@@ -15,10 +15,12 @@ für die Spezifikation.
 | Punkt | Stand | Konsequenz |
 |---|---|---|
 | Aktiengattung | **Namensaktien** | Legitimation über Aktienregister-Eintragung und Umschreibungsstopp, **nicht** über Nachweisstichtag und Depotnachweis. Löschfristen für registerabgeleitete Daten separat führen. |
-| Vorabfragen | **Ja**, Aktionärsvereinigungen reichen vorab ein; zuletzt ca. **200 Fragenblätter**, mehrere Fragen je Blatt | Vorab-Strecke ist real und braucht eigene Fristen-, Freigabe- und ggf. Publikationslogik. Offen: formales Regime oder faktischer Eingang (siehe Abschnitt 8). |
+| Vorabfragen | **Informeller Vorab-Eingang aus praktischen Gründen** — Aktionärsvereinigungen schicken ihre Kataloge vorab, ca. **200 Fragenblätter** mit mehreren Fragen je Blatt. Die Fragen werden **in der Versammlung normal verlesen** und **nicht vorab zugänglich gemacht**. | **Nicht** das formale Vorabfragen-Regime. Keine Pflicht zur Vorabveröffentlichung von Fragen und Antworten, keine Vorab-Fristenkette. Der Auskunftsanspruch entsteht erst mit dem Verlesen in der Versammlung. Das Blatt ist ein **Vorbereitungsartefakt**, kein Vorgang. |
+| Zielbild | Werkzeug **für dieses eine Unternehmen**, kein Produkt für den Markt | Keine Fremdmandantenfähigkeit, keine abweichenden Rechtsprofile, kein Produktisierungsaufwand. Trennung nach **HV-Jahrgang** bleibt trotzdem nötig — wegen Löschfristen und Beweisführung. |
+| Leitziele | flüssiger, leichter, transparenter Workflow, von Jahr zu Jahr optimierbar; interne Datenschutz- und Sicherheitsprüfung sowie Betriebsrat sollen tragfähig durchlaufen werden | Dokumentation und Transparenz richten sich **primär an diese Prüfkreise**, nicht an die Entwicklung. Siehe [`rollen-und-rechtekonzept.md`](rollen-und-rechtekonzept.md), Abschnitt 6. |
 | Plattform | **Webbasiert** | Browser-Anwendung, keine Fat-Client-Komponenten. |
 | Q&A-Katalog | ca. **1.500 Fragen** in einer Themen-Ordnerstruktur | Migrationsgegenstand; zugleich Korpus für das KI-Tool. |
-| Nachbarsysteme | Transkriptions-Tool und KI-Wissensbasis-Tool, beide **inhouse**, bleiben bestehen | Das neue HV-Tool ist Integrationsknoten, nicht Alleinsystem. |
+| Nachbarsysteme | Transkriptions-Tool und KI-Wissensbasis-Tool, beide **inhouse**, bleiben bestehen; nach Einschätzung der Projektleitung solide gebaut und flexibel | Das neue HV-Tool ist Integrationsknoten, nicht Alleinsystem. Die Integrationslast liegt voraussichtlich beim HV-Tool, nicht bei den Nachbarn. |
 | Aktienregister | **eigene Instanz**, sensibelster Teil | Bleibt getrennt. Zugriff nur lesend, Just-in-time, nie repliziert. |
 | Kernschwäche heute | Das HV-Tool **bietet keine Schnittstellen an** | Schnittstellenfähigkeit ist ein Primärziel, kein Nachrüstthema. |
 
@@ -147,8 +149,13 @@ Priorisiert nach Risiko. Vollständige Begründungen im Rechercheergebnis.
     der Vorstand, vorgetragen wird ggf. durch eine andere Person.
 12. **Kanalbindung.** Der Chat bleibt sinnvoll — aber alles, was eine konkrete Frage betrifft, gehört an
     den Vorgang, nicht in einen Chatverlauf. Sonst zerfällt die Nachweiskette dort, wo sie gebraucht wird.
-13. **Vorab-Strecke als eigener Prozesszweig** mit eigener Fristenuhr, eigener Freigabe und
-    Publikationssteuerung — heute läuft „vorbereitete Frage" nur als Klassifizierung mit.
+13. **Vorabblatt und Vorgang trennen.** Da die Vorabfragen informell eingehen und in der Versammlung
+    verlesen werden, sind zwei Objekte nötig: das **Vorabblatt** als Vorbereitungsartefakt (vorab
+    atomisierbar, vorab beantwortbar) und die **Frage** als Vorgang, der mit dem Verlesen entsteht.
+    Beide werden verknüpft, aber nicht gleichgesetzt. Nötig ist zusätzlich ein **Abgleich**: was
+    tatsächlich verlesen wurde, weicht regelmäßig vom Blatt ab (übersprungen, ergänzt, umformuliert).
+    Der Nutzen ist erheblich — die Atomisierung von 200 Blättern kann Tage vorher passieren statt unter
+    Zeitdruck am HV-Tag.
 14. **Katalog von Ordnerstruktur auf zwei Achsen umstellen:** gesetzliche TOP-Struktur (jahrgangsfest) und
     frei pflegbare Themen-Taxonomie, dazu Volltext- und Semantiksuche mit deutscher Kompositazerlegung.
     Eine Ordnerhierarchie über 1.500 Einträge ist unter Zeitdruck nicht navigierbar.
@@ -277,22 +284,34 @@ Nachvollziehbarkeit verloren geht. Das verlangt Dokumentation, die **beide** Les
 
 ## 8. Offene Fragen
 
-1. **Vorabfragen — formales Regime oder faktischer Eingang?** Ist die Vorabeinreichung in der Einberufung
-   vorgegeben (mit der Folge, dass Fragen und Antworten vor der Versammlung allen Aktionären zugänglich zu
-   machen sind), oder schicken die Vereinigungen ihre Kataloge lediglich aus Praxisgründen vorab? Die
-   Antwort ändert Fristen, Veröffentlichungspflichten und die Nutzbarkeit des Website-Verweigerungsgrundes
-   grundlegend.
+**Geklärt:** Vorabfragen sind ein informeller Eingang ohne Vorabveröffentlichung (Abschnitt 1) ·
+Zielbild ist ein Werkzeug für ein Unternehmen · Namensaktien · webbasiert · Nachbarsysteme sind solide
+und flexibel. „FOO" steht vermutlich für Finance Operating Office, „GC" für Group Compliance — von der
+Projektleitung noch zu verifizieren.
+
+**Offen:**
+
+1. **Wo wird die vorbereitete Frage tatsächlich beantwortet?** Schritt `8A` schließt sie direkt ab.
+   Die Frage wird aber erst mit dem Verlesen in der Versammlung rechtlich gestellt — die Antwort muss
+   also **in** der Versammlung erteilt werden. Geschieht das über die Rede (Redenschreiber CEO ist in
+   `8B` beteiligt), in einer Antwortrunde, oder anders? Das Tool muss festhalten, **wo und wann** die
+   Antwort gegeben wurde, sonst fehlt genau dieser Nachweis.
 2. **Schritt 10 — prüft Legal die *tatsächlich gegebene* Antwort nach dem Verlesen?** So liest sich das
    Schaubild. Falls ja: existiert vor der Bühne ein Gate, das eine kursrelevante Antwort auf Pfad A
    anhalten kann?
 3. **TOP-Bezug** — wird der heute irgendwo geführt, und sei es außerhalb des Tools?
 4. **Verweigerung** — gibt es heute einen Fall „Frage wird bewusst nicht beantwortet", und wer entscheidet
    ihn? Oder deckt „kein Antwortbedarf" beides ab?
-5. **Nachbarsysteme** — was bieten Transkriptions-Tool und KI-Tool technisch heute an (REST, Datenbank,
-   Dateiaustausch, gar nichts), wer betreibt sie, und wie ist deren Release-Zyklus?
-6. **Aktienregister** — gibt es eine abrufbare Schnittstelle, oder ist der Abgleich heute manuell?
+5. **Zwei Rechtsrollen oder eine?** Wenn „GC" Group Compliance ist, fehlt in Schritt 10 möglicherweise die
+   gesellschaftsrechtliche Freigabe — Kapitalmarkt-Compliance und Aktienrecht sind verschiedene
+   Kompetenzen. Wer zeichnet die aktienrechtliche Seite?
+6. **Technischer Zuschnitt der Nachbarsysteme** — Sprache, Laufzeit, vorhandene Endpunkte, Betreiber,
+   Release-Zyklus. Und: hat das Aktienregister eine abrufbare Schnittstelle, oder ist der Abgleich heute
+   manuell?
 7. **Volumen** — Fragenblätter zu Einzelfragen, Live-Fragen, Zahl der Redner, Dauer der Generaldebatte,
    Nachfragequote. Auch grobe Werte helfen für die Kapazitätsauslegung.
 8. **Notar und Widerspruch** — wie läuft die Übergabe an den Notar heute, und wo werden Widersprüche
    erfasst?
-9. **Rollenkürzel** — wofür steht „FOO" in der Antwortprüfung (Schritt 10)?
+9. **Tochtergesellschaften** — bleiben deren Hauptversammlungen außen vor, oder sollen sie perspektivisch
+   mitlaufen? Das ändert nichts am Datenmodell (Trennung nach Gesellschaft und Jahrgang ist ohnehin
+   nötig), aber es ändert den Zuschnitt der Rollen- und Stammdatenpflege.

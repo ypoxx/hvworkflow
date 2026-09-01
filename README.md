@@ -10,6 +10,8 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | Dokument | Zweck |
 |---|---|
 | [`docs/anforderungen-recherche.md`](docs/anforderungen-recherche.md) | Anforderungsrecherche über 15 Bereiche — Recht, Kapitalmarkt, Datenschutz, KI, Featureset, Architektur, Sicherheit, Betrieb, UX, Produktstrategie, Organisation. Enthält zusätzlich die offenen Entscheidungen, die häufigsten Fallstricke, eine Zeitachse T-300 bis T+30 und die Verifikationsaufträge. |
+| [`docs/ist-analyse-und-schnittstellen.md`](docs/ist-analyse-und-schnittstellen.md) | Wie der Q&A-Prozess heute läuft, wie das bestehende HV-Tool aufgebaut ist, welche Nachbarsysteme angebunden werden — und das daraus abgeleitete Delta samt Schnittstellenarchitektur. |
+| [`docs/rollen-und-rechtekonzept.md`](docs/rollen-und-rechtekonzept.md) | Berechtigungsmodell: Rechte als Daten, ein Entscheidungspunkt, Policy-Tests als Wahrheitstabelle. Zugleich das zentrale Artefakt für Datenschutz- und Sicherheitsprüfung sowie Betriebsrat. |
 
 ## Status
 
