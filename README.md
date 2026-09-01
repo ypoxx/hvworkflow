@@ -12,9 +12,12 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/anforderungen-recherche.md`](docs/anforderungen-recherche.md) | Anforderungsrecherche über 15 Bereiche — Recht, Kapitalmarkt, Datenschutz, KI, Featureset, Architektur, Sicherheit, Betrieb, UX, Produktstrategie, Organisation. Enthält zusätzlich die offenen Entscheidungen, die häufigsten Fallstricke, eine Zeitachse T-300 bis T+30 und die Verifikationsaufträge. |
 | [`docs/ist-analyse-und-schnittstellen.md`](docs/ist-analyse-und-schnittstellen.md) | Wie der Q&A-Prozess heute läuft, wie das bestehende HV-Tool aufgebaut ist, welche Nachbarsysteme angebunden werden — und das daraus abgeleitete Delta samt Schnittstellenarchitektur. |
 | [`docs/rollen-und-rechtekonzept.md`](docs/rollen-und-rechtekonzept.md) | Berechtigungsmodell: Rechte als Daten, ein Entscheidungspunkt, Policy-Tests als Wahrheitstabelle. Zugleich das zentrale Artefakt für Datenschutz- und Sicherheitsprüfung sowie Betriebsrat. |
+| [`docs/adr/0001-schichtung-und-vertragskopplung.md`](docs/adr/0001-schichtung-und-vertragskopplung.md) | Architekturentscheidung zur Schichtung: keine vollständige Autarkie zwischen Oberfläche und Anwendung, sondern Kopplung an einen stabilen Vertrag. Drei harte Grenzen, verworfene Alternativen mit Begründung. |
+| [`docs/erste-version-und-offene-fragen.md`](docs/erste-version-und-offene-fragen.md) | Schnitt der ersten lauffähigen Version: was sie beweisen muss, Abnahmesatz, drei nicht nachrüstbare Invarianten. Dazu die Fragen an die HV-Projektleitung und an die Umsetzung. |
+| [`docs/agentische-entwicklung-plan.md`](docs/agentische-entwicklung-plan.md) | Wie das Werkzeug mit mehreren KI-Agenten unterschiedlicher Qualität und Kosten gebaut wird: Befunde der letzten Monate, zwölf Regeln, Rollen- und Modellbesetzung, Takt je Scheibe, Qualitätstore je Ebene, Kostenrahmen, ehrliche Bewertung der These „bauen statt kaufen", Zeitplan bis zur Demo. |
 
 ## Status
 
-Recherche, noch keine Spezifikation. Sämtliche Normverweise sind vor der
+Recherche und Bauplan, noch keine Spezifikation. Sämtliche Normverweise sind vor der
 Spezifikationsfreigabe durch die Rechtsabteilung am geltenden Gesetzestext zu
 verifizieren — siehe Abschnitt 0 des Recherchedokuments.
