@@ -6,10 +6,10 @@
  * so together with `acceptance.test.ts` and `negative.test.ts` every operationId has a test.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Hono } from 'hono';
+import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
 import { ACTOR, req } from './helpers.ts';
-import { allOperationIds, expectValid } from './schema.ts';
+import { allOperationIds, expectValid } from '../contractSchema.ts';
 
 interface QuestionLike {
   id: string;
@@ -17,7 +17,7 @@ interface QuestionLike {
   status: string;
 }
 
-async function firstQuestion(app: Hono, status: string): Promise<QuestionLike> {
+async function firstQuestion(app: App, status: string): Promise<QuestionLike> {
   const res = await req(app, 'GET', `/v1/questions?status=${status}&limit=1`, { actor: ACTOR.admin });
   const { items } = (await res.json()) as { items: QuestionLike[] };
   expect(items.length).toBeGreaterThan(0);
@@ -25,7 +25,7 @@ async function firstQuestion(app: Hono, status: string): Promise<QuestionLike> {
 }
 
 describe('contract: the operations the acceptance sentence does not reach', () => {
-  let app: Hono;
+  let app: App;
 
   beforeAll(async () => {
     app = createApp({ demoEnabled: true });

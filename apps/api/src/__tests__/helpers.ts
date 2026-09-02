@@ -1,5 +1,5 @@
 /** Tiny `fetch`-shaped request helper for driving `app.request()` (Hono's in-process test client). */
-import type { Hono } from 'hono';
+import type { App } from '../app.ts';
 
 export interface ReqOptions {
   actor?: string;
@@ -7,7 +7,7 @@ export interface ReqOptions {
   headers?: Record<string, string>;
 }
 
-export async function req(app: Hono, method: string, path: string, opts: ReqOptions = {}): Promise<Response> {
+export async function req(app: App, method: string, path: string, opts: ReqOptions = {}): Promise<Response> {
   const headers: Record<string, string> = { ...opts.headers };
   if (opts.actor !== undefined) headers['X-Actor'] = opts.actor;
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';

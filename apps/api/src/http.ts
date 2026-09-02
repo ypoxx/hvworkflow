@@ -1,16 +1,18 @@
 /**
  * Small HTTP-layer helpers shared by every route in `app.ts`. No business logic lives here — only
  * translating a Hono `Context` into the plain values `HvApi` expects and back (AGENTS.md rule 6).
+ * Request-shape checking against the contract lives in `validate.ts` / `contractSchema.ts`.
  */
 import type { Context } from 'hono';
 import { ApiProblem, type WriteOptions } from '@hv/domain';
 
-/** Parse the JSON body, tolerating an absent one (several writes have no required body). */
-export async function readJson<T>(c: Context): Promise<Partial<T>> {
+/** Parse the JSON body, tolerating an absent one (several writes have no required body). Shape is
+ * checked separately, against the contract's own schema, by `validateOperation` (`validate.ts`). */
+export async function readJson(c: Context): Promise<unknown> {
   const text = await c.req.text();
   if (text.trim() === '') return {};
   try {
-    return JSON.parse(text) as Partial<T>;
+    return JSON.parse(text);
   } catch {
     throw new ApiProblem(422, 'Unprocessable', 'Request body is not valid JSON.');
   }
@@ -31,19 +33,4 @@ export function requireParam(c: Context, name: string): string {
   const value = c.req.param(name);
   if (value === undefined) throw new ApiProblem(400, 'Bad Request', `Missing path parameter "${name}".`);
   return value;
-}
-
-function toInt(value: string | undefined): number | undefined {
-  if (value === undefined) return undefined;
-  const n = Number.parseInt(value, 10);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-/** Reads an integer query parameter, clamped to `[min, max]` when given. Invalid values fall back. */
-export function intQuery(c: Context, name: string, opts?: { min?: number; max?: number }): number | undefined {
-  const n = toInt(c.req.query(name));
-  if (n === undefined) return undefined;
-  const min = opts?.min ?? Number.NEGATIVE_INFINITY;
-  const max = opts?.max ?? Number.POSITIVE_INFINITY;
-  return Math.min(max, Math.max(min, n));
 }

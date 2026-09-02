@@ -6,13 +6,13 @@
  * agree on one contract (AGENTS.md rule 6).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Hono } from 'hono';
+import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
 import { ACTOR, req } from './helpers.ts';
-import { expectValid } from './schema.ts';
+import { expectValid } from '../contractSchema.ts';
 
 describe('acceptance sentence (HTTP)', () => {
-  let app: Hono;
+  let app: App;
   let t = Date.parse('2027-04-20T12:00:00.000Z');
 
   beforeAll(async () => {
