@@ -9,7 +9,7 @@ daneben. Zeiten in Europe/Berlin.
 | Scheibe | Rolle · Modell | Start | Ende | Reviewrunden | Befunde (blocker/major/minor) | Tore grün | Bemerkung |
 |---|---|---|---|---|---|---|---|
 | Fundament (Vertrag, Kern, Seed, Tests, Gerüst, Doku) | Architekt · Fable 5.1 | 21:40 | 22:05 | — | — | ja | Domäne mit 35 Tests, Wahrheitstabelle generiert |
-| 001 Shell, Designsystem, i18n | Implementierer · Opus 5 (bewusst statt Sonnet: setzt das Aussehen des gesamten Produkts) | 22:07 | 22:37 | | | ja (e2e + Screenshot) | 235 Tsd. Token, 77 Werkzeugaufrufe; Schriften lokal gebündelt statt CDN |
+| 001 Shell, Designsystem, i18n | Implementierer · Opus 5 (bewusst statt Sonnet: setzt das Aussehen des gesamten Produkts) | 22:07 | 22:37 | 1 (Review Sonnet 5, 152 Tsd. Token, 7 min; Design-Kritik Fable: bestanden) | 0/0/2 | ja (e2e + Screenshot) | 235 Tsd. Token, 77 Werkzeugaufrufe; Schriften lokal gebündelt statt CDN; akzeptiert ohne Nacharbeit |
 | 004 API-Dienst (Hono) | Implementierer · Sonnet 5 | 22:07 | 22:27 | 1 (Review Opus 5, 153 Tsd. Token, 11 min) | 3/3/9 | ja (19 Tests) | 240 Tsd. Token, 107 Werkzeugaufrufe; SSE ausgelassen (optional); Domänenlücke gemeldet: Klassifizierung ohne Pfadprüfung → im Kern behoben. Review fand zusätzlich: fehlende Body-Validierung (500 statt 422) und Idempotenz-Schlüssel ohne Akteur-Bezug → Kern R-IDEM-01 behoben, Nacharbeit läuft |
 | 002 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 | | | | | | |
 | 003 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 | | | | | | |
