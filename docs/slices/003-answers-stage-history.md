@@ -1,6 +1,6 @@
 # 003 — Beantwortung (Expert Track), Freigabe, Bühne, Historie & Suche
 
-**Status:** spec
+**Status:** review
 **Role:** Implementierer Oberfläche (Sonnet)
 **Rule ids:** AGENTS.md rules 4, 5, 6, 9, 10; domain R-TRANS-02…R-TRANS-12, R-GUARD-04
 
@@ -62,7 +62,85 @@ events. Screenshots `docs/evidence/003-answers.png`, `003-stage.png`, `003-histo
 
 ## Evidence
 
-(filled by the implementer)
+Screenshots at 1440×900, produced by the run below:
+`docs/evidence/003-answers.png`, `003-stage.png`, `003-stage-only.png`, `003-history.png`.
+
+### `pnpm gates` (exit 0)
+
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  37 passed (37)
+packages/domain test:    Start at  21:13:10
+packages/domain test:    Duration  1.67s (transform 285ms, setup 0ms, import 615ms, tests 1.49s, environment 1ms)
+packages/domain test: Done
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  19 passed (19)
+apps/api test:    Start at  21:13:12
+apps/api test:    Duration  1.07s (transform 687ms, setup 0ms, import 1.61s, tests 676ms, environment 0ms)
+apps/api test: Done
+
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1676 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-8jqRRKum.css                        33.64 kB │ gzip:   7.60 kB
+dist/assets/index-B2FRENyG.js                        394.51 kB │ gzip: 117.66 kB │ map: 1,716.94 kB
+
+✓ built in 1.03s
+```
+
+Earlier in the same run: `redocly lint` clean, `tsc -b` clean in all four packages, `oxlint`
+without errors (warnings only, all of the `react(set-state-in-effect)` kind that the existing
+`src/api/useApiVersion.ts` also carries), `packages/domain` 37 tests passed.
+
+### `E2E_PORT=4183 pnpm --filter @hv/web e2e`
+
+```
+> @hv/web@0.0.0 e2e /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> playwright test
+
+Running 2 tests using 2 workers
+
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.6s)
+  ✓  1 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (42.8s)
+
+  2 passed (45.2s)
+```
+
+`apps/web/e2e/003-answers-stage.spec.ts` walks the acceptance criterion with the role switcher:
+Fachbereich drafts version 1 on an assigned question and hands it to clearing, Recht approves
+exactly version 1 (and returns a second question with a reason), Freigabe puts it on the podium,
+Podium reads out by click and by space bar and switches to "Nur Bühne", and the history shows the
+seven events of that question plus the event stream of the meeting.
+
+### Notes for the reviewer
+
+- **`question.approve` never appears in `_actions`.** `actionsFor()` in `packages/domain/src/api.ts`
+  evaluates every transition with an empty payload, so guard R-GUARD-04 (`approvalIsLatest`) can
+  never pass and the approval step would be invisible to everyone — the domain test in
+  `packages/domain/src/__tests__/api.test.ts:85` pins that behaviour. Since `packages/domain` is
+  outside the files allowed here, `apps/web/src/features/answers/rights.ts` asks the domain's own
+  decision point `can(actor, 'question.approve', question, { answerVersion: latest })` for that one
+  button, with the payload the button will send. No role name is compared, and the answer is the
+  one the server gives. The fix belongs in `actionsFor`.
+- Every other action is gated on `_actions` alone; every write sends `ifMatch: etagOf(version)` and
+  refetches list and question on any refusal (412 included).
+- The work list fetches once per version and per server-side filter with `limit: 2000` and renders
+  only the rows in the viewport; status counts come from that same list.
 
 ## Review findings
 
