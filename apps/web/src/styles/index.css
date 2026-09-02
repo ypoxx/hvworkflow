@@ -1,3 +1,308 @@
 @import 'tailwindcss';
 
-/* Design tokens are defined by slice 001 (see docs/slices/001-shell.md). */
+/*
+ * Design tokens of the HV-Tool (slice 001). Light theme only, on purpose: the tool is used in a
+ * bright hall and on a projector, and a second theme would double the review surface for no gain.
+ * The look is a control-room console — warm neutral greys, one accent, status shown as a quiet
+ * tint, never as a saturated block.
+ */
+@theme {
+  /* Type: Inter for text, JetBrains Mono for numbers, question numbers and identifiers. */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'Liberation Mono', Menlo, Consolas,
+    monospace;
+
+  /* 11px caps labels sit below Tailwind's default scale. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* One radius everywhere; 4px for small chips, 8px for large surfaces. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Neutral warm grey scale. */
+  --color-ink-0: #ffffff;
+  --color-ink-25: #fbfaf9;
+  --color-ink-50: #f7f6f4;
+  --color-ink-100: #f0efec;
+  --color-ink-150: #e9e7e3;
+  --color-ink-200: #dfdcd6;
+  --color-ink-300: #cbc7c0;
+  --color-ink-400: #a8a49c;
+  --color-ink-500: #83807a;
+  --color-ink-600: #63605b;
+  --color-ink-700: #4a4844;
+  --color-ink-800: #33312e;
+  --color-ink-900: #1f1e1c;
+
+  /* One accent, a deep blue. Used for selection, focus and primary actions only. */
+  --color-accent-50: #eef3ff;
+  --color-accent-100: #dde7fe;
+  --color-accent-200: #c3d4fd;
+  --color-accent-300: #9bb8fb;
+  --color-accent-500: #2563eb;
+  --color-accent-600: #1d4ed8;
+  --color-accent-700: #1b3fa8;
+
+  /* Surfaces. */
+  --color-canvas: #f4f3f1;
+  --color-surface: #ffffff;
+  --color-sunken: #faf9f7;
+  --color-line: #e4e1db;
+  --color-line-strong: #d3cfc7;
+
+  /* Status colours — one tint triple per QuestionStatus (packages/domain/src/types.ts). */
+  --color-status-captured-bg: #f1efeb;
+  --color-status-captured-fg: #55524c;
+  --color-status-captured-bd: #e2ded7;
+  --color-status-classified-bg: #eef2f8;
+  --color-status-classified-fg: #3d5875;
+  --color-status-classified-bd: #dbe3ee;
+  --color-status-assigned-bg: #eaf3f1;
+  --color-status-assigned-fg: #2f6659;
+  --color-status-assigned-bd: #d5e7e2;
+  --color-status-answer-drafted-bg: #eaf0fe;
+  --color-status-answer-drafted-fg: #1d4ed8;
+  --color-status-answer-drafted-bd: #d5e2fc;
+  --color-status-in-review-bg: #fdf3e4;
+  --color-status-in-review-fg: #8a5a08;
+  --color-status-in-review-bd: #f4e3c4;
+  --color-status-approved-bg: #e9f4ec;
+  --color-status-approved-fg: #1f6b3d;
+  --color-status-approved-bd: #d4e9db;
+  --color-status-staged-bg: #efedfb;
+  --color-status-staged-fg: #4b3a9e;
+  --color-status-staged-bd: #ddd8f4;
+  --color-status-delivered-bg: #e8f1f6;
+  --color-status-delivered-fg: #1f5773;
+  --color-status-delivered-bd: #d3e5ee;
+  --color-status-closed-bg: #ecebe8;
+  --color-status-closed-fg: #4a4844;
+  --color-status-closed-bd: #ddd9d2;
+  --color-status-withdrawn-bg: #fbeeed;
+  --color-status-withdrawn-fg: #97372f;
+  --color-status-withdrawn-bd: #f2d9d6;
+  --color-status-merged-bg: #f2f0ec;
+  --color-status-merged-fg: #6a635a;
+  --color-status-merged-bd: #e3ded5;
+
+  /* Answer tracks (Antwortpfade A, B, C). */
+  --color-track-podium-bg: #eaf0fe;
+  --color-track-podium-fg: #1d4ed8;
+  --color-track-podium-bd: #d5e2fc;
+  --color-track-fast-bg: #fdf3e4;
+  --color-track-fast-fg: #8a5a08;
+  --color-track-fast-bd: #f4e3c4;
+  --color-track-expert-bg: #efedfb;
+  --color-track-expert-fg: #4b3a9e;
+  --color-track-expert-bd: #ddd8f4;
+
+  /* Generic tones for badges that are not a status or a track. */
+  --color-tone-neutral-bg: #f1efeb;
+  --color-tone-neutral-fg: #55524c;
+  --color-tone-neutral-bd: #e2ded7;
+  --color-tone-accent-bg: #eaf0fe;
+  --color-tone-accent-fg: #1d4ed8;
+  --color-tone-accent-bd: #d5e2fc;
+  --color-tone-success-bg: #e9f4ec;
+  --color-tone-success-fg: #1f6b3d;
+  --color-tone-success-bd: #d4e9db;
+  --color-tone-warning-bg: #fdf3e4;
+  --color-tone-warning-fg: #8a5a08;
+  --color-tone-warning-bd: #f4e3c4;
+  --color-tone-danger-bg: #fbeeed;
+  --color-tone-danger-fg: #97372f;
+  --color-tone-danger-bd: #f2d9d6;
+
+  /* Fixed chrome sizes: a 56px header and a 220px navigation, 36px table rows. */
+  --spacing-header: 56px;
+  --spacing-nav: 220px;
+  --spacing-nav-collapsed: 56px;
+  --spacing-row: 36px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv05' 1, 'ss01' 1;
+  }
+
+  /* Numbers must line up in columns everywhere in this tool. */
+  .font-mono,
+  code,
+  kbd {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One visible focus ring for the whole product; it follows the element's radius. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-accent-100);
+    color: var(--color-accent-700);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-300) transparent;
+  }
+}
+
+@layer components {
+  /*
+   * A badge carries its colour in three custom properties so that a status, a track or a plain tone
+   * can share one element. Dynamic Tailwind class names would not survive the class scanner.
+   */
+  .hv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 20px;
+    padding: 0 0.4375rem;
+    border: 1px solid var(--hv-bd);
+    border-radius: var(--radius-sm);
+    background: var(--hv-bg);
+    color: var(--hv-fg);
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .hv-badge-dot::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.75;
+    flex: none;
+  }
+
+  .tone-neutral {
+    --hv-bg: var(--color-tone-neutral-bg);
+    --hv-fg: var(--color-tone-neutral-fg);
+    --hv-bd: var(--color-tone-neutral-bd);
+  }
+  .tone-accent {
+    --hv-bg: var(--color-tone-accent-bg);
+    --hv-fg: var(--color-tone-accent-fg);
+    --hv-bd: var(--color-tone-accent-bd);
+  }
+  .tone-success {
+    --hv-bg: var(--color-tone-success-bg);
+    --hv-fg: var(--color-tone-success-fg);
+    --hv-bd: var(--color-tone-success-bd);
+  }
+  .tone-warning {
+    --hv-bg: var(--color-tone-warning-bg);
+    --hv-fg: var(--color-tone-warning-fg);
+    --hv-bd: var(--color-tone-warning-bd);
+  }
+  .tone-danger {
+    --hv-bg: var(--color-tone-danger-bg);
+    --hv-fg: var(--color-tone-danger-fg);
+    --hv-bd: var(--color-tone-danger-bd);
+  }
+  .tone-outline {
+    --hv-bg: transparent;
+    --hv-fg: var(--color-ink-600);
+    --hv-bd: var(--color-line-strong);
+  }
+
+  .tone-status-captured {
+    --hv-bg: var(--color-status-captured-bg);
+    --hv-fg: var(--color-status-captured-fg);
+    --hv-bd: var(--color-status-captured-bd);
+  }
+  .tone-status-classified {
+    --hv-bg: var(--color-status-classified-bg);
+    --hv-fg: var(--color-status-classified-fg);
+    --hv-bd: var(--color-status-classified-bd);
+  }
+  .tone-status-assigned {
+    --hv-bg: var(--color-status-assigned-bg);
+    --hv-fg: var(--color-status-assigned-fg);
+    --hv-bd: var(--color-status-assigned-bd);
+  }
+  .tone-status-answer-drafted {
+    --hv-bg: var(--color-status-answer-drafted-bg);
+    --hv-fg: var(--color-status-answer-drafted-fg);
+    --hv-bd: var(--color-status-answer-drafted-bd);
+  }
+  .tone-status-in-review {
+    --hv-bg: var(--color-status-in-review-bg);
+    --hv-fg: var(--color-status-in-review-fg);
+    --hv-bd: var(--color-status-in-review-bd);
+  }
+  .tone-status-approved {
+    --hv-bg: var(--color-status-approved-bg);
+    --hv-fg: var(--color-status-approved-fg);
+    --hv-bd: var(--color-status-approved-bd);
+  }
+  .tone-status-staged {
+    --hv-bg: var(--color-status-staged-bg);
+    --hv-fg: var(--color-status-staged-fg);
+    --hv-bd: var(--color-status-staged-bd);
+  }
+  .tone-status-delivered {
+    --hv-bg: var(--color-status-delivered-bg);
+    --hv-fg: var(--color-status-delivered-fg);
+    --hv-bd: var(--color-status-delivered-bd);
+  }
+  .tone-status-closed {
+    --hv-bg: var(--color-status-closed-bg);
+    --hv-fg: var(--color-status-closed-fg);
+    --hv-bd: var(--color-status-closed-bd);
+  }
+  .tone-status-withdrawn {
+    --hv-bg: var(--color-status-withdrawn-bg);
+    --hv-fg: var(--color-status-withdrawn-fg);
+    --hv-bd: var(--color-status-withdrawn-bd);
+  }
+  .tone-status-merged {
+    --hv-bg: var(--color-status-merged-bg);
+    --hv-fg: var(--color-status-merged-fg);
+    --hv-bd: var(--color-status-merged-bd);
+  }
+
+  .tone-track-podium {
+    --hv-bg: var(--color-track-podium-bg);
+    --hv-fg: var(--color-track-podium-fg);
+    --hv-bd: var(--color-track-podium-bd);
+  }
+  .tone-track-fast {
+    --hv-bg: var(--color-track-fast-bg);
+    --hv-fg: var(--color-track-fast-fg);
+    --hv-bd: var(--color-track-fast-bd);
+  }
+  .tone-track-expert {
+    --hv-bg: var(--color-track-expert-bg);
+    --hv-fg: var(--color-track-expert-fg);
+    --hv-bd: var(--color-track-expert-bd);
+  }
+
+  /* All-caps micro label above a value; used in the header and in panels. */
+  .hv-label {
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink-500);
+  }
+}
