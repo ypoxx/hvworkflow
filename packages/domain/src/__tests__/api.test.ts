@@ -182,6 +182,15 @@ describe('invariants', () => {
     expect(after.current?.id).toBe(before.queue[0]?.id ?? null);
   });
 
+  it('classification validates its inputs (422) before any transition', async () => {
+    as(actors.capture!);
+    const q = await firstIn('captured');
+    await expect(api.classifyQuestion(q.id, { track: 'nope' as never })).rejects.toMatchObject({ status: 422 });
+    await expect(api.classifyQuestion(q.id, { track: 'podium', agendaItemId: 'top-99' })).rejects.toMatchObject({ status: 422 });
+    await expect(api.classifyQuestion(q.id, { track: 'podium', stageAssignment: 'janitor' as never })).rejects.toMatchObject({ status: 422 });
+    expect((await api.getQuestion(q.id)).status).toBe('captured');
+  });
+
   it('seeding twice is refused: the log is never replaced', async () => {
     as(actors.admin!);
     await expect(api.seedDemo()).rejects.toMatchObject({ status: 409 });

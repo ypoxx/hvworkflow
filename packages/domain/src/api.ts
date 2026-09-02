@@ -36,7 +36,7 @@ import type {
   Unit,
   WriteOptions,
 } from './types.js';
-import { PERMISSIONS } from './types.js';
+import { PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
 
 /** RFC 9457-shaped error. The HTTP adapter maps it 1:1 to a problem+json response. */
 export class ApiProblem extends Error {
@@ -389,6 +389,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return store.all().filter((e) => e.subjectId === id);
     },
     async classifyQuestion(id, input, opts) {
+      if (!TRACKS.includes(input.track)) throw new ApiProblem(422, 'Unprocessable', 'track must be podium, fast_track or expert_track.');
+      if (input.agendaItemId !== undefined && !state.agendaItems.some((a) => a.id === input.agendaItemId)) {
+        throw new ApiProblem(422, 'Unprocessable', `Agenda item ${input.agendaItemId} does not exist.`);
+      }
+      if (input.stageAssignment !== undefined && !STAGE_ASSIGNMENTS.includes(input.stageAssignment)) {
+        throw new ApiProblem(422, 'Unprocessable', 'stageAssignment is not a known podium assignment.');
+      }
       return transition(id, 'question.classify', opts, input, (q) => ({
         type: 'QuestionClassified',
         subjectId: q.id,
