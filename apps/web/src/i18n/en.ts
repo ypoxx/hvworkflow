@@ -336,6 +336,7 @@ export const en: Dictionary = {
     'Select a question on the left. Its wording, answer versions, approval and the possible steps then appear here.',
   'answers.detail.label': 'The question in full',
   'answers.detail.speaker': 'Request to speak',
+  'answers.detail.contributionLink': 'Go to the contribution',
   'answers.detail.agenda': 'Agenda item',
   'answers.detail.track': 'Answer track',
   'answers.detail.unit': 'Answering unit',
@@ -346,6 +347,7 @@ export const en: Dictionary = {
   'answers.detail.loading': 'Loading the question …',
   'answers.status.label': 'Status',
   'answers.approval.sealed': 'Approved · version {version} · {actor} · {time}',
+  'answers.approval.lapsed': 'Approval of version {previous} voided by version {current}',
   'answers.versions.title': 'Answer versions',
   'answers.versions.empty.body': 'No answer text has been drafted for this question yet.',
   'answers.versions.podium':

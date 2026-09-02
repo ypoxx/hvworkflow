@@ -228,26 +228,28 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
     [filters, onFilters],
   );
 
-  // Read by the reveal effect below, which must not run when the list is merely refetched.
-  const itemsRef = useRef<readonly Question[]>(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
   /**
-   * Keep the open question in sight when the person selects one or narrows the list. Deliberately
-   * not bound to `items`: a refetch (every event causes one) must never yank the scroll position
-   * away from somebody who is scanning.
+   * Keep the open question in sight after a deliberate act — selecting a row, changing a filter,
+   * clearing the search — and only then. The act arms the flag; the first list that arrives after
+   * it does the scrolling, because a filter change often has to wait for its fetch. A plain refetch
+   * (every event causes one) never yanks the scroll away from somebody who is scanning.
    */
+  const revealPending = useRef(true);
   useEffect(() => {
+    revealPending.current = true;
+  }, [selectedId, filters]);
+
+  useEffect(() => {
+    if (!revealPending.current) return;
+    revealPending.current = false;
     const scroller = scrollerRef.current;
-    const index = itemsRef.current.findIndex((question) => question.id === selectedId);
+    const index = items.findIndex((question) => question.id === selectedId);
     if (scroller === null || index < 0) return;
     const top = index * ROW_HEIGHT;
     if (top < scroller.scrollTop || top + ROW_HEIGHT > scroller.scrollTop + scroller.clientHeight) {
       scroller.scrollTop = Math.max(0, top - scroller.clientHeight / 2 + ROW_HEIGHT);
     }
-  }, [selectedId, filters]);
+  }, [items, selectedId]);
 
   /** Arrow keys walk the list; the moved-to row is scrolled into view without a jump. */
   const onKeyDown = useCallback(

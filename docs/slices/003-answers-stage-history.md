@@ -129,7 +129,8 @@ seven events of that question plus the event stream of the meeting.
 
 ### Notes for the reviewer
 
-- **`question.approve` never appears in `_actions`.** `actionsFor()` in `packages/domain/src/api.ts`
+- **`question.approve` never appears in `_actions`** — *resolved in the rework below: the domain
+  guard was fixed and `rights.ts` is gone.* `actionsFor()` in `packages/domain/src/api.ts`
   evaluates every transition with an empty payload, so guard R-GUARD-04 (`approvalIsLatest`) can
   never pass and the approval step would be invisible to everyone — the domain test in
   `packages/domain/src/__tests__/api.test.ts:85` pins that behaviour. Since `packages/domain` is
@@ -145,3 +146,82 @@ seven events of that question plus the event stream of the meeting.
 ## Review findings
 
 (filled by the reviewer)
+
+## Rework
+
+Round 1 after the review, on top of the merge with `claude/dax-shareholder-meeting-workflow-0s934z`
+(which brings the domain fix: guard R-GUARD-04 answers the capability question when it is asked
+without a payload, so `question.approve` now appears in `_actions` — `pnpm --filter @hv/domain test`
+→ 38 passed).
+
+1. **MAJOR, `can()` in the interface — done.** `apps/web/src/features/answers/rights.ts` is deleted.
+   "Freigeben" is gated on `question._actions.includes('question.approve')` like every other button,
+   and `latestVersion()` (a pure read of the record) moved into `features/answers/lib.ts`. The only
+   values the three feature folders still import from `@hv/domain` are `etagOf` and the constant
+   lists `QUESTION_STATUSES` / `TERMINAL_STATUSES` / `TRACKS`; everything else is `import type`.
+2. **MAJOR, "Freigabe erloschen" — done.** `lapsedApproval()` in `features/answers/lib.ts` reads the
+   state off the event log: no `approval` on the record, an `AnswerDrafted` event carrying
+   `invalidatedApprovalOfVersion`, and no `QuestionApproved` after it. The detail loads the history
+   of the open question lazily (one `api.getQuestionHistory` per selection, in the same `Promise.all`
+   as `getQuestion`) and shows a muted block `approval-lapsed`: "Freigabe der Version {previous}
+   erloschen durch Version {current}" (`answers.approval.lapsed`, DE/EN). Nothing is inferred from
+   the status. Evidence: `docs/evidence/003-approval-lapsed.png`.
+3. **MINOR, link to the Redebeitrag — done.** The detail's Wortmeldung field carries a link
+   `answers-detail-contribution` → `/capture?speaker=<question.speakerId>`, which the capture desk
+   reads as its preselected Wortmeldung (`answers.detail.contributionLink`, DE/EN).
+
+Also in this round: after a deliberate act (row selected, filter changed, search cleared) the work
+list now reveals the open question once the list that act produced has arrived — a plain refetch
+still never moves the scroll position.
+
+### `pnpm gates` (exit 0)
+
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  38 passed (38)
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1695 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-BhQ1UYbP.css                        36.70 kB │ gzip:   8.06 kB
+dist/assets/index-CsPaxkco.js                        502.74 kB │ gzip: 147.77 kB │ map: 2,073.67 kB
+
+✓ built in 1.18s
+```
+
+### `E2E_PORT=4183 pnpm --filter @hv/web e2e --grep 003` (exit 0)
+
+```
+> @hv/web@0.0.0 e2e /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> playwright test --grep 003
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.3s)
+
+  1 passed (45.4s)
+```
+
+The spec now also asserts the link to the Redebeitrag and walks the lapsed approval: as Fachbereich
+a new version is drafted on an approved question (never the one that has to reach the podium), the
+`approval-lapsed` block appears and the seal is gone. Screenshots regenerated on the merged corpus:
+`003-answers.png`, `003-stage.png`, `003-stage-only.png`, `003-history.png`, and the new
+`003-approval-lapsed.png`. `001-*` and `002-*` evidence was not touched (the run was filtered
+with `--grep 003`).

@@ -8,7 +8,7 @@
  * every refused write calls: the record is the truth, the interface never patches state locally.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AgendaItem, Question, QuestionStatus, Track, Unit } from '@hv/domain';
+import type { AgendaItem, DomainEvent, Question, QuestionStatus, Track, Unit } from '@hv/domain';
 import { QUESTION_STATUSES } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -60,6 +60,8 @@ export interface Backlog {
   listLoading: boolean;
   selected: Question | null;
   selectedLoading: boolean;
+  /** The event log of the open question — the only source for a lapsed approval. */
+  selectedHistory: readonly DomainEvent[];
   units: readonly Unit[];
   agendaItems: readonly AgendaItem[];
   reload: () => void;
@@ -88,6 +90,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const [pool, setPool] = useState<readonly Question[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [selected, setSelected] = useState<Question | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<readonly DomainEvent[]>([]);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [units, setUnits] = useState<readonly Unit[]>([]);
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
@@ -135,23 +138,27 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     };
   }, [version, nonce, search, track, unitId, agendaItemId]);
 
+  // The open question and its history travel together: the detail shows facts from both, and one
+  // without the other would show a state that never existed.
   useEffect(() => {
     if (selectedId === null) {
       setSelected(null);
+      setSelectedHistory([]);
       return undefined;
     }
     let cancelled = false;
     setSelectedLoading(true);
-    api
-      .getQuestion(selectedId)
-      .then((question) => {
+    Promise.all([api.getQuestion(selectedId), api.getQuestionHistory(selectedId)])
+      .then(([question, history]) => {
         if (cancelled) return;
         setSelected(question);
+        setSelectedHistory(history);
         setSelectedLoading(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setSelected(null);
+        setSelectedHistory([]);
         setSelectedLoading(false);
         problem(error);
       });
@@ -187,6 +194,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     listLoading,
     selected,
     selectedLoading,
+    selectedHistory,
     units,
     agendaItems,
     reload,

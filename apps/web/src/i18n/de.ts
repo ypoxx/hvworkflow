@@ -334,6 +334,7 @@ export const de = {
     'Wählen Sie links eine Einzelfrage. Hier stehen dann Wortlaut, Antwortversionen, Freigabe und die möglichen Schritte.',
   'answers.detail.label': 'Einzelfrage im Wortlaut',
   'answers.detail.speaker': 'Wortmeldung',
+  'answers.detail.contributionLink': 'Zum Redebeitrag',
   'answers.detail.agenda': 'Tagesordnungspunkt',
   'answers.detail.track': 'Antwortpfad',
   'answers.detail.unit': 'Fachbereich',
@@ -344,6 +345,7 @@ export const de = {
   'answers.detail.loading': 'Einzelfrage wird geladen …',
   'answers.status.label': 'Stand',
   'answers.approval.sealed': 'Freigegeben · Version {version} · {actor} · {time}',
+  'answers.approval.lapsed': 'Freigabe der Version {previous} erloschen durch Version {current}',
   'answers.versions.title': 'Antwortversionen',
   'answers.versions.empty.body': 'Für diese Einzelfrage wurde noch kein Antworttext entworfen.',
   'answers.versions.podium':

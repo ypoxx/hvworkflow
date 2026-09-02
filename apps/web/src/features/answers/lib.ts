@@ -2,7 +2,7 @@
  * Small helpers of the answer backlog (Beantwortung). They live in the feature, not in the component
  * kit: the kit owns look and behaviour, not the wording of an age or the shape of a refused call.
  */
-import type { Approval, Question } from '@hv/domain';
+import type { Approval, DomainEvent, Question } from '@hv/domain';
 import type { Translate } from '../../i18n';
 
 /** One fetch per version carries the whole corpus; filtering and windowing happen in the client. */
@@ -53,6 +53,47 @@ export function sealedApproval(question: Question): Approval | undefined {
   const approval = question.approval;
   if (approval === undefined) return undefined;
   return question.answers.length > approval.answerVersion ? undefined : approval;
+}
+
+/** The version "Freigeben" acts on: always the newest text. */
+export function latestVersion(question: Question): number | undefined {
+  return question.answers[question.answers.length - 1]?.version;
+}
+
+/** A lapsed approval, read off the event log (never inferred from the status). */
+export interface LapsedApproval {
+  /** The version that had been approved. */
+  previous: number;
+  /** The version that voided it. */
+  current: number;
+}
+
+/**
+ * "Freigabe erloschen": the record has no approval any more, but the log says there was one — an
+ * `AnswerDrafted` event that carries `invalidatedApprovalOfVersion` (the domain writes it in
+ * `draftAnswer`, R-GUARD-04). A later `QuestionApproved` ends the state again. Both facts come from
+ * the event log; nothing here is derived from the status.
+ */
+export function lapsedApproval(
+  question: Question,
+  history: readonly DomainEvent[],
+): LapsedApproval | undefined {
+  if (question.approval !== undefined) return undefined;
+  let lapsed: LapsedApproval | undefined;
+  for (const event of history) {
+    if (
+      event.type === 'AnswerDrafted' &&
+      event.payload.invalidatedApprovalOfVersion !== undefined
+    ) {
+      lapsed = {
+        previous: event.payload.invalidatedApprovalOfVersion,
+        current: event.payload.answer.version,
+      };
+    } else if (event.type === 'QuestionApproved') {
+      lapsed = undefined;
+    }
+  }
+  return lapsed;
 }
 
 /** Sources are typed as one line and stored as a list. */
