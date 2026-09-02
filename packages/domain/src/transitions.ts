@@ -45,9 +45,12 @@ const approvalIsLatest: Guard = {
   description:
     'The approved version must be the latest answer version (approval bound to the text).',
   check: (q, payload) => {
-    const v = (payload as { answerVersion?: number } | undefined)?.answerVersion;
     const latest = q.answers[q.answers.length - 1]?.version;
-    return v !== undefined && latest !== undefined && v === latest;
+    if (latest === undefined) return false;
+    const v = (payload as { answerVersion?: number } | undefined)?.answerVersion;
+    // Without a payload this is the capability question behind `_actions` ("may approve at all?"):
+    // yes, and only the latest version. With a payload the named version must be the latest.
+    return v === undefined || v === latest;
   },
 };
 const notMergingIntoSelf: Guard = {

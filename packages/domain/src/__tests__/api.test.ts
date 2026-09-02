@@ -85,6 +85,7 @@ describe('acceptance sentence', () => {
     expect(submitted._actions).not.toContain('question.approve');
 
     as(actors.legal!);
+    expect((await api.getQuestion(q.id))._actions).toContain('question.approve'); // capability without payload
     await expect(api.approveQuestion(q.id, 99)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-04' });
     const approved = await api.approveQuestion(q.id, 1);
     expect(approved.status).toBe('approved');
