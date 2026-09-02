@@ -67,200 +67,210 @@ interface Topic {
   unitId: string;
   agenda: readonly string[];
   stage: readonly StageAssignment[];
-  questions: readonly string[];
-  answers: readonly string[];
+  /** Question and the matching answer, paired so that the podium never reads a mismatched text. */
+  qa: readonly (readonly [question: string, answer: string])[];
 }
 
 /** {Y} = fiscal year, {P} = percentage, {M} = millions, {N} = small integer, {B} = billions */
 const TOPICS: readonly Topic[] = [
   {
     id: 'dividende', unitId: 'unit-fin', agenda: ['top-2'], stage: ['cfo', 'ceo'],
-    questions: [
-      'Wie hoch war die Ausschüttungsquote im Geschäftsjahr {Y}, und welche Quote strebt der Vorstand mittelfristig an?',
-      'Warum wird die Dividende trotz gestiegenem Free Cashflow nur um {N} Cent angehoben?',
-      'Plant die Gesellschaft, die Dividendenpolitik von einer Quote auf einen Mindestbetrag je Aktie umzustellen?',
-      'Welcher Anteil des Bilanzgewinns wird in die Gewinnrücklagen eingestellt, und wofür werden diese Mittel verwendet?',
-      'Wie verhält sich die Dividendenrendite zum Durchschnitt der Wettbewerber im DAX?',
-      'Wurde geprüft, statt einer Dividendenerhöhung ein Aktienrückkaufprogramm aufzulegen, und mit welchem Ergebnis?',
-    ],
-    answers: [
-      'Die Ausschüttungsquote lag im Geschäftsjahr {Y} bei {P} Prozent des bereinigten Konzernergebnisses. Mittelfristig streben wir eine Quote zwischen 40 und 60 Prozent an, wie im Geschäftsbericht auf Seite {N}2 dargestellt.',
-      'Der Vorschlag zur Gewinnverwendung berücksichtigt neben dem Free Cashflow auch den Investitionsbedarf des laufenden Jahres in Höhe von rund {B} Milliarden Euro. Die Dividendenkontinuität hat für uns Vorrang vor einer einmalig höheren Ausschüttung.',
-      'Ein Aktienrückkauf wurde im Rahmen der Kapitalallokation geprüft. Der Vorstand hat sich für die Dividende entschieden, weil sie allen Aktionären gleichermaßen zugutekommt und die Bilanzstruktur nicht belastet.',
+    qa: [
+      ['Wie hoch war die Ausschüttungsquote im Geschäftsjahr {Y}, und welche Quote strebt der Vorstand mittelfristig an?',
+       'Die Ausschüttungsquote lag im Geschäftsjahr {Y} bei {P} Prozent des bereinigten Konzernergebnisses. Mittelfristig streben wir eine Quote zwischen 40 und 60 Prozent an, wie im Geschäftsbericht auf Seite {N}2 dargestellt.'],
+      ['Warum wird die Dividende trotz gestiegenem Free Cashflow nur um {N} Cent angehoben?',
+       'Der Vorschlag zur Gewinnverwendung berücksichtigt neben dem Free Cashflow auch den Investitionsbedarf des laufenden Jahres in Höhe von rund {B} Milliarden Euro. Die Dividendenkontinuität hat für uns Vorrang vor einer einmalig höheren Ausschüttung.'],
+      ['Plant die Gesellschaft, die Dividendenpolitik von einer Quote auf einen Mindestbetrag je Aktie umzustellen?',
+       'Eine Umstellung auf einen Mindestbetrag je Aktie ist nicht geplant. Die Quotenpolitik verbindet die Ausschüttung mit der Ertragskraft; der Vorstand hält sie für die verlässlichere Grundlage und hat sie zuletzt im Kapitalmarkttag bestätigt.'],
+      ['Welcher Anteil des Bilanzgewinns wird in die Gewinnrücklagen eingestellt, und wofür werden diese Mittel verwendet?',
+       'Von dem Bilanzgewinn werden {M} Millionen Euro in die Gewinnrücklagen eingestellt. Die Mittel dienen der Finanzierung des Investitionsprogramms und der Stärkung der Eigenkapitalquote, die zum Stichtag {P} Prozent betrug.'],
+      ['Wie verhält sich die Dividendenrendite zum Durchschnitt der Wettbewerber im DAX?',
+       'Auf Basis des Jahresschlusskurses ergibt sich eine Dividendenrendite von {N},{N} Prozent. Sie liegt damit im oberen Drittel der Vergleichsgruppe; die Berechnung ist im Geschäftsbericht im Abschnitt Aktie dargestellt.'],
+      ['Wurde geprüft, statt einer Dividendenerhöhung ein Aktienrückkaufprogramm aufzulegen, und mit welchem Ergebnis?',
+       'Ein Aktienrückkauf wurde im Rahmen der Kapitalallokation geprüft. Der Vorstand hat sich für die Dividende entschieden, weil sie allen Aktionären gleichermaßen zugutekommt und die Bilanzstruktur nicht belastet.'],
     ],
   },
   {
     id: 'verguetung', unitId: 'unit-hr', agenda: ['top-6'], stage: ['supervisory_board_chair'],
-    questions: [
-      'Wie hoch war die Zielerreichung der kurzfristigen variablen Vergütung des Vorstands im Geschäftsjahr {Y}, und welche Kennzahlen lagen ihr zugrunde?',
-      'Warum enthält der Vergütungsbericht keine Angaben zum Verhältnis der Vorstandsvergütung zur durchschnittlichen Mitarbeitervergütung in Deutschland?',
-      'Welche Nachhaltigkeitsziele sind Teil der langfristigen variablen Vergütung, und mit welchem Gewicht?',
-      'Hat der Aufsichtsrat im Berichtsjahr von der Möglichkeit Gebrauch gemacht, variable Vergütung zurückzufordern?',
-      'Wie begründet der Aufsichtsrat die Erhöhung der Festvergütung des Vorstandsvorsitzenden um {P} Prozent?',
-      'Wurden Abfindungszahlungen an ausgeschiedene Vorstandsmitglieder geleistet, und in welcher Höhe?',
-    ],
-    answers: [
-      'Die Zielerreichung der kurzfristigen variablen Vergütung lag im Geschäftsjahr {Y} bei {P} Prozent. Maßgeblich waren das bereinigte EBIT, der Free Cashflow und ein Nachhaltigkeitsfaktor. Die Einzelwerte sind im Vergütungsbericht, Abschnitt 3, tabellarisch dargestellt.',
-      'Der Aufsichtsrat hat im Berichtsjahr keine Rückforderung variabler Vergütung veranlasst. Die Clawback-Regelung des Vergütungssystems wurde geprüft; ein Anwendungsfall lag nicht vor.',
-      'Die Anpassung der Festvergütung folgt dem vertikalen und horizontalen Vergleich, den der Aufsichtsrat mit externer Unterstützung durchgeführt hat. Die Vergütung liegt damit im Median der Vergleichsgruppe.',
+    qa: [
+      ['Wie hoch war die Zielerreichung der kurzfristigen variablen Vergütung des Vorstands im Geschäftsjahr {Y}, und welche Kennzahlen lagen ihr zugrunde?',
+       'Die Zielerreichung der kurzfristigen variablen Vergütung lag im Geschäftsjahr {Y} bei {P} Prozent. Maßgeblich waren das bereinigte EBIT, der Free Cashflow und ein Nachhaltigkeitsfaktor. Die Einzelwerte sind im Vergütungsbericht, Abschnitt 3, tabellarisch dargestellt.'],
+      ['Warum enthält der Vergütungsbericht keine Angaben zum Verhältnis der Vorstandsvergütung zur durchschnittlichen Mitarbeitervergütung in Deutschland?',
+       'Der Vergütungsbericht enthält den vertikalen Vergleich in Abschnitt 5: Die Vergütung des Vorstandsvorsitzenden entspricht dem {N}0-fachen der durchschnittlichen Vergütung der Belegschaft in Deutschland. Der Aufsichtsrat berücksichtigt dieses Verhältnis bei jeder Anpassung.'],
+      ['Welche Nachhaltigkeitsziele sind Teil der langfristigen variablen Vergütung, und mit welchem Gewicht?',
+       'Die langfristige variable Vergütung enthält mit einem Gewicht von {N}0 Prozent Nachhaltigkeitsziele: die Reduktion der Scope-1- und Scope-2-Emissionen, die Unfallhäufigkeit und den Frauenanteil in Führungspositionen. Die Zielwerte sind im Vergütungssystem veröffentlicht.'],
+      ['Hat der Aufsichtsrat im Berichtsjahr von der Möglichkeit Gebrauch gemacht, variable Vergütung zurückzufordern?',
+       'Der Aufsichtsrat hat im Berichtsjahr keine Rückforderung variabler Vergütung veranlasst. Die Clawback-Regelung des Vergütungssystems wurde geprüft; ein Anwendungsfall lag nicht vor.'],
+      ['Wie begründet der Aufsichtsrat die Erhöhung der Festvergütung des Vorstandsvorsitzenden um {P} Prozent?',
+       'Die Anpassung der Festvergütung folgt dem vertikalen und horizontalen Vergleich, den der Aufsichtsrat mit externer Unterstützung durchgeführt hat. Die Vergütung liegt damit im Median der Vergleichsgruppe.'],
+      ['Wurden Abfindungszahlungen an ausgeschiedene Vorstandsmitglieder geleistet, und in welcher Höhe?',
+       'Im Berichtsjahr wurden Abfindungszahlungen in Höhe von {N},{N} Millionen Euro an ein ausgeschiedenes Vorstandsmitglied geleistet. Sie entsprechen der vertraglichen Regelung und der Obergrenze des Kodex von zwei Jahresvergütungen; Einzelheiten stehen im Vergütungsbericht.'],
     ],
   },
   {
     id: 'nachhaltigkeit', unitId: 'unit-esg', agenda: ['top-1', 'top-3'], stage: ['ceo', 'board_member'],
-    questions: [
-      'Wie haben sich die Scope-1- und Scope-2-Emissionen im Geschäftsjahr {Y} gegenüber dem Basisjahr entwickelt?',
-      'Welcher Anteil der Investitionen des Berichtsjahres war nach der EU-Taxonomie als ökologisch nachhaltig einzustufen?',
-      'Bis wann will die Gesellschaft Klimaneutralität in Scope 3 erreichen, und welche Zwischenziele gelten?',
-      'Wie viele Lieferanten wurden im Berichtsjahr nach dem Lieferkettensorgfaltspflichtengesetz geprüft, und wie viele Verstöße wurden festgestellt?',
-      'Warum hat sich die Gesellschaft nicht der Science Based Targets Initiative angeschlossen?',
-      'Welche Kosten sind im Geschäftsjahr {Y} für den Erwerb von CO2-Zertifikaten angefallen?',
-      'Wie hoch ist der Frauenanteil in den beiden Führungsebenen unterhalb des Vorstands, und welche Zielgrößen gelten?',
-    ],
-    answers: [
-      'Die Scope-1- und Scope-2-Emissionen lagen im Geschäftsjahr {Y} um {P} Prozent unter dem Basisjahr. Die Entwicklung ist im Nachhaltigkeitsbericht auf Seite {N}8 nach Standorten aufgeschlüsselt.',
-      'Rund {P} Prozent der Investitionen des Berichtsjahres waren taxonomiekonform. Der Anteil steigt mit dem Investitionsprogramm in erneuerbare Eigenversorgung an den europäischen Standorten.',
-      'Im Berichtsjahr wurden {N}20 Lieferanten mit erhöhtem Risikoprofil geprüft. In {N} Fällen wurden Abhilfemaßnahmen vereinbart; eine Beendigung der Geschäftsbeziehung war nicht erforderlich.',
+    qa: [
+      ['Wie haben sich die Scope-1- und Scope-2-Emissionen im Geschäftsjahr {Y} gegenüber dem Basisjahr entwickelt?',
+       'Die Scope-1- und Scope-2-Emissionen lagen im Geschäftsjahr {Y} um {P} Prozent unter dem Basisjahr. Die Entwicklung ist im Nachhaltigkeitsbericht auf Seite {N}8 nach Standorten aufgeschlüsselt.'],
+      ['Welcher Anteil der Investitionen des Berichtsjahres war nach der EU-Taxonomie als ökologisch nachhaltig einzustufen?',
+       'Rund {P} Prozent der Investitionen des Berichtsjahres waren taxonomiekonform. Der Anteil steigt mit dem Investitionsprogramm in erneuerbare Eigenversorgung an den europäischen Standorten.'],
+      ['Bis wann will die Gesellschaft Klimaneutralität in Scope 3 erreichen, und welche Zwischenziele gelten?',
+       'Für Scope 3 gilt das Ziel der Klimaneutralität bis 2045 mit einem Zwischenziel von minus {P} Prozent bis 2030 gegenüber dem Basisjahr. Der Pfad ist im Nachhaltigkeitsbericht im Abschnitt Klimastrategie beschrieben.'],
+      ['Wie viele Lieferanten wurden im Berichtsjahr nach dem Lieferkettensorgfaltspflichtengesetz geprüft, und wie viele Verstöße wurden festgestellt?',
+       'Im Berichtsjahr wurden {N}20 Lieferanten mit erhöhtem Risikoprofil geprüft. In {N} Fällen wurden Abhilfemaßnahmen vereinbart; eine Beendigung der Geschäftsbeziehung war nicht erforderlich.'],
+      ['Warum hat sich die Gesellschaft nicht der Science Based Targets Initiative angeschlossen?',
+       'Die Gesellschaft hat ihre Klimaziele im Berichtsjahr bei der Science Based Targets Initiative zur Validierung eingereicht; das Verfahren läuft. Über das Ergebnis wird im nächsten Nachhaltigkeitsbericht informiert.'],
+      ['Welche Kosten sind im Geschäftsjahr {Y} für den Erwerb von CO2-Zertifikaten angefallen?',
+       'Für den Erwerb von Emissionszertifikaten sind im Geschäftsjahr {Y} Aufwendungen von {M} Millionen Euro entstanden. Sie sind im Konzernanhang unter den sonstigen betrieblichen Aufwendungen ausgewiesen.'],
+      ['Wie hoch ist der Frauenanteil in den beiden Führungsebenen unterhalb des Vorstands, und welche Zielgrößen gelten?',
+       'Der Frauenanteil betrug zum Stichtag {P} Prozent in der ersten und {P} Prozent in der zweiten Führungsebene. Die Zielgrößen von 30 beziehungsweise 35 Prozent bis Ende {Y}+2 sind in der Erklärung zur Unternehmensführung veröffentlicht.'],
     ],
   },
   {
     id: 'strategie', unitId: 'unit-strat', agenda: ['top-1', 'top-3'], stage: ['ceo'],
-    questions: [
-      'Welche Umsatz- und Margenziele verfolgt der Vorstand bis zum Geschäftsjahr {Y}+3, und wie realistisch sind sie angesichts der Marktentwicklung?',
-      'Welche Rolle spielen Zukäufe in der Strategie, und welche Mittel sind dafür vorgesehen?',
-      'Wie beurteilt der Vorstand die Abhängigkeit vom chinesischen Markt, und welche Gegenmaßnahmen wurden eingeleitet?',
-      'Warum hält die Gesellschaft an dem verlustbringenden Geschäftsbereich fest, statt ihn zu veräußern?',
-      'Welche Auswirkungen hatten die US-Zölle auf das Ergebnis des Geschäftsjahres {Y}?',
-      'Welche Investitionen sind in künstliche Intelligenz geplant, und welche Einsparungen erwartet der Vorstand daraus?',
-      'Wie hoch war der Anteil des Umsatzes mit neuen Produkten, die in den letzten drei Jahren eingeführt wurden?',
-    ],
-    answers: [
-      'Der Vorstand hält an der Mittelfristplanung fest: Umsatzwachstum von durchschnittlich {N} Prozent pro Jahr und eine bereinigte EBIT-Marge von {P} Prozent. Die Annahmen sind im Geschäftsbericht im Prognosebericht erläutert.',
-      'Der Umsatzanteil des chinesischen Marktes lag im Berichtsjahr bei {P} Prozent. Wir reduzieren Abhängigkeiten durch den Ausbau der Kapazitäten in Südostasien und Nordamerika; die Investitionen dafür sind im Kapitalallokationsrahmen enthalten.',
-      'Die US-Zölle belasteten das Ergebnis des Geschäftsjahres {Y} mit rund {M} Millionen Euro. Ein Teil wurde durch Preisanpassungen und lokale Fertigung kompensiert.',
+    qa: [
+      ['Welche Umsatz- und Margenziele verfolgt der Vorstand bis zum Geschäftsjahr {Y}+3, und wie realistisch sind sie angesichts der Marktentwicklung?',
+       'Der Vorstand hält an der Mittelfristplanung fest: Umsatzwachstum von durchschnittlich {N} Prozent pro Jahr und eine bereinigte EBIT-Marge von {P} Prozent. Die Annahmen sind im Geschäftsbericht im Prognosebericht erläutert.'],
+      ['Welche Rolle spielen Zukäufe in der Strategie, und welche Mittel sind dafür vorgesehen?',
+       'Zukäufe ergänzen das organische Wachstum in den Bereichen Software und Service. Der Kapitalallokationsrahmen sieht dafür bis zu {B} Milliarden Euro über drei Jahre vor; über einzelne Vorhaben informieren wir, sobald sie beschlossen sind.'],
+      ['Wie beurteilt der Vorstand die Abhängigkeit vom chinesischen Markt, und welche Gegenmaßnahmen wurden eingeleitet?',
+       'Der Umsatzanteil des chinesischen Marktes lag im Berichtsjahr bei {P} Prozent. Wir reduzieren Abhängigkeiten durch den Ausbau der Kapazitäten in Südostasien und Nordamerika; die Investitionen dafür sind im Kapitalallokationsrahmen enthalten.'],
+      ['Warum hält die Gesellschaft an dem verlustbringenden Geschäftsbereich fest, statt ihn zu veräußern?',
+       'Der Geschäftsbereich wird derzeit restrukturiert; die Maßnahmen sollen ihn bis Ende {Y}+1 in die Gewinnzone führen. Alle Optionen einschließlich einer Veräußerung werden regelmäßig geprüft; über eine Entscheidung würden wir den Kapitalmarkt unverzüglich informieren.'],
+      ['Welche Auswirkungen hatten die US-Zölle auf das Ergebnis des Geschäftsjahres {Y}?',
+       'Die US-Zölle belasteten das Ergebnis des Geschäftsjahres {Y} mit rund {M} Millionen Euro. Ein Teil wurde durch Preisanpassungen und lokale Fertigung kompensiert.'],
+      ['Welche Investitionen sind in künstliche Intelligenz geplant, und welche Einsparungen erwartet der Vorstand daraus?',
+       'Für Anwendungen künstlicher Intelligenz sind über drei Jahre Investitionen von rund {M} Millionen Euro vorgesehen. Wir erwarten daraus Einsparungen im mittleren zweistelligen Millionenbereich pro Jahr, vor allem in Einkauf, Fertigungsplanung und Verwaltung.'],
+      ['Wie hoch war der Anteil des Umsatzes mit neuen Produkten, die in den letzten drei Jahren eingeführt wurden?',
+       'Der Umsatzanteil von Produkten, die in den letzten drei Jahren eingeführt wurden, lag im Geschäftsjahr {Y} bei {P} Prozent. Die Kennzahl ist im Lagebericht im Abschnitt Forschung und Entwicklung ausgewiesen.'],
     ],
   },
   {
     id: 'kapital', unitId: 'unit-fin', agenda: ['top-8', 'top-1'], stage: ['cfo'],
-    questions: [
-      'Wofür sollen die zurückgekauften Aktien verwendet werden, und schließt der Vorstand eine Verwendung als Akquisitionswährung aus?',
-      'Wie hoch ist die Nettoverschuldung im Verhältnis zum EBITDA, und welchen Zielkorridor verfolgt die Gesellschaft?',
-      'Welche Fälligkeiten stehen im kommenden Geschäftsjahr an, und zu welchen Konditionen wurde zuletzt refinanziert?',
-      'Warum wurde die Ermächtigung zum Erwerb eigener Aktien auf zehn Prozent des Grundkapitals festgelegt?',
-      'Wie hoch waren die Zinsaufwendungen im Geschäftsjahr {Y}, und wie wirkt sich das Zinsniveau auf die Planung aus?',
-      'Welche Ratingveränderungen gab es im Berichtsjahr, und wie bewertet der Vorstand das Risiko einer Herabstufung?',
-    ],
-    answers: [
-      'Die Nettoverschuldung betrug zum Bilanzstichtag das {N},{N}-fache des EBITDA. Unser Zielkorridor liegt zwischen dem 1,0- und 2,0-fachen; die Finanzierungsstruktur ist im Konzernanhang, Abschnitt Finanzverbindlichkeiten, dargestellt.',
-      'Die Ermächtigung entspricht dem gesetzlichen Rahmen des § 71 Abs. 1 Nr. 8 AktG. Über eine Ausnutzung entscheidet der Vorstand mit Zustimmung des Aufsichtsrats; ein konkreter Beschluss liegt nicht vor.',
-      'Die Zinsaufwendungen lagen im Geschäftsjahr {Y} bei {M} Millionen Euro. Rund {P} Prozent der Finanzverbindlichkeiten sind festverzinslich, sodass die Planung gegenüber Zinsänderungen weitgehend unempfindlich ist.',
+    qa: [
+      ['Wofür sollen die zurückgekauften Aktien verwendet werden, und schließt der Vorstand eine Verwendung als Akquisitionswährung aus?',
+       'Die Ermächtigung sieht die Einziehung, die Verwendung für Mitarbeiterbeteiligungsprogramme und die Nutzung als Gegenleistung bei Unternehmenszusammenschlüssen vor. Eine Verwendung als Akquisitionswährung ist damit nicht ausgeschlossen; ein konkretes Vorhaben besteht nicht.'],
+      ['Wie hoch ist die Nettoverschuldung im Verhältnis zum EBITDA, und welchen Zielkorridor verfolgt die Gesellschaft?',
+       'Die Nettoverschuldung betrug zum Bilanzstichtag das {N},{N}-fache des EBITDA. Unser Zielkorridor liegt zwischen dem 1,0- und 2,0-fachen; die Finanzierungsstruktur ist im Konzernanhang, Abschnitt Finanzverbindlichkeiten, dargestellt.'],
+      ['Welche Fälligkeiten stehen im kommenden Geschäftsjahr an, und zu welchen Konditionen wurde zuletzt refinanziert?',
+       'Im kommenden Geschäftsjahr werden Anleihen über {M} Millionen Euro fällig. Die letzte Refinanzierung erfolgte über eine Anleihe mit einem Kupon von {N},{N} Prozent und siebenjähriger Laufzeit; die Konditionen sind im Konzernanhang aufgeführt.'],
+      ['Warum wurde die Ermächtigung zum Erwerb eigener Aktien auf zehn Prozent des Grundkapitals festgelegt?',
+       'Die Ermächtigung entspricht dem gesetzlichen Rahmen des § 71 Abs. 1 Nr. 8 AktG. Über eine Ausnutzung entscheidet der Vorstand mit Zustimmung des Aufsichtsrats; ein konkreter Beschluss liegt nicht vor.'],
+      ['Wie hoch waren die Zinsaufwendungen im Geschäftsjahr {Y}, und wie wirkt sich das Zinsniveau auf die Planung aus?',
+       'Die Zinsaufwendungen lagen im Geschäftsjahr {Y} bei {M} Millionen Euro. Rund {P} Prozent der Finanzverbindlichkeiten sind festverzinslich, sodass die Planung gegenüber Zinsänderungen weitgehend unempfindlich ist.'],
+      ['Welche Ratingveränderungen gab es im Berichtsjahr, und wie bewertet der Vorstand das Risiko einer Herabstufung?',
+       'Beide Ratingagenturen haben das Rating im Berichtsjahr mit stabilem Ausblick bestätigt. Der Vorstand sieht auf Basis der Verschuldungskennzahlen kein erhöhtes Risiko einer Herabstufung; die Ratingerhaltung ist Teil der Finanzstrategie.'],
     ],
   },
   {
     id: 'aufsichtsrat', unitId: 'unit-legal', agenda: ['top-4', 'top-7'], stage: ['supervisory_board_chair'],
-    questions: [
-      'Wie viele Sitzungen hat der Prüfungsausschuss im Geschäftsjahr {Y} abgehalten, und wie hoch war die Teilnahmequote?',
-      'Welche Qualifikationen bringt die zur Wahl vorgeschlagene Kandidatin für den Aufsichtsrat mit, und bestehen Interessenkonflikte?',
-      'Warum überschreitet ein Aufsichtsratsmitglied die vom Kodex empfohlene Zahl an Mandaten?',
-      'Wie hat der Aufsichtsrat die Effizienz seiner Tätigkeit im Berichtsjahr überprüft?',
-      'Welche Beraterverträge bestehen mit Aufsichtsratsmitgliedern oder ihnen nahestehenden Unternehmen?',
-      'Wie begründet der Aufsichtsrat die Wiederbestellung des Abschlussprüfers trotz der langen Mandatsdauer?',
-    ],
-    answers: [
-      'Der Prüfungsausschuss hat im Geschäftsjahr {Y} {N} Sitzungen abgehalten; die Teilnahmequote lag bei {P} Prozent. Die Einzelteilnahme ist im Bericht des Aufsichtsrats tabellarisch dargestellt.',
-      'Die vorgeschlagene Kandidatin verfügt über langjährige Erfahrung in der Finanzierung industrieller Unternehmen. Der Aufsichtsrat hat sich vergewissert, dass keine Interessenkonflikte im Sinne des Kodex bestehen.',
-      'Die Selbstbeurteilung des Aufsichtsrats erfolgte im Berichtsjahr mit externer Unterstützung. Ergebnisse und abgeleitete Maßnahmen sind in der Erklärung zur Unternehmensführung zusammengefasst.',
+    qa: [
+      ['Wie viele Sitzungen hat der Prüfungsausschuss im Geschäftsjahr {Y} abgehalten, und wie hoch war die Teilnahmequote?',
+       'Der Prüfungsausschuss hat im Geschäftsjahr {Y} {N} Sitzungen abgehalten; die Teilnahmequote lag bei {P} Prozent. Die Einzelteilnahme ist im Bericht des Aufsichtsrats tabellarisch dargestellt.'],
+      ['Welche Qualifikationen bringt die zur Wahl vorgeschlagene Kandidatin für den Aufsichtsrat mit, und bestehen Interessenkonflikte?',
+       'Die vorgeschlagene Kandidatin verfügt über langjährige Erfahrung in der Finanzierung industrieller Unternehmen. Der Aufsichtsrat hat sich vergewissert, dass keine Interessenkonflikte im Sinne des Kodex bestehen.'],
+      ['Warum überschreitet ein Aufsichtsratsmitglied die vom Kodex empfohlene Zahl an Mandaten?',
+       'Das betreffende Mitglied hält einschließlich des Vorsitzes vier Mandate, was nach der Zählweise des Kodex der Empfehlung entspricht. Die Erklärung zur Unternehmensführung legt die Mandate und die Zählung offen.'],
+      ['Wie hat der Aufsichtsrat die Effizienz seiner Tätigkeit im Berichtsjahr überprüft?',
+       'Die Selbstbeurteilung des Aufsichtsrats erfolgte im Berichtsjahr mit externer Unterstützung. Ergebnisse und abgeleitete Maßnahmen sind in der Erklärung zur Unternehmensführung zusammengefasst.'],
+      ['Welche Beraterverträge bestehen mit Aufsichtsratsmitgliedern oder ihnen nahestehenden Unternehmen?',
+       'Im Berichtsjahr bestanden keine Beraterverträge mit Aufsichtsratsmitgliedern oder ihnen nahestehenden Unternehmen. Zustimmungspflichtige Verträge nach § 114 AktG hat der Aufsichtsrat nicht behandelt.'],
+      ['Wie begründet der Aufsichtsrat die Wiederbestellung des Abschlussprüfers trotz der langen Mandatsdauer?',
+       'Die Mandatsdauer liegt mit {N} Jahren innerhalb der gesetzlichen Höchstdauer. Der Prüfungsausschuss hat Unabhängigkeit und Qualität der Prüfung bewertet und empfiehlt die Wiederbestellung; die nächste Ausschreibung ist für das Geschäftsjahr {Y}+2 vorgesehen.'],
     ],
   },
   {
     id: 'risiko', unitId: 'unit-legal', agenda: ['top-1', 'top-3'], stage: ['ceo', 'cfo'],
-    questions: [
-      'Welche Rückstellungen wurden für laufende Rechtsstreitigkeiten gebildet, und welches ist das größte Einzelrisiko?',
-      'Gab es im Berichtsjahr Cyberangriffe mit Auswirkungen auf den Geschäftsbetrieb, und welche Kosten sind entstanden?',
-      'Wie hoch war der Aufwand für Compliance-Untersuchungen, und wurden Behörden eingeschaltet?',
-      'Welche Auswirkungen hätte ein Ausfall des größten Zulieferers auf die Produktion, und wie ist das abgesichert?',
-      'Wurden im Geschäftsjahr {Y} Bußgelder gegen die Gesellschaft verhängt, und in welcher Höhe?',
-      'Welche Sanktionsrisiken bestehen aus Geschäftsbeziehungen in Russland, und sind alle Aktivitäten beendet?',
-    ],
-    answers: [
-      'Für Rechtsstreitigkeiten sind zum Bilanzstichtag Rückstellungen in Höhe von {M} Millionen Euro gebildet. Das größte Einzelverfahren ist im Konzernanhang unter den Eventualverbindlichkeiten beschrieben; weitergehende Angaben würden die Verteidigungsposition der Gesellschaft beeinträchtigen.',
-      'Im Berichtsjahr wurden {N} sicherheitsrelevante Vorfälle registriert. Keiner davon hatte Auswirkungen auf den Geschäftsbetrieb oder auf personenbezogene Daten; die Kosten der Abwehr sind im IT-Budget enthalten.',
-      'Die Geschäftsaktivitäten in Russland wurden im Jahr 2023 beendet. Verbleibende Verpflichtungen betreffen die Abwicklung von Gewährleistungen; ein Sanktionsverstoß liegt nach unserer Prüfung nicht vor.',
+    qa: [
+      ['Welche Rückstellungen wurden für laufende Rechtsstreitigkeiten gebildet, und welches ist das größte Einzelrisiko?',
+       'Für Rechtsstreitigkeiten sind zum Bilanzstichtag Rückstellungen in Höhe von {M} Millionen Euro gebildet. Das größte Einzelverfahren ist im Konzernanhang unter den Eventualverbindlichkeiten beschrieben; weitergehende Angaben würden die Verteidigungsposition der Gesellschaft beeinträchtigen.'],
+      ['Gab es im Berichtsjahr Cyberangriffe mit Auswirkungen auf den Geschäftsbetrieb, und welche Kosten sind entstanden?',
+       'Im Berichtsjahr wurden {N} sicherheitsrelevante Vorfälle registriert. Keiner davon hatte Auswirkungen auf den Geschäftsbetrieb oder auf personenbezogene Daten; die Kosten der Abwehr sind im IT-Budget enthalten.'],
+      ['Wie hoch war der Aufwand für Compliance-Untersuchungen, und wurden Behörden eingeschaltet?',
+       'Der Aufwand für interne Untersuchungen lag im Berichtsjahr bei {N},{N} Millionen Euro. In einem Fall wurde die zuständige Behörde von der Gesellschaft selbst informiert; das Verfahren ist im Konzernanhang beschrieben.'],
+      ['Welche Auswirkungen hätte ein Ausfall des größten Zulieferers auf die Produktion, und wie ist das abgesichert?',
+       'Der größte Zulieferer steht für rund {N} Prozent des Einkaufsvolumens. Für die kritischen Komponenten bestehen Zweitquellen und ein Sicherheitsbestand von {N} Wochen; das Szenario ist Teil der jährlichen Notfallplanung.'],
+      ['Wurden im Geschäftsjahr {Y} Bußgelder gegen die Gesellschaft verhängt, und in welcher Höhe?',
+       'Im Geschäftsjahr {Y} wurden gegen Konzerngesellschaften Bußgelder in Höhe von insgesamt {N}00.000 Euro verhängt, überwiegend wegen Verstößen gegen Melde- und Formvorschriften. Kartell- oder Korruptionsverfahren gab es nicht.'],
+      ['Welche Sanktionsrisiken bestehen aus Geschäftsbeziehungen in Russland, und sind alle Aktivitäten beendet?',
+       'Die Geschäftsaktivitäten in Russland wurden im Jahr 2023 beendet. Verbleibende Verpflichtungen betreffen die Abwicklung von Gewährleistungen; ein Sanktionsverstoß liegt nach unserer Prüfung nicht vor.'],
     ],
   },
   {
     id: 'personal', unitId: 'unit-hr', agenda: ['top-3'], stage: ['board_member', 'ceo'],
-    questions: [
-      'Wie viele Stellen wurden im Geschäftsjahr {Y} in Deutschland abgebaut, und wie viele im Ausland aufgebaut?',
-      'Wie hoch ist die Fluktuationsrate, und welche Maßnahmen ergreift der Vorstand zur Mitarbeiterbindung?',
-      'Welche Vereinbarungen bestehen mit den Arbeitnehmervertretungen zur Standortsicherung, und bis wann gelten sie?',
-      'Wie viele Auszubildende wurden eingestellt, und wie hoch ist die Übernahmequote?',
-      'Wie hat sich der Krankenstand im Berichtsjahr entwickelt?',
-      'Welche Folgen hat der Einsatz künstlicher Intelligenz für die Beschäftigung in der Verwaltung?',
-    ],
-    answers: [
-      'Die Zahl der Beschäftigten in Deutschland lag zum Jahresende bei {N}2.{N}00 und damit um {N} Prozent unter dem Vorjahr; der Abbau erfolgte ausschließlich über natürliche Fluktuation und freiwillige Programme.',
-      'Die Fluktuationsrate betrug {N},{N} Prozent. Zur Bindung setzen wir auf Qualifizierung, flexible Arbeitsmodelle und die Beteiligung der Beschäftigten am Unternehmenserfolg.',
-      'Die Standortsicherungsvereinbarung gilt bis Ende {Y}+2 und schließt betriebsbedingte Kündigungen an den deutschen Standorten aus.',
+    qa: [
+      ['Wie viele Stellen wurden im Geschäftsjahr {Y} in Deutschland abgebaut, und wie viele im Ausland aufgebaut?',
+       'Die Zahl der Beschäftigten in Deutschland lag zum Jahresende bei {N}2.{N}00 und damit um {N} Prozent unter dem Vorjahr; der Abbau erfolgte ausschließlich über natürliche Fluktuation und freiwillige Programme. Im Ausland wurden {N}00 Stellen aufgebaut, vor allem in der Fertigung in Nordamerika.'],
+      ['Wie hoch ist die Fluktuationsrate, und welche Maßnahmen ergreift der Vorstand zur Mitarbeiterbindung?',
+       'Die Fluktuationsrate betrug {N},{N} Prozent. Zur Bindung setzen wir auf Qualifizierung, flexible Arbeitsmodelle und die Beteiligung der Beschäftigten am Unternehmenserfolg.'],
+      ['Welche Vereinbarungen bestehen mit den Arbeitnehmervertretungen zur Standortsicherung, und bis wann gelten sie?',
+       'Die Standortsicherungsvereinbarung gilt bis Ende {Y}+2 und schließt betriebsbedingte Kündigungen an den deutschen Standorten aus.'],
+      ['Wie viele Auszubildende wurden eingestellt, und wie hoch ist die Übernahmequote?',
+       'Im Berichtsjahr wurden {N}00 Auszubildende und dual Studierende eingestellt. Die Übernahmequote nach erfolgreichem Abschluss lag bei {P} Prozent.'],
+      ['Wie hat sich der Krankenstand im Berichtsjahr entwickelt?',
+       'Die Gesundheitsquote lag im Berichtsjahr bei {P} Prozent und damit auf dem Niveau des Vorjahres. Die Kennzahl und die Maßnahmen des betrieblichen Gesundheitsmanagements sind im Personalbericht dargestellt.'],
+      ['Welche Folgen hat der Einsatz künstlicher Intelligenz für die Beschäftigung in der Verwaltung?',
+       'Der Einsatz künstlicher Intelligenz verändert Tätigkeiten in der Verwaltung, führt aber nicht zu betriebsbedingten Kündigungen; das schließt die Standortsicherungsvereinbarung aus. Freiwerdende Kapazitäten werden über Qualifizierung und natürliche Fluktuation gesteuert.'],
     ],
   },
   {
     id: 'operations', unitId: 'unit-ops', agenda: ['top-1'], stage: ['board_member'],
-    questions: [
-      'Wie hoch war die Auslastung der Produktionsstandorte im Geschäftsjahr {Y}, und welche Standorte stehen zur Disposition?',
-      'Welche Fortschritte gibt es beim Bau des neuen Werks, und liegt das Projekt im Budget?',
-      'Welche Lieferengpässe haben das Berichtsjahr belastet, und wie wurden sie gelöst?',
-      'Wie hoch waren die Qualitätskosten, und welche Rückrufe gab es?',
-      'Welche Investitionen fließen in die Digitalisierung der Fertigung, und welche Produktivitätsgewinne wurden bislang realisiert?',
-    ],
-    answers: [
-      'Die Auslastung der Produktionsstandorte lag im Geschäftsjahr {Y} bei durchschnittlich {P} Prozent. Über Standortentscheidungen wird im Rahmen der Netzwerkplanung entschieden; ein Beschluss zur Schließung liegt nicht vor.',
-      'Das neue Werk liegt im Zeit- und Budgetplan. Die Inbetriebnahme ist für das dritte Quartal {Y}+1 vorgesehen; die Gesamtinvestition beträgt rund {M} Millionen Euro.',
-      'Die Qualitätskosten lagen bei {N},{N} Prozent des Umsatzes. Im Berichtsjahr gab es {N} freiwillige Rückrufaktionen ohne Sicherheitsrelevanz.',
+    qa: [
+      ['Wie hoch war die Auslastung der Produktionsstandorte im Geschäftsjahr {Y}, und welche Standorte stehen zur Disposition?',
+       'Die Auslastung der Produktionsstandorte lag im Geschäftsjahr {Y} bei durchschnittlich {P} Prozent. Über Standortentscheidungen wird im Rahmen der Netzwerkplanung entschieden; ein Beschluss zur Schließung liegt nicht vor.'],
+      ['Welche Fortschritte gibt es beim Bau des neuen Werks, und liegt das Projekt im Budget?',
+       'Das neue Werk liegt im Zeit- und Budgetplan. Die Inbetriebnahme ist für das dritte Quartal {Y}+1 vorgesehen; die Gesamtinvestition beträgt rund {M} Millionen Euro.'],
+      ['Welche Lieferengpässe haben das Berichtsjahr belastet, und wie wurden sie gelöst?',
+       'Engpässe betrafen im ersten Halbjahr elektronische Bauteile und Spezialstähle. Sie wurden durch Zweitquellen, Vorratsaufbau und Konstruktionsänderungen gelöst; die Lieferfähigkeit lag im zweiten Halbjahr wieder bei {P} Prozent.'],
+      ['Wie hoch waren die Qualitätskosten, und welche Rückrufe gab es?',
+       'Die Qualitätskosten lagen bei {N},{N} Prozent des Umsatzes. Im Berichtsjahr gab es {N} freiwillige Rückrufaktionen ohne Sicherheitsrelevanz.'],
+      ['Welche Investitionen fließen in die Digitalisierung der Fertigung, und welche Produktivitätsgewinne wurden bislang realisiert?',
+       'In die Digitalisierung der Fertigung fließen im laufenden Programm {M} Millionen Euro. An den bereits umgestellten Standorten stieg die Produktivität je Stunde um {N} Prozent; die Kennzahl wird je Standort verfolgt.'],
     ],
   },
   {
     id: 'ir', unitId: 'unit-ir', agenda: ['top-1', 'top-2'], stage: ['cfo', 'ceo'],
-    questions: [
-      'Warum hat sich der Aktienkurs im Geschäftsjahr {Y} deutlich schlechter entwickelt als der DAX?',
-      'Welche Maßnahmen ergreift der Vorstand, um die Bewertungslücke zu den Wettbewerbern zu schließen?',
-      'Wie hoch ist der Anteil der Aktien im Besitz von Vorstand und Aufsichtsrat?',
-      'Warum wurde die Prognose im dritten Quartal gesenkt, obwohl der Vorstand kurz zuvor die Ziele bestätigt hatte?',
-      'Welche Aktionärsstruktur hat die Gesellschaft zum Stichtag, und wie hoch ist der Anteil aktivistischer Investoren?',
-      'Wird die Hauptversammlung im kommenden Jahr wieder in Präsenz stattfinden?',
-    ],
-    answers: [
-      'Die Kursentwicklung spiegelt vor allem die Unsicherheit über die Nachfrageentwicklung in unseren Kernmärkten wider. Der Vorstand konzentriert sich auf die Umsetzung der Mittelfristziele; die Bewertung durch den Kapitalmarkt folgt der operativen Entwicklung.',
-      'Vorstand und Aufsichtsrat hielten zum Stichtag zusammen {N},{N} Prozent des Grundkapitals. Die Einzelangaben sind im Vergütungsbericht enthalten.',
-      'Die Anpassung der Prognose im dritten Quartal beruhte auf der kurzfristigen Nachfrageabschwächung in Nordamerika, die sich erst nach der Bestätigung der Ziele abzeichnete. Der Vorstand hat den Kapitalmarkt am Tag der Erkenntnis informiert.',
+    qa: [
+      ['Warum hat sich der Aktienkurs im Geschäftsjahr {Y} deutlich schlechter entwickelt als der DAX?',
+       'Die Kursentwicklung spiegelt vor allem die Unsicherheit über die Nachfrageentwicklung in unseren Kernmärkten wider. Der Vorstand konzentriert sich auf die Umsetzung der Mittelfristziele; die Bewertung durch den Kapitalmarkt folgt der operativen Entwicklung.'],
+      ['Welche Maßnahmen ergreift der Vorstand, um die Bewertungslücke zu den Wettbewerbern zu schließen?',
+       'Der Vorstand adressiert die Bewertung über drei Hebel: Margenverbesserung im Kerngeschäft, Portfoliobereinigung und eine verlässliche Ausschüttung. Der Fortschritt wird quartalsweise am Kapitalmarkt berichtet.'],
+      ['Wie hoch ist der Anteil der Aktien im Besitz von Vorstand und Aufsichtsrat?',
+       'Vorstand und Aufsichtsrat hielten zum Stichtag zusammen {N},{N} Prozent des Grundkapitals. Die Einzelangaben sind im Vergütungsbericht enthalten.'],
+      ['Warum wurde die Prognose im dritten Quartal gesenkt, obwohl der Vorstand kurz zuvor die Ziele bestätigt hatte?',
+       'Die Anpassung der Prognose im dritten Quartal beruhte auf der kurzfristigen Nachfrageabschwächung in Nordamerika, die sich erst nach der Bestätigung der Ziele abzeichnete. Der Vorstand hat den Kapitalmarkt am Tag der Erkenntnis informiert.'],
+      ['Welche Aktionärsstruktur hat die Gesellschaft zum Stichtag, und wie hoch ist der Anteil aktivistischer Investoren?',
+       'Zum Stichtag hielten institutionelle Investoren {P} Prozent, Privataktionäre {P} Prozent des Grundkapitals; der Streubesitz lag bei {P} Prozent. Meldepflichtige Beteiligungen aktivistischer Investoren bestanden nicht.'],
+      ['Wird die Hauptversammlung im kommenden Jahr wieder in Präsenz stattfinden?',
+       'Über das Format der nächsten Hauptversammlung entscheidet der Vorstand mit Zustimmung des Aufsichtsrats im Herbst. Die Erfahrungen der heutigen Versammlung und die Rückmeldungen der Aktionäre fließen in die Entscheidung ein.'],
     ],
   },
   {
     id: 'digital', unitId: 'unit-ops', agenda: ['top-1', 'top-3'], stage: ['board_member', 'ceo'],
-    questions: [
-      'Wie hoch waren die IT-Ausgaben im Geschäftsjahr {Y}, und welcher Anteil entfiel auf Cloud-Dienste außereuropäischer Anbieter?',
-      'Welche Ergebnisse hat das KI-Programm bislang erbracht, und wie wird der Nutzen gemessen?',
-      'Wie stellt die Gesellschaft sicher, dass beim Einsatz von KI keine Verstöße gegen den Datenschutz erfolgen?',
-      'Welche Systeme sind noch nicht auf die neue ERP-Plattform migriert, und welche Kosten entstehen durch den Parallelbetrieb?',
-      'Wie viele Datenschutzvorfälle wurden im Berichtsjahr an die Aufsichtsbehörden gemeldet?',
-    ],
-    answers: [
-      'Die IT-Ausgaben lagen im Geschäftsjahr {Y} bei {M} Millionen Euro. Rund {P} Prozent entfielen auf Cloud-Dienste; für personenbezogene Daten nutzen wir ausschließlich Rechenzentren in der Europäischen Union.',
-      'Das KI-Programm umfasst {N}0 Anwendungsfälle in Produktion, Einkauf und Verwaltung. Der Nutzen wird je Anwendungsfall über Zeit- und Kosteneinsparungen gemessen und vierteljährlich berichtet.',
-      'Im Berichtsjahr wurden {N} meldepflichtige Datenschutzvorfälle an die zuständigen Behörden gemeldet. Keiner davon führte zu einem Bußgeld.',
+    qa: [
+      ['Wie hoch waren die IT-Ausgaben im Geschäftsjahr {Y}, und welcher Anteil entfiel auf Cloud-Dienste außereuropäischer Anbieter?',
+       'Die IT-Ausgaben lagen im Geschäftsjahr {Y} bei {M} Millionen Euro. Rund {P} Prozent entfielen auf Cloud-Dienste; für personenbezogene Daten nutzen wir ausschließlich Rechenzentren in der Europäischen Union.'],
+      ['Welche Ergebnisse hat das KI-Programm bislang erbracht, und wie wird der Nutzen gemessen?',
+       'Das KI-Programm umfasst {N}0 Anwendungsfälle in Produktion, Einkauf und Verwaltung. Der Nutzen wird je Anwendungsfall über Zeit- und Kosteneinsparungen gemessen und vierteljährlich berichtet.'],
+      ['Wie stellt die Gesellschaft sicher, dass beim Einsatz von KI keine Verstöße gegen den Datenschutz erfolgen?',
+       'Jeder KI-Anwendungsfall durchläuft vor dem Einsatz eine Datenschutz-Folgenabschätzung und die Abstimmung mit dem Betriebsrat. Personenbezogene Daten werden nur pseudonymisiert und in europäischen Rechenzentren verarbeitet.'],
+      ['Welche Systeme sind noch nicht auf die neue ERP-Plattform migriert, und welche Kosten entstehen durch den Parallelbetrieb?',
+       'Noch nicht migriert sind die Vertriebsgesellschaften in Südamerika und Asien; ihre Umstellung ist für {Y}+1 geplant. Der Parallelbetrieb verursacht Mehrkosten von rund {N} Millionen Euro pro Jahr, die im Projektbudget enthalten sind.'],
+      ['Wie viele Datenschutzvorfälle wurden im Berichtsjahr an die Aufsichtsbehörden gemeldet?',
+       'Im Berichtsjahr wurden {N} meldepflichtige Datenschutzvorfälle an die zuständigen Behörden gemeldet. Keiner davon führte zu einem Bußgeld.'],
     ],
   },
   {
     id: 'pruefer', unitId: 'unit-fin', agenda: ['top-5'], stage: ['supervisory_board_chair', 'cfo'],
-    questions: [
-      'Wie hoch war das Honorar des Abschlussprüfers im Geschäftsjahr {Y}, und welcher Anteil entfiel auf Nichtprüfungsleistungen?',
-      'Welche besonders wichtigen Prüfungssachverhalte hat der Abschlussprüfer im Bestätigungsvermerk benannt?',
-      'Wann ist der nächste Wechsel des Abschlussprüfers vorgesehen?',
-      'Hat der Abschlussprüfer Schwächen im internen Kontrollsystem festgestellt, und welche Maßnahmen wurden ergriffen?',
-    ],
-    answers: [
-      'Das Honorar des Abschlussprüfers betrug im Geschäftsjahr {Y} {N},{N} Millionen Euro; der Anteil der Nichtprüfungsleistungen lag bei {P} Prozent und damit innerhalb der gesetzlichen Grenze.',
-      'Der Bestätigungsvermerk benennt als besonders wichtige Prüfungssachverhalte die Werthaltigkeit der Geschäfts- oder Firmenwerte und die Bewertung der Rückstellungen für Rechtsstreitigkeiten. Beide sind im Geschäftsbericht abgedruckt.',
-      'Der Abschlussprüfer hat keine wesentlichen Schwächen des internen Kontrollsystems festgestellt. Hinweise zur Weiterentwicklung wurden mit dem Prüfungsausschuss erörtert und in das Maßnahmenprogramm aufgenommen.',
+    qa: [
+      ['Wie hoch war das Honorar des Abschlussprüfers im Geschäftsjahr {Y}, und welcher Anteil entfiel auf Nichtprüfungsleistungen?',
+       'Das Honorar des Abschlussprüfers betrug im Geschäftsjahr {Y} {N},{N} Millionen Euro; der Anteil der Nichtprüfungsleistungen lag bei {P} Prozent und damit innerhalb der gesetzlichen Grenze.'],
+      ['Welche besonders wichtigen Prüfungssachverhalte hat der Abschlussprüfer im Bestätigungsvermerk benannt?',
+       'Der Bestätigungsvermerk benennt als besonders wichtige Prüfungssachverhalte die Werthaltigkeit der Geschäfts- oder Firmenwerte und die Bewertung der Rückstellungen für Rechtsstreitigkeiten. Beide sind im Geschäftsbericht abgedruckt.'],
+      ['Wann ist der nächste Wechsel des Abschlussprüfers vorgesehen?',
+       'Die gesetzliche Höchstlaufzeit des Prüfungsmandats endet mit dem Geschäftsjahr {Y}+3. Der Prüfungsausschuss wird das Auswahlverfahren im Geschäftsjahr {Y}+2 durchführen und der Hauptversammlung einen Vorschlag unterbreiten.'],
+      ['Hat der Abschlussprüfer Schwächen im internen Kontrollsystem festgestellt, und welche Maßnahmen wurden ergriffen?',
+       'Der Abschlussprüfer hat keine wesentlichen Schwächen des internen Kontrollsystems festgestellt. Hinweise zur Weiterentwicklung wurden mit dem Prüfungsausschuss erörtert und in das Maßnahmenprogramm aufgenommen.'],
     ],
   },
 ];
@@ -410,21 +420,22 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
     return r < 0.05 ? 'delivered' : r < 0.15 ? 'staged' : r < 0.3 ? 'approved' : r < 0.45 ? 'in_review' : r < 0.6 ? 'answer_drafted' : r < 0.75 ? 'assigned' : r < 0.9 ? 'classified' : 'captured';
   };
 
-  const speechOf = (count: number): { text: string; parts: { text: string; start: number; end: number; topic: Topic }[] } => {
+  const speechOf = (count: number): { text: string; parts: { text: string; start: number; end: number; topic: Topic; answer: string }[] } => {
     const opening = pick(rnd, OPENINGS);
     let text = opening + ' ';
-    const parts: { text: string; start: number; end: number; topic: Topic }[] = [];
+    const parts: { text: string; start: number; end: number; topic: Topic; answer: string }[] = [];
     const usedTopics = new Set<string>();
     for (let i = 0; i < count; i++) {
       let topic = pick(rnd, TOPICS);
       if (usedTopics.has(topic.id) && chance(rnd, 0.7)) topic = pick(rnd, TOPICS);
       usedTopics.add(topic.id);
-      const qText = fill(pick(rnd, topic.questions), rnd, year);
+      const pair = pick(rnd, topic.qa);
+      const qText = fill(pair[0], rnd, year);
       const connective = i === 0 ? CONNECTIVES[0]! : pick(rnd, CONNECTIVES.slice(1));
       text += connective + ' ';
       const start = text.length;
       text += qText;
-      parts.push({ text: qText, start, end: text.length, topic });
+      parts.push({ text: qText, start, end: text.length, topic, answer: pair[1] });
       text += ' ';
     }
     const closing = pick(rnd, CLOSINGS);
@@ -520,7 +531,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       push({ type: 'QuestionAssigned', at: tick(15_000, 90_000), actor: SEED_ACTORS.capture1!, subjectId: qid, payload: { unitId } });
       if (targetStatus === 'assigned') continue;
 
-      const answerText = fill(pick(rnd, part.topic.answers), rnd, year);
+      const answerText = fill(part.answer, rnd, year);
       let version = 1;
       push({
         type: 'AnswerDrafted',
