@@ -17,21 +17,50 @@ export interface Candidate {
 /** Sentences shorter than this are punctuation noise ("Wirklich?"), not a question of record. */
 const MIN_LENGTH = 12;
 
-const SENTENCE = /[^?]*?\?/g;
+/**
+ * Abbreviations whose trailing period does not end a sentence. Dictated speeches are full of them
+ * ("in Mio. EUR", "z. B.", "Nr. 7"); a digit before the period ("3. Quartal") never ends one either.
+ */
+const ABBREVIATIONS = new Set([
+  'mio', 'mrd', 'tsd', 'nr', 'ca', 'bzw', 'vgl', 'abs', 'art', 'z', 'b', 'u', 'a', 'd', 'h',
+  'usw', 'evtl', 'ggf', 'inkl', 'exkl', 'sog', 'str', 'dr', 'prof', 'gj', 'vj', 'hv', 'ar',
+]);
+const LETTER = /[A-Za-zÄÖÜäöüß]/;
+
+/** Does the character at `i` end a sentence (or a connective such as "Meine erste Frage:")? */
+function endsSentence(chunk: string, i: number): boolean {
+  const ch = chunk[i];
+  const next = chunk[i + 1];
+  const followedByBreak = next === undefined || /\s/.test(next);
+  if (ch === '?' || ch === '!' || ch === ':') return followedByBreak;
+  if (ch !== '.' || !followedByBreak) return false;
+  let j = i - 1;
+  while (j >= 0 && LETTER.test(chunk[j]!)) j--;
+  const token = chunk.slice(j + 1, i);
+  if (token.length === 0) return false; // "3. Quartal", "..."
+  if (token.length <= 1) return false; // "z. B."
+  return !ABBREVIATIONS.has(token.toLowerCase());
+}
 
 export function suggestQuestions(text: string, uncovered: readonly TextSpan[]): Candidate[] {
   const candidates: Candidate[] = [];
   for (const span of uncovered) {
     const chunk = text.slice(span.start, span.end);
-    SENTENCE.lastIndex = 0;
-    let match = SENTENCE.exec(chunk);
-    while (match !== null) {
-      const raw = match[0];
-      const leading = raw.length - raw.trimStart().length;
-      const start = span.start + match.index + leading;
-      const end = span.start + match.index + raw.length;
+    let cursor = 0;
+    for (let q = chunk.indexOf('?'); q !== -1; q = chunk.indexOf('?', q + 1)) {
+      // The candidate runs from the last sentence end before the question mark to the mark itself.
+      let from = cursor;
+      for (let i = q - 1; i >= cursor; i--) {
+        if (endsSentence(chunk, i)) {
+          from = i + 1;
+          break;
+        }
+      }
+      while (from < q && /\s/.test(chunk[from]!)) from++;
+      const start = span.start + from;
+      const end = span.start + q + 1;
       if (end - start >= MIN_LENGTH) candidates.push({ text: text.slice(start, end), start, end });
-      match = SENTENCE.exec(chunk);
+      cursor = q + 1;
     }
   }
   return candidates;

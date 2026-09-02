@@ -11,12 +11,12 @@ describe('suggestQuestions', () => {
     expect(candidates[0]).toEqual({
       text: 'Ist die Antwort korrekt?',
       start: 0,
-      end: 25,
+      end: 24,
     });
     expect(candidates[1]).toEqual({
       text: 'Ist sie vollständig?',
-      start: 26,
-      end: 46,
+      start: 25,
+      end: 45,
     });
   });
 
@@ -34,8 +34,8 @@ describe('suggestQuestions', () => {
     });
   });
 
-  it('two questions: suggest multiple questions separated by period and uppercase', () => {
-    const text = 'Wann beginnt die Sitzung? Der CEO eröffnet um 10 Uhr. Was kommt danach?';
+  it('two questions: suggest multiple questions separated by question marks', () => {
+    const text = 'Wann beginnt die Sitzung? Was kommt danach?';
     const uncovered = [{ start: 0, end: text.length }];
     const candidates = suggestQuestions(text, uncovered);
 
@@ -47,9 +47,28 @@ describe('suggestQuestions', () => {
     });
     expect(candidates[1]).toEqual({
       text: 'Was kommt danach?',
-      start: 56,
-      end: 73,
+      start: 26,
+      end: 43,
     });
+  });
+});
+
+describe('suggestQuestions on a dictated speech', () => {
+  it('starts each candidate after the previous sentence or connective, keeps abbreviations and ordinals', () => {
+    const text =
+      'Sehr geehrte Damen und Herren, ich danke dem Vorstand für den Bericht. Meine erste Frage: ' +
+      'Wie hoch war der Aufwand (in Mio. EUR) im 3. Quartal? Zweitens: Wann rechnet die Gesellschaft, z. B. bis Nr. 4, mit einer Entscheidung? Vielen Dank.';
+    const candidates = suggestQuestions(text, [{ start: 0, end: text.length }]);
+    expect(candidates.map((c) => c.text)).toEqual([
+      'Wie hoch war der Aufwand (in Mio. EUR) im 3. Quartal?',
+      'Wann rechnet die Gesellschaft, z. B. bis Nr. 4, mit einer Entscheidung?',
+    ]);
+    for (const c of candidates) expect(text.slice(c.start, c.end)).toBe(c.text);
+  });
+  it('only proposes inside uncovered spans', () => {
+    const text = 'Erste Frage? Zweite Frage bitte?';
+    const candidates = suggestQuestions(text, [{ start: 13, end: text.length }]);
+    expect(candidates.map((c) => c.text)).toEqual(['Zweite Frage bitte?']);
   });
 });
 
