@@ -29,11 +29,12 @@ export function PhasePlaceholder({
         actions={<Badge tone="accent">{t('placeholder.badge', { slice })}</Badge>}
       />
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Panel bodyClassName="grid">
+        <Panel bodyClassName="grid place-items-center">
           <EmptyState
             icon={icon}
             title={t('placeholder.title')}
             description={t('placeholder.body', { phase: t(titleKey), slice })}
+            className="w-full max-w-xl"
           />
         </Panel>
         <MeetingPanel />

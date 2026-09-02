@@ -70,7 +70,7 @@ function Counter({
     <div
       data-testid={spec.testId}
       title={t(spec.titleKey)}
-      className="flex min-w-16 flex-col items-end"
+      className="flex flex-col items-end whitespace-nowrap"
     >
       <span className="hv-label">{t(spec.labelKey)}</span>
       <span
@@ -105,7 +105,7 @@ export function Header({
         >
           HV
         </span>
-        <div className="hidden flex-col leading-tight md:flex">
+        <div className="hidden flex-col leading-tight 2xl:flex">
           <span className="text-[13px] font-semibold text-ink-900">{t('app.name')}</span>
           <span className="hv-label">{t('app.tagline')}</span>
         </div>
@@ -113,7 +113,7 @@ export function Header({
 
       <span aria-hidden="true" className="h-7 w-px bg-line" />
 
-      <div data-testid="header-meeting-title" className="min-w-0 max-w-md">
+      <div data-testid="header-meeting-title" className="min-w-0 shrink">
         <div className="flex items-center gap-2">
           <h1 className="truncate text-[13px] font-semibold text-ink-900">
             {meeting?.title ?? t('header.meeting')}
@@ -135,7 +135,7 @@ export function Header({
 
       <div
         aria-label={t('header.counters')}
-        className="hidden items-center gap-5 rounded-md border border-line bg-sunken px-3 py-1 md:flex"
+        className="hidden shrink-0 items-center gap-4 rounded-md border border-line bg-sunken px-3 py-1 lg:flex"
       >
         {COUNTERS.map((spec) => (
           <Counter key={spec.testId} spec={spec} meeting={meeting} t={t} />

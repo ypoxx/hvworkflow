@@ -20,20 +20,22 @@ export function CapturePage() {
         initial={55}
         className="min-h-0 flex-1"
         left={
-          <Panel title={t('placeholder.left')} className="h-full">
+          <Panel title={t('placeholder.left')} className="h-full" bodyClassName="grid place-items-center">
             <EmptyState
               icon={PencilLine}
               title={t('placeholder.title')}
               description={t('placeholder.body', { phase: t('placeholder.left'), slice: '002' })}
+              className="w-full max-w-md"
             />
           </Panel>
         }
         right={
-          <Panel title={t('placeholder.right')} className="h-full">
+          <Panel title={t('placeholder.right')} className="h-full" bodyClassName="grid place-items-center">
             <EmptyState
               icon={ScissorsLineDashed}
               title={t('placeholder.title')}
               description={t('placeholder.body', { phase: t('placeholder.right'), slice: '002' })}
+              className="w-full max-w-md"
             />
           </Panel>
         }

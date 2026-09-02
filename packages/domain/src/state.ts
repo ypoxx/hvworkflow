@@ -57,6 +57,16 @@ export function refreshCounts(state: State): void {
     staged,
     delivered,
   };
+  // The current round is where the microphone is: the round of the speaker talking now, else the
+  // lowest round that still has someone waiting, else the last round that was registered.
+  const speakers = [...state.speakers.values()];
+  const speaking = speakers.find((s) => s.status === 'speaking');
+  if (speaking) state.meeting.currentRound = speaking.round;
+  else {
+    const waiting = speakers.filter((s) => s.status === 'waiting').map((s) => s.round);
+    if (waiting.length > 0) state.meeting.currentRound = Math.min(...waiting);
+    else if (speakers.length > 0) state.meeting.currentRound = Math.max(...speakers.map((s) => s.round));
+  }
 }
 
 function recomputeCoverage(state: State, contributionId: string): void {
@@ -106,7 +116,6 @@ export function reduce(state: State, e: DomainEvent): State {
         ...(p.organisation !== undefined ? { organisation: p.organisation } : {}),
         ...(p.requestedMinutes !== undefined ? { requestedMinutes: p.requestedMinutes } : {}),
       });
-      if (state.meeting && p.round > state.meeting.currentRound) state.meeting.currentRound = p.round;
       break;
     }
     case 'SpeakersReordered': {

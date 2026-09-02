@@ -65,6 +65,9 @@ export function RoleSwitcher() {
           <p className="px-2 py-1.5 text-2xs text-ink-500">{t('role.hint')}</p>
           {DEMO_ACTORS.map((persona) => {
             const active = persona.id === actor.id;
+          const label = roleLabel(t, persona.role);
+          // The persona name only adds something when it says more than the role itself.
+          const personaName = persona.displayName === label ? undefined : persona.displayName;
             return (
               <button
                 key={persona.id}
@@ -87,9 +90,11 @@ export function RoleSwitcher() {
                     active ? 'text-accent-700' : 'text-ink-800',
                   )}
                 >
-                  {roleLabel(t, persona.role)}
+                  {label}
                 </span>
-                <span className="truncate text-2xs text-ink-500">{persona.displayName}</span>
+                {personaName !== undefined && (
+                  <span className="truncate text-2xs text-ink-500">{personaName}</span>
+                )}
                 {active && (
                   <Check
                     size={14}

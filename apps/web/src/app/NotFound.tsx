@@ -11,7 +11,7 @@ export function NotFound() {
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader title={t('page.notFound.title')} description={t('page.notFound.description')} />
-      <Panel className="flex-1" bodyClassName="grid">
+      <Panel className="flex-1" bodyClassName="grid place-items-center">
         <EmptyState
           icon={Compass}
           title={t('page.notFound.title')}
@@ -21,6 +21,7 @@ export function NotFound() {
               {t('page.notFound.back')}
             </Button>
           }
+          className="w-full max-w-xl"
         />
       </Panel>
     </div>

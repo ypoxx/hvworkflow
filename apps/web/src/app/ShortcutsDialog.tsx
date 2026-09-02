@@ -17,11 +17,11 @@ const ROWS: readonly { keys: readonly string[]; descriptionKey: TKey }[] = [
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
   return (
-    <Dialog open={open} onClose={onClose} title={t('shortcuts.title')} size="sm">
+    <Dialog open={open} onClose={onClose} title={t('shortcuts.title')}>
       <Table>
         <THead>
           <TR>
-            <TH className="w-28">{t('shortcuts.column.key')}</TH>
+            <TH className="w-36">{t('shortcuts.column.key')}</TH>
             <TH>{t('shortcuts.column.action')}</TH>
           </TR>
         </THead>
@@ -29,7 +29,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
           {ROWS.map((row) => (
             <TR key={row.descriptionKey}>
               <TD>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   {row.keys.map((key, index) => (
                     <Fragment key={key}>
                       {index > 0 && <span className="text-ink-400">+</span>}

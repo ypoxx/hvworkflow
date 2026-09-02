@@ -24,7 +24,7 @@ export function Clock() {
   }, []);
 
   return (
-    <div className="hidden flex-col items-end lg:flex">
+    <div className="hidden shrink-0 flex-col items-end whitespace-nowrap xl:flex">
       <span className="hv-label">
         {t('clock.label')} {t('clock.zone')}
       </span>

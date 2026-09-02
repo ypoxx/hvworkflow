@@ -29,6 +29,11 @@ describe('synthetic corpus', () => {
       expect(c.text.slice(q.span!.start, q.span!.end)).toBe(q.text);
     }
   });
+  it('reports the round where the microphone is, not the last registered round', () => {
+    const speaking = [...state.speakers.values()].find((s) => s.status === 'speaking')!;
+    expect(state.meeting?.currentRound).toBe(speaking.round);
+    expect(state.meeting?.currentRound).toBe(3);
+  });
   it('has one speaker at the microphone and speakers waiting', () => {
     const statuses = [...state.speakers.values()].map((s) => s.status);
     expect(statuses.filter((s) => s === 'speaking')).toHaveLength(1);
