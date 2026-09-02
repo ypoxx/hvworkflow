@@ -1,0 +1,19 @@
+# Netlify project "hvtool": static build of the web interface (ADR 0002). No functions, no secrets.
+[build]
+  command = "pnpm install --frozen-lockfile && pnpm --filter @hv/domain typecheck && pnpm --filter @hv/web build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

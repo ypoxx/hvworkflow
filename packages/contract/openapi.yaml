@@ -1,0 +1,805 @@
+openapi: 3.1.0
+info:
+  title: HV-Tool API
+  version: 0.1.0
+  license: { name: Proprietary, identifier: LicenseRef-Proprietary }
+  summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
+  description: |
+    Single source of truth for the contract between the user interface, the application core and
+    neighbouring systems. Every endpoint is implemented by the application core (`apps/api`) and, for
+    the demo, by an in-process adapter that runs the same domain code inside the browser
+    (`packages/domain`, see ADR 0002).
+
+    Conventions (see docs/ist-analyse-und-schnittstellen.md, section 6):
+    - Writes carry an `Idempotency-Key`; replays return the original result.
+    - Resources carry an `ETag`; state-changing calls send `If-Match` and receive `412` on conflict.
+    - Errors are RFC 9457 problem details.
+    - Every response of a question includes `_actions`: the actions the calling actor may perform
+      now. The interface renders only what the server allows; it never derives rights from role names.
+    - Time is UTC, ISO 8601. The meeting clock is the only source of time for legally relevant events.
+    - Vocabulary follows the house glossary (docs/glossar.md). German terms in parentheses.
+  x-legal-notice: >
+    Legal references (§ 131 AktG etc.) are documented in the rule tables of the domain package and
+    must be verified by the legal department before the specification is frozen.
+servers:
+  - url: /v1
+    description: Same-origin API. In the demo the path is served in-process.
+tags:
+  - { name: meeting, description: The general meeting (Hauptversammlung) and its master data }
+  - { name: speakers, description: List of speakers (Wortmeldeliste) }
+  - { name: contributions, description: Speeches (Redebeiträge) and their capture }
+  - { name: questions, description: Individual questions (Einzelfragen) and their workflow }
+  - { name: stage, description: Podium view (Bühne) }
+  - { name: events, description: Append-only event feed for neighbouring systems and the history }
+  - { name: demo, description: 'Demo-only operations, never deployed to production' }
+security:
+  - demoActor: []
+paths:
+  /meeting:
+    get:
+      tags: [meeting]
+      operationId: getMeeting
+      summary: Get the current meeting
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+  /agenda-items:
+    get:
+      tags: [meeting]
+      operationId: listAgendaItems
+      summary: List agenda items (Tagesordnungspunkte)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+  /units:
+    get:
+      tags: [meeting]
+      operationId: listUnits
+      summary: List answering units (Fachbereiche)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+  /speakers:
+    get:
+      tags: [speakers]
+      operationId: listSpeakers
+      summary: List speakers (Wortmeldeliste), ordered by round and position
+      parameters:
+        - { name: round, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/SpeakerStatus' } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+    post:
+      tags: [speakers]
+      operationId: registerSpeaker
+      summary: Register a speaker (Wortmeldung aufnehmen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerRegistration' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /speakers/order:
+    put:
+      tags: [speakers]
+      operationId: reorderSpeakers
+      summary: Set the order of speakers within a round (Reihenfolge ändern)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [round, speakerIds]
+              properties:
+                round: { type: integer, minimum: 1 }
+                speakerIds: { type: array, items: { type: string } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /speakers/{speakerId}:
+    parameters: [ { $ref: '#/components/parameters/SpeakerId' } ]
+    get:
+      tags: [speakers]
+      operationId: getSpeaker
+      summary: Get a speaker
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [speakers]
+      operationId: updateSpeaker
+      summary: Change speaker status or round (Redner aufrufen, beenden, zurückziehen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerUpdate' } } }
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /contributions:
+    get:
+      tags: [contributions]
+      operationId: listContributions
+      summary: List speeches (Redebeiträge)
+      parameters:
+        - { name: speakerId, in: query, schema: { type: string } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
+    post:
+      tags: [contributions]
+      operationId: captureContribution
+      summary: Capture a speech (Redebeitrag erfassen)
+      description: >
+        Creates the immutable text of a speech. Questions are then atomised out of it with
+        `captureQuestions`. Later, transcript segments arrive through the ingest interface and become
+        contributions the same way.
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ContributionCapture' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /contributions/{contributionId}:
+    parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
+    get:
+      tags: [contributions]
+      operationId: getContribution
+      summary: Get a speech with its coverage (Restabdeckung)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /contributions/{contributionId}/questions:
+    parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
+    post:
+      tags: [questions]
+      operationId: captureQuestions
+      summary: Atomise a speech into individual questions (Einzelfragen erfassen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questions]
+              properties:
+                questions:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/QuestionCapture' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Question' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /questions:
+    get:
+      tags: [questions]
+      operationId: listQuestions
+      summary: List questions with filters
+      parameters:
+        - { name: status, in: query, schema: { type: array, items: { $ref: '#/components/schemas/QuestionStatus' } }, style: form, explode: false }
+        - { name: track, in: query, schema: { $ref: '#/components/schemas/Track' } }
+        - { name: unitId, in: query, schema: { type: string } }
+        - { name: speakerId, in: query, schema: { type: string } }
+        - { name: contributionId, in: query, schema: { type: string } }
+        - { name: agendaItemId, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Full-text search over question and answer text, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 2000, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Question' } }
+                  total: { type: integer }
+  /questions/{questionId}:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    get:
+      tags: [questions]
+      operationId: getQuestion
+      summary: Get a question with its answer versions and allowed actions
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /questions/{questionId}/history:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    get:
+      tags: [questions, events]
+      operationId: getQuestionHistory
+      summary: Full event history of a question (Vorgangshistorie)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Event' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /questions/{questionId}/classification:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: classifyQuestion
+      summary: Classify a question (Klassifizieren) — answer track, agenda item, stage assignment
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Classification' } } }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /questions/{questionId}/assignment:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: assignQuestion
+      summary: Assign a question to an answering unit (Zuweisen an Fachbereich)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId]
+              properties:
+                unitId: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/answers:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: draftAnswer
+      summary: Add an answer version (Antwortentwurf)
+      description: >
+        Every call creates a new, immutable answer version. If the question was already approved,
+        the approval is bound to the earlier version and the question falls back to `answer_drafted`.
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AnswerDraft' } } }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /questions/{questionId}/review-submissions:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: submitForReview
+      summary: Submit the current answer version for legal clearing (Zur Prüfung geben)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/approvals:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: approveQuestion
+      summary: Approve an answer version (Freigeben) — the approval is bound to the version
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answerVersion]
+              properties:
+                answerVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /questions/{questionId}/returns:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: returnQuestion
+      summary: Return a question for rework (Zurückgeben) from review, staging or the podium
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/staging:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions, stage]
+      operationId: stageQuestion
+      summary: Put an approved question on the podium queue (Auf die Bühne legen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/delivery:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions, stage]
+      operationId: deliverQuestion
+      summary: Mark the answer as read out on the podium (Vorgelesen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/closure:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: closeQuestion
+      summary: Close a delivered question (Abschließen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/withdrawal:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: withdrawQuestion
+      summary: Withdraw a question (Zurückgezogen) — e.g. the shareholder withdrew it
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /questions/{questionId}/merge:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: mergeQuestion
+      summary: Merge a duplicate into another question (Zusammenführen)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intoQuestionId]
+              properties:
+                intoQuestionId: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+  /stage:
+    get:
+      tags: [stage]
+      operationId: getStage
+      summary: Podium view (Bühne) — current question, queue, counters
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
+  /events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: Append-only event feed. Poll with `after` = last seen sequence number.
+      parameters:
+        - { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 1000 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, lastSeq]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                  lastSeq: { type: integer }
+  /demo/seed:
+    post:
+      tags: [demo]
+      operationId: seedDemo
+      summary: Replace all data with a synthetic corpus (demo only)
+      x-demo-only: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questions: { type: integer, minimum: 0, maximum: 5000, default: 800 }
+                seed: { type: integer, default: 2027 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    demoActor:
+      type: apiKey
+      in: header
+      name: X-Actor
+      description: >
+        Demo stand-in for OIDC. Value `<actorId>:<role>`. The production adapter maps OIDC claims to
+        the same actor context; nothing else in the system changes.
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://idp.example.invalid/.well-known/openid-configuration
+      description: Production authentication (planned, see docs/rollen-und-rechtekonzept.md).
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 128 }
+      description: Client-generated key. A replay with the same key returns the original result.
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      schema: { type: string }
+      description: ETag of the resource the client last saw. Mismatch yields 412.
+    SpeakerId: { name: speakerId, in: path, required: true, schema: { type: string } }
+    ContributionId: { name: contributionId, in: path, required: true, schema: { type: string } }
+    QuestionId: { name: questionId, in: path, required: true, schema: { type: string } }
+  headers:
+    ETag:
+      schema: { type: string }
+      description: Opaque version tag, changes with every write.
+  responses:
+    QuestionUpdated:
+      description: Updated question with new ETag and current `_actions`
+      headers: { ETag: { $ref: '#/components/headers/ETag' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } }
+    Forbidden:
+      description: The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`)
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    NotFound:
+      description: Not found
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Conflict:
+      description: The transition is not allowed from the current status
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    PreconditionFailed:
+      description: If-Match did not match the current ETag
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Unprocessable:
+      description: Validation failed
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details, extended with the rule id that produced the decision.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        ruleId: { type: string, description: 'Rule id from the domain rule tables, e.g. R-TRANS-07' }
+    Role:
+      type: string
+      description: >
+        Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface
+        never branches on a role name; it reads `_actions`.
+      enum: [moderation, capture, expert, legal, approver, podium, admin, observer]
+    Actor:
+      type: object
+      required: [id, role]
+      properties:
+        id: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        displayName: { type: string }
+    Action:
+      type: string
+      description: Permission identifiers, identical to the domain permission list.
+      enum:
+        - speaker.register
+        - speaker.reorder
+        - speaker.update
+        - contribution.capture
+        - question.capture
+        - question.classify
+        - question.assign
+        - answer.draft
+        - question.submit_review
+        - question.approve
+        - question.return
+        - question.stage
+        - question.deliver
+        - question.close
+        - question.withdraw
+        - question.merge
+        - question.read
+        - demo.seed
+    Meeting:
+      type: object
+      required: [id, title, date, status, currentRound, counts]
+      properties:
+        id: { type: string }
+        title: { type: string, examples: ['Ordentliche Hauptversammlung 2027'] }
+        legalEntity: { type: string }
+        date: { type: string, format: date }
+        status: { type: string, enum: [preparation, running, closed] }
+        currentRound: { type: integer, minimum: 1 }
+        counts:
+          type: object
+          description: Aggregate counters for the header and the podium
+          properties:
+            speakers: { type: integer }
+            questions: { type: integer }
+            open: { type: integer }
+            staged: { type: integer }
+            delivered: { type: integer }
+    AgendaItem:
+      type: object
+      required: [id, number, title]
+      properties:
+        id: { type: string }
+        number: { type: integer }
+        title: { type: string }
+    Unit:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        shortName: { type: string }
+    SpeakerStatus:
+      type: string
+      enum: [waiting, speaking, finished, withdrawn]
+    Speaker:
+      type: object
+      required: [id, number, displayName, kind, round, position, status, version]
+      properties:
+        id: { type: string }
+        number: { type: integer, description: Running number of the request to speak }
+        displayName: { type: string, description: Pseudonym in the demo; real name only via the register interface }
+        organisation: { type: string }
+        kind: { type: string, enum: [shareholder, proxy, association] }
+        round: { type: integer, minimum: 1 }
+        position: { type: integer, minimum: 1 }
+        status: { $ref: '#/components/schemas/SpeakerStatus' }
+        requestedMinutes: { type: integer }
+        speakingStartedAt: { type: string, format: date-time }
+        speakingEndedAt: { type: string, format: date-time }
+        questionCount: { type: integer }
+        version: { type: integer }
+        _actions: { type: array, items: { $ref: '#/components/schemas/Action' } }
+    SpeakerRegistration:
+      type: object
+      required: [displayName, kind]
+      properties:
+        displayName: { type: string, minLength: 1 }
+        organisation: { type: string }
+        kind: { type: string, enum: [shareholder, proxy, association] }
+        round: { type: integer, minimum: 1 }
+        requestedMinutes: { type: integer, minimum: 1 }
+    SpeakerUpdate:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/SpeakerStatus' }
+        round: { type: integer, minimum: 1 }
+        requestedMinutes: { type: integer, minimum: 1 }
+    TextSpan:
+      type: object
+      description: Character offsets into the contribution text, half-open interval
+      required: [start, end]
+      properties:
+        start: { type: integer, minimum: 0 }
+        end: { type: integer, minimum: 0 }
+    Contribution:
+      type: object
+      required: [id, speakerId, text, capturedAt, questionIds, coverage]
+      properties:
+        id: { type: string }
+        speakerId: { type: string }
+        text: { type: string }
+        capturedAt: { type: string, format: date-time }
+        source: { type: string, enum: [manual, transcript], default: manual }
+        questionIds: { type: array, items: { type: string } }
+        coverage:
+          type: object
+          description: How much of the text is covered by captured questions (Restabdeckung)
+          required: [coveredRatio, uncovered]
+          properties:
+            coveredRatio: { type: number, minimum: 0, maximum: 1 }
+            uncovered: { type: array, items: { $ref: '#/components/schemas/TextSpan' } }
+    ContributionCapture:
+      type: object
+      required: [speakerId, text]
+      properties:
+        speakerId: { type: string }
+        text: { type: string, minLength: 1 }
+        source: { type: string, enum: [manual, transcript] }
+    Track:
+      type: string
+      description: >
+        The three answer tracks (Antwortpfade). `podium` = free answer by the board (Pfad A),
+        `fast_track` = reference to an existing publication (Pfad B), `expert_track` = specialist
+        answer followed by legal clearing (Pfad C).
+      enum: [podium, fast_track, expert_track]
+    StageAssignment:
+      type: string
+      description: Who answers on the podium (Bühnenzuordnung)
+      enum: [supervisory_board_chair, ceo, cfo, board_member]
+    QuestionStatus:
+      type: string
+      description: >
+        Workflow status. Transitions are defined as data in the domain transition table; the
+        interface never hard-codes them.
+      enum:
+        - captured
+        - classified
+        - assigned
+        - answer_drafted
+        - in_review
+        - approved
+        - staged
+        - delivered
+        - closed
+        - withdrawn
+        - merged
+    AnswerVersion:
+      type: object
+      required: [version, text, createdAt, createdBy]
+      properties:
+        version: { type: integer, minimum: 1 }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        createdBy: { $ref: '#/components/schemas/Actor' }
+        sources:
+          type: array
+          description: References the answer relies on (publication, catalogue entry, document)
+          items: { type: string }
+    Approval:
+      type: object
+      required: [answerVersion, approvedAt, approvedBy]
+      properties:
+        answerVersion: { type: integer }
+        approvedAt: { type: string, format: date-time }
+        approvedBy: { $ref: '#/components/schemas/Actor' }
+    Question:
+      type: object
+      required: [id, number, contributionId, speakerId, text, status, answers, version, createdAt, updatedAt, _actions]
+      properties:
+        id: { type: string }
+        number: { type: string, examples: ['F-0417'] }
+        contributionId: { type: string }
+        speakerId: { type: string }
+        speakerDisplayName: { type: string }
+        text: { type: string }
+        span: { $ref: '#/components/schemas/TextSpan' }
+        status: { $ref: '#/components/schemas/QuestionStatus' }
+        track: { $ref: '#/components/schemas/Track' }
+        agendaItemId: { type: string }
+        stageAssignment: { $ref: '#/components/schemas/StageAssignment' }
+        unitId: { type: string }
+        answers: { type: array, items: { $ref: '#/components/schemas/AnswerVersion' } }
+        approval: { $ref: '#/components/schemas/Approval' }
+        returnReason: { type: string }
+        stagePosition: { type: integer }
+        deliveredAt: { type: string, format: date-time }
+        mergedIntoId: { type: string }
+        version: { type: integer, description: 'Optimistic-locking counter, also the ETag' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        _actions:
+          type: array
+          description: Actions the calling actor may perform on this question right now
+          items: { $ref: '#/components/schemas/Action' }
+    QuestionCapture:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, minLength: 1 }
+        span: { $ref: '#/components/schemas/TextSpan' }
+    Classification:
+      type: object
+      required: [track]
+      properties:
+        track: { $ref: '#/components/schemas/Track' }
+        agendaItemId: { type: string }
+        stageAssignment: { $ref: '#/components/schemas/StageAssignment' }
+    AnswerDraft:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, minLength: 1 }
+        sources: { type: array, items: { type: string } }
+    StageView:
+      type: object
+      required: [current, queue, deliveredCount, openCount]
+      properties:
+        current:
+          oneOf:
+            - { $ref: '#/components/schemas/Question' }
+            - { type: 'null' }
+        queue: { type: array, items: { $ref: '#/components/schemas/Question' } }
+        deliveredCount: { type: integer }
+        openCount: { type: integer }
+    Event:
+      type: object
+      description: One immutable fact. The sequence number is global and gap-free.
+      required: [seq, id, type, at, actor, payload]
+      properties:
+        seq: { type: integer }
+        id: { type: string }
+        type:
+          type: string
+          enum:
+            - MeetingCreated
+            - SpeakerRegistered
+            - SpeakersReordered
+            - SpeakerUpdated
+            - ContributionCaptured
+            - QuestionCaptured
+            - QuestionClassified
+            - QuestionAssigned
+            - AnswerDrafted
+            - QuestionSubmittedForReview
+            - QuestionApproved
+            - QuestionReturned
+            - QuestionStaged
+            - QuestionDelivered
+            - QuestionClosed
+            - QuestionWithdrawn
+            - QuestionMerged
+        at: { type: string, format: date-time }
+        actor: { $ref: '#/components/schemas/Actor' }
+        subjectId: { type: string, description: Id of the aggregate the event belongs to }
+        payload: { type: object, additionalProperties: true }

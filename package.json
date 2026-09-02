@@ -1,0 +1,28 @@
+{
+  "name": "hvworkflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HV-Tool: end-to-end Q&A workflow for the general meeting of one DAX company.",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/* --filter ./apps/* build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "gates": "pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm --filter @hv/web build",
+    "contract:types": "openapi-typescript packages/contract/openapi.yaml -o packages/contract/src/types.ts",
+    "contract:lint": "redocly lint packages/contract/openapi.yaml",
+    "vocabulary": "node scripts/vocabulary-check.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "openapi-typescript": "^7.13.0",
+    "@redocly/cli": "^2.0.0",
+    "prettier": "^3.6.0",
+    "vitest": "^4.1.11",
+    "oxlint": "^1.79.0"
+  }
+}
