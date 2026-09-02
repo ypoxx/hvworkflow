@@ -17,7 +17,7 @@ export interface Candidate {
 /** Sentences shorter than this are punctuation noise ("Wirklich?"), not a question of record. */
 const MIN_LENGTH = 12;
 
-const SENTENCE = /[^.!?…]*\?/g;
+const SENTENCE = /[^?]*?\?/g;
 
 export function suggestQuestions(text: string, uncovered: readonly TextSpan[]): Candidate[] {
   const candidates: Candidate[] = [];

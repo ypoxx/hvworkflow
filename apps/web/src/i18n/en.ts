@@ -138,6 +138,8 @@ export const en: Dictionary = {
   'capture.error.body': 'The corpus cannot be reached at the moment.',
   'nav.collapse': 'Collapse navigation',
   'nav.expand': 'Expand navigation',
+  'capture.key.alt': 'Alt',
+  'capture.key.q': 'Q',
 
   'header.meeting': 'General Meeting',
   'header.round': 'Round {round}',

@@ -108,7 +108,7 @@ export function SpeakersPage() {
    * contract carries no `_actions` list for it; the permission bundle that may change a Wortmeldung
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
-  const mayRegister = view.some((speaker) => speaker._actions.includes('speaker.update'));
+  const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
 
   const run = useCallback(
     async (id: string, action: () => Promise<unknown>): Promise<boolean> => {

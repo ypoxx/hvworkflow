@@ -60,8 +60,8 @@ export function QuestionsPane({
             action={
               <span className="flex items-center gap-1.5 text-2xs text-ink-500">
                 {t('capture.selection.hint')}
-                <Kbd>Alt</Kbd>
-                <Kbd>Q</Kbd>
+                <Kbd>{t('capture.key.alt')}</Kbd>
+                <Kbd>{t('capture.key.q')}</Kbd>
               </span>
             }
           />

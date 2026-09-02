@@ -180,8 +180,8 @@ export function ContributionText({
             {t('capture.selection.add')}
           </Button>
           <span className="flex items-center gap-1">
-            <Kbd>Alt</Kbd>
-            <Kbd>Q</Kbd>
+            <Kbd>{t('capture.key.alt')}</Kbd>
+            <Kbd>{t('capture.key.q')}</Kbd>
           </span>
         </div>
       )}

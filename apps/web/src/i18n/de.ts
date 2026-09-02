@@ -137,6 +137,8 @@ export const de = {
   'capture.error.body': 'Der Bestand ist gerade nicht erreichbar.',
   'nav.collapse': 'Navigation einklappen',
   'nav.expand': 'Navigation ausklappen',
+  'capture.key.alt': 'Alt',
+  'capture.key.q': 'Q',
 
   'header.meeting': 'Hauptversammlung',
   'header.round': 'Runde {round}',
