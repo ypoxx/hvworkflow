@@ -201,12 +201,17 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       );
     }
   };
-  /** Wrap a write so that an idempotency key replays the first result instead of re-executing. */
-  const idempotent = <T>(opts: WriteOptions | undefined, run: () => T): T => {
+  /**
+   * Wrap a write so that an idempotency key replays the first result instead of re-executing.
+   * The key is scoped to the calling actor and the operation (R-IDEM-01): a replay by another actor
+   * or against another resource is a new request and goes through the permission check again.
+   */
+  const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
-    if (key !== undefined && idempotency.has(key)) return idempotency.get(key) as T;
+    const scoped = key !== undefined ? `${actor().id}|${scope}|${key}` : undefined;
+    if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
     const result = run();
-    if (key !== undefined) idempotency.set(key, result);
+    if (scoped !== undefined) idempotency.set(scoped, result);
     return result;
   };
   const append = (events: Omit<NewEvent, 'id' | 'at' | 'actor'>[]): DomainEvent[] => {
@@ -226,7 +231,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     payload: unknown,
     build: (q: QuestionRecord, to: QuestionRecord['status']) => Omit<NewEvent, 'id' | 'at' | 'actor'>,
   ): Question =>
-    idempotent(opts, () => {
+    idempotent(`${action}:${id}`, opts, () => {
       const q = requireQuestion(id);
       const perm = hasPermission(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
@@ -276,7 +281,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return viewSpeaker(requireSpeaker(id));
     },
     async registerSpeaker(input, opts) {
-      return idempotent(opts, () => {
+      return idempotent('registerSpeaker', opts, () => {
         requirePermission('speaker.register');
         if (!input.displayName?.trim()) throw new ApiProblem(422, 'Unprocessable', 'displayName is required.');
         const round = input.round ?? state.meeting?.currentRound ?? 1;
@@ -301,7 +306,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       });
     },
     async reorderSpeakers(round, speakerIds, opts) {
-      return idempotent(opts, () => {
+      return idempotent(`reorderSpeakers:${round}`, opts, () => {
         requirePermission('speaker.reorder');
         for (const id of speakerIds) requireSpeaker(id);
         append([{ type: 'SpeakersReordered', subjectId: state.meeting?.id ?? 'meeting', payload: { round, speakerIds } }]);
@@ -312,7 +317,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       });
     },
     async updateSpeaker(id, input, opts) {
-      return idempotent(opts, () => {
+      return idempotent(`updateSpeaker:${id}`, opts, () => {
         requirePermission('speaker.update');
         const s = requireSpeaker(id);
         checkIfMatch(s.version, opts);
@@ -332,7 +337,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return { ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } };
     },
     async captureContribution(input, opts) {
-      return idempotent(opts, () => {
+      return idempotent('captureContribution', opts, () => {
         requirePermission('contribution.capture');
         requireSpeaker(input.speakerId);
         if (!input.text?.trim()) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
@@ -342,7 +347,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       });
     },
     async captureQuestions(contributionId, questions, opts) {
-      return idempotent(opts, () => {
+      return idempotent(`captureQuestions:${contributionId}`, opts, () => {
         requirePermission('question.capture');
         const c = requireContribution(contributionId);
         if (questions.length === 0) throw new ApiProblem(422, 'Unprocessable', 'At least one question is required.');

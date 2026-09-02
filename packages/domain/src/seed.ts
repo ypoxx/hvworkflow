@@ -437,7 +437,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
   // speakers who have finished, with jitter but an exact sum.
   const nowCaptured = speakingNow ? Math.min(3, target) : 0;
   const rest = target - nowCaptured;
-  const counts = new Array<number>(spoken.length).fill(0);
+  const counts: number[] = Array.from({ length: spoken.length }, () => 0);
   if (spoken.length > 0) {
     const base = Math.floor(rest / spoken.length);
     counts.fill(base);

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import { seedEvents } from '../seed.js';
-import type { Actor } from '../types.js';
+import type { Actor, Question } from '../types.js';
 
 const actors: Record<string, Actor> = {
   admin: { id: 'admin', role: 'admin' },
@@ -140,6 +140,22 @@ describe('invariants', () => {
     const b = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
     expect(b).toEqual(a);
     expect((await api.listEvents(0, 100000)).lastSeq).toBe(before + 1);
+  });
+
+  it('R-IDEM-01: an idempotency key is scoped to actor and operation', async () => {
+    as(actors.capture!);
+    const { items } = await api.listQuestions({ status: ['captured'], limit: 2 });
+    const [a, b] = items as [Question, Question];
+    const first = await api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' });
+    // Another actor replaying the same key is a new request: permission check applies, no leak of _actions.
+    as(actors.observer!);
+    await expect(api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' })).rejects.toMatchObject({ status: 403 });
+    // The same actor with the same key on another resource executes independently.
+    as(actors.capture!);
+    const other = await api.classifyQuestion(b.id, { track: 'fast_track' }, { idempotencyKey: 'shared' });
+    expect(other.id).toBe(b.id);
+    expect(other.track).toBe('fast_track');
+    expect(await api.classifyQuestion(a.id, { track: 'expert_track' }, { idempotencyKey: 'shared' })).toEqual(first);
   });
 
   it('a new answer version after approval voids the approval (bound to the text)', async () => {
