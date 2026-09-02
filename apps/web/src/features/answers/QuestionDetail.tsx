@@ -2,13 +2,14 @@
  * One question, everything that has been written about it, and exactly the steps this person may
  * take on it right now.
  *
- * Nothing on this side is inferred: status, approval and answer versions are read from the record,
- * and every button is gated on `question._actions` (the one exception, "Freigeben", is explained in
- * `rights.ts`). What may not be done is not shown — it is not greyed out (design principle 9).
+ * Nothing on this side is inferred: status, answer versions and approval are read from the record,
+ * a lapsed approval is read from the event log, and every button without exception is gated on
+ * `question._actions`. What may not be done is not shown — it is not greyed out (principle 9).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, Undo2 } from 'lucide-react';
-import type { AgendaItem, Actor, Question, Unit } from '@hv/domain';
+import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
+import { Link } from 'react-router';
+import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
 import {
   Badge,
   Button,
@@ -24,8 +25,7 @@ import {
 } from '../../components';
 import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n';
 import { AnswerEditor } from './AnswerEditor';
-import { clockTime, relativeAge, sealedApproval } from './lib';
-import { latestVersion, mayApproveLatest } from './rights';
+import { clockTime, lapsedApproval, latestVersion, relativeAge, sealedApproval } from './lib';
 
 export type DetailAction =
   | { kind: 'draft'; text: string; sources: string }
@@ -39,7 +39,8 @@ export type DetailAction =
 
 interface QuestionDetailProps {
   question: Question;
-  actor: Actor;
+  /** The events of this question; carries the fact of a lapsed approval. */
+  history: readonly DomainEvent[];
   units: readonly Unit[];
   agendaItems: readonly AgendaItem[];
   busy: boolean;
@@ -119,7 +120,7 @@ function VersionCard({
 
 export function QuestionDetail({
   question,
-  actor,
+  history,
   units,
   agendaItems,
   busy,
@@ -162,7 +163,7 @@ export function QuestionDetail({
   const may = question._actions;
   const mayDraft = may.includes('answer.draft');
   const maySubmit = may.includes('question.submit_review');
-  const mayApprove = mayApproveLatest(actor, question);
+  const mayApprove = may.includes('question.approve');
   const mayStage = may.includes('question.stage');
   const mayReturn = may.includes('question.return');
   const mayAssign = may.includes('question.assign');
@@ -186,6 +187,7 @@ export function QuestionDetail({
               : 'none';
 
   const seal = sealedApproval(question);
+  const lapsed = lapsedApproval(question, history);
   // A question that has come to rest (closed, withdrawn, merged) offers nothing; then the command
   // bar is not empty, it is gone.
   const hasSteps =
@@ -297,7 +299,17 @@ export function QuestionDetail({
 
           <KeyValueList className="grid-cols-2 sm:grid-cols-3">
             <KeyValue label={t('answers.detail.speaker')}>
-              {question.speakerDisplayName ?? t('common.none')}
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="truncate">{question.speakerDisplayName ?? t('common.none')}</span>
+                {/* The capture desk opens on this Wortmeldung — the question came out of its Redebeitrag. */}
+                <Link
+                  data-testid="answers-detail-contribution"
+                  to={`/capture?speaker=${encodeURIComponent(question.speakerId)}`}
+                  className="text-2xs text-accent-600 underline underline-offset-2 hover:text-accent-700"
+                >
+                  {t('answers.detail.contributionLink')}
+                </Link>
+              </span>
             </KeyValue>
             <KeyValue label={t('answers.detail.agenda')}>
               <span className="line-clamp-2" title={agendaItem?.title ?? ''}>
@@ -361,6 +373,22 @@ export function QuestionDetail({
               </>
             )}
           </div>
+
+          {/* A seal the newest text has voided. Read from the event log, never from the status. */}
+          {lapsed !== undefined && (
+            <p
+              data-testid="approval-lapsed"
+              className="flex items-center gap-2 rounded-md border border-line-strong bg-ink-50 px-3 py-2 text-[13px] text-ink-600"
+            >
+              <ShieldOff
+                size={16}
+                strokeWidth={1.75}
+                className="shrink-0 text-ink-400"
+                aria-hidden="true"
+              />
+              {t('answers.approval.lapsed', { previous: lapsed.previous, current: lapsed.current })}
+            </p>
+          )}
 
           <div className="space-y-2">
             <span className="hv-label">{t('answers.versions.title')}</span>

@@ -1,6 +1,6 @@
 # 003 — Beantwortung (Expert Track), Freigabe, Bühne, Historie & Suche
 
-**Status:** rework
+**Status:** accepted
 **Role:** Implementierer Oberfläche (Sonnet)
 **Rule ids:** AGENTS.md rules 4, 5, 6, 9, 10; domain R-TRANS-02…R-TRANS-12, R-GUARD-04
 
@@ -129,7 +129,8 @@ seven events of that question plus the event stream of the meeting.
 
 ### Notes for the reviewer
 
-- **`question.approve` never appears in `_actions`.** `actionsFor()` in `packages/domain/src/api.ts`
+- **`question.approve` never appears in `_actions`** — *resolved in the rework below: the domain
+  guard was fixed and `rights.ts` is gone.* `actionsFor()` in `packages/domain/src/api.ts`
   evaluates every transition with an empty payload, so guard R-GUARD-04 (`approvalIsLatest`) can
   never pass and the approval step would be invisible to everyone — the domain test in
   `packages/domain/src/__tests__/api.test.ts:85` pins that behaviour. Since `packages/domain` is
@@ -144,124 +145,83 @@ seven events of that question plus the event stream of the meeting.
 
 ## Review findings
 
-Reviewed at commit `ab111bd` (interface diff `f13ab48..0babf20`, domain fix `e542c21` already applied on
-top and verified real: `pnpm --filter @hv/domain test` → 38/38 passing, and
-`packages/domain/src/__tests__/api.test.ts:88` asserts `(await api.getQuestion(q.id))._actions` contains
-`'question.approve'`, the capability-without-payload case). Verified independently against spec, rules and
-diff; the slice file's own "## Evidence" section was not used as a source of truth.
+(filled by the reviewer)
 
-1. **MAJOR** — `apps/web/src/features/answers/rights.ts:14,22-26` and its call site
-   `apps/web/src/features/answers/QuestionDetail.tsx:28,165` call the domain's decision point `can()`
-   directly from the interface (`import { can } from '@hv/domain'`) to gate the "Freigeben" button. This
-   was a documented workaround for a real bug in `actionsFor()` — that bug is now fixed
-   (`packages/domain/src/transitions.ts`'s `R-GUARD-04` treats a payload-less call as the capability
-   question, per `e542c21`), so `question.approve` now appears in `question._actions` for every actor who
-   may approve, exactly like every other action. The workaround is now dead weight that violates AGENTS.md
-   rule 6 ("The interface uses the `HvApi` interface... talks to `HvApi` only") and rule 4's spirit (a
-   second, parallel decision point besides `_actions`). **Fix:** delete `rights.ts` (or reduce it to the
-   pure `latestVersion()` helper with no domain import), and in `QuestionDetail.tsx` replace
-   `mayApprove = mayApproveLatest(actor, question)` with `mayApprove = may.includes('question.approve')`,
-   gated on `_actions` like every other button. Drop the `actor` prop from `QuestionDetailProps` if nothing
-   else in the component needs it.
+## Rework
 
-2. **MAJOR** — Approval block does not implement the "erloschen" (expired) state that Goal A explicitly
-   specifies: *"If a newer version exists the block shows 'Freigabe erloschen durch Version 3' (status is
-   `answer_drafted` then — do not invent this in the interface, read it from the record)."* The current
-   code only distinguishes "sealed" vs. "not sealed" (`apps/web/src/features/answers/lib.ts:52-56`,
-   `sealedApproval()`) and when not sealed falls back to a generic status badge
-   (`apps/web/src/features/answers/QuestionDetail.tsx:332-363`, the `approval-block` div) with no mention
-   of which version voided the approval. There is no i18n key for this at all — confirmed absent from both
-   `apps/web/src/i18n/de.ts` and `en.ts` (the `// --- 003` blocks were diffed key-for-key: 141/141, no
-   "erloschen"/"expired" key exists in either). The e2e spec (`apps/web/e2e/003-answers-stage.spec.ts`)
-   never exercises this path either, so nothing catches the gap. **Fix:** in `QuestionDetail.tsx`, when
-   `question.approval !== undefined` but `sealedApproval(question)` is `undefined` (i.e. a newer answer
-   version exists), render a distinct message reading the invalidating version from the record
-   (`question.answers[question.answers.length - 1].version`, which is exactly what `sealedApproval`
-   already computes against) instead of the plain status badge fallback; add the matching DE/EN key pair
-   (e.g. `answers.approval.expired`) to the `// --- 003` i18n blocks.
+Round 1 after the review, on top of the merge with `claude/dax-shareholder-meeting-workflow-0s934z`
+(which brings the domain fix: guard R-GUARD-04 answers the capability question when it is asked
+without a payload, so `question.approve` now appears in `_actions` — `pnpm --filter @hv/domain test`
+→ 38 passed).
 
-3. **MINOR** — Goal A's detail spec reads *"question text with speaker and contribution link"*; the
-   contribution link is entirely absent. `question.contributionId` is a required field on every `Question`
-   (`packages/domain/src/types.ts:157`) but is never read anywhere in
-   `apps/web/src/features/answers/QuestionDetail.tsx` or elsewhere in the `answers` feature (confirmed by
-   `grep -rn "contributionId" apps/web/src/features/answers` → no matches). The question text is shown
-   (`QuestionDetail.tsx:293-296`) with speaker (`answers.detail.speaker` key-value) but nothing lets a
-   reader jump to or view the originating Redebeitrag. **Fix:** add a link/button in the detail header or
-   the key-value grid that opens the contribution (e.g. via `api.getContribution(question.contributionId)`
-   in a small popover/dialog, or a link into `/capture` filtered to that contribution) — reusing whatever
-   pattern the `capture` feature already has for showing a contribution's text.
+1. **MAJOR, `can()` in the interface — done.** `apps/web/src/features/answers/rights.ts` is deleted.
+   "Freigeben" is gated on `question._actions.includes('question.approve')` like every other button,
+   and `latestVersion()` (a pure read of the record) moved into `features/answers/lib.ts`. The only
+   values the three feature folders still import from `@hv/domain` are `etagOf` and the constant
+   lists `QUESTION_STATUSES` / `TERMINAL_STATUSES` / `TRACKS`; everything else is `import type`.
+2. **MAJOR, "Freigabe erloschen" — done.** `lapsedApproval()` in `features/answers/lib.ts` reads the
+   state off the event log: no `approval` on the record, an `AnswerDrafted` event carrying
+   `invalidatedApprovalOfVersion`, and no `QuestionApproved` after it. The detail loads the history
+   of the open question lazily (one `api.getQuestionHistory` per selection, in the same `Promise.all`
+   as `getQuestion`) and shows a muted block `approval-lapsed`: "Freigabe der Version {previous}
+   erloschen durch Version {current}" (`answers.approval.lapsed`, DE/EN). Nothing is inferred from
+   the status. Evidence: `docs/evidence/003-approval-lapsed.png`.
+3. **MINOR, link to the Redebeitrag — done.** The detail's Wortmeldung field carries a link
+   `answers-detail-contribution` → `/capture?speaker=<question.speakerId>`, which the capture desk
+   reads as its preselected Wortmeldung (`answers.detail.contributionLink`, DE/EN).
 
-No other findings: no role-name comparisons in `apps/web/src/features/**` (rule 4), no re-implemented
-status/transition logic outside the domain (rule 5), no `fetch(` and no other domain-bypassing calls
-besides finding 1 (rule 6), `node scripts/vocabulary-check.mjs` → `vocabulary-check: ok` (rule 9), and no
-hard-coded user-visible strings were found in JSX/attributes across `answers/`, `stage/`, `history/` (rule
-10; every literal checked routes through `t(...)`). All required `data-testid`s are present and correctly
-wired (`answers-filter-status-<status>`, `answers-filter-track-<track>`, `answers-search`, `answers-row`
-with `data-number`/`data-status`, `answers-detail`, `answers-detail-number`, `answer-editor`,
-`answer-sources`, `answer-submit-draft`, `answer-submit-review`, `answer-approve`, `answer-return`,
-`answer-return-reason`, `answer-return-submit`, `answer-stage`, `answer-assign`, `answer-assign-unit`,
-`answer-assign-submit`, `answer-merge`, `answer-withdraw`, `approval-block`, `answer-version` with
-`data-version`, `stage-current`, `stage-current-number`, `stage-current-text`, `stage-answer`,
-`stage-assignment`, `stage-queue`, `stage-queue-item` with `data-number`, `stage-next`, `stage-return`,
-`stage-return-reason`, `stage-return-submit`, `stage-only-toggle`, `stage-counter-delivered`,
-`stage-counter-open`, `history-search`, `history-result` with `data-number`, `history-timeline`,
-`history-event` with `data-type`, `history-tab-stream`). Files touched stay within the allowed list
-(`apps/web/src/features/{answers,stage,history}/**`, the `// --- 003` i18n blocks, `e2e/003-*`,
-`docs/evidence/003-*`, this slice doc — `apps/web/src/app/routes.tsx` was not touched because it was
-already wired). `apps/web/src/features/stage/Page.tsx` uses `api.getStage()` (a single server-computed
-call), not a client-side scan of `listQuestions()` over all 800 questions, and every list/detail/stage
-effect is keyed off `useApiVersion()` plus an explicit `reload()`/`nonce`, with no feedback-loop
-dependencies; keyboard handlers (`stage/Page.tsx`'s `Space`/`R`, `app/AppShell.tsx`'s `Alt+N`) are attached
-and removed via `useEffect` cleanup. Every write (`answers/Page.tsx`'s `run()`, `stage/Page.tsx`'s
-`deliver()`/`returnAnswer()`) sends `ifMatch: etagOf(version)` and calls `showProblem` + `reload()` on
-refusal, including 412; `showProblem` (pre-existing, `apps/web/src/components/toastStore.ts`) surfaces
-`detail` and `ruleId` from the `ApiProblem` shape for 403/409 as required. Podium type sizes meet the
-minimums (`text-[28px]` for the question in `stage/Podium.tsx:136`, `text-[24px]` for the answer at
-`:158`); the podium answer text is gated through `approvedAnswer()` (`stage/lib.ts:18-23`), which mirrors
-`R-GUARD-04` and only returns text for the version the approval is actually bound to, falling back to the
-podium-track placeholder otherwise; the queue is capped at 8 (`StageQueue`, `Podium.tsx:202`); "Nur Bühne"
-is persisted in `localStorage` and rendered as a `fixed inset-0 z-40` overlay above the shell
-(`stage/Page.tsx:288-304`) since the shell itself is not touched.
+Also in this round: after a deliberate act (row selected, filter changed, search cleared) the work
+list now reveals the open question once the list that act produced has arrived — a plain refetch
+still never moves the scroll position.
 
-### Verdict: rework
-
-Blocking findings: #1 and #2 above (both MAJOR). #3 is MINOR and does not by itself block acceptance, but
-should be fixed in the same pass.
-
-### Gate output observed
-
-`pnpm gates` (exit 0):
+### `pnpm gates` (exit 0)
 
 ```
 packages/domain test:  Test Files  4 passed (4)
 packages/domain test:       Tests  38 passed (38)
 apps/api test:  Test Files  3 passed (3)
 apps/api test:       Tests  25 passed (25)
-apps/web test: No test files found, exiting with code 0
 
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3
 > node scripts/vocabulary-check.mjs
+
 vocabulary-check: ok
 
-> @hv/web@0.0.0 build
-tsc -b && vite build
-✓ 1696 modules transformed.
-✓ built in 1.25s
+> @hv/web@0.0.0 build /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1695 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-BhQ1UYbP.css                        36.70 kB │ gzip:   8.06 kB
+dist/assets/index-CsPaxkco.js                        502.74 kB │ gzip: 147.77 kB │ map: 2,073.67 kB
+
+✓ built in 1.18s
 ```
 
-(oxlint reported only the pre-existing `react(set-state-in-effect)` warning class, same kind already
-carried by `src/api/useApiVersion.ts` before this slice — no new lint errors.)
-
-`E2E_PORT=4185 pnpm --filter @hv/web e2e --grep 003`:
+### `E2E_PORT=4183 pnpm --filter @hv/web e2e --grep 003` (exit 0)
 
 ```
+> @hv/web@0.0.0 e2e /home/user/hvworkflow/.claude/worktrees/agent-a31949b65eef9eee3/apps/web
+> playwright test --grep 003
+
 Running 1 test using 1 worker
 
-  ✓  1 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (42.3s)
+  ✓  1 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.3s)
 
-  1 passed (44.7s)
+  1 passed (45.4s)
 ```
 
-`docs/evidence/003-*.png` were regenerated by that run and restored afterwards
-(`git checkout -- docs/evidence/003-answers.png docs/evidence/003-history.png docs/evidence/003-stage-only.png docs/evidence/003-stage.png`)
-so the working tree matches what was reviewed; `docs/evidence/001-*.png` and `002-*.png` were not touched
-by this review's runs.
+The spec now also asserts the link to the Redebeitrag and walks the lapsed approval: as Fachbereich
+a new version is drafted on an approved question (never the one that has to reach the podium), the
+`approval-lapsed` block appears and the seal is gone. Screenshots regenerated on the merged corpus:
+`003-answers.png`, `003-stage.png`, `003-stage-only.png`, `003-history.png`, and the new
+`003-approval-lapsed.png`. `001-*` and `002-*` evidence was not touched (the run was filtered
+with `--grep 003`).

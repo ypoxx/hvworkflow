@@ -61,6 +61,12 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(detail).toBeVisible();
   await expect(page.getByTestId('answers-detail-number')).toHaveText(number!);
 
+  // The question keeps its origin: one click back to the Redebeitrag it was atomised from.
+  await expect(page.getByTestId('answers-detail-contribution')).toHaveAttribute(
+    'href',
+    /\/capture\?speaker=/,
+  );
+
   await page
     .getByTestId('answer-editor')
     .fill(
@@ -97,6 +103,33 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.getByTestId('answer-return-submit').click();
   await expect(page.getByTestId('answers-detail')).toContainText('Antwortentwurf');
 
+  /* ---------- Fachbereich: a new version voids the approval that was on the old one ---------- */
+  await asRole(page, 'expert');
+  await page.getByTestId('answers-filter-status-approved').click();
+  // Not the question of this walk-through: it has to keep its approval to reach the podium.
+  const otherApproved = page
+    .locator(`[data-testid="answers-row"]:not([data-number="${number!}"])`)
+    .first();
+  await expect(otherApproved).toHaveAttribute('data-status', 'approved');
+  await otherApproved.click();
+  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
+
+  await page
+    .getByTestId('answer-editor')
+    .fill(
+      'Ergänzte Fassung: die Zahl ist mit dem Konzernanhang abgeglichen und dort auf Seite 118 belegt.',
+    );
+  await page.getByTestId('answer-submit-draft').click();
+
+  const lapsed = page.getByTestId('approval-lapsed');
+  await expect(lapsed).toBeVisible();
+  await expect(lapsed).toContainText('erloschen');
+  await expect(page.getByTestId('approval-block')).not.toContainText('Freigegeben');
+
+  await clearToasts(page);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('003-approval-lapsed.png') });
+
   // Back to the question of this walk-through, found by its number.
   await page.getByTestId('answers-filter-status-all').click();
   await page.getByTestId('answers-search').fill(number!);
@@ -112,7 +145,11 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(page.getByTestId('answers-detail')).toContainText('auf der Bühne');
 
   // The backlog as it is really read: every status in one list, one question open beside it.
+  // The search is debounced, so wait until the whole corpus is back in the list.
   await page.getByTestId('answers-search').fill('');
+  await expect(page.getByTestId('answers-filter-status-all')).toContainText(
+    String(SEEDED_QUESTIONS),
+  );
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-answers.png') });

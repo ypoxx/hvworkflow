@@ -12,7 +12,6 @@ import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, WriteOptions } from '@hv/domain';
 import { api } from '../../api';
-import { useActor } from '../../api/actor';
 import { EmptyState, Panel, PageHeader, SplitPane, showProblem, showToast } from '../../components';
 import { actionLabel, useT } from '../../i18n';
 import { AssignDialog, MergeDialog, ReasonDialog } from './ActionDialogs';
@@ -27,7 +26,6 @@ type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | null;
 
 export function AnswersPage() {
   const t = useT();
-  const actor = useActor();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
@@ -159,7 +157,7 @@ export function AnswersPage() {
               <QuestionDetail
                 key={question.id}
                 question={question}
-                actor={actor}
+                history={backlog.selectedHistory}
                 units={backlog.units}
                 agendaItems={backlog.agendaItems}
                 busy={busy}
