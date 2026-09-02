@@ -20,7 +20,9 @@ describe('synthetic corpus', () => {
     for (const s of ['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved', 'staged', 'delivered', 'closed']) {
       expect(present.has(s as (typeof QUESTION_STATUSES)[number])).toBe(true);
     }
-    expect(state.meeting?.counts.staged).toBeGreaterThan(5);
+    // A short podium queue: reachable within a few presses, but never empty.
+    expect(state.meeting?.counts.staged).toBeGreaterThanOrEqual(3);
+    expect(state.meeting?.counts.staged).toBeLessThanOrEqual(12);
   });
   it('keeps every question span inside its speech text', () => {
     for (const q of state.questions.values()) {

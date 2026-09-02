@@ -42,4 +42,13 @@ wurde, mit Review-Befunden), `docs/messung.md` (was es gekostet hat).
 
 ## Bekannte Punkte
 
-(wird nach den Reviews ergänzt)
+- **Die Bühne arbeitet die Warteschlange in Reihenfolge ab.** Eine neu auf die Bühne gelegte Frage
+  steht hinten an. Der Demo-Korpus hält die Warteschlange deshalb kurz (eine Handvoll), sodass die
+  eigene Frage nach wenigen „Vorgelesen, weiter" erreicht ist. Ein Vorziehen durch das
+  Versammlungsbüro ist für den Piloten vorgesehen, nicht in der Demo.
+- **Jeder Browser hat seinen eigenen Stand** (ADR 0002). Zwei Geräte sehen nicht dieselben Daten.
+- **Pfad A und B** sind klassifizierbar und laufen durch die Statusmaschine, haben aber keine eigene
+  Oberfläche über den Expert Track hinaus.
+- **Zusammenführen und Zurückziehen** sind vorhanden, aber nicht Teil des Ablaufs oben.
+- **Ereignisstrom und Historie** zeigen Rohereignisse in Hausvokabular; eine Exportfunktion für die
+  Nachweisführung gibt es noch nicht.

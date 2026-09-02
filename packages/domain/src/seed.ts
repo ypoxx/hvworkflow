@@ -415,9 +415,12 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
   // Target status by round: the further back the round, the further the questions have progressed.
   const statusFor = (round: number): QuestionStatus => {
     const r = rnd();
-    if (round === 1) return r < 0.55 ? 'closed' : r < 0.78 ? 'delivered' : r < 0.9 ? 'staged' : r < 0.96 ? 'approved' : 'in_review';
-    if (round === 2) return r < 0.25 ? 'closed' : r < 0.45 ? 'delivered' : r < 0.6 ? 'staged' : r < 0.75 ? 'approved' : r < 0.85 ? 'in_review' : r < 0.95 ? 'answer_drafted' : 'assigned';
-    return r < 0.05 ? 'delivered' : r < 0.15 ? 'staged' : r < 0.3 ? 'approved' : r < 0.45 ? 'in_review' : r < 0.6 ? 'answer_drafted' : r < 0.75 ? 'assigned' : r < 0.9 ? 'classified' : 'captured';
+    // The podium queue is deliberately short (a handful): the podium reads in order, so a freshly
+    // staged question must be reachable within a few "weiter" presses. The backlog before the stage
+    // (approved, in review, drafting) is where the afternoon pressure sits.
+    if (round === 1) return r < 0.55 ? 'closed' : r < 0.78 ? 'delivered' : r < 0.79 ? 'staged' : r < 0.93 ? 'approved' : 'in_review';
+    if (round === 2) return r < 0.25 ? 'closed' : r < 0.45 ? 'delivered' : r < 0.462 ? 'staged' : r < 0.68 ? 'approved' : r < 0.8 ? 'in_review' : r < 0.92 ? 'answer_drafted' : 'assigned';
+    return r < 0.05 ? 'delivered' : r < 0.07 ? 'staged' : r < 0.22 ? 'approved' : r < 0.42 ? 'in_review' : r < 0.6 ? 'answer_drafted' : r < 0.75 ? 'assigned' : r < 0.9 ? 'classified' : 'captured';
   };
 
   const speechOf = (count: number): { text: string; parts: { text: string; start: number; end: number; topic: Topic; answer: string }[] } => {
