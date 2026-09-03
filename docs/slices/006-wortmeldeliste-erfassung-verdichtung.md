@@ -136,3 +136,15 @@ wrapping `<span className="w-20">` instead and leaving `ProgressBar` unmodified 
 follow whenever a consumer needs to constrain this component's width.
 
 ## Review findings
+
+### Design-Kritik (Fable, Screenshots 006-speakers.png, 006-capture.png)
+
+1. **major** — `features/speakers/NowSpeaking.tsx`: der Zeitbudget-Ring sitzt zwischen Name und Timer und
+   nimmt dem Namen die Breite ("Vera Reh…" wird abgeschnitten). Erwartet: Ring unmittelbar links neben
+   dem mm:ss-Timer in derselben Gruppe; die Namensspalte bekommt `flex-1 min-w-0` und wird bei 1440 px
+   nicht abgeschnitten (Playwright: `scrollWidth === clientWidth` des Namens).
+2. **minor** — Erfassung: eine soeben klassifizierte Karte bleibt aufgeklappt (gewollt, kein
+   Auto-Einklappen während der Bearbeitung). Nach einem Neuladen der Seite muss sie eingeklappt sein;
+   bitte im e2e-Test prüfen.
+3. Alles Übrige entspricht der Spec: Marker, Hover-Kopplung, Rundenfortschritt, gedämpfte Zeilen,
+   Art-Icons, Quellen-Icon, Restabdeckung über den Kit-Balken.
