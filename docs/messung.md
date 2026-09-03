@@ -34,7 +34,7 @@ mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtp
 |---|---|---|---|---|---|---|---|
 | Planung, Kern/Vertrag `byStatus`, Specs 005–007 | Architekt · Fable 5.1 | 08:45 | 09:08 | — | — | ja | 39 Kern-Tests |
 | 005 Designsystem-Erweiterung | Implementierer · Sonnet 5 | 09:10 | 10:21 | 2 (Design-Kritik Fable: Kopfzeile bricht um, Titel abgeschnitten; dann Scroll-Kompromiss abgelehnt → Balken mit Popover-Legende) | 0/1/1 | ja (5 e2e) | 481 Tsd. Token, 229 Werkzeugaufrufe, 71 min inkl. zwei Nacharbeitsrunden |
-| 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | 09:52 | | | | | |
+| 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | 09:52 | 10:26 | | | ja (5 e2e) | 367 Tsd. Token, 198 Werkzeugaufrufe, 34 min; Kit-Lücke gemeldet: Progress ohne Attribut-Durchreichung, Breitenklasse kollidiert mit w-full |
 | 007 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 (Worktree) | 09:52 | | | | | |
 | Gebündeltes Review 005–007 | Reviewer · Opus 5 | | | | | | |
 | Nacharbeit, Endkontrolle, Push | Mechaniker · Haiku / Architekt · Fable | | | | | | |
