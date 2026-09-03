@@ -22,9 +22,9 @@ import {
   showProblem,
 } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
-import { EventStream, Timeline } from './Timeline';
+import { EventStream, HistoryKpiLine, Timeline } from './Timeline';
 import type { SummaryContext } from './eventSummary';
-import { RESULT_LIMIT, STREAM_LIMIT, excerpt } from './lib';
+import { RESULT_LIMIT, STREAM_LIMIT, excerpt, loadCurve } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -92,6 +92,7 @@ export function HistoryPage() {
   const [speakerNames, setSpeakerNames] = useState<ReadonlyMap<string, string>>(new Map());
   const [history, setHistory] = useState<readonly DomainEvent[]>([]);
   const [stream, setStream] = useState<readonly DomainEvent[]>([]);
+  const [curve, setCurve] = useState<readonly number[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,12 +156,15 @@ export function HistoryPage() {
   useEffect(() => {
     if (tab !== 'stream') return undefined;
     let cancelled = false;
-    // The log is read from the end: ask for its length first, then for the last events only.
+    // The log is read from the end for the visible tail; the Lastkurve (point 9) needs the whole
+    // log, since two real-time hours can hold far more than the tail the table shows.
     api
       .listEvents(0, 1)
-      .then(({ lastSeq }) => api.listEvents(Math.max(0, lastSeq - STREAM_LIMIT), STREAM_LIMIT))
+      .then(({ lastSeq }) => api.listEvents(0, lastSeq))
       .then((page) => {
-        if (!cancelled) setStream([...page.items].reverse());
+        if (cancelled) return;
+        setStream(page.items.slice(-STREAM_LIMIT).reverse());
+        setCurve(loadCurve(page.items, Date.now()));
       })
       .catch(problem);
     return () => {
@@ -346,7 +350,7 @@ export function HistoryPage() {
           >
             <div id="history-panel" role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
               {tab === 'stream' ? (
-                <EventStream events={stream} context={context} />
+                <EventStream events={stream} context={context} curve={curve} />
               ) : selected === null ? (
                 <div className="p-4">
                   <EmptyState
@@ -357,6 +361,7 @@ export function HistoryPage() {
                 </div>
               ) : (
                 <div className="px-4 py-4">
+                  <HistoryKpiLine events={history} />
                   <Timeline
                     events={history}
                     context={context}

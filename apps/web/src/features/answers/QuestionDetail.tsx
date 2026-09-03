@@ -25,7 +25,58 @@ import {
 } from '../../components';
 import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n';
 import { AnswerEditor } from './AnswerEditor';
-import { clockTime, lapsedApproval, latestVersion, relativeAge, sealedApproval } from './lib';
+import {
+  clockTime,
+  lapsedApproval,
+  latestVersion,
+  relativeAge,
+  sealedApproval,
+  wordDiff,
+} from './lib';
+
+/**
+ * "Änderung gegenüber Version n-1" (point 3): a word-level diff, removed words struck through,
+ * added words underlined. Rendered inline so that reading it needs no separate view.
+ */
+function AnswerDiff({ previous, current }: { previous: string; current: string }) {
+  const parts = useMemo(() => wordDiff(previous, current), [previous, current]);
+  return (
+    <p
+      data-testid="answer-diff"
+      className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap"
+    >
+      {parts.map((part, index) => {
+        if (part.type === 'equal') return <span key={index}>{part.text} </span>;
+        if (part.type === 'removed') {
+          return (
+            <span
+              key={index}
+              className="line-through"
+              style={{
+                backgroundColor: 'var(--color-tone-danger-bg)',
+                color: 'var(--color-tone-danger-fg)',
+              }}
+            >
+              {part.text}{' '}
+            </span>
+          );
+        }
+        return (
+          <span
+            key={index}
+            className="underline"
+            style={{
+              backgroundColor: 'var(--color-tone-success-bg)',
+              color: 'var(--color-tone-success-fg)',
+            }}
+          >
+            {part.text}{' '}
+          </span>
+        );
+      })}
+    </p>
+  );
+}
 
 export type DetailAction =
   | { kind: 'draft'; text: string; sources: string }
@@ -55,6 +106,7 @@ function VersionCard({
   at,
   text,
   sources,
+  previousText,
   latest,
   open,
   onToggle,
@@ -64,11 +116,14 @@ function VersionCard({
   at: string;
   text: string;
   sources: readonly string[] | undefined;
+  /** The text of version n-1, when there is one — carries the diff toggle (point 3). */
+  previousText: string | undefined;
   latest: boolean;
   open: boolean;
   onToggle: () => void;
 }) {
   const t = useT();
+  const [showDiff, setShowDiff] = useState(false);
   return (
     <div
       data-testid="answer-version"
@@ -111,6 +166,23 @@ function VersionCard({
                 </Badge>
               ))}
             </div>
+          )}
+          {previousText !== undefined && (
+            <>
+              <button
+                type="button"
+                data-testid="answer-diff-toggle"
+                aria-expanded={showDiff}
+                onClick={() => setShowDiff((value) => !value)}
+                className={cx(
+                  'mt-2.5 inline-flex h-6 items-center rounded-sm px-1.5 text-2xs font-medium',
+                  'text-ink-500 transition-colors duration-100 hover:bg-ink-50 hover:text-ink-700',
+                )}
+              >
+                {t('answers.diff.toggle', { previous: version - 1 })}
+              </button>
+              {showDiff && <AnswerDiff previous={previousText} current={text} />}
+            </>
           )}
         </div>
       )}
@@ -400,7 +472,7 @@ export function QuestionDetail({
               </p>
             ) : (
               <div className="space-y-1.5">
-                {question.answers.map((answer) => (
+                {question.answers.map((answer, index) => (
                   <VersionCard
                     key={answer.version}
                     version={answer.version}
@@ -408,6 +480,7 @@ export function QuestionDetail({
                     at={answer.createdAt}
                     text={answer.text}
                     sources={answer.sources}
+                    previousText={question.answers[index - 1]?.text}
                     latest={answer.version === latest}
                     open={open.includes(answer.version)}
                     onToggle={() =>

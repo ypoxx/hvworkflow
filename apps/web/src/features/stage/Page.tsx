@@ -10,7 +10,7 @@
  * away for a minute cannot overwrite a return that happened in the meantime.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Contrast, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { StageView } from '@hv/domain';
 import { api } from '../../api';
@@ -21,6 +21,7 @@ import { Podium, StageQueue } from './Podium';
 import { isInteractiveTarget } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
+const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
 
 function loadStageOnly(): boolean {
   try {
@@ -30,11 +31,28 @@ function loadStageOnly(): boolean {
   }
 }
 
+function loadStageContrast(): boolean {
+  try {
+    return localStorage.getItem(STAGE_CONTRAST_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `--color-stage-text` rather than `text-ink-900`: identical near-black in the ordinary view, but
+ * this counter also has to survive on the black ground of Kontrastmodus (point 6).
+ */
 function Counter({ testId, label, value }: { testId: string; label: string; value: number }) {
   return (
     <div data-testid={testId} className="flex flex-col leading-tight">
       <span className="hv-label">{label}</span>
-      <span className="font-mono text-[20px] font-medium tabular-nums text-ink-900">{value}</span>
+      <span
+        className="font-mono text-[20px] font-medium tabular-nums"
+        style={{ color: 'var(--color-stage-text)' }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -115,6 +133,7 @@ export function StagePage() {
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [stageOnly, setStageOnly] = useState(loadStageOnly);
+  const [contrast, setContrast] = useState(loadStageContrast);
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
@@ -149,6 +168,18 @@ export function StagePage() {
         localStorage.setItem(STAGE_ONLY_KEY, next ? '1' : '0');
       } catch {
         /* ignore: podium-only mode then simply starts off again */
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleContrast = useCallback(() => {
+    setContrast((value) => {
+      const next = !value;
+      try {
+        localStorage.setItem(STAGE_CONTRAST_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore: contrast mode then simply starts off again */
       }
       return next;
     });
@@ -238,12 +269,17 @@ export function StagePage() {
     </div>
   );
 
+  // A "secondary" button's own text (`text-ink-800`) would go dark-on-dark once Kontrastmodus turns
+  // the ground black; `--color-stage-text` is near-black in the ordinary view and near-white there.
+  const stageTextStyle = { color: 'var(--color-stage-text)' };
+
   const toggle = (
     <Button
       data-testid="stage-only-toggle"
       variant={stageOnly ? 'secondary' : 'ghost'}
       aria-pressed={stageOnly}
       aria-label={stageOnly ? t('stage.only.leave') : t('stage.only.enter')}
+      style={stageOnly ? stageTextStyle : undefined}
       icon={
         stageOnly ? (
           <Minimize2 size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -254,6 +290,22 @@ export function StagePage() {
       onClick={toggleStageOnly}
     >
       {stageOnly ? t('stage.only.leave') : t('stage.only.label')}
+    </Button>
+  );
+
+  // Kontrastmodus (point 6): black ground, near-white text, one light accent — offered only inside
+  // "Nur Bühne", the device this is actually for.
+  const contrastToggle = (
+    <Button
+      data-testid="stage-contrast-toggle"
+      variant={contrast ? 'secondary' : 'ghost'}
+      aria-pressed={contrast}
+      style={contrast ? stageTextStyle : undefined}
+      aria-label={contrast ? t('stage.contrast.leave') : t('stage.contrast.enter')}
+      icon={<Contrast size={15} strokeWidth={1.75} aria-hidden="true" />}
+      onClick={toggleContrast}
+    >
+      {t('stage.contrast.label')}
     </Button>
   );
 
@@ -287,10 +339,14 @@ export function StagePage() {
 
   if (stageOnly) {
     return (
-      <div data-testid="stage-only" className="fixed inset-0 z-40 flex flex-col bg-surface">
+      <div
+        data-testid="stage-only"
+        className={cx('fixed inset-0 z-40 flex flex-col bg-surface', contrast && 'stage-contrast')}
+      >
         <div className="flex shrink-0 items-center gap-6 border-b border-line px-8 py-3">
           {counters}
           <span className="flex-1" />
+          {contrastToggle}
           {toggle}
         </div>
         <div className="flex min-h-0 flex-1 gap-8 px-8 py-6">

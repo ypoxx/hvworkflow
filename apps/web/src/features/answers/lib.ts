@@ -103,3 +103,74 @@ export function splitSources(input: string): string[] {
     .map((source) => source.trim())
     .filter((source) => source.length > 0);
 }
+
+/**
+ * Urgency of an open row, from the age of the question alone (no status logic, AGENTS.md rule 5):
+ * 0 under 15 minutes, 1 from 15 to 45, 2 beyond that. The caller decides whether a terminal status
+ * shows it at all.
+ */
+export function urgencyLevel(createdAt: string, now: number): 0 | 1 | 2 {
+  const minutes = (now - Date.parse(createdAt)) / 60_000;
+  if (minutes < 15) return 0;
+  if (minutes < 45) return 1;
+  return 2;
+}
+
+/** One token of a word-level diff: kept, taken out, or put in. */
+export interface DiffPart {
+  type: 'equal' | 'removed' | 'added';
+  text: string;
+}
+
+/**
+ * A word-level diff between two answer texts, so that "Änderung gegenüber Version n-1" can be read
+ * at a glance instead of re-read in full. LCS over whitespace tokens — plenty for a few hundred words
+ * of house prose, and simple enough to keep without pulling in a diff library.
+ */
+export function wordDiff(a: string, b: string): DiffPart[] {
+  const left = a.split(/\s+/).filter((word) => word.length > 0);
+  const right = b.split(/\s+/).filter((word) => word.length > 0);
+  const n = left.length;
+  const m = right.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i]![j] =
+        left[i] === right[j]
+          ? lcs[i + 1]![j + 1]! + 1
+          : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+    }
+  }
+
+  const parts: DiffPart[] = [];
+  const push = (type: DiffPart['type'], text: string): void => {
+    const last = parts[parts.length - 1];
+    if (last !== undefined && last.type === type) last.text = `${last.text} ${text}`;
+    else parts.push({ type, text });
+  };
+
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (left[i] === right[j]) {
+      push('equal', left[i]!);
+      i += 1;
+      j += 1;
+    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) {
+      push('removed', left[i]!);
+      i += 1;
+    } else {
+      push('added', right[j]!);
+      j += 1;
+    }
+  }
+  while (i < n) {
+    push('removed', left[i]!);
+    i += 1;
+  }
+  while (j < m) {
+    push('added', right[j]!);
+    j += 1;
+  }
+  return parts;
+}
