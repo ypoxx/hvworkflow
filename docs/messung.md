@@ -23,3 +23,18 @@ daneben. Zeiten in Europe/Berlin.
   einer schwachen Oberfläche in der Entscheidungsdemo gering.
 - Reviews laufen in derselben Nacht; Nacharbeit wird gebündelt, um die Demo bis zum Morgen zu
   erreichen. Befunde, die nicht mehr behoben werden, stehen im Demo-Skript als bekannte Punkte.
+
+## Bautag 2 — 3. September 2026 (UI-Verbesserungsrunde)
+
+Planung durch Fable 5.1 (Design-Kritik → drei Scheiben-Specs 005–007, Kern- und Vertragserweiterung
+`counts.byStatus`). Umsetzung bewusst mit Sonnet 5, Mechanik mit Haiku 4.5, ein gebündeltes Review
+mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtprüfung.
+
+| Scheibe | Rolle · Modell | Start | Ende | Reviewrunden | Befunde (blocker/major/minor) | Tore grün | Bemerkung |
+|---|---|---|---|---|---|---|---|
+| Planung, Kern/Vertrag `byStatus`, Specs 005–007 | Architekt · Fable 5.1 | 00:35 | 00:55 | — | — | ja | 39 Kern-Tests |
+| 005 Designsystem-Erweiterung | Implementierer · Sonnet 5 | 00:56 | | | | | |
+| 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | | | | | | |
+| 007 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 (Worktree) | | | | | | |
+| Gebündeltes Review 005–007 | Reviewer · Opus 5 | | | | | | |
+| Nacharbeit, Endkontrolle, Push | Mechaniker · Haiku / Architekt · Fable | | | | | | |
