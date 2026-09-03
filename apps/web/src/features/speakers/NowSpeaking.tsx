@@ -6,19 +6,31 @@
 import { Mic, MicOff, PencilLine } from 'lucide-react';
 import { Link } from 'react-router';
 import type { Speaker } from '@hv/domain';
-import { Badge, Button, Panel, cx } from '../../components';
+import { Button, Panel, ProgressRing, cx } from '../../components';
 import { useT } from '../../i18n';
 import { speakerKindLabel } from './labels';
 import { SpeakingTimer, useElapsedSeconds } from './SpeakingTimer';
-import { TimerRing } from './TimerRing';
 
-function Identity({ speaker, className }: { speaker: Speaker; className?: string }) {
+function Identity({
+  speaker,
+  className,
+  nameTestId,
+}: {
+  speaker: Speaker;
+  className?: string;
+  /** Set only on the "Am Mikrofon" identity: `next`'s uses the same component and would otherwise
+   *  make the testid ambiguous (both are present whenever a speaker is being called). */
+  nameTestId?: string;
+}) {
   const t = useT();
   return (
     <div className={cx('flex min-w-0 flex-col gap-0.5', className)}>
       <div className="flex min-w-0 items-baseline gap-2">
         <span className="font-mono text-[13px] tabular-nums text-ink-500">{speaker.number}</span>
-        <span className="truncate text-[16px] leading-6 font-semibold text-ink-900">
+        <span
+          {...(nameTestId !== undefined ? { 'data-testid': nameTestId } : {})}
+          className="truncate text-[16px] leading-6 font-semibold text-ink-900"
+        >
           {speaker.displayName}
         </span>
       </div>
@@ -64,37 +76,44 @@ export function NowSpeaking({
           </p>
         ) : (
           <div className="flex h-14 flex-wrap items-center gap-4">
-            <Identity speaker={speaking} className="flex-1" />
-            <div className="flex flex-col items-end">
-              <span className="hv-label">{t('speakers.now.elapsed')}</span>
-              <div className="flex items-center gap-2">
-                {elapsed !== null && budgetSeconds !== undefined && (
-                  <TimerRing
-                    value={elapsed}
-                    max={budgetSeconds}
-                    tone={elapsed >= budgetSeconds ? 'warn' : 'accent'}
-                    label={t('speakers.now.elapsed')}
-                    testId="speaker-timer-ring"
+            {/*
+             * R6 (006 rework): the name needs real priority, not leftover space — `min-w-[220px]`
+             * keeps it from being squeezed by the fixed-width blocks that follow, which are grouped
+             * into one `shrink-0` unit so they wrap as a whole rather than eating into the name one
+             * by one. The "angemeldet {n} min" badge is gone: the ring's max is that same figure.
+             */}
+            <Identity
+              speaker={speaking}
+              className="min-w-[220px] flex-1"
+              nameTestId="speaker-now-name"
+            />
+            <div className="flex shrink-0 items-center gap-4">
+              <div className="flex flex-col items-end">
+                <span className="hv-label">{t('speakers.now.elapsed')}</span>
+                <div className="flex items-center gap-2">
+                  {elapsed !== null && budgetSeconds !== undefined && (
+                    <ProgressRing
+                      value={elapsed}
+                      max={budgetSeconds}
+                      tone={elapsed >= budgetSeconds ? 'warn' : 'accent'}
+                      label={t('speakers.now.elapsed')}
+                      data-testid="speaker-timer-ring"
+                    />
+                  )}
+                  <SpeakingTimer
+                    startedAt={speaking.speakingStartedAt}
+                    requestedMinutes={speaking.requestedMinutes}
+                    size="lead"
                   />
-                )}
-                <SpeakingTimer
-                  startedAt={speaking.speakingStartedAt}
-                  requestedMinutes={speaking.requestedMinutes}
-                  size="lead"
-                />
+                </div>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="hv-label">{t('speakers.column.questions')}</span>
+                <span className="font-mono text-[13px] tabular-nums text-ink-800">
+                  {speaking.questionCount}
+                </span>
               </div>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="hv-label">{t('speakers.column.questions')}</span>
-              <span className="font-mono text-[13px] tabular-nums text-ink-800">
-                {speaking.questionCount}
-              </span>
-            </div>
-            {speaking.requestedMinutes !== undefined && (
-              <Badge tone="neutral" mono>
-                {t('speakers.now.requested', { minutes: speaking.requestedMinutes })}
-              </Badge>
-            )}
             <div className="flex items-center gap-2">
               <Link
                 to={`/capture?speaker=${encodeURIComponent(speaking.id)}`}

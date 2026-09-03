@@ -119,8 +119,6 @@ export const de = {
   'capture.contribution.option': '{time} Uhr · {chars} Zeichen',
   'capture.contribution.new': 'Weiteren Redebeitrag erfassen',
   'capture.contribution.back': 'Zurück zum Wortlaut',
-  'capture.contribution.source.manual': 'mitgeschrieben',
-  'capture.contribution.source.transcript': 'aus Mitschrift',
   'capture.text.label': 'Wortlaut des Redebeitrags',
   'capture.text.placeholder': 'Wortlaut mitschreiben oder aus der Mitschrift einfügen …',
   'capture.text.empty.title': 'Noch kein Redebeitrag erfasst',
@@ -171,7 +169,6 @@ export const de = {
   'header.counter.open': 'Offen',
   'header.counter.open.title': 'Einzelfragen, die noch nicht abgeschlossen sind',
   'header.counter.staged': 'Bühne',
-  'header.counter.staged.title': 'Einzelfragen, die auf der Bühne liegen',
 
   'clock.label': 'Ortszeit',
   'clock.zone': 'Berlin',
@@ -323,6 +320,9 @@ export const de = {
   'time.minutes': 'vor {n} min',
   'time.hours': 'vor {n} Std.',
   'time.days': 'vor {n} Tg.',
+  'time.unit.h': 'h',
+  'time.unit.min': 'min',
+  'time.unit.s': 's',
 
   'answers.list.title': 'Einzelfragen',
   'answers.list.label': 'Liste der Einzelfragen',

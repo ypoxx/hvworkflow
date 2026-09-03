@@ -1,6 +1,6 @@
 # 007 — Beantwortung, Bühne, Historie: Verteilung, Dringlichkeit, Änderungen, Durchlaufzeiten
 
-**Status:** rework
+**Status:** accepted
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 5, 6, 9, 10; docs/design-prinzipien.md 1, 4, 5, 10
 **Depends on:** 005 (ProcessStrip, Sparkline, StaleBanner, statusTone, glyphs, stage tokens)
@@ -195,3 +195,88 @@ render — but see R10 for what that fetch now costs. **wordDiff edge cases** ho
     does not have to guess.
 
 **Verdict: rework** — because of R9 (major). R10–R12 are minors and may travel with it.
+
+## Rework
+
+### Rework round (Implementierer Oberfläche, Sonnet 5), single pass over 005/006/007
+
+- **R9 (major)** — `styles/index.css`, `.stage-contrast`: re-pointed the rest of the neutral ramp
+  the podium actually renders with — `--color-ink-900/800/700/600/400/300/50`, `--color-sunken`,
+  `--color-line`, `--color-line-strong` — alongside the five tokens already there. Verified with a
+  Playwright colour probe in `e2e/003-answers-stage.spec.ts` (`getComputedStyle` on the queue
+  item's question text, the "Als Nächstes" card, and the current question's `tone-outline`
+  assignment badge), printed to the test output and asserted against the new values: queue text
+  `rgb(203, 213, 225)` on the black ground (≈13:1, was ≈2.2:1), the "Als Nächstes" card
+  `background: rgb(19, 26, 44)` / `text: rgb(248, 250, 252)` (a dark card with light text, not the
+  white block it was), the assignment badge `rgb(148, 163, 184)` (light-on-transparent, legible,
+  was ink-600's dark grey). `docs/evidence/007-stage-contrast.png` regenerated from that same run.
+  `TrackBadge`'s own tint tokens (`tone-track-*`) were left alone: each is a filled chip with its
+  own background, already ≥ 4.5:1 internally regardless of the ground it sits on.
+- **Architect finding** — `features/answers/WorkList.tsx`: the status `ProcessStrip` now renders
+  with `compact`, so a zero-count status keeps its (zero-width) bar segment but drops its label —
+  the bar itself is unchanged.
+- **R11 (minor)** — `features/answers/WorkList.tsx`: urgency now reads a local
+  `NO_URGENCY_STATUSES = ['delivered', ...TERMINAL_STATUSES]` (comment pointing at
+  `packages/domain/src/state.ts:55`, the domain's own "open" predicate) instead of
+  `TERMINAL_STATUSES` alone — a delivered question no longer carries the red urgency bar.
+- **R10 (minor)** — `features/history/Page.tsx`: the stream tab now reads
+  `listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT)` (`STREAM_SCAN_LIMIT =
+  5000`, `lib.ts`) instead of the whole log, and skips that read entirely when a cheap
+  `listEvents(0, 1)` shows the tail `seq` has not moved — which is exactly what a `version` bump
+  from an actor switch alone looks like (`api/useApiVersion.ts`). The Lastkurve (`curve`) is
+  recomputed in that same branch, so it too is bucketed once per fetched tail, not on every render.
+- **R12 (minor)** — `features/history/lib.ts`: `formatSpan`/`eventGap`/`elapsedSpan` now take a
+  `Translate` and read `time.unit.h`/`time.unit.min`/`time.unit.s` from the dictionary (identical
+  "h"/"min"/"s" values in `de.ts` and `en.ts`, in the `// --- 003 answers, stage, history ---`
+  block) instead of assembling the unit letters in code; `Timeline.tsx`'s two call sites pass `t`.
+
+Evidence (from the shared rework run across 005/006/007 — `pnpm gates` tail):
+
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/web test:  Test Files  2 passed (2)
+apps/web test:       Tests  9 passed (9)
+
+> hvworkflow@0.1.0 vocabulary
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build
+> tsc -b && vite build
+
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
+dist/assets/index-CCi1ZcpM.js                        525.03 kB │ gzip: 154.02 kB │ map: 2,152.33 kB
+✓ built in 953ms
+```
+
+`E2E_PORT=4196 pnpm --filter @hv/web e2e` (tail, all five green):
+
+```
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.2s)
+[006 rework] "Am Mikrofon" name "Vera Rehberg": scrollWidth=105 clientWidth=105
+[005 rework] header counters pill width: 458.7px
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:75:1 › header strip on the answers desk @screenshot (1.4s)
+  ✓  1 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (6.5s)
+[timing] /answers list after status filter click: 129.5 ms
+[timing] /stage view after navigation: 136.7 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (34.9s)
+[007 rework] stage-contrast queue item text colour: rgb(203, 213, 225)
+[007 rework] stage-contrast "Als Nächstes" card: background=rgb(19, 26, 44) text=rgb(248, 250, 252)
+[007 rework] stage-contrast assignment badge colour: rgb(148, 163, 184)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.8s)
+
+  5 passed (49.4s)
+```
+
+Screenshots regenerated: `docs/evidence/007-answers.png`, `007-stage.png`, `007-stage-contrast.png`,
+`007-history.png`.
+
+Touched: `styles/index.css`, `features/answers/WorkList.tsx`, `features/history/Page.tsx`,
+`features/history/Timeline.tsx`, `features/history/lib.ts`, `i18n/de.ts`, `i18n/en.ts`,
+`e2e/003-answers-stage.spec.ts`.

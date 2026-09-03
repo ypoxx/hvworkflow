@@ -112,6 +112,21 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(timerRing).toHaveAttribute('aria-valuenow', /^\d+$/);
   await expect(round.getByTestId('round-progress-3')).toBeVisible();
 
+  // R6 (006 rework, architect finding 1): the identity column must win real width instead of
+  // leftover space, or a name like "Vera Rehberg" is cut off behind the ring/timer/Fragen/action
+  // blocks that follow it — scrollWidth > clientWidth is exactly what that truncation looks like.
+  const nowName = page.getByTestId('speaker-now-name');
+  await expect(nowName).toBeVisible();
+  const nameMetrics = await nowName.evaluate((el) => ({
+    text: el.textContent,
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  console.log(
+    `[006 rework] "Am Mikrofon" name "${nameMetrics.text}": scrollWidth=${nameMetrics.scrollWidth} clientWidth=${nameMetrics.clientWidth}`,
+  );
+  expect(nameMetrics.scrollWidth).toBeLessThanOrEqual(nameMetrics.clientWidth);
+
   // A Wortmeldung that comes in while the meeting runs.
   await page.getByTestId('speaker-register').click();
   await page.getByTestId('speaker-register-name').fill('Henrike Baumgart');

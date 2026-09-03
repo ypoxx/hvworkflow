@@ -245,6 +245,34 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(page.getByTestId('stage-current-text')).toBeVisible();
   // Away from the toggle so the evidence shows the resting state, not a lingering :hover.
   await page.mouse.move(700, 500);
+
+  // R9 (007 rework): a screenshot alone does not prove legibility — read the real computed colours
+  // of the three elements the design review named (queue text, the "Als Nächstes" card, the current
+  // question's assignment badge) instead of trusting the picture.
+  const queueQuestionText = page.getByTestId('stage-queue-item').first().locator('.line-clamp-2');
+  const nextPreview = page.getByTestId('stage-next-preview');
+  const assignmentBadge = page.getByTestId('stage-assignment').locator('.hv-badge');
+
+  const queueColor = await queueQuestionText.evaluate((el) => getComputedStyle(el).color);
+  const nextPreviewColors = await nextPreview.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    text: getComputedStyle(el.querySelector('p')!).color,
+  }));
+  const badgeColor = await assignmentBadge.evaluate((el) => getComputedStyle(el).color);
+  console.log(`[007 rework] stage-contrast queue item text colour: ${queueColor}`);
+  console.log(
+    `[007 rework] stage-contrast "Als Nächstes" card: background=${nextPreviewColors.background} text=${nextPreviewColors.text}`,
+  );
+  console.log(`[007 rework] stage-contrast assignment badge colour: ${badgeColor}`);
+
+  // --color-ink-700 inside .stage-contrast (#cbd5e1): ~13:1 on the black ground, was ~2.2:1 before.
+  expect(queueColor).toBe('rgb(203, 213, 225)');
+  // The card is a dark surface (--color-sunken, #131a2c) with near-white text, not a white block.
+  expect(nextPreviewColors.background).toBe('rgb(19, 26, 44)');
+  expect(nextPreviewColors.text).toBe('rgb(248, 250, 252)');
+  // tone-outline's --hv-fg (--color-ink-600, #94a3b8): light text, no longer ink-600's dark grey.
+  expect(badgeColor).toBe('rgb(148, 163, 184)');
+
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('007-stage-contrast.png') });

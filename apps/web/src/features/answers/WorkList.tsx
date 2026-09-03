@@ -121,6 +121,13 @@ const URGENCY_FILL: Readonly<Record<0 | 1 | 2, string>> = {
   2: 'var(--color-tone-danger-fg)',
 };
 
+/**
+ * "Non-terminal" alone under-counts: the domain's own "open" predicate also excludes `delivered`
+ * (packages/domain/src/state.ts:55) — a question already read out has nobody waiting on it, so it
+ * gets no urgency bar either (R11, 007 rework).
+ */
+const NO_URGENCY_STATUSES: readonly Question['status'][] = ['delivered', ...TERMINAL_STATUSES];
+
 function Row({
   question,
   selected,
@@ -142,8 +149,9 @@ function Row({
   t: Translate;
   onSelect: (id: string) => void;
 }) {
-  // Dringlichkeit am Zeilenrand (point 2): a closed question is not waiting on anyone any more.
-  const urgency = TERMINAL_STATUSES.includes(question.status)
+  // Dringlichkeit am Zeilenrand (point 2): a closed or delivered question is not waiting on
+  // anyone any more.
+  const urgency = NO_URGENCY_STATUSES.includes(question.status)
     ? undefined
     : urgencyLevel(question.createdAt, now);
   return (
@@ -348,6 +356,10 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
               onSelect={(key) =>
                 set({ status: filters.status === key ? ALL : (key as Filters['status']) })
               }
+              // Architect finding: eleven labels wrap past three lines at the default pane width;
+              // a zero-count status contributes nothing to look at, so it keeps its bar segment
+              // (0px) but drops its label.
+              compact
               testIdPrefix="answers-filter-status"
             />
           </div>

@@ -80,6 +80,9 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
   // The one true "open" figure is the domain's own count (it includes the podium queue); never
   // recompute it from a subset of strip segments, or it silently drifts from the nav badge.
   const open = meeting === null ? null : meeting.counts.open;
+  // The strip is generic (ProcessStrip.tsx carries no header-specific keys, R2 of the 005 rework);
+  // "staged" is this header's own reading, so the sr-only figure for it is rendered here too.
+  const staged = segments.find((segment) => segment.key === 'staged')?.count ?? null;
   // The strip's aria-label: one sentence carrying every segment, so a screen reader gets the whole
   // distribution without needing to hover the popover at all.
   const legend = t(
@@ -89,6 +92,7 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
 
   return (
     <div
+      role="group"
       aria-label={t('header.counters')}
       className="hidden shrink-0 items-center gap-3 rounded-md border border-line bg-sunken px-3 py-1 lg:flex"
     >
@@ -116,6 +120,9 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
           next to the meeting title at 1440px). Content, not presentation, so no `hidden` attribute. */}
       <span data-testid="header-counter-open" title={t('header.counter.open.title')} className="sr-only">
         {t('header.counter.open')}: {open ?? '—'}
+      </span>
+      <span data-testid="header-counter-staged" className="sr-only">
+        {t('header.counter.staged')}: {staged ?? '—'}
       </span>
     </div>
   );

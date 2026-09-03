@@ -20,11 +20,14 @@ export function Sparkline({ values, ariaLabel, className }: SparklineProps) {
 
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = max - min || 1;
+  // A flat series (all-zero included) has no range to plot: draw it through the middle instead of
+  // falling back to `max - min || 1`, which put every point on the bottom edge, clipping half the
+  // stroke — "no events in the window" then read as an empty box (R3, 005 rework).
   const step = WIDTH / (values.length - 1);
-  const line = values
-    .map((value, i) => `${i * step},${HEIGHT - ((value - min) / span) * HEIGHT}`)
-    .join(' ');
+  const line =
+    max === min
+      ? values.map((_, i) => `${i * step},${HEIGHT / 2}`).join(' ')
+      : values.map((value, i) => `${i * step},${HEIGHT - ((value - min) / (max - min)) * HEIGHT}`).join(' ');
   const area = `0,${HEIGHT} ${line} ${WIDTH},${HEIGHT}`;
 
   return (

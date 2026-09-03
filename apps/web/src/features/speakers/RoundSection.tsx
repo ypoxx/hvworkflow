@@ -107,20 +107,13 @@ export function RoundSection({
               data-testid={`round-progress-${round}`}
               className="flex shrink-0 items-center gap-2"
             >
-              {/*
-               * `ProgressBar` already carries its own `w-full`; a width utility handed in through
-               * `className` would collide with it (equal specificity, undefined winner — it rendered
-               * at 0 px in practice), so the width is fixed on this wrapper instead and the bar just
-               * fills it.
-               */}
-              <span className="w-20 shrink-0">
-                <ProgressBar
-                  value={finished}
-                  max={speakers.length}
-                  tone="accent"
-                  label={t('speakers.round.progress.label', { round })}
-                />
-              </span>
+              <ProgressBar
+                value={finished}
+                max={speakers.length}
+                tone="accent"
+                label={t('speakers.round.progress.label', { round })}
+                className="w-20 shrink-0"
+              />
               <span className="whitespace-nowrap font-mono text-2xs tabular-nums text-ink-500">
                 {t('speakers.round.progress', { finished, total: speakers.length })}
               </span>

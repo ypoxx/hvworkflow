@@ -24,7 +24,7 @@ import {
 import { getLang, translate, useT } from '../../i18n';
 import { EventStream, HistoryKpiLine, Timeline } from './Timeline';
 import type { SummaryContext } from './eventSummary';
-import { RESULT_LIMIT, STREAM_LIMIT, excerpt, loadCurve } from './lib';
+import { RESULT_LIMIT, STREAM_LIMIT, STREAM_SCAN_LIMIT, excerpt, loadCurve } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -91,7 +91,12 @@ export function HistoryPage() {
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
   const [speakerNames, setSpeakerNames] = useState<ReadonlyMap<string, string>>(new Map());
   const [history, setHistory] = useState<readonly DomainEvent[]>([]);
-  const [stream, setStream] = useState<readonly DomainEvent[]>([]);
+  // The tail read for the "Ereignisstrom" tab: `streamWindow` is the bounded read itself (`stream`,
+  // the reversed table slice, is derived from it); `curve`, the bucketed Lastkurve, is recomputed
+  // in the same place the read happens, so it is bucketed once per fetched tail, keyed on
+  // `streamLastSeq` — never on a render that leaves the tail untouched (R10, 007 rework).
+  const [streamWindow, setStreamWindow] = useState<readonly DomainEvent[]>([]);
+  const [streamLastSeq, setStreamLastSeq] = useState(0);
   const [curve, setCurve] = useState<readonly number[]>([]);
 
   useEffect(() => {
@@ -156,21 +161,29 @@ export function HistoryPage() {
   useEffect(() => {
     if (tab !== 'stream') return undefined;
     let cancelled = false;
-    // The log is read from the end for the visible tail; the Lastkurve (point 9) needs the whole
-    // log, since two real-time hours can hold far more than the tail the table shows.
+    // `version` bumps on every actor switch too (api/useApiVersion.ts), which never grows the log
+    // — a cheap read of just the tail `seq` first, and skipping the bounded read below when it has
+    // not moved, means switching roles while this tab is open no longer re-reads the log at all
+    // (R10, 007 rework). The table and the Lastkurve (point 9) both read the last STREAM_SCAN_LIMIT
+    // events rather than the whole log, which at seed volume is already several thousand events.
     api
       .listEvents(0, 1)
-      .then(({ lastSeq }) => api.listEvents(0, lastSeq))
-      .then((page) => {
-        if (cancelled) return;
-        setStream(page.items.slice(-STREAM_LIMIT).reverse());
-        setCurve(loadCurve(page.items, Date.now()));
+      .then(({ lastSeq }) => {
+        if (cancelled || lastSeq === streamLastSeq) return undefined;
+        return api.listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT).then((page) => {
+          if (cancelled) return;
+          setStreamLastSeq(lastSeq);
+          setStreamWindow(page.items);
+          setCurve(loadCurve(page.items, Date.now()));
+        });
       })
       .catch(problem);
     return () => {
       cancelled = true;
     };
-  }, [version, tab]);
+  }, [version, tab, streamLastSeq]);
+
+  const stream = useMemo(() => streamWindow.slice(-STREAM_LIMIT).reverse(), [streamWindow]);
 
   const context = useMemo<SummaryContext>(
     () => ({

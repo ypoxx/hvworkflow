@@ -31,7 +31,7 @@ export function HistoryKpiLine({ events }: { events: readonly DomainEvent[] }) {
   const kpi = historyKpi(events);
   const duration =
     kpi.capturedAt !== undefined && kpi.deliveredAt !== undefined
-      ? elapsedSpan(kpi.capturedAt, kpi.deliveredAt)
+      ? elapsedSpan(kpi.capturedAt, kpi.deliveredAt, t)
       : t('history.kpi.running');
   return (
     <div
@@ -88,7 +88,7 @@ export function Timeline({
                     data-testid="history-duration"
                     className="ml-auto font-mono text-2xs tabular-nums text-ink-400"
                   >
-                    {eventGap(previous.at, event.at)}
+                    {eventGap(previous.at, event.at, t)}
                   </span>
                 )}
               </div>

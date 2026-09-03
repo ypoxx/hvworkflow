@@ -99,7 +99,6 @@ function DenseStrip({
   legend: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const staged = segments.find((segment) => segment.key === 'staged');
 
   return (
     <div
@@ -135,13 +134,6 @@ function DenseStrip({
         })}
       </div>
 
-      {/* Always present regardless of the width cutoff above: the e2e check must not depend on hover. */}
-      {staged !== undefined && (
-        <span data-testid="header-counter-staged" className="sr-only">
-          {staged.count}
-        </span>
-      )}
-
       {open && (
         <div
           data-testid="header-strip-legend"
@@ -156,12 +148,7 @@ function DenseStrip({
                 style={{ backgroundColor: BAR_FILL[segment.tone] }}
               />
               <span className="flex-1 truncate text-[12px] text-ink-700">{segment.label}</span>
-              <span
-                className="font-mono text-[12px] tabular-nums text-ink-900"
-                {...(segment.key === 'staged' ? { 'data-testid': 'header-counter-staged' } : {})}
-              >
-                {segment.count}
-              </span>
+              <span className="font-mono text-[12px] tabular-nums text-ink-900">{segment.count}</span>
             </div>
           ))}
         </div>

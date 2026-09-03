@@ -120,8 +120,6 @@ export const en: Dictionary = {
   'capture.contribution.option': '{time} · {chars} characters',
   'capture.contribution.new': 'Capture another contribution',
   'capture.contribution.back': 'Back to the wording',
-  'capture.contribution.source.manual': 'taken down',
-  'capture.contribution.source.transcript': 'from the transcript',
   'capture.text.label': 'Wording of the contribution',
   'capture.text.placeholder': 'Take down the wording or paste it from the transcript …',
   'capture.text.empty.title': 'No contribution captured yet',
@@ -172,7 +170,6 @@ export const en: Dictionary = {
   'header.counter.open': 'Open',
   'header.counter.open.title': 'Individual questions that are not closed yet',
   'header.counter.staged': 'Podium',
-  'header.counter.staged.title': 'Individual questions waiting on the podium',
 
   'clock.label': 'Local time',
   'clock.zone': 'Berlin',
@@ -325,6 +322,9 @@ export const en: Dictionary = {
   'time.minutes': '{n} min ago',
   'time.hours': '{n} hr ago',
   'time.days': '{n} d ago',
+  'time.unit.h': 'h',
+  'time.unit.min': 'min',
+  'time.unit.s': 's',
 
   'answers.list.title': 'Questions',
   'answers.list.label': 'List of questions',

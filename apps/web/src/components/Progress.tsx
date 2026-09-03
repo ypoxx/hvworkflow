@@ -2,7 +2,7 @@
  * A quiet read on one ratio — never a spinner: the value stays a number a screen reader can announce,
  * not just a shape in motion (docs/design-prinzipien.md #8: skeletons and numbers, not spinners).
  */
-import type { ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { cx } from './cx';
 
 export type ProgressTone = 'accent' | 'warn' | 'muted';
@@ -21,7 +21,7 @@ function ratio(value: number, max: number): number {
   return Math.min(1, Math.max(0, value / max));
 }
 
-export interface ProgressBarProps {
+export interface ProgressBarProps extends ComponentPropsWithoutRef<'div'> {
   value: number;
   max: number;
   tone?: ProgressTone;
@@ -30,16 +30,28 @@ export interface ProgressBarProps {
   className?: string;
 }
 
-export function ProgressBar({ value, max, tone = 'accent', label, className }: ProgressBarProps) {
+/** A caller-supplied width utility (`w-20`, `min-w-0`, …) wins over the default `w-full` (R1, 005 rework). */
+const HAS_WIDTH_CLASS = /\bw-/;
+
+export function ProgressBar({
+  value,
+  max,
+  tone = 'accent',
+  label,
+  className,
+  ...rest
+}: ProgressBarProps) {
   const percent = ratio(value, max) * 100;
+  const sized = HAS_WIDTH_CLASS.test(className ?? '');
   return (
     <div
+      {...rest}
       role="progressbar"
       aria-valuenow={value}
       aria-valuemin={0}
       aria-valuemax={max}
       {...(label !== undefined ? { 'aria-label': label } : {})}
-      className={cx('h-1 w-full overflow-hidden rounded-full', className)}
+      className={cx('h-1 overflow-hidden rounded-full', !sized && 'w-full', className)}
       style={{ background: TRACK }}
     >
       <div
@@ -50,7 +62,7 @@ export function ProgressBar({ value, max, tone = 'accent', label, className }: P
   );
 }
 
-export interface ProgressRingProps {
+export interface ProgressRingProps extends ComponentPropsWithoutRef<'div'> {
   value: number;
   max: number;
   tone?: ProgressTone;
@@ -65,11 +77,20 @@ const STROKE = 3;
 const RADIUS = (RING_SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function ProgressRing({ value, max, tone = 'accent', label, children, className }: ProgressRingProps) {
+export function ProgressRing({
+  value,
+  max,
+  tone = 'accent',
+  label,
+  children,
+  className,
+  ...rest
+}: ProgressRingProps) {
   const percent = ratio(value, max);
   const offset = CIRCUMFERENCE * (1 - percent);
   return (
     <div
+      {...rest}
       role="progressbar"
       aria-valuenow={value}
       aria-valuemin={0}

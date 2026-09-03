@@ -1,6 +1,6 @@
 # 006 — Wortmeldeliste und Erfassung: Priorisierung, Zeitbudget, Marker, Verdichtung
 
-**Status:** rework
+**Status:** accepted
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 6, 9, 10; docs/design-prinzipien.md 1, 2, 5, 7
 **Depends on:** 005 (ProgressBar, ProgressRing, SourceIcon, TrackBadge glyphs, StageAssignmentBadge initials)
@@ -206,3 +206,74 @@ edge.
 
 **Verdict: rework** — because of R6 (major, the architect's finding 1 is unaddressed). R7 and R8 are
 minors and may travel with it.
+
+## Rework
+
+### Rework round (Implementierer Oberfläche, Sonnet 5), single pass over 005/006/007
+
+- **R6 (major)** — `features/speakers/NowSpeaking.tsx`: the identity column now carries
+  `min-w-[220px] flex-1` (real priority instead of leftover space) and ring + `SpeakingTimer` +
+  Fragen count are grouped into one `shrink-0` flex child, so they wrap together instead of eating
+  into the name one block at a time. The redundant "angemeldet {n} min" badge is gone from this
+  card — the ring's `max` is that same figure, and the round list still shows it. Verified at
+  1440×900 with Playwright: `speaker-now-name`'s `scrollWidth === clientWidth` (both 105px for
+  "Vera Rehberg" in the seeded corpus), asserted in `e2e/002-speakers-capture.spec.ts`.
+- **R7 (minor)** — `features/capture/ContributionText.tsx`: the marker `<sup>` now carries
+  `select-none` in addition to its existing `aria-hidden="true"`, so marking or copying a passage
+  never picks up the digit. `data-offset` handling is unchanged (the marker was never in the
+  offset path — see the adversarial review's own line-by-line check). The dead keys
+  `capture.contribution.source.manual`/`.transcript` were grepped (no other reference) and removed
+  from `de.ts`/`en.ts`.
+- **R8 (minor)** — `features/speakers/TimerRing.tsx` deleted now that R1 of 005 landed
+  (`components/Progress.tsx` takes `...rest`); `NowSpeaking.tsx` uses the kit `ProgressRing` with
+  `data-testid="speaker-timer-ring"` instead.
+
+Evidence (from the shared rework run across 005/006/007 — `pnpm gates` tail):
+
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/web test:  Test Files  2 passed (2)
+apps/web test:       Tests  9 passed (9)
+
+> hvworkflow@0.1.0 vocabulary
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build
+> tsc -b && vite build
+
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
+dist/assets/index-CCi1ZcpM.js                        525.03 kB │ gzip: 154.02 kB │ map: 2,152.33 kB
+✓ built in 953ms
+```
+
+`E2E_PORT=4196 pnpm --filter @hv/web e2e` (tail, all five green):
+
+```
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.2s)
+[006 rework] "Am Mikrofon" name "Vera Rehberg": scrollWidth=105 clientWidth=105
+[005 rework] header counters pill width: 458.7px
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:75:1 › header strip on the answers desk @screenshot (1.4s)
+  ✓  1 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (6.5s)
+[timing] /answers list after status filter click: 129.5 ms
+[timing] /stage view after navigation: 136.7 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (34.9s)
+[007 rework] stage-contrast queue item text colour: rgb(203, 213, 225)
+[007 rework] stage-contrast "Als Nächstes" card: background=rgb(19, 26, 44) text=rgb(248, 250, 252)
+[007 rework] stage-contrast assignment badge colour: rgb(148, 163, 184)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.8s)
+
+  5 passed (49.4s)
+```
+
+Screenshots regenerated: `docs/evidence/006-speakers.png`, `docs/evidence/006-capture.png`.
+
+Touched: `features/speakers/NowSpeaking.tsx`, `features/speakers/RoundSection.tsx` (R1 consequence),
+`features/capture/ContributionText.tsx`, `i18n/de.ts`, `i18n/en.ts`,
+`e2e/002-speakers-capture.spec.ts`; deletes `features/speakers/TimerRing.tsx`.

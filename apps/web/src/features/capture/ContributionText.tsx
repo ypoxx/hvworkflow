@@ -187,7 +187,7 @@ export function ContributionText({
                 className={cx(
                   'mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full',
                   'border border-accent-300 bg-accent-100 align-middle font-mono text-[10px]',
-                  'leading-none font-medium text-accent-700 no-underline',
+                  'leading-none font-medium text-accent-700 no-underline select-none',
                 )}
               >
                 {marker.number}

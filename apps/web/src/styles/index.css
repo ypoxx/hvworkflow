@@ -187,6 +187,25 @@
   --color-stage-text: #f8fafc;
   --color-accent-500: #93c5fd;
   --color-ink-500: #94a3b8;
+  /*
+   * R9 (007 rework): the five tokens above only cover the podium's own headline text. Everything
+   * else the podium renders with — the queue's `text-ink-700`, the "Als Nächstes" card's
+   * `bg-sunken`/`text-ink-900`, the current question's `tone-outline` assignment badge
+   * (Badge.tsx: --hv-fg: var(--color-ink-600), --hv-bd: var(--color-line-strong)) — kept its
+   * light-theme value and disappeared on this black ground. Re-pointed the rest of the ramp the
+   * same way: ink-700 on --color-canvas measures ~13:1, the tone-outline badge ~7.5:1
+   * (docs/design-prinzipien.md #10, "aus zwei Metern lesbar").
+   */
+  --color-ink-900: #f8fafc;
+  --color-ink-800: #e2e8f0;
+  --color-ink-700: #cbd5e1;
+  --color-ink-600: #94a3b8;
+  --color-ink-400: #64748b;
+  --color-ink-300: #475569;
+  --color-ink-50: #111827;
+  --color-sunken: #131a2c;
+  --color-line: #1e293b;
+  --color-line-strong: #334155;
 }
 
 @layer base {

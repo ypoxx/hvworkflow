@@ -393,3 +393,84 @@ scripts/vocabulary-check.mjs` → `vocabulary-check: ok`. Rule 10: no literal JS
 
 **Verdict: accepted** (four minors, no blocker and no major). R1 and R2 should be picked up by
 whichever slice next touches `src/components/`.
+
+## Rework
+
+### Rework round (Implementierer Oberfläche, Sonnet 5), single pass over 005/006/007
+
+R1 and R2 were minors on an already-accepted slice, picked up here because this round is the first
+to touch `src/components/` again (as the reviewer anticipated). R3 and R4 are this slice's own
+findings.
+
+- **R1** — `components/Progress.tsx`: `ProgressBarProps`/`ProgressRingProps` now extend
+  `ComponentPropsWithoutRef<'div'>` and spread `...rest` onto the root, ahead of the computed
+  `role`/`aria-value*`/`aria-label` (so a caller cannot override those by accident) — `data-testid`
+  and `aria-valuenow` sit on the same node. `ProgressBar` no longer forces `w-full` when the
+  caller's `className` carries a width utility (`/\bw-/`, e.g. `w-20`). Consequence: deleted
+  `features/speakers/TimerRing.tsx` (`NowSpeaking.tsx` now renders the kit `ProgressRing` with
+  `data-testid="speaker-timer-ring"`), and `RoundSection.tsx`'s `<span className="w-20">` wrapper
+  around `ProgressBar` is gone — the width is a plain `className` again, exactly as the finding
+  predicted.
+- **R2** — `components/ProcessStrip.tsx` no longer knows the header's `'staged'` segment key: the
+  sr-only span and the popover row's conditional `data-testid` are both removed from the generic
+  kit component. `app/HeaderStrip.tsx` renders its own sr-only `header-counter-staged` next to the
+  strip, with the label text (`t('header.counter.staged')`) the same way `header-counter-open`
+  already does — the popover no longer carries a duplicate testid while open.
+- **R3** — `components/Sparkline.tsx`: when `max === min` the line is drawn straight across
+  `HEIGHT / 2` instead of falling back to `span = 1`, which used to put every point (and half the
+  stroke) on the bottom edge.
+- **R4** — `app/HeaderStrip.tsx`: the pill now carries `role="group"` alongside its
+  `aria-label={t('header.counters')}` (the inner strip keeps its own `role="group"` +
+  `aria-label`, unchanged). `header.counter.staged` is revived by the new sr-only span (b);
+  `header.counter.staged.title` stayed dead (grepped first) and is removed from `de.ts`/`en.ts`.
+
+Evidence (from the shared rework run across 005/006/007 — `pnpm gates` tail):
+
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/web test:  Test Files  2 passed (2)
+apps/web test:       Tests  9 passed (9)
+
+> hvworkflow@0.1.0 vocabulary
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build
+> tsc -b && vite build
+
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
+dist/assets/index-CCi1ZcpM.js                        525.03 kB │ gzip: 154.02 kB │ map: 2,152.33 kB
+✓ built in 953ms
+```
+
+`E2E_PORT=4196 pnpm --filter @hv/web e2e` (tail, all five green):
+
+```
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.2s)
+[006 rework] "Am Mikrofon" name "Vera Rehberg": scrollWidth=105 clientWidth=105
+[005 rework] header counters pill width: 458.7px
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:75:1 › header strip on the answers desk @screenshot (1.4s)
+  ✓  1 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (6.5s)
+[timing] /answers list after status filter click: 129.5 ms
+[timing] /stage view after navigation: 136.7 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (34.9s)
+[007 rework] stage-contrast queue item text colour: rgb(203, 213, 225)
+[007 rework] stage-contrast "Als Nächstes" card: background=rgb(19, 26, 44) text=rgb(248, 250, 252)
+[007 rework] stage-contrast assignment badge colour: rgb(148, 163, 184)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.8s)
+
+  5 passed (49.4s)
+```
+
+Screenshot regenerated: `docs/evidence/005-header.png`. Status stays **accepted** — this closes the
+two minors the reviewer deferred; nothing here reopens the slice.
+
+Touched: `components/Progress.tsx`, `components/ProcessStrip.tsx`, `components/Sparkline.tsx`,
+`app/HeaderStrip.tsx`, `features/speakers/NowSpeaking.tsx` (deletes `TimerRing.tsx`),
+`features/speakers/RoundSection.tsx`, `i18n/de.ts`, `i18n/en.ts`.

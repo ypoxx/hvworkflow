@@ -3,12 +3,21 @@
  * row can carry is a decision of this view, not of the component kit.
  */
 import type { DomainEvent } from '@hv/domain';
+import type { Translate } from '../../i18n';
 
 /** How many results are rendered before the person is asked to narrow the search. */
 export const RESULT_LIMIT = 200;
 
 /** How many events the "Ereignisstrom" tab shows — the tail of the meeting, not its whole log. */
 export const STREAM_LIMIT = 200;
+
+/**
+ * How many trailing events the stream tab reads at most. Bounds both the tail table and the
+ * Lastkurve to a fixed, documented cap instead of the whole log (R10, 007 rework): at 800 seeded
+ * questions that log is already several thousand events, and over the HTTP adapter fetching all of
+ * it on every refetch is a multi-megabyte response.
+ */
+export const STREAM_SCAN_LIMIT = 5000;
 
 /** Wall clock with seconds: two events of the same minute must stay distinguishable. */
 export function clockTime(iso: string): string {
@@ -26,25 +35,29 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-/** "1 h 12 min", "2 min 10 s", "9 s" — the coarsest two units that matter at each scale. */
-function formatSpan(ms: number): string {
+/**
+ * "1 h 12 min", "2 min 10 s", "9 s" — the coarsest two units that matter at each scale. The unit
+ * words go through i18n like every other visible string (`time.unit.h/min/s`, R12 of the 007
+ * rework); `t` is passed in rather than imported so this stays a pure function of its arguments.
+ */
+function formatSpan(ms: number, t: Translate): string {
   const totalSeconds = Math.round(Math.max(0, ms) / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours} h ${pad2(minutes)} min`;
-  if (minutes > 0) return `${minutes} min ${pad2(seconds)} s`;
-  return `${seconds} s`;
+  if (hours > 0) return `${hours} ${t('time.unit.h')} ${pad2(minutes)} ${t('time.unit.min')}`;
+  if (minutes > 0) return `${minutes} ${t('time.unit.min')} ${pad2(seconds)} ${t('time.unit.s')}`;
+  return `${seconds} ${t('time.unit.s')}`;
 }
 
 /** Durchlaufzeit between two consecutive events on the timeline ("+9 s", "+1 h 05 min", point 8). */
-export function eventGap(fromIso: string, toIso: string): string {
-  return `+${formatSpan(Date.parse(toIso) - Date.parse(fromIso))}`;
+export function eventGap(fromIso: string, toIso: string, t: Translate): string {
+  return `+${formatSpan(Date.parse(toIso) - Date.parse(fromIso), t)}`;
 }
 
 /** A total elapsed span for the KPI line — the same scale rule, without the "+" of a gap. */
-export function elapsedSpan(fromIso: string, toIso: string): string {
-  return formatSpan(Date.parse(toIso) - Date.parse(fromIso));
+export function elapsedSpan(fromIso: string, toIso: string, t: Translate): string {
+  return formatSpan(Date.parse(toIso) - Date.parse(fromIso), t);
 }
 
 /** The three KPI numbers of point 8, read from the event log alone (AGENTS.md rule 5). */
