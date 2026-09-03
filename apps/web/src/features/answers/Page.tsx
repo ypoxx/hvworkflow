@@ -7,18 +7,26 @@
  * on refusal — a 412 means somebody else wrote first, and the record, not the interface, says what
  * is true afterwards.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, WriteOptions } from '@hv/domain';
 import { api } from '../../api';
-import { EmptyState, Panel, PageHeader, SplitPane, showProblem, showToast } from '../../components';
+import {
+  EmptyState,
+  Panel,
+  PageHeader,
+  SplitPane,
+  StaleBanner,
+  showProblem,
+  showToast,
+} from '../../components';
 import { actionLabel, useT } from '../../i18n';
 import { AssignDialog, MergeDialog, ReasonDialog } from './ActionDialogs';
 import { QuestionDetail } from './QuestionDetail';
 import type { DetailAction } from './QuestionDetail';
 import { WorkList } from './WorkList';
-import { splitSources } from './lib';
+import { problemStatus, splitSources } from './lib';
 import { EMPTY_FILTERS, useBacklog } from './useBacklog';
 import type { Filters } from './useBacklog';
 
@@ -31,9 +39,16 @@ export function AnswersPage() {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [busy, setBusy] = useState(false);
   const [draftResetToken, setDraftResetToken] = useState(0);
+  // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
+  const [stale, setStale] = useState(false);
 
   const backlog = useBacklog(filters, selectedId);
   const { reload, selected: question } = backlog;
+
+  // A fresh look at a (possibly different) question starts without yesterday's notice.
+  useEffect(() => {
+    setStale(false);
+  }, [selectedId]);
 
   /**
    * One door for every write: optimistic lock in, problem out, refetch on refusal. The permission
@@ -53,9 +68,10 @@ export function AnswersPage() {
         setDialog(null);
         return true;
       } catch (error) {
-        showProblem(error, t('toast.problem'));
-        // Any refusal can mean this view holds an outdated copy; 412 says so outright. Refetch the
-        // list and the open question instead of repairing state locally.
+        // 412: somebody else wrote first — say so above the detail and reload; keep the toast for
+        // every other refusal (403/409 among them).
+        if (problemStatus(error) === 412) setStale(true);
+        else showProblem(error, t('toast.problem'));
         reload();
         return false;
       } finally {
@@ -153,17 +169,29 @@ export function AnswersPage() {
               />
             </Panel>
           ) : (
-            <div data-testid="answers-detail" className="h-full">
-              <QuestionDetail
-                key={question.id}
-                question={question}
-                history={backlog.selectedHistory}
-                units={backlog.units}
-                agendaItems={backlog.agendaItems}
-                busy={busy}
-                draftResetToken={draftResetToken}
-                onAction={onAction}
-              />
+            <div data-testid="answers-detail" className="flex h-full min-h-0 flex-col gap-2">
+              {stale && (
+                <StaleBanner
+                  testId="stale-banner"
+                  message={t('answers.stale.banner')}
+                  onReload={() => {
+                    setStale(false);
+                    reload();
+                  }}
+                />
+              )}
+              <div className="min-h-0 flex-1">
+                <QuestionDetail
+                  key={question.id}
+                  question={question}
+                  history={backlog.selectedHistory}
+                  units={backlog.units}
+                  agendaItems={backlog.agendaItems}
+                  busy={busy}
+                  draftResetToken={draftResetToken}
+                  onAction={onAction}
+                />
+              </div>
             </div>
           )
         }

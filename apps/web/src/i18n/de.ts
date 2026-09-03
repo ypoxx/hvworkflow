@@ -405,6 +405,8 @@ export const de = {
     'Die Einzelfrage wird mit Begründung aus dem Bestand genommen. Der Vorgang bleibt in der Historie sichtbar.',
   'answers.withdraw.reason': 'Begründung',
   'answers.toast.done': 'Übernommen',
+  'answers.stale.banner': 'Stand wurde inzwischen geändert, Ansicht neu geladen',
+  'answers.diff.toggle': 'Änderung gegenüber Version {previous}',
 
   'stage.only.label': 'Nur Bühne',
   'stage.only.enter': 'Nur Bühne einschalten',
@@ -434,6 +436,9 @@ export const de = {
   'stage.return.placeholder': 'Warum kann die Antwort nicht vorgelesen werden?',
   'stage.toast.delivered': 'Vorgelesen',
   'stage.toast.closed': 'Vorgelesen und abgeschlossen',
+  'stage.contrast.label': 'Kontrast',
+  'stage.contrast.enter': 'Kontrast einschalten',
+  'stage.contrast.leave': 'Kontrast ausschalten',
 
   'history.search.label': 'Suche im Bestand',
   'history.search.placeholder': 'Nummer, Redner, Frage- oder Antworttext',
@@ -473,4 +478,9 @@ export const de = {
   'history.payload.speaker': 'Wortmeldung: {name}',
   'history.payload.round': 'Runde {round}',
   'history.question.label': 'Einzelfrage {number}',
+  'history.kpi.captureToDelivery': 'Erfassung → Vorlesen',
+  'history.kpi.versions': 'Versionen',
+  'history.kpi.returns': 'Rückgaben',
+  'history.kpi.running': 'läuft',
+  'history.sparkline.caption': 'Ereignisse je 5 Minuten, letzte 2 Stunden',
 };

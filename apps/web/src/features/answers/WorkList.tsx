@@ -10,19 +10,25 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
-import type { Question, QuestionStatus } from '@hv/domain';
+import type { Question } from '@hv/domain';
 import { QUESTION_STATUSES, TERMINAL_STATUSES, TRACKS } from '@hv/domain';
-import { Badge, Button, EmptyState, Panel, StatusBadge, TrackBadge, cx } from '../../components';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Panel,
+  ProcessStrip,
+  StatusBadge,
+  TrackBadge,
+  cx,
+  statusTone,
+} from '../../components';
+import type { ProcessStripSegment } from '../../components';
 import { statusLabel, trackShortLabel, useT } from '../../i18n';
 import type { Translate } from '../../i18n';
-import { ROW_HEIGHT, excerpt, relativeAge } from './lib';
+import { ROW_HEIGHT, excerpt, relativeAge, urgencyLevel } from './lib';
 import { ALL, EMPTY_FILTERS, isFiltered } from './useBacklog';
 import type { Backlog, Filters, SortOrder } from './useBacklog';
-
-/** Statuses a question can still move on from — the only ones worth filtering a backlog by. */
-const OPEN_STATUSES: readonly QuestionStatus[] = QUESTION_STATUSES.filter(
-  (status) => !TERMINAL_STATUSES.includes(status),
-);
 
 /** Rows rendered above and below the viewport so that fast scrolling never shows a gap. */
 const OVERSCAN = 6;
@@ -108,6 +114,13 @@ function Select({
   );
 }
 
+/** The urgency bar's fill per level — none, amber, red-700 tint (point 2, only non-terminal rows). */
+const URGENCY_FILL: Readonly<Record<0 | 1 | 2, string>> = {
+  0: 'transparent',
+  1: 'var(--color-tone-warning-fg)',
+  2: 'var(--color-tone-danger-fg)',
+};
+
 function Row({
   question,
   selected,
@@ -129,6 +142,10 @@ function Row({
   t: Translate;
   onSelect: (id: string) => void;
 }) {
+  // Dringlichkeit am Zeilenrand (point 2): a closed question is not waiting on anyone any more.
+  const urgency = TERMINAL_STATUSES.includes(question.status)
+    ? undefined
+    : urgencyLevel(question.createdAt, now);
   return (
     <div
       id={`answers-row-${question.id}`}
@@ -140,11 +157,20 @@ function Row({
       onClick={() => onSelect(question.id)}
       style={{ height: ROW_HEIGHT, gridTemplateColumns: columns }}
       className={cx(
-        'grid cursor-pointer items-center gap-2 border-b border-line px-3',
+        'relative grid cursor-pointer items-center gap-2 border-b border-line pr-3 pl-4',
         'border-l-2 transition-colors duration-100',
         selected ? 'border-l-accent-600 bg-accent-50' : 'border-l-transparent hover:bg-ink-25',
       )}
     >
+      {urgency !== undefined && (
+        <span
+          aria-hidden="true"
+          data-testid="answers-row-urgency"
+          data-level={urgency}
+          className="absolute inset-y-0 left-0.5 w-[3px]"
+          style={{ backgroundColor: URGENCY_FILL[urgency] }}
+        />
+      )}
       <span
         className={cx(
           'font-mono text-2xs tabular-nums',
@@ -214,6 +240,19 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
   const unitNames = useMemo(
     () => new Map(units.map((unit) => [unit.id, unit.shortName ?? unit.name])),
     [units],
+  );
+
+  // The eleven statuses in workflow order, terminal ones last (point 1) — QUESTION_STATUSES is
+  // already ordered that way (packages/domain/src/types.ts).
+  const statusSegments: ProcessStripSegment[] = useMemo(
+    () =>
+      QUESTION_STATUSES.map((status) => ({
+        key: status,
+        label: statusLabel(t, status),
+        count: counts[status],
+        tone: statusTone(status),
+      })),
+    [t, counts],
   );
 
   const showTrack = box.width >= TRACK_FROM;
@@ -300,34 +339,18 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         ) : undefined
       }
     >
-      <div className="flex shrink-0 flex-col gap-2 border-b border-line px-4 py-3">
-        <div className="relative">
-          <Search
-            size={14}
-            strokeWidth={1.75}
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-400"
-          />
-          <input
-            type="search"
-            data-testid="answers-search"
-            aria-label={t('answers.search.label')}
-            placeholder={t('answers.search.placeholder')}
-            value={filters.q}
-            onChange={(event) => set({ q: event.target.value })}
-            className={cx(
-              'h-8 w-full rounded-md border border-line bg-surface pr-2 pl-8 text-[13px]',
-              'text-ink-900 transition-colors duration-100 placeholder:text-ink-400',
-              'hover:border-ink-300',
-            )}
-          />
-        </div>
-
-        <div
-          className="flex flex-wrap gap-1.5"
-          role="group"
-          aria-label={t('answers.filter.status.label')}
-        >
+      <div className="flex shrink-0 flex-col gap-2.5 border-b border-line px-4 py-3">
+        <div className="flex items-start gap-3" role="group" aria-label={t('answers.filter.status.label')}>
+          <div className="min-w-0 flex-1 pt-px">
+            <ProcessStrip
+              segments={statusSegments}
+              selected={filters.status === ALL ? [] : [filters.status]}
+              onSelect={(key) =>
+                set({ status: filters.status === key ? ALL : (key as Filters['status']) })
+              }
+              testIdPrefix="answers-filter-status"
+            />
+          </div>
           <Chip
             active={filters.status === ALL}
             label={t('answers.filter.status.all')}
@@ -335,19 +358,31 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
             testId="answers-filter-status-all"
             onClick={() => set({ status: ALL })}
           />
-          {OPEN_STATUSES.map((status) => (
-            <Chip
-              key={status}
-              active={filters.status === status}
-              label={statusLabel(t, status)}
-              count={counts[status]}
-              testId={`answers-filter-status-${status}`}
-              onClick={() => set({ status: filters.status === status ? ALL : status })}
-            />
-          ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          <div className="relative w-52 shrink-0">
+            <Search
+              size={14}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-400"
+            />
+            <input
+              type="search"
+              data-testid="answers-search"
+              aria-label={t('answers.search.label')}
+              placeholder={t('answers.search.placeholder')}
+              value={filters.q}
+              onChange={(event) => set({ q: event.target.value })}
+              className={cx(
+                'h-7 w-full rounded-md border border-line bg-surface pr-2 pl-8 text-2xs',
+                'text-ink-900 transition-colors duration-100 placeholder:text-ink-400',
+                'hover:border-ink-300',
+              )}
+            />
+          </div>
+          <span aria-hidden="true" className="h-5 w-px bg-line" />
           <div className="flex gap-1.5" role="group" aria-label={t('answers.filter.track.label')}>
             <Chip
               active={filters.track === ALL}

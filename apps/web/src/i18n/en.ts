@@ -407,6 +407,8 @@ export const en: Dictionary = {
     'The question is taken out of the corpus, with a reason. The history keeps the record.',
   'answers.withdraw.reason': 'Reason',
   'answers.toast.done': 'Applied',
+  'answers.stale.banner': 'The record has changed in the meantime; the view was reloaded',
+  'answers.diff.toggle': 'Change from version {previous}',
 
   'stage.only.label': 'Podium only',
   'stage.only.enter': 'Switch to podium only',
@@ -436,6 +438,9 @@ export const en: Dictionary = {
   'stage.return.placeholder': 'Why can the answer not be read out?',
   'stage.toast.delivered': 'Read out',
   'stage.toast.closed': 'Read out and closed',
+  'stage.contrast.label': 'Contrast',
+  'stage.contrast.enter': 'Switch on contrast',
+  'stage.contrast.leave': 'Switch off contrast',
 
   'history.search.label': 'Search the corpus',
   'history.search.placeholder': 'Number, speaker, question or answer text',
@@ -475,4 +480,9 @@ export const en: Dictionary = {
   'history.payload.speaker': 'Request to speak: {name}',
   'history.payload.round': 'Round {round}',
   'history.question.label': 'Question {number}',
+  'history.kpi.captureToDelivery': 'Capture → read out',
+  'history.kpi.versions': 'Versions',
+  'history.kpi.returns': 'Returns',
+  'history.kpi.running': 'in progress',
+  'history.sparkline.caption': 'Events per 5 minutes, last 2 hours',
 };

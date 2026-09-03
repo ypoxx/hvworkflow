@@ -5,12 +5,45 @@
  * learnt the other.
  */
 import type { DomainEvent } from '@hv/domain';
-import { EmptyState, cx } from '../../components';
+import { EmptyState, Sparkline, cx } from '../../components';
 import { eventTypeLabel, useT } from '../../i18n';
 import { eventSubject, eventSummary } from './eventSummary';
 import type { SummaryContext } from './eventSummary';
-import { clockTime } from './lib';
+import { clockTime, elapsedSpan, eventGap, historyKpi } from './lib';
 import { History } from 'lucide-react';
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="hv-label">{label}</span>
+      <span className="font-mono text-[13px] tabular-nums text-ink-800">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * The three numbers of point 8, above the timeline — every one of them read off the event log, none
+ * of them a status (AGENTS.md rule 5): the run from capture to podium, how many versions it took,
+ * how often it was sent back.
+ */
+export function HistoryKpiLine({ events }: { events: readonly DomainEvent[] }) {
+  const t = useT();
+  const kpi = historyKpi(events);
+  const duration =
+    kpi.capturedAt !== undefined && kpi.deliveredAt !== undefined
+      ? elapsedSpan(kpi.capturedAt, kpi.deliveredAt)
+      : t('history.kpi.running');
+  return (
+    <div
+      data-testid="history-kpi"
+      className="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-b border-line pb-3"
+    >
+      <Kpi label={t('history.kpi.captureToDelivery')} value={duration} />
+      <Kpi label={t('history.kpi.versions')} value={String(kpi.versions)} />
+      <Kpi label={t('history.kpi.returns')} value={String(kpi.returns)} />
+    </div>
+  );
+}
 
 export function Timeline({
   events,
@@ -27,6 +60,7 @@ export function Timeline({
       {events.map((event, index) => {
         const summary = eventSummary(t, event, context);
         const last = index === events.length - 1;
+        const previous = events[index - 1];
         return (
           <li
             key={event.id}
@@ -49,6 +83,14 @@ export function Timeline({
                 <span className="text-2xs text-ink-500">
                   {event.actor.displayName ?? event.actor.id}
                 </span>
+                {previous !== undefined && (
+                  <span
+                    data-testid="history-duration"
+                    className="ml-auto font-mono text-2xs tabular-nums text-ink-400"
+                  >
+                    {eventGap(previous.at, event.at)}
+                  </span>
+                )}
               </div>
               {summary !== '' && (
                 <p className="mt-0.5 text-[13px] leading-snug text-ink-600">{summary}</p>
@@ -64,9 +106,12 @@ export function Timeline({
 export function EventStream({
   events,
   context,
+  curve,
 }: {
   events: readonly DomainEvent[];
   context: SummaryContext;
+  /** Events per 5-minute bucket over the last two hours, oldest first — the "Lastkurve" (point 9). */
+  curve: readonly number[];
 }) {
   const t = useT();
 
@@ -82,6 +127,10 @@ export function EventStream({
 
   return (
     <div data-testid="history-stream">
+      <div data-testid="history-sparkline" className="border-b border-line px-3 py-2">
+        <Sparkline values={[...curve]} ariaLabel={t('history.sparkline.caption')} className="h-7 w-full" />
+        <p className="mt-1 text-2xs text-ink-500">{t('history.sparkline.caption')}</p>
+      </div>
       <div className="sticky top-0 z-10 grid grid-cols-[72px_84px_minmax(0,1.1fr)_minmax(0,1.4fr)] gap-3 border-b border-line bg-sunken px-3 py-1.5">
         <span className="hv-label">{t('history.col.time')}</span>
         <span className="hv-label">{t('history.col.subject')}</span>

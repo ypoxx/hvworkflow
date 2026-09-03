@@ -49,10 +49,23 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
 
+  // Statusverteilung als Filter (point 1): a ProcessStrip segment click filters the whole list.
   await page.getByTestId('answers-filter-status-assigned').click();
-  const firstRow = page.getByTestId('answers-row').first();
+  const answersRows = page.getByTestId('answers-row');
+  const firstRow = answersRows.first();
   await expect(firstRow).toBeVisible();
   await expect(firstRow).toHaveAttribute('data-status', 'assigned');
+  const visibleAfterFilter = Math.min(await answersRows.count(), 5);
+  for (let i = 0; i < visibleAfterFilter; i++) {
+    await expect(answersRows.nth(i)).toHaveAttribute('data-status', 'assigned');
+  }
+
+  // Dringlichkeit am Zeilenrand (point 2): a 3px bar carrying its urgency level.
+  await expect(firstRow.getByTestId('answers-row-urgency')).toHaveAttribute(
+    'data-level',
+    /^[012]$/,
+  );
+
   const number = await firstRow.getAttribute('data-number');
   expect(number).not.toBeNull();
   await firstRow.click();
@@ -126,9 +139,21 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(lapsed).toContainText('erloschen');
   await expect(page.getByTestId('approval-block')).not.toContainText('Freigegeben');
 
+  // Änderungen zwischen Versionen (point 3): version 2 offers a word-level diff against version 1.
+  const diffToggle = page.getByTestId('answer-diff-toggle');
+  await expect(diffToggle).toBeVisible();
+  await expect(diffToggle).toContainText('Version 1');
+  await diffToggle.click();
+  const diff = page.getByTestId('answer-diff');
+  await expect(diff).toBeVisible();
+  // The seeded version 1 is arbitrary prose; only what this test itself typed is a safe fixture.
+  await expect(diff.locator('.line-through').first()).toBeVisible();
+  await expect(diff.locator('.underline').first()).toContainText('Ergänzte');
+
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-approval-lapsed.png') });
+  await page.screenshot({ path: evidence('007-answers.png') });
 
   // Back to the question of this walk-through, found by its number.
   await page.getByTestId('answers-filter-status-all').click();
@@ -165,6 +190,8 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(currentNumber).toBeVisible();
   await expect(page.getByTestId('stage-current-text')).not.toBeEmpty();
   await expect(page.getByTestId('stage-assignment')).toBeVisible();
+  // Nächste Frage vorbereiten (point 7): the first queue item is its own, larger "Als Nächstes" card.
+  await expect(page.getByTestId('stage-next-preview')).toBeVisible();
   await expect(page.getByTestId('stage-queue-item').first()).toBeVisible();
 
   const readOutOnce = async (): Promise<void> => {
@@ -184,6 +211,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-stage.png') });
+  await page.screenshot({ path: evidence('007-stage.png') });
 
   const delivered = page.getByTestId('stage-counter-delivered');
   const deliveredBefore = Number((await delivered.innerText()).replace(/\D/g, ''));
@@ -207,6 +235,22 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-stage-only.png') });
+
+  // Kontrastmodus (point 6): offered only inside "Nur Bühne", flips the overlay to the dark scope.
+  const contrastToggle = page.getByTestId('stage-contrast-toggle');
+  await expect(contrastToggle).toBeVisible();
+  await expect(overlay).not.toHaveClass(/stage-contrast/);
+  await contrastToggle.click();
+  await expect(overlay).toHaveClass(/stage-contrast/);
+  await expect(page.getByTestId('stage-current-text')).toBeVisible();
+  // Away from the toggle so the evidence shows the resting state, not a lingering :hover.
+  await page.mouse.move(700, 500);
+  await clearToasts(page);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('007-stage-contrast.png') });
+  await contrastToggle.click();
+  await expect(overlay).not.toHaveClass(/stage-contrast/);
+
   await page.getByTestId('stage-only-toggle').click();
   await expect(overlay).toHaveCount(0);
 
@@ -236,13 +280,24 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   }
   await expect(timeline).toContainText('Version 1');
 
+  // Durchlaufzeiten (point 8): a KPI line above the timeline, and a gap between consecutive events.
+  const kpi = page.getByTestId('history-kpi');
+  await expect(kpi).toBeVisible();
+  await expect(kpi).toContainText('Versionen');
+  await expect(kpi).toContainText('Rückgaben');
+  await expect(timeline.getByTestId('history-duration').first()).toBeVisible();
+
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-history.png') });
+  await page.screenshot({ path: evidence('007-history.png') });
 
   // The event stream carries the tail of the whole meeting.
   await page.getByTestId('history-tab-stream').click();
   await expect(page.getByTestId('history-stream')).toBeVisible();
   const streamRows = page.getByTestId('history-stream').getByTestId('history-event');
   expect(await streamRows.count()).toBeGreaterThan(20);
+
+  // Lastkurve (point 9): a sparkline of events per five-minute bucket, above the event list.
+  await expect(page.getByTestId('history-sparkline')).toBeVisible();
 });
