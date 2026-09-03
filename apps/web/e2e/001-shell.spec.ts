@@ -45,6 +45,11 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
     await expect(page.getByTestId(testId)).toBeVisible();
   }
 
+  // The process strip (005) carries these testids on its own segment labels now, one per workflow
+  // stage, each with a real count next to it — not just a decorative bar.
+  await expect(page.getByTestId('header-counter-drafting')).toContainText(/\d/);
+  await expect(page.getByTestId('header-counter-staged')).toContainText(/\d/);
+
   // Rights are data: switching the persona is the only role decision in the interface.
   await page.getByTestId('role-switcher').click();
   await page.getByTestId('role-option-podium').click();
@@ -66,4 +71,20 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell-en.png') });
+});
+
+test('header strip on the answers desk @screenshot', async ({ page }) => {
+  await page.goto('/answers');
+
+  const questions = page.getByTestId('header-counter-questions');
+  await expect(questions).toBeVisible({ timeout: 90_000 });
+  await expect
+    .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), {
+      timeout: 90_000,
+    })
+    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+  await expect(page.getByTestId('header-counter-staged')).toBeVisible();
+
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('005-header.png') });
 });

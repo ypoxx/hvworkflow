@@ -171,6 +171,22 @@
   --spacing-nav: 220px;
   --spacing-nav-collapsed: 56px;
   --spacing-row: 36px;
+
+  /* The podium device (slice 007): near-black text on the light canvas it otherwise shares. */
+  --color-stage-text: #111827;
+}
+
+/*
+ * The podium is read from two metres away (docs/design-prinzipien.md #10): maximum contrast, dark
+ * ground. `.stage-contrast` scopes these overrides to that one screen; nothing else in the tool uses
+ * a dark surface.
+ */
+.stage-contrast {
+  --color-canvas: #0b0f19;
+  --color-surface: #0b0f19;
+  --color-stage-text: #f8fafc;
+  --color-accent-500: #93c5fd;
+  --color-ink-500: #94a3b8;
 }
 
 @layer base {

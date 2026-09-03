@@ -4,7 +4,10 @@
  * class scanner sees every possible value.
  */
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Mic, Users, Zap } from 'lucide-react';
 import type { QuestionStatus, StageAssignment, Track } from '@hv/domain';
+import type { TKey } from '../i18n';
 import { stageAssignmentLabel, statusLabel, trackShortLabel, useT } from '../i18n';
 import { cx } from './cx';
 
@@ -19,24 +22,48 @@ const TONE: Readonly<Record<BadgeTone, string>> = {
   outline: 'tone-outline',
 };
 
-const STATUS_TONE: Readonly<Record<QuestionStatus, string>> = {
-  captured: 'tone-status-captured',
-  classified: 'tone-status-classified',
-  assigned: 'tone-status-assigned',
-  answer_drafted: 'tone-status-answer-drafted',
-  in_review: 'tone-status-in-review',
-  approved: 'tone-status-approved',
-  staged: 'tone-status-staged',
-  delivered: 'tone-status-delivered',
-  closed: 'tone-status-closed',
-  withdrawn: 'tone-status-withdrawn',
-  merged: 'tone-status-merged',
+/**
+ * Every status collapses into one of four meanings — waiting, active, done, closed — so colour keeps
+ * carrying meaning once a list runs to hundreds of rows (docs/design-prinzipien.md #4). The finer
+ * eleven-way `.tone-status-*` tokens in index.css stay defined for components that still need them.
+ */
+const STATUS_TONE_GROUP: Readonly<Record<QuestionStatus, BadgeTone>> = {
+  captured: 'warning',
+  classified: 'warning',
+  assigned: 'warning',
+  in_review: 'warning',
+  answer_drafted: 'accent',
+  staged: 'accent',
+  delivered: 'accent',
+  approved: 'success',
+  closed: 'neutral',
+  withdrawn: 'neutral',
+  merged: 'neutral',
 };
+
+export function statusTone(status: QuestionStatus): BadgeTone {
+  return STATUS_TONE_GROUP[status];
+}
 
 const TRACK_TONE: Readonly<Record<Track, string>> = {
   podium: 'tone-track-podium',
   fast_track: 'tone-track-fast',
   expert_track: 'tone-track-expert',
+};
+
+/** One glyph per answer track, so the track reads before the label is even parsed. */
+const TRACK_ICON: Readonly<Record<Track, LucideIcon>> = {
+  podium: Mic,
+  fast_track: Zap,
+  expert_track: Users,
+};
+
+/** Two-letter shorthand for the 20px podium-queue circle; full names live in `stage.*`. */
+const STAGE_INITIALS_KEY: Readonly<Record<StageAssignment, TKey>> = {
+  supervisory_board_chair: 'stage.initials.supervisory_board_chair',
+  ceo: 'stage.initials.ceo',
+  cfo: 'stage.initials.cfo',
+  board_member: 'stage.initials.board_member',
 };
 
 export interface BadgeProps {
@@ -63,7 +90,7 @@ export function Badge({ tone = 'neutral', dot = false, mono = false, title, clas
 export function StatusBadge({ status, className }: { status: QuestionStatus; className?: string }) {
   const t = useT();
   return (
-    <span className={cx('hv-badge hv-badge-dot', STATUS_TONE[status], className)}>
+    <span className={cx('hv-badge hv-badge-dot', TONE[statusTone(status)], className)}>
       {statusLabel(t, status)}
     </span>
   );
@@ -71,22 +98,42 @@ export function StatusBadge({ status, className }: { status: QuestionStatus; cla
 
 export function TrackBadge({ track, className }: { track: Track; className?: string }) {
   const t = useT();
+  const Icon = TRACK_ICON[track];
   return (
-    <span className={cx('hv-badge', TRACK_TONE[track], className)}>{trackShortLabel(t, track)}</span>
+    <span className={cx('hv-badge', TRACK_TONE[track], className)}>
+      <Icon size={12} strokeWidth={1.75} aria-hidden="true" />
+      {trackShortLabel(t, track)}
+    </span>
   );
 }
 
 export function StageAssignmentBadge({
   assignment,
+  variant,
   className,
 }: {
   assignment: StageAssignment;
+  /** 'initials' renders the 20px podium-queue circle instead of the full-width pill. */
+  variant?: 'initials';
   className?: string;
 }) {
   const t = useT();
+  const fullLabel = stageAssignmentLabel(t, assignment);
+  if (variant === 'initials') {
+    return (
+      <span
+        className={cx(
+          'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong bg-sunken font-mono text-2xs font-medium text-ink-700',
+          className,
+        )}
+        title={fullLabel}
+        aria-label={fullLabel}
+      >
+        {t(STAGE_INITIALS_KEY[assignment])}
+      </span>
+    );
+  }
   return (
-    <span className={cx('hv-badge tone-outline', className)}>
-      {stageAssignmentLabel(t, assignment)}
-    </span>
+    <span className={cx('hv-badge tone-outline', className)}>{fullLabel}</span>
   );
 }

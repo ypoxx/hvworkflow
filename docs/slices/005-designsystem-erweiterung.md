@@ -1,6 +1,6 @@
 # 005 — Designsystem-Erweiterung: Prozessleiste, Glyphen, Statusfarben, Bausteine
 
-**Status:** spec
+**Status:** review
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 6, 9, 10; docs/design-prinzipien.md 1, 4, 5, 9
 **Depends on:** `Meeting.counts.byStatus` (domain + contract, done)
@@ -73,5 +73,87 @@ Component kit exports ProcessStrip, ProgressBar, ProgressRing, Sparkline, Source
 statusTone from `src/components/index.ts`.
 
 ## Evidence
+
+Implemented all ten points. New components: `ProcessStrip.tsx`, `Progress.tsx` (`ProgressBar` +
+`ProgressRing`), `Sparkline.tsx`, `SourceIcon.tsx`, `StaleBanner.tsx`; `Badge.tsx` gained `statusTone`,
+`TrackBadge` glyphs and `StageAssignmentBadge`'s `variant="initials"`; `src/app/HeaderStrip.tsx`
+replaces the four header counter cells with three stat cells (Wortmeldungen, Einzelfragen, Offen) plus
+a compact `ProcessStrip` (workflow segments `captured`/`drafting`/`review`/`approved`/`staged`/
+`delivered`, testid prefix `header-counter-*`, so `header-counter-staged` now comes straight off the
+strip). The six full-word German segment labels do not fit one line inside a 520px pill at 11px type
+(measured ~572px), so the strip's label row wraps to two lines inside its own ≤340px box — verified by
+measuring actual DOM bounding boxes (Playwright) before settling on this layout: the pill stays 55.9px
+tall, inside the fixed 56px header, in both languages. `index.css` gained exactly the two things point
+9 asked for (`--color-stage-text` and `.stage-contrast`, reusing existing tone tokens for the bar so no
+other tokens changed). New i18n keys sit in one `// --- 005 design system ---` block in `de.ts`/`en.ts`
+directly after `'nav.history'`.
+
+### `pnpm gates` (tail)
+
+```
+Scope: 4 of 5 workspace projects
+packages/contract typecheck: Done
+packages/domain typecheck: Done
+apps/api typecheck: Done
+apps/web typecheck: Done
+Scope: 4 of 5 workspace projects
+packages/contract lint: contract lint runs at root: pnpm contract:lint
+packages/contract lint: Done
+packages/domain lint: Done
+apps/api lint: Done
+apps/web lint: [21 pre-existing react(set-state-in-effect) warnings, unrelated to this slice, plus
+  one new warning: src/components/Badge.tsx:44:17: react(only-export-components) — Badge.tsx now also
+  exports the statusTone function alongside its badge components; oxlint exits 0 either way]
+apps/web lint: Done
+Scope: 4 of 5 workspace projects
+packages/contract test: no unit tests in contract package
+packages/contract test: Done
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+packages/domain test: Done
+apps/web test:  Test Files  1 passed (1)
+apps/web test:       Tests  6 passed (6)
+apps/web test: Done
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/api test: Done
+
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/hvworkflow/apps/web
+> tsc -b && vite build
+✓ 1701 modules transformed.
+✓ built in 1.07s
+```
+
+Full run exits 0 (`pnpm gates` itself, not piped through `tail`, was checked directly).
+
+### `E2E_PORT=4191 pnpm --filter @hv/web e2e` (tail)
+
+```
+Running 5 tests using 2 workers
+
+  ✓  1 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.4s)
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:76:1 › header strip on the answers desk @screenshot (1.3s)
+  ✓  2 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (5.8s)
+[timing] /answers list after status filter click: 93.5 ms
+[timing] /stage view after navigation: 118.9 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (35.3s)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.1s)
+
+  5 passed (48.8s)
+```
+
+`apps/web/e2e/001-shell.spec.ts` gained the `@screenshot` test that produces `docs/evidence/005-header.png`
+(1440×900, `/answers`) and two extra assertions (`header-counter-drafting`/`-staged` carry a digit) that
+exercise the strip specifically; the four pre-existing testids it already checked
+(`header-counter-speakers`, `-questions`, `-open`, `-staged`) are untouched in meaning. All screenshots the
+run rewrote other than `005-header.png` were restored with `git checkout` afterwards, per instruction.
+
+Screenshot: `docs/evidence/005-header.png`.
 
 ## Review findings

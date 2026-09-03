@@ -30,6 +30,21 @@ export const de = {
   'nav.stage': 'Bühne',
   'nav.history': 'Historie & Suche',
 
+  // --- 005 design system ---
+  'process.segment.captured': 'Erfasst',
+  'process.segment.drafting': 'In Arbeit',
+  'process.segment.review': 'Im Clearing',
+  'process.segment.approved': 'Freigegeben',
+  'process.segment.staged': 'Bühne',
+  'process.segment.delivered': 'Vorgelesen',
+  'stage.initials.supervisory_board_chair': 'AR',
+  'stage.initials.ceo': 'VV',
+  'stage.initials.cfo': 'FV',
+  'stage.initials.board_member': 'VM',
+  'source.transcript': 'Mitschrift',
+  'source.manual': 'Manuell',
+  'stale.reload': 'Neu laden',
+
   // --- 002 speakers & capture ---
   'speakers.now.title': 'Am Mikrofon',
   'speakers.now.empty': 'Es spricht gerade niemand.',

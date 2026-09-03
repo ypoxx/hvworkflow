@@ -1,5 +1,5 @@
 /** The component kit of the HV-Tool. Views compose from here; no view invents its own primitives. */
-export { Badge, StageAssignmentBadge, StatusBadge, TrackBadge } from './Badge';
+export { Badge, StageAssignmentBadge, StatusBadge, statusTone, TrackBadge } from './Badge';
 export type { BadgeProps, BadgeTone } from './Badge';
 export { Button } from './Button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button';
@@ -14,8 +14,18 @@ export type { KeyValueProps } from './KeyValue';
 export { PageHeader } from './PageHeader';
 export { Panel } from './Panel';
 export type { PanelProps } from './Panel';
+export { ProcessStrip } from './ProcessStrip';
+export type { ProcessStripProps, ProcessStripSegment } from './ProcessStrip';
+export { ProgressBar, ProgressRing } from './Progress';
+export type { ProgressBarProps, ProgressRingProps, ProgressTone } from './Progress';
+export { SourceIcon } from './SourceIcon';
+export type { SourceIconProps } from './SourceIcon';
+export { Sparkline } from './Sparkline';
+export type { SparklineProps } from './Sparkline';
 export { SplitPane } from './SplitPane';
 export type { SplitPaneProps } from './SplitPane';
+export { StaleBanner } from './StaleBanner';
+export type { StaleBannerProps } from './StaleBanner';
 export { Table, TBody, TD, TH, THead, TR } from './Table';
 export { ToastProvider } from './Toast';
 export { dismissToast, showProblem, showToast, useToasts } from './toastStore';

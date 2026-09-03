@@ -31,6 +31,21 @@ export const en: Dictionary = {
   'nav.stage': 'Podium',
   'nav.history': 'History & search',
 
+  // --- 005 design system ---
+  'process.segment.captured': 'Captured',
+  'process.segment.drafting': 'In progress',
+  'process.segment.review': 'In clearing',
+  'process.segment.approved': 'Approved',
+  'process.segment.staged': 'Podium',
+  'process.segment.delivered': 'Read out',
+  'stage.initials.supervisory_board_chair': 'SB',
+  'stage.initials.ceo': 'CE',
+  'stage.initials.cfo': 'CF',
+  'stage.initials.board_member': 'BM',
+  'source.transcript': 'Transcript',
+  'source.manual': 'Manual',
+  'stale.reload': 'Reload',
+
   // --- 002 speakers & capture ---
   'speakers.now.title': 'At the microphone',
   'speakers.now.empty': 'Nobody is speaking right now.',

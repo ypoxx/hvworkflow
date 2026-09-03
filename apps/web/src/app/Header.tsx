@@ -5,12 +5,12 @@
  */
 import { Keyboard } from 'lucide-react';
 import type { Meeting } from '@hv/domain';
-import type { NumericCounter } from './routes';
-import { Badge, Button, cx } from '../components';
+import { Badge, Button } from '../components';
 import { useT } from '../i18n';
-import type { TKey, Translate } from '../i18n';
+import type { TKey } from '../i18n';
 import { Clock } from './Clock';
 import { DemoControls } from './DemoControls';
+import { HeaderStrip } from './HeaderStrip';
 import { LanguageToggle } from './LanguageToggle';
 import { RoleSwitcher } from './RoleSwitcher';
 
@@ -19,72 +19,6 @@ const STATE_KEYS: Readonly<Record<Meeting['status'], TKey>> = {
   running: 'meeting.state.running',
   closed: 'meeting.state.closed',
 };
-
-interface CounterSpec {
-  testId: string;
-  labelKey: TKey;
-  titleKey: TKey;
-  field: NumericCounter;
-  emphasis?: boolean;
-}
-
-const COUNTERS: readonly CounterSpec[] = [
-  {
-    testId: 'header-counter-speakers',
-    labelKey: 'header.counter.speakers',
-    titleKey: 'header.counter.speakers.title',
-    field: 'speakers',
-  },
-  {
-    testId: 'header-counter-questions',
-    labelKey: 'header.counter.questions',
-    titleKey: 'header.counter.questions.title',
-    field: 'questions',
-  },
-  {
-    testId: 'header-counter-open',
-    labelKey: 'header.counter.open',
-    titleKey: 'header.counter.open.title',
-    field: 'open',
-  },
-  {
-    testId: 'header-counter-staged',
-    labelKey: 'header.counter.staged',
-    titleKey: 'header.counter.staged.title',
-    field: 'staged',
-    emphasis: true,
-  },
-];
-
-function Counter({
-  spec,
-  meeting,
-  t,
-}: {
-  spec: CounterSpec;
-  meeting: Meeting | null;
-  t: Translate;
-}) {
-  const value = meeting === null ? null : meeting.counts[spec.field];
-  const highlight = spec.emphasis === true && value !== null && value > 0;
-  return (
-    <div
-      data-testid={spec.testId}
-      title={t(spec.titleKey)}
-      className="flex flex-col items-end whitespace-nowrap"
-    >
-      <span className="hv-label">{t(spec.labelKey)}</span>
-      <span
-        className={cx(
-          'font-mono text-[15px] leading-5 font-medium tabular-nums',
-          value === null ? 'text-ink-300' : highlight ? 'text-accent-700' : 'text-ink-900',
-        )}
-      >
-        {value ?? '—'}
-      </span>
-    </div>
-  );
-}
 
 export function Header({
   meeting,
@@ -134,14 +68,7 @@ export function Header({
 
       <span className="flex-1" />
 
-      <div
-        aria-label={t('header.counters')}
-        className="hidden shrink-0 items-center gap-4 rounded-md border border-line bg-sunken px-3 py-1 lg:flex"
-      >
-        {COUNTERS.map((spec) => (
-          <Counter key={spec.testId} spec={spec} meeting={meeting} t={t} />
-        ))}
-      </div>
+      <HeaderStrip meeting={meeting} />
 
       <Clock />
 
