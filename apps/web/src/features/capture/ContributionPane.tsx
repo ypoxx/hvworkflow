@@ -5,8 +5,8 @@
  */
 import { useEffect, useId, useState } from 'react';
 import { ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert } from 'lucide-react';
-import type { Contribution, QuestionCapture, Speaker } from '@hv/domain';
-import { Badge, Button, EmptyState, Kbd, Panel, cx } from '../../components';
+import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
+import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, cx } from '../../components';
 import { actionLabel, useLang, useT } from '../../i18n';
 import { ContributionText } from './ContributionText';
 import { CoverageBar } from './CoverageBar';
@@ -53,6 +53,10 @@ export interface ContributionPaneProps {
   onWrite: (text: string) => Promise<boolean>;
   onCaptureQuestions: (questions: QuestionCapture[]) => void;
   onOpenSuggest: () => void;
+  /** The Einzelfragen of this Redebeitrag, in card order — `ContributionText` numbers its markers by it. */
+  questions: readonly Question[];
+  hoveredQuestionId: string | null;
+  onHoverQuestion: (id: string | null) => void;
 }
 
 export function ContributionPane({
@@ -70,6 +74,9 @@ export function ContributionPane({
   onWrite,
   onCaptureQuestions,
   onOpenSuggest,
+  questions,
+  hoveredQuestionId,
+  onHoverQuestion,
 }: ContributionPaneProps) {
   const t = useT();
   const lang = useLang();
@@ -235,11 +242,7 @@ export function ContributionPane({
                 <Badge tone="outline" mono>
                   {timeOf(lang, contribution.capturedAt)}
                 </Badge>
-                <Badge tone="neutral">
-                  {contribution.source === 'transcript'
-                    ? t('capture.contribution.source.transcript')
-                    : t('capture.contribution.source.manual')}
-                </Badge>
+                <SourceIcon source={contribution.source} className="text-ink-500" />
               </div>
               {canCapture && (
                 <span className="flex items-center gap-1.5 text-2xs text-ink-500">
@@ -314,6 +317,9 @@ export function ContributionPane({
             contribution={contribution}
             canCapture={canCapture}
             onCapture={onCaptureQuestions}
+            questions={questions}
+            hoveredQuestionId={hoveredQuestionId}
+            onHoverQuestion={onHoverQuestion}
           />
         )}
       </div>

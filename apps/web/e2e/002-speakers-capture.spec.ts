@@ -105,6 +105,13 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   ).toHaveAttribute('data-number', called);
   await expect(round.locator('[data-testid="speaker-row"][data-status="speaking"]')).toHaveCount(1);
 
+  // Slice 006: the time-budget ring next to "Am Mikrofon"'s mm:ss timer, and the round's own
+  // finished/total progress next to its header.
+  const timerRing = page.getByTestId('speaker-timer-ring');
+  await expect(timerRing).toBeVisible();
+  await expect(timerRing).toHaveAttribute('aria-valuenow', /^\d+$/);
+  await expect(round.getByTestId('round-progress-3')).toBeVisible();
+
   // A Wortmeldung that comes in while the meeting runs.
   await page.getByTestId('speaker-register').click();
   await page.getByTestId('speaker-register-name').fill('Henrike Baumgart');
@@ -113,6 +120,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('002-speakers.png') });
+  await page.screenshot({ path: evidence('006-speakers.png') });
 
   /* ---- the capture desk ---- */
   await page.getByTestId('role-switcher').click();
@@ -153,6 +161,10 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await page.getByTestId('capture-suggest-add').click();
   await expect(page.getByTestId('capture-question-card')).toHaveCount(7);
 
+  // Slice 006: every one of the seven spans just captured carries its own numbered marker in the
+  // Redebeitrag, so the marker count matches the card count exactly.
+  await expect(page.locator('[data-testid^="capture-marker-"]')).toHaveCount(7);
+
   // Everything but the greeting and the closing sentence is now covered.
   const afterAll = await coverageOf(page);
   expect(afterAll).toBeGreaterThan(afterFirst);
@@ -175,6 +187,27 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(card).toContainText('Pfad C');
   await expect(card).toContainText('klassifiziert');
 
+  // Slice 006: nothing jumps under the desk's cursor — the card that was open while still
+  // `captured` stays open now that it is `classified` (design principle 8).
+  await expect(card.getByTestId('classify-save')).toBeVisible();
+
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('002-capture.png') });
+  await page.screenshot({ path: evidence('006-capture.png') });
+
+  // A fresh mount of that same, now-classified question starts collapsed to a summary line
+  // instead — leaving the desk unmounts and remounts this route, the same way switching between
+  // "Wortmeldungen" and "Erfassung" does all afternoon.
+  await page.getByTestId('nav-speakers').click();
+  await expect(page).toHaveURL(/\/speakers$/);
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
+
+  const remounted = page.getByTestId('capture-question-card').first();
+  await expect(remounted).toContainText('klassifiziert');
+  await expect(remounted.getByTestId('classify-track-expert_track')).toBeHidden();
+  const toggle = remounted.getByTestId('card-classification-toggle');
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(remounted.getByTestId('classify-track-expert_track')).toBeVisible();
 });

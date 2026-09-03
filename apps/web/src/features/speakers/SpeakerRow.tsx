@@ -6,12 +6,12 @@
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowRightLeft, Ban, GripVertical, Mic, MicOff, PencilLine } from 'lucide-react';
+import { ArrowRightLeft, Ban, Check, GripVertical, Mic, MicOff, Minus, PencilLine } from 'lucide-react';
 import { Link } from 'react-router';
 import type { Speaker } from '@hv/domain';
 import { Badge, Button, cx } from '../../components';
 import { useT } from '../../i18n';
-import { STATE_TONE, speakerKindLabel, speakerStateLabel } from './labels';
+import { KIND_ICON, STATE_TONE, speakerKindLabel, speakerStateLabel } from './labels';
 import { SpeakingTimer } from './SpeakingTimer';
 
 /** One grid for the head strip and every row, so the columns line up across all rounds. */
@@ -67,6 +67,10 @@ export function SpeakerRow({
     ...(transition !== undefined ? { transition } : {}),
   };
   const speaking = speaker.status === 'speaking';
+  const finished = speaker.status === 'finished';
+  const withdrawn = speaker.status === 'withdrawn';
+  const waiting = speaker.status === 'waiting';
+  const KindIcon = KIND_ICON[speaker.kind];
 
   return (
     <li
@@ -82,11 +86,11 @@ export function SpeakerRow({
         'transition-colors duration-100 hover:bg-ink-25 focus-visible:bg-ink-25',
         speaking && 'bg-accent-50 hover:bg-accent-50',
         isDragging && 'z-10 rounded-sm bg-surface shadow-[0_8px_24px_-10px_rgba(31,30,28,0.35)]',
-        speaker.status === 'withdrawn' && 'text-ink-400',
+        withdrawn && 'text-ink-400',
       )}
     >
       {speaking && (
-        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-accent-500" />
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-accent-500" />
       )}
 
       {mayReorder ? (
@@ -108,7 +112,12 @@ export function SpeakerRow({
         <span />
       )}
 
-      <span className="text-right font-mono text-[13px] tabular-nums text-ink-500">
+      <span
+        className={cx(
+          'text-right font-mono text-[13px] tabular-nums',
+          waiting ? 'text-ink-900' : withdrawn ? 'text-ink-400' : 'text-ink-500',
+        )}
+      >
         {speaker.number}
       </span>
 
@@ -116,7 +125,9 @@ export function SpeakerRow({
         <span
           className={cx(
             'truncate text-[13px] font-medium',
-            speaker.status === 'withdrawn' ? 'text-ink-400 line-through' : 'text-ink-900',
+            withdrawn && 'text-ink-400 line-through',
+            finished && 'text-ink-500',
+            !withdrawn && !finished && 'text-ink-900',
           )}
         >
           {speaker.displayName}
@@ -126,7 +137,10 @@ export function SpeakerRow({
         )}
       </span>
 
-      <span className="truncate text-2xs text-ink-600">{speakerKindLabel(t, speaker.kind)}</span>
+      <span className="flex min-w-0 items-center gap-1 truncate text-2xs text-ink-600">
+        <KindIcon size={14} strokeWidth={1.75} className="shrink-0 text-ink-400" aria-hidden="true" />
+        <span className="truncate">{speakerKindLabel(t, speaker.kind)}</span>
+      </span>
 
       <span className="text-right font-mono text-[13px] tabular-nums text-ink-600">
         {speaker.requestedMinutes === undefined
@@ -135,9 +149,29 @@ export function SpeakerRow({
       </span>
 
       <span>
-        <Badge tone={STATE_TONE[speaker.status]} dot={speaking}>
-          {speakerStateLabel(t, speaker.status)}
-        </Badge>
+        {speaking ? (
+          <Badge tone={STATE_TONE.speaking} dot>
+            {speakerStateLabel(t, speaker.status)}
+          </Badge>
+        ) : finished ? (
+          <Check
+            size={14}
+            strokeWidth={2}
+            className="text-ink-500"
+            role="img"
+            aria-label={speakerStateLabel(t, speaker.status)}
+          />
+        ) : withdrawn ? (
+          <Minus
+            size={14}
+            strokeWidth={2}
+            className="text-ink-400"
+            role="img"
+            aria-label={speakerStateLabel(t, speaker.status)}
+          />
+        ) : (
+          <span className="text-2xs text-ink-500">{speakerStateLabel(t, speaker.status)}</span>
+        )}
       </span>
 
       <span className="text-right">

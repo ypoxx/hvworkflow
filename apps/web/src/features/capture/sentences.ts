@@ -85,3 +85,42 @@ export function segmentsOf(textLength: number, uncovered: readonly TextSpan[]): 
   if (cursor < textLength) segments.push({ start: cursor, end: textLength, covered: true });
   return segments;
 }
+
+/** One captured Einzelfrage's place in the Redebeitrag, with its 1-based position in the card list. */
+export interface Marker {
+  id: string;
+  number: number;
+  start: number;
+  end: number;
+}
+
+/** A run of the Redebeitrag, tagged with the Einzelfrage it belongs to — or plain, if none does. */
+export interface MarkedSegment {
+  start: number;
+  end: number;
+  marker: Marker | undefined;
+}
+
+/**
+ * The text split at the boundary of every captured span, individually — unlike `segmentsOf`, which
+ * only tells covered from uncovered, this keeps each Einzelfrage's own boundary so every one gets its
+ * own superscript marker, even where two captured spans sit back to back. Overlapping input (should
+ * not occur: a capture is only ever taken from currently uncovered text) is resolved by keeping the
+ * first span in text order and dropping what would overlap it, so the result never overlaps itself.
+ */
+export function markedSegmentsOf(textLength: number, markers: readonly Marker[]): MarkedSegment[] {
+  const sorted = [...markers]
+    .map((m) => ({ ...m, start: Math.max(0, m.start), end: Math.min(textLength, m.end) }))
+    .filter((m) => m.end > m.start)
+    .sort((a, b) => a.start - b.start);
+  const segments: MarkedSegment[] = [];
+  let cursor = 0;
+  for (const marker of sorted) {
+    if (marker.start < cursor) continue;
+    if (marker.start > cursor) segments.push({ start: cursor, end: marker.start, marker: undefined });
+    segments.push({ start: marker.start, end: marker.end, marker });
+    cursor = marker.end;
+  }
+  if (cursor < textLength) segments.push({ start: cursor, end: textLength, marker: undefined });
+  return segments;
+}

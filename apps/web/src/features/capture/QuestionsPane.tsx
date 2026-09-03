@@ -15,12 +15,16 @@ export function QuestionsPane({
   loading,
   failed,
   onProblem,
+  hoveredQuestionId,
+  onHoverQuestion,
 }: {
   questions: readonly Question[];
   agendaItems: readonly AgendaItem[];
   loading: boolean;
   failed: boolean;
   onProblem: () => void;
+  hoveredQuestionId: string | null;
+  onHoverQuestion: (id: string | null) => void;
 }) {
   const t = useT();
 
@@ -74,6 +78,8 @@ export function QuestionsPane({
               question={question}
               agendaItems={agendaItems}
               onProblem={onProblem}
+              hoveredQuestionId={hoveredQuestionId}
+              onHoverQuestion={onHoverQuestion}
             />
           ))}
         </div>

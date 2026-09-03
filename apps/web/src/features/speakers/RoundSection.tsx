@@ -6,7 +6,7 @@
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Speaker } from '@hv/domain';
-import { Badge, Panel, cx } from '../../components';
+import { Badge, Panel, ProgressBar, cx } from '../../components';
 import { useT } from '../../i18n';
 import { ROW_COLUMNS, SpeakerRow } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
@@ -55,6 +55,7 @@ export function RoundSection({
 }) {
   const t = useT();
   const waiting = speakers.filter((s) => s.status === 'waiting').length;
+  const finished = speakers.filter((s) => s.status === 'finished').length;
 
   return (
     <section data-testid={`speakers-round-${round}`}>
@@ -62,43 +63,69 @@ export function RoundSection({
         padded={false}
         className={cx('shrink-0', current && 'border-line-strong')}
         title={
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={open}
-            aria-label={
-              open ? t('speakers.round.collapse', { round }) : t('speakers.round.expand', { round })
-            }
-            className="-my-1 flex w-full items-center gap-2 rounded-sm py-1 text-left"
-          >
-            {open ? (
-              <ChevronDown
-                size={14}
-                strokeWidth={2}
-                className="shrink-0 text-ink-400"
-                aria-hidden="true"
-              />
-            ) : (
-              <ChevronRight
-                size={14}
-                strokeWidth={2}
-                className="shrink-0 text-ink-400"
-                aria-hidden="true"
-              />
-            )}
-            <span className="text-[13px] font-semibold text-ink-900">
-              {t('header.round', { round })}
-            </span>
-            {current && <Badge tone="accent">{t('speakers.round.current')}</Badge>}
-            <span className="text-2xs text-ink-500">
-              {t('speakers.round.count', { count: speakers.length })}
-            </span>
-            {waiting > 0 && (
-              <span className="text-2xs text-ink-500">
-                · {t('speakers.state.waiting')} <span className="font-mono">{waiting}</span>
+          <div className="-my-1 flex w-full items-center gap-2 py-1">
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={open}
+              aria-label={
+                open
+                  ? t('speakers.round.collapse', { round })
+                  : t('speakers.round.expand', { round })
+              }
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left"
+            >
+              {open ? (
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2}
+                  className="shrink-0 text-ink-400"
+                  aria-hidden="true"
+                />
+              ) : (
+                <ChevronRight
+                  size={14}
+                  strokeWidth={2}
+                  className="shrink-0 text-ink-400"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="shrink-0 text-[13px] font-semibold text-ink-900">
+                {t('header.round', { round })}
               </span>
-            )}
-          </button>
+              {current && <Badge tone="accent">{t('speakers.round.current')}</Badge>}
+              <span className="shrink-0 text-2xs text-ink-500">
+                {t('speakers.round.count', { count: speakers.length })}
+              </span>
+              {waiting > 0 && (
+                <span className="shrink-0 text-2xs text-ink-500">
+                  · {t('speakers.state.waiting')} <span className="font-mono">{waiting}</span>
+                </span>
+              )}
+            </button>
+            <span
+              data-testid={`round-progress-${round}`}
+              className="flex shrink-0 items-center gap-2"
+            >
+              {/*
+               * `ProgressBar` already carries its own `w-full`; a width utility handed in through
+               * `className` would collide with it (equal specificity, undefined winner — it rendered
+               * at 0 px in practice), so the width is fixed on this wrapper instead and the bar just
+               * fills it.
+               */}
+              <span className="w-20 shrink-0">
+                <ProgressBar
+                  value={finished}
+                  max={speakers.length}
+                  tone="accent"
+                  label={t('speakers.round.progress.label', { round })}
+                />
+              </span>
+              <span className="whitespace-nowrap font-mono text-2xs tabular-nums text-ink-500">
+                {t('speakers.round.progress', { finished, total: speakers.length })}
+              </span>
+            </span>
+          </div>
         }
       >
         {open &&
