@@ -36,5 +36,5 @@ mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtp
 | 005 Designsystem-Erweiterung | Implementierer · Sonnet 5 | 09:10 | 10:21 | 2 (Design-Kritik Fable: Kopfzeile bricht um, Titel abgeschnitten; dann Scroll-Kompromiss abgelehnt → Balken mit Popover-Legende) | 0/1/1 | ja (5 e2e) | 481 Tsd. Token, 229 Werkzeugaufrufe, 71 min inkl. zwei Nacharbeitsrunden |
 | 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | 09:52 | 10:26 | | | ja (5 e2e) | 367 Tsd. Token, 198 Werkzeugaufrufe, 34 min; Kit-Lücke gemeldet: Progress ohne Attribut-Durchreichung, Breitenklasse kollidiert mit w-full |
 | 007 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 (Worktree) | 09:52 | 10:29 | | | ja (5 e2e, 9 Web-Unit-Tests) | 374 Tsd. Token, 193 Werkzeugaufrufe, 37 min |
-| Gebündeltes Review 005–007 | Reviewer · Opus 5 | | | | | | |
+| Gebündeltes Review 005–007 | Reviewer · Opus 5 | 10:33 | 10:47 | — | 0/2/10 (005 akzeptiert, 006 und 007 Nacharbeit) | ja (gates + 5 e2e) | 254 Tsd. Token, 70 Werkzeugaufrufe, 14 min; bestätigte den Namensabschnitt aus der Design-Kritik, fand Kontrastmodus mit zu kleinem Token-Satz |
 | Nacharbeit, Endkontrolle, Push | Mechaniker · Haiku / Architekt · Fable | | | | | | |

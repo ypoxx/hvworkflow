@@ -1,6 +1,6 @@
 # 005 — Designsystem-Erweiterung: Prozessleiste, Glyphen, Statusfarben, Bausteine
 
-**Status:** review
+**Status:** accepted
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 6, 9, 10; docs/design-prinzipien.md 1, 4, 5, 9
 **Depends on:** `Meeting.counts.byStatus` (domain + contract, done)
@@ -325,3 +325,71 @@ Updated screenshot: `docs/evidence/005-header.png` — resting state, title and 
 showing the bar plus the one count wide enough to print (468, under "vorgelesen").
 
 ## Review findings
+
+### Review of the UI improvement round (adversarial review, slices 005–007 together)
+
+Checked against the spec's ten numbered points, AGENTS.md rules 4/5/6/9/10 and
+docs/design-prinzipien.md, on the merged state (`git diff 6a746ff HEAD -- apps/web`), plus a full
+`pnpm gates` and `E2E_PORT=4195 pnpm --filter @hv/web e2e` run of my own (both green, output below).
+
+**Points 1–10: all implemented.** Verified in the code, not from the report: `ProcessStrip` props and
+6px/3px bar (`components/ProcessStrip.tsx:60-86`), zero total and zero segments produce `pct = 0`
+instead of `NaN` (`:69`), `ProgressBar`/`ProgressRing` clamp `value > max` to 1 and `max <= 0` to 0
+(`components/Progress.tsx:19-22`), the four-way `statusTone` mapping is exactly the one the spec
+lists (`components/Badge.tsx:30-46`) and is the only source of a status colour in the kit, the header
+strip follows the architect's binding decision (6px bar only, counts under segments ≥28px —
+`ProcessStrip.tsx:48,130`, popover legend on hover/focus that closes on mouse-leave/blur/Escape
+`:110-116`, `role="group"` + `aria-label` `:106-108`, sr-only `header-counter-open`
+`app/HeaderStrip.tsx:117` and `header-counter-staged` `ProcessStrip.tsx:140`, no wrapping, no
+scrolling — the e2e asserts `scrollWidth === clientWidth` — and the title renders in full at 1440,
+confirmed in the regenerated `docs/evidence/005-header.png`). `index.css` adds exactly the two things
+point 9 asked for and nothing else.
+
+**Rules.** Rule 4: no role-name comparison outside `src/api/actor.ts`; the two `=== 'podium'` hits are
+`Track`, not a role. Rule 6: no `fetch(` anywhere in `apps/web/src`; the only value imports from
+`@hv/domain` outside `src/api` are `etagOf` and the constant lists. Rule 9: `node
+scripts/vocabulary-check.mjs` → `vocabulary-check: ok`. Rule 10: no literal JSX text, `aria-label`,
+`title` or `placeholder` in the new components (one exception, see R12 under 007).
+
+1. **minor — `apps/web/src/components/Progress.tsx:24-31,42`.** The kit gap slice 006 reported is
+   real, on both counts. (a) `ProgressBarProps`/`ProgressRingProps` take only `value/max/tone/label/
+   children/className`, so a consumer cannot put `data-testid` (or any `data-*`/`id`) on the same node
+   that carries `aria-valuenow` — which is why 006 had to duplicate the whole component in
+   `features/speakers/TimerRing.tsx`. (b) The root always carries `w-full` (`:42`), so a width utility
+   handed in through `className` collides with it at equal specificity and the winner is stylesheet
+   order, not JSX order (006 measured a 0px bar in the browser). Fix: take
+   `...rest: ComponentPropsWithoutRef<'div'>` and spread it onto the root, and drop `w-full` when the
+   caller passes a width class, e.g.
+   `const sized = /(^|\s)(w-|min-w-|max-w-|basis-|flex-)/.test(className ?? '')` and then
+   `cx('h-1 overflow-hidden rounded-full', !sized && 'w-full', className)`. Once that lands,
+   `TimerRing.tsx` is deleted and `RoundSection.tsx`'s wrapper `<span className="w-20">` becomes a
+   plain `className` again.
+2. **minor — `apps/web/src/components/ProcessStrip.tsx:102,140,161`.** The generic kit component
+   carries header knowledge: it looks for the segment key `'staged'` and emits the feature testid
+   `data-testid="header-counter-staged"` — twice, once sr-only (`:140`) and once inside the popover
+   (`:161`). Any second consumer of `dense` inherits a foreign testid, and while the popover is open
+   the same testid exists twice, so `getByTestId('header-counter-staged')` is a Playwright strict-mode
+   violation for any future test that hovers or focuses the strip. Fix: render the sr-only span in
+   `app/HeaderStrip.tsx` next to the strip (it needs no internal state) and remove both the `staged`
+   lookup and the testid from the popover row.
+3. **minor — `apps/web/src/components/Sparkline.tsx:23-27`.** For a constant series (all zeros
+   included) `span` falls back to 1 and every point maps to `y = HEIGHT`, i.e. the polyline sits
+   exactly on the bottom edge and half of its 1.5px non-scaling stroke is clipped; "no events in the
+   window" reads as an empty box. Fix: when `max === min`, place the line at `HEIGHT / 2` (or inset the
+   drawing area by half the stroke width). The `values.length < 2` branch (`:17`) is correct — it
+   renders an empty labelled `<svg>` rather than crashing.
+4. **minor — `apps/web/src/app/HeaderStrip.tsx:92,117` and `components/ProcessStrip.tsx:140`.** Three
+   small things in the pill: (a) `aria-label={t('header.counters')}` sits on a `<div>` with no role, so
+   assistive technology drops the name — and `e2e/001-shell.spec.ts:89` now locates the pill by exactly
+   that attribute; add `role="group"`. (b) the sr-only `header-counter-open` span carries its label
+   ("Offen: 332") but the sr-only `header-counter-staged` span carries a bare digit; give it the label
+   too. (c) `header.counter.staged` and `header.counter.staged.title` are now dead keys in `de.ts`/
+   `en.ts` — (b) revives the first, delete the second.
+5. **minor (cross-reference, no rework of this slice on its own) — `apps/web/src/styles/index.css:184-190`.**
+   `.stage-contrast` re-points five tokens only; everything inside the scope that uses
+   `--color-ink-600…900`, `--color-sunken` or `--color-line` keeps its light-theme value, which is what
+   makes finding R9 (slice 007) visible. The fix belongs in this block, so 007's rework touching
+   `index.css` is not work outside its allowed files.
+
+**Verdict: accepted** (four minors, no blocker and no major). R1 and R2 should be picked up by
+whichever slice next touches `src/components/`.

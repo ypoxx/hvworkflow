@@ -1,6 +1,6 @@
 # 006 — Wortmeldeliste und Erfassung: Priorisierung, Zeitbudget, Marker, Verdichtung
 
-**Status:** review
+**Status:** rework
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 6, 9, 10; docs/design-prinzipien.md 1, 2, 5, 7
 **Depends on:** 005 (ProgressBar, ProgressRing, SourceIcon, TrackBadge glyphs, StageAssignmentBadge initials)
@@ -148,3 +148,61 @@ follow whenever a consumer needs to constrain this component's width.
    bitte im e2e-Test prüfen.
 3. Alles Übrige entspricht der Spec: Marker, Hover-Kopplung, Rundenfortschritt, gedämpfte Zeilen,
    Art-Icons, Quellen-Icon, Restabdeckung über den Kit-Balken.
+
+### Review of the UI improvement round (adversarial review, slices 005–007 together)
+
+Checked against the spec's eight numbered points, AGENTS.md rules 4/5/6/9/10 and
+docs/design-prinzipien.md, on the merged state, plus my own `pnpm gates` and
+`E2E_PORT=4195 pnpm --filter @hv/web e2e` run (both green, output in the review report).
+
+**Points 1–8: all implemented**, verified in the code and in the evidence I regenerated myself:
+time-budget ring with `aria-valuenow` on the same node as the testid (`features/speakers/TimerRing.tsx:22-31`,
+tone flips at the budget — `NowSpeaking.tsx:75`), round progress bar plus "17 von 29 beendet"
+(`RoundSection.tsx:106-127`), the muted/Check/Minus/accent-bar row states (`SpeakerRow.tsx:228-334`,
+the speaking bar is now 3px), Art glyphs (`labels.ts:299-303`), numbered markers (`ContributionText.tsx:184-194`,
+seven markers for seven cards in `docs/evidence/006-capture.png`), the shared `hoveredQuestionId`
+(`useCapture.ts:147-150`, card outline `QuestionCard.tsx:86`, span tint `ContributionText.tsx:181`),
+the collapse/"Ändern" summary line (`QuestionCard.tsx:41,102-127`) and `SourceIcon` in the
+contribution header. **Architect finding 2 is resolved**: `e2e/002-speakers-capture.spec.ts:200-212`
+now leaves and re-enters the desk and asserts the card comes back collapsed.
+
+**Rule 5 specifically:** nothing in this slice decides an action from a status — `QuestionCard.tsx:30`
+still gates the controls on `_actions.includes('question.classify')`; the `question.status === 'captured'`
+read at `:41` only chooses the initial collapsed/expanded state, which is what point 6 asks for.
+
+**Selection mapping (checked line by line, no blocker):** the marker `<sup>` does **not** corrupt the
+DOM-range → text-offset mapping. `data-offset` sits on the wrapper span and `offsetOf`
+(`ContributionText.tsx:32-39`) adds the *text-node-local* offset to it; the `<sup>` is a separate
+element node, so the segment's own text node still starts at offset 0 = `segment.start`. Both element-
+node boundary cases behave exactly as they did before markers existed. See R7 for the one residual
+edge.
+
+6. **major — `apps/web/src/features/speakers/NowSpeaking.tsx:66-97`. Architect finding 1 is still
+   present.** No commit touched the file after the design critique (`git log -- NowSpeaking.tsx` ends
+   at a1757f1, the critique is 3d813b9), and the evidence I regenerated with my own e2e run
+   (`docs/evidence/006-speakers.png`, 1440×900) still shows **"Vera Reh…"** truncated. The two halves
+   of the requested fix that are cheap are in fact there — `Identity` gets `flex-1` (`:67`) on a root
+   that already has `min-w-0` (`:18`), and the ring sits in the same flex group as the mm:ss timer
+   (`:70-85`) — but they do not help, because the row is a `flex-wrap` line with five fixed-width
+   blocks after the name (elapsed, Fragen, "angemeldet 7 min", "Zur Erfassung", "Beenden"); at 1440px
+   the identity column collapses to ≈90px. Fix: give the name real priority instead of leftover space,
+   e.g. `min-w-[220px] flex-1` on `Identity` and one `shrink-0` group around ring+timer+Fragen+badge,
+   or drop the "angemeldet {n} min" badge (the ring already encodes the budget) — and add the check
+   the architect asked for to `e2e/002-speakers-capture.spec.ts`: the name span's
+   `scrollWidth === clientWidth` at 1440×900.
+7. **minor — `apps/web/src/features/capture/ContributionText.tsx:184-194`.** The marker `<sup>` is
+   ordinary selectable text inside the flow: copying a marked passage out of the Redebeitrag yields
+   the marker digits inside the wording, and a selection that *starts* inside the digit maps to
+   `segment.start + <offset inside the digit>` (`:38`), i.e. a one-character skew of the captured span.
+   Fix: `select-none` on the `<sup>` (and, belt and braces, `data-offset={segment.start}` on it, so any
+   offset inside it resolves to the span start).
+8. **minor — `apps/web/src/features/speakers/TimerRing.tsx` (whole file) and the dead keys
+   `capture.contribution.source.transcript`/`.manual` (`i18n/de.ts:122-123`, `en.ts:123-124`).** The
+   duplicated ring was the right call under this slice's non-goals clause and is reported honestly, but
+   it must not become permanent: once finding R1 of slice 005 lands (prop pass-through on
+   `components/Progress.tsx`), delete `TimerRing.tsx` and use `ProgressRing` with `data-testid`. The two
+   source keys became dead when point 7 replaced the badge with `SourceIcon`; remove them from both
+   dictionaries.
+
+**Verdict: rework** — because of R6 (major, the architect's finding 1 is unaddressed). R7 and R8 are
+minors and may travel with it.

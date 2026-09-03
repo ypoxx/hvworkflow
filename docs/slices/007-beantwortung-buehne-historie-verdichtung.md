@@ -1,6 +1,6 @@
 # 007 — Beantwortung, Bühne, Historie: Verteilung, Dringlichkeit, Änderungen, Durchlaufzeiten
 
-**Status:** review
+**Status:** rework
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 5, 6, 9, 10; docs/design-prinzipien.md 1, 4, 5, 10
 **Depends on:** 005 (ProcessStrip, Sparkline, StaleBanner, statusTone, glyphs, stage tokens)
@@ -127,3 +127,71 @@ black ground, near-white text, one light accent), `007-history.png` (KPI line an
 on the Vorgangshistorie tab).
 
 ## Review findings
+
+### Review of the UI improvement round (adversarial review, slices 005–007 together)
+
+Checked against the spec's nine numbered points, AGENTS.md rules 4/5/6/9/10 and
+docs/design-prinzipien.md, on the merged state, plus my own `pnpm gates` and
+`E2E_PORT=4195 pnpm --filter @hv/web e2e` run (both green, output in the review report). I
+regenerated every screenshot myself and restored the evidence afterwards.
+
+**Points 1–9: all implemented.** Statusverteilung as a filtering `ProcessStrip` with all eleven
+statuses, terminal ones last, tones from `statusTone`, `answers-filter-status-*` preserved
+(`features/answers/WorkList.tsx:245-256,343-361`); urgency bar with `data-level`
+(`WorkList.tsx:117-122,146-173`, thresholds in `lib.ts:112-117`); word diff with the three required
+unit tests (`lib.ts:130-176` — 47 lines, LCS over whitespace tokens; `lib.test.ts`), memoised per
+version pair and only rendered when the toggle is open (`QuestionDetail.tsx:32,167-185`); 412 →
+`StaleBanner` + refetch, toast kept for everything else (`Page.tsx:68-77,169-190`); stage text in
+`--color-stage-text` at weight 500 (`Podium.tsx:583-588`); contrast toggle persisted in
+`hv-stage-contrast-v1` with a `try`/`catch` around `localStorage` (`stage/Page.tsx:34-40,176-186`);
+"Als Nächstes" preview plus initials/glyph queue rows (`Podium.tsx:464-514`); per-event durations and
+the KPI line derived from events only (`history/lib.ts:29-82`, `Timeline.tsx:16-42,86-91`); the
+five-minute Lastkurve with its caption (`history/lib.ts:84-99`, `Timeline.tsx:130-133`).
+
+**Rule 5:** the history KPIs really are read off the log — `historyKpi` switches on
+`QuestionCaptured`/`QuestionDelivered`/`AnswerDrafted`/`QuestionReturned` and never looks at a status
+(`history/lib.ts:58-82`); no component in this slice decides an allowed action from `status` (podium
+and detail both gate on `_actions`). **Rule 6:** no `fetch(`; only `etagOf` and constant lists come
+from `@hv/domain`. **Performance:** the work list stays windowed, so urgency and age are computed for
+~25 rendered rows, not 800 (`WorkList.tsx:261-263`), and `loadCurve` runs once per fetch, not per
+render — but see R10 for what that fetch now costs. **wordDiff edge cases** hold up: `('','')` → `[]`,
+`('', b)` → one `added` part, insertion-only and replacement covered by the tests.
+
+9. **major — `apps/web/src/styles/index.css:184-190` (the `.stage-contrast` scope) applied at
+   `features/stage/Page.tsx:344`.** Kontrastmodus is only half a theme. It re-points five tokens
+   (`--color-canvas`, `--color-surface`, `--color-stage-text`, `--color-accent-500`, `--color-ink-500`),
+   so everything inside the scope that uses `--color-ink-600…900`, `--color-sunken` or `--color-line`
+   keeps its light-theme value on the black ground. In this slice's own evidence
+   (`docs/evidence/007-stage-contrast.png`, which I regenerated) the whole queue column is the
+   casualty: the question text of every queue row (`Podium.tsx:507`, `text-ink-700` #4a4844 on #0b0f19
+   ≈ 2.2:1 contrast) is effectively unreadable, the "Als Nächstes" card (`Podium.tsx:469`, `bg-sunken`
+   + `text-ink-900`) is a white block inside the black frame, and the `tone-outline` assignment badge
+   (`Podium.tsx:552`, ink-600 on transparent) disappears. Slice 005 point 9 promised "text #f8fafc" and
+   design principle 10 asks for maximum contrast on this device. Fix: in `.stage-contrast`, re-point the
+   neutral ramp the podium actually renders with — `--color-ink-900/800/700/600`, `--color-sunken`,
+   `--color-line`, `--color-line-strong` — five to seven more lines, no new tokens and no component
+   change. (The return dialog is safe: `Dialog` portals to `document.body`, outside the scope.)
+10. **minor — `apps/web/src/features/history/Page.tsx:156-173`.** The "Ereignisstrom" tab now reads the
+    *whole* log (`api.listEvents(0, lastSeq)`) instead of the last 200, and the effect depends on
+    `[version, tab]`, so every write anywhere in the tool refetches all of it while the tab is open. I
+    measured the seeded corpus with `seedEvents({ questions: 800 })`: **5 688 events, 5 473 of them
+    inside the two-hour window**. In-process (ADR 0002 demo) that is a few milliseconds, but across the
+    HTTP adapter it is a multi-megabyte response per event. Fix: bound the read the curve needs too —
+    e.g. `listEvents(Math.max(0, lastSeq - CURVE_SCAN_LIMIT), CURVE_SCAN_LIMIT)` with a documented cap,
+    or keep the curve out of the `version` dependency so it is computed once per tab visit.
+11. **minor — `apps/web/src/features/answers/WorkList.tsx:146-148`.** Point 2 says "only for
+    non-terminal statuses" and the code reads that as `TERMINAL_STATUSES` = closed/withdrawn/merged —
+    but the domain's own "open" figure excludes `delivered` as well
+    (`packages/domain/src/state.ts:55`). A question that has already been read out therefore still
+    carries the red "over 45 minutes" bar (visible in `docs/evidence/007-answers.png`, e.g. row
+    F-0008), although nobody is waiting on it. This is the same drift the 005 rework fixed for "Offen".
+    Fix: derive the bar from the domain's open predicate (export it as a constant list from
+    `@hv/domain`, which rule 6 allows) instead of from `TERMINAL_STATUSES`.
+12. **minor (rule 10) — `apps/web/src/features/history/lib.ts:35-37`.** `"h"`, `"min"` and `"s"` are
+    user-visible strings assembled in code instead of coming from the dictionary; every other unit in
+    the tool goes through i18n (`time.minutes`, `speakers.minutes`). Fix: three keys in the
+    `// --- 003 answers, stage, history ---` block and a `Translate` parameter for `formatSpan` — or, if
+    the units really are meant to be language-invariant, say so in the doc comment so the next reader
+    does not have to guess.
+
+**Verdict: rework** — because of R9 (major). R10–R12 are minors and may travel with it.
