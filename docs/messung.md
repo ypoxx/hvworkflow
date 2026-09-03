@@ -37,4 +37,9 @@ mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtp
 | 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | 09:52 | 10:26 | | | ja (5 e2e) | 367 Tsd. Token, 198 Werkzeugaufrufe, 34 min; Kit-Lücke gemeldet: Progress ohne Attribut-Durchreichung, Breitenklasse kollidiert mit w-full |
 | 007 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 (Worktree) | 09:52 | 10:29 | | | ja (5 e2e, 9 Web-Unit-Tests) | 374 Tsd. Token, 193 Werkzeugaufrufe, 37 min |
 | Gebündeltes Review 005–007 | Reviewer · Opus 5 | 10:33 | 10:47 | — | 0/2/10 (005 akzeptiert, 006 und 007 Nacharbeit) | ja (gates + 5 e2e) | 254 Tsd. Token, 70 Werkzeugaufrufe, 14 min; bestätigte den Namensabschnitt aus der Design-Kritik, fand Kontrastmodus mit zu kleinem Token-Satz |
-| Nacharbeit, Endkontrolle, Push | Mechaniker · Haiku / Architekt · Fable | | | | | | |
+| Nacharbeit 005–007 (12 Befunde + 2 Sichtbefunde) | Implementierer · Sonnet 5 | 10:50 | 11:17 | 1 | alle behoben | ja (gates + 5 e2e, Farbprobe Kontrastmodus) | 305 Tsd. Token, 163 Werkzeugaufrufe, 27 min |
+| Endkontrolle, Abnahme, Push | Architekt · Fable 5.1 | 11:18 | 11:25 | — | — | ja (eigener Lauf: gates + 5 e2e; Sichtprüfung 5 Screenshots) | Push ohne Build-Skip → Netlify |
+
+**Bautag 2 gesamt:** rund 2 h 40 min von der Design-Kritik bis zum Deploy; Subagenten etwa
+2,1 Mio. Token (Sonnet 1,84 Mio., Opus 0,25 Mio., Haiku 0); zwei größere und zwölf kleinere Befunde
+aus Review und Sichtprüfung, alle behoben; keine Regression in den fünf Playwright-Szenarien.
