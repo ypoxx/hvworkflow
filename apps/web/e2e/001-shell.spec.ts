@@ -85,6 +85,33 @@ test('header strip on the answers desk @screenshot', async ({ page }) => {
     .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
   await expect(page.getByTestId('header-counter-staged')).toBeVisible();
 
+  // Design review rework: the counters pill must never force the meeting title to truncate at
+  // 1440px. Measure both directly instead of trusting a screenshot to reveal it.
+  const pill = page.locator('[aria-label="Zählwerk"]');
+  const pillBox = await pill.boundingBox();
+  expect(pillBox).not.toBeNull();
+  if (pillBox === null) throw new Error('header counters pill not found');
+  console.log(`[005 rework] header counters pill width: ${pillBox.width.toFixed(1)}px`);
+  expect(pillBox.width).toBeLessThanOrEqual(560);
+
+  const titleMetrics = await page.getByTestId('header-meeting-title').evaluate((el) => {
+    const h1 = el.querySelector('h1');
+    const p = el.querySelector('p');
+    return {
+      h1Scroll: h1?.scrollWidth ?? 0,
+      h1Client: h1?.clientWidth ?? 0,
+      pScroll: p?.scrollWidth ?? 0,
+      pClient: p?.clientWidth ?? 0,
+    };
+  });
+  // scrollWidth > clientWidth is exactly what "truncated" means for a `truncate` (ellipsis) element.
+  expect(titleMetrics.h1Scroll).toBeLessThanOrEqual(titleMetrics.h1Client);
+  expect(titleMetrics.pScroll).toBeLessThanOrEqual(titleMetrics.pClient);
+
+  // "Offen" is not a visible cell any more, but it must still carry the one true figure
+  // (`meeting.counts.open`, the same value the navigation badge shows) for tests and screen readers.
+  await expect(page.getByTestId('header-counter-open')).toContainText(/\d/);
+
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('005-header.png') });
 });

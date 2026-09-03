@@ -1,7 +1,9 @@
 /**
- * The header's live read on the backlog: how many Wortmeldungen and Einzelfragen exist, how many are
- * still open, and — as one glance-able bar — where the open ones sit in the workflow. Replaces the
- * four separate counter cells of slice 001 (docs/slices/005-designsystem-erweiterung.md point 8).
+ * The header's live read on the backlog: how many Wortmeldungen and Einzelfragen exist, and — as one
+ * glance-able bar — where the open ones sit in the workflow. Replaces the four separate counter cells
+ * of slice 001 (docs/slices/005-designsystem-erweiterung.md point 8). "Offen" stays in the DOM for
+ * tests and screen readers but is not a visible cell (design review: the pill must not crowd out the
+ * meeting title at 1440px).
  */
 import type { Meeting, QuestionStatus } from '@hv/domain';
 import { ProcessStrip, statusTone } from '../components';
@@ -30,9 +32,6 @@ const SEGMENTS: readonly SegmentSpec[] = [
   // Delivered and closed both mean "nothing left to do"; one segment, delivered's tone.
   { key: 'delivered', labelKey: 'process.segment.delivered', statuses: ['delivered', 'closed'], primary: 'delivered' },
 ];
-
-/** The segments that still count as work in flight — staged and delivered/closed do not. */
-const OPEN_KEYS: ReadonlySet<string> = new Set(['captured', 'drafting', 'review', 'approved']);
 
 function sum(byStatus: Meeting['counts']['byStatus'], statuses: readonly QuestionStatus[]): number {
   return statuses.reduce((total, status) => total + byStatus[status], 0);
@@ -71,10 +70,9 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
     tone: statusTone(spec.primary),
   }));
   const total = meeting?.counts.questions ?? null;
-  const open =
-    meeting === null
-      ? null
-      : segments.filter((segment) => OPEN_KEYS.has(segment.key)).reduce((sum2, segment) => sum2 + segment.count, 0);
+  // The one true "open" figure is the domain's own count (it includes the podium queue); never
+  // recompute it from a subset of strip segments, or it silently drifts from the nav badge.
+  const open = meeting === null ? null : meeting.counts.open;
 
   return (
     <div
@@ -96,24 +94,29 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
         label={t('header.counter.questions')}
         value={total}
       />
-      <StatCell
-        testId="header-counter-open"
-        title={t('header.counter.open.title')}
-        label={t('header.counter.open')}
-        value={open}
-      />
 
       <span aria-hidden="true" className="h-7 w-px bg-line" />
 
-      {/* The strip itself stays within its own 520px pill (point 8); the stat cells sit outside it. */}
-      <div className="max-w-[340px]">
+      {/*
+       * The six full words at 10px still need ~520px in one line — more than fits next to the title
+       * at 1440px. Scrolling (not wrapping, not truncating a number away) keeps every segment reachable:
+       * the bar and its labels move together since both live inside this one scrolling box.
+       */}
+      <div className="min-w-0 max-w-[220px] overflow-x-auto">
         <ProcessStrip
           compact
+          dense
           segments={segments}
           {...(total !== null ? { total } : {})}
           testIdPrefix="header-counter"
         />
       </div>
+
+      {/* Kept for tests and assistive tech; not a visible cell (design review: the pill must fit
+          next to the meeting title at 1440px). Content, not presentation, so no `hidden` attribute. */}
+      <span data-testid="header-counter-open" title={t('header.counter.open.title')} className="sr-only">
+        {t('header.counter.open')}: {open ?? '—'}
+      </span>
     </div>
   );
 }

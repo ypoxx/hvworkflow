@@ -48,7 +48,7 @@ export function Header({
 
       <span aria-hidden="true" className="h-7 w-px bg-line" />
 
-      <div data-testid="header-meeting-title" className="min-w-0 shrink">
+      <div data-testid="header-meeting-title" className="min-w-[300px] shrink">
         <div className="flex items-center gap-2">
           <h1 className="truncate text-[13px] font-semibold text-ink-900">
             {meeting?.title ?? t('header.meeting')}

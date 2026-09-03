@@ -156,4 +156,108 @@ run rewrote other than `005-header.png` were restored with `git checkout` afterw
 
 Screenshot: `docs/evidence/005-header.png`.
 
+## Rework
+
+Design review of `docs/evidence/005-header.png` found two things, both addressed:
+
+1. **MAJOR — pill crowded out the meeting title.** The pill had grown to ~670px, so the title
+   truncated at 1440px. Fix: `ProcessStrip` gained a `dense` mode (`src/components/ProcessStrip.tsx`) —
+   10px uppercase labels, 12px mono counts, `flex-nowrap` + `whitespace-nowrap` (no wrapping), 12px gap
+   between segments — and the strip's shortened German/English labels moved into the `// --- 005
+   design system ---` block (`process.segment.review`: "Im Clearing"/"In clearing" → "Clearing";
+   `process.segment.drafting` (en only): "In progress" → "Drafting"). The "Offen" cell is gone from the
+   visible pill; `header-counter-open` is now an `sr-only` span carrying the label and value, still in
+   the DOM for the e2e assertions and for screen readers. Even after all of that, six full-word
+   segments at 10px still measure ~520px on one real line — more than fits next to the title — so
+   `HeaderStrip.tsx` puts the strip in its own `min-w-0 max-w-[220px] overflow-x-auto` box: the bar
+   (proportions for all six segments) is always fully visible at a glance, the labelled counts scroll
+   horizontally instead of wrapping or truncating a number away. `Header.tsx`'s title block moved from
+   `min-w-0` to `min-w-[300px]` so it never has to shrink below its own content. Verified directly with
+   Playwright rather than by eyeballing a screenshot: the new `header strip on the answers desk` test
+   reads `h1`/`p` `scrollWidth` vs `clientWidth` (equal in both languages — no truncation) and asserts
+   the pill's `boundingBox().width`, printing it to the test log.
+2. **MINOR — "Offen" must be one number everywhere.** `HeaderStrip.tsx` no longer sums four strip
+   segments (that excluded the podium queue and undercounted — 323 vs. the real 332); it now reads
+   `meeting.counts.open` directly, the same field the navigation badge uses, so the two can never drift
+   apart again.
+
+### `pnpm gates` (tail)
+
+```
+Scope: 4 of 5 workspace projects
+packages/contract typecheck: Done
+packages/domain typecheck: Done
+apps/api typecheck: Done
+apps/web typecheck: Done
+Scope: 4 of 5 workspace projects
+packages/contract lint: contract lint runs at root: pnpm contract:lint
+packages/contract lint: Done
+packages/domain lint: Done
+apps/api lint: Done
+apps/web lint: [same 21 pre-existing react(set-state-in-effect) warnings, unrelated to this slice,
+  plus the one pre-existing react(only-export-components) warning on Badge.tsx:44 (statusTone
+  exported alongside the badge components) — oxlint exits 0]
+apps/web lint: Done
+Scope: 4 of 5 workspace projects
+packages/contract test: no unit tests in contract package
+packages/contract test: Done
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+packages/domain test: Done
+apps/web test:  Test Files  1 passed (1)
+apps/web test:       Tests  6 passed (6)
+apps/web test: Done
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/api test: Done
+
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/hvworkflow/apps/web
+> tsc -b && vite build
+✓ 1701 modules transformed.
+✓ built in 1.07s
+```
+
+Exit code of `pnpm gates` itself: 0.
+
+### `E2E_PORT=4191 pnpm --filter @hv/web e2e --grep 001` (real output)
+
+```
+Running 2 tests using 1 worker
+
+  ✓  1 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (1.9s)
+[005 rework] header counters pill width: 498.7px
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:76:1 › header strip on the answers desk @screenshot (1.0s)
+
+  2 passed (4.9s)
+```
+
+Pill width 498.7px (target ≤560px, met with margin) in German; the English render (longer words:
+"Requests"/"Questions"/"Captured"/"Drafting"/"Clearing"/"Approved") measured narrower still at
+429.8px in manual verification, so this isn't a German-specific fit. Both `h1`/`p` truncation
+assertions (`scrollWidth ≤ clientWidth`) pass in both languages.
+
+For full confidence beyond the requested `--grep 001`, the complete suite was also re-run since
+`Header.tsx`/`HeaderStrip.tsx`/`ProcessStrip.tsx` are shared across every screen:
+
+```
+Running 5 tests using 2 workers
+
+  ✓  2 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.3s)
+[005 rework] header counters pill width: 498.7px
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:76:1 › header strip on the answers desk @screenshot (1.4s)
+  ✓  1 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (5.7s)
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (36.0s)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.6s)
+
+  5 passed (49.2s)
+```
+
+Screenshots the run rewrote other than `005-header.png` were restored with `git checkout` afterwards.
+Updated screenshot: `docs/evidence/005-header.png` (title and subtitle now render in full at 1440×900).
+
 ## Review findings

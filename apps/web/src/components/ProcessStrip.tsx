@@ -20,6 +20,8 @@ export interface ProcessStripProps {
   onSelect?: (key: string) => void;
   /** Hides the label of a zero-count segment instead of showing it muted. */
   compact?: boolean;
+  /** One line, 10px labels, no wrap — for a tight space like the header (design review, 005). */
+  dense?: boolean;
   testIdPrefix?: string;
 }
 
@@ -40,6 +42,7 @@ export function ProcessStrip({
   selected,
   onSelect,
   compact = false,
+  dense = false,
   testIdPrefix,
 }: ProcessStripProps) {
   const denominator = total ?? segments.reduce((sum, segment) => sum + segment.count, 0);
@@ -68,14 +71,26 @@ export function ProcessStrip({
         })}
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+      <div
+        className={cx(
+          'flex items-baseline gap-x-3',
+          dense ? 'flex-nowrap' : 'flex-wrap gap-y-0.5',
+        )}
+      >
         {shownLabels.map((segment) => {
           const zero = segment.count === 0;
           const isSelected = selected?.includes(segment.key) ?? false;
           const testId = testIdPrefix !== undefined ? `${testIdPrefix}-${segment.key}` : undefined;
           const content = (
             <>
-              <span className={cx('hv-label', zero && 'text-ink-300')}>{segment.label}</span>
+              <span
+                className={cx(
+                  dense ? 'text-[10px] font-medium tracking-[0.06em] text-ink-500 uppercase' : 'hv-label',
+                  zero && 'text-ink-300',
+                )}
+              >
+                {segment.label}
+              </span>
               <span
                 className={cx(
                   'font-mono text-[12px] leading-4 tabular-nums',
@@ -95,7 +110,7 @@ export function ProcessStrip({
                 {...(testId !== undefined ? { 'data-testid': testId } : {})}
                 onClick={() => onSelect(segment.key)}
                 className={cx(
-                  '-mx-1 flex items-baseline gap-1 rounded-sm px-1 transition-colors',
+                  '-mx-1 flex shrink-0 items-baseline gap-1 rounded-sm px-1 whitespace-nowrap transition-colors',
                   isSelected ? 'bg-accent-50' : 'hover:bg-ink-50',
                 )}
               >
@@ -107,7 +122,7 @@ export function ProcessStrip({
             <span
               key={segment.key}
               {...(testId !== undefined ? { 'data-testid': testId } : {})}
-              className="flex items-baseline gap-1"
+              className="flex shrink-0 items-baseline gap-1 whitespace-nowrap"
             >
               {content}
             </span>

@@ -33,7 +33,7 @@ export const de = {
   // --- 005 design system ---
   'process.segment.captured': 'Erfasst',
   'process.segment.drafting': 'In Arbeit',
-  'process.segment.review': 'Im Clearing',
+  'process.segment.review': 'Clearing',
   'process.segment.approved': 'Freigegeben',
   'process.segment.staged': 'Bühne',
   'process.segment.delivered': 'Vorgelesen',

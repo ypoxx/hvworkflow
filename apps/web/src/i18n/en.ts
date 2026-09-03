@@ -33,8 +33,8 @@ export const en: Dictionary = {
 
   // --- 005 design system ---
   'process.segment.captured': 'Captured',
-  'process.segment.drafting': 'In progress',
-  'process.segment.review': 'In clearing',
+  'process.segment.drafting': 'Drafting',
+  'process.segment.review': 'Clearing',
   'process.segment.approved': 'Approved',
   'process.segment.staged': 'Podium',
   'process.segment.delivered': 'Read out',
