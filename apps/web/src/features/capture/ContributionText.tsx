@@ -9,10 +9,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Highlighter } from 'lucide-react';
-import type { Contribution, QuestionCapture } from '@hv/domain';
+import type { Contribution, Question, QuestionCapture } from '@hv/domain';
 import { Button, Kbd, cx } from '../../components';
 import { useT } from '../../i18n';
-import { segmentsOf } from './sentences';
+import type { Marker } from './sentences';
+import { markedSegmentsOf } from './sentences';
 
 interface PendingSelection {
   text: string;
@@ -41,10 +42,17 @@ export function ContributionText({
   contribution,
   canCapture,
   onCapture,
+  questions,
+  hoveredQuestionId,
+  onHoverQuestion,
 }: {
   contribution: Contribution;
   canCapture: boolean;
   onCapture: (questions: QuestionCapture[]) => void;
+  /** In card order: a marker's number is this Einzelfrage's 1-based position in that list. */
+  questions: readonly Question[];
+  hoveredQuestionId: string | null;
+  onHoverQuestion: (id: string | null) => void;
 }) {
   const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,9 +63,18 @@ export function ContributionText({
     pendingRef.current = pending;
   }, [pending]);
 
+  const markers = useMemo<Marker[]>(
+    () =>
+      questions.flatMap((question, index) =>
+        question.span !== undefined
+          ? [{ id: question.id, number: index + 1, start: question.span.start, end: question.span.end }]
+          : [],
+      ),
+    [questions],
+  );
   const segments = useMemo(
-    () => segmentsOf(contribution.text.length, contribution.coverage.uncovered),
-    [contribution.text.length, contribution.coverage.uncovered],
+    () => markedSegmentsOf(contribution.text.length, markers),
+    [contribution.text.length, markers],
   );
 
   const capture = useCallback(
@@ -141,19 +158,44 @@ export function ContributionText({
         data-testid="capture-contribution-text"
         className="text-[13px] leading-6 text-ink-800 selection:bg-accent-100"
       >
-        {segments.map((segment) => (
-          <span
-            key={segment.start}
-            data-offset={segment.start}
-            className={cx(
-              segment.covered &&
-                'rounded-[3px] bg-accent-50 box-decoration-clone px-0.5 text-ink-900 shadow-[inset_0_-1px_0_var(--color-accent-200)]',
-            )}
-            {...(segment.covered ? { title: t('capture.covered.title') } : {})}
-          >
-            {contribution.text.slice(segment.start, segment.end)}
-          </span>
-        ))}
+        {segments.map((segment) => {
+          const marker = segment.marker;
+          if (marker === undefined) {
+            return (
+              <span key={segment.start} data-offset={segment.start}>
+                {contribution.text.slice(segment.start, segment.end)}
+              </span>
+            );
+          }
+          const hovered = hoveredQuestionId === marker.id;
+          return (
+            <span
+              key={segment.start}
+              data-offset={segment.start}
+              data-question-id={marker.id}
+              title={t('capture.covered.title')}
+              onMouseEnter={() => onHoverQuestion(marker.id)}
+              onMouseLeave={() => onHoverQuestion(null)}
+              className={cx(
+                'rounded-[3px] box-decoration-clone px-0.5 text-ink-900 transition-colors duration-100',
+                hovered ? 'bg-accent-200' : 'bg-accent-100',
+              )}
+            >
+              <sup
+                aria-hidden="true"
+                data-testid={`capture-marker-${marker.number}`}
+                className={cx(
+                  'mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full',
+                  'border border-accent-300 bg-accent-100 align-middle font-mono text-[10px]',
+                  'leading-none font-medium text-accent-700 no-underline',
+                )}
+              >
+                {marker.number}
+              </sup>
+              {contribution.text.slice(segment.start, segment.end)}
+            </span>
+          );
+        })}
       </div>
 
       {pending !== null && (

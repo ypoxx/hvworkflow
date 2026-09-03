@@ -4,6 +4,8 @@
  * lives next to it. The maps use domain values as keys — a display lookup, never a rights decision
  * (AGENTS.md rule 4).
  */
+import type { LucideIcon } from 'lucide-react';
+import { Briefcase, User, Users } from 'lucide-react';
 import type { SpeakerKind, SpeakerStatus } from '@hv/domain';
 import type { BadgeTone } from '../../components';
 import type { TKey, Translate } from '../../i18n';
@@ -12,6 +14,13 @@ const KIND_KEYS: Readonly<Record<SpeakerKind, TKey>> = {
   shareholder: 'speakers.kind.shareholder',
   proxy: 'speakers.kind.proxy',
   association: 'speakers.kind.association',
+};
+
+/** One glyph per Wortmeldung kind, so "Art" reads before the label is even parsed (point 4). */
+export const KIND_ICON: Readonly<Record<SpeakerKind, LucideIcon>> = {
+  shareholder: User,
+  proxy: Briefcase,
+  association: Users,
 };
 
 const STATE_KEYS: Readonly<Record<SpeakerStatus, TKey>> = {

@@ -4,6 +4,7 @@
  * the desk's work — one bar, one number, no decoration.
  */
 import type { Contribution } from '@hv/domain';
+import { ProgressBar } from '../../components';
 import { useT } from '../../i18n';
 
 export function CoverageBar({ contribution }: { contribution: Contribution }) {
@@ -24,19 +25,13 @@ export function CoverageBar({ contribution }: { contribution: Contribution }) {
           {t('capture.coverage.value', { percent })}
         </span>
       </div>
-      <div
-        role="progressbar"
-        aria-label={t('capture.coverage.label')}
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-150"
-      >
-        <div
-          className="h-full rounded-full bg-accent-500 transition-[width] duration-100"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={percent}
+        max={100}
+        tone="accent"
+        label={t('capture.coverage.label')}
+        className="mt-1.5"
+      />
       <p className="mt-1 text-2xs text-ink-500">{t('capture.coverage.hint', { covered, total })}</p>
     </div>
   );

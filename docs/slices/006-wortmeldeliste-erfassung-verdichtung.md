@@ -1,6 +1,6 @@
 # 006 — Wortmeldeliste und Erfassung: Priorisierung, Zeitbudget, Marker, Verdichtung
 
-**Status:** spec
+**Status:** review
 **Role:** Implementierer Oberfläche (Sonnet 5)
 **Rule ids:** AGENTS.md rules 4, 6, 9, 10; docs/design-prinzipien.md 1, 2, 5, 7
 **Depends on:** 005 (ProgressBar, ProgressRing, SourceIcon, TrackBadge glyphs, StageAssignmentBadge initials)
@@ -56,5 +56,83 @@ locally in the feature folder and report it).
 `docs/evidence/006-speakers.png` and `006-capture.png` (capture with at least five cards and markers).
 
 ## Evidence
+
+`pnpm gates` (real tail):
+
+```
+apps/web test:  Test Files  1 passed (1)
+apps/web test:       Tests  6 passed (6)
+apps/web test:    Start at  08:21:12
+apps/web test:    Duration  247ms (transform 80ms, setup 0ms, import 95ms, tests 8ms, environment 0ms)
+apps/web test: Done
+apps/api test:  Test Files  3 passed (3)
+apps/api test:       Tests  25 passed (25)
+apps/api test:    Start at  08:21:12
+apps/api test:    Duration  1.55s (transform 1.09s, setup 0ms, import 2.31s, tests 1.20s, environment 0ms)
+apps/api test: Done
+
+> hvworkflow@0.1.0 vocabulary /home/user/hvworkflow/.claude/worktrees/agent-ab39ff455662a0169
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/hvworkflow/.claude/worktrees/agent-ab39ff455662a0169/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1702 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/index-DTqWyNH5.css                        38.14 kB │ gzip:   8.30 kB
+dist/assets/index-D2n2Mfb4.js                        513.63 kB │ gzip: 150.86 kB │ map: 2,115.58 kB
+✓ built in 1.15s
+```
+
+`E2E_PORT=4192 pnpm --filter @hv/web e2e` (real tail, all five specs including `abnahme.spec.ts`):
+
+```
+Running 5 tests using 2 workers
+
+  ✓  1 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (2.8s)
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:76:1 › header strip on the answers desk @screenshot (1.6s)
+  ✓  2 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (7.8s)
+[timing] /answers list after status filter click: 109.0 ms
+[timing] /stage view after navigation: 98.5 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (36.3s)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (43.7s)
+
+  5 passed (51.2s)
+```
+
+Screenshots: `docs/evidence/006-speakers.png` (Wortmeldeliste with the time-budget ring next to
+"Am Mikrofon"'s timer, the finished/total `ProgressBar` on every round header, Art icons, and the
+Check/Minus Stand column), `docs/evidence/006-capture.png` (Erfassung with eight captured cards,
+seven numbered markers in the Redebeitrag, and the first card classified into Pfad C, still
+expanded). Other evidence PNGs the e2e run rewrote were restored with `git checkout` — only the
+`006-*` files carry this slice's new output.
+
+## Open findings (kit gap, reported per the non-goals clause)
+
+The kit's `ProgressRing` and `ProgressBar` (`apps/web/src/components/Progress.tsx`, out of this
+slice's allowed files) accept no `data-testid` or other pass-through DOM attribute on their root
+node. Point 1 requires the ring itself to carry both `data-testid="speaker-timer-ring"` and
+`aria-valuenow` on the *same* element, which the kit component cannot do. Composed a small
+`TimerRing` in `apps/web/src/features/speakers/TimerRing.tsx` instead, mirroring the kit's visual
+constants (28 px, 3 px stroke, the same tone tokens) exactly, so the two stay indistinguishable —
+only the attribute contract differs. Suggest the kit component gain prop pass-through in a later
+slice so features stop needing to duplicate it. (Point 2's round-progress `ProgressBar` needed no
+such duplication — its `data-testid` sits on a wrapping `<span>` around the unmodified kit
+component, since that point does not require `aria-valuenow` on the same node.)
+
+While wiring the round-progress `ProgressBar` in, a second kit-usage pitfall turned up and was
+fixed before it shipped: passing a sizing class (`className="w-20"`) straight into `ProgressBar`
+collided with its own built-in `w-full` (both plain utility classes of equal specificity, so the
+winner is cascade-order, not JSX order) and rendered the bar at 0 px width in the real browser even
+though it reported a non-zero bounding box to Playwright's `toBeVisible()`. Fixed by sizing a
+wrapping `<span className="w-20">` instead and leaving `ProgressBar` unmodified — the pattern to
+follow whenever a consumer needs to constrain this component's width.
 
 ## Review findings

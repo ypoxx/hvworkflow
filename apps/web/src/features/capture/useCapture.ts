@@ -7,6 +7,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { showProblem } from '../../components';
 import { getLang, translate } from '../../i18n';
 
+export interface HoveredQuestion {
+  hoveredQuestionId: string | null;
+  onHoverQuestion: (id: string | null) => void;
+}
+
+/**
+ * The one piece of state a marked span in `ContributionText` and its `QuestionCard` share: hovering
+ * (or focusing) either highlights the other (point 5 of slice 006). Lives here, next to `useAsync`,
+ * because both halves of the capture desk (`ContributionPane`, `QuestionsPane`) sit as siblings under
+ * `CapturePage` and have no closer common ancestor to hold it.
+ */
+export function useHoveredQuestion(): HoveredQuestion {
+  const [hoveredQuestionId, onHoverQuestion] = useState<string | null>(null);
+  return { hoveredQuestionId, onHoverQuestion };
+}
+
 export type LoadStatus = 'loading' | 'ready' | 'error';
 
 export interface AsyncState<T> {

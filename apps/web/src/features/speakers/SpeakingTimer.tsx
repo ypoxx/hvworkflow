@@ -7,7 +7,8 @@ import { cx } from '../../components';
 import { useT } from '../../i18n';
 import { formatElapsed } from './labels';
 
-function useElapsedSeconds(startedAt: string | undefined): number | null {
+/** Shared with `NowSpeaking`, which needs the same value for the time-budget ring next to this timer. */
+export function useElapsedSeconds(startedAt: string | undefined): number | null {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (startedAt === undefined) return undefined;

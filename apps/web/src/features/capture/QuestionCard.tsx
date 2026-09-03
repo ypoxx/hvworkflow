@@ -5,10 +5,11 @@
  * question right now; otherwise the card is a read-only record (AGENTS.md rule 4).
  */
 import { useEffect, useState } from 'react';
+import { PencilLine } from 'lucide-react';
 import type { AgendaItem, Classification, Question, StageAssignment, Track } from '@hv/domain';
 import { STAGE_ASSIGNMENTS, TRACKS, etagOf } from '@hv/domain';
 import { api } from '../../api';
-import { Button, StatusBadge, TrackBadge, cx, showProblem } from '../../components';
+import { Button, StageAssignmentBadge, StatusBadge, TrackBadge, cx, showProblem } from '../../components';
 import { getLang, stageAssignmentLabel, trackLabel, translate, useT } from '../../i18n';
 import { Field, FIELD_CONTROL } from './fields';
 
@@ -16,10 +17,14 @@ export function QuestionCard({
   question,
   agendaItems,
   onProblem,
+  hoveredQuestionId,
+  onHoverQuestion,
 }: {
   question: Question;
   agendaItems: readonly AgendaItem[];
   onProblem: () => void;
+  hoveredQuestionId: string | null;
+  onHoverQuestion: (id: string | null) => void;
 }) {
   const t = useT();
   const mayClassify = question._actions.includes('question.classify');
@@ -27,6 +32,13 @@ export function QuestionCard({
   const [agendaItemId, setAgendaItemId] = useState(question.agendaItemId ?? '');
   const [stage, setStage] = useState<string>(question.stageAssignment ?? '');
   const [busy, setBusy] = useState(false);
+  /**
+   * Point 6: a card mounted on a question that is already beyond `captured` starts collapsed to a
+   * summary line; one still `captured` starts open, as before. Computed once at mount on purpose —
+   * classifying this very card must not make it jump shut under the desk's cursor (design
+   * principle 8), so the status changing afterwards never recomputes this.
+   */
+  const [expanded, setExpanded] = useState(question.status === 'captured');
 
   // A refetch must not throw away what the desk has just chosen: only a real change resets the draft.
   useEffect(() => {
@@ -59,11 +71,20 @@ export function QuestionCard({
     }
   };
 
+  const agendaItem = agendaItems.find((item) => item.id === question.agendaItemId);
+
   return (
     <article
       data-testid="capture-question-card"
       data-number={question.number}
-      className="rounded-md border border-line bg-surface p-3"
+      onMouseEnter={() => onHoverQuestion(question.id)}
+      onMouseLeave={() => onHoverQuestion(null)}
+      onFocus={() => onHoverQuestion(question.id)}
+      onBlur={() => onHoverQuestion(null)}
+      className={cx(
+        'rounded-md border border-line bg-surface p-3 transition-shadow duration-100',
+        hoveredQuestionId === question.id && 'outline outline-2 outline-offset-2 outline-accent-500',
+      )}
     >
       <header className="flex items-center gap-2">
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
@@ -78,7 +99,34 @@ export function QuestionCard({
 
       <p className="mt-2 text-[13px] leading-6 text-ink-800">{question.text}</p>
 
-      {mayClassify && (
+      {mayClassify && !expanded && (
+        <div
+          data-testid="capture-classification-summary"
+          className="mt-3 flex items-center gap-2 border-t border-line pt-3"
+        >
+          {question.track !== undefined && <TrackBadge track={question.track} />}
+          {agendaItem !== undefined && (
+            <span className="text-2xs text-ink-600">
+              {t('capture.classify.agenda.short', { number: agendaItem.number })}
+            </span>
+          )}
+          {question.stageAssignment !== undefined && (
+            <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="card-classification-toggle"
+            onClick={() => setExpanded(true)}
+            icon={<PencilLine size={14} strokeWidth={1.75} aria-hidden="true" />}
+            className="ml-auto"
+          >
+            {t('capture.classify.change')}
+          </Button>
+        </div>
+      )}
+
+      {mayClassify && expanded && (
         <div className="mt-3 grid gap-2 border-t border-line pt-3">
           <div>
             <span className="hv-label">{t('capture.classify.track')}</span>

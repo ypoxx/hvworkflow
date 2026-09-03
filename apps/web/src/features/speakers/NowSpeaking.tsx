@@ -9,7 +9,8 @@ import type { Speaker } from '@hv/domain';
 import { Badge, Button, Panel, cx } from '../../components';
 import { useT } from '../../i18n';
 import { speakerKindLabel } from './labels';
-import { SpeakingTimer } from './SpeakingTimer';
+import { SpeakingTimer, useElapsedSeconds } from './SpeakingTimer';
+import { TimerRing } from './TimerRing';
 
 function Identity({ speaker, className }: { speaker: Speaker; className?: string }) {
   const t = useT();
@@ -50,6 +51,9 @@ export function NowSpeaking({
   onCall: (speaker: Speaker) => void;
 }) {
   const t = useT();
+  const elapsed = useElapsedSeconds(speaking?.speakingStartedAt);
+  const budgetSeconds =
+    speaking?.requestedMinutes !== undefined ? speaking.requestedMinutes * 60 : undefined;
 
   return (
     <div className="grid shrink-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
@@ -63,11 +67,22 @@ export function NowSpeaking({
             <Identity speaker={speaking} className="flex-1" />
             <div className="flex flex-col items-end">
               <span className="hv-label">{t('speakers.now.elapsed')}</span>
-              <SpeakingTimer
-                startedAt={speaking.speakingStartedAt}
-                requestedMinutes={speaking.requestedMinutes}
-                size="lead"
-              />
+              <div className="flex items-center gap-2">
+                {elapsed !== null && budgetSeconds !== undefined && (
+                  <TimerRing
+                    value={elapsed}
+                    max={budgetSeconds}
+                    tone={elapsed >= budgetSeconds ? 'warn' : 'accent'}
+                    label={t('speakers.now.elapsed')}
+                    testId="speaker-timer-ring"
+                  />
+                )}
+                <SpeakingTimer
+                  startedAt={speaking.speakingStartedAt}
+                  requestedMinutes={speaking.requestedMinutes}
+                  size="lead"
+                />
+              </div>
             </div>
             <div className="flex flex-col items-end">
               <span className="hv-label">{t('speakers.column.questions')}</span>

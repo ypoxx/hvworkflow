@@ -13,7 +13,7 @@ import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
-import { useAsync } from './useCapture';
+import { useAsync, useHoveredQuestion } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
@@ -136,6 +136,8 @@ export function CapturePage() {
     contributions.reload();
   }, [questions, contributions]);
 
+  const { hoveredQuestionId, onHoverQuestion } = useHoveredQuestion();
+
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader title={t('page.capture.title')} description={t('page.capture.description')} />
@@ -160,6 +162,9 @@ export function CapturePage() {
             onWrite={writeContribution}
             onCaptureQuestions={(items) => void captureQuestions(items)}
             onOpenSuggest={() => setSuggestOpen(true)}
+            questions={questions.data.items}
+            hoveredQuestionId={hoveredQuestionId}
+            onHoverQuestion={onHoverQuestion}
           />
         }
         right={
@@ -169,6 +174,8 @@ export function CapturePage() {
             loading={questions.status === 'loading'}
             failed={questions.status === 'error'}
             onProblem={refetch}
+            hoveredQuestionId={hoveredQuestionId}
+            onHoverQuestion={onHoverQuestion}
           />
         }
       />
