@@ -45,9 +45,8 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
     await expect(page.getByTestId(testId)).toBeVisible();
   }
 
-  // The process strip (005) carries these testids on its own segment labels now, one per workflow
-  // stage, each with a real count next to it — not just a decorative bar.
-  await expect(page.getByTestId('header-counter-drafting')).toContainText(/\d/);
+  // The process strip (005) is a group with the full distribution as its accessible name; the staged
+  // count is always in the DOM (sr-only) so this holds without hovering the strip.
   await expect(page.getByTestId('header-counter-staged')).toContainText(/\d/);
 
   // Rights are data: switching the persona is the only role decision in the interface.
@@ -92,7 +91,7 @@ test('header strip on the answers desk @screenshot', async ({ page }) => {
   expect(pillBox).not.toBeNull();
   if (pillBox === null) throw new Error('header counters pill not found');
   console.log(`[005 rework] header counters pill width: ${pillBox.width.toFixed(1)}px`);
-  expect(pillBox.width).toBeLessThanOrEqual(560);
+  expect(pillBox.width).toBeLessThanOrEqual(460);
 
   const titleMetrics = await page.getByTestId('header-meeting-title').evaluate((el) => {
     const h1 = el.querySelector('h1');
@@ -112,6 +111,24 @@ test('header strip on the answers desk @screenshot', async ({ page }) => {
   // (`meeting.counts.open`, the same value the navigation badge shows) for tests and screen readers.
   await expect(page.getByTestId('header-counter-open')).toContainText(/\d/);
 
+  // Design review round 2: nothing in the strip may be reachable only by scrolling it — the bar's
+  // own box must never scroll, and the full distribution is on the group's accessible name already.
+  const strip = page.getByRole('group', { name: /Verteilung der Einzelfragen/ });
+  await expect(strip).toBeVisible();
+  const stripOverflow = await strip.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  expect(stripOverflow.scrollWidth).toBeLessThanOrEqual(stripOverflow.clientWidth);
+
+  // Evidence is the resting state — nothing focused, no popover open.
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('005-header.png') });
+
+  // Hover/focus opens the popover with the same six segments; Escape closes it again.
+  await strip.focus();
+  const legend = page.getByTestId('header-strip-legend');
+  await expect(legend).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(legend).toBeHidden();
 });

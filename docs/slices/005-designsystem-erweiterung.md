@@ -260,4 +260,68 @@ Running 5 tests using 2 workers
 Screenshots the run rewrote other than `005-header.png` were restored with `git checkout` afterwards.
 Updated screenshot: `docs/evidence/005-header.png` (title and subtitle now render in full at 1440×900).
 
+### Rework round 2 — no scrolling, ever
+
+Design decision from the coordinator: a horizontally scrolling label row is not acceptable ("nothing
+is hidden behind a scroll in the frame"). Rebuilt the header strip to the exact layout given:
+
+- `ProcessStrip.tsx` now has two real renderings sharing one `BarRow`: `LabelledStrip` (unchanged —
+  full label + count per segment, still exported for slice 007's answers desk) and a new `DenseStrip`
+  for the header. `dense` no longer means "the same label row, smaller font, no wrap" (round 1's
+  scrolling fix) — it now means: the 6px bar, and a mono count (10px, `ink-600`) centred under any
+  segment whose computed pixel width is ≥28px; narrower segments print nothing. Widths are computed
+  from a caller-supplied `width` prop (pixels), not measured live, so the "wide enough" cutoff and the
+  pill's total width are both deterministic and reproducible in a test.
+- The whole strip is one element: `role="group"`, `tabIndex={0}`, `aria-label` built from the new
+  `process.strip.legend` i18n key (6 named placeholders, one per segment) — e.g. in German exactly
+  *"Verteilung der Einzelfragen: erfasst 75, in Arbeit 56, Clearing 78, freigegeben 114, Bühne 9,
+  vorgelesen 468"*, confirmed verbatim against the running demo. Hover or focus opens a
+  `data-testid="header-strip-legend"` popover 8 rem (`w-60`) wide, white, `border-ink-200`, `rounded-md`,
+  Dialog's own shadow (`shadow-[0_16px_40px_-12px_rgba(31,30,28,0.28)]`), listing all six segments as
+  rows (8px colour swatch, label, mono count right-aligned); it closes on mouse leave, blur, or Escape.
+  `header-counter-staged` is now on two elements on purpose: an always-present `sr-only` span inside
+  the strip (so the e2e assertion never has to hover anything) and the staged row's count in the
+  popover, per the brief.
+- `HeaderStrip.tsx` no longer wraps the strip in an `overflow-x-auto`/`max-w-[220px]` box — that box is
+  gone entirely. The bar now gets a fixed `width={180}` (`STRIP_WIDTH_PX`, chosen so the pill lands
+  under the 460px target with room to spare, since the fixed stat cells plus padding already claim
+  ~277px of the budget). `Header.tsx`'s title block keeps `min-w-[300px]` from round 1.
+- New e2e coverage (`apps/web/e2e/001-shell.spec.ts`): the strip's own `scrollWidth` must not exceed
+  its `clientWidth` (i.e. it truly never scrolls), the popover opens on focus and disappears on Escape,
+  and the pill-width/title-truncation measurements from round 1 stay in place with the target tightened
+  to ≤460px. The evidence screenshot is taken *before* the focus/popover interaction, so it shows the
+  header's resting state, not a focus ring.
+
+#### `pnpm gates` — exit 0 (unchanged shape: contract lint, 4× typecheck, 4× lint, 4× test suites
+39+6+25 passing, `vocabulary-check: ok`, web build ✓; no new lint warnings beyond the two pre-existing
+ones already noted above)
+
+#### `E2E_PORT=4191 pnpm --filter @hv/web e2e` (real output, all five)
+
+```
+Running 5 tests using 2 workers
+
+  ✓  1 [chromium] › e2e/001-shell.spec.ts:16:1 › shell: counters, role switch, language switch @screenshot (3.4s)
+[005 rework] header counters pill width: 458.7px
+  ✓  3 [chromium] › e2e/001-shell.spec.ts:75:1 › header strip on the answers desk @screenshot (1.8s)
+  ✓  2 [chromium] › e2e/002-speakers-capture.spec.ts:61:1 › speakers list and capture desk @screenshot (7.5s)
+[timing] /answers list after status filter click: 146.6 ms
+[timing] /stage view after navigation: 140.4 ms
+[timing] stage-next presses to reach F-0801: 9
+  ✓  5 [chromium] › e2e/abnahme.spec.ts:86:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (36.4s)
+  ✓  4 [chromium] › e2e/003-answers-stage.spec.ts:43:1 › backlog, approval, podium and history @screenshot (44.3s)
+
+  5 passed (52.0s)
+```
+
+Pill width 458.7px in German (target ≤460px), 389.8px in English (verified manually — narrower, not
+wider). Both `h1` and subtitle satisfy `scrollWidth === clientWidth` at 1440×900 in both languages.
+`strip.scrollWidth === strip.clientWidth` (180 === 180) — confirmed no internal scroll. The popover's
+own `aria-label`/legend text was checked verbatim against the live demo numbers in both languages, and
+the popover opens on focus/hover and closes on Escape.
+
+Screenshots the run rewrote other than `005-header.png` were restored with `git checkout` afterwards.
+Updated screenshot: `docs/evidence/005-header.png` — resting state, title and subtitle in full, pill
+showing the bar plus the one count wide enough to print (468, under "vorgelesen").
+
 ## Review findings

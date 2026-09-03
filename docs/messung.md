@@ -33,7 +33,7 @@ mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtp
 | Scheibe | Rolle · Modell | Start | Ende | Reviewrunden | Befunde (blocker/major/minor) | Tore grün | Bemerkung |
 |---|---|---|---|---|---|---|---|
 | Planung, Kern/Vertrag `byStatus`, Specs 005–007 | Architekt · Fable 5.1 | 08:45 | 09:08 | — | — | ja | 39 Kern-Tests |
-| 005 Designsystem-Erweiterung | Implementierer · Sonnet 5 | 09:10 | 09:47 | 1 (Design-Kritik Fable: Kopfzeile bricht um, Titel abgeschnitten → Nacharbeit) | 0/1/1 | ja (5 e2e) | 309 Tsd. Token, 131 Werkzeugaufrufe, 37 min |
+| 005 Designsystem-Erweiterung | Implementierer · Sonnet 5 | 09:10 | 10:21 | 2 (Design-Kritik Fable: Kopfzeile bricht um, Titel abgeschnitten; dann Scroll-Kompromiss abgelehnt → Balken mit Popover-Legende) | 0/1/1 | ja (5 e2e) | 481 Tsd. Token, 229 Werkzeugaufrufe, 71 min inkl. zwei Nacharbeitsrunden |
 | 006 Wortmeldeliste, Erfassung | Implementierer · Sonnet 5 (Worktree) | 09:52 | | | | | |
 | 007 Beantwortung, Bühne, Historie | Implementierer · Sonnet 5 (Worktree) | 09:52 | | | | | |
 | Gebündeltes Review 005–007 | Reviewer · Opus 5 | | | | | | |

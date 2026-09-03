@@ -38,6 +38,8 @@ export const en: Dictionary = {
   'process.segment.approved': 'Approved',
   'process.segment.staged': 'Podium',
   'process.segment.delivered': 'Read out',
+  'process.strip.legend':
+    'Distribution of individual questions: captured {captured}, drafting {drafting}, clearing {review}, approved {approved}, podium {staged}, read out {delivered}',
   'stage.initials.supervisory_board_chair': 'SB',
   'stage.initials.ceo': 'CE',
   'stage.initials.cfo': 'CF',

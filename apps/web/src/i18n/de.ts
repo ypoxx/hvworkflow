@@ -37,6 +37,8 @@ export const de = {
   'process.segment.approved': 'Freigegeben',
   'process.segment.staged': 'Bühne',
   'process.segment.delivered': 'Vorgelesen',
+  'process.strip.legend':
+    'Verteilung der Einzelfragen: erfasst {captured}, in Arbeit {drafting}, Clearing {review}, freigegeben {approved}, Bühne {staged}, vorgelesen {delivered}',
   'stage.initials.supervisory_board_chair': 'AR',
   'stage.initials.ceo': 'VV',
   'stage.initials.cfo': 'FV',
