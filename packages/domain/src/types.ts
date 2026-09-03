@@ -92,6 +92,8 @@ export interface Meeting {
     open: number;
     staged: number;
     delivered: number;
+    /** Questions per workflow status, in one pass over the projection (Prozessleiste). */
+    byStatus: Record<QuestionStatus, number>;
   };
 }
 

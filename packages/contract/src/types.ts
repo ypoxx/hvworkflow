@@ -499,7 +499,7 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07 */
             ruleId?: string;
         };
         /**
@@ -534,6 +534,10 @@ export interface components {
                 open?: number;
                 staged?: number;
                 delivered?: number;
+                /** @description Questions per workflow status (drives the process strip in the header) */
+                byStatus?: {
+                    [key: string]: number;
+                };
             };
         };
         AgendaItem: {
@@ -662,7 +666,7 @@ export interface components {
             /** Format: date-time */
             deliveredAt?: string;
             mergedIntoId?: string;
-            /** @description Optimistic-locking counter */
+            /** @description Optimistic-locking counter, also the ETag */
             version: number;
             /** Format: date-time */
             createdAt: string;

@@ -585,6 +585,10 @@ components:
             open: { type: integer }
             staged: { type: integer }
             delivered: { type: integer }
+            byStatus:
+              type: object
+              description: Questions per workflow status (drives the process strip in the header)
+              additionalProperties: { type: integer }
     AgendaItem:
       type: object
       required: [id, number, title]

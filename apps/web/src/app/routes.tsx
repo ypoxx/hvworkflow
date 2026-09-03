@@ -14,6 +14,9 @@ import { AnswersPage } from '../features/answers/Page';
 import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
 
+/** The header and navigation show only the scalar counters; `byStatus` feeds the process strip. */
+export type NumericCounter = Exclude<keyof Meeting['counts'], 'byStatus'>;
+
 export interface AppRoute {
   path: string;
   labelKey: TKey;
@@ -21,7 +24,7 @@ export interface AppRoute {
   /** Stable hook for tests and for the keyboard shortcut list. */
   testId: string;
   /** Which of the meeting counters belongs next to this entry, if any. */
-  counter?: keyof Meeting['counts'];
+  counter?: NumericCounter;
   Component: ComponentType;
 }
 

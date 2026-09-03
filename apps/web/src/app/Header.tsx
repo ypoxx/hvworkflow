@@ -5,6 +5,7 @@
  */
 import { Keyboard } from 'lucide-react';
 import type { Meeting } from '@hv/domain';
+import type { NumericCounter } from './routes';
 import { Badge, Button, cx } from '../components';
 import { useT } from '../i18n';
 import type { TKey, Translate } from '../i18n';
@@ -23,7 +24,7 @@ interface CounterSpec {
   testId: string;
   labelKey: TKey;
   titleKey: TKey;
-  field: keyof Meeting['counts'];
+  field: NumericCounter;
   emphasis?: boolean;
 }
 

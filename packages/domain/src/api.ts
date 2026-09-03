@@ -262,7 +262,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   return {
     async getMeeting() {
       if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
-      return { ...state.meeting, counts: { ...state.meeting.counts } };
+      return { ...state.meeting, counts: { ...state.meeting.counts, byStatus: { ...state.meeting.counts.byStatus } } };
     },
     async listAgendaItems() {
       return state.agendaItems.map((a) => ({ ...a }));

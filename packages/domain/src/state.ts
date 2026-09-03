@@ -9,9 +9,11 @@ import type {
   Contribution,
   Meeting,
   QuestionRecord,
+  QuestionStatus,
   SpeakerRecord,
   Unit,
 } from './types.js';
+import { QUESTION_STATUSES } from './types.js';
 import { computeCoverage } from './coverage.js';
 
 export interface State {
@@ -45,7 +47,9 @@ export function refreshCounts(state: State): void {
   let open = 0;
   let staged = 0;
   let delivered = 0;
+  const byStatus = Object.fromEntries(QUESTION_STATUSES.map((s) => [s, 0])) as Record<QuestionStatus, number>;
   for (const q of state.questions.values()) {
+    byStatus[q.status] += 1;
     if (q.status === 'staged') staged++;
     else if (q.status === 'delivered' || q.status === 'closed') delivered++;
     if (!['closed', 'withdrawn', 'merged', 'delivered'].includes(q.status)) open++;
@@ -56,6 +60,7 @@ export function refreshCounts(state: State): void {
     open,
     staged,
     delivered,
+    byStatus,
   };
   // The current round is where the microphone is: the round of the speaker talking now, else the
   // lowest round that still has someone waiting, else the last round that was registered.
@@ -94,7 +99,7 @@ export function reduce(state: State, e: DomainEvent): State {
         date: e.payload.date,
         status: 'running',
         currentRound: 1,
-        counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0 },
+        counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0, byStatus: Object.fromEntries(QUESTION_STATUSES.map((st) => [st, 0])) as Record<QuestionStatus, number> },
         ...(e.payload.legalEntity !== undefined ? { legalEntity: e.payload.legalEntity } : {}),
       };
       state.agendaItems = e.payload.agendaItems.map((a) => ({ ...a }));

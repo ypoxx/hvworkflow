@@ -24,6 +24,11 @@ describe('synthetic corpus', () => {
     expect(state.meeting?.counts.staged).toBeGreaterThanOrEqual(3);
     expect(state.meeting?.counts.staged).toBeLessThanOrEqual(12);
   });
+  it('counts questions per status and the per-status counts add up to the total', () => {
+    const by = state.meeting!.counts.byStatus;
+    expect(Object.values(by).reduce((a, b) => a + b, 0)).toBe(800);
+    expect(by.staged).toBe(state.meeting!.counts.staged);
+  });
   it('keeps every question span inside its speech text', () => {
     for (const q of state.questions.values()) {
       const c = state.contributions.get(q.contributionId)!;
