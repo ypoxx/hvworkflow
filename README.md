@@ -23,6 +23,7 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/demo-skript.md`](docs/demo-skript.md) | Drehbuch der Vorführung, bekannte Punkte, Lesereihenfolge für Entwickler. |
 | [`docs/messung.md`](docs/messung.md) | Verbrauch, Reviewrunden und Befunde je Scheibe — die Zahlen hinter der These. |
 | [`docs/evidence/`](docs/evidence/) | Screenshots aus den automatisierten Durchläufen, zuletzt im Endzustand erzeugt. |
+| [`docs/feedback/`](docs/feedback/) | Auswertung von Rückmeldungen: je Aussage berücksichtigt, geplant, neu oder unklar, mit Folge, Aufwand und Rückfragen. |
 
 ## Lauffähige Version
 
