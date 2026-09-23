@@ -200,6 +200,8 @@ Testdaten, PNG oder Fragenpaket.
 
 ### Nacharbeit nach Review (Runde 2)
 
+Nacharbeit nach Review: Befunde 1–8 umgesetzt (Commit `8ffa46e89aa595364cf54d3708837c8bbffde211`).
+
 Opus-Review: „accept after minor fixes", 1 major. Alle acht Befunde umgesetzt:
 
 1. **Major — Marke 29 (vormals 28), Legendentext.** „zeigt „—", solange niemand am Mikrofon ist" traf
