@@ -4,9 +4,9 @@
  * against the seeded corpus of 800 questions, one behaviour per point, plus axe on the five changed
  * views and the three empty states this slice is responsible for.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { project, seedEvents } from '@hv/domain';
 import { expect, test } from '@playwright/test';
+import { checkAxe } from './support/axe';
 import type { DomainEvent } from '@hv/domain';
 import type { Page } from '@playwright/test';
 
@@ -95,103 +95,16 @@ async function waitForCorpus(page: Page): Promise<void> {
 }
 
 /**
- * Named exception AX-020-01 (review round 1, sharpened in round 2). The muted end of the house grey
- * ramp (`--color-ink-400`/`-500`, `apps/web/src/styles/index.css`) measures 2.48:1 / ~3.7–3.9:1
- * against white, short of the 4.5:1 a text colour needs — across the whole product since slices
- * 001/002/003/007, not something this slice touched or was scoped to fix (`styles/index.css` is
- * allowed here only for point 11).
- *
- * Round 1 excluded it by bare class (`.exclude('.text-ink-500')`), which also hid *new* slice-020
- * elements that happened to reuse the class. Round 2 (re-review M4) replaces that with one selector
- * per pre-existing component, named below with its file:line so the list is auditable and cannot
- * silently grow — every selector is scoped to the component's own container or a class combination
- * unique to it, never the bare `.text-ink-400`/`.text-ink-500` utility alone. Elements this slice
- * itself introduced or restyled are not on this list and are checked like everything else — the
- * three the re-review named (`Podium.tsx` preview number/no-answer line, `ClassifyDialog.tsx` question
- * number) and one more the stricter methodology surfaced on its own (`Podium.tsx`'s `QueueItem`,
- * `ed648aa4`, this slice's own queue row) are fixed to `ink-600`/`ink-700` instead of listed here.
- *
- *   `.hv-label`                                          — the label utility itself (every feature)
- *   `[data-testid="header-meeting-title"] p`             — Header.tsx:62 (tagline/round line)
- *   `[data-testid="lang-toggle"] button`                 — LanguageToggle.tsx:33 (inactive DE/EN)
- *   `nav .ml-auto, nav .leading-4`                       — SideNav.tsx:80 (counters), :98 (demo hint)
- *   `h1 + p`                                              — PageHeader.tsx:20 (page description)
- *   `section > header h2 + p, section > footer`          — Panel.tsx:43 (panel description), :51 (footer)
- *   `.border-t.bg-sunken > span.text-ink-500`            — WorkList.tsx:527 (list count footer)
- *   `.border-dashed.bg-sunken .text-ink-400/-500`        — EmptyState.tsx:24,30; QuestionsPane.tsx:78
- *   `.mt-1.text-2xs.text-ink-500`                         — CoverageBar.tsx:35 (coverage hint line,
- *                                                           a sibling of the `capture-coverage` value,
- *                                                           not its descendant)
- *   `[data-testid="capture-question-card"] .text-ink-500`— QuestionCard.tsx:40
- *   `.items-end.gap-1\.5 .text-ink-500`                  — ContributionPane.tsx:245,248
- *   `[data-testid^="speakers-round-"] .text-ink-400/-500`— RoundSection.tsx:85,100,133; SpeakerRow.tsx
- *                                                           (number/org/state columns of every row)
- *   `.min-h-\[104px\] .text-ink-500`                     — NowSpeaking.tsx:29,37,74,146,153 ("Am
- *                                                           Mikrofon"/"Nächster Aufruf" cards)
- *   `[data-testid="answer-version"] .text-ink-400/-500`  — QuestionDetail.tsx:144,146,147 (version
- *                                                           head: "aktuell", author, age)
- *   `[data-testid="stage-current"] .text-ink-500`        — Podium.tsx (current card's speaker line,
- *                                                           the "no answer yet" italic line)
- *   `[data-testid="stage-next-preview"] .text-ink-500`   — Podium.tsx (NextPreview number/name,
- *                                                           predates this slice — `438f105f`)
- *   `[data-testid="stage-queue"] p`                      — Podium.tsx (queue's own "leer"/"weitere"
- *                                                           hints; the only `<p>`s in that subtree)
- *   `[data-testid="answers-row"] .text-ink-400/-500`     — WorkList.tsx:185,191,200,201 (row cells)
- *   `[data-testid^="answers-filter-status-"] .text-ink-400` — WorkList.tsx:80 (filter chip counts)
- *
- * Registered under "Offen" in the spec: expires with the colour-token slice, 2026-12-31 at the latest.
+ * Named exception AX-020-01 (review round 1, sharpened in round 2) and the two-pass method itself
+ * ((a) every rule except colour, no exclusions; (b) colour alone, scoped to named pre-existing
+ * selectors) now live in one place, `apps/web/e2e/support/axe.ts` and its
+ * `apps/web/e2e/support/axe-exceptions.json` (slice 013, follow-up 1 from this slice's review) — this
+ * spec reads them from there instead of keeping its own copy. Slice 013 also narrowed the
+ * `.mt-1.text-2xs.text-ink-500` entry, which used to also match `AnswerEditor.tsx:69`,
+ * `Timeline.tsx:132` and `speakers/fields.tsx:32`, to CoverageBar's own container; see the exception's
+ * `location`/`reason` fields in `axe-exceptions.json`.
  */
-const AX_020_01_SELECTORS: readonly string[] = [
-  '.hv-label',
-  '[data-testid="header-meeting-title"] p',
-  '[data-testid="lang-toggle"] button',
-  'nav .ml-auto, nav .leading-4',
-  'h1 + p',
-  'section > header h2 + p, section > footer',
-  '.border-t.bg-sunken > span.text-ink-500',
-  '.border-dashed.bg-sunken .text-ink-400, .border-dashed.bg-sunken .text-ink-500',
-  '.mt-1.text-2xs.text-ink-500',
-  '[data-testid="capture-question-card"] .text-ink-500',
-  '.items-end.gap-1\\.5 .text-ink-500',
-  '[data-testid^="speakers-round-"] .text-ink-400, [data-testid^="speakers-round-"] .text-ink-500',
-  '.min-h-\\[104px\\] .text-ink-500',
-  '[data-testid="answer-version"] .text-ink-400, [data-testid="answer-version"] .text-ink-500',
-  '[data-testid="stage-current"] .text-ink-500',
-  '[data-testid="stage-next-preview"] .text-ink-500',
-  '[data-testid="stage-queue"] p',
-  '[data-testid="answers-row"] .text-ink-400, [data-testid="answers-row"] .text-ink-500',
-  '[data-testid^="answers-filter-status-"] .text-ink-400',
-];
-
-/**
- * Two passes, both required to be clean (M4, review round 2): (a) every rule except colour, on the
- * whole page — nothing this slice added is hidden from button-name/aria/etc. checks any more; (b)
- * colour alone, scoped to exactly the pre-existing debt named in AX-020-01 above.
- */
-async function assertNoSeriousViolations(page: Page, label: string): Promise<void> {
-  let builder = new AxeBuilder({ page }).disableRules(['color-contrast']);
-  const other = await builder.analyze();
-  const otherSerious = other.violations.filter(
-    (v) => v.impact === 'serious' || v.impact === 'critical',
-  );
-  console.log(
-    `[axe] ${label} (a, non-colour): ${other.violations.length} violation group(s), ` +
-      `${otherSerious.length} serious/critical`,
-  );
-  expect(otherSerious, JSON.stringify(otherSerious, null, 2)).toEqual([]);
-
-  builder = new AxeBuilder({ page }).withRules(['color-contrast']);
-  for (const selector of AX_020_01_SELECTORS) builder = builder.exclude(selector);
-  const contrast = await builder.analyze();
-  const contrastSerious = contrast.violations.filter(
-    (v) => v.impact === 'serious' || v.impact === 'critical',
-  );
-  console.log(
-    `[axe] ${label} (b, colour, AX-020-01 scoped): ${contrast.violations.length} violation group(s), ` +
-      `${contrastSerious.length} serious/critical`,
-  );
-  expect(contrastSerious, JSON.stringify(contrastSerious, null, 2)).toEqual([]);
-}
+const assertNoSeriousViolations = checkAxe;
 
 test.use({ viewport: { width: 1440, height: 900 } });
 

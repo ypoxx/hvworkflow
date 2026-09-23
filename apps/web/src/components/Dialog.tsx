@@ -102,7 +102,13 @@ export function Dialog({
           SIZE[size],
         )}
       >
-        <header className="flex items-start gap-3 border-b border-line px-4 py-3">
+        {/* Slice 013 (axe finding, goal 1): a `<header>` element is an implicit "banner" landmark
+         * whenever it is not scoped inside article/aside/main/nav/section — `role="dialog"` does not
+         * count as such a scope, so this used to register as a second banner next to the app's own
+         * `<header role="banner">` (axe `landmark-no-duplicate-banner`/`landmark-unique`, "moderate",
+         * flagged as open in slice 020's review). A plain `<div>` keeps the exact same layout with no
+         * landmark semantics at all — a dialog's own head bar is not one of the page's landmarks. */}
+        <div className="flex items-start gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-[14px] font-semibold text-ink-900">
               {title}
@@ -121,12 +127,12 @@ export function Dialog({
             onClick={onClose}
             icon={<X size={16} strokeWidth={1.75} aria-hidden="true" />}
           />
-        </header>
+        </div>
         {children !== undefined && <div className="px-4 py-4">{children}</div>}
         {footer !== undefined && (
-          <footer className="flex items-center justify-end gap-2 border-t border-line bg-sunken px-4 py-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line bg-sunken px-4 py-3">
             {footer}
-          </footer>
+          </div>
         )}
       </div>
     </div>,
