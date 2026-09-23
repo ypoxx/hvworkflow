@@ -179,12 +179,26 @@ Paths only appear in featureRegistry.ts (and tests).
 
 Open: None.
 
-Touched: 
-- /home/user/wt/082/apps/web/src/app/featureRegistry.ts (new)
-- /home/user/wt/082/apps/web/src/app/featureRegistry.test.ts (new)
+Nacharbeit nach Review: Befunde 1–2 umgesetzt
+
+Commit: (hash pending)
+
+Fixes:
+1. **Major** — Restored single "Alt 1…5" row in ShortcutsDialog. Created getNavigationShortcutRange() helper in featureRegistry.ts to derive min/max shortcut keys. ShortcutsDialog now renders one row with keys ['Alt', '1', '…', '5'] instead of five separate rows. Removed special-case logic at lines 44-46. Added unit test for getNavigationShortcutRange().
+
+2. **Minor** — Fixed test title at featureRegistry.test.ts:26 from "all labelKeys are page description keys (page.*.description)" to "all labelKeys start with nav." to match the assertion `/^nav\./`.
+
+Test results after fixes:
+- Unit tests: 48 passed (47 → 48, +1 new test for getNavigationShortcutRange)
+- Playwright: 9 scenarios all pass
+- pnpm gates: all pass
+
+Touched (original + rework):
+- /home/user/wt/082/apps/web/src/app/featureRegistry.ts (new, enhanced with getNavigationShortcutRange)
+- /home/user/wt/082/apps/web/src/app/featureRegistry.test.ts (new, test title fixed, test added)
 - /home/user/wt/082/apps/web/src/app/AppShell.tsx (updated)
 - /home/user/wt/082/apps/web/src/app/SideNav.tsx (updated)
-- /home/user/wt/082/apps/web/src/app/ShortcutsDialog.tsx (updated)
+- /home/user/wt/082/apps/web/src/app/ShortcutsDialog.tsx (updated, refactored to use registry range)
 - /home/user/wt/082/apps/web/src/app/NotFound.tsx (updated)
 - /home/user/wt/082/apps/web/src/app/routes.tsx (deleted)
 

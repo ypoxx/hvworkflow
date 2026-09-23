@@ -6,16 +6,18 @@ import { Fragment } from 'react';
 import { Dialog, Kbd, TBody, TD, TH, THead, TR, Table } from '../components';
 import { useT } from '../i18n';
 import type { TKey } from '../i18n';
-import { FEATURES } from './featureRegistry';
+import { getNavigationShortcutRange } from './featureRegistry';
 
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
 
+  const { min, max } = getNavigationShortcutRange();
+
   const rows: readonly { keys: readonly string[]; descriptionKey: TKey }[] = [
-    ...FEATURES.filter((f) => f.shortcutKey !== undefined).map((f) => ({
-      keys: ['Alt', String(f.shortcutKey)] as readonly string[],
+    {
+      keys: ['Alt', String(min), '…', String(max)] as readonly string[],
       descriptionKey: 'shortcuts.nav' as const,
-    })),
+    },
     { keys: ['Alt', 'N'], descriptionKey: 'shortcuts.collapse' as const },
     { keys: ['?'], descriptionKey: 'shortcuts.help' as const },
     { keys: ['Esc'], descriptionKey: 'shortcuts.close' as const },
@@ -36,14 +38,15 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
               <TD>
                 <span className="flex items-center gap-1 whitespace-nowrap">
                   {row.keys.map((key, keyIndex) => (
-                    <Fragment key={key}>
-                      {keyIndex > 0 && <span className="text-ink-400">+</span>}
-                      <Kbd>{key}</Kbd>
+                    <Fragment key={`${key}-${keyIndex}`}>
+                      {keyIndex > 0 && key !== '…' && <span className="text-ink-400">+</span>}
+                      {key === '…' ? (
+                        <span className="text-ink-400">{key}</span>
+                      ) : (
+                        <Kbd>{key}</Kbd>
+                      )}
                     </Fragment>
                   ))}
-                  {row.keys[0] === 'Alt' && row.keys[1] === '1' && (
-                    <span className="text-ink-400">…5</span>
-                  )}
                 </span>
               </TD>
               <TD>{t(row.descriptionKey)}</TD>

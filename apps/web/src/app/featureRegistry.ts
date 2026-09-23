@@ -133,6 +133,31 @@ export function visibleRoutes(
 }
 
 /**
+ * Get the minimum and maximum shortcut keys from the feature registry.
+ * Used to label the navigation shortcuts row in the shortcuts dialog as "Alt 1…5".
+ */
+export function getNavigationShortcutRange(): { min: number; max: number } {
+  const shortcuts = FEATURES
+    .filter((f) => f.shortcutKey !== undefined)
+    .map((f) => f.shortcutKey as number)
+    .sort((a, b) => a - b);
+
+  if (shortcuts.length === 0) {
+    return { min: 1, max: 1 };
+  }
+
+  const minKey = shortcuts[0];
+  const maxKey = shortcuts[shortcuts.length - 1];
+
+  // The filter above guarantees these are defined, but TypeScript needs explicit narrowing
+  if (minKey === undefined || maxKey === undefined) {
+    return { min: 1, max: 1 };
+  }
+
+  return { min: minKey, max: maxKey };
+}
+
+/**
  * Verify that the feature registry is well-formed:
  * - All paths are unique
  * - All shortcut keys (1…5) are unique

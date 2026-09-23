@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Permission } from '@hv/domain';
-import { FEATURES, visibleRoutes, checkFeatureRegistry } from './featureRegistry';
+import { FEATURES, visibleRoutes, checkFeatureRegistry, getNavigationShortcutRange } from './featureRegistry';
 
 describe('featureRegistry', () => {
   describe('invariants', () => {
@@ -23,7 +23,7 @@ describe('featureRegistry', () => {
       }
     });
 
-    it('all labelKeys are page description keys (page.*.description)', () => {
+    it('all labelKeys start with nav.', () => {
       const navKeys = new Set(FEATURES.map((f) => f.labelKey));
       for (const key of navKeys) {
         expect(key).toMatch(/^nav\./);
@@ -40,6 +40,15 @@ describe('featureRegistry', () => {
     it('registry check function returns undefined (no errors)', () => {
       const result = checkFeatureRegistry();
       expect(result).toBeUndefined();
+    });
+
+    it('navigation shortcut range collapses to "Alt 1…5" label for the shortcuts dialog', () => {
+      const range = getNavigationShortcutRange();
+      // All current features have shortcuts 1-5, so min=1 and max=5
+      expect(range.min).toBe(1);
+      expect(range.max).toBe(5);
+      // When rendered as keys ['Alt', '1', '…', '5'], this displays as "Alt 1 … 5"
+      // which formats correctly in the dialog
     });
   });
 
