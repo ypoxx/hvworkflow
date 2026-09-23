@@ -9,8 +9,9 @@
  * One Wortmeldung is registered and called to the microphone (Versammlungsbüro), its Redebeitrag is
  * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
  * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
- * exactly version 1 (Legal Clearing), put on the podium (Freigabe), read out (Podium) — and the
- * history proves every one of those steps afterwards.
+ * exactly version 1 (Legal Clearing), put on the podium and read out (Freigabe, Podium) — and the
+ * history, read by the Versammlungsbüro (moderation, which held `history.read` where podium no
+ * longer does after slice 010's read grants), proves every one of those steps afterwards.
  */
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
@@ -269,7 +270,12 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   // Read out: deliver (and, since the podium role may also close, straight into "abgeschlossen").
   await page.getByTestId('stage-next').click();
 
-  /* ---------- Historie: every step of this one question is on the record ---------- */
+  /* ---------- Historie: every step of this one question is on the record. Slice 010: podium lost
+   * `history.read` (Festlegung 4, it only holds `stage.read`), so the Versammlungsbüro
+   * (moderation) — which already held `history.read`/`question.read` — reads the history instead;
+   * the acceptance sentence itself (docs/erste-version-und-offene-fragen.md §1) is unaffected, it
+   * ends at "schließt sie ab". ---------- */
+  await asRole(page, 'moderation');
   await page.getByTestId('nav-history').click();
   await expect(page).toHaveURL(/\/history$/);
 
