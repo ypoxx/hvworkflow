@@ -223,6 +223,271 @@ Bestandstests mit Grund; Playwright-Zusammenfassung; Screenshots.
 
 (von den Implementierern, getrennt nach Auftrag A und B)
 
+### Auftrag A
+
+```
+Slice: 010-lesepfade-leserechte (Auftrag A)
+Done: Vertrag auf 0.2.1 (question.read.delivered, R-PERM-03, CHANGELOG); READ_PERMISSIONS/READ_SCOPES
+  als Daten in types.ts/permissions.ts, ROLE_PERMISSIONS nach Festlegung 4, can()/hasPermission tragen
+  R-PERM-01/02/03 und den 404-Vorrang aus Festlegung 3 (requireQuestionFor), alle 13 Lesemethoden
+  geprüft (Ziele 1, 2, 4); Wahrheitstabelle neu generiert (Ziel 3); Domänen- und HTTP-Tests je
+  Leserecht plus die vom Orchestrator nachgeschärften Zusatzfälle (Ziel 7, Domänen-/HTTP-Teil).
+Evidence: siehe unten (pnpm gates-Ende, Vertragstor, Wahrheitstabellen-Diff, Testnamen, angepasste
+  Bestandstests, Playwright-Zusammenfassung).
+Open: Ziele 5, 6 und der e2e-Teil von Ziel 7 (Auftrag B, nach 013). Drei Dateien außerhalb der
+  ursprünglichen Dateiliste angefasst, siehe "Unvermeidliche Randfolgen" unten — der Owner sollte das
+  im Diff bestätigen.
+Touched: siehe "Touched" unten.
+```
+
+**Spec-Nachschärfung während der Umsetzung.** Der Orchestrator hat den Auftrag nach dem ersten
+Einlesen mit einer präzisierten Fassung von Festlegung 2 und 3 sowie Ziel 7/Akzeptanz 1–2
+nachgeschärft (Commit `daea65e` auf diesem Branch): `can()` wendet `READ_SCOPES` grundsätzlich auf
+jede Aktion mit Umfang an (auch `question.read.delivered` selbst, für jeden Halter inklusive admin);
+der 404-Vorrang gilt nur, wenn der Akteur weder lesen darf noch das Recht der Operation hält (podium
+behält die heutige Reihenfolge für `deliver`/`close`/`return`/`getQuestionHistory`, wenn es das
+jeweilige Schreib-/Leserecht selbst hält). Die Implementierung unten folgt der nachgeschärften
+Fassung; nichts Vorheriges musste zurückgebaut werden, da noch kein Code stand, als die Nachricht kam.
+
+**Unvermeidliche Randfolgen außerhalb der ursprünglichen Dateiliste (transparent nachgetragen, siehe
+Diff von "Files allowed" oben).** Ziel 2 vergrößert `PERMISSIONS` (types.ts) um sechs Leserechte. Zwei
+Bestandsprüfungen zitieren die alte Form wörtlich bzw. erschöpfend und brechen sonst `pnpm gates`:
+
+- `apps/web/src/i18n/labels.ts`s `ACTION_KEYS` ist ein erschöpfendes `Record<Permission, TKey>`
+  (Regel 10 — jede Rechtebezeichnung geht durchs Wörterbuch); ohne die sechs neuen
+  `action.*`-Einträge bricht `apps/web`s Typecheck. Ergänzt in `labels.ts`, `shell.de.ts`,
+  `shell.en.ts` mit derselben knappen Bezeichnung wie das bestehende `action.question.read`
+  ("Ansehen"/"View" — kein neuer Glossarbegriff). `parity.test.ts`s Schlüsselzahl 436 → 442
+  (ausdrücklich als "nur Schlüsselzahl" erlaubt; die drei anderen Dateien waren es nicht, jetzt
+  nachgetragen).
+- `scripts/role-literal-check.test.mjs`s Test "a Role union / ROLE_PERMISSIONS key mismatch aborts
+  loudly" baut sein Fixture, indem er die Zeile `"observer: ['question.read'],"` wörtlich sucht und
+  ersetzt — nach Festlegung 4 lautet die Zeile jetzt `"observer: ['question.read.delivered'],"`. Nur
+  die Fixture-Zeichenkette angepasst, keine Prüflogik geändert.
+
+Beide Anpassungen sind rein mechanisch (keine neue UI, keine neue Prüflogik) und ausschließlich eine
+Folge des in Ziel 2 verlangten Wachstums von `PERMISSIONS`. Ich habe sie vorgenommen, weil "Endet mit
+grünem `pnpm gates`" ausdrückliche Abschlussbedingung von Auftrag A ist und beide Dateien sonst jeden
+Lauf rot färben, unabhängig davon, wer die Rechte korrekt nach Festlegung 4 umsetzt. Der Owner sieht
+die Ergänzung der Dateiliste im Diff.
+
+**pnpm gates (Ende, Exit 0):**
+
+```
+1..110
+# tests 110
+# suites 0
+# pass 110
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3786.587213
+
+> @hv/web@0.0.0 build /home/user/wt/010/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-l931jxa-.css                        39.97 kB │ gzip:   8.67 kB
+dist/assets/index-CrpqQLa3.js                        531.89 kB │ gzip: 155.94 kB │ map: 2,193.89 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a
+plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a
+sourcemap for the transformation.
+(!) Some chunks are larger than 500 kB after minification. [...]
+✓ built in 1.13s
+mark-test-run: wrote /home/user/wt/010/.claude/state/last-test-run (clean tree)
+```
+
+`pnpm --filter @hv/domain test`: 4 files, 60 tests passed. `pnpm --filter @hv/api test`: 5 files, 44
+tests passed. `pnpm --filter @hv/web test`: 4 files, 48 tests passed (unrelated to this slice, kept
+green by the `parity.test.ts`/`labels.ts` fix above). `arch` reports 7 pre-existing warnings (0
+errors) on files this slice never touched (`apps/web/src/features/{stage,speakers,capture,answers}/**`
+importing `@hv/domain`'s barrel instead of a scoped path) — not a regression.
+
+**Vertragstor-Ausgabe:**
+
+```
+contract gate: packages/contract/openapi.yaml (info.version 0.2.1, 29 operations)
+  ok    (a) info.version 0.2.1 = package.json version
+  ok    (b) CHANGELOG.md has a section for 0.2.1
+  ok    (c) openapi.yaml changed against merge base 22c7067; version 0.2.0 -> 0.2.1
+  ok    (d) allowlist.json well-formed, 0 pre-declared operation(s), none expired (today 2026-09-23)
+contract gate: ok
+```
+
+`redocly lint`: valid, 1 pre-existing warning (`oidc` security scheme unused, unrelated to this
+slice).
+
+**Wahrheitstabellen-Diff** (`git diff a0c38c4 58d5966 -- packages/domain/policy-truth-table.md`, real
+output, header + the three role blocks the acceptance criterion names + the new second table in
+full; every other row/cell is unchanged apart from the appended `q.read.delivered` column):
+
+```diff
+-| Role | Status | q.capture | q.classify | q.assign | answer.draft | q.submit_review | q.approve | q.return | q.stage | q.deliver | q.close | q.withdraw | q.merge | q.read |
+-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
++| Role | Status | q.capture | q.classify | q.assign | answer.draft | q.submit_review | q.approve | q.return | q.stage | q.deliver | q.close | q.withdraw | q.merge | q.read | q.read.delivered |
++|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+ ... (moderation/capture/expert/legal/approver rows: only the appended q.read.delivered column
+      changes, always "·" — unchanged otherwise) ...
+-| podium | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| podium | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
+ ... (every podium row: q.read ✓ -> ·, new column ·  — repeated for all 22 podium rows) ...
+-| admin | delivered | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ |
++| admin | delivered | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
+-| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+ ... (every other admin row: q.read unchanged (✓), new column · — admin's q.read.delivered is only ✓
+      in delivered/closed, per Festlegung 2's "auch für admin") ...
+-| observer | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| observer | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
+ ... (observer non-delivered/closed rows: q.read ✓ -> ·, new column ·) ...
+-| observer | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| observer | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+-| observer | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| observer | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+ ... (observer delivered/closed rows, expert_track and podium each: q.read stays ✓, new column ✓) ...
+
++# Policy truth table — Role × Leserecht
++
++Generated by the same test. A diff here is a rights change and needs an explicit decision
++(Festlegung 4 of docs/slices/010-lesepfade-leserechte.md).
++
++| Role | speaker.read | contribution.read | question.read | question.read.delivered | stage.read | history.read | event.read |
++|---|---|---|---|---|---|---|---|
++| moderation | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
++| capture | ✓ | ✓ | ✓ | · | · | ✓ | · |
++| expert | · | · | ✓ | · | · | ✓ | · |
++| legal | · | · | ✓ | · | · | ✓ | · |
++| approver | · | · | ✓ | · | ✓ | ✓ | · |
++| podium | · | · | · | · | ✓ | · | · |
++| admin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
++| observer | · | · | · | ✓ | · | · | · |
+```
+
+Matches acceptance criterion 2 exactly: (a) `q.read` → `·` for podium in every row, `✓` for observer
+only in `delivered`/`closed`; (b) new `q.read.delivered` column: admin and observer `✓` only in
+`delivered`/`closed`, everyone else `·` in every row (including admin/observer themselves outside
+that scope); (c) the new "Role × Leserecht" table matches Festlegung 4's grant table cell for cell;
+(d) no other cell changed (verified by full-file review, not only the excerpt above).
+
+**Negativtests je Leserecht (mit Regel-ID oder, nach Festlegung 3, mit 404) — Domäne
+(`packages/domain/src/__tests__/api.test.ts`):**
+
+- `speaker.read: expert is denied listSpeakers and getSpeaker with R-PERM-02`
+- `contribution.read: podium is denied listContributions and getContribution with R-PERM-02`
+- `question.read: podium is denied listQuestions with R-PERM-02, and getQuestion is masked as 404 (Festlegung 3)`
+- `question.read.delivered: observer 403 R-PERM-03 on a status filter outside the read scope`
+- `question.read.delivered: observer getQuestion on a non-delivered question is masked as 404 (Festlegung 3)`
+- `stage.read: expert is denied getStage with R-PERM-02`
+- `history.read: observer is denied getQuestionHistory of a delivered question with R-PERM-02 (it can read the question itself)`
+- `event.read: podium is denied listEvents with R-PERM-02`
+- Stammdaten (statt Negativtest): `master data (Festlegung 1): every role may read getMeeting, listAgendaItems, listUnits`
+
+**404-Vorrang (Festlegung 3) — Domäne:**
+
+- `404 precedence (Festlegung 3): observer write attempt on a non-delivered question is masked as not found, not 403`
+- `404 precedence (Festlegung 3): podium — no question.read, no history.read — gets 404 on getQuestionHistory, not 403`
+- `404 precedence (Festlegung 3): podium may still deliverQuestion on the staged question although it cannot read it` (200, nicht 404 — belegt die andere Hälfte von Festlegung 3)
+- `observer may read a delivered question (question.read.delivered) but not act on it — 403 with a rule id` (echtes 403 R-PERM-01, kein maskierter Fall, zur Abgrenzung)
+
+**subscribe (Festlegung 5) — Domäne:**
+
+- `subscribe (Festlegung 5): delivers [] to an actor without event.read`
+- `subscribe (Festlegung 5): checks the permission fresh on every delivery, so a role switch between two deliveries changes what arrives`
+
+**HTTP (`apps/api/src/__tests__/read-rights.test.ts`, dieselben Fälle mit `ruleId`, ohne subscribe):**
+`master data ...`, `speaker.read: expert is denied ...`, `contribution.read: podium is denied ...`,
+`question.read: podium is denied listQuestions ..., and getQuestion is masked as 404 ...`,
+`question.read.delivered: observer 403 R-PERM-03 ...`, `question.read.delivered: observer sees only
+delivered/closed questions, and total matches`, `question.read.delivered: observer getQuestion on a
+non-delivered question is masked as 404 ...`, `stage.read: expert is denied getStage ...`,
+`history.read: observer is denied getQuestionHistory of a delivered question ...`, `404 precedence
+...: podium — no question.read, no history.read — gets 404 on getQuestionHistory, not 403`, `404
+precedence ...: podium may still deliverQuestion on a staged question although it cannot read it`,
+`event.read: podium is denied listEvents with R-PERM-02` (12 Tests, alle grün).
+
+**Angepasste Bestandstests (mit Grund):**
+
+- `packages/domain/src/__tests__/api.test.ts`, Abnahmesatz: `closed._actions` war
+  `['question.read']`, jetzt `[]` (podium hält seit Festlegung 4 kein Leserecht mehr); der
+  `getQuestionHistory`-Aufruf danach läuft jetzt unter `moderation` statt unter dem verbliebenen
+  `podium`-Akteur (podium hält kein `history.read`).
+- Dieselbe Datei, `'Idempotency-Key replays the first result without a second event'`: die
+  `listEvents`-Zählung läuft jetzt unter `admin` statt unter `capture` (capture hält kein
+  `event.read`); der eigentliche klassifizierende Aufruf bleibt unter `capture`.
+- Dieselbe Datei, `'R-IDEM-01: an idempotency key is scoped to actor and operation'`: der
+  Cross-Actor-Replay durch `observer` erwartet jetzt `status: 404` statt `403` — die Frage ist nach
+  der ersten Klassifizierung `classified`, also außerhalb von observers
+  `question.read.delivered`-Umfang, und observer hält `question.classify` ohnehin nicht (Festlegung 3
+  maskiert das als 404).
+- Dieselbe Datei, `'observer may read but not act; deny reason carries a rule id'` ersetzt durch zwei
+  Tests: den 404-Vorrang-Test (`firstIn('captured')` unter observer wäre selbst schon ein R-PERM-03,
+  weil `captured` außerhalb des Umfangs liegt) und den echten-403-Test auf einer vorgelesenen Frage.
+- `apps/api/src/__tests__/negative.test.ts`, `'403: observer may read but not classify ...'` →
+  umbenannt zu `'404: observer classifying a captured question is masked as not found, not 403
+  (Festlegung 3, slice 010)'`; Statuscode und Erwartung entsprechend geändert (siehe Coordinator-
+  Nachschärfung Punkt 3).
+- Dieselbe Datei, `'idempotent replay is scoped to the actor ...'`: der `byObserver`-Replay erwartet
+  jetzt 404 statt 403 (dieselbe Begründung wie R-IDEM-01 oben — die Frage ist inzwischen
+  `classified`).
+- `apps/api/src/__tests__/acceptance.test.ts`: `closed._actions` wie oben von `['question.read']` auf
+  `[]`.
+- `packages/domain/src/__tests__/transitions.test.ts`, `'deny by default: an unknown role has no
+  permissions'`: `question.read`s Verweigerung ist jetzt R-PERM-02 statt R-PERM-01 (es ist ein
+  Leserecht, Festlegung 6); ein zweiter Fall mit `question.classify` behält R-PERM-01, damit beide
+  Zweige der neuen `hasPermission`-Logik geprüft sind.
+
+**Playwright-Zusammenfassung** (`E2E_PORT=4350 pnpm exec playwright test --reporter=list`, Chromium
+unter `/opt/pw-browsers`, absichtlich teilweise rot — Auftrag B löst diese vier in Zielen 5/6): **5
+passed, 4 failed**, alle vier roten Schritte betreffen genau die in der Aufgabenstellung erwartete
+Kategorie (podium/expert auf einer nun nicht mehr lesbaren Ansicht):
+
+1. `003-answers-stage.spec.ts:43` — Historiensuche unter `podium` (`history-result` nicht gefunden:
+   podium hält kein `history.read` mehr). Auftrag B, Ziel 5: dieser Schritt wandert zu `moderation`.
+2. `020-rueckbau-passung.spec.ts:198` — `speakers-readonly-hint` unter `expert` nicht gefunden:
+   `listSpeakers` verlangt jetzt `speaker.read`, das expert nie hielt; vorher hatte `listSpeakers` gar
+   keine Rechteprüfung, daher zeigte die alte Oberfläche eine reine "kein Schreibrecht"-Meldung.
+   Auftrag B, Ziel 6: der gestaltete Zustand "keine Leseberechtigung" ersetzt das.
+3. `020-rueckbau-passung.spec.ts:599` — `stage-current-number` unter derselben Rolle nicht gefunden:
+   `getStage` verlangt jetzt `stage.read`, ebenfalls vorher ungeprüft. Auftrag B, Ziel 6/Ziel 7-e2e
+   ("Bühne unter expert zeigt den Zustand keine Leseberechtigung") deckt genau das ab.
+4. `abnahme.spec.ts:86` — Historiensuche unter `podium` (`history-result` nicht gefunden), dieselbe
+   Ursache wie 1. Auftrag B, Ziel 5: "Historie unter moderation" — das ändert einen Schritt des
+   Abnahmesatzes der Projektleitung; den Satz vorher/nachher liefert Auftrag B, da erst dort der
+   e2e-Schritt selbst geändert wird.
+
+`docs/evidence/` nach dem Lauf mit `git checkout -- docs/evidence` zurückgesetzt (keine `010-*`-Bilder
+erzeugt — die kommen erst mit Auftrag B/e2e `010-lesepfade.spec.ts`).
+
+**Open:**
+- Ziele 5, 6 und der e2e-Teil von Ziel 7 (Auftrag B, startet erst nach 013).
+- Die vier oben gelisteten Playwright-Schritte bleiben bis Auftrag B rot (erwartet).
+- Drei Dateien außerhalb der ursprünglichen "Files allowed"-Liste angefasst (siehe oben); die Liste
+  wurde in diesem Commit nachgezogen, der Owner sollte das bestätigen.
+
+**Touched:**
+- `packages/contract/openapi.yaml`, `packages/contract/package.json`, `packages/contract/CHANGELOG.md`,
+  `packages/contract/src/types.ts`
+- `packages/domain/src/types.ts`, `packages/domain/src/permissions.ts`, `packages/domain/src/api.ts`
+- `packages/domain/src/__tests__/api.test.ts`, `packages/domain/src/__tests__/transitions.test.ts`
+- `packages/domain/policy-truth-table.md`
+- `apps/api/src/__tests__/acceptance.test.ts`, `apps/api/src/__tests__/negative.test.ts`,
+  `apps/api/src/__tests__/read-rights.test.ts` (neu)
+- `apps/web/src/i18n/labels.ts`, `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts`,
+  `apps/web/src/i18n/parity.test.ts` (Randfolgen, siehe oben)
+- `scripts/role-literal-check.test.mjs` (Randfolge, siehe oben)
+- `docs/slices/010-lesepfade-leserechte.md` (Dateiliste nachgezogen, dieser Bericht)
+
 ## Review findings
 
 (vom Reviewer)
