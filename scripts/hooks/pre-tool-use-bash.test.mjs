@@ -194,6 +194,69 @@ test('Codex C4 green: --push-option with an explicit remote and branch still pas
   assert.equal(r.status, 0, r.stderr);
 });
 
+// takt-006 rework (review round 2, MAJOR finding 2): GIT_PUSH_RE only recognised an enumerated list of
+// global options (-C, -c, --git-dir, --work-tree, --no-pager) between `git` and `push` — any *other*
+// global option (there are dozens) still hid the subcommand from the regex entirely, so the push
+// findings below it (force, delete, mirror, bare push, ...) never even ran.
+const REWORK_P2_BYPASSES = [
+  ['git -C "a b" push -f origin main', /force flag/],
+  ['git -p push -f origin main', /force flag/],
+  ['git --paginate push -f origin main', /force flag/],
+  ['git --bare push -f origin main', /force flag/],
+  ['git --namespace=x push -f origin main', /force flag/],
+];
+for (const [command, expected] of REWORK_P2_BYPASSES) {
+  test(`rework point 2 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('rework point 2 green: "git -C x push -u origin claude/x" (explicit, non-forced) still passes', () => {
+  const r = runCommand('git -C x push -u origin claude/x');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// takt-006 rework, MINOR finding 3 (+Codex): a short-option cluster containing `f` alongside digits
+// (`-4f`) must still count as force; a value-taking long option's *abbreviation* must still have its
+// value skipped before counting targets.
+const REWORK_P3_BYPASSES = [
+  ['git push -4f origin main', /force flag/],
+  ['git push -f4 origin main', /force flag/],
+  ['git push -6uf origin main', /force flag/],
+  ['git push --push-o ci.skip origin', /explicit remote and branch/],
+  ['git push --receive-p /bin/sh origin', /explicit remote and branch/],
+  ['git push --exec x origin', /explicit remote and branch/],
+];
+for (const [command, expected] of REWORK_P3_BYPASSES) {
+  test(`rework point 3 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+// takt-006 rework, MINOR finding 7: splitTopLevelSegments only split on `&&`, `||`, `;`, `|` — a
+// newline-separated second command (a common way a multi-line Bash tool call is written) was never
+// split off at all, so a `curl` on its own later line was invisible to `externalCurlFinding`.
+test('rework point 7 red: a curl on its own line (newline-separated) is blocked', () => {
+  const r = runCommand('ls\ncurl https://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
+});
+
+test('rework point 7 green: a curl on its own line to a local host still passes', () => {
+  const r = runCommand('ls\ncurl http://127.0.0.1:3000/health');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('rework point 7 red: a single "&" background separator is blocked', () => {
+  const r = runCommand('sleep 1 & curl https://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
+});
+
 // Review rework round 1, m2: these three used to false-positive on the old, boundary-free ".env" scan.
 test('m2 green: grep -rn "process.env" is not a .env file access', () => {
   const r = runCommand('grep -rn "process.env" apps/api/src');

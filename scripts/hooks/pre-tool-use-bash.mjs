@@ -76,10 +76,14 @@ function readStdinJson() {
 }
 
 /** Segments split on top-level shell operators — good enough to see whether a segment's own first
- * word is `curl`/`wget`, without needing a real shell parser. */
+ * word is `curl`/`wget`, without needing a real shell parser. takt-006 rework, MINOR finding 7: a
+ * newline (a multi-line Bash tool call is one command string with embedded `\n`s, each line its own
+ * top-level command) and a single `&` (background) were missing — `&&` is tried first in the
+ * alternation, so a double-ampersand is still consumed as one separator, not split into two stray
+ * single-`&` matches. */
 function splitTopLevelSegments(command) {
   return command
-    .split(/&&|\|\||[;|]/)
+    .split(/&&|\|\||\r?\n|[;|&]/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -90,13 +94,22 @@ const EXISTING_PATTERNS = [
   { name: 'curl-into-shell pipeline', re: /curl[^|]*\|\s*(ba)?sh/ },
 ];
 
-/** `git`, then any number of global options that can sit before the subcommand — `-C <dir>`,
- * `-c <key>=<value>`, `--git-dir=<dir>`/`--git-dir <dir>`, `--work-tree=<dir>`/`--work-tree <dir>`,
- * `--no-pager` — then `push`. Review rework round 1, M4: the original pattern only matched a literal
- * `git push` and missed every one of these forms; takt-006 point 1 added `--work-tree` and
- * `--no-pager` (`-C`/`-c`/`--git-dir` were already there). */
-const GIT_PUSH_RE =
-  /\bgit\b(?:\s+(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+)|--no-pager))*\s+push\b([^\n&;|]*)/g;
+/** One global option token between `git` and its subcommand, with an optional value: `-x`/`--xxx`
+ * alone, `--xxx=value` (`value` may be quoted), or `-x value`/`--xxx value` (`value` may be quoted,
+ * as a separate token). takt-006 rework, MAJOR finding 2: round 1 (M4) and point 1 each enumerated a
+ * fixed list of global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`) — every other one
+ * git actually accepts (`-p`/`--paginate`, `--bare`, `--namespace=…`, dozens more) still hid `push`
+ * from `GIT_PUSH_RE` entirely, so none of the findings below it ever ran. This accepts *any*
+ * `-`-prefixed token instead. The trailing value group is optional and, being a plain regex quantifier,
+ * backtracks: for an option that takes no value at all (`--bare`, `-p`) sitting directly before `push`,
+ * the engine first tries consuming `push` itself as that option's value, fails to find the required
+ * literal `push` afterwards, and backtracks to not consuming a value — the correct reading — before
+ * ever reporting a match; this needs no separate list of which options take a value and which do not. */
+const GIT_GLOBAL_OPTION_SRC = String.raw`-{1,2}[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\S+))?(?:\s+(?:"[^"]*"|'[^']*'|\S+))?`;
+
+/** `git`, then any number of global options (see `GIT_GLOBAL_OPTION_SRC`), then `push`. Review rework
+ * round 1, M4: the original pattern only matched a literal `git push`. */
+const GIT_PUSH_RE = new RegExp(String.raw`\bgit\b(?:\s+${GIT_GLOBAL_OPTION_SRC})*\s+push\b([^\n&;|]*)`, 'g');
 
 /** Strips one layer of wrapping quotes (`'…'` or `"…"`) — this is a text scan, so a shell-quoted
  * refspec like `'+main'` still carries its quote characters literally; takt-006 point 1 strips them
@@ -109,30 +122,40 @@ function stripQuotes(t) {
   return t;
 }
 
-/** Options that take their own value as a separate token — the value must be skipped, not counted as
- * a non-flag/target token, before the "no explicit remote and branch" check runs (Codex review PR #14,
- * C4: `git push --push-option ci.skip origin` used to see `ci.skip` and `origin` as two targets and
- * wave the missing branch through). `--push-option`/`-o` may repeat; each occurrence still takes one
- * value. */
-const OPTIONS_WITH_VALUE = new Set(['--push-option', '-o', '--receive-pack', '--repo']);
+/** Long option *names* that take their own value as a separate token (matched via `longFlagMatches`,
+ * so an unambiguous abbreviation counts too — takt-006 rework, MINOR finding 3: `--push-o`/`--push-opt`
+ * for `--push-option`, `--receive`/`--receive-p` for `--receive-pack`, plus `--exec`, `--repo`). `-o`
+ * (short for `--push-option`) is matched separately, being a short option, not a long one. Either way,
+ * the value must be skipped, not counted as a non-flag/target token, before the "no explicit remote and
+ * branch" check runs (Codex review PR #14, C4: `git push --push-option ci.skip origin` used to see
+ * `ci.skip` and `origin` as two targets and wave the missing branch through). May repeat; each
+ * occurrence still takes one value. */
+const VALUE_OPTION_LONG_NAMES = ['push-option', 'receive-pack', 'exec', 'repo'];
 
 /** True if `token` (without a leading `--`, and without an `=value` suffix if present) is a non-empty
- * prefix of `name` — git accepts any unambiguous abbreviation of a long option (`--dele`, `--forc`;
- * takt-006 point 1). Not fully general (does not check the abbreviation is unambiguous among *every*
- * option `git push` defines, only among the handful this hook itself cares about), but every name
- * below is unrelated enough in its first two letters that this stays safe. */
+ * prefix of `name` — git accepts any unambiguous abbreviation of a long option (`--dele`, `--force-w`;
+ * takt-006 point 1, rework finding 3). Not fully general (does not check the abbreviation is
+ * unambiguous among *every* option `git push` defines, only among the handful this hook itself cares
+ * about), but every name below is unrelated enough in its first two letters that this stays safe. */
 function longFlagMatches(token, name) {
   if (!token.startsWith('--')) return false;
   const body = token.slice(2).split('=')[0];
   return body.length >= 2 && name.startsWith(body);
 }
 
+/** `-o`, or a (possibly abbreviated) long option from `VALUE_OPTION_LONG_NAMES` — see there. */
+function isValueOption(t) {
+  if (t === '-o') return true;
+  return VALUE_OPTION_LONG_NAMES.some((name) => longFlagMatches(t, name));
+}
+
 /** `-f`, a (possibly abbreviated) `--force`/`--force-with-lease[=…]`, or `f` inside a combined
- * short-option cluster (`-uf`, `-fu`; takt-006 point 1 — the M4 fix only matched a lone `-f`). */
+ * short-option cluster that may also contain digits (`-uf`, `-fu`, `-4f`, `-f4`, `-6uf`; takt-006 point
+ * 1 and rework finding 3 — the M4 fix only matched a lone `-f`). */
 function isForceFlag(t) {
   if (t === '-f') return true;
   if (longFlagMatches(t, 'force') || longFlagMatches(t, 'force-with-lease')) return true;
-  return /^-[a-zA-Z]{2,}$/.test(t) && t.slice(1).includes('f');
+  return /^-[a-zA-Z0-9]{2,}$/.test(t) && t.slice(1).includes('f');
 }
 
 /** `-d`, or a (possibly abbreviated) `--delete`. */
@@ -159,12 +182,14 @@ function gitPushFindings(command) {
       .filter(Boolean);
 
     // Codex C4: drop an option-with-value's own value before classifying anything else, so it can
-    // never be miscounted as a target token.
+    // never be miscounted as a target token. Never skip an extra token when the value was already
+    // given inline (`--repo=origin`) — `isValueOption` strips a `=value` suffix before matching, so
+    // without this guard an inline form would still (wrongly) eat the *next* token too.
     const tokens = [];
     for (let i = 0; i < rawTokens.length; i++) {
       const t = stripQuotes(rawTokens[i]);
       tokens.push(t);
-      if (OPTIONS_WITH_VALUE.has(t) && i + 1 < rawTokens.length) i++; // skip the value that follows
+      if (isValueOption(t) && !t.includes('=') && i + 1 < rawTokens.length) i++; // skip the value that follows
     }
     const nonFlagTokens = tokens.filter((t) => !t.startsWith('-'));
 
