@@ -1,6 +1,6 @@
 # 015 — ADR-Paket 0003–0016 als vorgeschlagen
 
-**Status:** review (Nacharbeitsrunde 1)
+**Status:** accepted
 **Risikoklasse:** niedrig · 2,5 AStd · Kalender 30.09.2026 (W1) · Lanes: docs-adr (+ `README.md` Indexzeilen;
 keine andere laufende Scheibe ändert das README)
 **Rolle/Modell:** Architekt-Text · Fable 5.1; Review (Lesebefund) Opus 5.5 gegen Recherche, Rechtekonzept und ADR 0001
@@ -185,3 +185,20 @@ Opus-Lesebefund (gegen Recherche, Rechtekonzept, ADR 0001): 0 Blocker, 3 major, 
 | 13 | minor | ADR 0012 fünf Anzeigegruppen ohne Registerzeile | Text beibehalten; „Registerzeile folgt (Übergabe an 014)" in Entscheidung und „Offene Registerzeilen" |
 | 14 | minor | Bericht „Open" ohne die 014-Abhängigkeit des Nachweises | „Nachweis ‚Register verweist auf jede ADR' hängt an 014" ergänzt (Punkt 7) |
 | 15 | minor | ADR 0014 E22-Anmerkung vermischt das SSE-Ziel | E22 = RPO 0, RTO 15 min, p90 < 300 ms; SSE < 2 s stammt aus B11 |
+
+**Runde 2 — Nachprüfung Opus 5.5** (nur die Nacharbeit, 23.09.2026): Befunde 1–15 alle „erledigt"; keine neue
+Entscheidung, keine erfundene Registernummer, kein Widerspruch zum Plan; `pnpm gates` exit 0. Urteil „accept after
+minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen** und
+gehen als Kleinänderung in eine Folge-Scheibe (keine zweite Nacharbeitsrunde, Plan 6.3):
+- N1 0009:43 — „jede Auflösung protokolliert" geht über 067 hinaus → „Aufdecken per Lookup erzeugt `IdentityRevealed` mit Grund (067)".
+- N2 0013:33–35 — „keine personenbezogene Leistungsauswertung" (Plan 4, Zeile 0013) beim Verschieben verloren → zurück in die Entscheidung.
+- N3 0003:39–40, 0009:90, 0010:28 — „§4 schützt den Nachweis einer echten HV" ohne Quelle → nur auf Plan 3/042 stützen, Bestätigung durch Recht/DSB (052).
+- N4 0014:69 — E22 „im Probefenster" statt „am Dienst".
+- N5 0016:94 — „bis dahin" → „bis zur dauerhaften Regel (Prüfpunkt 1)".
+- N6 0010:43–44, 0015:24–25 — „Vorschlag (nicht im Plan): <Inhalt>", in 0015 außerhalb der Entscheidung.
+- N7 0012:20–22 — „044 macht Katalogtreffer und Begründung nur für Verweigerungspfad B zur Pflicht".
+- N8 Spec-Quellentabelle — Zeile 0002 um E48/Plan 6.6, Zeile 0016 um E35 ergänzen.
+
+An 014 (Register) übergeben: zwei neue Registerzeilen ohne Nummer — Pseudonymisierung (engerer Rollenkreis,
+Vier-Augen nach Recherche Z.116 / Rechtekonzept §6; Entscheider Projektleitung, DSB) und Zuordnung der fünf
+Anzeigegruppen (ADR 0012).
