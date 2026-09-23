@@ -116,10 +116,24 @@ export function etagOf(version: number): string {
   return `"v${version}"`;
 }
 
-const defaultId = (): string =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+/** 16 random bytes as hex, via the Web Crypto API — available even in "insecure" browser contexts
+ * that lack `crypto.randomUUID` (review rework round 1, minor 16), unlike the clock, never involved. */
+function randomIdFromBytes(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// `crypto.randomUUID` exists in Node 22 and every target browser in a secure context;
+// `crypto.getRandomValues` is the wider-available next choice. Both are built from randomness
+// alone — never from the clock (`scripts/now-check.mjs`, AGENTS.md rule 8) — so an id never
+// doubles as a timestamp. `Math.random` is a last resort for an environment with no Web Crypto API
+// at all (none of Node 22 or any target browser; kept only so this never throws).
+const defaultId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) return randomIdFromBytes();
+  return `${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
+};
 
 /**
  * The single decision point (docs/rollen-und-rechtekonzept.md): permission bundle first, then the
@@ -150,7 +164,7 @@ const SPEAKER_ACTIONS: readonly Permission[] = ['speaker.update', 'speaker.reord
 
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
-  const clock = options.clock ?? (() => new Date());
+  const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
   for (const e of store.all()) reduce(state, e);

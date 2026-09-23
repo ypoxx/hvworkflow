@@ -1,0 +1,19 @@
+#
+# gitleaks config (slice 012, AGENTS.md rule 11: no credentials, no real data). Extends gitleaks'
+# own default ruleset. No custom allowlist yet: an earlier version of this file added two
+# speculative entries (a "secret"-target regex for the demo `X-Actor` header, which gitleaks never
+# matches against by default since `regexTarget` defaults to the finding's secret, not the whole
+# line — a no-op; and a whole-file allowlist for `packages/domain/src/seed.ts` and its test that was
+# never run against the real binary). Review rework round 1, minor 12: removed both rather than ship
+# unproven config — a reasoned, `regexTarget`-correct entry belongs here once a real CI run shows an
+# actual false positive to allowlist, not before.
+#
+# Runs only in CI (official `gitleaks/gitleaks-action`): a GitHub release download is blocked from
+# this development sandbox, so this file could not be exercised against the real binary in this
+# slice — the first real run is the CI job itself. Scope in `gates.yml` is the PR diff / push range;
+# the nightly workflow scans the whole repository.
+#
+title = "HV-Tool gitleaks config"
+
+[extend]
+useDefault = true

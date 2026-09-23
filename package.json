@@ -12,17 +12,23 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "gates": "pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm --filter @hv/web build",
+    "gates": "pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm arch && pnpm role-literals && pnpm now-check && pnpm plan-honesty && pnpm --filter @hv/web build",
     "contract:types": "openapi-typescript packages/contract/openapi.yaml -o packages/contract/src/types.ts",
     "contract:lint": "redocly lint packages/contract/openapi.yaml",
-    "vocabulary": "node scripts/vocabulary-check.mjs"
+    "vocabulary": "node scripts/vocabulary-check.mjs",
+    "arch": "depcruise --config scripts/dependency-cruiser.cjs apps/web/src apps/api/src packages/domain/src",
+    "role-literals": "node scripts/role-literal-check.mjs",
+    "now-check": "node scripts/now-check.mjs",
+    "plan-honesty": "node scripts/plan-honesty.mjs",
+    "audit:check": "node scripts/audit-check.mjs"
   },
   "devDependencies": {
-    "typescript": "~6.0.2",
-    "openapi-typescript": "^7.13.0",
     "@redocly/cli": "^2.0.0",
+    "dependency-cruiser": "^18.4.0",
+    "openapi-typescript": "^7.13.0",
+    "oxlint": "^1.79.0",
     "prettier": "^3.6.0",
-    "vitest": "^4.1.11",
-    "oxlint": "^1.79.0"
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.11"
   }
 }
