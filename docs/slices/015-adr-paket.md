@@ -109,7 +109,7 @@ Touched: docs/adr/0003-persistenz-ereignislog.md, 0004-identitaet-oidc-bff.md, 0
 
 | ADR | Quellstellen in Plan 3 / Plan 4 | Offene E-Nummern | Annahme-Prüfpunkt |
 |---|---|---|---|
-| 0002 (Ergänzung) | Plan 3 „Taktfläche für Kleinänderungen"; Plan 4 Zeile 0002; B17 | E35 | 1 (Ergänzung), Eigentümer |
+| 0002 (Ergänzung) | Plan 3 „Taktfläche für Kleinänderungen"; Plan 4 Zeile 0002; B17; E48, Plan 6.6 | E35 | 1 (Ergänzung), Eigentümer |
 | 0003 Persistenz | Plan 3 „Persistenzform des Ereignislogs", „Hosting-Plattform" (Datenmigration); Plan 4 Zeile 0003; B3; Leitplanken 1.3 | E27, E22, E10, E16 | 3 |
 | 0004 Identität | Plan 3 „Identity Provider und Client-Typ", „Rollenzuweisungspfad"; Plan 4 Zeile 0004, Baustein 2; B1 | E11, E8, E13/E10b, E14, E38, E24 | 3 |
 | 0005 Antwortformat | Plan 3 „Formatierungsumfang"; Plan 4 Zeile 0005 | E6, E21 | 5 |
@@ -123,7 +123,7 @@ Touched: docs/adr/0003-persistenz-ereignislog.md, 0004-identitaet-oidc-bff.md, 0
 | 0013 Zwei Protokollebenen | Plan 3 „Betriebsrat und DSFA", „Vertraulichkeitsstufe" (`event.read.personal`); Plan 4 Zeile 0013; B5 | E13, E14, E16, E36 | 4 |
 | 0014 Realtime | Plan 3 „Realtime-Kanal", „Benachrichtigungen und Alarme"; Plan 4 Zeile 0014, Baustein 3; B10, B11 | E22, E33 | 3 |
 | 0015 Vertragsversionierung | Plan 4 Zeile 0015; Plan 3 „Exportpfad des Transkriptionstools" (zwei Zyklen, 1 AStd je Zyklus), „Jahrgang und Tagesordnung" (Alias bis 0.5) | keine eigene; abhängig E3a, E20 | 1 |
-| 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter Kalender) | E48, E44, E47 | 1 |
+| 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter Kalender) | E48, E35, E44, E47 | 1 |
 
 **`pnpm gates` in `/home/user/wt/015` (Tail, 23.09.2026, Lauf nach Nacharbeitsrunde 1; der erste Lauf vor der
 Nacharbeit war ebenfalls grün, EXIT=0):**
@@ -188,16 +188,17 @@ Opus-Lesebefund (gegen Recherche, Rechtekonzept, ADR 0001): 0 Blocker, 3 major, 
 
 **Runde 2 — Nachprüfung Opus 5.5** (nur die Nacharbeit, 23.09.2026): Befunde 1–15 alle „erledigt"; keine neue
 Entscheidung, keine erfundene Registernummer, kein Widerspruch zum Plan; `pnpm gates` exit 0. Urteil „accept after
-minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen** und
-gehen als Kleinänderung in eine Folge-Scheibe (keine zweite Nacharbeitsrunde, Plan 6.3):
-- N1 0009:43 — „jede Auflösung protokolliert" geht über 067 hinaus → „Aufdecken per Lookup erzeugt `IdentityRevealed` mit Grund (067)".
-- N2 0013:33–35 — „keine personenbezogene Leistungsauswertung" (Plan 4, Zeile 0013) beim Verschieben verloren → zurück in die Entscheidung.
-- N3 0003:39–40, 0009:90, 0010:28 — „§4 schützt den Nachweis einer echten HV" ohne Quelle → nur auf Plan 3/042 stützen, Bestätigung durch Recht/DSB (052).
-- N4 0014:69 — E22 „im Probefenster" statt „am Dienst".
-- N5 0016:94 — „bis dahin" → „bis zur dauerhaften Regel (Prüfpunkt 1)".
-- N6 0010:43–44, 0015:24–25 — „Vorschlag (nicht im Plan): <Inhalt>", in 0015 außerhalb der Entscheidung.
-- N7 0012:20–22 — „044 macht Katalogtreffer und Begründung nur für Verweigerungspfad B zur Pflicht".
-- N8 Spec-Quellentabelle — Zeile 0002 um E48/Plan 6.6, Zeile 0016 um E35 ergänzen.
+minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen**
+(inzwischen erledigt in takt-003, siehe unten) und gehen als Kleinänderung in eine Folge-Scheibe (keine zweite
+Nacharbeitsrunde, Plan 6.3):
+- N1 0009:43 — „jede Auflösung protokolliert" geht über 067 hinaus → „Aufdecken per Lookup erzeugt `IdentityRevealed` mit Grund (067)". — erledigt in takt-003
+- N2 0013:33–35 — „keine personenbezogene Leistungsauswertung" (Plan 4, Zeile 0013) beim Verschieben verloren → zurück in die Entscheidung. — erledigt in takt-003
+- N3 0003:39–40, 0009:90, 0010:28 — „§4 schützt den Nachweis einer echten HV" ohne Quelle → nur auf Plan 3/042 stützen, Bestätigung durch Recht/DSB (052). — erledigt in takt-003
+- N4 0014:69 — E22 „im Probefenster" statt „am Dienst". — erledigt in takt-003
+- N5 0016:94 — „bis dahin" → „bis zur dauerhaften Regel (Prüfpunkt 1)". — erledigt in takt-003
+- N6 0010:43–44, 0015:24–25 — „Vorschlag (nicht im Plan): <Inhalt>", in 0015 außerhalb der Entscheidung. — erledigt in takt-003
+- N7 0012:20–22 — „044 macht Katalogtreffer und Begründung nur für Verweigerungspfad B zur Pflicht". — erledigt in takt-003
+- N8 Spec-Quellentabelle — Zeile 0002 um E48/Plan 6.6, Zeile 0016 um E35 ergänzen. — erledigt in takt-003
 
 An 014 (Register) übergeben: zwei neue Registerzeilen ohne Nummer — Pseudonymisierung (engerer Rollenkreis,
 Vier-Augen nach Recherche Z.116 / Rechtekonzept §6; Entscheider Projektleitung, DSB) und Zuordnung der fünf

@@ -40,7 +40,7 @@ geschützte Fragen", „Pseudonymisierung gegenüber Fachbereichen", „Notiz-/R
 - **Pseudonymisierung gegenüber Fachbereichen** ist Standard an (`pseudonymiseForUnits = true`);
   Klarnamen sieht, wer `question.identity.reveal` hält (Standard: `coordination`, `moderation`,
   `legal`, `approver`, `podium`; 026). Ein Recht, kein Rollenname; Umschalten ist Konfiguration.
-  Ab 067 ist jede Auflösung ein protokolliertes Ereignis `IdentityRevealed` mit Grund; bis dahin
+  Ab 067 erzeugt das Aufdecken per Lookup ein Ereignis `IdentityRevealed` mit Grund (067); bis dahin
   löst die Projektion den Namen beim Lesen über das Recht auf (026).
 - **Notizfeld** `note` mit Ereignis `QuestionNoteAdded` im Vertrag, hinter der Meeting-Konfiguration
   `notes=off`, nie im Export, nie auf der Bühne, kein Chat; ohne Schalter entsteht kein
@@ -87,7 +87,8 @@ die Auflösung stehen nicht im Plan: offen, Entscheider Projektleitung und DSB; 
 - **Löschlogik im Ereignislog** (physisches Löschen einzelner Ereignisse oder Fragen). Verworfen:
   Regel 7; Rechtekonzept Abschnitt 4 (keine physische Löschung, für niemanden). Abgrenzung: Der
   Übungsbestand ist synthetisch und wird als Ganzes durch den Plattformbetreiber außerhalb der
-  Anwendung entfernt (Plan 3, B15, 042); Abschnitt 4 schützt den Nachweis einer echten HV.
+  Anwendung entfernt (Plan 3, B15, 042); ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen
+  Bestand erfasst, legt der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052.
 - **Umkodieren an Ort und Stelle.** Verworfen: jede Umkodierung ist ein Export in eine neue
   Datenbank (Leitplanken 1.3).
 - **Krypto-Umschlag erst nachrüsten, wenn Recht entschieden hat.** Verworfen: ohne `keyId` ab dem

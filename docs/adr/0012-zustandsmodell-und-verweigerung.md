@@ -17,8 +17,8 @@ Nebenaspekte: Zurückstellen, Korrektur nach dem Vorlesen, Nachfragen. Die Risik
 warnt vor einem Zustandsautomaten mit über 15 Zuständen. Das Rechtekonzept (Abschnitt 2.4) zeigt
 eine Beispieltabelle mit einem Zustand `refused`; seine Invariante Ersteller ≠ Freigeber
 (Abschnitt 4) gilt unabhängig vom gewählten Modell. Ob die Invariante „keine Verweigerung ohne
-zugeordneten Grund und Begründung" (Abschnitt 4) auch für Verweigerungspfad A gilt — laut 044
-verlangt nur Verweigerungspfad B Katalogtreffer und Begründung, `refusal_no_claim` hat beides
+zugeordneten Grund und Begründung" (Abschnitt 4) auch für Verweigerungspfad A gilt — 044 macht
+Katalogtreffer und Begründung nur für Verweigerungspfad B zur Pflicht, `refusal_no_claim` hat beides
 nicht —, legt der Plan nicht fest: offen, Frage an Recht mit dem Vorabzug vor 044 (E15).
 
 ## Entscheidung

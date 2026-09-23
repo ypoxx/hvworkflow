@@ -25,7 +25,8 @@ Standardannahme aus Plan 3 („Pilotmodus") und Plan 4 (Zeile 0010):
 - **Löschung des Übungsbestands:** der Plattformbetreiber entfernt die getrennte Datenbank, ein
   Skript erzeugt das Löschprotokoll; nie Löschen durch die Dienstrolle. Abgrenzung: der
   Übungsbestand ist synthetisch und wird als Ganzes außerhalb der Anwendung entfernt (Plan 3, B15,
-  042); Rechtekonzept Abschnitt 4 (keine physische Löschung) schützt den Nachweis einer echten HV.
+  042); ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand erfasst, legt
+  der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052.
 - **Sandbox für Partner** ist der Modus `training` mit synthetischem Korpus (ADR 0008).
 - Kleinänderungen erreichen den Übungsmandanten nur außerhalb des Freeze (Plan 3, „Taktfläche").
 
@@ -40,8 +41,8 @@ Löschprotokoll ist ein Nachweis für B15 und den DSB.
 im Rückfall gelten B1, B6, B9 und B15 nur mit Einschränkung (B18).
 
 **Risiko.** Ein Podium-Push aus einem Nicht-live-Modus. Plan 3 und Plan 4 legen „Podium-Push nur in
-live" fest; 042 weist Banner, Seed-Sperre und Löschprotokoll nach. Ein eigener Test der Push-Sperre
-steht nicht im Plan (Vorschlag, nicht im Plan).
+live" fest; 042 weist Banner, Seed-Sperre und Löschprotokoll nach. Vorschlag (nicht im Plan): ein
+eigener Test der Push-Sperre.
 
 ## Kosten bei Änderung
 
