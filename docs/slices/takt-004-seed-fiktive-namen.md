@@ -1,6 +1,6 @@
 # takt-004 — Seed: fiktive Vereinsnamen, Screenshot des Fragenpakets neu
 
-**Status:** review
+**Status:** angenommen (Nachprüfung Opus 5.5: annehmen; Folgebefunde A–D siehe unten)
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lanes: core (nur `seed.ts`; 012 gemergt,
 keine laufende Scheibe hält core), docs-feedback
 **Rolle/Modell:** Implementierer-Oberfläche · Sonnet 5 baut (Screenshot mit Legende, wie in 014); Review Opus 5.5
@@ -467,6 +467,55 @@ $ git -C /home/user/wt/takt grep -n --untracked "Lindner\|Falk\b\|Wendt\b\|DSW\|
 Alle acht Namen (fünf aus Runde 1, drei aus Runde 2) kommen jetzt außerhalb dieser Spec-Datei nirgends
 im Repository vor — auch nicht im Testcode selbst (Funktion `retired`, siehe Punkt 8 oben).
 
+## Nachweis nach dem Merge des Integrationsbranchs (Orchestrator)
+
+Nach dem Merge von 016 (neue Tore) und der Umstellung von „Files allowed" auf Pfade: `pnpm gates` auf `d7e4702`,
+Auszug der Ergebniszeilen (ANSI-Farbcodes entfernt, sonst wörtlich):
+
+```
+packages/contract test: contract gate: ok
+packages/domain test:       Tests  43 passed (43)
+apps/api test:       Tests  32 passed (32)
+apps/web test:       Tests  48 passed (48)
+vocabulary-check: ok
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 5 changed file(s), all within "docs/slices/takt-004-seed-fiktive-namen.md"'s "Files allowed" list (4 pattern(s)).
+Downgrade check: 10 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+# pass 110
+# fail 0
+✓ built in 1.29s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
+EXIT 0
+```
+
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 · 23.09.2026 · Urteil: annehmen nach Kleinbefunden, keine Blocker.**
+
+1. major · Legende Marke 29 beschrieb die Laufzeitspalte falsch („—" nur, wenn niemand am Mikrofon steht; das Bild
+   zeigt „—" in jeder Zeile, die gerade nicht spricht) → behoben.
+2. minor · Der neue Determinismustest verglich den neuen Seed nur mit sich selbst → Fingerabdruck des Korpus mit
+   maskierten Namen, festgelegt auf `c891616`; Suche über `JSON.stringify(events)` → behoben.
+3. minor · Marke 23 verdeckte den Griff, Marken 18/20/22/36 die Auf-/Zuklapp-Pfeile → verschoben, behoben.
+4. minor · Entwicklerbegriffe in Legendenzeilen 1, 4, 12; Einleitung nannte jede Nummer „Bedienelement"; Uhr und
+   Zähler ohne Erklärung → behoben.
+5. minor · gates-Auszug gekürzt → wörtlich nachgetragen, behoben.
+6. minor · Vor- und Nachnamen des Seeds ergaben Namen bekannter Personen (Regel 11) → drei Nachnamen an derselben
+   Stelle ersetzt, Screenshot neu, behoben.
+7. info · `seed.ts` nennt DAX, SBTi und einen Russland-Ausstieg 2023; keine Personen oder Aktionärsvereinigungen,
+   keine Änderung.
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: annehmen.** Alle acht Punkte mit eigenen Proben bestätigt
+(Fingerabdruck gegen `c891616` und `6fe9e3d` nachgerechnet, Negativkontrolle rot; Marken bei 4-facher Vergrößerung
+geprüft; 1..37 lückenlos). Neue Befunde:
+
+- A · minor · `maskNames` maskiert jeden Schlüssel `displayName`, also auch den Akteur in allen Ereignissen; ein
+  umbenannter Akteur ließe den Fingerabdruck grün. → Folgepunkt für **080**, das den Seed ohnehin neu schneidet und
+  den Fingerabdruck neu festlegen muss: nur `payload.displayName` und `payload.organisation` der Registrierungen
+  maskieren.
+- B · minor · gates-Nachweis stammte von vor dem Merge → oben nachgetragen (Orchestrator).
+- C · nit · Kommentar im Test verweist auf „den genauen Befehl" im Bericht, der Bericht beschreibt nur das Vorgehen →
+  Folgepunkt mit A in 080.
+- D · nit · Punkt 8 des Berichts sagt, die drei alten Nachnamen stünden nicht in diesem Bericht; sie stehen im
+  Abschnitt zum Grep-Nachweis im Klartext. Die Aussage gilt nur für Code und Tests.
