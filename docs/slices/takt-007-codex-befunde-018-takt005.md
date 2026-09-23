@@ -279,7 +279,7 @@ Bugfix-Scheibe für `scripts/slice-scope.mjs`.
 - `docs/slices/takt-005-email-aus-012.md` (Bericht: Diff-Stat- und E-Mail-Scan-Block ersetzt, Begründungen, Hinweissatz)
 - `docs/slices/takt-007-codex-befunde-018-takt005.md` (dieser Bericht)
 
-**Nachtrag Orchestrator zu Open 1:** „Files allowed“ steht jetzt als Liste (`f471044`), dieselben vier Dateien. `pnpm gates` auf `f471044`, Exit 0, letzte 24 Zeilen, nur ANSI-Farbcodes entfernt:
+**Nachtrag Orchestrator zu Open 1:** „Files allowed“ steht jetzt als Liste (`f471044`), dieselben vier Dateien. `pnpm gates` auf dem Endstand der Nacharbeit `27333c4`, Exit 0, letzte 24 Zeilen, nur ANSI-Farbcodes entfernt:
 
 ```
 > tsc -b && vite build
@@ -304,8 +304,8 @@ dist/assets/index-qUeoyjsj.js                        529.18 kB │ gzip: 155.32 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.21s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit f471044, tree a7d79c0fd8a8…
+✓ built in 1.12s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 27333c4, tree a7d79c0fd8a8…
 ```
 
 ## Review findings
