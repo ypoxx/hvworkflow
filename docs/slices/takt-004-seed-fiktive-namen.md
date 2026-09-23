@@ -36,8 +36,10 @@ Fragenpakets außer den Zahl-Nennungen.
 
 ## Files allowed
 
-`packages/domain/src/seed.ts`, ein Test unter `packages/domain/src/__tests__/`, die PNG, Anhang/Legende und die
-Zahl-Nennungen im Fragenpaket, diese Datei (Bericht).
+`packages/domain/src/seed.ts`, ein Test `packages/domain/src/__tests__/seed-fictitious-names.test.ts`, die PNG
+`docs/feedback/2026-10-fragenpaket-wortmeldeliste.png`, Anhang/Legende und die Zahl-Nennungen im Fragenpaket
+`docs/feedback/2026-10-fragenpaket-woche-1.md`, diese Datei (Bericht). (Pfade nach dem Merge von 016 ausgeschrieben,
+weil das Scheibenumfang-Tor nur Pfade in Backticks liest; der Umfang ist unverändert.)
 
 ## Nachweis
 
