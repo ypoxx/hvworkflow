@@ -50,7 +50,8 @@ Abschnitt 5 (Zeile Barrierefreiheit)
 - `apps/web/src/features/**`, `apps/web/src/components/**` nur für die in Ziel 1 genannten kleinen axe-Behebungen (je Datei
   im Bericht begründet); **nicht** `apps/web/src/app/**` (Lane web-shell hält 082 gleichzeitig)
 - `apps/web/e2e/020-rueckbau-passung.spec.ts` nur für Folgepunkt 1 aus 020 (Ziel 5)
-- `docs/agentische-entwicklung-plan.md` (Abschnitt 5, nur Stand-Spalte der Barrierefreiheits-Zeile(n))
+- `docs/agentische-entwicklung-plan.md` (Abschnitt 5, nur Stand- und Werkzeug-Spalte der Barrierefreiheits-Zeile(n); Werkzeug-Spalte nach Review Befund 8
+  vom Spec-Eigentümer freigegeben)
 - `docs/evidence/013-*.png` (neu, höchstens zwei: Fokus sichtbar in Beantwortung und Bühne), diese Datei (Bericht)
 
 ## Akzeptanzkriterium
