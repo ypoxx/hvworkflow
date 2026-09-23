@@ -26,6 +26,11 @@ geht an takt-006
 3. **#18-1 und #18-2 · `docs/slices/takt-005-email-aus-012.md`, Bericht:** Der E-Mail-Scan und der `git diff --stat`
    stammen von einem früheren Stand. Beides auf dem heutigen Integrationsbranch neu ausführen und wörtlich einsetzen.
    - Der Scan: der Befehl aus Ziel 2 jener Spec. Die Fundstellen im Bericht selbst werden als Selbstzitat benannt.
+   - *Nachtrag Orchestrator nach Codex (P2) und Review:* Eine Liste aller Fundstellen wächst mit jedem Einfügen und
+     kann den Endstand nie zeigen. Statt des wörtlichen Befehls und einer Begründung je Fundstelle weist der
+     Bericht deshalb die Menge der verschiedenen Adressen und die Zahl der übrigen Fundstellen (0) nach, begründet
+     je Adresse. Das weicht bewusst von takt-005, Akzeptanzkriterium 2 ab; der wörtliche Lauf des Bauers auf
+     `8622df1` bleibt in diesem Bericht erhalten.
    - Der Diff-Stat: der Squash-Commit von takt-005 gegen seinen Vorgänger, also
      `git show --stat --format= <Squash von takt-005>`; er zeigt vier Dateien.
    - Ein Satz vermerkt, dass die Nachweise nachträglich ersetzt wurden, mit Datum.
@@ -325,3 +330,8 @@ Nacharbeit hat der Orchestrator selbst gemacht (nach oben abgewichen, reine Text
 - Codex P2 · Die eingefügte Liste aller Fundstellen wächst mit jedem Einfügen (auf dem Endstand 137 statt 40
   Treffer), ein Bericht kann so nie den Endstand zeigen → **Ursache statt Einzelfall:** takt-005 weist jetzt die
   Menge der verschiedenen Adressen und die Zahl der übrigen Fundstellen (0) nach; beides bleibt beim Einfügen gleich.
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: annehmen** (0/0/1 + 2 nits). Mengenform byte-gleich und
+beim erneuten Einfügen stabil geprüft. minor: Abweichung von takt-005, Akzeptanzkriterium 2 nur unter Review findings
+vermerkt → Nachtrag unter Ziel 3. nits: Commit des Laufs fehlte, Exit 1 bei Zählung 0 → im Bericht von takt-005
+genannt.

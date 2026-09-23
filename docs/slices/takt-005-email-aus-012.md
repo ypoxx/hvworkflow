@@ -53,8 +53,10 @@ Historie entscheidet der Eigentümer). Keine anderen Wortlautänderungen im Beri
 ## Bericht
 
 **Nachweis-Ersatz durch takt-007, 23.09.2026:** Die beiden folgenden Nachweise (Diff-Stat und E-Mail-Scan) stammten
-von einem früheren Stand vor dem Squash und wurden am 23.09.2026 durch takt-007 mit einem neuen Lauf auf dem
-heutigen Integrationsbranch ersetzt.
+von einem früheren Stand vor dem Squash und wurden am 23.09.2026 durch takt-007 ersetzt: der Diff-Stat durch den
+Squash-Commit, der Scan durch die Mengenform, ausgeführt auf `27333c4` (Branch von takt-007). Die Mengenform bleibt
+beim Einfügen in einen Bericht gleich und gilt deshalb auch für jeden späteren Stand, der keine neue Adresse bringt.
+Die Zählung endet mit Exit 1, weil `grep -c` bei 0 Treffern so endet; als Tor wäre sie umzudrehen.
 
 **`git show --stat --format= e79c69d` (Squash-Commit von takt-005 gegen seinen Vorgänger), ausgeführt von takt-007:**
 ```
