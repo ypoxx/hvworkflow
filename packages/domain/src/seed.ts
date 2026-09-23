@@ -310,8 +310,11 @@ const CLOSINGS = [
 ];
 const FIRST_NAMES_F = ['Anna', 'Birgit', 'Claudia', 'Doris', 'Eva', 'Frauke', 'Gisela', 'Hanna', 'Ines', 'Julia', 'Karin', 'Lena', 'Monika', 'Nadine', 'Petra', 'Renate', 'Sabine', 'Tanja', 'Ulrike', 'Vera'];
 const FIRST_NAMES_M = ['Andreas', 'Bernd', 'Christian', 'Dieter', 'Erik', 'Frank', 'Gerd', 'Holger', 'Ingo', 'Jörg', 'Klaus', 'Lars', 'Markus', 'Norbert', 'Olaf', 'Peter', 'Rainer', 'Stefan', 'Thomas', 'Uwe'];
-const LAST_NAMES = ['Ahrens', 'Bachmann', 'Conrad', 'Dallmann', 'Ebert', 'Falk', 'Grunwald', 'Hartwig', 'Ilgner', 'Jansen', 'Kessler', 'Lindner', 'Mertens', 'Nowak', 'Ostermann', 'Pfeiffer', 'Quandt', 'Rehberg', 'Seidel', 'Thalmann', 'Ulbrich', 'Vogt', 'Wendt', 'Zeller'];
-const ASSOCIATIONS = ['DSW', 'SdK', 'Verband der Kleinaktionäre', 'Dachverband Kritischer Aktionäre'];
+const LAST_NAMES = ['Ahrens', 'Bachmann', 'Conrad', 'Dallmann', 'Ebert', 'Falk', 'Grunwald', 'Hartwig', 'Ilgner', 'Jansen', 'Kessler', 'Lindner', 'Mertens', 'Nowak', 'Ostermann', 'Pfeiffer', 'Quednau', 'Rehberg', 'Seidel', 'Thalmann', 'Ulbrich', 'Vogt', 'Wendt', 'Zeller'];
+// Fictitious associations only (takt-004): the demo corpus must never resemble a real shareholder
+// association (review 014 round 1 finding 10, round 2 point 11) — same count and order as before, so
+// the seeded RNG sequence (and every downstream id/timestamp) is unchanged.
+const ASSOCIATIONS = ['Aktionärsverein Nordlicht', 'Schutzgemeinschaft Musterstadt', 'Anlegerkreis am Elbufer', 'Verein kritischer Kleinanleger Beispielstadt'];
 const INSTITUTIONS = ['Fondsgesellschaft Nord', 'Pensionskasse Süd', 'Versicherungsverbund Mitte', 'Stiftung Kapital'];
 
 function fill(template: string, rnd: () => number, year: number): string {
