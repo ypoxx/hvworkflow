@@ -607,10 +607,8 @@ index 1b9f0d4..febd618 100644
 - **Semgrep-Regeländerung nicht mit dem exakten CI-Aufruf lokal reproduziert** (kaputtes lokales
   `pysemgrep`, siehe oben) — mit `--experimental` (echter Scan-Kern) aber sehr wohl real getestet;
   erster Lauf mit dem echten `pip install semgrep==1.177.0`-Pfad ist CI.
-- **ADR-Bezug-Zeile bleibt mit veraltetem Werkzeug-Text stehen**: Abschnitt 5 erlaubt mir laut
-  „Files allowed" nur die Stand-Spalte dieser Zeile zu ändern, nicht die Werkzeug-Spalte — die sagt
-  noch „keine eigene ADR-0001-Grenzprüfung in `.claude/agents/reviewer.md`", obwohl Prüfpunkt (9) sie
-  jetzt hat. Eine Kleinänderung sollte das Werkzeug-Feld nachziehen.
+- ~~ADR-Bezug-Zeile bleibt mit veraltetem Werkzeug-Text stehen~~ — erledigt im Nachtrag unten, nachdem
+  der Orchestrator die eine Zelle ausdrücklich freigegeben hat.
 - **`AGENTS.md`** beschreibt `pnpm gates` weiterhin als „contract lint + typecheck + lint + tests +
   vocabulary check + web build" (Zeile 31) — jetzt mit neun weiteren Schritten noch unvollständiger
   als seit 012. Nicht in „Files allowed" dieser Scheibe, wie schon 012 vermerkt hat.
@@ -630,6 +628,44 @@ index 1b9f0d4..febd618 100644
 - **`node --test scripts/**/*.test.mjs`** braucht in einer Shell die Glob-Syntax in Anführungszeichen
   (`'scripts/**/*.test.mjs'`), sonst expandiert die Shell `**` je nach `globstar`-Einstellung
   unvollständig; `package.json` nutzt die zitierte Form.
+
+### Nachtrag: Reviewer-Checkliste verlinkt statt wiederholt, ADR-Bezug-Werkzeugtext berichtigt (nach Merge von 039)
+
+Auslöser: Scheibe 039 (Bedrohungsmodell, Pentest-Scope, `docs/sicherheit/reviewer-checkliste-sicherheit.md`)
+ist gemergt und liegt seit dem Merge-Commit `facfbb3` in diesem Worktree; die Spec sagt für genau
+diesen Fall, dass die sieben Sicherheitspunkte auf die Checkliste verweisen statt sie zu wiederholen.
+
+Eine Zeile je Änderung:
+
+1. `.claude/agents/reviewer.md`: die wörtliche Liste der sieben Sicherheitspunkte (Demo-Seed, Limits,
+   Sitzung, CSP, Secrets, Bedrohungsmodell, Kill-Switch) ist ersetzt durch einen Verweis auf
+   `docs/sicherheit/reviewer-checkliste-sicherheit.md` — die Themenzeile bleibt lesbar, SP-1..7 und
+   SC-01..12 daraus sind für die Perspektive Security jetzt ausdrücklich verbindlich.
+2. `.claude/agents/reviewer-sonnet.md`: dieselbe Änderung, wortgleich (beide Dateien sind bewusst
+   identische Zwillinge, Regel 3).
+3. `docs/agentische-entwicklung-plan.md`, Zeile „ADR-Bezug": die Werkzeug-Spalte nannte noch „keine
+   eigene ADR-0001-Grenzprüfung in `.claude/agents/reviewer.md`" (veraltet seit Prüfpunkt (9) aus
+   dieser Scheibe); jetzt nennt sie diesen Prüfpunkt in `reviewer.md`/`reviewer-sonnet.md` als das
+   Werkzeug. Nur diese eine Zelle geändert, wie vom Orchestrator ausdrücklich freigegeben — die
+   Stand-Spalte bleibt `läuft (Review: Reviewer-Checkliste)`, unverändert korrekt.
+
+`pnpm gates` — Ende des grünen Laufs (danach, vollständig):
+```
+# tests 75
+# suites 0
+# pass 75
+# fail 0
+...
+> @hv/web@0.0.0 build /home/user/wt/016/apps/web
+✓ 1713 modules transformed.
+✓ built in 1.15s
+mark-test-run: wrote /home/user/wt/016/.claude/state/last-test-run
+```
+Exit `0`. `plan-honesty` unverändert grün (`4 table(s), 38 row(s) …, every "Stand" verified`) — die
+Stand-Spalte der ADR-Bezug-Zeile wurde nicht angefasst, nur ihre Werkzeug-Spalte, die `plan-honesty.mjs`
+nicht prüft. `slice-scope`: weiterhin `89 changed file(s)`, alle innerhalb der Liste (die drei hier
+geänderten Dateien waren schon vorher Teil des Diffs, die Zahl ändert sich durch eine Inhaltsänderung
+nicht).
 
 ## Touched
 

@@ -249,7 +249,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Ereignisspeicher nur anhängend | Testsuite (u. a. `events are append-only and gap-free`) | irgendein Pfad ändert oder löscht ein Ereignis | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Ereignisspeicher nur anhängend (Postgres-Append-only-Test) | — | derselbe Test gegen eine echte Postgres-Persistenz statt nur In-Memory | geplant in Scheibe 027 |
 | Ein Entscheidungspunkt für Rechte | statische Suche nach Rollenvergleichen (`scripts/role-literal-check.mjs`, `pnpm role-literals`) | ein Rollenname als Literal außerhalb der Policy-Schicht (`permissions.ts`, `seed.ts` und Tests ausgenommen) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| ADR-Bezug | Reviewer-Checkliste — heute nur allgemein über Prüfpunkt 1 „jede Spec-Anforderung umgesetzt", keine eigene ADR-0001-Grenzprüfung in `.claude/agents/reviewer.md` | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | läuft (Review: Reviewer-Checkliste) |
+| ADR-Bezug | Reviewer-Checkliste — Prüfpunkt (9) in `.claude/agents/reviewer.md`/`reviewer-sonnet.md` (Scheibe 016): eine Änderung an einer harten Grenze aus ADR 0001 (Leitplanken 1.3) trägt ein eigenes ADR, sonst Blocker | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | läuft (Review: Reviewer-Checkliste) |
 
 ### 5.2 Backend
 
