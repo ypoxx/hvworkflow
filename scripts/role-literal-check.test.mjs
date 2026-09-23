@@ -187,6 +187,34 @@ test('takt-006 point 12: a file that vanishes between listing and copying is ski
   }
 });
 
+// takt-006 rework, NIT finding 10: the mirror-image race of the one above — a file *appearing* in the
+// source tree during the copy (a concurrent process writing a new, not-yet-tracked file) must not leak
+// into the scratch copy (it was never part of the `git ls-files` listing this copy is pinned to) and
+// must not disturb copying the files that *were* listed.
+test('rework point 10: a file created (in the source) during the copy is not picked up, and the copy still succeeds', () => {
+  const srcRepo = mkdtempSync(join(tmpdir(), 'role-literal-check-src-'));
+  const dest = mkdtempSync(join(tmpdir(), 'role-literal-check-dest-'));
+  try {
+    mkdirSync(join(srcRepo, 'apps', 'api', 'src'), { recursive: true });
+    writeFileSync(join(srcRepo, 'apps', 'api', 'src', 'a.ts'), 'export const a = 1;\n');
+    execFileSync('git', ['init', '-q'], { cwd: srcRepo });
+    execFileSync('git', ['add', '-A'], { cwd: srcRepo });
+    execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: srcRepo });
+
+    copyTrackedTree(srcRepo, 'apps/api/src', dest, {
+      // Simulate another process creating a brand-new, untracked file between `git ls-files` and the
+      // copy loop.
+      afterList: () => writeFileSync(join(srcRepo, 'apps', 'api', 'src', 'new-during-copy.ts'), 'export const n = 1;\n'),
+    });
+
+    assert.equal(readFileSync(join(dest, 'apps', 'api', 'src', 'a.ts'), 'utf8'), 'export const a = 1;\n');
+    assert.equal(existsSync(join(dest, 'apps', 'api', 'src', 'new-during-copy.ts')), false);
+  } finally {
+    rmSync(srcRepo, { recursive: true, force: true });
+    rmSync(dest, { recursive: true, force: true });
+  }
+});
+
 test('m6: the real types.ts and permissions.ts are untouched by this whole suite', () => {
   // The suite above only ever mutates scratch copies now; this is a cheap, explicit check that the
   // real repository's working tree stays clean regardless.
