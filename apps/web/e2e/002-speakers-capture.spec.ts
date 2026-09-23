@@ -231,6 +231,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
     'aria-pressed',
     'true',
   );
+  await checkAxe(page, 'capture (Klassifizieren-Dialog erneut geöffnet)');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('classify-save')).toBeHidden();
 });
