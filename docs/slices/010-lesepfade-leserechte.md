@@ -1,6 +1,7 @@
 # 010 — Lesepfade unter can() mit Leserechten
 
-**Status:** spec (nachgeschärft nach der Fable-Prüfung vom 23.09.2026: 2 Blocker, 4 major, 8 minor eingearbeitet;
+**Status:** spec; **geteilt am 23.09.2026** wegen der Tokengrenze (1,2 Mio.): Ziel 6, der e2e-Teil von Ziel 7 und
+Kriterium 4 gehen in die eigene Scheibe **010b**; 010 bleibt Auftrag A plus Ziel 5 (nachgeschärft nach der Fable-Prüfung vom 23.09.2026: 2 Blocker, 4 major, 8 minor eingearbeitet;
 Nachprüfung: 2 weitere Blocker (Kriterium 2, 404-Vorrang für podium) und 2 minor eingearbeitet)
 **Risikoklasse:** hoch · 2 AStd · Kalender 06.10.2026 (W2) · Lanes: core, contract, service (`apps/api`), die
 Oberflächen-Lanes web-speakers, web-capture, web-answers, web-stage, web-history und e2e (Plan 5.2 nennt nur „core";
@@ -86,7 +87,9 @@ Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecke
      nicht zulässig". Regel-ID und Status stehen nur in der Antwort an Leseberechtigte.
    - Die Antwort einer Schreiboperation enthält die Frage auch dann, wenn der Akteur sie nicht lesen darf. Das
      betrifft heute podium beim Vorlesen und Schließen. Die Frage liegt auf der Bühne ohnehin vor ihm. Das ist ein
-     dokumentiertes Restrisiko bis 047 (Attributregel „podium sieht, was auf seiner Bühne liegt").
+     dokumentiertes Restrisiko bis 047 (Attributregel „podium sieht, was auf seiner Bühne liegt"). Ebenso: Ein
+     Schreibversuch von podium mit falschem `If-Match` liefert auf einer vorgelesenen Frage 412 (mit der aktuellen
+     Version), sonst 409; podium kann so den Stand einer Frage erfahren, ohne etwas zu ändern (Nachprüfung A).
    - `getQuestionHistory` verlangt beides: das Leserecht an der Frage (einschließlich Umfang) und `history.read`.
    - Das vorhandene Statusliteral `'staged'` in `getStage` stammt aus der Zeit vor dieser Scheibe. Es bleibt hier
      unverändert, und „kein Statusliteral in `api.ts`" gilt für neuen Code. Das Verschieben in die Daten ist ein
@@ -116,7 +119,7 @@ Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecke
 4. **Dienst:** `apps/api` liefert für jede verweigerte Leseoperation 403 als Problem mit der Regel-ID aus Festlegung 6
    und bei Festlegung 3 404. Die Antwortschema-Validierung aus 012 bleibt grün. `/events` liefert 403 für jede Rolle
    ohne `event.read`.
-5. **Alt-e2e und 020-e2e** (Auftrag B, nach 013; die Rollen wechseln, die Absicht jedes Schritts bleibt):
+5. **Alt-e2e und 020-e2e** (Auftrag B, verkleinert, nach 013; die Rollen wechseln, die Absicht jedes Schritts bleibt):
    - `003-answers-stage.spec.ts` (Schritte ab Historie, heute podium): Zeitleiste unter moderation, Ereignisstrom-Reiter
      unter admin.
    - `abnahme.spec.ts` (podium → Historie der vorgelesenen Frage): Historie unter moderation. **Das ändert einen
@@ -127,10 +130,10 @@ Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecke
      - expert auf `/capture` → moderation.
      - observer mit Filter `status=assigned` → expert auf einer Frage im Stand `captured`.
      - expert auf `/stage` → approver.
-   - `001-shell.spec.ts`: Wenn die Startroute unter der dort gewählten Rolle eine verweigerte Hauptabfrage stellt,
-     zeigt sie den gestalteten Zustand aus Ziel 6. Der Test prüft das oder wechselt die Rolle; begründet im Bericht.
+   - `001-shell.spec.ts`: nur falls der Lauf dort rot wird; dann wechselt die Rolle (den gestalteten Zustand bringt
+     erst 010b). Begründet im Bericht.
    - Weitere Brüche, die der Lauf zeigt, werden ebenso gelöst und einzeln im Bericht begründet.
-6. **Oberfläche (Auftrag B, nur Ladepfade):**
+6. **→ abgetrennt in Scheibe 010b.** Oberfläche (nur Ladepfade), zur Übergabe hier stehen gelassen:
    - **Gestalteter Zustand statt Fehlermeldung:** Jede Ansicht rendert bei 403 auf ihrer Hauptabfrage den Zustand
      „In dieser Rolle keine Leseberechtigung für diese Ansicht" (i18n im Feature-Modul, DE und en-US, Hausvokabular).
    - **Hauptabfrage je Ansicht:** Wortmeldeliste `listSpeakers`, Erfassung `listContributions`, Beantwortung
@@ -157,7 +160,9 @@ Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecke
      einem verbliebenen Akteur). Dazu der HTTP-Test `apps/api/src/__tests__/negative.test.ts`: observer
      klassifiziert eine erfasste Frage, heute 403 R-PERM-01, künftig 404. Jede Anpassung wird im Bericht genannt.
    - **HTTP-Tests** für dieselben Fälle mit `ruleId` (ohne `subscribe`).
-   - **e2e** `apps/web/e2e/010-lesepfade.spec.ts`:
+   - **Merge mit vorgelesener Hauptfrage** (Nachprüfung A): observer ruft `mergeQuestion` mit einer vorgelesenen
+     Hauptfrage und einem verborgenen bzw. unbekannten Ziel auf; beide Antworten sind gleich (Domäne und HTTP).
+   - **→ 010b:** e2e `apps/web/e2e/010-lesepfade.spec.ts`:
      - Historie unter observer: nur Vorgelesenes, Zeitleiste im Zustand „keine Leseberechtigung".
      - Beantwortung unter observer zeigt nur vorgelesene Fragen.
      - Bühne unter expert zeigt den Zustand „keine Leseberechtigung".
@@ -205,8 +210,8 @@ Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecke
    - (c) Die neue Tabelle „Rolle × Leserecht" entspricht genau Festlegung 4.
    - (d) Keine andere Zelle ändert sich.
 3. Vertragstor, `role-literals`, `now-check`, `plan-honesty`, `arch`, `slice-scope` grün; `pnpm gates` grün. Alle
-   Playwright-Szenarien grün: die vier Alt-Specs, 013, 020, 082-Kürzel und 010.
-4. Screenshots DE/EN:
+   Playwright-Szenarien grün: die vier Alt-Specs, 013, 020 und die 082-Kürzel (die e2e-Datei 010 kommt mit 010b).
+4. **→ 010b.** Screenshots DE/EN:
    - Historie unter observer: nur Vorgelesenes, Zeitleiste ohne Leseberechtigung.
    - Beantwortung unter observer: nur Vorgelesenes.
    - Bühne unter expert: keine Leseberechtigung.
@@ -227,7 +232,8 @@ Bestandstests mit Grund; Playwright-Zusammenfassung; Screenshots.
     - Startet sofort.
     - Endet mit grünem `pnpm gates`.
     - Playwright läuft danach absichtlich teilweise rot; der Bericht A listet die roten Schritte.
-  - **Auftrag B** (Implementierer-Oberfläche · Sonnet): Ziele 5 und 6 und der e2e-Teil von Ziel 7.
+  - **Auftrag B, verkleinert** (Implementierer-Oberfläche · Sonnet, frischer Agent): Ziel 5 und der Merge-Test aus
+    Ziel 7. Ziel 6 und die e2e-Datei 010 sind in Scheibe 010b abgetrennt.
     - Startet erst, wenn 013 gemergt ist; der Integrationsbranch wird zuerst eingemergt.
     - Endet mit grünem `pnpm gates` und allen Playwright-Szenarien grün.
   - Ein PR und ein Merge nach dem Review.
