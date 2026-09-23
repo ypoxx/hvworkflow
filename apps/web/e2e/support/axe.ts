@@ -72,12 +72,25 @@ export const AXE_EXCEPTIONS: readonly AxeException[] = JSON.parse(
 
 /**
  * Review round 1, minor 7 (also raised independently on PR #19): an expiry date that is only ever
- * read by a human is not enforced at all. `expires` is `YYYY-MM-DD`, which sorts correctly as a
- * plain string, so no date parsing is needed. Runs once, at import time, in every spec file that
+ * read by a human is not enforced at all. `expires` must be a real date `YYYY-MM-DD` (checked first,
+ * fail closed); once valid it sorts correctly as a plain string. Runs once, at import time, in every spec file that
  * imports this module — an expired exception fails every scenario immediately, loudly, and by name,
  * rather than quietly keeping a stale allowance alive.
  */
 function assertNoExpiredExceptions(exceptions: readonly AxeException[]): void {
+  // Review round 2 (Codex on PR #19): fail closed on a missing or malformed date. A value such as
+  // `2026-1-1` or `31.12.2026` would otherwise never compare as expired and keep the allowance alive.
+  const malformed = exceptions.filter(
+    (exception) =>
+      typeof exception.expires !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(exception.expires) ||
+      Number.isNaN(Date.parse(`${exception.expires}T00:00:00Z`)) ||
+      new Date(`${exception.expires}T00:00:00Z`).toISOString().slice(0, 10) !== exception.expires,
+  );
+  if (malformed.length > 0) {
+    const names = malformed.map((exception) => `${exception.id} (expires: ${String(exception.expires)})`).join(', ');
+    throw new Error(`axe-exceptions.json: expiry must be a real date YYYY-MM-DD: ${names}.`);
+  }
   const today = new Date().toISOString().slice(0, 10);
   const expired = exceptions.filter((exception) => exception.expires < today);
   if (expired.length === 0) return;

@@ -458,14 +458,18 @@ test('013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur', async ({ page
  * cannot hold focus, a native browser rule), and nothing moves focus back once it re-enables. Fixing
  * it needs feature-file edits beyond Ziel 1's "small axe fixes" allowance (`Podium.tsx`/`Page.tsx` for
  * stage, `AnswerEditor.tsx`/`Page.tsx` for answers, `ContributionPane.tsx` for capture) — recorded
- * here as a `test.fail()` so it stays visible and turns red (an *unexpected* pass) the moment a later
- * slice fixes it, rather than silently going stale. `expect.soft` on all six so one already-known
- * failure does not hide the others in the same run. Positioning is `.focus()`, not a fresh Tab walk —
- * this test is about *where* focus lands after the action, not about reachability (already proven by
- * the scenes above), so a slower, repeated tab search would add nothing.
+ * here as a characterisation test: each of the six actions asserts the known-bad state exactly
+ * (focus lands on `BODY`). Fixing any single action therefore turns this test red at once, and
+ * takt-008 flips exactly that line to the correct expectation (review round 2: one `test.fail()` over
+ * six soft checks hid partial fixes, Codex on PR #19; checking `testId !== null` instead of `BODY`
+ * would have missed a fix that moves focus to an element without a testid, Opus). `expect.soft` so
+ * every action is reported in one run. Positioning is `.focus()`, not a fresh Tab walk — this test is
+ * about *where* focus lands after the action, not about reachability (already proven by the scenes
+ * above). Setup uses mouse clicks and `.fill()` (register, call, filter chips, row selection): they
+ * only prepare state and are not part of any keyboard path under test.
  */
 test(
-  '013-bekannt: Fokus nach Aktion — disabled entzieht dem Knopf den Fokus, nichts holt ihn zurück',
+  '013-bekannt: Fokus nach Aktion — Charakterisierung, der Fokus landet heute auf BODY (takt-008)',
   {
     annotation: {
       type: 'issue',
@@ -474,8 +478,6 @@ test(
     },
   },
   async ({ page }) => {
-    test.fail();
-
     await page.goto('/');
     await waitForCorpus(page);
 
@@ -498,7 +500,7 @@ test(
     await submit.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach capture-submit').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach capture-submit (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
 
     const freeInput = page.getByTestId('capture-free-input');
     await freeInput.focus();
@@ -507,7 +509,7 @@ test(
     await freeAdd.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach capture-free-add').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach capture-free-add (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
 
     await asRole(page, 'expert');
     await page.keyboard.press('Alt+3');
@@ -522,14 +524,14 @@ test(
     await submitDraft.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach answer-submit-draft').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-submit-draft (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
 
     await waitForToastsGone(page);
     const submitReview = page.getByTestId('answer-submit-review');
     await submitReview.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach answer-submit-review').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-submit-review (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
 
     await waitForToastsGone(page);
     await asRole(page, 'legal');
@@ -541,7 +543,7 @@ test(
     await approve.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach answer-approve').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-approve (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
 
     await waitForToastsGone(page);
     await asRole(page, 'podium');
@@ -555,7 +557,7 @@ test(
     await nextButton.focus();
     await page.keyboard.press('Space');
     await expect(currentNumber).not.toHaveText(before);
-    expect.soft((await focusSnapshot(page)).testId, 'Fokus nach stage-next').not.toBeNull();
+    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach stage-next (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
   },
 );
 
