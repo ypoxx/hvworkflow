@@ -276,6 +276,35 @@ Bugfix-Scheibe für `scripts/slice-scope.mjs`.
 - `docs/slices/takt-005-email-aus-012.md` (Bericht: Diff-Stat- und E-Mail-Scan-Block ersetzt, Begründungen, Hinweissatz)
 - `docs/slices/takt-007-codex-befunde-018-takt005.md` (dieser Bericht)
 
+**Nachtrag Orchestrator zu Open 1:** „Files allowed“ steht jetzt als Liste (`f471044`), dieselben vier Dateien. `pnpm gates` auf `f471044`, Exit 0, letzte 24 Zeilen, nur ANSI-Farbcodes entfernt:
+
+```
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-qUeoyjsj.js                        529.18 kB │ gzip: 155.32 kB │ map: 2,183.38 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.21s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit f471044, tree a7d79c0fd8a8…
+```
+
 ## Review findings
 
 (vom Reviewer)
