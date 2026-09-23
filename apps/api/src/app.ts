@@ -95,7 +95,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       options.seedActor ??
       (process.env['HV_SEED_ACTOR'] !== undefined ? parseActorHeader(process.env['HV_SEED_ACTOR']) : undefined) ??
       SYSTEM_ACTOR;
-    actorStorage.run(seedActor, () => {
+    actorStorage.run({ id: 'ci-demo', role: 'admin' }, () => {
       domain
         .seedDemo({})
         .then((meeting) => {
