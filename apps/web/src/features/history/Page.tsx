@@ -364,7 +364,15 @@ export function HistoryPage() {
               </div>
             }
           >
-            <div id="history-panel" role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
+            {/* Slice 013 (axe, goal 1): axe's scrollable-region-focusable — this scrollable panel has
+             * no focusable descendant on its own (the event stream and timeline are plain text, no
+             * buttons), so it was unreachable by keyboard; tabIndex makes the region itself a stop. */}
+            <div
+              id="history-panel"
+              role="tabpanel"
+              tabIndex={0}
+              className="min-h-0 flex-1 overflow-y-auto"
+            >
               {tab === 'stream' ? (
                 <EventStream events={stream} context={context} curve={curve} />
               ) : selected === null ? (
