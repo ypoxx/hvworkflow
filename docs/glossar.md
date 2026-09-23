@@ -33,19 +33,19 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Zurückgezogen | Withdrawn | `withdrawn` | Cancelled |
 | Zusammengeführt | Merged | `merged` | Duplicate |
 | Vorgangshistorie | History | `history`, events | Audit log (nur intern) |
-| Versammlungsbüro | Meeting office | role `moderation` | Admin |
+| Versammlungsbüro | Meeting office | role `moderation` (bis zur Entscheidung E1) | Admin |
 | Erfassung (Rolle) | Capture desk | role `capture` | — |
 | Fachbereich (Rolle) | Expert | role `expert` | — |
 | Recht | Legal | role `legal` | — |
 | Freigabe (Rolle) | Approver | role `approver` | — |
 | Podium (Rolle) | Podium | role `podium` | — |
 | Koordination | Coordination | role `coordination` | — |
-| Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | Denial |
+| Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | — |
 | Antwortbündel | Answer bundle | `AnswerBundle` | — |
-| Bühnenplatz | Podium seat | `stageAssignment.seat` (ab Scheibe 040) | — |
-| Weiterleiten | Forward | `question.forward` (ab Scheibe 048) | — |
+| Bühnenplatz | Podium seat | — (ab Scheibe 040) | — |
+| Weiterleiten | Forward | `question.submit_review` (Anzeige „Weiterleiten", E5; Weiterleiten zwischen Fachbereichen ab Scheibe 048) | — |
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
-| Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | Control center |
+| Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | — |
 | Rechtsfreigabe | Legal clearing | `question.legal.clear` | — |

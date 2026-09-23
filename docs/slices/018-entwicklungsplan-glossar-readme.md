@@ -100,15 +100,23 @@ Glossar: 10 neue Zeilen mit Quellen
 | Koordination | Coordination | `role coordination` | openapi.yaml Enum Role, Produktplan Plan 3 „Wer klassifiziert" |
 | Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | ADR 0012, Produktplan B6 Zustandsmodell |
 | Antwortbündel | Answer bundle | `AnswerBundle` | Produktplan B6 und Scheibe 0006 |
-| Bühnenplatz | Podium seat | `stageAssignment.seat` | Produktplan B7, Scheibe 040 |
-| Weiterleiten | Forward | `question.forward` | Produktplan Scheibe 048, Frage 6 |
+| Bühnenplatz | Podium seat | — (ab Scheibe 040) | Produktplan 5 „Meilensteine", Scheibe 0006 |
+| Weiterleiten | Forward | `question.submit_review` | docs/entscheidungsregister.md E5 |
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` | Produktplan B47 Scheibe 047 |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | Produktplan B8 zwei Ansichten |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | Produktplan B8 zwei Ansichten |
 | Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | Produktplan Scheibe 0008, web-<feature> |
 | Rechtsfreigabe | Legal clearing | `question.legal.clear` | openapi.yaml Vertrag 0.2.0 Scheibe 019 |
 
-README-Index-Prüfung: 0 fehlend
+README-Index-Prüfung:
+Skript:
+```bash
+bash /tmp/claude-0/-home-user-hvworkflow/ba1d545a-db2b-57e2-a725-96ea31145014/scratchpad/check-readme-index.sh
+```
+Ausgabe:
+```
+0 fehlend
+```
 
 AGENTS.md gates-Kommentar aktualisiert:
 Vorher: `# contract lint + typecheck + lint + tests + vocabulary check + web build — green before any merge`
@@ -129,6 +137,16 @@ docs/slices/README.md                              | 20 ++++-
 Open: keine
 
 Touched: AGENTS.md, README.md, docs/agentische-entwicklung-plan.md, docs/glossar.md, docs/slices/018-entwicklungsplan-glossar-readme.md, docs/slices/README.md
+
+### Nacharbeit nach Review
+
+1. BLOCKER · docs/glossar.md Weiterleiten: Code column `question.submit_review` mit Anmerkung E5 und Scheibe 048 statt `question.forward` — kein Code-Name für question.forward vorhanden.
+2. BLOCKER · docs/glossar.md Versammlungsbüro: Vermerk "(bis zur Entscheidung E1)" nach `moderation` eingefügt.
+3. MAJOR · docs/glossar.md Bühnenplatz: Code column `— (ab Scheibe 040)` — kein Code-Name `stageAssignment.seat` im Contract.
+4. MAJOR · README.md: Doppelte feedback/ Zeile entfernt, pre-existing Zeile behalten.
+5. MAJOR · Bericht: Index-Check-Skript und Ausgabe hinzugefügt, Weiterleiten-Quelle auf E5 korrigiert, Bühnenplatz-Quelle auf Produktplan Scheibe 040 korrigiert.
+6. MINOR · docs/glossar.md "Verboten" column: "Denial" (Verweigerung) und "Control center" (Leitstand) durch "—" ersetzt — keine Quelle für diese Verbotswörter vorhanden.
+7. NIT · AGENTS.md gates comment: `mark-test-run` Schritt appended.
 
 ## Review findings
 

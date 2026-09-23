@@ -34,7 +34,6 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/betrieb/`](docs/betrieb/) | Betriebliche Dokumentation: Branch-Schutz und Deployment-Richtlinien. |
 | [`docs/datenschutz/`](docs/datenschutz/) | Datenschutz: DSFA-Vorentwurf und Begleitdokumentation. |
 | [`docs/sicherheit/`](docs/sicherheit/) | Sicherheit: Bedrohungsmodell, Penetrationstests-Scope, Reviewer-Checkliste für die Sicherheitsperspektive je Scheibe. |
-| [`docs/feedback/`](docs/feedback/) | Feedback-Auswertungen: Rückmeldungen von Projektleitung und Stakeholdern mit Klassifizierung und Folgen. |
 
 ## Lauffähige Version
 
