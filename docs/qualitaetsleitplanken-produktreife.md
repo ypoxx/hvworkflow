@@ -64,8 +64,8 @@ eine Änderung am Log.
 ## 2. Reifestufen
 
 Qualität ist relativ zum zugesagten Betriebszustand. Die Beta des Plans entspricht der Stufe Pilot
-(Schattenbetrieb, nie führend). Die Spec kann ihre Stufe im Planungsblock (3) nennen; die Tabelle ist Auswahlhilfe, kein Tor. Eine Funktion
-ist nicht produktionsreif, nur weil ihr Happy Path in der Demo läuft.
+(Schattenbetrieb, nie führend). Die Spec kann ihre Stufe im Planungsblock (3) nennen; die Tabelle ist
+Auswahlhilfe, kein Tor. Eine Funktion ist nicht produktionsreif, nur weil ihr Happy Path in der Demo läuft.
 
 | Bereich | Demo | Pilot (Beta) | Produktion |
 |---|---|---|---|
@@ -276,9 +276,9 @@ produktionsgleicher Umgebung; Betriebsvereinbarung; eingefrorene Konfiguration; 
 
 ## 10. Menschliche Prüfpunkte
 
-Die Prüfpunkte des Plans (Abschnitt 7) tragen die empfohlenen Gespräche: Zielarchitektur an 1 und 3, Referenzpfad
-und Administration an 3, Sicherheitsreview des Architekten an 3, 4 und 7, Abschluss in der Abnahme (079). Der
-Zwei-Stunden-Test einer neuen Entwicklerin läuft in 075; Stolperstellen sind Produktbefunde.
+Die Prüfpunkte des Plans (Abschnitt 7) tragen die empfohlenen Gespräche: Zielarchitektur an 1 und 3, Referenzpfad und
+Administration an 3, Betrieb und Sicherheit an 3 und 4, Sicherheitsreview des Architekten an 3, 4 und 7, Abschluss in der
+Abnahme (079). Der Zwei-Stunden-Test einer neuen Entwicklerin läuft in 075; Stolperstellen sind Produktbefunde.
 
 ## 11. Offene Entscheidungen
 

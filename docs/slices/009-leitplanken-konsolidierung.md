@@ -1,6 +1,6 @@
 # 009 — Leitplanken 008 konsolidieren, ADR 0001 zur Annahme vorlegen, Repositorium aufräumen
 
-**Status:** review (Nacharbeitsrunde 1 erledigt)
+**Status:** accepted
 **Risikoklasse:** niedrig · 1,5 AStd · Kalender 28.09.2026 (W1) · Lane: docs-plan (+ `docs/adr/0001-*` als Architekt)
 **Rolle/Modell:** Architekt (Orchestrator, Opus 5.5 in der Rolle des Architekten) · Review Fable 5.1
 (Regel 3: der Plan sieht Review Opus vor; weil Opus hier baut, reviewt Fable)
@@ -143,3 +143,11 @@ unverändert, keine neue Rolle/Tor/Arbeitsordnung, Dateiumfang. Nacharbeit durch
 | 9 | minor | Ungenehmigt weggefallen: Backup-Umfang, Sitzungsentzug/Break-Glass, Ausnahmen mit Eigentümer und Ablauf, Betroffenenauskunft | wieder aufgenommen (6.3, 6.5, 2, 6.6) |
 | 10 | minor | AGENTS.md: zwei physische Zeilen statt einer | auf eine Zeile gekürzt |
 | 11 | minor | Status und Evidence-Format | Status „review", echter `pnpm gates`-Ausschnitt |
+
+**Runde 2 — Nachprüfung Fable 5.1** (nur die Nacharbeit, 23.09.2026): Befunde 1–11 alle „erledigt"; `wc -l` = 340;
+AGENTS.md +1 Zeile; `pnpm gates` exit 0. Zwei neue minor, beide sofort umgesetzt, Urteil „accept after minor fixes —
+keine weitere Reviewrunde nötig":
+- N1 minor — Abschnitt 10: „Betrieb und Sicherheit an 3 und 4" war beim Kürzen weggefallen → wieder aufgenommen.
+- N2 minor — Vorlage ADR 0001: die an 012 übergebene Regel hätte `apps/web/src/api` selbst getroffen → auf Features
+  beschränkt („Werte nur in `apps/web/src/api`", ADR 0002).
+- Nit — lange Zeile in Abschnitt 2 umbrochen.
