@@ -9,9 +9,9 @@ const SCRIPT = join(HERE, 'post-tool-use-lint.mjs');
 const FIXTURES = join(HERE, '..', 'fixtures', 'hooks');
 
 // Review rework round 1, B1: the payload is built here, with this machine's own absolute path to the
-// fixture — never baked into a committed JSON file (a path like `/home/user/wt/016/...` would not
-// exist on a CI runner, so the hook's `existsSync` check would just skip and every assertion below
-// would pass or fail for the wrong reason).
+// fixture — never baked into a committed JSON file (a machine-specific absolute path baked into a
+// fixture would not exist on a CI runner, so the hook's `existsSync` check would just skip and every
+// assertion below would pass or fail for the wrong reason).
 function runWithFile(filePath, toolName = 'Write') {
   const payload = JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath, content: '' } });
   const r = spawnSync('node', [SCRIPT], { input: payload, encoding: 'utf8' });

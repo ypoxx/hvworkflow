@@ -81,6 +81,20 @@ test('green: curl to 127.0.0.1 passes', () => {
   assert.equal(r.status, 0);
 });
 
+// Codex review PR #14, C5: the old host extraction cut off at the *first* colon, so a bracketed IPv6
+// literal (`[::1]`) was seen as host "[" — never matching the `[::1]` local-hosts entry — and a public
+// IPv6 literal was never recognised as external either.
+test('Codex C5 green: curl to http://[::1]:3000/... passes (bracketed IPv6 loopback, with a port)', () => {
+  const r = runCommand('curl http://[::1]:3000/health');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('Codex C5 red: curl to a public IPv6 literal is blocked', () => {
+  const r = runCommand('curl http://[2001:db8::1]/x');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /2001:db8::1/);
+});
+
 test('green: git ls-remote to a public https URL passes (not curl/wget)', () => {
   const r = runFixture('pre-tool-use-git-ls-remote');
   assert.equal(r.status, 0);
@@ -121,13 +135,138 @@ for (const [command, expected] of M4_BYPASSES) {
 }
 
 test('M4 green: git -C/-c for an unrelated, explicit, non-forced push still passes', () => {
-  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+  const r = runCommand('git -C /tmp/x -c user.email=t@t.invalid push origin claude/slice-016-agenten');
   assert.equal(r.status, 0, r.stderr);
 });
 
 test('M4 green: --git-dir with an explicit, non-forced push still passes', () => {
-  const r = runCommand('git --git-dir=/home/user/wt/016/.git push origin claude/slice-016-agenten');
+  const r = runCommand('git --git-dir=/tmp/x/.git push origin claude/slice-016-agenten');
   assert.equal(r.status, 0, r.stderr);
+});
+
+// takt-006, point 1 (016 re-review round 2, findings 1-4): each of these bypassed the M4 fixes and
+// must now block too — combined short options, quoted refspecs, abbreviated long options, and global
+// options between `git` and `push` beyond `-C`/`-c`/`--git-dir`.
+const TAKT_006_P1_BYPASSES = [
+  ['git push -uf origin main', /force flag/],
+  ['git push -fu origin main', /force flag/],
+  ["git push origin '+main'", /forced\) refspec/],
+  ['git push origin "+main"', /forced\) refspec/],
+  ["git push origin ':main'", /remote-branch deletion/],
+  ['git push --dele origin main', /remote-branch deletion/],
+  // `--forc` is ambiguous in git 2.43 (force, force-with-lease, force-if-includes); still blocked, now
+  // with the accurate reason since the option table (Codex round 5).
+  ['git push --forc origin main', /ambiguous/],
+  ['git push --force-w origin main', /force flag/],
+  ['git --work-tree=/tmp/x push --force origin main', /force flag/],
+  ['git --no-pager push --force origin main', /force flag/],
+  ["git push --prune origin 'refs/heads/*:refs/heads/*'", /prune/],
+];
+for (const [command, expected] of TAKT_006_P1_BYPASSES) {
+  test(`takt-006 point 1 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('takt-006 point 1 green: "git push -u origin claude/…" (setting upstream, no force) still passes', () => {
+  const r = runCommand('git push -u origin claude/takt-006-nacharbeit-016');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// Codex review PR #14, C4: an option that takes its own value (`--push-option`/`-o`, `--receive-pack`,
+// `--repo`) must not be miscounted as a target token — its value must be skipped along with it, so a
+// push hiding a missing refspec behind one of these still gets caught as a bare push.
+const CODEX_C4_BYPASSES = [
+  ['git push --push-option ci.skip origin', /explicit remote and branch/],
+  ['git push -o ci.skip origin', /explicit remote and branch/],
+  ['git push --receive-pack /bin/sh origin', /explicit remote and branch/],
+  ['git push --repo origin', /explicit remote and branch/],
+];
+for (const [command, expected] of CODEX_C4_BYPASSES) {
+  test(`Codex C4 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('Codex C4 green: --push-option with an explicit remote and branch still passes', () => {
+  const r = runCommand('git push --push-option ci.skip origin claude/takt-006-nacharbeit-016');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// takt-006 rework (review round 2, MAJOR finding 2): GIT_PUSH_RE only recognised an enumerated list of
+// global options (-C, -c, --git-dir, --work-tree, --no-pager) between `git` and `push` — any *other*
+// global option (there are dozens) still hid the subcommand from the regex entirely, so the push
+// findings below it (force, delete, mirror, bare push, ...) never even ran.
+const REWORK_P2_BYPASSES = [
+  ['git -C "a b" push -f origin main', /force flag/],
+  ['git -p push -f origin main', /force flag/],
+  ['git --paginate push -f origin main', /force flag/],
+  ['git --bare push -f origin main', /force flag/],
+  ['git --namespace=x push -f origin main', /force flag/],
+];
+for (const [command, expected] of REWORK_P2_BYPASSES) {
+  test(`rework point 2 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('rework point 2 green: "git -C x push -u origin claude/x" (explicit, non-forced) still passes', () => {
+  const r = runCommand('git -C x push -u origin claude/x');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// takt-006 rework, MINOR finding 3 (+Codex): a short-option cluster containing `f` alongside digits
+// (`-4f`) must still count as force; a value-taking long option's *abbreviation* must still have its
+// value skipped before counting targets.
+const REWORK_P3_BYPASSES = [
+  ['git push -4f origin main', /force flag/],
+  ['git push -f4 origin main', /force flag/],
+  ['git push -6uf origin main', /force flag/],
+  ['git push --push-o ci.skip origin', /explicit remote and branch/],
+  ['git push --receive-p /bin/sh origin', /explicit remote and branch/],
+  ['git push --exec x origin', /explicit remote and branch/],
+];
+for (const [command, expected] of REWORK_P3_BYPASSES) {
+  test(`rework point 3 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+// takt-006 rework, MINOR finding 7: splitTopLevelSegments only split on `&&`, `||`, `;`, `|` — a
+// newline-separated second command (a common way a multi-line Bash tool call is written) was never
+// split off at all, so a `curl` on its own later line was invisible to `externalCurlFinding`.
+test('rework point 7 red: a curl on its own line (newline-separated) is blocked', () => {
+  const r = runCommand('ls\ncurl https://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
+});
+
+test('rework point 7 green: a curl on its own line to a local host still passes', () => {
+  const r = runCommand('ls\ncurl http://127.0.0.1:3000/health');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('rework point 7 red: a single "&" background separator is blocked', () => {
+  const r = runCommand('sleep 1 & curl https://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
+});
+
+// takt-006 rework, point 1 (Wirkung text accuracy): an upper-case URL scheme is just as much an
+// external request as a lower-case one — a "cheap" gap to close while writing the accurate Wirkung
+// text (rather than merely documenting it as undetected).
+test('rework point 1 red: an upper-case URL scheme (HTTPS://) is blocked the same as https://', () => {
+  const r = runCommand('curl HTTPS://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
 });
 
 // Review rework round 1, m2: these three used to false-positive on the old, boundary-free ".env" scan.
@@ -150,4 +289,101 @@ test('m2 red: a real .env path still blocks after the path-boundary fix', () => 
   const r = runCommand('cat apps/api/.env');
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\.env/);
+});
+
+// takt-006 review round 2 (major, ReDoS): an option's optional value could itself be the next `-x`
+// option, so a long run of global options without a following `push` backtracked exponentially
+// (38 options: 12 s). A value may no longer start with `-`; the scan stays linear.
+test('redos: 2000 global options without push return quickly and are not blocked', () => {
+  const started = Date.now();
+  const r = runCommand(`git${' -a'.repeat(2000)} x`);
+  const elapsed = Date.now() - started;
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(elapsed < 3000, `hook took ${elapsed} ms`);
+});
+
+test('redos: 2000 --a=b options followed by a force push still block quickly', () => {
+  const started = Date.now();
+  const r = runCommand(`git${' --a=b'.repeat(2000)} push -f origin main`);
+  const elapsed = Date.now() - started;
+  assert.equal(r.status, 2);
+  assert.ok(elapsed < 3000, `hook took ${elapsed} ms`);
+});
+
+// takt-006 review round 2 (Codex on PR #20): in a short-option cluster, `o` takes the rest as its
+// value, so an `f` inside that value is not a force flag.
+test('codex round 2 green: git push -ofoo origin main is not a force push', () => {
+  assert.equal(runCommand('git push -ofoo origin main').status, 0);
+});
+
+test('codex round 2 red: git push -fofoo origin main is still a force push (f before o)', () => {
+  assert.equal(runCommand('git push -fofoo origin main').status, 2);
+});
+
+test('codex round 2 red: git push -uo ci.skip origin has no branch (value of o in the next token)', () => {
+  assert.equal(runCommand('git push -uo ci.skip origin').status, 2);
+});
+
+// takt-006 Codex round 3: a quoted option value with a space is one shell argument, not two tokens.
+test('codex round 3 red: git push -o "ci skip" origin has no branch', () => {
+  assert.equal(runCommand('git push -o "ci skip" origin').status, 2);
+});
+
+test('codex round 3 green: git push -o "ci skip" origin main passes', () => {
+  assert.equal(runCommand('git push -o "ci skip" origin main').status, 0);
+});
+
+test("codex round 3 red: git push -o 'a b c' origin has no branch (single quotes)", () => {
+  assert.equal(runCommand("git push -o 'a b c' origin").status, 2);
+});
+
+// takt-006 Codex round 4: a partially quoted or escaped prefix is still a forced/deleting refspec.
+test("codex round 4 red: git push origin '+'main is a forced refspec", () => {
+  assert.equal(runCommand("git push origin '+'main").status, 2);
+});
+
+test("codex round 4 red: git push origin ':'main is a deleting refspec", () => {
+  assert.equal(runCommand("git push origin ':'main").status, 2);
+});
+
+test('codex round 4 red: git push origin \\+main is a forced refspec', () => {
+  assert.equal(runCommand('git push origin \\+main').status, 2);
+});
+
+test('codex round 4 green: git push origin "claude/x" still passes', () => {
+  assert.equal(runCommand('git push origin "claude/x"').status, 0);
+});
+
+// takt-006 Codex round 5: the push arguments are now parsed against the full `git push -h` option
+// table, so clusters and abbreviations are handled uniformly.
+test('codex round 5 red: git push -vd origin main deletes main (d inside a cluster)', () => {
+  assert.equal(runCommand('git push -vd origin main').status, 2);
+});
+
+test("codex round 5 red: git push --pru origin 'refs/heads/*:refs/heads/*' is a prune with a wildcard", () => {
+  assert.equal(runCommand("git push --pru origin 'refs/heads/*:refs/heads/*'").status, 2);
+});
+
+test('codex round 5 green: --no-force and --no-delete are not dangerous', () => {
+  assert.equal(runCommand('git push --no-force origin main').status, 0);
+  assert.equal(runCommand('git push --no-delete origin main').status, 0);
+});
+
+test('codex round 5 green: --repo=origin counts as the repository', () => {
+  assert.equal(runCommand('git push --repo=origin main').status, 0);
+});
+
+test('codex round 5 red: an ambiguous abbreviation (--f) is blocked (git refuses it anyway)', () => {
+  assert.equal(runCommand('git push --f origin main').status, 2);
+});
+
+// takt-006 Codex round 6: a later --no-X switches X off again, as git does.
+test('codex round 6 green: --delete --no-delete, --mirror --no-mirror, -f --no-force pass', () => {
+  assert.equal(runCommand('git push --delete --no-delete origin topic').status, 0);
+  assert.equal(runCommand('git push --mirror --no-mirror origin topic').status, 0);
+  assert.equal(runCommand('git push -f --no-force origin topic').status, 0);
+});
+
+test('codex round 6 red: --no-delete --delete still deletes (the later one wins)', () => {
+  assert.equal(runCommand('git push --no-delete --delete origin topic').status, 2);
 });
