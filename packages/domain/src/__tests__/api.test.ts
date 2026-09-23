@@ -5,8 +5,9 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, createInProcessApi, etagOf, type HvApi } from '../api.js';
-import { createInMemoryEventStore } from '../store.js';
+import { createInMemoryEventStore, type EventStore } from '../store.js';
 import { seedEvents } from '../seed.js';
+import type { DomainEvent } from '../events.js';
 import type { Actor, Question } from '../types.js';
 
 const actors: Record<string, Actor> = {
@@ -20,6 +21,7 @@ const actors: Record<string, Actor> = {
   observer: { id: 'obs', role: 'observer' },
 };
 
+let store: EventStore;
 let current: Actor = actors.admin!;
 let api: HvApi;
 const as = (a: Actor) => {
@@ -27,7 +29,7 @@ const as = (a: Actor) => {
 };
 
 beforeEach(async () => {
-  const store = createInMemoryEventStore();
+  store = createInMemoryEventStore();
   let t = Date.parse('2027-04-20T12:00:00.000Z');
   api = createInProcessApi({
     store,
@@ -102,8 +104,11 @@ describe('acceptance sentence', () => {
     expect(delivered.status).toBe('delivered');
     const closed = await api.closeQuestion(q.id);
     expect(closed.status).toBe('closed');
-    expect(closed._actions).toEqual(['question.read']); // terminal: nothing but reading
+    // Terminal: podium holds neither `question.read` nor `question.read.delivered` since slice 010
+    // (Festlegung 4) — it works the stage, not the question archive — so no action is left at all.
+    expect(closed._actions).toEqual([]);
 
+    as(actors.moderation!); // podium has no `history.read` (slice 010); moderation does
     const history = await api.getQuestionHistory(q.id);
     expect(history.map((e) => e.type)).toEqual([
       'QuestionCaptured',
@@ -136,10 +141,15 @@ describe('invariants', () => {
   it('Idempotency-Key replays the first result without a second event', async () => {
     as(actors.capture!);
     const q = await firstIn('captured');
+    // `listEvents` requires `event.read` since slice 010; capture does not hold it, so the counter
+    // reads happen under admin instead — the idempotent write itself still runs as capture.
+    as(actors.admin!);
     const before = (await api.listEvents(0, 100000)).lastSeq;
+    as(actors.capture!);
     const a = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
     const b = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
     expect(b).toEqual(a);
+    as(actors.admin!);
     expect((await api.listEvents(0, 100000)).lastSeq).toBe(before + 1);
   });
 
@@ -148,9 +158,11 @@ describe('invariants', () => {
     const { items } = await api.listQuestions({ status: ['captured'], limit: 2 });
     const [a, b] = items as [Question, Question];
     const first = await api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' });
-    // Another actor replaying the same key is a new request: permission check applies, no leak of _actions.
+    // Another actor replaying the same key is a new request: no leak of _actions. `a` is now
+    // `classified`, outside observer's `question.read.delivered` scope, and observer holds no
+    // `question.classify` either — 404, not 403 (Festlegung 3, "keine ableitbare ID", slice 010).
     as(actors.observer!);
-    await expect(api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' })).rejects.toMatchObject({ status: 403 });
+    await expect(api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' })).rejects.toMatchObject({ status: 404 });
     // The same actor with the same key on another resource executes independently.
     as(actors.capture!);
     const other = await api.classifyQuestion(b.id, { track: 'fast_track' }, { idempotencyKey: 'shared' });
@@ -168,12 +180,29 @@ describe('invariants', () => {
     expect(redrafted.answers.length).toBe(q.answers.length + 1);
   });
 
-  it('observer may read but not act; deny reason carries a rule id', async () => {
-    as(actors.observer!);
+  it('404 precedence (Festlegung 3): observer write attempt on a non-delivered question is masked as not found, not 403', async () => {
+    as(actors.capture!);
     const q = await firstIn('captured');
-    expect(q._actions).toEqual(['question.read']);
+    as(actors.observer!);
     try {
       await api.classifyQuestion(q.id, { track: 'podium' });
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      expect((e as ApiProblem).status).toBe(404);
+    }
+  });
+
+  it('observer may read a delivered question (question.read.delivered) but not act on it — 403 with a rule id', async () => {
+    as(actors.admin!);
+    const deliveredAdmin = await firstIn('delivered');
+    as(actors.observer!);
+    const q = await api.getQuestion(deliveredAdmin.id);
+    // `question.read.delivered` extends `question.read` within its scope (Festlegung 2), so both
+    // read actions show up here — `can()` reaches the same allow via either permission.
+    expect(q._actions).toEqual(['question.read', 'question.read.delivered']);
+    try {
+      await api.returnQuestion(q.id, 'nicht zulässig');
       expect.fail('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ApiProblem);
@@ -211,5 +240,197 @@ describe('invariants', () => {
   it('seeding twice is refused: the log is never replaced', async () => {
     as(actors.admin!);
     await expect(api.seedDemo()).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+/**
+ * Slice 010 (Lesepfade unter can() mit Leserechten): one positive and one negative test per read
+ * permission (Ziel 7), the master-data "every role may" test (Festlegung 1), the 404 precedence of
+ * Festlegung 3, and `subscribe` (Festlegung 5, the 13th read method).
+ */
+describe('read rights (slice 010)', () => {
+  async function firstIn(status: string) {
+    const { items } = await api.listQuestions({ status: [status as never], limit: 1 });
+    expect(items.length).toBeGreaterThan(0);
+    return items[0]!;
+  }
+
+  async function expectDenied(promise: Promise<unknown>, status: number, ruleId?: string): Promise<void> {
+    try {
+      await promise;
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      expect((e as ApiProblem).status).toBe(status);
+      if (ruleId !== undefined) expect((e as ApiProblem).ruleId).toBe(ruleId);
+    }
+  }
+
+  it('master data (Festlegung 1): every role may read getMeeting, listAgendaItems, listUnits', async () => {
+    for (const a of Object.values(actors)) {
+      as(a);
+      await expect(api.getMeeting()).resolves.toBeTruthy();
+      await expect(api.listAgendaItems()).resolves.toBeTruthy();
+      await expect(api.listUnits()).resolves.toBeTruthy();
+    }
+  });
+
+  it('speaker.read: moderation, capture and admin may listSpeakers and getSpeaker', async () => {
+    for (const a of [actors.moderation!, actors.capture!, actors.admin!]) {
+      as(a);
+      const speakers = await api.listSpeakers();
+      expect(speakers.length).toBeGreaterThan(0);
+      await expect(api.getSpeaker(speakers[0]!.id)).resolves.toBeTruthy();
+    }
+  });
+
+  it('speaker.read: expert is denied listSpeakers and getSpeaker with R-PERM-02', async () => {
+    as(actors.admin!);
+    const anySpeaker = (await api.listSpeakers())[0]!;
+    as(actors.expert!);
+    await expectDenied(api.listSpeakers(), 403, 'R-PERM-02');
+    await expectDenied(api.getSpeaker(anySpeaker.id), 403, 'R-PERM-02');
+  });
+
+  it('contribution.read: moderation, capture and admin may listContributions and getContribution', async () => {
+    for (const a of [actors.moderation!, actors.capture!, actors.admin!]) {
+      as(a);
+      const contributions = await api.listContributions();
+      expect(contributions.length).toBeGreaterThan(0);
+      await expect(api.getContribution(contributions[0]!.id)).resolves.toBeTruthy();
+    }
+  });
+
+  it('contribution.read: podium is denied listContributions and getContribution with R-PERM-02', async () => {
+    as(actors.admin!);
+    const anyContribution = (await api.listContributions())[0]!;
+    as(actors.podium!);
+    await expectDenied(api.listContributions(), 403, 'R-PERM-02');
+    await expectDenied(api.getContribution(anyContribution.id), 403, 'R-PERM-02');
+  });
+
+  it('question.read: moderation, capture, expert, legal, approver and admin may listQuestions and getQuestion', async () => {
+    for (const a of [actors.moderation!, actors.capture!, actors.expert!, actors.legal!, actors.approver!, actors.admin!]) {
+      as(a);
+      const { items } = await api.listQuestions({ limit: 1 });
+      expect(items.length).toBeGreaterThan(0);
+      await expect(api.getQuestion(items[0]!.id)).resolves.toBeTruthy();
+    }
+  });
+
+  it('question.read: podium is denied listQuestions with R-PERM-02, and getQuestion is masked as 404 (Festlegung 3)', async () => {
+    as(actors.admin!);
+    const anyQuestion = (await api.listQuestions({ limit: 1 })).items[0]!;
+    as(actors.podium!);
+    await expectDenied(api.listQuestions(), 403, 'R-PERM-02');
+    await expectDenied(api.getQuestion(anyQuestion.id), 404);
+  });
+
+  it('question.read.delivered: observer and admin see only delivered/closed questions in listQuestions(), and total matches', async () => {
+    as(actors.admin!);
+    const { items: all } = await api.listQuestions({ limit: 10000 });
+    const visible = all.filter((q) => q.status === 'delivered' || q.status === 'closed');
+    as(actors.observer!);
+    const observed = await api.listQuestions({ limit: 10000 });
+    expect(observed.items.every((q) => q.status === 'delivered' || q.status === 'closed')).toBe(true);
+    expect(observed.total).toBe(visible.length);
+    expect(observed.items.length).toBe(visible.length);
+  });
+
+  it('question.read.delivered: observer 403 R-PERM-03 on a status filter outside the read scope', async () => {
+    as(actors.observer!);
+    await expectDenied(api.listQuestions({ status: ['answer_drafted'] }), 403, 'R-PERM-03');
+  });
+
+  it('question.read.delivered: observer getQuestion on a non-delivered question is masked as 404 (Festlegung 3)', async () => {
+    as(actors.capture!);
+    const q = await firstIn('captured');
+    as(actors.observer!);
+    await expectDenied(api.getQuestion(q.id), 404);
+  });
+
+  it('stage.read: moderation, approver, podium and admin may getStage', async () => {
+    for (const a of [actors.moderation!, actors.approver!, actors.podium!, actors.admin!]) {
+      as(a);
+      await expect(api.getStage()).resolves.toBeTruthy();
+    }
+  });
+
+  it('stage.read: expert is denied getStage with R-PERM-02', async () => {
+    as(actors.expert!);
+    await expectDenied(api.getStage(), 403, 'R-PERM-02');
+  });
+
+  it('history.read: moderation, capture, expert, legal, approver and admin may getQuestionHistory', async () => {
+    as(actors.admin!);
+    const q = await firstIn('captured');
+    for (const a of [actors.moderation!, actors.capture!, actors.expert!, actors.legal!, actors.approver!, actors.admin!]) {
+      as(a);
+      await expect(api.getQuestionHistory(q.id)).resolves.toBeTruthy();
+    }
+  });
+
+  it('history.read: observer is denied getQuestionHistory of a delivered question with R-PERM-02 (it can read the question itself)', async () => {
+    as(actors.admin!);
+    const q = await firstIn('delivered');
+    as(actors.observer!);
+    await expect(api.getQuestion(q.id)).resolves.toBeTruthy(); // in scope: proves this is a real 403, not the 404 mask
+    await expectDenied(api.getQuestionHistory(q.id), 403, 'R-PERM-02');
+  });
+
+  it('404 precedence (Festlegung 3): podium — no question.read, no history.read — gets 404 on getQuestionHistory, not 403', async () => {
+    as(actors.admin!);
+    const q = await firstIn('captured');
+    as(actors.podium!);
+    await expectDenied(api.getQuestionHistory(q.id), 404);
+  });
+
+  it('404 precedence (Festlegung 3): podium may still deliverQuestion on the staged question although it cannot read it', async () => {
+    as(actors.podium!);
+    const stage = await api.getStage(); // podium holds stage.read
+    const current = stage.current!;
+    const delivered = await api.deliverQuestion(current.id);
+    expect(delivered.status).toBe('delivered');
+  });
+
+  it('event.read: admin may listEvents', async () => {
+    as(actors.admin!);
+    await expect(api.listEvents(0, 10)).resolves.toBeTruthy();
+  });
+
+  it('event.read: podium is denied listEvents with R-PERM-02', async () => {
+    as(actors.podium!);
+    await expectDenied(api.listEvents(0, 10), 403, 'R-PERM-02');
+  });
+
+  it('subscribe (Festlegung 5): delivers [] to an actor without event.read', async () => {
+    const writer = createInProcessApi({ store, actor: () => actors.capture! });
+    const received: DomainEvent[][] = [];
+    as(actors.observer!);
+    const unsubscribe = api.subscribe((events) => received.push(events));
+    const q = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
+    await writer.classifyQuestion(q.id, { track: 'podium' });
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual([]);
+    unsubscribe();
+  });
+
+  it('subscribe (Festlegung 5): checks the permission fresh on every delivery, so a role switch between two deliveries changes what arrives', async () => {
+    const writer = createInProcessApi({ store, actor: () => actors.capture! });
+    const received: DomainEvent[][] = [];
+    as(actors.observer!);
+    const unsubscribe = api.subscribe((events) => received.push(events));
+
+    const first = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
+    await writer.classifyQuestion(first.id, { track: 'podium' });
+    expect(received[0]).toEqual([]); // observer: no event.read
+
+    as(actors.admin!); // the demo role switcher changes the actor at runtime, same subscription
+    const second = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
+    await writer.classifyQuestion(second.id, { track: 'fast_track' });
+    expect(received).toHaveLength(2);
+    expect(received[1]!.length).toBeGreaterThan(0); // admin: holds event.read
+
+    unsubscribe();
   });
 });

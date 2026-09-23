@@ -11,7 +11,7 @@
  *   4. appends one event and returns the projected resource with `_actions`.
  */
 import type { DomainEvent, NewEvent } from './events.js';
-import { ALLOW, deny, hasPermission, type Decision } from './permissions.js';
+import { ALLOW, deny, hasPermission, READ_SCOPES, type Decision, type ReadScope } from './permissions.js';
 import { resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
 import type { EventStore } from './store.js';
@@ -28,6 +28,7 @@ import type {
   QuestionCapture,
   QuestionFilter,
   QuestionRecord,
+  QuestionStatus,
   Speaker,
   SpeakerRecord,
   SpeakerRegistration,
@@ -36,7 +37,7 @@ import type {
   Unit,
   WriteOptions,
 } from './types.js';
-import { PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
+import { PERMISSIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
 
 /** RFC 9457-shaped error. The HTTP adapter maps it 1:1 to a problem+json response. */
 export class ApiProblem extends Error {
@@ -136,8 +137,16 @@ const defaultId = (): string => {
 };
 
 /**
- * The single decision point (docs/rollen-und-rechtekonzept.md): permission bundle first, then the
- * transition table with its guards. Exported so that tests can produce the truth table from it.
+ * The single decision point (docs/rollen-und-rechtekonzept.md): permission bundle first, then a read
+ * scope (R-PERM-03, Festlegung 2 of slice 010) if the action has one, then the transition table with
+ * its guards. Exported so that tests can produce the truth table from it.
+ *
+ * `READ_SCOPES` (permissions.ts) restricts an action to specific statuses whenever it is a key there
+ * — applied even to a role that holds the permission outright (e.g. admin's
+ * `question.read.delivered` is still bound to `delivered`/`closed`). When the actor lacks `action`
+ * itself, a scoped permission that `extends` it (Festlegung 2: `question.read.delivered` extends
+ * `question.read`) substitutes for it within its scope — never by comparing permission names, only by
+ * walking this data.
  */
 export function can(
   actor: Actor,
@@ -146,12 +155,41 @@ export function can(
   payload?: unknown,
 ): Decision {
   const perm = hasPermission(actor, action);
-  if (!perm.allow) return perm;
-  if (question && TRANSITION_ACTIONS.includes(action)) {
-    const t = resolveTransition(question, action, payload);
-    if (!t.ok) return deny(t.ruleId, t.reason);
+  if (perm.allow) {
+    if (question) {
+      const scope = READ_SCOPES[action];
+      if (scope && !scope.statuses.includes(question.status)) {
+        return deny('R-PERM-03', `Permission "${action}" only covers status ${scope.statuses.join('/')} (Leseumfang).`);
+      }
+    }
+    if (question && TRANSITION_ACTIONS.includes(action)) {
+      const t = resolveTransition(question, action, payload);
+      if (!t.ok) return deny(t.ruleId, t.reason);
+    }
+    return ALLOW;
   }
-  return ALLOW;
+  if (question) {
+    for (const [p, scope] of Object.entries(READ_SCOPES) as [Permission, ReadScope][]) {
+      if (scope.extends === action && scope.statuses.includes(question.status) && hasPermission(actor, p).allow) {
+        return ALLOW;
+      }
+    }
+  }
+  return perm;
+}
+
+/** The statuses `question.read` resolves to for this actor: `undefined` means unrestricted (the
+ * actor holds `question.read` outright); an array is the scope of whichever `READ_SCOPES` entry
+ * extends `question.read` and the actor holds instead (e.g. `question.read.delivered`); an empty
+ * array means the actor holds neither — callers that reach this must have already required one of
+ * `READ_PERMISSIONS.listQuestions` (Festlegung 2, used by `listQuestions` to validate a status filter
+ * against the actor's own scope, R-PERM-03). */
+function questionReadScope(actor: Actor): readonly QuestionStatus[] | undefined {
+  if (hasPermission(actor, 'question.read').allow) return undefined;
+  for (const [p, scope] of Object.entries(READ_SCOPES) as [Permission, ReadScope][]) {
+    if (scope.extends === 'question.read' && hasPermission(actor, p).allow) return scope.statuses;
+  }
+  return [];
 }
 
 /** Actions the actor may take on this question right now — the server-provided `_actions`. */
@@ -206,6 +244,35 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     const d = hasPermission(actor(), p);
     if (!d.allow) throw new ApiProblem(403, 'Forbidden', d.reason, d.ruleId);
   };
+  /** A method that accepts more than one permission (`READ_PERMISSIONS`, types.ts): allow if the
+   * actor holds any of them, else 403 with the first denial's reason/rule id (every permission in
+   * `perms` is a read permission, so that is always R-PERM-02). */
+  const requireAnyPermission = (perms: readonly Permission[]): void => {
+    const denials = perms.map((p) => hasPermission(actor(), p)).filter((d): d is Extract<Decision, { allow: false }> => !d.allow);
+    if (denials.length < perms.length) return; // at least one permission was granted
+    const first = denials[0]!;
+    throw new ApiProblem(403, 'Forbidden', first.reason, first.ruleId);
+  };
+  /**
+   * 404 precedence for a single question (Festlegung 3, "keine ableitbare ID"): applies only when the
+   * actor can neither read this question (`can(actor, 'question.read', q)`) nor holds the permission
+   * the operation itself needs — then every operation on the question, including a write, reports 404
+   * so a role without any read access learns nothing about which ids exist. An actor holding the
+   * operation's permission keeps today's order (404 for an unknown id, then whatever check follows) —
+   * podium holds `question.deliver`/`question.close`/`question.return` but no `question.read`, and
+   * must keep working the stage.
+   */
+  const requireQuestionFor = (id: string, operationPermission: Permission): QuestionRecord => {
+    const q = state.questions.get(id);
+    if (hasPermission(actor(), operationPermission).allow) {
+      if (!q) throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+      return q;
+    }
+    if (!q || !can(actor(), 'question.read', q).allow) {
+      throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+    }
+    return q;
+  };
   const checkIfMatch = (version: number, opts?: WriteOptions): void => {
     if (opts?.ifMatch !== undefined && opts.ifMatch !== etagOf(version)) {
       throw new ApiProblem(
@@ -246,7 +313,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     build: (q: QuestionRecord, to: QuestionRecord['status']) => Omit<NewEvent, 'id' | 'at' | 'actor'>,
   ): Question =>
     idempotent(`${action}:${id}`, opts, () => {
-      const q = requireQuestion(id);
+      const q = requireQuestionFor(id, action);
       const perm = hasPermission(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
       const t = resolveTransition(q, action, payload);
@@ -286,12 +353,14 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     },
 
     async listSpeakers(filter = {}) {
+      requirePermission('speaker.read');
       return [...state.speakers.values()]
         .filter((s) => (filter.round === undefined || s.round === filter.round) && (filter.status === undefined || s.status === filter.status))
         .sort((a, b) => a.round - b.round || a.position - b.position)
         .map(viewSpeaker);
     },
     async getSpeaker(id) {
+      requirePermission('speaker.read');
       return viewSpeaker(requireSpeaker(id));
     },
     async registerSpeaker(input, opts) {
@@ -341,12 +410,14 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     },
 
     async listContributions(filter = {}) {
+      requirePermission('contribution.read');
       return [...state.contributions.values()]
         .filter((c) => filter.speakerId === undefined || c.speakerId === filter.speakerId)
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
         .map((c) => ({ ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } }));
     },
     async getContribution(id) {
+      requirePermission('contribution.read');
       const c = requireContribution(id);
       return { ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } };
     },
@@ -395,17 +466,33 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     },
 
     async listQuestions(filter = {}) {
-      const all = [...state.questions.values()].filter((q) => questionMatches(q, filter));
+      requireAnyPermission(READ_PERMISSIONS.listQuestions);
+      // Festlegung 2: a status filter naming a status outside the actor's own read scope is R-PERM-03
+      // — the pre-check compares against `READ_SCOPES`, never a hard-coded set of statuses.
+      const scope = questionReadScope(actor());
+      if (scope && filter.status) {
+        const outOfScope = filter.status.find((s) => !scope.includes(s));
+        if (outOfScope !== undefined) {
+          throw new ApiProblem(403, 'Forbidden', `Status "${outOfScope}" is outside the read scope (Leseumfang).`, 'R-PERM-03');
+        }
+      }
+      const all = [...state.questions.values()].filter((q) => questionMatches(q, filter) && can(actor(), 'question.read', q).allow);
       const offset = filter.offset ?? 0;
       const limit = filter.limit ?? 500;
       return { items: all.slice(offset, offset + limit).map(viewQuestion), total: all.length };
     },
     async getQuestion(id) {
-      return viewQuestion(requireQuestion(id));
+      const q = state.questions.get(id);
+      if (!q || !can(actor(), 'question.read', q).allow) {
+        // Outside the actor's read scope is reported exactly like an unknown id (Festlegung 3).
+        throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+      }
+      return viewQuestion(q);
     },
     async getQuestionHistory(id) {
-      requireQuestion(id);
-      return store.all().filter((e) => e.subjectId === id);
+      const q = requireQuestionFor(id, 'history.read');
+      requirePermission('history.read'); // may hold via requireQuestionFor's read-access branch only
+      return store.all().filter((e) => e.subjectId === q.id);
     },
     async classifyQuestion(id, input, opts) {
       if (!TRACKS.includes(input.track)) throw new ApiProblem(422, 'Unprocessable', 'track must be podium, fast_track or expert_track.');
@@ -507,6 +594,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     },
 
     async getStage() {
+      requirePermission('stage.read');
       const staged = [...state.questions.values()]
         .filter((q) => q.status === 'staged')
         .sort((a, b) => (a.stagePosition ?? 0) - (b.stagePosition ?? 0))
@@ -521,6 +609,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       };
     },
     async listEvents(after = 0, limit = 1000) {
+      requirePermission('event.read');
       return { items: store.readAfter(after, limit), lastSeq: store.lastSeq() };
     },
     async seedDemo(o = {}) {
@@ -534,7 +623,14 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return this.getMeeting();
     },
     subscribe(listener) {
-      return store.subscribe(listener);
+      // Festlegung 5: the 13th read method. Payloads only for `event.read`; everyone else gets `[]`
+      // as a bare change signal (the interface only reacts to it, `api/useApiVersion.ts`). Checked
+      // fresh against the *current* actor on every delivery, because the demo role switcher changes
+      // `actor()` at runtime — a subscription started under one role must not keep leaking events
+      // once the demo user switches to a role without `event.read`.
+      return store.subscribe((events) => {
+        listener(hasPermission(actor(), 'event.read').allow ? events : []);
+      });
     },
   };
 }
