@@ -1,6 +1,6 @@
 # takt-003 — Folgebefunde aus dem Review von 015 (N1–N8, ADR-Feinschliff)
 
-**Status:** review
+**Status:** angenommen
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lane: docs-adr (keine laufende Scheibe
 hält sie; 039 liest die ADRs nur)
 **Rolle/Modell:** Implementierer · Sonnet 5 baut (Wortlaut in ADRs, deshalb nicht Haiku); Review Opus 5.5
@@ -290,4 +290,17 @@ die bekannten Alt-Warnungen (react/set-state-in-effect, only-export-components),
 
 ## Review findings
 
-(vom Reviewer)
+**Opus 5.5 · 23.09.2026 · Urteil: annehmen nach Kleinbefunden (0 Blocker, 0 major, 4 minor, 1 nit).** Ziele 1–9 an
+allen Stellen wie spezifiziert; keine andere Aussage geändert; `pnpm gates` Exit 0 (eigener Lauf).
+
+1. minor · `015-adr-paket.md:126`: „E35" stand in der Quellspalte statt bei den offenen E-Nummern — behoben.
+2. minor · Bericht: gates-Auszug ohne Kennzeichnung gekürzt — behoben (wörtlich eingefügt).
+3. minor, aus der Spec des Orchestrators · `0003`, `0009`, `0010`: „bestätigen Recht und DSB mit dem Rechtekonzept in
+   052" nahm vorweg, was Recht und DSB feststellen, und hatte keine Planstütze (Leitplanken 11) — neutral gefasst:
+   „ob … diesen Bestand erfasst, legt der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept
+   aus 052".
+4. minor, aus der Spec · `0016:94`: Entscheidungspunkt von E35 laut Register ist 031 (23.10.2026), nicht Prüfpunkt 1 —
+   behoben.
+5. nit · Zeilenumbruch in `0016:94` und `0013:34`, Einleitungssatz „bleiben offen" in 015 — behoben.
+
+Die Nacharbeit übernimmt den Wortlaut des Reviewers; der Orchestrator hat die drei Stellen von Befund 3 nachgelesen.
