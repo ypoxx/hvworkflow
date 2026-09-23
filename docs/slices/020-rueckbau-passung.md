@@ -1,6 +1,6 @@
 # 020 — Oberfläche: Rückbau und Passung (S-Punkte der Projektleitung)
 
-**Status:** review (Nachschärfung Runde 2)
+**Status:** angenommen (Nachprüfung nach Runde 2: annehmen; Folgepunkte siehe Review findings)
 **Risikoklasse:** niedrig · 2 AStd · Kalender 02.10.2026 (W1) · Lanes: web-answers, web-capture, web-stage,
 web-history, web-speakers, web-shell (+ e2e: eigene Datei und, nur wo diese Spec es verlangt, die Alt-Specs;
 deshalb läuft 013 nicht gleichzeitig)
@@ -458,6 +458,25 @@ prüft nicht robust genug; Vorschau-Typografie zu klein für die Bühne.
 
 Nach Plan 6.3 (> 3 Major-Befunde) sind Opus- und Fable-Befunde unten zu einer geschärften,
 bindenden Liste zusammengeführt statt einzeln abgearbeitet.
+
+**Nachprüfung Opus 5.5 nach Runde 1 (23.09.2026):** B1, M1–M3, M5, M6 und alle Minors erledigt, jeweils mit eigenen
+Proben (B1: mit entferntem `aria-modal` kehrt der Fehler zurück und der Test fängt ihn). Offen blieb M4: die
+axe-Ausnahme schloss ganze Klassen (`.text-ink-500`, `.text-ink-400`) aus und verdeckte neue Texte der Scheibe
+(Vorschau-Nummer 3,94:1 u. a.). Neuer Kleinbefund: die Ereigniszählung las vor dem verzögerten Speichern.
+
+**Nachprüfung Opus 5.5 nach Runde 2 (23.09.2026): M4 erledigt, Urteil annehmen.** Zwei axe-Durchläufe (alle Regeln
+außer `color-contrast` ohne Ausnahme; `color-contrast` mit benannten, vorbestehenden Selektoren AX-020-01); acht der 19
+Selektoren gegen `f03eb2e` als vorbestehend nachgeprüft; neue Texte ink-600 oder dunkler; Ereigniszählung wartet auf
+das Speichern, der Stand der vorgeschauten Frage wird direkt geprüft; 020-e2e 4/4 grün.
+
+**Folgepunkte (nicht in dieser Scheibe; 020 hat die Token-Grenze von 1,2 Mio. nach Schätzung überschritten):**
+1. minor · AX-020-01 enthält den reinen Klassen-Selektor `.mt-1.text-2xs.text-ink-500`; er trifft auch
+   `AnswerEditor.tsx:69`, `Timeline.tsx:132`, `speakers/fields.tsx:32` und künftige Elemente — auf den Container von
+   CoverageBar eingrenzen; Zählung im Kommentar 19 statt 17. → mit der Farbtoken-Scheibe bzw. 013.
+2. AX-020-01 selbst (vorbestehender Farbtoken, Kontrast ~3,9:1) — eigene Scheibe, spätestens 31.12.2026.
+3. M2 ohne automatisierten Test (keine Komponenten-Testumgebung in `apps/web`).
+4. Keine frageunabhängige Quelle für das Erfassungsrecht (Lesehinweis bei leerem Bestand unterdrückt) → 082/043.
+5. Doppelte Landmarke `banner` im gemeinsamen `Dialog` (moderate) → Oberflächen-Kleinänderung.
 
 ## Nachschärfung nach Review (Runde 1)
 
