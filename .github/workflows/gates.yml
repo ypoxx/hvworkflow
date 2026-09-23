@@ -9,20 +9,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: the path filter and Semgrep's changed-file scan diff against it
       # The pnpm version comes from `packageManager` in package.json (takt-001).
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Slice 012 point 8: a doc-only commit (`docs/**`, `*.md`) skips the Chromium install and
+      # Playwright below — nothing else. No `paths-ignore` at the workflow level: the job always
+      # triggers and reports, so a later required status check never simply goes missing.
+      - name: Determine changed files
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          list-files: shell
+          filters: |
+            code:
+              - '!(docs/**|*.md)'
+            ts:
+              - '**/*.ts'
+              - '**/*.tsx'
       - name: Contract types are up to date
         run: pnpm contract:types && git diff --exit-code -- packages/contract/src/types.ts
-      - name: Contract lint, typecheck, lint, unit tests, vocabulary, build
+      - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build
         run: pnpm gates
       - name: Policy truth table is committed
         run: git diff --exit-code -- packages/domain/policy-truth-table.md
+      - name: Semgrep
+        run: |
+          if [ -z "${{ steps.changes.outputs.ts_files }}" ]; then
+            echo "Semgrep: no changed .ts/.tsx files — nothing to scan."
+            exit 0
+          fi
+          pip install --quiet semgrep
+          FILES="${{ steps.changes.outputs.ts_files }}"
+          # Hints (e.g. Math.random) are reported but never block, per the slice spec.
+          semgrep --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --severity INFO --quiet -- $FILES || true
+          # WARNING and ERROR block (docs/agentische-entwicklung-plan.md 5.2 "ab Schwere WARNING").
+          semgrep --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --severity WARNING --severity ERROR --error -- $FILES
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: scripts/gitleaks.toml
+      - name: pnpm audit
+        run: pnpm audit:check
       - name: Install Chromium for Playwright
+        if: steps.changes.outputs.code == 'true'
         run: pnpm --filter @hv/web exec playwright install --with-deps chromium
       - name: End-to-end acceptance scenario
+        if: steps.changes.outputs.code == 'true'
         run: pnpm --filter @hv/web e2e
       - uses: actions/upload-artifact@v4
         if: always()

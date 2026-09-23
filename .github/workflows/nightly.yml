@@ -1,0 +1,30 @@
+# Slower, network-heavy security scans that do not need to gate every push (docs/agentische-
+# entwicklung-plan.md 6.4 "(012)"): gitleaks over the whole repository, a Semgrep full run
+# (`p/typescript` plus the house ruleset), and `pnpm audit`. `gates.yml` already runs a narrower,
+# fast version of each on every push/PR; this is the full sweep.
+name: nightly
+on:
+  schedule:
+    - cron: '17 3 * * *' # daily, off peak hours; avoids the top of the hour with everyone else's cron
+  workflow_dispatch:
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: gitleaks (full repository)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: scripts/gitleaks.toml
+      - name: Semgrep (full run)
+        run: |
+          pip install --quiet semgrep
+          semgrep --config p/typescript --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --error .
+      - name: pnpm audit
+        run: pnpm audit:check

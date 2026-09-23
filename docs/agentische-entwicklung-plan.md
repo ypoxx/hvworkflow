@@ -228,53 +228,70 @@ gegeben. Meist ist dann die Spec falsch, nicht der Code.
 Tore sind deterministisch: Werkzeug, Schwelle, blockiert oder nicht. Kein Tor ist „Ermessen des
 Agenten".
 
+The last column, "Stand", is checked mechanically by `scripts/plan-honesty.mjs` (`pnpm plan-honesty`,
+slice 012): every row needs exactly one of `läuft (CI: <Schrittname>)` (the step must exist in
+`.github/workflows/*.yml`), `läuft (Hook: <Ereignis>)` (the event must be configured in
+`.claude/settings.json`), `läuft (Review: Reviewer-Checkliste)`, or `geplant in Scheibe NNN` (the
+slice must exist in `docs/produktplan-beta.md` section 5). A gate that partly runs gets two rows —
+one for what runs, one for what is still planned — rather than one row overclaiming the whole gate
+(Audit-Befund A2).
+
 ### 5.1 Architektur
 
-| Tor | Werkzeug | Blockiert, wenn |
-|---|---|---|
-| Abhängigkeitsrichtung | Import-Regelprüfung (z. B. dependency-cruiser, import-linter) | Domäne importiert aus Adapter, Oberfläche aus Persistenz, Nachbarsystem-Adapter aus anderem Adapter |
-| Vertrag ist Quelle | OpenAPI-Lint und Diff gegen `openapi/` | Endpunkt im Code ohne Vertrag; Vertragsänderung ohne Versions- und Changelog-Eintrag |
-| Ereignisspeicher nur anhängend | Test gegen die Persistenzschicht | irgendein Pfad ändert oder löscht ein Ereignis |
-| Ein Entscheidungspunkt für Rechte | statische Suche nach Rollenvergleichen im Code | Rollenname als Literal außerhalb der Policy-Schicht |
-| ADR-Bezug | Reviewer-Checkliste | Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR |
+| Tor | Werkzeug | Blockiert, wenn | Stand |
+|---|---|---|---|
+| Abhängigkeitsrichtung | dependency-cruiser (`scripts/dependency-cruiser.cjs`, `pnpm arch`) | Domäne importiert aus einem `apps/*` oder einem Node-I/O-Kernmodul; Oberfläche importiert aus `apps/api`; ein Adapter importiert einen anderen Adapter | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Vertrag ist Quelle (Lint) | `pnpm contract:lint` (Redocly) | der Vertrag verletzt sein eigenes Schema | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Vertrag ist Quelle (generierte Typen aktuell) | Diff von `packages/contract/src/types.ts` gegen einen frischen `openapi-typescript`-Lauf | `openapi.yaml` geändert, Typen nicht neu erzeugt | läuft (CI: Contract types are up to date) |
+| Vertrag ist Quelle (Versions- und Changelog-Pflicht) | — | eine Vertragsänderung ohne Versions- und Changelog-Eintrag | geplant in Scheibe 019 |
+| Ereignisspeicher nur anhängend | Testsuite (u. a. `events are append-only and gap-free`) | irgendein Pfad ändert oder löscht ein Ereignis | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Ein Entscheidungspunkt für Rechte | statische Suche nach Rollenvergleichen (`scripts/role-literal-check.mjs`, `pnpm role-literals`) | ein Rollenname als Literal außerhalb der Policy-Schicht (`permissions.ts`, `seed.ts` und Tests ausgenommen) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| ADR-Bezug | Reviewer-Checkliste (`.claude/agents/reviewer.md`, Punkt 1: Spec-Konformität deckt eine fehlende ADR mit ab) | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | läuft (Review: Reviewer-Checkliste) |
 
 ### 5.2 Backend
 
-| Tor | Werkzeug | Blockiert, wenn |
-|---|---|---|
-| Regeltabellen-Tests | Testsuite, ein Test je Regel-ID mit Legal Trace | eine Regel-ID ohne Test; ein Test ohne Regel-ID |
-| Policy-Wahrheitstabelle | generierte Tabelle Rolle × Status × Aktion, Diff gegen eingecheckten Stand | Diff ohne ausdrückliche Freigabe in der Spec |
-| Vertragstests | Schema-Validierung jeder Antwort gegen OpenAPI | Abweichung |
-| Statusmaschine | Übergangstabelle als Daten, Test jeder erlaubten und einer verbotenen Kante | fehlende Kante |
-| Migrationen | Vorwärts-Rückwärts-Lauf gegen leere und gefüllte Datenbank | Fehler |
-| Statische Sicherheitsanalyse | Semgrep-Regelsatz für die Sprache, Secrets-Scan, Abhängigkeits-Audit | Befund ab „mittel"; jedes Secret; bekannte CVE ohne Ausnahme-Eintrag |
-| Idempotenz und Nebenläufigkeit | Test: gleicher Idempotency-Key zweimal; zwei Schreiber, eine Version | Doppelanlage; verlorene Änderung |
-| Zeit | Test mit fester Uhr; Prüfung auf `now()` außerhalb der Zeitquelle | direkter Systemzeitzugriff |
+| Tor | Werkzeug | Blockiert, wenn | Stand |
+|---|---|---|---|
+| Regeltabellen-Tests (ein Test je Regel-ID) | Testsuite, ein generierter `it()` je Zeile von `TRANSITIONS`/`GUARDS` (`packages/domain/src/__tests__/transitions.test.ts`) | eine Regel-ID ohne Test; ein Test ohne Regel-ID | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Regeltabellen-Tests (mit Legal Trace) | — | eine Regel-ID ohne `legalRef` | geplant in Scheibe 011 |
+| Policy-Wahrheitstabelle | generierte Tabelle Rolle × Status × Aktion (`packages/domain/policy-truth-table.md`), Schnappschusstest plus Diff-Schritt | ein Diff ohne ausdrückliche Freigabe in der Spec | läuft (CI: Policy truth table is committed) |
+| Vertragstests | Schema-Validierung jeder Antwort gegen OpenAPI (`apps/api/src/__tests__/helpers.ts`, `expectValid`/`expectValidProblem`), mit begründeten Ausnahmen für heutige Vertragslücken | eine Abweichung ohne Ausnahmeeintrag | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Statusmaschine | Übergangstabelle als Daten (`packages/domain/src/transitions.ts`), Test jeder erlaubten und einer verbotenen Kante | eine fehlende Kante | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Migrationen | — | ein Vorwärts-Rückwärts-Lauf gegen leere und gefüllte Datenbank schlägt fehl | geplant in Scheibe 027 |
+| Statische Sicherheitsanalyse (Semgrep) | Semgrep-Regelsatz für TypeScript (`scripts/semgrep/rules.yml`), über die geänderten Dateien | ein Befund ab „mittel"/WARNING | läuft (CI: Semgrep) |
+| Statische Sicherheitsanalyse (Secrets-Scan) | gitleaks (`scripts/gitleaks.toml`), über PR-Diff bzw. Push-Bereich | jedes Secret ohne begründeten Allowlist-Eintrag | läuft (CI: gitleaks) |
+| Statische Sicherheitsanalyse (Abhängigkeits-Audit) | `pnpm audit --json` mit Ausnahmeliste (`scripts/audit-check.mjs`, `scripts/audit-exceptions.json`) | eine bekannte CVE ab „moderate" ohne (nicht abgelaufenen) Ausnahme-Eintrag | läuft (CI: pnpm audit) |
+| Idempotenz und Nebenläufigkeit | Test: derselbe Idempotency-Key zweimal (aktorskopiert, R-IDEM-01); ein veraltetes `If-Match` ergibt 412 | eine Doppelanlage; eine verlorene Änderung | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Zeit | Tests mit fester injizierter Uhr; `scripts/now-check.mjs` (`pnpm now-check`) gegen direkten Systemzeitzugriff außerhalb der Injektionsstelle | direkter Systemzeitzugriff | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 
 ### 5.3 Oberfläche
 
-| Tor | Werkzeug | Blockiert, wenn |
-|---|---|---|
-| Sichtnachweis | Playwright-Screenshot je Abnahmekriterium, im Abschlussbericht | fehlt |
-| Bühnenszene unter Last | Playwright-Lauf mit 800 synthetischen Fragen, Zeitbudget für Filter und Wechsel | Budget überschritten |
-| Barrierefreiheit | axe-core im Playwright-Lauf, Tastaturpfad für die Kernszene | Verstoß ab „ernst" |
-| Hausvokabular | Lint gegen Verbotsliste (Ticket, Assignee, Workflow-Instanz …) in Oberflächentexten | Treffer |
-| Zweisprachigkeit | Vollständigkeit der Übersetzungsschlüssel DE und EN, keine Literale in Komponenten | fehlender Schlüssel; Literal |
-| Vertragsbindung | Oberfläche nutzt nur generierten Client aus OpenAPI; `_actions` bestimmen Sichtbarkeit | handgeschriebener Aufruf; Rollenname in Komponente |
-| Fehlerpfad | Test: Konflikt (412), Verbindungsverlust, leere Liste | ungetestet |
+| Tor | Werkzeug | Blockiert, wenn | Stand |
+|---|---|---|---|
+| Sichtnachweis | Playwright-Screenshots je Abnahmekriterium (`apps/web/e2e/abnahme.spec.ts`, `docs/evidence/`) | ein Nachweis fehlt | läuft (CI: End-to-end acceptance scenario) |
+| Bühnenszene unter Last | — | das Zeitbudget für Filter und Wechsel bei 800 Fragen ist überschritten | geplant in Scheibe 084 |
+| Barrierefreiheit | — | ein Verstoß ab „ernst" | geplant in Scheibe 013 |
+| Hausvokabular | Lint gegen Verbotsliste (`scripts/vocabulary-check.mjs`, `pnpm vocabulary`) | ein Treffer (Ticket, Assignee, Workflow-Instanz, Issue, Task) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Zweisprachigkeit (Schlüssel-Vollständigkeit) | `apps/web/src/i18n/parity.test.ts` | ein Schlüssel fehlt in DE oder EN | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Zweisprachigkeit (keine Literale in Komponenten) | — | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | geplant in Scheibe 017 |
+| Vertragsbindung (kein Rollenname in der Komponente) | `scripts/vocabulary-check.mjs` (Rollenvergleich außerhalb `RoleSwitcher`/`actor.ts`/Tests) | ein Rollenname in einer Komponente | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Vertragsbindung (nur generierter Client) | — | ein handgeschriebener Aufruf außerhalb `apps/web/src/api/**` | geplant in Scheibe 016 |
+| Fehlerpfad | — | Konflikt (412), Verbindungsverlust oder leere Liste sind ungetestet | geplant in Scheibe 016 |
 
 ### 5.4 Hooks in der Agentensitzung
 
-| Hook | Wirkung |
-|---|---|
-| PreToolUse auf Shell | blockiert `rm -rf`, `git push`, `git reset --hard`, Netzwerkaufrufe nach außen, Zugriff auf `.env` |
-| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück |
-| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist |
-| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) |
-| TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat |
+| Hook | Wirkung | Stand |
+|---|---|---|
+| PreToolUse auf Shell (heutiger Umfang) | blockiert `git push --force`, `rm -rf /`, `git reset --hard` und `curl`-in-die-Shell-Pipelines (`.claude/settings.json`) | läuft (Hook: PreToolUse) |
+| PreToolUse auf Shell (voller Umfang) | soll jeden `rm -rf`, jeden Netzwerkaufruf nach außen und jeden `.env`-Zugriff blockieren, nicht nur die heutigen Muster | geplant in Scheibe 016 |
+| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | geplant in Scheibe 016 |
+| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | geplant in Scheibe 016 |
+| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | geplant in Scheibe 016 |
+| TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat | geplant in Scheibe 016 |
 
-Die Hooks sind Bequemlichkeit und erste Linie. **Die Tore in 5.1 bis 5.3 laufen zusätzlich in CI**,
-weil ein Stop-Hook nach acht Blockaden aufgehoben wird und weil Hooks lokal abschaltbar sind.
+Die Hooks sind Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst, weil ein Stop-Hook nach
+acht Blockaden aufgehoben wird und weil Hooks lokal abschaltbar sind: Die Spalte „Stand" in 5.1 bis
+5.3 oben sagt ehrlich, welche dieser Tore heute bereits in CI laufen und welche noch `geplant` sind.
 
 ---
 

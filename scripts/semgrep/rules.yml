@@ -1,0 +1,63 @@
+rules:
+  - id: no-eval
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      `eval` (or `new Function(...)` built from a string) runs arbitrary code. AGENTS.md rule 11:
+      no credentials, no dynamic code from untrusted input.
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+
+  - id: child-process-string-concatenation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A shell command built by string concatenation or template interpolation is a command-injection
+      risk. Pass arguments as an array (`execFile`/`spawn`) instead of building a string.
+    patterns:
+      - pattern-either:
+          - pattern: $MOD.exec($CMD, ...)
+          - pattern: $MOD.execSync($CMD, ...)
+          - pattern: exec($CMD, ...)
+          - pattern: execSync($CMD, ...)
+      - metavariable-pattern:
+          metavariable: $CMD
+          patterns:
+            - pattern-either:
+                - pattern: $A + $B
+                - pattern: "`...${$X}...`"
+
+  - id: dangerously-set-inner-html
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      `dangerouslySetInnerHTML` bypasses React's escaping and is an XSS risk. Render the text through
+      a normal React child instead.
+    pattern-regex: dangerouslySetInnerHTML\s*=
+
+  - id: math-random-possible-security-use
+    languages: [typescript, javascript]
+    severity: INFO # a hint, not a block (spec: "als Hinweis") — `pnpm gates`/CI block at WARNING+
+    message: >-
+      `Math.random()` is not cryptographically secure. If this value is a token, id, password or
+      anything else security-relevant, use `crypto.randomUUID()` or `crypto.getRandomValues()`
+      instead; if it is only demo-corpus jitter (packages/domain/src/seed.ts) or similar, ignore this.
+    pattern: Math.random()
+
+  - id: hardcoded-credential-literal
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A credential-shaped identifier assigned a string literal. AGENTS.md rule 11: no credentials in
+      the repository — read it from the environment/secret store instead.
+    patterns:
+      - pattern-either:
+          - pattern: const $VAR = "..."
+          - pattern: let $VAR = "..."
+          - pattern: "$OBJ.$VAR = \"...\""
+          - pattern: "{$VAR: \"...\"}"
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i)^(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)$

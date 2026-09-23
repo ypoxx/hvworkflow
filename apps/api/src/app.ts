@@ -16,6 +16,7 @@ import {
   createInProcessApi,
   etagOf,
   seedEvents,
+  SYSTEM_ACTOR,
   type Actor,
   type AnswerDraft,
   type Classification,
@@ -52,6 +53,14 @@ export interface CreateAppOptions {
    * by default so constructing an app for a test never has this side effect; `server.ts` turns it on.
    */
   seedOnStart?: boolean;
+  /**
+   * Actor the demo auto-seed (`seedOnStart`) runs as. Falls back to `HV_SEED_ACTOR` (env var, same
+   * `"<id>:<role>"` format as the `X-Actor` header) and finally to the synthetic system actor
+   * `packages/domain/src/seed.ts` defines. Never a role-name literal here — the only places a `Role`
+   * may appear as a string are `ROLE_PERMISSIONS`, the seed corpus and the demo role switcher
+   * (AGENTS.md rule 4; `scripts/role-literal-check.mjs`, slice 012).
+   */
+  seedActor?: Actor;
 }
 
 /** The concrete app type (with its `Variables`), so tests can type `let app: App` without repeating it. */
@@ -82,7 +91,11 @@ export function createApp(options: CreateAppOptions = {}): App {
     // store is already populated by the time this synchronous function returns even though the
     // promise below is not awaited here; `actorStorage.run` supplies the actor `seedDemo` needs
     // outside of any HTTP request.
-    actorStorage.run({ id: 'system', role: 'admin' }, () => {
+    const seedActor: Actor =
+      options.seedActor ??
+      (process.env['HV_SEED_ACTOR'] !== undefined ? parseActorHeader(process.env['HV_SEED_ACTOR']) : undefined) ??
+      SYSTEM_ACTOR;
+    actorStorage.run(seedActor, () => {
       domain
         .seedDemo({})
         .then((meeting) => {

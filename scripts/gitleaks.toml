@@ -1,0 +1,32 @@
+#
+# gitleaks config (slice 012, AGENTS.md rule 11: no credentials, no real data). Extends gitleaks'
+# own default ruleset — allowlist entries below are reasoned exceptions, never a blanket suppression.
+#
+# Runs only in CI (official `gitleaks/gitleaks-action` or the `zricethezav/gitleaks` container): a
+# GitHub release download is blocked from this development sandbox, so this file could not be
+# exercised against the real binary in this slice — the first real run is the CI job itself
+# (acceptance criterion 3). Scope in `gates.yml` is the PR diff / push range; the nightly workflow
+# scans the whole repository.
+#
+title = "HV-Tool gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic demo data and fixtures only — never a real credential (AGENTS.md rule 11)."
+
+# The demo `X-Actor` header (contract security scheme `demoActor`, apps/api/src/actor.ts) is a
+# `<id>:<role>` stand-in for authentication, not a secret — it appears throughout the seed corpus,
+# tests and docs as e.g. "admin:admin", "cap:capture".
+regexes = [
+  '''(?i)x-actor['":\s]*[\w.-]+:(admin|moderation|capture|expert|legal|approver|podium|observer)\b''',
+]
+
+# The synthetic demo corpus (packages/domain/src/seed.ts) and its tests are generated, pseudonymous
+# data (AGENTS.md rule 11) — free-text German sample content, not credentials; gitleaks' generic
+# high-entropy/secret rules occasionally trip on long generated strings there.
+paths = [
+  '''packages/domain/src/seed\.ts''',
+  '''packages/domain/src/__tests__/seed\.test\.ts''',
+]

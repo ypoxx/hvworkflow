@@ -116,10 +116,13 @@ export function etagOf(version: number): string {
   return `"v${version}"`;
 }
 
+// `crypto.randomUUID` exists in Node 22 and every target browser; the fallback below is defensive
+// and, per the now() gate (`scripts/now-check.mjs`, AGENTS.md rule 8), built from randomness alone —
+// never from the clock, so an id never doubles as a timestamp.
 const defaultId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    : `${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * The single decision point (docs/rollen-und-rechtekonzept.md): permission bundle first, then the
@@ -150,7 +153,7 @@ const SPEAKER_ACTIONS: readonly Permission[] = ['speaker.update', 'speaker.reord
 
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
-  const clock = options.clock ?? (() => new Date());
+  const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
   for (const e of store.all()) reduce(state, e);
