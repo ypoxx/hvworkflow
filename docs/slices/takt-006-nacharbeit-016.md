@@ -70,7 +70,8 @@ beim Eigentümer), keine Änderung an CI-Workflows.
 
 ## Files allowed
 
-`scripts/hooks/**`, `scripts/contract-gate-strict.test.mjs`, `scripts/role-literal-check.test.mjs`, `scripts/slice-scope.mjs`, `scripts/slice-scope.test.mjs`, `scripts/i18n-literal-check.test.mjs`,
+`scripts/hooks/**`, `scripts/i18n-literal-check.mjs` (nur die zwei Kopfkommentare mit lokalem Pfad; vom
+Spec-Eigentümer nach dem Bau ergänzt, damit Kriterium 3 erfüllbar ist), `scripts/contract-gate-strict.test.mjs`, `scripts/role-literal-check.test.mjs`, `scripts/slice-scope.mjs`, `scripts/slice-scope.test.mjs`, `scripts/i18n-literal-check.test.mjs`,
 `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`, `scripts/fixtures/**`, `docs/agentische-entwicklung-plan.md`
 (Abschnitt 5.4, Spalte „Wirkung" der Zeilen PreToolUse und TaskCompleted), diese Datei (Bericht).
 
