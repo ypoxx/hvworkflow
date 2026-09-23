@@ -175,6 +175,119 @@ docs/adr/0010-pilotmodus-uebungsbetrieb.md, docs/adr/0012-zustandsmodell-und-ver
 docs/adr/0013-zwei-protokollebenen.md, docs/adr/0014-realtime-sse.md, docs/adr/0015-vertragsversionierung.md,
 docs/adr/0016-agenten-arbeitsmodell.md, docs/slices/015-adr-paket.md, docs/slices/takt-003-nacharbeit-015.md
 
+### Nacharbeit nach Review (Runde 2)
+
+Nacharbeit nach Review: Befunde 1–5 umgesetzt (Commit 3ea735612dab4d5e33ee8ae8c02437eaa7f7d482).
+
+Auslöser: Opus-Review „accept after minor fixes"; zwei Befunde (Platzierung von E35 in der Quellentabelle, Wortlaut
+der N3-Ersetzung) gehen auf die Formulierung der Mini-Spec selbst zurück, nicht auf eine falsche Umsetzung.
+
+1. `docs/slices/015-adr-paket.md:126` (Zeile „0016 Agenten-Arbeitsmodell"): „E35" aus der Spalte Quellstellen
+   entfernt, in die Spalte der offenen E-Nummern verschoben (jetzt „E48, E35, E44, E47").
+2. N3 an allen drei Stellen (0003, 0009, 0010): der eingefügte Halbsatz „dass Rechtekonzept Abschnitt 4 (keine
+   physische Löschung) diesen Bestand nicht erfasst, bestätigen Recht und DSB mit dem Rechtekonzept in 052" durch
+   „ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand erfasst, legt der Plan nicht fest: offen
+   (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052" ersetzt, Zeilenumbruch angepasst.
+3. `docs/adr/0016-…:94`: „bis zur dauerhaften Regel (Prüfpunkt 1)" durch „bis zur dauerhaften Regel (E35, im
+   Register fällig am 23.10.2026 mit 031)" ersetzt, Absatz auf ca. 110 Zeichen umgebrochen.
+4. `docs/adr/0013-…:34`: die verkürzte Zeile in den Absatz zurückgeflossen (Umbruch ca. 110 Zeichen), kein
+   Wortlaut geändert.
+5. `docs/slices/015-adr-paket.md:~191`: dem Runde-2-Einleitungssatz „bleiben **offen**" den Zusatz „(inzwischen
+   erledigt in takt-003, siehe unten)" angefügt.
+6. `docs/slices/takt-003-nacharbeit-015.md`: Ziel-Punkte 3 und 5 an den neuen ADR-Wortlaut angepasst, jeweils
+   markiert „(nachgeschärft nach Review)"; dieser Bericht ergänzt.
+
+`git diff --stat 18e27f5 3ea7356`:
+```
+ docs/adr/0003-persistenz-ereignislog.md                       | 4 ++--
+ docs/adr/0009-aufbewahrung-vertraulichkeit-personentabelle.md | 4 ++--
+ docs/adr/0010-pilotmodus-uebungsbetrieb.md                    | 4 ++--
+ docs/adr/0013-zwei-protokollebenen.md                         | 8 ++++----
+ docs/adr/0016-agenten-arbeitsmodell.md                        | 4 ++--
+ docs/slices/015-adr-paket.md                                  | 7 ++++---
+ docs/slices/takt-003-nacharbeit-015.md                        | 8 ++++----
+ 7 files changed, 20 insertions(+), 19 deletions(-)
+```
+
+`git diff --word-diff 18e27f5 3ea7356 -- <file>` (gekürzt auf die geänderten Sätze):
+
+`docs/adr/0003-persistenz-ereignislog.md`:
+```
+B15, 042); [-dass-]{+ob+} Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand[-nicht-] erfasst, [-bestätigen-]{+legt+}
+{+  der Plan nicht fest: offen (E16), Frage an+} Recht und DSB mit dem Rechtekonzept [-in-]{+aus+} 052.
+```
+
+`docs/adr/0009-aufbewahrung-vertraulichkeit-personentabelle.md`:
+```
+Anwendung entfernt (Plan 3, B15, 042); [-dass-]{+ob+} Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen
+Bestand[-nicht-] erfasst, [-bestätigen-]{+legt der Plan nicht fest: offen (E16), Frage an+} Recht und DSB mit dem Rechtekonzept [-in-]{+aus+} 052.
+```
+
+`docs/adr/0010-pilotmodus-uebungsbetrieb.md`:
+```
+042); [-dass-]{+ob+} Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand[-nicht-] erfasst, [-bestätigen-]{+legt+}
+{+  der Plan nicht fest: offen (E16), Frage an+} Recht und DSB mit dem Rechtekonzept [-in-]{+aus+} 052.
+```
+
+`docs/adr/0013-zwei-protokollebenen.md` (reflow, keine Wortlautänderung):
+```
+- **Keine Kennzahl je Person.** Keine personenbezogene Leistungsauswertung (Plan 4, Zeile 0013). Es gibt fünf
+  fachliche Kennzahlen (Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf je 5 min, Fragen in
+  Rechtsfreigabe > 10 min, Ereignisse je Minute) und ein Kennzahlen-Allowlist-Tor: keine Kennzahl je Subject
+  ohne Spec-Eintrag.
+```
+
+`docs/adr/0016-agenten-arbeitsmodell.md`:
+```
+- **E35** Taktfläche nach Umstellung auf HTTP — bis zur dauerhaften Regel [-(Prüfpunkt 1)-]{+(E35, im Register fällig am 23.10.2026+}
+{+  mit 031)+} Übergangsregel vom 23.09.2026 (`[skip netlify]` auf jedem Commit, Demo-Build nur nach Go).
+```
+
+`docs/slices/015-adr-paket.md` (Quellentabelle Zeile 0016, und Runde-2-Einleitungssatz):
+```
+| 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter [-Kalender); E35-]{+Kalender)+} | E48, {+E35,+} E44, E47 | 1 |
+...
+minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen**
+{+(inzwischen erledigt in takt-003, siehe unten)+} und gehen als Kleinänderung in eine Folge-Scheibe (keine zweite
+Nacharbeitsrunde, Plan 6.3):
+```
+
+Tail von `pnpm gates` (Runde 2, EXIT=0, mit Sourcemap- und Chunk-Size-Warnungen):
+```
+> hvworkflow@0.1.0 vocabulary /home/user/wt/takt
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1713 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
+dist/assets/index-CS58249t.js                        525.20 kB │ gzip: 154.17 kB │ map: 2,155.11 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.20s
+```
+EXIT=0. Vor dem Build ebenfalls grün: contract gate ok (openapi.yaml unverändert), `packages/domain test` 39
+passed, `apps/api test` 25 passed, `apps/web test` 35 passed, `vocabulary-check: ok`; `apps/web lint` weiterhin nur
+die bekannten Alt-Warnungen (react/set-state-in-effect, only-export-components), keine neuen Befunde.
+
 ## Review findings
 
 (vom Reviewer)
