@@ -17,7 +17,10 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/agentische-entwicklung-plan.md`](docs/agentische-entwicklung-plan.md) | Wie das Werkzeug mit mehreren KI-Agenten unterschiedlicher Qualität und Kosten gebaut wird: Befunde der letzten Monate, zwölf Regeln, Rollen- und Modellbesetzung, Takt je Scheibe, Qualitätstore je Ebene, Kostenrahmen, ehrliche Bewertung der These „bauen statt kaufen", Zeitplan bis zur Demo. |
 | [`docs/bauplan-demo.md`](docs/bauplan-demo.md) | Orchestrierung der Demo-Nacht: Besetzung je Aufgabe und Modell, Phasen, Tore, Token-Hygiene, Kostenrahmen, Entscheidungspunkte. |
 | [`docs/design-prinzipien.md`](docs/design-prinzipien.md) | Was „beste Oberfläche" für dieses Werkzeug heißt: zehn Prinzipien, Muster, Checkliste der Design-Kritik. |
+| [`docs/adr/0001-vorlage-annahme.md`](docs/adr/0001-vorlage-annahme.md) | Vorlage zur Annahme von ADR 0001 an Prüfpunkt 1: was angenommen wird, was nicht, Nachweise je Grenze, Beschlussfeld. |
 | [`docs/adr/0002-demo-betriebsart-in-process.md`](docs/adr/0002-demo-betriebsart-in-process.md) | Demo-Betriebsart: der Anwendungskern läuft im Browser hinter dem Vertrag; der HTTP-Dienst nutzt denselben Kern. |
+| [`docs/adr/`](docs/adr/) | ADR 0003–0016, vorgeschlagen (Scheibe 015): Persistenz, Identität, Antwortformat, Bühne je Gerät, Deployment, Integrationen, Aufbewahrung, Pilotmodus, Ereignis-Umschlag, Zustandsmodell, Protokollebenen, Realtime, Vertragsversionierung, Agenten-Arbeitsmodell. Annahme je Prüfpunkt (Plan Abschnitt 4). |
+| [`docs/entscheidungsregister.md`](docs/entscheidungsregister.md) | Entscheidungsregister E1–E49 mit Eigentümer, Fälligkeit, Rückfalltrigger, Kosten bei Änderung und Vermerk „auf Standard gebaut" (Scheibe 014). |
 | [`docs/glossar.md`](docs/glossar.md) | Hausvokabular ↔ Code, verbindlich für Oberfläche und Contract. |
 | [`docs/slices/`](docs/slices/) | Eine Spezifikation je Scheibe mit Nachweisen, Review-Befunden und Nacharbeit — wie gebaut wurde. |
 | [`docs/demo-skript.md`](docs/demo-skript.md) | Drehbuch der Vorführung, bekannte Punkte, Lesereihenfolge für Entwickler. |
@@ -25,6 +28,7 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/evidence/`](docs/evidence/) | Screenshots aus den automatisierten Durchläufen, zuletzt im Endzustand erzeugt. |
 | [`docs/feedback/`](docs/feedback/) | Auswertung von Rückmeldungen: je Aussage berücksichtigt, geplant, neu oder unklar, mit Folge, Aufwand und Rückfragen. |
 | [`docs/produktplan-beta.md`](docs/produktplan-beta.md) | Plan für die KI-Agenten vom MVP zur soliden Beta: Beta-Kriterien B1–B18, Standardannahmen mit Änderungskosten, 80 Scheiben in sieben Meilensteinen, Kalender in Agentenzeit aus dem Abhängigkeitsgraphen, Prüfpunkte, Token, Risiken, Entscheidungsregister. |
+| [`docs/qualitaetsleitplanken-produktreife.md`](docs/qualitaetsleitplanken-produktreife.md) | Qualitätsleitplanken für Spec-Autoren und Reviewer: Risikoklassen, Perspektiven auf heutige Rollen, Qualitätschecks, Nachweise, durchgerechnetes Beispiel. Keine zweite Arbeitsordnung. |
 
 ## Lauffähige Version
 

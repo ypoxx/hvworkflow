@@ -36,3 +36,35 @@ nicht an Logik).
   Persistenzpfad und Deployment-Risiko in der Nacht vor der Demo; gewinnt nur Mehrnutzer-Sicht.
 - **Gehostete Postgres-Instanz.** Richtig für den Piloten, zu viel Betriebsaufwand und
   Zugangsdatenrisiko für die Demo.
+
+## Ergänzung (vorgeschlagen, 23.09.2026; Annahme Prüfpunkt 1)
+
+**Status der Ergänzung:** vorgeschlagen · **Entscheider:** Eigentümer (Plan 4, Zeile 0002) · Der
+bisherige Text dieses ADR bleibt unverändert; „angenommen" gilt für den bisherigen Teil.
+
+Standardannahme aus Plan 3 („Taktfläche für Kleinänderungen") und Plan 4 (Zeile 0002):
+
+- **Die Demo-Betriebsart bleibt bis beta-1 Taktfläche** für Kleinänderungen (E35).
+  Staging-synthetisch bekommt Kleinänderungen mit dem nächsten Approval-Deploy, der Übungsmandant
+  nur außerhalb des Freeze.
+- **Wer mergt und wann die Demo baut, ist im Plan nicht widerspruchsfrei.** Plan 3 („Taktfläche
+  für Kleinänderungen"): der Merge des Eigentümers ist das Go, die Pipeline baut die Demo. E48 und
+  Plan 6.6: der Orchestrator mergt nach grünen Toren und unabhängigem Review, danach Netlify-Build.
+  Übergangsregel des Eigentümers vom 23.09.2026: jeder Commit, auch der Squash-Merge des
+  Orchestrators, trägt `[skip netlify]`; ein Demo-Build geschieht nur nach ausdrücklichem Go des
+  Eigentümers. Die dauerhafte Regel ist offen (E35, E48, Prüfpunkt 1); ADR 0016 nennt denselben
+  Konflikt.
+- **Sie besteht dieselbe e2e-Suite wie die HTTP-Betriebsart** (Dual-Mode-e2e-Matrix, B17). Demo und
+  HTTP teilen Kern, Vertrag und e2e-Suite.
+- **Reset-Banner statt Upcaster.** Bei einem Schemawechsel des Ereignis-Umschlags (ADR 0011) zeigt
+  die Demo bei altem `localStorage`-Protokoll ein Reset-Banner; es gibt keinen Upcaster für
+  Demo-Protokolle.
+- **Der `localStorage`-Adapter bleibt Wegwerfcode.** Nichts daraus geht in die Produktivbetriebsart
+  außer Kern und Vertrag (unverändert aus dem bisherigen Teil).
+- **Ende nach beta-1 durch Eigentümerentscheid.**
+
+**Nachweis:** Scheibe 015 (dieser Text) und Scheibe 031 (e2e-Lauf beider Projekte grün, Test „altes
+Demo-Protokoll → Reset-Banner"); der Reset-Banner-Test entsteht in 024.
+
+**Offene Registerzeilen:** E35 (Taktfläche nach Umstellung auf HTTP), E48 (Merge-Befugnis; dauerhafte
+Regel für Demo-Builds, Prüfpunkt 1).

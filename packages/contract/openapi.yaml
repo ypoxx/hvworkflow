@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.1.0
+  version: 0.2.0
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -9,6 +9,12 @@ info:
     neighbouring systems. Every endpoint is implemented by the application core (`apps/api`) and, for
     the demo, by an in-process adapter that runs the same domain code inside the browser
     (`packages/domain`, see ADR 0002).
+
+    Versioning follows ADR 0015 (Vertragsversionierung, proposed — "Versionierung nach ADR 0015,
+    vorgeschlagen"): semantic versioning, every change recorded in `packages/contract/CHANGELOG.md`,
+    new mandatory fields arrive optional first, removals are deprecated one cycle ahead, pre-declared
+    operations live in `packages/contract/allowlist.json` with an expiry date. The gate
+    `packages/contract/scripts/check.mjs` (run by `pnpm -r test`) enforces this.
 
     Conventions (see docs/ist-analyse-und-schnittstellen.md, section 6):
     - Writes carry an `Idempotency-Key`; replays return the original result.
@@ -42,6 +48,7 @@ paths:
       summary: Get the current meeting
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /agenda-items:
     get:
       tags: [meeting]
@@ -49,6 +56,7 @@ paths:
       summary: List agenda items (Tagesordnungspunkte)
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /units:
     get:
       tags: [meeting]
@@ -56,6 +64,7 @@ paths:
       summary: List answering units (Fachbereiche)
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /speakers:
     get:
       tags: [speakers]
@@ -66,6 +75,7 @@ paths:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/SpeakerStatus' } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [speakers]
       operationId: registerSpeaker
@@ -106,6 +116,7 @@ paths:
       summary: Get a speaker
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [speakers]
@@ -130,6 +141,7 @@ paths:
         - { name: speakerId, in: query, schema: { type: string } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [contributions]
       operationId: captureContribution
@@ -154,6 +166,7 @@ paths:
       summary: Get a speech with its coverage (Restabdeckung)
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /contributions/{contributionId}/questions:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -205,6 +218,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Question' } }
                   total: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /questions/{questionId}:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     get:
@@ -213,6 +227,7 @@ paths:
       summary: Get a question with its answer versions and allowed actions
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /questions/{questionId}/history:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -222,6 +237,7 @@ paths:
       summary: Full event history of a question (Vorgangshistorie)
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Event' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /questions/{questionId}/classification:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -430,6 +446,7 @@ paths:
       summary: Podium view (Bühne) — current question, queue, counters
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /events:
     get:
       tags: [events]
@@ -449,6 +466,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Event' } }
                   lastSeq: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /demo/seed:
     post:
       tags: [demo]
@@ -505,7 +523,10 @@ components:
       headers: { ETag: { $ref: '#/components/headers/ETag' } }
       content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } }
     Forbidden:
-      description: The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`)
+      description: >-
+        The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`):
+        R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing
+        (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010).
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
     NotFound:
       description: Not found
@@ -530,13 +551,21 @@ components:
         status: { type: integer }
         detail: { type: string }
         instance: { type: string }
-        ruleId: { type: string, description: 'Rule id from the domain rule tables, e.g. R-TRANS-07' }
+        ruleId:
+          type: string
+          description: >-
+            Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write
+            permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt;
+            since 0.2.0, enforced from slice 010).
     Role:
       type: string
       description: >
         Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface
         never branches on a role name; it reads `_actions`.
-      enum: [moderation, capture, expert, legal, approver, podium, admin, observer]
+        `coordination` (since 0.2.0) is the working name (Arbeitsname) of the role that classifies and
+        assigns; displayed as "Koordination", final name pending register entry E1. Its permission
+        bundle arrives with slice 021; until then the server does not know the role.
+      enum: [moderation, capture, expert, legal, approver, podium, admin, observer, coordination]
     Actor:
       type: object
       required: [id, role]
@@ -546,17 +575,28 @@ components:
         displayName: { type: string }
     Action:
       type: string
-      description: Permission identifiers, identical to the domain permission list.
+      description: >
+        Permission identifiers (Rechtebezeichner), identical to the domain permission list. A
+        permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`,
+        AGENTS.md rule 4) — never by comparing a role name in interface or server code.
+        Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`,
+        `history.read` and `event.read` (next to `question.read`; the read operations check them from
+        slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe —
+        recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version,
+        not the approval, which stays `question.approve`; register E25; slice 021).
       enum:
         - speaker.register
         - speaker.reorder
         - speaker.update
+        - speaker.read
         - contribution.capture
+        - contribution.read
         - question.capture
         - question.classify
         - question.assign
         - answer.draft
         - question.submit_review
+        - question.legal.clear
         - question.approve
         - question.return
         - question.stage
@@ -565,6 +605,9 @@ components:
         - question.withdraw
         - question.merge
         - question.read
+        - stage.read
+        - history.read
+        - event.read
         - demo.seed
     Meeting:
       type: object
@@ -608,17 +651,28 @@ components:
       enum: [waiting, speaking, finished, withdrawn]
     Speaker:
       type: object
-      required: [id, number, displayName, kind, round, position, status, version]
+      # `kind` left the `required` list in 0.2.0 (deprecated, see below); enum and range stay so the
+      # existing 422 validation keeps its meaning until slice 080 removes both fields.
+      required: [id, number, displayName, round, position, status, version]
       properties:
         id: { type: string }
         number: { type: integer, description: Running number of the request to speak }
         displayName: { type: string, description: Pseudonym in the demo; real name only via the register interface }
         organisation: { type: string }
-        kind: { type: string, enum: [shareholder, proxy, association] }
+        kind:
+          type: string
+          enum: [shareholder, proxy, association]
+          deprecated: true
+          description: >-
+            Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
         round: { type: integer, minimum: 1 }
         position: { type: integer, minimum: 1 }
         status: { $ref: '#/components/schemas/SpeakerStatus' }
-        requestedMinutes: { type: integer }
+        requestedMinutes:
+          type: integer
+          deprecated: true
+          description: >-
+            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
         speakingStartedAt: { type: string, format: date-time }
         speakingEndedAt: { type: string, format: date-time }
         questionCount: { type: integer }
@@ -626,19 +680,35 @@ components:
         _actions: { type: array, items: { $ref: '#/components/schemas/Action' } }
     SpeakerRegistration:
       type: object
-      required: [displayName, kind]
+      required: [displayName]
       properties:
         displayName: { type: string, minLength: 1 }
         organisation: { type: string }
-        kind: { type: string, enum: [shareholder, proxy, association] }
+        kind:
+          type: string
+          enum: [shareholder, proxy, association]
+          deprecated: true
+          description: >-
+            Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+            No longer required since 0.2.0; the enum stays so an out-of-enum value is still a 422.
         round: { type: integer, minimum: 1 }
-        requestedMinutes: { type: integer, minimum: 1 }
+        requestedMinutes:
+          type: integer
+          minimum: 1
+          deprecated: true
+          description: >-
+            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
     SpeakerUpdate:
       type: object
       properties:
         status: { $ref: '#/components/schemas/SpeakerStatus' }
         round: { type: integer, minimum: 1 }
-        requestedMinutes: { type: integer, minimum: 1 }
+        requestedMinutes:
+          type: integer
+          minimum: 1
+          deprecated: true
+          description: >-
+            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
     TextSpan:
       type: object
       description: Character offsets into the contribution text, half-open interval
@@ -776,9 +846,27 @@ components:
         queue: { type: array, items: { $ref: '#/components/schemas/Question' } }
         deliveredCount: { type: integer }
         openCount: { type: integer }
+    QuestionLegalClearedPayload:
+      type: object
+      description: >
+        Payload of `QuestionLegalCleared` (since 0.2.0): legal (Recht) has cleared one answer version
+        (Rechtsfreigabe). The clearing is bound to that version like the approval is; it is a
+        recommendation, not the approval itself, which stays with `question.approve` (register E25).
+        Emitted by the core from slice 021; no operation of its own yet (it is declared through the
+        allowlist when 021 needs it).
+      required: [questionId, answerVersion]
+      properties:
+        questionId:
+          type: string
+          description: Same value as the event's `subjectId`, repeated so the payload is self-contained for neighbouring systems
+        answerVersion: { type: integer, minimum: 1, description: The answer version the clearing is bound to }
+        note: { type: string, description: Optional remark of the clearing lawyer (Anmerkung) }
     Event:
       type: object
-      description: One immutable fact. The sequence number is global and gap-free.
+      description: >
+        One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per
+        event type additively: an event of type `QuestionLegalCleared` carries
+        `QuestionLegalClearedPayload`; every other type keeps the open object.
       required: [seq, id, type, at, actor, payload]
       properties:
         seq: { type: integer }
@@ -796,6 +884,7 @@ components:
             - QuestionAssigned
             - AnswerDrafted
             - QuestionSubmittedForReview
+            - QuestionLegalCleared
             - QuestionApproved
             - QuestionReturned
             - QuestionStaged
@@ -807,3 +896,5 @@ components:
         actor: { $ref: '#/components/schemas/Actor' }
         subjectId: { type: string, description: Id of the aggregate the event belongs to }
         payload: { type: object, additionalProperties: true }
+      if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
+      then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
