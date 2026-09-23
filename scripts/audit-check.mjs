@@ -29,23 +29,51 @@ function loadExceptions() {
   return raw;
 }
 
+const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+
 function runPnpmAudit() {
   // `pnpm audit` exits non-zero when it finds vulnerabilities; that is expected, not a script failure —
-  // the JSON on stdout is what we actually evaluate.
-  const result = spawnSync('pnpm', ['audit', '--json'], { encoding: 'utf8' });
+  // the JSON on stdout is what we actually evaluate. A hard network/registry failure (unreachable
+  // registry, DNS, timeout, ...) also exits non-zero, but with a `{ "error": {...} }` body and no
+  // usable "advisories"/"metadata" — that must fail loudly, not read as "no advisories" (review
+  // finding major 1: `npm_config_registry=http://127.0.0.1:9/ node scripts/audit-check.mjs` used to
+  // exit 0).
+  const result = spawnSync('pnpm', ['audit', '--json'], { encoding: 'utf8', timeout: 120_000 });
   if (result.error) throw result.error;
   if (!result.stdout || result.stdout.trim() === '') {
     console.error('pnpm audit produced no output.');
     console.error(result.stderr);
     process.exit(1);
   }
+  let report;
   try {
-    return JSON.parse(result.stdout);
+    report = JSON.parse(result.stdout);
   } catch (e) {
     console.error('pnpm audit output was not valid JSON:', e);
     console.error(result.stdout);
     process.exit(1);
   }
+  if (report.error !== undefined) {
+    console.error('pnpm audit could not reach the audit service — treating this as a failure, not "no advisories":');
+    console.error(`  ${report.error.code ?? '?'}: ${report.error.message ?? JSON.stringify(report.error)}`);
+    process.exit(1);
+  }
+  if (!isPlainObject(report.advisories)) {
+    console.error('pnpm audit output has no usable "advisories" object:');
+    console.error(JSON.stringify(report).slice(0, 1000));
+    process.exit(1);
+  }
+  if (!isPlainObject(report.metadata)) {
+    console.error('pnpm audit output has no usable "metadata" object:');
+    console.error(JSON.stringify(report).slice(0, 1000));
+    process.exit(1);
+  }
+  if (result.status !== 0 && Object.keys(report.advisories).length === 0) {
+    console.error(`pnpm audit exited with status ${result.status} and reported zero advisories — this is a failed run, not a clean one.`);
+    console.error(result.stderr);
+    process.exit(1);
+  }
+  return report;
 }
 
 const exceptions = loadExceptions();
