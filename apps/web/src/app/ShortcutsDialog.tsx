@@ -6,16 +6,21 @@ import { Fragment } from 'react';
 import { Dialog, Kbd, TBody, TD, TH, THead, TR, Table } from '../components';
 import { useT } from '../i18n';
 import type { TKey } from '../i18n';
-
-const ROWS: readonly { keys: readonly string[]; descriptionKey: TKey }[] = [
-  { keys: ['Alt', '1'], descriptionKey: 'shortcuts.nav' },
-  { keys: ['Alt', 'N'], descriptionKey: 'shortcuts.collapse' },
-  { keys: ['?'], descriptionKey: 'shortcuts.help' },
-  { keys: ['Esc'], descriptionKey: 'shortcuts.close' },
-];
+import { FEATURES } from './featureRegistry';
 
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
+
+  const rows: readonly { keys: readonly string[]; descriptionKey: TKey }[] = [
+    ...FEATURES.filter((f) => f.shortcutKey !== undefined).map((f) => ({
+      keys: ['Alt', String(f.shortcutKey)] as readonly string[],
+      descriptionKey: 'shortcuts.nav' as const,
+    })),
+    { keys: ['Alt', 'N'], descriptionKey: 'shortcuts.collapse' as const },
+    { keys: ['?'], descriptionKey: 'shortcuts.help' as const },
+    { keys: ['Esc'], descriptionKey: 'shortcuts.close' as const },
+  ];
+
   return (
     <Dialog open={open} onClose={onClose} title={t('shortcuts.title')}>
       <Table>
@@ -26,13 +31,13 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
           </TR>
         </THead>
         <TBody>
-          {ROWS.map((row) => (
-            <TR key={row.descriptionKey}>
+          {rows.map((row, index) => (
+            <TR key={`${row.descriptionKey}-${index}`}>
               <TD>
                 <span className="flex items-center gap-1 whitespace-nowrap">
-                  {row.keys.map((key, index) => (
+                  {row.keys.map((key, keyIndex) => (
                     <Fragment key={key}>
-                      {index > 0 && <span className="text-ink-400">+</span>}
+                      {keyIndex > 0 && <span className="text-ink-400">+</span>}
                       <Kbd>{key}</Kbd>
                     </Fragment>
                   ))}
