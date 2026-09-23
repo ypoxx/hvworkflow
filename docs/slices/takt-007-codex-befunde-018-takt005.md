@@ -36,8 +36,15 @@ Keine andere Wortlautänderung im Entwicklungsplan, keine neue Zeile in Abschnit
 
 ## Files allowed
 
-`docs/agentische-entwicklung-plan.md` (nur Abschnitt 3), `README.md`, `docs/slices/takt-005-email-aus-012.md` (nur
-Bericht), `docs/slices/takt-007-codex-befunde-018-takt005.md` (Bericht).
+- `docs/agentische-entwicklung-plan.md` (nur Abschnitt 3)
+- `README.md`
+- `docs/slices/takt-005-email-aus-012.md` (nur Bericht)
+- `docs/slices/takt-007-codex-befunde-018-takt005.md` (Bericht)
+
+Nachtrag Orchestrator: als Liste statt Fließtext. Im Fließtext galt die README im Wurzelverzeichnis für das Tor als
+README unter docs, weil es einen bloßen Dateinamen im selben Absatz auf das Verzeichnis des vorigen Pfads bezieht
+(Befund des Umsetzers, Folgepunkt für das Scheibenumfang-Skript). Die erlaubten Dateien bleiben dieselben; der
+Nachtrag nennt bewusst keinen Pfad in Backticks, damit er die Liste nicht erweitert.
 
 ## Akzeptanzkriterium
 
