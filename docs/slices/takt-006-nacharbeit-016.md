@@ -329,8 +329,54 @@ Runde 1 und beide Codex-Punkte mit eigenen Proben erledigt; neu:
 - major · ReDoS: der Wert einer globalen Option konnte die nächste Option sein; 38 Optionen ohne `push` brauchten
   12 s, 40 über 20 s → vom Orchestrator behoben (nach oben abgewichen, eine Zeile): der Wert darf nicht mit `-`
   beginnen. Roter Lauf: der neue Test mit 2000 Optionen lief bis zum Abbruch nach 60 s; grün danach, 64/64 im
-  Hook-Test, `pnpm test:scripts` 176/176, `pnpm gates` Exit 0 (`40336de`). Die vier globalen Optionsformen blockieren
+  Hook-Test. Endstand siehe unten. Die vier globalen Optionsformen blockieren
   weiter, `git push -u origin claude/x` und `git -C x push -u origin claude/x` gehen durch.
 - nit · `git --no-pager log --grep push` wird blockiert (`log` gilt als Wert von `--no-pager`); Fehlalarm in der
   sicheren Richtung, bleibt, im Wirkungstext nicht eigens erwähnt.
 - nit · Stop-Hook blockiert eine Teil-Übernahme des getesteten Stands trotz gleichem Baum-Hash; bleibt.
+
+**Codex auf PR #20, weitere Läufe (vom Orchestrator behoben, je roter und grüner Test):**
+
+- P2 · `takt-006` wurde zur angenommenen Scheibe `006-…` aufgelöst; eine offene Kleinänderung hätte deren Annahme
+  geliehen → Namensraum `takt-NNN` bleibt erhalten (`c7b8fea`, Fixtures 904/takt-904).
+- P2 · `git push -ofoo origin main` galt als Force-Push (das `f` steckt im Wert von `-o`) → in einer Kurzoptionsgruppe
+  zählen nur Buchstaben vor dem ersten `o`; `-uo WERT` nimmt das nächste Wort als Wert (`c7b8fea`).
+- P1 · Nachweis: die gates-Ausgabe stammte von vor der ReDoS-Behebung → neuer Lauf auf dem Endstand, unten.
+- P2 · `git push -o "ci skip" origin` zählte drei Ziele → Push-Argumente werden als Shell-Wörter zerlegt (`039c90b`).
+
+`pnpm gates` auf dem Endstand `039c90b`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
+
+```
+# pass 184
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6114.050274
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-l931jxa-.css                        39.97 kB │ gzip:   8.67 kB
+dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 kB │ map: 2,181.19 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.22s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 039c90b, tree ebe0eeda28e6…
+```
