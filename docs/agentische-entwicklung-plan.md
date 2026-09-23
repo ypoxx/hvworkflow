@@ -274,7 +274,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 |---|---|---|---|
 | Sichtnachweis | Playwright-Screenshots je Abnahmekriterium (`apps/web/e2e/abnahme.spec.ts`, `docs/evidence/`) | ein Nachweis fehlt | läuft (CI: End-to-end acceptance scenario) |
 | Bühnenszene unter Last | — | das Zeitbudget für Filter und Wechsel bei 800 Fragen ist überschritten | geplant in Scheibe 084 |
-| Barrierefreiheit | `@axe-core/playwright` an jedem Ansichtswechsel (`apps/web/e2e/support/axe.ts`, alle Playwright-Szenarien) | ein Verstoß ab „ernst" ohne benannte Ausnahme (`apps/web/e2e/support/axe-exceptions.json`) | läuft (CI: End-to-end acceptance scenario) |
+| Barrierefreiheit | — | ein Verstoß ab „ernst" | läuft (CI: End-to-end acceptance scenario) |
 | Hausvokabular | Lint gegen Verbotsliste (`scripts/vocabulary-check.mjs`, `pnpm vocabulary`) | ein Treffer (Ticket, Assignee, Workflow-Instanz, Issue, Task) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (Schlüssel-Vollständigkeit) | `apps/web/src/i18n/parity.test.ts` | ein Schlüssel fehlt in DE oder EN | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (keine Literale in Komponenten) | — (016 ergänzt einen Literal-Scan für Oberflächentexte) | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | geplant in Scheibe 016 |
