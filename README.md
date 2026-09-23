@@ -19,6 +19,8 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/design-prinzipien.md`](docs/design-prinzipien.md) | Was „beste Oberfläche" für dieses Werkzeug heißt: zehn Prinzipien, Muster, Checkliste der Design-Kritik. |
 | [`docs/adr/0001-vorlage-annahme.md`](docs/adr/0001-vorlage-annahme.md) | Vorlage zur Annahme von ADR 0001 an Prüfpunkt 1: was angenommen wird, was nicht, Nachweise je Grenze, Beschlussfeld. |
 | [`docs/adr/0002-demo-betriebsart-in-process.md`](docs/adr/0002-demo-betriebsart-in-process.md) | Demo-Betriebsart: der Anwendungskern läuft im Browser hinter dem Vertrag; der HTTP-Dienst nutzt denselben Kern. |
+| [`docs/adr/`](docs/adr/) | ADR 0003–0016, vorgeschlagen (Scheibe 015): Persistenz, Identität, Antwortformat, Bühne je Gerät, Deployment, Integrationen, Aufbewahrung, Pilotmodus, Ereignis-Umschlag, Zustandsmodell, Protokollebenen, Realtime, Vertragsversionierung, Agenten-Arbeitsmodell. Annahme je Prüfpunkt (Plan Abschnitt 4). |
+| [`docs/entscheidungsregister.md`](docs/entscheidungsregister.md) | Entscheidungsregister E1–E49 mit Eigentümer, Fälligkeit, Rückfalltrigger, Kosten bei Änderung und Vermerk „auf Standard gebaut" (Scheibe 014). |
 | [`docs/glossar.md`](docs/glossar.md) | Hausvokabular ↔ Code, verbindlich für Oberfläche und Contract. |
 | [`docs/slices/`](docs/slices/) | Eine Spezifikation je Scheibe mit Nachweisen, Review-Befunden und Nacharbeit — wie gebaut wurde. |
 | [`docs/demo-skript.md`](docs/demo-skript.md) | Drehbuch der Vorführung, bekannte Punkte, Lesereihenfolge für Entwickler. |
