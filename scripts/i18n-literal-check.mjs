@@ -27,7 +27,7 @@
  *   - `//` and `/* *\/` comments are masked (replaced with spaces, newlines kept so line numbers stay
  *     correct) *before* either scan runs, so a comment that merely *talks about* JSX/HTML tags in
  *     prose — e.g. `{/* no <div>/<p> inside a <button> *\/}` — can never be misread as real tag
- *     boundaries (confirmed against `/home/user/wt/020/apps/web/src/features/stage/Podium.tsx:101`,
+ *     boundaries (confirmed against `apps/web/src/features/stage/Podium.tsx:101` in slice 020,
  *     a real false positive of exactly this shape before this fix — see the report).
  *   - JSX text may now span multiple lines (`[^<>{}]+` instead of `[^<>{}\n]+`), capped at 4 embedded
  *     newlines and rejected if it contains a semicolon, `=` or a backtick (`looksLikeCodeNotProse`) —
@@ -36,7 +36,7 @@
  *     parser.
  *
  * Run as `pnpm i18n-literals` (part of `pnpm gates`). `--root <dir>` and `--scan-roots a,b` point it at
- * a different tree, for tests (and for checking a sibling worktree, e.g. `--root /home/user/wt/020`).
+ * a different tree, for tests (and for checking a sibling worktree, e.g. `--root ../other-worktree`).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

@@ -71,6 +71,34 @@ test('m5 red: a line that starts like a slice bullet but does not match the full
   assert.match(r.stderr, /009/);
 });
 
+// takt-006 point 6: any parse error — not only the one m5 already gives a clean message for — must
+// print just that message and exit 1, never a raw Node stack trace (a "some/path.mjs:NN" source
+// frame, or a "    at ..." call-stack line).
+test('takt-006 point 6 red: a malformed plan line fails with a clean message, no raw stack trace', () => {
+  const r = run(['--plan', join(FIXTURES, 'malformed-bullet.md')]);
+  assert.equal(r.status, 1);
+  assert.doesNotMatch(r.stderr, /^\s+at /m);
+  assert.doesNotMatch(r.stderr, /plan-graph\.mjs:\d+/);
+});
+
+test('takt-006 point 6 red: an unparsable calendar date fails with a clean message and a line number, no raw stack trace', () => {
+  const r = run(['--plan', join(FIXTURES, 'bad-calendar-date.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /plan-graph: section 5, line \d+/);
+  assert.match(r.stderr, /cannot parse calendar/);
+  assert.doesNotMatch(r.stderr, /^\s+at /m);
+  assert.doesNotMatch(r.stderr, /plan-graph\.mjs:\d+/);
+});
+
+// takt-006 rework, NIT finding 9: the reported line number was the offset *within* section 5 (relative
+// to the "## 5." heading), not the real file line — correct only by coincidence whenever section 5
+// happens to start at line 1 of the plan (true for every fixture above, so none of them caught this).
+test('rework point 9 red: the reported line number is the real file line, not the offset from the section heading', () => {
+  const r = run(['--plan', join(FIXTURES, 'malformed-bullet-offset.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /line 8/); // the real file line of the malformed bullet, not line 3 (its in-section offset)
+});
+
 test('--calendar prints a start/finish date per slice and respects --merged', () => {
   const r = run(['--plan', join(FIXTURES, 'ok.md'), '--calendar', '--hours', '3']);
   assert.equal(r.status, 0, r.stdout + r.stderr);

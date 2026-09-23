@@ -27,13 +27,26 @@
  *     hook is already retrying) always exits 0 immediately, so this hook can never contribute to a
  *     retry loop.
  *
+ * takt-006 point 2: the marker also carries the commit that was `HEAD` when `mark-test-run.mjs` wrote
+ * it — a `git commit` made after the last successful test run moves `HEAD` to a commit nothing has
+ * actually run "pnpm gates" against yet.
+ *
+ * takt-006 rework, MAJOR finding 1 (Opus review)/point 4: comparing the commit id alone made this hook
+ * block on *any* later commit, even a docs-only one, or one that only formalises code already recorded
+ * as tested (`pnpm gates`, then `git commit` the exact tested change) — a commit always moves `HEAD`
+ * even when it never touches `apps/`, `packages/` or `scripts/` at all. The marker also carries a tree
+ * hash of just those three directories' current content (`codeTreeHash`, unaffected by `docs/` or any
+ * other path, and by *how many* commits happened, only by what they actually changed there); a moved
+ * `HEAD` only blocks when that hash also differs from what was recorded — i.e. the code itself, not
+ * merely the history, changed since the last successful test run.
+ *
  * Wired in `.claude/settings.json` under `hooks.Stop`. `--root <dir>` points it at a scratch git
  * repository in tests, in place of this one.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { statusLines, signatureFor } from './lib/dirty-tree-signature.mjs';
+import { statusLines, signatureFor, headCommit, codeTreeHash } from './lib/dirty-tree-signature.mjs';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const MARKER_REL_PATH = join('.claude', 'state', 'last-test-run');
@@ -61,6 +74,18 @@ function parseArgs(argv) {
   return out;
 }
 
+/** The marker's recorded `{ signature, commit, treeHash }` — all `undefined` if the marker is missing
+ * or unparsable (treated the same as "no marker" by the caller). */
+function readMarker(markerPath) {
+  if (!existsSync(markerPath)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(markerPath, 'utf8'));
+    return { signature: parsed.signature, commit: parsed.commit ?? undefined, treeHash: parsed.treeHash ?? undefined };
+  } catch {
+    return undefined;
+  }
+}
+
 function main(argv) {
   const input = readStdinJson();
   if (input?.stop_hook_active === true) return 0; // already retrying — never contribute to a loop
@@ -69,14 +94,37 @@ function main(argv) {
   const lines = statusLines(args.root);
   if (lines === undefined) return 0; // git unavailable — fail open, this hook cannot judge anything
 
+  const markerPath = join(args.root, MARKER_REL_PATH);
+  const marker = readMarker(markerPath);
+  const currentCommit = headCommit(args.root);
+
+  // takt-006 point 2, reworked at rework point 4: a commit made after the last successful test run
+  // (HEAD has moved away from what the marker vouches for) is only a *reason to look closer*, not an
+  // automatic block — only checked when both sides of the commit comparison are actually known, so "no
+  // marker yet"/"no commits yet" never fires this on their own (those are the existing, narrower checks
+  // below). Whether it actually blocks depends on the code-directory tree hash just below.
+  if (marker?.commit && currentCommit && marker.commit !== currentCommit) {
+    const currentTreeHash = codeTreeHash(args.root);
+    if (marker.treeHash && currentTreeHash && marker.treeHash !== currentTreeHash) {
+      console.error(
+        'Stop blocked (Plan 5.4): a commit was made after the last successful test run ' +
+          `(HEAD moved from ${marker.commit.slice(0, 7)} to ${currentCommit.slice(0, 7)}) and apps/, packages/ ` +
+          'or scripts/ changed as a result — that code was never tested. Run "pnpm gates" again.',
+      );
+      return 2;
+    }
+    // HEAD moved, but apps/, packages/ and scripts/ are byte-for-byte what they were when last tested
+    // (a docs-only commit, or a commit that only formalises the exact change "pnpm gates" already ran
+    // against) — nothing new to test, fall through to the ordinary checks below.
+  }
+
   if (lines.length === 0) {
     console.log('Stop check: apps/, packages/ and scripts/ have no uncommitted change.');
-    return 0; // a clean tree is always safe to stop from, marker or not
+    return 0; // a clean tree (and HEAD unmoved since the marker, checked above) is safe to stop from
   }
 
   const signature = signatureFor(args.root, lines);
-  const markerPath = join(args.root, MARKER_REL_PATH);
-  if (!existsSync(markerPath)) {
+  if (marker === undefined) {
     console.error(
       `Stop blocked (Plan 5.4): apps/, packages/ or scripts/ have an uncommitted change and no successful ` +
         `test run is recorded yet (${MARKER_REL_PATH} is missing). Run "pnpm gates" (it writes the marker on ` +
@@ -85,14 +133,7 @@ function main(argv) {
     return 2;
   }
 
-  let recordedSignature;
-  try {
-    recordedSignature = JSON.parse(readFileSync(markerPath, 'utf8')).signature;
-  } catch {
-    recordedSignature = undefined;
-  }
-
-  if (recordedSignature !== signature) {
+  if (marker.signature !== signature) {
     console.error(
       'Stop blocked (Plan 5.4): apps/, packages/ or scripts/ changed after the last successful test run ' +
         `(the dirty-tree signature no longer matches). Changed: ${lines.map((l) => l.slice(3)).join(', ')}. ` +
