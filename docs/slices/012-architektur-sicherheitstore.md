@@ -1,6 +1,6 @@
 # 012 — Architektur- und Sicherheitstore, Tor-Inventar ehrlich
 
-**Status:** spec
+**Status:** review (Nacharbeitsrunde 1)
 **Risikoklasse:** mittel · 2 AStd · Kalender 29.09.2026 (W1) · Lanes: infra (+ manifests additiv; service und
 core je eine eng begrenzte Stelle; docs-plan nur Abschnitt 5 des Entwicklungsplans — keine andere laufende
 Scheibe hält diese Lanes)
@@ -117,6 +117,79 @@ Diese Scheibe baut die Tore aus Plan 6.4 „(012)" und macht Abschnitt 5 ehrlich
 ## Nachweise
 
 `pnpm gates`-Ende, rote Läufe je Tor, `gates.yml`-Diff, Link des roten und des grünen CI-Laufs, Diff von Abschnitt 5.
+
+## Nachschärfung nach Review (Runde 1)
+
+Opus-Review (Perspektive Security/Betrieb): 0 Blocker, 8 Hauptbefunde (major), 12 Nebenbefunde (minor).
+Mehr als drei Hauptbefunde schärfen nach Plan 6.3 die Spec nach; die folgende Liste ist ab jetzt
+bindend für diese Scheibe (Nacharbeitsrunde 1, die einzige laut Plan 6.3). Punkte 18–20 sind Sache
+des Orchestrators, nicht des Implementierers.
+
+**MAJOR**
+
+1. `scripts/audit-check.mjs` läuft grün durch, wenn der Audit-Dienst selbst ausfällt
+   (`npm_config_registry=http://127.0.0.1:9/ node scripts/audit-check.mjs` → exit 0). Muss
+   fehlschlagen bei `report.error`, bei nicht-objekthaften `advisories`/`metadata`, und bei einem
+   Exit-Status ungleich 0 ohne Advisories. Roter Lauf zeigen.
+2. `scripts/role-literal-check.mjs` übersieht gängige Formen: `['admin','moderation'].includes(actor.role)`,
+   Template-Literal `role: \`admin\``, `actor['role'] === 'admin'`, mehrzeilige Vergleiche,
+   `switch (\n x.role\n)` + `case 'admin':`, `{admin:1}[actor.role]`; Rollenliste ist hartkodiert (019
+   bringt `coordination`). Fix: Rollenliste aus dem `Role`-Union in `packages/domain/src/types.ts`
+   ableiten (Abbruch bei leerer Liste); JEDES eindeutige Rollen-Literal (admin, moderation, capture,
+   approver, observer, später coordination) überall außerhalb der Ausnahmedateien und des
+   Typ-Unions als Treffer werten; der Rollenkontext bleibt nur für die zweideutigen
+   podium/expert/legal Pflicht, dazu `.includes(…role)`, Backticks, `['role']` und
+   Ganztext-(mehrzeiliges) Matching ergänzen. Rote Läufe je Probeform zeigen.
+3. `scripts/now-check.mjs` akzeptiert `// now-ok:` in jeder Zeile jeder Datei. Nur noch in
+   `packages/domain/src/api.ts` (höchstens einmal) und `apps/api/src/server.ts` erlauben; jedes
+   andere `now-ok` ist ein Befund. Zusätzlich erkennen: `new Date;`, `Date()`, `new Date(\n)`,
+   `Date['now']()`, `process.hrtime(` (Nebenbefund 16).
+4. Doku-Pfadfilter (`gates.yml` ~Z.29): `'!(docs/**|*.md)'` behandelt verschachtelte Doku-Dateien
+   unter picomatch 2.3.1 als Code. `predicate-quantifier: 'every'` mit `'!docs/**'` und `'!**/*.md'`
+   verwenden. Mit einer kleinen picomatch-Probe im Scratch belegen.
+5. Semgrep in CI wird rot, wenn ein PR eine `.ts`-Datei löscht (paths-filter listet gelöschte
+   Dateien, Semgrep bricht mit Exit 2 auf einem fehlenden Pfad ab). `added|modified|renamed` für den
+   Filter verwenden oder fehlende Pfade verwerfen; `**/*.{js,mjs,cjs}` ergänzen, damit
+   `scripts/*.mjs` in PRs mitgescannt wird.
+6. `nightly.yml`s Semgrep `--error` ohne Schweregrad-Filter scheitert am INFO-Hinweis (z. B.
+   `packages/domain/src/api.ts:~125` Math.random-Fallback). Nur ab WARNING/ERROR blockieren; INFO
+   als eigenen, nicht blockierenden Lauf. Außerdem die Ersatz-ID aus `crypto.getRandomValues` statt
+   `Math.random` bauen (Nebenbefund 16; `crypto.randomUUID` fehlt in unsicheren Browserkontexten).
+7. Token-Umfang und Pinning: `permissions: { contents: read, pull-requests: read }` zu beiden
+   Workflows; `dorny/paths-filter` und `gitleaks/gitleaks-action` auf volle Commit-SHA pinnen (Tag
+   als Kommentar); `persist-credentials: false` beim Checkout setzen.
+8. Abschnitt-5-Zuordnungen (vom Orchestrator entschieden): generierter Client (~Z.278) → Scheibe 030;
+   Literale in Komponenten (~Z.276) → Scheibe 016 (016 bekommt einen i18n-Literal-Scan);
+   TaskCompleted-Hook (~Z.290) → Scheibe 016; Fehlerpfad-Zeile (~Z.279) dreigeteilt: 412-Konflikt UI
+   → 060, Verbindungsverlust → 058, leere Liste → 020; Wortlaut von ~Z.286 an das, was 016 plant,
+   angleichen (schlichtes `git push` ohne Ziel, `.env`-Zugriff, Netzwerkaufrufe nach außen; zusätzlich
+   zu den heutigen Mustern). Optional: `plan-honesty.mjs` lehnt eine geplante Scheibe ab, deren
+   Spec-Datei in `docs/slices/` bereits „accepted" ist.
+
+**MINOR**
+
+9. `seedActor.test.ts`: `seed-bot:admin` verhält sich wie der Standard, der Env-Pfad ist also
+   ungetestet. `HV_SEED_ACTOR='x:observer'` → kein Meeting (404) und `'garbage'`/`'x:root'` →
+   `createApp` wirft; `HV_SEED_ACTOR` in der Fehlermeldung nennen (heute steht dort „X-Actor header").
+10. ADR-Bezug-Zeile (~Z.249) zitiert einen Reviewer-Checklistenpunkt, den es nicht gibt →
+    `geplant in Scheibe 016` (016 ergänzt einen ADR-0001-Grenzpunkt in `reviewer.md`).
+11. Verengte statt geteilte Zeilen (~Z.244–247, 264): geplante Zeilen ergänzen für „Endpunkt im Code
+    ohne Vertrag" (→ Scheibe 043), Postgres-Append-only-Test (→ 027), Zwei-Schreiber-/
+    Neustart-Idempotenz (→ 028).
+12. `scripts/gitleaks.toml`: das unbewiesene Ganzdatei-Allowlist für `seed.ts` und dessen Test sowie
+    der wirkungslose `regexes`-Eintrag entfernen.
+13. `gates.yml`: die geänderte Dateiliste per `env:` (idealerweise `list-files: json`) statt
+    `${{ … }}`-Interpolation in der Shell übergeben; die Semgrep-Version für `pip install` in beiden
+    Workflows pinnen.
+14. `scripts/semgrep/rules.yml`: die child-process-Regel trifft `RegExp.prototype.exec` — mit
+    `pattern-inside` auf einen tatsächlichen `child_process`-Import einschränken; die
+    Credential-Regel würde i18n-Wörterbücher blockieren — `apps/web/src/i18n/**` ausschließen oder
+    ein secret-artiges Literal verlangen. Je eine Probe zeigen.
+15. `scripts/dependency-cruiser.cjs`: ALLE `core`-Module aus `packages/domain/src` verbieten
+    (Browserlauf, ADR 0002); eine `not-to-unresolvable`-Fehlerregel ergänzen.
+17. Den englischen Absatz in `docs/agentische-entwicklung-plan.md` (~Z.231–237) ins Deutsche übersetzen.
+
+Nicht meins (Orchestrator): 18 (Vertragslücken → 019/043), 19 (AGENTS.md-Gates-Zeile → 018), 20 (CI-Links).
 
 ## Arbeitsweise
 
@@ -452,6 +525,146 @@ grün gelaufen.
 - **Web-e2e** (`pnpm --filter @hv/web e2e`) wurde in dieser Sitzung nicht erneut ausgeführt (keine
   Web-Änderung, Nicht-Ziel); die Chromium/Playwright-Bedingung in `gates.yml` (`if:
   steps.changes.outputs.code == 'true'`) ist nur durch einen echten CI-Lauf zu verifizieren.
+
+### Nacharbeitsrunde 1 — Befund → Erledigung
+
+| # | Befund | Erledigung | Commit |
+|---|---|---|---|
+| 1 | audit-check.mjs grün bei Dienstausfall | `report.error`/Nicht-Objekt-`advisories`/`metadata`/Exit≠0-ohne-Advisories brechen jetzt ab | 7d722ff |
+| 2 | role-literal-check.mjs übersieht Formen, Rollenliste hartkodiert | Rollenliste aus `Role`-Union abgeleitet; Ganztext-Matching; `.includes`, Backticks, `['role']`, Objektschlüssel ergänzt | 7d722ff |
+| 3 | now-check.mjs: now-ok überall, fehlende Muster | now-ok nur in api.ts (max. 1×)/server.ts; `new Date;`, `Date()`, `new Date(\n)`, `Date['now']()`, `process.hrtime(` ergänzt | 7d722ff |
+| 4 | Doku-Pfadfilter matcht verschachtelte Docs falsch | eigener Schritt mit `predicate-quantifier: every`, `!docs/**` + `!**/*.md`; picomatch-Probe siehe unten | e4063d6 |
+| 5 | Semgrep rot bei gelöschter Datei; scripts/*.mjs ungescannt | `added\|modified\|renamed`-Filter, `list-files: json`; `**/*.{js,mjs,cjs}` ergänzt | e4063d6 |
+| 6 | nightly Semgrep rot durch INFO-Hinweis | INFO als eigener nicht-blockierender Lauf; WARNING/ERROR blockieren getrennt | e4063d6 |
+| 7 | Token-Scope/Pinning fehlt | `permissions`-Block; `dorny/paths-filter`+`gitleaks-action` auf Commit-SHA gepinnt; `persist-credentials: false` | e4063d6 |
+| 8 | Abschnitt-5-Zuordnungen | 030/016/016/060+058+020/016 wie vom Orchestrator entschieden gesetzt | e4063d6 |
+| 9 | seedActor.test.ts Env-Pfad ungetestet; Fehlermeldung nennt X-Actor | 3 neue Tests (`x:observer`→404, `garbage`/`x:root`→throw); Fehlermeldung nennt jetzt `HV_SEED_ACTOR` | e4063d6 |
+| 10 | ADR-Bezug zitiert nicht existierenden Checklistenpunkt | Stand auf `geplant in Scheibe 016` geändert | e4063d6 |
+| 11 | verengte statt geteilte Zeilen | 3 neue geplante Zeilen (043, 027, 028) ergänzt | e4063d6 |
+| 12 | gitleaks.toml unbewiesenes Allowlist/No-op-Regex | beides entfernt, nur `useDefault = true` bleibt | e4063d6 |
+| 13 | `${{ }}` direkt in der Shell; Semgrep-Version ungepinnt | `env:`+`list-files: json`; `semgrep==1.177.0` in beiden Workflows | e4063d6 |
+| 14 | child-process-Regel trifft RegExp.exec; Credential-Regel würde i18n blockieren | `pattern-inside` auf echten `child_process`-Import; Entropie-Check + i18n-Ausschluss | e4063d6 |
+| 15 | dependency-cruiser: nur I/O-Kernmodule verboten, kein not-to-unresolvable | alle `core`-Module verboten; `not-to-unresolvable`-Regel ergänzt | e4063d6 |
+| 16 | Ersatz-ID nutzt Math.random | `crypto.getRandomValues` vor Math.random | 7d722ff |
+| 17 | englischer Absatz in Abschnitt 5 | ins Deutsche übersetzt | e4063d6 |
+| 18–20 | Vertragslücken/AGENTS.md/CI-Links | Orchestrator (nicht diese Sitzung) | — |
+
+### Rote Läufe der Nacharbeitsrunde 1
+
+**Major 1 — audit-check.mjs bei unerreichbarem Registry** (`npm_config_registry=http://127.0.0.1:9/`,
+mit kurzen Retry-Timeouts, damit der Lauf nicht minutenlang hängt):
+```
+pnpm audit could not reach the audit service — treating this as a failure, not "no advisories":
+  ECONNREFUSED: request to http://127.0.0.1:9/-/npm/v1/security/audits/quick failed, reason: connect ECONNREFUSED 127.0.0.1:9
+exit=1
+```
+Vorher (Befund, unrepariert): derselbe Aufruf lieferte `pnpm audit: no advisories reported.` mit
+Exit `0` — der Dienstausfall sah wie ein sauberer Lauf aus.
+
+**Major 2 — role-literal-check.mjs, sechs Probeformen** (Scratch-Dateien unter
+`apps/api/src/__scratch_probe__/`, nicht committet):
+```
+Role-literal check failed (AGENTS.md rule 4): a role name is used as a literal outside the policy layer.
+  apps/api/src/__scratch_probe__/case1.ts:2: return ['admin', 'moderation'].includes(actor.role);
+  apps/api/src/__scratch_probe__/case2.ts:2: return `admin` === actor.role;
+  apps/api/src/__scratch_probe__/case3.ts:2: return actor['role'] === 'admin';
+  apps/api/src/__scratch_probe__/case4.ts:3: .role
+  apps/api/src/__scratch_probe__/case5.ts:5: case 'podium':
+  apps/api/src/__scratch_probe__/case6.ts:2: return { admin: 1, observer: 2 }[actor.role];
+exit=1
+```
+Gegenprobe (kein Treffer): `q.track === 'podium'` und `q.stageAssignment === 'ceo'` bleiben grün.
+
+**Major 3 — now-check.mjs, fünf neue Muster** (Scratch-Datei):
+```
+now() check failed (AGENTS.md rule 8): direct system-clock access outside the injected clock.
+  apps/api/src/__scratch_probe__/probe.ts:7: export function d() { return Date['now'](); }
+  apps/api/src/__scratch_probe__/probe.ts:4: return new Date(
+  apps/api/src/__scratch_probe__/probe.ts:1: export function a() { return new Date; }
+  apps/api/src/__scratch_probe__/probe.ts:2: export function b() { return Date(); }
+  apps/api/src/__scratch_probe__/probe.ts:8: export function e() { return process.hrtime(); }
+exit=1
+```
+Plus now-ok-Policy: ein `now-ok` außerhalb der zwei erlaubten Dateien bleibt ein Fund (die
+zugrundeliegende `Date`-Nutzung wird NICHT unterdrückt); ein zweites `now-ok` in `api.ts` wird als
+„At most one `now-ok` is allowed…" gemeldet.
+
+**Major 4 — picomatch-Probe (Doku-Pfadfilter)**, `picomatch@2.3.1` (exakt die Version, die
+`dorny/paths-filter@v3.0.2` selbst einbindet), gegen vier Beispieldateien:
+```
+--- single extglob !(docs/**|*.md), quantifier some (isMatch default) ---
+docs/adr/0001.md => true      # FALSCH: zählt als "code", weil das Präfix "docs/" im Extglob übersehen wird
+docs/slices/012-x.md => true  # FALSCH, dasselbe
+apps/api/src/app.ts => true   # richtig
+README.md => false            # richtig (Wurzel-Datei)
+--- two negated rules, manual every: !docs/** AND !**/*.md ---
+docs/adr/0001.md => false     # richtig
+docs/slices/012-x.md => false # richtig
+apps/api/src/app.ts => true   # richtig
+README.md => false            # richtig
+```
+
+**Major 6/14 — Semgrep-Proben je Regel** (`pip install semgrep==1.177.0` lokal, `--metrics=off
+--disable-version-check`): alle fünf Regeln feuern auf präparierten Beispielen (`eval`, `new
+Function`, `exec('ls '+x)`, `` execSync(`rm -rf ${x}`) ``, `Math.random()` als INFO,
+`dangerouslySetInnerHTML`, `password = "hunter27x9Q!mZp"`, `apiKey: "sk-live-…"`), 0 Treffer auf den
+Gegenproben (`execFile(['x'])`, `re.exec(input + '!')` — RegExp, nicht child_process —,
+`crypto.randomUUID()`, `password = process.env.HV_PASSWORD`, `token = "TODO"`, sowie eine i18n-Datei
+unter `apps/web/src/i18n/**`, die durch den Pfadausschluss gar nicht erst gescannt wird). Gegen den
+echten Baum (`apps/api/src packages/domain/src apps/web/src scripts`): 0 ERROR-Funde, nur die 2
+erwarteten INFO-Hinweise (Math.random-Fallback in `api.ts`).
+
+**Minor 15 — dependency-cruiser, breiteres Kernmodul-Verbot und not-to-unresolvable**:
+```
+error domain-no-node-core-modules: packages/domain/src/state.ts → util
+x 7 dependency violations (1 errors, 6 warnings). 131 modules, 478 dependencies cruised.
+---
+error not-to-unresolvable: packages/domain/src/state.ts → ./this-module-does-not-exist.js
+x 7 dependency violations (1 errors, 6 warnings). 131 modules, 478 dependencies cruised.
+```
+(`node:util` wurde von der alten, nur-I/O-Liste nicht erfasst; jetzt schon.)
+
+**Minor 9 — seedActor.test.ts, drei neue Fälle**: alle drei neuen Tests grün
+(`HV_SEED_ACTOR='x:observer'` → 404; `'garbage'`/`'x:root'` → `createApp` wirft mit `HV_SEED_ACTOR`
+in der Meldung, nie mit „X-Actor"), zusammen mit den bestehenden 29 weiterhin grün (32 gesamt).
+
+### `pnpm gates` nach der Nacharbeitsrunde 1 (Ende, grün)
+
+```
+> hvworkflow@0.1.0 arch /home/user/wt/012
+> depcruise --config scripts/dependency-cruiser.cjs apps/web/src apps/api/src packages/domain/src
+
+  warn web-features-i18n-domain-types-only: ... (6 wie zuvor, unverändert)
+
+x 6 dependency violations (0 errors, 6 warnings). 130 modules, 477 dependencies cruised.
+
+> hvworkflow@0.1.0 role-literals /home/user/wt/012
+Role-literal check: no role-name literal outside the policy layer (apps/api/src, packages/domain/src);
+roles from packages/domain/src/types.ts: moderation, capture, expert, legal, approver, podium, admin,
+observer (role-context required only for: expert, legal, podium).
+
+> hvworkflow@0.1.0 now-check /home/user/wt/012
+now() check: no direct system-clock access outside the injected clock (packages/domain/src, apps/api/src).
+
+> hvworkflow@0.1.0 plan-honesty /home/user/wt/012
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+
+> @hv/web@0.0.0 build /home/user/wt/012/apps/web
+✓ 1713 modules transformed.
+✓ built in 1.33s
+```
+Exit `0`. `pnpm --filter @hv/api test`: 32 passed (4 files). `pnpm --filter @hv/domain test`: 39
+passed (unchanged).
+
+### Offen nach Runde 1
+
+- gitleaks (major 7 SHA-Pins, minor 12 Vereinfachung) weiterhin nicht lokal ausführbar
+  (GitHub-Release-Downloads gesperrt); erster echter Lauf ist CI.
+- Die `dorny/paths-filter`/`gitleaks-action`-SHAs wurden über `git ls-remote` nachgeschlagen und als
+  Kommentar mit der Tag-Version versehen; nicht gegen einen echten Actions-Lauf verifiziert.
+- Optionaler Teil von Befund 8 (plan-honesty lehnt `geplant`-Zeilen mit bereits akzeptierter Scheibe
+  ab) ist umgesetzt und hat beim Schreiben sofort einen echten Fund geliefert (Zeile mit Scheibe 017,
+  die schon „accepted" war) — als Beleg, dass die Prüfung wirkt, nicht nur als Vorsichtsmaßnahme.
 
 ## Touched
 
