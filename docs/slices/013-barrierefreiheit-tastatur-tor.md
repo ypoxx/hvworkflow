@@ -736,7 +736,30 @@ sechs weiche Prüfungen verdeckt Teilbehebungen. Vom Orchestrator behoben (nach 
 Test `013-bekannt` ist jetzt eine Charakterisierung — je Aktion die harte Erwartung „Fokus auf `BODY`“; jede einzelne
 Behebung macht ihn rot, takt-008 dreht die betreffende Zeile um. `axe.ts` bricht beim Import bei fehlendem oder
 ungültigem Datum ab (geprüft: `2026-1-1`, `31.12.2026`, `2026-02-30`, `2026-13-45`, fehlend → abgelehnt).
-`pnpm gates` Exit 0; Playwright 17 passed.
+`pnpm gates` Exit 0 (`e111097`). Playwright nach der Umstellung, voller Lauf
+(`E2E_PORT=4356 pnpm exec playwright test --reporter=list`), alle Ergebniszeilen wörtlich (Farbcodes entfernt,
+axe-Protokollzeilen ausgelassen):
+
+```
+  ✓   2 [chromium] › e2e/001-shell.spec.ts:17:1 › shell: counters, role switch, language switch @screenshot (8.7s)
+  ✓   3 [chromium] › e2e/001-shell.spec.ts:82:1 › header strip on the answers desk @screenshot (5.0s)
+  ✓   1 [chromium] › e2e/002-speakers-capture.spec.ts:62:1 › speakers list and capture desk @screenshot (19.2s)
+  ✓   5 [chromium] › e2e/013-tastaturpfad.spec.ts:158:1 › 013a: Wortmeldung per Tastatur anlegen und mit Pfeiltasten umsortieren (7.2s)
+  ✓   6 [chromium] › e2e/013-tastaturpfad.spec.ts:281:1 › 013b: Redebeitrag erfassen und mit der Tastatur in Einzelfragen zerlegen (7.7s)
+  ✓   7 [chromium] › e2e/013-tastaturpfad.spec.ts:371:1 › 013c: Antwort entwerfen und mit der Tastatur weiterleiten (13.1s)
+  ✓   8 [chromium] › e2e/013-tastaturpfad.spec.ts:411:1 › 013d: Freigeben mit der Tastatur (2.8s)
+  ✓   9 [chromium] › e2e/013-tastaturpfad.spec.ts:427:1 › 013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur (1.9s)
+  ✓   4 [chromium] › e2e/003-answers-stage.spec.ts:44:1 › backlog, approval, podium and history @screenshot (57.7s)
+  ✓  10 [chromium] › e2e/013-tastaturpfad.spec.ts:471:1 › 013-bekannt: Fokus nach Aktion — Charakterisierung, der Fokus landet heute auf BODY (takt-008) (33.0s)
+  ✓  12 [chromium] › e2e/013-tastaturpfad.spec.ts:650:1 › 013f: prefers-reduced-motion — Übergänge und Animationen sind abgeschaltet (2.1s)
+  ✓  13 [chromium] › e2e/013-tastaturpfad.spec.ts:670:1 › 013g: Kontrolllauf ohne reduced motion — dieselben drei Elemente haben wirklich einen Übergang (2.1s)
+  ✓  11 [chromium] › e2e/020-rueckbau-passung.spec.ts:111:1 › 020: Rückbau und Passung — points 1–9, axe on the five views (21.8s)
+  ✓  15 [chromium] › e2e/020-rueckbau-passung.spec.ts:512:1 › 020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle (4.8s)
+  ✓  16 [chromium] › e2e/020-rueckbau-passung.spec.ts:555:1 › 020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minutenwechsel (1.5s)
+  ✓  17 [chromium] › e2e/020-rueckbau-passung.spec.ts:595:1 › 020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschlange (3.7s)
+  ✓  14 [chromium] › e2e/abnahme.spec.ts:87:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (46.1s)
+  17 passed (2.3m)
+```
 - nits · Bericht (`1 passed`, Touched, Commit-Liste) → vom Orchestrator berichtigt.
 
 Nach E48 gemergt: kein Blocker und kein Hauptbefund offen.
