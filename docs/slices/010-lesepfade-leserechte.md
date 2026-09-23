@@ -1,6 +1,7 @@
 # 010 — Lesepfade unter can() mit Leserechten
 
-**Status:** spec (nachgeschärft nach der Fable-Prüfung vom 23.09.2026: 2 Blocker, 4 major, 8 minor eingearbeitet)
+**Status:** spec (nachgeschärft nach der Fable-Prüfung vom 23.09.2026: 2 Blocker, 4 major, 8 minor eingearbeitet;
+Nachprüfung: 2 weitere Blocker (Kriterium 2, 404-Vorrang für podium) und 2 minor eingearbeitet)
 **Risikoklasse:** hoch · 2 AStd · Kalender 06.10.2026 (W2) · Lanes: core, contract, service (`apps/api`), die
 Oberflächen-Lanes web-speakers, web-capture, web-answers, web-stage, web-history und e2e (Plan 5.2 nennt nur „core";
 die Plan-Zeile berichtigt der Orchestrator)
@@ -24,16 +25,22 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
    (Regel 5, Rechtekonzept 2.2): `READ_SCOPES` in `packages/domain/src/permissions.ts`, ein Eintrag
    `question.read.delivered → ['delivered', 'closed']`, mit Regel-ID **R-PERM-03** („Leseumfang") und Test.
    `can(actor, 'question.read', q)` erlaubt, wenn der Akteur `question.read` hält, oder wenn er
-   `question.read.delivered` hält und `q.status` im Umfang liegt.
+   `question.read.delivered` hält und `q.status` im Umfang liegt. Allgemein gilt: `can(actor, p, q)` wendet
+   `READ_SCOPES[p]` an, wenn `p` einen Umfang hat. Deshalb erlaubt `can(actor, 'question.read.delivered', q)` nur in
+   `delivered` und `closed`, auch für admin.
    - `listQuestions` filtert über `can()`.
    - `total` und die Seitenzählung zählen nur die sichtbaren Fragen.
    - Enthält der Statusfilter ein Element außerhalb des Umfangs (z. B. `?status=answer_drafted`), kommt 403 mit
-     `ruleId: 'R-PERM-03'`.
+     `ruleId: 'R-PERM-03'`. Die Vorprüfung vergleicht gegen `READ_SCOPES`, nie gegen eine fest geschriebene Menge.
    - `getQuestion` einer Frage außerhalb des Umfangs liefert 404, wie eine unbekannte ID.
-3. **Keine ableitbare ID:** Jede Operation auf einer Einzelfrage, die der Akteur nicht lesen darf, liefert 404, bevor
-   ein Schreibrecht geprüft wird. Das gilt auch für `getQuestionHistory` und für die Schreiboperationen, die heute
-   `requireQuestion` vor `hasPermission` aufrufen. Ein Test zeigt: Beobachter plus Schreibversuch auf eine nicht
-   vorgelesene Frage → 404, nicht 403.
+3. **Keine ableitbare ID:** Der 404-Vorrang gilt, wenn der Akteur die Einzelfrage weder lesen darf noch das
+   Recht der Operation hält. Dann liefert jede Operation auf dieser Frage 404, bevor ein Recht geprüft wird, auch
+   `getQuestionHistory`.
+   - Hält der Akteur das Recht der Operation, bleibt die heutige Reihenfolge: 404 für eine unbekannte Frage, dann
+     409 für einen unzulässigen Übergang. Beispiel: podium hält `question.deliver`, `question.close` und
+     `question.return`, darf die Fragen aber nicht lesen, und muss auf der Bühne weiter schreiben können.
+   - Tests zeigen: observer plus Schreibversuch auf eine nicht vorgelesene Frage → 404, nicht 403; podium plus
+     `getQuestionHistory` → 404; podium plus `deliverQuestion` auf der Frage auf der Bühne → 200.
 4. **Vergabe** (nur in `ROLE_PERMISSIONS`):
 
    | Leserecht | Methoden | Rollen |
@@ -125,13 +132,15 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
      - observer sieht in `listQuestions()` nur `delivered`/`closed`, und `total` stimmt.
      - observer `getQuestion` auf eine nicht vorgelesene Frage → 404.
      - observer Schreibversuch darauf → 404.
-     - podium 403 auf `listEvents` und auf `getQuestionHistory`.
+     - podium 403 auf `listEvents`; podium 404 auf `getQuestionHistory` (Festlegung 3); observer 403 R-PERM-02 auf
+       `getQuestionHistory` einer vorgelesenen Frage.
      - expert 403 auf `listSpeakers`.
      - `subscribe` liefert observer `[]` und admin die Ereignisse.
      - Rollenwechsel zwischen zwei Zustellungen.
    - **Bestehende Domänentests** anpassen, die heute auf alten Vergaben beruhen (`api.test.ts`: podium
      `getQuestionHistory`, `_actions` gleich `['question.read']`, observer `firstIn('captured')`, `listEvents` unter
-     einem verbliebenen Akteur). Jede Anpassung wird im Bericht genannt.
+     einem verbliebenen Akteur). Dazu der HTTP-Test `apps/api/src/__tests__/negative.test.ts`: observer
+     klassifiziert eine erfasste Frage, heute 403 R-PERM-01, künftig 404. Jede Anpassung wird im Bericht genannt.
    - **HTTP-Tests** für dieselben Fälle mit `ruleId` (ohne `subscribe`).
    - **e2e** `apps/web/e2e/010-lesepfade.spec.ts`:
      - Historie unter observer: nur Vorgelesenes, Zeitleiste im Zustand „keine Leseberechtigung".
@@ -166,11 +175,12 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
 
 ## Akzeptanzkriterium
 
-1. Jede der 13 Lesemethoden hat einen Negativtest mit ihrer Regel-ID. Die Stammdaten haben stattdessen einen Test
-   „jede Rolle darf".
+1. Jede der 13 Lesemethoden hat einen Negativtest mit ihrer Regel-ID oder, nach Festlegung 3, mit 404. Die
+   Stammdaten haben stattdessen einen Test „jede Rolle darf".
 2. **Wahrheitstabellen-Diff:**
-   - (a) Spalte `q.read` wird für podium und observer in jeder Zeile zu `·`.
-   - (b) Neue Spalte `q.read.delivered`: admin ✓ in jeder Zeile, observer ✓ nur in `delivered` und `closed`.
+   - (a) Spalte `q.read`: podium `·` in jeder Zeile; observer ✓ nur in `delivered` und `closed`, sonst `·`.
+   - (b) Neue Spalte `q.read.delivered`: admin und observer ✓ nur in `delivered` und `closed`; alle anderen Rollen
+     `·`.
    - (c) Die neue Tabelle „Rolle × Leserecht" entspricht genau Festlegung 4.
    - (d) Keine andere Zelle ändert sich.
 3. Vertragstor, `role-literals`, `now-check`, `plan-honesty`, `arch`, `slice-scope` grün; `pnpm gates` grün. Alle
