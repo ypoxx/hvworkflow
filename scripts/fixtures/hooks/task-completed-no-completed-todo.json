@@ -1,0 +1,1 @@
+{"hook_event_name": "TaskCompleted", "tool_input": {"todos": [{"content": "implement", "status": "in_progress"}, {"content": "test", "status": "pending"}]}}

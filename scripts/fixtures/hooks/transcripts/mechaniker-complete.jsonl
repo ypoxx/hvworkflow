@@ -1,0 +1,2 @@
+{"type":"system","message":{"role":"system","content":[{"type":"text","text":"You do exactly the mechanical task described, nothing more. No refactoring, no new abstractions,\nno changes to specs."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Slice: takt-900\nDone: fixed the typo.\nEvidence: pnpm lint output.\nOpen: nothing.\nTouched: docs/x.md"}]}}
