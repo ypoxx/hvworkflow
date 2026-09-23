@@ -1,31 +1,35 @@
 #!/usr/bin/env node
 /**
- * TaskCompleted hook (docs/agentische-entwicklung-plan.md 5.4 "TaskCompleted"): a task only counts as
- * done once the current slice's own spec carries `**Status:** accepted` or an acceptance checkbox
- * (`- [x] …`) — never on a bauende's own say-so (AGENTS.md rule 2, "Evidence, not claims"). If the
- * hook input names one or more to-do items and none of them is being marked `completed`, there is
- * nothing to check and it passes; only a transition to `completed` triggers the spec-acceptance check.
+ * TaskCompleted hook (docs/agentische-entwicklung-plan.md 5.4 "TaskCompleted"): a to-do that names a
+ * slice is not "done" (AGENTS.md rule 2, "Evidence, not claims") until that slice's own spec carries
+ * `**Status:** accepted` (or its German equivalent `angenommen`, used by several specs in this
+ * repository, e.g. 012/014/takt-002) — never on the bauende's own say-so.
+ *
+ * Review rework round 1, m3: this only blocks when a *completed* to-do item's own text names a
+ * three-digit slice/takt number that resolves to a real spec file under `docs/slices/` — an unrelated
+ * to-do ("write tests", "fix typo") never triggers a check, and a bare acceptance checkbox
+ * (`- [x] …`) elsewhere in a spec no longer counts by itself (round 1 fixed a false negative that
+ * would have let a `- [x]` in unrelated prose stand in for `**Status:** accepted`). Fails open (exit
+ * 0) whenever the input shape is not recognised (no `tool_input.todos` array at all) — an unfamiliar
+ * shape is never grounds to block a real session.
  *
  * Note: Claude Code has no built-in "TaskCompleted" hook event; this key is the plan's own vocabulary
  * for "the point at which a to-do is marked done" (docs/agentische-entwicklung-plan.md 5.4). Wiring it
  * in `.claude/settings.json` under `hooks.TaskCompleted` keeps `scripts/plan-honesty.mjs`'s
  * `läuft (Hook: TaskCompleted)` row honest (the row only claims the *hook is configured*, not that a
- * particular Claude Code build fires it) and gives the check a real, tested script rather than a
- * stub, ready the day an equivalent event exists.
+ * particular Claude Code build fires it) and gives the check a real, tested script rather than a stub.
  *
- * The slice is identified exactly as in `scripts/slice-scope.mjs`: from the current branch name
- * (`claude/slice-NNN-…`/`claude/takt-NNN-…`), or overridden with `--slice NNN`/`--takt NNN`/
- * `--spec <path>`. Skips (exit 0) when no slice can be identified, mirroring slice-scope.
- *
- * Test via a redirected fixture payload: `node scripts/hooks/task-completed.mjs --spec <path> < payload.json`.
+ * `--root <dir>` points at a different repository root (its `docs/slices/`), for tests.
+ * Test via a redirected fixture payload: `node scripts/hooks/task-completed.mjs --root <dir> < payload.json`.
  */
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SLICES_DIR = 'docs/slices';
+const SLICE_NUMBER_RE = /\b(\d{3})\b/;
+const ACCEPTED_STATUS_RE = /^\*\*Status:\*\*\s*(accepted|angenommen)\b/m;
 
 function readStdinJson() {
   let raw = '';
@@ -43,105 +47,61 @@ function readStdinJson() {
 }
 
 function parseArgs(argv) {
-  const out = { root: ROOT };
+  const out = { root: DEFAULT_ROOT };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--slice') out.slice = argv[++i];
-    else if (a === '--takt') out.takt = argv[++i];
-    else if (a === '--spec') out.specPath = argv[++i];
-    else if (a === '--root') out.root = argv[++i];
+    if (a === '--root') out.root = argv[++i];
     else throw new Error(`task-completed: unknown argument "${a}"`);
   }
   return out;
 }
 
-function findSpecFile(root, kind, number) {
-  const prefix = kind === 'takt' ? `takt-${number}-` : `${number}-`;
+/** The first `docs/slices/NNN-*.md` or `docs/slices/takt-NNN-*.md` for a given three-digit number,
+ * relative to `root` — `undefined` if neither exists. */
+function findSpecFile(root, number) {
   const dir = join(root, SLICES_DIR);
-  const match = readdirSync(dir).find((f) => f.startsWith(prefix) && f.endsWith('.md'));
-  return match ? join(SLICES_DIR, match) : undefined;
-}
-
-function detectSliceFromBranch(root) {
-  let branch;
-  try {
-    branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }).trim();
-  } catch {
-    return undefined;
-  }
-  const m = branch.match(/^claude\/(slice|takt)-(\d{3})-/);
-  return m ? { kind: m[1], number: m[2] } : undefined;
-}
-
-/** Whether the input marks *something* as newly `completed` — a plain to-do list write with no
- * `completed` entry (or no to-do list at all) has nothing for this hook to check yet. Fails open
- * (treated as "yes, check it") for any input shape this script does not recognise, so a real
- * completion signal is never silently skipped just because its exact field name differs. */
-function marksSomethingCompleted(input) {
-  const todos = input?.tool_input?.todos;
-  if (!Array.isArray(todos)) return true;
-  return todos.some((t) => t?.status === 'completed');
+  if (!existsSync(dir)) return undefined;
+  const files = readdirSync(dir);
+  const match = files.find((f) => (f.startsWith(`${number}-`) || f.startsWith(`takt-${number}-`)) && f.endsWith('.md'));
+  return match ? join(dir, match) : undefined;
 }
 
 function isAccepted(specText) {
-  if (/^\*\*Status:\*\*\s*accepted\b/m.test(specText)) return true;
-  if (/^\s*-\s*\[[xX]\]/m.test(specText)) return true; // an acceptance checkbox
-  return false;
+  return ACCEPTED_STATUS_RE.test(specText);
 }
 
 function main(argv) {
   const args = parseArgs(argv);
   const input = readStdinJson();
 
-  if (!marksSomethingCompleted(input)) return 0;
+  const todos = input?.tool_input?.todos;
+  if (!Array.isArray(todos)) return 0; // unrecognised input shape — fail open, nothing to check
 
-  let specRelPath = args.specPath;
-  if (!specRelPath) {
-    let kind;
-    let number;
-    if (args.slice) {
-      kind = 'slice';
-      number = args.slice;
-    } else if (args.takt) {
-      kind = 'takt';
-      number = args.takt;
-    } else {
-      const detected = detectSliceFromBranch(args.root);
-      if (!detected) {
-        console.log('task-completed: not on a claude/slice-NNN-…/claude/takt-NNN-… branch and no --slice/--takt/--spec given — skipping.');
-        return 0;
-      }
-      kind = detected.kind;
-      number = detected.number;
-    }
-    specRelPath = findSpecFile(args.root, kind, number);
-    if (!specRelPath) {
-      console.log(`task-completed: no spec file found under ${SLICES_DIR}/ for ${kind} ${number} — skipping.`);
-      return 0;
+  const completedTexts = todos.filter((t) => t?.status === 'completed' && typeof t?.content === 'string').map((t) => t.content);
+  if (completedTexts.length === 0) return 0; // nothing newly marked completed
+
+  let named;
+  for (const text of completedTexts) {
+    const m = text.match(SLICE_NUMBER_RE);
+    if (!m) continue;
+    const specPath = findSpecFile(args.root, m[1]);
+    if (specPath) {
+      named = { number: m[1], specPath, text };
+      break;
     }
   }
+  if (!named) return 0; // no completed item names a slice number with a real spec — nothing to check
 
-  const specAbsPath = isAbsolute(specRelPath) ? specRelPath : join(args.root, specRelPath);
-  if (!existsSync(specAbsPath)) {
-    console.log(`task-completed: ${specRelPath} does not exist — skipping.`);
-    return 0;
-  }
-  const specText = readFileSync(specAbsPath, 'utf8');
-
+  const specText = readFileSync(named.specPath, 'utf8');
   if (!isAccepted(specText)) {
     console.error(
-      `TaskCompleted blocked (AGENTS.md rule 2, "Evidence, not claims"): ${specRelPath} has neither ` +
-        '"**Status:** accepted" nor an acceptance checkbox ("- [x] …") yet — a task is not done until the ' +
-        'slice itself is.',
+      `TaskCompleted blocked (AGENTS.md rule 2, "Evidence, not claims"): the completed to-do "${named.text}" ` +
+        `names slice ${named.number}, whose spec (${named.specPath}) is not yet "**Status:** accepted"/"angenommen".`,
     );
     return 2;
   }
 
-  console.log(`task-completed: ${specRelPath} is accepted.`);
+  console.log(`task-completed: slice ${named.number} (${named.specPath}) is accepted.`);
   return 0;
 }
 

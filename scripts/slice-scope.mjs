@@ -8,26 +8,32 @@
  * segments, `*` one path segment, `{a,b}` alternation) and checks every file changed on this branch
  * against it.
  *
- * The slice is identified from the current branch name (`claude/slice-NNN-…` or
- * `claude/takt-NNN-…`), or overridden with `--slice NNN` / `--takt NNN` / `--spec <path>`. The changed
- * files are `git diff --name-only <merge-base>...HEAD` against the integration branch, or overridden
- * with `--diff a,b,c` (comma-separated, for tests — bypasses git entirely).
+ * The slice is identified from the current branch name — `GITHUB_HEAD_REF` first (set by GitHub
+ * Actions on `pull_request` to the real source-branch name; a `pull_request` checkout puts a merge
+ * ref, not that branch, on `HEAD`, so reading `HEAD` alone would silently see nothing to check — round
+ * 1, M1), then `git rev-parse --abbrev-ref HEAD` (push events, local use) — or overridden with
+ * `--slice NNN` / `--takt NNN` / `--spec <path>`. The changed files are
+ * `git diff --name-only <merge-base>...HEAD` against the integration branch, or overridden with
+ * `--diff a,b,c` (comma-separated, for tests — bypasses git entirely).
  *
  * Always allowed in addition to the spec's own list: the spec file itself, and `pnpm-lock.yaml` but
  * only when the spec's list already allows `package.json` (the root manifest).
  *
- * Skips (exit 0, with a note) rather than failing when: the branch does not follow the
+ * Skips (exit 0, with a note) rather than failing when the branch does not follow the
  * `claude/slice-NNN-…`/`claude/takt-NNN-…` naming scheme and no `--slice`/`--takt`/`--spec` was given
- * (e.g. the orchestrator's own day-report branch); or the merge-base/integration ref can't be
- * resolved (offline, shallow clone, no such remote branch) and no `--diff` override was given — this
- * mirrors `packages/contract/scripts/check.mjs`'s check (c).
+ * (e.g. the orchestrator's own day-report branch) — this is the only situation this gate treats as
+ * "not applicable". Once a slice/takt branch *is* identified, every later failure is a hard exit 1,
+ * including the merge-base/integration ref being unresolvable: round 1, M1 found that a silent skip
+ * there in CI (`CI` env var set) is indistinguishable from "not applicable" and could mask the gate
+ * going inert; locally (no `CI` env var) that same situation still only logs a note and exits 0,
+ * mirroring `packages/contract/scripts/check.mjs`'s check (c) for a normal offline/local run.
  *
  * Run as `pnpm slice-scope` (part of `pnpm gates`) or directly, e.g.
  * `node scripts/slice-scope.mjs --slice 016`. Deterministic apart from the git/network dependency in
  * its default mode; every option above turns that off for tests.
  */
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -119,17 +125,26 @@ function extractGlobs(sectionText) {
 function findSpecFile(root, kind, number) {
   const prefix = kind === 'takt' ? `takt-${number}-` : `${number}-`;
   const dir = join(root, SLICES_DIR);
+  if (!existsSync(dir)) return undefined;
   const match = readdirSync(dir).find((f) => f.startsWith(prefix) && f.endsWith('.md'));
   return match ? join(SLICES_DIR, match) : undefined;
 }
 
-function detectSliceFromBranch(root) {
-  let branch;
+/** `GITHUB_HEAD_REF` first — GitHub Actions sets it on `pull_request` to the real source branch, while
+ * `HEAD` itself is a detached merge ref there (round 1, M1) — then a plain git call, for push events
+ * and local use. */
+function resolveBranchName(root) {
+  if (process.env.GITHUB_HEAD_REF) return process.env.GITHUB_HEAD_REF;
   try {
-    branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+    return git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
   } catch {
     return undefined;
   }
+}
+
+function detectSliceFromBranch(root) {
+  const branch = resolveBranchName(root);
+  if (!branch) return undefined;
   const m = branch.match(/^claude\/(slice|takt)-(\d{3})-/);
   return m ? { kind: m[1], number: m[2], branch } : undefined;
 }
@@ -151,6 +166,11 @@ function gitChangedFiles(root, base) {
 function main(argv) {
   const args = parseArgs(argv);
   const root = args.root;
+  const inCI = Boolean(process.env.CI);
+
+  // Once any of these is true, a slice/takt scope is identified and every later problem is a hard
+  // failure, never a skip (round 1, M1) — only "no identifiable branch/override at all" may skip.
+  let sliceIdentified = Boolean(args.specPath || args.slice || args.takt);
 
   let specRelPath = args.specPath;
   if (!specRelPath) {
@@ -165,11 +185,12 @@ function main(argv) {
     } else {
       const detected = detectSliceFromBranch(root);
       if (!detected) {
-        console.log('slice-scope: not on a claude/slice-NNN-…/claude/takt-NNN-… branch and no --slice/--takt/--spec given — skipping.');
+        console.log('slice-scope: not on a claude/slice-NNN-…/claude/takt-NNN-… branch (checked GITHUB_HEAD_REF and git HEAD) and no --slice/--takt/--spec given — skipping.');
         return 0;
       }
       kind = detected.kind;
       number = detected.number;
+      sliceIdentified = true;
     }
     specRelPath = findSpecFile(root, kind, number);
     if (!specRelPath) {
@@ -202,7 +223,15 @@ function main(argv) {
     try {
       changed = gitChangedFiles(root, args.base);
     } catch (e) {
-      console.log(`slice-scope: could not resolve the merge-base with ${args.base} (${e.message.split('\n')[0]}) — skipping.`);
+      const reason = e.message.split('\n')[0];
+      if (inCI && sliceIdentified) {
+        console.error(
+          `slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — failing instead of ` +
+            'skipping: a slice/takt branch is identified and CI is set (round 1, M1).',
+        );
+        return 1;
+      }
+      console.log(`slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — skipping.`);
       return 0;
     }
   }

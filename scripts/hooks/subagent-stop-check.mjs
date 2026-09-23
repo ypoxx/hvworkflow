@@ -1,32 +1,33 @@
 #!/usr/bin/env node
 /**
  * SubagentStop hook (Plan 5.4 "SubagentStop"): when a subagent built with one of the
- * `implementierer-*`/`mechaniker` roles (`.claude/agents/`) finishes, its last reported message must
- * contain the report format from AGENTS.md ("Slice:", "Done:", "Evidence:", "Open:", "Touched:").
- * Every other agent (architekt, planer, design-kritiker, reviewer, reviewer-sonnet, or anything this
- * hook cannot identify) passes through untouched (exit 0) — this only ever tightens the three builder
- * roles the slice names, never anyone else.
+ * `implementierer-*`/`mechaniker` roles finishes, its last reported message must contain the report
+ * format from AGENTS.md ("Slice:", "Done:", "Evidence:", "Open:", "Touched:"). Every other agent
+ * (architekt, planer, design-kritiker, reviewer, reviewer-sonnet, or anything this hook cannot
+ * positively identify) passes through untouched (exit 0).
  *
- * Claude Code's SubagentStop hook JSON does not carry an explicit "which agent" field, so this script
- * identifies the agent from its own system prompt: the opening line of `.claude/agents/<name>.md`'s
- * body (after the frontmatter) is, verbatim, also the opening line of that subagent's own transcript
- * (`transcript_path`, JSONL, one Claude Code message per line). If the transcript cannot be read, or
- * none of the three builder roles' opening line is found in it, this hook does not guess further and
- * exits 0 (fail open — it only ever blocks a role it positively recognises).
+ * Review rework round 1, M3: the first version of this script identified the agent by searching for
+ * its system-prompt fingerprint inside `transcript_path` — but that field name is ambiguous and, on
+ * at least one real run, resolved to the *parent* orchestrator's transcript rather than one scoped to
+ * this one subagent, so the fingerprint search could match a *different* agent that had merely
+ * appeared earlier in the same parent conversation and block the wrong one. This version trusts only
+ * fields that name the agent and its message directly:
+ *   - `agent_type` (a plain string, e.g. "implementierer-backend") decides *whether* to check at all
+ *     — no `agent_type`, or one outside the three checked roles, is never blocked;
+ *   - `last_assistant_message` (a plain string), if present, is used as-is;
+ *   - otherwise `agent_transcript_path` (explicitly a per-agent transcript, unlike the ambiguous
+ *     `transcript_path`), if present, is read and its last assistant entry's text extracted;
+ *   - if neither is present, `agent_type` itself is absent, or the JSON does not parse, this hook
+ *     fails open (exit 0) — an unrecognised input shape is never grounds to block a real session.
+ *   - `stop_hook_active: true` (Claude Code sets this when a Stop-family hook is already retrying)
+ *     always exits 0 immediately, so this hook can never contribute to a retry loop.
  *
- * Wired in `.claude/settings.json` under `hooks.SubagentStop`. Test via a redirected fixture payload
- * whose `transcript_path` points at a fixture JSONL transcript, e.g.:
+ * Wired in `.claude/settings.json` under `hooks.SubagentStop`. Test via a redirected fixture payload:
  * `node scripts/hooks/subagent-stop-check.mjs < payload.json`.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const AGENTS_DIR = join(ROOT, '.claude', 'agents');
-
-// Only these three roles are held to the report format; every other agent is out of scope here.
-const CHECKED_AGENT_FILES = ['implementierer-backend.md', 'implementierer-oberflaeche.md', 'mechaniker.md'];
+const CHECKED_AGENT_TYPES = new Set(['implementierer-backend', 'implementierer-oberflaeche', 'mechaniker']);
 const REQUIRED_FIELDS = ['Slice:', 'Done:', 'Evidence:', 'Open:', 'Touched:'];
 
 function readStdinJson() {
@@ -44,20 +45,8 @@ function readStdinJson() {
   }
 }
 
-/** The first non-empty line of an agent .md's body, after the frontmatter — a stable fingerprint of
- * that agent's own system prompt, verbatim in every transcript it produces. */
-function agentFingerprint(fileName) {
-  const path = join(AGENTS_DIR, fileName);
-  if (!existsSync(path)) return undefined;
-  const text = readFileSync(path, 'utf8');
-  const afterFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
-  const firstLine = afterFrontmatter.split('\n').find((l) => l.trim().length > 0);
-  return firstLine?.trim();
-}
-
 /** Every string found anywhere in a parsed transcript entry — text blocks, tool_use inputs (so a
- * report delivered as a tool call's `message` parameter, e.g. SubagentHandback, still counts), and
- * anything else — joined so a plain substring search covers all of it. */
+ * report delivered as a tool call's `message` parameter, e.g. SubagentHandback, still counts). */
 function allStringsIn(value, out) {
   if (typeof value === 'string') {
     out.push(value);
@@ -68,8 +57,14 @@ function allStringsIn(value, out) {
   }
 }
 
-function readTranscriptEntries(transcriptPath) {
-  if (typeof transcriptPath !== 'string' || !existsSync(transcriptPath)) return [];
+function isAssistantEntry(entry) {
+  return entry?.type === 'assistant' || entry?.message?.role === 'assistant';
+}
+
+/** The last assistant entry's text from a JSONL transcript file — `undefined` if it can't be read or
+ * has no assistant entry at all (both fail open, never a finding). */
+function lastAssistantMessageFrom(transcriptPath) {
+  if (!existsSync(transcriptPath)) return undefined;
   const lines = readFileSync(transcriptPath, 'utf8')
     .split('\n')
     .filter((l) => l.trim());
@@ -78,43 +73,34 @@ function readTranscriptEntries(transcriptPath) {
     try {
       entries.push(JSON.parse(line));
     } catch {
-      // a non-JSON or partially written line — skip it, this hook only needs the well-formed ones.
+      // a non-JSON or partially written line — skip it.
     }
   }
-  return entries;
-}
-
-function isAssistantEntry(entry) {
-  return entry?.type === 'assistant' || entry?.message?.role === 'assistant';
+  const assistantEntries = entries.filter(isAssistantEntry);
+  if (assistantEntries.length === 0) return undefined;
+  const out = [];
+  allStringsIn(assistantEntries[assistantEntries.length - 1], out);
+  return out.join('\n');
 }
 
 function main() {
   const input = readStdinJson();
-  const entries = readTranscriptEntries(input?.transcript_path);
-  if (entries.length === 0) return 0; // no transcript to check — fail open
+  if (input?.stop_hook_active === true) return 0; // already retrying — never contribute to a loop
 
-  const allText = [];
-  for (const entry of entries) allStringsIn(entry, allText);
-  const wholeTranscript = allText.join('\n');
+  const agentType = input?.agent_type;
+  if (typeof agentType !== 'string' || !CHECKED_AGENT_TYPES.has(agentType)) return 0; // unknown shape or an out-of-scope role — fail open
 
-  const matchedAgent = CHECKED_AGENT_FILES.find((f) => {
-    const fingerprint = agentFingerprint(f);
-    return fingerprint && wholeTranscript.includes(fingerprint);
-  });
-  if (!matchedAgent) return 0; // not one of the three checked roles (or unrecognisable) — fail open
-
-  const assistantEntries = entries.filter(isAssistantEntry);
-  if (assistantEntries.length === 0) return 0; // nothing said yet — nothing to check
-
-  const lastText = [];
-  allStringsIn(assistantEntries[assistantEntries.length - 1], lastText);
-  const lastMessage = lastText.join('\n');
+  let lastMessage;
+  if (typeof input.last_assistant_message === 'string') {
+    lastMessage = input.last_assistant_message;
+  } else if (typeof input.agent_transcript_path === 'string') {
+    lastMessage = lastAssistantMessageFrom(input.agent_transcript_path);
+  }
+  if (typeof lastMessage !== 'string') return 0; // no reliable source for the last message — fail open
 
   const missing = REQUIRED_FIELDS.filter((f) => !lastMessage.includes(f));
   if (missing.length > 0) {
-    console.error(
-      `SubagentStop blocked (AGENTS.md report format, agent "${matchedAgent}"): the last message is missing ${missing.join(', ')}.`,
-    );
+    console.error(`SubagentStop blocked (AGENTS.md report format, agent "${agentType}"): the last message is missing ${missing.join(', ')}.`);
     return 2;
   }
   return 0;

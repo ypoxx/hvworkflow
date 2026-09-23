@@ -4,9 +4,16 @@
  * Reads the Claude Code hook JSON from stdin (`{tool_input: {command}}`) and blocks (exit 2, message
  * on stderr) a small, deliberately narrow set of shell patterns; everything else passes (exit 0).
  *
- * From slice 012: `git push --force`, `rm -rf /`, `git reset --hard`, a `curl … | sh`/`bash` pipeline.
- * New in slice 016 (Plan 5.4 "PreToolUse auf Shell (voller Umfang)"):
+ * From slice 012: `rm -rf /`, `git reset --hard`, a `curl … | sh`/`bash` pipeline.
+ * New in slice 016 (Plan 5.4 "PreToolUse auf Shell (voller Umfang)"), all handled by `gitPushFindings`:
  *   - a bare `git push` — no explicit remote *and* branch (`git push`, `git push origin` alone);
+ *   - a force flag (`-f`, `--force`, `--force-with-lease`), a `+`-prefixed (forced) refspec, or
+ *     `--mirror`;
+ *   - a remote-branch deletion (`--delete`/`-d`, or a `:`-prefixed refspec like `git push origin :main`);
+ *   - the git global options `-C <dir>`, `-c <key>=<value>` and `--git-dir=<dir>` between `git` and
+ *     `push` are recognised, so `git -C x push --force origin main` is caught, not just a literal
+ *     `git push --force` (round 1, M4 — the first version missed all of the above except a bare
+ *     `--force`/no-target push written with neither option);
  *   - reading or writing any `.env*` file other than exactly `.env.example`;
  *   - `curl`/`wget` whose target host is not `localhost`/`127.0.0.1`/`[::1]`/`0.0.0.0`.
  *
@@ -47,26 +54,46 @@ function splitTopLevelSegments(command) {
 }
 
 const EXISTING_PATTERNS = [
-  { name: 'git push --force', re: /git\s+push\s+.*--force/ },
   { name: 'rm -rf /', re: /rm\s+-rf\s+\/(\s|$)/ },
   { name: 'git reset --hard', re: /git\s+reset\s+--hard/ },
   { name: 'curl-into-shell pipeline', re: /curl[^|]*\|\s*(ba)?sh/ },
 ];
 
-/** A `git push` invocation with fewer than two non-flag tokens after it (remote, branch) has no
- * explicit target. */
-function bareGitPushFinding(command) {
-  const re = /\bgit\s+push\b([^\n&;|]*)/g;
+/** `git`, then any number of global options that can sit before the subcommand — `-C <dir>`,
+ * `-c <key>=<value>`, `--git-dir=<dir>`/`--git-dir <dir>` — then `push`. Review rework round 1, M4:
+ * the original pattern only matched a literal `git push` and missed every one of these forms. */
+const GIT_PUSH_RE = /\bgit\b(?:\s+(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=\S+|\s+\S+)))*\s+push\b([^\n&;|]*)/g;
+
+/** Every `git … push …` invocation, classified: a force flag/refspec, a `--mirror`, a remote-branch
+ * deletion, or a bare push with fewer than two non-flag tokens (no explicit remote *and* branch) are
+ * all findings — the first that applies to a given invocation, checked in this order (round 1, M4
+ * lists `-f`, `--force`, a `+`-prefixed refspec, `--mirror`, `--delete`, and a `:`-prefixed refspec as
+ * the bypasses the first version missed). */
+function gitPushFindings(command) {
+  const out = [];
+  const re = new RegExp(GIT_PUSH_RE.source, 'g');
   let m;
   while ((m = re.exec(command))) {
-    const rest = m[1];
-    const nonFlagTokens = rest
+    const whole = m[0].trim();
+    const tokens = m[1]
       .split(/\s+/)
       .map((t) => t.trim())
-      .filter((t) => t.length > 0 && !t.startsWith('-'));
-    if (nonFlagTokens.length < 2) return m[0].trim();
+      .filter(Boolean);
+    const nonFlagTokens = tokens.filter((t) => !t.startsWith('-'));
+
+    if (tokens.some((t) => t === '--mirror')) {
+      out.push({ reason: 'a --mirror push (rewrites/deletes everything on the remote to match local)', text: whole });
+    } else if (tokens.some((t) => t === '-f' || t === '--force' || t === '--force-with-lease' || t.startsWith('--force-with-lease='))) {
+      out.push({ reason: 'a force flag (-f/--force/--force-with-lease)', text: whole });
+    } else if (tokens.some((t) => !t.startsWith('-') && t.startsWith('+'))) {
+      out.push({ reason: 'a "+"-prefixed (forced) refspec', text: whole });
+    } else if (tokens.some((t) => t === '--delete' || t === '-d') || tokens.some((t) => !t.startsWith('-') && t.startsWith(':'))) {
+      out.push({ reason: 'a remote-branch deletion (--delete/-d or a ":"-prefixed refspec)', text: whole });
+    } else if (nonFlagTokens.length < 2) {
+      out.push({ reason: 'no explicit remote and branch', text: whole });
+    }
   }
-  return undefined;
+  return out;
 }
 
 /** Any `.env*` token other than the literal `.env.example` (the greedy extension group consumes
@@ -106,11 +133,10 @@ function main() {
     }
   }
 
-  const bareGitPush = bareGitPushFinding(command);
-  if (bareGitPush) {
-    console.error(
-      `Blocked by repository policy (AGENTS.md rule 11, slice 016): "git push" without an explicit remote and branch — ${bareGitPush}`,
-    );
+  const pushFindings = gitPushFindings(command);
+  if (pushFindings.length > 0) {
+    const f = pushFindings[0];
+    console.error(`Blocked by repository policy (AGENTS.md rule 11, slice 016): ${f.reason} — ${f.text}`);
     return 2;
   }
 

@@ -19,6 +19,14 @@ function runFixture(name) {
   return { status: r.status, stderr: r.stderr };
 }
 
+// Built here, in a JS test file — spawnSync feeds it to the hook's stdin directly (in-process), so a
+// command string containing "git push" is never itself run by a shell; only inline where B1's lesson
+// (never bake a machine-specific *path* into a fixture) does not apply, since these are plain strings.
+function runCommand(command) {
+  const r = spawnSync('node', [SCRIPT], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }), encoding: 'utf8' });
+  return { status: r.status, stderr: r.stderr };
+}
+
 test('red: git push --force is blocked (slice 012 pattern, unchanged)', () => {
   const r = runFixture('pre-tool-use-force-push');
   assert.equal(r.status, 2);
@@ -91,4 +99,33 @@ test('green: no tool_input.command at all passes (e.g. a non-Bash tool call)', (
 test('green: empty stdin passes', () => {
   const r = spawnSync('node', [SCRIPT], { input: '', encoding: 'utf8' });
   assert.equal(r.status, 0);
+});
+
+// Review rework round 1, M4: each of these bypassed the first version and must now block.
+const M4_BYPASSES = [
+  ['git push -f origin main', /force flag/],
+  ['git push origin +main', /forced\) refspec/],
+  ['git -C x push --force origin main', /force flag/],
+  ['git -c k=v push --force origin main', /force flag/],
+  ['git -C x push', /explicit remote and branch/],
+  ['git push origin --delete main', /remote-branch deletion/],
+  ['git push origin :main', /remote-branch deletion/],
+  ['git push --mirror origin', /--mirror push/],
+];
+for (const [command, expected] of M4_BYPASSES) {
+  test(`M4 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('M4 green: git -C/-c for an unrelated, explicit, non-forced push still passes', () => {
+  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('M4 green: --git-dir with an explicit, non-forced push still passes', () => {
+  const r = runCommand('git --git-dir=/home/user/wt/016/.git push origin claude/slice-016-agenten');
+  assert.equal(r.status, 0, r.stderr);
 });

@@ -1,2 +1,0 @@
-{"type":"system","message":{"role":"system","content":[{"type":"text","text":"You review one slice. Input: the slice file and `git diff`. Do not read any summary or chat by the\nimplementer."}]}}
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"0 blockers, 2 major findings, listed below."}]}}

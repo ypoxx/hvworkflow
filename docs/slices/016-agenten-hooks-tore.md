@@ -1,6 +1,6 @@
 # 016 — Agentenrollen, Hooks, Scheibenumfang-Tor, Plan-Graph-Prüfung, Branch-Schutz
 
-**Status:** review
+**Status:** review (Nacharbeitsrunde 1)
 **Risikoklasse:** niedrig · 1,5 AStd · Kalender 30.09.2026 (W1) · Lanes: infra (`.claude/**`, `scripts/**`,
 `.github/**`) + docs-betrieb (`docs/betrieb/branch-schutz.md`)
 **Rolle/Modell:** Implementierer-Backend · Sonnet 5 statt Mechaniker · Haiku (Abweichung nach oben: der
@@ -97,7 +97,7 @@ Plan 6.4 (Tore aus 016); Plan 8.3 (Kalendermodell); Audit A2 (Hooks); ADR 0016 (
         `require` und Alias-Import (`import { exec as run }`) erkennen.
      5. `scripts/now-check.mjs`: `process.hrtime.bigint(` und `performance['now'](` ergänzen.
      6. Owner der Audit-Ausnahme als Rolle statt Person (Regel 11): `scripts/audit-exceptions.json`s Eintrag
-        `#1193727` trug `owner: "aderno@gmail.com"` (eine echte Person) statt einer Funktion; `owner` wird
+        `#1193727` trug `owner: <eine persönliche E-Mail-Adresse>` (eine echte Person) statt einer Funktion; `owner` wird
         `"Umsetzer"`. `audit-check.mjs` prüft `owner` nur auf einen nichtleeren String, also keine Formatänderung
         am Skript nötig.
 8. **Branch-Schutz-Checkliste** `docs/betrieb/branch-schutz.md` für den Eigentümer (< 30 min): für den
@@ -113,7 +113,9 @@ Plan 6.4 (Tore aus 016); Plan 8.3 (Kalendermodell); Audit A2 (Hooks); ADR 0016 (
 ## Files allowed
 
 - `.claude/agents/*.md`, `.claude/settings.json`
-- `scripts/i18n-literal-check.mjs`, `docs/agentische-entwicklung-plan.md` (Abschnitt 5: nur die Stand-Spalte der genannten Zeilen und die Werkzeug-Spalte der Zeile „Versions- und Changelog-Pflicht")
+- `scripts/i18n-literal-check.mjs`, `docs/agentische-entwicklung-plan.md` (Abschnitt 5: die Stand-Spalte
+  der genannten Zeilen — inkl. PreToolUse (voll), PostToolUse, Stop, SubagentStop ab Nacharbeitsrunde 1,
+  m9 — und die Werkzeug-Spalte der Zeilen „Versions- und Changelog-Pflicht" und „ADR-Bezug")
 - `scripts/hooks/**`, `scripts/slice-scope.mjs`, `scripts/downgrade-check.mjs`, `scripts/plan-graph.mjs`,
   `scripts/**/*.test.mjs`, `scripts/fixtures/**` (Testkopien)
 - `.github/workflows/gates.yml` (neue Schritte, `CONTRACT_GATE_STRICT`, die zwei Pins aus Punkt 7)
@@ -140,6 +142,102 @@ Plan 6.4 (Tore aus 016); Plan 8.3 (Kalendermodell); Audit A2 (Hooks); ADR 0016 (
 
 settings.json-Diff; Protokoll eines blockierten Stop-Versuchs; rote Läufe; plan-graph-Ausgabe; `pnpm gates`; CI-Link.
 
+## Nachschärfung nach Review (Runde 1)
+
+Opus-Review: 2 Blocker, 6 Hauptbefunde (major). Mehr als drei Hauptbefunde schärfen nach Plan 6.3 die
+Spec nach; die folgende Liste ist ab jetzt bindend für diese Scheibe (Nacharbeitsrunde 1). CI muss grün
+werden; der erste CI-Lauf zeigte nur B1.
+
+**BLOCKER**
+
+- **B1.** `scripts/fixtures/hooks/*.json` hard-code `/home/user/wt/016/…`, so 3 tests fail in CI and 4
+  more pass without testing anything. Store relative paths or a placeholder and resolve them in the
+  tests against the fixture directory, or build the payloads inside the tests. Check that no other
+  test depends on this machine.
+- **B2.** `task-completed.test.mjs:19/25` uses the live 016 and 017 specs. Use fixture specs with
+  status `review` and `accepted`.
+
+**MAJOR**
+
+- **M1.** The CI step "Slice scope" checks nothing on `pull_request`: the merge-ref checkout makes the
+  branch `HEAD`, so the script skips.
+  - Read `GITHUB_HEAD_REF` first.
+  - When `CI` is set and the branch matches `claude/slice-NNN-*` or `claude/takt-NNN-*`, fail instead
+    of skipping if it cannot resolve the spec.
+  - Show a red CI-like run with `GITHUB_HEAD_REF` set to a slice branch that touches a foreign file.
+- **M2.** The Stop hook blocks without any code change (fresh clone, checkout, merge, e2e output).
+  - Detect changes with git: store a tree hash of `apps/`, `packages/` and `scripts/` in the marker,
+    and compare `git ls-files -m -o --exclude-standard` or the tree hash instead of mtimes.
+  - Allow when there is no marker and the tree is clean. Allow when `stop_hook_active` is true.
+  - Ignore `apps/web/test-results` and other generated output.
+  - Red and green runs: a real edit without a test run → 2; a checkout round-trip without an edit → 0.
+- **M3.** SubagentStop keys on the parent transcript and can block the wrong agent.
+  - Use `agent_type`, and `last_assistant_message` or `agent_transcript_path` if present. Exit 0 when
+    `stop_hook_active` is set or the input shape is unknown (fail-open, documented).
+  - Test: a reviewer stop is never blocked.
+- **M4.** PreToolUse force-push and remote-delete bypasses. Each of these currently exits 0 and must
+  be blocked, with a test each:
+  - `git push -f origin main`
+  - `git push origin +main`
+  - `git -C x push --force origin main`
+  - `git -c k=v push --force …`
+  - `git -C x push` (bare, no target)
+  - `git push origin --delete main`
+  - `git push origin :main`
+  - `--mirror`
+  Handle the git global options `-C`, `-c` and `--git-dir` before `push`.
+- **M5.** Rule 11: `docs/slices/016-agenten-hooks-tore.md:100` and `:157` still contain the owner's
+  email address. Write "eine persönliche E-Mail-Adresse" instead. Grep your whole diff for any email
+  address.
+- **M6.** i18n-literal gate:
+  - Drop the count-based grace (there are 0 hits today).
+  - Mask JSX and JS comments before scanning. Today `Podium.tsx:101` on the 020 branch
+    (`/home/user/wt/020`) is a false positive; run your script against that tree as a check.
+  - Detect JSX text split over several lines.
+
+**MINOR**
+
+- **m1.** `contract-gate-strict.test.mjs` must not assume git and node live in different directories.
+  Use an env override for the integration ref, or a temp copy without `.git`.
+- **m2.** PreToolUse false positives on `grep -rn "process.env"`, `import.meta.env` and `.envrc`:
+  require a path boundary before `.env`.
+  - Document in the script header the known, accepted bypasses (no-scheme curl, wrappers,
+    `node -e fetch`) and that it fails open on malformed input, deliberately.
+  - Do NOT add `permissions` rules to `.claude/settings.json`; the orchestrator puts that to the owner.
+- **m3.** TaskCompleted:
+  - block only if the task text names a slice number and that slice's spec status is not
+    `accepted`/`angenommen`; a stray `- [x]` never counts as acceptance;
+  - fail open on unknown input;
+  - correct the Bericht statement about the event.
+- **m4.** slice-scope:
+  - resolve bare filenames after a full path against that directory (020's spec lists
+    `003-answers-stage.spec.ts`, `abnahme.spec.ts` after a full path);
+  - reject bare `*` or `**` patterns;
+  - warn when "Files allowed" differs from the merge-base version of the spec.
+- **m5.** plan-graph:
+  - fail on any unparsed `- **NNN ·` line;
+  - the test must not hard-code 80 slices or run `--strict` on the live plan; use a fixture copy.
+- **m6.** `role-literal-check.test.mjs` must not rewrite the real `types.ts`/`permissions.ts`; use a
+  temp copy via `--root`.
+- **m7.** downgrade-check: the sign-off line counts only in the spec header block, not as quoted prose
+  anywhere.
+- **m8.** `branch-schutz.md`:
+  - no force-push test against the real integration branch; use a scratch branch or only the settings
+    screen;
+  - say that "Require a pull request" ends direct pushes, including today's squash merges through the
+    API, which still work via PR;
+  - note which GitHub plan branch protection needs for a private repository.
+- **m9.** `docs/agentische-entwicklung-plan.md` section 5: set the rows for PreToolUse (voll),
+  PostToolUse, Stop and SubagentStop to `läuft (Hook: <Ereignis>)`. This is allowed now; add it to
+  "Files allowed".
+- **m10.** Nits:
+  - pin comment `# v4.3.0`;
+  - strip `/* */` comments in the union parser;
+  - `pnpm -r test` may also write the marker (optional).
+
+Evidence: a "Befund → Erledigung" table in the Bericht, red/green runs for B1, M1–M4 and M6, the
+`pnpm gates` tail, and the status "review (Nacharbeitsrunde 1)".
+
 ## Arbeitsweise
 
 - Worktree `/home/user/wt/016`, Branch `claude/slice-016-agenten`. Absolute Pfade.
@@ -154,8 +252,8 @@ settings.json-Diff; Protokoll eines blockierten Stop-Versuchs; rote Läufe; plan
 
 ### Zusatz vom Orchestrator (vor Baubeginn erledigt)
 
-`scripts/audit-exceptions.json`s Eintrag `#1193727` trug `owner: "aderno@gmail.com"` (eine echte
-Person, AGENTS.md Regel 11) statt einer Rolle; jetzt `"owner": "Umsetzer"`. `audit-check.mjs` prüft
+`scripts/audit-exceptions.json`s Eintrag `#1193727` trug als `owner` eine persönliche E-Mail-Adresse
+(eine echte Person, AGENTS.md Regel 11) statt einer Rolle; jetzt `"owner": "Umsetzer"`. `audit-check.mjs` prüft
 `owner` nur auf einen nichtleeren String, keine Skriptänderung nötig (`node scripts/audit-check.mjs`
 grün, siehe unten). „Files allowed" um `scripts/audit-exceptions.json` (nur `owner`) ergänzt, Punkt 7
 um eine Zeile ergänzt.
@@ -666,6 +764,125 @@ Stand-Spalte der ADR-Bezug-Zeile wurde nicht angefasst, nur ihre Werkzeug-Spalte
 nicht prüft. `slice-scope`: weiterhin `89 changed file(s)`, alle innerhalb der Liste (die drei hier
 geänderten Dateien waren schon vorher Teil des Diffs, die Zahl ändert sich durch eine Inhaltsänderung
 nicht).
+
+### Nacharbeitsrunde 1 (Review: 2 Blocker, 6 Hauptbefunde)
+
+Reihenfolge wie im Auftrag: B1, B2, M1–M6 zuerst committet (dieser Abschnitt), Minor-Befunde danach in
+einem eigenen Abschnitt/Commit.
+
+| # | Befund | Erledigung |
+|---|---|---|
+| B1 | `scripts/fixtures/hooks/*.json` hard-coded `/home/user/wt/016/…` | Die vier `post-tool-use-*.json`- und fünf `subagent-stop-*.json`-Dateien mit gebackenem Pfad entfernt; `post-tool-use-lint.test.mjs` und `subagent-stop-check.test.mjs` bauen die Nutzlast jetzt zur Testzeit mit `join(FIXTURES, …)`/inline `agent_type`+`last_assistant_message`. `task-completed-*.json` ebenfalls entfernt (B2 ersetzt sie ohnehin). Geprüft: kein verbleibendes `scripts/fixtures/**/*.json(l)` mit `/home/user`-Pfad (`grep -rl "/home/user" scripts/fixtures/` nach der Änderung: leer). |
+| B2 | `task-completed.test.mjs` nutzte die echten Specs 016/017 | `task-completed.mjs` neu entworfen (siehe m3): die Slice-Nummer kommt jetzt aus dem Text des erledigten To-dos, nie aus Branch/`--spec`. Tests laufen gegen `scripts/fixtures/task-completed/docs/slices/{900-review,901-accepted,902-stray-checkbox,903-angenommen}.md`, nie gegen echte Specs. |
+| M1 | „Slice scope" prüft auf `pull_request` nichts (Merge-Ref macht `HEAD` zu einem fremden Ref) | `slice-scope.mjs` liest `GITHUB_HEAD_REF` vor `git rev-parse --abbrev-ref HEAD`; ist `CI` gesetzt und eine Scheiben-/Takt-Branch erkannt, wird ein unauflösbarer Merge-Base jetzt `fail` (Exit 1) statt `skip`. Rotes CI-artiges Beispiel unten. |
+| M2 | Stop-Hook blockiert ohne Codeänderung (Checkout/Merge/e2e-Output) | `stop-check.mjs` fragt jetzt `git status --porcelain -- apps packages scripts` statt mtimes (ignoriert `.gitignore`-Pfade automatisch, u. a. `apps/web/test-results/`); ein sauberer Baum ist immer erlaubt, auch ohne Marker; sonst vergleicht es einen Inhalts-Fingerabdruck (Pfad+Hash je geänderter/unversionierter Datei) gegen den, den `mark-test-run.mjs` zuletzt geschrieben hat (neues gemeinsames `scripts/hooks/lib/dirty-tree-signature.mjs`); `stop_hook_active: true` im Hook-Input erlaubt immer. |
+| M3 | SubagentStop hing am (mutmaßlich elterlichen) `transcript_path` und konnte den falschen Agenten treffen | Neu entworfen: nur `agent_type` (String) entscheidet, *ob* geprüft wird; die Nachricht kommt aus `last_assistant_message` oder, falls das fehlt, `agent_transcript_path` (nie mehr dem mehrdeutigen `transcript_path`); `stop_hook_active: true` oder ein unbekanntes Eingabeformat (kein `agent_type`) geben immer frei. Test „ein Reviewer-Stopp wird nie blockiert" grün, mit und ohne Berichtsformat. |
+| M4 | PreToolUse: Force-Push/Remote-Löschung umgehbar | `gitPushFindings` neu: erkennt `-f`/`--force`/`--force-with-lease`, ein `+`-Refspec, `--mirror`, `--delete`/`-d` und ein `:`-Refspec; erkennt die globalen Optionen `-C <dir>`, `-c k=v`, `--git-dir=<dir>` vor `push`. Alle 8 im Befund genannten Formen einzeln getestet, plus zwei grüne Gegenproben (legitimer `-C`/`-c`/`--git-dir`-Aufruf mit explizitem Ziel, ohne Force). |
+| M5 | E-Mail-Adresse in der Spec (Zeilen ~100, ~157) | Beide Stellen auf „eine persönliche E-Mail-Adresse" umgeschrieben; ganzer Diff gegen den Merge-Base auf E-Mail-Muster geprüft (siehe unten) — im *aktuellen* Dateiinhalt keine mehr; die *Historie* der bereits gemergten Commits `c456296`/`455f905` trägt sie weiterhin (kein Amend/Rebase, siehe „Offen"). |
+| M6 | i18n-Literal-Tor: Kulanzschwelle, Kommentare, mehrzeiliger JSX-Text | Kulanz (`HANDFUL`/`GRACE_PERIOD_UNTIL`/`--strict`/`--today`) entfernt — jeder Fund blockiert sofort. `//` und `/* … */` werden vor dem Scannen maskiert (längen-/zeilenerhaltend); behebt den echten Fund `apps/web/src/features/stage/Podium.tsx:101` auf `/home/user/wt/020` (ein Kommentar, der `<div>`/`<p>`/`<button>` in Prosa erwähnt). JSX-Text darf jetzt bis zu 4 eingebettete Zeilenumbrüche überspannen; das deckte zwei echte, aber aus dieser Scheibe heraus unreparierbare Funde auf (`apps/web/src/app/{BootScreen,Header}.tsx`: das Monogramm „HV" auf einem `aria-hidden`-Badge) — dafür eine benannte, schmale Ausnahme `isHouseAbbreviationMonogram` ergänzt (kein allgemeines „kurzes Großbuchstabenwort"-Muster, das hätte z. B. „OK"/„Ja" mitgeschluckt); außerdem zwei echte Regex-Lücken behoben (`&&`/`||` und unausgeglichene Klammern als Code-Signal), die durch mehrzeiliges Matching neu sichtbar wurden (`{total > results.length && (` und ein Ternary mit Klammern). |
+
+**Judgement-Aufruf zur Kenntnisnahme (M6, `isHouseAbbreviationMonogram`):** Ich habe entschieden, dass
+das zweimal vorkommende „HV"-Monogramm (ein `aria-hidden`- bzw. dekoratives 36×36/28×28-px-Badge, kein
+Fließtext) keine Übersetzung braucht, und eine benannte Ausnahme dafür ergänzt statt die zwei Fundstellen
+zu reparieren (außerhalb „Files allowed" dieser Scheibe: `apps/web/src/app/{BootScreen,Header}.tsx`).
+Das ist eine inhaltliche Einschätzung, keine rein mechanische — bitte im Review bestätigen oder als
+Befund vermerken; die Gegenprobe ohne diese Ausnahme steht oben im Text (4 Funde statt 0).
+
+#### Rote/grüne Läufe
+
+**B1** (Nachweis, dass kein Test mehr von diesem Rechner abhängt):
+```
+$ grep -rl "/home/user" scripts/fixtures/
+(kein Treffer)
+```
+
+**M1** (rotes CI-artiges Beispiel: `pull_request`-Checkout mit `GITHUB_HEAD_REF` gesetzt, fremde Datei im Diff):
+```
+$ CI=true GITHUB_HEAD_REF=claude/slice-016-agenten node scripts/slice-scope.mjs \
+    --diff "docs/slices/016-agenten-hooks-tore.md,apps/web/src/features/stage/Page.tsx"
+slice-scope: 1 file(s) outside "docs/slices/016-agenten-hooks-tore.md"'s "Files allowed" list:
+  apps/web/src/features/stage/Page.tsx
+exit=1
+```
+Zusätzlich, mit einem echten detachten `HEAD` (simuliert per `git checkout <sha>`) in einer Testkopie:
+ohne `GITHUB_HEAD_REF` skippt das Tor fälschlich (Fehler reproduziert, `exit=0`, kein Fund trotz zweier
+fremder Dateien); mit `GITHUB_HEAD_REF=claude/slice-016-agenten` findet es beide (`exit=1`).
+
+**M2**:
+```
+$ # echte Bearbeitung, kein Testlauf seither
+$ node scripts/hooks/stop-check.mjs   # (in einer Testkopie mit dirty apps/api/src/index.ts)
+Stop blocked (Plan 5.4): apps/, packages/ or scripts/ have an uncommitted change and no successful
+test run is recorded yet ... exit=2
+
+$ # Checkout-Hin-und-Zurück ohne echte Änderung
+$ git checkout -- apps/api/src/index.ts
+$ node scripts/hooks/stop-check.mjs
+Stop check: apps/, packages/ and scripts/ have no uncommitted change.
+exit=0
+```
+
+**M3**:
+```
+$ echo '{"agent_type":"implementierer-backend","last_assistant_message":"Done, trust me."}' \
+    | node scripts/hooks/subagent-stop-check.mjs
+SubagentStop blocked ... exit=2
+
+$ echo '{"agent_type":"reviewer","last_assistant_message":"Done, trust me."}' \
+    | node scripts/hooks/subagent-stop-check.mjs
+(kein Fund) exit=0
+```
+
+**M4** (alle acht Formen aus dem Befund, siehe `scripts/hooks/pre-tool-use-bash.test.mjs`):
+```
+git push -f origin main                          -> blocked (force flag)
+git push origin +main                             -> blocked (forced refspec)
+git -C x push --force origin main                 -> blocked (force flag)
+git -c k=v push --force origin main                -> blocked (force flag)
+git -C x push                                      -> blocked (no explicit remote and branch)
+git push origin --delete main                      -> blocked (remote-branch deletion)
+git push origin :main                              -> blocked (remote-branch deletion)
+git push --mirror origin                           -> blocked (--mirror push)
+```
+Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
+`git --git-dir=/home/user/wt/016/.git push origin claude/slice-016-agenten` (explizites Ziel, keine
+der obigen Formen).
+
+**M5**:
+```
+$ git diff 76e572e... | grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" | grep -v "example\."
+(nur `-`-Zeilen aus bereits gemergten, älteren Commits — der aktuelle Dateiinhalt ist sauber)
+```
+
+**M6**:
+```
+$ node scripts/i18n-literal-check.mjs --root /home/user/wt/020
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+```
+(vorher, mit der alten Einzeilen-Regex ohne Kommentarmaskierung, war `Podium.tsx:101` ein Fund.)
+Mehrzeiliger Fund als Beleg, dass die Erkennung jetzt wirklich mehrzeilig ist:
+```
+$ node scripts/i18n-literal-check.mjs --root scripts/fixtures/i18n-literal/multiline --scan-roots features
+i18n-literal check: 1 literal(s) found under features:
+  features/demo/Page.tsx:4: Hallo Welt
+```
+
+#### `pnpm gates` — Ende (nach B1, B2, M1–M6)
+
+```
+> hvworkflow@0.1.0 test:scripts /home/user/wt/016
+> node --test 'scripts/**/*.test.mjs'
+...
+# tests 98
+# pass 98
+# fail 0
+...
+> @hv/web@0.0.0 build /home/user/wt/016/apps/web
+✓ built in 1.58s
+mark-test-run: wrote /home/user/wt/016/.claude/state/last-test-run (signature 94e8e65822ac…)
+```
+Exit `0`. Die neue Signatur-Zeile selbst ist der Beleg, dass `stop-check.mjs` jetzt git-basiert
+arbeitet (ein leerer Baum hätte `(clean tree)` gemeldet).
 
 ## Touched
 
