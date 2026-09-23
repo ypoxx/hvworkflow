@@ -53,7 +53,150 @@ Bericht), `docs/slices/takt-007-codex-befunde-018-takt005.md` (Bericht).
 
 ## Bericht
 
-(vom Implementierer)
+**Slice:** takt-007-codex-befunde-018-takt005
+
+**Done:**
+1. `docs/agentische-entwicklung-plan.md` Abschnitt 3: im Satz zum Sicherheitsreview „einmal je Meilenstein" entfernt,
+   sodass der Satz nur noch die Prüfpunkte 3, 4 und 7 nennt (deckungsgleich mit `docs/produktplan-beta.md`
+   Abschnitt 6.3, das den Review des Architekten nur an diesen drei Prüfpunkten plant); sonst kein Wort geändert.
+   `node scripts/plan-honesty.mjs` bleibt grün.
+2. `README.md` Dokumentenindex: die vier Verzeichnis-Zeilen `docs/adr/`, `docs/betrieb/`, `docs/datenschutz/`,
+   `docs/sicherheit/` und `docs/feedback/` durch je eine Zeile pro Datei ersetzt (14 ADR-Dateien 0003–0016, 1 Datei
+   unter `docs/betrieb/`, 1 unter `docs/datenschutz/`, 3 unter `docs/sicherheit/`, 3 unter `docs/feedback/`); jeder
+   Zweck stammt aus der ersten Überschrift bzw. dem ersten Absatz der jeweiligen Datei. Bestehende Zeilen, die schon
+   eine Datei nannten, blieben unverändert. Ausgenommen bleiben `docs/evidence/`, `docs/slices/` (laut Spec) und
+   `docs/bautage/` (kein solcher Pfad unter `docs/` vorhanden).
+3. `docs/slices/takt-005-email-aus-012.md`, Abschnitt Bericht: den `git diff --stat`-Block (Stand vor dem Squash)
+   durch `git show --stat --format= e79c69d` (Squash-Commit von takt-005) ersetzt, den veralteten E-Mail-Scan durch
+   einen neuen `git grep`-Lauf auf dem heutigen Integrationsbranch ersetzt, jede der 40 Fundstellen einzeln
+   begründet (10 davon als Selbstzitate benannt, weil sie im Bericht selbst liegen und den vorigen Scan wörtlich
+   zitieren) und einen Satz ergänzt, dass beide Nachweise am 23.09.2026 durch takt-007 ersetzt wurden.
+
+**Evidence:**
+
+*Ziel 1 — plan-honesty bleibt grün:*
+```
+$ node scripts/plan-honesty.mjs
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+```
+
+*Ziel 2 — Index-Prüfung, Skript nur im Scratch
+(`/tmp/claude-0/-home-user-hvworkflow/ba1d545a-db2b-57e2-a725-96ea31145014/scratchpad/takt-007-readme-index-check.mjs`,
+vergleicht `git ls-files docs | grep -v -e '^docs/evidence/' -e '^docs/slices/' -e '^docs/bautage/'` gegen die Pfade
+in README.md):*
+```
+$ node /tmp/claude-0/-home-user-hvworkflow/ba1d545a-db2b-57e2-a725-96ea31145014/scratchpad/takt-007-readme-index-check.mjs
+0 fehlend
+```
+
+*Ziel 3 — Squash-Commit-Stat (`git show --stat --format= e79c69d`), vier Dateien wie in der takt-005-Spec erwartet:*
+```
+$ git show --stat --format= e79c69d
+ docs/adr/0015-vertragsversionierung.md         |   3 +
+ docs/produktplan-beta.md                       |   2 +-
+ docs/slices/012-architektur-sicherheitstore.md |   2 +-
+ docs/slices/takt-005-email-aus-012.md          | 192 +++++++++++++++++++++++++
+ 4 files changed, 197 insertions(+), 2 deletions(-)
+```
+
+*Ziel 3 — E-Mail-`git grep` aus takt-005 Ziel 2, neu ausgeführt auf dem heutigen Integrationsbranch (identischer
+Befehl wie in der takt-005-Spec):*
+```
+$ git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**'
+docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
+docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
+docs/slices/takt-005-email-aus-012.md:65:docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
+docs/slices/takt-005-email-aus-012.md:66:docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
+docs/slices/takt-005-email-aus-012.md:67:scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+docs/slices/takt-005-email-aus-012.md:68:scripts/hooks/pre-tool-use-bash.test.mjs:124:  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+docs/slices/takt-005-email-aus-012.md:69:scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+docs/slices/takt-005-email-aus-012.md:70:scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
+docs/slices/takt-005-email-aus-012.md:71:scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+docs/slices/takt-005-email-aus-012.md:72:scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+docs/slices/takt-005-email-aus-012.md:76:1. `docs/slices/016-agenten-hooks-tore.md:853`: `t@t.invalid` ist eine Test-Adresse in einem Git-Befehl-Beispiel, nicht real.
+docs/slices/takt-005-email-aus-012.md:77:2. `docs/slices/takt-005-email-aus-012.md:19`: `noreply@anthropic.com` ist die Automatisierungs-Adresse in Commit-Vorlage-Beispielen, wie in der Spec angegeben.
+docs/slices/takt-005-email-aus-012.md:78:3. `scripts/hooks/mark-test-run.test.mjs:40`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+docs/slices/takt-005-email-aus-012.md:79:4. `scripts/hooks/pre-tool-use-bash.test.mjs:124`: `t@t.invalid` ist eine Test-Adresse in Git-Befehl-String für Tests.
+docs/slices/takt-005-email-aus-012.md:80:5. `scripts/hooks/stop-check.test.mjs:26`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+docs/slices/takt-005-email-aus-012.md:81:6. `scripts/hooks/stop-check.test.mjs:132`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+docs/slices/takt-005-email-aus-012.md:82:7. `scripts/slice-scope.test.mjs:181`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+docs/slices/takt-005-email-aus-012.md:83:8. `scripts/slice-scope.test.mjs:188`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+scripts/contract-gate-strict.test.mjs:36:  execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'contract snapshot'], { cwd: dir });
+scripts/hooks/lib/dirty-tree-signature.test.mjs:22:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/mark-test-run.test.mjs:63:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/mark-test-run.test.mjs:86:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/pre-tool-use-bash.test.mjs:138:  const r = runCommand('git -C /tmp/x -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
+scripts/hooks/stop-check.test.mjs:155:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
+scripts/hooks/stop-check.test.mjs:169:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
+scripts/hooks/stop-check.test.mjs:189:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'docs only']);
+scripts/hooks/stop-check.test.mjs:203:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'untested code change']);
+scripts/role-literal-check.test.mjs:174:    execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: srcRepo });
+scripts/role-literal-check.test.mjs:202:    execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: srcRepo });
+scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
+scripts/slice-scope.test.mjs:214:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+scripts/slice-scope.test.mjs:223:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
+scripts/slice-scope.test.mjs:228:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
+scripts/slice-scope.test.mjs:249:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+scripts/slice-scope.test.mjs:257:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
+scripts/slice-scope.test.mjs:262:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'unrelated'], { cwd: dir });
+```
+Alle 40 Fundstellen sind Test- oder Automatisierungsadressen (`t@t.invalid`, `noreply@anthropic.com`) oder
+Selbstzitate der Zeilen 65–72 und 76–83 in `docs/slices/takt-005-email-aus-012.md` selbst; keine persönliche
+Adresse gefunden. Begründung jeder einzelnen Zeile steht ausführlich im Bericht von takt-005.
+
+*`pnpm gates` (Tail, wörtlich):*
+```
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7955.593888
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-qUeoyjsj.js                        529.18 kB │ gzip: 155.32 kB │ map: 2,183.38 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.34s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit c9d6655, tree a7d79c0fd8a8…
+```
+(ANSI-Farbcode beim `SOURCEMAP_BROKEN`-Hinweis beim Einfügen entfernt, sonst byte-gleich mit dem Lauf; Commit-Hash
+in der letzten Zeile ist der Stand vor diesem takt-007-Commit, weil `pnpm gates` vor dem Commit dieser Änderung
+lief — Dateiinhalt auf der Platte war zu diesem Zeitpunkt bereits der hier committete.)
+
+**Open:** Die Codex-Threads auf PR #17 und #18 bekommen die Antwort mit dem Commit-Hash erst nach dem Merge durch
+den Orchestrator (Akzeptanzkriterium 3) — das liegt außerhalb dieses Worktrees und außerhalb der erlaubten Dateien.
+
+**Touched:**
+- `docs/agentische-entwicklung-plan.md` (Abschnitt 3, ein Satz)
+- `README.md` (Dokumentenindex, Verzeichnis-Zeilen durch Datei-Zeilen ersetzt)
+- `docs/slices/takt-005-email-aus-012.md` (Bericht: Diff-Stat- und E-Mail-Scan-Block ersetzt, Begründungen, Hinweissatz)
+- `docs/slices/takt-007-codex-befunde-018-takt005.md` (dieser Bericht)
 
 ## Review findings
 
