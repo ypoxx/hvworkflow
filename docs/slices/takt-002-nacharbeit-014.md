@@ -1,6 +1,6 @@
 # takt-002 — Folgebefunde aus dem Review von 014 (N1–N4, N6)
 
-**Status:** review
+**Status:** angenommen
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lanes: docs-register, docs-datenschutz,
 `scripts/takt.mjs` (keine davon hält gerade eine Scheibe)
 **Rolle/Modell:** Mechaniker · Haiku 4.5 baut; Review Sonnet 5
@@ -93,4 +93,12 @@ Touched: `scripts/takt.mjs`, `docs/datenschutz/dsfa-vorentwurf.md`, `docs/entsch
 
 ## Review findings
 
-(vom Reviewer)
+**Sonnet 5 · 23.09.2026 · Urteil: annehmen (0 Blocker, 0 major, 0 minor, 2 nits).** Wortlaut aller fünf Zellen
+byteweise geprüft; Spaltenzahl unverändert; nur erlaubte Dateien. Datumsprüfung selbst getestet: `2026-10-32`,
+`2026-10-01 25:00`, `2026-13-45`, `2026-02-29`, `1900-02-29`, `2026-04-31` warnen; `2028-02-29`, `2000-02-29` und
+`2026-10-25 02:30` (Tag der Zeitumstellung) gelten; eine abgeschlossene Zeile → „1 Punkt". `pnpm gates` Exit 0.
+
+1. nit · `scripts/takt.mjs:170–172`: Variablennamen `y_num` usw. in snake_case statt camelCase — bleibt (kosmetisch).
+2. nit · `scripts/takt.mjs:170–181`: die umbenannten Zwischenvariablen sind entbehrlich — bleibt (kosmetisch).
+
+Beide nits bleiben stehen; sie gehen mit der nächsten Änderung an `takt.mjs` mit.
