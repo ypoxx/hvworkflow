@@ -51,8 +51,12 @@ Rechtsfreigabe)
 
 ## Files allowed
 
-`docs/agentische-entwicklung-plan.md` (Abschnitte 3, 5 einschließlich 5.4, 7, 8, 9), `docs/glossar.md`, `README.md`,
-`docs/slices/README.md`, `AGENTS.md` (eine Zeile), diese Datei (Bericht).
+- `docs/agentische-entwicklung-plan.md` (Abschnitte 3, 5 einschließlich 5.4, 7, 8, 9)
+- `docs/glossar.md`
+- `README.md`
+- `docs/slices/README.md`
+- `AGENTS.md` (eine Zeile)
+- diese Datei (Bericht)
 
 ## Akzeptanzkriterium
 
