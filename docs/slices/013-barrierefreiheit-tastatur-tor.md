@@ -649,7 +649,7 @@ Verbindlich nach Opus 5.5 ("nacharbeiten") und zwei überschneidenden Codex-Fund
    `assertFocusVisible(page, {testId:'speaker-register'})` nach dem Registrieren-Submit, `013b`
    `{testId:'capture-suggest'}` nach dem Vorschlagsdialog-Submit; beide bestehen. Die Bericht-
    Formulierung „Escape und Submit geprüft" ist damit wahr, nicht mehr nur behauptet. →
-   `f9ad984`.
+   `8a66f7d`.
 2. **MAJOR — Fokus nach einer Aktionstaste nie geprüft, Szene c verdeckte den bekannten Fund.**
    Alle sechs Schreibaktionen (`capture-submit`, `capture-free-add`, `answer-submit-draft`,
    `answer-submit-review`, `answer-approve`, `stage-next`) wurden geprüft: jede verliert den
@@ -658,7 +658,7 @@ Verbindlich nach Opus 5.5 ("nacharbeiten") und zwei überschneidenden Codex-Fund
    echten Fehlschlag, sobald eine künftige Scheibe das behebt. Toast-Klick aus Szene c entfernt
    (`waitForToastsGone` statt `clearToasts`), Kommentar an der Screenshot-Stelle korrigiert.
    Bericht „Open" nennt jetzt Szenen b, c, d **und** e (nicht nur c/d/e — `capture-submit`/
-   `capture-free-add` sind derselbe Fund). → `f9ad984`.
+   `capture-free-add` sind derselbe Fund). → `8a66f7d`.
 3. **MAJOR (Regel 2) — Belege müssen wortgetreu sein.** `pnpm gates`-Ende, Playwright-Liste und
    roter Lauf oben sind die echten, ungekürzten Ausgaben dieser Runde (kein „…" mehr) — siehe
    „Evidence" oben; der rote Lauf wurde frisch nachgefahren (`aria-label` lokal entfernt,
@@ -669,7 +669,7 @@ Verbindlich nach Opus 5.5 ("nacharbeiten") und zwei überschneidenden Codex-Fund
    (`waitForToastsGone`); `page.keyboard.type()` statt `.fill()` auf den per Tab erreichten
    Feldern; Kopfkommentar zählt den verbleibenden Klick-Rest ehrlich auf (Demo-Rollenumschalter,
    Regel 4; das Registrieren/Aufrufen einer zweiten Wortmeldung als Voraussetzung in Szene b und
-   im bekannten-Fund-Test). → `f9ad984`.
+   im bekannten-Fund-Test). → `8a66f7d`.
 5. **MINOR — reduced motion.** Neuer Kontrolllauf `013g` ohne `emulateMedia` deckte selbst einen
    echten Fund auf: die Wortmeldung-Zeile hat wegen dnd-kits eigenem Inline-`style`
    (`transitionProperty: "transform"`, `transitionDuration: "0s"` in Ruhe) gar keinen echten
@@ -679,23 +679,23 @@ Verbindlich nach Opus 5.5 ("nacharbeiten") und zwei überschneidenden Codex-Fund
    — das Panel (`components/Dialog.tsx`) hat keinen eigenen Übergang, es erscheint/verschwindet
    ohne Fade. `animationDuration` wird weiter geprüft, aber ehrlich als „keines der drei nutzt
    eine CSS-Keyframe-Animation" dokumentiert (immer „0s", in beiden Läufen) statt als stiller
-   Blindtest zu gelten. → `f9ad984`.
+   Blindtest zu gelten. → `8a66f7d`.
 6. **MINOR — MoveDialog.tsx ungeöffnet.** `013a` öffnet „In Runde verschieben" jetzt über die
    Tastatur (von der gerade umsortierten Zeile: Tab, Tab, Enter), prüft `checkAxe` auf dem
-   offenen Dialog und die Fokusrückkehr auf `speaker-move` nach Escape. → `f9ad984`.
+   offenen Dialog und die Fokusrückkehr auf `speaker-move` nach Escape. → `8a66f7d`.
 7. **MINOR (auch Codex) — Ablaufdatum der axe-Ausnahmen nicht erzwungen.** `axe.ts` wirft jetzt
    beim Import, sobald ein `expires` vor dem heutigen Datum liegt, mit Regel-ID und Selektor
    benannt. Falscher Kommentar zu Regel 8/`now-check` korrigiert (`now-check.mjs` scannt nur
    `packages/domain/src`/`apps/api/src`, nie `apps/web/e2e/**`). `URL.pathname` mit
-   `decodeURIComponent` umschlossen (Nit 9). → `f7fc4ad`.
+   `decodeURIComponent` umschlossen (Nit 9). → `df45a5f`.
 8. **MINOR — Werkzeug-Spalte.** Nennt jetzt `apps/web/e2e/support/axe.ts` und
    `apps/web/e2e/013-tastaturpfad.spec.ts`; Stand-Spalte unverändert;
-   `node scripts/plan-honesty.mjs` grün. → `f964f39`.
+   `node scripts/plan-honesty.mjs` grün. → `6cbe379`.
 9. **NIT.**
    - `.hv-label` in `axe-exceptions.json` als die mit Abstand breiteste Ausnahme im Grund-Text
-     benannt. → `f7fc4ad`.
+     benannt. → `df45a5f`.
    - `checkAxe` beim erneuten Öffnen des Klassifizieren-Dialogs in
-     `002-speakers-capture.spec.ts` ergänzt (0/0 in beiden Durchläufen). → `be1ed87`.
+     `002-speakers-capture.spec.ts` ergänzt (0/0 in beiden Durchläufen). → `d4f33a7`.
    - Commit-Liste im Bericht vervollständigt (dieser Abschnitt). → diese Datei.
 
 `node scripts/slice-scope.mjs`:
