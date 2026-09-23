@@ -17,6 +17,24 @@
  *   - reading or writing any `.env*` file other than exactly `.env.example`;
  *   - `curl`/`wget` whose target host is not `localhost`/`127.0.0.1`/`[::1]`/`0.0.0.0`.
  *
+ * takt-006 (016 re-review round 2, points 1 and 4; Codex review PR #14, C4) closed further bypasses in
+ * `gitPushFindings`, all still just a text scan, not a shell parser:
+ *   - a combined short-option cluster containing `f` (`-uf`, `-fu`) counts as a force flag, not just a
+ *     lone `-f`;
+ *   - a quoted refspec (`'+main'`, `"+main"`, `':main'`) has its wrapping quotes stripped before the
+ *     `+`/`:` prefix checks run;
+ *   - an unambiguous abbreviation of a long option (`--dele`, `--forc`, git itself accepts any prefix
+ *     that is not ambiguous among the options it defines) is recognised the same as the option in full;
+ *   - `--work-tree=<dir>`/`--work-tree <dir>` and `--no-pager` are recognised as further global options
+ *     between `git` and `push` (alongside `-C`, `-c`, `--git-dir` from round 1);
+ *   - `--prune` together with a wildcard (`*`) refspec (can delete many remote refs matching a pattern
+ *     at once, the same class of risk as `--mirror`/`--delete`) is its own finding;
+ *   - an option that takes its own value (`-o`/`--push-option <value>`, `--receive-pack <value>`,
+ *     `--repo <value>`) has that value skipped along with the option itself before counting
+ *     non-flag/target tokens, so `git push --push-option ci.skip origin` is still seen as missing a
+ *     branch, not as already having two targets (Codex C4: the value used to be miscounted as the
+ *     target).
+ *
  * This is a first line of defence, not the enforcement itself (docs/agentische-entwicklung-plan.md
  * 5.4) — a plain scan of the command text, not a shell parser: it can miss an obfuscated command and,
  * rarely, flag an unrelated argument that happens to contain the same text (e.g. a `grep` pattern for
@@ -73,40 +91,103 @@ const EXISTING_PATTERNS = [
 ];
 
 /** `git`, then any number of global options that can sit before the subcommand — `-C <dir>`,
- * `-c <key>=<value>`, `--git-dir=<dir>`/`--git-dir <dir>` — then `push`. Review rework round 1, M4:
- * the original pattern only matched a literal `git push` and missed every one of these forms. */
-const GIT_PUSH_RE = /\bgit\b(?:\s+(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=\S+|\s+\S+)))*\s+push\b([^\n&;|]*)/g;
+ * `-c <key>=<value>`, `--git-dir=<dir>`/`--git-dir <dir>`, `--work-tree=<dir>`/`--work-tree <dir>`,
+ * `--no-pager` — then `push`. Review rework round 1, M4: the original pattern only matched a literal
+ * `git push` and missed every one of these forms; takt-006 point 1 added `--work-tree` and
+ * `--no-pager` (`-C`/`-c`/`--git-dir` were already there). */
+const GIT_PUSH_RE =
+  /\bgit\b(?:\s+(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+)|--no-pager))*\s+push\b([^\n&;|]*)/g;
+
+/** Strips one layer of wrapping quotes (`'…'` or `"…"`) — this is a text scan, so a shell-quoted
+ * refspec like `'+main'` still carries its quote characters literally; takt-006 point 1 strips them
+ * before any prefix check (`+`, `:`, `-`) runs, so a quoted forced/deleting refspec is seen the same as
+ * an unquoted one. */
+function stripQuotes(t) {
+  if (t.length >= 2 && ((t[0] === '"' && t[t.length - 1] === '"') || (t[0] === "'" && t[t.length - 1] === "'"))) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+/** Options that take their own value as a separate token — the value must be skipped, not counted as
+ * a non-flag/target token, before the "no explicit remote and branch" check runs (Codex review PR #14,
+ * C4: `git push --push-option ci.skip origin` used to see `ci.skip` and `origin` as two targets and
+ * wave the missing branch through). `--push-option`/`-o` may repeat; each occurrence still takes one
+ * value. */
+const OPTIONS_WITH_VALUE = new Set(['--push-option', '-o', '--receive-pack', '--repo']);
+
+/** True if `token` (without a leading `--`, and without an `=value` suffix if present) is a non-empty
+ * prefix of `name` — git accepts any unambiguous abbreviation of a long option (`--dele`, `--forc`;
+ * takt-006 point 1). Not fully general (does not check the abbreviation is unambiguous among *every*
+ * option `git push` defines, only among the handful this hook itself cares about), but every name
+ * below is unrelated enough in its first two letters that this stays safe. */
+function longFlagMatches(token, name) {
+  if (!token.startsWith('--')) return false;
+  const body = token.slice(2).split('=')[0];
+  return body.length >= 2 && name.startsWith(body);
+}
+
+/** `-f`, a (possibly abbreviated) `--force`/`--force-with-lease[=…]`, or `f` inside a combined
+ * short-option cluster (`-uf`, `-fu`; takt-006 point 1 — the M4 fix only matched a lone `-f`). */
+function isForceFlag(t) {
+  if (t === '-f') return true;
+  if (longFlagMatches(t, 'force') || longFlagMatches(t, 'force-with-lease')) return true;
+  return /^-[a-zA-Z]{2,}$/.test(t) && t.slice(1).includes('f');
+}
+
+/** `-d`, or a (possibly abbreviated) `--delete`. */
+function isDeleteFlag(t) {
+  if (t === '-d') return true;
+  return longFlagMatches(t, 'delete');
+}
 
 /** Every `git … push …` invocation, classified: a force flag/refspec, a `--mirror`, a remote-branch
- * deletion, or a bare push with fewer than two non-flag tokens (no explicit remote *and* branch) are
- * all findings — the first that applies to a given invocation, checked in this order (round 1, M4
- * lists `-f`, `--force`, a `+`-prefixed refspec, `--mirror`, `--delete`, and a `:`-prefixed refspec as
- * the bypasses the first version missed). */
+ * deletion, a `--prune` with a wildcard refspec, or a bare push with fewer than two non-flag tokens (no
+ * explicit remote *and* branch) are all findings — the first that applies to a given invocation,
+ * checked in this order (round 1, M4 lists `-f`, `--force`, a `+`-prefixed refspec, `--mirror`,
+ * `--delete`, and a `:`-prefixed refspec as the bypasses the first version missed; takt-006 point 1
+ * adds combined short options, quoted refspecs, abbreviated long options and `--prune`+wildcard). */
 function gitPushFindings(command) {
   const out = [];
   const re = new RegExp(GIT_PUSH_RE.source, 'g');
   let m;
   while ((m = re.exec(command))) {
     const whole = m[0].trim();
-    const tokens = m[1]
+    const rawTokens = m[1]
       .split(/\s+/)
       .map((t) => t.trim())
       .filter(Boolean);
+
+    // Codex C4: drop an option-with-value's own value before classifying anything else, so it can
+    // never be miscounted as a target token.
+    const tokens = [];
+    for (let i = 0; i < rawTokens.length; i++) {
+      const t = stripQuotes(rawTokens[i]);
+      tokens.push(t);
+      if (OPTIONS_WITH_VALUE.has(t) && i + 1 < rawTokens.length) i++; // skip the value that follows
+    }
     const nonFlagTokens = tokens.filter((t) => !t.startsWith('-'));
 
-    if (tokens.some((t) => t === '--mirror')) {
+    if (tokens.some((t) => isMirrorFlag(t))) {
       out.push({ reason: 'a --mirror push (rewrites/deletes everything on the remote to match local)', text: whole });
-    } else if (tokens.some((t) => t === '-f' || t === '--force' || t === '--force-with-lease' || t.startsWith('--force-with-lease='))) {
+    } else if (tokens.some(isForceFlag)) {
       out.push({ reason: 'a force flag (-f/--force/--force-with-lease)', text: whole });
     } else if (tokens.some((t) => !t.startsWith('-') && t.startsWith('+'))) {
       out.push({ reason: 'a "+"-prefixed (forced) refspec', text: whole });
-    } else if (tokens.some((t) => t === '--delete' || t === '-d') || tokens.some((t) => !t.startsWith('-') && t.startsWith(':'))) {
+    } else if (tokens.some(isDeleteFlag) || tokens.some((t) => !t.startsWith('-') && t.startsWith(':'))) {
       out.push({ reason: 'a remote-branch deletion (--delete/-d or a ":"-prefixed refspec)', text: whole });
+    } else if (tokens.some((t) => t === '--prune') && tokens.some((t) => !t.startsWith('-') && t.includes('*'))) {
+      out.push({ reason: 'a --prune push with a wildcard refspec (can delete many remote refs at once)', text: whole });
     } else if (nonFlagTokens.length < 2) {
       out.push({ reason: 'no explicit remote and branch', text: whole });
     }
   }
   return out;
+}
+
+/** A (possibly abbreviated) `--mirror`. */
+function isMirrorFlag(t) {
+  return longFlagMatches(t, 'mirror');
 }
 
 /** Any `.env*` token other than the literal `.env.example` — with a path boundary required on both
@@ -124,14 +205,23 @@ function envFileFinding(command) {
   return undefined;
 }
 
-/** A `curl`/`wget` segment whose URL's host is not one of the local hosts. */
+/** A `curl`/`wget` segment whose URL's host is not one of the local hosts. Codex review PR #14, C5:
+ * cutting the host off at the *first* colon (the old approach) reads a bracketed IPv6 literal
+ * (`http://[::1]:3000/…`) as host `[`, so it never matched the `[::1]` entry in `LOCAL_HOSTS` — this
+ * parses the whole URL with `new URL()` instead, whose `.hostname` already keeps an IPv6 literal's
+ * brackets and correctly separates it from a following `:<port>`. */
 function externalCurlFinding(command) {
   for (const segment of splitTopLevelSegments(command)) {
     if (!/^\s*(curl|wget)\b/.test(segment)) continue;
-    const urlRe = /https?:\/\/([^\s/'":]+)/g;
+    const urlRe = /https?:\/\/[^\s'"]+/g;
     let m;
     while ((m = urlRe.exec(segment))) {
-      const host = m[1].split(':')[0];
+      let host;
+      try {
+        host = new URL(m[0]).hostname;
+      } catch {
+        continue; // not a parseable URL — nothing this hook can judge, same fail-open spirit as elsewhere
+      }
       if (!LOCAL_HOSTS.has(host)) return `${segment.trim()} (host: ${host})`;
     }
   }

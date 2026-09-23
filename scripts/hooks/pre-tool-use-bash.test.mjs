@@ -81,6 +81,20 @@ test('green: curl to 127.0.0.1 passes', () => {
   assert.equal(r.status, 0);
 });
 
+// Codex review PR #14, C5: the old host extraction cut off at the *first* colon, so a bracketed IPv6
+// literal (`[::1]`) was seen as host "[" — never matching the `[::1]` local-hosts entry — and a public
+// IPv6 literal was never recognised as external either.
+test('Codex C5 green: curl to http://[::1]:3000/... passes (bracketed IPv6 loopback, with a port)', () => {
+  const r = runCommand('curl http://[::1]:3000/health');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('Codex C5 red: curl to a public IPv6 literal is blocked', () => {
+  const r = runCommand('curl http://[2001:db8::1]/x');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /2001:db8::1/);
+});
+
 test('green: git ls-remote to a public https URL passes (not curl/wget)', () => {
   const r = runFixture('pre-tool-use-git-ls-remote');
   assert.equal(r.status, 0);
@@ -121,12 +135,62 @@ for (const [command, expected] of M4_BYPASSES) {
 }
 
 test('M4 green: git -C/-c for an unrelated, explicit, non-forced push still passes', () => {
-  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+  const r = runCommand('git -C /tmp/x -c user.email=t@t.invalid push origin claude/slice-016-agenten');
   assert.equal(r.status, 0, r.stderr);
 });
 
 test('M4 green: --git-dir with an explicit, non-forced push still passes', () => {
-  const r = runCommand('git --git-dir=/home/user/wt/016/.git push origin claude/slice-016-agenten');
+  const r = runCommand('git --git-dir=/tmp/x/.git push origin claude/slice-016-agenten');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// takt-006, point 1 (016 re-review round 2, findings 1-4): each of these bypassed the M4 fixes and
+// must now block too — combined short options, quoted refspecs, abbreviated long options, and global
+// options between `git` and `push` beyond `-C`/`-c`/`--git-dir`.
+const TAKT_006_P1_BYPASSES = [
+  ['git push -uf origin main', /force flag/],
+  ['git push -fu origin main', /force flag/],
+  ["git push origin '+main'", /forced\) refspec/],
+  ['git push origin "+main"', /forced\) refspec/],
+  ["git push origin ':main'", /remote-branch deletion/],
+  ['git push --dele origin main', /remote-branch deletion/],
+  ['git push --forc origin main', /force flag/],
+  ['git --work-tree=/tmp/x push --force origin main', /force flag/],
+  ['git --no-pager push --force origin main', /force flag/],
+  ["git push --prune origin 'refs/heads/*:refs/heads/*'", /prune/],
+];
+for (const [command, expected] of TAKT_006_P1_BYPASSES) {
+  test(`takt-006 point 1 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('takt-006 point 1 green: "git push -u origin claude/…" (setting upstream, no force) still passes', () => {
+  const r = runCommand('git push -u origin claude/takt-006-nacharbeit-016');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// Codex review PR #14, C4: an option that takes its own value (`--push-option`/`-o`, `--receive-pack`,
+// `--repo`) must not be miscounted as a target token — its value must be skipped along with it, so a
+// push hiding a missing refspec behind one of these still gets caught as a bare push.
+const CODEX_C4_BYPASSES = [
+  ['git push --push-option ci.skip origin', /explicit remote and branch/],
+  ['git push -o ci.skip origin', /explicit remote and branch/],
+  ['git push --receive-pack /bin/sh origin', /explicit remote and branch/],
+  ['git push --repo origin', /explicit remote and branch/],
+];
+for (const [command, expected] of CODEX_C4_BYPASSES) {
+  test(`Codex C4 red: "${command}" is blocked`, () => {
+    const r = runCommand(command);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test('Codex C4 green: --push-option with an explicit remote and branch still passes', () => {
+  const r = runCommand('git push --push-option ci.skip origin claude/takt-006-nacharbeit-016');
   assert.equal(r.status, 0, r.stderr);
 });
 
