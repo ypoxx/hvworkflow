@@ -90,6 +90,15 @@ test('takt-006 point 6 red: an unparsable calendar date fails with a clean messa
   assert.doesNotMatch(r.stderr, /plan-graph\.mjs:\d+/);
 });
 
+// takt-006 rework, NIT finding 9: the reported line number was the offset *within* section 5 (relative
+// to the "## 5." heading), not the real file line — correct only by coincidence whenever section 5
+// happens to start at line 1 of the plan (true for every fixture above, so none of them caught this).
+test('rework point 9 red: the reported line number is the real file line, not the offset from the section heading', () => {
+  const r = run(['--plan', join(FIXTURES, 'malformed-bullet-offset.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /line 8/); // the real file line of the malformed bullet, not line 3 (its in-section offset)
+});
+
 test('--calendar prints a start/finish date per slice and respects --merged', () => {
   const r = run(['--plan', join(FIXTURES, 'ok.md'), '--calendar', '--hours', '3']);
   assert.equal(r.status, 0, r.stdout + r.stderr);

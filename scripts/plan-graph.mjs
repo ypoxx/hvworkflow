@@ -69,6 +69,10 @@ function parseArgs(argv) {
 
 // ---- parsing -----------------------------------------------------------------------------------------
 
+/** `{ lines, startIdx }` — `startIdx` is section 5's own heading's 0-based index in the *whole* plan
+ * file, so a caller can turn an index into `lines` back into a real file line number
+ * (`startIdx + i + 1`) instead of an offset from the heading (takt-006 rework, NIT finding 9: the
+ * offset is only correct by coincidence when section 5 happens to start at line 1). */
 function extractSection5(planText) {
   const lines = planText.split('\n');
   const startIdx = lines.findIndex((l) => /^## 5\./.test(l));
@@ -80,7 +84,7 @@ function extractSection5(planText) {
       break;
     }
   }
-  return lines.slice(startIdx, endIdx);
+  return { lines: lines.slice(startIdx, endIdx), startIdx };
 }
 
 /** "28.09.2026 (W1)" -> "2026-09-28"; "01.02.–05.02.2027 (W19)" -> "2027-02-01" (the *start* date;
@@ -107,9 +111,12 @@ function parseCalendarStart(raw) {
 }
 
 function parseSlices(planText) {
-  const lines = extractSection5(planText);
+  const { lines, startIdx } = extractSection5(planText);
   const slices = [];
   const byNumber = new Map();
+  // The real 1-based file line number of `lines[i]` — `startIdx` is section 5's own heading's index in
+  // the whole file, `i` is the offset from it (takt-006 rework, NIT finding 9).
+  const fileLine = (i) => startIdx + i + 1;
   lines.forEach((line, i) => {
     if (!NEXT_BULLET_RE.test(line)) return; // not a slice-bullet line at all: prose, heading, deps line
     const m = line.match(HOURS_PER_CLASS_PATTERN);
@@ -117,7 +124,7 @@ function parseSlices(planText) {
       // Round 1, m5: a line that starts like a slice bullet ("- **NNN ·") but does not fully match must
       // fail loudly — silently dropping it would understate the slice count without any signal.
       throw new Error(
-        `plan-graph: section 5, line ${i + 1} starts like a slice bullet ("- **NNN ·") but does not match ` +
+        `plan-graph: section 5, line ${fileLine(i)} starts like a slice bullet ("- **NNN ·") but does not match ` +
           `the expected "- **NNN · Title** — risk · X AStd · Kalender ... · Lanes: ..." format: "${line}"`,
       );
     }
@@ -128,7 +135,7 @@ function parseSlices(planText) {
     } catch (e) {
       // takt-006 point 6: every parse error names its line, the same as the m5 case above, and (via
       // main()'s own try/catch below) is never allowed to surface as a raw Node stack trace.
-      throw new Error(`plan-graph: section 5, line ${i + 1}: ${e.message}`);
+      throw new Error(`plan-graph: section 5, line ${fileLine(i)}: ${e.message}`);
     }
     let deps = [];
     for (let j = i + 1; j < lines.length; j++) {
@@ -150,7 +157,7 @@ function parseSlices(planText) {
       deps,
       order: slices.length,
     };
-    if (byNumber.has(number)) throw new Error(`plan-graph: section 5, line ${i + 1}: slice ${number} appears twice.`);
+    if (byNumber.has(number)) throw new Error(`plan-graph: section 5, line ${fileLine(i)}: slice ${number} appears twice.`);
     byNumber.set(number, slice);
     slices.push(slice);
   });
