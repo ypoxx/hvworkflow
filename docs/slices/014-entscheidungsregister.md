@@ -1,6 +1,6 @@
 # 014 — Entscheidungsregister, Abdeckungsmatrix, Fragenpaket, DSFA-Vorentwurf, Takt-Skript
 
-**Status:** review
+**Status:** angenommen (Review Runde 2: annehmen nach Kleinbefunden; N1–N6 als Folge-Kleinänderung, siehe unten)
 **Risikoklasse:** niedrig · 2,5 AStd · Kalender 29.09.2026 (W1) · Lanes: docs-register (+ docs-feedback,
 docs-datenschutz; `scripts/takt.mjs` als einzelne neue Datei — die parallel laufende Scheibe 012 berührt sie nicht)
 **Rolle/Modell:** Architekt-Text · Fable 5.1 (Register, Matrix, Fragenpaket, DSFA-Vorentwurf, Changelog);
@@ -114,12 +114,24 @@ Done: Register (51 E-Zeilen, dazu strukturelle Standardannahmen S1–S6, Anfrage
       Rückfalltrigger), Abdeckungsmatrix (13 Zeilen mit Stand), Fragenpaket Woche 1 (19 Fragen, Fragen 3/7/8 für die
       Feedback-Runde 2), DSFA-Vorentwurf (Systembeschreibung, Datenflüsse, Rechtsgrundlagen-Matrix V1–V19, alle
       „zu prüfen"), Änderungsprotokoll für die Projektleitung, Takt-Tabelle in docs/messung.md und scripts/takt.mjs,
-      nummerierter Screenshot der Wortmeldeliste (30 Nummern, Legende aus denselben Daten erzeugt).
+      nummerierter Screenshot der Wortmeldeliste (36 Nummern nach der Nacharbeit, Legende aus denselben Daten erzeugt).
 Evidence: grep -cE '^\| E[0-9]+[ab]? \|' docs/entscheidungsregister.md → 51 (E1–E49, E3a/E3b, E10b); Status 49 × offen,
       E23 und E48 „entschieden am 23.09.2026 von Umsetzer"; grep -c '^### Frage' Fragenpaket → 19;
-      node scripts/takt.mjs → „0 Punkte"; mit Beispieldatei (S 2,5 h und 24 h, M offen) → „2 Punkte / 0 offen /
-      Median gesamt: 13.25 h / Median S: 13.25 h" (von Hand: (2,5 + 24) / 2 = 13,25 ✓);
-      pnpm gates exit 0: domain 39, web 35, api 25, vocabulary-check: ok, ✓ built in 1.10s.
+      node scripts/takt.mjs → „0 Punkte"; mit Beispieldatei (S 2,5 h und 24 h, M offen) nach der Nacharbeit →
+      „3 Punkte / 1 offen / Median gesamt: 13.25 h / Median S: 13.25 h" (von Hand: (2,5 + 24) / 2 = 13,25 ✓;
+      die erste Fassung meldete „2 Punkte / 0 offen" — Befund M1, siehe Review findings).
+      Screenshot: aus `apps/web` bei laufendem `pnpm exec vite --port 4392` mit `node <scratch>/shot014/shot.mjs`
+      (Playwright, Chromium aus /opt/pw-browsers, Rolle Moderation, Ansicht Wortmeldungen), Legende mit
+      `node <scratch>/shot014/generate-legend.mjs` aus derselben Markierungsliste; beide Skripte liegen nur im
+      Scratch-Verzeichnis der Orchestrierung (keine Datei im Repositorium).
+      pnpm gates (Orchestrator, nach Merge des Integrationsbranchs b86930d, Exit 0), Ende der Ausgabe:
+        packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.2.0, 29 operations)
+        packages/domain test:       Tests  39 passed (39)
+        apps/web test:       Tests  35 passed (35)
+        apps/api test:       Tests  25 passed (25)
+        > node scripts/vocabulary-check.mjs
+        vocabulary-check: ok
+        ✓ built in 1.25s
 Open: Die Abdeckungsmatrix führt 014 selbst als „geplant", bis die Scheibe gemergt ist. Zwei Registerzeilen aus dem
       Review von 015 (Pseudonymisierung: engerer Rollenkreis und Vier-Augen nach Recherche Z.116; Zuordnung der fünf
       Anzeigegruppen, ADR 0012) sind nicht in dieser Scheibe — Übergabe an eine Folge-Kleinänderung.
@@ -135,4 +147,33 @@ Markierungen erzeugt und Nummer für Nummer am Bild geprüft). Erzeugungsskripte
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 · 23.09.2026 · Urteil: Nacharbeit (0 Blocker, 2 major, 8 minor).**
+
+| Nr. | Schwere | Befund | Erledigung (Runde 2) |
+|---|---|---|---|
+| M1 | major | `scripts/takt.mjs` verwirft Zeilen mit leeren Zellen; offene Zeilen verschwinden („4 Punkte / 0 offen" statt „5 / 1") | erledigt: Zellen nach Position, Spalten nach Kopfnamen; Bericht korrigiert |
+| M2 | major | E26 (und E43): erfundener Rückfall „Umsetzer trägt allein" widerspricht Plan 8.5 | erledigt: Plan 11.6 und 8.5 zitiert, Eskalation in die Entscheidungsstunde |
+| 3 | minor | E47, E9, E12, E28: Zellen über Plan 10 hinaus | erledigt |
+| 4 | minor | takt.mjs: fehlender Abschnitt, Pfad relativ zum Aufruf, Zeitzone, stille Fehlzeilen; Kopf ohne Format | erledigt (Rest N1) |
+| 5 | minor | Screenshot: Navigation ohne Nummern, Legende 1 (468 statt 800), steuernde Sätze, Marke 22 | erledigt: 36 Nummern |
+| 6 | minor | Bericht ohne Screenshot-Befehl und ohne echte gates-Ausgabe | erledigt durch den Orchestrator (dieser Bericht) |
+| 7 | minor | Fragenpaket: Entwicklerbegriffe, „Antwort bis" fehlt je Frage | erledigt |
+| 8 | minor | DSFA: subjectHash, Revision ohne Konto, Auftragsverarbeiter, „zu prüfen", V18, Erfassung als Empfänger | erledigt (neue Ungenauigkeit N2) |
+| 9 | minor | Abdeckungsmatrix: Stand widerspricht der eigenen Legende | erledigt; beim Merge nachgeführt |
+| 10 | minor | Echte Verbandsnamen aus `seed.ts:307` im Screenshot | bewusst ausgenommen: Folge-Kleinänderung takt-002 (fiktive Namen im Seed, Screenshot neu) vor dem Versand am 02.10.2026 |
+
+**Runde 2 · Opus 5.5 · 23.09.2026 · Urteil: annehmen nach Kleinbefunden (0 Blocker, 0 major).** Neue Befunde, offen
+als Folge-Kleinänderung (keine weitere Nacharbeitsrunde nach Plan 6.3):
+
+- N1 · minor · `scripts/takt.mjs`: unmögliche Kalenderdaten (`2026-10-32`, `25:00`) rollen über `Date.UTC` still
+  weiter; nach dem Parsen Monat, Tag, Stunde, Minute prüfen und die Formatwarnung ausgeben.
+- N2 · minor · `docs/datenschutz/dsfa-vorentwurf.md` Z. 122, 196, 199: Beobachter als Leser der Historie (V9) und der
+  Rollenzuordnungen (V12) widerspricht Plan B2/010 (nur Zähler und Vorgelesenes; `event.read` nur Administration).
+- N3 · minor · Register „o. Nr. 2": Vorschlag „mit 052" widerspricht der Fälligkeit „vor 044"; Wortlaut „offen; kein
+  Vorschlag im Plan, Zuordnung vor 044 mit ADR 0012 an Recht".
+- N4 · minor · DSFA V13: „(Recht aus 026, Protokoll aus 067)".
+- N5 · nit · Screenshot: Marke 28 verdeckt die erste Ziffer von „00:06".
+- N6 · nit · `scripts/takt.mjs`: „1 Punkte" → „1 Punkt".
+
+N2 wird vor dem Versand des Fragenpakets (02.10.2026) behoben, weil der DSFA-Vorentwurf mitgeht; N5 fällt mit dem
+neuen Screenshot aus takt-002 weg.
