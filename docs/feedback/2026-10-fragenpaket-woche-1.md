@@ -1,20 +1,22 @@
 # Fragenpaket Woche 1 — Fragen an die HV-Projektleitung
 
-**Versand:** 02.10.2026 durch den Eigentümer · **Stand des Textes:** 23.09.2026 (Scheibe 014) ·
+**Versand:** 02.10.2026 durch den Eigentümer · **Stand des Textes:** 23.09.2026 ·
 **Antworten erbeten:** die Fragen 3, 7 und 8 in der Feedback-Runde 2 am 09.10.2026; alle übrigen gern
 vorab, eine Sprachnachricht mit einem Satz je Frage reicht · **Register:** jede Frage trägt die Nummer
-ihrer Zeile im Entscheidungsregister (`docs/entscheidungsregister.md`), dort wird die Antwort eingetragen.
+ihrer Zeile im Entscheidungsregister des Projekts (E-Nummer); dort wird die Antwort eingetragen.
 
 ## Worum es geht
 
 Nach dem ersten Klickdurchgang durch die Demo und der Auswertung des heutigen Verfahrens sind 19 Fragen
 offen, die nur die Projektleitung beantworten kann. Keine davon hält den Bau auf: Zu jeder Frage steht,
 mit welcher Annahme gebaut wird, bis die Antwort da ist. Rollen, Übergänge und Einstellungen sind im Tool
-als Daten hinterlegt, deshalb kostet eine spätere Antwort eine Anpassung und keinen Umbau. Kommt bis zum
-genannten Termin keine Antwort, wird die Annahme gebaut und im Register mit Datum vermerkt; die Antwort
-bleibt willkommen und wird in der Anpassungsphase (Januar 2027) eingearbeitet.
+als Daten hinterlegt, deshalb kostet eine spätere Antwort eine Anpassung und keinen Umbau. Kommt bis zum Termin in der
+Zeile „Antwort bis" keine Antwort, wird die Annahme gebaut und im Register mit Datum vermerkt; die Antwort
+bleibt willkommen und wird in der Anpassungsphase (Januar 2027) eingearbeitet. Wo ein Aufwand genannt ist,
+steht er in Agentenstunden: Bauzeit der KI-Agenten, keine Arbeitszeit von Personen.
 
-Die Antworten fließen bis zum 16.10.2026 (Prüfpunkt 2) in das Register ein.
+Die Antworten fließen bis zum 16.10.2026 in das Register ein (Prüfpunkt 2, der zweite gemeinsame
+Abnahmetermin des Plans).
 
 Drei Teile: **A** die neun Fragen aus dem Klickdurchgang, **B** sieben Fragen aus der Analyse des
 heutigen Verfahrens, **C** drei Grundsatzfragen. Die Volumenfrage aus der Analyse (rund 200 Fragen,
@@ -30,11 +32,12 @@ hier deshalb.
 **Kontext:** In der Sprachnachricht hieß es „das mit der Redezeit, den Button Daten verstehe ich nicht";
 welches Bedienelement gemeint ist, wissen wir nicht.
 **Frage:** Welche Nummer auf dem beiliegenden Bild der Wortmeldeliste trägt der gemeinte Knopf?
-Das Bild `2026-10-fragenpaket-wortmeldeliste.png` zeigt die Wortmeldeliste der Demo mit einer Nummer an
+Das beiliegende Bild (Datei 2026-10-fragenpaket-wortmeldeliste.png) zeigt die Wortmeldeliste der Demo mit einer Nummer an
 jedem Knopf und jedem Bedienelement; die Legende steht im Anhang.
 **Annahme bis zur Antwort:** keine Bauannahme. Die Redezeit-Anzeigen (Zeitring, Minutenangabe)
 verschwinden ohnehin mit der Rückmeldung 15; sobald die Nummer bekannt ist, wird der Knopf erklärt,
 umbenannt oder entfernt.
+**Antwort bis:** 09.10.2026 (Feedback-Runde 2).
 
 ### Frage 2 — Wer klassifiziert? · E1
 
@@ -45,6 +48,7 @@ Fachbereich, und wie heißt diese Stelle im Haus?
 **Annahme bis zur Antwort:** eine eigene Rolle „Koordination" mit genau diesen Rechten; die Erfassung
 behält nur das Erfassen und Zerlegen in Einzelfragen. Umbenennen oder Zusammenlegen mit einer bestehenden
 Rolle (etwa dem Versammlungsbüro) kostet weniger als eine Stunde.
+**Antwort bis:** 09.10.2026 (Prüfpunkt 1); danach wird die Rolle „Koordination" so gebaut.
 
 ### Frage 3 — Antwortrunde · E2 · **für die Feedback-Runde 2 am 09.10.**
 
@@ -55,6 +59,7 @@ Wortmeldeliste?
 **Annahme bis zur Antwort:** ein eigenes „Antwortbündel", das die Koordination von Hand zusammenstellt,
 Zielgröße 20, Reihenfolge nach Bühnenplatz und dann nach Fragenummer. Die bestehende Runde der
 Wortmeldeliste (Fragesteller-Runde, Beantwortungs-Runde) bleibt unverändert.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 4 — Transkriptionstool · E3a, E3b
 
@@ -65,6 +70,7 @@ die sprechende Person, und wer ist bis zum 16.10.2026 die Ansprechperson im Tool
 **Annahme bis zur Antwort:** Erster Weg ist ein Import per Datei oder Zwischenablage in der Erfassung
 (E3b). Eine direkte Anbindung folgt, sobald die Ansprechperson die Angaben je Textabschnitt bestätigt hat:
 Wortlaut, Anfang, Ende, Sprecherin oder Sprecher falls bekannt, Quelle (E3a).
+**Antwort bis:** 09.10.2026 (Feedback-Runde 2); Ansprechperson des Tool-Teams bis 16.10.2026.
 
 ### Frage 5 — Rückfragen im Tool · E4
 
@@ -73,6 +79,7 @@ Wortlaut, Anfang, Ende, Sprecherin oder Sprecher falls bekannt, Quelle (E3a).
 bewusst außerhalb, auch mit Blick auf die Mitbestimmung?
 **Annahme bis zur Antwort:** Das Feld wird vorbereitet, bleibt aber ausgeschaltet; es erscheint nie auf
 der Bühne und nie im Export, und es ist kein Chat. Einschalten ist eine Einstellung, kein Umbau.
+**Antwort bis:** 09.10.2026 (Feedback-Runde 2).
 
 ### Frage 6 — „Weiterleiten" · E5
 
@@ -81,6 +88,7 @@ der Bühne und nie im Export, und es ist kein Chat. Einschalten ist eine Einstel
 Kollegen oder einen anderen Fachbereich?
 **Annahme bis zur Antwort:** Der Knopf heißt ab Anfang Oktober „Weiterleiten" und führt zum nächsten
 Schritt. Die Übergabe an einen anderen Fachbereich mit Begründung kommt Anfang November dazu.
+**Antwort bis:** 09.10.2026 (Feedback-Runde 2); die Umbenennung des Knopfs ist unabhängig davon ab 02.10.2026 in der Demo.
 
 ### Frage 7 — Formatierung · E6 · **für die Feedback-Runde 2 am 09.10.**
 
@@ -91,6 +99,7 @@ gewünscht, weil das Hausformat gilt?
 **Annahme bis zur Antwort:** genau diese vier Auszeichnungen plus Absätze. Schrift und Größe kommen von
 der Ansicht; Bühne, Vorgangshistorie und Export zeigen denselben Text gleich. Eine Auszeichnung
 dazuzunehmen kostet weniger als eine Agentenstunde.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 8 — Bühne je Person · E7 · **für die Feedback-Runde 2 am 09.10.**
 
@@ -98,6 +107,7 @@ dazuzunehmen kostet weniger als eine Agentenstunde.
 **Frage:** Sieht ein Vorstandsmitglied nur die eigenen Fragen, oder alle mit Markierung der eigenen?
 **Annahme bis zur Antwort:** nur die eigenen. Umstellen auf „alle mit Markierung" ist eine Einstellung je
 Hauptversammlung, keine Änderung am Tool.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 9 — Rollen und Personen · E8, E11
 
@@ -109,13 +119,14 @@ Konzerns (Identity Provider) mit Gruppen, gegen den angemeldet werden kann?
 Gruppen aus dem Konzernverzeichnis dienen als Vorschlag, nie als automatische Zuweisung (E8). Die
 Anmeldung läuft über den Anmeldedienst des Konzerns; bis dahin dient ein Testsystem ohne echte Personen
 (E11).
+**Antwort bis:** 09.10.2026 (Aufteilung auf Rollen); die Angaben zum Anmeldedienst kommen von der Konzern-IT bis 27.11.2026.
 
 ---
 
 ## Teil B — Fragen aus der Analyse des heutigen Verfahrens
 
-Die Nummern verweisen auf die offenen Fragen der Ist-Analyse (`docs/ist-analyse-und-schnittstellen.md`,
-Abschnitt 8). Alle sieben stehen im Register unter E31; die genannten weiteren E-Nummern sind die Zeilen,
+Die Nummern verweisen auf die offenen Fragen des Dokuments „IST-Analyse, Systemlandschaft und
+Schnittstellenarchitektur" (Abschnitt 8, Offene Fragen). Alle sieben stehen im Register unter E31; die genannten weiteren E-Nummern sind die Zeilen,
 auf die die Antwort wirkt.
 
 ### Frage 10 — Wo wird die vorbereitete Frage beantwortet? · Ist-Frage 1 · E31, E29
@@ -126,6 +137,7 @@ gestellt ist sie aber erst mit dem Verlesen in der Versammlung, die Antwort muss
 wer hält heute fest, wo und wann?
 **Annahme bis zur Antwort:** Auch eine vorbereitete Antwort geht als freigegebener Text auf die Bühne und
 gilt erst mit „Vorgelesen" als gegeben; das Tool hält Bühnenplatz und Zeitpunkt fest.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 11 — Prüft Recht nach dem Verlesen? · Ist-Frage 2 · E31, E25
 
@@ -136,6 +148,7 @@ Pfad A anhalten kann?
 **Annahme bis zur Antwort:** Vor der Bühne steht für alle drei Antwortpfade eine Rechtsfreigabe
 (Rechtstor), die im laufenden Betrieb nicht abschaltbar ist. Die Prüfung nach dem Verlesen wird als
 Soll-Ist-Vermerk an der vorgelesenen Antwort festgehalten.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 12 — Tagesordnungspunkt · Ist-Frage 3 · E31
 
@@ -144,6 +157,7 @@ und 28).
 **Frage:** Wird der Bezug zum Tagesordnungspunkt heute irgendwo geführt, und sei es außerhalb des Tools?
 **Annahme bis zur Antwort:** Das Feld bleibt im Tool für die Nachweisführung erhalten, ist optional und
 standardmäßig ausgeblendet.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 13 — Verweigerung · Ist-Frage 4 · E31
 
@@ -154,17 +168,19 @@ es nur „kein Antwortbedarf".
 **Annahme bis zur Antwort:** Die Verweigerung ist eine Antwortart mit einem Grund aus einem Katalog und
 läuft durch dieselbe Prüfung und Freigabe wie eine Antwort. „Kein Antwortbedarf" bleibt ein
 Direktabschluss ohne Bühne.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 14 — Nachbarsysteme · Ist-Frage 6 · E31, E3b, E28
 
 **Kontext:** Transkriptionstool, KI-Wissensbasis und Aktienregister sollen angebunden werden; ihr
 technischer Zuschnitt ist unbekannt.
 **Frage:** Welche Technik, Betreiber, vorhandenen Schnittstellen und Änderungszyklen haben die drei
-Nachbarsysteme, und hat das Aktienregister eine abrufbare Schnittstelle, oder ist der Abgleich heute
-manuell?
+Nachbarsysteme, hat das Aktienregister eine abrufbare Schnittstelle, oder ist der Abgleich heute manuell,
+und wie legitimiert das Versammlungsbüro heute eine Wortmeldung (E28)?
 **Annahme bis zur Antwort:** Je Nachbarsystem ein eigener Anschluss hinter einer festen Schnittstelle des
 HV-Tools. In der Beta nur der Import für das Transkriptionstool; keine KI, kein Aktienregisterabgleich
 (Wortmeldungen nimmt das Versammlungsbüro wie heute von Hand auf).
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 15 — Notar und Widerspruch · Ist-Frage 8 · E31, E19
 
@@ -172,6 +188,7 @@ HV-Tools. In der Beta nur der Import für das Transkriptionstool; keine KI, kein
 **Frage:** Wie läuft die Übergabe an den Notar heute, und wo werden Widersprüche erfasst?
 **Annahme bis zur Antwort:** Übergabe als Export (Druck und Datei) durch eine berechtigte Rolle; kein
 eigener Zugang für den Notar. Widersprüche bleiben in der Beta außerhalb des Tools.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 16 — Tochtergesellschaften · Ist-Frage 9 · E31
 
@@ -181,6 +198,7 @@ Rollen- und Stammdatenpflege.
 perspektivisch mitlaufen?
 **Annahme bis zur Antwort:** Ein Rechtsträger, mehrere Jahrgänge. Ein zweiter Rechtsträger ist später ein
 zusätzliches Feld plus Filter, rund 1,5 Agentenstunden.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ---
 
@@ -195,6 +213,7 @@ zeichnet die aktienrechtliche Seite? Stehen „FOO" und „GC" für Finance Oper
 Compliance?
 **Annahme bis zur Antwort:** eine Rolle „Recht"; die Insider-Relevanz ist ein Kennzeichen an der Frage.
 Eine zweite Rechtsrolle mit eigener Freigabe kostet rund 1,5 Agentenstunden.
+**Antwort bis:** Feedback-Runde 2 am 09.10.2026.
 
 ### Frage 18 — Letztverantwortung und Rechtstor · E25
 
@@ -206,6 +225,7 @@ Freigeber auf dem Podium sitzt? Ist eine beschleunigte Rechtsfreigabe mit kürze
 **Annahme bis zur Antwort:** Die Rolle Freigabe gibt frei, Recht empfiehlt; je Rolle zwei benannte
 Vertretungen; vor der Bühne steht für jeden Antwortpfad das Rechtstor; kein Eilpfad an der Freigabe
 vorbei.
+**Antwort bis:** 09.10.2026 (Prüfpunkt 1).
 
 ### Frage 19 — HV-Datum und Format · E20
 
@@ -214,14 +234,15 @@ werden.
 **Frage:** Bitte Datum und Format der HV 2027 bestätigen.
 **Annahme bis zur Antwort:** Präsenz-HV am 15.04.2027. Eine hybride HV zieht die Vorabfragen vor
 (rund 2,5 Agentenstunden); eine virtuelle HV schneidet zwei Meilensteine neu.
+**Antwort bis:** 02.10.2026.
 
 ---
 
 ## Was mit den Antworten geschieht
 
-Jede Antwort wird mit Datum in der Zeile des Registers eingetragen und in der nächsten passenden Scheibe
+Jede Antwort wird mit Datum in der Zeile des Registers eingetragen und im nächsten passenden Arbeitspaket
 oder in der Anpassungsphase umgesetzt. Was sich dadurch für die Projektleitung sichtbar ändert, steht je
-Punkt im Änderungsprotokoll (`docs/changelog-projektleitung.md`).
+Punkt im Änderungsprotokoll für die Projektleitung.
 
 ---
 
