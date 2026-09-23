@@ -268,8 +268,11 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   /* =========================================================================================
    * Point #26 (Wortmeldeliste) — a role without any speaker write right sees a read-only hint
    * instead of a page that silently offers no buttons at all.
+   * Slice 010: `expert` lost `speaker.read` outright (Festlegung 4) and can no longer even reach
+   * this view; `capture` holds `speaker.read` but none of `speaker.register`/`reorder`/`update`, so
+   * it demonstrates the same "reads, cannot write" property this hint is about.
    * ========================================================================================= */
-  await asRole(page, 'expert'); // no speaker.* permission in this role's bundle
+  await asRole(page, 'capture'); // speaker.read, but no speaker.* write permission
   await expect(page.getByTestId('speakers-readonly-hint')).toBeVisible();
   await expect(page.getByTestId('speakers-readonly-hint')).toHaveText('In dieser Rolle nur lesen');
   await expect(page.getByTestId('speaker-drag-handle').first()).toHaveCount(0);
@@ -371,22 +374,30 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   /* =========================================================================================
    * Point #21 (continued) + #26 (Erfassung) — without `question.classify` the action is simply
    * absent (never disabled), and a role without any capture right sees the same read-only hint.
+   * Slice 010: `expert` lost `contribution.read` outright (Festlegung 4) and can no longer even
+   * reach this desk (`listContributions`, the Hauptabfrage, would 403); `moderation` holds
+   * `contribution.read`/`question.read` but neither `question.classify` nor `question.capture`, so
+   * it demonstrates the same "reads, cannot write" property this hint is about.
    * ========================================================================================= */
-  await asRole(page, 'expert'); // no question.classify, no question.capture / contribution.capture
+  await asRole(page, 'moderation'); // contribution.read/question.read, but no capture/classify right
   await expect(page.getByTestId('capture-classify-open')).toHaveCount(0);
   await expect(page.getByTestId('capture-readonly-hint')).toBeVisible();
   await expect(page.getByTestId('capture-readonly-hint')).toHaveText('In dieser Rolle nur lesen');
 
   /* =========================================================================================
    * Point #26 (Beantwortung) + #10 (leerer Zustand: Filter ohne Treffer) + #28 + #32.
+   * Slice 010: `observer` now holds only `question.read.delivered` (delivered/closed, Festlegung
+   * 2), so filtering by `assigned` would 403 with R-PERM-03 before ever reaching a row — `expert`
+   * demonstrates the same "no editing action on any question" property on a status (`captured`) it
+   * may read but not touch, and still reaches `closed` afterwards for the "at rest" half below.
    * ========================================================================================= */
-  await asRole(page, 'observer'); // question.read only: no editing action on any question
+  await asRole(page, 'expert'); // question.read on every status, but no editing action before assignment
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   // m3 (review round 1): the hint is suppressed for a question at rest (delivered/terminal) — the
   // default row is any status, so pick a deliberately non-terminal one for this check.
-  await page.getByTestId('answers-filter-status-assigned').click();
-  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'assigned');
+  await page.getByTestId('answers-filter-status-captured').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'captured');
   await page.getByTestId('answers-row').first().click();
   await expect(page.getByTestId('answers-detail')).toBeVisible();
   await expect(page.getByTestId('answers-readonly-hint')).toBeVisible();
@@ -433,6 +444,12 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await expect(detail).toContainText('im Legal Clearing');
 
   // The history shows the same event under the same, house-vocabulary label (E5: display only).
+  // Slice 010: `expert` lost `speaker.read` outright (Festlegung 4); `features/history/Page.tsx`'s
+  // shared `Promise.all` for units/agendaItems/speakers/corpus (Ziel 6, "Nebenabfragen", deferred to
+  // slice 010b) fails as a whole when any one of those side reads 403s, so the corpus this view
+  // needs to open a result never loads under expert. `moderation` holds every read right this view
+  // needs; switched back to `expert` below for the "Forward" action check, which only expert holds.
+  await asRole(page, 'moderation');
   await page.getByTestId('nav-history').click();
   await expect(page).toHaveURL(/\/history$/);
   await page.getByTestId('history-search').fill(forwardedNumber);
@@ -448,6 +465,7 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
    * string, header included (already proven end to end in 001-shell.spec.ts); here it is enough
    * to prove the slice's own new and changed strings follow.
    * ========================================================================================= */
+  await asRole(page, 'expert'); // back to the role that holds `question.submit_review`
   await page.getByTestId('lang-toggle').click();
   await page.getByTestId('lang-option-en').click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -478,9 +496,12 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.screenshot({ path: evidence('020-speakers-en.png') });
   await page.locator('header[role="banner"]').screenshot({ path: evidence('020-header-en.png') });
 
-  await asRole(page, 'expert');
+  // Slice 010: two different roles now, as above — `capture` reads speakers but cannot write them;
+  // `moderation` reads contributions/questions but cannot capture or classify.
+  await asRole(page, 'capture');
   await expect(page.getByTestId('speakers-readonly-hint')).toHaveText('Read only in this role');
 
+  await asRole(page, 'moderation');
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
   await expect(page.getByTestId('capture-classify-open')).toHaveCount(0);
@@ -537,10 +558,12 @@ test('020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle', async
   await expect(page.getByTestId('stage-current-number')).toBeVisible();
   await expect(page.getByTestId('stage-only')).toHaveCount(0);
 
-  // A role with drafting rights and no `question.deliver` at all never gets the default either.
+  // A role with `question.stage`/`question.approve` and no `question.deliver` at all never gets the
+  // default either. Slice 010: `expert` lost `stage.read` outright (Festlegung 4) and can no longer
+  // even reach `/stage`; `approver` holds `stage.read` and the same "no deliver right" property.
   await page.goto('/speakers');
   await waitForCorpus(page);
-  await asRole(page, 'expert');
+  await asRole(page, 'approver');
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
   await expect(page.getByTestId('stage-current-number')).toBeVisible();
