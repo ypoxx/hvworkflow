@@ -75,7 +75,11 @@ Rechtsfreigabe)
 
 ## Bericht
 
-(vom Mechaniker)
+Slice: 018-entwicklungsplan-glossar-readme
+Done: Abschnitte 5.4 (Hook-Wirkungen), 3 (Sicherheitsreview-Perspektive) und 7–9 (Kostenrahmen, These, Zeitplan) des Entwicklungsplans abgeglichen; Glossar um 10 neue Einträge mit Codenames erweitert (Koordination, Verweigerung, Antwortbündel, Bühnenplatz, Weiterleiten, Vertraulichkeitsstufe, Fokusansicht, Steuerungsansicht, Leitstand, Rechtsfreigabe); README-Index vollständig (8 neue Einträge); Slice-Vorlage und AGENTS.md gates-Kommentar aktualisiert.
+Evidence: pnpm gates grün (plan-honesty: „Plan-honesty check: 4 table(s), 38 row(s) in section 5, every \"Stand\" verified."; vocabulary-check: ok; script tests: 110 pass); Glossar-Diff (10 neue Zeilen, Quellen: openapi.yaml, docs/produktplan-beta.md Abschnitte 8.1–8.3, 6.5, ADR 0012, Produktplan Plan 3 und B-Punkte); README-Index-Prüfung: „0 fehlend"; AGENTS.md gates-Kommentar: „contract lint, typecheck, lint, unit tests, vocabulary check, architecture check, role-literals, now-check, plan-honesty, i18n-literals, slice-scope, downgrade-check, plan-graph, script tests, web build" vs. package.json gates-Skript (14 Werkzeuge + mark-test-run); git diff --stat: 5 Dateien, 46 Zeilen hinzu, 83 entfernt.
+Open: keine
+Touched: docs/agentische-entwicklung-plan.md, docs/glossar.md, README.md, AGENTS.md, docs/slices/README.md
 
 ## Review findings
 

@@ -39,3 +39,13 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Recht | Legal | role `legal` | — |
 | Freigabe (Rolle) | Approver | role `approver` | — |
 | Podium (Rolle) | Podium | role `podium` | — |
+| Koordination | Coordination | role `coordination` | — |
+| Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | Denial |
+| Antwortbündel | Answer bundle | `AnswerBundle` | — |
+| Bühnenplatz | Podium seat | `stageAssignment.seat` (ab Scheibe 040) | — |
+| Weiterleiten | Forward | `question.forward` (ab Scheibe 048) | — |
+| Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
+| Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
+| Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
+| Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | Control center |
+| Rechtsfreigabe | Legal clearing | `question.legal.clear` | — |
