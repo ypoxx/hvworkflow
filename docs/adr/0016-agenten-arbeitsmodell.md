@@ -91,7 +91,7 @@ vertauschter Abhängigkeit; Screenshot des Branch-Schutzes (Eigentümer). i18n j
 
 - **E48** Merge-Befugnis beim Orchestrator (Prüfpunkt 0); für die Demo-Taktfläche offen mit E35
   (Prüfpunkt 1).
-- **E35** Taktfläche nach Umstellung auf HTTP — bis dahin Übergangsregel vom 23.09.2026
+- **E35** Taktfläche nach Umstellung auf HTTP — bis zur dauerhaften Regel (Prüfpunkt 1) Übergangsregel vom 23.09.2026
   (`[skip netlify]` auf jedem Commit, Demo-Build nur nach Go).
 - **E44** Leichtere Regel für Kleinänderungen.
 - **E47** Geld- und Nutzungsdeckel; Überprüfung an Prüfpunkt 1.

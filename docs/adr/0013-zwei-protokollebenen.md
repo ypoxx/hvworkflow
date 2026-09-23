@@ -30,7 +30,8 @@ Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe")
   (`event.read.personal`) sind nur im Vier-Augen-Verfahren auswertbar: Ereignis
   `AuditAccessGranted` mit Zweck und Frist; das Verfahren ist dokumentiert (033), die technische
   Sperre liegt in `can()` (047): `personId`-Auswertung ohne zweite Freigabe → 403.
-- **Keine Kennzahl je Person.** Es gibt fünf fachliche Kennzahlen (Alter der ältesten offenen
+- **Keine Kennzahl je Person.** Keine personenbezogene Leistungsauswertung (Plan 4, Zeile 0013). Es
+  gibt fünf fachliche Kennzahlen (Alter der ältesten offenen
   Frage, Rückstand je Fachbereich, Zulauf je 5 min, Fragen in Rechtsfreigabe > 10 min, Ereignisse
   je Minute) und ein Kennzahlen-Allowlist-Tor: keine Kennzahl je Subject ohne Spec-Eintrag.
 - **Rate-Limit-Zähler sind flüchtig** und nicht auswertbar; sie stehen nicht im Katalog.
