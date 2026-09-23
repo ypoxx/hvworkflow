@@ -48,4 +48,4 @@ aus Review und Sichtprüfung, alle behoben; keine Regression in den fünf Playwr
 
 | Bautag | Datum | Scheiben gemergt | Scheiben angefangen | Subagenten-Token | Kopfsitzung | Wandzeit | Bericht |
 |---|---|---|---|---|---|---|---|
-| B1 | 23.09.2026 | takt-001, 017, 009 (laufend) | 012, 014, 015 | 429 363 bis 11:52 (laufend) | nicht getrennt messbar (kein `/cost` in der Cloud-Sitzung) | ab 11:21 | [docs/bautage/2026-09-23.md](bautage/2026-09-23.md) |
+| B1 | 23.09.2026 | takt-001, 017, 009, 015, 019 (laufend) | 012, 014, 020 | rund 2,9 Mio. bis 13:13 (laufend) | nicht getrennt messbar (kein `/cost` in der Cloud-Sitzung) | ab 11:21 | [docs/bautage/2026-09-23.md](bautage/2026-09-23.md) |
