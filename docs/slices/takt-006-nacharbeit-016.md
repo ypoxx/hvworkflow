@@ -345,16 +345,21 @@ Runde 1 und beide Codex-Punkte mit eigenen Proben erledigt; neu:
 - P2 · `git push -o "ci skip" origin` zählte drei Ziele → Push-Argumente werden als Shell-Wörter zerlegt (`039c90b`).
 - P2 · teilweise gequotete oder maskierte Präfixe (`'+'main`, `':'main`, `\+main`) kamen durch → Shell-Wörter werden
   wie von der Shell übergeben ausgewertet, ohne Anführungszeichen und mit aufgelösten Escapes (`02e79ce`).
+- P2 (zweimal) · `-d` in einer Kurzoptionsgruppe (`-vd`) und die Abkürzung `--pru` kamen durch → **Ursache statt
+  Einzelfall:** die Push-Argumente werden gegen eine Optionstabelle nach `git push -h` (git 2.43) ausgewertet
+  (Werte, Abkürzungen, `--no-`-Formen, Kurzoptionsgruppen); eine mehrdeutige Abkürzung (`--forc`) blockiert mit
+  diesem Grund (`6e1667c`). Der Test für `--forc` erwartet jetzt „ambiguous“ statt „force flag“, blockiert bleibt
+  blockiert; `--force-w` prüft den Force-Grund. Hook-Tests 80/80.
 
-`pnpm gates` auf dem Endstand `02e79ce`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
+`pnpm gates` auf dem Endstand `6e1667c`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
 
 ```
-# pass 188
+# pass 194
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6955.608423
+# duration_ms 6456.292859
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -379,6 +384,6 @@ dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 2.28s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 02e79ce, tree 995f77d7e289…
+✓ built in 1.33s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 6e1667c, tree c1309195cc67…
 ```
