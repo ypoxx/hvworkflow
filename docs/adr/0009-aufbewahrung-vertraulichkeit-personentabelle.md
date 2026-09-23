@@ -39,7 +39,9 @@ geschützte Fragen", „Pseudonymisierung gegenüber Fachbereichen", „Notiz-/R
   (`AuditAccessGranted` mit Zweck und Frist); im Standardlesepfad ist `personId` maskiert (ADR 0013).
 - **Pseudonymisierung gegenüber Fachbereichen** ist Standard an (`pseudonymiseForUnits = true`);
   Klarnamen sieht, wer `question.identity.reveal` hält (Standard: `coordination`, `moderation`,
-  `legal`, `approver`, `podium`). Ein Recht, kein Rollenname; Umschalten ist Konfiguration.
+  `legal`, `approver`, `podium`; 026). Ein Recht, kein Rollenname; Umschalten ist Konfiguration.
+  Ab 067 ist jede Auflösung ein protokolliertes Ereignis `IdentityRevealed` mit Grund; bis dahin
+  löst die Projektion den Namen beim Lesen über das Recht auf (026).
 - **Notizfeld** `note` mit Ereignis `QuestionNoteAdded` im Vertrag, hinter der Meeting-Konfiguration
   `notes=off`, nie im Export, nie auf der Bühne, kein Chat; ohne Schalter entsteht kein
   personenbezogener Freitext im Log (E4).
@@ -60,6 +62,14 @@ Existenz („nicht einmal sichtbar"). Die Beta liefert davon die Inhaltsverdecku
 Zählern; der verdeckte Bestand folgt nach der Beta in einer eigenen Scheibe (Plan 3). Das umbasierte
 Rechtekonzept (052) hält diese Stufung fest.
 
+**Abgrenzung zu Recherche Z.116 und Rechtekonzept Abschnitt 6.** Z.116 verlangt die
+Re-Identifikation nur für Recht, IR und Vorstandsbüro im Vier-Augen-Prinzip mit Protokolleintrag;
+Abschnitt 6 nennt die Klarnamenauflösung eine eigene, protokollierte Berechtigung. Der Plan baut
+davon das Recht `question.identity.reveal` mit fünf Standardrollen (026) und die Protokollierung
+als Ereignis `IdentityRevealed` erst mit 067. Ein engerer Rollenkreis und eine Vier-Augen-Regel für
+die Auflösung stehen nicht im Plan: offen, Entscheider Projektleitung und DSB; Registerzeile folgt
+(Übergabe an 014).
+
 ## Kosten bei Änderung
 
 - Ohne Umschlag: Neuaufbau des Logs. Mit Umschlag: Schlüssel einschalten und den Bestand einmal in
@@ -75,7 +85,9 @@ Rechtekonzept (052) hält diese Stufung fest.
 - **Klarnamen in Ereignissen.** Verworfen: `personId` und Personentabelle; Test „kein displayName in
   Ereignissen" (Prüfpunkt 3).
 - **Löschlogik im Ereignislog** (physisches Löschen einzelner Ereignisse oder Fragen). Verworfen:
-  Regel 7; Rechtekonzept Abschnitt 4 (keine physische Löschung, für niemanden).
+  Regel 7; Rechtekonzept Abschnitt 4 (keine physische Löschung, für niemanden). Abgrenzung: Der
+  Übungsbestand ist synthetisch und wird als Ganzes durch den Plattformbetreiber außerhalb der
+  Anwendung entfernt (Plan 3, B15, 042); Abschnitt 4 schützt den Nachweis einer echten HV.
 - **Umkodieren an Ort und Stelle.** Verworfen: jede Umkodierung ist ein Export in eine neue
   Datenbank (Leitplanken 1.3).
 - **Krypto-Umschlag erst nachrüsten, wenn Recht entschieden hat.** Verworfen: ohne `keyId` ab dem
@@ -90,8 +102,9 @@ Scheiben **047** und **073** (Plan 4): `policy-attribute-table.md` eingecheckt; 
 `expert` anderer Einheit → 403, `observer` auf `protected` → 403, Client behauptet einen fremden
 Platz → wird ignoriert; Test `personId`-Auswertung ohne zweite Freigabe → 403; Test Export ohne
 Notiz; generierte Rechtsgrundlagen-Matrix und Auswertungskatalog; Löschkonzept-Vorlage mit
-benanntem Schlüsselverwahrer; Löschprotokoll-Vorlage. Umschlag und Codec-Port aus 024 (ADR 0011),
-Personentabelle aus 027 (ADR 0003).
+benanntem Schlüsselverwahrer; Löschprotokoll-Vorlage. Umschlag und Codec-Port aus 024 (ADR 0011);
+Personentabelle als Entität aus 026 (Test „kein displayName in Ereignis-Payloads"), Speicherung in
+027 (ADR 0003).
 
 ## Offene Registerzeilen
 
@@ -103,3 +116,5 @@ Personentabelle aus 027 (ADR 0003).
 - **E29** Veröffentlichungsumfang — `publicationVersion` und `internal | external` sind reservierte
   Attributnamen (Plan 3), keine Veröffentlichung in der Beta.
 - **E40** Insider-Kennzeichen als Attribut (eine Rechtsrolle) — 047 baut auf Standard.
+- Klarnamenkreis und Vier-Augen bei der Auflösung (Recherche Z.116, Rechtekonzept Abschnitt 6):
+  nicht im Plan; Entscheider Projektleitung, DSB; Registerzeile folgt (Übergabe an 014).

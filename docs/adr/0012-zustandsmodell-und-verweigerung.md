@@ -9,13 +9,17 @@ Die Einzelfrage kennt heute elf Zustände (`packages/domain/src/types.ts`): `cap
 `closed`, `withdrawn`, `merged`. Die Übergänge sind eine Tabelle (`transitions.ts`, Regel 5); jede
 Zeile trägt eine Regel-ID und einen Test.
 
-Die Beta braucht die Verweigerung (B6): Pfad A „kein Auskunftsanspruch" und Pfad B „Verweigerung
-trotz Anspruchs" mit Grundkatalog als Daten. Recherche Z.24 nennt sie zwei Nichtbeantwortungen mit
-zwei Rechtsfolgen (Pfad B: § 131 Abs. 3 AktG — ungeprüft (E15)). Dazu kommen Nebenaspekte:
-Zurückstellen, Korrektur nach dem Vorlesen, Nachfragen. Die Risikotabelle des Plans warnt vor einem
-Zustandsautomaten mit über 15 Zuständen. Das Rechtekonzept (Abschnitt 2.4) zeigt eine
-Beispieltabelle mit einem Zustand `refused`; seine Invarianten (Abschnitt 4: Ersteller ≠ Freigeber,
-keine Verweigerung ohne Grund und Begründung) gelten unabhängig vom gewählten Modell.
+Die Beta braucht die Verweigerung (B6): Verweigerungspfad A „kein Auskunftsanspruch" und
+Verweigerungspfad B „Verweigerung trotz Anspruchs" mit Grundkatalog als Daten (nicht zu verwechseln
+mit den Antwortpfaden A/B/C des Glossars). Recherche Z.24 nennt sie zwei Nichtbeantwortungen mit
+zwei Rechtsfolgen (Verweigerungspfad B: § 131 Abs. 3 AktG — ungeprüft (E15)). Dazu kommen
+Nebenaspekte: Zurückstellen, Korrektur nach dem Vorlesen, Nachfragen. Die Risikotabelle des Plans
+warnt vor einem Zustandsautomaten mit über 15 Zuständen. Das Rechtekonzept (Abschnitt 2.4) zeigt
+eine Beispieltabelle mit einem Zustand `refused`; seine Invariante Ersteller ≠ Freigeber
+(Abschnitt 4) gilt unabhängig vom gewählten Modell. Ob die Invariante „keine Verweigerung ohne
+zugeordneten Grund und Begründung" (Abschnitt 4) auch für Verweigerungspfad A gilt — laut 044
+verlangt nur Verweigerungspfad B Katalogtreffer und Begründung, `refusal_no_claim` hat beides
+nicht —, legt der Plan nicht fest: offen, Frage an Recht mit dem Vorabzug vor 044 (E15).
 
 ## Entscheidung
 
@@ -26,17 +30,19 @@ Rechtstor") und Plan 4 (Zeile 0012). Zwei Modelle stehen zur Wahl; der Plan baut
 
 - **Keine Reform in der Beta; die elf Zustände bleiben.** Ein neuer Zustand entsteht nur mit ADR.
 - **Verweigerung ist eine Antwortart**, kein Zustand: `answerKind: answer | refusal_no_claim |
-  refusal_with_ground` auf der Antwortversion, bei Pfad B mit `refusalGroundId` (Pflichtauswahl
+  refusal_with_ground` auf der Antwortversion, bei Verweigerungspfad B mit `refusalGroundId` (Pflichtauswahl
   aus dem Grundkatalog als Daten, jeder Grund mit `legalRef` und `verified: false`) und
   Pflichtbegründung.
 - **Sie läuft durch die bestehende Kette** `in_review → approved → staged → delivered`. Damit gelten
   Vier-Augen (R-GUARD-06) und Rechtstor (R-GUARD-07) automatisch; dazu die Guards R-GUARD-08
-  „Verweigerung nur mit Rechtsfreigabe-Ereignis" und R-GUARD-09 Grundpflicht (Pfad B ohne
+  „Verweigerung nur mit Rechtsfreigabe-Ereignis" und R-GUARD-09 Grundpflicht (Verweigerungspfad B ohne
   `refusalGroundId` oder Begründung → 409; `_actions` enthält die Verweigerung erst, wenn der Guard
   erfüllbar ist).
 - **Rechte:** `question.refuse.propose` (Standard `legal`, `coordination`) und
   `question.refuse.approve` (Standard `approver`). Die Rolle `approver` trägt die Freigabe; Recht
-  empfiehlt (`question.legal.clear` als eigenes Ereignis) und gibt nicht frei (E25).
+  empfiehlt (`question.legal.clear` als eigenes Ereignis) und gibt nicht frei (E25). Das
+  Rechtekonzept (Abschnitte 2.1 und 2.4) kennt dafür noch `answer.approve.legal` als Rechtsfreigabe;
+  die Trennung in Empfehlung und Freigabe zieht das umbasierte Rechtekonzept (052) nach.
 - **Rechtstor vor der Bühne:** Geltungsbereich als Datentabelle `LEGAL_GATE_BY_TRACK` (Standard:
   alle drei Antwortpfade), zur Laufzeit nicht abschaltbar; kein Eilpfad an der Freigabe vorbei.
 - **Nebenaspekte sind Kennzeichen, keine Zustände:** `deferred` (Pflichtgrund, Wiedervorlage),
@@ -47,7 +53,7 @@ Rechtstor") und Plan 4 (Zeile 0012). Zwei Modelle stehen zur Wahl; der Plan baut
   `transitions.ts` mit Regel-ID (R-TRANS-14..16) und Test.
 - **Fünf Anzeigegruppen** fassen die elf Zustände in der Oberfläche zusammen (Plan 4). Welche
   Zustände welche Gruppe bilden, legt der Plan nicht fest; dieser ADR legt es nicht fest (offen;
-  der Plan führt dazu keine Registerzeile).
+  der Plan führt dazu keine Registerzeile — Registerzeile folgt (Übergabe an 014)).
 - **Reform des Zustandsmodells erst nach der Beta**, dann über eine Projektion.
 
 ### Modell B — zwei Hauptzustände (Alternative mit Preis)
@@ -71,8 +77,9 @@ einen Formulierungsbaustein aus dem Katalog; der Katalog zeigt „ungeprüft", b
 
 **Negativ.** Eine Verweigerung ist technisch eine Antwortversion; Historie, Bühne und Export müssen
 die Antwortart sichtbar machen, damit aus einer Verweigerung nie eine „Antwort" wird. Die
-Beispieltabelle des Rechtekonzepts (`refused` als Zustand) ist eine Illustration und wird mit dem
-umbasierten Rechtekonzept (052) an dieses Modell angepasst.
+Beispieltabelle des Rechtekonzepts (`refused` als Zustand, `answer.approve.legal` als
+Rechtsfreigabe) ist eine Illustration; das umbasierte Rechtekonzept (052) passt sie an dieses Modell
+und an die Trennung von Empfehlung (`question.legal.clear`) und Freigabe (`approver`, E25) an.
 
 **Risiko.** Baut 044, bevor Recht gelesen hat, trägt es „auf Standard gebaut"; ein späterer Wechsel
 kostet den Preis aus Modell B.
@@ -107,9 +114,13 @@ Verweigerungsdialog- und Bühnen-Screenshots, Übergabevermerk an Recht.
 
 ## Offene Registerzeilen
 
-- **E15** Legal-Verifikation: Normzitate und Verweigerungskatalog (`verified: false`, „ungeprüft").
+- **E15** Legal-Verifikation: Normzitate und Verweigerungskatalog (`verified: false`, „ungeprüft");
+  dazu die Frage an Recht, ob Grund- und Begründungspflicht auch für Verweigerungspfad A gilt (mit
+  dem Vorabzug vor 044).
 - **E25** Letztverantwortung Freigabe, Vertretungen, Rechtstor; Option beschleunigte
-  Rechtsfreigabe.
+  Rechtsfreigabe; Trennung Empfehlung/Freigabe gegenüber Rechtekonzept 2.1/2.4.
 - **E30** Zurückstellen und Korrektur nach dem Vorlesen.
 - **E37** Freigabetiefe je Pfad und Kapazität Recht (Prüfliste je Pfad als Daten).
 - **E40** Eine oder zwei Rechtsrollen — eine zweite Freigabe wäre ein weiterer Guard.
+- Fünf Anzeigegruppen (Zuordnung Zustand → Gruppe): keine E-Nummer; Registerzeile folgt (Übergabe
+  an 014).

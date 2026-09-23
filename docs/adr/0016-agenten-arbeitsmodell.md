@@ -6,18 +6,18 @@
 
 Rund 80 Scheiben werden von mehreren Agenten in parallelen Worktrees gebaut; AGENTS.md (Regeln
 1–12) und `docs/agentische-entwicklung-plan.md` setzen den Rahmen: kein Bau ohne Spec, Nachweise
-statt Behauptungen, wer baut, reviewt nicht, kleine Diffs. Die Demo-Phase hat gezeigt, wo Parallelität
-kollidiert (geteilte i18n-Datei, geteilte e2e-Dateien, README) und dass ein von Hand geschätzter
-Kalender nicht hält. Der Kalender des Plans ist deshalb aus dem Abhängigkeitsgraphen gerechnet, nicht
-geschätzt (Plan 8).
+statt Behauptungen, wer baut, reviewt nicht, kleine Diffs. Plan 4 (Zeile 0016) nennt als Bausteine
+Lanes mit exklusivem Dateibesitz, i18n je Feature-Modul, e2e-Dateien je Scheibe und einen
+berechneten Kalender; der Kalender ergibt sich aus dem Abhängigkeitsgraphen, den Lanes und den
+äußeren Terminen und wird nicht von Hand geschätzt (Plan 8).
 
 ## Entscheidung
 
 Standardannahme aus Plan 4 (Zeile 0016) und Plan 10 (E44, E47, E48):
 
 - **Lanes mit exklusivem Dateibesitz.** Jede Scheibe nennt ihre Lanes; gleichzeitig laufende
-  Scheiben teilen keine Lane. Geteilte Dateien (README, Glossar) gehören für eine Scheibe genau einer
-  Lane.
+  Scheiben teilen keine Lane. README und Glossar liegen in der Lane docs-plan (Plan 5); eine andere
+  Scheibe ändert sie nur, wenn ihre Spec das ausdrücklich zuweist (wie 015 die README-Indexzeilen).
 - **Berechneter Kalender statt Handplanung:** `scripts/plan-graph.mjs` prüft den Scheibengraphen
   (jede Abhängigkeit existiert, keine Zyklen, jede Abhängigkeit endet vor dem Start, keine
   Lane-Kollision) und rechnet den Kalender neu.
@@ -28,9 +28,14 @@ Standardannahme aus Plan 4 (Zeile 0016) und Plan 10 (E44, E47, E48):
 - **Review-Paarung nach Regel 3:** ein anderes Modell in frischem Kontext, das nur Spec und Diff
   sieht; Rollen liegen in `.claude/agents/` (Architekt, Planer, Design-Kritiker, Reviewer,
   Reviewer für Opus-gebaute Scheiben).
-- **Merge durch den Orchestrator** nach grünen Toren und unabhängigem Review (E48); der Mensch sieht
-  jeden Merge im Tagesbericht und kann ihn zurücknehmen; Deploy nur nach Go des Eigentümers
-  (Regel 11).
+- **Merge durch den Orchestrator** nach grünen Toren und unabhängigem Review (E48, Plan 6.6); der
+  Mensch sieht jeden Merge im Tagesbericht und kann ihn zurücknehmen; Deploy nach Staging und
+  Übungsmandant nur nach Go des Eigentümers (Regel 11, Plan 6.7). Für die Demo als Taktfläche
+  widerspricht das Plan 3 („Taktfläche für Kleinänderungen": der Merge des Eigentümers ist das Go,
+  die Pipeline baut die Demo). Übergangsregel des Eigentümers vom 23.09.2026: jeder Commit
+  einschließlich des Squash-Merges des Orchestrators trägt `[skip netlify]`; ein Demo-Build nur nach
+  ausdrücklichem Go des Eigentümers. Die dauerhafte Regel ist offen (E35, E48, Prüfpunkt 1); siehe
+  Ergänzung zu ADR 0002.
 - **Herabstufung der Risikoklasse nur mit menschlicher Unterschrift** (Leitplanken Abschnitt 4).
 - **Token-Regelkreis:** der Tagesdurchsatz wird in Woche 1 gemessen; liegt er nach fünf Bautagen
   unter einer Scheibe je Bautag, rechnet 016 den Kalender neu, und Prüfpunkt 1 entscheidet über
@@ -67,7 +72,8 @@ Behauptung; B13 verlangt deshalb ein Plan-Ehrlichkeits-Tor.
 - **Von Hand geschätzter Kalender.** Verworfen: der Kalender ergibt sich aus Graph, Lanes und
   äußeren Terminen (Plan 8).
 - **Der Mensch mergt jede Scheibe selbst.** Nicht gewählt: E48 — Orchestrator mergt nach Toren und
-  Review, Rücknahme bleibt; Deploy bleibt beim Menschen.
+  Review, Rücknahme bleibt; Deploy bleibt beim Menschen. Für die Demo-Taktfläche ist der Merge-Weg
+  offen (Konflikt Plan 3 / E48, siehe Entscheidung).
 - **Der Bauende reviewt selbst oder dasselbe Modell reviewt.** Verworfen: Regel 3.
 - **Sammelregel oder Sammel-Merge für Kleinänderungen.** Nicht gewählt; Option E44.
 - **Ein geteiltes i18n-Wörterbuch, geteilte e2e-Dateien.** Verworfen: Lane-Konflikte (017).
@@ -83,6 +89,9 @@ vertauschter Abhängigkeit; Screenshot des Branch-Schutzes (Eigentümer). i18n j
 
 ## Offene Registerzeilen
 
-- **E48** Merge-Befugnis beim Orchestrator (Prüfpunkt 0).
+- **E48** Merge-Befugnis beim Orchestrator (Prüfpunkt 0); für die Demo-Taktfläche offen mit E35
+  (Prüfpunkt 1).
+- **E35** Taktfläche nach Umstellung auf HTTP — bis dahin Übergangsregel vom 23.09.2026
+  (`[skip netlify]` auf jedem Commit, Demo-Build nur nach Go).
 - **E44** Leichtere Regel für Kleinänderungen.
 - **E47** Geld- und Nutzungsdeckel; Überprüfung an Prüfpunkt 1.

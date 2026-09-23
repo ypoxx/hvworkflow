@@ -69,8 +69,8 @@ wertlos; eine Client-Behauptung wird im Dienst ignoriert und mit einem Negativte
 - **Statuswechsel offline im Client** („Vorgelesen" lokal setzen und später abgleichen). Verworfen:
   keine Statuslogik im Client (ADR 0001, Regel 5); offline gibt es nur die Absicht.
 - **Bündel als Sicht auf die bestehende Runde.** Nicht gewählt, bleibt Option mit Preis (E2).
-- **Geräteeinstellungen serverseitig je Person.** Verworfen: Plan 4 stuft sie als Per-Viewer-
-  Bequemlichkeit im Browser ein; der Dienst hält keine Anzeigepräferenzen.
+- **Geräteeinstellungen serverseitig je Person.** Verworfen: Plan 4 stuft sie als legitime
+  Per-Viewer-Bequemlichkeit im Browser ein (056: Anzeigeeinstellungen je Gerät im `localStorage`).
 - **Gemeinsame Bühne für alle Podiumsmitglieder wie heute.** Verworfen: B7.
 
 ## Nachweis

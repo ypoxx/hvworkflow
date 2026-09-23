@@ -35,8 +35,7 @@ und Plan 4 (Zeile 0008, Abschnitt „Nachbarsysteme"):
 - **Ereignisstrom für Nachbarn:** Abonnements je Systemakteur (Ereignistypen, Ziel-URL, HMAC-Secret
   aus der Konfiguration), signierte Zustellung mit Wiederholung und Idempotenzschlüssel;
   **Sandbox-Mandant** `HV_MODE=training` mit synthetischem Korpus für Partnertests (ADR 0010).
-- **Aktienregister-Lookup** hinter einem kanonischen Vertrag; die Legitimation der Wortmeldung
-  bleibt in der Beta manuell, kein Registerabgleich (E28).
+- **Aktienregister-Lookup** hinter einem kanonischen Vertrag (Plan 4, „Nachbarsysteme"; 067).
 - **/v1-Kompatibilität für Partner über zwei Vertragszyklen** (ADR 0015), festgehalten im
   Integrationsleitfaden.
 
@@ -84,4 +83,5 @@ Vertragsform in 043 (E3a); KI-Port in 066, Aktienregister in 067 (Vorlage zu ADR
 - **E3a** Vertragsform der Transkript-Segmente (Ansprechperson Tool-Team bis 16.10.2026).
 - **E3b** Adapter des Transkriptionstools.
 - **E18** KI-Funktionen und Anbieter.
-- **E28** Legitimation, Aktien- und Teilnehmermodell.
+- **E28** Legitimation, Aktien- und Teilnehmermodell — Register-Standard (Plan 10): manuelle
+  Aufnahme der Wortmeldung durch das Versammlungsbüro, kein Registerabgleich in der Beta.

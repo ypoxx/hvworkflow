@@ -20,8 +20,9 @@ und Tagesordnung"):
   Versions- und Changelog-Tor.
 - **Brechende Änderungen nur mit ADR-Verweis.**
 - **Neue Pflichtfelder werden erst optional** eingeführt, mit Ablaufdatum, und in einem Folgezyklus
-  Pflicht. Veraltete Felder werden markiert und erst in einem späteren Zyklus entfernt (Beispiel:
-  `kind` und `requestedMinutes` auf `Speaker`, veraltet in 0.2.0, gelöscht in 080).
+  Pflicht (Plan 4). Das Veralten von Feldern folgt dem Beispiel aus 019 (`kind` und
+  `requestedMinutes` auf `Speaker`, veraltet in 0.2.0, gelöscht in 080); eine allgemeine
+  Veraltungsregel steht nicht im Plan (Vorschlag, nicht im Plan).
 - **Vorab deklarierte Operationen** stehen in einer Allowlist mit Ablaufdatum, damit das Tor „jede
   `operationId` wird ausgeübt" bestehen bleibt und keine tote Operation im Vertrag überdauert.
 - **Vertragsfreeze vor der Generalprobe.**
@@ -41,7 +42,7 @@ pflegen; ein abgelaufener Eintrag macht das Tor rot. Der Freeze bindet den Vertr
 der Generalprobe (E20, E45).
 
 **Risiko.** Eine „kleine" Vertragsänderung ohne Changelog oder ADR ist der Weg zurück in die
-Kopplung an volatile Logik (ADR 0001); das Tor ist deshalb Teil von `pnpm gates`.
+Kopplung an volatile Logik (ADR 0001); das Versions- und Changelog-Tor aus 019 fängt das ab.
 
 ## Kosten bei Änderung
 

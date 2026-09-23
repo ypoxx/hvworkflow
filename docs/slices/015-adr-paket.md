@@ -1,6 +1,6 @@
 # 015 — ADR-Paket 0003–0016 als vorgeschlagen
 
-**Status:** spec
+**Status:** review (Nacharbeitsrunde 1)
 **Risikoklasse:** niedrig · 2,5 AStd · Kalender 30.09.2026 (W1) · Lanes: docs-adr (+ `README.md` Indexzeilen;
 keine andere laufende Scheibe ändert das README)
 **Rolle/Modell:** Architekt-Text · Fable 5.1; Review (Lesebefund) Opus 5.5 gegen Recherche, Rechtekonzept und ADR 0001
@@ -83,6 +83,7 @@ Done: Vierzehn ADR-Dateien 0003–0016 in docs/adr/ mit den festgelegten Namen, 
       Entscheider aus Plan 3/4/10 · Annahme Prüfpunkt n) und den Abschnitten Kontext · Entscheidung · Konsequenzen · Kosten bei
       Änderung · Verworfene Alternativen · Nachweis · Offene Registerzeilen; ADR 0012 mit Modell A (Standard) und Modell B (2,5 AStd);
       Ergänzung an ADR 0002 als neuer Schlussabschnitt; zwei README-Indexzeilen (docs/adr/ und docs/entscheidungsregister.md).
+      Nacharbeitsrunde 1 (Opus-Lesebefund: 0 Blocker, 3 major, 12 minor) eingearbeitet, Tabelle unter „Review findings".
 Evidence: pnpm gates (Tail unten), EXIT=0. Keine Oberflächenarbeit, kein Screenshot; docs/evidence unverändert.
 Open: (1) Lesebefund des Reviewers (Akzeptanzkriterium 4) steht aus. (2) Die README-Zeile zu docs/entscheidungsregister.md zeigt
       bis zum Merge von 014 ins Leere (laut Spec so gewollt). (3) ADR 0012: Der Plan nennt „fünf Anzeigegruppen", aber nicht, welche
@@ -91,7 +92,11 @@ Open: (1) Lesebefund des Reviewers (Akzeptanzkriterium 4) steht aus. (2) Die REA
       den Lesebefund: Rechtekonzept 2.3 nennt „Existenz" als Wirkung der Vertraulichkeitsstufe, die Beta liefert Inhaltsverdeckung
       mit lückenlosen Zählern (ADR 0009, Abgrenzung); Rechtekonzept 2.4 zeigt `refused` als Zustand, ADR 0012 wählt Modell A und
       verweist auf das umbasierte Rechtekonzept (052). (6) Normzitate: § 131 Abs. 3 AktG (0012, aus Recherche Z.24) und Art. 13
-      DSGVO (0004, aus Plan 5 Scheibe 029) tragen „ungeprüft (E15)".
+      DSGVO (0004, aus Plan 5 Scheibe 029) tragen „ungeprüft (E15)". (7) Nachweis „Register verweist auf jede ADR" hängt an 014.
+      (8) Aus der Nacharbeit offen und als Registerzeilen an 014 zu übergeben (keine E-Nummern erfunden): Klarnamenkreis und
+      Vier-Augen bei der Auflösung (0009); Zuordnung der fünf Anzeigegruppen (0012); Grund-/Begründungspflicht für
+      Verweigerungspfad A (0012, mit E15 an Recht); Mindest-Aggregationsschwelle (0013, E13); dauerhafte Merge- und
+      Demo-Build-Regel (0002/0016, E35/E48, Prüfpunkt 1) — bis dahin Übergangsregel des Eigentümers vom 23.09.2026.
 Touched: docs/adr/0003-persistenz-ereignislog.md, 0004-identitaet-oidc-bff.md, 0005-antwortformat.md,
       0006-buehne-je-geraet-und-antwortbuendel.md, 0007-deployment-hosting-umgebungen.md, 0008-integrationen.md,
       0009-aufbewahrung-vertraulichkeit-personentabelle.md, 0010-pilotmodus-uebungsbetrieb.md, 0011-ereignis-umschlag-v2.md,
@@ -120,29 +125,30 @@ Touched: docs/adr/0003-persistenz-ereignislog.md, 0004-identitaet-oidc-bff.md, 0
 | 0015 Vertragsversionierung | Plan 4 Zeile 0015; Plan 3 „Exportpfad des Transkriptionstools" (zwei Zyklen, 1 AStd je Zyklus), „Jahrgang und Tagesordnung" (Alias bis 0.5) | keine eigene; abhängig E3a, E20 | 1 |
 | 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter Kalender) | E48, E44, E47 | 1 |
 
-**`pnpm gates` in `/home/user/wt/015` (Tail, 23.09.2026):**
+**`pnpm gates` in `/home/user/wt/015` (Tail, 23.09.2026, Lauf nach Nacharbeitsrunde 1; der erste Lauf vor der
+Nacharbeit war ebenfalls grün, EXIT=0):**
 
 ```
 packages/domain test:  Test Files  4 passed (4)
 packages/domain test:       Tests  39 passed (39)
+packages/domain test:    Start at  10:32:41
+packages/domain test:    Duration  2.19s (transform 450ms, setup 0ms, import 913ms, tests 1.97s, environment 0ms)
+packages/domain test: Done
 apps/web test:  Test Files  3 passed (3)
 apps/web test:       Tests  35 passed (35)
-apps/web test:    Start at  10:08:23
-apps/web test:    Duration  699ms (transform 396ms, setup 0ms, import 560ms, tests 88ms, environment 0ms)
+apps/web test:    Start at  10:32:44
+apps/web test:    Duration  974ms (transform 777ms, setup 0ms, import 961ms, tests 67ms, environment 0ms)
 apps/web test: Done
 apps/api test:  Test Files  3 passed (3)
 apps/api test:       Tests  25 passed (25)
-apps/api test:    Start at  10:08:23
-apps/api test:    Duration  1.24s (transform 633ms, setup 0ms, import 1.75s, tests 866ms, environment 0ms)
+apps/api test:    Start at  10:32:43
+apps/api test:    Duration  1.76s (transform 917ms, setup 0ms, import 2.70s, tests 1.47s, environment 0ms)
 apps/api test: Done
 
 > hvworkflow@0.1.0 vocabulary /home/user/wt/015
 > node scripts/vocabulary-check.mjs
 
 vocabulary-check: ok
-
-> @hv/web@0.0.0 build /home/user/wt/015/apps/web
-> tsc -b && vite build
 
 vite v8.2.2 building client environment for production...
 transforming...
@@ -153,10 +159,29 @@ dist/index.html                                        0.43 kB │ gzip:   0.27 
 dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
 dist/assets/index-CS58249t.js                        525.20 kB │ gzip: 154.17 kB │ map: 2,155.11 kB
 (!) Some chunks are larger than 500 kB after minification.
-✓ built in 1.15s
+✓ built in 1.08s
 EXIT=0
 ```
 
 ## Review findings
 
-(vom Reviewer)
+Opus-Lesebefund (gegen Recherche, Rechtekonzept, ADR 0001): 0 Blocker, 3 major, 12 minor. Nacharbeitsrunde 1 am
+23.09.2026 durch den Architekten; keine neuen Entscheidungen, keine neuen E-Nummern.
+
+| Nr | Schwere | Befund (kurz) | Erledigung |
+|---|---|---|---|
+| 1 | major | ADR 0012 Kontext bezog die §4-Invariante „keine Verweigerung ohne Grund und Begründung" pauschal auf beide Verweigerungspfade; Modell A verlangt Katalogtreffer und Begründung nur für Verweigerungspfad B | Kontext neu gefasst: Ersteller ≠ Freigeber gilt modellunabhängig; Grund-/Begründungspflicht für Verweigerungspfad A offen, Frage an Recht mit dem Vorabzug vor 044 (E15); E15-Zeile unter „Offene Registerzeilen" ergänzt |
+| 2 | major | ADR 0009 zitiert Recherche Z.116 und Rechtekonzept §6, weicht aber ab (Rollenkreis, Vier-Augen, Protokollierung) | Absatz „Abgrenzung zu Recherche Z.116 und Rechtekonzept Abschnitt 6"; `IdentityRevealed` ab 067 in der Entscheidung; engerer Kreis und Vier-Augen nicht im Plan → offen, Entscheider Projektleitung und DSB, „Registerzeile folgt (Übergabe an 014)" |
+| 3 | major | ADR 0002 (Ergänzung) vs ADR 0016: Merge und Go für Demo-Builds widersprüchlich; „Regel 11 gewahrt" unqualifiziert | Konflikt in beiden ADRs benannt (Plan 3 „Taktfläche" vs E48/Plan 6.6); Übergangsregel des Eigentümers vom 23.09.2026 aufgenommen (`[skip netlify]` auf jedem Commit inkl. Squash-Merge, Demo-Build nur nach ausdrücklichem Go); dauerhafte Regel offen (E35/E48, Prüfpunkt 1); „Regel 11 gewahrt" entfernt |
+| 4 | minor | ADR 0012 „Pfad A/B" kollidiert mit dem Glossar (Antwortpfade A/B/C) | überall „Verweigerungspfad A/B", Hinweis auf die Antwortpfade des Glossars im Kontext |
+| 5 | minor | Register-Standards aus Plan 10 innerhalb „Entscheidung" (0007 E22, 0013 E36, 0008 E28, 0004 E38) | 0007, 0013, 0008: nach „Offene Registerzeilen" verschoben, gekennzeichnet „Register-Standard (Plan 10)"; 0004: im Satz als Register-Standard gekennzeichnet (zusammen mit Nr. 12) |
+| 6 | minor | Aussagen ohne Planquelle: 0003:50–51, :67; 0005:51, :54–55; 0006:72–73; 0010:40–41; 0011:66–67 (Begründung verdreht); 0014:41; 0015:22–24, :43–44; 0016:9–11, :19–20 | je Stelle gestrichen, mit Quelle versehen oder als „Vorschlag, nicht im Plan" gekennzeichnet; 0011 auf Plan 3 („ohne Umschlag Neuaufbau des Logs") zurückgedreht; 0016: README und Glossar als Lane docs-plan |
+| 7 | minor | Entfernen der Übungs-Datenbank (0003, 0009, 0010) vs Rechtekonzept §4 | Abgrenzungssatz an allen drei Stellen: synthetischer Bestand, als Ganzes durch den Plattformbetreiber außerhalb der Anwendung entfernt (Plan 3, B15, 042); §4 schützt den Nachweis einer echten HV |
+| 8 | minor | ADR 0013 „unbegrenzt aufbewahrt" | „in der Beta unbegrenzt (keine Löschlogik); Fristen je `retentionClass` offen, E16" |
+| 9 | minor | ADR 0013 Mindest-Aggregationsschwelle zitiert, nicht adressiert | Satz im Kontext und Ergänzung der E13-Zeile: offen (Betriebsvereinbarung) |
+| 10 | minor | ADR 0012 052-Hinweis ohne die Trennung Empfehlung/Freigabe (Rechtekonzept 2.1/2.4 `answer.approve.legal`, E25) | Rechte-Bullet und Konsequenzen ergänzt; E25-Zeile ergänzt |
+| 11 | minor | ADR 0009 Nachweis nennt die Personentabelle nur mit 027 | „Personentabelle als Entität aus 026 (Test „kein displayName in Ereignis-Payloads"), Speicherung in 027" |
+| 12 | minor | ADR 0004 TOTP-Geltungsbereich unklar | „Keycloak-Realm aus 088 (Staging, Rückfall E11/E13): Register-Standard (Plan 10, E38) TOTP-Pflicht für Freigabe-, Rechts- und Admin-Rechte" |
+| 13 | minor | ADR 0012 fünf Anzeigegruppen ohne Registerzeile | Text beibehalten; „Registerzeile folgt (Übergabe an 014)" in Entscheidung und „Offene Registerzeilen" |
+| 14 | minor | Bericht „Open" ohne die 014-Abhängigkeit des Nachweises | „Nachweis ‚Register verweist auf jede ADR' hängt an 014" ergänzt (Punkt 7) |
+| 15 | minor | ADR 0014 E22-Anmerkung vermischt das SSE-Ziel | E22 = RPO 0, RTO 15 min, p90 < 300 ms; SSE < 2 s stammt aus B11 |

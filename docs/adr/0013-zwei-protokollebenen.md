@@ -12,15 +12,17 @@ für jede personenbezogene Log-Auswertung, Log-Löschfristen (Z.129). Das Rechte
 (Abschnitt 6) macht daraus die Anforderung, dass der Auswertungskatalog aus dem System generiert
 wird und Drill-down auf Einzelpersonen technisch deaktiviert ist, nicht organisatorisch untersagt.
 Der Betriebsrat-Prozess startet am 25.09.2026; bis zum Abschluss läuft die Beta nur mit
-synthetischen Fragen (E13, E14). Der Termin blockiert den Produktivstart, nicht die Beta.
+synthetischen Fragen (E13, E14). Der Termin blockiert den Produktivstart, nicht die Beta. Die
+Mindest-Aggregationsschwelle aus Z.129 adressiert der Plan nicht: offen (E13, Betriebsvereinbarung).
 
 ## Entscheidung
 
 Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe") und Plan 4
 (Zeile 0013):
 
-- **Ebene 1, fachliche Vorgangshistorie:** das Ereignislog — unbegrenzt aufbewahrt, nicht
-  abschaltbar (Rechtekonzept Abschnitt 4), mit `personId` statt Klarname (ADR 0009).
+- **Ebene 1, fachliche Vorgangshistorie:** das Ereignislog — in der Beta unbegrenzt aufbewahrt
+  (keine Löschlogik; Fristen je `retentionClass` offen, E16), nicht abschaltbar (Rechtekonzept
+  Abschnitt 4), mit `personId` statt Klarname (ADR 0009).
 - **Ebene 2, technisches Zugriffslog:** strukturiert (Korrelations-ID, Subject-Hash, Operation,
   Status, Latenz, `seq`), **ohne Nutzdaten** — nie Fragetext —, in einer getrennten Senke,
   Aufbewahrung als Konfiguration mit Standard 30 Tage.
@@ -34,8 +36,6 @@ Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe")
 - **Rate-Limit-Zähler sind flüchtig** und nicht auswertbar; sie stehen nicht im Katalog.
 - **Der Auswertungskatalog wird generiert**, nicht gepflegt: welche Kennzahlen existieren, keine je
   Person; als CI-Artefakt mit Diff-Tor (033, vervollständigt in 073).
-- **Keine personenbezogene Leistungsauswertung.** Zuweisung geht an den Fachbereich; eine Person
-  wird nur über die Übernahme (Claim) sichtbar, keine automatisierte Personenzuweisung (E36).
 
 ## Konsequenzen
 
@@ -82,7 +82,10 @@ Zulieferungen an Betriebsrat und DSB in 083. Aus B5: Zugriffslog-Tor, Kennzahlen
 
 ## Offene Registerzeilen
 
-- **E13** Mitbestimmung: Betriebsrat-Prozess und Identitäten in der Probe.
+- **E13** Mitbestimmung: Betriebsrat-Prozess und Identitäten in der Probe; Mindest-
+  Aggregationsschwelle (Recherche Z.129) offen für die Betriebsvereinbarung.
 - **E14** DSFA als Vorbedingung für Personenidentitäten auf Staging.
 - **E16** Aufbewahrung — Löschfristen des Zugriffslogs (Standard 30 Tage als Konfiguration).
-- **E36** Personenzuweisung von Einzelfragen (Person statt Fachbereich).
+- **E36** Personenzuweisung von Einzelfragen — Register-Standard (Plan 10): Zuweisung an den
+  Fachbereich, eine Person nur über die Übernahme (Claim) sichtbar, keine automatisierte
+  Personenzuweisung (BV).

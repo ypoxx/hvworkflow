@@ -38,8 +38,9 @@ zweiten Kanal.
 Offline- und Wiederverbindungszuständen. Der Strom muss dieselben Leserechte anwenden wie die
 Lesemethoden; ein Fehler dort wäre ein Leck (Test: `observer` erhält keine Entwurfsereignisse).
 
-**Risiko.** Lange Verbindungen hängen am Saalnetz und an Proxys der Konzern-IT (E33); der
-Polling-Fallback bleibt deshalb Pflicht.
+**Risiko.** Lange Verbindungen hängen am Saalnetz (E33: Hallen-WLAN plus Hotspot-Rückfall); ob
+Proxys der Konzern-IT sie begrenzen, nennt der Plan nicht (Vorschlag, nicht im Plan). Der
+Polling-Fallback bleibt Pflicht (Plan 3).
 
 ## Kosten bei Änderung
 
@@ -65,6 +66,7 @@ zweiter Browser sieht Änderung < 2 s; Netztrace im Bericht. In-App-Alarme mit Q
 
 ## Offene Registerzeilen
 
-- **E22** RPO/RTO/SLO — Latenzziel im Probefenster.
+- **E22** RPO/RTO/SLO — Register-Standard (Plan 10): RPO 0, RTO 15 min, p90 < 300 ms am Dienst.
+  Das SSE-Ziel < 2 s stammt aus B11, nicht aus E22.
 - **E33** Endgeräte und Saalnetz (Hallen-WLAN, Hotspot-Rückfall) — bestimmt, wie oft der Strom
   wieder aufsetzt.

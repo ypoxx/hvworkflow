@@ -29,8 +29,8 @@ Plan 4 (Zeile 0004):
   Ablauf am Jahrgangsende. IdP-Gruppen werden als Vorschlag gelesen, nie automatisch zur Rolle.
   Beide Pfade münden im selben Actor-Objekt; die Tabelle ist die eine Wahrheit.
 - **Umgebungen:** Staging gegen einen Keycloak-Container mit Testrealm, Produktion gegen den
-  Konzern-IdP. Im Rückfall gepoolter Stationsidentitäten (E13, E10b) trägt ein Keycloak-Realm die
-  Konten; dann gilt die Standardannahme TOTP-Pflicht für Freigabe-, Rechts- und Admin-Rechte (E38).
+  Konzern-IdP. Der Keycloak-Realm aus 088 trägt Staging und den Rückfall (E11/E13); dort gilt als
+  Register-Standard (Plan 10, E38) TOTP-Pflicht für Freigabe-, Rechts- und Admin-Rechte.
 
 ## Konsequenzen
 

@@ -48,11 +48,12 @@ Whitelist stattdessen.
 
 - **Freies HTML oder unbegrenzter Rich-Text.** Verworfen: der Formatumfang ist eine Whitelist,
   damit Bühne, Historie und Export aus einem Renderer kommen und Erweiterungen additiv bleiben.
-- **Schriftwahl.** Verworfen: das Hausformat gilt (E6, Frage an die Projektleitung).
+- **Schriftwahl.** Verworfen als Standardannahme: keine Schriftwahl (Plan 3); ob das Hausformat der
+  Grund ist, fragt E6 die Projektleitung.
 - **Normalisierung im Editor (Client).** Verworfen: Normalisierung ist eine Regel des Kerns; die
   Oberfläche enthält keine Geschäftsregel (ADR 0001, Grenze 1).
-- **Nur Klartext ohne Format.** Verworfen: Absatz, Aufzählung, fett, kursiv und Hervorhebung sind
-  der abgefragte Mindestumfang (Frage 7, E6).
+- **Nur Klartext ohne Format.** Verworfen: die Whitelist Absatz, Aufzählung, fett, kursiv,
+  Hervorhebung ist die Standardannahme (Plan 3); ob sie reicht, fragt E6.
 - **Mehrere Renderer je Ansicht.** Verworfen: ein Renderer, damit Bühne und Export nicht
   auseinanderdriften.
 

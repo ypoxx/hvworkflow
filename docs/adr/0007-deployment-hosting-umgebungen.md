@@ -31,7 +31,6 @@ Standardannahme aus Plan 3 („Hosting-Plattform", „Taktfläche für Kleinänd
   läuft standardmäßig auf derselben Plattform wie Staging; der Rückfall (gemieteter Host plus
   Keycloak-Realm mit gepoolten Stationsidentitäten, AVV vom Umsetzer, DSB informiert) wird mit E13
   am 29.01.2027 entschieden (E10b).
-- **Betriebsziele als Standardannahme:** RPO 0, RTO 15 min, p90 < 300 ms im Probefenster (E22).
 
 ## Konsequenzen
 
@@ -78,6 +77,7 @@ Auswertung mit ausgelöstem Testalarm. RPO/RTO-Drill in 038 (E22).
 - **E10** Hosting-Plattform und Ansprechpartner der Konzern-IT (Hosting, Postgres, AVV).
 - **E10b** Plattform des Übungsmandanten (mit E13 am 29.01.2027).
 - **E39** Rückfall-Host: Verantwortlichkeit, AVV, Standort, Löschung.
-- **E22** RPO/RTO/SLO.
+- **E22** RPO/RTO/SLO — Register-Standard (Plan 10): RPO 0, RTO 15 min, p90 < 300 ms im
+  Probefenster; Drill in 038.
 - **E27** Datenbanktopologie und Hochverfügbarkeit.
 - **E35** Taktfläche nach Umstellung auf HTTP.

@@ -34,7 +34,10 @@ Standardannahme aus Plan 3 („Persistenzform des Ereignislogs") und Plan 4 (Zei
 - **Eine Datenhaltung mit PITR, keine zweite Zone in der Beta** (E27). Backup und Restore werden
   einmal als Drill protokolliert (B3).
 - **Bestände werden nie durch die Dienstrolle gelöscht.** Der Übungsbestand verschwindet, indem der
-  Plattformbetreiber die getrennte Datenbank entfernt, mit Löschprotokoll (ADR 0010).
+  Plattformbetreiber die getrennte Datenbank entfernt, mit Löschprotokoll (ADR 0010). Abgrenzung:
+  Der Übungsbestand ist synthetisch und wird als Ganzes außerhalb der Anwendung entfernt (Plan 3,
+  B15, 042); Rechtekonzept Abschnitt 4 (keine physische Löschung) schützt den Nachweis einer echten
+  HV.
 
 ## Konsequenzen
 
@@ -47,8 +50,9 @@ Umkodieren oder Plattformwechsel sind Dump und Restore des Logs.
 Datenbank, ein Service-Container in der CI und ein Drill kommen hinzu. `/readyz` prüft ab 027
 Datenbank und Migrationsstand. Zwei Adapter (Postgres, JSONL) sind zu pflegen.
 
-**Risiko.** Wächst das Log über die Beta-Annahmen hinaus, trägt der optionale Snapshot die
-Rebuild-Zeit; die Grenze von fünf Minuten wird in 027 gemessen und im Bericht festgehalten.
+**Risiko.** Die Rebuild-Grenze von fünf Minuten wird in 027 als Test gemessen und im Bericht
+festgehalten (Plan 5). Dass der optionale Snapshot bei Wachstum die Rebuild-Zeit trägt, ist ein
+Vorschlag, nicht im Plan.
 
 ## Kosten bei Änderung
 
@@ -64,7 +68,8 @@ Rebuild-Zeit; die Grenze von fünf Minuten wird in 027 gemessen und im Bericht f
 - **JSONL als Produktionsspeicher.** Verworfen: B3 verlangt einen Grant-gesicherten Speicher mit
   PITR und Restore-Drill; JSONL bleibt Entwicklungsadapter.
 - **UPDATE- oder DELETE-Recht für die Dienstrolle** (etwa für Snapshots oder Korrekturen).
-  Verworfen: eine Korrektur ist ein neues Ereignis; Snapshots liegen außerhalb der `events`-Tabelle.
+  Verworfen: Regel 7 und B3 — die Dienstrolle hat nur INSERT/SELECT (Plan 3); eine Korrektur ist ein
+  neues Ereignis. Wo ein optionaler Snapshot liegt, legt der Plan nicht fest (offen).
 - **Zweite Zone in der Beta.** Verworfen für die Beta: eine managed Postgres mit PITR genügt dem
   Probebetrieb (E27); die zweite Zone steht in der Restliste zu 9.3.
 - **Gehostete Postgres schon für die Demo.** In ADR 0002 verworfen (Betriebsaufwand,

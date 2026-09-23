@@ -63,8 +63,8 @@ das ein Log-Neuaufbau (Plan 3). Deshalb liegt 024 vor 027.
   Absenders neben der maßgeblichen Serverzeit (B4, B7).
 - **Upcaster für Demo-Protokolle.** Verworfen: der `localStorage`-Adapter ist Wegwerfcode
   (ADR 0002); Reset-Banner.
-- **Hash-Kette und Codec später nachrüsten.** Verworfen: Bestand vor Kette und Codec ist
-  wegwerfbar; B3 verlangt die Kette über alle Ereignisse.
+- **Hash-Kette und Codec später nachrüsten.** Verworfen: ohne Umschlag kostet das spätere
+  Einschalten einen Neuaufbau des Logs (Plan 3); B3 verlangt die Kette über alle Ereignisse.
 - **Zweiter Rechtsträger oder Mandantenfeld jetzt.** Verworfen: Registerzeile (B-Liste), additiv
   nachrüstbar.
 - **Klarname im Ereignis.** Verworfen: `personId`, Personentabelle (ADR 0009).
