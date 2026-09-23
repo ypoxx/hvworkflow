@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Contrast, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
-import type { StageView } from '@hv/domain';
+import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
 import { Button, Dialog, Panel, PageHeader, cx, showProblem, showToast } from '../../components';
@@ -23,12 +23,34 @@ import { isInteractiveTarget } from './lib';
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
 
-function loadStageOnly(): boolean {
+/** Points #3/#9 (feedback, slice 020): a person who may only read out never has any of these. */
+const WORK_ACTIONS: readonly Permission[] = [
+  'question.capture',
+  'question.classify',
+  'answer.draft',
+  'question.approve',
+];
+
+/** `null`: no explicit choice yet — the default may still be derived from the actor's rights. */
+function loadStoredStageOnly(): boolean | null {
   try {
-    return localStorage.getItem(STAGE_ONLY_KEY) === '1';
+    const raw = localStorage.getItem(STAGE_ONLY_KEY);
+    if (raw === '1') return true;
+    if (raw === '0') return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Point #3/#9: "Nur Bühne" as the default of a role that only reads answers out. Derived the same
+ * way `deskActions` is derived in `features/capture/Page.tsx` — from `_actions` of the Bühnenfragen
+ * themselves (never from the role name, AGENTS.md rule 4): the rights bundle carries the read-out
+ * permission and none of the drafting, classifying, capturing or approving ones.
+ */
+function stageOnlyByRights(actions: readonly Permission[]): boolean {
+  return actions.includes('question.deliver') && !WORK_ACTIONS.some((a) => actions.includes(a));
 }
 
 function loadStageContrast(): boolean {
@@ -132,8 +154,11 @@ export function StagePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const [stageOnly, setStageOnly] = useState(loadStageOnly);
+  const [stageOnly, setStageOnly] = useState<boolean>(() => loadStoredStageOnly() ?? false);
   const [contrast, setContrast] = useState(loadStageContrast);
+  // A plain, un-staged probe: the only reliable way to see `question.capture` (point #3/#9), which
+  // is never gated by a transition and so shows up regardless of that one question's own status.
+  const [probeActions, setProbeActions] = useState<readonly Permission[]>([]);
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
@@ -160,6 +185,36 @@ export function StagePage() {
       cancelled = true;
     };
   }, [version, nonce]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listQuestions({ limit: 1 })
+      .then((page) => {
+        if (!cancelled) setProbeActions(page.items[0]?._actions ?? []);
+      })
+      .catch(() => {
+        /* the default then simply falls back to whatever the Bühnenfragen already show */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [version]);
+
+  /**
+   * Point #3/#9: the default applies only once, and only until the person makes a conscious choice
+   * — the stored preference (`toggleStageOnly` below) always wins from then on.
+   */
+  useEffect(() => {
+    if (loadStoredStageOnly() !== null) return;
+    const actions = [
+      ...(stage?.current?._actions ?? []),
+      ...(stage?.queue[0]?._actions ?? []),
+      ...probeActions,
+    ];
+    if (actions.length === 0) return;
+    if (stageOnlyByRights(actions)) setStageOnly(true);
+  }, [stage, probeActions]);
 
   const toggleStageOnly = useCallback(() => {
     setStageOnly((value) => {

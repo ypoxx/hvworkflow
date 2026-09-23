@@ -8,9 +8,19 @@
  * pixels high, which is right for a dense console and far too small for the person reading out.
  */
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { CornerUpLeft, Presentation, Undo2 } from 'lucide-react';
 import type { Question, StageView } from '@hv/domain';
-import { Badge, EmptyState, Kbd, StageAssignmentBadge, TrackBadge, cx } from '../../components';
+import {
+  Badge,
+  Button,
+  Dialog,
+  EmptyState,
+  Kbd,
+  StageAssignmentBadge,
+  TrackBadge,
+  cx,
+} from '../../components';
 import { useT } from '../../i18n';
 import { approvedAnswer, clockTime } from './lib';
 
@@ -72,13 +82,21 @@ function PodiumButton({
  * "Als Nächstes" (point 7): the first item in the queue reads as its own, larger card — full
  * question text at 18px, clearly secondary to the 28px question on stage (design-prinzipien.md
  * checklist item on this slice) — while the rest of the queue stays a compact list.
+ *
+ * Point #10 (feedback, slice 020): the whole card is now a button that opens a read-only preview of
+ * the question and its released answer — no status change, no write, Escape or the dialog's own
+ * close button leave it exactly as it was.
  */
-function NextPreview({ question }: { question: Question }) {
+function NextPreview({ question, onOpen }: { question: Question; onOpen: (q: Question) => void }) {
   const t = useT();
   return (
-    <div
+    <button
+      type="button"
       data-testid="stage-next-preview"
-      className="mb-3 rounded-md border border-line-strong bg-sunken p-3"
+      onClick={() => onOpen(question)}
+      // Only the border transitions on hover: a `transition-colors` here would also animate
+      // `background-color`, which very visibly races the Kontrastmodus colour swap (R9/007).
+      className="mb-3 w-full rounded-md border border-line-strong bg-sunken p-3 text-left transition-[border-color] duration-100 hover:border-ink-300"
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
@@ -91,36 +109,38 @@ function NextPreview({ question }: { question: Question }) {
       <p className="mt-1 truncate text-2xs text-ink-500">
         {question.speakerDisplayName ?? t('common.none')}
       </p>
-    </div>
+    </button>
   );
 }
 
 /** A queue row further out: initials and the track glyph lead, the text stays compact. */
-function QueueItem({ question }: { question: Question }) {
+function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Question) => void }) {
   const t = useT();
   return (
-    <li
-      data-testid="stage-queue-item"
-      data-number={question.number}
-      className="flex items-start gap-2.5 border-b border-line py-2 last:border-b-0"
-    >
-      <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
-        <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
-        {question.stageAssignment !== undefined && (
-          <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        {question.track !== undefined && (
-          <span className="mb-0.5 flex">
-            <TrackBadge track={question.track} />
-          </span>
-        )}
-        <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
-        <span className="mt-0.5 block truncate text-2xs text-ink-400">
-          {question.speakerDisplayName ?? t('common.none')}
+    <li data-testid="stage-queue-item" data-number={question.number} className="border-b border-line last:border-b-0">
+      <button
+        type="button"
+        onClick={() => onOpen(question)}
+        className="flex w-full items-start gap-2.5 py-2 text-left transition-colors duration-100 hover:bg-ink-25"
+      >
+        <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
+          <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
+          {question.stageAssignment !== undefined && (
+            <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
+          )}
         </span>
-      </span>
+        <span className="min-w-0 flex-1">
+          {question.track !== undefined && (
+            <span className="mb-0.5 flex">
+              <TrackBadge track={question.track} />
+            </span>
+          )}
+          <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
+          <span className="mt-0.5 block truncate text-2xs text-ink-400">
+            {question.speakerDisplayName ?? t('common.none')}
+          </span>
+        </span>
+      </button>
     </li>
   );
 }
@@ -236,8 +256,62 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
   );
 }
 
+/**
+ * Point #10: the preview a click on the queue opens. Read-only on purpose — it shows the question
+ * and its released answer, exactly what the podium device will show once the question is actually
+ * read, without touching the record: no "vorgelesen", no write, no new event.
+ */
+function QueuePreview({ question, onClose }: { question: Question | null; onClose: () => void }) {
+  const t = useT();
+  const answer = question !== null ? approvedAnswer(question) : undefined;
+  return (
+    <Dialog
+      open={question !== null}
+      onClose={onClose}
+      size="lg"
+      title={t('stage.preview.title')}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          {t('common.close')}
+        </Button>
+      }
+    >
+      {question !== null && (
+        <div data-testid="stage-preview" className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span data-testid="stage-preview-number" className="font-mono text-[13px] text-ink-500">
+              {question.number}
+            </span>
+            {question.stageAssignment !== undefined && (
+              <StageAssignmentBadge assignment={question.stageAssignment} />
+            )}
+            {question.track !== undefined && <TrackBadge track={question.track} />}
+          </div>
+          <p data-testid="stage-preview-text" className="text-[16px] leading-6 text-ink-900">
+            {question.text}
+          </p>
+          <div className="border-t border-line pt-3">
+            <span className="hv-label">{t('stage.answer.label')}</span>
+            <p
+              data-testid="stage-preview-answer"
+              className={cx('mt-2 text-[14px] leading-6 text-ink-800', answer === undefined && 'text-ink-500 italic')}
+            >
+              {answer !== undefined
+                ? answer.text
+                : question.track === 'podium'
+                  ? t('stage.answer.podium')
+                  : t('stage.answer.none')}
+            </p>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
 export function StageQueue({ stage }: { stage: StageView }) {
   const t = useT();
+  const [preview, setPreview] = useState<Question | null>(null);
   const shown = stage.queue.slice(0, 8);
   const [next, ...rest] = shown;
   const more = stage.queue.length - shown.length;
@@ -246,7 +320,9 @@ export function StageQueue({ stage }: { stage: StageView }) {
     <div data-testid="stage-queue" className="flex min-h-0 flex-col">
       <div className="flex items-baseline justify-between">
         <span className="hv-label">{t('stage.queue.title')}</span>
-        <span className="font-mono text-2xs tabular-nums text-ink-400">{stage.queue.length}</span>
+        <span data-testid="stage-queue-remaining" className="font-mono text-2xs tabular-nums text-ink-400">
+          {t('stage.queue.remaining', { n: stage.queue.length })}
+        </span>
       </div>
       {next === undefined ? (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-500">
@@ -255,10 +331,10 @@ export function StageQueue({ stage }: { stage: StageView }) {
         </p>
       ) : (
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
-          <NextPreview question={next} />
+          <NextPreview question={next} onOpen={setPreview} />
           <ul aria-label={t('stage.queue.label')} className="min-h-0 flex-1 overflow-y-auto">
             {rest.map((question) => (
-              <QueueItem key={question.id} question={question} />
+              <QueueItem key={question.id} question={question} onOpen={setPreview} />
             ))}
           </ul>
           {more > 0 && (
@@ -268,6 +344,7 @@ export function StageQueue({ stage }: { stage: StageView }) {
           )}
         </div>
       )}
+      <QueuePreview question={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

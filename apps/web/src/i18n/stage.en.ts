@@ -25,6 +25,8 @@ export const stageEn: typeof stageDe = {
   'stage.queue.label': 'Further questions on the podium',
   'stage.queue.empty': 'Nothing else is on the podium.',
   'stage.queue.more': 'and {n} more',
+  'stage.queue.remaining': '{n} more',
+  'stage.preview.title': 'Preview',
   'stage.counter.delivered': 'Read out',
   'stage.counter.open': 'Open',
   'stage.key.next': 'Space',

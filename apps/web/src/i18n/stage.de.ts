@@ -23,6 +23,8 @@ export const stageDe = {
   'stage.queue.label': 'Weitere Einzelfragen auf der Bühne',
   'stage.queue.empty': 'Danach liegt nichts mehr auf der Bühne.',
   'stage.queue.more': 'und {n} weitere',
+  'stage.queue.remaining': 'noch {n}',
+  'stage.preview.title': 'Vorschau',
   'stage.counter.delivered': 'Vorgelesen',
   'stage.counter.open': 'Offen',
   'stage.key.next': 'Leertaste',
