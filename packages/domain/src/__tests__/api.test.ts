@@ -6,9 +6,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore, type EventStore } from '../store.js';
+import { ROLE_PERMISSIONS } from '../permissions.js';
 import { seedEvents } from '../seed.js';
 import type { DomainEvent } from '../events.js';
-import type { Actor, Question } from '../types.js';
+import type { Actor, Permission, Question, Role } from '../types.js';
+import { READ_PERMISSIONS } from '../types.js';
 
 const actors: Record<string, Actor> = {
   admin: { id: 'admin', role: 'admin' },
@@ -326,15 +328,37 @@ describe('read rights (slice 010)', () => {
     await expectDenied(api.getQuestion(anyQuestion.id), 404);
   });
 
-  it('question.read.delivered: observer and admin see only delivered/closed questions in listQuestions(), and total matches', async () => {
+  it('question.read.delivered: observer sees only delivered/closed questions in listQuestions(), and total matches; admin (holding question.read too) stays unrestricted', async () => {
     as(actors.admin!);
-    const { items: all } = await api.listQuestions({ limit: 10000 });
+    const { items: all, total: totalAll } = await api.listQuestions({ limit: 10000 });
     const visible = all.filter((q) => q.status === 'delivered' || q.status === 'closed');
+
     as(actors.observer!);
     const observed = await api.listQuestions({ limit: 10000 });
     expect(observed.items.every((q) => q.status === 'delivered' || q.status === 'closed')).toBe(true);
     expect(observed.total).toBe(visible.length);
     expect(observed.items.length).toBe(visible.length);
+
+    // The admin case the old title promised but the body never checked (rework round, point 10):
+    // admin holds `question.read` unrestricted *as well as* the scoped `question.read.delivered`
+    // (Festlegung 2), so its own listQuestions() is not limited to delivered/closed.
+    as(actors.admin!);
+    const adminAgain = await api.listQuestions({ limit: 10000 });
+    expect(adminAgain.total).toBe(totalAll);
+    expect(adminAgain.items.some((q) => q.status !== 'delivered' && q.status !== 'closed')).toBe(true);
+  });
+
+  it('question.read.delivered: paging through the observer visible list only ever returns visible items, and total is stable across pages', async () => {
+    as(actors.observer!);
+    const page1 = await api.listQuestions({ limit: 5, offset: 0 });
+    const page2 = await api.listQuestions({ limit: 5, offset: 5 });
+    expect(page1.total).toBeGreaterThanOrEqual(10); // seed corpus assumption, so the two pages differ
+    expect(page2.total).toBe(page1.total);
+    for (const q of [...page1.items, ...page2.items]) {
+      expect(['delivered', 'closed']).toContain(q.status);
+    }
+    const page1Ids = new Set(page1.items.map((q) => q.id));
+    for (const q of page2.items) expect(page1Ids.has(q.id)).toBe(false);
   });
 
   it('question.read.delivered: observer 403 R-PERM-03 on a status filter outside the read scope', async () => {
@@ -431,6 +455,99 @@ describe('read rights (slice 010)', () => {
     expect(received).toHaveLength(2);
     expect(received[1]!.length).toBeGreaterThan(0); // admin: holds event.read
 
+    // The other direction too (rework round, point 10): switching back must stop the flow again —
+    // this is not a one-way "gets enabled once" effect, the check really runs fresh every time.
+    as(actors.observer!);
+    const third = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
+    await writer.classifyQuestion(third.id, { track: 'expert_track' });
+    expect(received).toHaveLength(3);
+    expect(received[2]).toEqual([]); // observer again: no event.read
+
     unsubscribe();
+  });
+
+  it('every entry of READ_PERMISSIONS (types.ts) names a real HvApi method (rework round, point 4)', () => {
+    for (const method of Object.keys(READ_PERMISSIONS)) {
+      expect(typeof (api as unknown as Record<string, unknown>)[method], method).toBe('function');
+    }
+  });
+
+  it('mergeQuestion: intoQuestionId is not an existence oracle — observer and podium get an identical 404 for a hidden target and a non-existent one (rework round, point 1)', async () => {
+    as(actors.admin!);
+    const primary = await firstIn('captured'); // neither observer nor podium can read `captured`
+    const hiddenTarget = (await api.listQuestions({ status: ['captured'], limit: 2 })).items[1]!;
+
+    for (const a of [actors.observer!, actors.podium!]) {
+      as(a);
+      let hiddenStatus: number | undefined;
+      let hiddenRuleId: string | undefined;
+      try {
+        await api.mergeQuestion(primary.id, hiddenTarget.id);
+        expect.fail('should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(ApiProblem);
+        hiddenStatus = (e as ApiProblem).status;
+        hiddenRuleId = (e as ApiProblem).ruleId;
+      }
+      let unknownStatus: number | undefined;
+      let unknownRuleId: string | undefined;
+      try {
+        await api.mergeQuestion(primary.id, 'does-not-exist-at-all');
+        expect.fail('should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(ApiProblem);
+        unknownStatus = (e as ApiProblem).status;
+        unknownRuleId = (e as ApiProblem).ruleId;
+      }
+      expect(hiddenStatus).toBe(404);
+      expect(unknownStatus).toBe(404);
+      expect(hiddenRuleId).toBeUndefined();
+      expect(unknownRuleId).toBeUndefined();
+    }
+  });
+
+  it('409 detail (Festlegung 8): an actor who may not read the question gets a generic detail with no status and no rule id; a reader keeps both', async () => {
+    as(actors.admin!);
+    const captured = await firstIn('captured'); // deliverQuestion only allows 'staged' -> 409 here
+
+    as(actors.podium!); // holds question.deliver, but neither question.read nor question.read.delivered
+    try {
+      await api.deliverQuestion(captured.id);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      const problem = e as ApiProblem;
+      expect(problem.status).toBe(409);
+      expect(problem.ruleId).toBeUndefined();
+      expect(problem.detail).toBe('Transition not allowed.');
+    }
+
+    as(actors.admin!); // holds question.deliver and unrestricted question.read
+    try {
+      await api.deliverQuestion(captured.id);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      const problem = e as ApiProblem;
+      expect(problem.status).toBe(409);
+      expect(problem.ruleId).toBe('R-TRANS-00');
+      expect(problem.detail).toContain('captured');
+    }
+  });
+
+  it('getQuestionHistory requires both history.read and read access to the question, including scope (Festlegung 8, rework round point 5)', async () => {
+    as(actors.capture!);
+    const captured = await firstIn('captured');
+    // No current role holds `history.read` without full `question.read` (Festlegung 4's table always
+    // grants both together); a synthetic role proves the endpoint does not treat "holds history.read"
+    // as sufficient on its own once a future role might separate the two.
+    const mutableRolePermissions = ROLE_PERMISSIONS as unknown as Record<string, readonly Permission[]>;
+    mutableRolePermissions['auditor'] = ['history.read'];
+    try {
+      as({ id: 'aud', role: 'auditor' as Role });
+      await expect(api.getQuestionHistory(captured.id)).rejects.toMatchObject({ status: 404 });
+    } finally {
+      delete mutableRolePermissions['auditor'];
+    }
   });
 });

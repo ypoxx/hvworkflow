@@ -75,6 +75,21 @@ export const READ_SCOPES: Partial<Record<Permission, ReadScope>> = {
   'question.read.delivered': { statuses: ['delivered', 'closed'], extends: 'question.read' },
 };
 
+/**
+ * Every `READ_SCOPES` entry whose `extends` targets `action` and that `actor` holds — the walk
+ * `can()` needs when the actor lacks `action` itself, to see whether a scoped alternative substitutes
+ * for it. The single place this walk happens (rework round after review, point 3): a second scoped
+ * read right that `extends` the same action is picked up here automatically, with no further change
+ * to `can()`, `listQuestions`'s status-filter check, or any other caller.
+ */
+export function extendingScopesFor(actor: Actor, action: Permission): readonly ReadScope[] {
+  const scopes: ReadScope[] = [];
+  for (const [p, scope] of Object.entries(READ_SCOPES) as [Permission, ReadScope][]) {
+    if (scope.extends === action && hasPermission(actor, p).allow) scopes.push(scope);
+  }
+  return scopes;
+}
+
 /** Every permission named in `READ_PERMISSIONS` (types.ts, Festlegung 6) — turns a missing grant
  * into R-PERM-02 (Leserecht fehlt) instead of R-PERM-01 (Schreibrecht fehlt). Membership in this
  * data decides; there is no name-based check like `.endsWith('.read')`. */
