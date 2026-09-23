@@ -154,7 +154,10 @@ const TAKT_006_P1_BYPASSES = [
   ['git push origin "+main"', /forced\) refspec/],
   ["git push origin ':main'", /remote-branch deletion/],
   ['git push --dele origin main', /remote-branch deletion/],
-  ['git push --forc origin main', /force flag/],
+  // `--forc` is ambiguous in git 2.43 (force, force-with-lease, force-if-includes); still blocked, now
+  // with the accurate reason since the option table (Codex round 5).
+  ['git push --forc origin main', /ambiguous/],
+  ['git push --force-w origin main', /force flag/],
   ['git --work-tree=/tmp/x push --force origin main', /force flag/],
   ['git --no-pager push --force origin main', /force flag/],
   ["git push --prune origin 'refs/heads/*:refs/heads/*'", /prune/],
@@ -349,4 +352,27 @@ test('codex round 4 red: git push origin \\+main is a forced refspec', () => {
 
 test('codex round 4 green: git push origin "claude/x" still passes', () => {
   assert.equal(runCommand('git push origin "claude/x"').status, 0);
+});
+
+// takt-006 Codex round 5: the push arguments are now parsed against the full `git push -h` option
+// table, so clusters and abbreviations are handled uniformly.
+test('codex round 5 red: git push -vd origin main deletes main (d inside a cluster)', () => {
+  assert.equal(runCommand('git push -vd origin main').status, 2);
+});
+
+test("codex round 5 red: git push --pru origin 'refs/heads/*:refs/heads/*' is a prune with a wildcard", () => {
+  assert.equal(runCommand("git push --pru origin 'refs/heads/*:refs/heads/*'").status, 2);
+});
+
+test('codex round 5 green: --no-force and --no-delete are not dangerous', () => {
+  assert.equal(runCommand('git push --no-force origin main').status, 0);
+  assert.equal(runCommand('git push --no-delete origin main').status, 0);
+});
+
+test('codex round 5 green: --repo=origin counts as the repository', () => {
+  assert.equal(runCommand('git push --repo=origin main').status, 0);
+});
+
+test('codex round 5 red: an ambiguous abbreviation (--f) is blocked (git refuses it anyway)', () => {
+  assert.equal(runCommand('git push --f origin main').status, 2);
 });

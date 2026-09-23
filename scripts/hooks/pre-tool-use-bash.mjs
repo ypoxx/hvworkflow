@@ -114,64 +114,107 @@ const GIT_GLOBAL_OPTION_SRC = String.raw`-{1,2}[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^'
  * round 1, M4: the original pattern only matched a literal `git push`. */
 const GIT_PUSH_RE = new RegExp(String.raw`\bgit\b(?:\s+${GIT_GLOBAL_OPTION_SRC})*\s+push\b([^\n&;|]*)`, 'g');
 
-/** Strips one layer of wrapping quotes (`'…'` or `"…"`) — this is a text scan, so a shell-quoted
- * refspec like `'+main'` still carries its quote characters literally; takt-006 point 1 strips them
- * before any prefix check (`+`, `:`, `-`) runs, so a quoted forced/deleting refspec is seen the same as
- * an unquoted one. */
-function stripQuotes(t) {
-  if (t.length >= 2 && ((t[0] === '"' && t[t.length - 1] === '"') || (t[0] === "'" && t[t.length - 1] === "'"))) {
-    return t.slice(1, -1);
+/** The options of `git push` as data, taken from `git push -h` of the installed git (2.43). The hook
+ * parses the push arguments against this table instead of matching single spellings, so short-option
+ * clusters (`-vd`, `-4f`, `-ofoo`), unambiguous abbreviations of long options (`--pru`, `--dele`,
+ * `--force-w`), `--no-` negations and options with values are all handled the same way (takt-006,
+ * Codex rounds 1–5: each round had found one more spelling). `value`: `none`, `required` (inline
+ * `=VALUE` or the next word) or `optional` (inline `=VALUE` only). `kind` marks what the hook blocks. */
+const PUSH_LONG_OPTIONS = {
+  verbose: { value: 'none' },
+  quiet: { value: 'none' },
+  repo: { value: 'required', kind: 'repo' },
+  all: { value: 'none' },
+  branches: { value: 'none' },
+  mirror: { value: 'none', kind: 'mirror' },
+  delete: { value: 'none', kind: 'delete' },
+  tags: { value: 'none' },
+  'dry-run': { value: 'none' },
+  porcelain: { value: 'none' },
+  force: { value: 'none', kind: 'force' },
+  'force-with-lease': { value: 'optional', kind: 'force' },
+  'force-if-includes': { value: 'none' },
+  'recurse-submodules': { value: 'required' },
+  thin: { value: 'none' },
+  'receive-pack': { value: 'required' },
+  exec: { value: 'required' },
+  'set-upstream': { value: 'none' },
+  progress: { value: 'none' },
+  prune: { value: 'none', kind: 'prune' },
+  verify: { value: 'none' },
+  'follow-tags': { value: 'none' },
+  signed: { value: 'optional' },
+  atomic: { value: 'none' },
+  'push-option': { value: 'required' },
+  ipv4: { value: 'none' },
+  ipv6: { value: 'none' },
+};
+
+/** Short options of `git push`: all are plain switches except `-o`, which takes the rest of its
+ * cluster (`-ofoo`) or, if nothing follows in the cluster, the next word as its value. */
+const PUSH_SHORT_OPTIONS = { v: null, q: null, d: 'delete', n: null, f: 'force', u: null, 4: null, 6: null };
+
+/** Resolves a long option name the way git's parse-options does: an exact name, else the one option it
+ * is an unambiguous prefix of. `--no-X` negates X (`--no-verify` is `verify`, negated). Returns
+ * `{ spec, negated }`, or `{ ambiguous: true }` / `undefined` for an ambiguous or unknown name. */
+function resolveLongOption(body) {
+  let name = body;
+  let negated = false;
+  if (!(name in PUSH_LONG_OPTIONS) && name.startsWith('no-')) {
+    name = name.slice(3);
+    negated = true;
   }
-  return t;
+  if (name in PUSH_LONG_OPTIONS) return { spec: PUSH_LONG_OPTIONS[name], negated };
+  const candidates = Object.keys(PUSH_LONG_OPTIONS).filter((option) => option.startsWith(name));
+  if (candidates.length === 1) return { spec: PUSH_LONG_OPTIONS[candidates[0]], negated };
+  if (candidates.length > 1) return { ambiguous: true };
+  return undefined;
 }
 
-/** Long option *names* that take their own value as a separate token (matched via `longFlagMatches`,
- * so an unambiguous abbreviation counts too — takt-006 rework, MINOR finding 3: `--push-o`/`--push-opt`
- * for `--push-option`, `--receive`/`--receive-p` for `--receive-pack`, plus `--exec`, `--repo`). `-o`
- * (short for `--push-option`) is matched separately, being a short option, not a long one. Either way,
- * the value must be skipped, not counted as a non-flag/target token, before the "no explicit remote and
- * branch" check runs (Codex review PR #14, C4: `git push --push-option ci.skip origin` used to see
- * `ci.skip` and `origin` as two targets and wave the missing branch through). May repeat; each
- * occurrence still takes one value. */
-const VALUE_OPTION_LONG_NAMES = ['push-option', 'receive-pack', 'exec', 'repo'];
-
-/** True if `token` (without a leading `--`, and without an `=value` suffix if present) is a non-empty
- * prefix of `name` — git accepts any unambiguous abbreviation of a long option (`--dele`, `--force-w`;
- * takt-006 point 1, rework finding 3). Not fully general (does not check the abbreviation is
- * unambiguous among *every* option `git push` defines, only among the handful this hook itself cares
- * about), but every name below is unrelated enough in its first two letters that this stays safe. */
-function longFlagMatches(token, name) {
-  if (!token.startsWith('--')) return false;
-  const body = token.slice(2).split('=')[0];
-  return body.length >= 2 && name.startsWith(body);
-}
-
-/** `-o`, or a (possibly abbreviated) long option from `VALUE_OPTION_LONG_NAMES` — see there. */
-function isValueOption(t) {
-  // `-o`, or a short-option cluster whose first `o` is its last character (`-uo`): the value is the next
-  // token (Codex on PR #20). An earlier `o` (`-ofoo`) carries its value attached.
-  if (/^-[a-np-zA-Z0-9]*o$/.test(t)) return true;
-  return VALUE_OPTION_LONG_NAMES.some((name) => longFlagMatches(t, name));
-}
-
-/** `-f`, a (possibly abbreviated) `--force`/`--force-with-lease[=…]`, or `f` inside a combined
- * short-option cluster that may also contain digits (`-uf`, `-fu`, `-4f`, `-f4`, `-6uf`; takt-006 point
- * 1 and rework finding 3 — the M4 fix only matched a lone `-f`). */
-function isForceFlag(t) {
-  if (t === '-f') return true;
-  if (longFlagMatches(t, 'force') || longFlagMatches(t, 'force-with-lease')) return true;
-  if (!/^-[a-zA-Z0-9]{2,}$/.test(t)) return false;
-  // In a cluster, `o` takes the rest as its value (`-ofoo`): only letters before it are flags (Codex on
-  // PR #20, round 2).
-  const cluster = t.slice(1);
-  const valueAt = cluster.indexOf('o');
-  return (valueAt === -1 ? cluster : cluster.slice(0, valueAt)).includes('f');
-}
-
-/** `-d`, or a (possibly abbreviated) `--delete`. */
-function isDeleteFlag(t) {
-  if (t === '-d') return true;
-  return longFlagMatches(t, 'delete');
+/** Parses the words after `push` into what the hook needs: which dangerous kinds are switched on, and
+ * the positional words (repository and refspecs). An ambiguous abbreviation counts as `ambiguous`; git
+ * itself refuses such a command, so blocking it costs nothing. */
+function parsePushArgs(words) {
+  const kinds = new Set();
+  const positional = [];
+  let repoOption = false;
+  let ambiguous = false;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (word === '--') {
+      positional.push(...words.slice(i + 1));
+      break;
+    }
+    if (word.startsWith('--')) {
+      const [body, inline] = [word.slice(2).split('=')[0], word.includes('=')];
+      const resolved = resolveLongOption(body);
+      if (resolved?.ambiguous) {
+        ambiguous = true;
+        continue;
+      }
+      if (!resolved) continue; // unknown option: git refuses it; nothing to classify
+      const { spec, negated } = resolved;
+      if (spec.value === 'required' && !inline && !negated) i++; // the value is the next word
+      if (spec.kind === 'repo' && !negated) repoOption = true;
+      else if (spec.kind && !negated) kinds.add(spec.kind);
+      continue;
+    }
+    if (word.startsWith('-') && word.length > 1) {
+      const cluster = word.slice(1);
+      for (let j = 0; j < cluster.length; j++) {
+        const c = cluster[j];
+        if (c === 'o') {
+          if (j === cluster.length - 1) i++; // `-o VALUE` / `-uo VALUE`: the value is the next word
+          break; // `-oVALUE`: the rest of the cluster is the value
+        }
+        const kind = PUSH_SHORT_OPTIONS[c];
+        if (kind) kinds.add(kind);
+      }
+      continue;
+    }
+    positional.push(word);
+  }
+  return { kinds, positional, repoOption, ambiguous };
 }
 
 /** Every `git … push …` invocation, classified: a force flag/refspec, a `--mirror`, a remote-branch
@@ -186,31 +229,22 @@ function gitPushFindings(command) {
   let m;
   while ((m = re.exec(command))) {
     const whole = m[0].trim();
-    const rawTokens = shellWords(m[1]);
+    const { kinds, positional, repoOption, ambiguous } = parsePushArgs(shellWords(m[1]));
+    const targets = positional.length + (repoOption ? 1 : 0);
 
-    // Codex C4: drop an option-with-value's own value before classifying anything else, so it can
-    // never be miscounted as a target token. Never skip an extra token when the value was already
-    // given inline (`--repo=origin`) — `isValueOption` strips a `=value` suffix before matching, so
-    // without this guard an inline form would still (wrongly) eat the *next* token too.
-    const tokens = [];
-    for (let i = 0; i < rawTokens.length; i++) {
-      const t = stripQuotes(rawTokens[i]);
-      tokens.push(t);
-      if (isValueOption(t) && !t.includes('=') && i + 1 < rawTokens.length) i++; // skip the value that follows
-    }
-    const nonFlagTokens = tokens.filter((t) => !t.startsWith('-'));
-
-    if (tokens.some((t) => isMirrorFlag(t))) {
+    if (ambiguous) {
+      out.push({ reason: 'an ambiguous abbreviated option (git refuses it; spell the option out)', text: whole });
+    } else if (kinds.has('mirror')) {
       out.push({ reason: 'a --mirror push (rewrites/deletes everything on the remote to match local)', text: whole });
-    } else if (tokens.some(isForceFlag)) {
+    } else if (kinds.has('force')) {
       out.push({ reason: 'a force flag (-f/--force/--force-with-lease)', text: whole });
-    } else if (tokens.some((t) => !t.startsWith('-') && t.startsWith('+'))) {
+    } else if (positional.some((t) => t.startsWith('+'))) {
       out.push({ reason: 'a "+"-prefixed (forced) refspec', text: whole });
-    } else if (tokens.some(isDeleteFlag) || tokens.some((t) => !t.startsWith('-') && t.startsWith(':'))) {
+    } else if (kinds.has('delete') || positional.some((t) => t.startsWith(':'))) {
       out.push({ reason: 'a remote-branch deletion (--delete/-d or a ":"-prefixed refspec)', text: whole });
-    } else if (tokens.some((t) => t === '--prune') && tokens.some((t) => !t.startsWith('-') && t.includes('*'))) {
+    } else if (kinds.has('prune') && positional.some((t) => t.includes('*'))) {
       out.push({ reason: 'a --prune push with a wildcard refspec (can delete many remote refs at once)', text: whole });
-    } else if (nonFlagTokens.length < 2) {
+    } else if (targets < 2) {
       out.push({ reason: 'no explicit remote and branch', text: whole });
     }
   }
@@ -249,11 +283,6 @@ function shellWords(text) {
   }
   if (inWord) words.push(word);
   return words;
-}
-
-/** A (possibly abbreviated) `--mirror`. */
-function isMirrorFlag(t) {
-  return longFlagMatches(t, 'mirror');
 }
 
 /** Any `.env*` token other than the literal `.env.example` — with a path boundary required on both
