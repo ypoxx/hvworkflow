@@ -36,8 +36,8 @@ Standardannahme aus Plan 3 („Persistenzform des Ereignislogs") und Plan 4 (Zei
 - **Bestände werden nie durch die Dienstrolle gelöscht.** Der Übungsbestand verschwindet, indem der
   Plattformbetreiber die getrennte Datenbank entfernt, mit Löschprotokoll (ADR 0010). Abgrenzung:
   Der Übungsbestand ist synthetisch und wird als Ganzes außerhalb der Anwendung entfernt (Plan 3,
-  B15, 042); dass Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand nicht
-  erfasst, bestätigen Recht und DSB mit dem Rechtekonzept in 052.
+  B15, 042); ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand erfasst, legt
+  der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052.
 
 ## Konsequenzen
 

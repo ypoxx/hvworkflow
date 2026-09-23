@@ -123,7 +123,7 @@ Touched: docs/adr/0003-persistenz-ereignislog.md, 0004-identitaet-oidc-bff.md, 0
 | 0013 Zwei Protokollebenen | Plan 3 „Betriebsrat und DSFA", „Vertraulichkeitsstufe" (`event.read.personal`); Plan 4 Zeile 0013; B5 | E13, E14, E16, E36 | 4 |
 | 0014 Realtime | Plan 3 „Realtime-Kanal", „Benachrichtigungen und Alarme"; Plan 4 Zeile 0014, Baustein 3; B10, B11 | E22, E33 | 3 |
 | 0015 Vertragsversionierung | Plan 4 Zeile 0015; Plan 3 „Exportpfad des Transkriptionstools" (zwei Zyklen, 1 AStd je Zyklus), „Jahrgang und Tagesordnung" (Alias bis 0.5) | keine eigene; abhängig E3a, E20 | 1 |
-| 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter Kalender); E35 | E48, E44, E47 | 1 |
+| 0016 Agenten-Arbeitsmodell | Plan 4 Zeile 0016; Plan 10 E44, E47, E48; Plan 8 (berechneter Kalender) | E48, E35, E44, E47 | 1 |
 
 **`pnpm gates` in `/home/user/wt/015` (Tail, 23.09.2026, Lauf nach Nacharbeitsrunde 1; der erste Lauf vor der
 Nacharbeit war ebenfalls grün, EXIT=0):**
@@ -188,8 +188,9 @@ Opus-Lesebefund (gegen Recherche, Rechtekonzept, ADR 0001): 0 Blocker, 3 major, 
 
 **Runde 2 — Nachprüfung Opus 5.5** (nur die Nacharbeit, 23.09.2026): Befunde 1–15 alle „erledigt"; keine neue
 Entscheidung, keine erfundene Registernummer, kein Widerspruch zum Plan; `pnpm gates` exit 0. Urteil „accept after
-minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen** und
-gehen als Kleinänderung in eine Folge-Scheibe (keine zweite Nacharbeitsrunde, Plan 6.3):
+minor fixes". Nach E48 mergefähig (kein offener Blocker oder Hauptbefund). Die acht neuen minor bleiben **offen**
+(inzwischen erledigt in takt-003, siehe unten) und gehen als Kleinänderung in eine Folge-Scheibe (keine zweite
+Nacharbeitsrunde, Plan 6.3):
 - N1 0009:43 — „jede Auflösung protokolliert" geht über 067 hinaus → „Aufdecken per Lookup erzeugt `IdentityRevealed` mit Grund (067)". — erledigt in takt-003
 - N2 0013:33–35 — „keine personenbezogene Leistungsauswertung" (Plan 4, Zeile 0013) beim Verschieben verloren → zurück in die Entscheidung. — erledigt in takt-003
 - N3 0003:39–40, 0009:90, 0010:28 — „§4 schützt den Nachweis einer echten HV" ohne Quelle → nur auf Plan 3/042 stützen, Bestätigung durch Recht/DSB (052). — erledigt in takt-003

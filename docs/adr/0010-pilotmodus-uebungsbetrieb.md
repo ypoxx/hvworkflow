@@ -25,8 +25,8 @@ Standardannahme aus Plan 3 („Pilotmodus") und Plan 4 (Zeile 0010):
 - **Löschung des Übungsbestands:** der Plattformbetreiber entfernt die getrennte Datenbank, ein
   Skript erzeugt das Löschprotokoll; nie Löschen durch die Dienstrolle. Abgrenzung: der
   Übungsbestand ist synthetisch und wird als Ganzes außerhalb der Anwendung entfernt (Plan 3, B15,
-  042); dass Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand nicht erfasst,
-  bestätigen Recht und DSB mit dem Rechtekonzept in 052.
+  042); ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen Bestand erfasst, legt
+  der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052.
 - **Sandbox für Partner** ist der Modus `training` mit synthetischem Korpus (ADR 0008).
 - Kleinänderungen erreichen den Übungsmandanten nur außerhalb des Freeze (Plan 3, „Taktfläche").
 

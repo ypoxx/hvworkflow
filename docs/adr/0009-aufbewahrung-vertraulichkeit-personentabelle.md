@@ -87,8 +87,8 @@ die Auflösung stehen nicht im Plan: offen, Entscheider Projektleitung und DSB; 
 - **Löschlogik im Ereignislog** (physisches Löschen einzelner Ereignisse oder Fragen). Verworfen:
   Regel 7; Rechtekonzept Abschnitt 4 (keine physische Löschung, für niemanden). Abgrenzung: Der
   Übungsbestand ist synthetisch und wird als Ganzes durch den Plattformbetreiber außerhalb der
-  Anwendung entfernt (Plan 3, B15, 042); dass Rechtekonzept Abschnitt 4 (keine physische Löschung)
-  diesen Bestand nicht erfasst, bestätigen Recht und DSB mit dem Rechtekonzept in 052.
+  Anwendung entfernt (Plan 3, B15, 042); ob Rechtekonzept Abschnitt 4 (keine physische Löschung) diesen
+  Bestand erfasst, legt der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus 052.
 - **Umkodieren an Ort und Stelle.** Verworfen: jede Umkodierung ist ein Export in eine neue
   Datenbank (Leitplanken 1.3).
 - **Krypto-Umschlag erst nachrüsten, wenn Recht entschieden hat.** Verworfen: ohne `keyId` ab dem

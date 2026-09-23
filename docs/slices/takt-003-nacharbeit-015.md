@@ -19,13 +19,13 @@ Nur Wortlaut; kein Status, kein Datum, keine Entscheidung ändert sich. Die Zeil
    personenbezogene Leistungsauswertung (Plan 4, Zeile 0013)." und fährt dann mit dem bisherigen Text fort.
 3. **N3** an drei Stellen (`0003` Abgrenzung, `0009` Abgrenzung, `0010` Abgrenzung) wird der Halbsatz
    „Rechtekonzept Abschnitt 4 (keine physische Löschung) schützt den Nachweis einer echten HV" bzw. „Abschnitt 4
-   schützt den Nachweis einer echten HV" ersetzt durch: „dass Rechtekonzept Abschnitt 4 (keine physische Löschung)
-   diesen Bestand nicht erfasst, bestätigen Recht und DSB mit dem Rechtekonzept in 052". Die Stütze bleibt Plan 3,
-   B15, 042.
+   schützt den Nachweis einer echten HV" ersetzt durch: „ob Rechtekonzept Abschnitt 4 (keine physische Löschung)
+   diesen Bestand erfasst, legt der Plan nicht fest: offen (E16), Frage an Recht und DSB mit dem Rechtekonzept aus
+   052" (nachgeschärft nach Review). Die Stütze bleibt Plan 3, B15, 042.
 4. **N4 `docs/adr/0014-…`** Abschnitt „Offene Registerzeilen", E22: „p90 < 300 ms am Dienst" → „p90 < 300 ms im
    Probefenster" (Wortlaut des Registers, E22).
 5. **N5 `docs/adr/0016-…`**: In der Zeile zu E35 wird „bis dahin" ersetzt durch „bis zur dauerhaften Regel
-   (Prüfpunkt 1)".
+   (E35, im Register fällig am 23.10.2026 mit 031)" (nachgeschärft nach Review).
 6. **N6** `0010` (Abschnitt Risiko) und `0015` (Abschnitt Entscheidung): Vorschläge ohne Planstütze stehen in der Form
    „Vorschlag (nicht im Plan): <Inhalt>." In `0015` wandert der Satz zur allgemeinen Veraltungsregel aus dem
    Abschnitt „Entscheidung" in den Abschnitt „Konsequenzen" unter „Risiko" (die Entscheidung enthält nur, was der
