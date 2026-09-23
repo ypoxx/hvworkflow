@@ -79,7 +79,56 @@ Ausgabe von `pnpm gates` (Ende), Schlüsselzählung 437/437, Ausgabe des absicht
 
 ## Bericht
 
-(vom Implementierer auszufüllen im Format aus AGENTS.md)
+Slice: 017 — i18n-Wörterbuch in Feature-Module teilen
+
+Done: 437 Schlüssel aus de.ts und en.ts in sechs Feature-Module (shell, speakers, capture, answers, stage, history) aufgeteilt, ohne einen Schlüssel oder Text zu ändern. Indexdateien de.ts und en.ts re-exportieren die gemergten Module. parity.test.ts mit sechs Verifikationen implementiert.
+
+Evidence: 
+```
+apps/web test:  Test Files  3 passed (3)
+apps/web test:       Tests  35 passed (35)
+...
+vocabulary-check: ok
+
+Schlüsselzählung: 437 DE / 437 EN (Bericht verfiziert)
+Module: shell=173, speakers=62, capture=45, answers=78, stage=37, history=42 (Summe 437)
+
+Byte-Gleichheit: Alle Werte der Original-Dumps (JSON) matchen den gemergten Modulen
+```
+
+Absichtlich roter Paritätslauf (mit gelöschtem Schlüssel app.name aus shell.en):
+```
+FAIL  src/i18n/parity.test.ts > i18n parity checks > module shell > (a) German and English have the same key set
+Error: Missing in EN: app.name
+
+FAIL  src/i18n/parity.test.ts > i18n parity checks > (f) Total key count is 437 across all modules and matches de and en
+AssertionError: expected 436 to be 437
+
+Test Files  1 failed | 2 passed (3)
+Tests  2 failed | 33 passed (35)
+```
+Nach Wiederherstellung: grün.
+
+Open: Keine
+
+Touched: 
+- `apps/web/src/i18n/de.ts` (Index, re-exports modules)
+- `apps/web/src/i18n/en.ts` (Index, re-exports modules)
+- `apps/web/src/i18n/shell.de.ts` (neu, 173 Schlüssel)
+- `apps/web/src/i18n/shell.en.ts` (neu, typisiert gegen shell.de)
+- `apps/web/src/i18n/speakers.de.ts` (neu, 62 Schlüssel)
+- `apps/web/src/i18n/speakers.en.ts` (neu, typisiert gegen speakers.de)
+- `apps/web/src/i18n/capture.de.ts` (neu, 45 Schlüssel)
+- `apps/web/src/i18n/capture.en.ts` (neu, typisiert gegen capture.de)
+- `apps/web/src/i18n/answers.de.ts` (neu, 78 Schlüssel)
+- `apps/web/src/i18n/answers.en.ts` (neu, typisiert gegen answers.de)
+- `apps/web/src/i18n/stage.de.ts` (neu, 37 Schlüssel)
+- `apps/web/src/i18n/stage.en.ts` (neu, typisiert gegen stage.de)
+- `apps/web/src/i18n/history.de.ts` (neu, 42 Schlüssel)
+- `apps/web/src/i18n/history.en.ts` (neu, typisiert gegen history.de)
+- `apps/web/src/i18n/parity.test.ts` (neu, 35 Tests)
+
+Commit: ff11daf
 
 ## Review findings
 
