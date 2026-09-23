@@ -7,9 +7,10 @@
  * `question._actions`. What may not be done is not shown — it is not greyed out (principle 9).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
 import { Link } from 'react-router';
-import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
+import type { DomainEvent, Question, Unit } from '@hv/domain';
+import { TERMINAL_STATUSES } from '@hv/domain';
 import {
   Badge,
   Button,
@@ -25,14 +26,7 @@ import {
 } from '../../components';
 import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n';
 import { AnswerEditor } from './AnswerEditor';
-import {
-  clockTime,
-  lapsedApproval,
-  latestVersion,
-  relativeAge,
-  sealedApproval,
-  wordDiff,
-} from './lib';
+import { clockTime, lapsedApproval, latestVersion, sealedApproval, wordDiff } from './lib';
 
 /**
  * "Änderung gegenüber Version n-1" (point 3): a word-level diff, removed words struck through,
@@ -93,7 +87,6 @@ interface QuestionDetailProps {
   /** The events of this question; carries the fact of a lapsed approval. */
   history: readonly DomainEvent[];
   units: readonly Unit[];
-  agendaItems: readonly AgendaItem[];
   busy: boolean;
   /** Bumped by the page after a version was written; the editor then starts empty again. */
   draftResetToken: number;
@@ -194,7 +187,6 @@ export function QuestionDetail({
   question,
   history,
   units,
-  agendaItems,
   busy,
   draftResetToken,
   onAction,
@@ -204,14 +196,6 @@ export function QuestionDetail({
   const [open, setOpen] = useState<readonly number[]>(latest === undefined ? [] : [latest]);
   const [draft, setDraft] = useState('');
   const [sources, setSources] = useState('');
-  // The age of a question keeps running while it is open; reading the clock during render would
-  // make this component impure.
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (latest === undefined) return;
@@ -226,10 +210,6 @@ export function QuestionDetail({
   const unit = useMemo(
     () => units.find((candidate) => candidate.id === question.unitId),
     [units, question.unitId],
-  );
-  const agendaItem = useMemo(
-    () => agendaItems.find((candidate) => candidate.id === question.agendaItemId),
-    [agendaItems, question.agendaItemId],
   );
 
   const may = question._actions;
@@ -264,6 +244,18 @@ export function QuestionDetail({
   // bar is not empty, it is gone.
   const hasSteps =
     mayWithdraw || mayMerge || mayAssign || mayReturn || maySubmit || mayApprove || mayStage;
+  /**
+   * Point #26 (feedback, slice 020): "Wieso kann ich hier nicht rein?" — a role without any editing
+   * action for this question used to leave an empty command bar with no explanation. `_actions`
+   * alone decides this, never the role name (AGENTS.md rule 4).
+   *
+   * m3 (review round 1): a question that has come to rest — delivered or one of the terminal
+   * statuses — offers nobody a next step, in any role; the StatusBadge already says so, so the hint
+   * would only repeat it. It is read from `question.status`, not inferred, the same way `hasSteps`'
+   * own comment already treats "come to rest" as a status fact.
+   */
+  const atRest = question.status === 'delivered' || TERMINAL_STATUSES.includes(question.status);
+  const mayEditAnything = atRest || hasSteps || mayDraft;
 
   return (
     <Panel
@@ -284,7 +276,12 @@ export function QuestionDetail({
       }
       description={question.speakerDisplayName ?? t('common.none')}
       footer={
-        hasSteps ? (
+        !mayEditAnything ? (
+          <p data-testid="answers-readonly-hint" className="flex items-center gap-1.5 text-ink-600">
+            <Eye size={13} strokeWidth={1.75} aria-hidden="true" />
+            {t('answers.readonly.hint')}
+          </p>
+        ) : hasSteps ? (
           <Toolbar label={t('answers.detail.actions')}>
             {mayWithdraw && (
               <Button
@@ -383,13 +380,6 @@ export function QuestionDetail({
                 </Link>
               </span>
             </KeyValue>
-            <KeyValue label={t('answers.detail.agenda')}>
-              <span className="line-clamp-2" title={agendaItem?.title ?? ''}>
-                {agendaItem === undefined
-                  ? t('common.none')
-                  : `${t('answers.filter.agenda.option', { number: agendaItem.number })} · ${agendaItem.title}`}
-              </span>
-            </KeyValue>
             <KeyValue label={t('answers.detail.track')}>
               {question.track === undefined ? t('common.none') : trackLabel(t, question.track)}
             </KeyValue>
@@ -398,9 +388,6 @@ export function QuestionDetail({
               {question.stageAssignment === undefined
                 ? t('common.none')
                 : stageAssignmentLabel(t, question.stageAssignment)}
-            </KeyValue>
-            <KeyValue label={t('answers.detail.captured')} mono>
-              {`${clockTime(question.createdAt)} · ${relativeAge(t, question.createdAt, now)}`}
             </KeyValue>
           </KeyValueList>
 

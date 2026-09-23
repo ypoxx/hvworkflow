@@ -43,7 +43,7 @@ export const speakersEn: typeof speakersDe = {
   'speakers.action.move.title': 'Move request to speak {number} to another round',
   'speakers.action.capture.title': 'Capture the contribution of request to speak {number}',
   'speakers.drag.label': 'Move request to speak {number}',
-  'speakers.drag.hint': 'Change the order: drag the handle, or lift with the space bar and move with the arrow keys.',
+  'speakers.drag.hint': 'Drag the handle or lift with Space',
   'speakers.dnd.instructions': 'The space bar lifts the request to speak. Move it with the arrow keys, drop it with the space bar, cancel with Esc.',
   'speakers.dnd.lifted': 'Request to speak {number} lifted, position {position} of {count}.',
   'speakers.dnd.moved': 'Request to speak {number} is at position {position} of {count}.',
@@ -64,4 +64,5 @@ export const speakersEn: typeof speakersDe = {
   'speakers.loading': 'Loading the speakers list',
   'speakers.error.title': 'The speakers list could not be loaded',
   'speakers.error.body': 'The corpus cannot be reached at the moment.',
+  'speakers.readonly.hint': 'Read only in this role',
 };

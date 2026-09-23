@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Contrast, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
-import type { StageView } from '@hv/domain';
+import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
 import { Button, Dialog, Panel, PageHeader, cx, showProblem, showToast } from '../../components';
@@ -23,12 +23,34 @@ import { isInteractiveTarget } from './lib';
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
 
-function loadStageOnly(): boolean {
+/** Points #3/#9 (feedback, slice 020): a person who may only read out never has any of these. */
+const WORK_ACTIONS: readonly Permission[] = [
+  'question.capture',
+  'question.classify',
+  'answer.draft',
+  'question.approve',
+];
+
+/** `null`: no explicit choice yet — the default may still be derived from the actor's rights. */
+function loadStoredStageOnly(): boolean | null {
   try {
-    return localStorage.getItem(STAGE_ONLY_KEY) === '1';
+    const raw = localStorage.getItem(STAGE_ONLY_KEY);
+    if (raw === '1') return true;
+    if (raw === '0') return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Point #3/#9: "Nur Bühne" as the default of a role that only reads answers out. Derived the same
+ * way `deskActions` is derived in `features/capture/Page.tsx` — from `_actions` of the Bühnenfragen
+ * themselves (never from the role name, AGENTS.md rule 4): the rights bundle carries the read-out
+ * permission and none of the drafting, classifying, capturing or approving ones.
+ */
+function stageOnlyByRights(actions: readonly Permission[]): boolean {
+  return actions.includes('question.deliver') && !WORK_ACTIONS.some((a) => actions.includes(a));
 }
 
 function loadStageContrast(): boolean {
@@ -132,8 +154,14 @@ export function StagePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const [stageOnly, setStageOnly] = useState(loadStageOnly);
+  // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
+  // either layout (see the early return below) — not a silent stand-in for `false` any more.
+  const [stageOnly, setStageOnly] = useState<boolean | null>(loadStoredStageOnly);
   const [contrast, setContrast] = useState(loadStageContrast);
+  // A plain, un-staged probe: the only reliable way to see `question.capture` (point #3/#9), which
+  // is never gated by a transition and so shows up regardless of that one question's own status.
+  const [probeActions, setProbeActions] = useState<readonly Permission[]>([]);
+  const [probeLoading, setProbeLoading] = useState(true);
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
@@ -161,9 +189,51 @@ export function StagePage() {
     };
   }, [version, nonce]);
 
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listQuestions({ limit: 1 })
+      .then((page) => {
+        if (cancelled) return;
+        setProbeActions(page.items[0]?._actions ?? []);
+        setProbeLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setProbeLoading(false);
+        /* the default then simply falls back to whatever the Bühnenfragen already show */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [version]);
+
+  /**
+   * Point #3/#9 / m2 (review round 1): the default is derived exactly once. `stageOnly !== null`
+   * — a stored choice, or an earlier run of this very effect — stops it from running again; a
+   * later, conscious toggle always wins because it always writes a concrete `true`/`false`.
+   *
+   * A meeting with no question at all (the empty-meeting e2e fixture, or a brand new one) can
+   * never fill `actions` — nothing here is ever staged or captured, so neither fetch ever has a
+   * question to read `_actions` off. Once both have genuinely settled with nothing to show, the
+   * default falls back to the ordinary layout rather than leaving the page undecided forever.
+   */
+  useEffect(() => {
+    if (stageOnly !== null) return;
+    const actions = [
+      ...(stage?.current?._actions ?? []),
+      ...(stage?.queue[0]?._actions ?? []),
+      ...probeActions,
+    ];
+    if (actions.length > 0) {
+      setStageOnly(stageOnlyByRights(actions));
+    } else if (!loading && !probeLoading) {
+      setStageOnly(false);
+    }
+  }, [stageOnly, stage, probeActions, loading, probeLoading]);
+
   const toggleStageOnly = useCallback(() => {
     setStageOnly((value) => {
-      const next = !value;
+      const next = !(value ?? false);
       try {
         localStorage.setItem(STAGE_ONLY_KEY, next ? '1' : '0');
       } catch {
@@ -233,6 +303,12 @@ export function StagePage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (returnOpen) return; // the dialog owns the keyboard
+      // B1 (review round 1): the queue preview (`QueuePreview` in Podium.tsx) is a dialog too, and
+      // it has no state of its own up here to check like `returnOpen` — Space must not deliver the
+      // current question, R must not open the return dialog on top of it, while it is open. Any
+      // open `Dialog` sets `aria-modal="true"` (components/Dialog.tsx), so this catches the preview
+      // and every future stage dialog alike, without threading its open state through two files.
+      if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isInteractiveTarget(event.target)) return;
       if (event.code === 'Space') {
@@ -255,6 +331,28 @@ export function StagePage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [deliver, returnOpen]);
+
+  /**
+   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, the same shape
+   * `loading` already uses, so a role whose default turns out to be "Nur Bühne" never flashes the
+   * ordinary shell first (design-prinzipien.md #8, "nichts springt").
+   */
+  if (stageOnly === null) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4" data-testid="stage-deciding">
+        <PageHeader title={t('page.stage.title')} description={t('page.stage.description')} />
+        <div
+          aria-busy="true"
+          aria-label={t('answers.list.loading')}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+        >
+          <div className="h-5 w-40 animate-pulse rounded-sm bg-ink-50" />
+          <div className="h-16 w-3/4 animate-pulse rounded-sm bg-ink-50" />
+          <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
+        </div>
+      </div>
+    );
+  }
 
   const view: StageView = stage ?? { current: null, queue: [], deliveredCount: 0, openCount: 0 };
 
