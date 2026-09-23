@@ -4,6 +4,15 @@
  * deleted, or untracked-but-not-ignored) under `apps/`, `packages/`, `scripts/`. Built from
  * `git status --porcelain`, which already respects `.gitignore` — a file under e.g.
  * `apps/web/test-results/` never appears here, no separate ignore-list needed.
+ *
+ * Codex review PR #14, C2: plain `git status --porcelain` collapses a wholly untracked directory into
+ * one line, `?? dir/` — hashing that "file" always fails (it is a directory) and falls back to the
+ * constant `'absent'`, so any further edit *inside* that still-untracked directory never changes the
+ * signature at all, and the Stop hook would then let an untested change through as long as it lives
+ * inside a brand-new directory nothing has been added from yet. `--untracked-files=all` makes git list
+ * every file inside a new directory individually instead of the directory itself; `-z` (NUL-separated
+ * records, no quoting/escaping of unusual filenames) is parsed explicitly below rather than relying on
+ * newline-per-line output.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -16,16 +25,29 @@ function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-/** `git status --porcelain` lines for the three code directories — `undefined` if git itself is
- * unavailable (both callers fail open on that). */
+/** `git status --porcelain` lines for the three code directories, one file at a time even inside a
+ * brand-new untracked directory (`--untracked-files=all`) — `undefined` if git itself is unavailable
+ * (both callers fail open on that). Reads the `-z` (NUL-separated) form and turns it back into the
+ * same `"XY path"` strings the rest of this module and its callers already expect; a rename/copy
+ * record carries a second, NUL-separated "from" path that is consumed and discarded (only the
+ * *current* path matters for a dirty-tree signature). */
 export function statusLines(root) {
+  let raw;
   try {
-    return git(root, ['status', '--porcelain', '--', ...CODE_DIRS])
-      .split('\n')
-      .filter(Boolean);
+    raw = git(root, ['status', '--porcelain=1', '-z', '--untracked-files=all', '--', ...CODE_DIRS]);
   } catch {
     return undefined;
   }
+  const fields = raw.split('\0').filter(Boolean);
+  const out = [];
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    const status = field.slice(0, 2);
+    const path = field.slice(3);
+    out.push(`${status} ${path}`);
+    if (status[0] === 'R' || status[0] === 'C') i++; // skip the paired "renamed/copied from" path field
+  }
+  return out;
 }
 
 /** A path plus a content hash for every changed/untracked file, sorted and joined into one signature
