@@ -149,11 +149,60 @@ describe('read rights over HTTP (slice 010)', () => {
     expectValid('deliverQuestion', 200, await res.json());
   });
 
-  it('event.read: podium is denied listEvents with R-PERM-02', async () => {
-    const res = await req(app, 'GET', '/v1/events?limit=1', { actor: ACTOR.podium });
-    expect(res.status).toBe(403);
-    const problem = await res.json();
-    expectValid('listEvents', 403, problem, 'application/problem+json');
-    expect(problem.ruleId).toBe('R-PERM-02');
+  it('event.read: every role except admin is denied listEvents with R-PERM-02 (rework round, point 7)', async () => {
+    for (const [role, actor] of Object.entries(ACTOR)) {
+      if (role === 'admin') continue;
+      const res = await req(app, 'GET', '/v1/events?limit=1', { actor });
+      expect(res.status, `listEvents as ${role}`).toBe(403);
+      const problem = await res.json();
+      expectValid('listEvents', 403, problem, 'application/problem+json');
+      expect(problem.ruleId, `listEvents as ${role}`).toBe('R-PERM-02');
+    }
+  });
+
+  it('mergeQuestion: intoQuestionId is not an existence oracle over HTTP — observer and podium get an identical 404 for a hidden target and a non-existent one (rework round, point 1)', async () => {
+    const listRes = await req(app, 'GET', '/v1/questions?status=captured&limit=2', { actor: ACTOR.admin });
+    const { items } = await listRes.json();
+    const primary = items[0];
+    const hiddenTarget = items[1];
+
+    for (const actor of [ACTOR.observer, ACTOR.podium]) {
+      const hiddenRes = await req(app, 'POST', `/v1/questions/${primary.id}/merge`, {
+        actor,
+        body: { intoQuestionId: hiddenTarget.id },
+      });
+      const unknownRes = await req(app, 'POST', `/v1/questions/${primary.id}/merge`, {
+        actor,
+        body: { intoQuestionId: 'does-not-exist-at-all' },
+      });
+      expect(hiddenRes.status, `merge as ${actor} with a hidden target`).toBe(404);
+      expect(unknownRes.status, `merge as ${actor} with an unknown target`).toBe(404);
+      expect((await hiddenRes.json()).ruleId).toBeUndefined();
+      expect((await unknownRes.json()).ruleId).toBeUndefined();
+    }
+  });
+
+  it('404 precedence: an unknown id and "exists but not readable" produce equivalent bodies over HTTP — no ruleId, no ETag (rework round, point 8)', async () => {
+    const capturedRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
+    const hidden = (await capturedRes.json()).items[0];
+
+    const hiddenRes = await req(app, 'GET', `/v1/questions/${hidden.id}`, { actor: ACTOR.podium });
+    const unknownRes = await req(app, 'GET', '/v1/questions/does-not-exist-xyz', { actor: ACTOR.podium });
+
+    expect(hiddenRes.status).toBe(404);
+    expect(unknownRes.status).toBe(404);
+    expect(hiddenRes.headers.get('ETag')).toBeNull();
+    expect(unknownRes.headers.get('ETag')).toBeNull();
+
+    const hiddenProblem = await hiddenRes.json();
+    const unknownProblem = await unknownRes.json();
+    expect(hiddenProblem.ruleId).toBeUndefined();
+    expect(unknownProblem.ruleId).toBeUndefined();
+
+    // Same shape apart from the id embedded in `detail` — replace the two different ids with a
+    // placeholder before comparing so the bodies are otherwise identical.
+    const normalize = (problem: Record<string, unknown>, id: string): unknown =>
+      JSON.parse(JSON.stringify(problem).split(id).join('<id>'));
+    expect(normalize(hiddenProblem, hidden.id)).toEqual(normalize(unknownProblem, 'does-not-exist-xyz'));
   });
 });
