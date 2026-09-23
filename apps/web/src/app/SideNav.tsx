@@ -7,7 +7,7 @@ import { NavLink } from 'react-router';
 import type { Meeting } from '@hv/domain';
 import { Button, cx } from '../components';
 import { useT } from '../i18n';
-import { APP_ROUTES } from './routes';
+import { FEATURES } from './featureRegistry';
 
 export function SideNav({
   meeting,
@@ -31,16 +31,16 @@ export function SideNav({
     >
       {!collapsed && <p className="hv-label px-4 pt-4 pb-2">{t('nav.section')}</p>}
       <ul className={cx('flex flex-col gap-0.5 px-2', collapsed && 'pt-4')}>
-        {APP_ROUTES.map((route) => {
-          const label = t(route.labelKey);
-          const count = route.counter === undefined || meeting === null
+        {FEATURES.map((feature) => {
+          const label = t(feature.labelKey);
+          const count = feature.counter === undefined || meeting === null
             ? undefined
-            : meeting.counts[route.counter];
+            : meeting.counts[feature.counter];
           return (
-            <li key={route.path}>
+            <li key={feature.path}>
               <NavLink
-                to={route.path}
-                data-testid={route.testId}
+                to={feature.path}
+                data-testid={feature.testId}
                 {...(collapsed ? { title: label } : {})}
                 className={({ isActive }) =>
                   cx(
@@ -60,7 +60,7 @@ export function SideNav({
                         className="absolute top-2 bottom-2 -left-2 w-0.5 rounded-full bg-accent-600"
                       />
                     )}
-                    <route.icon
+                    <feature.icon
                       size={16}
                       strokeWidth={isActive ? 2 : 1.75}
                       className="shrink-0"
