@@ -1,6 +1,6 @@
 # takt-006 — Folgebefunde aus der Nachprüfung von 016 und dem Codex-Review von PR #14 (Hooks und Tore)
 
-**Status:** spec
+**Status:** angenommen nach Behebung des Nachprüfungsbefunds (Review Opus 5.5 und Codex)
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lane: infra (`scripts/**`; keine laufende
 Scheibe hält sie)
 **Rolle/Modell:** Implementierer-Backend · Sonnet 5 (Sicherheitsmuster in Hooks, deshalb nicht Haiku); Review Opus 5.5
@@ -308,4 +308,29 @@ Warnung (keine Fehlermeldung) zu „Files allowed" (siehe „Open"), `24 changed
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 (Security/Betrieb) · 23.09.2026 · Urteil: nacharbeiten** (0/2/5 + 3 nits), dazu Codex auf PR #20
+(2 × P2):
+
+1. major · Wirkungstext PreToolUse ungenau (Pipe-Aussage falsch, „blockiert globale Optionen" statt „erkennt") → neu
+   aus dem Quelltext geschrieben.
+2. major · globale Optionen vor `push` nur aufgezählt (`-C "a b"`, `-p`, `--bare`, `--namespace=x` kamen durch) →
+   jede `-`-Option erkannt.
+3. minor (+Codex) · Ziffern in Kurzoptionen (`-4f`) und abgekürzte Optionen mit Wert (`--push-o`, `--receive-p`,
+   `--exec`) → behoben.
+4. minor · Stop-Hook blockierte jede Bewegung von HEAD, auch Doku-Commits → Baum-Hash der Code-Verzeichnisse.
+5. minor · TaskCompleted prüfte nur die erste Scheibennummer → alle.
+6. minor · Bericht veraltet → erneuert.
+7. minor · Zeilenumbruch und einzelnes `&` trennten keine Segmente → behoben.
+8.–10. nits (Umbenennung im Arbeitsbaum, echte Zeilennummer im Plan-Graph, Datei entsteht beim Kopieren) → behoben.
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: nacharbeiten, ein neuer Hauptbefund.** Alle Punkte der
+Runde 1 und beide Codex-Punkte mit eigenen Proben erledigt; neu:
+
+- major · ReDoS: der Wert einer globalen Option konnte die nächste Option sein; 38 Optionen ohne `push` brauchten
+  12 s, 40 über 20 s → vom Orchestrator behoben (nach oben abgewichen, eine Zeile): der Wert darf nicht mit `-`
+  beginnen. Roter Lauf: der neue Test mit 2000 Optionen lief bis zum Abbruch nach 60 s; grün danach, 64/64 im
+  Hook-Test, `pnpm test:scripts` 176/176, `pnpm gates` Exit 0 (`40336de`). Die vier globalen Optionsformen blockieren
+  weiter, `git push -u origin claude/x` und `git -C x push -u origin claude/x` gehen durch.
+- nit · `git --no-pager log --grep push` wird blockiert (`log` gilt als Wert von `--no-pager`); Fehlalarm in der
+  sicheren Richtung, bleibt, im Wirkungstext nicht eigens erwähnt.
+- nit · Stop-Hook blockiert eine Teil-Übernahme des getesteten Stands trotz gleichem Baum-Hash; bleibt.
