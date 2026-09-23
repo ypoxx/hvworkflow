@@ -24,6 +24,7 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/messung.md`](docs/messung.md) | Verbrauch, Reviewrunden und Befunde je Scheibe — die Zahlen hinter der These. |
 | [`docs/evidence/`](docs/evidence/) | Screenshots aus den automatisierten Durchläufen, zuletzt im Endzustand erzeugt. |
 | [`docs/feedback/`](docs/feedback/) | Auswertung von Rückmeldungen: je Aussage berücksichtigt, geplant, neu oder unklar, mit Folge, Aufwand und Rückfragen. |
+| [`docs/produktplan-beta.md`](docs/produktplan-beta.md) | Plan für die KI-Agenten vom MVP zur soliden Beta: Beta-Kriterien B1–B18, Standardannahmen mit Änderungskosten, 80 Scheiben in sieben Meilensteinen, Kalender in Agentenzeit aus dem Abhängigkeitsgraphen, Prüfpunkte, Token, Risiken, Entscheidungsregister. |
 
 ## Lauffähige Version
 
