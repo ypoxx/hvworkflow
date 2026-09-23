@@ -228,13 +228,14 @@ gegeben. Meist ist dann die Spec falsch, nicht der Code.
 Tore sind deterministisch: Werkzeug, Schwelle, blockiert oder nicht. Kein Tor ist „Ermessen des
 Agenten".
 
-The last column, "Stand", is checked mechanically by `scripts/plan-honesty.mjs` (`pnpm plan-honesty`,
-slice 012): every row needs exactly one of `läuft (CI: <Schrittname>)` (the step must exist in
-`.github/workflows/*.yml`), `läuft (Hook: <Ereignis>)` (the event must be configured in
-`.claude/settings.json`), `läuft (Review: Reviewer-Checkliste)`, or `geplant in Scheibe NNN` (the
-slice must exist in `docs/produktplan-beta.md` section 5). A gate that partly runs gets two rows —
-one for what runs, one for what is still planned — rather than one row overclaiming the whole gate
-(Audit-Befund A2).
+Die letzte Spalte, „Stand", wird mechanisch von `scripts/plan-honesty.mjs` geprüft (`pnpm
+plan-honesty`, Scheibe 012): jede Zeile braucht genau eine der Formen `läuft (CI: <Schrittname>)`
+(der Schritt muss in `.github/workflows/*.yml` existieren), `läuft (Hook: <Ereignis>)` (das Ereignis
+muss in `.claude/settings.json` konfiguriert sein), `läuft (Review: Reviewer-Checkliste)` oder
+`geplant in Scheibe NNN` (die Scheibe muss in `docs/produktplan-beta.md` Abschnitt 5 existieren, und
+ihre eigene Spec-Datei `docs/slices/NNN-*.md` darf noch nicht `**Status:** accepted` tragen). Ein Tor,
+das nur teilweise läuft, bekommt zwei Zeilen — eine für das, was läuft, eine für das, was noch geplant
+ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 
 ### 5.1 Architektur
 
@@ -244,9 +245,11 @@ one for what runs, one for what is still planned — rather than one row overcla
 | Vertrag ist Quelle (Lint) | `pnpm contract:lint` (Redocly) | der Vertrag verletzt sein eigenes Schema | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Vertrag ist Quelle (generierte Typen aktuell) | Diff von `packages/contract/src/types.ts` gegen einen frischen `openapi-typescript`-Lauf | `openapi.yaml` geändert, Typen nicht neu erzeugt | läuft (CI: Contract types are up to date) |
 | Vertrag ist Quelle (Versions- und Changelog-Pflicht) | — | eine Vertragsänderung ohne Versions- und Changelog-Eintrag | geplant in Scheibe 019 |
+| Vertrag ist Quelle (Endpunkt im Code ohne Vertrag) | — | ein Codepfad in `apps/api/src` ohne passende `operationId` im Vertrag | geplant in Scheibe 043 |
 | Ereignisspeicher nur anhängend | Testsuite (u. a. `events are append-only and gap-free`) | irgendein Pfad ändert oder löscht ein Ereignis | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Ereignisspeicher nur anhängend (Postgres-Append-only-Test) | — | derselbe Test gegen eine echte Postgres-Persistenz statt nur In-Memory | geplant in Scheibe 027 |
 | Ein Entscheidungspunkt für Rechte | statische Suche nach Rollenvergleichen (`scripts/role-literal-check.mjs`, `pnpm role-literals`) | ein Rollenname als Literal außerhalb der Policy-Schicht (`permissions.ts`, `seed.ts` und Tests ausgenommen) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| ADR-Bezug | Reviewer-Checkliste (`.claude/agents/reviewer.md`, Punkt 1: Spec-Konformität deckt eine fehlende ADR mit ab) | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | läuft (Review: Reviewer-Checkliste) |
+| ADR-Bezug | Reviewer-Checkliste — heute nur allgemein über Prüfpunkt 1 „jede Spec-Anforderung umgesetzt", keine eigene ADR-0001-Grenzprüfung in `.claude/agents/reviewer.md` | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | geplant in Scheibe 016 |
 
 ### 5.2 Backend
 
@@ -262,6 +265,7 @@ one for what runs, one for what is still planned — rather than one row overcla
 | Statische Sicherheitsanalyse (Secrets-Scan) | gitleaks (`scripts/gitleaks.toml`), über PR-Diff bzw. Push-Bereich | jedes Secret ohne begründeten Allowlist-Eintrag | läuft (CI: gitleaks) |
 | Statische Sicherheitsanalyse (Abhängigkeits-Audit) | `pnpm audit --json` mit Ausnahmeliste (`scripts/audit-check.mjs`, `scripts/audit-exceptions.json`) | eine bekannte CVE ab „moderate" ohne (nicht abgelaufenen) Ausnahme-Eintrag | läuft (CI: pnpm audit) |
 | Idempotenz und Nebenläufigkeit | Test: derselbe Idempotency-Key zweimal (aktorskopiert, R-IDEM-01); ein veraltetes `If-Match` ergibt 412 | eine Doppelanlage; eine verlorene Änderung | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
+| Idempotenz und Nebenläufigkeit (zwei Schreiber, Neustart) | — | zwei echte gleichzeitige Schreiber oder ein Prozess-Neustart mitten im Ablaufen eines Claims | geplant in Scheibe 028 |
 | Zeit | Tests mit fester injizierter Uhr; `scripts/now-check.mjs` (`pnpm now-check`) gegen direkten Systemzeitzugriff außerhalb der Injektionsstelle | direkter Systemzeitzugriff | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 
 ### 5.3 Oberfläche
@@ -273,17 +277,19 @@ one for what runs, one for what is still planned — rather than one row overcla
 | Barrierefreiheit | — | ein Verstoß ab „ernst" | geplant in Scheibe 013 |
 | Hausvokabular | Lint gegen Verbotsliste (`scripts/vocabulary-check.mjs`, `pnpm vocabulary`) | ein Treffer (Ticket, Assignee, Workflow-Instanz, Issue, Task) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (Schlüssel-Vollständigkeit) | `apps/web/src/i18n/parity.test.ts` | ein Schlüssel fehlt in DE oder EN | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| Zweisprachigkeit (keine Literale in Komponenten) | — | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | geplant in Scheibe 017 |
+| Zweisprachigkeit (keine Literale in Komponenten) | — (016 ergänzt einen Literal-Scan für Oberflächentexte) | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | geplant in Scheibe 016 |
 | Vertragsbindung (kein Rollenname in der Komponente) | `scripts/vocabulary-check.mjs` (Rollenvergleich außerhalb `RoleSwitcher`/`actor.ts`/Tests) | ein Rollenname in einer Komponente | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| Vertragsbindung (nur generierter Client) | — | ein handgeschriebener Aufruf außerhalb `apps/web/src/api/**` | geplant in Scheibe 016 |
-| Fehlerpfad | — | Konflikt (412), Verbindungsverlust oder leere Liste sind ungetestet | geplant in Scheibe 016 |
+| Vertragsbindung (nur generierter Client) | — | ein handgeschriebener Aufruf außerhalb `apps/web/src/api/**` | geplant in Scheibe 030 |
+| Fehlerpfad (Konflikt 412 in der Oberfläche) | — | ein 412-Konflikt beim Schreiben ist in der Oberfläche ungetestet | geplant in Scheibe 060 |
+| Fehlerpfad (Verbindungsverlust) | — | ein Verbindungsverlust ist ungetestet | geplant in Scheibe 058 |
+| Fehlerpfad (leere Liste) | — | eine leere Liste/kein Treffer ist ungetestet | geplant in Scheibe 020 |
 
 ### 5.4 Hooks in der Agentensitzung
 
 | Hook | Wirkung | Stand |
 |---|---|---|
 | PreToolUse auf Shell (heutiger Umfang) | blockiert `git push --force`, `rm -rf /`, `git reset --hard` und `curl`-in-die-Shell-Pipelines (`.claude/settings.json`) | läuft (Hook: PreToolUse) |
-| PreToolUse auf Shell (voller Umfang) | soll jeden `rm -rf`, jeden Netzwerkaufruf nach außen und jeden `.env`-Zugriff blockieren, nicht nur die heutigen Muster | geplant in Scheibe 016 |
+| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | geplant in Scheibe 016 |
 | PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | geplant in Scheibe 016 |
 | Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | geplant in Scheibe 016 |
 | SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | geplant in Scheibe 016 |

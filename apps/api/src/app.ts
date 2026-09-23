@@ -66,6 +66,21 @@ export interface CreateAppOptions {
 /** The concrete app type (with its `Variables`), so tests can type `let app: App` without repeating it. */
 export type App = Hono<{ Variables: Variables }>;
 
+/**
+ * `HV_SEED_ACTOR` shares `parseActorHeader`'s `"<id>:<role>"` format, but its errors must say so —
+ * review rework round 1, minor 9: a malformed value used to be reported as a problem with "the
+ * X-Actor header", which is confusing outside an HTTP request. This is startup-time configuration
+ * (`seedOnStart`), not a request, so it throws a plain `Error`, not the HTTP-shaped `ApiProblem`.
+ */
+function parseSeedActorEnv(raw: string): Actor {
+  try {
+    return parseActorHeader(raw);
+  } catch (err) {
+    const detail = err instanceof ApiProblem ? err.detail.replaceAll('X-Actor header', 'HV_SEED_ACTOR') : String(err);
+    throw new Error(`Invalid HV_SEED_ACTOR: ${detail}`);
+  }
+}
+
 export function createApp(options: CreateAppOptions = {}): App {
   const demoEnabled = options.demoEnabled ?? process.env['HV_DEMO'] === '1';
   const eventLogPath = options.eventLogPath ?? process.env['HV_EVENT_LOG'];
@@ -93,7 +108,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     // outside of any HTTP request.
     const seedActor: Actor =
       options.seedActor ??
-      (process.env['HV_SEED_ACTOR'] !== undefined ? parseActorHeader(process.env['HV_SEED_ACTOR']) : undefined) ??
+      (process.env['HV_SEED_ACTOR'] !== undefined ? parseSeedActorEnv(process.env['HV_SEED_ACTOR']) : undefined) ??
       SYSTEM_ACTOR;
     actorStorage.run(seedActor, () => {
       domain

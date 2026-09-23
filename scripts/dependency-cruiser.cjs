@@ -17,16 +17,28 @@ module.exports = {
       to: { path: '^apps/' },
     },
     {
-      name: 'domain-no-node-io-core-modules',
+      // Review rework round 1, minor 15: this used to enumerate only the I/O-shaped core modules
+      // (fs, net, http, ...). packages/domain also runs in the browser (ADR 0002, demo runs the
+      // domain in-process in the browser) — *any* Node core module (e.g. `path`, `util`, `assert`,
+      // Node's own `crypto`) is equally out of place there, I/O or not.
+      name: 'domain-no-node-core-modules',
       severity: 'error',
       comment:
-        'The domain has no I/O of its own; reading files, sockets or spawning processes belongs to an ' +
-        'adapter (apps/api), never to packages/domain.',
+        'packages/domain runs in the browser too (ADR 0002); it has no I/O of its own and must not ' +
+        'depend on any Node core module, not just the I/O-shaped ones.',
       from: { path: '^packages/domain/src' },
-      to: {
-        dependencyTypes: ['core'],
-        path: '^(fs|fs/promises|net|http|http2|https|child_process|dgram|tls|dns|cluster|worker_threads)$',
-      },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      // dependency-cruiser's own predefined rule (configs/rules/not-to-unresolvable.cjs), inlined
+      // rather than referenced so this config stays a single self-contained file.
+      name: 'not-to-unresolvable',
+      severity: 'error',
+      comment:
+        "This module depends on a module that cannot be found ('resolved to disk'). If it's an npm " +
+        'module: add it to package.json. In all other cases you likely already know what to do.',
+      from: {},
+      to: { couldNotResolve: true },
     },
     {
       name: 'web-no-api',

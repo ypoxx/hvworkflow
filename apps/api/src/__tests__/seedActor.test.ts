@@ -45,4 +45,27 @@ describe('demo auto-seed actor configuration', () => {
     const res = await req(app, 'GET', '/v1/meeting', { actor: ACTOR.admin });
     expect(res.status).toBe(404); // "No meeting exists yet." — the auto-seed was denied, not skipped silently
   });
+
+  // Review rework round 1, minor 9: `seed-bot:admin` above behaves exactly like the default
+  // (`SYSTEM_ACTOR`, also role `admin`), so it never actually exercised the env-var *parsing* path
+  // against a differently-permissioned or malformed value. These three do.
+
+  it('HV_SEED_ACTOR with a role lacking demo.seed also fails closed — no meeting appears', async () => {
+    process.env['HV_SEED_ACTOR'] = 'x:observer';
+    const app = createApp({ demoEnabled: true, seedOnStart: true });
+    const res = await req(app, 'GET', '/v1/meeting', { actor: ACTOR.admin });
+    expect(res.status).toBe(404);
+  });
+
+  it('a malformed HV_SEED_ACTOR (no ":<role>") makes createApp throw, naming HV_SEED_ACTOR, not X-Actor', () => {
+    process.env['HV_SEED_ACTOR'] = 'garbage';
+    expect(() => createApp({ demoEnabled: true, seedOnStart: true })).toThrow(/HV_SEED_ACTOR/);
+    expect(() => createApp({ demoEnabled: true, seedOnStart: true })).not.toThrow(/X-Actor/);
+  });
+
+  it('an HV_SEED_ACTOR with an unknown role makes createApp throw, naming HV_SEED_ACTOR, not X-Actor', () => {
+    process.env['HV_SEED_ACTOR'] = 'x:root';
+    expect(() => createApp({ demoEnabled: true, seedOnStart: true })).toThrow(/HV_SEED_ACTOR/);
+    expect(() => createApp({ demoEnabled: true, seedOnStart: true })).not.toThrow(/X-Actor/);
+  });
 });

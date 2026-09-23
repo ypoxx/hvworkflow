@@ -7,6 +7,9 @@ on:
   schedule:
     - cron: '17 3 * * *' # daily, off peak hours; avoids the top of the hour with everyone else's cron
   workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
 jobs:
   nightly:
     runs-on: ubuntu-latest
@@ -14,18 +17,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: gitleaks (full repository)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: scripts/gitleaks.toml
       - name: Semgrep (full run)
         run: |
-          pip install --quiet semgrep
-          semgrep --config p/typescript --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --error .
+          pip install --quiet 'semgrep==1.177.0'
+          # Review rework round 1, major 6: `--error` without a severity filter used to fail the job
+          # on the Math.random INFO hint alone (e.g. the id-generator fallback in
+          # packages/domain/src/api.ts) — INFO is a non-blocking, separate pass; only WARNING/ERROR
+          # block, same threshold as gates.yml (docs/agentische-entwicklung-plan.md 5.2).
+          semgrep --config p/typescript --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --severity INFO --quiet . || true
+          semgrep --config p/typescript --config scripts/semgrep/rules.yml --metrics=off --disable-version-check --severity WARNING --severity ERROR --error .
       - name: pnpm audit
         run: pnpm audit:check

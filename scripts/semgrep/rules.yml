@@ -17,11 +17,39 @@ rules:
       A shell command built by string concatenation or template interpolation is a command-injection
       risk. Pass arguments as an array (`execFile`/`spawn`) instead of building a string.
     patterns:
+      # Review rework round 1, minor 14: an unqualified `$MOD.exec(...)` also matches
+      # `RegExp.prototype.exec` (any object with an `exec` method), which has nothing to do with
+      # child processes. Require the call to sit after an import that actually names
+      # `child_process`/`node:child_process` — `$MOD`/the destructured name is then also checked so
+      # a same-named unrelated import can't accidentally satisfy this.
       - pattern-either:
-          - pattern: $MOD.exec($CMD, ...)
-          - pattern: $MOD.execSync($CMD, ...)
-          - pattern: exec($CMD, ...)
-          - pattern: execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  import { exec } from '$MODSPEC'
+                  ...
+              - pattern: exec($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  import { execSync } from '$MODSPEC'
+                  ...
+              - pattern: execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  import * as $MOD from '$MODSPEC'
+                  ...
+              - pattern-either:
+                  - pattern: $MOD.exec($CMD, ...)
+                  - pattern: $MOD.execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  const $MOD = require('$MODSPEC')
+                  ...
+              - pattern-either:
+                  - pattern: $MOD.exec($CMD, ...)
+                  - pattern: $MOD.execSync($CMD, ...)
+      - metavariable-regex:
+          metavariable: $MODSPEC
+          regex: ^(node:)?child_process$
       - metavariable-pattern:
           metavariable: $CMD
           patterns:
@@ -50,14 +78,25 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
-      A credential-shaped identifier assigned a string literal. AGENTS.md rule 11: no credentials in
-      the repository — read it from the environment/secret store instead.
+      A credential-shaped identifier assigned a string literal that looks like a real secret (not a
+      short placeholder or translation text). AGENTS.md rule 11: no credentials in the repository —
+      read it from the environment/secret store instead.
+    # Review rework round 1, minor 14: without an entropy check, this rule would also fire on the
+    # i18n dictionaries — e.g. a future `token: 'Zugangscode'` translation string is credential-
+    # *shaped* but not a secret. Belt and braces: the i18n module is out of scope for this rule at
+    # all, and every match additionally has to look like a real secret (high-entropy value).
+    paths:
+      exclude:
+        - '**/apps/web/src/i18n/**'
     patterns:
       - pattern-either:
-          - pattern: const $VAR = "..."
-          - pattern: let $VAR = "..."
-          - pattern: "$OBJ.$VAR = \"...\""
-          - pattern: "{$VAR: \"...\"}"
+          - pattern: const $VAR = "$VAL"
+          - pattern: let $VAR = "$VAL"
+          - pattern: "$OBJ.$VAR = \"$VAL\""
+          - pattern: "{$VAR: \"$VAL\"}"
       - metavariable-regex:
           metavariable: $VAR
           regex: (?i)^(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)$
+      - metavariable-analysis:
+          analyzer: entropy
+          metavariable: $VAL

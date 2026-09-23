@@ -6,7 +6,9 @@
  *   - `läuft (CI: <Schrittname>)`      — `<Schrittname>` must be a `name:` in .github/workflows/*.yml
  *   - `läuft (Hook: <Hook-Ereignis>)`  — `<Hook-Ereignis>` must be a key under `hooks` in .claude/settings.json
  *   - `läuft (Review: Reviewer-Checkliste)`
- *   - `geplant in Scheibe NNN`         — `NNN` must be a slice bullet in docs/produktplan-beta.md section 5
+ *   - `geplant in Scheibe NNN`         — `NNN` must be a slice bullet in docs/produktplan-beta.md section 5,
+ *                                        and must not already be `**Status:** accepted` in its own
+ *                                        `docs/slices/NNN-*.md` (review rework round 1, major 8, optional part)
  *
  * Run as part of `pnpm gates` (`pnpm plan-honesty`). Deterministic, no network.
  */
@@ -21,6 +23,7 @@ const PLAN_PATH = 'docs/agentische-entwicklung-plan.md';
 const SETTINGS_PATH = '.claude/settings.json';
 const WORKFLOWS_DIR = '.github/workflows';
 const PRODUCT_PLAN_PATH = 'docs/produktplan-beta.md';
+const SLICES_DIR = 'docs/slices';
 
 const STAND_FORMS = [
   { re: /^läuft \(CI: (.+)\)$/, kind: 'ci' },
@@ -81,6 +84,21 @@ function collectPlannedSliceNumbers() {
   return numbers;
 }
 
+/** Review rework round 1, major 8 (optional part): slice numbers whose own spec file in
+ * `docs/slices/NNN-*.md` already has `**Status:** accepted` — a row still marked `geplant in
+ * Scheibe NNN` for one of these is stale (the slice landed; the row should say `läuft` now). */
+function collectAcceptedSliceNumbers() {
+  const accepted = new Set();
+  for (const file of readdirSync(SLICES_DIR)) {
+    const m = file.match(/^(\d{3})-.*\.md$/);
+    if (!m) continue;
+    const text = readFileSync(join(SLICES_DIR, file), 'utf8');
+    const status = text.match(/^\*\*Status:\*\*\s*(.+)$/m);
+    if (status && /^accepted\b/.test(status[1].trim())) accepted.add(m[1]);
+  }
+  return accepted;
+}
+
 // ---- parse section 5 of the development plan into table rows ----------------------------------
 
 /** One table block: header cells, and each data row's cells (both arrays of trimmed strings). */
@@ -138,6 +156,7 @@ function extractSection5(planText) {
 const ciStepNames = collectCiStepNames();
 const hookEvents = collectHookEvents();
 const plannedSlices = collectPlannedSliceNumbers();
+const acceptedSlices = collectAcceptedSliceNumbers();
 
 const planText = readFileSync(PLAN_PATH, 'utf8');
 const { lines: sectionLines, offset } = extractSection5(planText);
@@ -178,6 +197,12 @@ for (const table of tables) {
     }
     if (match.kind === 'planned' && !plannedSlices.has(match.m[1])) {
       problems.push(`line ${fileLine}: "${match.m[1]}" is not a slice listed in ${PRODUCT_PLAN_PATH} section 5.`);
+    }
+    if (match.kind === 'planned' && acceptedSlices.has(match.m[1])) {
+      problems.push(
+        `line ${fileLine}: "geplant in Scheibe ${match.m[1]}" but ${SLICES_DIR}/${match.m[1]}-*.md already has ` +
+          '"**Status:** accepted" — this row should say `läuft`, not `geplant`, by now.',
+      );
     }
   }
 }
