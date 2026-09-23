@@ -1,6 +1,6 @@
 # 020 — Oberfläche: Rückbau und Passung (S-Punkte der Projektleitung)
 
-**Status:** spec
+**Status:** review (Nacharbeitsrunde 1)
 **Risikoklasse:** niedrig · 2 AStd · Kalender 02.10.2026 (W1) · Lanes: web-answers, web-capture, web-stage,
 web-history, web-speakers, web-shell (+ e2e: eigene Datei und, nur wo diese Spec es verlangt, die Alt-Specs;
 deshalb läuft 013 nicht gleichzeitig)
@@ -225,6 +225,125 @@ Touched:
 - diese Datei (Abschnitt „Bericht")
 
 Commits: ba721d9, fb811b7, 3774e97, ed648aa, 6ead3a2, 6e78b3f, 932cdc7
+
+### Nacharbeit Runde 1 (Opus 5.5 + Fable 5.1, Plan 6.3)
+
+Befund → Erledigung:
+
+| Befund | Erledigung |
+|---|---|
+| B1 Bühnen-Tasten wirken bei offener Vorschau | `[aria-modal="true"]`-Check vor jeder Tastenaktion in `stage/Page.tsx`; e2e: Klick in die Vorschau, Leertaste, R — Zähler, aktuelle Frage und Event-Log-Länge unverändert, kein Rückgabedialog |
+| M1 TOP verloren, kein Dirty-Guard | `agendaItemId` wird unverändert mitgesendet, `dirty`-Guard wiederhergestellt, Erklärungssatz unter dem Titel; e2e: Re-Klassifizierung über Beantwortung→Historie→Erfassung→Historie bestätigt gleiches TOP, Save zunächst deaktiviert |
+| M2 veraltete Frage-Referenz | `QuestionsPane` hält nur die Id, leitet die Frage aus der aktuellen Liste ab, schließt bei fehlendem Recht/verschwundener Frage und bei 412 |
+| M3 Lesehinweis falsch positiv bei leerem Bestand | `knowsCaptureRight = deskActions.length > 0` zusätzlich zur Rechteprüfung; e2e-Regression im Leerzustand-Test |
+| M4 Kontrast Uhr/„noch n“, zu grobe axe-Ausnahme | Uhr `text-xs`/ink-600 (~6,25:1), „noch n“ 16px/ink-900, ausgeblendet bei 0; `disableRules` ersetzt durch `.exclude('.hv-label')`/`.exclude('.text-ink-500')`/`.exclude('.text-ink-400')` (AX-020-01, siehe „Offen“); axe mit `color-contrast` an: 0 serious/critical auf allen fünf Ansichten |
+| M5 Punkt-8-Test unvollständig | zusätzlich Event-Log-Länge und Warteschlangen-Fingerabdruck vor/nach, „noch n“ gegen `header-counter-staged` (unabhängige Quelle) |
+| M6 Vorschau-Typografie Konsolen-Skala | Frage 22px/Antwort 18px mit `--color-stage-text`, Hinweissatz „Nur ansehen — nichts wird als vorgelesen markiert.“ |
+| m1 Rundenhinweis nur `lg`, falsches Recht, Satzpunkt | Gate auf `speaker.reorder`, `flex-wrap` statt `hidden lg:flex`, neuer Wortlaut ohne Punkt |
+| m2 Default nicht wirklich einmalig | `stageOnly: boolean \| null`, Guard auf State statt Storage, Skeleton bis entschieden, Fallback `false` wenn Bestand leer bleibt; eigener Test mit drei frischen Seitenaufrufen (Podium/Admin/Fachbereich) |
+| m3 Hinweis-Platzierung | Kopfzeilen-Meta-Slot (Auge-Symbol) in Wortmeldungen/Erfassung; kein Hinweis bei Frage in Ruhe in der Beantwortung |
+| m4 „Klassifizieren“ wie ein Label | `secondary`, Tag-Symbol |
+| m5 en-US „more“ statt „remaining“ | `stage.queue.remaining` EN → „{n} remaining“ |
+| m6 `hover:bg-ink-25`/`transition-colors` in der Warteschlangenzeile | `hover:bg-ink-50`, `transition-colors` entfernt |
+| m7 Uhr-Test flackerte an der Minutengrenze | eigener Test mit `page.clock` (`pauseAt`), deterministisch |
+| m8 Ratifizierung | in diesem Abschnitt: `i18n/parity.test.ts`, `hv-stage-only-v1='0'` in 003/abnahme |
+| m9 Nits | `capture.question.marked`/`unmarked` entfernt; `<p>`/`<div>` durch `<span>` in `NextPreview` ersetzt; Fokus nach Escape (siehe unten) |
+
+Rot/Grün: die erste Fassung der drei neuen Zusatztests schlug zweimal fehl, bevor sie grün wurde
+— alle drei Ursachen waren Testfehler, nicht Produktfehler:
+1. `"Nur Bühne" default`-Test: der zweite `page.reload()` landete noch auf `/stage` im
+   Nur-Bühne-Overlay der vorigen Rolle, das den Rollenumschalter verdeckte
+   (`element intercepts pointer events` auf `stage-contrast-toggle`) → auf `page.goto('/speakers')`
+   vor jedem Rollenwechsel umgestellt.
+2. Uhr-Test: `08:15:30Z` als vermeintlich „10:15 Europe/Berlin“ angenommen, tatsächlich aber
+   `10:15:30Z` eingesetzt (→ 12:15 Berlin/CEST) und danach knapp an einer Sekunden-Rundung der
+   Fake-Clock beim Grenzübergang gescheitert → korrigiert auf `08:15:30Z` und von
+   `fastForward`-Ketten auf zwei `pauseAt`-Sprünge mit Sicherheitsabstand zur Minutengrenze
+   umgestellt (seither in mehreren Wiederholungen stabil grün).
+3. Leerzustand-Test: mit `questions: 0` kann `stage/Page.tsx`s Ableitung nie eine Rechtemenge
+   sehen (kein Bühnen-, kein Sondierungs-Frage vorhanden) und blieb ohne den m2-Fallback für immer
+   im Skeleton stehen — das war ein echter, von m2 aufgedeckter Produktfehler (siehe Tabelle oben),
+   kein Testfehler.
+
+Playwright, voller Lauf `apps/web`, `E2E_PORT=4357 pnpm exec playwright test --reporter=list`, alle
+neun Szenarien grün:
+```
+✓  001-shell.spec.ts:16   shell: counters, role switch, language switch @screenshot (2.4s)
+✓  001-shell.spec.ts:75   header strip on the answers desk @screenshot (1.5s)
+✓  002-speakers-capture.spec.ts:61   speakers list and capture desk @screenshot (7.0s)
+✓  020-rueckbau-passung.spec.ts:98   020: Rückbau und Passung — points 1–9, axe on the five views (16.1s)
+✓  020-rueckbau-passung.spec.ts:492  020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle (4.2s)
+✓  020-rueckbau-passung.spec.ts:535  020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minutenwechsel (1.1s)
+✓  020-rueckbau-passung.spec.ts:575  020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschlange (2.9s)
+✓  003-answers-stage.spec.ts:43      backlog, approval, podium and history @screenshot (43.9s)
+✓  abnahme.spec.ts:86  @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (35.8s)
+
+9 passed (1.2m)
+```
+
+axe, `color-contrast` an (AX-020-01 nur `.hv-label`/`.text-ink-500`/`.text-ink-400` ausgeschlossen):
+
+| Ansicht | Verstöße gesamt | serious/critical |
+|---|---|---|
+| stage (podium, mit Vorschau) | 2 (moderate: `landmark-no-duplicate-banner`, `landmark-unique`, vorbestehend im gemeinsamen `Dialog`-Bauteil) | 0 |
+| speakers (moderation) | 0 | 0 |
+| capture (capture desk) | 0 | 0 |
+| answers (expert, answer_drafted) | 0 | 0 |
+| capture (leerer Zustand) | 0 | 0 |
+| stage (leerer Zustand) | 0 | 0 |
+
+`pnpm gates`-Ende (voller Lauf nach Runde 1, grün):
+```
+> hvworkflow@0.1.0 vocabulary
+> node scripts/vocabulary-check.mjs
+vocabulary-check: ok
+
+> hvworkflow@0.1.0 arch
+> depcruise --config scripts/dependency-cruiser.cjs apps/web/src apps/api/src packages/domain/src
+x 7 dependency violations (0 errors, 7 warnings). 131 modules, 484 dependencies cruised.
+
+> hvworkflow@0.1.0 role-literals
+Role-literal check: no role-name literal outside the policy layer …
+
+> hvworkflow@0.1.0 now-check
+now() check: no direct system-clock access outside the injected clock …
+
+> hvworkflow@0.1.0 plan-honesty
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+
+> @hv/web@0.0.0 build
+✓ 1714 modules transformed.
+✓ built in 1.09s
+```
+(davon `packages/domain test`: 4/4 Dateien, 39/39 Tests; `apps/web test`: 3/3, 35/35; `apps/api
+test`: 4/4, 32/32 — alle grün, i18n-Paritätstest inklusive, unverändert bei 436 Schlüsseln trotz
+Verschiebungen zwischen den Modulen in dieser Runde.)
+
+D8 (m9): nach Escape kehrt der Fokus auf den Warteschlangen-Knopf zurück, der die Vorschau
+geöffnet hatte (`Dialog.tsx`s eigene `previouslyFocused?.focus()`), nicht auf ein beliebiges
+Element — eine anschließende Leertaste löst dort erneut einen Klick aus (öffnet die Vorschau
+wieder) statt die Bühnen-Kurzbefehle zu treffen, weil `isInteractiveTarget` einen fokussierten
+Button ausschließt. Im e2e-Test nachgewiesen (`020-rueckbau-passung.spec.ts`, Abschnitt Punkt #10).
+
+Offen (Runde 1, zusätzlich zu den bereits genannten Punkten):
+- **AX-020-01** — vorbestehender Farbtoken (`--color-ink-400`/`-500`, `.hv-label` und die
+  `text-ink-400`/`text-ink-500`-Nutzstellen direkt) unterschreitet 4,5:1; von `color-contrast`
+  gezielt ausgenommen. Läuft ab mit der Farbtoken-Scheibe, spätestens 31.12.2026.
+- M3: „keine frageunabhängige Erfassungsrecht-Quelle“ — `canCapture` lässt sich weiterhin nur aus
+  einer vorhandenen Frage lesen (`question.capture` ist zwar ungegatet, aber ohne mindestens eine
+  Frage im Bestand gibt es nichts zu lesen); der Hinweis bleibt dann stumm statt falsch. Ein
+  eigener, frageunabhängiger Rechte-Endpunkt wäre eine Vertragsänderung und damit außerhalb dieser
+  Scheibe.
+- M2: kein automatisierter Regressionstest für „Dialog schließt bei 412 / bei verschwundenem
+  Klassifizierungsrecht“ — das Demo-Modell hält den Ereignisspeicher pro Browser-Tab im Speicher
+  (ADR 0002); ein zweiter Tab schreibt zwar in dasselbe `localStorage`, aber der bereits offene
+  Tab liest das nicht automatisch nach, ohne selbst neu zu laden — ein Reload würde aber nur einen
+  Neustart der Komponente prüfen, nicht den Schutz selbst. Die Korrektur (Ableitung aus der Liste,
+  Schließen bei 412) steht; ein Test dafür bräuchte eigene Testinfrastruktur (z. B. ein
+  Test-only-Hook, der `_actions` von außen verändert) und ist hier nicht enthalten.
+- 003-answers-stage.spec.ts: eine zusätzliche Selektor-Anpassung über die m8-Ratifizierung hinaus
+  (Kindindex statt `querySelector('p')` in der Kontrastmodus-Farbprüfung), erzwungen durch m9s
+  „kein Blockelement in einem Button“ — eine Zeile, im Commit-Text begründet.
 
 ## Design-Kritik
 
