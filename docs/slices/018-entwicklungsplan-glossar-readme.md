@@ -1,6 +1,6 @@
 # 018 — Entwicklungsplan, Glossar und README abgleichen
 
-**Status:** spec
+**Status:** angenommen (Review Sonnet 5, Nachprüfung: annehmen)
 **Risikoklasse:** niedrig · 1 AStd · Kalender 01.10.2026 (W1) · Lane: docs-plan (serielle Doku-Lane; 016 hielt Teile
 von Abschnitt 5 des Entwicklungsplans und ist vorher gemergt)
 **Rolle/Modell:** Mechaniker · Haiku 4.5; Review Sonnet 5
@@ -150,4 +150,21 @@ Touched: AGENTS.md, README.md, docs/agentische-entwicklung-plan.md, docs/glossar
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Sonnet 5 · 23.09.2026 · Urteil: nacharbeiten.** `pnpm gates` nachgelaufen: Exit 0.
+
+1. blocker · Glossar „Weiterleiten“ nannte `question.forward (ab Scheibe 048)`; nach E5 ist „Weiterleiten“ heute die
+   Anzeige für `question.submit_review` → behoben.
+2. blocker · Der von der Spec verlangte Vermerk in der Zeile „Versammlungsbüro“ (bis E1 auf `moderation`) fehlte →
+   behoben.
+3. major · Glossar „Bühnenplatz“ nannte den erfundenen Code-Namen `stageAssignment.seat` → `— (ab Scheibe 040)`,
+   behoben.
+4. major · README: `docs/feedback/` stand zweimal im Index → Dublette entfernt, behoben.
+5. major · Bericht: Indexprüfung ohne Befehl und Ausgabe; Quelle der Zeile „Weiterleiten“ widersprach der Zeile →
+   behoben.
+6. minor · „Verboten“-Einträge „Denial“ und „Control center“ ohne Quelle → „—“, behoben.
+7. nit · AGENTS.md-Zeile ohne den letzten Schritt `mark-test-run` → ergänzt.
+8. nit · „Files allowed“ der Spec vom Bauenden in Aufzählungsform gebracht (für das Scheibenumfang-Tor); Umfang
+   unverändert → bleibt.
+
+**Runde 2 · Nachprüfung Sonnet 5 · 23.09.2026 · Urteil: annehmen.** Punkte 1–7 erledigt, 8 bewusst unverändert;
+`slice-scope` und `plan-honesty` grün; AGENTS.md weicht in genau einer Zeile ab.
