@@ -5,6 +5,22 @@ the review findings (R3) and the acceptance mark (step 7 of the cycle). Template
 
 ```
 # NNN — Name
-Status: spec | in progress | review | rework | accepted
-Goal / Non-goals / Rule ids / Files allowed / Acceptance criterion / Evidence / Review findings
+
+**Status:** spec | in progress | review | rework | accepted
+**Risikoklasse:** niedrig/mittel/hoch · AStd · Kalenderdatum (Woche NN) · Lane: …
+**Rolle/Modell:** [role] · [model]; Review [reviewer_model]
+**Rule ids:** …
+**Quellen-IDs:** Plan section NNN; Audit code; Register entry
+**Depends on:** NNN (gemergt)
+**Perspektive:** … · **Glossar: neue Begriffe:** ja/nein
+
+## Ziel
+## Nicht-Ziele
+## Files allowed
+## Akzeptanzkriterium
+## Nachweise
+## Bericht
+## Review findings
 ```
+
+Wenn eine Scheibe herabgestuft wird: `**Herabstufung freigegeben von [Name] am [Datum]**` nach der Perspektive-Zeile.

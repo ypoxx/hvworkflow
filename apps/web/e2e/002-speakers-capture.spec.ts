@@ -6,6 +6,7 @@
  * one question into the Expert Track.
  */
 import { expect, test } from '@playwright/test';
+import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
@@ -77,6 +78,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(round).toBeVisible();
   const waiting = round.locator('[data-testid="speaker-row"][data-status="waiting"]');
   await expect(waiting.first()).toBeVisible();
+  await checkAxe(page, 'speakers (moderation, Wortmeldeliste)');
 
   const firstBefore = (await waiting.nth(0).getAttribute('data-number')) ?? '';
   const secondBefore = (await waiting.nth(1).getAttribute('data-number')) ?? '';
@@ -130,6 +132,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   // A Wortmeldung that comes in while the meeting runs.
   await page.getByTestId('speaker-register').click();
   await page.getByTestId('speaker-register-name').fill('Henrike Baumgart');
+  await checkAxe(page, 'speakers (Wortmeldung registrieren, dialog open)');
   await page.getByTestId('speaker-register-submit').click();
   await expect(round.getByText('Henrike Baumgart')).toBeVisible();
 
@@ -149,6 +152,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
     return select.options[select.selectedIndex]?.text ?? '';
   });
   expect(selected).toContain(`Nr. ${called}`);
+  await checkAxe(page, 'capture (Erfassung, kein Redebeitrag erfasst)');
 
   await page.getByTestId('capture-text').fill(SPEECH);
   await page.getByTestId('capture-submit').click();
@@ -173,6 +177,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   // … and the remaining five in one call through the batch proposal.
   await page.getByTestId('capture-suggest').click();
   await expect(page.getByTestId('capture-suggest-item')).toHaveCount(5);
+  await checkAxe(page, 'capture (Vorschlagsdialog offen)');
   await page.getByTestId('capture-suggest-add').click();
   await expect(page.getByTestId('capture-question-card')).toHaveCount(7);
 
@@ -198,6 +203,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await card.getByTestId('capture-classify-open').click();
   await page.getByTestId('classify-track-expert_track').click();
   await page.getByTestId('classify-stage').selectOption('cfo');
+  await checkAxe(page, 'capture (Klassifizieren-Dialog offen)');
   await page.getByTestId('classify-save').click();
   await expect(page.getByTestId('classify-save')).toBeHidden();
 
@@ -205,6 +211,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(card).not.toContainText('Pfad C');
 
   await page.evaluate(() => document.fonts.ready);
+  await checkAxe(page, 'capture (Erfassungskarte klassifiziert)');
   await page.screenshot({ path: evidence('002-capture.png') });
   await page.screenshot({ path: evidence('006-capture.png') });
 
@@ -224,6 +231,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
     'aria-pressed',
     'true',
   );
+  await checkAxe(page, 'capture (Klassifizieren-Dialog erneut geöffnet)');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('classify-save')).toBeHidden();
 });

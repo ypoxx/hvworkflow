@@ -4,6 +4,7 @@
  * and switching the language actually changes every visible string, header included.
  */
 import { expect, test } from '@playwright/test';
+import { checkAxe } from './support/axe';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
 const evidence = (name: string): string =>
@@ -49,6 +50,10 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
   // count is always in the DOM (sr-only) so this holds without hovering the strip.
   await expect(page.getByTestId('header-counter-staged')).toContainText(/\d/);
 
+  // Slice 013, goal 1: axe at every view change — the resting speakers list, before any role/language
+  // switch.
+  await checkAxe(page, 'shell (speakers, moderation, de)');
+
   // Rights are data: switching the persona is the only role decision in the interface.
   await page.getByTestId('role-switcher').click();
   await page.getByTestId('role-option-podium').click();
@@ -59,6 +64,7 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell.png') });
+  await checkAxe(page, 'shell (speakers, podium role, de)');
 
   // Every visible string changes with the language, including the header.
   await page.getByTestId('lang-option-en').click();
@@ -70,6 +76,7 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell-en.png') });
+  await checkAxe(page, 'shell (speakers, podium role, en)');
 });
 
 test('header strip on the answers desk @screenshot', async ({ page }) => {
@@ -124,11 +131,13 @@ test('header strip on the answers desk @screenshot', async ({ page }) => {
   // Evidence is the resting state — nothing focused, no popover open.
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('005-header.png') });
+  await checkAxe(page, 'answers (header strip, resting)');
 
   // Hover/focus opens the popover with the same six segments; Escape closes it again.
   await strip.focus();
   const legend = page.getByTestId('header-strip-legend');
   await expect(legend).toBeVisible();
+  await checkAxe(page, 'answers (header strip, legend open)');
   await page.keyboard.press('Escape');
   await expect(legend).toBeHidden();
 });

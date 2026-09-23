@@ -181,8 +181,7 @@ versioniert und für die Entwickler lesbar.
 | **Reviewer** | Opus 5 | Sieht nur Spec, Regel-IDs und Diff. Sucht Abweichung von der Spec, fehlende Tests, Hausvokabular, Randfälle. Gibt Befund, ändert nichts. | lesen, Tests ausführen | mittel, je Scheibe einmal |
 | **Mechaniker** | Haiku 4.5 | Synthetische Testdaten, Lint-Korrekturen, Übersetzungsschlüssel DE/EN, Doku-Abgleich, Log-Auswertung. | eng begrenzt je Auftrag | sehr niedrig |
 
-**Sicherheitsreview** ist keine eigene Rolle, sondern ein Modus des Architekten: einmal je Meilenstein
-über den gesamten Stand, mit den Ergebnissen der statischen Analyse als Eingabe.
+**Sicherheitsreview** ist keine eigene Rolle, sondern ein Modus des Architekten an den Prüfpunkten 3, 4 und 7, einmal je Meilenstein über den gesamten Stand, mit den Ergebnissen der statischen Analyse als Eingabe. Die Sicherheitsperspektive wird je Scheibe im Opus-Review durch die Checkliste `docs/sicherheit/reviewer-checkliste-sicherheit.md` berücksichtigt.
 
 **Warum nicht durchgehend das stärkste Modell?** Weil die Berichte zeigen, dass die Ergebnisqualität
 bei kleinen, gut spezifizierten Scheiben vom Reviewer bestimmt wird, nicht vom Schreiber — und
@@ -274,7 +273,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 |---|---|---|---|
 | Sichtnachweis | Playwright-Screenshots je Abnahmekriterium (`apps/web/e2e/abnahme.spec.ts`, `docs/evidence/`) | ein Nachweis fehlt | läuft (CI: End-to-end acceptance scenario) |
 | Bühnenszene unter Last | — | das Zeitbudget für Filter und Wechsel bei 800 Fragen ist überschritten | geplant in Scheibe 084 |
-| Barrierefreiheit | — | ein Verstoß ab „ernst" | geplant in Scheibe 013 |
+| Barrierefreiheit | `apps/web/e2e/support/axe.ts`, `apps/web/e2e/013-tastaturpfad.spec.ts` | ein Verstoß ab „ernst" | läuft (CI: End-to-end acceptance scenario) |
 | Hausvokabular | Lint gegen Verbotsliste (`scripts/vocabulary-check.mjs`, `pnpm vocabulary`) | ein Treffer (Ticket, Assignee, Workflow-Instanz, Issue, Task) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (Schlüssel-Vollständigkeit) | `apps/web/src/i18n/parity.test.ts` | ein Schlüssel fehlt in DE oder EN | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (keine Literale in Komponenten) | — (016 ergänzt einen Literal-Scan für Oberflächentexte) | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
@@ -289,11 +288,11 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Hook | Wirkung | Stand |
 |---|---|---|
 | PreToolUse auf Shell (heutiger Umfang) | blockiert `git push --force`, `rm -rf /`, `git reset --hard` und `curl`-in-die-Shell-Pipelines (`.claude/settings.json`) | läuft (Hook: PreToolUse) |
-| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | läuft (Hook: PreToolUse) |
+| PreToolUse auf Shell (voller Umfang) | blockiert ein bare `git push` (ohne explizites Remote und Branch), einen Force-Flag (`-f`, `--force`, `--force-with-lease`), einen `+`-prefixed Refspec, `--mirror`, einen Remote-Branch-Löschvorgang (`--delete`/`-d` oder `:` prefixed), jeden Zugriff auf `.env*` außer `.env.example`, und `curl`/`wget` zu Hosts außer localhost/127.0.0.1/[::1]/0.0.0.0 | läuft (Hook: PreToolUse) |
 | PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | läuft (Hook: PostToolUse) |
 | Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | läuft (Hook: Stop) |
 | SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | läuft (Hook: SubagentStop) |
-| TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat | läuft (Hook: TaskCompleted) |
+| TaskCompleted | prüft, dass ein als erledigt markierter Punkt aus `tool_input.todos`, der eine Scheibe nennt, verlangt, dass die Spec-Datei dieser Scheibe `**Status:** accepted` oder `**Status:** angenommen` trägt | läuft (Hook: TaskCompleted) |
 
 Die Hooks sind Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst, weil ein Stop-Hook nach
 acht Blockaden aufgehoben wird und weil Hooks lokal abschaltbar sind: Die Spalte „Stand" in 5.1 bis
@@ -325,93 +324,25 @@ Aus R9. Diese Grenzen gelten für jede Sitzung, jeden Subagenten, jedes Team.
 
 ## 7. Kostenrahmen
 
-### 7.1 Annahmen
-
-| Annahme | Wert | Herkunft |
-|---|---|---|
-| Scheiben bis zur Demo | 25–35 | Schnitt der ersten Version, geteilt in Tageseinheiten |
-| Token je Scheibe, Implementierer (Sonnet 5) | 1,5–3 Mio. Eingabe (überwiegend Cache), 100–250 Tsd. Ausgabe | Erfahrungswerte aus den Berichten |
-| Token je Scheibe, Planer und Reviewer (Opus 5) | je 150–300 Tsd. Eingabe, 10–30 Tsd. Ausgabe | dito |
-| Architekt (Fable 5.1) | 6–10 Aufrufe insgesamt, je 200–400 Tsd. Eingabe, 20–50 Tsd. Ausgabe | Fundament plus Meilensteine |
-| Nacharbeit | 40 % der Scheiben brauchen eine zweite Runde | konservativ gegenüber den Berichten |
-| Cache-Anteil der Eingabe | 70 % | AGENTS.md, Spec, OpenAPI stabil |
-
-### 7.2 Rechnung
-
-| Posten | je Scheibe | Demo gesamt (30 Scheiben) |
-|---|---|---|
-| Implementierung Sonnet 5 | 2–5 $ | 60–150 $ |
-| Planung und Review Opus 5 | 2–4 $ | 60–120 $ |
-| Nacharbeit (40 % der Scheiben) | — | 50–110 $ |
-| Mechanik Haiku 4.5 | <1 $ | 15–30 $ |
-| Architekt Fable 5.1, Fundament und Meilensteine | — | 60–120 $ |
-| Sicherheitsreview, zwei Durchgänge | — | 30–60 $ |
-| Reserve für Irrwege und Kontextverlust, 50 % | — | 140–300 $ |
-| **Summe Modellnutzung Demo** | | **≈ 420–890 $** |
-
-Dazu kommen Netlify (kostenfrei bis Kleinkunden-Tarif), eine gehostete Postgres-Instanz für die
-Demo (einstellig bis niedrig zweistellig im Monat) und die eigene Zeit des Umsetzers.
-
-**Wenn über ein Abonnement gearbeitet wird** (Claude Code mit Max-Tarif), fällt die Modellnutzung als
-Festbetrag an, die Grenze ist dann das Nutzungsfenster, nicht der Betrag. Empfehlung: interaktive
-Arbeit über das Abonnement, Kopfläufe (Reviews, Testdatengenerierung, CI-Reviewer) über einen
-API-Schlüssel mit Budgetdeckel. So ist der Verbrauch der Automatik exakt messbar, und das ist die
-Zahl, die im Business Case zählt.
-
-### 7.3 Messung
-
-Vom ersten Tag an, weil die These sonst nicht belegbar ist:
-
-- je Scheibe: Modellkosten (aus `/cost` bzw. Nutzungsbericht), Zahl der Reviewrunden, Zeit von Spec
-  bis Abnahme, Befunde je Tor
-- je Woche: Summe, Anteil Nacharbeit, Anteil Architekt
-- je Meilenstein: Ergebnis des Sicherheitsscans, Abdeckung der Regel-IDs durch Tests
-
-Diese Tabelle wird im Repository geführt (`docs/messung.md`) und ist Teil der Demo.
+Der Kostenrahmen für die Agentische Entwicklung ist in `docs/produktplan-beta.md` (Abschnitt 8.1–8.3, 6.5) dokumentiert: Aufwand in Agentenstunden, Token und Geld, Kalender aus dem Abhängigkeitsgraph. Die Messung wird vom ersten Tag an geführt und ist Teil der Demo — siehe `docs/messung.md`.
 
 ---
 
 ## 8. Die These ehrlich gestellt
 
 Die These lautet: mit deutlich geringeren Kosten und Zeit und vergleichbarem oder geringerem Risiko
-kann eine hausintern agentisch gebaute Lösung mit einem Kaufmodell konkurrieren. Das
-Entwicklerteam ist skeptisch. Ein Teil dieser Skepsis ist berechtigt und wird hier benannt, damit
-der Plan sie beantwortet statt umgeht.
-
-| Einwand der Skeptiker | Berechtigt? | Antwort des Plans |
-|---|---|---|
-| „KI-Code ist unsicher." | Ja, die Zahlen sind eindeutig. | eigenes Sicherheitstor, Semgrep und Audit in CI, Sicherheitsreview je Meilenstein, externer Pentest vor Produktion. Der Nachweis liegt dann in Berichten, nicht in Zusicherungen. |
-| „Niemand liest den Code." | Ja, das ist die größte Schwäche. | gegnerisches Review durch zweites Modell in jeder Scheibe; die beiden Entwickler werden in Woche 2 zum Lesen eingeladen, ihr Befund wird als Scheibe verarbeitet. Codebasis auf Lesbarkeit optimiert: AGENTS.md, Glossar, ADRs, ein Test je Regel-ID. |
-| „Wer wartet das in drei Jahren?" | Ja. | Wartung ist im Bauplan: Rechte als Daten, Vertrag als Quelle, Regeltabellen mit Legal Trace. Ein Entwickler, der das Repository öffnet, findet in unter einer Stunde Ort und Grund jeder Regel. Ob das reicht, entscheidet die Lesesitzung in Woche 2 — das ist ein echter Prüfstein, kein Argument. |
-| „Ein Mensch ist der Bus-Faktor." | Ja. | Das gilt für ein gekauftes Produkt mit einem internen Ansprechpartner ebenso. Der Plan mindert es durch Dokumentation für Maschinen: der nächste Agent kann übernehmen, wenn AGENTS.md und ADRs stimmen. Das ist kein vollständiger Ersatz. |
-| „Betrieb, Monitoring, Vorfallsmanagement fehlen." | Ja, für die Demo. | Sie sind explizit nicht Teil der Demo und stehen als Kosten im Business Case: Managed Postgres, Container-Plattform nach Konzernstandard, Bereitschaft am HV-Tag. Das Kaufmodell hat diese Posten auch, nur versteckt im Lizenzpreis. |
-| „Die Produktivitätsgewinne sind nicht belegt." | Teilweise. METR zeigt Verluste bei erfahrenen Entwicklern in fremdem Code. | Hier gibt es keine erfahrenen Entwickler, deren Tempo verloren gehen könnte; die Alternative ist nicht „schneller oder langsamer", sondern „ob überhaupt". Die Messung in 7.3 liefert die echten Zahlen. |
-| „Ein Kaufprodukt hat Referenzen und Haftung." | Ja. | Das ist der stärkste Punkt der Gegenseite. Der Plan antwortet mit Nachweisbarkeit (Ereignisspeicher, Regeltabellen, Auswertungskatalog) und mit Passung auf den eigenen Prozess, die ein Produkt nie hat. Haftung bleibt beim Haus — wie bei jeder Eigenentwicklung. |
-
-**Was der Plan nicht löst:** die Frage, wer nach der Demo verantwortlich weiterbaut, und die
-Sicherheitsfreigabe nach Konzernprozess. Beides braucht Entscheidungen der Projektleitung, keine
-Technik.
-
-**Wie die These gemessen wird:** Kosten je Scheibe und gesamt (7.3), Kalendertage bis
-Abnahmesatz, Anzahl Befunde des Sicherheitsscans je Meilenstein, Urteil der beiden Entwickler zur
-Lesbarkeit, Ergebnis des Abnahmesatzes aus dem Dokument zur ersten Version mit einer unbeteiligten
-Person.
+kann eine hausintern agentisch gebaute Lösung mit einem Kaufmodell konkurrieren. Der Plan verhandelt
+Einwände, Risiken und Gegenmaßnahmen in `docs/produktplan-beta.md` (Abschnitt 9). Die Messung folgt
+in `docs/messung.md`: Kosten je Scheibe, Zeiten, Sicherheitsfunde je Meilenstein, Urteile zur
+Lesbarkeit.
 
 ---
 
 ## 9. Zeitplan bis zur Demo
 
-Fünfzehn Arbeitstage, drei Blöcke. Der erste Block ist der teuerste je Tag und der wichtigste.
-
-| Block | Tage | Inhalt | Rollen | Tor |
-|---|---|---|---|---|
-| **Fundament** | 1–3 | Antworten der Projektleitung einarbeiten; Domänenmodell und Statusmaschine; OpenAPI-Vertrag der Wirbelsäule; Rechte-Tabelle; AGENTS.md, Glossar, Rollen-Definitionen, Hooks, CI mit allen Toren auf leerem Projekt; Generator für den 800-Fragen-Korpus | Architekt, Mechaniker | CI grün auf leerem Gerüst; Vertrag gelintet; Wahrheitstabelle eingecheckt |
-| **Wirbelsäule** | 4–9 | Wortmeldeliste, Erfassung und Atomisierung, Klassifizierung, Ereignisspeicher, Historie, Suche; Oberfläche dazu | Planer, zwei Implementierer, Reviewer | jede Scheibe durch den Takt; Ende Tag 9: Erfassung bis Klassifizierung klickbar unter 800 Fragen |
-| **Antwortpfad und Bühne** | 10–13 | Expert Track vollständig, Freigabe an Textversion gebunden, Bühnenansicht, Rechte je Status für drei bis vier Rollen; Lesesitzung mit den beiden Entwicklern an Tag 11 | wie oben, plus Architekt für Sicherheitsreview | Abnahmesatz mit einer unbeteiligten Person an Tag 13 |
-| **Schliff** | 14–15 | Befunde der Lesesitzung, Demo-Skript, Messtabelle, Deployment auf Netlify nach Freigabe | Mechaniker, ein Implementierer | Demo läuft auf der Zieladresse; Messtabelle vollständig |
-
-Was bei Verzug fällt: erst Suche, dann Rechte für die vierte Rolle, dann Redezeitmessung. Nie
-fällt: Atomisierung, Freigabebindung, Bühnenansicht, der 800er-Korpus.
+Der Zeitplan folgt aus dem Abhängigkeitsgraph der 80 Scheiben und dem Kalender der Meilensteine,
+dokumentiert in `docs/produktplan-beta.md` (Abschnitt 8.3, Abschnitt 5 für die Scheibenpläne je Meilenstein).
+Stand der Demo: siehe `docs/messung.md`, Bautage 1 und 2.
 
 ---
 

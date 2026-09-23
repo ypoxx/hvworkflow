@@ -295,14 +295,17 @@ export function HistoryPage() {
                             : 'border-l-transparent hover:bg-ink-25',
                         )}
                       >
-                        <span className="mt-0.5 shrink-0 font-mono text-2xs tabular-nums text-ink-500">
+                        {/* Slice 013 (axe, goal 1): ink-500/-400 fell to 3.54:1/2.23:1 on the
+                         * selected row's accent-50 background — below 4.5:1. ink-600 is an existing
+                         * token and clears WCAG AA on both the resting and the selected background. */}
+                        <span className="mt-0.5 shrink-0 font-mono text-2xs tabular-nums text-ink-600">
                           {question.number}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] text-ink-800">
                             {excerpt(question.text, 120)}
                           </span>
-                          <span className="mt-0.5 block truncate text-2xs text-ink-400">
+                          <span className="mt-0.5 block truncate text-2xs text-ink-600">
                             {question.speakerDisplayName ?? t('common.none')}
                           </span>
                         </span>
@@ -315,7 +318,7 @@ export function HistoryPage() {
             </div>
 
             {total > results.length && (
-              <p className="shrink-0 border-t border-line bg-sunken px-4 py-1.5 text-2xs text-ink-500">
+              <p className="shrink-0 border-t border-line bg-sunken px-4 py-1.5 text-2xs text-ink-600">
                 {t('history.results.more')}
               </p>
             )}
@@ -361,7 +364,15 @@ export function HistoryPage() {
               </div>
             }
           >
-            <div id="history-panel" role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
+            {/* Slice 013 (axe, goal 1): axe's scrollable-region-focusable — this scrollable panel has
+             * no focusable descendant on its own (the event stream and timeline are plain text, no
+             * buttons), so it was unreachable by keyboard; tabIndex makes the region itself a stop. */}
+            <div
+              id="history-panel"
+              role="tabpanel"
+              tabIndex={0}
+              className="min-h-0 flex-1 overflow-y-auto"
+            >
               {tab === 'stream' ? (
                 <EventStream events={stream} context={context} curve={curve} />
               ) : selected === null ? (

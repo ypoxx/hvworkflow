@@ -357,7 +357,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle/Modell:* Implementierer-Oberfläche · Sonnet; Review Opus
   - *Nachweise:* axe-Bericht 0 serious/critical; Tastaturpfad-Specs grün; pnpm gates + e2e
   - *Offene Entscheidung:* —
-- **010 · Lesepfade unter can() mit Leserechten** — hoch · 2 AStd · Kalender 06.10.2026 (W2) · Lanes: core
+- **010 · Lesepfade unter can() mit Leserechten** — hoch · 2 AStd · Kalender 06.10.2026 (W2) · Lanes: core, contract, service, web-speakers, web-capture, web-answers, web-stage, web-history, e2e
   - *Ziel:* Alle 13 Lesemethoden in packages/domain/src/api.ts prüfen ein Leserecht (question.read, speaker.read, contribution.read, stage.read, history.read, event.read) auf Rechteebene; die Leserechte kommen aus Vertrag 0.2.0 (019) und werden nur in ROLE_PERMISSIONS vergeben, nie als Rollenname im Code: observer erhält Zähler und Vorgelesenes, podium stage.read, capture speaker.read und contribution.read, expert/legal/approver/moderation question.read, event.read nur admin; HTTP-Routen liefern 403 mit R-PERM-02; `_actions`-Form unverändert; Nicht-Ziel: Attributfilter (Einheit, Bühnenplatz, Vertraulichkeit, Frage 8) — das kommt in 047.
   - *Abhängigkeiten:* 019
   - *Rolle/Modell:* Implementierer-Backend · Sonnet; Review Opus mit Perspektive Security
