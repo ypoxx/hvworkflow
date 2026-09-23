@@ -167,6 +167,12 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
   `apps/web/src/i18n/capture.en.ts`, `apps/web/src/i18n/answers.de.ts`, `apps/web/src/i18n/answers.en.ts`,
   `apps/web/src/i18n/stage.de.ts`, `apps/web/src/i18n/stage.en.ts`, `apps/web/src/i18n/history.de.ts`,
   `apps/web/src/i18n/history.en.ts`, `apps/web/src/i18n/parity.test.ts` (nur Schlüsselzahl)
+- `apps/web/src/i18n/labels.ts`, `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts` (nur die
+  `action.*`-Einträge der sechs neuen Leserechte — Auftrag A, sonst bricht `ACTION_KEYS`, eine erschöpfende
+  `Record<Permission, TKey>`, den Typecheck von `apps/web`; im Bericht A begründet)
+- `scripts/role-literal-check.test.mjs` (nur die Fixture-Zeichenkette des Tests „Role union /
+  ROLE_PERMISSIONS key mismatch" — Auftrag A, sie zitiert die alte `observer`-Zeile wörtlich und bricht mit
+  Festlegung 4; im Bericht A begründet)
 - `apps/web/e2e/010-lesepfade.spec.ts` (neu), `apps/web/e2e/001-shell.spec.ts`,
   `apps/web/e2e/003-answers-stage.spec.ts`, `apps/web/e2e/abnahme.spec.ts`,
   `apps/web/e2e/020-rueckbau-passung.spec.ts` (nur Rollenwechsel nach Ziel 5)
