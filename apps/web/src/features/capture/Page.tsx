@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { AgendaItem, Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
+import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
 import { PageHeader, SplitPane, showProblem } from '../../components';
@@ -17,7 +17,6 @@ import { useAsync, useHoveredQuestion } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
-const NO_AGENDA: readonly AgendaItem[] = [];
 const NO_QUESTIONS: { items: Question[]; total: number } = { items: [], total: 0 };
 
 const problemTitle = (): string => translate(getLang(), 'toast.problem');
@@ -32,12 +31,6 @@ export function CapturePage() {
     NO_SPEAKERS,
     `s:${version}`,
   );
-  const agenda = useAsync<readonly AgendaItem[]>(
-    () => api.listAgendaItems(),
-    NO_AGENDA,
-    `a:${version}`,
-  );
-
   /**
    * The Wortmeldung in the address bar wins — that is the link from the speakers list. Without one
    * the desk starts where the work is: at the microphone, otherwise at the last speech that ended.
@@ -142,6 +135,12 @@ export function CapturePage() {
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader title={t('page.capture.title')} description={t('page.capture.description')} />
 
+      {!canCapture && (
+        <p data-testid="capture-readonly-hint" className="text-2xs text-ink-600">
+          {t('capture.readonly.hint')}
+        </p>
+      )}
+
       <SplitPane
         storageKey="hv-capture-split-v1"
         initial={55}
@@ -170,7 +169,6 @@ export function CapturePage() {
         right={
           <QuestionsPane
             questions={questions.data.items}
-            agendaItems={agenda.data}
             loading={questions.status === 'loading'}
             failed={questions.status === 'error'}
             onProblem={refetch}
