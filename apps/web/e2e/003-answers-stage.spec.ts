@@ -46,9 +46,13 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await waitForCorpus(page);
 
   /* ---------- Fachbereich: draft an answer on an assigned question and hand it over ---------- */
-  await asRole(page, 'expert');
+  // Slice 010: navigate away from /speakers before switching role. The default actor (capture) may
+  // read the Wortmeldeliste; switching straight to `expert` while it is still mounted would refetch
+  // `listSpeakers` under a role that no longer holds `speaker.read` (Festlegung 4) and leave a stray
+  // error toast on screen — `expert` never needed that view for this walk-through anyway.
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
+  await asRole(page, 'expert');
 
   // Statusverteilung als Filter (point 1): a ProcessStrip segment click filters the whole list.
   await page.getByTestId('answers-filter-status-assigned').click();
@@ -299,7 +303,10 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.getByTestId('stage-only-toggle').click();
   await expect(overlay).toHaveCount(0);
 
-  /* ---------- Historie: every step of that one question is on the record ---------- */
+  /* ---------- Historie: every step of that one question is on the record. Slice 010: podium lost
+   * `history.read` (Festlegung 4, it only holds `stage.read`), so the search and timeline move to
+   * moderation, which already held `history.read`/`question.read`. ---------- */
+  await asRole(page, 'moderation');
   await page.getByTestId('nav-history').click();
   await expect(page).toHaveURL(/\/history$/);
 
@@ -338,7 +345,8 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.screenshot({ path: evidence('003-history.png') });
   await page.screenshot({ path: evidence('007-history.png') });
 
-  // The event stream carries the tail of the whole meeting.
+  // The event stream carries the tail of the whole meeting — `event.read` is admin-only (Festlegung 4).
+  await asRole(page, 'admin');
   await page.getByTestId('history-tab-stream').click();
   await expect(page.getByTestId('history-stream')).toBeVisible();
   const streamRows = page.getByTestId('history-stream').getByTestId('history-event');
