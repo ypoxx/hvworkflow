@@ -1,6 +1,6 @@
 # 014 — Entscheidungsregister, Abdeckungsmatrix, Fragenpaket, DSFA-Vorentwurf, Takt-Skript
 
-**Status:** spec
+**Status:** review
 **Risikoklasse:** niedrig · 2,5 AStd · Kalender 29.09.2026 (W1) · Lanes: docs-register (+ docs-feedback,
 docs-datenschutz; `scripts/takt.mjs` als einzelne neue Datei — die parallel laufende Scheibe 012 berührt sie nicht)
 **Rolle/Modell:** Architekt-Text · Fable 5.1 (Register, Matrix, Fragenpaket, DSFA-Vorentwurf, Changelog);
@@ -108,7 +108,30 @@ Beispiel), `pnpm gates`.
 
 ## Bericht
 
-(von den Umsetzenden)
+```
+Slice: 014-entscheidungsregister
+Done: Register (51 E-Zeilen, dazu strukturelle Standardannahmen S1–S6, Anfragen der Woche 0, ADR-Stand 0001–0016,
+      Rückfalltrigger), Abdeckungsmatrix (13 Zeilen mit Stand), Fragenpaket Woche 1 (19 Fragen, Fragen 3/7/8 für die
+      Feedback-Runde 2), DSFA-Vorentwurf (Systembeschreibung, Datenflüsse, Rechtsgrundlagen-Matrix V1–V19, alle
+      „zu prüfen"), Änderungsprotokoll für die Projektleitung, Takt-Tabelle in docs/messung.md und scripts/takt.mjs,
+      nummerierter Screenshot der Wortmeldeliste (30 Nummern, Legende aus denselben Daten erzeugt).
+Evidence: grep -cE '^\| E[0-9]+[ab]? \|' docs/entscheidungsregister.md → 51 (E1–E49, E3a/E3b, E10b); Status 49 × offen,
+      E23 und E48 „entschieden am 23.09.2026 von Umsetzer"; grep -c '^### Frage' Fragenpaket → 19;
+      node scripts/takt.mjs → „0 Punkte"; mit Beispieldatei (S 2,5 h und 24 h, M offen) → „2 Punkte / 0 offen /
+      Median gesamt: 13.25 h / Median S: 13.25 h" (von Hand: (2,5 + 24) / 2 = 13,25 ✓);
+      pnpm gates exit 0: domain 39, web 35, api 25, vocabulary-check: ok, ✓ built in 1.10s.
+Open: Die Abdeckungsmatrix führt 014 selbst als „geplant", bis die Scheibe gemergt ist. Zwei Registerzeilen aus dem
+      Review von 015 (Pseudonymisierung: engerer Rollenkreis und Vier-Augen nach Recherche Z.116; Zuordnung der fünf
+      Anzeigegruppen, ADR 0012) sind nicht in dieser Scheibe — Übergabe an eine Folge-Kleinänderung.
+Touched: docs/entscheidungsregister.md, docs/abdeckungsmatrix.md, docs/feedback/2026-10-fragenpaket-woche-1.md,
+      docs/feedback/2026-10-fragenpaket-wortmeldeliste.png, docs/datenschutz/dsfa-vorentwurf.md,
+      docs/changelog-projektleitung.md, docs/messung.md (Abschnitt Takt), scripts/takt.mjs, diese Datei
+```
+
+Bau: Fable 5.1 (Punkte 1–6, 8; 192 Tsd. Token, 17,5 min); Haiku 4.5 (Punkt 9 und zwei Anläufe für Punkt 7,
+125 Tsd. Token); Punkt 7 nach einer Nacharbeitsrunde an Sonnet 5 übergeben (Abweichung nach oben: Haikus Legende passte
+nicht zum Bild, Bedienelemente der Zeilen fehlten; Sonnet 210 Tsd. Token, Legende aus derselben Datenstruktur wie die
+Markierungen erzeugt und Nummer für Nummer am Bild geprüft). Erzeugungsskripte liegen nur im Scratch-Verzeichnis.
 
 ## Review findings
 
