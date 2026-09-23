@@ -3,7 +3,7 @@
  * bottom, each slimmed to number, wording and status (point #21). Classification is one dialog away,
  * owned here because it needs nothing the pane does not already have.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScissorsLineDashed, TriangleAlert } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { Button, EmptyState, Kbd, Panel, cx } from '../../components';
@@ -27,7 +27,19 @@ export function QuestionsPane({
   onHoverQuestion: (id: string | null) => void;
 }) {
   const t = useT();
-  const [classifying, setClassifying] = useState<Question | null>(null);
+  // M2 (review round 1): only the id survives a refetch — holding the whole record risked acting on
+  // a stale snapshot across a 412/409. The question itself is always the current one from `questions`.
+  const [classifyingId, setClassifyingId] = useState<string | null>(null);
+  const classifying = questions.find((question) => question.id === classifyingId) ?? null;
+
+  // The question moved on (assigned, merged, withdrawn …) or vanished from this list entirely while
+  // the dialog was open: it is not this desk's business any more, so the dialog closes itself.
+  useEffect(() => {
+    if (classifyingId === null) return;
+    if (classifying === null || !classifying._actions.includes('question.classify')) {
+      setClassifyingId(null);
+    }
+  }, [classifyingId, classifying]);
 
   return (
     <Panel
@@ -77,7 +89,7 @@ export function QuestionsPane({
             <QuestionCard
               key={question.id}
               question={question}
-              onClassify={setClassifying}
+              onClassify={(q) => setClassifyingId(q.id)}
               hoveredQuestionId={hoveredQuestionId}
               onHoverQuestion={onHoverQuestion}
             />
@@ -87,7 +99,7 @@ export function QuestionsPane({
 
       <ClassifyDialog
         question={classifying}
-        onClose={() => setClassifying(null)}
+        onClose={() => setClassifyingId(null)}
         onProblem={onProblem}
       />
     </Panel>

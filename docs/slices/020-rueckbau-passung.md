@@ -228,8 +228,99 @@ Commits: ba721d9, fb811b7, 3774e97, ed648aa, 6ead3a2, 6e78b3f, 932cdc7
 
 ## Design-Kritik
 
-(Fable)
+Fable 5.1: 5 major, deckungsgleich mit einem Teil der Opus-Befunde (Kontrast Uhr/„noch n", Vorschau-
+Typografie auf Konsolen-Skala, Rundenhinweis nur bei `lg`, Lesehinweis als Fließzeile statt im
+Kopfzeilen-Meta-Slot, „Klassifizieren" als Beschriftung statt Aktion). In die Merge-Liste unten
+eingearbeitet.
 
 ## Review findings
 
-(vom Reviewer)
+Opus 5.5 (frischer Kontext, nur Spec und Diff): **1 Blocker, 5 major.** Blocker: die Bühnen-
+Tastenkürzel (Leertaste, R) wirken, während die Warteschlangen-Vorschau offen ist. Majors: TOP-
+Verlust in `ClassifyDialog`, fehlender Dirty-Guard; veraltete Frage-Referenz in `QuestionsPane`
+bricht den 412/409-Pfad; Lesehinweis in der Erfassung bei leerem/ladendem Bestand falsch positiv;
+zwei neue kontrastschwache Texte (Uhr, „noch n") unter einem zu groben `disableRules`; Punkt-8-Test
+prüft nicht robust genug; Vorschau-Typografie zu klein für die Bühne.
+
+Nach Plan 6.3 (> 3 Major-Befunde) sind Opus- und Fable-Befunde unten zu einer geschärften,
+bindenden Liste zusammengeführt statt einzeln abgearbeitet.
+
+## Nachschärfung nach Review (Runde 1)
+
+Verbindlich für diese Nacharbeitsrunde (Merge aus Opus 5.5 Review und Fable 5.1 Design-Kritik,
+Plan 6.3). Reihenfolge der Abarbeitung: B1 und M1–M6 zuerst und committet, danach m1–m9.
+
+### BLOCKER
+
+- **B1.** Stage key handler (`stage/Page.tsx:288-312`) acts while the queue preview is open. Space
+  marks the current question as read out; R opens the return dialog on top.
+  Fix: lift the preview-open state from `Podium.tsx` to StagePage and bail like `returnOpen`, or
+  ignore stage hotkeys while any `[aria-modal="true"]` dialog is open.
+  e2e: open the preview, click inside it, press Space and R. The delivered counter, the current
+  question and the event count in localStorage `hv-demo-events-v1` stay equal, and no return
+  dialog opens.
+
+### MAJOR
+
+- **M1.** `ClassifyDialog.tsx:44-47` never sends `agendaItemId`, and the reducer deletes it, so the
+  TOP is lost. `Save` is enabled with no change (the `dirty` guard was dropped). Pass
+  `question.agendaItemId` through, restore `!dirty`, and add the one-sentence explanation under the
+  title (dialog pattern "Titel, Erklärungssatz"). Test: re-classifying a question that has a TOP
+  keeps it; Save is disabled with no change.
+- **M2.** A stale question snapshot in `QuestionsPane.tsx:30/88` breaks the 412/409 path. Hold only
+  the id and derive the question from the current list. Close the dialog if the question is gone or
+  no longer offers `question.classify`. On 412, refresh or close. Add a test if the effort is
+  reasonable; otherwise justify its absence in the Bericht.
+- **M3.** The read-only hint shows for the capture role on an empty or loading desk
+  (`capture/Page.tsx:84-85,138`; see your `020-capture-empty-de.png`). Show it only when the
+  actions are known: `deskActions.length > 0 && !canCapture`. List "keine frageunabhängige
+  Erfassungsrecht-Quelle" as open.
+- **M4. Contrast.** 020 adds two failing texts, the clock (ink-500, 3.93:1) and "noch n" (ink-400,
+  2.48:1), and the blanket `disableRules(['color-contrast'])` hides them. Clock: `text-xs` ink-600.
+  The label "Ortszeit Berlin" must stay lighter than the value. "noch n": mono, 16–20 px,
+  ink-700/900, placed with VORGELESEN/OFFEN or as the value in the "Als Nächstes" header. Omit it
+  at 0. Replace the disable with `.exclude()` scoped to the pre-existing `.hv-label`/Badge
+  selectors. Register that as the named exception "AX-020-01 — vorbestehender Farbtoken, läuft ab
+  mit der Farbtoken-Scheibe, spätestens 31.12.2026" under "Offen" in the spec. axe with
+  `color-contrast` on for all 020 elements: 0 serious/critical.
+- **M5.** The point-8 test is incomplete. Also assert the previewed question's status and the
+  event count (localStorage `hv-demo-events-v1`) before and after. Check "noch n" against the
+  header's staged count minus 1, not against the same array.
+- **M6.** Preview typography is console scale on a different device. Question 20–24 px, answer
+  18 px; honour `--color-stage-text` in contrast mode. Add a one-line description: "Nur ansehen —
+  nichts wird als vorgelesen markiert." / "Preview only — nothing is marked as read out."
+
+### MINOR
+
+- **m1.** Round hint (`RoundSection.tsx:106-116`). Show it only if `_actions` offers
+  `speaker.reorder`, and at all widths (drop `hidden lg:flex`; wrap under the title when narrow).
+  Wording: "Am Griff ziehen oder mit Leertaste anheben" / "Drag the handle or lift with Space". No
+  stray period next to "16 von 28 beendet".
+- **m2.** Derive the "Nur Bühne" default once, as the comment says. Use `stageOnly: boolean | null`
+  and hold the first paint (skeleton) until it is derived, so nothing jumps. Negative test: a role
+  with `question.deliver` plus another write action (admin) does not start in Nur Bühne.
+- **m3.** Read-only hint placement. Put it in the PageHeader meta slot next to the title (Eye
+  glyph as in answers), not as a loose line that shifts the layout. In the answers detail, show no
+  role hint for terminal statuses (delivered/closed); the status explains it.
+- **m4.** The "Klassifizieren" button on the card reads as a label: make it `secondary` size sm
+  with a Tag icon.
+- **m5.** en-US: in the header "8 remaining" (not "8 more"); footer as is.
+- **m6.** `Podium.tsx:124`: `hover:bg-ink-25` is not overridden in contrast mode, and
+  `transition-colors` contradicts R9. Fix both.
+- **m7.** The clock test is flaky (it failed in CI at a minute boundary, see PR #13). Use
+  `page.clock`: no change within a minute, exactly one change at the minute boundary. Prove the
+  alignment to the minute.
+- **m8.** Ratify in the Nachschärfung section, as allowed: `i18n/parity.test.ts` (key total);
+  `hv-stage-only-v1='0'` preset in 003 and abnahme (setup forced by point 7). No other old-spec
+  changes.
+- **m9.** Nits: remove unused keys `capture.question.marked`/`unmarked` (DE and EN; adjust parity);
+  no `<p>`/`<div>` inside `<button>` (use `<span className="block">`); document in the Bericht that
+  after Escape the focus returns to the queue button (D8), so Space opens the preview there and
+  does not advance.
+
+### Evidence (Runde 1)
+
+Update the Bericht: a "Befund → Erledigung" table, the new red/green runs, the Playwright summary
+with all names, the axe table with `color-contrast` on and the exception scoped, and the
+`pnpm gates` tail. Re-take the screenshots whose view changed. Status → "review (Nacharbeitsrunde
+1)".

@@ -288,6 +288,12 @@ export function StagePage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (returnOpen) return; // the dialog owns the keyboard
+      // B1 (review round 1): the queue preview (`QueuePreview` in Podium.tsx) is a dialog too, and
+      // it has no state of its own up here to check like `returnOpen` — Space must not deliver the
+      // current question, R must not open the return dialog on top of it, while it is open. Any
+      // open `Dialog` sets `aria-modal="true"` (components/Dialog.tsx), so this catches the preview
+      // and every future stage dialog alike, without threading its open state through two files.
+      if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isInteractiveTarget(event.target)) return;
       if (event.code === 'Space') {

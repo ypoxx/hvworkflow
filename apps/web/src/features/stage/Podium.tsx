@@ -118,10 +118,16 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
   const t = useT();
   return (
     <li data-testid="stage-queue-item" data-number={question.number} className="border-b border-line last:border-b-0">
+      {/*
+       * m6 (review round 1): `ink-25` has no `.stage-contrast` override (only `ink-50` and darker
+       * do), so the old hover flashed a near-white background on the dark ground. `ink-50` is
+       * themed both ways. `transition-colors` also raced the Kontrastmodus swap on every
+       * CSS-var-backed colour on this button (R9/007) — dropped, same as `NextPreview`'s border.
+       */}
       <button
         type="button"
         onClick={() => onOpen(question)}
-        className="flex w-full items-start gap-2.5 py-2 text-left transition-colors duration-100 hover:bg-ink-25"
+        className="flex w-full items-start gap-2.5 py-2 text-left hover:bg-ink-50"
       >
         <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
           <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
@@ -270,6 +276,7 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
       onClose={onClose}
       size="lg"
       title={t('stage.preview.title')}
+      description={t('stage.preview.description')}
       footer={
         <Button variant="ghost" onClick={onClose}>
           {t('common.close')}
@@ -277,9 +284,13 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
       }
     >
       {question !== null && (
+        // M6 (review round 1): this is a preview of the Bühne, a different device (design
+        // principle 10) — console-scale 13/16px read as an ordinary form here. Question and answer
+        // follow the podium's own sizes and `--color-stage-text`, so Kontrastmodus (if it happened
+        // to be on) would not swallow either.
         <div data-testid="stage-preview" className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span data-testid="stage-preview-number" className="font-mono text-[13px] text-ink-500">
+            <span className="font-mono text-[13px] text-ink-500" data-testid="stage-preview-number">
               {question.number}
             </span>
             {question.stageAssignment !== undefined && (
@@ -287,14 +298,19 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
             )}
             {question.track !== undefined && <TrackBadge track={question.track} />}
           </div>
-          <p data-testid="stage-preview-text" className="text-[16px] leading-6 text-ink-900">
+          <p
+            data-testid="stage-preview-text"
+            className="text-[22px] leading-8 font-medium tracking-[-0.01em]"
+            style={{ color: 'var(--color-stage-text)' }}
+          >
             {question.text}
           </p>
           <div className="border-t border-line pt-3">
             <span className="hv-label">{t('stage.answer.label')}</span>
             <p
               data-testid="stage-preview-answer"
-              className={cx('mt-2 text-[14px] leading-6 text-ink-800', answer === undefined && 'text-ink-500 italic')}
+              className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-500 italic')}
+              style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
             >
               {answer !== undefined
                 ? answer.text
@@ -320,9 +336,19 @@ export function StageQueue({ stage }: { stage: StageView }) {
     <div data-testid="stage-queue" className="flex min-h-0 flex-col">
       <div className="flex items-baseline justify-between">
         <span className="hv-label">{t('stage.queue.title')}</span>
-        <span data-testid="stage-queue-remaining" className="font-mono text-2xs tabular-nums text-ink-400">
-          {t('stage.queue.remaining', { n: stage.queue.length })}
-        </span>
+        {/*
+         * M4 (review round 1): ink-400 measured 2.48:1 — nowhere near the 4.5:1 text needs. This is
+         * now sized and coloured like a value next to VORGELESEN/OFFEN (ink-900, ~15:1) rather than
+         * a caption, and omitted entirely once there is nothing left to count.
+         */}
+        {stage.queue.length > 0 && (
+          <span
+            data-testid="stage-queue-remaining"
+            className="font-mono text-base leading-5 font-semibold tabular-nums text-ink-900"
+          >
+            {t('stage.queue.remaining', { n: stage.queue.length })}
+          </span>
+        )}
       </div>
       {next === undefined ? (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-500">

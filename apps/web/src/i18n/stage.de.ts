@@ -25,6 +25,7 @@ export const stageDe = {
   'stage.queue.more': 'und {n} weitere',
   'stage.queue.remaining': 'noch {n}',
   'stage.preview.title': 'Vorschau',
+  'stage.preview.description': 'Nur ansehen — nichts wird als vorgelesen markiert.',
   'stage.counter.delivered': 'Vorgelesen',
   'stage.counter.open': 'Offen',
   'stage.key.next': 'Leertaste',

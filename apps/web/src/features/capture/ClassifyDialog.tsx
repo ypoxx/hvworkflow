@@ -13,6 +13,15 @@ import { Button, Dialog, cx, showProblem } from '../../components';
 import { actionLabel, getLang, stageAssignmentLabel, translate, trackLabel, useT } from '../../i18n';
 import { Field, FIELD_CONTROL } from './fields';
 
+/** The status of a refused call, read structurally: the interface talks to `HvApi` only. */
+function problemStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status: unknown }).status;
+    if (typeof status === 'number') return status;
+  }
+  return undefined;
+}
+
 export function ClassifyDialog({
   question,
   onClose,
@@ -38,11 +47,19 @@ export function ClassifyDialog({
     setBusy(false);
   }, [question]);
 
+  // M1 (review round 1): without a change there is nothing to save, and the record's own
+  // Tagesordnungspunkt must survive a classify write even though this dialog never edits it
+  // (point #23) — omitting it here would have the reducer read "no TOP" and erase it.
+  const dirty =
+    question !== null &&
+    (track !== question.track || stage !== (question.stageAssignment ?? ''));
+
   const save = async (): Promise<void> => {
-    if (question === null || track === undefined || busy) return;
+    if (question === null || track === undefined || busy || !dirty) return;
     setBusy(true);
     const input: Classification = {
       track,
+      ...(question.agendaItemId !== undefined ? { agendaItemId: question.agendaItemId } : {}),
       ...(stage !== '' ? { stageAssignment: stage as StageAssignment } : {}),
     };
     try {
@@ -51,6 +68,10 @@ export function ClassifyDialog({
     } catch (error: unknown) {
       showProblem(error, translate(getLang(), 'toast.problem'));
       onProblem();
+      // M2 (review round 1): a 412 means somebody else wrote first — this draft is stale, close
+      // rather than let the desk save over a version it never saw. `onProblem` above already
+      // refetches; a re-opened dialog then starts from the record that actually exists now.
+      if (problemStatus(error) === 412) onClose();
     } finally {
       setBusy(false);
     }
@@ -61,6 +82,7 @@ export function ClassifyDialog({
       open={question !== null}
       onClose={onClose}
       title={actionLabel(t, 'question.classify')}
+      description={t('capture.classify.description')}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -69,7 +91,7 @@ export function ClassifyDialog({
           <Button
             variant="primary"
             data-testid="classify-save"
-            disabled={busy || track === undefined}
+            disabled={busy || track === undefined || !dirty}
             onClick={() => void save()}
           >
             {t('common.save')}

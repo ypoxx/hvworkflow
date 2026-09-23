@@ -83,6 +83,12 @@ export function CapturePage() {
   const probe = useAsync(() => api.listQuestions({ limit: 1 }), NO_QUESTIONS, `p:${version}`);
   const deskActions = questions.data.items[0]?._actions ?? probe.data.items[0]?._actions ?? [];
   const canCapture = deskActions.includes('question.capture');
+  /**
+   * M3 (review round 1): an empty or still-loading desk has no question to read `_actions` off, so
+   * `deskActions` is `[]` and `canCapture` reads false for EVERY role, not only one without the
+   * right — the read-only hint must stay silent until there is a real answer, not a default one.
+   */
+  const knowsCaptureRight = deskActions.length > 0;
 
   const [writing, setWriting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -135,7 +141,7 @@ export function CapturePage() {
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader title={t('page.capture.title')} description={t('page.capture.description')} />
 
-      {!canCapture && (
+      {knowsCaptureRight && !canCapture && (
         <p data-testid="capture-readonly-hint" className="text-2xs text-ink-600">
           {t('capture.readonly.hint')}
         </p>

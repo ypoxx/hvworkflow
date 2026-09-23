@@ -34,6 +34,27 @@ async function digitsOf(page: Page, testId: string): Promise<number> {
   return Number((await page.getByTestId(testId).innerText()).replace(/\D/g, ''));
 }
 
+/** The append-only event log this device persists to (`apps/web/src/api/index.ts`) — its length is
+ *  the one true "did anything get written" signal, independent of what any view happens to show. */
+async function eventLogLength(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    try {
+      const raw = window.localStorage.getItem('hv-demo-events-v1');
+      return raw === null ? 0 : (JSON.parse(raw) as unknown[]).length;
+    } catch {
+      return -1;
+    }
+  });
+}
+
+/** The queue's own order, by number — a stable fingerprint that a delivered/returned question would
+ *  disturb (it would leave the list, shifting everything behind it). */
+async function queueNumbers(page: Page): Promise<string[]> {
+  return page.getByTestId('stage-queue-item').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-number') ?? ''),
+  );
+}
+
 async function waitForCorpus(page: Page): Promise<void> {
   const questions = page.getByTestId('header-counter-questions');
   await expect(questions).toBeVisible({ timeout: 90_000 });
@@ -45,17 +66,24 @@ async function waitForCorpus(page: Page): Promise<void> {
 /**
  * 0 "serious" or "critical" axe violations on the given scope; every other impact is reported only.
  *
- * `color-contrast` is disabled here on purpose, and only here: `--color-ink-500` (docs house token,
- * `apps/web/src/styles/index.css`) and the `.hv-label` utility built on it are the muted-text colour
- * of `EmptyState`, `Panel` descriptions and every field label across the whole product since slice
- * 002 — not something this slice touched or was scoped to fix (`styles/index.css` is allowed here
- * only for point 11, prefers-reduced-motion). Measured at ~3.7–3.9:1 against white/sunken, against a
- * 4.5:1 requirement; every other axe rule (names, roles, structure, keyboard, focus order — the ones
- * that actually exercise the new dialogs, hints and clickable rows of this slice) stays enabled. This
- * is reported as an open finding for a dedicated follow-up slice, not fixed here.
+ * Named exception AX-020-01 (review round 1, replaces the blanket `disableRules(['color-contrast'])`
+ * of the first pass): the muted end of the house grey ramp (`--color-ink-400`/`-500`,
+ * `apps/web/src/styles/index.css`) measures 2.48:1 / ~3.7–3.9:1 against white, short of the 4.5:1 a
+ * text colour needs. It is the colour of `.hv-label`, of `EmptyState`/`Panel` secondary text, of the
+ * navigation's own counters and the demo hint — carried as the `text-ink-400`/`text-ink-500` utility
+ * classes directly wherever it is not `.hv-label` — across the whole product since slice 001/002, not
+ * something this slice touched or was scoped to fix (`styles/index.css` is allowed here only for
+ * point 11). `color-contrast` therefore runs with every other rule, `.exclude()`-scoped to exactly
+ * those three pre-existing selectors; every element this slice itself added or restyled (clock,
+ * "noch n", hints, dialogs) is checked by the same rule like everything else. Registered under
+ * "Offen" in the spec: expires with the colour-token slice, 2026-12-31 at the latest.
  */
 async function assertNoSeriousViolations(page: Page, label: string): Promise<void> {
-  const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
+  const results = await new AxeBuilder({ page })
+    .exclude('.hv-label')
+    .exclude('.text-ink-500')
+    .exclude('.text-ink-400')
+    .analyze();
   const serious = results.violations.filter(
     (v) => v.impact === 'serious' || v.impact === 'critical',
   );
@@ -99,14 +127,23 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   /* =========================================================================================
    * Point #10 — the queue is clickable (and Enter-able), opens a read-only preview, changes no
    * state, and "noch n" counts exactly the questions still to come after the current one.
+   * M5 (review round 1): "noch n" is checked against the header's own staged count (an
+   * independent source, not the same rendered array), and the previewed question's status is
+   * checked via the queue's own fingerprint and the event log length, not only the current card.
    * ========================================================================================= */
   const currentNumber = page.getByTestId('stage-current-number');
   const currentBefore = await currentNumber.innerText();
   const deliveredBefore = await digitsOf(page, 'stage-counter-delivered');
   const openCounterBefore = await digitsOf(page, 'header-counter-open');
   const stagedCounterBefore = await digitsOf(page, 'header-counter-staged');
+  const eventsBefore = await eventLogLength(page);
+  const queueBefore = await queueNumbers(page);
 
   const remaining = await digitsOf(page, 'stage-queue-remaining');
+  // Independent cross-check (M5): every staged question except the one currently on stage is, by
+  // definition, "still to come" — this reads the header's own staged total, not the queue's own
+  // rendered rows, so a bug that miscounts the same array both ways would not go unnoticed.
+  expect(remaining).toBe(stagedCounterBefore - 1);
   const visibleQueueRows = await page.getByTestId('stage-queue-item').count();
   const moreEl = page.getByTestId('stage-queue-more');
   const more = (await moreEl.count()) > 0 ? Number((await moreEl.innerText()).replace(/\D/g, '')) : 0;
@@ -119,25 +156,59 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await expect(page.getByTestId('stage-preview-number')).not.toBeEmpty();
   await expect(page.getByTestId('stage-preview-text')).not.toBeEmpty();
   await expect(page.getByTestId('stage-preview-answer')).not.toBeEmpty();
+  // M6: the one-line "read only" note is the dialog's own description, next to its title.
+  await expect(page.getByRole('dialog', { name: 'Vorschau' })).toContainText('Nur ansehen');
+
+  /* =========================================================================================
+   * B1 (review round 1, blocker) — the preview is a dialog and must own the keyboard exactly like
+   * the return dialog already does: clicking inside it, then Space and R, must neither deliver the
+   * current question nor open the return dialog underneath it.
+   * ========================================================================================= */
+  await page.getByTestId('stage-preview-text').click();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('r');
+  await expect(preview).toBeVisible(); // still open — neither key was swallowed by it closing
+  await expect(page.getByTestId('stage-return-reason')).toHaveCount(0); // no return dialog opened
+  await expect(currentNumber).toHaveText(currentBefore);
+  expect(await digitsOf(page, 'stage-counter-delivered')).toBe(deliveredBefore);
+  expect(await eventLogLength(page)).toBe(eventsBefore);
+
   await page.keyboard.press('Escape');
   await expect(preview).toBeHidden();
 
-  // No state change whatsoever: same current question, same counters, same "noch n".
+  // No state change whatsoever from the preview itself either: same current question, same
+  // counters, same queue fingerprint, same "noch n", not one extra event on the log.
   await expect(currentNumber).toHaveText(currentBefore);
   expect(await digitsOf(page, 'stage-counter-delivered')).toBe(deliveredBefore);
   expect(await digitsOf(page, 'stage-queue-remaining')).toBe(remaining);
   expect(await digitsOf(page, 'header-counter-open')).toBe(openCounterBefore);
   expect(await digitsOf(page, 'header-counter-staged')).toBe(stagedCounterBefore);
+  expect(await queueNumbers(page)).toEqual(queueBefore);
+  expect(await eventLogLength(page)).toBe(eventsBefore);
 
   // The keyboard path: a compact row also opens the preview on Enter, unchanged in every way.
+  // D8 (documented in the Bericht): closing with Escape returns focus to the row that opened it,
+  // so the immediately following Space re-opens the same preview rather than delivering anything.
   if (visibleQueueRows > 0) {
-    const row = page.getByTestId('stage-queue-item').first();
+    // The `<li>` itself is not focusable — the `<button>` filling it is (Podium.tsx's `QueueItem`).
+    const row = page.getByTestId('stage-queue-item').first().locator('button');
     await row.focus();
     await page.keyboard.press('Enter');
     await expect(preview).toBeVisible();
     await expect(currentNumber).toHaveText(currentBefore);
+    await page.keyboard.press('Escape');
+    await expect(preview).toBeHidden();
+    await expect(row).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(preview).toBeVisible();
+    expect(await digitsOf(page, 'stage-counter-delivered')).toBe(deliveredBefore);
+    await page.keyboard.press('Escape');
+    await expect(preview).toBeHidden();
   }
 
+  // Reopen for the evidence shot: the required screenshot shows the preview open (point #10).
+  await page.getByTestId('stage-next-preview').click();
+  await expect(preview).toBeVisible();
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('020-stage-de.png') });
@@ -231,6 +302,67 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('020-capture-de.png') });
   await assertNoSeriousViolations(page, 'capture (capture desk)');
+
+  /* =========================================================================================
+   * M1 (review round 1) — re-classifying a question that already carries a Tagesordnungspunkt
+   * must not erase it, even though this dialog never edits TOP (point #23); Save stays disabled
+   * until something actually changes.
+   * ========================================================================================= */
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  await page.getByTestId('answers-filter-status-classified').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'classified');
+  await page.getByTestId('answers-row').first().click();
+  const topNumber = await page.getByTestId('answers-detail-number').innerText();
+  const contributionHref = await page.getByTestId('answers-detail-contribution').getAttribute('href');
+  expect(contributionHref).not.toBeNull();
+
+  const topEventText = async (): Promise<string | undefined> => {
+    await page.getByTestId('nav-history').click();
+    await expect(page).toHaveURL(/\/history$/);
+    await page.getByTestId('history-search').fill(topNumber);
+    await page.getByTestId('history-result').filter({ hasText: topNumber }).first().click();
+    const classified = page
+      .getByTestId('history-timeline')
+      .locator('[data-testid="history-event"][data-type="QuestionClassified"]')
+      .last();
+    await expect(classified).toBeVisible();
+    return (await classified.innerText()).match(/Tagesordnungspunkt \d+/)?.[0];
+  };
+  const originalTop = await topEventText();
+  expect(originalTop).toBeDefined(); // the seeder always sets one on classify
+
+  await page.goto(contributionHref!);
+  await waitForCorpus(page);
+  await expect(page).toHaveURL(/\/capture\?speaker=/);
+  let topCard = page.locator(`[data-testid="capture-question-card"][data-number="${topNumber}"]`);
+  // The desk shows one Redebeitrag at a time; try every one of this Wortmeldung's contributions
+  // until the target question turns up.
+  const contributionSelect = page.getByTestId('capture-contribution-select');
+  if ((await topCard.count()) === 0 && (await contributionSelect.count()) > 0) {
+    const optionCount = await contributionSelect.locator('option').count();
+    for (let i = 0; i < optionCount && (await topCard.count()) === 0; i++) {
+      await contributionSelect.selectOption({ index: i });
+    }
+  }
+  await expect(topCard).toBeVisible();
+  await topCard.getByTestId('capture-classify-open').click();
+  const reclassifyDialog = page.getByRole('dialog', { name: 'Klassifizieren' });
+  await expect(reclassifyDialog).toBeVisible();
+  await expect(page.getByTestId('classify-save')).toBeDisabled(); // no change yet (M1)
+
+  const podiumPressed = await page.getByTestId('classify-track-podium').getAttribute('aria-pressed');
+  const otherTrack = podiumPressed === 'true' ? 'expert_track' : 'podium';
+  await page.getByTestId(`classify-track-${otherTrack}`).click();
+  await expect(page.getByTestId('classify-save')).toBeEnabled();
+  await page.getByTestId('classify-save').click();
+  await expect(reclassifyDialog).toBeHidden();
+
+  const newTop = await topEventText();
+  expect(newTop).toBe(originalTop); // M1: the TOP survived the re-classification
+
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
 
   /* =========================================================================================
    * Point #21 (continued) + #26 (Erfassung) — without `question.classify` the action is simply
@@ -399,6 +531,9 @@ test('020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschl
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
   await expect(page.getByText('Noch kein Redebeitrag erfasst')).toBeVisible();
+  // M3 (review round 1): an empty desk has no question to read `_actions` off, so the read-only
+  // hint must stay silent rather than default to "no right" for every role, capture included.
+  await expect(page.getByTestId('capture-readonly-hint')).toHaveCount(0);
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('020-capture-empty-de.png') });
