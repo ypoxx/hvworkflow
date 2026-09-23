@@ -139,6 +139,40 @@ test('M2: a .gitignore-covered path (generated e2e output) never counts as dirty
   }
 });
 
+// takt-006 point 2: the marker now carries the commit that was HEAD at the last successful test run,
+// not only a signature of the dirty tree. A `git commit` after that run — folding a further, untested
+// edit into what gets committed, or simply moving HEAD at all — used to be invisible to this hook once
+// the tree was clean again; it must now still block until "pnpm gates" runs again.
+test('takt-006 point 2 red: a commit made after mark-test-run is blocked even though the tree is clean again', () => {
+  const dir = scratchRepo();
+  try {
+    writeFileSync(join(dir, 'apps', 'api', 'src', 'index.ts'), 'export const x = 2;\n');
+    mark(dir); // "pnpm gates" ran against this dirty state
+    git(dir, ['add', '-A']);
+    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
+    const r = run(dir);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /commit/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-006 point 2 green: after that commit, a fresh "pnpm gates" run (mark-test-run) unblocks again', () => {
+  const dir = scratchRepo();
+  try {
+    writeFileSync(join(dir, 'apps', 'api', 'src', 'index.ts'), 'export const x = 2;\n');
+    mark(dir);
+    git(dir, ['add', '-A']);
+    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
+    mark(dir); // re-run "pnpm gates" against the new commit
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('green: git unavailable (not a repository at all) fails open', () => {
   const dir = mkdtempSync(join(tmpdir(), 'stop-check-test-'));
   try {

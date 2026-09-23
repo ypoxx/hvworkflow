@@ -25,6 +25,21 @@ function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+/** The commit currently at `HEAD` — `undefined` if git is unavailable or there is no commit yet (both
+ * callers fail open on that, same as `statusLines`). takt-006 point 2: recorded by `mark-test-run.mjs`
+ * alongside the dirty-tree signature, and compared by `stop-check.mjs` against the *current* `HEAD` —
+ * a `git commit` after the last successful test run moves `HEAD` to a commit that was never actually
+ * tested (whatever the tree looked like at test time, the commit may fold in a further, untested edit,
+ * or a formatting/normalisation step during the commit itself), and a clean tree alone can no longer
+ * tell the two situations apart. */
+export function headCommit(root) {
+  try {
+    return git(root, ['rev-parse', 'HEAD']).trim();
+  } catch {
+    return undefined;
+  }
+}
+
 /** `git status --porcelain` lines for the three code directories, one file at a time even inside a
  * brand-new untracked directory (`--untracked-files=all`) — `undefined` if git itself is unavailable
  * (both callers fail open on that). Reads the `-z` (NUL-separated) form and turns it back into the
