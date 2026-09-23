@@ -292,7 +292,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | läuft (Hook: PostToolUse) |
 | Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | läuft (Hook: Stop) |
 | SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | läuft (Hook: SubagentStop) |
-| TaskCompleted | prüft, dass ein als erledigt markierter Punkt aus `tool_input.todos`, der eine Scheibe nennt, verlangt, dass die Spec-Datei dieser Scheibe `**Status:** accepted` oder `**Status:** angenommen` trägt | läuft (Hook: TaskCompleted) |
+| TaskCompleted | prüft für jeden als erledigt markierten Punkt, der eine Scheibe nennt — aus `tool_input.todos` oder aus `task_subject`/`task_description` —, dass die Spec-Datei dieser Scheibe `**Status:** accepted` oder `**Status:** angenommen` trägt; nennen mehrere erledigte Punkte je eine Scheibe, wird jeder geprüft, nicht nur der erste | läuft (Hook: TaskCompleted) |
 
 Die Hooks sind Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst, weil ein Stop-Hook nach
 acht Blockaden aufgehoben wird und weil Hooks lokal abschaltbar sind: Die Spalte „Stand" in 5.1 bis

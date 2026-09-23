@@ -65,3 +65,46 @@ test('green (fail open): empty stdin is never blocked', () => {
   const r = spawnSync('node', [SCRIPT, '--root', FIXTURE_ROOT], { input: '', encoding: 'utf8' });
   assert.equal(r.status, 0);
 });
+
+// takt-006 point 4: the real TaskCompleted hook event carries `task_subject`/`task_description` at
+// the top level, not a `tool_input.todos` array — the hook must read that shape too.
+function runTaskEvent(taskSubject, taskDescription, root = FIXTURE_ROOT) {
+  const payload = JSON.stringify({ hook_event_name: 'TaskCompleted', task_subject: taskSubject, task_description: taskDescription });
+  const r = spawnSync('node', [SCRIPT, '--root', root], { input: payload, encoding: 'utf8' });
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+test('takt-006 point 4 red: task_subject/task_description naming a not-yet-accepted slice is blocked', () => {
+  const r = runTaskEvent('finish slice 900', 'complete the review');
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 900/);
+});
+
+test('takt-006 point 4 green: task_subject/task_description naming an accepted slice passes', () => {
+  const r = runTaskEvent('finish slice 901', '');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('takt-006 point 4 green: task_subject/task_description naming no slice is nothing to check', () => {
+  const r = runTaskEvent('write the spec', 'no slice number here');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+// Codex review PR #14, C3 (together with point 4): several completed items naming a slice each — the
+// hook used to stop at the *first* one whose spec exists and never look at the rest.
+test('Codex C3 red: two completed items, only the second unaccepted — the loop must not stop at the first', () => {
+  const r = run([
+    { content: 'finish slice 901', status: 'completed' }, // accepted — resolvable, but not the only one
+    { content: 'finish slice 900', status: 'completed' }, // not accepted — must still be caught
+  ]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 900/);
+});
+
+test('Codex C3 green: two completed items, both accepted, passes', () => {
+  const r = run([
+    { content: 'finish slice 901', status: 'completed' },
+    { content: 'finish slice 903', status: 'completed' },
+  ]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
