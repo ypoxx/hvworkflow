@@ -21,7 +21,10 @@ rules:
       # `RegExp.prototype.exec` (any object with an `exec` method), which has nothing to do with
       # child processes. Require the call to sit after an import that actually names
       # `child_process`/`node:child_process` — `$MOD`/the destructured name is then also checked so
-      # a same-named unrelated import can't accidentally satisfy this.
+      # a same-named unrelated import can't accidentally satisfy this. Review rework round 2, minor 5
+      # adds: a default import (`import cp from '…'`), a destructured `require`
+      # (`const { exec } = require('…')`), and an aliased named import
+      # (`import { exec as run } from '…'`).
       - pattern-either:
           - patterns:
               - pattern-inside: |
@@ -42,11 +45,38 @@ rules:
                   - pattern: $MOD.execSync($CMD, ...)
           - patterns:
               - pattern-inside: |
+                  import $MOD from '$MODSPEC'
+                  ...
+              - pattern-either:
+                  - pattern: $MOD.exec($CMD, ...)
+                  - pattern: $MOD.execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
                   const $MOD = require('$MODSPEC')
                   ...
               - pattern-either:
                   - pattern: $MOD.exec($CMD, ...)
                   - pattern: $MOD.execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  const { exec } = require('$MODSPEC')
+                  ...
+              - pattern: exec($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  const { execSync } = require('$MODSPEC')
+                  ...
+              - pattern: execSync($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  import { exec as $ALIAS } from '$MODSPEC'
+                  ...
+              - pattern: $ALIAS($CMD, ...)
+          - patterns:
+              - pattern-inside: |
+                  import { execSync as $ALIAS } from '$MODSPEC'
+                  ...
+              - pattern: $ALIAS($CMD, ...)
       - metavariable-regex:
           metavariable: $MODSPEC
           regex: ^(node:)?child_process$

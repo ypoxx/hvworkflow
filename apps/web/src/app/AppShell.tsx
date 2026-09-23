@@ -9,7 +9,7 @@ import { Header } from './Header';
 import { NotFound } from './NotFound';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { SideNav } from './SideNav';
-import { APP_ROUTES, DEFAULT_ROUTE } from './routes';
+import { FEATURES, DEFAULT_ROUTE } from './featureRegistry';
 import { useMeeting } from './useMeeting';
 
 const COLLAPSE_KEY = 'hv-nav-collapsed-v1';
@@ -54,11 +54,13 @@ export function AppShell() {
       if (isTextEntry(event.target)) return;
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
         const index = Number.parseInt(event.key, 10);
-        const route = Number.isNaN(index) ? undefined : APP_ROUTES[index - 1];
-        if (route !== undefined) {
-          event.preventDefault();
-          void navigate(route.path);
-          return;
+        if (!Number.isNaN(index)) {
+          const feature = FEATURES.find((f) => f.shortcutKey === index);
+          if (feature !== undefined) {
+            event.preventDefault();
+            void navigate(feature.path);
+            return;
+          }
         }
         if (event.key.toLowerCase() === 'n') {
           event.preventDefault();
@@ -95,8 +97,8 @@ export function AppShell() {
         >
           <Routes>
             <Route path="/" element={<Navigate to={DEFAULT_ROUTE} replace />} />
-            {APP_ROUTES.map((route) => (
-              <Route key={route.path} path={route.path} element={<route.Component />} />
+            {FEATURES.map((feature) => (
+              <Route key={feature.path} path={feature.path} element={<feature.Component />} />
             ))}
             <Route path="*" element={<NotFound />} />
           </Routes>
