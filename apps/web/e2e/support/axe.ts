@@ -21,9 +21,15 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import type { Result } from 'axe-core';
 import type { Page } from '@playwright/test';
+
+/** Derived from `AxeBuilder.analyze()`'s own, already-resolved return type instead of an `import
+ *  type … from 'axe-core'` — `apps/web` has no direct dependency on `axe-core` itself (only on
+ *  `@axe-core/playwright`, which depends on it), and pnpm's isolated `node_modules` makes that
+ *  transitive package unresolvable from here, even though the exact same type is reachable through
+ *  the wrapper's own declaration file. */
+type AxeAnalysis = Awaited<ReturnType<InstanceType<typeof AxeBuilder>['analyze']>>;
+type AxeViolation = AxeAnalysis['violations'][number];
 
 export interface AxeException {
   /** A human-auditable name shared by every selector belonging to the same underlying debt (e.g.
@@ -47,7 +53,11 @@ export interface AxeException {
   readonly owner: string;
 }
 
-const EXCEPTIONS_PATH = fileURLToPath(new URL('./axe-exceptions.json', import.meta.url));
+// `.pathname` rather than Node's `fileURLToPath` (see the `node:fs` note above) — `URL` itself is a
+// DOM/web-standard global already covered by `tsconfig.app.json`'s `lib`. Every test file's own
+// `import.meta.url` is a real `file://` URL of an absolute path, and this project runs Linux-only
+// (no Windows drive-letter path to get wrong).
+const EXCEPTIONS_PATH = new URL('./axe-exceptions.json', import.meta.url).pathname;
 
 /** Read once per test file import; the list is small and the file never changes mid-run. */
 export const AXE_EXCEPTIONS: readonly AxeException[] = JSON.parse(
@@ -60,11 +70,11 @@ function selectorsForRule(rule: string): string[] {
   );
 }
 
-function isSerious(violation: Result): boolean {
+function isSerious(violation: AxeViolation): boolean {
   return violation.impact === 'serious' || violation.impact === 'critical';
 }
 
-function logPass(label: string, pass: string, violations: readonly Result[]): void {
+function logPass(label: string, pass: string, violations: readonly AxeViolation[]): void {
   const serious = violations.filter(isSerious);
   console.log(
     `[axe] ${label} (${pass}): ${violations.length} violation group(s), ${serious.length} serious/critical`,
