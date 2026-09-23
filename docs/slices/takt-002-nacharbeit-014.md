@@ -1,6 +1,6 @@
 # takt-002 — Folgebefunde aus dem Review von 014 (N1–N4, N6)
 
-**Status:** spec
+**Status:** review
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lanes: docs-register, docs-datenschutz,
 `scripts/takt.mjs` (keine davon hält gerade eine Scheibe)
 **Rolle/Modell:** Mechaniker · Haiku 4.5 baut; Review Sonnet 5
@@ -45,7 +45,52 @@ Zeile) und mit genau einer abgeschlossenen Zeile („1 Punkt"); die Beispieldate
 
 ## Bericht
 
-(vom Bauenden)
+Slice: takt-002-nacharbeit-014
+
+Done: Datumsbereichsprüfung nach Format-Check in `parseBerlinTime()` für N1
+(Monat 1–12, Tag innerhalb des Monats mit Schaltjahr, Stunde 0–23, Minute 0–59);
+Singular-Form „1 Punkt" für N6; DSFA und Entscheidungsregister aktualisiert für N2–N4.
+
+Evidence:
+```
+Commit 77eb2db
+
+Test 1: Vier ungültige Dateien und eine gültige (5 Punkte, 4 offen):
+Warnung: Punkt "P001": Nachricht oder Live nicht im Format "JJJJ-MM-TT HH:MM" lesbar — zählt als offen.
+Warnung: Punkt "P002": Nachricht oder Live nicht im Format "JJJJ-MM-TT HH:MM" lesbar — zählt als offen.
+Warnung: Punkt "P003": Nachricht oder Live nicht im Format "JJJJ-MM-TT HH:MM" lesbar — zählt als offen.
+Warnung: Punkt "P004": Nachricht oder Live nicht im Format "JJJJ-MM-TT HH:MM" lesbar — zählt als offen.
+5 Punkte
+4 offen
+Median gesamt: 1.00 h
+Median S: 1.00 h
+
+Test 2: Singular-Form mit 1 Punkt:
+1 Punkt
+0 offen
+Median gesamt: 1.00 h
+Median S: 1.00 h
+
+git diff --stat HEAD~0:
+docs/datenschutz/dsfa-vorentwurf.md | 10 +++++-----
+docs/entscheidungsregister.md       |  2 +-
+scripts/takt.mjs                    | 26 ++++++++++++++++++++++++--
+
+pnpm gates (tail):
+apps/contract test: contract gate: ok
+packages/domain test: Test Files 4 passed (4)
+packages/domain test: Tests 39 passed (39)
+apps/api test: Test Files 3 passed (3)
+apps/api test: Tests 25 passed (25)
+apps/web test: Test Files 3 passed (3)
+apps/web test: Tests 35 passed (35)
+vocabulary-check: ok
+✓ built in 1.13s
+```
+
+Open: keine
+
+Touched: `scripts/takt.mjs`, `docs/datenschutz/dsfa-vorentwurf.md`, `docs/entscheidungsregister.md`
 
 ## Review findings
 
