@@ -506,6 +506,43 @@ describe('read rights (slice 010)', () => {
     }
   });
 
+  it('mergeQuestion: a delivered primary question observer may read is still not a target-existence oracle (Ziel 7, Nachprüfung A)', async () => {
+    as(actors.admin!);
+    const primary = await firstIn('delivered'); // in observer's read scope (question.read.delivered)
+    const hiddenTarget = await firstIn('captured'); // outside observer's read scope
+
+    as(actors.observer!);
+    // Sanity: the primary really is readable — a difference below could then never come from
+    // Festlegung 3's "cannot read the primary at all" precedence (the existing test above, with a
+    // `captured` primary, covers that case).
+    await expect(api.getQuestion(primary.id)).resolves.toBeTruthy();
+
+    let hidden: ApiProblem | undefined;
+    try {
+      await api.mergeQuestion(primary.id, hiddenTarget.id);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      hidden = e as ApiProblem;
+    }
+    let unknown: ApiProblem | undefined;
+    try {
+      await api.mergeQuestion(primary.id, 'does-not-exist-at-all');
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiProblem);
+      unknown = e as ApiProblem;
+    }
+    // Observer never holds `question.merge` at all (Festlegung 4) — `transition()` denies on that
+    // permission alone, before `build()` ever resolves `intoQuestionId` (rework round, point 1), so
+    // the hidden target and the unknown one produce the identical response, id and all.
+    expect(hidden!.status).toBe(403);
+    expect(hidden!.ruleId).toBe('R-PERM-01');
+    expect(unknown!.status).toBe(hidden!.status);
+    expect(unknown!.ruleId).toBe(hidden!.ruleId);
+    expect(unknown!.detail).toBe(hidden!.detail);
+  });
+
   it('409 detail (Festlegung 8): an actor who may not read the question gets a generic detail with no status and no rule id; a reader keeps both', async () => {
     as(actors.admin!);
     const captured = await firstIn('captured'); // deliverQuestion only allows 'staged' -> 409 here

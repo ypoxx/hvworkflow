@@ -182,6 +182,39 @@ describe('read rights over HTTP (slice 010)', () => {
     }
   });
 
+  it('mergeQuestion: a delivered primary question observer may read is still not a target-existence oracle over HTTP (Ziel 7, Nachprüfung A)', async () => {
+    const deliveredRes = await req(app, 'GET', '/v1/questions?status=delivered&limit=1', { actor: ACTOR.admin });
+    const primary = (await deliveredRes.json()).items[0];
+    const capturedRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
+    const hiddenTarget = (await capturedRes.json()).items[0];
+
+    // Sanity: observer really can read the primary (question.read.delivered, Festlegung 2) — the
+    // existing test above, with a `captured` (hidden) primary, already covers Festlegung 3's "cannot
+    // read the primary at all" precedence; this one is the other case.
+    const readRes = await req(app, 'GET', `/v1/questions/${primary.id}`, { actor: ACTOR.observer });
+    expect(readRes.status).toBe(200);
+
+    const hiddenRes = await req(app, 'POST', `/v1/questions/${primary.id}/merge`, {
+      actor: ACTOR.observer,
+      body: { intoQuestionId: hiddenTarget.id },
+    });
+    const unknownRes = await req(app, 'POST', `/v1/questions/${primary.id}/merge`, {
+      actor: ACTOR.observer,
+      body: { intoQuestionId: 'does-not-exist-at-all' },
+    });
+
+    // Observer never holds `question.merge` at all (Festlegung 4) — denied on that permission alone
+    // before `intoQuestionId` is ever resolved (rework round, point 1): same status, same rule id,
+    // same body for the hidden target and the unknown one.
+    expect(hiddenRes.status).toBe(403);
+    expect(unknownRes.status).toBe(403);
+    const hiddenProblem = await hiddenRes.json();
+    const unknownProblem = await unknownRes.json();
+    expectValid('mergeQuestion', 403, hiddenProblem, 'application/problem+json');
+    expect(hiddenProblem.ruleId).toBe('R-PERM-01');
+    expect(unknownProblem).toEqual(hiddenProblem);
+  });
+
   it('404 precedence: an unknown id and "exists but not readable" produce equivalent bodies over HTTP — no ruleId, no ETag (rework round, point 8)', async () => {
     const capturedRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
     const hidden = (await capturedRes.json()).items[0];
