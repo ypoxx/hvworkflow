@@ -12,7 +12,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "gates": "pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm arch && pnpm role-literals && pnpm now-check && pnpm plan-honesty && pnpm --filter @hv/web build",
+    "gates": "pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm arch && pnpm role-literals && pnpm now-check && pnpm plan-honesty && pnpm i18n-literals && pnpm slice-scope && pnpm downgrade-check && pnpm plan-graph && pnpm test:scripts && pnpm --filter @hv/web build && node scripts/hooks/mark-test-run.mjs",
     "contract:types": "openapi-typescript packages/contract/openapi.yaml -o packages/contract/src/types.ts",
     "contract:lint": "redocly lint packages/contract/openapi.yaml",
     "vocabulary": "node scripts/vocabulary-check.mjs",
@@ -20,6 +20,11 @@
     "role-literals": "node scripts/role-literal-check.mjs",
     "now-check": "node scripts/now-check.mjs",
     "plan-honesty": "node scripts/plan-honesty.mjs",
+    "i18n-literals": "node scripts/i18n-literal-check.mjs",
+    "slice-scope": "node scripts/slice-scope.mjs",
+    "downgrade-check": "node scripts/downgrade-check.mjs",
+    "plan-graph": "node scripts/plan-graph.mjs",
+    "test:scripts": "node --test 'scripts/**/*.test.mjs'",
     "audit:check": "node scripts/audit-check.mjs"
   },
   "devDependencies": {

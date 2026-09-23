@@ -8,3 +8,5 @@ You implement one backend slice. Read AGENTS.md, the slice file, `packages/contr
 and `packages/domain/src/api.ts` first. The transition table and `can()` in the domain are the only
 places for status and rights logic. Tests first, then code, then `pnpm gates` from the root; paste
 the real tail into your report. Use absolute paths in shell commands. Stay inside the allowed files.
+Commit Playwright screenshots under `docs/evidence/` only when the spec calls for them; every commit
+subject ends with `[skip netlify]`.

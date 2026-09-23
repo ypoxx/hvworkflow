@@ -11,7 +11,11 @@
  *   (b) CHANGELOG.md has a section heading for exactly that version.
  *   (c) If openapi.yaml differs from its state at the merge base with the integration branch, the
  *       version must be higher than it was there. Skipped with a note when git or the ref is not
- *       available (shallow CI checkout, no remote).
+ *       available (shallow CI checkout, no remote) — unless `CONTRACT_GATE_STRICT=1` (slice 016,
+ *       set by `gates.yml`'s `pnpm gates` step), in which case that same situation is a failure
+ *       instead of a skip: a full checkout with the integration branch reachable (`fetch-depth: 0`,
+ *       since slice 012) always has this available in CI, so a skip there would hide a real problem
+ *       rather than report a merely-local limitation.
  *   (d) allowlist.json is a well-formed list of pre-declared, not yet implemented operations
  *       `{ operationId, reason, slice, expires }`; every operationId exists in the contract; no entry
  *       is expired (an expired entry makes the gate red on purpose — nothing dead may survive).
@@ -27,6 +31,8 @@ const contractPath = join(packageDir, 'openapi.yaml');
 const contractRel = relative(repoRoot, contractPath).split('\\').join('/');
 const INTEGRATION_REF = 'origin/claude/dax-shareholder-meeting-workflow-0s934z';
 
+const STRICT = process.env.CONTRACT_GATE_STRICT === '1';
+
 const failures = [];
 const ok = (msg) => console.log(`  ok    ${msg}`);
 const skip = (msg) => console.log(`  skip  ${msg}`);
@@ -34,6 +40,8 @@ const fail = (msg) => {
   failures.push(msg);
   console.log(`  FAIL  ${msg}`);
 };
+/** A skip of check (c) becomes a failure under CONTRACT_GATE_STRICT=1 — same message either way. */
+const skipOrFailIfStrict = (msg) => (STRICT ? fail(msg) : skip(msg));
 
 // ---- helpers ------------------------------------------------------------------------------------
 
@@ -109,7 +117,7 @@ else if (contractVersion) {
     git(['rev-parse', '--verify', '--quiet', `${INTEGRATION_REF}^{commit}`]);
     base = git(['merge-base', 'HEAD', INTEGRATION_REF]);
   } catch {
-    skip(`(c) git or ${INTEGRATION_REF} not available — version-bump check skipped`);
+    skipOrFailIfStrict(`(c) git or ${INTEGRATION_REF} not available — version-bump check skipped`);
     return;
   }
   let changed;
@@ -119,7 +127,7 @@ else if (contractVersion) {
   } catch (e) {
     if (e && e.status === 1) changed = true;
     else {
-      skip(`(c) git diff failed (${e?.message?.split('\n')[0] ?? 'unknown'}) — version-bump check skipped`);
+      skipOrFailIfStrict(`(c) git diff failed (${e?.message?.split('\n')[0] ?? 'unknown'}) — version-bump check skipped`);
       return;
     }
   }
