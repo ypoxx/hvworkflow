@@ -1,6 +1,6 @@
 # 019 — Vertrag 0.2.0 (nur Vertrag): Redezeit und Art veraltet, Leserechte, Koordination, Rechtsfreigabe-Ereignis, Versionierung
 
-**Status:** spec
+**Status:** accepted
 **Risikoklasse:** mittel · 1,5 AStd · Kalender 01.10.2026 (W1) · Lane: contract (seriell; keine andere Scheibe
 hält sie)
 **Rolle/Modell:** Architekt · Fable 5.1 baut; Review Opus 5.5 gegen Recherche, Rechtekonzept und ADR 0001
@@ -177,4 +177,28 @@ Touched: packages/contract/openapi.yaml, packages/contract/src/types.ts (generie
 
 ## Review findings
 
-(vom Reviewer)
+Review Opus 5.5 (frischer Kontext, Spec und Diff), 23.09.2026 — **Urteil: accept after minor fixes**, 0 blocker / 0 major.
+Bestätigt: alle Ziele 1–10; streng additiv (Feld für Feld verglichen); `contract:types` idempotent; `contract:lint`
+0 Fehler, 1 Warnung (vorbestehend); Tor in Scratch-Klonen absichtlich rot gemacht (Version nicht erhöht, gesenkt,
+uneinig, ohne CHANGELOG; Allowlist abgelaufen, ungültiges Datum, leerer Grund, fehlende Scheibe, doppelt, unbekannte
+Operation); keine Netzaufrufe; `pnpm gates` exit 0. Merge nach E48; die Befunde bleiben als Folgepunkte offen:
+
+1. minor — Wortmeldung ohne `kind` wird jetzt angenommen und als Ereignis ohne `kind` gespeichert; Domäne und Web
+   erwarten `kind` noch (`api.ts:297`, `SpeakerRow.tsx:73`). Folge: **080** macht `kind` sofort optional, Projektion
+   spielt beide Ereignisformen ab, Test „Registrierung ohne kind wird abgespielt und gerendert".
+2. minor — Prüfung (c) wird im flachen CI-Checkout übersprungen (`gates.yml` ohne `fetch-depth`). Folge: **016**
+   (`gates.yml`): `fetch-depth: 0` und `CONTRACT_GATE_STRICT=1`, damit (c) in CI nicht übersprungen wird.
+3. minor — `allowlist.json` wird noch von keinem Test gelesen (Test „jede operationId" prüft nur ≥ 29). Folge: **021**
+   bzw. die nächste Scheibe mit `apps/api/src/__tests__`: Menge der ausgeübten operationIds = alle minus Allowlist.
+4. minor — `getMeeting`, `listAgendaItems`, `listUnits` dokumentieren 403, aber keines der sechs Leserechte deckt sie.
+   Folge: **010**-Spec legt fest: Stammdaten lesen alle angemeldeten Rollen (Plan 010: observer sieht Zähler), 403 dort
+   nur für künftige Attributregeln reserviert; Wortlaut im Vertrag mit 043.
+5. minor (Plan) — 021 soll `coordination` auch `question.forward` und `round.assemble` geben; beide kommen erst mit
+   043 in den Vertrag. Folge: **021**-Spec gibt nur classify/assign; forward/round.assemble mit 043/048.
+6. minor (Doku) — Rechtekonzept nennt noch `answer.approve.legal` statt `question.legal.clear`. Folge: **052**
+   (Rechtekonzept umbasieren) bzw. 021.
+7. nit — Beschreibung von `QuestionLegalClearedPayload`/Action: „Empfehlung" ist vor der Bühne Pflicht (R-GUARD-07,
+   021) → mit 043.
+8. nit — Meldung bei gesenkter Version „stayed at" → „did not increase".
+9. nit — `expires` ist der letzte gültige Tag in UTC; dokumentieren oder Europe/Berlin rechnen.
+10. nit — `info.version` muss vor der ersten Leerzeile im `info:`-Block stehen (schlägt sicher fehl).
