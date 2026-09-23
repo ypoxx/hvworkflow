@@ -1005,6 +1005,196 @@ Bericht A (003-answers-stage.spec.ts:43, 020-rueckbau-passung.spec.ts:198, 020-r
 abnahme.spec.ts:86) — keine neuen, keine behobenen. `docs/evidence/` danach mit
 `git checkout -- docs/evidence` zurückgesetzt.
 
+### Auftrag B (verkleinert)
+
+```
+Slice: 010-lesepfade-leserechte (Auftrag B, verkleinert)
+Done: Ziel 5 (e2e-Rollenwechsel in 001-shell.spec.ts, 003-answers-stage.spec.ts, abnahme.spec.ts,
+  020-rueckbau-passung.spec.ts) nach den neuen Leserechten aus Auftrag A, plus ein vom Lauf selbst
+  gezeigter weiterer Bruch in 020 (Nebenabfrage-Fehlschlag in history/Page.tsx, Ziel 6/010b);
+  Ziel 7, Domänen- und HTTP-Test "Merge mit vorgelesener Hauptfrage" (Nachprüfung A).
+Evidence: siehe unten (pnpm gates-Ende, Playwright-Zusammenfassung, slice-scope-Ausgabe).
+Open: keins — alle 17 Playwright-Szenarien grün, pnpm gates grün, slice-scope grün. Ziel 6, die
+  e2e-Datei 010 und die Screenshots bleiben in Scheibe 010b (nicht Teil dieses Auftrags).
+Touched: siehe "Touched" unten.
+```
+
+**Rollenwechsel (Ziel 5), je Datei, Schritt, alte → neue Rolle, Grund:**
+
+| Datei | Schritt | Alt → Neu | Grund |
+|---|---|---|---|
+| `001-shell.spec.ts` | Rollenumschalter-Demonstration auf `/speakers` (Screenshot + axe DE/EN) | `podium` → `capture` | podium hält seit Festlegung 4 kein `speaker.read` mehr; der Wechsel dorthin, während `/speakers` noch gemountet ist, lässt `listSpeakers` 403'en und einen Fehler-Toast stehen, dessen Regel-Text (`Regel R-PERM-02`) den axe-Kontrasttest reißt (vorbestehender Kontrastmangel in `Toast.tsx`, außerhalb dieses Auftrags — der gestaltete Zustand kommt mit 010b). `capture` hält `speaker.read`. |
+| `003-answers-stage.spec.ts` | "Fachbereich: draft an answer" — Zeitpunkt des Rollenwechsels | Wechsel zu `expert` verschoben: erst `nav-answers` klicken, dann `asRole('expert')` (vorher umgekehrt) | Derselbe Mechanismus wie oben: der Standardakteur der Demo ist `capture` (hält `speaker.read`); ein Wechsel zu `expert`, während `/speakers` noch gemountet ist, ließ `listSpeakers` 403'en und einen Toast stehen, der den axe-Kontrasttest bei "answers (assigned, Fachbereich)" riss. `expert` brauchte `/speakers` an dieser Stelle ohnehin nie. |
+| `003-answers-stage.spec.ts` | Historiensuche + Zeitleiste der podium-Frage | `podium` → `moderation` | podium hält seit Festlegung 4 kein `history.read` mehr (nur noch `stage.read`); moderation hielt `history.read`/`question.read` schon vorher. |
+| `003-answers-stage.spec.ts` | Ereignisstrom-Reiter | `moderation` → `admin` | `event.read` ist seit Festlegung 4 admin-exklusiv. |
+| `abnahme.spec.ts` | Historiensuche + Zeitleiste der vorgelesenen Frage | `podium` → `moderation` | podium hält seit Festlegung 4 kein `history.read` mehr. **Ändert einen Schritt des Abnahmesatzes der Projektleitung — Satz vorher/nachher unten.** |
+| `020-rueckbau-passung.spec.ts` | Lesehinweis auf `/speakers` (Punkt #26) | `expert` → `capture` | expert verliert `speaker.read` vollständig (Festlegung 4) und kann die Ansicht nicht mehr erreichen; `capture` hält `speaker.read`, aber keines der `speaker.*`-Schreibrechte — dieselbe „liest, darf nicht schreiben"-Eigenschaft. |
+| `020-rueckbau-passung.spec.ts` | Lesehinweis auf `/capture` (Punkt #21/#26), DE- und EN-Durchlauf | `expert` → `moderation` | expert verliert zusätzlich `contribution.read` (Festlegung 4); `listContributions`, die Hauptabfrage der Erfassung, würde 403'en. `moderation` hält `contribution.read`/`question.read`, aber weder `question.classify` noch `question.capture`. Aus einer gemeinsamen Rolle für beide Lesehinweise (vorher `expert` für beide) werden damit zwei verschiedene, weil keine Rolle mehr beides zugleich liest und nirgends schreibt. |
+| `020-rueckbau-passung.spec.ts` | Lesehinweis Beantwortung + leerer Zustand (Punkt #26/#10/#28/#32) | `observer` mit Filter `status=assigned` → `expert` auf einer Frage im Stand `captured` | observer hält seit Festlegung 2 nur noch `question.read.delivered` (Umfang `delivered`/`closed`); ein Filter auf `assigned` läge außerhalb des Umfangs und lieferte 403 R-PERM-03, bevor je eine Zeile erscheint. `expert` liest jeden Status, hat aber im Stand `captured` keine einzige Schreibaktion — dieselbe geprüfte Eigenschaft. |
+| `020-rueckbau-passung.spec.ts` | "Weiterleiten" → Historie-Beleg (Punkt #32), danach zurück für die en-US-Passage | `expert` → `moderation` → `expert` | **Vom Lauf selbst gezeigter, nicht ursprünglich gelisteter Bruch:** expert verliert `speaker.read`; `features/history/Page.tsx`s gemeinsames `Promise.all` für Einheiten/Tagesordnung/Sprecher/Korpus (Ziel 6 „Nebenabfragen", nach 010b verschoben) scheitert als Ganzes, sobald eine Nebenabfrage (hier `listSpeakers`) 403't — die Hauptabfrage (der Korpus, den die Trefferliste zum Öffnen eines Treffers braucht) lädt dann nie, `selectedId` wird zwar gesetzt, aber kein `corpus`-Eintrag gefunden, die Ansicht bleibt bei „Keine Einzelfrage gewählt". `moderation` hält jedes hier nötige Leserecht; der Rückwechsel zu `expert` vor der en-US-Passage bleibt nötig, weil nur `expert` `question.submit_review` hält (die „Forward"-Beschriftung). |
+| `020-rueckbau-passung.spec.ts` | "Nur Bühne"-Default, negativer Fall ohne `question.deliver` | `expert` → `approver` | expert verliert `stage.read` vollständig (Festlegung 4) und kann `/stage` nicht mehr erreichen (`getStage` 403't, `stage-current-number` erscheint nie); `approver` hält `stage.read` und dieselbe „kein `question.deliver`"-Eigenschaft. |
+
+`001-shell.spec.ts` ging rot (axe-Kontrastfehler unter `podium`) und wurde deshalb geändert, wie in
+Ziel 5 vorgesehen ("nur falls der Lauf dort rot wird"). Die von der Aufgabenstellung optional
+genannten Wechsel "expert auf `/capture` → moderation" und "observer mit Filter `status=assigned` →
+expert auf einer Frage im Stand `captured`" wurden beide angewandt, weil der Lauf sie beide rot
+zeigte (siehe Tabelle oben) — nicht weil der Schritt seine Aussage verloren hätte.
+
+**Der Abnahmesatz vorher und nachher (Ziel 5, `abnahme.spec.ts`):**
+
+Der Abnahmesatz selbst (`docs/erste-version-und-offene-fragen.md` §1, wörtlich, unverändert von
+diesem Auftrag) endet vor der Historie und nennt keine Rolle für sie:
+
+> Eine Person, die das Werkzeug nie gesehen hat, erfasst aus einem Redebeitrag sieben Einzelfragen,
+> klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet und gibt frei,
+> und der Vorstand liest sie am Podiumsgerät vor und schließt sie ab — bei 800 Fragen im Bestand,
+> ohne Anleitung, ohne dass jemand erklären muss, wo man klickt.
+
+Der Schritt, den dieser Auftrag ändert, ist der operationalisierte Kopfkommentar von
+`abnahme.spec.ts` selbst (die englische Übersetzung des Abnahmesatzes mit einer Rolle je Klammer)
+und der tatsächliche Testschritt danach — **vorher:**
+
+```
+ * One Wortmeldung is registered and called to the microphone (Versammlungsbüro), its Redebeitrag is
+ * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
+ * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
+ * exactly version 1 (Legal Clearing), put on the podium (Freigabe), read out (Podium) — and the
+ * history proves every one of those steps afterwards.
+ */
+```
+```
+  // Read out: deliver (and, since the podium role may also close, straight into "abgeschlossen").
+  await page.getByTestId('stage-next').click();
+
+  /* ---------- Historie: every step of this one question is on the record ---------- */
+  await page.getByTestId('nav-history').click();
+```
+
+**nachher:**
+
+```
+ * One Wortmeldung is registered and called to the microphone (Versammlungsbüro), its Redebeitrag is
+ * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
+ * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
+ * exactly version 1 (Legal Clearing), put on the podium and read out (Freigabe, Podium) — and the
+ * history, read by the Versammlungsbüro (moderation, which held `history.read` where podium no
+ * longer does after slice 010's read grants), proves every one of those steps afterwards.
+ */
+```
+```
+  // Read out: deliver (and, since the podium role may also close, straight into "abgeschlossen").
+  await page.getByTestId('stage-next').click();
+
+  /* ---------- Historie: every step of this one question is on the record. Slice 010: podium lost
+   * `history.read` (Festlegung 4, it only holds `stage.read`), so the Versammlungsbüro
+   * (moderation) — which already held `history.read`/`question.read` — reads the history instead;
+   * the acceptance sentence itself (docs/erste-version-und-offene-fragen.md §1) is unaffected, it
+   * ends at "schließt sie ab". ---------- */
+  await asRole(page, 'moderation');
+  await page.getByTestId('nav-history').click();
+```
+
+Der Orchestrator legt diese Änderung dem Eigentümer vor (Ziel 5, `abnahme.spec.ts`-Zeile).
+
+**Merge-Test-Namen (Ziel 7, Nachprüfung A):**
+
+- Domäne (`packages/domain/src/__tests__/api.test.ts`): `mergeQuestion: a delivered primary question
+  observer may read is still not a target-existence oracle (Ziel 7, Nachprüfung A)`
+- HTTP (`apps/api/src/__tests__/read-rights.test.ts`): `mergeQuestion: a delivered primary question
+  observer may read is still not a target-existence oracle over HTTP (Ziel 7, Nachprüfung A)`
+
+Beide: observer ruft `mergeQuestion` auf einer `delivered`-Hauptfrage auf (die es über
+`question.read.delivered` lesen darf — durch einen expliziten `getQuestion`-Aufruf davor bestätigt,
+Status 200), einmal mit einem verborgenen Ziel (Status `captured`, außerhalb des Leseumfangs) und
+einmal mit einer unbekannten Ziel-ID. Beide Antworten sind identisch: 403, Regel-ID `R-PERM-01`,
+derselbe `detail`-Text — observer hält `question.merge` nie, `transition()` verweigert darauf, bevor
+`intoQuestionId` je aufgelöst wird (Nacharbeit-Punkt 1 aus Auftrag A). Ergänzt die bestehende Prüfung
+`mergeQuestion: intoQuestionId is not an existence oracle — observer and podium get an identical 404
+for a hidden target and a non-existent one` (die dort verwendete Hauptfrage im Stand `captured` ist
+für observer und podium selbst unlesbar, maskiert also schon an der Hauptfrage als 404) um den Fall
+einer für observer lesbaren Hauptfrage.
+
+**pnpm gates (Ende, `tail -30`, Exit 0, sauberer Baum nach allen Commits dieses Auftrags):**
+
+```
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3546.518823
+
+> @hv/web@0.0.0 build /home/user/wt/010/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-Boc0Eqma.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,200.67 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a
+plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a
+sourcemap for the transformation. Consult the plugin documentation for help:
+https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.14s
+mark-test-run: wrote /home/user/wt/010/.claude/state/last-test-run (clean tree)
+```
+
+**Playwright, vollständige Suite (`E2E_PORT=4357 pnpm exec playwright test --reporter=list`,
+Chromium unter `/opt/pw-browsers`, `grep -E "✓|✘|passed|failed"`, kopiert): 17 passed, 0 failed —**
+alle vier ursprünglich roten Schritte plus der zusätzliche, vom Lauf gezeigte Bruch sind behoben,
+013s Szenarien unverändert grün:
+
+```
+  ✓   2 [chromium] › e2e/001-shell.spec.ts:24:1 › shell: counters, role switch, language switch @screenshot (8.0s)
+  ✓   3 [chromium] › e2e/001-shell.spec.ts:89:1 › header strip on the answers desk @screenshot (4.8s)
+  ✓   1 [chromium] › e2e/002-speakers-capture.spec.ts:62:1 › speakers list and capture desk @screenshot (17.9s)
+  ✓   5 [chromium] › e2e/013-tastaturpfad.spec.ts:158:1 › 013a: Wortmeldung per Tastatur anlegen und mit Pfeiltasten umsortieren (7.1s)
+  ✓   6 [chromium] › e2e/013-tastaturpfad.spec.ts:281:1 › 013b: Redebeitrag erfassen und mit der Tastatur in Einzelfragen zerlegen (7.2s)
+  ✓   7 [chromium] › e2e/013-tastaturpfad.spec.ts:371:1 › 013c: Antwort entwerfen und mit der Tastatur weiterleiten (12.7s)
+  ✓   8 [chromium] › e2e/013-tastaturpfad.spec.ts:411:1 › 013d: Freigeben mit der Tastatur (3.0s)
+  ✓   9 [chromium] › e2e/013-tastaturpfad.spec.ts:427:1 › 013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur (1.8s)
+  ✓   4 [chromium] › e2e/003-answers-stage.spec.ts:44:1 › backlog, approval, podium and history @screenshot (57.1s)
+  ✓  10 [chromium] › e2e/013-tastaturpfad.spec.ts:471:1 › 013-bekannt: Fokus nach Aktion — Charakterisierung, der Fokus landet heute auf BODY (takt-008) (33.4s)
+  ✓  12 [chromium] › e2e/013-tastaturpfad.spec.ts:650:1 › 013f: prefers-reduced-motion — Übergänge und Animationen sind abgeschaltet (2.1s)
+  ✓  13 [chromium] › e2e/013-tastaturpfad.spec.ts:670:1 › 013g: Kontrolllauf ohne reduced motion — dieselben drei Elemente haben wirklich einen Übergang (2.0s)
+  ✓  11 [chromium] › e2e/020-rueckbau-passung.spec.ts:111:1 › 020: Rückbau und Passung — points 1–9, axe on the five views (22.3s)
+  ✓  15 [chromium] › e2e/020-rueckbau-passung.spec.ts:533:1 › 020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle (4.8s)
+  ✓  16 [chromium] › e2e/020-rueckbau-passung.spec.ts:578:1 › 020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minutenwechsel (1.4s)
+  ✓  17 [chromium] › e2e/020-rueckbau-passung.spec.ts:618:1 › 020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschlange (3.9s)
+  ✓  14 [chromium] › e2e/abnahme.spec.ts:88:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (53.2s)
+  17 passed (2.4m)
+```
+
+`docs/evidence/` danach mit `git checkout -- docs/evidence` zurückgesetzt (keine der 36 vom Lauf
+berührten, vorbestehenden Bilder committet; kein `010-*`-Bild erzeugt, die e2e-Datei 010 kommt mit
+010b).
+
+**`node scripts/slice-scope.mjs`:**
+
+```
+slice-scope: 23 changed file(s), all within "docs/slices/010-lesepfade-leserechte.md"'s "Files allowed" list (43 pattern(s)).
+```
+
+**Touched:**
+- `packages/domain/src/__tests__/api.test.ts` (Ziel 7, Merge-Test)
+- `apps/api/src/__tests__/read-rights.test.ts` (Ziel 7, Merge-Test über HTTP)
+- `apps/web/e2e/001-shell.spec.ts`, `apps/web/e2e/003-answers-stage.spec.ts`,
+  `apps/web/e2e/abnahme.spec.ts`, `apps/web/e2e/020-rueckbau-passung.spec.ts` (Ziel 5, Rollenwechsel)
+- `docs/slices/010-lesepfade-leserechte.md` (dieser Bericht)
+
 ## Review findings
 
 (vom Reviewer)
