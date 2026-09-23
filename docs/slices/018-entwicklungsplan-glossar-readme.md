@@ -80,10 +80,55 @@ Rechtsfreigabe)
 ## Bericht
 
 Slice: 018-entwicklungsplan-glossar-readme
-Done: Abschnitte 5.4 (Hook-Wirkungen), 3 (Sicherheitsreview-Perspektive) und 7–9 (Kostenrahmen, These, Zeitplan) des Entwicklungsplans abgeglichen; Glossar um 10 neue Einträge mit Codenames erweitert (Koordination, Verweigerung, Antwortbündel, Bühnenplatz, Weiterleiten, Vertraulichkeitsstufe, Fokusansicht, Steuerungsansicht, Leitstand, Rechtsfreigabe); README-Index vollständig (8 neue Einträge); Slice-Vorlage und AGENTS.md gates-Kommentar aktualisiert.
-Evidence: pnpm gates grün (plan-honesty: „Plan-honesty check: 4 table(s), 38 row(s) in section 5, every \"Stand\" verified."; vocabulary-check: ok; script tests: 110 pass); Glossar-Diff (10 neue Zeilen, Quellen: openapi.yaml, docs/produktplan-beta.md Abschnitte 8.1–8.3, 6.5, ADR 0012, Produktplan Plan 3 und B-Punkte); README-Index-Prüfung: „0 fehlend"; AGENTS.md gates-Kommentar: „contract lint, typecheck, lint, unit tests, vocabulary check, architecture check, role-literals, now-check, plan-honesty, i18n-literals, slice-scope, downgrade-check, plan-graph, script tests, web build" vs. package.json gates-Skript (14 Werkzeuge + mark-test-run); git diff --stat: 5 Dateien, 46 Zeilen hinzu, 83 entfernt.
+
+Done: Abschnitte 5.4 (Hook-Wirkungen), 3 (Sicherheitsreview-Perspektive) und 7–9 (Kostenrahmen, These, Zeitplan) des Entwicklungsplans abgeglichen; Glossar um 10 neue Einträge mit Code-Namen erweitert; README-Index mit 8 Einträgen für alle Dokumentdateien unter docs/ (ohne evidence/, slices/, bautage/) vervollständigt.
+
+Evidence:
+
+`pnpm gates` grün:
+```
+vocabulary-check: ok
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+slice-scope: 6 changed file(s), all within "docs/slices/018-entwicklungsplan-glossar-readme.md"'s "Files allowed" list (5 pattern(s)).
+✓ built in 1.23s
+mark-test-run: wrote /home/user/wt/018/.claude/state/last-test-run (clean tree)
+```
+
+Glossar: 10 neue Zeilen mit Quellen
+| Deutsch | en-US | Code/Contract | Quelle |
+|---------|-------|---------------|--------|
+| Koordination | Coordination | `role coordination` | openapi.yaml Enum Role, Produktplan Plan 3 „Wer klassifiziert" |
+| Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | ADR 0012, Produktplan B6 Zustandsmodell |
+| Antwortbündel | Answer bundle | `AnswerBundle` | Produktplan B6 und Scheibe 0006 |
+| Bühnenplatz | Podium seat | `stageAssignment.seat` | Produktplan B7, Scheibe 040 |
+| Weiterleiten | Forward | `question.forward` | Produktplan Scheibe 048, Frage 6 |
+| Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` | Produktplan B47 Scheibe 047 |
+| Fokusansicht | Focus view | `apps/web/src/features/focus/**` | Produktplan B8 zwei Ansichten |
+| Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | Produktplan B8 zwei Ansichten |
+| Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | Produktplan Scheibe 0008, web-<feature> |
+| Rechtsfreigabe | Legal clearing | `question.legal.clear` | openapi.yaml Vertrag 0.2.0 Scheibe 019 |
+
+README-Index-Prüfung: 0 fehlend
+
+AGENTS.md gates-Kommentar aktualisiert:
+Vorher: `# contract lint + typecheck + lint + tests + vocabulary check + web build — green before any merge`
+Nachher: `# contract lint, typecheck, lint, unit tests, vocabulary check, architecture check, role-literals, now-check, plan-honesty, i18n-literals, slice-scope, downgrade-check, plan-graph, script tests, web build — green before any merge`
+package.json gates-Skript: `pnpm contract:lint && pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm vocabulary && pnpm arch && pnpm role-literals && pnpm now-check && pnpm plan-honesty && pnpm i18n-literals && pnpm slice-scope && pnpm downgrade-check && pnpm plan-graph && pnpm test:scripts && pnpm --filter @hv/web build && node scripts/hooks/mark-test-run.mjs`
+
+`git diff --stat` gegen origin/claude/dax-shareholder-meeting-workflow-0s934z:
+```
+AGENTS.md                                          |  2 +-
+README.md                                          |  6 ++
+docs/agentische-entwicklung-plan.md                | 91 +++-------------------
+docs/glossar.md                                    | 10 +++
+docs/slices/018-entwicklungsplan-glossar-readme.md | 90 +++++++++++++++++++++
+docs/slices/README.md                              | 20 ++++-
+6 files changed, 136 insertions(+), 83 deletions(-)
+```
+
 Open: keine
-Touched: docs/agentische-entwicklung-plan.md, docs/glossar.md, README.md, AGENTS.md, docs/slices/README.md
+
+Touched: AGENTS.md, README.md, docs/agentische-entwicklung-plan.md, docs/glossar.md, docs/slices/018-entwicklungsplan-glossar-readme.md, docs/slices/README.md
 
 ## Review findings
 
