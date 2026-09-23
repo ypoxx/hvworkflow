@@ -1,6 +1,6 @@
 # 013 — Barrierefreiheit und Tastaturpfad als Tor
 
-**Status:** review
+**Status:** angenommen (Review Opus 5.5 und Codex; Nachprüfung: keine Blocker oder Hauptbefunde offen, Rest → takt-008)
 **Risikoklasse:** niedrig · 1 AStd · Kalender 02.10.2026 (W1) · Lane: e2e (die vier Alt-Specs sind geteilte Dateien,
 die diese Scheibe hält; deshalb erst nach dem Merge von 020, das sie für Selektoren berührt)
 **Rolle/Modell:** Implementierer-Oberfläche · Sonnet 5; Review Opus 5.5
@@ -581,7 +581,7 @@ Open:
   Der neue Test `013-bekannt: Fokus nach Aktion …` (`test.fail()`, Annotation
   `{type: 'issue', description: 'Fokus nach Aktion: disabled={busy} entzieht dem Knopf den
   Fokus — Folge-Kleinänderung takt-008'}`) läuft alle sechs mit `expect.soft` durch und
-  wird als erwarteter Fehlschlag gemeldet (`1 passed`, siehe Playwright-Zusammenfassung
+  wird als erwarteter Fehlschlag gemeldet (Marker ✘, in der Summe „17 passed“ mitgezählt, siehe Playwright-Zusammenfassung
   unten); er wird zu einem echten, roten Fehlschlag, sobald eine künftige Scheibe das
   behebt — dann muss `test.fail()` entfernt werden. Eine Behebung selbst würde
   `apps/web/src/features/{stage,answers,capture}/**` über die in Ziel 1 erlaubten „kleinen
@@ -634,11 +634,13 @@ Touched:
   und -Akteur; axe `color-contrast`)
 - `apps/web/src/features/speakers/MoveDialog.tsx` — Wortmeldungsnummer ink-500 → ink-600
   (axe `color-contrast`, eine Zeile)
-- `docs/agentische-entwicklung-plan.md` (Abschnitt 5.3, nur Stand-Spalte „Barrierefreiheit")
+- `docs/agentische-entwicklung-plan.md` (Abschnitt 5.3, Stand- und Werkzeug-Spalte „Barrierefreiheit", Werkzeug-Spalte
+  nach Review freigegeben)
 - `docs/evidence/013-fokus-{beantwortung,buehne}.png` (neu)
 - diese Datei (Abschnitt „Bericht", Status)
 
-Commits: ba68ae3, 0a2efe1, e535280, e39bca1, ada3db2, 558fb81
+Commits: 9bcec4f (Spec), ba68ae3, 0a2efe1, e535280, e39bca1, ada3db2, 558fb81, 9921f86 (Merge des Integrationsbranchs),
+d713242 (Screenshots nach Merge), ce22650, df45a5f, 8a66f7d, d4f33a7, 6cbe379, 32e2a66, 0e6eeea (ergänzt vom Orchestrator)
 
 ### Nacharbeit nach Review (Runde 1)
 
@@ -708,4 +710,28 @@ Der e2e-tsconfig-Folgepunkt (eine eigene `tsconfig.json` für `apps/web/e2e/**` 
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 · 23.09.2026 · Urteil: nacharbeiten** (0 Blocker, 3 major, 5 minor, 3 nits), dazu Codex auf PR #19
+(2 × P2, deckungsgleich mit Opus 1 und 7):
+
+1. major · Fokus-Rückgabe nach dem Absenden eines Dialogs nicht geprüft, nur nach Escape → behoben.
+2. major · Fokus nach einer Aktion nie geprüft; Szene (c) verdeckte den Fokusverlust durch einen Klick → Fokus nach
+   jeder Aktion geprüft; bekannter Fehler als `test.fail()` (`013-bekannt`, Annotation takt-008); Klick entfernt.
+3. major · Nachweise nicht wörtlich → ersetzt.
+4. minor · Szenen nutzten Maus und `.fill()` → Tastatur (Alt+1..5, Tab/Enter, `keyboard.type`).
+5. minor · reduced-motion ohne Gegenprobe → Kontrolllauf 013g; „Liste“ auf `answers-row` umgestellt.
+6. minor · MoveDialog geändert, aber nie geöffnet → per Tastatur geöffnet, axe, Fokus-Rückgabe.
+7. minor · Ablaufdatum der axe-Ausnahmen nicht erzwungen → Abbruch beim Import.
+8. minor · Werkzeug-Spalte „—“ bei Stand „läuft“ → Werkzeuge benannt (vom Spec-Eigentümer freigegeben).
+9.–11. nits → behoben (Commit-Liste zunächst unvollständig, siehe Runde 2).
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: nacharbeiten, nur 1 minor und nits.** Alle Punkte der Runde 1
+erledigt; eigene Läufe: `pnpm gates` Exit 0, Playwright 17 passed, alle axe-Zeilen 0/0. Offen:
+
+- minor · `013-bekannt` prüft `testId !== null` statt „Fokus nicht auf `BODY`“; führt takt-008 den Fokus auf ein
+  Element ohne `data-testid`, würde der Test nie rot. → **takt-008** (die Kleinänderung stellt diesen Test ohnehin
+  um).
+- nit · Ablaufdaten ohne Formatprüfung (`31.12.2026` liefe nie ab) → takt-008.
+- nit · Kopfkommentar nennt nicht alle Klicks im bekannten Fehlertest → takt-008.
+- nits · Bericht (`1 passed`, Touched, Commit-Liste) → vom Orchestrator berichtigt.
+
+Nach E48 gemergt: kein Blocker und kein Hauptbefund offen.
