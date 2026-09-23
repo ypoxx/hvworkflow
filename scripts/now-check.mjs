@@ -4,8 +4,10 @@
  * domain or server code (AGENTS.md rule 8). Flags, over the whole file text (so a match split across
  * lines is still caught): `Date.now(`, `Date['now']()`, a bare `new Date()` / `new Date(\n)` (no
  * argument — `new Date(x)` reconstructing a stored timestamp is fine), a bare `new Date` with no
- * parentheses at all, `Date()` called as a plain function, `performance.now(` and `process.hrtime(`.
- * Tests are excluded (fixed-clock tests legitimately build fixed dates).
+ * parentheses at all, `Date()` called as a plain function, `performance.now(`, `performance['now']()`,
+ * `process.hrtime(` and `process.hrtime.bigint(` (round 2, minor 7: the bracket and `.bigint(` forms
+ * were the two remaining gaps after round 1's rework). Tests are excluded (fixed-clock tests
+ * legitimately build fixed dates).
  *
  * Review rework (round 1, major 3): a `// now-ok: <reason>` comment only ever excuses a match in
  * `packages/domain/src/api.ts` (the default-clock injection point, at most once) or
@@ -37,7 +39,10 @@ function buildPatterns() {
     { name: 'new Date (no parentheses)', re: /new\s+Date\b(?!\s*\()/g },
     { name: 'Date() called as a function', re: /(?<!new\s+)\bDate\s*\(\s*\)/g },
     { name: 'performance.now(', re: /performance\.now\(/g },
+    { name: "performance['now']()", re: /performance\[\s*['"`]now['"`]\s*\]\s*\(/g },
     { name: 'process.hrtime(', re: /process\.hrtime\(/g },
+    // Review rework round 2, minor 7: process.hrtime's own bigint variant.
+    { name: 'process.hrtime.bigint(', re: /process\.hrtime\.bigint\(/g },
   ];
 }
 

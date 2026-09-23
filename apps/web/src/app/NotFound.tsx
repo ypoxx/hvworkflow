@@ -3,7 +3,7 @@ import { Compass } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button, EmptyState, PageHeader, Panel } from '../components';
 import { useT } from '../i18n';
-import { DEFAULT_ROUTE } from './routes';
+import { DEFAULT_ROUTE } from './featureRegistry';
 
 export function NotFound() {
   const t = useT();

@@ -4,7 +4,7 @@
     "githubAdvisoryId": "GHSA-2883-xcg3-v3hh",
     "module": "js-yaml",
     "reason": "High-severity CPU-exhaustion advisory in js-yaml, pulled in transitively via openapi-typescript > @redocly/openapi-core. Both are build-time-only devDependencies (contract lint/type generation); js-yaml never parses untrusted input at runtime here. Bumping openapi-typescript is an unrelated dependency change outside this slice's Files allowed (docs/slices/012-architektur-sicherheitstore.md).",
-    "owner": "aderno@gmail.com",
+    "owner": "Umsetzer",
     "expires": "2026-12-31"
   }
 ]

@@ -29,6 +29,11 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/feedback/`](docs/feedback/) | Auswertung von Rückmeldungen: je Aussage berücksichtigt, geplant, neu oder unklar, mit Folge, Aufwand und Rückfragen. |
 | [`docs/produktplan-beta.md`](docs/produktplan-beta.md) | Plan für die KI-Agenten vom MVP zur soliden Beta: Beta-Kriterien B1–B18, Standardannahmen mit Änderungskosten, 80 Scheiben in sieben Meilensteinen, Kalender in Agentenzeit aus dem Abhängigkeitsgraphen, Prüfpunkte, Token, Risiken, Entscheidungsregister. |
 | [`docs/qualitaetsleitplanken-produktreife.md`](docs/qualitaetsleitplanken-produktreife.md) | Qualitätsleitplanken für Spec-Autoren und Reviewer: Risikoklassen, Perspektiven auf heutige Rollen, Qualitätschecks, Nachweise, durchgerechnetes Beispiel. Keine zweite Arbeitsordnung. |
+| [`docs/abdeckungsmatrix.md`](docs/abdeckungsmatrix.md) | Anforderungs-Traceability: welche Anforderung aus docs/anforderungen-recherche.md durch welche Scheibe gebaut wird. |
+| [`docs/changelog-projektleitung.md`](docs/changelog-projektleitung.md) | Zusammenfassung von Änderungen für die Projektleitung: was sich am Beta-Plan seit der letzten Rückmeldung geändert hat, neue Termine, neue Erkenntnisse. |
+| [`docs/betrieb/`](docs/betrieb/) | Betriebliche Dokumentation: Branch-Schutz und Deployment-Richtlinien. |
+| [`docs/datenschutz/`](docs/datenschutz/) | Datenschutz: DSFA-Vorentwurf und Begleitdokumentation. |
+| [`docs/sicherheit/`](docs/sicherheit/) | Sicherheit: Bedrohungsmodell, Penetrationstests-Scope, Reviewer-Checkliste für die Sicherheitsperspektive je Scheibe. |
 
 ## Lauffähige Version
 

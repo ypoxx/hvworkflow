@@ -1,0 +1,3 @@
+{"type":"system","message":{"role":"system","content":[{"type":"text","text":"You implement one backend slice. Read AGENTS.md, the slice file, `packages/contract/openapi.yaml`\nand `packages/domain/src/api.ts` first."}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Implement slice 900."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"SubagentHandback","input":{"message":"Slice: 900-fixture\nDone: implemented the fixture.\nEvidence: pnpm gates tail.\nOpen: nothing.\nTouched: scripts/fixtures/slice-scope/900-fixture.md"}}]}}
