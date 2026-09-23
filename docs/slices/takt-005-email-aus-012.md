@@ -65,95 +65,28 @@ heutigen Integrationsbranch ersetzt.
  4 files changed, 197 insertions(+), 2 deletions(-)
 ```
 
-**E-Mail-Adressen im Arbeitsbaum, `git grep` aus Ziel 2 dieser Spec, ausgeführt von takt-007 auf dem heutigen
-Integrationsbranch:**
+**E-Mail-Adressen im Arbeitsbaum, als Menge verschiedener Adressen** (neu gefasst nach dem Codex-Befund auf
+PR #22: eine Liste aller Fundstellen wächst mit jedem Einfügen in einen Bericht, so dass ein eingefügter Lauf nie
+den Endstand zeigt; die Menge der verschiedenen Adressen und die Zählung der übrigen Fundstellen bleiben beim
+Einfügen gleich). Beide Befehle laufen über den Arbeitsbaum einschließlich dieses Berichts:
+
 ```
-docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
-docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
-docs/slices/takt-005-email-aus-012.md:65:docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
-docs/slices/takt-005-email-aus-012.md:66:docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
-docs/slices/takt-005-email-aus-012.md:67:scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-docs/slices/takt-005-email-aus-012.md:68:scripts/hooks/pre-tool-use-bash.test.mjs:124:  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
-docs/slices/takt-005-email-aus-012.md:69:scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-docs/slices/takt-005-email-aus-012.md:70:scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
-docs/slices/takt-005-email-aus-012.md:71:scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-docs/slices/takt-005-email-aus-012.md:72:scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-docs/slices/takt-005-email-aus-012.md:76:1. `docs/slices/016-agenten-hooks-tore.md:853`: `t@t.invalid` ist eine Test-Adresse in einem Git-Befehl-Beispiel, nicht real.
-docs/slices/takt-005-email-aus-012.md:77:2. `docs/slices/takt-005-email-aus-012.md:19`: `noreply@anthropic.com` ist die Automatisierungs-Adresse in Commit-Vorlage-Beispielen, wie in der Spec angegeben.
-docs/slices/takt-005-email-aus-012.md:78:3. `scripts/hooks/mark-test-run.test.mjs:40`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-docs/slices/takt-005-email-aus-012.md:79:4. `scripts/hooks/pre-tool-use-bash.test.mjs:124`: `t@t.invalid` ist eine Test-Adresse in Git-Befehl-String für Tests.
-docs/slices/takt-005-email-aus-012.md:80:5. `scripts/hooks/stop-check.test.mjs:26`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-docs/slices/takt-005-email-aus-012.md:81:6. `scripts/hooks/stop-check.test.mjs:132`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-docs/slices/takt-005-email-aus-012.md:82:7. `scripts/slice-scope.test.mjs:181`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-docs/slices/takt-005-email-aus-012.md:83:8. `scripts/slice-scope.test.mjs:188`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-scripts/contract-gate-strict.test.mjs:36:  execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'contract snapshot'], { cwd: dir });
-scripts/hooks/lib/dirty-tree-signature.test.mjs:22:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/mark-test-run.test.mjs:63:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/mark-test-run.test.mjs:86:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/pre-tool-use-bash.test.mjs:138:  const r = runCommand('git -C /tmp/x -c user.email=t@t.invalid push origin claude/slice-016-agenten');
-scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
-scripts/hooks/stop-check.test.mjs:155:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
-scripts/hooks/stop-check.test.mjs:169:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
-scripts/hooks/stop-check.test.mjs:189:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'docs only']);
-scripts/hooks/stop-check.test.mjs:203:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'untested code change']);
-scripts/role-literal-check.test.mjs:174:    execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: srcRepo });
-scripts/role-literal-check.test.mjs:202:    execFileSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: srcRepo });
-scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
-scripts/slice-scope.test.mjs:214:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-scripts/slice-scope.test.mjs:223:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
-scripts/slice-scope.test.mjs:228:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
-scripts/slice-scope.test.mjs:249:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-scripts/slice-scope.test.mjs:257:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
-scripts/slice-scope.test.mjs:262:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'unrelated'], { cwd: dir });
+$ git grep -ohE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**' | sort -u
+noreply@anthropic.com
+t@t.invalid
+$ git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**' | grep -cvE 't@t\.invalid|noreply@anthropic\.com'
+0
 ```
 
-Begründung jeder Fundstelle (Zeilen 1–10 sind Selbstzitate: diese Zeilen liegen in `docs/slices/takt-005-email-aus-012.md`
-selbst und zitieren den vorigen, jetzt ersetzten Scan-Block bzw. dessen Begründungsliste wörtlich):
-1. `docs/slices/016-agenten-hooks-tore.md:853`: `t@t.invalid` ist eine Test-Adresse (RFC-2606-reserviert) in einem Git-Befehl-Beispiel, nicht real.
-2. `docs/slices/takt-005-email-aus-012.md:19` — **Selbstzitat**: nennt `noreply@anthropic.com` als Beispiel in der Zielbeschreibung dieser Spec.
-3. `docs/slices/takt-005-email-aus-012.md:65` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `docs/slices/016-agenten-hooks-tore.md:853`.
-4. `docs/slices/takt-005-email-aus-012.md:66` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus dieser Datei, Zeile 19.
-5. `docs/slices/takt-005-email-aus-012.md:67` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/hooks/mark-test-run.test.mjs:40`.
-6. `docs/slices/takt-005-email-aus-012.md:68` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/hooks/pre-tool-use-bash.test.mjs` (damalige Zeile 124, heute Zeile 138 mit geändertem Pfad `/tmp/x`).
-7. `docs/slices/takt-005-email-aus-012.md:69` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/hooks/stop-check.test.mjs:26`.
-8. `docs/slices/takt-005-email-aus-012.md:70` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/hooks/stop-check.test.mjs:132`.
-9. `docs/slices/takt-005-email-aus-012.md:71` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/slice-scope.test.mjs:181`.
-10. `docs/slices/takt-005-email-aus-012.md:72` — **Selbstzitat**: wiederholt den vorigen Scan-Treffer aus `scripts/slice-scope.test.mjs:188`.
-11. `docs/slices/takt-005-email-aus-012.md:76` — **Selbstzitat**: Begründungszeile 1 des vorigen, jetzt ersetzten Scans, nennt `t@t.invalid`.
-12. `docs/slices/takt-005-email-aus-012.md:77` — **Selbstzitat**: Begründungszeile 2 des vorigen Scans, nennt `noreply@anthropic.com`.
-13. `docs/slices/takt-005-email-aus-012.md:78` — **Selbstzitat**: Begründungszeile 3 des vorigen Scans, nennt `t@t.invalid`.
-14. `docs/slices/takt-005-email-aus-012.md:79` — **Selbstzitat**: Begründungszeile 4 des vorigen Scans, nennt `t@t.invalid`.
-15. `docs/slices/takt-005-email-aus-012.md:80` — **Selbstzitat**: Begründungszeile 5 des vorigen Scans, nennt `t@t.invalid`.
-16. `docs/slices/takt-005-email-aus-012.md:81` — **Selbstzitat**: Begründungszeile 6 des vorigen Scans, nennt `t@t.invalid`.
-17. `docs/slices/takt-005-email-aus-012.md:82` — **Selbstzitat**: Begründungszeile 7 des vorigen Scans, nennt `t@t.invalid`.
-18. `docs/slices/takt-005-email-aus-012.md:83` — **Selbstzitat**: Begründungszeile 8 des vorigen Scans, nennt `t@t.invalid`.
-19. `scripts/contract-gate-strict.test.mjs:36`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (Datei neu seit einer Scheibe nach takt-005).
-20. `scripts/hooks/lib/dirty-tree-signature.test.mjs:22`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (Datei neu seit einer Scheibe nach takt-005).
-21. `scripts/hooks/mark-test-run.test.mjs:40`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-22. `scripts/hooks/mark-test-run.test.mjs:63`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-23. `scripts/hooks/mark-test-run.test.mjs:86`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-24. `scripts/hooks/pre-tool-use-bash.test.mjs:138`: `t@t.invalid` ist eine Test-Adresse in einem Git-Befehl-String für Tests (Zeile und Pfad `/tmp/x` haben sich seit takt-005 verschoben).
-25. `scripts/hooks/stop-check.test.mjs:26`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-26. `scripts/hooks/stop-check.test.mjs:132`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-27. `scripts/hooks/stop-check.test.mjs:155`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-28. `scripts/hooks/stop-check.test.mjs:169`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-29. `scripts/hooks/stop-check.test.mjs:189`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-30. `scripts/hooks/stop-check.test.mjs:203`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-31. `scripts/role-literal-check.test.mjs:174`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (Datei neu seit einer Scheibe nach takt-005).
-32. `scripts/role-literal-check.test.mjs:202`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (Datei neu seit einer Scheibe nach takt-005).
-33. `scripts/slice-scope.test.mjs:181`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-34. `scripts/slice-scope.test.mjs:188`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-35. `scripts/slice-scope.test.mjs:214`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-36. `scripts/slice-scope.test.mjs:223`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-37. `scripts/slice-scope.test.mjs:228`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-38. `scripts/slice-scope.test.mjs:249`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-39. `scripts/slice-scope.test.mjs:257`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
-40. `scripts/slice-scope.test.mjs:262`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung (neuer Testfall seit takt-005).
+Begründung je Adresse:
+1. `t@t.invalid`: Die Domain `.invalid` ist nach RFC 2606 reserviert und nie zustellbar. Git-Identität in
+   Testfixtures (`-c user.email=…` in `scripts/**/*.test.mjs`), ein Befehlsbeispiel in der Spec von 016 und
+   Zitate davon in dieser Datei und im Bericht von takt-007.
+2. `noreply@anthropic.com`: Automatisierungs-Adresse aus Commit-Vorlagen (Co-Authored-By), keine Person; nur als
+   Beispiel in dieser Spec und Zitate davon.
 
-Keine dieser 40 Fundstellen ist eine persönliche Adresse; keine weitere persönliche Adresse wurde gefunden.
+Die zweite Zeile zählt alle Fundstellen, die keine der beiden Adressen enthalten: 0. Eine persönliche Adresse
+steht damit nirgends im Arbeitsbaum.
 
 **plan-graph.mjs:**
 ```

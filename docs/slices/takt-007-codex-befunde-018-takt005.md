@@ -42,7 +42,8 @@ Keine andere Wortlautänderung im Entwicklungsplan, keine neue Zeile in Abschnit
 - `docs/slices/takt-007-codex-befunde-018-takt005.md` (Bericht)
 
 Nachtrag Orchestrator: als Liste statt Fließtext. Im Fließtext galt die README im Wurzelverzeichnis für das Tor als
-README unter docs, weil es einen bloßen Dateinamen im selben Absatz auf das Verzeichnis des vorigen Pfads bezieht
+README unter docs, weil es einen bloßen Dateinamen im selben Listenpunkt (ohne Liste: im ganzen Abschnitt) auf das
+Verzeichnis des vorigen Pfads bezieht
 (Befund des Umsetzers, Folgepunkt für das Scheibenumfang-Skript). Die erlaubten Dateien bleiben dieselben; der
 Nachtrag nennt bewusst keinen Pfad in Backticks, damit er die Liste nicht erweitert.
 
@@ -67,7 +68,7 @@ Nachtrag nennt bewusst keinen Pfad in Backticks, damit er die Liste nicht erweit
    sodass der Satz nur noch die Prüfpunkte 3, 4 und 7 nennt (deckungsgleich mit `docs/produktplan-beta.md`
    Abschnitt 6.3, das den Review des Architekten nur an diesen drei Prüfpunkten plant); sonst kein Wort geändert.
    `node scripts/plan-honesty.mjs` bleibt grün.
-2. `README.md` Dokumentenindex: die vier Verzeichnis-Zeilen `docs/adr/`, `docs/betrieb/`, `docs/datenschutz/`,
+2. `README.md` Dokumentenindex: die fünf Verzeichnis-Zeilen `docs/adr/`, `docs/betrieb/`, `docs/datenschutz/`,
    `docs/sicherheit/` und `docs/feedback/` durch je eine Zeile pro Datei ersetzt (14 ADR-Dateien 0003–0016, 1 Datei
    unter `docs/betrieb/`, 1 unter `docs/datenschutz/`, 3 unter `docs/sicherheit/`, 3 unter `docs/feedback/`); jeder
    Zweck stammt aus der ersten Überschrift bzw. dem ersten Absatz der jeweiligen Datei. Bestehende Zeilen, die schon
@@ -75,9 +76,10 @@ Nachtrag nennt bewusst keinen Pfad in Backticks, damit er die Liste nicht erweit
    `docs/bautage/` (kein solcher Pfad unter `docs/` vorhanden).
 3. `docs/slices/takt-005-email-aus-012.md`, Abschnitt Bericht: den `git diff --stat`-Block (Stand vor dem Squash)
    durch `git show --stat --format= e79c69d` (Squash-Commit von takt-005) ersetzt, den veralteten E-Mail-Scan durch
-   einen neuen `git grep`-Lauf auf dem heutigen Integrationsbranch ersetzt, jede der 40 Fundstellen einzeln
-   begründet (10 davon als Selbstzitate benannt, weil sie im Bericht selbst liegen und den vorigen Scan wörtlich
-   zitieren) und einen Satz ergänzt, dass beide Nachweise am 23.09.2026 durch takt-007 ersetzt wurden.
+   einen neuen `git grep`-Lauf auf `8622df1` ersetzt, jede der 40 Fundstellen einzeln begründet und einen Satz
+   ergänzt, dass beide Nachweise am 23.09.2026 durch takt-007 ersetzt wurden. *(Nachtrag Orchestrator: die Zählung
+   „10 Selbstzitate“ war falsch, es waren 17; der Scan ist nach Codex und Review inzwischen durch eine Form ersetzt,
+   die beim Einfügen gleich bleibt, siehe Review findings.)*
 
 **Evidence:**
 
@@ -106,8 +108,9 @@ $ git show --stat --format= e79c69d
  4 files changed, 197 insertions(+), 2 deletions(-)
 ```
 
-*Ziel 3 — E-Mail-`git grep` aus takt-005 Ziel 2, neu ausgeführt auf dem heutigen Integrationsbranch (identischer
-Befehl wie in der takt-005-Spec):*
+*Ziel 3 — E-Mail-`git grep` aus takt-005 Ziel 2, neu ausgeführt auf `8622df1` (Integrationsbranch vor dieser
+Änderung; identischer Befehl wie in der takt-005-Spec). Stand des Bauers, im Bericht von takt-005 inzwischen durch die
+Mengenform ersetzt:*
 ```
 $ git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**'
 docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
@@ -152,8 +155,8 @@ scripts/slice-scope.test.mjs:257:    spawnSync('git', ['-c', 'user.email=t@t.inv
 scripts/slice-scope.test.mjs:262:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'unrelated'], { cwd: dir });
 ```
 Alle 40 Fundstellen sind Test- oder Automatisierungsadressen (`t@t.invalid`, `noreply@anthropic.com`) oder
-Selbstzitate der Zeilen 65–72 und 76–83 in `docs/slices/takt-005-email-aus-012.md` selbst; keine persönliche
-Adresse gefunden. Begründung jeder einzelnen Zeile steht ausführlich im Bericht von takt-005.
+Selbstzitate der Zeilen 65–72 und 76–83 in `docs/slices/takt-005-email-aus-012.md` (Stand `8622df1`); keine
+persönliche Adresse gefunden.
 
 *`pnpm gates` (Tail, wörtlich):*
 ```
@@ -307,4 +310,18 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 · 23.09.2026 · Urteil: nacharbeiten** (0/1/2 + 4 nits), dazu Codex auf PR #22 (1 × P2). Die
+Nacharbeit hat der Orchestrator selbst gemacht (nach oben abgewichen, reine Textstellen).
+
+1. major · Zählung der Selbstzitate falsch („Zeilen 1–10“, „10 davon“; tatsächlich 17, Eintrag 1 ist ein echter
+   Treffer) → takt-005 durch die Mengenform ersetzt (Punkt P2), hier berichtigt.
+2. minor · README: die Legende zum PNG steht nicht im Bild, sondern im Anhang des Fragenpakets → Zeile verweist dorthin.
+3. minor · Scan nannte keinen Commit → der Lauf des Bauers ist mit `8622df1` bezeichnet; die neue Mengenform läuft
+   über den Arbeitsbaum und bleibt beim Einfügen gleich.
+4. nit · „vier Verzeichnis-Zeilen“ bei fünf Verzeichnissen → „fünf“.
+5. nit · Zeile 19 der takt-005-Spec liegt im Ziel, nicht im Bericht → mit der Mengenform entfallen.
+6. nit · Satz in Plan Abschnitt 3 wirkt verkürzt → bleibt, grammatisch korrekt.
+7. nit · Nachtrag zu „Files allowed“: Einheit ist der Listenpunkt, nicht der Absatz → präzisiert.
+- Codex P2 · Die eingefügte Liste aller Fundstellen wächst mit jedem Einfügen (auf dem Endstand 137 statt 40
+  Treffer), ein Bericht kann so nie den Endstand zeigen → **Ursache statt Einzelfall:** takt-005 weist jetzt die
+  Menge der verschiedenen Adressen und die Zahl der übrigen Fundstellen (0) nach; beides bleibt beim Einfügen gleich.
