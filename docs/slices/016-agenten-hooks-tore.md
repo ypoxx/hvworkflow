@@ -137,7 +137,7 @@ settings.json-Diff; Protokoll eines blockierten Stop-Versuchs; rote Läufe; plan
 
 ## Arbeitsweise
 
-- Worktree `/home/user/wt/016`, Branch `claude/slice-016-hooks`. Absolute Pfade.
+- Worktree `/home/user/wt/016`, Branch `claude/slice-016-agenten`. Absolute Pfade.
 - Achtung: Hooks in `.claude/settings.json` wirken auf Claude-Sitzungen in diesem Worktree. Teste Hook-Skripte über
   stdin mit Beispiel-JSON, nicht indem du deine eigene Sitzung blockierst.
 - Jeder Commit nennt die Scheibe und endet in der Betreffzeile mit `[skip netlify]`.
