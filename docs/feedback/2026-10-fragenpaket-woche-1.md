@@ -249,14 +249,15 @@ Punkt im Änderungsprotokoll für die Projektleitung.
 ## Anhang — Bild der Wortmeldeliste und Legende
 
 Bild: `2026-10-fragenpaket-wortmeldeliste.png` (Wortmeldeliste der Demo in der Rolle mit den meisten
-sichtbaren Knöpfen; jede Nummer markiert einen Knopf oder ein Bedienelement).
+sichtbaren Knöpfen; jede Nummer markiert einen Knopf, ein Bedienelement, eine Anzeige oder einen
+Hinweis). Uhr und Zähler in der Kopfzeile sind Anzeigen ohne Nummer.
 
 | Nummer | Bedienelement | Was es tut |
 |---|---|---|
-| 1 | Verteilung der Einzelfragen | Kopfzeile: zeigt als Farbbalken, in welchem Bearbeitungsstand die 800 Einzelfragen des Bestands stehen (erfasst, in Arbeit, Clearing, freigegeben, Bühne, vorgelesen); der breiteste Abschnitt, „vorgelesen", macht 468 davon aus. Bei Fokus oder Mauskontakt öffnet sich die Aufschlüsselung mit Zahlen je Stand. |
+| 1 | Verteilung der Einzelfragen | Kopfzeile: zeigt als Farbbalken, in welchem Bearbeitungsstand die 800 Einzelfragen des Bestands stehen (erfasst, in Arbeit, Clearing, freigegeben, Bühne, vorgelesen); der breiteste Abschnitt, „vorgelesen", macht 468 davon aus. Beim Anwählen mit Maus oder Tabulatortaste öffnet sich die Aufschlüsselung mit Zahlen je Stand. |
 | 2 | Rolle wechseln | Öffnet die Liste der Demo-Rollen und wechselt die Rechte der angemeldeten Person, ohne eine eigene Anmeldung; die Wortmeldeliste zeigt danach nur, was die neue Rolle darf. |
 | 3 | Deutsch | Stellt die Oberfläche auf Deutsch, die Haussprache des Werkzeugs. |
-| 4 | Englisch (en-US) | Stellt die Oberfläche auf Englisch (en-US); vollständig übersetzt, kein Rückfalltext. |
+| 4 | Englisch (en-US) | Stellt die Oberfläche auf Englisch (en-US); vollständig übersetzt. |
 | 5 | Tastaturkürzel | Öffnet die Übersicht der Tastaturkürzel (Sprung in einen Bereich, Navigation ein-/ausklappen, diese Übersicht öffnen). |
 | 6 | Demodaten zurücksetzen | Öffnet die Sicherheitsabfrage, um den synthetischen Demobestand auf diesem Gerät zu verwerfen und neu aufzubauen; es gehen keine echten Daten verloren, weil nur der synthetische Bestand betroffen ist. |
 | 7 | Wortmeldungen | Navigation: wechselt zur Wortmeldeliste — der hier gezeigte Bereich. |
@@ -264,7 +265,7 @@ sichtbaren Knöpfen; jede Nummer markiert einen Knopf oder ein Bedienelement).
 | 9 | Beantwortung | Navigation: wechselt zur Beantwortung (Antwortentwurf, Legal Clearing, Freigabe je Antwortpfad). |
 | 10 | Bühne | Navigation: wechselt zur Bühne (Podiumsansicht: freigegebene Antwort vorlesen und abschließen). |
 | 11 | Historie & Suche | Navigation: wechselt zu Historie & Suche (Vorgangshistorie und Volltextsuche). |
-| 12 | Navigation einklappen | Klappt die linke Navigation auf Icons zusammen, um Platz für die Arbeitsfläche zu gewinnen. |
+| 12 | Navigation einklappen | Klappt die linke Navigation auf Symbole zusammen, um Platz für die Arbeitsfläche zu gewinnen. |
 | 13 | Wortmeldung aufnehmen | Öffnet den Dialog, um eine neue Wortmeldung (Name, Organisation, Art, Runde, angemeldete Redezeit) ans Ende der gewählten Runde aufzunehmen. |
 | 14 | Redezeit-Anzeige | Zeitring und Digitalanzeige der laufenden Redezeit der Person am Mikrofon; die Anzeige färbt sich, sobald die angemeldete Redezeit überschritten ist. Die Redezeit-Anzeigen selbst entfallen ohnehin mit Rückmeldung 15. |
 | 15 | Zur Erfassung | Führt von der Person am Mikrofon zur Erfassung, um ihren Redebeitrag in Einzelfragen zu zerlegen. |
@@ -275,19 +276,20 @@ sichtbaren Knöpfen; jede Nummer markiert einen Knopf oder ein Bedienelement).
 | 20 | Runde 2 ausklappen | Klappt Runde 2 auf, um ihre Wortmeldungen zu zeigen; eingeklappt, weil nicht die aktuelle Runde. |
 | 21 | Rundenfortschritt Runde 2 | Zeigt den Anteil der in Runde 2 bereits beendeten Wortmeldungen. |
 | 22 | Runde 3 einklappen | Klappt die aktuelle Runde 3 wieder ein; sie ist beim Öffnen der Wortmeldeliste automatisch aufgeklappt. |
-| 23 | Rundenfortschritt Runde 3 | Zeigt den Anteil der in Runde 3 bereits beendeten Wortmeldungen. |
-| 24 | Wortmeldung 75 verschieben | Greift Wortmeldung Nr. 75 zum Verschieben innerhalb von Runde 3 (Ziehen, oder Leertaste zum Anheben und Pfeiltasten zum Verschieben); derselbe Griff steht am linken Rand jeder Zeile. |
-| 25 | Redebeitrag von Wortmeldung 75 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 75, weil sie bereits gesprochen hat; dieselbe Schaltfläche erscheint in jeder Zeile mit dem Stand „spricht" oder „beendet". |
-| 26 | Wortmeldung 76 verschieben | Greift Wortmeldung Nr. 76 zum Verschieben innerhalb von Runde 3; gleich in jeder Zeile (siehe Nr. 24). |
-| 27 | Redebeitrag von Wortmeldung 76 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 76; gleich in jeder Zeile mit dem Stand „spricht" oder „beendet" (siehe Nr. 25). |
-| 28 | Läuft (Wortmeldung 91) | Digitalanzeige der laufenden Redezeit von Wortmeldung Nr. 91 (Spalte „Läuft"); zeigt „—", solange niemand am Mikrofon ist. |
-| 29 | Redebeitrag von Wortmeldung 91 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 91, die gerade spricht (gleich in jeder Zeile mit diesem Stand). |
-| 30 | Wortmeldung 91 beenden | Beendet Wortmeldung Nr. 91; ihr Stand wechselt auf „beendet" (gleich in jeder Zeile mit diesem Stand). |
-| 31 | Wortmeldung 91 zurückziehen | Zieht Wortmeldung Nr. 91 zurück (gleich in jeder Zeile mit diesem Stand). |
-| 32 | Wortmeldung 92 aufrufen | Ruft Wortmeldung Nr. 92 ans Mikrofon; eine noch laufende Wortmeldung wird dabei zuerst automatisch beendet (gleich in jeder Zeile mit diesem Stand). |
-| 33 | Wortmeldung 92 in eine andere Runde verschieben | Öffnet den Dialog, um Wortmeldung Nr. 92 in eine andere Runde zu verschieben (gleich in jeder Zeile mit diesem Stand). |
-| 34 | Wortmeldung 92 zurückziehen | Zieht Wortmeldung Nr. 92 zurück (gleich in jeder Zeile mit diesem Stand). |
-| 35 | Runde 4 ausklappen | Klappt Runde 4 auf, um ihre Wortmeldungen zu zeigen; eingeklappt, weil nicht die aktuelle Runde. |
-| 36 | Rundenfortschritt Runde 4 | Zeigt den Anteil der in Runde 4 bereits beendeten Wortmeldungen. |
+| 23 | Verschiebehinweis Runde 3 | Text- und Symbolhinweis im Kopf von Runde 3: zeigt, dass Wortmeldungen dieser Runde am Griff gezogen oder mit der Leertaste angehoben und dann mit den Pfeiltasten verschoben werden können; erscheint nur, wenn die Runde aufgeklappt ist und Wortmeldungen darin verschoben werden dürfen. |
+| 24 | Rundenfortschritt Runde 3 | Zeigt den Anteil der in Runde 3 bereits beendeten Wortmeldungen. |
+| 25 | Wortmeldung 75 verschieben | Greift Wortmeldung Nr. 75 zum Verschieben innerhalb von Runde 3 (Ziehen, oder Leertaste zum Anheben und Pfeiltasten zum Verschieben); derselbe Griff steht am linken Rand jeder Zeile. |
+| 26 | Redebeitrag von Wortmeldung 75 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 75, weil sie bereits gesprochen hat; dieselbe Schaltfläche erscheint in jeder Zeile mit dem Stand „spricht" oder „beendet". |
+| 27 | Wortmeldung 76 verschieben | Greift Wortmeldung Nr. 76 zum Verschieben innerhalb von Runde 3; gleich in jeder Zeile (siehe Nr. 25). |
+| 28 | Redebeitrag von Wortmeldung 76 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 76; gleich in jeder Zeile mit dem Stand „spricht" oder „beendet" (siehe Nr. 26). |
+| 29 | Läuft (Wortmeldung 91) | Digitalanzeige der laufenden Redezeit von Wortmeldung Nr. 91 (Spalte „Läuft"); zeigt „—" in jeder Zeile, die gerade nicht spricht. |
+| 30 | Redebeitrag von Wortmeldung 91 erfassen | Öffnet die Erfassung für Wortmeldung Nr. 91, die gerade spricht (gleich in jeder Zeile mit diesem Stand). |
+| 31 | Wortmeldung 91 beenden | Beendet Wortmeldung Nr. 91; ihr Stand wechselt auf „beendet" (gleich in jeder Zeile mit diesem Stand). |
+| 32 | Wortmeldung 91 zurückziehen | Zieht Wortmeldung Nr. 91 zurück (gleich in jeder Zeile mit diesem Stand). |
+| 33 | Wortmeldung 92 aufrufen | Ruft Wortmeldung Nr. 92 ans Mikrofon; eine noch laufende Wortmeldung wird dabei zuerst automatisch beendet (gleich in jeder Zeile mit diesem Stand). |
+| 34 | Wortmeldung 92 in eine andere Runde verschieben | Öffnet den Dialog, um Wortmeldung Nr. 92 in eine andere Runde zu verschieben (gleich in jeder Zeile mit diesem Stand). |
+| 35 | Wortmeldung 92 zurückziehen | Zieht Wortmeldung Nr. 92 zurück (gleich in jeder Zeile mit diesem Stand). |
+| 36 | Runde 4 ausklappen | Klappt Runde 4 auf, um ihre Wortmeldungen zu zeigen; eingeklappt, weil nicht die aktuelle Runde. |
+| 37 | Rundenfortschritt Runde 4 | Zeigt den Anteil der in Runde 4 bereits beendeten Wortmeldungen. |
 
-Weitere Zeilen von Runde 3 tragen keine eigene Nummer, damit das Bild lesbar bleibt, wiederholen aber dieselben Bedienelemente: Wortmeldungen mit dem Stand „beendet" (z. B. Nr. 77–90) zeigen Griff und Erfassungs-Schaltfläche wie Nr. 24–27; eine zweite laufende Wortmeldung würde Läuft-Anzeige, Erfassungs-, Beenden- und Zurückziehen-Schaltfläche wie Nr. 28–31 zeigen; weitere wartende Wortmeldungen (z. B. Nr. 93 und folgende) zeigen Aufrufen-, Verschieben- und Zurückziehen-Schaltfläche wie Nr. 32–34.
+Weitere Zeilen von Runde 3 tragen keine eigene Nummer, damit das Bild lesbar bleibt, wiederholen aber dieselben Bedienelemente: Wortmeldungen mit dem Stand „beendet" (z. B. Nr. 77–90) zeigen Griff und Erfassungs-Schaltfläche wie Nr. 25–28; eine zweite laufende Wortmeldung würde Läuft-Anzeige, Erfassungs-, Beenden- und Zurückziehen-Schaltfläche wie Nr. 29–32 zeigen; weitere wartende Wortmeldungen (z. B. Nr. 93 und folgende) zeigen Aufrufen-, Verschieben- und Zurückziehen-Schaltfläche wie Nr. 33–35.
