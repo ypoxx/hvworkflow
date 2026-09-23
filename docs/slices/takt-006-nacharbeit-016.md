@@ -343,16 +343,18 @@ Runde 1 und beide Codex-Punkte mit eigenen Proben erledigt; neu:
   zählen nur Buchstaben vor dem ersten `o`; `-uo WERT` nimmt das nächste Wort als Wert (`c7b8fea`).
 - P1 · Nachweis: die gates-Ausgabe stammte von vor der ReDoS-Behebung → neuer Lauf auf dem Endstand, unten.
 - P2 · `git push -o "ci skip" origin` zählte drei Ziele → Push-Argumente werden als Shell-Wörter zerlegt (`039c90b`).
+- P2 · teilweise gequotete oder maskierte Präfixe (`'+'main`, `':'main`, `\+main`) kamen durch → Shell-Wörter werden
+  wie von der Shell übergeben ausgewertet, ohne Anführungszeichen und mit aufgelösten Escapes (`02e79ce`).
 
-`pnpm gates` auf dem Endstand `039c90b`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
+`pnpm gates` auf dem Endstand `02e79ce`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
 
 ```
-# pass 184
+# pass 188
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6114.050274
+# duration_ms 6955.608423
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -377,6 +379,6 @@ dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.22s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 039c90b, tree ebe0eeda28e6…
+✓ built in 2.28s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 02e79ce, tree 995f77d7e289…
 ```
