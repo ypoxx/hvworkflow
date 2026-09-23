@@ -499,24 +499,24 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07 */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010). */
             ruleId?: string;
         };
         /**
-         * @description Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface never branches on a role name; it reads `_actions`.
+         * @description Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface never branches on a role name; it reads `_actions`. `coordination` (since 0.2.0) is the working name (Arbeitsname) of the role that classifies and assigns; displayed as "Koordination", final name pending register entry E1. Its permission bundle arrives with slice 021; until then the server does not know the role.
          * @enum {string}
          */
-        Role: "moderation" | "capture" | "expert" | "legal" | "approver" | "podium" | "admin" | "observer";
+        Role: "moderation" | "capture" | "expert" | "legal" | "approver" | "podium" | "admin" | "observer" | "coordination";
         Actor: {
             id: string;
             role: components["schemas"]["Role"];
             displayName?: string;
         };
         /**
-         * @description Permission identifiers, identical to the domain permission list.
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021).
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "contribution.capture" | "question.capture" | "question.classify" | "question.assign" | "answer.draft" | "question.submit_review" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "question.capture" | "question.classify" | "question.assign" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "stage.read" | "history.read" | "event.read" | "demo.seed";
         Meeting: {
             id: string;
             /** @example Ordentliche Hauptversammlung 2027 */
@@ -559,11 +559,19 @@ export interface components {
             /** @description Pseudonym in the demo; real name only via the register interface */
             displayName: string;
             organisation?: string;
-            /** @enum {string} */
-            kind: "shareholder" | "proxy" | "association";
+            /**
+             * @deprecated
+             * @description Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+             * @enum {string}
+             */
+            kind?: "shareholder" | "proxy" | "association";
             round: number;
             position: number;
             status: components["schemas"]["SpeakerStatus"];
+            /**
+             * @deprecated
+             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+             */
             requestedMinutes?: number;
             /** Format: date-time */
             speakingStartedAt?: string;
@@ -576,14 +584,26 @@ export interface components {
         SpeakerRegistration: {
             displayName: string;
             organisation?: string;
-            /** @enum {string} */
-            kind: "shareholder" | "proxy" | "association";
+            /**
+             * @deprecated
+             * @description Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15). No longer required since 0.2.0; the enum stays so an out-of-enum value is still a 422.
+             * @enum {string}
+             */
+            kind?: "shareholder" | "proxy" | "association";
             round?: number;
+            /**
+             * @deprecated
+             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+             */
             requestedMinutes?: number;
         };
         SpeakerUpdate: {
             status?: components["schemas"]["SpeakerStatus"];
             round?: number;
+            /**
+             * @deprecated
+             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+             */
             requestedMinutes?: number;
         };
         /** @description Character offsets into the contribution text, half-open interval */
@@ -694,12 +714,21 @@ export interface components {
             deliveredCount: number;
             openCount: number;
         };
-        /** @description One immutable fact. The sequence number is global and gap-free. */
+        /** @description Payload of `QuestionLegalCleared` (since 0.2.0): legal (Recht) has cleared one answer version (Rechtsfreigabe). The clearing is bound to that version like the approval is; it is a recommendation, not the approval itself, which stays with `question.approve` (register E25). Emitted by the core from slice 021; no operation of its own yet (it is declared through the allowlist when 021 needs it). */
+        QuestionLegalClearedPayload: {
+            /** @description Same value as the event's `subjectId`, repeated so the payload is self-contained for neighbouring systems */
+            questionId: string;
+            /** @description The answer version the clearing is bound to */
+            answerVersion: number;
+            /** @description Optional remark of the clearing lawyer (Anmerkung) */
+            note?: string;
+        };
+        /** @description One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per event type additively: an event of type `QuestionLegalCleared` carries `QuestionLegalClearedPayload`; every other type keeps the open object. */
         Event: {
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "MeetingCreated" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged";
+            type: "MeetingCreated" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged";
             /** Format: date-time */
             at: string;
             actor: components["schemas"]["Actor"];
@@ -721,7 +750,7 @@ export interface components {
                 "application/json": components["schemas"]["Question"];
             };
         };
-        /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`) */
+        /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`): R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010). */
         Forbidden: {
             headers: {
                 [name: string]: unknown;
@@ -803,6 +832,7 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     listAgendaItems: {
@@ -823,6 +853,7 @@ export interface operations {
                     "application/json": components["schemas"]["AgendaItem"][];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     listUnits: {
@@ -843,6 +874,7 @@ export interface operations {
                     "application/json": components["schemas"]["Unit"][];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     listSpeakers: {
@@ -866,6 +898,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"][];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     registerSpeaker: {
@@ -950,6 +983,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1009,6 +1043,7 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"][];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     captureContribution: {
@@ -1060,6 +1095,7 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1129,6 +1165,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     getQuestion: {
@@ -1152,6 +1189,7 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1175,6 +1213,7 @@ export interface operations {
                     "application/json": components["schemas"]["Event"][];
                 };
             };
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1490,6 +1529,7 @@ export interface operations {
                     "application/json": components["schemas"]["StageView"];
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     listEvents: {
@@ -1516,6 +1556,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Forbidden"];
         };
     };
     seedDemo: {
