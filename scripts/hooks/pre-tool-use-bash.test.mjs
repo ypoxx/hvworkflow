@@ -333,3 +333,20 @@ test('codex round 3 green: git push -o "ci skip" origin main passes', () => {
 test("codex round 3 red: git push -o 'a b c' origin has no branch (single quotes)", () => {
   assert.equal(runCommand("git push -o 'a b c' origin").status, 2);
 });
+
+// takt-006 Codex round 4: a partially quoted or escaped prefix is still a forced/deleting refspec.
+test("codex round 4 red: git push origin '+'main is a forced refspec", () => {
+  assert.equal(runCommand("git push origin '+'main").status, 2);
+});
+
+test("codex round 4 red: git push origin ':'main is a deleting refspec", () => {
+  assert.equal(runCommand("git push origin ':'main").status, 2);
+});
+
+test('codex round 4 red: git push origin \\+main is a forced refspec', () => {
+  assert.equal(runCommand('git push origin \\+main').status, 2);
+});
+
+test('codex round 4 green: git push origin "claude/x" still passes', () => {
+  assert.equal(runCommand('git push origin "claude/x"').status, 0);
+});

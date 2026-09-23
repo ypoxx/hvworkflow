@@ -217,9 +217,10 @@ function gitPushFindings(command) {
   return out;
 }
 
-/** Splits a command tail into shell words: whitespace separates words, but not inside `'…'` or `"…"`,
- * and a backslash escapes the next character. Quote characters stay in the word (`stripQuotes` removes
- * one wrapping layer later), so `-o "ci skip"` is two words, not three (takt-006, Codex round 3). */
+/** Splits a command tail into shell words the way the shell hands them to git: whitespace separates
+ * words, but not inside `'…'` or `"…"`; quote characters are removed and a backslash outside single
+ * quotes yields the next character literally. So `-o "ci skip"` is two words (Codex round 3), and
+ * `'+'main`, `':'main` and `\\+main` all arrive as `+main`/`:main` (Codex round 4). */
 function shellWords(text) {
   const words = [];
   let word = '';
@@ -228,14 +229,14 @@ function shellWords(text) {
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quote) {
-      word += c;
       if (c === quote) quote = null;
+      else if (quote === '"' && c === '\\' && i + 1 < text.length) word += text[++i];
+      else word += c;
     } else if (c === '\\' && i + 1 < text.length) {
-      word += c + text[++i];
+      word += text[++i];
       inWord = true;
     } else if (c === '"' || c === "'") {
       quote = c;
-      word += c;
       inWord = true;
     } else if (/\s/.test(c)) {
       if (inWord) words.push(word);
