@@ -129,3 +129,25 @@ test('M4 green: --git-dir with an explicit, non-forced push still passes', () =>
   const r = runCommand('git --git-dir=/home/user/wt/016/.git push origin claude/slice-016-agenten');
   assert.equal(r.status, 0, r.stderr);
 });
+
+// Review rework round 1, m2: these three used to false-positive on the old, boundary-free ".env" scan.
+test('m2 green: grep -rn "process.env" is not a .env file access', () => {
+  const r = runCommand('grep -rn "process.env" apps/api/src');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('m2 green: import.meta.env is not a .env file access', () => {
+  const r = runCommand('grep -rn "import.meta.env" apps/web/src');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('m2 green: .envrc is a different, unrelated dotfile', () => {
+  const r = runCommand('cat .envrc');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('m2 red: a real .env path still blocks after the path-boundary fix', () => {
+  const r = runCommand('cat apps/api/.env');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /\.env/);
+});

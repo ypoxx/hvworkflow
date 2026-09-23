@@ -141,3 +141,59 @@ test('skip (exit 0): an unresolvable integration ref', () => {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /skipping/);
 });
+
+test('m4 green: a bare filename after a full path resolves against that path\'s directory', () => {
+  const r = run([
+    '--spec',
+    FIXTURE_SPEC,
+    '--diff',
+    [
+      'scripts/fixtures/slice-scope/900-fixture.md',
+      'apps/web/e2e/002-x.spec.ts', // the full path itself
+      'apps/web/e2e/003-y.spec.ts', // bare `003-y.spec.ts` in the spec, resolved against apps/web/e2e/
+      'apps/web/e2e/abnahme.spec.ts', // bare `abnahme.spec.ts`, same directory
+    ].join(','),
+  ]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('m4 red: the same bare filenames do not match at the repository root (proof they were resolved, not left bare)', () => {
+  const r = run(['--spec', FIXTURE_SPEC, '--diff', '003-y.spec.ts']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /003-y\.spec\.ts/);
+});
+
+test('m4 red: a bare "*" pattern is rejected outright, not interpreted as "everything"', () => {
+  const r = run(['--spec', 'scripts/fixtures/slice-scope/902-bare-wildcard.md', '--diff', 'anything/at/all.ts']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /bare "\*" pattern/);
+});
+
+test('m4: a warning (not a failure) when "Files allowed" changed since the merge-base', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    const specPath = join(dir, 'docs', 'slices', '016-x.md');
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(specPath, '# 016 — X\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n');
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+    spawnSync('git', ['remote', 'add', 'origin', dir], { cwd: dir });
+    spawnSync('git', ['fetch', '-q', 'origin', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-016-agenten'], { cwd: dir });
+    // Widen "Files allowed" mid-slice.
+    writeFileSync(specPath, '# 016 — X\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n- `scripts/**`\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
+
+    const r = spawnSync('node', [SCRIPT, '--root', dir, '--slice', '016'], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_HEAD_REF: '', CI: '' },
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /differs from its version at the merge-base/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -118,7 +118,8 @@ Plan 6.4 (Tore aus 016); Plan 8.3 (Kalendermodell); Audit A2 (Hooks); ADR 0016 (
   m9 — und die Werkzeug-Spalte der Zeilen „Versions- und Changelog-Pflicht" und „ADR-Bezug")
 - `scripts/hooks/**`, `scripts/slice-scope.mjs`, `scripts/downgrade-check.mjs`, `scripts/plan-graph.mjs`,
   `scripts/**/*.test.mjs`, `scripts/fixtures/**` (Testkopien)
-- `.github/workflows/gates.yml` (neue Schritte, `CONTRACT_GATE_STRICT`, die zwei Pins aus Punkt 7)
+- `.github/workflows/gates.yml` (neue Schritte, `CONTRACT_GATE_STRICT`, die zwei Pins aus Punkt 7,
+  der `concurrency`-Block aus Nacharbeitsrunde 1, m11)
 - `scripts/role-literal-check.mjs`, `scripts/semgrep/rules.yml`, `scripts/now-check.mjs` (nur Punkt 7)
 - `scripts/audit-exceptions.json` (nur das Feld `owner`, Punkt 7)
 - `packages/contract/scripts/check.mjs` (nur `CONTRACT_GATE_STRICT`; Lane contract, frei bis 010)
@@ -234,6 +235,11 @@ werden; der erste CI-Lauf zeigte nur B1.
   - pin comment `# v4.3.0`;
   - strip `/* */` comments in the union parser;
   - `pnpm -r test` may also write the marker (optional).
+- **m11.** (orchestrator addition, small) `.github/workflows/gates.yml`: add
+  `concurrency: { group: gates-${{ github.event.pull_request.number || github.ref }},
+  cancel-in-progress: true }` — a superseded run on PR #15 failed inside gitleaks-action with
+  "Invalid revision range `<base>^..<newer head>`" because that action fetches the PR's commit list
+  at run time, by when the head had already moved on; cancelling superseded runs removes the race.
 
 Evidence: a "Befund → Erledigung" table in the Bericht, red/green runs for B1, M1–M4 and M6, the
 `pnpm gates` tail, and the status "review (Nacharbeitsrunde 1)".
@@ -713,16 +719,16 @@ index 1b9f0d4..febd618 100644
 - **SubagentStop-/Stop-/TaskCompleted-Hook-Verhalten gegenüber der echten Claude-Code-Sitzung ist
   eine begründete Annahme, kein Beleg aus offizieller Schema-Dokumentation**: Ich habe kein
   Referenzdokument für die exakte JSON-Form dieser drei Ereignisse gefunden (im Unterschied zu
-  `PreToolUse`, das schon aus 012 bekannt war). Die Fingerabdruck-Erkennung in
+  `PreToolUse`, das schon aus 012 bekannt war). ~~Die Fingerabdruck-Erkennung in
   `subagent-stop-check.mjs` stützt sich darauf, dass die erste Zeile eines Agenten-Systemprompts
-  wortgleich im eigenen Transkript auftaucht — das ist genau das, was ich in dieser Sitzung selbst als
-  `implementierer-backend` beobachtet habe (meine eigene erste Eingabezeile war wortgleich mit
-  `.claude/agents/implementierer-backend.md`s Textkörper), aber ich konnte es nicht gegen eine zweite,
-  unabhängige Quelle prüfen. Jedes der drei Skripte ist bewusst fail-open (blockiert nur bei
-  positiver Erkennung, nie bei Unklarheit), damit ein falsches Schema-Verständnis niemals eine echte
-  Sitzung blockiert statt nur wirkungslos zu bleiben. Ich habe die Hooks ausschließlich über
-  Datei-Redirection getestet (nie inline im Bash-Aufruf), wie in der Aufgabenstellung verlangt, und
-  keine meiner eigenen Sitzungsaktionen hätte laut Spec eines der neuen Muster ausgelöst.
+  wortgleich im eigenen Transkript auftaucht~~ — in Nacharbeitsrunde 1 (M3) durch `agent_type` plus
+  `last_assistant_message`/`agent_transcript_path` ersetzt, siehe die Tabelle dort; der Rest dieses
+  Punkts (kein amtliches Schema, bewusstes Fail-open) gilt unverändert für alle drei Hooks. Jedes der
+  drei Skripte ist bewusst fail-open (blockiert nur bei positiver Erkennung, nie bei Unklarheit),
+  damit ein falsches Schema-Verständnis niemals eine echte Sitzung blockiert statt nur wirkungslos zu
+  bleiben. Ich habe die Hooks ausschließlich über Datei-Redirection getestet (nie inline im
+  Bash-Aufruf), wie in der Aufgabenstellung verlangt, und keine meiner eigenen Sitzungsaktionen hätte
+  laut Spec eines der neuen Muster ausgelöst.
 - **`node --test scripts/**/*.test.mjs`** braucht in einer Shell die Glob-Syntax in Anführungszeichen
   (`'scripts/**/*.test.mjs'`), sonst expandiert die Shell `**` je nach `globstar`-Einstellung
   unvollständig; `package.json` nutzt die zitierte Form.
@@ -884,6 +890,60 @@ mark-test-run: wrote /home/user/wt/016/.claude/state/last-test-run (signature 94
 Exit `0`. Die neue Signatur-Zeile selbst ist der Beleg, dass `stop-check.mjs` jetzt git-basiert
 arbeitet (ein leerer Baum hätte `(clean tree)` gemeldet).
 
+### Nacharbeitsrunde 1 — Minor-Befunde (m1–m11)
+
+Zweiter Commit dieser Runde, wie im Auftrag „B1, B2 und M1–M6 zuerst committen, dann die Minor-Befunde".
+
+| # | Befund | Erledigung |
+|---|---|---|
+| m1 | `contract-gate-strict.test.mjs` nahm an, dass git und node in verschiedenen Verzeichnissen liegen (PATH-Manipulation) | Ersetzt durch `detachedContractDir()`: kopiert `packages/contract` per `cpSync` in ein frisches `mkdtempSync`-Verzeichnis ganz ohne `.git`-Vorfahren — `git rev-parse` schlägt dort deterministisch fehl, unabhängig davon, wo git/node auf dem jeweiligen Rechner liegen. |
+| m2 | PreToolUse: `grep -rn "process.env"`, `import.meta.env`, `.envrc` als `.env`-Zugriff falsch erkannt | `envFileFinding()`-Regex verlangt jetzt eine Pfadgrenze vor `.env` (`(?:^|[\s/"'`=(:;,])(\.env(?:\.[\w-]+)*)(?![\w-])`); die drei genannten Fälle sind jetzt grün, ein echter `.env`-Zugriff weiterhin rot. Bekannte, akzeptierte Umgehungen (schemaloses `curl`, Wrapper, `node -e fetch`) und das bewusste Fail-open bei kaputtem Input stehen jetzt im Skriptkopf. Keine `permissions`-Regeln in `.claude/settings.json` ergänzt (Eigentümer-Entscheidung). |
+| m3 | TaskCompleted: sollte nur bei genannter Slice-Nummer *und* Status ungleich `accepted`/`angenommen` blockieren, nie bei einem bloßen `- [x]` | Bereits mit B2 neu entworfen: `task-completed.mjs` liest die Slice-Nummer aus dem Text des erledigten To-dos, prüft ausschließlich `**Status:** accepted|angenommen` (`ACCEPTED_STATUS_RE`), ein `- [x]` zählt nirgends mehr als Abnahme; unbekanntes Eingabeformat und keine erkennbare Slice-Nummer geben immer frei. Bericht-Aussage zum Ereignis korrigiert (Abschnitt 5.4: „prüft, dass die Spec-Datei einen Status `accepted` … hat", nicht mehr „ein Abnahmehäkchen"). |
+| m4 | slice-scope: bare Dateinamen nach einem vollen Pfad nicht aufgelöst; bare `*`/`**` nicht abgelehnt; keine Warnung bei geänderter „Files allowed" seit dem Merge-Base | `extractGlobs` löst jetzt bare Dateinamen gegen das Verzeichnis des zuletzt genannten vollen Pfads *im selben Aufzählungspunkt* auf (getrennt pro Punkt); ein bare `*`/`**` wird ausdrücklich abgelehnt statt als „alles" interpretiert; eine neue Warnung (kein Fehler) meldet, wenn der Abschnitt „Files allowed" gegenüber der Merge-Base-Version der Spec abweicht. |
+| m5 | plan-graph: eine Zeile, die wie ein Scheiben-Aufzählungspunkt beginnt (`- **NNN ·`), aber nicht vollständig passt, wurde stillschweigend übersprungen | `parseSlices` wirft jetzt einen Fehler, sobald eine Zeile `NEXT_BULLET_RE` erfüllt, aber nicht dem vollen `HOURS_PER_CLASS_PATTERN` entspricht. Test hängt nicht mehr an „80 Scheiben" (nur noch an einer positiven Zahl) und lässt `--strict` gegen eine Testkopie (`ok.md`) statt den echten Plan laufen. |
+| m6 | `role-literal-check.test.mjs` schrieb destruktiv in die echten `types.ts`/`permissions.ts` (mit Try/finally-Wiederherstellung) | `role-literal-check.mjs` bekommt ein neues `--root <pfad>`; die Tests kopieren `apps/api/src` und `packages/domain/src` per `cpSync` in ein `mkdtempSync`-Verzeichnis und mutieren nur die Kopie. Ein expliziter Test prüft `git status --porcelain -- types.ts permissions.ts` am Ende der Suite (leer). |
+| m7 | downgrade-check: die Freigabe-Zeile zählte überall im Dateitext, auch als zitierte Prosa | Neue Funktion `headerBlock()`: nur der Text vor der ersten `## `-Überschrift (oder die ganze Datei, falls keine vorhanden) zählt für `DOWNGRADE_LINE_RE`. Rote Testkopie `scripts/fixtures/downgrade/quoted-prose/`: eine Herabstufung ohne echte Kopfzeilen-Freigabe, aber mit der Zeile als Beispiel-Zitat in einem späteren Abschnitt, schlägt weiterhin fehl. |
+| m8 | `branch-schutz.md`: Force-Push-Test gegen den echten Integrationsbranch; fehlender Hinweis zu Squash-Merges per API; fehlender Hinweis zum nötigen GitHub-Plan | Prüfpunkt umformuliert: Nachweis über die gespeicherte Regel im Screenshot, kein `git push --force` gegen den echten Branch mehr; wer es scharf testen will, nur gegen einen eigenen Wegwerf-Branch. Schritt 5 ergänzt: „Require a pull request" beendet direkte Pushes, ein Squash-Merge per API/CLI läuft aber selbst über einen PR und funktioniert weiter. Neuer Absatz unter „Ziel": private Repositorien brauchen mindestens GitHub Pro bzw. Team/Enterprise für Branch-Schutzregeln. |
+| m9 | Abschnitt 5.4 des Entwicklungsplans nannte vier Hooks als „geplant in Scheibe 016", obwohl sie in dieser Runde bereits laufen | Stand-Spalte für PreToolUse (voll), PostToolUse, Stop und SubagentStop auf `läuft (Hook: <Ereignis>)` gesetzt; „Files allowed" entsprechend ergänzt (bereits vor dieser Runde erledigt). |
+| m10 | Nits: Pin-Kommentar, `/* */` im Rollen-Union-Parser, optionaler `pnpm -r test`-Marker | Pin-Kommentar in `gates.yml` von `# v4 (currently v4.3.0)` auf `# v4.3.0` vereinheitlicht (gleiche Form wie die anderen Pins). `maskLineComments` in `role-literal-check.mjs` zu `maskComments` erweitert: maskiert jetzt auch `/* … */`-Blockkommentare (längen-/zeilenerhaltend), nicht nur `//`. Roter-vor-Fix-Beweis: ein `/* … */`-Kommentar mit `;` und einem erfundenen zitierten Namen in der `Role`-Union hätte vorher die Union vorzeitig abgeschnitten und einen „Role list mismatch" ausgelöst — jetzt grün (neuer Test). `pnpm -r test` schreibt den Marker weiterhin nicht zusätzlich (optional, siehe „Offen"). |
+| m11 | (Zusatz vom Orchestrator) `gates.yml`: fehlendes `concurrency`, dadurch schlug ein überholter Lauf auf PR #15 in `gitleaks-action` mit „Invalid revision range" fehl | `concurrency: { group: gates-${{ github.event.pull_request.number \|\| github.ref }}, cancel-in-progress: true }` ergänzt; überholte Läufe auf demselben PR/Branch werden jetzt abgebrochen statt zu Ende zu laufen. |
+
+**m5/m7/m10 rote/grüne Läufe:**
+```
+$ node --test scripts/plan-graph.test.mjs
+# m5 red: a line that starts like a slice bullet but does not match the full format fails loudly
+ok 87 ...
+# tests 8, pass 8, fail 0
+
+$ node --test scripts/downgrade-check.test.mjs
+# m7 red: the sign-off line quoted as prose in a later section does not count, only the header block does
+ok 5 ...
+# tests 5, pass 5, fail 0
+
+$ node --test scripts/role-literal-check.test.mjs
+# m10 green: a /* */ block comment in the Role union (with a semicolon and a fake quoted name inside) is masked, not just // line comments
+ok 9 ...
+# m6: the real types.ts and permissions.ts are untouched by this whole suite
+ok 10 ...
+# tests 10, pass 10, fail 0
+```
+
+#### Offen (Nacharbeitsrunde 1, Minor-Befunde)
+
+- **m10, dritter Punkt (ausdrücklich optional):** `pnpm -r test` schreibt den Marker
+  (`.claude/state/last-test-run`) nicht zusätzlich selbst — nur `pnpm gates` tut das am Ende, wie
+  zuvor. Ein `pnpm -r test` allein (außerhalb von `pnpm gates`) hinterlässt also weiterhin keinen
+  frischen Marker; das ist die bestehende, unveränderte Grenze von M2/`stop-check.mjs`, nicht neu
+  durch diese Runde eingeführt.
+- **Abschnitt 5.4, Zeile „TaskCompleted", Spalte „Wirkung"** sagt weiterhin „prüft, dass die
+  Spec-Datei ein Abnahmehäkchen hat" — nach B2/m3 stimmt das nicht mehr (geprüft wird `**Status:**
+  accepted`/`angenommen`, nie ein Häkchen). Nicht behoben: „Files allowed" dieser Runde erlaubt für
+  diese Zeile ausdrücklich nur die Stand-Spalte, nicht die Wirkung-Spalte (siehe oben, Abschnitt
+  „Files allowed"); eine Korrektur bräuchte eine weitere Freigabe des Orchestrators.
+- Die Git-*Historie* (nicht der aktuelle Dateiinhalt) trägt weiterhin die persönliche E-Mail-Adresse
+  aus den bereits gemergten, älteren Commits (siehe M5 oben) — unverändert seit dem ersten Commit
+  dieser Runde, kein Amend/Rebase vorgenommen.
+
 ## Touched
 
 `.claude/agents/architekt.md`, `planer.md`, `design-kritiker.md`, `reviewer-sonnet.md` (neu),
@@ -898,7 +958,8 @@ arbeitet (ein leerer Baum hätte `(clean tree)` gemeldet).
 `subagent-stop-check.mjs`, `task-completed.mjs`, `mark-test-run.mjs` (je + `.test.mjs`, alle neu),
 `scripts/fixtures/hooks/**`, `scripts/fixtures/slice-scope/**`, `scripts/fixtures/downgrade/**`,
 `scripts/fixtures/plan-graph/**`, `scripts/fixtures/i18n-literal/**` (neu, Testkopien),
-`docs/agentische-entwicklung-plan.md` (Abschnitt 5, drei Stand-Zellen),
+`docs/agentische-entwicklung-plan.md` (Abschnitt 5, drei Stand-Zellen vor Nacharbeitsrunde 1, plus vier
+weitere — PreToolUse (voll), PostToolUse, Stop, SubagentStop — in Runde 1, m9),
 `docs/betrieb/branch-schutz.md` (neu), diese Datei (Bericht, Status, Files-allowed-Ergänzung).
 
 ## Review findings

@@ -14,17 +14,23 @@ function run(args) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-test('green: the real product plan has 80 slices, no missing deps, no cycles, no order problems', () => {
+test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {
+  // Round 1, m5: do not hard-code the current slice count here — the plan grows over the project's
+  // life and a fixed number makes this test fail on every unrelated planning change. The slice count
+  // is still asserted to be a real, positive number, so an empty or unparsed plan still fails loudly.
   const r = run(['--plan', REAL_PLAN]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /plan-graph: 80 slice\(s\) found/);
+  assert.match(r.stdout, /plan-graph: \d+ slice\(s\) found/);
   assert.match(r.stdout, /missing dependencies: 0/);
   assert.match(r.stdout, /cycles: 0/);
   assert.match(r.stdout, /dependency-order problems: 0/);
 });
 
-test('green: --strict on the real plan also passes (no lane-sharing warnings today)', () => {
-  const r = run(['--plan', REAL_PLAN, '--strict']);
+test('green: --strict passes on a clean fixture plan (no lane-sharing warnings)', () => {
+  // Round 1, m5: --strict must not run against the live plan in this test — a plan-only change
+  // (adding a same-day, same-lane slice) should not be able to break this script's own test suite.
+  // `ok.md` is deliberately conflict-free (see the other tests in this file for the conflicting case).
+  const r = run(['--plan', join(FIXTURES, 'ok.md'), '--strict']);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
 
@@ -56,6 +62,13 @@ test('warning vs. --strict: same-day lane sharing warns but passes by default, f
 
   const strict = run(['--plan', join(FIXTURES, 'lane-conflict.md'), '--strict']);
   assert.equal(strict.status, 1);
+});
+
+test('m5 red: a line that starts like a slice bullet but does not match the full format fails loudly', () => {
+  const r = run(['--plan', join(FIXTURES, 'malformed-bullet.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /starts like a slice bullet/);
+  assert.match(r.stderr, /009/);
 });
 
 test('--calendar prints a start/finish date per slice and respects --merged', () => {

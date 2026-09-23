@@ -13,6 +13,8 @@ touching the real product plan or a real spec.
 - `apps/*/package.json`
 - `packages/{domain,contract}/src/*.ts`
 - `package.json` (Root, nur Skripte)
+- Alt-Specs `apps/web/e2e/002-x.spec.ts`, `003-y.spec.ts`, `abnahme.spec.ts` (round 1, m4: the latter two
+  are bare filenames meant to resolve against `apps/web/e2e/`, the directory of the first)
 - diese Datei (`scripts/fixtures/slice-scope/900-fixture.md`)
 
 ## Akzeptanzkriterium

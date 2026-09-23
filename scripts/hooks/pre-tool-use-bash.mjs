@@ -20,7 +20,20 @@
  * This is a first line of defence, not the enforcement itself (docs/agentische-entwicklung-plan.md
  * 5.4) — a plain scan of the command text, not a shell parser: it can miss an obfuscated command and,
  * rarely, flag an unrelated argument that happens to contain the same text (e.g. a `grep` pattern for
- * the literal string ".env"). Wired in `.claude/settings.json` under `hooks.PreToolUse` (matcher
+ * the literal string ".env"). On malformed/unrecognised input (no `tool_input.command` string, unparsable
+ * JSON, empty stdin) it fails open (exit 0) deliberately — a hook that cannot even read its own input is
+ * not evidence of a violation, and blocking on that basis would make every unrelated tool call fragile.
+ *
+ * Known, accepted bypasses of the network check (review rework round 1, m2) — narrowing them further
+ * would need a real shell parser and a real network policy, both out of scope for a text scan: a
+ * scheme-less host (`curl example.com`, no `http(s)://`), any wrapper or alias around `curl`/`wget`
+ * (`xargs curl …`, a shell function named `curl`), and any other way to reach the network from a
+ * one-liner (`node -e "fetch(...)"`, `python3 -c "import urllib.request; ..."`). These are not
+ * silently "fine" — they are simply outside what this hook can see; the real backstop is that the
+ * session has no credentials to exfiltrate anything meaningful to (AGENTS.md rule 11, Plan 5.4's own
+ * framing: "Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst").
+ *
+ * Wired in `.claude/settings.json` under `hooks.PreToolUse` (matcher
  * `Bash`). Test via a redirected file, never an inline literal, so a crafted test payload can never
  * itself read as the very shell command being scanned:
  * `node scripts/hooks/pre-tool-use-bash.mjs < payload.json`.
@@ -96,13 +109,17 @@ function gitPushFindings(command) {
   return out;
 }
 
-/** Any `.env*` token other than the literal `.env.example` (the greedy extension group consumes
- * ".example" whole, so `.env.example` itself is a single match and compares equal). */
+/** Any `.env*` token other than the literal `.env.example` — with a path boundary required on both
+ * sides (review rework round 1, m2): a boundary character (start of string, whitespace, `/`, a quote,
+ * `=`, `(`, `:`, `;`, `,`) before `.env`, and no further word/hyphen character right after the match,
+ * so `process.env`/`import.meta.env` (a `.` preceded by an identifier, not a path separator) and
+ * `.envrc` (a different, unrelated dotfile) are never mistaken for the `.env` family. Each optional
+ * `.segment` after `.env` may repeat, so `.env.local.example` still resolves to one token. */
 function envFileFinding(command) {
-  const re = /\.env(?:\.[\w.-]+)?/g;
+  const re = /(?:^|[\s/"'`=(:;,])(\.env(?:\.[\w-]+)*)(?![\w-])/g;
   let m;
   while ((m = re.exec(command))) {
-    if (m[0] !== '.env.example') return m[0];
+    if (m[1] !== '.env.example') return m[1];
   }
   return undefined;
 }

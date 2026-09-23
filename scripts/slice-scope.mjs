@@ -117,9 +117,43 @@ function extractFilesAllowedSection(specText) {
 }
 
 /** Every backtick-quoted span in the section is a path glob — the convention every spec in
- * docs/slices/ follows, wrapped markdown lines and multiple paths per bullet included. */
+ * docs/slices/ follows, wrapped markdown lines and multiple paths per bullet included.
+ *
+ * Review rework round 1, m4: a bare filename (no `/` at all) that follows a full path *within the
+ * same bullet* is resolved against that full path's directory — e.g. 020's
+ * `` Alt-Specs `apps/web/e2e/002-x.spec.ts`, `003-y.spec.ts`, `abnahme.spec.ts` `` means the second and
+ * third live in `apps/web/e2e/` too, not at the repository root. The directory context resets at every
+ * new bullet (a line starting with `- `), so an unrelated bare name in its *own* bullet (e.g.
+ * `` `package.json` (Root, nur Skripte) ``) is never accidentally prefixed with some earlier bullet's
+ * directory. */
 function extractGlobs(sectionText) {
-  return [...sectionText.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+  const lines = sectionText.split('\n');
+  const bullets = [];
+  let current = [];
+  for (const line of lines) {
+    if (/^-\s/.test(line)) {
+      if (current.length > 0) bullets.push(current.join('\n'));
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) bullets.push(current.join('\n'));
+
+  const globs = [];
+  for (const bulletText of bullets) {
+    let currentDir;
+    for (const m of bulletText.matchAll(/`([^`]+)`/g)) {
+      let glob = m[1];
+      if (glob.includes('/')) {
+        currentDir = glob.slice(0, glob.lastIndexOf('/'));
+      } else if (currentDir) {
+        glob = `${currentDir}/${glob}`;
+      }
+      globs.push(glob);
+    }
+  }
+  return globs;
 }
 
 function findSpecFile(root, kind, number) {
@@ -158,7 +192,23 @@ function git(root, args) {
 function gitChangedFiles(root, base) {
   const mergeBase = git(root, ['merge-base', 'HEAD', base]).trim();
   const out = git(root, ['diff', '--name-only', `${mergeBase}...HEAD`]);
-  return out.split('\n').filter(Boolean);
+  return { mergeBase, changed: out.split('\n').filter(Boolean) };
+}
+
+/** Round 1, m4: a warning (never a failure) when the spec's own "Files allowed" section has changed
+ * since the merge-base — widening (or narrowing) what a slice may touch mid-implementation is not
+ * wrong, but it is exactly the kind of thing a reviewer should notice, not discover by diffing the
+ * spec by hand. `undefined` (no warning) if the spec did not exist yet at the merge-base at all (a
+ * brand-new slice) or the comparison itself fails for any reason (never blocks on that). */
+function filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, currentSectionText) {
+  try {
+    const baseText = git(root, ['show', `${mergeBase}:${specRelPath}`]);
+    const baseSection = extractFilesAllowedSection(baseText);
+    if (baseSection === undefined) return undefined;
+    return baseSection.trim() !== currentSectionText.trim();
+  } catch {
+    return undefined; // e.g. the spec is new since the merge-base — nothing to compare against
+  }
 }
 
 // ---- main ------------------------------------------------------------------------------------------
@@ -211,17 +261,35 @@ function main(argv) {
     console.error(`slice-scope: ${specRelPath}'s "Files allowed" section has no backtick-quoted path.`);
     return 1;
   }
+  // Round 1, m4: a bare `*`/`**` (not `dir/*`/`dir/**`) would allow "any file at the repository root"
+  // or "any file anywhere" — almost certainly a typo, and dangerous enough to refuse outright rather
+  // than silently apply it.
+  const bareWildcards = globs.filter((g) => g === '*' || g === '**');
+  if (bareWildcards.length > 0) {
+    console.error(
+      `slice-scope: ${specRelPath}'s "Files allowed" section has a bare "${bareWildcards[0]}" pattern ` +
+        '(matches every file at the repository root, or everywhere) — write a directory prefix instead.',
+    );
+    return 1;
+  }
   const patterns = globs.map((g) => ({ glob: g, re: globToRegExp(g) }));
 
   const alwaysAllowed = new Set([specRelPath]);
   if (patterns.some((p) => p.re.test('package.json'))) alwaysAllowed.add('pnpm-lock.yaml');
 
   let changed;
+  let mergeBase;
   if (args.diff) {
     changed = args.diff;
   } else {
     try {
-      changed = gitChangedFiles(root, args.base);
+      ({ mergeBase, changed } = gitChangedFiles(root, args.base));
+      if (filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, sectionText)) {
+        console.log(
+          `slice-scope: warning — "${specRelPath}"'s "Files allowed" section differs from its version ` +
+            `at the merge-base (${mergeBase.slice(0, 7)}) with ${args.base}.`,
+        );
+      }
     } catch (e) {
       const reason = e.message.split('\n')[0];
       if (inCI && sliceIdentified) {

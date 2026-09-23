@@ -30,10 +30,24 @@
  * Run as part of `pnpm gates` (`pnpm role-literals`). Deterministic, no network.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+/** Round 1, m6: `--root` lets the test suite point this gate at a throwaway scratch copy of the
+ * scanned tree instead of destructively rewriting the real `types.ts`/`permissions.ts` in place. No
+ * other flag is added — the spec's "Files allowed" for this round is limited to this one addition. */
+function parseArgs(argv) {
+  const out = { root: undefined };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--root') out.root = argv[++i];
+    else throw new Error(`role-literal-check: unknown argument "${a}"`);
+  }
+  return out;
+}
+
+const args = parseArgs(process.argv.slice(2));
+const ROOT = args.root ? resolve(args.root) : fileURLToPath(new URL('..', import.meta.url));
 process.chdir(ROOT);
 
 const TYPES_PATH = 'packages/domain/src/types.ts';
@@ -50,12 +64,13 @@ const isTestFile = (relPath) => relPath.includes('/__tests__/') || relPath.endsW
 // Values that double as Track/StageAssignment values: only these keep the "role context" requirement.
 const AMBIGUOUS_ROLES = new Set(['podium', 'expert', 'legal']);
 
-/** Replaces every `//`-to-end-of-line comment with spaces of the same length (never changes the
- * string's length or its newlines), so character offsets found in the result still index correctly
- * into the original text, while a `;` or quote inside a comment can no longer be mistaken for real
- * code (round 2, minor 3). */
-function maskLineComments(text) {
-  return text.replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+/** Replaces every `//`-to-end-of-line comment and every block comment (round 1, m10: the union parser
+ * previously only stripped line comments) with spaces of the same length, and never removes a
+ * newline, so character offsets found in the result still index correctly into the original text,
+ * while a `;` or quote inside a comment can no longer be mistaken for real code (round 2, minor 3). */
+function maskComments(text) {
+  const withoutBlocks = text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+  return withoutBlocks.replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
 }
 
 /** Parses `export type Role = | 'a' // ... | 'b' ...;` from `packages/domain/src/types.ts` — the
@@ -74,7 +89,7 @@ function deriveRoleUnion() {
   const rest = text.slice(bodyStart);
   const nextExport = rest.match(/^export\s/m);
   const bounded = nextExport ? rest.slice(0, nextExport.index) : rest;
-  const masked = maskLineComments(bounded);
+  const masked = maskComments(bounded);
   const semiIdx = masked.indexOf(';');
   if (semiIdx === -1) {
     throw new Error(`${TYPES_PATH}: no terminating ";" found for "export type Role = ...".`);

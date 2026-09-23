@@ -111,8 +111,16 @@ function parseSlices(planText) {
   const slices = [];
   const byNumber = new Map();
   lines.forEach((line, i) => {
+    if (!NEXT_BULLET_RE.test(line)) return; // not a slice-bullet line at all: prose, heading, deps line
     const m = line.match(HOURS_PER_CLASS_PATTERN);
-    if (!m) return;
+    if (!m) {
+      // Round 1, m5: a line that starts like a slice bullet ("- **NNN ·") but does not fully match must
+      // fail loudly — silently dropping it would understate the slice count without any signal.
+      throw new Error(
+        `plan-graph: section 5, line ${i + 1} starts like a slice bullet ("- **NNN ·") but does not match ` +
+          `the expected "- **NNN · Title** — risk · X AStd · Kalender ... · Lanes: ..." format: "${line}"`,
+      );
+    }
     const [, number, title, riskClass, hoursRaw, calendarRaw, lanesRaw] = m;
     let deps = [];
     for (let j = i + 1; j < lines.length; j++) {

@@ -10,6 +10,12 @@ Dauer: unter 30 Minuten. Nachweis: ein Screenshot der Regel nach dem Speichern, 
 Kein Merge bei rotem `gates`-Lauf (`.github/workflows/gates.yml`), keine Force-Pushes, kein Löschen
 des Branches, immer der aktuelle Stand des Zielbranches vor dem Merge.
 
+**Voraussetzung (GitHub-Plan):** Branch-Schutzregeln für einen **privaten** Repository benötigen
+mindestens GitHub Pro (persönliches Konto) bzw. GitHub Team oder Enterprise Cloud/Server
+(Organisation) — auf GitHub Free stehen sie nur für öffentliche Repositorien zur Verfügung. Vor
+Schritt 1 prüfen, welcher Plan für dieses Repositorium aktiv ist; ohne einen der genannten Pläne
+fehlt der Menüpunkt „Branches" unter Settings ganz.
+
 ## Klickpfad (GitHub, klassische Branch-Schutzregeln)
 
 1. Repositorium öffnen → **Settings** (Zahnrad, oben rechts im Repo, nicht im Profil).
@@ -19,7 +25,11 @@ des Branches, immer der aktuelle Stand des Zielbranches vor dem Merge.
    später eine zweite Regel mit Muster `main`).
 5. **Require a pull request before merging** aktivieren (mindestens eine Genehmigung ist nicht
    Teil dieser Scheibe — Regel 3 „ein anderes Modell reviewt" läuft heute außerhalb von GitHub;
-   diese Kleinänderung ist eine spätere Entscheidung des Eigentümers).
+   diese Kleinänderung ist eine spätere Entscheidung des Eigentümers). Diese Einstellung beendet
+   jeden direkten Push auf den Branch, nicht nur den Merge-Knopf: ein heute üblicher Squash-Merge
+   per API/CLI (`gh pr merge --squash` o. ä.) funktioniert danach weiterhin — er läuft technisch
+   selbst über einen Pull Request und dessen Pflicht-Statuscheck —, ein einfaches `git push` direkt
+   auf den Branch dagegen nicht mehr.
 6. **Require status checks to pass before merging** aktivieren:
    - **Require branches to be up to date before merging** anhaken.
    - Im Suchfeld darunter den Pflicht-Statuscheck suchen und hinzufügen: **`gates`**
@@ -47,8 +57,15 @@ anlegen, sonst wirken zwei Regelwerke auf denselben Branch.
 - [ ] Ein PR gegen den Integrationsbranch zeigt `gates` als Pflicht-Statuscheck und lässt sich bei
       Rot nicht mergen (Merge-Knopf ist deaktiviert oder verlangt eine Bestätigung, je nach
       GitHub-Plan).
-- [ ] `git push --force` auf den Integrationsbranch wird von GitHub abgelehnt (`protected branch
-      hook declined`).
+- [ ] Force-Push und Löschen sind laut der gespeicherten Regel unter Settings → Branches nicht
+      erlaubt (siehe Screenshot Schritt 10 — die beiden „nicht erlaubt"-Zeilen unter „Rules applied
+      to everyone including administrators"). Das reicht als Nachweis; **kein** `git push --force`
+      gegen den echten Integrationsbranch ausprobieren, um es „scharf" zu testen — ein
+      fehlschlagender Force-Push kann den Branch je nach lokalem Zustand in einen unklaren Zustand
+      bringen und ist unnötig, wenn die Regel bereits sichtbar aktiv ist. Wer es dennoch scharf
+      testen will, tut das nur gegen einen eigens angelegten Wegwerf-Branch mit einer eigenen
+      Testregel (gleiches Vorgehen, anderer Branch-Name), nie gegen
+      `claude/dax-shareholder-meeting-workflow-0s934z` selbst.
 - [ ] Der Branch lässt sich über die GitHub-Oberfläche nicht löschen (kein Papierkorb-Symbol bzw.
       Fehlermeldung beim Versuch über die API/CLI).
 - [ ] „Require branches to be up to date before merging" ist aktiv: ein PR, dessen Basis seit dem

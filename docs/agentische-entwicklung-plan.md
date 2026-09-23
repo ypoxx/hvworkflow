@@ -289,10 +289,10 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Hook | Wirkung | Stand |
 |---|---|---|
 | PreToolUse auf Shell (heutiger Umfang) | blockiert `git push --force`, `rm -rf /`, `git reset --hard` und `curl`-in-die-Shell-Pipelines (`.claude/settings.json`) | läuft (Hook: PreToolUse) |
-| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | geplant in Scheibe 016 |
-| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | geplant in Scheibe 016 |
-| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | geplant in Scheibe 016 |
-| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | geplant in Scheibe 016 |
+| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | läuft (Hook: PreToolUse) |
+| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | läuft (Hook: PostToolUse) |
+| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | läuft (Hook: Stop) |
+| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | läuft (Hook: SubagentStop) |
 | TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat | läuft (Hook: TaskCompleted) |
 
 Die Hooks sind Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst, weil ein Stop-Hook nach

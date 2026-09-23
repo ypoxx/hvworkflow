@@ -5,7 +5,10 @@
  * spec's own header (`**Risikoklasse:** niedrig|mittel|hoch`, docs/slices/NNN-*.md) against the class
  * `docs/produktplan-beta.md` section 5 assigns that same slice number
  * (`- **NNN · Titel** — <klasse> · …`). If the spec is lower, the spec must contain the line
- * `Herabstufung freigegeben von <Name> am <TT.MM.JJJJ>`, or the gate fails.
+ * `Herabstufung freigegeben von <Name> am <TT.MM.JJJJ>`, or the gate fails. Round 1, m7: that line only
+ * counts inside the spec's own header block (everything before the first `## ` section heading, or the
+ * whole file if it has none) — never as quoted prose inside a later section, e.g. a spec's own text
+ * discussing or illustrating this very check with a realistic-looking example date.
  *
  * Run as `pnpm downgrade-check` (part of `pnpm gates`) over every `docs/slices/NNN-*.md` with a
  * three-digit number 009-099 (the plan's numbering range; 001-008 predate the plan and never appear
@@ -57,6 +60,14 @@ function planClasses(planPath) {
   return classes;
 }
 
+/** Round 1, m7: everything before the first `## ` section heading (or the whole text, if the spec has
+ * none at all, as in this gate's own test fixtures) — the sign-off line is only binding there. */
+function headerBlock(specText) {
+  const lines = specText.split('\n');
+  const idx = lines.findIndex((l) => /^## /.test(l));
+  return (idx === -1 ? lines : lines.slice(0, idx)).join('\n');
+}
+
 function specFiles(slicesDir) {
   return readdirSync(slicesDir)
     .map((f) => f.match(/^(\d{3})-.*\.md$/))
@@ -85,7 +96,7 @@ function main(argv) {
     }
     checked++;
     const specClass = specMatch[1];
-    if (CLASS_RANK[specClass] < CLASS_RANK[planClass] && !DOWNGRADE_LINE_RE.test(specText)) {
+    if (CLASS_RANK[specClass] < CLASS_RANK[planClass] && !DOWNGRADE_LINE_RE.test(headerBlock(specText))) {
       problems.push(
         `${specPath}: risk class "${specClass}" is lower than "${planClass}" in ${args.plan} section 5, ` +
           'without a "Herabstufung freigegeben von <Name> am <TT.MM.JJJJ>" line.',

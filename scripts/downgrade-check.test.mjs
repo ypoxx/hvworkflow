@@ -36,3 +36,9 @@ test('green: a raised (not lowered) risk class needs no sign-off line', () => {
   const r = run(['--plan', join(FIXTURES, 'raised', 'plan.md'), '--slices-dir', join(FIXTURES, 'raised', 'slices')]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+test('m7 red: the sign-off line quoted as prose in a later section does not count, only the header block does', () => {
+  const r = run(['--plan', join(FIXTURES, 'quoted-prose', 'plan.md'), '--slices-dir', join(FIXTURES, 'quoted-prose', 'slices')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /risk class "niedrig" is lower than "mittel"/);
+});
