@@ -66,7 +66,9 @@ export function AnswerEditor({
             'placeholder:text-ink-400 hover:border-ink-300',
           )}
         />
-        <span className="mt-1 block text-2xs text-ink-500">{t('answers.editor.sources.hint')}</span>
+        {/* Slice 013 (axe, goal 1): ink-500 measured 3.74:1 at this size — below 4.5:1; ink-600 is
+         * an existing token and clears WCAG AA (see QuestionDetail.tsx's lapsed-approval hint). */}
+        <span className="mt-1 block text-2xs text-ink-600">{t('answers.editor.sources.hint')}</span>
       </label>
 
       <div className="mt-3 flex items-center gap-2">

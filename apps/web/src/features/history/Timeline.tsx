@@ -68,7 +68,9 @@ export function Timeline({
             data-type={event.type}
             className="grid grid-cols-[64px_16px_minmax(0,1fr)] gap-2"
           >
-            <time className="pt-2 text-right font-mono text-2xs tabular-nums text-ink-400">
+            {/* Slice 013 (axe, goal 1): ink-400 measured 2.48:1 on white here — below 4.5:1. ink-600
+             * is an existing token (used a few lines below for the event summary) and clears WCAG AA. */}
+            <time className="pt-2 text-right font-mono text-2xs tabular-nums text-ink-600">
               {clockTime(event.at)}
             </time>
             <span aria-hidden="true" className="relative flex h-full justify-center">
@@ -80,13 +82,13 @@ export function Timeline({
                 <span className="text-[13px] font-medium text-ink-900">
                   {eventTypeLabel(t, event.type)}
                 </span>
-                <span className="text-2xs text-ink-500">
+                <span className="text-2xs text-ink-600">
                   {event.actor.displayName ?? event.actor.id}
                 </span>
                 {previous !== undefined && (
                   <span
                     data-testid="history-duration"
-                    className="ml-auto font-mono text-2xs tabular-nums text-ink-400"
+                    className="ml-auto font-mono text-2xs tabular-nums text-ink-600"
                   >
                     {eventGap(previous.at, event.at, t)}
                   </span>
@@ -129,7 +131,7 @@ export function EventStream({
     <div data-testid="history-stream">
       <div data-testid="history-sparkline" className="border-b border-line px-3 py-2">
         <Sparkline values={[...curve]} ariaLabel={t('history.sparkline.caption')} className="h-7 w-full" />
-        <p className="mt-1 text-2xs text-ink-500">{t('history.sparkline.caption')}</p>
+        <p className="mt-1 text-2xs text-ink-600">{t('history.sparkline.caption')}</p>
       </div>
       <div className="sticky top-0 z-10 grid grid-cols-[72px_84px_minmax(0,1.1fr)_minmax(0,1.4fr)] gap-3 border-b border-line bg-sunken px-3 py-1.5">
         <span className="hv-label">{t('history.col.time')}</span>
@@ -146,7 +148,7 @@ export function EventStream({
             data-type={event.type}
             className="grid grid-cols-[72px_84px_minmax(0,1.1fr)_minmax(0,1.4fr)] items-baseline gap-3 border-b border-line px-3 py-1.5 last:border-b-0 hover:bg-ink-25"
           >
-            <span className="font-mono text-2xs tabular-nums text-ink-400">
+            <span className="font-mono text-2xs tabular-nums text-ink-600">
               {clockTime(event.at)}
             </span>
             <span className="truncate font-mono text-2xs tabular-nums text-ink-600">
@@ -156,7 +158,7 @@ export function EventStream({
               <span className="block truncate text-[13px] text-ink-900">
                 {eventTypeLabel(t, event.type)}
               </span>
-              <span className="block truncate text-2xs text-ink-500">
+              <span className="block truncate text-2xs text-ink-600">
                 {event.actor.displayName ?? event.actor.id}
               </span>
             </span>
