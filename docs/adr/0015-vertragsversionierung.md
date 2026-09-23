@@ -21,8 +21,7 @@ und Tagesordnung"):
 - **Brechende Änderungen nur mit ADR-Verweis.**
 - **Neue Pflichtfelder werden erst optional** eingeführt, mit Ablaufdatum, und in einem Folgezyklus
   Pflicht (Plan 4). Das Veralten von Feldern folgt dem Beispiel aus 019 (`kind` und
-  `requestedMinutes` auf `Speaker`, veraltet in 0.2.0, gelöscht in 080); eine allgemeine
-  Veraltungsregel steht nicht im Plan (Vorschlag, nicht im Plan).
+  `requestedMinutes` auf `Speaker`, veraltet in 0.2.0, gelöscht in 080).
 - **Vorab deklarierte Operationen** stehen in einer Allowlist mit Ablaufdatum, damit das Tor „jede
   `operationId` wird ausgeübt" bestehen bleibt und keine tote Operation im Vertrag überdauert.
 - **Vertragsfreeze vor der Generalprobe.**
@@ -43,6 +42,7 @@ der Generalprobe (E20, E45).
 
 **Risiko.** Eine „kleine" Vertragsänderung ohne Changelog oder ADR ist der Weg zurück in die
 Kopplung an volatile Logik (ADR 0001); das Versions- und Changelog-Tor aus 019 fängt das ab.
+Vorschlag (nicht im Plan): eine allgemeine Veraltungsregel.
 
 ## Kosten bei Änderung
 

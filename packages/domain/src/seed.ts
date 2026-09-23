@@ -62,6 +62,13 @@ export const SEED_ACTORS: Record<string, Actor> = {
   podium: { id: 'u-podium', role: 'podium', displayName: 'Podium' },
 };
 
+/**
+ * The system actor for non-interactive, admin-level operations outside any HTTP request (e.g. the
+ * API's demo auto-seed, `apps/api/src/app.ts`). Exported so callers never need their own role-name
+ * literal for this (AGENTS.md rule 4; `scripts/role-literal-check.mjs`, slice 012).
+ */
+export const SYSTEM_ACTOR: Actor = SEED_ACTORS.system!;
+
 interface Topic {
   id: string;
   unitId: string;

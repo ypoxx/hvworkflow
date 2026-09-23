@@ -43,3 +43,13 @@ mit Opus 5 über den Gesamt-Diff, Endkontrolle durch Tore, Playwright und Sichtp
 **Bautag 2 gesamt:** rund 2 h 40 min von der Design-Kritik bis zum Deploy; Subagenten etwa
 2,1 Mio. Token (Sonnet 1,84 Mio., Opus 0,25 Mio., Haiku 0); zwei größere und zwölf kleinere Befunde
 aus Review und Sichtprüfung, alle behoben; keine Regression in den fünf Playwright-Szenarien.
+
+## Takt
+
+Zeiten für den Durchsatz-Takt, je Punkt eine Klasse S/M/L: S-Punkte (small) sollen am nächsten
+Bautag live sein (< 1 Bautag), M-Punkte (medium) innerhalb von 2 Bautagen (< 2 Bautage), L-Punkte
+(large) innerhalb einer Woche (< 1 Woche). Nachricht und Live im Format `JJJJ-MM-TT HH:MM`, Zeiten
+in Europe/Berlin. `node scripts/takt.mjs [--file docs/messung.md]` liest diese Tabelle.
+
+| Punkt | Quelle | Klasse | Nachricht | Live | Dauer (h) |
+|---|---|---|---|---|---|

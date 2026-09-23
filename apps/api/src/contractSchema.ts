@@ -79,6 +79,36 @@ function operationOf(operationId: string): Operation {
 }
 
 /**
+ * Finds the `operationId` whose method and path template match a bare request (method + pathname),
+ * independent of Hono's own routing — used by the test helper (`__tests__/helpers.ts`, slice 012
+ * point 7) to validate every response of every API test against the contract it claims to implement.
+ */
+export function matchOperationId(method: string, pathname: string): string | undefined {
+  const path = pathname.startsWith('/v1') ? (pathname.slice(3) || '/') : pathname;
+  const wanted = method.toLowerCase();
+  for (const [operationId, op] of Object.entries(operations)) {
+    if (op.method !== wanted) continue;
+    if (pathTemplateMatches(op.path, path)) return operationId;
+  }
+  return undefined;
+}
+
+/** `/questions/{questionId}/history` matches `/questions/abc/history`; segment counts must agree. */
+function pathTemplateMatches(template: string, actual: string): boolean {
+  const t = template.split('/');
+  const a = actual.split('/');
+  if (t.length !== a.length) return false;
+  return t.every((segment, i) => segment.startsWith('{') || segment === a[i]);
+}
+
+/** The response status codes (as the contract's own string keys, e.g. `"200"`) documented for an operation. */
+export function documentedStatuses(operationId: string): string[] {
+  const op = operationOf(operationId);
+  const responses = (openapiDoc.paths[op.path][op.method] as { responses: Record<string, unknown> }).responses;
+  return Object.keys(responses);
+}
+
+/**
  * Many responses (and this rework's parameters) in the contract are themselves `$ref`s to a shared
  * object (e.g. every question-changing operation's `200` is `#/components/responses/QuestionUpdated`,
  * every `403` is `#/components/responses/Forbidden`). A JSON Pointer walk does not follow that kind

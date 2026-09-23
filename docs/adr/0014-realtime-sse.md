@@ -66,7 +66,7 @@ zweiter Browser sieht Änderung < 2 s; Netztrace im Bericht. In-App-Alarme mit Q
 
 ## Offene Registerzeilen
 
-- **E22** RPO/RTO/SLO — Register-Standard (Plan 10): RPO 0, RTO 15 min, p90 < 300 ms am Dienst.
+- **E22** RPO/RTO/SLO — Register-Standard (Plan 10): RPO 0, RTO 15 min, p90 < 300 ms im Probefenster.
   Das SSE-Ziel < 2 s stammt aus B11, nicht aus E22.
 - **E33** Endgeräte und Saalnetz (Hallen-WLAN, Hotspot-Rückfall) — bestimmt, wie oft der Strom
   wieder aufsetzt.
