@@ -159,21 +159,22 @@ $ pnpm test:scripts
 # tests 148 / # pass 148 / # fail 0
 ```
 
-`git grep -n "/home/user" -- scripts`:
+`git grep -n "/home/user" -- scripts` (Stand nach der Nacharbeitsrunde, siehe dort — der Eigentümer hat
+`scripts/i18n-literal-check.mjs` selbst berichtigt und in „Files allowed" aufgenommen, Commit b6c30fe):
 ```
-scripts/i18n-literal-check.mjs:30: *     boundaries (confirmed against `/home/user/wt/020/apps/web/src/features/stage/Podium.tsx:101`,
-scripts/i18n-literal-check.mjs:39: * a different tree, for tests (and for checking a sibling worktree, e.g. `--root /home/user/wt/020`).
+(keine Treffer)
 ```
-(zwei Treffer, siehe „Offen" — `scripts/i18n-literal-check.mjs` steht nicht in „Files allowed").
 
-`pnpm test:scripts`: `# tests 148 / # pass 148 / # fail 0`.
+`pnpm test:scripts`: `# tests 174 / # pass 174 / # fail 0` (Stand nach der Nacharbeitsrunde; zum
+Zeitpunkt der ersten Abgabe: `# tests 148 / # pass 148 / # fail 0`).
 
-`pnpm gates` (Tail, wörtlich):
+`pnpm gates` (Tail, wörtlich; Stand nach der Nacharbeitsrunde, letzter Fach-Commit `ef82c95` — dieser
+Bericht-Commit selbst kommt danach):
 ```
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6085.31902
+# duration_ms 6194.49214
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -193,29 +194,38 @@ dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 
 
 [plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
-[plugin builtin:vite-reporter]
+[plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.15s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit eb0be51
+✓ built in 1.14s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit ef82c95, tree 4b5e75235d61…
 ```
 
 Open:
-- Akzeptanzkriterium 3 ist nicht vollständig erfüllt: `scripts/i18n-literal-check.mjs` (nicht die
-  `.test.mjs`-Datei) nennt in zwei Kopfkommentaren weiterhin `/home/user/wt/020` — dieselbe Datei, deren
-  Test Punkt 5 fixt. Ich habe die Datei zunächst mitkorrigiert, das aber wieder zurückgenommen: sie steht
-  nicht in „Files allowed" dieser Spec (nur `scripts/i18n-literal-check.test.mjs` steht dort), und
-  `node scripts/slice-scope.mjs` schlug mit genau dieser Datei fehl, solange die Änderung committet war.
-  Empfehlung: `scripts/i18n-literal-check.mjs` in einer eigenen Kleinstscheibe (oder per Spec-Erweiterung)
-  freigeben und die zwei Kommentarzeilen dort nachziehen.
-- Nebenfund (selbst verursacht und behoben): `scripts/plan-honesty.mjs` teilt eine Tabellenzeile naiv an
-  jedem `|`-Zeichen, auch innerhalb Backticks — mein erster Entwurf des Wirkungstexts zu Punkt 13 enthielt
-  `` `||` `` und zerriss dadurch die Zeile. Text so umformuliert, dass kein rohes `|` mehr vorkommt; kein
-  Fund an `plan-honesty.mjs` selbst nötig.
-- Punkt 13 kam als Nachtrag während der Bearbeitung (Codex-Review von PR #17) und wurde in „Ziel" der Spec
-  ergänzt; kein separater automatisierter Test, da reiner Dokumentationstext (siehe Evidence oben).
+- Akzeptanzkriterium 3 ist jetzt erfüllt: der Eigentümer hat `scripts/i18n-literal-check.mjs` selbst
+  berichtigt (die zwei `/home/user/wt/020`-Kommentare entfernt, Commit b6c30fe) und die Datei in „Files
+  allowed" aufgenommen; `git grep -n "/home/user" -- scripts` hat keine Treffer mehr (siehe oben).
+- Nebenfund (selbst verursacht und in derselben Sitzung behoben, zweimal): `scripts/plan-honesty.mjs`
+  teilt eine Tabellenzeile naiv an jedem `|`-Zeichen, auch innerhalb Backticks — sowohl mein erster
+  Entwurf des Wirkungstexts zu Punkt 13 (erste Abgabe) als auch mein erster Entwurf zur Nacharbeit an
+  Punkt 1 (`` `||` `` als Beispiel für den Trenner) haben das getroffen. Beide Male vor dem Commit
+  bemerkt und ohne rohes `|` umformuliert; kein Fund an `plan-honesty.mjs` selbst nötig, aber ein
+  wiederkehrendes Stolperfeld für jede künftige Bearbeitung dieser Tabelle.
+- Punkt 13 (erste Abgabe) und Punkt 1 der Nacharbeit kamen als Nachtrag während der jeweiligen Sitzung
+  (Codex-Review PR #17 bzw. PR #20) und wurden in „Ziel"/als Bericht-Abschnitt der Spec ergänzt; kein
+  separater automatisierter Test für den Dokumentationstext selbst (siehe Evidence).
+- Nacharbeit Punkt 1, „unless you fix them cheaply": von den in der Wirkungszeile genannten
+  unerkannten Formen wurde nur die Groß-/Kleinschreibung des URL-Schemas behoben (ein Zeichen, siehe
+  „### Nacharbeit nach Review"). Die Präfix-/Pfadformen (`FOO=1 curl`, `sudo curl`, `command curl`,
+  `/usr/bin/curl`, `(curl …)`) sind bewusst nicht behoben, sondern nur dokumentiert — eine belastbare
+  generische Erkennung bräuchte entweder eine feste (und damit unvollständige) Liste von Wrapper-
+  Befehlen oder einen echten Shell-Parser, beides außerhalb dessen, was in dieser Nacharbeitsrunde als
+  „billig" gelten sollte.
+- Nacharbeit Punkt 10: kein roter Lauf beobachtet — `copyTrackedTree()` war für das Szenario „Datei
+  entsteht während der Kopie" bereits korrekt (durch Konstruktion an die ursprüngliche Auflistung
+  gebunden). Der neue Test sichert dieses Verhalten nur ab, ohne dass eine Änderung am Code nötig war.
 
 Touched:
 - `scripts/hooks/pre-tool-use-bash.mjs`, `scripts/hooks/pre-tool-use-bash.test.mjs`
@@ -226,11 +236,75 @@ Touched:
 - `scripts/hooks/post-tool-use-lint.test.mjs` (Kommentar ohne `/home/user`)
 - `scripts/slice-scope.mjs`, `scripts/slice-scope.test.mjs`
 - `scripts/i18n-literal-check.test.mjs`, `scripts/fixtures/i18n-literal/podium-regression/features/NextPreview.tsx` (neu)
-- `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`, `scripts/fixtures/plan-graph/bad-calendar-date.md` (neu)
+- `scripts/i18n-literal-check.mjs` — **nicht von mir geändert**: der Eigentümer/Orchestrator hat die zwei
+  `/home/user/wt/020`-Kommentare selbst berichtigt (Commit b6c30fe, außerhalb dieser Implementierer-
+  Sitzung) und die Datei in „Files allowed" aufgenommen, siehe „Open" oben und Punkt 6 der Nacharbeit.
+- `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`, `scripts/fixtures/plan-graph/bad-calendar-date.md`,
+  `scripts/fixtures/plan-graph/malformed-bullet-offset.md` (beide Fixtures neu)
 - `scripts/contract-gate-strict.test.mjs`
 - `scripts/role-literal-check.test.mjs`
 - `docs/agentische-entwicklung-plan.md` (5.4, Zeilen PreToolUse und TaskCompleted)
-- `docs/slices/takt-006-nacharbeit-016.md` (dieser Bericht, Ziel-Punkt 13)
+- `docs/slices/takt-006-nacharbeit-016.md` (dieser Bericht, Ziel-Punkt 13, Abschnitt „Nacharbeit nach Review")
+
+### Nacharbeit nach Review
+
+Einzige zulässige Nacharbeitsrunde, ausgelöst durch das unabhängige Review (Opus, Security/Betrieb:
+„nacharbeiten") und zwei Codex-Befunde auf PR #20. Ausgangspunkt: `git -C /home/user/wt/takt log
+--oneline -4` zeigte `b6c30fe` (Eigentümer-Fix der zwei `/home/user`-Kommentare, „Files allowed"
+erweitert) als aktuellen HEAD. Ein Commit je Punkt (Punkte 2/3/7 zusammen, da alle drei
+`gitPushFindings`/`splitTopLevelSegments` in derselben Datei betreffen); Testname und zusammengefasste
+Ausgabe je rot → grün:
+
+1. **MAJOR · Wirkungstext PreToolUse** (`docs/agentische-entwicklung-plan.md` 5.4). Kein automatisierter
+   Test für den Dokumentationstext selbst; Nachweis über `pnpm plan-honesty`:
+   `Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.` Dabei einen
+   billigen Fund selbst behoben: `pre-tool-use-bash.test.mjs`, "rework point 1 red: an upper-case URL
+   scheme (HTTPS://) is blocked the same as https://" — rot: `not ok 58 ... # pass 61 / # fail 1`; grün:
+   `# tests 62 / # pass 62 / # fail 0`. Commits `143f93c` (Code), `ef82c95` (Wirkungstext).
+2. **MAJOR · generische globale Optionen vor `push`** (`GIT_PUSH_RE`). Rot (`pre-tool-use-bash.test.mjs`,
+   „rework point 2 red: …" ×5, u. a. `-p`, `--paginate`, `--bare`, `--namespace=x`, gequotetes `-C "a b"`):
+   5/5 schlugen fehl, Sammel-Lauf mit Punkt 3 und 7 zusammen `# pass 48 / # fail 13`. Grün (derselbe
+   Lauf nach dem Fix): `# tests 61 / # pass 61 / # fail 0`. Commit `542c8bc`.
+3. **MINOR (+Codex) · Ziffern in Kurzoptions-Cluster, abgekürzte Wert-Optionen.** Rot
+   („rework point 3 red: …" ×6, u. a. `-4f`, `-f4`, `-6uf`, `--push-o`, `--receive-p`, `--exec`):
+   6/6 schlugen fehl (Teil desselben Sammel-Laufs wie Punkt 2). Grün: `# tests 61 / # pass 61 / # fail 0`.
+   Commit `542c8bc`.
+4. **MINOR · Stop-Hook vergleicht Codeverzeichnis-Inhalt statt Commit-Id.** Rot (`stop-check.test.mjs`,
+   „rework point 4 green: a docs-only commit after mark-test-run passes …"): `not ok 11 … # pass 12 /
+   # fail 1` (ein dokumentationsloser Commit blockierte fälschlich). Grün: `# tests 17 / # pass 17 /
+   # fail 0`, inklusive der auf grün umgestellten alten Testerwartung „takt-006 point 2 green
+   (reworked): committing exactly the already-tested code no longer blocks". Commit `24e221d`.
+5. **MINOR · jede Scheibenzahl aus task_subject+task_description.** Rot (`task-completed.test.mjs`,
+   „rework point 5 red: task_subject names one accepted slice, task_description names a second,
+   unaccepted one"): `not ok 15 … # pass 15 / # fail 1`. Grün: `# tests 16 / # pass 16 / # fail 0`.
+   Commit `476f341`.
+6. **MINOR · Bericht auffrischen.** Dieser Abschnitt selbst plus die aktualisierten Blöcke „Open",
+   `git grep`-Ausgabe, `pnpm gates`-Tail und „Touched" oben. Kein automatisierter Test (reine
+   Berichtspflege); Nachweis: `git grep -n "/home/user" -- scripts` liefert keinen Treffer mehr (siehe
+   oben), `pnpm test:scripts` → `# tests 174 / # pass 174 / # fail 0`. Commit: diese Änderung selbst.
+7. **MINOR · Zeilenumbruch und einzelnes `&` als Trenner.** Rot (`pre-tool-use-bash.test.mjs`,
+   „rework point 7 red: a curl on its own line (newline-separated) is blocked" und „… a single "&"
+   background separator is blocked"): 2/2 schlugen fehl (Teil desselben Sammel-Laufs wie Punkt 2/3).
+   Grün: `# tests 61 / # pass 61 / # fail 0`. Commit `542c8bc`.
+8. **NIT · Rename auf der Worktree-Seite (`status[1]`).** Rot (`dirty-tree-signature.test.mjs`,
+   „rework point 8 red: a worktree-side rename (after "git add -N") is one clean entry, not corrupted"):
+   `not ok 5 … # pass 6 / # fail 1` (echte Beobachtung: `["  R apps/api/src/renamed.ts", "ap
+   s/api/src/index.ts"]`, der zweite Eintrag korrupt). Grün: `# tests 7 / # pass 7 / # fail 0`.
+   Commit `92fbd85`.
+9. **NIT · echte Dateizeile statt Abschnitts-Offset.** Rot (`plan-graph.test.mjs`, „rework point 9 red:
+   the reported line number is the real file line, not the offset from the section heading", neue
+   Fixture `malformed-bullet-offset.md`): `not ok 10 … # pass 10 / # fail 1` (meldete Zeile 3 statt der
+   echten Zeile 8). Grün: `# tests 11 / # pass 11 / # fail 0`. Commit `f35b06d`.
+10. **NIT · Datei entsteht während der Kopie.** Kein roter Lauf beobachtet — `copyTrackedTree()` war
+    bereits durch Konstruktion (an die `git ls-files`-Auflistung gebunden) korrekt. Test
+    „rework point 10: a file created (in the source) during the copy is not picked up, and the copy
+    still succeeds" lief beim ersten Versuch bereits grün: `# tests 12 / # pass 12 / # fail 0`.
+    Commit `3c63198`.
+
+Abschließend: `pnpm gates` grün (Tail siehe oben, letzter Lauf gegen diese Änderung selbst),
+`pnpm test:scripts` → `# tests 174 / # pass 174 / # fail 0`, `node scripts/slice-scope.mjs` →
+Warnung (keine Fehlermeldung) zu „Files allowed" (siehe „Open"), `24 changed file(s), all within
+… (11 pattern(s))`.
 
 ## Review findings
 
