@@ -1,6 +1,6 @@
 # 017 — i18n-Wörterbuch in Feature-Module teilen
 
-**Status:** spec
+**Status:** accepted
 **Risikoklasse:** niedrig · 1 AStd · Kalender 28.09.2026 (W1) · Lane: web-shell (i18n)
 **Rolle/Modell:** Mechaniker · Haiku 4.5; Review Sonnet 5
 **Rule ids:** AGENTS.md Regeln 1, 2, 9, 10, 12
@@ -132,4 +132,14 @@ Commit: ff11daf
 
 ## Review findings
 
-(vom Reviewer)
+Review Sonnet 5 (frischer Kontext, nur Spec und Diff), 23.09.2026 — **Urteil: accept**, 0 blocker / 0 major / 2 minor.
+Der Reviewer hat 437/437 Schlüssel und byte-gleiche Texte selbst nachgerechnet, die Reihenfolge je Modul als
+Teilfolge des Originals bestätigt, fünf Mutationen des Paritätstests (fehlender Schlüssel, leerer Wert, Platzhalter,
+falsches Präfix, Doppelung) rot gesehen und TS2741/TS2353 bei fehlendem/zusätzlichem englischen Schlüssel belegt;
+`pnpm gates` grün (web 35/35, davon parity 26/26).
+
+1. minor — `shell.de.ts:174`, `speakers.de.ts:2`: Die Abschnittskommentare `--- 002 …` und `--- 003 …` stehen jeweils
+   nur in einem der Module, auf die ihr Block verteilt wurde. Nicht behoben (Wortlaut erhalten, keine Wirkung);
+   offen für die nächste Scheibe, die diese Module berührt.
+2. minor — `parity.test.ts:28-52`: Die Präfixliste des Moduls `shell` wird in Test (d) nicht benutzt (toter Code).
+   Nicht behoben; offen als Kleinänderung (Test (d) für `shell` gegen die Liste prüfen oder Liste entfernen).
