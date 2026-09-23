@@ -189,8 +189,79 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
 in der letzten Zeile ist der Stand vor diesem takt-007-Commit, weil `pnpm gates` vor dem Commit dieser Änderung
 lief — Dateiinhalt auf der Platte war zu diesem Zeitpunkt bereits der hier committete.)
 
-**Open:** Die Codex-Threads auf PR #17 und #18 bekommen die Antwort mit dem Commit-Hash erst nach dem Merge durch
-den Orchestrator (Akzeptanzkriterium 3) — das liegt außerhalb dieses Worktrees und außerhalb der erlaubten Dateien.
+**Befund: `pnpm gates` nach dem Commit rot bei `slice-scope`, unabhängig vom Inhalt dieser Änderung.** Der
+abschließende Lauf nach dem Commit `70aa232` (verlangt von der Arbeitsanweisung, „At the end, run pnpm gates … and
+node scripts/slice-scope.mjs"):
+```
+$ node scripts/slice-scope.mjs
+slice-scope: 1 file(s) outside "docs/slices/takt-007-codex-befunde-018-takt005.md"'s "Files allowed" list:
+  README.md
+```
+`pnpm gates` (Tail, wörtlich, nach dem Commit):
+```
+x 7 dependency violations (0 errors, 7 warnings). 133 modules, 490 dependencies cruised.
+
+
+> hvworkflow@0.1.0 role-literals /home/user/wt/takt
+> node scripts/role-literal-check.mjs
+
+Role-literal check: no role-name literal outside the policy layer (apps/api/src, packages/domain/src); roles from packages/domain/src/types.ts: moderation, capture, expert, legal, approver, podium, admin, observer (role-context required only for: expert, legal, podium).
+
+> hvworkflow@0.1.0 now-check /home/user/wt/takt
+> node scripts/now-check.mjs
+
+now() check: no direct system-clock access outside the injected clock (packages/domain/src, apps/api/src).
+
+> hvworkflow@0.1.0 plan-honesty /home/user/wt/takt
+> node scripts/plan-honesty.mjs
+
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+
+> hvworkflow@0.1.0 i18n-literals /home/user/wt/takt
+> node scripts/i18n-literal-check.mjs
+
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+
+> hvworkflow@0.1.0 slice-scope /home/user/wt/takt
+> node scripts/slice-scope.mjs
+
+slice-scope: 1 file(s) outside "docs/slices/takt-007-codex-befunde-018-takt005.md"'s "Files allowed" list:
+  README.md
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.
+```
+**Ursache (geprüft, nicht vermutet):** `scripts/slice-scope.mjs`s `extractGlobs()` behandelt den gesamten Text von
+„## Files allowed" als eine einzige „Bullet", weil die Zeile mit keinem `- ` beginnt (der Abschnitt dieser Spec ist
+ein Fließtext mit Kommas, wie auch bei takt-001 bis takt-006). Innerhalb einer Bullet trägt ein Pfad mit „/" sein
+Verzeichnis als `currentDir` für jeden *folgenden* Pfad *ohne* „/" in derselben Bullet weiter. Der erste Pfad
+`docs/agentische-entwicklung-plan.md` setzt `currentDir = "docs"`; der zweite, `README.md`, hat kein „/" und wird
+deshalb zu `docs/README.md` verlängert — obwohl `README.md` im Repository-Wurzelverzeichnis liegt. Reproduziert mit
+dem unveränderten Auszug aus `extractFilesAllowedSection`/`extractGlobs` gegen den Text dieser Spec:
+```
+GLOBS: [
+  'docs/agentische-entwicklung-plan.md',
+  'docs/README.md',
+  'docs/slices/takt-005-email-aus-012.md',
+  'docs/slices/takt-007-codex-befunde-018-takt005.md'
+]
+```
+Kein anderer takt-Spec vor takt-007 hatte einen bloßen Dateinamen (ohne „/") *nach* einem Pfad mit Verzeichnis in
+derselben Bullet, deshalb ist der Fall neu. Die Spec selbst nennt `README.md` unzweideutig unter „Files allowed"
+(Ziel 2 verlangt ausdrücklich README.md); der rote Lauf ist ein Werkzeugbefund, keine Abweichung dieser Änderung
+vom Ziel. **Ich habe weder `scripts/slice-scope.mjs` noch den Abschnitt „Files allowed" der takt-007-Spec
+angefasst**, weil beides außerhalb der mir erlaubten Dateien liegt (für diese Spec-Datei ist nur „(Bericht)"
+erlaubt) — eine Korrektur braucht eine Freigabe des Orchestrators, entweder als Bullet-Liste in der Spec oder als
+Bugfix-Scheibe für `scripts/slice-scope.mjs`.
+
+**Open:**
+1. **Blocker (außerhalb meines Dateizugriffs):** `pnpm gates` ist nach dem Commit rot, weil `scripts/slice-scope.mjs`
+   den bloßen Dateinamen `README.md` in der Files-allowed-Zeile dieser Spec fälschlich zu `docs/README.md`
+   verlängert (Ursache siehe oben). Alle anderen Tore liefen davor grün (siehe Evidence). Betrifft nur diese
+   Scheibe; Behebung erfordert eine Änderung außerhalb der erlaubten Dateien (`scripts/slice-scope.mjs` oder die
+   Files-allowed-Zeile der Spec) und damit eine Entscheidung des Orchestrators.
+2. Die Codex-Threads auf PR #17 und #18 bekommen die Antwort mit dem Commit-Hash erst nach dem Merge durch
+   den Orchestrator (Akzeptanzkriterium 3) — das liegt außerhalb dieses Worktrees und außerhalb der erlaubten
+   Dateien.
 
 **Touched:**
 - `docs/agentische-entwicklung-plan.md` (Abschnitt 3, ein Satz)
