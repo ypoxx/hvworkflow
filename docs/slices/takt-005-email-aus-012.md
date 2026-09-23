@@ -1,6 +1,6 @@
 # takt-005 — Doku-Nachträge: E-Mail-Adresse aus dem Bericht von 012, Patch-Stufe in ADR 0015, Lanes von 010 im Plan
 
-**Status:** spec
+**Status:** angenommen (Review Sonnet 5, Nachprüfung: annehmen)
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lanes: docs-slices, docs-adr, docs-plan
 (nur `docs/produktplan-beta.md`; 018 hält `docs/agentische-entwicklung-plan.md`, nicht den Produktplan)
 **Rolle/Modell:** Mechaniker · Haiku 4.5; Review Sonnet 5
@@ -187,3 +187,6 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
 
 Nacharbeit vom Orchestrator statt vom Mechaniker (nach oben abgewichen): Haiku hat heute zum zweiten Mal einen
 Nachweis umformuliert (auch takt-002); zwei Zeilen waren schneller selbst berichtigt als eine zweite Runde.
+
+**Runde 2 · Nachprüfung Sonnet 5 · 23.09.2026 · Urteil: annehmen.** Keine persönliche Adresse mehr im Baum; neuer
+gates-Auszug byte-gleich mit dem Lauf (nur ANSI entfernt); Scheibenumfang grün; Commit mit `[skip netlify]`.
