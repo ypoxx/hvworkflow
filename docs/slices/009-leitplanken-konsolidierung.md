@@ -47,9 +47,10 @@ bindend über die Leitplanken"); Register E23, E42; Risiko „Scheibe 008 bringt
 5. **Arbeitsordnung bleibt eine.** AGENTS.md bleibt die einzige Arbeitsordnung; das Leitplanken-Dokument sagt
    das im ersten Absatz, AGENTS.md verweist in einer Zeile darauf. README-Index erhält je eine Zeile für
    Leitplanken und Annahmevorlage.
-6. **Aufräumen.** `.claude/worktrees/` sind im Repositorium nicht versioniert (`git ls-files` leer); damit
-   repo-weite Suchen sie nicht mehr doppelt finden, kommt `.claude/worktrees/` in `.gitignore`
-   (ripgrep und das Grep-Werkzeug beachten `.gitignore`). Die Spec 008 des Codex-Branches wird als
+6. **Aufräumen.** `.claude/worktrees/agent-*` sind im Repositorium nicht versioniert (`git ls-files` leer) und
+   `.claude/worktrees/` steht bereits in `.gitignore` (ripgrep und das Grep-Werkzeug beachten das); im
+   Repositorium ist nichts zu entfernen. Lokale Kopien beim Umsetzer räumt `git worktree prune` auf
+   (Bericht). Die Spec 008 des Codex-Branches wird als
    `docs/slices/008-produktreife-qualitaetsleitplanken.md` übernommen (Herkunft der Leitplanken, Status
    „ersetzt durch 009"). Der Codex-Branch wird nach dem Merge dieser Scheibe gelöscht (E23, Orchestrator).
 
@@ -65,7 +66,7 @@ bindend über die Leitplanken"); Register E23, E42; Risiko „Scheibe 008 bringt
 - `docs/adr/0001-vorlage-annahme.md` (neu)
 - `docs/slices/008-produktreife-qualitaetsleitplanken.md` (übernommen, Statuszeile angepasst)
 - `docs/slices/009-leitplanken-konsolidierung.md` (diese Datei)
-- `AGENTS.md` (eine Verweiszeile), `README.md` (Indexzeilen), `.gitignore` (eine Zeile)
+- `AGENTS.md` (eine Verweiszeile), `README.md` (Indexzeilen)
 
 ## Akzeptanzkriterium
 
@@ -75,8 +76,10 @@ bindend über die Leitplanken"); Register E23, E42; Risiko „Scheibe 008 bringt
    und Vermerk „Übernahme durch 014".
 4. `docs/adr/0001-vorlage-annahme.md` existiert; `git diff` auf `docs/adr/0001-schichtung-und-vertragskopplung.md` ist leer.
 5. Keine Stelle im Dokument führt eine neue Rolle, ein neues Tor oder eine zweite Arbeitsordnung ein.
-6. `pnpm gates` grün.
-7. Nach dem Merge: `git ls-remote origin` ohne `codex/bewertungsbericht-zum-hv-tool-erstellen` (Orchestrator, E23).
+6. Die Abschnitte 9.1 „Produktionsfundament", 9.2 „Pilotbereit", 9.3 „Produktionsbereit" behalten Nummer
+   und Namen, weil der Produktplan (Abschnitte 1, 5.4, 5.8, 5.10, 7) darauf verweist.
+7. `pnpm gates` grün.
+8. Nach dem Merge: `git ls-remote origin` ohne `codex/bewertungsbericht-zum-hv-tool-erstellen` (Orchestrator, E23).
 
 ## Nachweise
 
@@ -85,7 +88,33 @@ nach dem Merge `git ls-remote` ohne Codex-Branch.
 
 ## Bericht
 
-(vom Umsetzer)
+```
+Slice: 009-leitplanken-konsolidierung
+Done: Leitplanken vom Codex-Branch übernommen und von 506 auf 339 Zeilen gekürzt (Wörter 4137 → 3419,
+      Zeichen 32297 → 26151; darin neu: Perspektiven-Tabelle, Registerzeilen, Beispiel 021); die sieben
+      Befunde eingearbeitet; ADR-0001-Annahmevorlage; Verweis in AGENTS.md, zwei Indexzeilen im README;
+      Spec 008 als Herkunft übernommen (Status superseded).
+Evidence: pnpm gates exit 0 — domain 39/39, web 9/9, api 25/25 Tests, vocabulary-check: ok, Web-Build ✓;
+      git diff auf docs/adr/0001-schichtung-und-vertragskopplung.md leer.
+Open: Codex-Branch wird nach dem Merge gelöscht (E23, Orchestrator). .claude/worktrees/ ist bereits in
+      .gitignore und nicht versioniert — im Repositorium nichts zu entfernen; lokal beim Umsetzer ggf.
+      `git worktree prune`.
+Touched: docs/qualitaetsleitplanken-produktreife.md (neu), docs/adr/0001-vorlage-annahme.md (neu),
+      docs/slices/008-produktreife-qualitaetsleitplanken.md (übernommen), docs/slices/009-… (diese Datei),
+      AGENTS.md (+2 Zeilen Verweis), README.md (+2 Indexzeilen)
+```
+
+| Befund | Fundstelle im Dokument |
+|---|---|
+| B1 ADR 0001 operativ bindend | 1.1 (Quellenstatus), 1.3 (Grenzen, Blocker im Review), 11 (entfällt als offene Frage, E42); Vorlage `docs/adr/0001-vorlage-annahme.md` |
+| B2 Regel 7 nicht verhandelbar | 1.3 zweiter Absatz; 11 Abbildung („Event Sourcing oder Zustand → entfällt") |
+| B3 Perspektiven auf heutige Rollen | 5 (Tabelle Perspektive → Rolle), 7 (Spalte Rolle) |
+| B4 Mensch entscheidet Herabstufung | 4 (letzter Absatz), 3 (Zeile im Planungsblock) |
+| B5 Betriebsrat und Rechtsprüfung als Registerzeilen | 6.6 (keine Merge-Bedingung), 6.1 Blocker, 11 (Zeilen E13/E14 und E15, „Übernahme durch 014") |
+| B6 um ein Drittel kürzen | 506 → 339 Zeilen |
+| B7 durchgerechnetes Beispiel | 12 (Scheibe 021) |
+
+Abschnitte 9.1, 9.2, 9.3 tragen Nummer und Namen wie im Codex-Stand (Plan verweist darauf).
 
 ## Review findings
 
