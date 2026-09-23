@@ -350,16 +350,18 @@ Runde 1 und beide Codex-Punkte mit eigenen Proben erledigt; neu:
   (Werte, Abkürzungen, `--no-`-Formen, Kurzoptionsgruppen); eine mehrdeutige Abkürzung (`--forc`) blockiert mit
   diesem Grund (`6e1667c`). Der Test für `--forc` erwartet jetzt „ambiguous“ statt „force flag“, blockiert bleibt
   blockiert; `--force-w` prüft den Force-Grund. Hook-Tests 80/80.
+- P2 · Fehlalarm: eine spätere `--no-`-Form hob die Option nicht auf (`--delete --no-delete`) → das spätere
+  Argument gewinnt wie in git (`352c8c7`). Hook-Tests 82/82.
 
-`pnpm gates` auf dem Endstand `6e1667c`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
+`pnpm gates` auf dem Endstand `352c8c7`, Exit 0, letzte 32 Zeilen, nur ANSI-Farbcodes entfernt:
 
 ```
-# pass 194
+# pass 196
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6456.292859
+# duration_ms 6632.50606
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -384,6 +386,6 @@ dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.33s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 6e1667c, tree c1309195cc67…
+✓ built in 1.27s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 352c8c7, tree 85e7294e44f3…
 ```
