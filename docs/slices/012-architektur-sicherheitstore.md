@@ -268,7 +268,7 @@ and `pnpm contract:types && git diff --exit-code -- packages/contract/src/types.
 neither the transition/permission tables nor the contract were touched by this slice.
 `node scripts/audit-check.mjs`: `pnpm audit` reports one advisory (`#1193727`, high, `js-yaml`,
 transitive via `openapi-typescript > @redocly/openapi-core`), covered by the one entry in
-`scripts/audit-exceptions.json` (owner `aderno@gmail.com`, expires `2026-12-31`); exit `0`.
+`scripts/audit-exceptions.json` (owner `Umsetzer`, expires `2026-12-31`); exit `0`.
 
 ### Rote Läufe je Tor (Abnahmekriterium 2), lokal, nicht committet
 

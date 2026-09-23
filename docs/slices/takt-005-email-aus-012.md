@@ -52,7 +52,122 @@ Historie entscheidet der Eigentümer). Keine anderen Wortlautänderungen im Beri
 
 ## Bericht
 
-(vom Mechaniker)
+**git diff --stat against working tree:**
+```
+docs/adr/0015-vertragsversionierung.md         | 3 +++
+docs/produktplan-beta.md                       | 2 +-
+docs/slices/012-architektur-sicherheitstore.md | 2 +-
+3 files changed, 5 insertions(+), 2 deletions(-)
+```
+
+**E-Mail-Adressen im Arbeitsbaum:**
+```
+docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
+docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
+scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/pre-tool-use-bash.test.mjs:124:  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
+scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
+scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+```
+
+Begründung jeder Fundstelle:
+1. `docs/slices/016-agenten-hooks-tore.md:853`: `t@t.invalid` ist eine Test-Adresse in einem Git-Befehl-Beispiel, nicht real.
+2. `docs/slices/takt-005-email-aus-012.md:19`: `noreply@anthropic.com` ist die Automatisierungs-Adresse in Commit-Vorlage-Beispielen, wie in der Spec angegeben.
+3. `scripts/hooks/mark-test-run.test.mjs:40`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+4. `scripts/hooks/pre-tool-use-bash.test.mjs:124`: `t@t.invalid` ist eine Test-Adresse in Git-Befehl-String für Tests.
+5. `scripts/hooks/stop-check.test.mjs:26`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+6. `scripts/hooks/stop-check.test.mjs:132`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+7. `scripts/slice-scope.test.mjs:181`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+8. `scripts/slice-scope.test.mjs:188`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+
+**plan-graph.mjs:**
+```
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+  missing dependencies: 0
+  cycles: 0
+  dependency-order problems: 0
+  same-day lane-sharing warnings: 0
+
+plan-graph: ok.
+```
+
+**plan-graph.mjs --calendar | head -20:**
+```
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+  missing dependencies: 0
+  cycles: 0
+  dependency-order problems: 0
+  same-day lane-sharing warnings: 0
+
+plan-graph --calendar: 80 slice(s) scheduled (0 taken out as already merged), 3 AStd/day, start 2026-09-28:
+  009  start 2026-09-28  finish 2026-09-28  (1.5 AStd, lanes: docs-plan)  Leitplanken 008 konsolidieren, ADR 0001 zur Annahme vorlegen, Repositorium aufräumen
+  017  start 2026-09-28  finish 2026-09-28  (1 AStd, lanes: web-shell)  i18n-Wörterbuch in Feature-Module teilen
+  012  start 2026-09-29  finish 2026-09-29  (2 AStd, lanes: infra)  Architektur- und Sicherheitstore, Tor-Inventar ehrlich
+  014  start 2026-09-29  finish 2026-09-29  (2.5 AStd, lanes: docs-register)  Entscheidungsregister, Abdeckungsmatrix, Fragenpaket, DSFA-Vorentwurf, Takt-Skript
+  015  start 2026-09-29  finish 2026-09-29  (2.5 AStd, lanes: docs-adr)  ADR-Paket 0003–0016 als vorgeschlagen
+  016  start 2026-09-30  finish 2026-09-30  (1.5 AStd, lanes: infra)  Agentenrollen, Hooks, Scheibenumfang-Tor, Plan-Graph-Prüfung, Branch-Schutz
+  013  start 2026-09-30  finish 2026-09-30  (1 AStd, lanes: e2e)  Barrierefreiheit und Tastaturpfad als Tor
+  019  start 2026-09-30  finish 2026-09-30  (1.5 AStd, lanes: contract)  Vertrag 0.2.0 (nur Vertrag): Redezeit und Art veraltet, Leserechte, Koordination, Rechtsfreigabe-Ereignis, Versionierung
+  018  start 2026-10-01  finish 2026-10-01  (1 AStd, lanes: docs-plan)  Entwicklungsplan, Glossar und README abgleichen
+  010  start 2026-10-01  finish 2026-10-01  (2 AStd, lanes: core, contract, service, web-speakers, web-capture, web-answers, web-stage, web-history, e2e)  Lesepfade unter can() mit Leserechten
+  082  start 2026-10-01  finish 2026-10-01  (1 AStd, lanes: web-shell)  Feature-Register für Routen, Navigation, Kürzel und Hilfe
+  011  start 2026-10-02  finish 2026-10-02  (1.5 AStd, lanes: core)  Legal-Trace-Feld und Regelregister
+  020  start 2026-10-02  finish 2026-10-02  (2 AStd, lanes: web-answers, web-capture, web-stage, web-history, web-speakers, web-shell)  Oberfläche: Rückbau und Passung (S-Punkte)
+```
+
+**pnpm gates tail (exit 0):**
+```
+# tests 110
+# suites 0
+# pass 110
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4651.23601
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-l931jxa-.css                        39.97 kB │ gzip:   8.67 kB
+dist/assets/index-C6zQBIzf.js                        529.18 kB │ gzip: 155.32 kB │ map: 2,181.19 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunkifying: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.16s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
+```
+
+**Done:**
+- Updated owner value in docs/slices/012-architektur-sicherheitstore.md from `aderno@gmail.com` to `Umsetzer`
+- Verified all email addresses in codebase with git grep and documented each remaining occurrence with rationale
+- Added new proposal line to docs/adr/0015-vertragsversionierung.md Entscheidung section
+- Updated slice 010 lanes in docs/produktplan-beta.md and verified plan-graph consistency
+
+**Open:** none
+
+**Touched:** 
+- docs/slices/012-architektur-sicherheitstore.md (1 line changed)
+- docs/adr/0015-vertragsversionierung.md (3 lines added)
+- docs/produktplan-beta.md (1 line changed)
+- docs/slices/takt-005-email-aus-012.md (this spec, Bericht section)
 
 ## Review findings
 
