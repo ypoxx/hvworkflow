@@ -249,11 +249,16 @@ Done: Vertrag auf 0.2.1 (question.read.delivered, R-PERM-03, CHANGELOG); READ_PE
   Leserecht plus die vom Orchestrator nachgeschärften Zusatzfälle (Ziel 7, Domänen-/HTTP-Teil).
 Evidence: siehe unten (pnpm gates-Ende, Vertragstor, Wahrheitstabellen-Diff, Testnamen, angepasste
   Bestandstests, Playwright-Zusammenfassung).
-Open: Ziele 5, 6 und der e2e-Teil von Ziel 7 (Auftrag B, nach 013). Drei Dateien außerhalb der
+Open: Ziele 5, 6 und der e2e-Teil von Ziel 7 (Auftrag B, nach 013). Vier Dateien außerhalb der
   ursprünglichen Dateiliste angefasst, siehe "Unvermeidliche Randfolgen" unten — der Owner sollte das
   im Diff bestätigen.
 Touched: siehe "Touched" unten.
 ```
+
+**Korrektur (Nacharbeit nach Review, Punkt 11):** "Drei Dateien" oben und unter "Open" war falsch gezählt —
+es sind vier: `apps/web/src/i18n/labels.ts`, `shell.de.ts`, `shell.en.ts` (eine Gruppe, drei Dateien) plus
+`scripts/role-literal-check.test.mjs` (eine vierte, separate Datei). Beide Textstellen sind jetzt auf "Vier
+Dateien" korrigiert.
 
 **Spec-Nachschärfung während der Umsetzung.** Der Orchestrator hat den Auftrag nach dem ersten
 Einlesen mit einer präzisierten Fassung von Festlegung 2 und 3 sowie Ziel 7/Akzeptanz 1–2
@@ -487,8 +492,10 @@ erzeugt — die kommen erst mit Auftrag B/e2e `010-lesepfade.spec.ts`).
 **Open:**
 - Ziele 5, 6 und der e2e-Teil von Ziel 7 (Auftrag B, startet erst nach 013).
 - Die vier oben gelisteten Playwright-Schritte bleiben bis Auftrag B rot (erwartet).
-- Drei Dateien außerhalb der ursprünglichen "Files allowed"-Liste angefasst (siehe oben); die Liste
-  wurde in diesem Commit nachgezogen, der Owner sollte das bestätigen.
+- Vier Dateien außerhalb der ursprünglichen "Files allowed"-Liste angefasst (siehe oben; Korrektur der
+  Zählung in der Nacharbeit nach Review, Punkt 11): `labels.ts`, `shell.de.ts`, `shell.en.ts`,
+  `scripts/role-literal-check.test.mjs`. Die Liste wurde in diesem Commit nachgezogen, der Owner
+  sollte das bestätigen.
 
 **Touched:**
 - `packages/contract/openapi.yaml`, `packages/contract/package.json`, `packages/contract/CHANGELOG.md`,
@@ -502,6 +509,495 @@ erzeugt — die kommen erst mit Auftrag B/e2e `010-lesepfade.spec.ts`).
   `apps/web/src/i18n/parity.test.ts` (Randfolgen, siehe oben)
 - `scripts/role-literal-check.test.mjs` (Randfolge, siehe oben)
 - `docs/slices/010-lesepfade-leserechte.md` (Dateiliste nachgezogen, dieser Bericht)
+
+### Auftrag A — Nacharbeit nach Review
+
+Die einzige Nacharbeitsrunde für Auftrag A, ausgelöst durch die unabhängige Sicherheitsprüfung (Opus):
+"Auftrag A nacharbeiten". Festlegung 8 (Commit `0bfe8b5`) ist eingearbeitet; die elf Punkte unten
+folgen der Nachricht des Orchestrators.
+
+**Punkt → Commit:**
+
+| Punkt | Inhalt | Commit |
+|---|---|---|
+| 1 (Kern) | mergeQuestion: `intoQuestionId` kein Existenzorakel mehr | `bc6266d` |
+| 1 (Dienst) | HTTP-Test: identisches 404 für observer/podium, verborgenes vs. unbekanntes Ziel | `983ffe3` |
+| 2 | 409-Detail maskiert für Nicht-Leseberechtigte (Festlegung 8) | `bc6266d` |
+| 3 | `extendingScopesFor` als einzige Stelle; `listQuestions` prüft über `can()` | `bc6266d` |
+| 4 | `requireReadPermission(method)` liest aus `READ_PERMISSIONS` | `bc6266d` |
+| 5 | `getQuestionHistory` verlangt zusätzlich `can(actor,'question.read',q)` | `bc6266d` |
+| 6 | HTTP: zwei Schreibrecht-Verweigerungen wiederhergestellt | `983ffe3` |
+| 7 | `/events` 403 für jede Rolle außer admin (Domäne + HTTP) | `bc6266d` (Domäne), `983ffe3` (HTTP) |
+| 8 | HTTP: identische 404-Körper, keine ruleId, kein ETag | `983ffe3` |
+| 9 | Test: keine `extends`-Verknüpfung zeigt auf eine Übergangsaktion | `bc6266d` |
+| 10 | Testlücken (Titel/Admin-Fall, Rollenwechsel beide Richtungen, Seitenwechsel-Test) | `bc6266d` |
+| 11 | Beweise (dieser Abschnitt, Vier-Dateien-Korrektur) | dieser Commit |
+
+Punkte 1–5, 9 und 10 landen in einem gemeinsamen Commit (`bc6266d`): sie betreffen alle
+`packages/domain/src/api.ts`/`permissions.ts` und ihre beiden Testdateien, in einem Arbeitsgang
+umgesetzt, bevor ich zum ersten Mal zwischen-committet habe. Sie sind hier einzeln referenziert, aber
+nicht in getrennten Commits isoliert. Punkt 1 (Dienst-Teil), 6, 7 (HTTP-Teil) und 8 liegen in
+`983ffe3`.
+
+**pnpm gates — echtes Ende, exit 0 (kopiert, nicht abgetippt):**
+
+```
+ok 110 - m4: a warning (not a failure) when "Files allowed" changed since the merge-base
+  ---
+  duration_ms: 372.75952
+  type: 'test'
+  ...
+1..110
+# tests 110
+# suites 0
+# pass 110
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6959.541751
+
+> @hv/web@0.0.0 build /home/user/wt/010/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-l931jxa-.css                        39.97 kB │ gzip:   8.67 kB
+dist/assets/index-DyO5Nybo.js                        532.14 kB │ gzip: 156.02 kB │ map: 2,197.71 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a
+plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a
+sourcemap for the transformation. Consult the plugin documentation for help:
+https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.54s
+mark-test-run: wrote /home/user/wt/010/.claude/state/last-test-run (clean tree)
+```
+
+Exit code 0. `node scripts/slice-scope.mjs` run separately:
+
+```
+slice-scope: 19 changed file(s), all within "docs/slices/010-lesepfade-leserechte.md"'s "Files allowed" list (43 pattern(s)).
+```
+
+Domain: 67 tests passed (was 60; +7 for points 1, 2, 4, 5, 9, and 10 (×2 new tests)). apps/api: 48
+tests passed (was 44; +4 across points 1/6/7/8 in `negative.test.ts` and `read-rights.test.ts`).
+
+**Wahrheitstabellen-Diff gegen den Merge-Base, vollständig, ohne Auslassung**
+(`git diff 22c7067 HEAD -- packages/domain/policy-truth-table.md`, kopiert):
+
+```diff
+diff --git a/packages/domain/policy-truth-table.md b/packages/domain/policy-truth-table.md
+index 9c2548b..a12dd85 100644
+--- a/packages/domain/policy-truth-table.md
++++ b/packages/domain/policy-truth-table.md
+@@ -4,181 +4,197 @@ Generated by `packages/domain/src/__tests__/transitions.test.ts`. A diff here is
+ needs an explicit decision (docs/rollen-und-rechtekonzept.md). Representative question: expert track,
+ one answer version; podium-track rows are marked separately.
+ 
+-| Role | Status | q.capture | q.classify | q.assign | answer.draft | q.submit_review | q.approve | q.return | q.stage | q.deliver | q.close | q.withdraw | q.merge | q.read |
+-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+-| moderation | captured | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | captured (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | classified | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | classified (podium) | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | ✓ |
+-| moderation | assigned | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | assigned (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | answer_drafted | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| moderation | in_review | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | approved | · | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ |
+-| moderation | approved (podium) | · | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ |
+-| moderation | staged | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | delivered | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| moderation | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| moderation | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| moderation | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| moderation | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| moderation | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| moderation | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | captured | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | captured (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | classified | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | classified (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | assigned | ✓ | · | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | answer_drafted | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| capture | in_review | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | in_review (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | approved | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | approved (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | staged | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | staged (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | delivered | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | delivered (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ |
+-| capture | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| capture | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| expert | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| expert | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | answer_drafted | · | · | · | ✓ | ✓ | · | · | · | · | · | · | · | ✓ |
+-| expert | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | in_review | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| expert | in_review (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | approved | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| expert | approved (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | staged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | staged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | delivered (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| expert | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| legal | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| legal | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | answer_drafted | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ |
+-| legal | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | in_review | · | · | · | ✓ | · | ✓ | ✓ | · | · | · | · | · | ✓ |
+-| legal | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | approved | · | · | · | ✓ | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | approved (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | staged | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | delivered | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| legal | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| legal | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | classified | · | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | classified (podium) | · | · | · | · | · | · | · | ✓ | · | · | · | · | ✓ |
+-| approver | assigned | · | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | in_review | · | · | · | · | · | ✓ | ✓ | · | · | · | · | · | ✓ |
+-| approver | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| approver | approved | · | · | · | · | · | · | ✓ | ✓ | · | · | · | · | ✓ |
+-| approver | approved (podium) | · | · | · | · | · | · | ✓ | ✓ | · | · | · | · | ✓ |
+-| approver | staged | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| approver | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| approver | delivered | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| approver | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| approver | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| approver | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | classified | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | assigned | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | in_review | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| podium | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| podium | approved | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| podium | approved (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ |
+-| podium | staged | · | · | · | · | · | · | ✓ | · | ✓ | · | · | · | ✓ |
+-| podium | staged (podium) | · | · | · | · | · | · | ✓ | · | ✓ | · | · | · | ✓ |
+-| podium | delivered | · | · | · | · | · | · | ✓ | · | · | ✓ | · | · | ✓ |
+-| podium | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | ✓ | · | · | ✓ |
+-| podium | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| podium | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | captured | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | captured (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | classified | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | classified (podium) | ✓ | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | ✓ |
+-| admin | assigned | ✓ | · | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | answer_drafted | ✓ | · | · | ✓ | ✓ | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ |
+-| admin | in_review | ✓ | · | · | ✓ | · | ✓ | ✓ | · | · | · | ✓ | · | ✓ |
+-| admin | in_review (podium) | ✓ | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ |
+-| admin | approved | ✓ | · | · | ✓ | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ |
+-| admin | approved (podium) | ✓ | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ |
+-| admin | staged | ✓ | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ |
+-| admin | staged (podium) | ✓ | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ |
+-| admin | delivered | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ |
+-| admin | delivered (podium) | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ |
+-| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| admin | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | classified | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | assigned | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | in_review | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | in_review (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | approved | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | approved (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | staged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | staged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | delivered (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
+-| observer | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ |
++| Role | Status | q.capture | q.classify | q.assign | answer.draft | q.submit_review | q.approve | q.return | q.stage | q.deliver | q.close | q.withdraw | q.merge | q.read | q.read.delivered |
++|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
++| moderation | captured | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | captured (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | classified | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | classified (podium) | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | ✓ | · |
++| moderation | assigned | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | assigned (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | answer_drafted | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| moderation | in_review | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | approved | · | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ | · |
++| moderation | approved (podium) | · | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ | · |
++| moderation | staged | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | delivered | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| moderation | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| moderation | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| moderation | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| moderation | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| moderation | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| moderation | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | captured | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | captured (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | classified | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | classified (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | assigned | ✓ | · | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | answer_drafted | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| capture | in_review | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | in_review (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | approved | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | approved (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | staged | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | staged (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | delivered | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | delivered (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · | ✓ | · |
++| capture | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| capture | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | answer_drafted | · | · | · | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | · |
++| expert | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | in_review | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | in_review (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | approved | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | approved (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | staged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | staged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | delivered (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| expert | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | answer_drafted | · | · | · | ✓ | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | in_review | · | · | · | ✓ | · | ✓ | ✓ | · | · | · | · | · | ✓ | · |
++| legal | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | approved | · | · | · | ✓ | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | approved (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | staged | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | delivered | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| legal | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| legal | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | captured | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | classified | · | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | classified (podium) | · | · | · | · | · | · | · | ✓ | · | · | · | · | ✓ | · |
++| approver | assigned | · | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | in_review | · | · | · | · | · | ✓ | ✓ | · | · | · | · | · | ✓ | · |
++| approver | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | approved | · | · | · | · | · | · | ✓ | ✓ | · | · | · | · | ✓ | · |
++| approver | approved (podium) | · | · | · | · | · | · | ✓ | ✓ | · | · | · | · | ✓ | · |
++| approver | staged | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | staged (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | delivered | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | merged | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| approver | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| podium | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | classified | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | assigned | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | in_review | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
++| podium | in_review (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
++| podium | approved | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
++| podium | approved (podium) | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
++| podium | staged | · | · | · | · | · | · | ✓ | · | ✓ | · | · | · | · | · |
++| podium | staged (podium) | · | · | · | · | · | · | ✓ | · | ✓ | · | · | · | · | · |
++| podium | delivered | · | · | · | · | · | · | ✓ | · | · | ✓ | · | · | · | · |
++| podium | delivered (podium) | · | · | · | · | · | · | ✓ | · | · | ✓ | · | · | · | · |
++| podium | closed | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | merged | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| podium | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| admin | captured | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | captured (podium) | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | classified | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | classified (podium) | ✓ | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | ✓ | · |
++| admin | assigned | ✓ | · | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | answer_drafted | ✓ | · | · | ✓ | ✓ | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
++| admin | in_review | ✓ | · | · | ✓ | · | ✓ | ✓ | · | · | · | ✓ | · | ✓ | · |
++| admin | in_review (podium) | ✓ | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++| admin | approved | ✓ | · | · | ✓ | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ | · |
++| admin | approved (podium) | ✓ | · | · | · | · | · | ✓ | ✓ | · | · | ✓ | · | ✓ | · |
++| admin | staged | ✓ | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
++| admin | staged (podium) | ✓ | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
++| admin | delivered | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
++| admin | delivered (podium) | ✓ | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
++| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| admin | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| admin | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| observer | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | classified | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | assigned | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | in_review | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | in_review (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | approved | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | approved (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | staged | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | staged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | delivered | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| observer | delivered (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| observer | closed | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| observer | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| observer | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | merged | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++| observer | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
++
++# Policy truth table — Role × Leserecht
++
++Generated by the same test. A diff here is a rights change and needs an explicit decision
++(Festlegung 4 of docs/slices/010-lesepfade-leserechte.md).
++
++| Role | speaker.read | contribution.read | question.read | question.read.delivered | stage.read | history.read | event.read |
++|---|---|---|---|---|---|---|---|
++| moderation | ✓ | ✓ | ✓ | · | ✓ | ✓ | · |
++| capture | ✓ | ✓ | ✓ | · | · | ✓ | · |
++| expert | · | · | ✓ | · | · | ✓ | · |
++| legal | · | · | ✓ | · | · | ✓ | · |
++| approver | · | · | ✓ | · | ✓ | ✓ | · |
++| podium | · | · | · | · | ✓ | · | · |
++| admin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
++| observer | · | · | · | ✓ | · | · | · |
+```
+
+**Bedrohungs-ID → abdeckende Tests** (docs/sicherheit/bedrohungsmodell.md, Kopfzeile: schließt
+T-G1-I-01; berührt T-G1-I-02, T-G1-I-04, T-G3-I-01; Missbrauchsfall MF-02):
+
+| Bedrohung | Stand nach 010 | Abdeckende Tests |
+|---|---|---|
+| T-G1-I-01 „Jede Rolle liest alles" | geschlossen | Alle Positiv-/Negativtests je Leserecht (Domäne `api.test.ts`, HTTP `read-rights.test.ts`); wörtlich der im Bedrohungsmodell genannte Probelauf: `question.read.delivered: observer 403 R-PERM-03 on a status filter outside the read scope` (Domäne und HTTP) |
+| T-G1-I-02 „Massenlesen in einem Aufruf" | teilweise (Seitenobergrenze seit 012; `event.read` nur admin seit 010; Rate-Limit erst 034) | `negative.test.ts › 422: an out-of-range or out-of-enum query parameter is rejected, not clamped` (Bestand, 012); `event.read: every role except admin is denied listEvents with R-PERM-02` (Domäne + HTTP, Punkt 7) |
+| T-G1-I-04 „Ableitung über Nummern, Zähler, Suche" | teilweise (Suche/Liste nur über lesbare Fragen seit 010; Zähler `byStatus` bleiben offen bis 047) | `question.read.delivered: observer sees only delivered/closed questions in listQuestions(), and total matches; admin ... stays unrestricted`; `question.read.delivered: paging through the observer visible list only ever returns visible items, and total is stable across pages` (Punkt 10) |
+| T-G3-I-01 „Ereignisstrom gibt Geschütztes an Nachbarn" | teilweise (`event.read` nur admin seit 010; SSE-Filter erst 035/065) | `event.read: every role except admin is denied listEvents with R-PERM-02` (Domäne + HTTP); `subscribe (Festlegung 5): delivers [] to an actor without event.read`; `subscribe (Festlegung 5): checks the permission fresh on every delivery, so a role switch between two deliveries changes what arrives` |
+| MF-02 „Massenlesen und Export" | teilweise (der Leserechts-Teil ist 010; Export-Ereignis/Rate-Limit sind 051/034) | wörtlich der im Bedrohungsmodell genannte Nachweis `question.read.delivered: observer 403 R-PERM-03 on a status filter outside the read scope`; ergänzt um den Seitenwechsel-Test und die `/events`-Rollenschleife oben |
+
+**Playwright** (`E2E_PORT=4350 pnpm exec playwright test --reporter=list`, erneut gelaufen nach der
+Nacharbeit): unverändert **5 passed, 4 failed**, exakt dieselben vier Schritte wie im ursprünglichen
+Bericht A (003-answers-stage.spec.ts:43, 020-rueckbau-passung.spec.ts:198, 020-rueckbau-passung.spec.ts:599,
+abnahme.spec.ts:86) — keine neuen, keine behobenen. `docs/evidence/` danach mit
+`git checkout -- docs/evidence` zurückgesetzt.
 
 ## Review findings
 
