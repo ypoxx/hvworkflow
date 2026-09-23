@@ -181,6 +181,11 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
 
   /* ---------- Podium: read out, next ---------- */
   await asRole(page, 'podium');
+  // Point #3/#9 (slice 020): "Nur Bühne" now defaults on for a role that only reads answers out.
+  // This walk-through exercises the manual toggle explicitly below, so it starts as if the person
+  // had already made a conscious choice — the stored preference always wins over the default
+  // (020-rueckbau-passung.spec.ts covers the default itself on a fresh session).
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
 

@@ -192,27 +192,26 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await page.getByTestId('capture-free-add').click();
   await expect(page.getByTestId('capture-question-card')).toHaveCount(8);
 
-  // Classification: Pfad C, Expert Track.
+  // Classification (point #21, slice 020): reached only through the explicit "Klassifizieren"
+  // action, in a dialog — the card itself carries no track, agenda or stage field any more.
   const card = page.getByTestId('capture-question-card').first();
-  await card.getByTestId('classify-track-expert_track').click();
-  await card.getByTestId('classify-agenda').selectOption({ index: 1 });
-  await card.getByTestId('classify-stage').selectOption('cfo');
-  await card.getByTestId('classify-save').click();
+  await card.getByTestId('capture-classify-open').click();
+  await page.getByTestId('classify-track-expert_track').click();
+  await page.getByTestId('classify-stage').selectOption('cfo');
+  await page.getByTestId('classify-save').click();
+  await expect(page.getByTestId('classify-save')).toBeHidden();
 
-  await expect(card).toContainText('Pfad C');
   await expect(card).toContainText('klassifiziert');
-
-  // Slice 006: nothing jumps under the desk's cursor — the card that was open while still
-  // `captured` stays open now that it is `classified` (design principle 8).
-  await expect(card.getByTestId('classify-save')).toBeVisible();
+  await expect(card).not.toContainText('Pfad C');
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('002-capture.png') });
   await page.screenshot({ path: evidence('006-capture.png') });
 
-  // A fresh mount of that same, now-classified question starts collapsed to a summary line
-  // instead — leaving the desk unmounts and remounts this route, the same way switching between
-  // "Wortmeldungen" and "Erfassung" does all afternoon.
+  // A fresh mount of that same, now-classified question still shows only number, wording and
+  // status — leaving the desk unmounts and remounts this route, the same way switching between
+  // "Wortmeldungen" and "Erfassung" does all afternoon. "Klassifizieren" is still reachable
+  // (re-classifying is allowed up to `assigned`) and reopens with the earlier choice in place.
   await page.getByTestId('nav-speakers').click();
   await expect(page).toHaveURL(/\/speakers$/);
   await page.getByTestId('nav-capture').click();
@@ -220,9 +219,11 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   const remounted = page.getByTestId('capture-question-card').first();
   await expect(remounted).toContainText('klassifiziert');
-  await expect(remounted.getByTestId('classify-track-expert_track')).toBeHidden();
-  const toggle = remounted.getByTestId('card-classification-toggle');
-  await expect(toggle).toBeVisible();
-  await toggle.click();
-  await expect(remounted.getByTestId('classify-track-expert_track')).toBeVisible();
+  await remounted.getByTestId('capture-classify-open').click();
+  await expect(page.getByTestId('classify-track-expert_track')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('classify-save')).toBeHidden();
 });
