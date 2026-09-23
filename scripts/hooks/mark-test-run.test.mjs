@@ -72,6 +72,47 @@ test('mark-test-run also records the current HEAD commit', () => {
   }
 });
 
+// takt-006 rework point 4: the marker also carries a tree hash of just apps/, packages/ and scripts/
+// (used by stop-check.mjs to tell a docs-only or code-unchanged commit apart from one that actually
+// changed the tested code).
+test('mark-test-run also records a code-directory tree hash, stable across a docs-only edit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mark-test-run-test-'));
+  try {
+    git(dir, ['init', '-q']);
+    git(dir, ['checkout', '-q', '-b', 'main']);
+    mkdirSync(join(dir, 'apps', 'api', 'src'), { recursive: true });
+    writeFileSync(join(dir, 'apps', 'api', 'src', 'index.ts'), 'export const x = 1;\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
+
+    const r1 = spawnSync('node', [SCRIPT, '--root', dir], { encoding: 'utf8' });
+    assert.equal(r1.status, 0, r1.stdout + r1.stderr);
+    const written1 = JSON.parse(readFileSync(join(dir, '.claude', 'state', 'last-test-run'), 'utf8'));
+    assert.equal(typeof written1.treeHash, 'string');
+    assert.ok(written1.treeHash.length > 0);
+
+    writeFileSync(join(dir, 'README.md'), '# notes\n'); // docs-only, outside apps/packages/scripts
+    const r2 = spawnSync('node', [SCRIPT, '--root', dir], { encoding: 'utf8' });
+    assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+    const written2 = JSON.parse(readFileSync(join(dir, '.claude', 'state', 'last-test-run'), 'utf8'));
+    assert.equal(written2.treeHash, written1.treeHash);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mark-test-run records treeHash: null for a non-git tree', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mark-test-run-test-'));
+  try {
+    const r = spawnSync('node', [SCRIPT, '--root', dir], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const written = JSON.parse(readFileSync(join(dir, '.claude', 'state', 'last-test-run'), 'utf8'));
+    assert.equal(written.treeHash, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('mark-test-run records commit: null for a non-git tree', () => {
   const dir = mkdtempSync(join(tmpdir(), 'mark-test-run-test-'));
   try {

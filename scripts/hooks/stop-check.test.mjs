@@ -140,10 +140,13 @@ test('M2: a .gitignore-covered path (generated e2e output) never counts as dirty
 });
 
 // takt-006 point 2: the marker now carries the commit that was HEAD at the last successful test run,
-// not only a signature of the dirty tree. A `git commit` after that run — folding a further, untested
-// edit into what gets committed, or simply moving HEAD at all — used to be invisible to this hook once
-// the tree was clean again; it must now still block until "pnpm gates" runs again.
-test('takt-006 point 2 red: a commit made after mark-test-run is blocked even though the tree is clean again', () => {
+// not only a signature of the dirty tree.
+//
+// Reworked at rework point 4 (Opus review, MAJOR 1): comparing the commit id alone made *this exact*
+// scenario block too — committing precisely the code "pnpm gates" already tested changes HEAD but not
+// the code itself, so it must now pass; see "rework point 4 red" below for the case that *should*
+// still block (a commit that actually changes untested code).
+test('takt-006 point 2 green (reworked): committing exactly the already-tested code no longer blocks', () => {
   const dir = scratchRepo();
   try {
     writeFileSync(join(dir, 'apps', 'api', 'src', 'index.ts'), 'export const x = 2;\n');
@@ -151,8 +154,7 @@ test('takt-006 point 2 red: a commit made after mark-test-run is blocked even th
     git(dir, ['add', '-A']);
     git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'apply tested change']);
     const r = run(dir);
-    assert.equal(r.status, 2);
-    assert.match(r.stderr, /commit/i);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -168,6 +170,40 @@ test('takt-006 point 2 green: after that commit, a fresh "pnpm gates" run (mark-
     mark(dir); // re-run "pnpm gates" against the new commit
     const r = run(dir);
     assert.equal(r.status, 0, r.stdout + r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-006 rework, MAJOR finding 1 (Opus review) / point 4: comparing the commit id alone (previous
+// round's fix) blocks on *any* HEAD move, even one that never touched apps/, packages/ or scripts/ at
+// all — a docs-only commit, or simply committing the exact code already marked as tested ("gates, then
+// commit"). The marker now also carries a tree hash of just those three directories' current content;
+// a commit is only a problem if that hash actually changed.
+test('rework point 4 green: a docs-only commit after mark-test-run passes (HEAD moved, code did not)', () => {
+  const dir = scratchRepo();
+  try {
+    mark(dir); // clean tree, nothing to test yet
+    writeFileSync(join(dir, 'README.md'), '# notes\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'docs only']);
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('rework point 4 red: a code commit after mark-test-run blocks (HEAD moved, code changed)', () => {
+  const dir = scratchRepo();
+  try {
+    mark(dir); // clean tree, nothing to test yet
+    writeFileSync(join(dir, 'apps', 'api', 'src', 'index.ts'), 'export const x = 2;\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'untested code change']);
+    const r = run(dir);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /commit/i);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

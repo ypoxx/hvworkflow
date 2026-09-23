@@ -19,15 +19,16 @@
  * the new path is at least known to it, e.g. via `git add -N`) — either one pairs the record with a
  * second, NUL-separated "from" path that must be consumed, not misread as an unrelated status line.
  */
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const CODE_DIRS = ['apps', 'packages', 'scripts'];
 
-function git(root, args) {
-  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+function git(root, args, env = process.env) {
+  return execFileSync('git', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 /** The commit currently at `HEAD` — `undefined` if git is unavailable or there is no commit yet (both
@@ -42,6 +43,41 @@ export function headCommit(root) {
     return git(root, ['rev-parse', 'HEAD']).trim();
   } catch {
     return undefined;
+  }
+}
+
+/** A `git` tree-object hash of exactly `apps/`, `packages/` and `scripts/` as they currently sit on
+ * disk — committed or not, and regardless of `HEAD` — `undefined` if git is unavailable (both callers
+ * fail open on that). takt-006 rework, MAJOR finding 1 (Opus review)/point 4: `headCommit` alone (the
+ * previous round's fix) makes `stop-check.mjs` block on *any* `git commit`, even a docs-only one, or
+ * one that only formalises code already recorded as tested — because a commit always changes `HEAD`
+ * even when it never touches these three directories at all. Comparing a hash of their *content*
+ * instead answers the question that actually matters ("did the tested code change?") independently of
+ * whether, or how many times, it got committed in between.
+ *
+ * Built with a throwaway index file (`GIT_INDEX_FILE`, never the repository's real index — this must
+ * never disturb whatever a real `pnpm gates`/git operation elsewhere has staged) : `git add -A -- <code
+ * dirs>` stages exactly the current on-disk content of those paths into it, then `git write-tree`
+ * hashes the resulting tree. Nothing outside those three directories is ever staged, so the result
+ * depends only on their content, never on `docs/`, root config files, or anything else. */
+export function codeTreeHash(root) {
+  const indexFile = join(tmpdir(), `takt-hooks-index-${randomUUID()}`);
+  const env = { ...process.env, GIT_INDEX_FILE: indexFile };
+  // A pathspec that matches nothing at all (e.g. a scratch test repo that never created `packages/`)
+  // makes `git add` fail outright ("did not match any files") rather than just adding nothing for it —
+  // only ask for the ones that currently exist.
+  const existingDirs = CODE_DIRS.filter((d) => existsSync(join(root, d)));
+  try {
+    if (existingDirs.length > 0) git(root, ['add', '-A', '--', ...existingDirs], env);
+    return git(root, ['write-tree'], env).trim(); // an empty tree is still a well-defined, stable hash
+  } catch {
+    return undefined;
+  } finally {
+    try {
+      rmSync(indexFile, { force: true });
+    } catch {
+      // best-effort cleanup of a temp file in the OS temp dir — never worth failing the caller over
+    }
   }
 }
 
