@@ -28,7 +28,7 @@ test('green: a completed to-do naming an accepted slice (status accepted) passes
 });
 
 test('green: status "angenommen" (German) also counts as accepted', () => {
-  const r = run([{ content: 'finish slice 903', status: 'completed' }]);
+  const r = run([{ content: 'finish slice 904', status: 'completed' }]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
 
@@ -104,7 +104,7 @@ test('Codex C3 red: two completed items, only the second unaccepted — the loop
 test('Codex C3 green: two completed items, both accepted, passes', () => {
   const r = run([
     { content: 'finish slice 901', status: 'completed' },
-    { content: 'finish slice 903', status: 'completed' },
+    { content: 'finish slice 904', status: 'completed' },
   ]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
@@ -121,5 +121,17 @@ test('rework point 5 red: task_subject names one accepted slice, task_descriptio
 
 test('rework point 5 green: task_subject and task_description both name only accepted slices', () => {
   const r = runTaskEvent('901 fertig', 'und 903');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+// takt-006 review round 2 (Codex on PR #20): "takt-904" must resolve to takt-904-*.md, never to the
+// accepted regular slice 904-*.md with the same number, or an unaccepted takt borrows its acceptance.
+test('codex round 2 red: a completed "takt-904" is checked against takt-904, not the accepted slice 904', () => {
+  const r = run([{ content: 'takt-904 fertig', status: 'completed' }]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+});
+
+test('codex round 2 green: a completed "Scheibe 904" still resolves to the accepted regular slice', () => {
+  const r = run([{ content: 'Scheibe 904 fertig', status: 'completed' }]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });

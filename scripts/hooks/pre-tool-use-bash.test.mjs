@@ -306,3 +306,17 @@ test('redos: 2000 --a=b options followed by a force push still block quickly', (
   assert.equal(r.status, 2);
   assert.ok(elapsed < 3000, `hook took ${elapsed} ms`);
 });
+
+// takt-006 review round 2 (Codex on PR #20): in a short-option cluster, `o` takes the rest as its
+// value, so an `f` inside that value is not a force flag.
+test('codex round 2 green: git push -ofoo origin main is not a force push', () => {
+  assert.equal(runCommand('git push -ofoo origin main').status, 0);
+});
+
+test('codex round 2 red: git push -fofoo origin main is still a force push (f before o)', () => {
+  assert.equal(runCommand('git push -fofoo origin main').status, 2);
+});
+
+test('codex round 2 red: git push -uo ci.skip origin has no branch (value of o in the next token)', () => {
+  assert.equal(runCommand('git push -uo ci.skip origin').status, 2);
+});

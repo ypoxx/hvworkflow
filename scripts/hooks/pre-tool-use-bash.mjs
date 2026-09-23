@@ -148,7 +148,9 @@ function longFlagMatches(token, name) {
 
 /** `-o`, or a (possibly abbreviated) long option from `VALUE_OPTION_LONG_NAMES` — see there. */
 function isValueOption(t) {
-  if (t === '-o') return true;
+  // `-o`, or a short-option cluster whose first `o` is its last character (`-uo`): the value is the next
+  // token (Codex on PR #20). An earlier `o` (`-ofoo`) carries its value attached.
+  if (/^-[a-np-zA-Z0-9]*o$/.test(t)) return true;
   return VALUE_OPTION_LONG_NAMES.some((name) => longFlagMatches(t, name));
 }
 
@@ -158,7 +160,12 @@ function isValueOption(t) {
 function isForceFlag(t) {
   if (t === '-f') return true;
   if (longFlagMatches(t, 'force') || longFlagMatches(t, 'force-with-lease')) return true;
-  return /^-[a-zA-Z0-9]{2,}$/.test(t) && t.slice(1).includes('f');
+  if (!/^-[a-zA-Z0-9]{2,}$/.test(t)) return false;
+  // In a cluster, `o` takes the rest as its value (`-ofoo`): only letters before it are flags (Codex on
+  // PR #20, round 2).
+  const cluster = t.slice(1);
+  const valueAt = cluster.indexOf('o');
+  return (valueAt === -1 ? cluster : cluster.slice(0, valueAt)).includes('f');
 }
 
 /** `-d`, or a (possibly abbreviated) `--delete`. */

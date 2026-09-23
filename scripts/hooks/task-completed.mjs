@@ -37,7 +37,8 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SLICES_DIR = 'docs/slices';
-const SLICE_NUMBER_RE = /\b(\d{3})\b/g;
+// Codex on PR #20 (round 2): keep the namespace — "takt-006" must not resolve to "006-*.md".
+const SLICE_NUMBER_RE = /\b(takt-)?(\d{3})\b/g;
 const ACCEPTED_STATUS_RE = /^\*\*Status:\*\*\s*(accepted|angenommen)\b/m;
 
 function readStdinJson() {
@@ -65,13 +66,14 @@ function parseArgs(argv) {
   return out;
 }
 
-/** The first `docs/slices/NNN-*.md` or `docs/slices/takt-NNN-*.md` for a given three-digit number,
- * relative to `root` — `undefined` if neither exists. */
-function findSpecFile(root, number) {
+/** `docs/slices/takt-NNN-*.md` for a `takt-NNN` mention, otherwise `docs/slices/NNN-*.md`, relative to
+ * `root` — `undefined` if it does not exist. The two namespaces never stand in for each other. */
+function findSpecFile(root, number, isTakt) {
   const dir = join(root, SLICES_DIR);
   if (!existsSync(dir)) return undefined;
   const files = readdirSync(dir);
-  const match = files.find((f) => (f.startsWith(`${number}-`) || f.startsWith(`takt-${number}-`)) && f.endsWith('.md'));
+  const prefix = isTakt ? `takt-${number}-` : `${number}-`;
+  const match = files.find((f) => f.startsWith(prefix) && f.endsWith('.md'));
   return match ? join(dir, match) : undefined;
 }
 
@@ -106,9 +108,10 @@ function namedFindings(root, completedTexts) {
   const seen = new Set();
   for (const text of completedTexts) {
     for (const m of text.matchAll(SLICE_NUMBER_RE)) {
-      const number = m[1];
+      const isTakt = m[1] !== undefined;
+      const number = isTakt ? `takt-${m[2]}` : m[2];
       if (seen.has(number)) continue;
-      const specPath = findSpecFile(root, number);
+      const specPath = findSpecFile(root, m[2], isTakt);
       if (specPath) {
         seen.add(number);
         out.push({ number, specPath, text });
