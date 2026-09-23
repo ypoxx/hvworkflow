@@ -195,19 +195,57 @@ function gitChangedFiles(root, base) {
   return { mergeBase, changed: out.split('\n').filter(Boolean) };
 }
 
-/** Round 1, m4: a warning (never a failure) when the spec's own "Files allowed" section has changed
- * since the merge-base — widening (or narrowing) what a slice may touch mid-implementation is not
- * wrong, but it is exactly the kind of thing a reviewer should notice, not discover by diffing the
- * spec by hand. `undefined` (no warning) if the spec did not exist yet at the merge-base at all (a
- * brand-new slice) or the comparison itself fails for any reason (never blocks on that). */
-function filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, currentSectionText) {
+/** The first commit, reachable from `HEAD` but not from `mergeBase`, that adds `specRelPath` —
+ * `undefined` if no such commit exists (the file is not new on this branch at all, or something about
+ * the log call itself fails). takt-006 point 3: a slice's spec is typically added on the slice's own
+ * branch, in its first commit touching that path — it does not exist at the merge-base with the
+ * integration branch at all, so `mergeBase` itself is never the right reference point to diff
+ * "Files allowed" against; the commit that *introduced* the file is. */
+function findSpecIntroducingCommit(root, mergeBase, specRelPath) {
   try {
-    const baseText = git(root, ['show', `${mergeBase}:${specRelPath}`]);
+    const log = git(root, ['log', '--reverse', '--format=%H', '--diff-filter=A', `${mergeBase}..HEAD`, '--', specRelPath]).trim();
+    return log ? log.split('\n')[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Round 1, m4 (takt-006 point 3 fixed the reference point): a warning (never a failure) when the
+ * spec's own "Files allowed" section has changed since it was first introduced — widening (or
+ * narrowing) what a slice may touch mid-implementation is not wrong, but it is exactly the kind of
+ * thing a reviewer should notice, not discover by diffing the spec by hand.
+ *
+ * The reference is the spec's content at `mergeBase` if it already existed there (an edge case: a spec
+ * committed before the slice branch even forked); otherwise — the ordinary case — the commit that
+ * first added the file *on this branch* (`findSpecIntroducingCommit`), so a later commit widening
+ * "Files allowed" is still caught even though the merge-base itself never had the file at all (the bug
+ * round 1's version had: comparing only against the merge-base always saw "no spec there yet" and gave
+ * up, silently, for every ordinary slice). `undefined` (no warning) if the spec is not found at either
+ * reference point, or the comparison itself fails for any reason (never blocks on that); otherwise
+ * `{ changed, refCommit, viaIntroducingCommit }`. */
+function filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, currentSectionText) {
+  let baseText;
+  let refCommit = mergeBase;
+  let viaIntroducingCommit = false;
+  try {
+    baseText = git(root, ['show', `${mergeBase}:${specRelPath}`]);
+  } catch {
+    const introducingCommit = findSpecIntroducingCommit(root, mergeBase, specRelPath);
+    if (!introducingCommit) return undefined; // not found at the merge-base or introduced on this branch
+    try {
+      baseText = git(root, ['show', `${introducingCommit}:${specRelPath}`]);
+      refCommit = introducingCommit;
+      viaIntroducingCommit = true;
+    } catch {
+      return undefined;
+    }
+  }
+  try {
     const baseSection = extractFilesAllowedSection(baseText);
     if (baseSection === undefined) return undefined;
-    return baseSection.trim() !== currentSectionText.trim();
+    return { changed: baseSection.trim() !== currentSectionText.trim(), refCommit, viaIntroducingCommit };
   } catch {
-    return undefined; // e.g. the spec is new since the merge-base — nothing to compare against
+    return undefined;
   }
 }
 
@@ -284,11 +322,12 @@ function main(argv) {
   } else {
     try {
       ({ mergeBase, changed } = gitChangedFiles(root, args.base));
-      if (filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, sectionText)) {
-        console.log(
-          `slice-scope: warning — "${specRelPath}"'s "Files allowed" section differs from its version ` +
-            `at the merge-base (${mergeBase.slice(0, 7)}) with ${args.base}.`,
-        );
+      const filesAllowedChange = filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, sectionText);
+      if (filesAllowedChange?.changed) {
+        const where = filesAllowedChange.viaIntroducingCommit
+          ? `at the commit that introduced it (${filesAllowedChange.refCommit.slice(0, 7)})`
+          : `at the merge-base (${filesAllowedChange.refCommit.slice(0, 7)}) with ${args.base}`;
+        console.log(`slice-scope: warning — "${specRelPath}"'s "Files allowed" section differs from its version ${where}.`);
       }
     } catch (e) {
       const reason = e.message.split('\n')[0];

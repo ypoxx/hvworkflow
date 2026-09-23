@@ -197,3 +197,77 @@ test('m4: a warning (not a failure) when "Files allowed" changed since the merge
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// takt-006 point 3: the typical case — a slice's spec does not exist yet at the merge-base at all (it
+// is added on the slice's own branch, in the branch's first commit touching it), so the old comparison
+// (only ever against the merge-base) always saw "no spec there yet" and silently gave up, even though a
+// *later* commit on the very same branch then widened "Files allowed". The reference must be the
+// commit that introduced the spec file, not the (spec-less) merge-base.
+test('takt-006 point 3 red: widening "Files allowed" after the spec-introducing commit is warned, even though the spec did not exist at the merge-base at all', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'slices', '.gitkeep'), '');
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+    spawnSync('git', ['remote', 'add', 'origin', dir], { cwd: dir });
+    spawnSync('git', ['fetch', '-q', 'origin', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-016-agenten'], { cwd: dir });
+
+    const specPath = join(dir, 'docs', 'slices', '016-x.md');
+    // The spec is added on the slice's own branch (typical workflow) — absent at the merge-base.
+    writeFileSync(specPath, '# 016 — X\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
+
+    // Widen "Files allowed" in a later commit, still on the slice branch.
+    writeFileSync(specPath, '# 016 — X\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n- `scripts/**`\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'widen scope'], { cwd: dir });
+
+    const r = spawnSync('node', [SCRIPT, '--root', dir, '--slice', '016'], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_HEAD_REF: '', CI: '' },
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /differs from its version at the commit that introduced it/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-006 point 3 green: "Files allowed" unchanged since the spec-introducing commit gives no warning', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'slices', '.gitkeep'), '');
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+    spawnSync('git', ['remote', 'add', 'origin', dir], { cwd: dir });
+    spawnSync('git', ['fetch', '-q', 'origin', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-016-agenten'], { cwd: dir });
+
+    const specPath = join(dir, 'docs', 'slices', '016-x.md');
+    writeFileSync(specPath, '# 016 — X\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add spec'], { cwd: dir });
+
+    // A further commit that only touches the spec's prose, never "Files allowed" itself.
+    writeFileSync(specPath, '# 016 — X (updated title)\n\n## Files allowed\n\n- `docs/slices/016-x.md`\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'unrelated'], { cwd: dir });
+
+    const r = spawnSync('node', [SCRIPT, '--root', dir, '--slice', '016'], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_HEAD_REF: '', CI: '' },
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /differs from its version/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
