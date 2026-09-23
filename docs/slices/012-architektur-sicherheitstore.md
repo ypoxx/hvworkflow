@@ -1,6 +1,6 @@
 # 012 — Architektur- und Sicherheitstore, Tor-Inventar ehrlich
 
-**Status:** review (Nacharbeitsrunde 1)
+**Status:** angenommen (Nachprüfung: annehmen nach Kleinbefunden; Folgebefunde gehen in 016)
 **Risikoklasse:** mittel · 2 AStd · Kalender 29.09.2026 (W1) · Lanes: infra (+ manifests additiv; service und
 core je eine eng begrenzte Stelle; docs-plan nur Abschnitt 5 des Entwicklungsplans — keine andere laufende
 Scheibe hält diese Lanes)
@@ -680,4 +680,27 @@ passed (unchanged).
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 (Security/Betrieb) · 23.09.2026 · Urteil: Nacharbeit (0 Blocker, 8 major, 12 minor).** Die
+Befunde stehen wörtlich als verbindliche Nachschärfung im Abschnitt „Nachschärfung nach Review (Runde 1)"; 18
+(Vertragslücken → 043), 19 (AGENTS.md-Zeile zu `pnpm gates` → 018) und 20 (CI-Links, Orchestrator) lagen nicht beim
+Bauenden.
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: annehmen nach Kleinbefunden (0 Blocker, 0 major).** Punkte
+1–17 erledigt, jeweils mit eigenen Proben belegt (audit gegen unerreichbare und gefälschte Registry rot;
+sechs Rollenliteral-Formen rot, Gegenprobe `q.track === 'podium'` sauber; `now-ok` außerhalb erlaubter Dateien rot;
+picomatch 2.3.1 mit `every`: `docs/sub/x.md` und `apps/web/README.md` kein Code, `apps/web/src/x.ts` Code; Pins
+`de90cc6…` = v3.0.2, `ff98106…` = v2.3.9; `pnpm gates` Exit 0; CI grün auf `455c953`). Neue Kleinbefunde, übergeben
+an Scheibe 016 (gleiche Lane infra, als nächste an der Reihe):
+
+1. minor · `gates.yml:34,48`: v3.0.2 von `dorny/paths-filter` deklariert `predicate-quantifier` nicht (CI-Warnung
+   „Unexpected input(s)"), liest ihn aber; auf `0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4` pinnen und mit einem
+   reinen Doku-Push belegen, dass e2e entfällt.
+2. minor · `role-literal-check.mjs:34`: ausgenommen ist ganz `types.ts` statt nur der `Role`-Union.
+3. minor · `role-literal-check.mjs:51–60`: Teil-Parse der Union scheitert offen (Kommentar mit `;`); Kommentare
+   entfernen und gegen die Schlüssel von `ROLE_PERMISSIONS` abgleichen, bei Abweichung rot.
+4. minor · `role-literal-check.mjs:~118`: `({podium:1})[actor.role]` und `new Set([...]).has(actor.role)` für die
+   mehrdeutigen Rollen gehen durch.
+5. minor · `semgrep/rules.yml:25–52`: Standardimport, destrukturiertes `require` und Alias von `child_process`
+   werden nicht erkannt.
+6. minor (Orchestrator) · `agentische-entwicklung-plan.md:247`: Wortlaut zu Prüfung (c) — vor dem Merge berichtigt.
+7. nit · now-check: `process.hrtime.bigint()`, `performance['now']()`; `pnpm/action-setup@v4` noch per Tag.
