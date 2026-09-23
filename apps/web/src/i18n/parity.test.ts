@@ -133,13 +133,17 @@ describe('i18n parity checks', () => {
     expect(allKeys.length).toBe(uniqueKeys.size);
   });
 
-  it('(f) Total key count is 437 across all modules and matches de and en', () => {
+  // Slice 020 (Rückbau und Passung): net -1 versus the 437 of slice 017 — six keys removed
+  // (TOP left the capture card and the classify dialog entirely, and its own summary "Ändern"
+  // toggle went with it; TOP and the capture timestamp left the answers detail) against five added
+  // (a read-only hint per feature, the queue's "noch n" and the preview dialog's title).
+  it('(f) Total key count is 436 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(437);
-    expect(deKeys).toBe(437);
-    expect(enKeys).toBe(437);
+    expect(totalKeys).toBe(436);
+    expect(deKeys).toBe(436);
+    expect(enKeys).toBe(436);
   });
 });

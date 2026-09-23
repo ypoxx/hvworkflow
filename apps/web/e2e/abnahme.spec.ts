@@ -144,12 +144,14 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   );
   expect(coverage).toBeGreaterThan(50);
 
-  // Classify the first card: Pfad C, Expert Track, one agenda item, one podium assignment.
+  // Classify the first card via the explicit "Klassifizieren" action (point #21, slice 020):
+  // Pfad C, Expert Track, one podium assignment. The Tagesordnungspunkt is not asked here.
   const card = cards.first();
-  await card.getByTestId('classify-track-expert_track').click();
-  await card.getByTestId('classify-agenda').selectOption({ index: 1 });
-  await card.getByTestId('classify-stage').selectOption('cfo');
-  await card.getByTestId('classify-save').click();
+  await card.getByTestId('capture-classify-open').click();
+  await page.getByTestId('classify-track-expert_track').click();
+  await page.getByTestId('classify-stage').selectOption('cfo');
+  await page.getByTestId('classify-save').click();
+  await expect(page.getByTestId('classify-save')).toBeHidden();
   await expect(card).toContainText('klassifiziert');
 
   const questionNumber = (await card.getAttribute('data-number')) ?? '';
@@ -218,6 +220,11 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
 
   /* ---------- Podium: read out our question ---------- */
   await asRole(page, 'podium');
+  // Point #3/#9 (slice 020): the podium role now defaults to "Nur Bühne"; this walk-through still
+  // needs the ordinary shell (it navigates on to "Historie" afterwards without switching role), so
+  // it starts from the explicit choice a person would otherwise have made — the stored preference
+  // always wins over the default.
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
 
   const stageNavStart = await page.evaluate(() => performance.now());
   await page.getByTestId('nav-stage').click();

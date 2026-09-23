@@ -14,11 +14,11 @@ import {
 } from '@dnd-kit/core';
 import type { Announcements, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ListOrdered, Plus, TriangleAlert } from 'lucide-react';
+import { Eye, ListOrdered, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
-import { Button, EmptyState, Panel, PageHeader, Toolbar, showProblem } from '../../components';
+import { Button, EmptyState, Panel, PageHeader, showProblem } from '../../components';
 import { actionLabel, getLang, translate, useT } from '../../i18n';
 import { useMeeting } from '../../app/useMeeting';
 import { MoveDialog } from './MoveDialog';
@@ -109,6 +109,15 @@ export function SpeakersPage() {
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
   const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
+  /**
+   * Point #26 (feedback, slice 020): a role without any write right on the Wortmeldeliste used to
+   * see no register button and no row actions with no explanation at all. Derived from `_actions`
+   * alone, never from the role name (AGENTS.md rule 4).
+   */
+  const mayWriteSpeakers = view.some(
+    (speaker) => speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
+  );
+  const readOnly = view.length > 0 && !mayWriteSpeakers;
 
   const run = useCallback(
     async (id: string, action: () => Promise<unknown>): Promise<boolean> => {
@@ -285,12 +294,25 @@ export function SpeakersPage() {
 
   const empty = status !== 'loading' && view.length === 0;
 
+  // m3 (review round 1): the hint sits in the header's own meta slot, next to the title, the same
+  // place `registerButton` would go — not a loose line that pushes the rest of the page down.
+  const readOnlyHint = readOnly ? (
+    <span
+      data-testid="speakers-readonly-hint"
+      className="flex items-center gap-1.5 text-[13px] text-ink-600"
+    >
+      <Eye size={14} strokeWidth={1.75} aria-hidden="true" />
+      {t('speakers.readonly.hint')}
+    </span>
+  ) : undefined;
+  const headerMeta = registerButton ?? readOnlyHint;
+
   return (
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title={t('page.speakers.title')}
         description={t('page.speakers.description')}
-        {...(registerButton !== undefined ? { actions: registerButton } : {})}
+        {...(headerMeta !== undefined ? { actions: headerMeta } : {})}
       />
 
       {status === 'error' && view.length === 0 ? (
@@ -328,10 +350,6 @@ export function SpeakersPage() {
             onCall={actions.onCall}
             onFinish={actions.onFinish}
           />
-
-          <Toolbar label={t('page.speakers.title')} className="shrink-0">
-            <span className="text-2xs text-ink-500">{t('speakers.drag.hint')}</span>
-          </Toolbar>
 
           <DndContext
             sensors={sensors}

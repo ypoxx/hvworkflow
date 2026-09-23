@@ -186,7 +186,6 @@ export function AnswersPage() {
                   question={question}
                   history={backlog.selectedHistory}
                   units={backlog.units}
-                  agendaItems={backlog.agendaItems}
                   busy={busy}
                   draftResetToken={draftResetToken}
                   onAction={onAction}

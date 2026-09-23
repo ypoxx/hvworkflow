@@ -4,8 +4,9 @@
  * covered. Everything runs through `HvApi`; every list refetches on `useApiVersion()`.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { useSearchParams } from 'react-router';
-import type { AgendaItem, Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
+import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
 import { PageHeader, SplitPane, showProblem } from '../../components';
@@ -17,7 +18,6 @@ import { useAsync, useHoveredQuestion } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
-const NO_AGENDA: readonly AgendaItem[] = [];
 const NO_QUESTIONS: { items: Question[]; total: number } = { items: [], total: 0 };
 
 const problemTitle = (): string => translate(getLang(), 'toast.problem');
@@ -32,12 +32,6 @@ export function CapturePage() {
     NO_SPEAKERS,
     `s:${version}`,
   );
-  const agenda = useAsync<readonly AgendaItem[]>(
-    () => api.listAgendaItems(),
-    NO_AGENDA,
-    `a:${version}`,
-  );
-
   /**
    * The Wortmeldung in the address bar wins — that is the link from the speakers list. Without one
    * the desk starts where the work is: at the microphone, otherwise at the last speech that ended.
@@ -90,6 +84,12 @@ export function CapturePage() {
   const probe = useAsync(() => api.listQuestions({ limit: 1 }), NO_QUESTIONS, `p:${version}`);
   const deskActions = questions.data.items[0]?._actions ?? probe.data.items[0]?._actions ?? [];
   const canCapture = deskActions.includes('question.capture');
+  /**
+   * M3 (review round 1): an empty or still-loading desk has no question to read `_actions` off, so
+   * `deskActions` is `[]` and `canCapture` reads false for EVERY role, not only one without the
+   * right — the read-only hint must stay silent until there is a real answer, not a default one.
+   */
+  const knowsCaptureRight = deskActions.length > 0;
 
   const [writing, setWriting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -140,7 +140,25 @@ export function CapturePage() {
 
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
-      <PageHeader title={t('page.capture.title')} description={t('page.capture.description')} />
+      <PageHeader
+        title={t('page.capture.title')}
+        description={t('page.capture.description')}
+        {...(knowsCaptureRight && !canCapture
+          ? {
+              // m3 (review round 1): the header's own meta slot, next to the title — not a loose
+              // line that shifts the split pane below it.
+              actions: (
+                <span
+                  data-testid="capture-readonly-hint"
+                  className="flex items-center gap-1.5 text-[13px] text-ink-600"
+                >
+                  <Eye size={14} strokeWidth={1.75} aria-hidden="true" />
+                  {t('capture.readonly.hint')}
+                </span>
+              ),
+            }
+          : {})}
+      />
 
       <SplitPane
         storageKey="hv-capture-split-v1"
@@ -170,7 +188,6 @@ export function CapturePage() {
         right={
           <QuestionsPane
             questions={questions.data.items}
-            agendaItems={agenda.data}
             loading={questions.status === 'loading'}
             failed={questions.status === 'error'}
             onProblem={refetch}
