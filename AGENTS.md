@@ -28,7 +28,7 @@ Risk classes, checks and evidence per slice (a checklist, not a second rulebook)
 
 ```
 pnpm install
-pnpm gates            # contract lint + typecheck + lint + tests + vocabulary check + web build — green before any merge
+pnpm gates            # contract lint, typecheck, lint, unit tests, vocabulary check, architecture check, role-literals, now-check, plan-honesty, i18n-literals, slice-scope, downgrade-check, plan-graph, script tests, web build, mark-test-run — green before any merge
 pnpm contract:types   # regenerate packages/contract/src/types.ts after editing openapi.yaml
 pnpm --filter @hv/web dev
 pnpm --filter @hv/web e2e

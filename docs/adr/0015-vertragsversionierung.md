@@ -28,6 +28,9 @@ und Tagesordnung"):
 - **/v1-Kompatibilität für Partner über zwei Vertragszyklen** (ADR 0008).
 - Kanonisch ist `/v1/meetings/{id}/…`; `/v1/meeting` bleibt Alias für „aktuelle HV" bis Vertrag 0.5
   (Plan 3).
+- Vorschlag (nicht im Plan): Ein Vertragszyklus des Architekten hebt die Minor-Stufe (0.2.0, 0.3.0,
+  0.4.0); eine additive Einzeländerung innerhalb eines Zyklus hebt die Patch-Stufe (0.2.1 in 010,
+  0.3.1 in 028).
 
 ## Konsequenzen
 
