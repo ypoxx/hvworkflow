@@ -48,4 +48,14 @@ aus Review und Sichtprüfung, alle behoben; keine Regression in den fünf Playwr
 
 | Bautag | Datum | Scheiben gemergt | Scheiben angefangen | Subagenten-Token | Kopfsitzung | Wandzeit | Bericht |
 |---|---|---|---|---|---|---|---|
-| B1 | 23.09.2026 | takt-001, 017, 009, 015, 019 (laufend) | 012, 014, 020 | rund 2,9 Mio. bis 13:13 (laufend) | nicht getrennt messbar (kein `/cost` in der Cloud-Sitzung) | ab 11:21 | [docs/bautage/2026-09-23.md](bautage/2026-09-23.md) |
+| B1 | 23.09.2026 | takt-001, 017, 009, 015, 019, 014 (laufend) | 012, 020, 039, takt-002 | rund 3,1 Mio. bis 16:36 (laufend; ohne die an der Nutzungsgrenze abgebrochenen Läufe) | nicht getrennt messbar (kein `/cost` in der Cloud-Sitzung) | ab 11:21; Pause 13:21–16:20 (Nutzungsgrenze) | [docs/bautage/2026-09-23.md](bautage/2026-09-23.md) |
+
+## Takt
+
+Zeiten für den Durchsatz-Takt, je Punkt eine Klasse S/M/L: S-Punkte (small) sollen am nächsten
+Bautag live sein (< 1 Bautag), M-Punkte (medium) innerhalb von 2 Bautagen (< 2 Bautage), L-Punkte
+(large) innerhalb einer Woche (< 1 Woche). Nachricht und Live im Format `JJJJ-MM-TT HH:MM`, Zeiten
+in Europe/Berlin. `node scripts/takt.mjs [--file docs/messung.md]` liest diese Tabelle.
+
+| Punkt | Quelle | Klasse | Nachricht | Live | Dauer (h) |
+|---|---|---|---|---|---|
