@@ -167,11 +167,32 @@ function berlinWallClockToUtcMs(y, mo, d, h, mi) {
 
 const TIME_RE = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/;
 
+/** Check if a date is valid: month 1–12, day within the month (leap year aware), hour 0–23, minute 0–59. */
+function isValidDateRange(y, mo, d, h, mi) {
+  if (mo < 1 || mo > 12) return false;
+  if (h < 0 || h > 23) return false;
+  if (mi < 0 || mi > 59) return false;
+  // Day validation: check if day is within valid range for the month
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) {
+    daysInMonth[1] = 29; // Leap year
+  }
+  if (d < 1 || d > daysInMonth[mo - 1]) return false;
+  return true;
+}
+
 function parseBerlinTime(value) {
   const match = TIME_RE.exec(value.trim());
   if (match === null) return null;
   const [, y, mo, d, h, mi] = match;
-  return berlinWallClockToUtcMs(Number(y), Number(mo), Number(d), Number(h), Number(mi));
+  const y_num = Number(y);
+  const mo_num = Number(mo);
+  const d_num = Number(d);
+  const h_num = Number(h);
+  const mi_num = Number(mi);
+  // Validate the range before calling berlinWallClockToUtcMs
+  if (!isValidDateRange(y_num, mo_num, d_num, h_num, mi_num)) return null;
+  return berlinWallClockToUtcMs(y_num, mo_num, d_num, h_num, mi_num);
 }
 
 function median(values) {
@@ -224,7 +245,8 @@ const medianS = median(durationsByClass.S);
 const medianM = median(durationsByClass.M);
 const medianL = median(durationsByClass.L);
 
-console.log(`${rows.length} Punkte`);
+const pointsLabel = rows.length === 1 ? 'Punkt' : 'Punkte';
+console.log(`${rows.length} ${pointsLabel}`);
 console.log(`${openPoints} offen`);
 console.log(medianOverall !== null ? `Median gesamt: ${medianOverall.toFixed(2)} h` : 'Median gesamt: —');
 console.log(medianS !== null ? `Median S: ${medianS.toFixed(2)} h` : 'Median S: —');
