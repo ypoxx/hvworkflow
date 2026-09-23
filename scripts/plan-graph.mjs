@@ -122,6 +122,14 @@ function parseSlices(planText) {
       );
     }
     const [, number, title, riskClass, hoursRaw, calendarRaw, lanesRaw] = m;
+    let date;
+    try {
+      date = parseCalendarStart(calendarRaw.trim());
+    } catch (e) {
+      // takt-006 point 6: every parse error names its line, the same as the m5 case above, and (via
+      // main()'s own try/catch below) is never allowed to surface as a raw Node stack trace.
+      throw new Error(`plan-graph: section 5, line ${i + 1}: ${e.message}`);
+    }
     let deps = [];
     for (let j = i + 1; j < lines.length; j++) {
       if (NEXT_BULLET_RE.test(lines[j])) break; // next slice started, no deps line in between
@@ -137,12 +145,12 @@ function parseSlices(planText) {
       riskClass,
       hours: Number(hoursRaw.replace(',', '.')),
       calendarRaw: calendarRaw.trim(),
-      date: parseCalendarStart(calendarRaw.trim()),
+      date,
       lanes: lanesRaw.split(',').map((s) => s.trim()).filter(Boolean),
       deps,
       order: slices.length,
     };
-    if (byNumber.has(number)) throw new Error(`slice ${number} appears twice in section 5.`);
+    if (byNumber.has(number)) throw new Error(`plan-graph: section 5, line ${i + 1}: slice ${number} appears twice.`);
     byNumber.set(number, slice);
     slices.push(slice);
   });
@@ -352,4 +360,13 @@ function main(argv) {
   return 0;
 }
 
-process.exit(main(process.argv.slice(2)));
+// takt-006 point 6: every parse error above already names a section-5 line number; this is the single
+// place that turns *any* of them (and anything else this script might throw) into a one-line message
+// on stderr and exit code 1 — never a raw Node stack trace, regardless of where in the file the throw
+// happened.
+try {
+  process.exit(main(process.argv.slice(2)));
+} catch (e) {
+  console.error(e instanceof Error ? e.message : String(e));
+  process.exit(1);
+}
