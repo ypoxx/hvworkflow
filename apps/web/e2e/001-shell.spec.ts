@@ -1,7 +1,14 @@
 /**
  * Slice 001 — the shell. Proves the three things a reviewer has to see with their own eyes: the
- * synthetic corpus really is behind the counters, the role can be switched to the podium persona,
+ * synthetic corpus really is behind the counters, the role can be switched to the capture persona,
  * and switching the language actually changes every visible string, header included.
+ *
+ * Slice 010 (Lesepfade unter can() mit Leserechten): this used to switch to `podium`, which no
+ * longer holds `speaker.read` (Festlegung 4) — switching to it while still on `/speakers` refetches
+ * the list under a role that gets 403'd, leaving a stray error toast whose rule-id text fails the
+ * axe colour-contrast check below (a pre-existing contrast defect, out of this slice's scope; the
+ * designed "no read permission" state is 010b's job). `capture` demonstrates the same role-switch
+ * mechanism without tripping over the read grant.
  */
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
@@ -56,15 +63,15 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   // Rights are data: switching the persona is the only role decision in the interface.
   await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-podium').click();
-  await expect(page.getByTestId('role-switcher')).toContainText('Podium');
+  await page.getByTestId('role-option-capture').click();
+  await expect(page.getByTestId('role-switcher')).toContainText('Erfassung');
 
   const headerTitle = page.getByTestId('header-meeting-title');
   await expect(headerTitle).toContainText('Runde');
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell.png') });
-  await checkAxe(page, 'shell (speakers, podium role, de)');
+  await checkAxe(page, 'shell (speakers, capture role, de)');
 
   // Every visible string changes with the language, including the header.
   await page.getByTestId('lang-option-en').click();
@@ -76,7 +83,7 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell-en.png') });
-  await checkAxe(page, 'shell (speakers, podium role, en)');
+  await checkAxe(page, 'shell (speakers, capture role, en)');
 });
 
 test('header strip on the answers desk @screenshot', async ({ page }) => {
