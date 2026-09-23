@@ -13,6 +13,11 @@
  * every file inside a new directory individually instead of the directory itself; `-z` (NUL-separated
  * records, no quoting/escaping of unusual filenames) is parsed explicitly below rather than relying on
  * newline-per-line output.
+ *
+ * takt-006 rework, NIT finding 8: a rename/copy can be reported on either side — `status[0]` (staged,
+ * relative to `HEAD`) *or* `status[1]` (an unstaged, worktree-side rename, which git only detects once
+ * the new path is at least known to it, e.g. via `git add -N`) — either one pairs the record with a
+ * second, NUL-separated "from" path that must be consumed, not misread as an unrelated status line.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -60,7 +65,9 @@ export function statusLines(root) {
     const status = field.slice(0, 2);
     const path = field.slice(3);
     out.push(`${status} ${path}`);
-    if (status[0] === 'R' || status[0] === 'C') i++; // skip the paired "renamed/copied from" path field
+    // A rename/copy pairs this record with a second, NUL-separated "from" path, whichever side (staged
+    // X or worktree Y) reports it (takt-006 rework, NIT 8) — skip it, it is not its own status line.
+    if (status[0] === 'R' || status[0] === 'C' || status[1] === 'R' || status[1] === 'C') i++;
   }
   return out;
 }

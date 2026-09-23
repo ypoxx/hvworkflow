@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { statusLines, signatureFor } from './dirty-tree-signature.mjs';
@@ -81,6 +81,35 @@ test('green: a clean tree has no status lines', () => {
   const dir = scratchRepo();
   try {
     assert.deepEqual(statusLines(dir), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-006 rework, NIT finding 8: a worktree-side rename — status "XY" with Y (not X) = 'R', which git
+// reports after `git add -N` marks the new path as intent-to-add and the old, tracked path is then
+// simply missing from the working tree — was never recognised as a rename pairing at all (only
+// `status[0] === 'R'`, the *staged* rename, was checked). The NUL-separated "from" path that follows
+// such a record was then misread as if it were its own, unrelated status line (a 2-byte slice of a
+// path with no real status prefix at all).
+test('rework point 8 red: a worktree-side rename (after "git add -N") is one clean entry, not corrupted', () => {
+  const dir = scratchRepo();
+  try {
+    renameSync(join(dir, 'apps', 'api', 'src', 'index.ts'), join(dir, 'apps', 'api', 'src', 'renamed.ts'));
+    execFileSync('git', ['add', '-N', 'apps/api/src/renamed.ts'], { cwd: dir, stdio: 'ignore' });
+    const lines = statusLines(dir);
+    assert.deepEqual(lines, [' R apps/api/src/renamed.ts']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('rework point 8: a file name git would quote without -z (a space in it) is parsed correctly', () => {
+  const dir = scratchRepo();
+  try {
+    writeFileSync(join(dir, 'apps', 'api', 'src', 'has space.ts'), 'export const z = 1;\n');
+    const lines = statusLines(dir);
+    assert.deepEqual(lines, ['?? apps/api/src/has space.ts']);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
