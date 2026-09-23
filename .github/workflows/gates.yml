@@ -7,6 +7,13 @@ on:
 permissions:
   contents: read
   pull-requests: read
+# Round 1, m11: a superseded run on the same PR (or branch push) is cancelled instead of left to race
+# to completion — without this, PR #15 saw a superseded run fail inside gitleaks-action with "Invalid
+# revision range <base>^..<newer head>", because that action fetches the PR's commit list at run time,
+# by when the head had already moved on to a newer commit.
+concurrency:
+  group: gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   gates:
     runs-on: ubuntu-latest
@@ -16,7 +23,10 @@ jobs:
           fetch-depth: 0 # full history: both path filters and Semgrep's changed-file scan diff against it
           persist-credentials: false # nothing later pushes or otherwise needs git write credentials
       # The pnpm version comes from `packageManager` in package.json (takt-001).
-      - uses: pnpm/action-setup@v4
+      # Slice 016, review-012-round-2 finding 7: pinned to a full commit SHA (`git ls-remote
+      # https://github.com/pnpm/action-setup refs/tags/v4*`); "v4" itself currently resolves to this
+      # same commit, i.e. v4.3.0.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
@@ -31,7 +41,9 @@ jobs:
       # before it counts, which is exact rather than relying on one combined extglob.
       - name: Determine if only documentation changed
         id: docsfilter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        # Slice 016, review-012-round-2 finding 1: v3.0.2 doesn't declare `predicate-quantifier`
+        # (CI showed "Unexpected input(s)") even though it honours it; v3.0.4 declares it.
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           predicate-quantifier: 'every'
           filters: |
@@ -45,7 +57,7 @@ jobs:
       # is added so a changed `scripts/*.mjs` is scanned on PRs too.
       - name: Determine changed source files
         id: changes
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           list-files: json
           filters: |
@@ -58,9 +70,21 @@ jobs:
       - name: Contract types are up to date
         run: pnpm contract:types && git diff --exit-code -- packages/contract/src/types.ts
       - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build
+        env:
+          # Slice 016: a full checkout (fetch-depth 0, since slice 012) always has the integration
+          # branch reachable in CI, so check (c)'s "not available" skip would hide a real problem here
+          # rather than report a merely-local limitation — CONTRACT_GATE_STRICT turns it into a
+          # failure instead (packages/contract/scripts/check.mjs).
+          CONTRACT_GATE_STRICT: '1'
         run: pnpm gates
       - name: Policy truth table is committed
         run: git diff --exit-code -- packages/domain/policy-truth-table.md
+      # Scheibenumfang-Tor (016): only on a PR against the integration branch, and only for a
+      # `claude/slice-NNN-…`/`claude/takt-NNN-…` head branch — `scripts/slice-scope.mjs` itself already
+      # skips (exit 0, with a note) for anything else, e.g. the orchestrator's own day-report branch.
+      - name: Slice scope
+        if: github.event_name == 'pull_request' && github.base_ref == 'claude/dax-shareholder-meeting-workflow-0s934z'
+        run: pnpm slice-scope
       - name: Semgrep
         env:
           # Minor 13: the changed-file list travels through `env`, never spliced with `${{ }}`

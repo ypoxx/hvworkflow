@@ -249,7 +249,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Ereignisspeicher nur anhängend | Testsuite (u. a. `events are append-only and gap-free`) | irgendein Pfad ändert oder löscht ein Ereignis | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Ereignisspeicher nur anhängend (Postgres-Append-only-Test) | — | derselbe Test gegen eine echte Postgres-Persistenz statt nur In-Memory | geplant in Scheibe 027 |
 | Ein Entscheidungspunkt für Rechte | statische Suche nach Rollenvergleichen (`scripts/role-literal-check.mjs`, `pnpm role-literals`) | ein Rollenname als Literal außerhalb der Policy-Schicht (`permissions.ts`, `seed.ts` und Tests ausgenommen) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| ADR-Bezug | Reviewer-Checkliste — heute nur allgemein über Prüfpunkt 1 „jede Spec-Anforderung umgesetzt", keine eigene ADR-0001-Grenzprüfung in `.claude/agents/reviewer.md` | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | geplant in Scheibe 016 |
+| ADR-Bezug | Reviewer-Checkliste — Prüfpunkt (9) in `.claude/agents/reviewer.md`/`reviewer-sonnet.md` (Scheibe 016): eine Änderung an einer harten Grenze aus ADR 0001 (Leitplanken 1.3) trägt ein eigenes ADR, sonst Blocker | eine Änderung an einer harten Grenze aus ADR 0001 ohne neues ADR | läuft (Review: Reviewer-Checkliste) |
 
 ### 5.2 Backend
 
@@ -277,7 +277,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Barrierefreiheit | — | ein Verstoß ab „ernst" | geplant in Scheibe 013 |
 | Hausvokabular | Lint gegen Verbotsliste (`scripts/vocabulary-check.mjs`, `pnpm vocabulary`) | ein Treffer (Ticket, Assignee, Workflow-Instanz, Issue, Task) | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Zweisprachigkeit (Schlüssel-Vollständigkeit) | `apps/web/src/i18n/parity.test.ts` | ein Schlüssel fehlt in DE oder EN | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| Zweisprachigkeit (keine Literale in Komponenten) | — (016 ergänzt einen Literal-Scan für Oberflächentexte) | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | geplant in Scheibe 016 |
+| Zweisprachigkeit (keine Literale in Komponenten) | — (016 ergänzt einen Literal-Scan für Oberflächentexte) | ein Literal in einer Komponente statt eines Wörterbuchschlüssels | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Vertragsbindung (kein Rollenname in der Komponente) | `scripts/vocabulary-check.mjs` (Rollenvergleich außerhalb `RoleSwitcher`/`actor.ts`/Tests) | ein Rollenname in einer Komponente | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Vertragsbindung (nur generierter Client) | — | ein handgeschriebener Aufruf außerhalb `apps/web/src/api/**` | geplant in Scheibe 030 |
 | Fehlerpfad (Konflikt 412 in der Oberfläche) | — | ein 412-Konflikt beim Schreiben ist in der Oberfläche ungetestet | geplant in Scheibe 060 |
@@ -289,11 +289,11 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Hook | Wirkung | Stand |
 |---|---|---|
 | PreToolUse auf Shell (heutiger Umfang) | blockiert `git push --force`, `rm -rf /`, `git reset --hard` und `curl`-in-die-Shell-Pipelines (`.claude/settings.json`) | läuft (Hook: PreToolUse) |
-| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | geplant in Scheibe 016 |
-| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | geplant in Scheibe 016 |
-| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | geplant in Scheibe 016 |
-| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | geplant in Scheibe 016 |
-| TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat | geplant in Scheibe 016 |
+| PreToolUse auf Shell (voller Umfang) | soll zusätzlich zu den heutigen Mustern jeden `git push` (auch ohne `--force`/Ziel), jeden `.env`-Zugriff und jeden Netzwerkaufruf nach außen blockieren | läuft (Hook: PreToolUse) |
+| PostToolUse auf Schreiben | formatiert und lintet die Datei sofort; Fehler gehen als Feedback zurück | läuft (Hook: PostToolUse) |
+| Stop | Exit 2, solange kein Testlauf jünger als die letzte Änderung nachgewiesen ist | läuft (Hook: Stop) |
+| SubagentStop | verlangt den Abschlussbericht im festen Format (Was, Beweis, Offen) | läuft (Hook: SubagentStop) |
+| TaskCompleted | prüft, dass die Spec-Datei ein Abnahmehäkchen hat | läuft (Hook: TaskCompleted) |
 
 Die Hooks sind Bequemlichkeit und erste Linie, nicht die Durchsetzung selbst, weil ein Stop-Hook nach
 acht Blockaden aufgehoben wird und weil Hooks lokal abschaltbar sind: Die Spalte „Stand" in 5.1 bis
