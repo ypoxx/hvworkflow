@@ -320,3 +320,16 @@ test('codex round 2 red: git push -fofoo origin main is still a force push (f be
 test('codex round 2 red: git push -uo ci.skip origin has no branch (value of o in the next token)', () => {
   assert.equal(runCommand('git push -uo ci.skip origin').status, 2);
 });
+
+// takt-006 Codex round 3: a quoted option value with a space is one shell argument, not two tokens.
+test('codex round 3 red: git push -o "ci skip" origin has no branch', () => {
+  assert.equal(runCommand('git push -o "ci skip" origin').status, 2);
+});
+
+test('codex round 3 green: git push -o "ci skip" origin main passes', () => {
+  assert.equal(runCommand('git push -o "ci skip" origin main').status, 0);
+});
+
+test("codex round 3 red: git push -o 'a b c' origin has no branch (single quotes)", () => {
+  assert.equal(runCommand("git push -o 'a b c' origin").status, 2);
+});

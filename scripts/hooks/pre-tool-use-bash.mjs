@@ -186,10 +186,7 @@ function gitPushFindings(command) {
   let m;
   while ((m = re.exec(command))) {
     const whole = m[0].trim();
-    const rawTokens = m[1]
-      .split(/\s+/)
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const rawTokens = shellWords(m[1]);
 
     // Codex C4: drop an option-with-value's own value before classifying anything else, so it can
     // never be miscounted as a target token. Never skip an extra token when the value was already
@@ -218,6 +215,39 @@ function gitPushFindings(command) {
     }
   }
   return out;
+}
+
+/** Splits a command tail into shell words: whitespace separates words, but not inside `'…'` or `"…"`,
+ * and a backslash escapes the next character. Quote characters stay in the word (`stripQuotes` removes
+ * one wrapping layer later), so `-o "ci skip"` is two words, not three (takt-006, Codex round 3). */
+function shellWords(text) {
+  const words = [];
+  let word = '';
+  let quote = null;
+  let inWord = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      word += c;
+      if (c === quote) quote = null;
+    } else if (c === '\\' && i + 1 < text.length) {
+      word += c + text[++i];
+      inWord = true;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+      word += c;
+      inWord = true;
+    } else if (/\s/.test(c)) {
+      if (inWord) words.push(word);
+      word = '';
+      inWord = false;
+    } else {
+      word += c;
+      inWord = true;
+    }
+  }
+  if (inWord) words.push(word);
+  return words;
 }
 
 /** A (possibly abbreviated) `--mirror`. */
