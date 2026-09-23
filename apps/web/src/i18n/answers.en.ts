@@ -35,11 +35,9 @@ export const answersEn: typeof answersDe = {
   'answers.detail.label': 'The question in full',
   'answers.detail.speaker': 'Request to speak',
   'answers.detail.contributionLink': 'Go to the contribution',
-  'answers.detail.agenda': 'Agenda item',
   'answers.detail.track': 'Answer track',
   'answers.detail.unit': 'Answering unit',
   'answers.detail.stageAssignment': 'Podium assignment',
-  'answers.detail.captured': 'Captured',
   'answers.detail.returned': 'Returned',
   'answers.detail.actions': 'Steps for this question',
   'answers.detail.loading': 'Loading the question …',
@@ -84,4 +82,5 @@ export const answersEn: typeof answersDe = {
   'answers.toast.done': 'Applied',
   'answers.stale.banner': 'The record has changed in the meantime; the view was reloaded',
   'answers.diff.toggle': 'Change from version {previous}',
+  'answers.readonly.hint': 'Read only in this role',
 };
