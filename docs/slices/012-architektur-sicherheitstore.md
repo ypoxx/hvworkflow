@@ -414,6 +414,18 @@ index c87a165..fa22caf 100644
          if: always()
 ```
 
+### Nachtrag: gitleaks-Fix nach dem ersten CI-Lauf
+
+Push-Lauf war vollständig grün (https://github.com/ypoxx/hvworkflow/actions/runs/35850239685),
+inkl. Semgrep, gitleaks, audit, e2e; der `pull_request`-Lauf scheiterte am gitleaks-Schritt
+(„🛑 GITHUB_TOKEN is now required to scan pull requests",
+https://github.com/ypoxx/hvworkflow/actions/runs/35850259165/job/107145995174). Fix: `GITHUB_TOKEN:
+${{ secrets.GITHUB_TOKEN }}` zum `env`-Block des gitleaks-Schritts in `.github/workflows/gates.yml`
+und, defensiv (gitleaks-actions eigenes Nutzungsbeispiel setzt ihn für push/pull_request/schedule/
+workflow_dispatch gleichermaßen), auch in `.github/workflows/nightly.yml` ergänzt. Beide YAML-Dateien
+mit `python3 -c "import yaml,sys;yaml.safe_load(open(sys.argv[1]))"` validiert; `pnpm gates` erneut
+grün gelaufen.
+
 ### Offen
 
 - **CI-Rot/Grün-Nachweis (Kriterium 3):** nicht durch mich ausführbar (kein Push aus diesem

@@ -21,6 +21,7 @@ jobs:
       - name: gitleaks (full repository)
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: scripts/gitleaks.toml
       - name: Semgrep (full run)
         run: |
