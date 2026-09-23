@@ -181,7 +181,7 @@ Open: None.
 
 Nacharbeit nach Review: Befunde 1–2 umgesetzt
 
-Commit: (hash pending)
+Commit: 2a118da
 
 Fixes:
 1. **Major** — Restored single "Alt 1…5" row in ShortcutsDialog. Created getNavigationShortcutRange() helper in featureRegistry.ts to derive min/max shortcut keys. ShortcutsDialog now renders one row with keys ['Alt', '1', '…', '5'] instead of five separate rows. Removed special-case logic at lines 44-46. Added unit test for getNavigationShortcutRange().
