@@ -727,11 +727,16 @@ Der e2e-tsconfig-Folgepunkt (eine eigene `tsconfig.json` für `apps/web/e2e/**` 
 **Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: nacharbeiten, nur 1 minor und nits.** Alle Punkte der Runde 1
 erledigt; eigene Läufe: `pnpm gates` Exit 0, Playwright 17 passed, alle axe-Zeilen 0/0. Offen:
 
-- minor · `013-bekannt` prüft `testId !== null` statt „Fokus nicht auf `BODY`“; führt takt-008 den Fokus auf ein
-  Element ohne `data-testid`, würde der Test nie rot. → **takt-008** (die Kleinänderung stellt diesen Test ohnehin
-  um).
-- nit · Ablaufdaten ohne Formatprüfung (`31.12.2026` liefe nie ab) → takt-008.
-- nit · Kopfkommentar nennt nicht alle Klicks im bekannten Fehlertest → takt-008.
+- minor · `013-bekannt` prüft `testId !== null` statt „Fokus nicht auf `BODY`“ → behoben (siehe unten).
+- nit · Ablaufdaten ohne Formatprüfung (`31.12.2026` liefe nie ab) → behoben (siehe unten).
+- nit · Kopfkommentar nennt nicht alle Klicks im bekannten Fehlertest → behoben.
+
+**Codex auf PR #19, zweiter Lauf (2 × P2):** (1) Ablaufdatum nicht als echtes Datum geprüft; (2) ein `test.fail()` über
+sechs weiche Prüfungen verdeckt Teilbehebungen. Vom Orchestrator behoben (nach oben abgewichen, wenige Zeilen): der
+Test `013-bekannt` ist jetzt eine Charakterisierung — je Aktion die harte Erwartung „Fokus auf `BODY`“; jede einzelne
+Behebung macht ihn rot, takt-008 dreht die betreffende Zeile um. `axe.ts` bricht beim Import bei fehlendem oder
+ungültigem Datum ab (geprüft: `2026-1-1`, `31.12.2026`, `2026-02-30`, `2026-13-45`, fehlend → abgelehnt).
+`pnpm gates` Exit 0; Playwright 17 passed.
 - nits · Bericht (`1 passed`, Touched, Commit-Liste) → vom Orchestrator berichtigt.
 
 Nach E48 gemergt: kein Blocker und kein Hauptbefund offen.
