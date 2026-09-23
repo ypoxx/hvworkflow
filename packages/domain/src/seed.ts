@@ -310,7 +310,11 @@ const CLOSINGS = [
 ];
 const FIRST_NAMES_F = ['Anna', 'Birgit', 'Claudia', 'Doris', 'Eva', 'Frauke', 'Gisela', 'Hanna', 'Ines', 'Julia', 'Karin', 'Lena', 'Monika', 'Nadine', 'Petra', 'Renate', 'Sabine', 'Tanja', 'Ulrike', 'Vera'];
 const FIRST_NAMES_M = ['Andreas', 'Bernd', 'Christian', 'Dieter', 'Erik', 'Frank', 'Gerd', 'Holger', 'Ingo', 'Jörg', 'Klaus', 'Lars', 'Markus', 'Norbert', 'Olaf', 'Peter', 'Rainer', 'Stefan', 'Thomas', 'Uwe'];
-const LAST_NAMES = ['Ahrens', 'Bachmann', 'Conrad', 'Dallmann', 'Ebert', 'Falk', 'Grunwald', 'Hartwig', 'Ilgner', 'Jansen', 'Kessler', 'Lindner', 'Mertens', 'Nowak', 'Ostermann', 'Pfeiffer', 'Quednau', 'Rehberg', 'Seidel', 'Thalmann', 'Ulbrich', 'Vogt', 'Wendt', 'Zeller'];
+// Rework round (review, rule 11): three surnames combined with first names from FIRST_NAMES_F/_M
+// into well-known public figures — replaced at the same index with names close enough in sound to
+// keep the corpus's German feel, but that spell no real person. (The three retired surnames are
+// deliberately not spelled out here; see packages/domain/src/__tests__/seed-fictitious-names.test.ts.)
+const LAST_NAMES = ['Ahrens', 'Bachmann', 'Conrad', 'Dallmann', 'Ebert', 'Falkenried', 'Grunwald', 'Hartwig', 'Ilgner', 'Jansen', 'Kessler', 'Lindenau', 'Mertens', 'Nowak', 'Ostermann', 'Pfeiffer', 'Quednau', 'Rehberg', 'Seidel', 'Thalmann', 'Ulbrich', 'Vogt', 'Wendhausen', 'Zeller'];
 // Fictitious associations only (takt-004): the demo corpus must never resemble a real shareholder
 // association (review 014 round 1 finding 10, round 2 point 11) — same count and order as before, so
 // the seeded RNG sequence (and every downstream id/timestamp) is unchanged.
