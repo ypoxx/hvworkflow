@@ -8,9 +8,19 @@
  * pixels high, which is right for a dense console and far too small for the person reading out.
  */
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { CornerUpLeft, Presentation, Undo2 } from 'lucide-react';
 import type { Question, StageView } from '@hv/domain';
-import { Badge, EmptyState, Kbd, StageAssignmentBadge, TrackBadge, cx } from '../../components';
+import {
+  Badge,
+  Button,
+  Dialog,
+  EmptyState,
+  Kbd,
+  StageAssignmentBadge,
+  TrackBadge,
+  cx,
+} from '../../components';
 import { useT } from '../../i18n';
 import { approvedAnswer, clockTime } from './lib';
 
@@ -72,55 +82,77 @@ function PodiumButton({
  * "Als Nächstes" (point 7): the first item in the queue reads as its own, larger card — full
  * question text at 18px, clearly secondary to the 28px question on stage (design-prinzipien.md
  * checklist item on this slice) — while the rest of the queue stays a compact list.
+ *
+ * Point #10 (feedback, slice 020): the whole card is now a button that opens a read-only preview of
+ * the question and its released answer — no status change, no write, Escape or the dialog's own
+ * close button leave it exactly as it was.
  */
-function NextPreview({ question }: { question: Question }) {
+function NextPreview({ question, onOpen }: { question: Question; onOpen: (q: Question) => void }) {
   const t = useT();
   return (
-    <div
+    <button
+      type="button"
       data-testid="stage-next-preview"
-      className="mb-3 rounded-md border border-line-strong bg-sunken p-3"
+      onClick={() => onOpen(question)}
+      // Only the border transitions on hover: a `transition-colors` here would also animate
+      // `background-color`, which very visibly races the Kontrastmodus colour swap (R9/007).
+      className="mb-3 w-full rounded-md border border-line-strong bg-sunken p-3 text-left transition-[border-color] duration-100 hover:border-ink-300"
     >
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* m9 (review round 1): no block-level `<div>`/`<p>` inside a `<button>` — `<span>` with the
+       *  same layout classes renders identically and stays valid HTML. */}
+      <span className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
         {question.stageAssignment !== undefined && (
           <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
         )}
         {question.track !== undefined && <TrackBadge track={question.track} />}
-      </div>
-      <p className="mt-2 text-[18px] leading-6 font-medium text-ink-900">{question.text}</p>
-      <p className="mt-1 truncate text-2xs text-ink-500">
+      </span>
+      <span className="mt-2 block text-[18px] leading-6 font-medium text-ink-900">
+        {question.text}
+      </span>
+      <span className="mt-1 block truncate text-2xs text-ink-500">
         {question.speakerDisplayName ?? t('common.none')}
-      </p>
-    </div>
+      </span>
+    </button>
   );
 }
 
 /** A queue row further out: initials and the track glyph lead, the text stays compact. */
-function QueueItem({ question }: { question: Question }) {
+function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Question) => void }) {
   const t = useT();
   return (
-    <li
-      data-testid="stage-queue-item"
-      data-number={question.number}
-      className="flex items-start gap-2.5 border-b border-line py-2 last:border-b-0"
-    >
-      <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
-        <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
-        {question.stageAssignment !== undefined && (
-          <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        {question.track !== undefined && (
-          <span className="mb-0.5 flex">
-            <TrackBadge track={question.track} />
-          </span>
-        )}
-        <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
-        <span className="mt-0.5 block truncate text-2xs text-ink-400">
-          {question.speakerDisplayName ?? t('common.none')}
+    <li data-testid="stage-queue-item" data-number={question.number} className="border-b border-line last:border-b-0">
+      {/*
+       * m6 (review round 1): `ink-25` has no `.stage-contrast` override (only `ink-50` and darker
+       * do), so the old hover flashed a near-white background on the dark ground. `ink-50` is
+       * themed both ways. `transition-colors` also raced the Kontrastmodus swap on every
+       * CSS-var-backed colour on this button (R9/007) — dropped, same as `NextPreview`'s border.
+       */}
+      <button
+        type="button"
+        onClick={() => onOpen(question)}
+        className="flex w-full items-start gap-2.5 py-2 text-left hover:bg-ink-50"
+      >
+        <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
+          {/* Nachschärfung Runde 2 (M4): this row is slice 020's own (`ed648aa4`), not a
+           *  pre-existing spot — ink-600/ink-700 read at 7:1+/9:1+, not the 3.7–3.9:1 of ink-500/400. */}
+          <span className="font-mono text-2xs tabular-nums text-ink-600">{question.number}</span>
+          {question.stageAssignment !== undefined && (
+            <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
+          )}
         </span>
-      </span>
+        <span className="min-w-0 flex-1">
+          {question.track !== undefined && (
+            <span className="mb-0.5 flex">
+              <TrackBadge track={question.track} />
+            </span>
+          )}
+          <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
+          <span className="mt-0.5 block truncate text-2xs text-ink-700">
+            {question.speakerDisplayName ?? t('common.none')}
+          </span>
+        </span>
+      </button>
     </li>
   );
 }
@@ -236,8 +268,72 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
   );
 }
 
+/**
+ * Point #10: the preview a click on the queue opens. Read-only on purpose — it shows the question
+ * and its released answer, exactly what the podium device will show once the question is actually
+ * read, without touching the record: no "vorgelesen", no write, no new event.
+ */
+function QueuePreview({ question, onClose }: { question: Question | null; onClose: () => void }) {
+  const t = useT();
+  const answer = question !== null ? approvedAnswer(question) : undefined;
+  return (
+    <Dialog
+      open={question !== null}
+      onClose={onClose}
+      size="lg"
+      title={t('stage.preview.title')}
+      description={t('stage.preview.description')}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          {t('common.close')}
+        </Button>
+      }
+    >
+      {question !== null && (
+        // M6 (review round 1): this is a preview of the Bühne, a different device (design
+        // principle 10) — console-scale 13/16px read as an ordinary form here. Question and answer
+        // follow the podium's own sizes and `--color-stage-text`, so Kontrastmodus (if it happened
+        // to be on) would not swallow either.
+        <div data-testid="stage-preview" className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[13px] text-ink-600" data-testid="stage-preview-number">
+              {question.number}
+            </span>
+            {question.stageAssignment !== undefined && (
+              <StageAssignmentBadge assignment={question.stageAssignment} />
+            )}
+            {question.track !== undefined && <TrackBadge track={question.track} />}
+          </div>
+          <p
+            data-testid="stage-preview-text"
+            className="text-[22px] leading-8 font-medium tracking-[-0.01em]"
+            style={{ color: 'var(--color-stage-text)' }}
+          >
+            {question.text}
+          </p>
+          <div className="border-t border-line pt-3">
+            <span className="hv-label">{t('stage.answer.label')}</span>
+            <p
+              data-testid="stage-preview-answer"
+              className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-600 italic')}
+              style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
+            >
+              {answer !== undefined
+                ? answer.text
+                : question.track === 'podium'
+                  ? t('stage.answer.podium')
+                  : t('stage.answer.none')}
+            </p>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
 export function StageQueue({ stage }: { stage: StageView }) {
   const t = useT();
+  const [preview, setPreview] = useState<Question | null>(null);
   const shown = stage.queue.slice(0, 8);
   const [next, ...rest] = shown;
   const more = stage.queue.length - shown.length;
@@ -246,7 +342,19 @@ export function StageQueue({ stage }: { stage: StageView }) {
     <div data-testid="stage-queue" className="flex min-h-0 flex-col">
       <div className="flex items-baseline justify-between">
         <span className="hv-label">{t('stage.queue.title')}</span>
-        <span className="font-mono text-2xs tabular-nums text-ink-400">{stage.queue.length}</span>
+        {/*
+         * M4 (review round 1): ink-400 measured 2.48:1 — nowhere near the 4.5:1 text needs. This is
+         * now sized and coloured like a value next to VORGELESEN/OFFEN (ink-900, ~15:1) rather than
+         * a caption, and omitted entirely once there is nothing left to count.
+         */}
+        {stage.queue.length > 0 && (
+          <span
+            data-testid="stage-queue-remaining"
+            className="font-mono text-base leading-5 font-semibold tabular-nums text-ink-900"
+          >
+            {t('stage.queue.remaining', { n: stage.queue.length })}
+          </span>
+        )}
       </div>
       {next === undefined ? (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-500">
@@ -255,10 +363,10 @@ export function StageQueue({ stage }: { stage: StageView }) {
         </p>
       ) : (
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
-          <NextPreview question={next} />
+          <NextPreview question={next} onOpen={setPreview} />
           <ul aria-label={t('stage.queue.label')} className="min-h-0 flex-1 overflow-y-auto">
             {rest.map((question) => (
-              <QueueItem key={question.id} question={question} />
+              <QueueItem key={question.id} question={question} onOpen={setPreview} />
             ))}
           </ul>
           {more > 0 && (
@@ -268,6 +376,7 @@ export function StageQueue({ stage }: { stage: StageView }) {
           )}
         </div>
       )}
+      <QueuePreview question={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

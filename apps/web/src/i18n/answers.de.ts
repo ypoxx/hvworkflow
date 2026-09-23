@@ -33,11 +33,9 @@ export const answersDe = {
   'answers.detail.label': 'Einzelfrage im Wortlaut',
   'answers.detail.speaker': 'Wortmeldung',
   'answers.detail.contributionLink': 'Zum Redebeitrag',
-  'answers.detail.agenda': 'Tagesordnungspunkt',
   'answers.detail.track': 'Antwortpfad',
   'answers.detail.unit': 'Fachbereich',
   'answers.detail.stageAssignment': 'Bühnenzuordnung',
-  'answers.detail.captured': 'Erfasst',
   'answers.detail.returned': 'Zurückgegeben',
   'answers.detail.actions': 'Schritte zu dieser Einzelfrage',
   'answers.detail.loading': 'Einzelfrage wird geladen …',
@@ -82,4 +80,5 @@ export const answersDe = {
   'answers.toast.done': 'Übernommen',
   'answers.stale.banner': 'Stand wurde inzwischen geändert, Ansicht neu geladen',
   'answers.diff.toggle': 'Änderung gegenüber Version {previous}',
+  'answers.readonly.hint': 'In dieser Rolle nur lesen',
 };

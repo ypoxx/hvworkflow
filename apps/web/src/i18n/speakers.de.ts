@@ -41,7 +41,7 @@ export const speakersDe = {
   'speakers.action.move.title': 'Wortmeldung {number} in eine andere Runde verschieben',
   'speakers.action.capture.title': 'Redebeitrag von Wortmeldung {number} erfassen',
   'speakers.drag.label': 'Wortmeldung {number} verschieben',
-  'speakers.drag.hint': 'Reihenfolge ändern: Griff ziehen, oder mit Leertaste anheben und mit den Pfeiltasten verschieben.',
+  'speakers.drag.hint': 'Am Griff ziehen oder mit Leertaste anheben',
   'speakers.dnd.instructions': 'Leertaste hebt die Wortmeldung an. Mit den Pfeiltasten verschieben, mit der Leertaste ablegen, mit Esc abbrechen.',
   'speakers.dnd.lifted': 'Wortmeldung {number} angehoben, Position {position} von {count}.',
   'speakers.dnd.moved': 'Wortmeldung {number} steht auf Position {position} von {count}.',
@@ -62,4 +62,5 @@ export const speakersDe = {
   'speakers.loading': 'Wortmeldeliste wird geladen',
   'speakers.error.title': 'Die Wortmeldeliste konnte nicht geladen werden',
   'speakers.error.body': 'Der Bestand ist gerade nicht erreichbar.',
+  'speakers.readonly.hint': 'In dieser Rolle nur lesen',
 };

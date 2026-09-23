@@ -100,7 +100,9 @@ export function SpeakerRow({
           data-testid="speaker-drag-handle"
           aria-label={t('speakers.drag.label', { number: speaker.number })}
           className={cx(
-            'flex h-7 w-6 cursor-grab items-center justify-center rounded-sm text-ink-300',
+            // Point #17 (feedback, slice 020): the handle must read as a handle even before the
+            // pointer reaches it, not only on hover — text-ink-300 was too faint to notice.
+            'flex h-7 w-6 cursor-grab items-center justify-center rounded-sm text-ink-500',
             'transition-colors duration-100 hover:bg-ink-100 hover:text-ink-700',
           )}
           {...attributes}

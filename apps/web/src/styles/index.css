@@ -246,6 +246,22 @@
     scrollbar-width: thin;
     scrollbar-color: var(--color-ink-300) transparent;
   }
+
+  /*
+   * Point 11 (slice 020): prefers-reduced-motion turns every transition and animation off rather
+   * than merely shortening it, so a vestibular disorder is respected without redesigning the 120ms
+   * hover/dialog transitions the rest of the tool relies on (design-prinzipien.md #8).
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {

@@ -181,6 +181,11 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
 
   /* ---------- Podium: read out, next ---------- */
   await asRole(page, 'podium');
+  // Point #3/#9 (slice 020): "Nur Bühne" now defaults on for a role that only reads answers out.
+  // This walk-through exercises the manual toggle explicitly below, so it starts as if the person
+  // had already made a conscious choice — the stored preference always wins over the default
+  // (020-rueckbau-passung.spec.ts covers the default itself on a fresh session).
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
 
@@ -254,9 +259,12 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   const assignmentBadge = page.getByTestId('stage-assignment').locator('.hv-badge');
 
   const queueColor = await queueQuestionText.evaluate((el) => getComputedStyle(el).color);
+  // m9 (slice 020, review round 1): `NextPreview` no longer nests a `<p>` inside its `<button>`
+  // (no block element inside a button) — the question text is the second of its three direct
+  // `<span>` children (badge row, question text, speaker name).
   const nextPreviewColors = await nextPreview.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
-    text: getComputedStyle(el.querySelector('p')!).color,
+    text: getComputedStyle(el.children[1]!).color,
   }));
   const badgeColor = await assignmentBadge.evaluate((el) => getComputedStyle(el).color);
   console.log(`[007 rework] stage-contrast queue item text colour: ${queueColor}`);
