@@ -124,7 +124,7 @@ Evidence: grep -cE '^\| E[0-9]+[ab]? \|' docs/entscheidungsregister.md → 51 (E
       (Playwright, Chromium aus /opt/pw-browsers, Rolle Moderation, Ansicht Wortmeldungen), Legende mit
       `node <scratch>/shot014/generate-legend.mjs` aus derselben Markierungsliste; beide Skripte liegen nur im
       Scratch-Verzeichnis der Orchestrierung (keine Datei im Repositorium).
-      pnpm gates (Orchestrator, nach Merge des Integrationsbranchs b86930d, Exit 0), Ende der Ausgabe:
+      pnpm gates (Orchestrator, nach Merge des Integrationsbranchs b86930d, Exit 0), Auszug (Zeilen wörtlich aus dem Lauf, nicht zusammenhängend):
         packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.2.0, 29 operations)
         packages/domain test:       Tests  39 passed (39)
         apps/web test:       Tests  35 passed (35)
@@ -132,7 +132,7 @@ Evidence: grep -cE '^\| E[0-9]+[ab]? \|' docs/entscheidungsregister.md → 51 (E
         > node scripts/vocabulary-check.mjs
         vocabulary-check: ok
         ✓ built in 1.25s
-Open: Die Abdeckungsmatrix führt 014 selbst als „geplant", bis die Scheibe gemergt ist. Zwei Registerzeilen aus dem
+Open: Zwei Registerzeilen aus dem
       Review von 015 (Pseudonymisierung: engerer Rollenkreis und Vier-Augen nach Recherche Z.116; Zuordnung der fünf
       Anzeigegruppen, ADR 0012) sind nicht in dieser Scheibe — Übergabe an eine Folge-Kleinänderung.
 Touched: docs/entscheidungsregister.md, docs/abdeckungsmatrix.md, docs/feedback/2026-10-fragenpaket-woche-1.md,
