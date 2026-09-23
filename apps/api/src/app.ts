@@ -95,7 +95,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       options.seedActor ??
       (process.env['HV_SEED_ACTOR'] !== undefined ? parseActorHeader(process.env['HV_SEED_ACTOR']) : undefined) ??
       SYSTEM_ACTOR;
-    actorStorage.run({ id: 'ci-demo', role: 'admin' }, () => {
+    actorStorage.run(seedActor, () => {
       domain
         .seedDemo({})
         .then((meeting) => {
@@ -299,3 +299,6 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   return app;
 }
+
+// CI-Nachweis Scheibe 012: absichtlicher Verstoß, wird im nächsten Commit entfernt.
+export const CI_PROBE_ACTOR = { id: 'ci-demo', role: 'admin' } as const;
