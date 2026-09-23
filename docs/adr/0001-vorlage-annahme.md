@@ -26,7 +26,7 @@ danach verschiebt nur ein neuer ADR eine Grenze.
 ## Was nicht angenommen wird
 
 - Keine Technologiewahl (Persistenz, Identität, Hosting, Realtime): Das sind ADR 0003–0016, die Scheibe 015
-  als „vorgeschlagen" vorlegt; sie werden an den Prüfpunkten 3 bis 5 einzeln angenommen.
+  als „vorgeschlagen" vorlegt; sie werden an den Prüfpunkten 1 bis 5 einzeln angenommen (Plan 4, Spalte „Annahme").
 - Keine inhaltliche Änderung am ADR; nur Status, Datum und Entscheider werden eingetragen.
 
 ## Was für die Projektleitung daraus folgt (Frage aus E42)
@@ -45,8 +45,8 @@ danach verschiebt nur ein neuer ADR eine Grenze.
 
 | Grenze | Heute belegt | Bis Prüfpunkt 1 ergänzt |
 |---|---|---|
-| 1 | Oberfläche nutzt nur `apps/web/src/api` (kein `fetch(` in `apps/web/src`); Rollenvergleich-Scan im Vokabular-Tor (`scripts/vocabulary-check.mjs`); Vertragstests für jede operationId (`apps/api`) | Antwort-Schema-Validierung und Rollenliteral-Scan über `apps/api` und `packages/domain` (012) |
-| 2 | `packages/domain/src` importiert nur relativ, kein Framework, keine I/O; Uhr ist injiziert (`api.ts:153`) | dependency-cruiser „Domäne importiert nichts aus apps/*" und statischer now()-Check (012); offener Befund für 012: `api.ts:122` erzeugt eine Ersatz-ID mit `Date.now()` |
+| 1 | Kein `fetch(` in `apps/web/src`; alle Aufrufe laufen über `HvApi` (`apps/web/src/api/index.ts`); Rollenvergleich-Scan im Vokabular-Tor (`scripts/vocabulary-check.mjs`); Vertragstests für jede operationId (`apps/api`). **Offen:** Die Features importieren Werte aus `@hv/domain` — `etagOf` sowie `QUESTION_STATUSES`, `TERMINAL_STATUSES`, `TRACKS`, `STAGE_ASSIGNMENTS` (z. B. `features/answers/WorkList.tsx:14`, `features/capture/QuestionCard.tsx:10`); das ist kein Vertragsaufruf, aber Statuswissen in der Oberfläche | Antwort-Schema-Validierung und Rollenliteral-Scan über `apps/api` und `packages/domain` (012); Abhängigkeitsregel „web importiert aus `@hv/domain` nur Typen und `HvApi`" als Befund für 012 und Bereinigung in einer Oberflächenscheibe |
+| 2 | `packages/domain/src` importiert nur relativ, kein Framework, keine I/O; die Uhr ist injizierbar (`createInProcessApi({ clock })`) | dependency-cruiser „Domäne importiert nichts aus apps/*" und statischer now()-Check (012); offene Befunde für 012: `api.ts:122` erzeugt eine Ersatz-ID mit `Date.now()`, `api.ts:153` fällt ohne injizierte Uhr auf `new Date()` zurück |
 | 3 | Noch kein Nachbarsystem angeschlossen; Redebeitrag kennt `source: transcript` nur als Kennzeichen | Adapter folgen in 064 (Ingest), 066 (KI-Port), 067 (Aktienregister) |
 
 ## Beschluss

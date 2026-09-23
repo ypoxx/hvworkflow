@@ -10,8 +10,7 @@ one German listed company: speakers list, capture of speeches, atomisation into 
 classification into answer tracks, drafting, legal clearing, approval, podium, history.
 Requirements: `docs/anforderungen-recherche.md`. Current process: `docs/ist-analyse-und-schnittstellen.md`.
 Rights: `docs/rollen-und-rechtekonzept.md`. Architecture: `docs/adr/`. Working method: `docs/agentische-entwicklung-plan.md`.
-Risk classes, quality checks and evidence per slice (a checklist for spec writers, not a second rulebook):
-`docs/qualitaetsleitplanken-produktreife.md`.
+Risk classes, checks and evidence per slice (a checklist, not a second rulebook): `docs/qualitaetsleitplanken-produktreife.md`.
 
 ## Layout
 

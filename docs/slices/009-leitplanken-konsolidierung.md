@@ -1,6 +1,6 @@
 # 009 — Leitplanken 008 konsolidieren, ADR 0001 zur Annahme vorlegen, Repositorium aufräumen
 
-**Status:** spec
+**Status:** review (Nacharbeitsrunde 1 erledigt)
 **Risikoklasse:** niedrig · 1,5 AStd · Kalender 28.09.2026 (W1) · Lane: docs-plan (+ `docs/adr/0001-*` als Architekt)
 **Rolle/Modell:** Architekt (Orchestrator, Opus 5.5 in der Rolle des Architekten) · Review Fable 5.1
 (Regel 3: der Plan sieht Review Opus vor; weil Opus hier baut, reviewt Fable)
@@ -90,12 +90,19 @@ nach dem Merge `git ls-remote` ohne Codex-Branch.
 
 ```
 Slice: 009-leitplanken-konsolidierung
-Done: Leitplanken vom Codex-Branch übernommen und von 506 auf 339 Zeilen gekürzt (Wörter 4137 → 3419,
+Done: Leitplanken vom Codex-Branch übernommen und von 506 auf 340 Zeilen gekürzt (Wörter 4137 → 3419,
       Zeichen 32297 → 26151; darin neu: Perspektiven-Tabelle, Registerzeilen, Beispiel 021); die sieben
       Befunde eingearbeitet; ADR-0001-Annahmevorlage; Verweis in AGENTS.md, zwei Indexzeilen im README;
       Spec 008 als Herkunft übernommen (Status superseded).
-Evidence: pnpm gates exit 0 — domain 39/39, web 9/9, api 25/25 Tests, vocabulary-check: ok, Web-Build ✓;
-      git diff auf docs/adr/0001-schichtung-und-vertragskopplung.md leer.
+Evidence: git diff auf docs/adr/0001-schichtung-und-vertragskopplung.md leer; wc -l Leitplanken = 340;
+      pnpm gates nach der Nacharbeit (exit 0), Ausschnitt:
+        packages/domain test:       Tests  39 passed (39)
+        apps/web test:       Tests  9 passed (9)
+        apps/api test:       Tests  25 passed (25)
+        > node scripts/vocabulary-check.mjs
+        vocabulary-check: ok
+        > @hv/web@0.0.0 build /home/user/wt/009/apps/web
+        ✓ built in 1.12s
 Open: Codex-Branch wird nach dem Merge gelöscht (E23, Orchestrator). .claude/worktrees/ ist bereits in
       .gitignore und nicht versioniert — im Repositorium nichts zu entfernen; lokal beim Umsetzer ggf.
       `git worktree prune`.
@@ -111,11 +118,28 @@ Touched: docs/qualitaetsleitplanken-produktreife.md (neu), docs/adr/0001-vorlage
 | B3 Perspektiven auf heutige Rollen | 5 (Tabelle Perspektive → Rolle), 7 (Spalte Rolle) |
 | B4 Mensch entscheidet Herabstufung | 4 (letzter Absatz), 3 (Zeile im Planungsblock) |
 | B5 Betriebsrat und Rechtsprüfung als Registerzeilen | 6.6 (keine Merge-Bedingung), 6.1 Blocker, 11 (Zeilen E13/E14 und E15, „Übernahme durch 014") |
-| B6 um ein Drittel kürzen | 506 → 339 Zeilen |
+| B6 um ein Drittel kürzen | 506 → 340 Zeilen |
 | B7 durchgerechnetes Beispiel | 12 (Scheibe 021) |
 
 Abschnitte 9.1, 9.2, 9.3 tragen Nummer und Namen wie im Codex-Stand (Plan verweist darauf).
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 — Review Fable 5.1** (frischer Kontext, Spec und Diff, 23.09.2026): 0 blocker / 1 major / 10 minor, Urteil
+„rework required — eine kurze Runde". Bestätigt ohne Befund: Zeilenzahl, Fundstellen B1–B7, Registerzeilen E13/E14/E15,
+vollständige Abbildung der 20 Codex-Entscheidungen auf E-Nummern, 9.1–9.3, Beispiel 021 gegen Plan 5.3, ADR 0001
+unverändert, keine neue Rolle/Tor/Arbeitsordnung, Dateiumfang. Nacharbeit durch den Umsetzer (Orchestrator):
+
+| # | Schwere | Befund | Erledigung |
+|---|---|---|---|
+| 1 | major | Vorlage ADR 0001, Nachweis Grenze 1: „Oberfläche nutzt nur `apps/web/src/api`" stimmt nicht — Features importieren `etagOf`, `QUESTION_STATUSES`, `TERMINAL_STATUSES`, `TRACKS`, `STAGE_ASSIGNMENTS` aus `@hv/domain` | Zelle berichtigt, Befund als „Offen" mit Fundstellen; Abhängigkeitsregel an 012 übergeben |
+| 2 | minor | Zitate: `can()` liegt in `api.ts`; „kein Upcaster" ist die geplante Ergänzung zu ADR 0002; Changelog nicht aus Regel 6 | berichtigt (1.1, 6.3, 6.4) |
+| 3 | minor | Plan 6.3: nach einer Runde zurück an den Planer, nach zwei an den Architekten | berichtigt (7) |
+| 4 | minor | ADR 0003–0016 werden an Prüfpunkten 1 bis 5 angenommen | berichtigt (Vorlage) |
+| 5 | minor | `api.ts:153` fällt auf `new Date()` zurück; „noch Uhr" ungenau | Vorlage nennt beide Befunde; 1.3 Punkt 2 „keine eigene Uhr, nur Clock-Port" |
+| 6 | minor | „Was die Klasse auslöst" → „Was aus der Klasse folgt" | berichtigt (4) |
+| 7 | minor | „zwei Grenzen" kollidiert mit den drei Grenzen aus ADR 0001 | „zwei Festlegungen" (1, 1.3) |
+| 8 | minor | „Die Spec nennt ihre Stufe" ist eine neue Anforderung | „kann … im Planungsblock (3) nennen" |
+| 9 | minor | Ungenehmigt weggefallen: Backup-Umfang, Sitzungsentzug/Break-Glass, Ausnahmen mit Eigentümer und Ablauf, Betroffenenauskunft | wieder aufgenommen (6.3, 6.5, 2, 6.6) |
+| 10 | minor | AGENTS.md: zwei physische Zeilen statt einer | auf eine Zeile gekürzt |
+| 11 | minor | Status und Evidence-Format | Status „review", echter `pnpm gates`-Ausschnitt |

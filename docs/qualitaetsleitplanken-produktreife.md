@@ -14,7 +14,7 @@ Slice-Spec bei drei Fragen:
 3. Hängt sie an einer offenen Entscheidung, und wenn ja, mit welcher Standardannahme wird trotzdem gebaut?
 
 Ein Punkt aus diesem Katalog wird für eine Scheibe erst verbindlich, wenn die Spec ihn als
-Akzeptanzkriterium übernimmt; ohne Übernahme verbindlich sind nur die beiden Grenzen in 1.3. Das Dokument
+Akzeptanzkriterium übernimmt; ohne Übernahme verbindlich sind nur die beiden Festlegungen in 1.3. Das Dokument
 kopiert weder Operationen, Rollenmatrix, Übergänge noch Rechtsanforderungen, wählt weder Plattform, IdP,
 Datenbanktopologie noch KI-Anbieter und erteilt keine Rechts-, Sicherheits- oder Produktionsfreigabe.
 
@@ -26,7 +26,7 @@ Datenbanktopologie noch KI-Anbieter und erteilt keine Rechts-, Sicherheits- oder
 | Plan, Scheiben, Standardannahmen | `docs/produktplan-beta.md` | verbindlich für Reihenfolge und Umfang |
 | Umfang einer Scheibe | `docs/slices/NNN-*.md` | verbindlich für diese Scheibe |
 | Vertrag | `packages/contract/openapi.yaml`, generierte Typen | verbindlich |
-| Übergänge, Rechte, Ereignisse | `transitions.ts`, `permissions.ts` mit `can()`, `events.ts`/`state.ts` | verbindlich (Stand des Codes) |
+| Übergänge, Rechte, Ereignisse | `transitions.ts`, `permissions.ts` (`ROLE_PERMISSIONS`), `can()` in `api.ts`, `events.ts`/`state.ts` | verbindlich (Stand des Codes) |
 | Schichtung | ADR 0001 | vorgeschlagen, **operativ bindend** (1.3); Annahme an Prüfpunkt 1 (E42) |
 | Weitere Architektur | ADR 0002 angenommen; ab 015 ADR 0003–0016 | nur angenommene ADRs entscheiden; gegen vorgeschlagene wird mit Vermerk „auf Standard gebaut" gebaut |
 | Offene Entscheidungen | Plan Abschnitt 10; ab 014 `docs/entscheidungsregister.md` | Standardannahme gilt, bis der Entscheider antwortet |
@@ -42,7 +42,7 @@ Text ersetzt eine Entscheidung nur mit ausdrücklich dokumentierter Ablösung.
 eine **Leitplanke** ist eine Prüfhilfe, verbindlich sobald die Spec sie übernimmt; **offen** ist die Entscheidung
 eines Menschen, gebaut wird dann auf der Standardannahme aus dem Register (Abschnitt 11).
 
-### 1.3 Zwei Grenzen, die nicht zur Wahl stehen
+### 1.3 Zwei Festlegungen, die nicht zur Wahl stehen
 
 **ADR 0001 ist operativ bindend.** Die drei Grenzen gelten ab sofort für jede Scheibe, obwohl der ADR formal
 „vorgeschlagen" ist; die Annahme folgt an Prüfpunkt 1 (`docs/adr/0001-vorlage-annahme.md`). Eine Verletzung
@@ -50,8 +50,8 @@ ist im Review ein Blocker:
 
 1. *Oberfläche gegen Anwendung:* Die Oberfläche spricht nur `HvApi` bzw. den generierten Client, rendert
    nur `_actions` und enthält keine Geschäftsregel, keine Rechtelogik, keine Statusmaschine (Regeln 4–6).
-2. *Fachlichkeit gegen Technik:* `packages/domain` kennt weder HTTP noch Datenbank noch Dateisystem
-   noch Uhr (Regel 8); alles Technische hängt an Ports, die der Kern definiert.
+2. *Fachlichkeit gegen Technik:* `packages/domain` kennt weder HTTP noch Datenbank noch Dateisystem und keine
+   eigene Uhr, nur den injizierten Clock-Port (Regel 8); alles Technische hängt an Ports, die der Kern definiert.
 3. *Eigenes gegen Fremdes:* ein Adapter je Nachbarsystem hinter einem kanonischen Vertrag; kein
    Fremdformat erreicht den Kern.
 
@@ -64,7 +64,7 @@ eine Änderung am Log.
 ## 2. Reifestufen
 
 Qualität ist relativ zum zugesagten Betriebszustand. Die Beta des Plans entspricht der Stufe Pilot
-(Schattenbetrieb, nie führend). Die Spec nennt ihre Stufe; die Tabelle ist Auswahlhilfe, kein Tor. Eine Funktion
+(Schattenbetrieb, nie führend). Die Spec kann ihre Stufe im Planungsblock (3) nennen; die Tabelle ist Auswahlhilfe, kein Tor. Eine Funktion
 ist nicht produktionsreif, nur weil ihr Happy Path in der Demo läuft.
 
 | Bereich | Demo | Pilot (Beta) | Produktion |
@@ -79,7 +79,8 @@ ist nicht produktionsreif, nur weil ihr Happy Path in der Demo läuft.
 **Antwortwerte** für übernommene Checks: `ja` (erfüllt, Nachweis benannt) · `nein` (relevant, nicht erfüllt,
 Spec nicht abnahmefähig) · `nicht anwendbar` (kurzer Grund) · `blockiert` (nur wenn eine Voraussetzung fehlt,
 für die das Register **keine** Standardannahme hat; sonst Bau auf Standard mit Vermerk „auf Standard gebaut
-am <Datum>"). Abweichungen genehmigt der in Spec oder Register benannte Entscheider, nicht dieses Dokument.
+am <Datum>"). Abweichungen genehmigt der in Spec oder Register benannte Entscheider mit Eigentümer, Grund, Geltungsbereich
+und Ablaufdatum, nicht dieses Dokument.
 
 ## 3. Planungsblock für die Spec
 
@@ -112,7 +113,7 @@ Es gilt die höchste ausgelöste Klasse. **Ist die Zuordnung unklar, gilt hoch.*
 - **Niedrig** ist nur eine Änderung ohne Verhalten, Vertrag, persistierte Daten, Rechte, Personenbezug
   oder Betrieb (Text, reine Optik, interne Vereinfachung, Dokumentation).
 
-Was die Klasse auslöst, steht im Plan (6.1, 6.3) und wird hier nur zusammengefasst:
+Was aus der Klasse folgt, steht im Plan (6.1, 6.3) und wird hier nur zusammengefasst:
 
 | Klasse | Mindestnachweis | Review |
 |---|---|---|
@@ -158,19 +159,19 @@ Demo-Scheibe genügen meist 6.1, 6.2, 6.9, 6.11, 6.12.
 Rechtsfrage still durch einen technischen Standard entschieden, statt ihn als Registerzeile auszuweisen.
 
 ### 6.2 Architektur und Modulgrenzen
-- [ ] Die Grenzen aus 1.3 sind eingehalten; die Abhängigkeitsrichtung ist automatisch prüfbar (ab 012).
+- [ ] Die Grenzen aus ADR 0001 (1.3) sind eingehalten; die Abhängigkeitsrichtung ist automatisch prüfbar (ab 012).
 - [ ] Module greifen nur über benannte Schnittstellen aufeinander zu; der lokale Entwicklungsweg bleibt einfach genug, um Fehler nachzustellen.
 - [ ] Ein neuer Dienst hat einen belegten Skalierungs-, Sicherheits- oder Zuständigkeitsgrund; Standard ist der modulare Monolith.
 
 ### 6.3 Daten, Konsistenz und Migration
 - [ ] Transaktionsgrenze benannt; Gleichzeitiges führt zu sichtbarem Konflikt (412); Wiederholungen sind idempotent je Akteur und Operation.
-- [ ] Ereignisse haben eine Evolutionsstrategie (Schema-Version, Upcaster nur für Dev-Bestände, ADR 0002: kein Upcaster in der Demo).
+- [ ] Ereignisse haben eine Evolutionsstrategie (Schema-Version, Upcaster nur für Dev-Bestände; Demo: Reset-Banner statt Upcaster, Ergänzung zu ADR 0002 in 015).
 - [ ] Migrationen laufen gegen realistischen Bestand, vorwärts und rückwärts, und setzen nach Neustart sicher fort.
-- [ ] Restore wurde ausgeführt und fachlich verifiziert (Hash-Kette, Projektion identisch), nicht nur gestartet.
+- [ ] Backup umfasst Daten, Konfiguration, Schlüsselbezug (keyId) und Metadaten; Restore wurde ausgeführt und fachlich verifiziert (Hash-Kette, Projektion identisch), nicht nur gestartet.
 - [ ] Aufbewahrungsklasse und Legal Hold sind für neue Daten gesetzt; Löschung ist nicht Teil der Beta.
 
 ### 6.4 Vertrag, Ereignisse, Integrationen
-- [ ] Vertrag zuerst geändert, Typen regeneriert, Changelog-Eintrag (Regel 6); rückwärtskompatibel oder mit Ablauf in der Allowlist (ADR 0015).
+- [ ] Vertrag zuerst geändert, Typen regeneriert (Regel 6); Changelog-Eintrag, rückwärtskompatibel oder mit Ablauf in der Allowlist (019, ADR 0015).
 - [ ] Erfolg, 400/422, 403, 404, 409, 412, 428 und 500 sind konsistent als Problem-Details mit Regel-ID modelliert.
 - [ ] Limits, Paginierung, Filtersemantik, Idempotenz und Nebenläufigkeit sind dokumentiert und vertragsgetestet.
 - [ ] Webhooks tragen Ereignis-ID, Typ, Schemaversion, Zeit, Jahrgang, Korrelations-ID; Signatur, Wiederholung, Deduplizierung sind definiert.
@@ -180,12 +181,12 @@ Rechtsfrage still durch einen technischen Standard entschieden, statt ihn als Re
 - [ ] Authentifizierung und Autorisierung werden im Dienst erzwungen; der Kontext (Einheit, Bühnenplatz, Vertraulichkeit) kommt nie vom Client.
 - [ ] Neue Aktionen sind für niemanden erlaubt, bis sie in `ROLE_PERMISSIONS` vergeben und getestet sind (deny by default).
 - [ ] Nichtberechtigte erkennen weder Inhalt noch ableitbare IDs geschützter Vorgänge (Zähler bleiben lückenlos); Massenlesen, Export und Rechteerhöhung sind begrenzt und als Ereignis nachvollziehbar.
-- [ ] Keine Secrets in Repositorium, Artefakt, Log, Screenshot oder Agentenkontext (Regel 11).
+- [ ] Keine Secrets in Repositorium, Artefakt, Log, Screenshot oder Agentenkontext (Regel 11); Sitzungsentzug, Sperrliste und Notfallkonten funktionieren unabhängig vom Happy Path.
 - [ ] Für jede Hochrisikoänderung ist ein Missbrauchsfall mit Erkennung beschrieben; Ausnahmen haben Eigentümer und Ablauf.
 
 ### 6.6 Datenschutz und Mitbestimmung
 - [ ] Zweck, Rechtsgrundlage, Empfänger und Schutzklasse neuer personenbezogener Felder stehen in der Rechtsgrundlagen-Matrix (ab 014).
-- [ ] Jede Rolle sieht nur die Felder, die ihr Zweck braucht; Identitätsdaten liegen getrennt von Fachinhalten (Personentabelle).
+- [ ] Jede Rolle sieht nur die Felder, die ihr Zweck braucht; Identitätsdaten liegen getrennt von Fachinhalten (Personentabelle); Betroffenenauskunft und Berichtigung bleiben möglich, ohne Nachweise umzuschreiben (Regel 7).
 - [ ] Logs, Fehlermeldungen und Testartefakte enthalten keine Fragetexte oder Personendaten; eine neue Auswertung erscheint im generierten Auswertungskatalog, eine Kennzahl je Person gibt es nicht.
 
 Ob der Betriebsrat zustimmt und der DSB die DSFA annimmt, ist **keine Merge-Bedingung je Scheibe**, sondern
@@ -241,7 +242,8 @@ Infrastruktur ohne Betriebsmodell.
 | Bühne oder anderer kritischer Arbeitsbildschirm | UX, Betrieb · Design-Kritik, Reviewer | e2e, Tastatur- und Fokusprüfung, Screenshot DE/EN, Fehlerzustand |
 
 Der Reviewer sieht nur Spec und Diff, also muss die Spec die Kriterien enthalten. Mehr als drei Hauptbefunde
-schärfen die Spec; nach einer erfolglosen Nacharbeitsrunde geht die Scheibe zurück an den Architekten (Plan 6.3).
+schärfen die Spec; nach einer Nacharbeitsrunde geht die Scheibe an den Planer zurück (meist ist die Spec falsch),
+nach zwei Runden wird sie gestoppt und an den Architekten zurückgegeben (Plan 6.3).
 
 ## 8. Abnahmehilfe
 
@@ -274,10 +276,9 @@ produktionsgleicher Umgebung; Betriebsvereinbarung; eingefrorene Konfiguration; 
 
 ## 10. Menschliche Prüfpunkte
 
-Die Prüfpunkte des Plans (Abschnitt 7) tragen die empfohlenen Gespräche: Zielarchitektur an 1 und 3,
-Referenzpfad und Administration an 3, Betrieb und Sicherheit mit Sicherheitsreview des Architekten an 3, 4 und 7,
-Abschluss in der Abnahme (079). Der Zwei-Stunden-Test einer neuen Entwicklerin läuft in 075; Stolperstellen
-sind Produktbefunde.
+Die Prüfpunkte des Plans (Abschnitt 7) tragen die empfohlenen Gespräche: Zielarchitektur an 1 und 3, Referenzpfad
+und Administration an 3, Sicherheitsreview des Architekten an 3, 4 und 7, Abschluss in der Abnahme (079). Der
+Zwei-Stunden-Test einer neuen Entwicklerin läuft in 075; Stolperstellen sind Produktbefunde.
 
 ## 11. Offene Entscheidungen
 
