@@ -4,6 +4,7 @@
  * covered. Everything runs through `HvApi`; every list refetches on `useApiVersion()`.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
@@ -139,13 +140,25 @@ export function CapturePage() {
 
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
-      <PageHeader title={t('page.capture.title')} description={t('page.capture.description')} />
-
-      {knowsCaptureRight && !canCapture && (
-        <p data-testid="capture-readonly-hint" className="text-2xs text-ink-600">
-          {t('capture.readonly.hint')}
-        </p>
-      )}
+      <PageHeader
+        title={t('page.capture.title')}
+        description={t('page.capture.description')}
+        {...(knowsCaptureRight && !canCapture
+          ? {
+              // m3 (review round 1): the header's own meta slot, next to the title — not a loose
+              // line that shifts the split pane below it.
+              actions: (
+                <span
+                  data-testid="capture-readonly-hint"
+                  className="flex items-center gap-1.5 text-[13px] text-ink-600"
+                >
+                  <Eye size={14} strokeWidth={1.75} aria-hidden="true" />
+                  {t('capture.readonly.hint')}
+                </span>
+              ),
+            }
+          : {})}
+      />
 
       <SplitPane
         storageKey="hv-capture-split-v1"

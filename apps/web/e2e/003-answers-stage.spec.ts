@@ -259,9 +259,12 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   const assignmentBadge = page.getByTestId('stage-assignment').locator('.hv-badge');
 
   const queueColor = await queueQuestionText.evaluate((el) => getComputedStyle(el).color);
+  // m9 (slice 020, review round 1): `NextPreview` no longer nests a `<p>` inside its `<button>`
+  // (no block element inside a button) — the question text is the second of its three direct
+  // `<span>` children (badge row, question text, speaker name).
   const nextPreviewColors = await nextPreview.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
-    text: getComputedStyle(el.querySelector('p')!).color,
+    text: getComputedStyle(el.children[1]!).color,
   }));
   const badgeColor = await assignmentBadge.evaluate((el) => getComputedStyle(el).color);
   console.log(`[007 rework] stage-contrast queue item text colour: ${queueColor}`);

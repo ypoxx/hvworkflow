@@ -154,11 +154,14 @@ export function StagePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const [stageOnly, setStageOnly] = useState<boolean>(() => loadStoredStageOnly() ?? false);
+  // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
+  // either layout (see the early return below) — not a silent stand-in for `false` any more.
+  const [stageOnly, setStageOnly] = useState<boolean | null>(loadStoredStageOnly);
   const [contrast, setContrast] = useState(loadStageContrast);
   // A plain, un-staged probe: the only reliable way to see `question.capture` (point #3/#9), which
   // is never gated by a transition and so shows up regardless of that one question's own status.
   const [probeActions, setProbeActions] = useState<readonly Permission[]>([]);
+  const [probeLoading, setProbeLoading] = useState(true);
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
@@ -191,9 +194,12 @@ export function StagePage() {
     api
       .listQuestions({ limit: 1 })
       .then((page) => {
-        if (!cancelled) setProbeActions(page.items[0]?._actions ?? []);
+        if (cancelled) return;
+        setProbeActions(page.items[0]?._actions ?? []);
+        setProbeLoading(false);
       })
       .catch(() => {
+        if (!cancelled) setProbeLoading(false);
         /* the default then simply falls back to whatever the Bühnenfragen already show */
       });
     return () => {
@@ -202,23 +208,32 @@ export function StagePage() {
   }, [version]);
 
   /**
-   * Point #3/#9: the default applies only once, and only until the person makes a conscious choice
-   * — the stored preference (`toggleStageOnly` below) always wins from then on.
+   * Point #3/#9 / m2 (review round 1): the default is derived exactly once. `stageOnly !== null`
+   * — a stored choice, or an earlier run of this very effect — stops it from running again; a
+   * later, conscious toggle always wins because it always writes a concrete `true`/`false`.
+   *
+   * A meeting with no question at all (the empty-meeting e2e fixture, or a brand new one) can
+   * never fill `actions` — nothing here is ever staged or captured, so neither fetch ever has a
+   * question to read `_actions` off. Once both have genuinely settled with nothing to show, the
+   * default falls back to the ordinary layout rather than leaving the page undecided forever.
    */
   useEffect(() => {
-    if (loadStoredStageOnly() !== null) return;
+    if (stageOnly !== null) return;
     const actions = [
       ...(stage?.current?._actions ?? []),
       ...(stage?.queue[0]?._actions ?? []),
       ...probeActions,
     ];
-    if (actions.length === 0) return;
-    if (stageOnlyByRights(actions)) setStageOnly(true);
-  }, [stage, probeActions]);
+    if (actions.length > 0) {
+      setStageOnly(stageOnlyByRights(actions));
+    } else if (!loading && !probeLoading) {
+      setStageOnly(false);
+    }
+  }, [stageOnly, stage, probeActions, loading, probeLoading]);
 
   const toggleStageOnly = useCallback(() => {
     setStageOnly((value) => {
-      const next = !value;
+      const next = !(value ?? false);
       try {
         localStorage.setItem(STAGE_ONLY_KEY, next ? '1' : '0');
       } catch {
@@ -316,6 +331,28 @@ export function StagePage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [deliver, returnOpen]);
+
+  /**
+   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, the same shape
+   * `loading` already uses, so a role whose default turns out to be "Nur Bühne" never flashes the
+   * ordinary shell first (design-prinzipien.md #8, "nichts springt").
+   */
+  if (stageOnly === null) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4" data-testid="stage-deciding">
+        <PageHeader title={t('page.stage.title')} description={t('page.stage.description')} />
+        <div
+          aria-busy="true"
+          aria-label={t('answers.list.loading')}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+        >
+          <div className="h-5 w-40 animate-pulse rounded-sm bg-ink-50" />
+          <div className="h-16 w-3/4 animate-pulse rounded-sm bg-ink-50" />
+          <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
+        </div>
+      </div>
+    );
+  }
 
   const view: StageView = stage ?? { current: null, queue: [], deliveredCount: 0, openCount: 0 };
 

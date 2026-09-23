@@ -98,17 +98,21 @@ function NextPreview({ question, onOpen }: { question: Question; onOpen: (q: Que
       // `background-color`, which very visibly races the Kontrastmodus colour swap (R9/007).
       className="mb-3 w-full rounded-md border border-line-strong bg-sunken p-3 text-left transition-[border-color] duration-100 hover:border-ink-300"
     >
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* m9 (review round 1): no block-level `<div>`/`<p>` inside a `<button>` — `<span>` with the
+       *  same layout classes renders identically and stays valid HTML. */}
+      <span className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
         {question.stageAssignment !== undefined && (
           <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
         )}
         {question.track !== undefined && <TrackBadge track={question.track} />}
-      </div>
-      <p className="mt-2 text-[18px] leading-6 font-medium text-ink-900">{question.text}</p>
-      <p className="mt-1 truncate text-2xs text-ink-500">
+      </span>
+      <span className="mt-2 block text-[18px] leading-6 font-medium text-ink-900">
+        {question.text}
+      </span>
+      <span className="mt-1 block truncate text-2xs text-ink-500">
         {question.speakerDisplayName ?? t('common.none')}
-      </p>
+      </span>
     </button>
   );
 }

@@ -99,28 +99,16 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.goto('/');
   await waitForCorpus(page);
 
-  /* =========================================================================================
-   * Point #3/#9 — "Nur Bühne" default derived from rights, never from a role name. This must be
-   * the very first thing this test does: a fresh browser context starts with no stored preference,
-   * and the derivation only ever applies once, before anyone has made a conscious choice.
-   * ========================================================================================= */
-  await asRole(page, 'expert'); // has drafting rights: never gets the podium-only default
+  // Point #3/#9 ("Nur Bühne" default, m2's "derive once" and its admin negative case) has its own,
+  // dedicated test below — the derivation only ever runs once per mount (m2), so it needs a fresh
+  // page per role to observe honestly, which does not fit this continuous walk-through. This test
+  // starts from an explicit, conscious choice instead (the same override 003/abnahme use, m8) so
+  // the sections below are decoupled from whichever role's derivation happened to run first.
+  await asRole(page, 'podium');
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
-  await expect(page.getByTestId('stage-current-number')).toBeVisible();
-  await expect(page.getByTestId('stage-only')).toHaveCount(0);
-
-  await asRole(page, 'podium'); // deliver, return, close, read only: derives "Nur Bühne"
   const overlay = page.getByTestId('stage-only');
-  await expect(overlay).toBeVisible();
-  await expect(page.getByTestId('stage-current-number')).toBeVisible();
-
-  await clearToasts(page);
-  await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: evidence('020-stage-nur-buehne-default-de.png') });
-
-  // A conscious choice always wins over the derived default (the spec's own words).
-  await page.getByTestId('stage-only-toggle').click();
   await expect(overlay).toHaveCount(0);
   await expect(page.getByTestId('stage-current-number')).toBeVisible();
 
@@ -230,13 +218,9 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   console.log(`[020] clock: font-size=${clockStyle.fontSize} weight=${clockStyle.fontWeight} color=${clockStyle.color}`);
   expect(Number.parseFloat(clockStyle.fontSize)).toBeLessThanOrEqual(12);
   expect(Number.parseFloat(clockStyle.fontWeight)).toBeLessThanOrEqual(500);
-  // "höchstens einmal je Minute": two readings a couple of seconds apart must (almost always)
-  // still agree — the old build repainted four times a second and this would flake constantly.
-  const firstReading = await clock.innerText();
-  await page.waitForTimeout(2_500);
-  const secondReading = await clock.innerText();
-  console.log(`[020] clock readings 2.5s apart: "${firstReading}" / "${secondReading}"`);
-  expect(secondReading).toBe(firstReading);
+  // m7 (review round 1): "höchstens einmal je Minute" itself is proven deterministically, with a
+  // mocked clock, in the dedicated test below — a 2.5s real-time sample here flaked at a minute
+  // boundary in CI (PR #13).
 
   /* =========================================================================================
    * Point #17 — the Wortmeldeliste's drag handle is visible without hovering it, and the "drag to
@@ -379,12 +363,24 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await asRole(page, 'observer'); // question.read only: no editing action on any question
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
+  // m3 (review round 1): the hint is suppressed for a question at rest (delivered/terminal) — the
+  // default row is any status, so pick a deliberately non-terminal one for this check.
+  await page.getByTestId('answers-filter-status-assigned').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'assigned');
   await page.getByTestId('answers-row').first().click();
   await expect(page.getByTestId('answers-detail')).toBeVisible();
   await expect(page.getByTestId('answers-readonly-hint')).toBeVisible();
   await expect(page.getByTestId('answers-readonly-hint')).toHaveText('In dieser Rolle nur lesen');
 
+  // m3: a question at rest explains itself through the status badge, with no hint underneath.
+  await page.getByTestId('answers-filter-status-closed').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'closed');
+  await page.getByTestId('answers-row').first().click();
+  await expect(page.getByTestId('answers-detail')).toBeVisible();
+  await expect(page.getByTestId('answers-readonly-hint')).toHaveCount(0);
+
   // Leerer Zustand: a search text that matches nothing in an 800-question corpus.
+  await page.getByTestId('answers-filter-status-all').click();
   await page.getByTestId('answers-search').fill('kein-treffer-020-rueckbau');
   await expect(page.getByText('Kein Treffer')).toBeVisible();
   await page.getByTestId('answers-search').fill('');
@@ -484,6 +480,79 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('020-stage-en.png') });
+});
+
+/**
+ * Point #3/#9 + m2 (review round 1) — "Nur Bühne" is derived from the actor's rights exactly once
+ * per mount, never from a role name. Each role below therefore gets its own fresh page: within one
+ * mount, only the first role's derivation runs (m2, "derive once"), so a second role switch in the
+ * same session would just inherit whatever the first one decided — not what any of these three
+ * checks are about.
+ */
+test('020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle', async ({ page }) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+
+  // Deliver, return, close, read only: derives "Nur Bühne".
+  await asRole(page, 'podium');
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-current-number')).toBeVisible();
+  await expect(page.getByTestId('stage-only')).toBeVisible();
+  await clearToasts(page);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('020-stage-nur-buehne-default-de.png') });
+
+  // m2's negative case: admin has `question.deliver` too, but also every drafting/classifying/
+  // capturing/approving action — the probe question (any status) reveals `question.capture`,
+  // which is enough on its own to keep the ordinary layout. A fresh navigation (not just a role
+  // switch, m2 "derive once") is needed to see this role's own derivation — but not to `/stage`
+  // itself, whose "Nur Bühne" overlay from the previous section would otherwise cover the very
+  // role switcher this needs next.
+  await page.goto('/speakers');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-current-number')).toBeVisible();
+  await expect(page.getByTestId('stage-only')).toHaveCount(0);
+
+  // A role with drafting rights and no `question.deliver` at all never gets the default either.
+  await page.goto('/speakers');
+  await waitForCorpus(page);
+  await asRole(page, 'expert');
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-current-number')).toBeVisible();
+  await expect(page.getByTestId('stage-only')).toHaveCount(0);
+});
+
+/**
+ * m7 (review round 1) — the clock's "at most once a minute" is deterministic here (`page.clock`),
+ * not a real-time sample: it flaked in CI exactly at a minute boundary (PR #13). Its own, small
+ * test, so a mocked clock never touches the corpus-seeding/preview/dialog timers of the main test.
+ */
+test('020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minutenwechsel', async ({
+  page,
+}) => {
+  // 08:15:30 UTC = 10:15:30 Europe/Berlin in September (CEST, UTC+2) — the clock reads the hall's
+  // wall clock (Clock.tsx's own `timeZone: 'Europe/Berlin'`), not this test runner's local time.
+  await page.clock.install({ time: new Date('2026-09-23T08:15:30.000Z') });
+  await page.goto('/');
+  await waitForCorpus(page);
+
+  const clock = page.getByTestId('clock-time');
+  const initial = await clock.innerText();
+  expect(initial).toBe('10:15');
+
+  // Jump to a moment still well inside the same minute (10:15:50) — margin on both sides of the
+  // fake clock's own rounding, deliberately away from the exact boundary.
+  await page.clock.pauseAt(new Date('2026-09-23T08:15:50.000Z'));
+  await expect(clock).toHaveText(initial);
+
+  // Jump past the minute change to 10:16:20 — one repaint, aligned to the minute, and no more.
+  await page.clock.pauseAt(new Date('2026-09-23T08:16:20.000Z'));
+  await expect(clock).toHaveText('10:16');
 });
 
 /* ===============================================================================================

@@ -4,6 +4,7 @@
  * card lives behind the explicit "Klassifizieren" action in `ClassifyDialog` now, rendered only when
  * `question._actions` allows it (AGENTS.md rule 4) — until slice 053 moves it to the Steuerungsansicht.
  */
+import { Tag } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { Button, StatusBadge, cx } from '../../components';
 import { actionLabel, useT } from '../../i18n';
@@ -39,12 +40,15 @@ export function QuestionCard({
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
         <StatusBadge status={question.status} />
         {mayClassify && (
+          // m4 (review round 1): "secondary" with a Tag icon reads as an action, not a label —
+          // "ghost" with plain text next to a status badge looked like one more piece of metadata.
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             data-testid="capture-classify-open"
             className="ml-auto"
             onClick={() => onClassify(question)}
+            icon={<Tag size={14} strokeWidth={1.75} aria-hidden="true" />}
           >
             {actionLabel(t, 'question.classify')}
           </Button>

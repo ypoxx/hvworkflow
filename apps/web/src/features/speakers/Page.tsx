@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import type { Announcements, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ListOrdered, Plus, TriangleAlert } from 'lucide-react';
+import { Eye, ListOrdered, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
@@ -294,19 +294,26 @@ export function SpeakersPage() {
 
   const empty = status !== 'loading' && view.length === 0;
 
+  // m3 (review round 1): the hint sits in the header's own meta slot, next to the title, the same
+  // place `registerButton` would go — not a loose line that pushes the rest of the page down.
+  const readOnlyHint = readOnly ? (
+    <span
+      data-testid="speakers-readonly-hint"
+      className="flex items-center gap-1.5 text-[13px] text-ink-600"
+    >
+      <Eye size={14} strokeWidth={1.75} aria-hidden="true" />
+      {t('speakers.readonly.hint')}
+    </span>
+  ) : undefined;
+  const headerMeta = registerButton ?? readOnlyHint;
+
   return (
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title={t('page.speakers.title')}
         description={t('page.speakers.description')}
-        {...(registerButton !== undefined ? { actions: registerButton } : {})}
+        {...(headerMeta !== undefined ? { actions: headerMeta } : {})}
       />
-
-      {readOnly && (
-        <p data-testid="speakers-readonly-hint" className="text-2xs text-ink-600">
-          {t('speakers.readonly.hint')}
-        </p>
-      )}
 
       {status === 'error' && view.length === 0 ? (
         <Panel bodyClassName="grid place-items-center">

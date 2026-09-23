@@ -41,7 +41,7 @@ export const speakersDe = {
   'speakers.action.move.title': 'Wortmeldung {number} in eine andere Runde verschieben',
   'speakers.action.capture.title': 'Redebeitrag von Wortmeldung {number} erfassen',
   'speakers.drag.label': 'Wortmeldung {number} verschieben',
-  'speakers.drag.hint': 'Zum Umsortieren am Griff ziehen.',
+  'speakers.drag.hint': 'Am Griff ziehen oder mit Leertaste anheben',
   'speakers.dnd.instructions': 'Leertaste hebt die Wortmeldung an. Mit den Pfeiltasten verschieben, mit der Leertaste ablegen, mit Esc abbrechen.',
   'speakers.dnd.lifted': 'Wortmeldung {number} angehoben, Position {position} von {count}.',
   'speakers.dnd.moved': 'Wortmeldung {number} steht auf Position {position} von {count}.',

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
 import { Link } from 'react-router';
 import type { DomainEvent, Question, Unit } from '@hv/domain';
+import { TERMINAL_STATUSES } from '@hv/domain';
 import {
   Badge,
   Button,
@@ -247,8 +248,14 @@ export function QuestionDetail({
    * Point #26 (feedback, slice 020): "Wieso kann ich hier nicht rein?" — a role without any editing
    * action for this question used to leave an empty command bar with no explanation. `_actions`
    * alone decides this, never the role name (AGENTS.md rule 4).
+   *
+   * m3 (review round 1): a question that has come to rest — delivered or one of the terminal
+   * statuses — offers nobody a next step, in any role; the StatusBadge already says so, so the hint
+   * would only repeat it. It is read from `question.status`, not inferred, the same way `hasSteps`'
+   * own comment already treats "come to rest" as a status fact.
    */
-  const mayEditAnything = hasSteps || mayDraft;
+  const atRest = question.status === 'delivered' || TERMINAL_STATUSES.includes(question.status);
+  const mayEditAnything = atRest || hasSteps || mayDraft;
 
   return (
     <Panel

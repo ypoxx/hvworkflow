@@ -56,6 +56,9 @@ export function RoundSection({
   const t = useT();
   const waiting = speakers.filter((s) => s.status === 'waiting').length;
   const finished = speakers.filter((s) => s.status === 'finished').length;
+  // m1 (review round 1): the drag hint is only true for a person who may actually reorder this
+  // round — `_actions` decides, never a role name (AGENTS.md rule 4).
+  const mayReorder = speakers.some((speaker) => speaker._actions.includes('speaker.reorder'));
 
   return (
     <section data-testid={`speakers-round-${round}`}>
@@ -63,7 +66,7 @@ export function RoundSection({
         padded={false}
         className={cx('shrink-0', current && 'border-line-strong')}
         title={
-          <div className="-my-1 flex w-full items-center gap-2 py-1">
+          <div className="-my-1 flex w-full flex-wrap items-center gap-2 py-1">
             <button
               type="button"
               onClick={onToggle}
@@ -103,12 +106,14 @@ export function RoundSection({
                 </span>
               )}
             </button>
-            {open && (
+            {open && mayReorder && (
               // Point #17 (feedback, slice 020): the drag hint now lives in every round's own head
-              // instead of once above the whole list, next to the round it actually reorders.
+              // instead of once above the whole list, next to the round it actually reorders. m1
+              // (review round 1): visible at every width now — `flex-wrap` on the row above moves
+              // it under the title instead of hiding it below `lg`.
               <span
                 data-testid={`round-drag-hint-${round}`}
-                className="hidden shrink-0 items-center gap-1 text-2xs text-ink-600 lg:flex"
+                className="flex shrink-0 items-center gap-1 text-2xs text-ink-600"
               >
                 <GripVertical size={12} strokeWidth={1.75} aria-hidden="true" />
                 {t('speakers.drag.hint')}
