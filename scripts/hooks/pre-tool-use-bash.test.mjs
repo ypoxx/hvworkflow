@@ -287,3 +287,22 @@ test('m2 red: a real .env path still blocks after the path-boundary fix', () => 
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\.env/);
 });
+
+// takt-006 review round 2 (major, ReDoS): an option's optional value could itself be the next `-x`
+// option, so a long run of global options without a following `push` backtracked exponentially
+// (38 options: 12 s). A value may no longer start with `-`; the scan stays linear.
+test('redos: 2000 global options without push return quickly and are not blocked', () => {
+  const started = Date.now();
+  const r = runCommand(`git${' -a'.repeat(2000)} x`);
+  const elapsed = Date.now() - started;
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(elapsed < 3000, `hook took ${elapsed} ms`);
+});
+
+test('redos: 2000 --a=b options followed by a force push still block quickly', () => {
+  const started = Date.now();
+  const r = runCommand(`git${' --a=b'.repeat(2000)} push -f origin main`);
+  const elapsed = Date.now() - started;
+  assert.equal(r.status, 2);
+  assert.ok(elapsed < 3000, `hook took ${elapsed} ms`);
+});

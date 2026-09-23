@@ -105,7 +105,10 @@ const EXISTING_PATTERNS = [
  * the engine first tries consuming `push` itself as that option's value, fails to find the required
  * literal `push` afterwards, and backtracks to not consuming a value — the correct reading — before
  * ever reporting a match; this needs no separate list of which options take a value and which do not. */
-const GIT_GLOBAL_OPTION_SRC = String.raw`-{1,2}[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\S+))?(?:\s+(?:"[^"]*"|'[^']*'|\S+))?`;
+// A separate value (after a space) must not start with `-`: otherwise the next option could also be
+// read as this option's value, and a long run of options without a following `push` backtracks
+// exponentially (takt-006 review round 2, ReDoS). With the restriction each token parses one way.
+const GIT_GLOBAL_OPTION_SRC = String.raw`-{1,2}[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\S+))?(?:\s+(?:"[^"]*"|'[^']*'|[^\s"'-]\S*))?`;
 
 /** `git`, then any number of global options (see `GIT_GLOBAL_OPTION_SRC`), then `push`. Review rework
  * round 1, M4: the original pattern only matched a literal `git push`. */
