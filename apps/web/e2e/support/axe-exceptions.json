@@ -1,0 +1,173 @@
+[
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": ".hv-label",
+    "location": "the label utility itself, used by every feature",
+    "reason": "The broadest entry in this list by far: every element carrying the shared .hv-label utility class, in every feature, matches. Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"header-meeting-title\"] p",
+    "location": "Header.tsx:62 (tagline/round line)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"lang-toggle\"] button",
+    "location": "LanguageToggle.tsx:33 (inactive DE/EN option)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "nav .ml-auto, nav .leading-4",
+    "location": "SideNav.tsx:80 (counters), SideNav.tsx:98 (demo hint)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "h1 + p",
+    "location": "PageHeader.tsx:20 (page description)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "section > header h2 + p, section > footer",
+    "location": "Panel.tsx:43 (panel description), Panel.tsx:51 (footer)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": ".border-t.bg-sunken > span.text-ink-500",
+    "location": "WorkList.tsx:527 (list count footer)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": ".border-dashed.bg-sunken .text-ink-400, .border-dashed.bg-sunken .text-ink-500",
+    "location": "EmptyState.tsx:24,30; QuestionsPane.tsx:78",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "div:has(> div > [data-testid=\"capture-coverage\"]) > p.text-ink-500",
+    "location": "CoverageBar.tsx:35 (Restabdeckung hint line — a sibling of the capture-coverage value, not its descendant)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01). Slice 013 follow-up 1: the bare class selector `.mt-1.text-2xs.text-ink-500` also matched AnswerEditor.tsx:69, Timeline.tsx:132 and speakers/fields.tsx:32, which share the same class combination but are unrelated hint lines — this selector is scoped to CoverageBar's own root (the only one that also contains a `capture-coverage` descendant) so it no longer reaches them.",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"capture-question-card\"] .text-ink-500",
+    "location": "QuestionCard.tsx:40",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": ".items-end.gap-1\\.5 .text-ink-500",
+    "location": "ContributionPane.tsx:245,248",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid^=\"speakers-round-\"] .text-ink-400, [data-testid^=\"speakers-round-\"] .text-ink-500",
+    "location": "RoundSection.tsx:85,100,133; SpeakerRow.tsx (number/org/state columns of every row)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": ".min-h-\\[104px\\] .text-ink-500",
+    "location": "NowSpeaking.tsx:29,37,74,146,153 (\"Am Mikrofon\"/\"Nächster Aufruf\" cards)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"answer-version\"] .text-ink-400, [data-testid=\"answer-version\"] .text-ink-500",
+    "location": "QuestionDetail.tsx:144,146,147 (version head: \"aktuell\", author, age)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"stage-current\"] .text-ink-500",
+    "location": "Podium.tsx (current card's speaker line, the \"no answer yet\" italic line)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"stage-next-preview\"] .text-ink-500",
+    "location": "Podium.tsx (NextPreview number/name, predates slice 020 — 438f105f)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"stage-queue\"] p",
+    "location": "Podium.tsx (queue's own \"leer\"/\"weitere\" hints — the only <p> elements in that subtree)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid=\"answers-row\"] .text-ink-400, [data-testid=\"answers-row\"] .text-ink-500",
+    "location": "WorkList.tsx:185,191,200,201 (row cells)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  },
+  {
+    "id": "AX-020-01",
+    "rule": "color-contrast",
+    "selector": "[data-testid^=\"answers-filter-status-\"] .text-ink-400",
+    "location": "WorkList.tsx:80 (filter chip counts)",
+    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "expires": "2026-12-31",
+    "owner": "Umsetzer"
+  }
+]

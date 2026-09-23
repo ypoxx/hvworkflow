@@ -13,6 +13,7 @@
  * history proves every one of those steps afterwards.
  */
 import { expect, test } from '@playwright/test';
+import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
@@ -105,6 +106,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
 
   await speakerRow.getByTestId('speaker-call').click();
   await expect(speakerRow).toHaveAttribute('data-status', 'speaking');
+  await checkAxe(page, 'speakers (Abnahme, Wortmeldung am Mikrofon)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -156,6 +158,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
 
   const questionNumber = (await card.getAttribute('data-number')) ?? '';
   expect(questionNumber).not.toEqual('');
+  await checkAxe(page, 'capture (Abnahme, klassifiziert)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -182,6 +185,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await findAndOpen(page, questionNumber);
   await page.getByTestId('answer-assign').click();
   await page.getByTestId('answer-assign-unit').selectOption({ index: 0 });
+  await checkAxe(page, 'answers (Abnahme, Zuweisungsdialog offen)');
   await page.getByTestId('answer-assign-submit').click();
   await expect(page.getByTestId('answers-detail')).toContainText('zugewiesen');
 
@@ -207,6 +211,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await expect(approvalBlock).toBeVisible();
   await expect(approvalBlock).toContainText('1');
   await expect(approvalBlock).toContainText('Version 1');
+  await checkAxe(page, 'answers (Abnahme, freigegeben)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -255,6 +260,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   const answerBlock = page.getByTestId('stage-answer');
   await expect(answerBlock).toHaveAttribute('data-prepared', 'true');
   await expect(answerBlock).toContainText(ANSWER_TEXT);
+  await checkAxe(page, 'stage (Abnahme, vorbereitete Antwort)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -288,6 +294,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
       timeline.locator(`[data-testid="history-event"][data-type="${type}"]`),
     ).toHaveCount(1);
   }
+  await checkAxe(page, 'history (Abnahme, Zeitleiste)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);

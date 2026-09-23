@@ -64,7 +64,9 @@ export function MoveDialog({
       {speaker !== null && (
         <div className="grid gap-3">
           <p className="text-[13px] text-ink-700">
-            <span className="font-mono text-ink-500">{speaker.number}</span> {speaker.displayName}
+            {/* Slice 013 (axe, goal 1): ink-500 fell under 4.5:1 on this surface; the surrounding
+             * text is already ink-700, so the number takes the same, already-used tone. */}
+            <span className="font-mono text-ink-600">{speaker.number}</span> {speaker.displayName}
           </p>
           <Field label={t('speakers.field.round')} htmlFor={`${ids}-round`}>
             <select

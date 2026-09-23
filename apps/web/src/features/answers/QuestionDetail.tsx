@@ -451,8 +451,11 @@ export function QuestionDetail({
 
           <div className="space-y-2">
             <span className="hv-label">{t('answers.versions.title')}</span>
+            {/* Slice 013 (axe, goal 1): ink-500 measured 3.74:1 here — below 4.5:1. ink-600 is an
+             * existing token elsewhere in the same panel (e.g. the lapsed-approval hint above) and
+             * clears WCAG AA at this size. */}
             {question.answers.length === 0 ? (
-              <p className="rounded-md border border-dashed border-line-strong bg-sunken px-3 py-3 text-[13px] text-ink-500">
+              <p className="rounded-md border border-dashed border-line-strong bg-sunken px-3 py-3 text-[13px] text-ink-600">
                 {question.track === 'podium'
                   ? t('answers.versions.podium')
                   : t('answers.versions.empty.body')}

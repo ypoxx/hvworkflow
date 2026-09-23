@@ -8,6 +8,7 @@
  * `_actions` offered it.
  */
 import { expect, test } from '@playwright/test';
+import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
@@ -79,6 +80,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
     'href',
     /\/capture\?speaker=/,
   );
+  await checkAxe(page, 'answers (assigned, Fachbereich)');
 
   await page
     .getByTestId('answer-editor')
@@ -105,6 +107,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   const approval = page.getByTestId('approval-block');
   await expect(approval).toContainText('Freigegeben');
   await expect(approval).toContainText('Version 1');
+  await checkAxe(page, 'answers (approved, Recht)');
 
   // Still legal: another answer goes back for rework — a return is impossible without a reason.
   await page.getByTestId('answers-filter-status-in_review').click();
@@ -113,6 +116,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page
     .getByTestId('answer-return-reason')
     .fill('Bitte die Zahl mit dem Geschäftsbericht abgleichen und die Quelle nennen.');
+  await checkAxe(page, 'answers (Rückgabe-Dialog offen)');
   await page.getByTestId('answer-return-submit').click();
   await expect(page.getByTestId('answers-detail')).toContainText('Antwortentwurf');
 
@@ -149,6 +153,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   // The seeded version 1 is arbitrary prose; only what this test itself typed is a safe fixture.
   await expect(diff.locator('.line-through').first()).toBeVisible();
   await expect(diff.locator('.underline').first()).toContainText('Ergänzte');
+  await checkAxe(page, 'answers (Freigabe erloschen, Diff geöffnet)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -168,6 +173,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await asRole(page, 'approver');
   await page.getByTestId('answer-stage').click();
   await expect(page.getByTestId('answers-detail')).toContainText('auf der Bühne');
+  await checkAxe(page, 'answers (auf der Bühne, Freigabe)');
 
   // The backlog as it is really read: every status in one list, one question open beside it.
   // The search is debounced, so wait until the whole corpus is back in the list.
@@ -198,6 +204,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   // Nächste Frage vorbereiten (point 7): the first queue item is its own, larger "Als Nächstes" card.
   await expect(page.getByTestId('stage-next-preview')).toBeVisible();
   await expect(page.getByTestId('stage-queue-item').first()).toBeVisible();
+  await checkAxe(page, 'stage (Podium, aktuelle Frage)');
 
   const readOutOnce = async (): Promise<void> => {
     const before = await currentNumber.innerText();
@@ -240,6 +247,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('003-stage-only.png') });
+  await checkAxe(page, 'stage (Nur Bühne)');
 
   // Kontrastmodus (point 6): offered only inside "Nur Bühne", flips the overlay to the dark scope.
   const contrastToggle = page.getByTestId('stage-contrast-toggle');
@@ -284,6 +292,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('007-stage-contrast.png') });
+  await checkAxe(page, 'stage (Nur Bühne, Kontrastmodus)');
   await contrastToggle.click();
   await expect(overlay).not.toHaveClass(/stage-contrast/);
 
@@ -322,6 +331,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await expect(kpi).toContainText('Versionen');
   await expect(kpi).toContainText('Rückgaben');
   await expect(timeline.getByTestId('history-duration').first()).toBeVisible();
+  await checkAxe(page, 'history (Zeitleiste)');
 
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);
@@ -336,4 +346,5 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
 
   // Lastkurve (point 9): a sparkline of events per five-minute bucket, above the event list.
   await expect(page.getByTestId('history-sparkline')).toBeVisible();
+  await checkAxe(page, 'history (Ereignisstrom)');
 });
