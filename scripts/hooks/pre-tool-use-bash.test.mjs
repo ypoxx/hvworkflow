@@ -376,3 +376,14 @@ test('codex round 5 green: --repo=origin counts as the repository', () => {
 test('codex round 5 red: an ambiguous abbreviation (--f) is blocked (git refuses it anyway)', () => {
   assert.equal(runCommand('git push --f origin main').status, 2);
 });
+
+// takt-006 Codex round 6: a later --no-X switches X off again, as git does.
+test('codex round 6 green: --delete --no-delete, --mirror --no-mirror, -f --no-force pass', () => {
+  assert.equal(runCommand('git push --delete --no-delete origin topic').status, 0);
+  assert.equal(runCommand('git push --mirror --no-mirror origin topic').status, 0);
+  assert.equal(runCommand('git push -f --no-force origin topic').status, 0);
+});
+
+test('codex round 6 red: --no-delete --delete still deletes (the later one wins)', () => {
+  assert.equal(runCommand('git push --no-delete --delete origin topic').status, 2);
+});

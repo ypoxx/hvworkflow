@@ -195,8 +195,10 @@ function parsePushArgs(words) {
       if (!resolved) continue; // unknown option: git refuses it; nothing to classify
       const { spec, negated } = resolved;
       if (spec.value === 'required' && !inline && !negated) i++; // the value is the next word
-      if (spec.kind === 'repo' && !negated) repoOption = true;
-      else if (spec.kind && !negated) kinds.add(spec.kind);
+      // Later arguments win, as in git: `--delete --no-delete` ends with delete off (Codex round 6).
+      if (spec.kind === 'repo') repoOption = !negated;
+      else if (spec.kind && negated) kinds.delete(spec.kind);
+      else if (spec.kind) kinds.add(spec.kind);
       continue;
     }
     if (word.startsWith('-') && word.length > 1) {
