@@ -102,7 +102,7 @@ export function ClassifyDialog({
       {question !== null && (
         <div className="grid gap-3">
           <p className="text-[13px] leading-6 text-ink-700">
-            <span className="font-mono text-ink-500">{question.number}</span> {question.text}
+            <span className="font-mono text-ink-600">{question.number}</span> {question.text}
           </p>
           <div>
             <span className="hv-label">{t('capture.classify.track')}</span>

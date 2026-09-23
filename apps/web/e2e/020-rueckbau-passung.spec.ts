@@ -5,8 +5,9 @@
  * views and the three empty states this slice is responsible for.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { seedEvents } from '@hv/domain';
+import { project, seedEvents } from '@hv/domain';
 import { expect, test } from '@playwright/test';
+import type { DomainEvent } from '@hv/domain';
 import type { Page } from '@playwright/test';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
@@ -47,6 +48,36 @@ async function eventLogLength(page: Page): Promise<number> {
   });
 }
 
+/**
+ * Minor (review round 2): `saveLog` (`src/api/index.ts:32`) debounces the write to `localStorage` by
+ * 150ms after the last event, so reading `eventLogLength` right away can observe a stale count —
+ * either side of the debounce window. Samples twice, 220ms apart (comfortably past the debounce),
+ * and only trusts the count once it reads the same both times.
+ */
+async function stableEventLogLength(page: Page): Promise<number> {
+  let previous = await eventLogLength(page);
+  for (;;) {
+    await page.waitForTimeout(220);
+    const current = await eventLogLength(page);
+    if (current === previous) return current;
+    previous = current;
+  }
+}
+
+/** The previewed question's own `status`, read directly off the projected domain state — not off
+ *  whatever a view happens to render for it — so B1's "no state change" claim is not only "the
+ *  counters and the current card look the same" but "this exact question truly did not move". */
+async function questionStatus(page: Page, number: string): Promise<string | undefined> {
+  const raw = await page.evaluate(() => window.localStorage.getItem('hv-demo-events-v1'));
+  if (raw === null) return undefined;
+  const events = JSON.parse(raw) as DomainEvent[];
+  const state = project(events);
+  for (const question of state.questions.values()) {
+    if (question.number === number) return question.status;
+  }
+  return undefined;
+}
+
 /** The queue's own order, by number — a stable fingerprint that a delivered/returned question would
  *  disturb (it would leave the list, shifting everything behind it). */
 async function queueNumbers(page: Page): Promise<string[]> {
@@ -64,33 +95,102 @@ async function waitForCorpus(page: Page): Promise<void> {
 }
 
 /**
- * 0 "serious" or "critical" axe violations on the given scope; every other impact is reported only.
+ * Named exception AX-020-01 (review round 1, sharpened in round 2). The muted end of the house grey
+ * ramp (`--color-ink-400`/`-500`, `apps/web/src/styles/index.css`) measures 2.48:1 / ~3.7–3.9:1
+ * against white, short of the 4.5:1 a text colour needs — across the whole product since slices
+ * 001/002/003/007, not something this slice touched or was scoped to fix (`styles/index.css` is
+ * allowed here only for point 11).
  *
- * Named exception AX-020-01 (review round 1, replaces the blanket `disableRules(['color-contrast'])`
- * of the first pass): the muted end of the house grey ramp (`--color-ink-400`/`-500`,
- * `apps/web/src/styles/index.css`) measures 2.48:1 / ~3.7–3.9:1 against white, short of the 4.5:1 a
- * text colour needs. It is the colour of `.hv-label`, of `EmptyState`/`Panel` secondary text, of the
- * navigation's own counters and the demo hint — carried as the `text-ink-400`/`text-ink-500` utility
- * classes directly wherever it is not `.hv-label` — across the whole product since slice 001/002, not
- * something this slice touched or was scoped to fix (`styles/index.css` is allowed here only for
- * point 11). `color-contrast` therefore runs with every other rule, `.exclude()`-scoped to exactly
- * those three pre-existing selectors; every element this slice itself added or restyled (clock,
- * "noch n", hints, dialogs) is checked by the same rule like everything else. Registered under
- * "Offen" in the spec: expires with the colour-token slice, 2026-12-31 at the latest.
+ * Round 1 excluded it by bare class (`.exclude('.text-ink-500')`), which also hid *new* slice-020
+ * elements that happened to reuse the class. Round 2 (re-review M4) replaces that with one selector
+ * per pre-existing component, named below with its file:line so the list is auditable and cannot
+ * silently grow — every selector is scoped to the component's own container or a class combination
+ * unique to it, never the bare `.text-ink-400`/`.text-ink-500` utility alone. Elements this slice
+ * itself introduced or restyled are not on this list and are checked like everything else — the
+ * three the re-review named (`Podium.tsx` preview number/no-answer line, `ClassifyDialog.tsx` question
+ * number) and one more the stricter methodology surfaced on its own (`Podium.tsx`'s `QueueItem`,
+ * `ed648aa4`, this slice's own queue row) are fixed to `ink-600`/`ink-700` instead of listed here.
+ *
+ *   `.hv-label`                                          — the label utility itself (every feature)
+ *   `[data-testid="header-meeting-title"] p`             — Header.tsx:62 (tagline/round line)
+ *   `[data-testid="lang-toggle"] button`                 — LanguageToggle.tsx:33 (inactive DE/EN)
+ *   `nav .ml-auto, nav .leading-4`                       — SideNav.tsx:80 (counters), :98 (demo hint)
+ *   `h1 + p`                                              — PageHeader.tsx:20 (page description)
+ *   `section > header h2 + p, section > footer`          — Panel.tsx:43 (panel description), :51 (footer)
+ *   `.border-t.bg-sunken > span.text-ink-500`            — WorkList.tsx:527 (list count footer)
+ *   `.border-dashed.bg-sunken .text-ink-400/-500`        — EmptyState.tsx:24,30; QuestionsPane.tsx:78
+ *   `.mt-1.text-2xs.text-ink-500`                         — CoverageBar.tsx:35 (coverage hint line,
+ *                                                           a sibling of the `capture-coverage` value,
+ *                                                           not its descendant)
+ *   `[data-testid="capture-question-card"] .text-ink-500`— QuestionCard.tsx:40
+ *   `.items-end.gap-1\.5 .text-ink-500`                  — ContributionPane.tsx:245,248
+ *   `[data-testid^="speakers-round-"] .text-ink-400/-500`— RoundSection.tsx:85,100,133; SpeakerRow.tsx
+ *                                                           (number/org/state columns of every row)
+ *   `.min-h-\[104px\] .text-ink-500`                     — NowSpeaking.tsx:29,37,74,146,153 ("Am
+ *                                                           Mikrofon"/"Nächster Aufruf" cards)
+ *   `[data-testid="answer-version"] .text-ink-400/-500`  — QuestionDetail.tsx:144,146,147 (version
+ *                                                           head: "aktuell", author, age)
+ *   `[data-testid="stage-current"] .text-ink-500`        — Podium.tsx (current card's speaker line,
+ *                                                           the "no answer yet" italic line)
+ *   `[data-testid="stage-next-preview"] .text-ink-500`   — Podium.tsx (NextPreview number/name,
+ *                                                           predates this slice — `438f105f`)
+ *   `[data-testid="stage-queue"] p`                      — Podium.tsx (queue's own "leer"/"weitere"
+ *                                                           hints; the only `<p>`s in that subtree)
+ *   `[data-testid="answers-row"] .text-ink-400/-500`     — WorkList.tsx:185,191,200,201 (row cells)
+ *   `[data-testid^="answers-filter-status-"] .text-ink-400` — WorkList.tsx:80 (filter chip counts)
+ *
+ * Registered under "Offen" in the spec: expires with the colour-token slice, 2026-12-31 at the latest.
+ */
+const AX_020_01_SELECTORS: readonly string[] = [
+  '.hv-label',
+  '[data-testid="header-meeting-title"] p',
+  '[data-testid="lang-toggle"] button',
+  'nav .ml-auto, nav .leading-4',
+  'h1 + p',
+  'section > header h2 + p, section > footer',
+  '.border-t.bg-sunken > span.text-ink-500',
+  '.border-dashed.bg-sunken .text-ink-400, .border-dashed.bg-sunken .text-ink-500',
+  '.mt-1.text-2xs.text-ink-500',
+  '[data-testid="capture-question-card"] .text-ink-500',
+  '.items-end.gap-1\\.5 .text-ink-500',
+  '[data-testid^="speakers-round-"] .text-ink-400, [data-testid^="speakers-round-"] .text-ink-500',
+  '.min-h-\\[104px\\] .text-ink-500',
+  '[data-testid="answer-version"] .text-ink-400, [data-testid="answer-version"] .text-ink-500',
+  '[data-testid="stage-current"] .text-ink-500',
+  '[data-testid="stage-next-preview"] .text-ink-500',
+  '[data-testid="stage-queue"] p',
+  '[data-testid="answers-row"] .text-ink-400, [data-testid="answers-row"] .text-ink-500',
+  '[data-testid^="answers-filter-status-"] .text-ink-400',
+];
+
+/**
+ * Two passes, both required to be clean (M4, review round 2): (a) every rule except colour, on the
+ * whole page — nothing this slice added is hidden from button-name/aria/etc. checks any more; (b)
+ * colour alone, scoped to exactly the pre-existing debt named in AX-020-01 above.
  */
 async function assertNoSeriousViolations(page: Page, label: string): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .exclude('.hv-label')
-    .exclude('.text-ink-500')
-    .exclude('.text-ink-400')
-    .analyze();
-  const serious = results.violations.filter(
+  let builder = new AxeBuilder({ page }).disableRules(['color-contrast']);
+  const other = await builder.analyze();
+  const otherSerious = other.violations.filter(
     (v) => v.impact === 'serious' || v.impact === 'critical',
   );
   console.log(
-    `[axe] ${label}: ${results.violations.length} violation group(s), ${serious.length} serious/critical`,
+    `[axe] ${label} (a, non-colour): ${other.violations.length} violation group(s), ` +
+      `${otherSerious.length} serious/critical`,
   );
-  expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  expect(otherSerious, JSON.stringify(otherSerious, null, 2)).toEqual([]);
+
+  builder = new AxeBuilder({ page }).withRules(['color-contrast']);
+  for (const selector of AX_020_01_SELECTORS) builder = builder.exclude(selector);
+  const contrast = await builder.analyze();
+  const contrastSerious = contrast.violations.filter(
+    (v) => v.impact === 'serious' || v.impact === 'critical',
+  );
+  console.log(
+    `[axe] ${label} (b, colour, AX-020-01 scoped): ${contrast.violations.length} violation group(s), ` +
+      `${contrastSerious.length} serious/critical`,
+  );
+  expect(contrastSerious, JSON.stringify(contrastSerious, null, 2)).toEqual([]);
 }
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -124,7 +224,7 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   const deliveredBefore = await digitsOf(page, 'stage-counter-delivered');
   const openCounterBefore = await digitsOf(page, 'header-counter-open');
   const stagedCounterBefore = await digitsOf(page, 'header-counter-staged');
-  const eventsBefore = await eventLogLength(page);
+  const eventsBefore = await stableEventLogLength(page);
   const queueBefore = await queueNumbers(page);
 
   const remaining = await digitsOf(page, 'stage-queue-remaining');
@@ -141,11 +241,14 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.getByTestId('stage-next-preview').click();
   const preview = page.getByTestId('stage-preview');
   await expect(preview).toBeVisible();
+  const previewedNumber = await page.getByTestId('stage-preview-number').innerText();
   await expect(page.getByTestId('stage-preview-number')).not.toBeEmpty();
   await expect(page.getByTestId('stage-preview-text')).not.toBeEmpty();
   await expect(page.getByTestId('stage-preview-answer')).not.toBeEmpty();
   // M6: the one-line "read only" note is the dialog's own description, next to its title.
   await expect(page.getByRole('dialog', { name: 'Vorschau' })).toContainText('Nur ansehen');
+  const previewedStatusBefore = await questionStatus(page, previewedNumber);
+  expect(previewedStatusBefore).toBeDefined();
 
   /* =========================================================================================
    * B1 (review round 1, blocker) — the preview is a dialog and must own the keyboard exactly like
@@ -159,7 +262,10 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await expect(page.getByTestId('stage-return-reason')).toHaveCount(0); // no return dialog opened
   await expect(currentNumber).toHaveText(currentBefore);
   expect(await digitsOf(page, 'stage-counter-delivered')).toBe(deliveredBefore);
-  expect(await eventLogLength(page)).toBe(eventsBefore);
+  expect(await stableEventLogLength(page)).toBe(eventsBefore);
+  // Minor (review round 2): not only "the counters look the same" — the previewed question's own
+  // `status`, read directly off the projected event log, truly did not move either.
+  expect(await questionStatus(page, previewedNumber)).toBe(previewedStatusBefore);
 
   await page.keyboard.press('Escape');
   await expect(preview).toBeHidden();
@@ -172,7 +278,8 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   expect(await digitsOf(page, 'header-counter-open')).toBe(openCounterBefore);
   expect(await digitsOf(page, 'header-counter-staged')).toBe(stagedCounterBefore);
   expect(await queueNumbers(page)).toEqual(queueBefore);
-  expect(await eventLogLength(page)).toBe(eventsBefore);
+  expect(await questionStatus(page, previewedNumber)).toBe(previewedStatusBefore);
+  expect(await stableEventLogLength(page)).toBe(eventsBefore);
 
   // The keyboard path: a compact row also opens the preview on Enter, unchanged in every way.
   // D8 (documented in the Bericht): closing with Escape returns focus to the row that opened it,

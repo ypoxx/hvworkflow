@@ -134,7 +134,9 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
         className="flex w-full items-start gap-2.5 py-2 text-left hover:bg-ink-50"
       >
         <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
-          <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
+          {/* Nachschärfung Runde 2 (M4): this row is slice 020's own (`ed648aa4`), not a
+           *  pre-existing spot — ink-600/ink-700 read at 7:1+/9:1+, not the 3.7–3.9:1 of ink-500/400. */}
+          <span className="font-mono text-2xs tabular-nums text-ink-600">{question.number}</span>
           {question.stageAssignment !== undefined && (
             <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
           )}
@@ -146,7 +148,7 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
             </span>
           )}
           <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
-          <span className="mt-0.5 block truncate text-2xs text-ink-400">
+          <span className="mt-0.5 block truncate text-2xs text-ink-700">
             {question.speakerDisplayName ?? t('common.none')}
           </span>
         </span>
@@ -294,7 +296,7 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
         // to be on) would not swallow either.
         <div data-testid="stage-preview" className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[13px] text-ink-500" data-testid="stage-preview-number">
+            <span className="font-mono text-[13px] text-ink-600" data-testid="stage-preview-number">
               {question.number}
             </span>
             {question.stageAssignment !== undefined && (
@@ -313,7 +315,7 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
             <span className="hv-label">{t('stage.answer.label')}</span>
             <p
               data-testid="stage-preview-answer"
-              className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-500 italic')}
+              className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-600 italic')}
               style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
             >
               {answer !== undefined

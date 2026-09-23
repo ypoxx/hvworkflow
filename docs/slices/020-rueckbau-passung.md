@@ -1,6 +1,6 @@
 # 020 — Oberfläche: Rückbau und Passung (S-Punkte der Projektleitung)
 
-**Status:** review (Nacharbeitsrunde 1)
+**Status:** review (Nachschärfung Runde 2)
 **Risikoklasse:** niedrig · 2 AStd · Kalender 02.10.2026 (W1) · Lanes: web-answers, web-capture, web-stage,
 web-history, web-speakers, web-shell (+ e2e: eigene Datei und, nur wo diese Spec es verlangt, die Alt-Specs;
 deshalb läuft 013 nicht gleichzeitig)
@@ -345,6 +345,101 @@ Offen (Runde 1, zusätzlich zu den bereits genannten Punkten):
   (Kindindex statt `querySelector('p')` in der Kontrastmodus-Farbprüfung), erzwungen durch m9s
   „kein Blockelement in einem Button“ — eine Zeile, im Commit-Text begründet.
 
+### Nacharbeit Runde 2 (Re-Review, Plan 6.3: sharpen, do not retry)
+
+Befund → Erledigung:
+
+| Befund | Erledigung |
+|---|---|
+| M4 (verbleibend) axe-Ausnahme zu grob — `.exclude('.text-ink-500')`/`.exclude('.text-ink-400')` blendete alle neuen 020-Elemente aus, nicht nur die vorbestehenden | `assertNoSeriousViolations` läuft jetzt zweiphasig: (a) `disableRules(['color-contrast'])` ohne jede Ausnahme — alle anderen Regeln (aria, button-name, landmark, …) prüfen jetzt auch das, was vorher ausgeblendet war; (b) nur `color-contrast`, mit `.exclude()` je Selektor für exakt die vorbestehenden Fundstellen, benannt mit Datei:Zeile im Quelltext-Kommentar über `AX_020_01_SELECTORS` (17 gezielte Selektoren, keine bloße `.text-ink-*`-Klasse allein) |
+| Drei neue 020-Texte in ink-500/-400 | `Podium.tsx` Vorschau-Nummer (`stage-preview-number`) und die „keine Antwort“-Zeile → `ink-600`; `ClassifyDialog.tsx` Fragen-Nummer → `ink-600` |
+| `SpeakerRow.tsx:105` (Griff-Knopf) unter Durchlauf (a) geprüft | 0 Verstöße (Icon-only-Button ohne sichtbaren Textknoten; `color-contrast` greift dort nicht) — nichts zu beheben |
+| Die strengere Methodik selbst deckte eine vierte, nicht benannte Stelle auf: `Podium.tsx`s `QueueItem` (Nummer/Name der Warteschlangenzeile) ist selbst Scheibe-020-Code (`ed648aa4`), keine vorbestehende Stelle — gehört daher nicht unter AX-020-01 | Nummer → `ink-600`, Name → `ink-700`, mit Kommentar im Quelltext, der das von der Vorschau (`NextPreview`, vorbestehend) unterscheidet |
+| Event-Log-Timing-Race — `eventLogLength` liest sofort, `saveLog` schreibt erst 150ms später (`src/api/index.ts:32`) | neue `stableEventLogLength()`: zwei Messungen im Abstand von 220ms, erst bei Gleichstand vertraut; zusätzlich `questionStatus()` liest den Status der vorgeschauten Frage direkt aus der projizierten Domäne (`project()` aus `@hv/domain`), nicht nur aus Zählern/Fingerabdrücken |
+
+Rot/Grün: beim Aufbau der Selektorliste für Durchlauf (b) fielen zunächst mehrere vorbestehende
+Stellen durch das Raster, weil ihr `data-testid`-Umschluss nicht deckungsgleich mit dem
+DOM-Bereich war, der tatsächlich verstößt (Testfehler in der Selektorwahl, kein Produktfehler):
+1. `NowSpeaking.tsx` („Am Mikrofon“/„Nächster Aufruf“, Slice 002) hatte keinen umschließenden
+   `data-testid`; über `.min-h-\[104px\]` (die gemeinsame `Panel`-Klasse beider Karten) nachgerüstet.
+2. `QuestionDetail.tsx`s Versionskopf („aktuell“, Autor, Alter, Slice 003) lag unter
+   `[data-testid="answer-version"]`, das zunächst gar nicht in der Liste stand.
+3. `CoverageBar.tsx`s Hinweiszeile (Slice 002) liegt als Geschwister, nicht als Nachfahre, des
+   `capture-coverage`-Elements; die erste Fassung scopte fälschlich auf den Nachfahren-Kombinator
+   und traf nichts — durch die konkrete Klassenkombination `.mt-1.text-2xs.text-ink-500` ersetzt.
+
+Jede der 17 Selektoren wurde per `git blame` gegen slice 020 geprüft und liegt vor `ed648aa4`
+(dieser Scheibe eigenem ersten Commit) — siehe Quelltext-Kommentar über `AX_020_01_SELECTORS` in
+`020-rueckbau-passung.spec.ts` für die vollständige, mit Datei:Zeile benannte Liste.
+
+Playwright, voller Lauf `apps/web`, `E2E_PORT=4444 pnpm exec playwright test --reporter=list`, alle
+neun Szenarien grün:
+```
+✓  001-shell.spec.ts:16   shell: counters, role switch, language switch @screenshot (2.4s)
+✓  001-shell.spec.ts:75   header strip on the answers desk @screenshot (1.6s)
+✓  002-speakers-capture.spec.ts:61   speakers list and capture desk @screenshot (7.0s)
+✓  020-rueckbau-passung.spec.ts:198  020: Rückbau und Passung — points 1–9, axe on the five views (18.6s)
+✓  020-rueckbau-passung.spec.ts:599  020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle (4.0s)
+✓  020-rueckbau-passung.spec.ts:642  020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minutenwechsel (1.0s)
+✓  020-rueckbau-passung.spec.ts:682  020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschlange (3.4s)
+✓  003-answers-stage.spec.ts:43      backlog, approval, podium and history @screenshot (43.7s)
+✓  abnahme.spec.ts:86  @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (35.6s)
+
+9 passed (1.2m)
+```
+
+axe, beide Durchläufe je Ansicht (Durchlauf a: alle Regeln außer `color-contrast`, keine Ausnahme;
+Durchlauf b: nur `color-contrast`, AX-020-01-Selektoren ausgeschlossen):
+
+| Ansicht | (a) Verstöße / serious | (b) Verstöße / serious |
+|---|---|---|
+| stage (podium, mit Vorschau) | 2 (moderate: `landmark-no-duplicate-banner`, `landmark-unique`, vorbestehend im gemeinsamen `Dialog`-Bauteil) / 0 | 0 / 0 |
+| speakers (moderation) | 0 / 0 | 0 / 0 |
+| capture (capture desk) | 0 / 0 | 0 / 0 |
+| answers (expert, answer_drafted) | 0 / 0 | 0 / 0 |
+| capture (leerer Zustand) | 0 / 0 | 0 / 0 |
+| stage (leerer Zustand) | 0 / 0 | 0 / 0 |
+
+`pnpm gates`-Ende (voller Lauf nach Runde 2, grün):
+```
+packages/domain test:  Test Files  4 passed (4)
+packages/domain test:       Tests  39 passed (39)
+apps/web test:  Test Files  3 passed (3)
+apps/web test:       Tests  35 passed (35)
+apps/api test:  Test Files  4 passed (4)
+apps/api test:       Tests  32 passed (32)
+
+> hvworkflow@0.1.0 vocabulary
+vocabulary-check: ok
+
+> hvworkflow@0.1.0 arch
+x 7 dependency violations (0 errors, 7 warnings). 131 modules, 484 dependencies cruised.
+
+> hvworkflow@0.1.0 role-literals
+Role-literal check: no role-name literal outside the policy layer …
+
+> hvworkflow@0.1.0 now-check
+now() check: no direct system-clock access outside the injected clock …
+
+> hvworkflow@0.1.0 plan-honesty
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+
+> @hv/web@0.0.0 build
+✓ 1714 modules transformed.
+✓ built in 1.11s
+```
+(i18n-Paritätstest unverändert bei 436 Schlüsseln — diese Runde hat keine i18n-Datei berührt.)
+
+Offen (Runde 2, unverändert gegenüber Runde 1 zusätzlich zu den bereits genannten Punkten):
+- **AX-020-01** bleibt bestehen, jetzt mit 17 einzeln benannten, Datei:Zeile-dokumentierten
+  Selektoren statt einer klassenweiten Ausnahme (siehe Quelltext-Kommentar). Läuft ab mit der
+  Farbtoken-Scheibe, spätestens 31.12.2026.
+- M3 und M2 (Runde 1, unverändert): siehe oben.
+- Nur `020-stage-de.png`/`020-stage-en.png` wurden neu aufgenommen — ein Pixelvergleich (PIL,
+  Toleranz 10/Kanal) gegen den vorherigen Commit zeigte für alle anderen `020-*.png` nur Rauschen
+  aus der laufenden Wanduhr/Sprechzeit (z. B. „18:01“ vs. „18:28“, „6:34“ vs. „7:01“), keine echte
+  Änderung; sie wurden auf den committeten Stand zurückgesetzt.
+
 ## Design-Kritik
 
 Fable 5.1: 5 major, deckungsgleich mit einem Teil der Opus-Befunde (Kontrast Uhr/„noch n", Vorschau-
@@ -443,3 +538,26 @@ Update the Bericht: a "Befund → Erledigung" table, the new red/green runs, the
 with all names, the axe table with `color-contrast` on and the exception scoped, and the
 `pnpm gates` tail. Re-take the screenshots whose view changed. Status → "review (Nacharbeitsrunde
 1)".
+
+## Nachschärfung nach Review (Runde 2)
+
+Verbindlich (Plan 6.3: sharpen, do not retry). The re-review accepts B1, M1–M3, M5, M6 and all
+minors from Runde 1. Exactly one major is left open: M4's axe exclusion was too wide.
+
+1. `e2e/020-rueckbau-passung.spec.ts:82-86`: `.exclude('.text-ink-500')` and
+   `.exclude('.text-ink-400')` remove new 020 elements from all axe rules. Replace with two passes
+   per view: (a) all rules except `color-contrast`, with no exclusions; (b) only `color-contrast`,
+   excluding only `.hv-label` and the specifically named pre-existing selectors. List those
+   selectors under AX-020-01 with file:line of the pre-existing components; no class-wide
+   exclusions of `text-ink-*`. Both passes: 0 serious/critical.
+2. Change these new 020 texts to `text-ink-600` or darker: `Podium.tsx:297` (preview number),
+   `Podium.tsx:316` (the "no answer" line), `ClassifyDialog.tsx:105` (question number). Check
+   `SpeakerRow.tsx:105` (the drag handle button) under pass (a) and fix anything it reports.
+3. Minor: `e2e/020-rueckbau-passung.spec.ts:162,175` reads the event count right away, but the log
+   is saved 150 ms later (`src/api/index.ts:32`). Poll or wait until the count is stable (at least
+   200 ms) before comparing, and assert the previewed question's status directly.
+
+### Evidence (Runde 2)
+
+Bericht: axe table of both passes, Playwright summary, `pnpm gates` tail. Re-take only the
+screenshots whose pixels change. Status → "review (Nachschärfung Runde 2)".
