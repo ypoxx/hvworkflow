@@ -56,6 +56,12 @@ Stand — ändert takt-006 das Verhalten eines Hooks, zieht es genau diese Zeile
     ein zweiter `pnpm gates`), scheitert die Kopie mit `ENOENT` (beobachtet im Review von takt-005: erster Lauf rot in
     Test 92, zweiter grün). Nur versionierte Dateien kopieren (`git ls-files`) oder beim Kopieren verschwundene Dateien
     überspringen; Test, der während der Kopie eine Datei anlegt und löscht.
+13. **Codex #17 · Wirkungstext PreToolUse:** Der Wirkungstext in `docs/agentische-entwicklung-plan.md` 5.4 behauptet,
+    nicht-lokale `curl`/`wget`-Aufrufe würden generell blockiert. `externalCurlFinding()` prüft aber nur Top-Level-
+    Shell-Segmente, deren erstes Wort `curl`/`wget` ist, und nur explizite `http://`/`https://`-URLs — `curl
+    example.com` und `echo URL | xargs curl` passieren also. Nach den Änderungen zu Punkt 11 (C5) und Punkt 1 den
+    Wirkungstext so fassen, dass er aus der endgültigen Quelle genau sagt, was der Hook blockiert und was nicht
+    (Stand bleibt `läuft (Hook: PreToolUse)`).
 
 ## Nicht-Ziele
 
