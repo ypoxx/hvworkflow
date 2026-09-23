@@ -53,7 +53,7 @@ Singular-Form „1 Punkt" für N6; DSFA und Entscheidungsregister aktualisiert f
 
 Evidence:
 ```
-Commit 77eb2db
+Commit 7a6d00c (vorher 77eb2db; Betreffzeile um [skip netlify] ergänzt)
 
 Test 1: Vier ungültige Dateien und eine gültige (5 Punkte, 4 offen):
 Warnung: Punkt "P001": Nachricht oder Live nicht im Format "JJJJ-MM-TT HH:MM" lesbar — zählt als offen.
@@ -76,16 +76,15 @@ docs/datenschutz/dsfa-vorentwurf.md | 10 +++++-----
 docs/entscheidungsregister.md       |  2 +-
 scripts/takt.mjs                    | 26 ++++++++++++++++++++++++--
 
-pnpm gates (tail):
-apps/contract test: contract gate: ok
-packages/domain test: Test Files 4 passed (4)
-packages/domain test: Tests 39 passed (39)
-apps/api test: Test Files 3 passed (3)
-apps/api test: Tests 25 passed (25)
-apps/web test: Test Files 3 passed (3)
-apps/web test: Tests 35 passed (35)
+pnpm gates (Orchestrator, nach Berichtigung der Commit-Nachricht, Exit 0), Auszug — Zeilen wörtlich aus dem Lauf:
+packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.2.0, 29 operations)
+packages/contract test: contract gate: ok
+packages/domain test:       Tests  39 passed (39)
+apps/web test:       Tests  35 passed (35)
+apps/api test:       Tests  25 passed (25)
+> node scripts/vocabulary-check.mjs
 vocabulary-check: ok
-✓ built in 1.13s
+✓ built in 1.12s
 ```
 
 Open: keine
