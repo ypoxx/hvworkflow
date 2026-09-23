@@ -1,6 +1,6 @@
 # 016 — Agentenrollen, Hooks, Scheibenumfang-Tor, Plan-Graph-Prüfung, Branch-Schutz
 
-**Status:** review (Nacharbeitsrunde 1)
+**Status:** angenommen (Nachprüfung: annehmen; Folgebefunde als Kleinänderung)
 **Risikoklasse:** niedrig · 1,5 AStd · Kalender 30.09.2026 (W1) · Lanes: infra (`.claude/**`, `scripts/**`,
 `.github/**`) + docs-betrieb (`docs/betrieb/branch-schutz.md`)
 **Rolle/Modell:** Implementierer-Backend · Sonnet 5 statt Mechaniker · Haiku (Abweichung nach oben: der
@@ -964,4 +964,30 @@ weitere — PreToolUse (voll), PostToolUse, Stop, SubagentStop — in Runde 1, m
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 (Security/Betrieb) · 23.09.2026 · Urteil: Nacharbeit (2 Blocker, 6 major, 10 minor, Nits).**
+Blocker: Hook-Fixtures mit lokalen absoluten Pfaden (CI rot, vier Tests ohne Aussage); Test gegen die lebende Spec von
+016/017. Major: Scheibenumfang-Tor prüfte im PR nichts (losgelöster HEAD); Stop-Hook blockierte ohne Codeänderung;
+SubagentStop konnte den falschen Agenten blockieren; Force-Push-/Lösch-Umgehungen im PreToolUse-Hook; persönliche
+E-Mail-Adresse im Spec-Text; i18n-Literal-Tor mit Kulanz, Kommentar-Fehltreffern, ohne mehrzeiligen JSX-Text. Die
+Befunde stehen als verbindliche Nachschärfung im Abschnitt „Nachschärfung nach Review (Runde 1)"; dazu m11 (Orchestrator):
+`concurrency` mit `cancel-in-progress` gegen einen gitleaks-Wettlauf auf überholten PR-Läufen.
+
+**Runde 2 · Nachprüfung Opus 5.5 · 23.09.2026 · Urteil: annehmen.** B1, B2, M1–M6 mit eigenen Proben bestätigt
+(u. a. Scheibenumfang rot mit `GITHUB_HEAD_REF` und fremder Datei; Stop-Hook grün nach Checkout-Hin-und-zurück, rot
+nach echter Änderung; alle neun Force-/Delete-Formen blockiert). CI auf `6d01d5f` grün, der Schritt „Slice scope"
+läuft im PR. Neue Kleinbefunde, als Folge-Kleinänderung (infra):
+
+1. minor · `pre-tool-use-bash.mjs:47`: weitere Umgehungen (`-uf`, gequotete `'+main'`/`":main"`, abgekürztes
+   `--dele`, `--work-tree=`/`--no-pager` vor `push`, `--prune` mit Wildcard).
+2. minor · `stop-check.mjs`: nach `git commit` ohne Testlauf lässt der Hook durch — Commit-Stand in die Signatur
+   aufnehmen oder als bekannte, durch CI abgedeckte Lücke dokumentieren.
+3. minor · `slice-scope.mjs`: die Warnung „Files allowed geändert" greift nie, weil die Spec auf dem Scheiben-Branch
+   selbst entsteht — gegen den ersten Commit der Spec vergleichen.
+4. minor · TaskCompleted liest nur `tool_input.todos`, nicht `task_subject`/`task_description`; Bericht (Z. 294) und
+   Entwicklungsplan (Z. 296, „Abnahmehäkchen") berichtigen.
+5. minor · `i18n-literal-check.test.mjs:12` liest `/home/user/wt/020` — durch eine Fixture ersetzen.
+6. nits · Stacktrace statt sauberer Meldung bei fehlerhafter Planzeile; Wirkungstext der PreToolUse-Zeile im
+   Entwicklungsplan (Z. 292) verspricht mehr, als der Hook blockiert.
+
+Außerhalb von 016 gemeldet: `docs/slices/012-architektur-sicherheitstore.md:271` enthält noch die persönliche
+E-Mail-Adresse → takt-005.
