@@ -46,8 +46,10 @@ export interface AxeException {
   readonly location: string;
   /** Why this is debt, not a defect this slice owns. */
   readonly reason: string;
-  /** ISO date; the exception check below is documentation only (the file's expiry is enforced by
-   *  the Bericht and the review, not by a runtime clock check R8 would forbid in a Playwright spec). */
+  /** ISO date (`YYYY-MM-DD`); enforced below at import time, not just documentation — AGENTS.md
+   *  rule 8 ("time comes from the injected clock") governs `packages/domain/src/api.ts` and
+   *  `apps/api/src/server.ts` (`scripts/now-check.mjs`'s own scan roots), not this test harness, so
+   *  a plain `new Date()` here is not a rule-8 violation, just an ordinary expiry check. */
   readonly expires: string;
   /** A role ("Umsetzer"), never a person's name (AGENTS.md rule 11). */
   readonly owner: string;
@@ -56,13 +58,37 @@ export interface AxeException {
 // `.pathname` rather than Node's `fileURLToPath` (see the `node:fs` note above) — `URL` itself is a
 // DOM/web-standard global already covered by `tsconfig.app.json`'s `lib`. Every test file's own
 // `import.meta.url` is a real `file://` URL of an absolute path, and this project runs Linux-only
-// (no Windows drive-letter path to get wrong).
-const EXCEPTIONS_PATH = new URL('./axe-exceptions.json', import.meta.url).pathname;
+// (no Windows drive-letter path to get wrong). `decodeURIComponent` (review round 1, nit 9):
+// `.pathname` is percent-encoded (e.g. a space would arrive as `%20`); this repository's own path
+// has none today, but `readFileSync` must see the real path, not the URL-escaped one, on principle.
+const EXCEPTIONS_PATH = decodeURIComponent(
+  new URL('./axe-exceptions.json', import.meta.url).pathname,
+);
 
 /** Read once per test file import; the list is small and the file never changes mid-run. */
 export const AXE_EXCEPTIONS: readonly AxeException[] = JSON.parse(
   readFileSync(EXCEPTIONS_PATH, 'utf8'),
 ) as AxeException[];
+
+/**
+ * Review round 1, minor 7 (also raised independently on PR #19): an expiry date that is only ever
+ * read by a human is not enforced at all. `expires` is `YYYY-MM-DD`, which sorts correctly as a
+ * plain string, so no date parsing is needed. Runs once, at import time, in every spec file that
+ * imports this module — an expired exception fails every scenario immediately, loudly, and by name,
+ * rather than quietly keeping a stale allowance alive.
+ */
+function assertNoExpiredExceptions(exceptions: readonly AxeException[]): void {
+  const today = new Date().toISOString().slice(0, 10);
+  const expired = exceptions.filter((exception) => exception.expires < today);
+  if (expired.length === 0) return;
+  const names = expired.map((exception) => `${exception.id} (${exception.selector})`).join(', ');
+  throw new Error(
+    `axe-exceptions.json: ${expired.length} exception(s) expired as of ${today}: ${names}. ` +
+      'Renew the expiry date after re-checking the debt, or remove the exception and fix the finding.',
+  );
+}
+
+assertNoExpiredExceptions(AXE_EXCEPTIONS);
 
 function selectorsForRule(rule: string): string[] {
   return AXE_EXCEPTIONS.filter((exception) => exception.rule === rule).map(

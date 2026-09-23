@@ -4,7 +4,7 @@
     "rule": "color-contrast",
     "selector": ".hv-label",
     "location": "the label utility itself, used by every feature",
-    "reason": "Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
+    "reason": "The broadest entry in this list by far: every element carrying the shared .hv-label utility class, in every feature, matches. Pre-existing house-grey text tokens (--color-ink-400/-500) fall short of the 4.5:1 text-contrast ratio across the whole product since early slices (001/002/003/007). A dedicated colour-token slice has to raise the ramp itself; not fixable with a few lines in any single component (slice 020 review, AX-020-01).",
     "expires": "2026-12-31",
     "owner": "Umsetzer"
   },
