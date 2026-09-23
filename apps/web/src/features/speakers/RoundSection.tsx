@@ -4,7 +4,7 @@
  * being worked on at a time.
  */
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import type { Speaker } from '@hv/domain';
 import { Badge, Panel, ProgressBar, cx } from '../../components';
 import { useT } from '../../i18n';
@@ -103,6 +103,17 @@ export function RoundSection({
                 </span>
               )}
             </button>
+            {open && (
+              // Point #17 (feedback, slice 020): the drag hint now lives in every round's own head
+              // instead of once above the whole list, next to the round it actually reorders.
+              <span
+                data-testid={`round-drag-hint-${round}`}
+                className="hidden shrink-0 items-center gap-1 text-2xs text-ink-600 lg:flex"
+              >
+                <GripVertical size={12} strokeWidth={1.75} aria-hidden="true" />
+                {t('speakers.drag.hint')}
+              </span>
+            )}
             <span
               data-testid={`round-progress-${round}`}
               className="flex shrink-0 items-center gap-2"

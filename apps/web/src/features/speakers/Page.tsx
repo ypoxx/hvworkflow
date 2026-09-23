@@ -18,7 +18,7 @@ import { ListOrdered, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
-import { Button, EmptyState, Panel, PageHeader, Toolbar, showProblem } from '../../components';
+import { Button, EmptyState, Panel, PageHeader, showProblem } from '../../components';
 import { actionLabel, getLang, translate, useT } from '../../i18n';
 import { useMeeting } from '../../app/useMeeting';
 import { MoveDialog } from './MoveDialog';
@@ -109,6 +109,15 @@ export function SpeakersPage() {
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
   const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
+  /**
+   * Point #26 (feedback, slice 020): a role without any write right on the Wortmeldeliste used to
+   * see no register button and no row actions with no explanation at all. Derived from `_actions`
+   * alone, never from the role name (AGENTS.md rule 4).
+   */
+  const mayWriteSpeakers = view.some(
+    (speaker) => speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
+  );
+  const readOnly = view.length > 0 && !mayWriteSpeakers;
 
   const run = useCallback(
     async (id: string, action: () => Promise<unknown>): Promise<boolean> => {
@@ -293,6 +302,12 @@ export function SpeakersPage() {
         {...(registerButton !== undefined ? { actions: registerButton } : {})}
       />
 
+      {readOnly && (
+        <p data-testid="speakers-readonly-hint" className="text-2xs text-ink-600">
+          {t('speakers.readonly.hint')}
+        </p>
+      )}
+
       {status === 'error' && view.length === 0 ? (
         <Panel bodyClassName="grid place-items-center">
           <EmptyState
@@ -328,10 +343,6 @@ export function SpeakersPage() {
             onCall={actions.onCall}
             onFinish={actions.onFinish}
           />
-
-          <Toolbar label={t('page.speakers.title')} className="shrink-0">
-            <span className="text-2xs text-ink-500">{t('speakers.drag.hint')}</span>
-          </Toolbar>
 
           <DndContext
             sensors={sensors}
