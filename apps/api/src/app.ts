@@ -299,6 +299,3 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   return app;
 }
-
-// CI-Nachweis Scheibe 012: absichtlicher Verstoß, wird im nächsten Commit entfernt.
-export const CI_PROBE_ACTOR = { id: 'ci-demo', role: 'admin' } as const;
