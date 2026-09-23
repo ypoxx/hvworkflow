@@ -14,6 +14,8 @@ Rechtekonzept 2.2 (ein Entscheidungspunkt)
 **Depends on:** 019 (gemergt), 012 (gemergt), 016 (gemergt), 020 (gemergt); Auftrag B zusätzlich 013 (hält die
 Alt-e2e-Specs und `apps/web/src/features/**`)
 **Perspektive:** Security, Datenschutz · **Glossar: neue Begriffe:** nein
+**Bedrohungen (docs/sicherheit/bedrohungsmodell.md):** schließt T-G1-I-01; berührt T-G1-I-02, T-G1-I-04, T-G3-I-01;
+Missbrauchsfall MF-02. Der Bericht ordnet jeder ID die Tests zu, die sie abdecken.
 
 ## Festlegungen des Architekten (Standard; der Wahrheitstabellen-Diff geht an den Eigentümer)
 
@@ -79,6 +81,18 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
    die Dokumentation von R-PERM-03 innerhalb des 0.2-Zyklus sind eine Patch-Stufe, wie 0.3.1 in 028. Der
    CHANGELOG-Abschnitt 0.2.1 nennt diese Konvention in einem Satz. Die Zeile in ADR 0015 trägt der Orchestrator nach.
    023 kann nicht vorher landen, weil die Lane contract seriell ist.
+8. **Nach dem Review von Auftrag A** (Festlegungen des Architekten, 23.09.2026):
+   - Ein 409 an einen Akteur, der die Frage nicht lesen darf, nennt keinen Status. Die Meldung ist allgemein: „Übergang
+     nicht zulässig". Regel-ID und Status stehen nur in der Antwort an Leseberechtigte.
+   - Die Antwort einer Schreiboperation enthält die Frage auch dann, wenn der Akteur sie nicht lesen darf. Das
+     betrifft heute podium beim Vorlesen und Schließen. Die Frage liegt auf der Bühne ohnehin vor ihm. Das ist ein
+     dokumentiertes Restrisiko bis 047 (Attributregel „podium sieht, was auf seiner Bühne liegt").
+   - `getQuestionHistory` verlangt beides: das Leserecht an der Frage (einschließlich Umfang) und `history.read`.
+   - Das vorhandene Statusliteral `'staged'` in `getStage` stammt aus der Zeit vor dieser Scheibe. Es bleibt hier
+     unverändert, und „kein Statusliteral in `api.ts`" gilt für neuen Code. Das Verschieben in die Daten ist ein
+     Folgepunkt.
+   - Die Erweiterung von „Files allowed" durch den Bauenden (i18n-Labels, Fixture im Rollenliteral-Test) bestätigt der
+     Spec-Eigentümer: Beides ist zwingende Folge von Ziel 2 und minimal.
 
 ## Ziel
 
@@ -93,7 +107,8 @@ Alt-e2e-Specs und `apps/web/src/features/**`)
    - Alle 13 Lesemethoden in `api.ts` prüfen über `can()` und liefern bei Verweigerung
      `ApiProblem(403, …, ruleId)`.
    - Der 404-Vorrang nach Festlegung 3.
-   - Kein Rollenname außerhalb von `ROLE_PERMISSIONS` (Tor `role-literals`). Kein Statusliteral in `api.ts`.
+   - Kein Rollenname außerhalb von `ROLE_PERMISSIONS` (Tor `role-literals`). Kein neues Statusliteral in `api.ts`
+     (Festlegung 8).
    - `_actions` behält seine Form; der Inhalt ändert sich für podium und observer.
 3. **Wahrheitstabelle:** `packages/domain/policy-truth-table.md` wird neu generiert. Die bestehende Tabelle
    „Role × Status × Action" bekommt die neue Spalte `q.read.delivered`, weil der Test Spalten aus jedem
