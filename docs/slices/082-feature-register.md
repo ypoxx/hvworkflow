@@ -1,6 +1,6 @@
 # 082 — Feature-Register für Routen, Navigation, Kürzel und Hilfe
 
-**Status:** review
+**Status:** angenommen
 **Risikoklasse:** niedrig · 1 AStd · Kalender 05.10.2026 (W2) · Lane: web-shell (`apps/web/src/app/**`; 020 ist
 gemergt, 013 läuft gleichzeitig und hält `apps/web/src/app/**` ausdrücklich nicht)
 **Rolle/Modell:** Mechaniker · Haiku 4.5; Review Sonnet 5
@@ -204,4 +204,16 @@ Touched (original + rework):
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Sonnet 5 · 23.09.2026 · Urteil: annehmen nach Kleinbefunden, aber 1 major (0 Blocker, 1 major, 1 minor).**
+Abnahme 1–3 selbst nachgeprüft (`git grep` trifft nur `featureRegistry.ts`; Playwright 9/9; `pnpm gates` grün);
+`visibleRoutes` rein, ohne Rollennamen, `Permission` nur als Typ.
+
+1. major · `ShortcutsDialog.tsx:14-22,44-46`: der Kürzel-Dialog zeigte fünf Zeilen mit gleichem Text statt einer Zeile
+   „Alt 1…5" — nicht beschriebene Verhaltensänderung (Nicht-Ziel 2) — behoben: eine Zeile, Bereich aus dem Register
+   (`getNavigationShortcutRange`), Sonderfall entfernt, Test ergänzt.
+2. minor · `featureRegistry.test.ts:24`: Testtitel passte nicht zur Prüfung — behoben.
+3. Hinweis: `helpKey` nutzt die vorhandenen `page.*.description`-Schlüssel; angezeigt wird er erst mit einer späteren
+   Hilfe-Ansicht (Nicht-Ziel dieser Scheibe).
+
+**Nachprüfung Sonnet 5 · 23.09.2026 · Urteil: annehmen.** Genau eine Navigationszeile, Bereich aus dem Register;
+„5" jetzt als Taste statt als Text — unerheblich; Unit-Tests 13/13.
