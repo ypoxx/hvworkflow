@@ -83,7 +83,97 @@ Tests bleiben grün, weil nichts entfernt und nichts Pflicht wird.
 
 ## Bericht
 
-(vom Umsetzer)
+```
+Slice: 019-vertrag-0-2-0
+Done: Vertrag 0.2.0 rein additiv: `kind`/`requestedMinutes` auf Speaker, SpeakerRegistration, SpeakerUpdate
+      `deprecated: true` und nicht mehr in `required` (Enum/Wertebereich bleiben); Rolle `coordination`; Rechte
+      speaker.read, contribution.read, stage.read, history.read, event.read, question.legal.clear; Ereignistyp
+      QuestionLegalCleared mit Schema QuestionLegalClearedPayload (questionId, answerVersion, note?), per if/then
+      an den Ereignistyp gebunden (alle anderen Typen behalten das offene Objekt); 403 mit Problem an allen zwölf
+      Leseoperationen, R-PERM-01/R-PERM-02 in Problem.ruleId und Forbidden dokumentiert; info.description und
+      CHANGELOG verweisen auf ADR 0015 (vorgeschlagen). Neu: packages/contract/CHANGELOG.md (0.1.0, 0.2.0),
+      allowlist.json (`[]`), scripts/check.mjs als `test`-Skript des Pakets (läuft in `pnpm -r test`, also in
+      `pnpm gates`; ohne Netz, ohne neue Abhängigkeit — info.version und operationIds werden zeilenweise gelesen,
+      weil `yaml` aus dem Vertragspaket nicht auflösbar ist und die Lockdatei nicht zu den erlaubten Dateien zählt).
+Evidence:
+  pnpm contract:lint — vorher 9 Warnungen (8× operation-4xx-response an getMeeting, listAgendaItems, listUnits,
+  listSpeakers, listContributions, listQuestions, getStage, listEvents; 1× no-unused-components oidc), nachher:
+    packages/contract/openapi.yaml: validated in 92ms
+    Woohoo! Your API description is valid. 🎉
+    You have 1 warning.            <- nur noch no-unused-components: securitySchemes/oidc (Bestand, nicht 019)
+  pnpm contract:types — 53 Einfügungen, 12 Löschungen in packages/contract/src/types.ts; zweiter Lauf ohne Diff
+  (sha256 d8352e5debccc025 vor und nach dem Lauf). Inhalt des Diffs:
+    Role:   + "coordination"
+    Action: + "speaker.read" | "contribution.read" | "question.legal.clear" | "stage.read" | "history.read" | "event.read"
+    Speaker.kind: `kind: ...` -> `kind?: ...` mit @deprecated; Speaker.requestedMinutes?, SpeakerRegistration.kind?,
+      SpeakerRegistration.requestedMinutes?, SpeakerUpdate.requestedMinutes? mit @deprecated und Beschreibung
+      „veraltet seit 0.2.0, entfällt in 080 (Feedback #15)"
+    Event.type: + "QuestionLegalCleared"; neues Schema QuestionLegalClearedPayload { questionId: string;
+      answerVersion: number; note?: string }
+    operations: 403: components["responses"]["Forbidden"] an 12 Leseoperationen; Beschreibungen Problem.ruleId,
+      Forbidden, Role, Action, Event erweitert. Kein Feld wurde Pflicht, nichts entfernt.
+  Ajv-Stichprobe gegen #/components/schemas/Event (Ajv2020 wie in apps/api/src/contractSchema.ts):
+    valid   | QuestionApproved, open payload (unchanged)
+    valid   | QuestionLegalCleared, full payload
+    INVALID | QuestionLegalCleared, payload without answerVersion -> /payload must have required property 'answerVersion'
+    INVALID | QuestionLegalCleared, answerVersion 0 -> /payload/answerVersion must be >= 1
+  Tor grün (pnpm --filter @hv/contract test):
+    contract gate: packages/contract/openapi.yaml (info.version 0.2.0, 29 operations)
+      ok    (a) info.version 0.2.0 = package.json version
+      ok    (b) CHANGELOG.md has a section for 0.2.0
+      ok    (c) openapi.yaml changed against merge base cadbd6e; version 0.1.0 -> 0.2.0
+      ok    (d) allowlist.json well-formed, 0 pre-declared operation(s), none expired (today 2026-09-23)
+    contract gate: ok
+  Tor absichtlich rot 1 (Version in openapi.yaml und package.json auf 0.1.0 zurückgesetzt, Vertrag geändert):
+      ok    (a) info.version 0.1.0 = package.json version
+      ok    (b) CHANGELOG.md has a section for 0.1.0
+      FAIL  (c) openapi.yaml changed against merge base cadbd6e but info.version stayed at 0.1.0 (was 0.1.0) — bump the
+            version and add a CHANGELOG section (ADR 0015)
+      ok    (d) allowlist.json well-formed, 0 pre-declared operation(s), none expired (today 2026-09-23)
+    contract gate: 1 failure(s) — ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @hv/contract@0.1.0 test, Exit status 1
+  Tor absichtlich rot 2 (Allowlist: abgelaufener Eintrag getMeeting expires 2026-09-01; unbekannte operationId;
+  Eintrag mit Fremdschlüssel und Datum 31.10.2026):
+      FAIL  (d) allowlist[0] operationId "getMeeting" expired on 2026-09-01 (today 2026-09-23, slice 019) — implement
+            it or remove it from the contract
+      FAIL  (d) allowlist[1] operationId "clearQuestionLegally" does not exist in openapi.yaml
+      FAIL  (d) allowlist[2] has an unknown key "owner" (allowed: operationId, reason, slice, expires)
+      FAIL  (d) allowlist[2] expires "31.10.2026" is not a calendar date YYYY-MM-DD
+    contract gate: 4 failure(s) — Exit status 1
+  Beide roten Läufe zurückgesetzt (Version 0.2.0, allowlist `[]`), danach Tor wieder grün; nicht committet.
+  pnpm gates (exit 0, 19 s; Log-Zeilen desselben Laufs):
+    packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.2.0, 29 operations)
+    packages/contract test: contract gate: ok
+    packages/domain test:  Test Files  4 passed (4)
+    packages/domain test:       Tests  39 passed (39)
+    apps/web test:  Test Files  3 passed (3)
+    apps/web test:       Tests  35 passed (35)
+    apps/api test:  Test Files  3 passed (3)
+    apps/api test:       Tests  25 passed (25)
+    vocabulary-check: ok
+    ✓ 1713 modules transformed.
+    dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+    dist/assets/index-BC8cI4Qz.css                        39.09 kB │ gzip:   8.51 kB
+    dist/assets/index-CS58249t.js                        525.20 kB │ gzip: 154.17 kB │ map: 2,155.11 kB
+    (!) Some chunks are larger than 500 kB after minification. (Bestand)
+    ✓ built in 1.10s
+    gates exit=0
+  Kein Screenshot (reine Vertragsscheibe); docs/evidence/ unverändert.
+Open:
+  - `coordination` steht im Vertrag, der Server kennt die Rolle bis 021 nicht (apps/api/src/actor.ts prüft gegen
+    ROLE_PERMISSIONS): `X-Actor: x:coordination` liefert bis dahin 401. So im Enum beschrieben.
+  - Die zwölf Leseoperationen dokumentieren 403/R-PERM-02, liefern es heute nie; Durchsetzung in 010.
+  - Eine Registrierung ohne `kind` passiert seit 0.2.0 die Vertragsprüfung und erreicht den Kern, der `kind`
+    unverändert übernimmt (packages/domain/src/api.ts:297, Domäntyp weiter Pflicht). Die Oberfläche sendet `kind`
+    immer; endgültig löst es 080 (Rückbau). Kein Test betroffen.
+  - Tor-Prüfung (c) braucht den Merge-Base mit origin/claude/dax-shareholder-meeting-workflow-0s934z; in einem
+    flachen CI-Checkout (actions/checkout@v4, Tiefe 1) wird sie mit Hinweis übersprungen (a, b, d laufen immer).
+    Ein `fetch-depth: 0` in gates.yml wäre eine CI-Änderung und damit Nicht-Ziel dieser Scheibe — Vorschlag für 012/CI.
+  - Verbleibende Lint-Warnung no-unused-components (securitySchemes/oidc) ist Bestand, nicht Gegenstand von 019.
+  - Glossarzeilen „Koordination", „Rechtsfreigabe" folgen laut Spec in 018; ADR 0015 bleibt „vorgeschlagen".
+Touched: packages/contract/openapi.yaml, packages/contract/src/types.ts (generiert), packages/contract/package.json,
+      packages/contract/CHANGELOG.md (neu), packages/contract/allowlist.json (neu), packages/contract/scripts/check.mjs
+      (neu), docs/slices/019-vertrag-0-2-0.md
+```
 
 ## Review findings
 

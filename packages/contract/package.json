@@ -1,6 +1,6 @@
 {
   "name": "@hv/contract",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -13,7 +13,7 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'contract lint runs at root: pnpm contract:lint'",
-    "test": "echo 'no unit tests in contract package'"
+    "test": "node scripts/check.mjs"
   },
   "devDependencies": {
     "typescript": "~6.0.2"
