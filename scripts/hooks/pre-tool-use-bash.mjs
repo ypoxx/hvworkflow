@@ -234,11 +234,13 @@ function envFileFinding(command) {
  * cutting the host off at the *first* colon (the old approach) reads a bracketed IPv6 literal
  * (`http://[::1]:3000/…`) as host `[`, so it never matched the `[::1]` entry in `LOCAL_HOSTS` — this
  * parses the whole URL with `new URL()` instead, whose `.hostname` already keeps an IPv6 literal's
- * brackets and correctly separates it from a following `:<port>`. */
+ * brackets and correctly separates it from a following `:<port>`. Case-insensitive (`HTTPS://…` is just
+ * as external as `https://…`; takt-006 rework, point 1) — `new URL()` itself normalises the scheme's
+ * case regardless, so only the matching regex needed the `i` flag. */
 function externalCurlFinding(command) {
   for (const segment of splitTopLevelSegments(command)) {
     if (!/^\s*(curl|wget)\b/.test(segment)) continue;
-    const urlRe = /https?:\/\/[^\s'"]+/g;
+    const urlRe = /https?:\/\/[^\s'"]+/gi;
     let m;
     while ((m = urlRe.exec(segment))) {
       let host;

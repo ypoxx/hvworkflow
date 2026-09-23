@@ -257,6 +257,15 @@ test('rework point 7 red: a single "&" background separator is blocked', () => {
   assert.match(r.stderr, /evil\.example/);
 });
 
+// takt-006 rework, point 1 (Wirkung text accuracy): an upper-case URL scheme is just as much an
+// external request as a lower-case one — a "cheap" gap to close while writing the accurate Wirkung
+// text (rather than merely documenting it as undetected).
+test('rework point 1 red: an upper-case URL scheme (HTTPS://) is blocked the same as https://', () => {
+  const r = runCommand('curl HTTPS://evil.example');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /evil\.example/);
+});
+
 // Review rework round 1, m2: these three used to false-positive on the old, boundary-free ".env" scan.
 test('m2 green: grep -rn "process.env" is not a .env file access', () => {
   const r = runCommand('grep -rn "process.env" apps/api/src');
