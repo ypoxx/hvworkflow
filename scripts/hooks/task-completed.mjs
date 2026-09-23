@@ -23,11 +23,10 @@
  * not just the first — several completed items each naming a different slice used to stop at the
  * first spec found and let every later, still-unaccepted one through unexamined.
  *
- * Note: Claude Code has no built-in "TaskCompleted" hook event; this key is the plan's own vocabulary
- * for "the point at which a to-do is marked done" (docs/agentische-entwicklung-plan.md 5.4). Wiring it
- * in `.claude/settings.json` under `hooks.TaskCompleted` keeps `scripts/plan-honesty.mjs`'s
- * `läuft (Hook: TaskCompleted)` row honest (the row only claims the *hook is configured*, not that a
- * particular Claude Code build fires it) and gives the check a real, tested script rather than a stub.
+ * takt-006 rework, MINOR finding 5: every three-digit number in the completed text is extracted (a
+ * global regex), not only the first — `task_subject`/`task_description` can each, or together, name
+ * more than one slice, and a second, unaccepted number right alongside an accepted one used to pass
+ * unseen.
  *
  * `--root <dir>` points at a different repository root (its `docs/slices/`), for tests.
  * Test via a redirected fixture payload: `node scripts/hooks/task-completed.mjs --root <dir> < payload.json`.
@@ -38,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SLICES_DIR = 'docs/slices';
-const SLICE_NUMBER_RE = /\b(\d{3})\b/;
+const SLICE_NUMBER_RE = /\b(\d{3})\b/g;
 const ACCEPTED_STATUS_RE = /^\*\*Status:\*\*\s*(accepted|angenommen)\b/m;
 
 function readStdinJson() {
@@ -97,16 +96,24 @@ function completedTextsFrom(input) {
   return undefined; // unrecognised input shape
 }
 
-/** Every completed item that names a three-digit slice/takt number resolving to a real spec file —
- * Codex C3: *every* one, not just the first (a for-loop with an early `break` used to stop checking
- * the moment the first resolvable spec was found, silently ignoring every later completed item). */
+/** Every three-digit slice/takt number, from every completed item's text, that resolves to a real spec
+ * file — Codex C3: every completed *item*, not just the first (a for-loop with an early `break` used to
+ * stop checking the moment the first resolvable spec was found, silently ignoring every later completed
+ * item); rework finding 5: every *number within a given item's text* too (a non-global match only ever
+ * found the first). Each distinct number is only checked once even if it appears more than once. */
 function namedFindings(root, completedTexts) {
   const out = [];
+  const seen = new Set();
   for (const text of completedTexts) {
-    const m = text.match(SLICE_NUMBER_RE);
-    if (!m) continue;
-    const specPath = findSpecFile(root, m[1]);
-    if (specPath) out.push({ number: m[1], specPath, text });
+    for (const m of text.matchAll(SLICE_NUMBER_RE)) {
+      const number = m[1];
+      if (seen.has(number)) continue;
+      const specPath = findSpecFile(root, number);
+      if (specPath) {
+        seen.add(number);
+        out.push({ number, specPath, text });
+      }
+    }
   }
   return out;
 }

@@ -108,3 +108,18 @@ test('Codex C3 green: two completed items, both accepted, passes', () => {
   ]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+// takt-006 rework, MINOR finding 5: task_subject/task_description can each (or together) name more
+// than one slice number — only the *first* number in the combined text used to be extracted at all
+// (a non-global regex match), so a second, unaccepted number right alongside an accepted one passed
+// unseen.
+test('rework point 5 red: task_subject names one accepted slice, task_description names a second, unaccepted one', () => {
+  const r = runTaskEvent('901 fertig', 'und 900');
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 900/);
+});
+
+test('rework point 5 green: task_subject and task_description both name only accepted slices', () => {
+  const r = runTaskEvent('901 fertig', 'und 903');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
