@@ -43,7 +43,8 @@ its working directory between calls.
    criterion, files allowed. Work outside the allowed files is a finding, not initiative.
 2. **Evidence, not claims.** A slice is done when the report names the commit `pnpm gates` ran on and
    contains the real tail of its output once, and, for interface work, a screenshot in
-   `docs/evidence/`. Docs-only commits afterwards need no new run; the PR's CI is the running proof.
+   `docs/evidence/`. Docs-only commits afterwards need no new local run; the PR's CI is the running proof,
+   and a merge needs green CI on the PR's last commit.
    "Tests pass" without output counts as not run.
 3. **Whoever builds does not review.** Reviews run in a fresh context that sees only spec and diff —
    a separate reviewer agent, never the builder's own session. Independence comes from the fresh
