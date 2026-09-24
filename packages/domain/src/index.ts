@@ -2,6 +2,7 @@ export * from './types.js';
 export * from './events.js';
 export * from './permissions.js';
 export * from './transitions.js';
+export * from './rules.js';
 export * from './coverage.js';
 export * from './store.js';
 export * from './state.js';

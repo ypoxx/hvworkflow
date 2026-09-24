@@ -277,7 +277,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Tor | Werkzeug | Blockiert, wenn | Stand |
 |---|---|---|---|
 | Regeltabellen-Tests (ein Test je Regel-ID) | Testsuite, ein generierter `it()` je Zeile von `TRANSITIONS`/`GUARDS` (`packages/domain/src/__tests__/transitions.test.ts`) | eine Regel-ID ohne Test; ein Test ohne Regel-ID | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
-| Regeltabellen-Tests (mit Legal Trace) | — | eine Regel-ID ohne `legalRef` | geplant in Scheibe 011 |
+| Regeltabellen-Tests (mit Legal Trace) | — | eine Regel-ID ohne `legalRef` | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Policy-Wahrheitstabelle | generierte Tabelle Rolle × Status × Aktion (`packages/domain/policy-truth-table.md`), Schnappschusstest plus Diff-Schritt | ein Diff ohne ausdrückliche Freigabe in der Spec | läuft (CI: Policy truth table is committed) |
 | Vertragstests | Schema-Validierung jeder Antwort gegen OpenAPI (`apps/api/src/__tests__/helpers.ts`, `expectValid`/`expectValidProblem`), mit begründeten Ausnahmen für heutige Vertragslücken | eine Abweichung ohne Ausnahmeeintrag | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Statusmaschine | Übergangstabelle als Daten (`packages/domain/src/transitions.ts`), Test jeder erlaubten und einer verbotenen Kante | eine fehlende Kante | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
