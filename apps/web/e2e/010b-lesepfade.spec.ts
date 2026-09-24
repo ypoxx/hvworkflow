@@ -740,7 +740,8 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  await asRole(page, 'podium');
+  // admin may deliver, and may write something unrelated to the stage (a Wortmeldung) below.
+  await asRole(page, 'admin');
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
@@ -766,8 +767,13 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
     };
   }, API_MODULE);
 
-  // admin may deliver too; the switch only bumps `version`, and that reload fails.
-  await asRole(page, 'admin');
+  // A new event bumps `version` for the same actor, and that reload fails. Review round 5: this
+  // used to be a role switch podium → admin; since Codex P2-B on 948a721 an actor change drops the
+  // previous actor's record on purpose, so the failed reload is now caused by an ordinary event.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    await api['registerSpeaker']!({ displayName: 'Testperson Runde 5', kind: 'shareholder' });
+  }, API_MODULE);
   await expect(toasts(page)).toHaveCount(1);
   await expect(currentNumber).toBeVisible();
 
