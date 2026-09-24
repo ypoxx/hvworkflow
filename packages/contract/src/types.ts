@@ -499,7 +499,7 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010). */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). */
             ruleId?: string;
         };
         /**
@@ -513,10 +513,10 @@ export interface components {
             displayName?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021).
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010).
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "question.capture" | "question.classify" | "question.assign" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "stage.read" | "history.read" | "event.read" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "question.capture" | "question.classify" | "question.assign" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "demo.seed";
         Meeting: {
             id: string;
             /** @example Ordentliche Hauptversammlung 2027 */
@@ -750,7 +750,7 @@ export interface components {
                 "application/json": components["schemas"]["Question"];
             };
         };
-        /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`): R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010). */
+        /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`): R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010) — e.g. a `listQuestions` status filter naming a status outside the actor's `question.read.delivered` scope. */
         Forbidden: {
             headers: {
                 [name: string]: unknown;

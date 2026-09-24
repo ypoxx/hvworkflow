@@ -156,6 +156,13 @@ export const shellEn: typeof shellDe = {
   'action.question.withdraw': 'Withdraw',
   'action.question.merge': 'Merge',
   'action.question.read': 'View',
+  // Read permissions (slice 010): read-only rights, the same terse label as question.read.
+  'action.speaker.read': 'View',
+  'action.contribution.read': 'View',
+  'action.question.read.delivered': 'View',
+  'action.stage.read': 'View',
+  'action.history.read': 'View',
+  'action.event.read': 'View',
   'action.demo.seed': 'Create the demo corpus',
   'event.MeetingCreated': 'General meeting created',
   'event.SpeakerRegistered': 'Request to speak added',

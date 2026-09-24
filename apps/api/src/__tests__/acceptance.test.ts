@@ -158,7 +158,9 @@ describe('acceptance sentence (HTTP)', () => {
     const closed = await closeRes.json();
     expectValid('closeQuestion', 200, closed);
     expect(closed.status).toBe('closed');
-    expect(closed._actions).toEqual(['question.read']);
+    // Podium holds neither `question.read` nor `question.read.delivered` since slice 010
+    // (Festlegung 4) — it works the stage, not the question archive — so no action is left at all.
+    expect(closed._actions).toEqual([]);
 
     const historyRes = await req(app, 'GET', `/v1/questions/${q.id}/history`, { actor: ACTOR.admin });
     expect(historyRes.status).toBe(200);

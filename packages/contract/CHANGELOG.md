@@ -10,6 +10,23 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.2.1] - 2026-09-23
+
+Slice 010 (Implementierer-Backend), contract only for this entry: additive within the 0.2 cycle. An
+additive enum value and the documentation of a new rule id are a patch release, not a minor one
+(compare 0.3.1 in slice 028); 0.3.0 is reserved for the next contract package (slice 023).
+
+### Added
+
+- `question.read.delivered` in `Action`: a scoped alternative to `question.read` for the observer
+  role, restricted to `delivered`/`closed` (R-PERM-03, `READ_SCOPES` in
+  `packages/domain/src/permissions.ts`) for `listQuestions`/`getQuestion`, enforced from slice 010.
+- Rule id **R-PERM-03** (Leseumfang überschritten) documented in `Problem.ruleId` and the `Forbidden`
+  response, next to R-PERM-01/R-PERM-02.
+- Core, service and role grants for all read permissions declared since 0.2.0 (`speaker.read`,
+  `contribution.read`, `question.read`, `question.read.delivered`, `stage.read`, `history.read`,
+  `event.read`): slice 010.
+
 ## [0.2.0] - 2026-09-23
 
 Slice 019 (Architekt), contract only. Additive: nothing removed, nothing becomes required, all
