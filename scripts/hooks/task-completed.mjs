@@ -38,7 +38,14 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SLICES_DIR = 'docs/slices';
 // Codex on PR #20 (round 2): keep the namespace — "takt-006" must not resolve to "006-*.md".
-const SLICE_NUMBER_RE = /\b(takt-)?(\d{3})\b/g;
+// takt-010 goal 2: an optional single lowercase letter suffix (e.g. "010b") is part of the number too
+// — a digit and a following letter are both \w, so plain `\d{3}\b` never found a trailing boundary
+// right after the digits of "010b" at all, and the whole match failed silently (neither "010b" nor,
+// wrongly, "010" was extracted) — the same class of namespace confusion as "takt-006" vs "006", fixed
+// for that case in takt-006. "010b" must be checked against its own spec, never against plain "010",
+// and vice versa; `findSpecFile` below already keeps them apart on its own (its prefix always includes
+// the trailing hyphen), so capturing the fuller number here is the only change needed.
+const SLICE_NUMBER_RE = /\b(takt-)?(\d{3}[a-z]?)\b/g;
 const ACCEPTED_STATUS_RE = /^\*\*Status:\*\*\s*(accepted|angenommen)\b/m;
 
 function readStdinJson() {

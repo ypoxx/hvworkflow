@@ -20,7 +20,9 @@
  * only when the spec's list already allows `package.json` (the root manifest).
  *
  * Skips (exit 0, with a note) rather than failing when the branch does not follow the
- * `claude/slice-NNN-…`/`claude/takt-NNN-…` naming scheme and no `--slice`/`--takt`/`--spec` was given
+ * `claude/slice-NNN[a-z]?-…`/`claude/takt-NNN[a-z]?-…` naming scheme (a single optional lowercase
+ * letter suffix, e.g. `010b`, is its own slice, distinct from plain `010` — takt-010 goal 1) and no
+ * `--slice`/`--takt`/`--spec` was given
  * (e.g. the orchestrator's own day-report branch) — this is the only situation this gate treats as
  * "not applicable". Once a slice/takt branch *is* identified, every later failure is a hard exit 1,
  * including the merge-base/integration ref being unresolvable: round 1, M1 found that a silent skip
@@ -116,6 +118,29 @@ function extractFilesAllowedSection(specText) {
   return lines.slice(startIdx + 1, endIdx).join('\n');
 }
 
+/** takt-010 goal 3: a bare filename (no `/` at all) that is itself a real file directly at the
+ * repository root is that root file — the directory of an earlier full path in the same paragraph is
+ * never carried onto it. Without this, the first version of the takt-007 spec (a plain paragraph, not
+ * a bulleted list: `` `docs/agentische-entwicklung-plan.md` (…), `README.md`, `docs/slices/…md` (…). ``)
+ * turned the bare `README.md` into `docs/README.md`.
+ *
+ * A glob with wildcard characters (`*`, `?`, `{`) is never resolved this way — it cannot name a single
+ * real file, and existing specs rely on the carry-over for exactly such globs (e.g. takt-003's
+ * `` `docs/adr/0003-*.md`, `0009-*.md`, `0010-*.md`, … `` — every one of those bare names is meant to
+ * live in `docs/adr/`, and none of them is a real file at the repository root anyway). This is a
+ * narrower reading, never a wider one (a bare name is either the root file it names, when one really
+ * exists, or the carried directory — never both): 020's shorthand (`003-y.spec.ts`, `abnahme.spec.ts`
+ * after `apps/web/e2e/002-x.spec.ts`) is untouched by it, because none of those names exist as real
+ * files at the repository root at all. */
+function isRealRootFile(root, bareName) {
+  if (/[*?{]/.test(bareName)) return false;
+  try {
+    return existsSync(join(root, bareName));
+  } catch {
+    return false;
+  }
+}
+
 /** Every backtick-quoted span in the section is a path glob — the convention every spec in
  * docs/slices/ follows, wrapped markdown lines and multiple paths per bullet included.
  *
@@ -125,8 +150,9 @@ function extractFilesAllowedSection(specText) {
  * third live in `apps/web/e2e/` too, not at the repository root. The directory context resets at every
  * new bullet (a line starting with `- `), so an unrelated bare name in its *own* bullet (e.g.
  * `` `package.json` (Root, nur Skripte) ``) is never accidentally prefixed with some earlier bullet's
- * directory. */
-function extractGlobs(sectionText) {
+ * directory. takt-010 goal 3: except when the bare name is itself a real file at the repository root
+ * (`isRealRootFile`) — then the carry-over never applies, root wins. */
+function extractGlobs(sectionText, root) {
   const lines = sectionText.split('\n');
   const bullets = [];
   let current = [];
@@ -147,7 +173,7 @@ function extractGlobs(sectionText) {
       let glob = m[1];
       if (glob.includes('/')) {
         currentDir = glob.slice(0, glob.lastIndexOf('/'));
-      } else if (currentDir) {
+      } else if (currentDir && !isRealRootFile(root, glob)) {
         glob = `${currentDir}/${glob}`;
       }
       globs.push(glob);
@@ -176,10 +202,16 @@ function resolveBranchName(root) {
   }
 }
 
+// takt-010 goal 1: an optional single lowercase letter suffix (`010b`) is its own slice, distinct from
+// the plain `010` — before this, `\d{3}-` required the hyphen right after the three digits, so a
+// branch like `claude/slice-010b-…` never matched at all and the gate fell through to "not on a
+// claude/slice-NNN-… branch … skipping" (Quellen-ID: Bericht of 010b, exactly that skip). `findSpecFile`
+// below already keeps `010` and `010b` apart on its own — its prefix match always includes the trailing
+// hyphen (`010-` vs `010b-`), so passing the fuller number through here is the only change needed.
 function detectSliceFromBranch(root) {
   const branch = resolveBranchName(root);
   if (!branch) return undefined;
-  const m = branch.match(/^claude\/(slice|takt)-(\d{3})-/);
+  const m = branch.match(/^claude\/(slice|takt)-(\d{3}[a-z]?)-/);
   return m ? { kind: m[1], number: m[2], branch } : undefined;
 }
 
@@ -294,7 +326,7 @@ function main(argv) {
     console.error(`slice-scope: ${specRelPath} has no "## Files allowed" section.`);
     return 1;
   }
-  const globs = extractGlobs(sectionText);
+  const globs = extractGlobs(sectionText, root);
   if (globs.length === 0) {
     console.error(`slice-scope: ${specRelPath}'s "Files allowed" section has no backtick-quoted path.`);
     return 1;
