@@ -47,6 +47,7 @@ außerhalb der Features.
 - `apps/web/src/features/{speakers,capture,answers,stage,history}/**`
 - `apps/web/e2e/010c-lesezustand.spec.ts` (neu)
 - `docs/slices/010c-lesezustand-je-ladevorgang.md`
+- `docs/evidence/010c-*.png` (Nachtrag des Architekten 24.09.: Beweis-Screenshot nach Regel 2, Review-Befund 8)
 
 ## Akzeptanzkriterium
 
@@ -231,4 +232,38 @@ Administration, Akteur im selben Task gesetzt und zurückgesetzt (die Ansicht si
 
 ## Review findings
 
-(vom Reviewer)
+Runde 1 (Opus 5.5, frischer Kontext, Perspektive Barrierefreiheit und Lesezustände; HEAD `7f17174`): Gates exit 0,
+Playwright 59/59, axe ohne serious/critical; roter Lauf auf `c6ad01f` 14 rot / 2 grün bestätigt; die fünf Kopien des
+Musters sind byte-gleich. Kein Rechteproblem (Server lehnt jeden Schreibversuch über veraltete `_actions` ab). Urteil:
+mergebereit mit Auflagen.
+
+1. **minor** — Ziel 5 verschluckt echte Fehler, solange die Auswahl besteht, nicht nur direkt nach dem Wechsel
+   (`answers/useBacklog.ts:204, 248`, `answers/lib.ts:241`; `selectedBy` wird nur bei neuer Auswahl zurückgesetzt).
+   Sonde: admin wählt Zeile 0 → Wechsel zu moderation (liest sie) → Suche → `getQuestion` 500 → 0 Toasts (vorher 1).
+2. **minor, vorher schon da** — Zeilen und `_actions` der vorigen Rolle bleiben nach dem Wechsel bis zur ersten
+   Antwort bedienbar; Server lehnt ab (maskierter 404, Toast mit englischem Titel). Verstößt kurz gegen D9 („was nicht
+   erlaubt ist, wird nicht angeboten“), nicht gegen Regel 4.
+3. **minor** — Muster in den Detail-Lesevorgängen der Beantwortung unvollständig (`useBacklog.ts:267` `getQuestion`,
+   `:292` `getQuestionHistory`, `:167` Einheiten/Tagesordnung nur mit `cancelled`).
+4. **minor** — Nach einem Fehler zeigt die Ansicht einen leeren Zustand mit falscher Aussage: Beantwortung „Kein
+   Treffer … Auswahl zurücksetzen“ (vorher schon so bei jedem ersten 500); Bühne, gleiche Rolle, 500 nach Verweigerung
+   „Die Bühne ist frei“ (neu in 010c, `stage/Page.tsx:288`, `:507`, `Podium.tsx:216`).
+5. **minor, vorher schon da (takt-008)** — Ausgang eines älteren Schreibens wirkt auf die jetzt gezeigte Frage
+   (`answers/Page.tsx:98, 103, 132`, `QuestionDetail.tsx:214-218`): 412 zeigt „Stand veraltet“ über B, Erfolg schließt
+   B's Dialog und leert B's Entwurf.
+6. **nit** — `readVerdict`, `settledFor`, `KeyedRead` in speakers, stage, capture nur von Tests benutzt.
+7. **nit** — Während des Ladens bleibt das Urteil des vorigen Schlüssels stehen, auch die Verweigerung einer anderen
+   Rolle; weicht vom Wortlaut „nur Zustände des aktuellen Schlüssels“ ab.
+8. **minor (Prozess)** — kein Screenshot in `docs/evidence/` (Files allowed ließ es nicht zu).
+9. **nit** — Status-Zeile noch „spec“.
+
+Entscheidung des Architekten:
+- In dieser Scheibe beheben: 1 (mit e2e), 3, 4 nur für den neuen Bühnenfall (eine Verweigerung gehört dem Akteur:
+  bei gleichem Akteur und nur neuer `version` bleibt sie stehen, bis eine Antwort des aktuellen Schlüssels sie
+  ersetzt; ein gewöhnlicher Fehler derselben Rolle ersetzt sie nicht), 6 (ungenutzte Exporte entfernen, Tabelle für
+  `loadKey`/`isCurrentLoad` bleibt je Feature), 8 (Files allowed ergänzt), 9.
+- 7 angenommen: Das vorige Urteil bleibt bis zur ersten Antwort des neuen Schlüssels stehen, damit nichts flackert
+  (Designprinzip 8); die Bühne setzt beim Akteurwechsel zurück, weil sie ohnehin neu aufbaut. Der Satz „zeigt nur
+  Zustände des aktuellen Schlüssels“ gilt für Antworten, nicht für den Übergang.
+- 2, 5 und der schon bestehende Teil von 4 (Beantwortung) gehen in die Folgescheibe 010d „Ansichtsdaten gehören dem
+  Schlüssel des Akteurs; gestalteter Ladefehler; alte Schreibvorgänge wirken nur auf ihre Frage“.
