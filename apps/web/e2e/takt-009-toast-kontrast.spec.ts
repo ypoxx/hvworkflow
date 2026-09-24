@@ -3,18 +3,27 @@
  *
  * Trigger (goal 2 of the spec): a question is merged into itself. `question.merge` (R-TRANS-12,
  * `packages/domain/src/transitions.ts`) carries its own guard, R-GUARD-05
- * (`notMergingIntoSelf`, "A question cannot be merged into itself."). The guard evaluates the
- * *payload* (`intoQuestionId === q.id`), never the read side of any permission, so it refuses the
- * write for every role that may merge at all, on every run, independent of the seeded corpus'
- * exact contents — only that at least one `classified` question exists, which the 800-question
- * corpus (`packages/domain/src/seed.ts`) always provides. The interface reaches it without any
- * test hook: open a `classified` question's own "Zusammenführen" dialog and type that same
- * question's own number (read off its own row, `data-number`) as the merge target —
- * `MergeDialog.onResolve` (`ActionDialogs.tsx`) resolves a number to an id through
- * `HvApi.listQuestions`, exactly the way a person mistyping the wrong number would, and
- * `api.mergeQuestion(question.id, targetId, …)` (`Page.tsx`) then sends `id === intoQuestionId`.
- * `capture` is one of the two roles the merge action is bundled for (`ROLE_PERMISSIONS`,
- * `packages/domain/src/permissions.ts`), the same role slices 013b/020 already use at this desk.
+ * (`notMergingIntoSelf`, "A question cannot be merged into itself."). The guard itself evaluates
+ * only the *payload* (`intoQuestionId === q.id`), never a read permission, so the refusal fires for
+ * every role that may merge at all, on every run, independent of the seeded corpus' exact contents
+ * — only that at least one `classified` question exists, which the 800-question corpus
+ * (`packages/domain/src/seed.ts`) always provides. The interface reaches it without any test hook:
+ * open a `classified` question's own "Zusammenführen" dialog and type that same question's own
+ * number (read off its own row, `data-number`) as the merge target — `MergeDialog.onResolve`
+ * (`ActionDialogs.tsx`) resolves a number to an id through `HvApi.listQuestions`, exactly the way a
+ * person mistyping the wrong number would, and `api.mergeQuestion(question.id, targetId, …)`
+ * (`Page.tsx`) then sends `id === intoQuestionId`.
+ *
+ * Rework after review (Codex minor 2, slice 010 now in the base): the *rule line on screen* is not
+ * as read-independent as the guard itself. `transition()` (`packages/domain/src/api.ts`,
+ * Festlegung 8, slice 010) only puts the reason and the rule id on the 409 when the actor can also
+ * read the question (`can(actor, 'question.read', q).allow`); otherwise the problem is the generic
+ * "Transition not allowed." with no rule id at all, and this test's `ruleLine` assertion would fail
+ * loudly rather than pass silently if that changed. `capture` (admin also holds `question.merge`,
+ * `ROLE_PERMISSIONS`, `packages/domain/src/permissions.ts`) holds `question.read` unscoped, so it
+ * sees the real reason and rule id on every question regardless of status — the trigger below still
+ * needs no read right beyond what `capture` already has for everything on this desk, but it is no
+ * longer accurate to call the rule *line* read-independent in general, only the guard.
  *
  * Candidates checked and set aside:
  *   - A stale `answerVersion` on `question.approve` (R-GUARD-04) — `QuestionDetail.tsx` always
@@ -33,6 +42,10 @@
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
+
+/** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
+const evidence = (name: string): string =>
+  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
 const SEEDED_QUESTIONS = 800;
 
@@ -85,7 +98,15 @@ test('takt-009: Regelzeile im Toast bei verweigerter Selbst-Zusammenführung —
   await expect(ruleLine).toBeVisible();
   await expect(ruleLine).toContainText('R-GUARD-05');
 
+  // Evidence (AGENTS.md rule 2, Codex P1): the rule line, on screen, at readable contrast.
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('takt-009-toast.png') });
+
   // No exception for the toast (goal 2): the whole page, with the toast and the still-open merge
   // dialog behind it, must be free of serious/critical findings, `color-contrast` included.
   await checkAxe(page, 'toast (Regelzeile, Selbst-Zusammenführung abgelehnt)');
+
+  // minor 1 (review): `checkAxe` runs two full passes; proof the toast was still the thing on
+  // screen throughout both, not something that auto-dismissed (`DISMISS_AFTER_MS`, 9s) mid-check.
+  await expect(ruleLine).toBeVisible();
 });
