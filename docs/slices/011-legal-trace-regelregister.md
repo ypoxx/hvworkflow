@@ -677,7 +677,49 @@ Tabelle in Abschnitt 9 entsprechend ergänzt. Festlegung 5 eingehalten: kein Ver
 oder „geprüft" in den neuen Zitaten (`grep` auf die geänderten Zeilen).
 `git diff --exit-code -- packages/domain/policy-truth-table.md`: leer.
 
-`pnpm gates`-Ende: folgt im nächsten Commit dieses Abschnitts, gelaufen auf dem committeten Stand.
+`pnpm -C /home/user/wt/011 gates` auf dem committeten Stand `8f97f6d` (sauberer Baum), Exit 0. Auszug, wörtliche Zeilen aus dem Lauf (Testsummen, Tore, Ende; Vite-Hinweise zu Sourcemap und Chunkgröße weggelassen):
+
+```
+packages/domain test:  Test Files  6 passed (6)
+packages/domain test:       Tests  85 passed (85)
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  48 passed (48)
+apps/api test:  Test Files  6 passed (6)
+apps/api test:       Tests  55 passed (55)
+
+vocabulary-check: ok
+x 7 dependency violations (0 errors, 7 warnings). 139 modules, 505 dependencies cruised.
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+Downgrade check: 14 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+...
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7940.619971
+> @hv/web@0.0.0 build /home/user/wt/011/apps/web
+> tsc -b && vite build
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1715 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-frBADcGl.js                        543.92 kB │ gzip: 159.76 kB │ map: 2,217.06 kB
+✓ built in 1.61s
+mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) at commit 8f97f6d, tree 0acdf6f2af90…
+```
+
+Kein `FAIL`/`not ok` im Lauf (`grep`); `arch`: dieselben sieben vorbestehenden Warnungen. Dieser Absatz kam in einem reinen `docs/`-Commit danach dazu.
 
 ## Review findings
 
