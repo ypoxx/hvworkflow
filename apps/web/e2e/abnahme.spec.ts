@@ -10,8 +10,8 @@
  * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
  * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
  * exactly version 1 (Legal Clearing), put on the podium and read out (Freigabe, Podium) — and the
- * history, read by the Versammlungsbüro (moderation, which held `history.read` where podium no
- * longer does after slice 010's read grants), proves every one of those steps afterwards.
+ * history, read by the Versammlungsbüro (under slice 010's Festlegung 4 moderation holds
+ * `history.read`, podium does not), proves every one of those steps afterwards.
  */
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
@@ -227,9 +227,9 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   /* ---------- Podium: read out our question ---------- */
   await asRole(page, 'podium');
   // Point #3/#9 (slice 020): the podium role now defaults to "Nur Bühne"; this walk-through still
-  // needs the ordinary shell (it navigates on to "Historie" afterwards without switching role), so
-  // it starts from the explicit choice a person would otherwise have made — the stored preference
-  // always wins over the default.
+  // needs the ordinary shell (the "Nur Bühne" overlay would cover the role switcher it uses next to
+  // hand the history to the Versammlungsbüro), so it starts from the explicit choice a person would
+  // otherwise have made — the stored preference always wins over the default.
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
 
   const stageNavStart = await page.evaluate(() => performance.now());
@@ -270,9 +270,9 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   // Read out: deliver (and, since the podium role may also close, straight into "abgeschlossen").
   await page.getByTestId('stage-next').click();
 
-  /* ---------- Historie: every step of this one question is on the record. Slice 010: podium lost
-   * `history.read` (Festlegung 4, it only holds `stage.read`), so the Versammlungsbüro
-   * (moderation) — which already held `history.read`/`question.read` — reads the history instead;
+  /* ---------- Historie: every step of this one question is on the record. Slice 010 puts the
+   * history behind `history.read` (Festlegung 4): moderation holds it together with `question.read`,
+   * podium does not (it holds `stage.read`), so the Versammlungsbüro reads the history;
    * the acceptance sentence itself (docs/erste-version-und-offene-fragen.md §1) is unaffected, it
    * ends at "schließt sie ab". ---------- */
   await asRole(page, 'moderation');

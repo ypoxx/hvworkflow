@@ -388,8 +388,8 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
    * Point #26 (Beantwortung) + #10 (leerer Zustand: Filter ohne Treffer) + #28 + #32.
    * Slice 010: `observer` now holds only `question.read.delivered` (delivered/closed, Festlegung
    * 2), so filtering by `assigned` would 403 with R-PERM-03 before ever reaching a row — `expert`
-   * demonstrates the same "no editing action on any question" property on a status (`captured`) it
-   * may read but not touch, and still reaches `closed` afterwards for the "at rest" half below.
+   * shows the read-only hint on a question it may read but not touch (`captured`, before
+   * assignment), and still reaches `closed` afterwards for the "at rest" half below.
    * ========================================================================================= */
   await asRole(page, 'expert'); // question.read on every status, but no editing action before assignment
   await page.getByTestId('nav-answers').click();
@@ -417,7 +417,7 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.getByTestId('answers-search').fill('');
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
 
-  await asRole(page, 'expert');
+  // Still `expert` from point #26 above — the drafting half needs no role switch.
   await page.getByTestId('answers-filter-status-answer_drafted').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'answer_drafted');
   await page.getByTestId('answers-row').first().click();

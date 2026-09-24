@@ -303,9 +303,9 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.getByTestId('stage-only-toggle').click();
   await expect(overlay).toHaveCount(0);
 
-  /* ---------- Historie: every step of that one question is on the record. Slice 010: podium lost
-   * `history.read` (Festlegung 4, it only holds `stage.read`), so the search and timeline move to
-   * moderation, which already held `history.read`/`question.read`. ---------- */
+  /* ---------- Historie: every step of that one question is on the record. Slice 010 puts the
+   * history behind `history.read` (Festlegung 4): moderation holds it together with `question.read`,
+   * podium does not, so the search and timeline move to moderation. ---------- */
   await asRole(page, 'moderation');
   await page.getByTestId('nav-history').click();
   await expect(page).toHaveURL(/\/history$/);

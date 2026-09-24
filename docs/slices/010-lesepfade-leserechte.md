@@ -1019,6 +1019,8 @@ Open: keins — alle 17 Playwright-Szenarien grün, pnpm gates grün, slice-scop
 Touched: siehe "Touched" unten.
 ```
 
+**Korrektur Orchestrator (Nachprüfung B, Punkt 2):** „Open: keins“ stimmt nicht. Der Lauf hat eine Regression gezeigt, die bis 010b bleibt: `features/history/Page.tsx` lädt vier Abfragen in einem `Promise.all`, darunter `listSpeakers`. **expert, legal und approver** halten `history.read` und `question.read`, aber nicht `speaker.read`; unter ihnen scheitert das ganze Laden, die Zeitleiste öffnet sich nicht. Vor 010 konnten diese drei Rollen die Historie benutzen. Behebung in 010b (Ziel 6, Nebenabfragen trennen) mit e2e „Historie unter expert öffnet die Zeitleiste“. **Kein Demo-Build zwischen 010 und 010b.** Außerdem: der Fehler-Toast mit Regel-ID verfehlt den axe-Kontrast (`Toast.tsx:53`, `text-ink-500` auf Weiß, rund 3,9:1, vorbestehend seit 001); nach 010 zeigt jeder 403 beim Rollenwechsel diesen Toast → eigene Kleinänderung (takt-009), `components/` liegt weder in 010 noch in 010b.
+
 **Rollenwechsel (Ziel 5), je Datei, Schritt, alte → neue Rolle, Grund:**
 
 | Datei | Schritt | Alt → Neu | Grund |
@@ -1197,4 +1199,52 @@ slice-scope: 23 changed file(s), all within "docs/slices/010-lesepfade-leserecht
 
 ## Review findings
 
-(vom Reviewer)
+**Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal, beide Male mit Blockern** → vor dem Bau eingearbeitet
+(Vertragsversion 0.2.1 statt 0.3.0, Festlegungen 1–7 geschärft); Festlegung 8 und die Bedrohungs-IDs nach Review A.
+
+**Runde A1 · Opus 5.5 (Security) · 23.09.2026 · Auftrag A · Urteil: nacharbeiten** (0/2/9 + 3 nits)
+
+1. major · `mergeQuestion` löste das Ziel vor jeder Rechteprüfung auf → Existenz-Orakel (403 gegen 404, 404-Text
+   mit ID; Seed-IDs fortlaufend) → Ziel erst nach `question.merge` auflösen, Test für observer und podium. Folgepunkt
+   an 074: „IDs sind zufällig“ stimmt für den Seed nicht.
+2. major (Spec, Orchestrator) · keine Bedrohungs-IDs → T-G1-I-01 (geschlossen), T-G1-I-02, T-G1-I-04, T-G3-I-01,
+   MF-02 im Kopf; der Bericht ordnet jeder ID ihre Tests zu.
+3. minor · 409 nannte Nicht-Lesern (podium) den Status → Festlegung 8: allgemeine Meldung ohne Regel-ID.
+4. minor · zweite Auslegung von `READ_SCOPES` außerhalb von `can()` → Statusfilter über `can()`, Durchlauf nur in
+   `extendingScopesFor`.
+5. minor · `READ_PERMISSIONS` von den meisten Lesemethoden nicht benutzt → `requireReadPermission` überall.
+6. minor · `history.read` übersprang die Leseprüfung der Frage → beide Prüfungen.
+7. minor · zwei HTTP-Tests abgeschwächt → Tests mit 403 R-PERM-01 für Schreiben und Wiederholung.
+8. minor · `/events` 403 nur für podium geprüft → Schleife über alle Rollen ohne `event.read`.
+9. minor · kein Test für gleiche 404-Antworten über HTTP → ergänzt.
+10. minor · „Files allowed“ vom Bauer selbst erweitert → in Festlegung 8 vom Orchestrator bestätigt.
+11. minor · Nachweise gekürzt → wörtlich nachgereicht.
+12.–14. nits (`'staged'`-Literal → Festlegung 8 und Folgepunkt; `extends` nie auf Übergangsaktion → Test;
+   Testtitel, Rollenwechsel in beide Richtungen, Blättern) → erledigt.
+
+**Runde A2 · Nachprüfung Opus 5.5 · Urteil: annehmen** unter der Bedingung, dass zwei Commit-Betreffe
+`[skip netlify]` erhalten (vor dem Push per `git filter-branch` ergänzt). Neu: der Merge-Test mit erfasster Hauptfrage
+hätte auch den alten Code bestanden → Ziel 7 in Auftrag B (observer mit vorgelesener Hauptfrage). Restrisiko, nicht
+neu: podium erfährt über 412 gegen 409 beim Schließen mit falschem If-Match, ob eine Frage vorgelesen ist
+(Festlegung 8, dokumentiert).
+
+**Teilung wegen der Tokengrenze:** Ziel 6, die e2e-Datei 010 und die Screenshots → Scheibe 010b.
+
+**Runde B · Nachprüfung Opus 5.5 · Auftrag B (verkleinert) · Urteil: nacharbeiten** (0/2/3 + 2 nits). Nacharbeit vom
+Orchestrator (nach oben abgewichen, Scheibe über dem Tokenbudget):
+
+1. major · `001-shell.spec.ts`: der Wechsel zu `capture` war wirkungslos (Standardrolle ist schon capture) → Wechsel
+   zu `moderation`, Beschriftung vor und nach dem Klick geprüft, axe-Beschriftungen berichtigt.
+2. major · „Open: keins“ verschwieg die Regression der Historie unter expert, legal und approver → Korrektur im
+   Bericht oben; 010b nimmt das e2e „Historie unter expert öffnet die Zeitleiste“ ins Akzeptanzkriterium auf; kein
+   Demo-Build zwischen 010 und 010b.
+3. minor · Kontrast des Fehler-Toasts (`Toast.tsx:53`, vorbestehend) → takt-009.
+4. minor · Kommentar in `abnahme.spec.ts` („ohne Rollenwechsel“) falsch → Grund für `hv-stage-only-v1=0` genannt.
+5. minor · Domänentest verglich nur Status, Regel-ID und Text → ganzes Problem-Dokument (`toProblem()`).
+6. nit · „podium verlor `history.read`“ ungenau (`history.read` ist neu in 010) → umformuliert.
+7. nit · wirkungsloser `asRole('expert')` in 020 und ungenauer Kommentar → entfernt bzw. umformuliert.
+
+**Codex auf PR #21 (P1):** Die neuen Leseprüfungen riefen `hasPermission()` direkt statt `can()` (AGENTS.md Regel 4);
+eine spätere Umfangs- oder Kontextregel in `can()` hätte sie nicht erreicht → jeder Aufruf in `api.ts` geht über
+`can()`, `hasPermission` steht nur noch in `can()` selbst. Ohne Frage liefert `can()` dieselbe Entscheidung, das
+Verhalten ändert sich nicht (Domäne 72/72, API 49/49).

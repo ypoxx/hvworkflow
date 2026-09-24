@@ -224,7 +224,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
 
   const viewSpeaker = (s: SpeakerRecord): Speaker => ({
     ...s,
-    _actions: SPEAKER_ACTIONS.filter((p) => hasPermission(actor(), p).allow),
+    _actions: SPEAKER_ACTIONS.filter((p) => can(actor(), p).allow),
   });
   const viewQuestion = (q: QuestionRecord): Question => ({
     ...q,
@@ -247,15 +247,18 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     if (!c) throw new ApiProblem(404, 'Not found', `Contribution ${id} does not exist.`);
     return c;
   };
+  // Every decision in this file goes through `can()` (AGENTS.md rule 4, Codex on PR #21), even where
+  // no question is involved and `can()` is the bare permission check today — a scope or context rule
+  // added to `can()` later then reaches every read and write path without a second edit.
   const requirePermission = (p: Permission): void => {
-    const d = hasPermission(actor(), p);
+    const d = can(actor(), p);
     if (!d.allow) throw new ApiProblem(403, 'Forbidden', d.reason, d.ruleId);
   };
   /** A method that accepts more than one permission (`READ_PERMISSIONS`, types.ts): allow if the
    * actor holds any of them, else 403 with the first denial's reason/rule id (every permission in
    * `perms` is a read permission, so that is always R-PERM-02). */
   const requireAnyPermission = (perms: readonly Permission[]): void => {
-    const denials = perms.map((p) => hasPermission(actor(), p)).filter((d): d is Extract<Decision, { allow: false }> => !d.allow);
+    const denials = perms.map((p) => can(actor(), p)).filter((d): d is Extract<Decision, { allow: false }> => !d.allow);
     if (denials.length < perms.length) return; // at least one permission was granted
     const first = denials[0]!;
     throw new ApiProblem(403, 'Forbidden', first.reason, first.ruleId);
@@ -275,7 +278,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
    */
   const requireQuestionFor = (id: string, operationPermission: Permission): QuestionRecord => {
     const q = state.questions.get(id);
-    if (hasPermission(actor(), operationPermission).allow) {
+    if (can(actor(), operationPermission).allow) {
       if (!q) throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
       return q;
     }
@@ -325,7 +328,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   ): Question =>
     idempotent(`${action}:${id}`, opts, () => {
       const q = requireQuestionFor(id, action);
-      const perm = hasPermission(actor(), action);
+      const perm = can(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
       const t = resolveTransition(q, action, payload);
       if (!t.ok) {
@@ -670,7 +673,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // `actor()` at runtime — a subscription started under one role must not keep leaking events
       // once the demo user switches to a role without `event.read`.
       return store.subscribe((events) => {
-        listener(hasPermission(actor(), 'event.read').allow ? events : []);
+        listener(can(actor(), 'event.read').allow ? events : []);
       });
     },
   };

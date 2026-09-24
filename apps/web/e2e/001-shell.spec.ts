@@ -59,19 +59,22 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   // Slice 013, goal 1: axe at every view change — the resting speakers list, before any role/language
   // switch.
-  await checkAxe(page, 'shell (speakers, moderation, de)');
+  await checkAxe(page, 'shell (speakers, capture, de)');
 
-  // Rights are data: switching the persona is the only role decision in the interface.
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-capture').click();
+  // Rights are data: switching the persona is the only role decision in the interface. The demo
+  // starts as the capture desk (`DEMO_ACTORS[1]`), so the switch goes to the meeting office — a role
+  // that also holds `speaker.read` (slice 010: podium no longer does) and a change the test can see.
   await expect(page.getByTestId('role-switcher')).toContainText('Erfassung');
+  await page.getByTestId('role-switcher').click();
+  await page.getByTestId('role-option-moderation').click();
+  await expect(page.getByTestId('role-switcher')).toContainText('Versammlungsbüro');
 
   const headerTitle = page.getByTestId('header-meeting-title');
   await expect(headerTitle).toContainText('Runde');
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell.png') });
-  await checkAxe(page, 'shell (speakers, capture role, de)');
+  await checkAxe(page, 'shell (speakers, moderation role, de)');
 
   // Every visible string changes with the language, including the header.
   await page.getByTestId('lang-option-en').click();
@@ -83,7 +86,7 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('001-shell-en.png') });
-  await checkAxe(page, 'shell (speakers, capture role, en)');
+  await checkAxe(page, 'shell (speakers, moderation role, en)');
 });
 
 test('header strip on the answers desk @screenshot', async ({ page }) => {

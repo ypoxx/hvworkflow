@@ -538,9 +538,8 @@ describe('read rights (slice 010)', () => {
     // the hidden target and the unknown one produce the identical response, id and all.
     expect(hidden!.status).toBe(403);
     expect(hidden!.ruleId).toBe('R-PERM-01');
-    expect(unknown!.status).toBe(hidden!.status);
-    expect(unknown!.ruleId).toBe(hidden!.ruleId);
-    expect(unknown!.detail).toBe(hidden!.detail);
+    // The whole problem document, title included (Nachprüfung B, point 5).
+    expect(unknown!.toProblem()).toEqual(hidden!.toProblem());
   });
 
   it('409 detail (Festlegung 8): an actor who may not read the question gets a generic detail with no status and no rule id; a reader keeps both', async () => {
