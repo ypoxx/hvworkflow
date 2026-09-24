@@ -14,9 +14,13 @@
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inject } from 'vitest';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+import type { ValidateFunction } from 'ajv';
 import type { App } from '../app.ts';
 import {
   documentedStatuses,
+  escapePointer,
   expectValid,
   expectValidProblem,
   matchOperationId,
@@ -118,29 +122,66 @@ function assertUnderDeclaredBaseUrl(operationId: string, method: string, pathnam
   }
 }
 
-/** The (possibly `$ref`-ed) response object the contract declares for this operation and status. */
-function responseObjectOf(operationId: string, status: number): Record<string, unknown> | undefined {
+/** JSON Pointer (into the document) of the response object for this operation and status, `$ref` followed once. */
+function responsePointerOf(operationId: string, status: number): string {
   const op = operations[operationId]!;
   const responses = (openapiDoc.paths[op.path][op.method] as { responses: Record<string, unknown> }).responses;
   const node = responses[String(status)] as Record<string, unknown> | undefined;
-  if (node !== undefined && '$ref' in node) return resolvePointer(node['$ref'] as string) as Record<string, unknown>;
-  return node;
+  if (node !== undefined && '$ref' in node) return node['$ref'] as string;
+  return `#/paths/${escapePointer(op.path)}/${op.method}/responses/${status}`;
+}
+
+/** The (possibly `$ref`-ed) response object the contract declares for this operation and status. */
+function responseObjectOf(operationId: string, status: number): Record<string, unknown> | undefined {
+  return resolvePointer(responsePointerOf(operationId, status)) as Record<string, unknown> | undefined;
+}
+
+// Header schemas are compiled here rather than in `contractSchema.ts` (outside this slice's files);
+// the same document, the same Ajv settings.
+const headerAjv = new Ajv2020({ strict: false, allErrors: true });
+addFormats(headerAjv);
+headerAjv.addSchema(openapiDoc, 'openapi');
+const headerValidators = new Map<string, ValidateFunction>();
+function headerValidator(schemaPointer: string): ValidateFunction {
+  let validate = headerValidators.get(schemaPointer);
+  if (validate === undefined) {
+    validate = headerAjv.compile({ $ref: `openapi${schemaPointer}` });
+    headerValidators.set(schemaPointer, validate);
+  }
+  return validate;
 }
 
 /**
- * Codex on 8ef3ad2: a response that lacks a header the contract marks `required: true` for its status
- * (`ETag` on the 0.3.0 writes, `Location` on the sign-in redirects, `Set-Cookie` on the callback)
- * breaks the contract as much as a wrong body does, so it fails the test and is never a coverage hit.
- * Optional headers (the 0.2 `ETag`, `X-Server-Time`) are not checked here.
+ * Codex on 8ef3ad2 and on 50cc738: a response that lacks a header the contract marks `required: true`
+ * for its status (`ETag` on the 0.3.0 writes, `Location`, `Set-Cookie` and `Cache-Control` on the
+ * sign-in path), or sends a declared header whose value does not match its schema (a `Location` off
+ * the origin, a cookie without `HttpOnly`, an `ETag` that is no entity-tag), breaks the contract as
+ * much as a wrong body does: the test fails and the call is never a coverage hit. Optional headers
+ * are validated when present.
  */
-function assertRequiredHeaders(operationId: string, method: string, pathname: string, res: Response): void {
-  const headers = (responseObjectOf(operationId, res.status)?.['headers'] ?? {}) as Record<string, Record<string, unknown>>;
-  for (const [name, raw] of Object.entries(headers)) {
-    const header = ('$ref' in raw ? resolvePointer(raw['$ref'] as string) : raw) as { required?: boolean };
-    if (header.required === true && res.headers.get(name) === null) {
+function assertResponseHeaders(operationId: string, method: string, pathname: string, res: Response): void {
+  const base = responsePointerOf(operationId, res.status);
+  const headers = (resolvePointer(base) as Record<string, unknown> | undefined)?.['headers'] as
+    | Record<string, Record<string, unknown>>
+    | undefined;
+  for (const [name, raw] of Object.entries(headers ?? {})) {
+    const pointer = '$ref' in raw ? (raw['$ref'] as string) : `${base}/headers/${escapePointer(name)}`;
+    const header = resolvePointer(pointer) as { required?: boolean };
+    const value = res.headers.get(name);
+    if (value === null) {
+      if (header.required === true) {
+        throw new Error(
+          `${method} ${pathname} ("${operationId}") returned ${res.status} without the response header ` +
+            `"${name}", which the contract marks as required for this status.`,
+        );
+      }
+      continue;
+    }
+    const validate = headerValidator(`${pointer}/schema`);
+    if (!validate(value)) {
       throw new Error(
-        `${method} ${pathname} ("${operationId}") returned ${res.status} without the response header ` +
-          `"${name}", which the contract marks as required for this status.`,
+        `${method} ${pathname} ("${operationId}") returned ${res.status} with response header "${name}: ${value}", ` +
+          `which does not match its contract schema:\n${JSON.stringify(validate.errors, null, 2)}`,
       );
     }
   }
@@ -193,7 +234,7 @@ async function assertMatchesContract(method: string, path: string, res: Response
   } else {
     expectValid(operationId, status, body, contentType);
   }
-  assertRequiredHeaders(operationId, method, pathname, res);
+  assertResponseHeaders(operationId, method, pathname, res);
   // Only a documented success counts as exercising the operation (review 023, point 2).
   if (status >= 200 && status < 400) recordOperationHit(operationId);
 }

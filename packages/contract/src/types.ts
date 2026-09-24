@@ -1196,6 +1196,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Since 0.3.0 (Codex on 50cc738, SECURITY): a path inside the application, same origin — the open-redirect rule shared by `login` (`returnTo`) and the `Location` of `completeLogin`. */
+        SameOriginPath: string;
+        /** @description Since 0.3.0 (Codex on 50cc738): a SHA-256 digest as 64 lower-case hex digits */
+        Sha256Hex: string;
+        /** @description Since 0.3.0 (security sweep after Codex on 50cc738): pseudonymous subject id of the identity provider (OIDC `sub`, at most 255 characters) or the demo actor id — never an e-mail address (no `@`) and no whitespace (ADR 0009). That it is no clear name is prose: a schema cannot tell a name from an opaque id. */
+        SubjectId: string;
         /** @description RFC 9457 problem details, extended with the rule id that produced the decision. `status` equals the HTTP status; since 0.3.0 every problem response binds it with `const` (Codex round 5; today's service builds the HTTP status from this field, so no response changes). */
         Problem: {
             /** Format: uri */
@@ -1233,10 +1239,10 @@ export interface components {
             personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026).
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047).
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "demo.seed";
         /**
          * @description Lifecycle of a meeting (Jahrgang): preparation → running → closed (rule table R-MTG, slice 025; the actions come with slice 040)
          * @enum {string}
@@ -1268,8 +1274,8 @@ export interface components {
              * @description Since 0.3.0 (slice 040): set by the configuration freeze
              */
             configFrozenAt?: string;
-            /** @description Since 0.3.0 (slice 040): SHA-256 over rights table, transition table and master data at the freeze */
-            configHash?: string;
+            /** @description Since 0.3.0 (slice 040): SHA-256 (lower-case hex) over rights table, transition table and master data at the freeze */
+            configHash?: components["schemas"]["Sha256Hex"];
             /** @description Aggregate counters for the header and the podium */
             counts: {
                 speakers?: number;
@@ -1361,7 +1367,7 @@ export interface components {
             id: string;
             meetingId: string;
             /** @description Subject of the identity provider (pseudonymous id), or the demo actor id */
-            subjectId: string;
+            subjectId: components["schemas"]["SubjectId"];
             /** @description Key into the person table (ADR 0009), when known */
             personId?: string;
             role: components["schemas"]["Role"];
@@ -1373,7 +1379,7 @@ export interface components {
              */
             expiresAt?: string;
             /** @description Set when this assignment is one of the two deputies of another holder (slice 040) */
-            deputyForSubjectId?: string;
+            deputyForSubjectId?: components["schemas"]["SubjectId"];
             /** Format: date-time */
             assignedAt: string;
             assignedBy: components["schemas"]["Actor"];
@@ -1383,13 +1389,13 @@ export interface components {
         };
         /** @description Since 0.3.0 (slice 026): body of `assignRole` */
         RoleAssignmentCreate: {
-            subjectId: string;
+            subjectId: components["schemas"]["SubjectId"];
             personId?: string;
             role: components["schemas"]["Role"];
             unitId?: string;
             /** Format: date-time */
             expiresAt?: string;
-            deputyForSubjectId?: string;
+            deputyForSubjectId?: components["schemas"]["SubjectId"];
         };
         /** @description Since 0.3.0 (slice 040): result of `freezeMeetingConfig`, also mirrored on `Meeting.configFrozenAt`/`configHash` */
         ConfigFreeze: {
@@ -1397,7 +1403,7 @@ export interface components {
             /** Format: date-time */
             frozenAt: string;
             frozenBy: components["schemas"]["Actor"];
-            configHash: string;
+            configHash: components["schemas"]["Sha256Hex"];
         };
         /** @description Since 0.3.0 (slice 029): response of `GET /auth/me`. Two variants, told apart by `scheme` — the name of the security scheme that authenticated the call (Codex round 5): `demoActor` has no session and therefore no token and no expiry; `session` always carries `subjectId`, `roles`, `expiresAt` and `csrfToken`, so a client under the cookie scheme can rely on the token. */
         Session: components["schemas"]["DemoSession"] | components["schemas"]["SignedInSession"];
@@ -1412,7 +1418,7 @@ export interface components {
             /** @description The one role of the header (equal to `actor.role` — prose, JSON Schema cannot compare values), for symmetry with the session variant */
             roles?: components["schemas"]["Role"][];
             /** @description The actor id of the header, equal to `actor.id` (prose — JSON Schema cannot compare values); declared so a client can read `subjectId` under both schemes */
-            subjectId?: string;
+            subjectId?: components["schemas"]["SubjectId"];
             idpGroups?: never;
             personId?: never;
             csrfToken?: never;
@@ -1427,7 +1433,7 @@ export interface components {
             scheme: "session";
             actor: components["schemas"]["Actor"];
             /** @description Subject of the identity provider (pseudonymous id) */
-            subjectId: string;
+            subjectId: components["schemas"]["SubjectId"];
             /** @description Key into the person table (ADR 0009), when known */
             personId?: string;
             /** @description All roles from the assignment table valid now; `actor.role` is the active one. A subject without any role never gets a session (403 at `completeLogin`). */
@@ -1439,7 +1445,7 @@ export interface components {
             expiresAt: string;
             /** @description Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004) */
             idpGroups?: string[];
-            /** @description Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029) */
+            /** @description Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029). At least 32 base64url characters (≥ 192 bits when random; security sweep after Codex on 50cc738), so it survives a header without quoting */
             csrfToken: string;
         };
         /** @description Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15) */
@@ -1769,19 +1775,19 @@ export interface components {
         RoleAssignedPayload: {
             assignmentId: string;
             /** @description Pseudonymous subject id of the identity provider or the demo actor id — never a name or an e-mail address (ADR 0009) */
-            subjectId: string;
+            subjectId: components["schemas"]["SubjectId"];
             role: components["schemas"]["Role"];
             unitId?: string;
             /** Format: date-time */
             expiresAt?: string;
-            deputyForSubjectId?: string;
+            deputyForSubjectId?: components["schemas"]["SubjectId"];
             reason?: never;
         };
         /** @description Since 0.3.0 (slice 026): payload of `RoleRevoked`; the event's `subjectId` is the assignment id. `reason` is the administrator's text from `revokeRole` and holds no personal data (ADR 0009; prose — a schema cannot inspect free text) */
         RoleRevokedPayload: {
             assignmentId: string;
             /** @description Pseudonymous subject id, as on `RoleAssigned` */
-            subjectId: string;
+            subjectId: components["schemas"]["SubjectId"];
             role: components["schemas"]["Role"];
             /** @description Revocation reason, when given */
             reason?: string;
@@ -1817,10 +1823,10 @@ export interface components {
             idempotencyKey?: string;
             /** @description Since 0.3.0: id of the event that caused this one (e.g. the intention a podium device buffered offline), when any */
             causationId?: string;
-            /** @description Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string. Pflicht ab 0.3.1, Scheibe 028. */
+            /** @description Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string (genesis). 64 lower-case hex digits or empty (Codex on 50cc738). Pflicht ab 0.3.1, Scheibe 028. */
             prevHash?: string;
-            /** @description Since 0.3.0: SHA-256 (hex) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028. */
-            hash?: string;
+            /** @description Since 0.3.0: SHA-256 (lower-case hex, Codex on 50cc738) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028. */
+            hash?: components["schemas"]["Sha256Hex"];
             /**
              * Format: date-time
              * @description Since 0.3.0 (ADR 0011): the authoritative time, always from the server clock (injected clock port, rule 8); never a device time. Pflicht ab 0.3.1, Scheibe 028.
@@ -1992,7 +1998,7 @@ export interface components {
         IfMatch: string;
         /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`SignedInSession.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there — OpenAPI cannot make a header required for one security scheme only, so the document keeps it optional and the service decides); under `demoActor` it is ignored. Declared on every state-changing operation except `logout`, which takes `CsrfTokenRequired`; not on `seedDemo` (demo only). */
         CsrfToken: string;
-        /** @description Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`, the one operation whose only security scheme is `session` — there the token is never optional, so generated clients must type it as required. */
+        /** @description Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`, the one operation whose only security scheme is `session` — there the token is never optional, so generated clients must type it as required. Deliberately no format pattern on the request (security sweep after Codex on 50cc738): a wrong token is a 403 with a rule id from slice 029, and a 422 naming the expected format would tell a forger what to send. The format binds the issuing side instead (`SignedInSession.csrfToken`). */
         CsrfTokenRequired: string;
         SpeakerId: string;
         ContributionId: string;
@@ -2026,6 +2032,8 @@ export interface components {
         ETag: string;
         /** @description Since 0.3.0 (Codex round 5): the same opaque version tag as `ETag`, always sent. Used on the responses of operations new in 0.3.0 whose description promises an ETag (meeting, agenda, units, seats, freeze, agenda progress, speech claim/release), because the next write sends it back as `If-Match`. The 0.2 responses keep the optional `ETag`. `claimQuestion` and `releaseQuestion` are new in 0.3.0 but answer with the shared `QuestionUpdated` response and therefore the optional `ETag`: that response is the 200 of every 0.2 question write, and making its header required would change eleven 0.2 operations at once (the 0.2.1 service does send it; tightening all of them is a 0.4 question). */
         ETagRequired: string;
+        /** @description Since 0.3.0 (security sweep after Codex on 50cc738): `no-store` on every response of the sign-in path (`login`, `completeLogin`, `logout`, `getSession`) — they carry a `state`, a session cookie or the CSRF token, and no shared or browser cache may keep them. Other directives may accompany it (`private, no-store`). */
+        CacheControlNoStore: string;
         /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header; optional (no `required: true`) because the unchanged 0.3.0 service does not send it yet. */
         "X-Server-Time": string;
     };
@@ -3689,7 +3697,7 @@ export interface operations {
     login: {
         parameters: {
             query?: {
-                /** @description Relative path inside the application to return to after sign-in; anything else is ignored (open-redirect guard) */
+                /** @description Relative path inside the application to return to after sign-in (open-redirect guard). The service keeps it only when it matches `SameOriginPath` — the same rule the `Location` of `completeLogin` is bound to — and otherwise ignores it (redirect to `/`). Ignored rather than rejected, so a stale bookmark never ends on an error page; the schema therefore keeps only the length limit here. */
                 returnTo?: string;
             };
             header?: never;
@@ -3702,6 +3710,7 @@ export interface operations {
             302: {
                 headers: {
                     Location: string;
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3725,9 +3734,11 @@ export interface operations {
             /** @description Signed in; redirect to `returnTo` or the application root */
             302: {
                 headers: {
-                    Location: string;
-                    /** @description Sets the `hv_session` cookie of the `session` scheme (HttpOnly, Secure, SameSite; ADR 0004). The only way a session comes into being. */
+                    /** @description `returnTo` of `login` when it matched `SameOriginPath`, else `/` */
+                    Location: components["schemas"]["SameOriginPath"];
+                    /** @description Sets the `hv_session` cookie of the `session` scheme (ADR 0004); the only way a session comes into being. Codex on 50cc738 (SECURITY): the value is at least 32 cookie octets (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Attribute names in the canonical case the service writes. Prose only: an `Expires` in the past (JSON Schema cannot compare dates). */
                     "Set-Cookie": string;
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3754,7 +3765,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`, the one operation whose only security scheme is `session` — there the token is never optional, so generated clients must type it as required. */
+                /** @description Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`, the one operation whose only security scheme is `session` — there the token is never optional, so generated clients must type it as required. Deliberately no format pattern on the request (security sweep after Codex on 50cc738): a wrong token is a 403 with a rule id from slice 029, and a 422 naming the expected format would tell a forger what to send. The format binds the issuing side instead (`SignedInSession.csrfToken`). */
                 "X-CSRF-Token": components["parameters"]["CsrfTokenRequired"];
             };
             path?: never;
@@ -3765,6 +3776,9 @@ export interface operations {
             /** @description Signed out; the cookie is cleared */
             204: {
                 headers: {
+                    /** @description Clears the `hv_session` cookie: empty value and `Max-Age=0`. Blocking the session id server-side (block list) is prose — it is not visible in the response. */
+                    "Set-Cookie": string;
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3783,9 +3797,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description OK — carries the CSRF token, so never stored by a cache */
             200: {
                 headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };

@@ -33,7 +33,8 @@ global, `/stream` with a `meetingId` filter (`/events` gets it in 0.4.0). (b) En
 columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`, `security: []`.
 (d) New permission identifiers: `contribution.claim`, `question.claim`, `agenda.manage`,
 `admin.meetings.manage`, `admin.units.manage`, `admin.seats.manage`, `admin.roles.manage`,
-`admin.config.freeze`. (e) Without credential: `/healthz`, `/readyz`, `/auth/login`, `/auth/callback`,
+`admin.config.freeze`; after Codex on 50cc738 also `question.identity.reveal` (026), `admin.override`
+(040), `question.read.protected` and `event.read.personal` (047). (e) Without credential: `/healthz`, `/readyz`, `/auth/login`, `/auth/callback`,
 `/auth/transparency-notice`; `/metrics` behind the `metricsBearer` token; global `security` is
 `demoActor` or `session`; `oidc` is `x-deprecated`.
 
@@ -171,6 +172,22 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   contract test helper now fails a response that lacks a header marked `required: true` and does not
   count it as exercised. None of these responses or requests is produced or accepted by the 0.2.1
   service today (live probe: 2329 seed events, none with `schemaVersion`, all valid).
+- Security sweep (Codex on 50cc738, 24.09.2026; table in the slice report): `completeLogin` 302
+  `Location` is a `SameOriginPath` (new schema: starts with one `/`, never `//` or `/\`, no
+  backslash, whitespace or control character; the same rule the service applies to `returnTo`, which
+  stays unvalidated because a foreign value is ignored, not rejected); its `Set-Cookie` needs a value
+  of at least 32 cookie octets plus `HttpOnly`, `Secure` and `SameSite=Lax|Strict` in any order and
+  no `Max-Age=0`; `logout` 204 requires a clearing `Set-Cookie` (`hv_session=` empty, `Max-Age=0`);
+  new header `CacheControlNoStore` (required `no-store`) on `login` 302, `completeLogin` 302,
+  `logout` 204 and `getSession` 200. `Action` +4: `question.identity.reveal`, `admin.override`,
+  `question.read.protected`, `event.read.personal`. New schemas `Sha256Hex` (`Event.hash`,
+  `Meeting.configHash`, `ConfigFreeze.configHash`; `Event.prevHash` is the same or empty) and
+  `SubjectId` (1–255 characters, no `@`, no whitespace: every subject id of `RoleAssignment`,
+  `RoleAssignmentCreate`, the role payloads and both session variants). `SignedInSession.csrfToken`
+  at least 32 base64url characters; `Event.idempotencyKey` 1–128 characters like the header; `ETag`
+  and `ETagRequired` bound to the entity-tag syntax (today's service sends `"v<n>"`, checked by the
+  whole API suite). The contract test helper validates the value of every declared response header
+  that is present, not only the presence of the required ones.
 
 ### Changed
 
@@ -186,9 +203,11 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   (`captureMeetingContribution` only), `Classification.seatId` and the `listEvents` `meetingId` filter
   to 0.4.0 (slice 043), because the service validates requests against the contract and each of them
   had taken effect immediately (`paper` was written to the log, `seatId` and `meetingId` were silently
-  dropped). What remains and is visible today: (1) response enums widened — `Action` +8
+  dropped). What remains and is visible today: (1) response enums widened — `Action` +12
   (`contribution.claim`, `question.claim`, `agenda.manage`, `admin.meetings.manage`,
-  `admin.units.manage`, `admin.seats.manage`, `admin.roles.manage`, `admin.config.freeze`),
+  `admin.units.manage`, `admin.seats.manage`, `admin.roles.manage`, `admin.config.freeze`, and after
+  Codex on 50cc738 `question.identity.reveal`, `admin.override`, `question.read.protected`,
+  `event.read.personal`),
   `Event.type` +10 (`ContributionClaimed`, `ContributionReleased`, `QuestionClaimed`,
   `QuestionReleased`, `AgendaItemOpened`, `VotingOpened`, `VotingClosed`, `RoleAssigned`,
   `RoleRevoked`, `ConfigFrozen`), `Contribution.source` +`paper` — none produced by the service yet;

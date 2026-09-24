@@ -42,7 +42,7 @@ info:
     scraper only and takes the `metricsBearer` token from the service configuration. `/healthz`,
     `/readyz`, `/metrics` and `/auth/*` live outside `/v1` (per-path `servers`).
 
-    Compatibility within a major version: enumerations grow in minor versions (0.3.0: `Action` +8,
+    Compatibility within a major version: enumerations grow in minor versions (0.3.0: `Action` +12,
     `Event.type` +10, `Contribution.source` +`paper`, new `ReadinessCheckCode`) and optional fields
     are added. A client must ignore an unknown enum value in a response (skip the event, hide the
     action), ignore an unknown optional field and not fail on a documented status it has not seen
@@ -1049,9 +1049,24 @@ paths:
         this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
       security: []
       parameters:
-        - { name: returnTo, in: query, description: 'Relative path inside the application to return to after sign-in; anything else is ignored (open-redirect guard)', schema: { type: string, maxLength: 512 } }
+        - name: returnTo
+          in: query
+          description: >-
+            Relative path inside the application to return to after sign-in (open-redirect guard). The
+            service keeps it only when it matches `SameOriginPath` — the same rule the `Location` of
+            `completeLogin` is bound to — and otherwise ignores it (redirect to `/`). Ignored rather than
+            rejected, so a stale bookmark never ends on an error page; the schema therefore keeps only
+            the length limit here.
+          schema: { type: string, maxLength: 512 }
       responses:
-        '302': { description: Redirect to the identity provider, headers: { Location: { required: true, schema: { type: string, format: uri } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
+        '302':
+          description: Redirect to the identity provider
+          headers:
+            # The identity provider's authorization URL from the configuration (slice 029). Not bound to
+            # `https:` because the local and e2e Keycloak (031) runs on plain http on localhost.
+            Location: { required: true, schema: { type: string, format: uri } }
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /auth/callback:
     servers: [ { url: /, description: 'Outside /v1: the identity provider redirects the browser here' } ]
@@ -1075,12 +1090,27 @@ paths:
         '302':
           description: Signed in; redirect to `returnTo` or the application root
           headers:
-            Location: { required: true, schema: { type: string } }
+            # Codex on 50cc738 (SECURITY): only a same-origin path, never an absolute or
+            # protocol-relative URL — the open-redirect guard of `returnTo` as a schema.
+            Location:
+              required: true
+              description: '`returnTo` of `login` when it matched `SameOriginPath`, else `/`'
+              schema: { $ref: '#/components/schemas/SameOriginPath' }
             # Codex on 8ef3ad2: a 302 without the cookie would be a sign-in that signed no one in.
             Set-Cookie:
               required: true
-              schema: { type: string, pattern: '^hv_session=' }
-              description: 'Sets the `hv_session` cookie of the `session` scheme (HttpOnly, Secure, SameSite; ADR 0004). The only way a session comes into being.'
+              description: >-
+                Sets the `hv_session` cookie of the `session` scheme (ADR 0004); the only way a session
+                comes into being. Codex on 50cc738 (SECURITY): the value is at least 32 cookie octets
+                (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and
+                `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a
+                `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Attribute names in
+                the canonical case the service writes. Prose only: an `Expires` in the past (JSON
+                Schema cannot compare dates).
+              schema:
+                type: string
+                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*Max-Age=(?:0|-))'
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1095,7 +1125,16 @@ paths:
       security: [ { session: [] } ]
       parameters: [ { $ref: '#/components/parameters/CsrfTokenRequired' } ]
       responses:
-        '204': { description: Signed out; the cookie is cleared, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
+        '204':
+          description: Signed out; the cookie is cleared
+          headers:
+            # Security sweep after Codex on 50cc738: "the cookie is cleared" as a schema.
+            Set-Cookie:
+              required: true
+              description: 'Clears the `hv_session` cookie: empty value and `Max-Age=0`. Blocking the session id server-side (block list) is prose — it is not visible in the response.'
+              schema: { type: string, pattern: '^hv_session=(?=;|$)(?=.*;\s*Max-Age=0\s*(?:;|$))' }
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /auth/me:
@@ -1110,7 +1149,7 @@ paths:
         themselves (ADR 0004). `csrfToken` is sent as `X-CSRF-Token` on state-changing calls under the
         `session` scheme (slice 029; parameter `CsrfToken`).
       responses:
-        '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '200': { description: 'OK — carries the CSRF token, so never stored by a cache', headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /auth/transparency-notice:
     servers: [ { url: /, description: 'Outside /v1: read before sign-in' } ]
@@ -1294,7 +1333,10 @@ components:
       description: >-
         Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`,
         the one operation whose only security scheme is `session` — there the token is never optional,
-        so generated clients must type it as required.
+        so generated clients must type it as required. Deliberately no format pattern on the request
+        (security sweep after Codex on 50cc738): a wrong token is a 403 with a rule id from slice 029,
+        and a 422 naming the expected format would tell a forger what to send. The format binds the
+        issuing side instead (`SignedInSession.csrfToken`).
     SpeakerId: { name: speakerId, in: path, required: true, schema: { type: string } }
     ContributionId: { name: contributionId, in: path, required: true, schema: { type: string } }
     QuestionId: { name: questionId, in: path, required: true, schema: { type: string } }
@@ -1317,11 +1359,12 @@ components:
     QuestionOffset: { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
   headers:
     ETag:
-      schema: { type: string }
+      # Entity-tag syntax of RFC 9110 (optionally weak); today's service sends `"v<version>"`.
+      schema: { type: string, pattern: '^(?:W/)?"[!#-~]*"$' }
       description: Opaque version tag, changes with every write.
     ETagRequired:
       required: true
-      schema: { type: string }
+      schema: { type: string, pattern: '^(?:W/)?"[!#-~]*"$' }
       description: >-
         Since 0.3.0 (Codex round 5): the same opaque version tag as `ETag`, always sent. Used on the
         responses of operations new in 0.3.0 whose description promises an ETag (meeting, agenda,
@@ -1331,6 +1374,14 @@ components:
         therefore the optional `ETag`: that response is the 200 of every 0.2 question write, and
         making its header required would change eleven 0.2 operations at once (the 0.2.1 service
         does send it; tightening all of them is a 0.4 question).
+    CacheControlNoStore:
+      required: true
+      schema: { type: string, pattern: '(?:^|,)\s*no-store\s*(?:,|$)' }
+      description: >-
+        Since 0.3.0 (security sweep after Codex on 50cc738): `no-store` on every response of the sign-in
+        path (`login`, `completeLogin`, `logout`, `getSession`) — they carry a `state`, a session cookie
+        or the CSRF token, and no shared or browser cache may keep them. Other directives may accompany
+        it (`private, no-store`).
     X-Server-Time:
       schema: { type: string, format: date-time }
       description: >-
@@ -1408,6 +1459,29 @@ components:
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
   schemas:
+    SameOriginPath:
+      type: string
+      maxLength: 512
+      # Starts with one `/`, never `//` or `/\` (protocol-relative in browsers), no backslash, no
+      # whitespace or control character anywhere (header splitting, browser normalisation).
+      pattern: '^/(?![/\\])[^\\\x00-\x20\x7f]*$'
+      description: >-
+        Since 0.3.0 (Codex on 50cc738, SECURITY): a path inside the application, same origin — the
+        open-redirect rule shared by `login` (`returnTo`) and the `Location` of `completeLogin`.
+    Sha256Hex:
+      type: string
+      pattern: '^[0-9a-f]{64}$'
+      description: 'Since 0.3.0 (Codex on 50cc738): a SHA-256 digest as 64 lower-case hex digits'
+    SubjectId:
+      type: string
+      minLength: 1
+      maxLength: 255
+      pattern: '^[^@\s]+$'
+      description: >-
+        Since 0.3.0 (security sweep after Codex on 50cc738): pseudonymous subject id of the identity
+        provider (OIDC `sub`, at most 255 characters) or the demo actor id — never an e-mail address
+        (no `@`) and no whitespace (ADR 0009). That it is no clear name is prose: a schema cannot tell
+        a name from an opaque id.
     Problem:
       type: object
       description: >-
@@ -1488,7 +1562,12 @@ components:
         by default until then): `contribution.claim` and `question.claim` (take over and release,
         slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage`
         (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze`
-        (slice 040); `admin.roles.manage` (role assignments, slice 026).
+        (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on
+        50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either:
+        `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it
+        but comes after 026), `admin.override` (change after the configuration freeze with a reason,
+        slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and
+        personal history under four eyes, slice 047).
       enum:
         - speaker.register
         - speaker.reorder
@@ -1522,6 +1601,10 @@ components:
         - admin.seats.manage
         - admin.roles.manage
         - admin.config.freeze
+        - question.identity.reveal
+        - admin.override
+        - question.read.protected
+        - event.read.personal
         - demo.seed
     MeetingStatus:
       type: string
@@ -1550,7 +1633,7 @@ components:
         version: { type: integer, description: 'Since 0.3.0 (slice 040): optimistic-locking counter for administration writes, also the ETag of `GET /meetings/{meetingId}`' }
         clonedFromMeetingId: { type: string, description: 'Since 0.3.0 (slice 040): set when the master data was cloned from an earlier meeting' }
         configFrozenAt: { type: string, format: date-time, description: 'Since 0.3.0 (slice 040): set by the configuration freeze' }
-        configHash: { type: string, description: 'Since 0.3.0 (slice 040): SHA-256 over rights table, transition table and master data at the freeze' }
+        configHash: { $ref: '#/components/schemas/Sha256Hex', description: 'Since 0.3.0 (slice 040): SHA-256 (lower-case hex) over rights table, transition table and master data at the freeze' }
         counts:
           type: object
           description: Aggregate counters for the header and the podium
@@ -1655,12 +1738,12 @@ components:
       properties:
         id: { type: string }
         meetingId: { type: string }
-        subjectId: { type: string, description: 'Subject of the identity provider (pseudonymous id), or the demo actor id' }
+        subjectId: { $ref: '#/components/schemas/SubjectId', description: 'Subject of the identity provider (pseudonymous id), or the demo actor id' }
         personId: { type: string, description: 'Key into the person table (ADR 0009), when known' }
         role: { $ref: '#/components/schemas/Role' }
         unitId: { type: string, description: 'Binds the role to one answering unit (optional)' }
         expiresAt: { type: string, format: date-time, description: 'Defaults to the end of the meeting; the role vanishes afterwards (auto-expiry)' }
-        deputyForSubjectId: { type: string, description: 'Set when this assignment is one of the two deputies of another holder (slice 040)' }
+        deputyForSubjectId: { $ref: '#/components/schemas/SubjectId', description: 'Set when this assignment is one of the two deputies of another holder (slice 040)' }
         assignedAt: { type: string, format: date-time }
         assignedBy: { $ref: '#/components/schemas/Actor' }
         revokedAt: { type: string, format: date-time }
@@ -1673,12 +1756,12 @@ components:
       description: 'Since 0.3.0 (slice 026): body of `assignRole`'
       required: [subjectId, role]
       properties:
-        subjectId: { type: string, minLength: 1 }
+        subjectId: { $ref: '#/components/schemas/SubjectId' }
         personId: { type: string }
         role: { $ref: '#/components/schemas/Role' }
         unitId: { type: string }
         expiresAt: { type: string, format: date-time }
-        deputyForSubjectId: { type: string }
+        deputyForSubjectId: { $ref: '#/components/schemas/SubjectId' }
     ConfigFreeze:
       type: object
       description: 'Since 0.3.0 (slice 040): result of `freezeMeetingConfig`, also mirrored on `Meeting.configFrozenAt`/`configHash`'
@@ -1687,7 +1770,7 @@ components:
         meetingId: { type: string }
         frozenAt: { type: string, format: date-time }
         frozenBy: { $ref: '#/components/schemas/Actor' }
-        configHash: { type: string }
+        configHash: { $ref: '#/components/schemas/Sha256Hex' }
     Session:
       description: >-
         Since 0.3.0 (slice 029): response of `GET /auth/me`. Two variants, told apart by `scheme` —
@@ -1710,7 +1793,7 @@ components:
         scheme: { type: string, const: demoActor }
         actor: { $ref: '#/components/schemas/Actor' }
         roles: { type: array, minItems: 1, maxItems: 1, items: { $ref: '#/components/schemas/Role' }, description: 'The one role of the header (equal to `actor.role` — prose, JSON Schema cannot compare values), for symmetry with the session variant' }
-        subjectId: { type: string, description: 'The actor id of the header, equal to `actor.id` (prose — JSON Schema cannot compare values); declared so a client can read `subjectId` under both schemes' }
+        subjectId: { $ref: '#/components/schemas/SubjectId', description: 'The actor id of the header, equal to `actor.id` (prose — JSON Schema cannot compare values); declared so a client can read `subjectId` under both schemes' }
         # No identity provider and no person table behind a header identity (Opus recheck on 8ef3ad2).
         idpGroups: false
         personId: false
@@ -1725,12 +1808,12 @@ components:
       properties:
         scheme: { type: string, const: session }
         actor: { $ref: '#/components/schemas/Actor' }
-        subjectId: { type: string, description: 'Subject of the identity provider (pseudonymous id)' }
+        subjectId: { $ref: '#/components/schemas/SubjectId', description: 'Subject of the identity provider (pseudonymous id)' }
         personId: { type: string, description: 'Key into the person table (ADR 0009), when known' }
         roles: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Role' }, description: 'All roles from the assignment table valid now; `actor.role` is the active one. A subject without any role never gets a session (403 at `completeLogin`).' }
         expiresAt: { type: string, format: date-time, description: 'Session expiry (14 h with silent refresh, ADR 0004)' }
         idpGroups: { type: array, items: { type: string }, description: 'Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004)' }
-        csrfToken: { type: string, minLength: 1, description: 'Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029)' }
+        csrfToken: { type: string, pattern: '^[A-Za-z0-9_-]{32,}$', description: 'Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029). At least 32 base64url characters (≥ 192 bits when random; security sweep after Codex on 50cc738), so it survives a header without quoting' }
     TransparencyNotice:
       type: object
       description: 'Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15)'
@@ -2148,11 +2231,11 @@ components:
       required: [assignmentId, subjectId, role]
       properties:
         assignmentId: { type: string }
-        subjectId: { type: string, description: 'Pseudonymous subject id of the identity provider or the demo actor id — never a name or an e-mail address (ADR 0009)' }
+        subjectId: { $ref: '#/components/schemas/SubjectId', description: 'Pseudonymous subject id of the identity provider or the demo actor id — never a name or an e-mail address (ADR 0009)' }
         role: { $ref: '#/components/schemas/Role' }
         unitId: { type: string }
         expiresAt: { type: string, format: date-time }
-        deputyForSubjectId: { type: string }
+        deputyForSubjectId: { $ref: '#/components/schemas/SubjectId' }
         reason: false
     RoleRevokedPayload:
       type: object
@@ -2160,7 +2243,7 @@ components:
       required: [assignmentId, subjectId, role]
       properties:
         assignmentId: { type: string }
-        subjectId: { type: string, description: 'Pseudonymous subject id, as on `RoleAssigned`' }
+        subjectId: { $ref: '#/components/schemas/SubjectId', description: 'Pseudonymous subject id, as on `RoleAssigned`' }
         role: { $ref: '#/components/schemas/Role' }
         reason: { type: string, minLength: 1, description: 'Revocation reason, when given' }
         unitId: false
@@ -2245,10 +2328,10 @@ components:
         subjectId: { type: string, description: Id of the aggregate the event belongs to }
         schemaVersion: { type: integer, minimum: 2, description: 'Since 0.3.0: envelope version, `2` from slice 024. Never `1` on the wire (minimum 2, Opus recheck on 8ef3ad2): v1 events exist only in JSONL dev data and are upcast on load, so an event without `schemaVersion` is a 0.2 event of the unchanged service. Pflicht ab 0.3.1, Scheibe 028.' }
         meetingId: { type: string, description: 'Since 0.3.0 (ADR 0011): the meeting (Jahrgang) the event belongs to. Pflicht ab 0.3.1, Scheibe 028.' }
-        idempotencyKey: { type: string, description: 'Since 0.3.0: the `Idempotency-Key` of the write that produced the event, when the client sent one; replays after a restart are answered from it (slice 028)' }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128, description: 'Since 0.3.0: the `Idempotency-Key` of the write that produced the event, when the client sent one; replays after a restart are answered from it (slice 028)' }
         causationId: { type: string, description: 'Since 0.3.0: id of the event that caused this one (e.g. the intention a podium device buffered offline), when any' }
-        prevHash: { type: string, description: 'Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string. Pflicht ab 0.3.1, Scheibe 028.' }
-        hash: { type: string, description: 'Since 0.3.0: SHA-256 (hex) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028.' }
+        prevHash: { type: string, pattern: '^(?:[0-9a-f]{64})?$', description: 'Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string (genesis). 64 lower-case hex digits or empty (Codex on 50cc738). Pflicht ab 0.3.1, Scheibe 028.' }
+        hash: { $ref: '#/components/schemas/Sha256Hex', description: 'Since 0.3.0: SHA-256 (lower-case hex, Codex on 50cc738) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028.' }
         recordedAt: { type: string, format: date-time, description: 'Since 0.3.0 (ADR 0011): the authoritative time, always from the server clock (injected clock port, rule 8); never a device time. Pflicht ab 0.3.1, Scheibe 028.' }
         occurredAt: { type: string, format: date-time, description: 'Since 0.3.0: when the fact happened according to `occurredAtSource`; equals `recordedAt` for source `server`. Pflicht ab 0.3.1, Scheibe 028.' }
         occurredAtSource:
