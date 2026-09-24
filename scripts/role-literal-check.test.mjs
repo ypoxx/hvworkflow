@@ -133,8 +133,8 @@ test('red (round 2, minor 3): a Role union / ROLE_PERMISSIONS key mismatch abort
     const permissionsPath = join(root, 'packages', 'domain', 'src', 'permissions.ts');
     const original = readFileSync(permissionsPath, 'utf8');
     const withExtraRole = original.replace(
-      "observer: ['question.read'],",
-      "observer: ['question.read'],\n  coordination: ['question.read'],",
+      "observer: ['question.read.delivered'],",
+      "observer: ['question.read.delivered'],\n  coordination: ['question.read'],",
     );
     assert.notEqual(withExtraRole, original, 'fixture edit did not match — has permissions.ts changed shape?');
     writeFileSync(permissionsPath, withExtraRole);
