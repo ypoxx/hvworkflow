@@ -41,11 +41,14 @@ its working directory between calls.
 
 1. **No slice without a spec** in `docs/slices/NNN-name.md`: goal, non-goals, rule ids, acceptance
    criterion, files allowed. Work outside the allowed files is a finding, not initiative.
-2. **Evidence, not claims.** A slice is done when the report contains the real output of
-   `pnpm gates` and, for interface work, a screenshot in `docs/evidence/`. "Tests pass" without output
-   counts as not run.
-3. **Whoever builds does not review.** Reviews are done by a different model in a fresh context
-   that sees only spec and diff.
+2. **Evidence, not claims.** A slice is done when the report names the commit `pnpm gates` ran on and
+   contains the real tail of its output once, and, for interface work, a screenshot in
+   `docs/evidence/`. Docs-only commits afterwards need no new local run; the PR's CI is the running proof,
+   and a merge needs green CI on the PR's last commit.
+   "Tests pass" without output counts as not run.
+3. **Whoever builds does not review.** Reviews run in a fresh context that sees only spec and diff —
+   a separate reviewer agent, never the builder's own session. Independence comes from the fresh
+   context, not from a different model (model per role: `.claude/agents/`).
 4. **Rights are data.** Never compare a role name in interface or server code. The interface renders
    what `_actions` allows; the server decides through `can()` in `packages/domain/src/api.ts`.
    The only places a role name may appear: `ROLE_PERMISSIONS` and the demo role switcher.
