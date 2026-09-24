@@ -520,6 +520,11 @@ Rollenzuordnung (role assignment, `RoleAssignment`) · Konfigurationsfreeze (con
   Punkt 1):** `Classification.seatId` (vor 040) und der `meetingId`-Filter an `listEvents` (vor 035). Der Papierpfad
   und die Absenderzeit sind nur über `captureMeetingContribution` (`MeetingContributionCapture`) erreichbar; der
   Alias `captureContribution` bleibt bei `manual | transcript`.
+- **Für die Spec von 024 (Letzte Kleinrunde, Punkt c):** `Event.schemaVersion` hat ab jetzt `minimum: 2`, und
+  `schemaVersion` verlangt sieben Felder (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`,
+  `retentionClass`, `legalHold`). Der Upcaster von 024 muss für alte v1-Ereignisse aus JSONL-Entwicklungsdaten also
+  **alle sieben** synthetisieren — einschließlich `hash` und `prevHash` (Kette beim Laden neu berechnen) — und
+  `actor.displayName` entfernen, sonst ist kein hochgestuftes Ereignis über HTTP vertragsgültig.
 - `oidc` bleibt als unbenutztes, `x-deprecated` Schema (1 Lint-Warnung, Bestand seit 0.1.0) bis 0.5.
 - Glossar, Rechtekonzept, DSFA: Nachführung durch den Orchestrator (Nicht-Ziel); Begriffsliste oben.
 
@@ -873,6 +878,125 @@ Pakete grün, API-Suite 49/49, Tor 29 ausgeübt / 36 deklariert.
 8. `a53a2fd fix(contract): Invarianten-Durchgang über alle neuen Schemata — Rollenereignisse je Typ, Problem-Status an HTTP-Status, ETag und Location Pflicht (Scheibe 023) [skip netlify]`
 9. Bericht (diese Datei): `docs: Bericht Scheibe 023 — Invarianten-Durchgang nach Codex Runde 5 (Scheibe 023) [skip netlify]`
 
+### Letzte Kleinrunde (Opus-Nachprüfung und Codex auf 8ef3ad2)
+
+Commit `f5a02e5` (Vertrag, Typen, CHANGELOG, Allowlist, Testhelfer); dieser Bericht im Folgecommit. Kein Feld
+entfernt, nichts an einer Anfrage einer Bestandsoperation verengt.
+
+| Punkt | Stelle im Vertrag / Code | Erledigung |
+|---|---|---|
+| Opus a | `Readiness.checks.{clock,db,migrations}` | je Prüfung `allOf` aus `ReadinessCheck` und eigenem `code`-Enum: clock `clock_unsynced\|clock_drift\|timeout`; db `not_configured\|unreachable\|timeout`; migrations `migrations_pending\|not_configured\|unreachable\|timeout` |
+| Opus b | `Event.dependentRequired` | `hash: [prevHash, schemaVersion]`, `prevHash: [hash, schemaVersion]`, `recordedAt`, `retentionClass`, `legalHold` → `[schemaVersion]`; zusätzlich `occurredAt`/`occurredAtSource` → `+ schemaVersion` (gleiche Lücke, der Dienst sendet keines der Felder) |
+| Opus c | `Event.schemaVersion` | `minimum: 2`; Upcaster-Hinweis für 024 unter „Offen" |
+| Opus d | `Event` `if`/`then` | `required: [subjectId]` (mit `properties.subjectId`, sonst Lint-Warnung `no-required-schema-properties-undefined`) für AgendaItemOpened, VotingOpened, VotingClosed, RoleAssigned, RoleRevoked |
+| Opus e | `Contribution.occurredAtSource` | `enum: [device, paper, transcript]` wie `MeetingContributionCapture` |
+| Opus f | `getContribution` 200, `captureMeetingContribution` 201 | optionales `ETag` (= `Contribution.version`, das `If-Match` von claim/release) |
+| Opus g | `ETagRequired.description` | begründet, warum `claimQuestion`/`releaseQuestion` `QuestionUpdated` mit optionalem `ETag` nutzen (geteilte Antwort von elf 0.2-Operationen) |
+| Opus h | `DemoSession` | `subjectId` (= `actor.id`) deklariert; `idpGroups: false`, `personId: false` |
+| Opus i | `allowlist.json` | 27 `reason`-Texte (025: 14, 026: 3, 028: 4, 040: 6): „Lane service seit takt-011; wird mit Scheibe NNN ausgeübt und entfernt"; 36 Einträge, `operationId`/`slice`/`expires` und Feldsatz unverändert (Skriptvergleich: `36 36 true`) |
+| Codex 1 (P1) | `completeLogin` 302 | `Set-Cookie` `required: true`, `pattern: '^hv_session='`, mit Beschreibung |
+| Codex 2 (P2) | `logout` | neuer Parameter `CsrfTokenRequired` (`X-CSRF-Token`, `required: true`, `minLength: 1`); generiert: `"X-CSRF-Token": components["parameters"]["CsrfTokenRequired"]` (nicht optional) |
+| Codex 3 (P2) | `ReadinessCheck` | beide `oneOf`-Zweige `additionalProperties: false` |
+| Codex 4 (P2) | `apps/api/src/__tests__/helpers.ts` | `assertRequiredHeaders()` vor `recordOperationHit`: fehlt ein Header mit `required: true` für den Status, scheitert der Test und es gibt keinen Treffer |
+
+**Test zuerst** (Wegwerf-Test `apps/api/src/__tests__/zz-letzte-kleinrunde.test.ts` mit `expectValid`/`resolvePointer`/
+`paramsFor` aus `apps/api/src/contractSchema.ts` und für Codex 4 `req()` gegen eine Wegwerf-App ohne Header; je ein
+Ablehnungsfall für a–e und h, dazu f, Codex 1–4; danach gelöscht). Rot gegen 8ef3ad2 (nur der Test hinzugefügt):
+
+```
+     × a: codes per readiness check
+     × Codex 3: readiness check variants are closed
+     × b: envelope fields depend on schemaVersion
+     × c: schemaVersion 1 is never on the wire
+     × d: subjectId on agenda and role events
+     × e: Contribution.occurredAtSource has no server
+     × h: DemoSession subjectId declared, no idpGroups/personId
+     × f: optional ETag on getContribution 200 and captureMeetingContribution 201
+     × Codex 1: completeLogin 302 requires Set-Cookie
+     × Codex 2: logout requires X-CSRF-Token
+     × Codex 4: helper rejects a missing required response header
+AssertionError: promise resolved "Response { status: 302, … headers: Headers {} … }" instead of rejecting
+      Tests  11 failed (11)
+```
+
+Grün nach der Änderung:
+
+```
+ ✓ … > a: codes per readiness check 15ms
+ ✓ … > Codex 3: readiness check variants are closed 2ms
+ ✓ … > b: envelope fields depend on schemaVersion 36ms
+ ✓ … > c: schemaVersion 1 is never on the wire 0ms
+ ✓ … > d: subjectId on agenda and role events 2ms
+ ✓ … > e: Contribution.occurredAtSource has no server 11ms
+ ✓ … > h: DemoSession subjectId declared, no idpGroups/personId 16ms
+ ✓ … > f: optional ETag on getContribution 200 and captureMeetingContribution 201 1ms
+ ✓ … > Codex 1: completeLogin 302 requires Set-Cookie 1ms
+ ✓ … > Codex 2: logout requires X-CSRF-Token 1ms
+ ✓ … > Codex 4: helper rejects a missing required response header 63ms
+      Tests  11 passed (11)
+```
+
+Codex 4 gegen die bestehende Suite: `apps/api` 49/49 grün mit der neuen Kopfzeilenprüfung, auch mit
+`CONTRACT_GATE_STRICT=1`; keine heute ausgeübte Operation hat einen Pflicht-Header (`ETagRequired`, `Location`,
+`Set-Cookie` hängen nur an allowlisteten Operationen), also musste nichts am Vertrag gelockert werden.
+
+**Live-Probe** (Wegwerf-Test, danach gelöscht): `createApp({ demoEnabled: true })`, `POST /v1/demo/seed`
+(300 Fragen, Seed 11), dann über `req()` (Status, Körper, Pflicht-Header) und zusätzlich `expectValid`:
+
+```
+PROBE seed=200 events=2329 (types: AnswerDrafted,ContributionCaptured,MeetingCreated,QuestionApproved,QuestionAssigned,QuestionCaptured,QuestionClassified,QuestionClosed,QuestionDelivered,QuestionReturned,QuestionStaged,QuestionSubmittedForReview,SpeakerRegistered,SpeakerUpdated) withSchemaVersion=0 questions=300 histories=300 meeting=200 problems=404,401,403
+ ✓ src/__tests__/zz-live-probe.test.ts > live probe on the seeded service 550ms
+      Tests  1 passed (1)
+```
+
+`listEvents` (2329 Ereignisse, keines mit `schemaVersion`), `listQuestions` (300), `getQuestionHistory` (alle 300),
+`getMeeting` und die Problemantworten 404/401/403 bleiben gültig.
+
+**`contract:lint`:** `You have 6 warnings.` (dieselben sechs wie vorher; die drei zwischenzeitlichen
+`no-required-schema-properties-undefined` aus Punkt d sind durch `properties.subjectId` im `then` behoben).
+**`pnpm contract:types`:** zweimal gleiche SHA-256 (`70c91ee0…`), kein weiterer Diff. **Typen-Diff:** `Readiness.checks.*`
+als `ReadinessCheck & { code?: … }` je Prüfung; `DemoSession.subjectId?: string`, `idpGroups?: never`,
+`personId?: never`; `Contribution.occurredAtSource?: "device" | "paper" | "transcript"`; neuer Parameter
+`CsrfTokenRequired: string`, an `logout` als Pflicht-Header; `"Set-Cookie": string` an `completeLogin` 302; `ETag`
+an `getContribution` 200 und `captureMeetingContribution` 201; sonst Beschreibungen. **CHANGELOG 0.3.0:** Eintrag
+„Last small round" unter Added.
+
+**`pnpm gates`** (Commit `f5a02e5`, eigenes Log via `mktemp`, Exit 0). Zeilen desselben Laufs: `You have 6 warnings.`;
+`packages/domain Tests 72 passed (72)`; `apps/web Tests 48 passed (48)`; `apps/api Tests 49 passed (49)`;
+`operation-coverage: 65 operations in the contract, 29 exercised by tests, 36 pre-declared in allowlist.json` /
+`ok`; `vocabulary-check: ok`; `slice-scope: 10 changed file(s), all within … "Files allowed" list (12 pattern(s)).`;
+`plan-graph: ok.`; Ende wörtlich:
+
+```
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7160.732187
+
+> @hv/web@0.0.0 build /home/user/wt/023/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+…
+dist/assets/index-BoqUekbh.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,200.90 kB
+…
+✓ built in 1.26s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit f5a02e5, tree 199b66283adf…
+```
+
+Hinweis zu „Offen/Service-Lane-Lücke" oben: der Text beschreibt den Stand vor takt-011; die Allowlist-Texte sind
+jetzt auf den Stand nach dem Merge von takt-011 (PR #29) formuliert.
+
 ## Review findings
 
 **Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
@@ -932,3 +1056,27 @@ kein 403 → `Forbidden` ergänzt; eine Skriptprüfung über alle 34 Operationen
 `/auth/me` war ohne `csrfToken` gültig, `/readyz` verlangte keine Prüfung, `Event.occurredAt` ohne
 `occurredAtSource` war gültig → Invarianten-Durchgang über jedes neue Schema, Bericht unter „Invarianten-Durchgang nach
 Codex (Runde 5)" (rot 33 / grün 48 mit den Validatoren des Dienstes).
+
+**Runde 4 — Nachprüfung Opus 5.5 auf 8ef3ad2: annehmen** (0 blocker, 0 major, 8 minor/nit + 1 Allowlist-Punkt), alle
+in `f5a02e5` behoben, Nachweise unter „Letzte Kleinrunde":
+
+- a. minor · `Readiness.checks` nahm `db = {fail, clock_drift}` an → Codes je Prüfung (`allOf` + `enum`). **behoben**
+- b. minor · v2-Felder ohne `schemaVersion` gültig → `dependentRequired` auf `schemaVersion` (auch `occurredAt`/
+  `occurredAtSource`). **behoben**
+- c. minor · `schemaVersion` `minimum: 1` → `2`; Upcaster-Pflicht (alle sieben Felder inkl. `hash`/`prevHash`) unter
+  „Offen" für 024. **behoben**
+- d. minor · Tagesordnungs- und Rollenereignisse ohne `subjectId` gültig → `required: [subjectId]` im `then`. **behoben**
+- e. minor · `Contribution.occurredAtSource` erlaubte `server` → `[device, paper, transcript]`. **behoben**
+- f. minor · kein `ETag` an `getContribution` 200 / `captureMeetingContribution` 201 → optionales `ETag`. **behoben**
+- g. nit · `ETagRequired.description` begründet jetzt `claimQuestion`/`releaseQuestion` mit optionalem `ETag`. **behoben**
+- h. nit · `DemoSession.subjectId` deklariert, `idpGroups: false`, `personId: false`. **behoben**
+- i. `allowlist.json`: 27 `reason`-Texte auf den Stand nach takt-011 umformuliert; Ablaufdatum und Feldsatz
+  unverändert. **behoben**
+
+**Codex auf 8ef3ad2** (1 × P1, 3 × P2), alle in `f5a02e5` behoben:
+
+- P1 · `completeLogin` 302 ohne `Set-Cookie` gültig → `Set-Cookie` Pflicht (`^hv_session=`). **behoben**
+- P2 · `logout` typisierte `X-CSRF-Token` optional → Parameter `CsrfTokenRequired` (Pflicht). **behoben**
+- P2 · SECURITY · `ReadinessCheck` offen für `detail` → beide Varianten `additionalProperties: false`. **behoben**
+- P2 · `helpers.ts` zählte Antworten ohne Pflicht-Header als ausgeübt → `assertRequiredHeaders()` vor dem Treffer;
+  rot/grün mit Wegwerf-App; bestehende Suite 49/49 grün, keine Bestandsoperation betroffen. **behoben**
