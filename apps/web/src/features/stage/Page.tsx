@@ -166,9 +166,17 @@ export function StagePage() {
   // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
   const [forbidden, setForbidden] = useState(false);
   const [busy, setBusy] = useState(false);
-  // takt-008: "Vorgelesen, weiter" keeps focus while it writes (`aria-disabled`, Podium.tsx), so a
-  // second activation can arrive before React has re-rendered `busy` — one write at a time.
+  /**
+   * takt-008: the question being read out, as it was read. "Vorgelesen, weiter" keeps focus while
+   * it writes (`aria-disabled`, Podium.tsx), and the lock holds until the podium shows a different
+   * question (or the same one in a newer version, or none) — not merely until the write has
+   * answered, or a second press would act on the old copy and meet its own 412 and a problem toast
+   * (review round 1, finding 3). Released at once when the write, or the read-back, fails.
+   */
+  const [delivering, setDelivering] = useState<{ id: string; version: number } | null>(null);
+  // The same lock for a second activation in the same task, before React has rendered it.
   const writing = useRef(false);
+  const stageBusy = busy || delivering !== null;
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
   // either layout (see the early return below) — not a silent stand-in for `false` any more.
@@ -188,6 +196,17 @@ export function StagePage() {
     stageRef.current = stage;
     shownRef.current = stage;
   }, [stage]);
+
+  // Adjusted during render: the render that shows the next question is the one that unlocks.
+  if (
+    delivering !== null &&
+    (stage?.current?.id !== delivering.id || stage.current.version !== delivering.version)
+  ) {
+    setDelivering(null);
+  }
+  useEffect(() => {
+    if (delivering === null) writing.current = false;
+  }, [delivering]);
 
   /**
    * Minor B (review round 4): an actor change on an open page decides the layout afresh — back to
@@ -249,6 +268,9 @@ export function StagePage() {
         // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
         // next event. The server still decides every write (a stale record meets its 412/403).
         stageRef.current = shownRef.current;
+        // takt-008: the record the lock waits for will not come — the podium acts on what it shows.
+        writing.current = false;
+        setDelivering(null);
         // The language is read at call time so that a language switch does not refetch the podium.
         showProblem(error, translate(getLang(), 'toast.problem'));
       });
@@ -330,7 +352,7 @@ export function StagePage() {
     if (!current._actions.includes('question.deliver')) return;
     if (writing.current) return;
     writing.current = true;
-    setBusy(true);
+    setDelivering({ id: current.id, version: current.version });
     try {
       const delivered = await api.deliverQuestion(current.id, { ifMatch: etagOf(current.version) });
       const alsoClose = delivered._actions.includes('question.close');
@@ -344,11 +366,11 @@ export function StagePage() {
       });
     } catch (error) {
       showProblem(error, t('toast.problem'));
+      // Refused: nothing to wait for — unlock at once.
+      writing.current = false;
+      setDelivering(null);
       // A refusal — 412 above all — means the podium is looking at an old copy. Refetch.
       reload();
-    } finally {
-      writing.current = false;
-      setBusy(false);
     }
   }, [reload, t]);
 
@@ -385,13 +407,19 @@ export function StagePage() {
       // and every future stage dialog alike, without threading its open state through two files.
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (isInteractiveTarget(event.target)) return;
+      // takt-008 review round 1, finding 1: the podium's own buttons keep focus after a press, so
+      // R ("Antwort zurückgeben") is let through from them. Only R: Space already activates the
+      // focused button itself (on keyup) — handling it here as well would read out twice.
+      const isR = event.key === 'r' || event.key === 'R';
+      const fromPodiumButton =
+        event.target instanceof HTMLElement && event.target.closest('[data-podium-key]') !== null;
+      if (isInteractiveTarget(event.target) && !(isR && fromPodiumButton)) return;
       if (event.code === 'Space') {
         event.preventDefault();
         void deliver();
         return;
       }
-      if (event.key === 'r' || event.key === 'R') {
+      if (isR) {
         const current = stageRef.current?.current;
         if (
           current !== null &&
@@ -506,7 +534,7 @@ export function StagePage() {
   ) : (
     <Podium
       stage={view}
-      busy={busy}
+      busy={stageBusy}
       onNext={() => void deliver()}
       onReturn={() => setReturnOpen(true)}
     />
@@ -515,7 +543,7 @@ export function StagePage() {
   const dialog = (
     <ReturnDialog
       open={returnOpen}
-      busy={busy}
+      busy={stageBusy}
       onClose={() => setReturnOpen(false)}
       onSubmit={(reason) => void returnAnswer(reason)}
     />

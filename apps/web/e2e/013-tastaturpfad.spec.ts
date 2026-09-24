@@ -453,6 +453,14 @@ test('013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur', async ({ page
   await expect(currentNumber).not.toHaveText(before);
   // takt-008: `aria-disabled` while writing — the button keeps focus for the next question.
   await assertFocusVisible(page, { testId: 'stage-next' });
+  // takt-008 review round 1, finding 1: with focus kept on the podium's own button, the house's
+  // R shortcut ("Antwort zurückgeben") must still reach the stage — it used to be dropped for any
+  // BUTTON target. Escape closes the dialog and returns focus to the button.
+  await page.keyboard.press('r');
+  await expect(page.getByTestId('stage-return-reason')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('stage-return-reason')).toBeHidden();
+  await assertFocusVisible(page, { testId: 'stage-next' });
 });
 
 /**
@@ -554,6 +562,9 @@ test('013h: Fokus nach Aktion bleibt sichtbar am Bedienelement, nie auf BODY (ta
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
   await assertFocusVisible(page, { testId: 'approval-block' });
+  // Review round 1, finding 6: the focus target is a named group, not an anonymous `div`.
+  await expect(page.getByTestId('approval-block')).toHaveAttribute('role', 'group');
+  await expect(page.getByTestId('approval-block')).toHaveAccessibleName('Stand und Freigabe');
 
   await waitForToastsGone(page);
   await asRole(page, 'legal');
@@ -583,6 +594,37 @@ test('013h: Fokus nach Aktion bleibt sichtbar am Bedienelement, nie auf BODY (ta
   await checkAxe(page, 'stage (nach Vorgelesen, weiter)');
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('takt-008-fokus-nach-buehne.png') });
+
+  // Review round 1, finding 1: R also works after a *mouse* click on "Vorgelesen, weiter" (a
+  // clicked button holds focus just the same).
+  const afterKey = await currentNumber.innerText();
+  await page.getByTestId('stage-next').click();
+  await expect(currentNumber).not.toHaveText(afterKey);
+  await page.keyboard.press('r');
+  await expect(page.getByTestId('stage-return-reason')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('stage-return-reason')).toBeHidden();
+
+  // Review round 1, finding 4: the last question read out takes "Vorgelesen, weiter" with it —
+  // focus goes to the podium itself (a named group), which then says the stage is clear.
+  const next = page.getByTestId('stage-next');
+  for (let press = 0; press < 30 && (await next.count()) > 0; press++) {
+    const reading = await currentNumber.innerText();
+    await next.focus();
+    await page.keyboard.press('Enter');
+    await expect(async () => {
+      if ((await next.count()) === 0) return;
+      expect(await currentNumber.innerText()).not.toBe(reading);
+    }).toPass({ timeout: 5_000 });
+  }
+  await expect(next).toHaveCount(0);
+  await assertFocusVisible(page, { testId: 'stage-current' });
+  await expect(page.getByTestId('stage-current')).toHaveAttribute('role', 'group');
+  await expect(page.getByTestId('stage-current')).toHaveAccessibleName('Frage auf der Bühne');
+  await checkAxe(page, 'stage (letzte Frage vorgelesen)');
+  await waitForToastsGone(page);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('takt-008-fokus-buehne-leer.png') });
 });
 
 /** `api/index.ts`'s own storage key: the demo event log of this device (ADR 0002). */
@@ -614,6 +656,25 @@ async function settledCount(page: Page, type: string): Promise<number> {
   }
 }
 
+/** Review round 1, findings 2 and 3: a second activation must not only add no event — it must not
+ *  reach the service at all, or the optimistic lock refuses it with a 412 and the person sees a
+ *  "Stand veraltet" banner (answers) or a problem toast (both views). */
+async function expectNoRefusal(page: Page): Promise<void> {
+  await expect(page.getByTestId('stale-banner')).toHaveCount(0);
+  await expect(
+    page.locator('[aria-live="polite"] [role="status"]').filter({ has: page.locator('.tone-danger') }),
+  ).toHaveCount(0);
+}
+
+/** Two activations in the same task, before React can re-render the lock (review round 1,
+ *  finding 2) — the only way to reach the in-flight window of the in-process demo. */
+async function clickTwiceInOneTask(locator: Locator): Promise<void> {
+  await locator.evaluate((el) => {
+    (el as HTMLButtonElement).click();
+    (el as HTMLButtonElement).click();
+  });
+}
+
 /**
  * takt-008, acceptance criterion 2: a button that keeps (or hands on) focus must not write twice.
  * Enter is pressed twice in quick succession on each write button whose second activation would
@@ -626,7 +687,13 @@ async function settledCount(page: Page, type: string): Promise<number> {
  * happen there is a second write while the first is still in flight; the in-process demo answers
  * faster than two key presses, so that window is exercised directly: two activations in the same
  * task, before React could re-render `busy` — exactly one `QuestionDelivered`. The same synchronous
- * pair is also fired at `capture-submit`, where it proves the handler's own guard.
+ * pair is also fired at `capture-submit`, `answer-submit-draft` (with text still in the editor),
+ * `answer-submit-review` and `answer-approve` (review round 1, finding 2): there it is what proves the
+ * page's own write lock — Enter, Enter alone would also have passed before takt-008. And a locked
+ * `Button` (`aria-disabled`, the emptied editor) is activated by keyboard and by click: nothing is
+ * written, nothing is refused (Button.tsx swallows the click). Every pair also asserts that no
+ * refusal notice appears (findings 2/3): a second write that reached the service would be refused
+ * by the optimistic lock (412) — no second event, but a "Stand veraltet" banner or problem toast.
  */
 test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein Ereignis (takt-008)', async ({
   page,
@@ -674,10 +741,7 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await page.getByTestId('capture-text').focus();
   await page.keyboard.type('Noch ein Redebeitrag. Wann kommt die Dividende?');
   before = await settledCount(page, 'ContributionCaptured');
-  await page.getByTestId('capture-submit').evaluate((el) => {
-    (el as HTMLButtonElement).click();
-    (el as HTMLButtonElement).click();
-  });
+  await clickTwiceInOneTask(page.getByTestId('capture-submit'));
   await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
   expect(await settledCount(page, 'ContributionCaptured')).toBe(before + 1);
 
@@ -697,15 +761,55 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
   expect(await settledCount(page, 'AnswerDrafted')).toBe(before + 1);
   await expect(page.locator('[data-testid="answer-version"]')).toHaveCount(1);
+  await expectNoRefusal(page);
+
+  // A locked Button (emptied editor, `aria-disabled`) — Enter and a click write nothing.
+  const draftButton = page.getByTestId('answer-submit-draft');
+  await expect(draftButton).toHaveAttribute('aria-disabled', 'true');
+  await waitForToastsGone(page);
+  before = await settledCount(page, 'AnswerDrafted');
+  await draftButton.focus();
+  await page.keyboard.press('Enter');
+  await draftButton.evaluate((el) => (el as HTMLButtonElement).click());
+  expect(await settledCount(page, 'AnswerDrafted')).toBe(before);
+  await expectNoRefusal(page);
+
+  // answer-submit-draft — two activations in one task, text still in the editor.
+  await page.getByTestId('answer-editor').focus();
+  await page.keyboard.type('Zweite Fassung für den Doppeltest.');
+  before = await settledCount(page, 'AnswerDrafted');
+  await clickTwiceInOneTask(draftButton);
+  await expect(page.locator('[data-testid="answer-version"][data-version="2"]')).toBeVisible();
+  expect(await settledCount(page, 'AnswerDrafted')).toBe(before + 1);
+  await expect(page.locator('[data-testid="answer-version"]')).toHaveCount(2);
+  await expectNoRefusal(page);
 
   // answer-submit-review — Enter, Enter.
   await waitForToastsGone(page);
+  const firstNumber = await page.getByTestId('answers-detail-number').innerText();
   before = await settledCount(page, 'QuestionSubmittedForReview');
   await page.getByTestId('answer-submit-review').focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
   expect(await settledCount(page, 'QuestionSubmittedForReview')).toBe(before + 1);
+  await expectNoRefusal(page);
+
+  // answer-submit-review — two activations in one task, on the next assigned question (drafted by
+  // a plain click first: that is setup, not the pair under test).
+  await waitForToastsGone(page);
+  await expect(page.getByTestId('answers-row').first()).not.toContainText(firstNumber);
+  await page.getByTestId('answers-row').first().click();
+  await expect(page.getByTestId('answers-detail-number')).not.toHaveText(firstNumber);
+  await page.getByTestId('answer-editor').fill('Antworttext für das zweite Paar.');
+  await draftButton.click();
+  await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
+  await waitForToastsGone(page);
+  before = await settledCount(page, 'QuestionSubmittedForReview');
+  await clickTwiceInOneTask(page.getByTestId('answer-submit-review'));
+  await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
+  expect(await settledCount(page, 'QuestionSubmittedForReview')).toBe(before + 1);
+  await expectNoRefusal(page);
 
   // answer-approve — Enter, Enter.
   await waitForToastsGone(page);
@@ -714,12 +818,25 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await page.getByTestId('answers-filter-status-in_review').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
   await page.getByTestId('answers-row').first().click();
+  const approvedNumber = await page.getByTestId('answers-detail-number').innerText();
   before = await settledCount(page, 'QuestionApproved');
   await page.getByTestId('answer-approve').focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
   expect(await settledCount(page, 'QuestionApproved')).toBe(before + 1);
+  await expectNoRefusal(page);
+
+  // answer-approve — two activations in one task, on the next question in Legal Clearing.
+  await waitForToastsGone(page);
+  await expect(page.getByTestId('answers-row').first()).not.toContainText(approvedNumber);
+  await page.getByTestId('answers-row').first().click();
+  await expect(page.getByTestId('answers-detail-number')).not.toHaveText(approvedNumber);
+  before = await settledCount(page, 'QuestionApproved');
+  await clickTwiceInOneTask(page.getByTestId('answer-approve'));
+  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
+  expect(await settledCount(page, 'QuestionApproved')).toBe(before + 1);
+  await expectNoRefusal(page);
 
   // stage-next — two activations in one task (see above for why not Enter, Enter).
   await waitForToastsGone(page);
@@ -731,12 +848,10 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await expect(currentNumber).toBeVisible();
   const shown = await currentNumber.innerText();
   before = await settledCount(page, 'QuestionDelivered');
-  await page.getByTestId('stage-next').evaluate((el) => {
-    (el as HTMLButtonElement).click();
-    (el as HTMLButtonElement).click();
-  });
+  await clickTwiceInOneTask(page.getByTestId('stage-next'));
   await expect(currentNumber).not.toHaveText(shown);
   expect(await settledCount(page, 'QuestionDelivered')).toBe(before + 1);
+  await expectNoRefusal(page);
 });
 
 async function motionOf(

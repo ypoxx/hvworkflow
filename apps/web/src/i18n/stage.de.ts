@@ -11,6 +11,7 @@ export const stageDe = {
   'stage.only.enter': 'Nur Bühne einschalten',
   'stage.only.leave': 'Nur Bühne verlassen',
   'stage.current.label': 'Jetzt vorlesen',
+  'stage.current.group': 'Frage auf der Bühne',
   'stage.current.empty.title': 'Die Bühne ist frei',
   'stage.current.empty.body':
     'Es liegt keine Einzelfrage auf der Bühne. Freigegebene Antworten legt die Freigabe auf die Bühne.',

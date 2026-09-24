@@ -51,6 +51,8 @@ function PodiumButton({
     <button
       type="button"
       data-testid={testId}
+      // The stage's key handler (Page.tsx) lets R through from these buttons, and only from these.
+      data-podium-key=""
       // takt-008: `aria-disabled`, not `disabled` — "Vorgelesen, weiter" is pressed from the
       // keyboard and, once written, stands for the next question; a natively disabled button would
       // drop its focus to `<body>` for the length of every write. Locked like this it keeps focus,
@@ -172,14 +174,21 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
   // takt-008: when the question just read out was the last one (or the next may not be read out
   // by this person), "Vorgelesen, weiter" leaves with it and its focus falls to `<body>`. It is
   // moved to the podium itself, which then says what is (or is not) on stage.
+  //
+  // Review round 1, finding 4: the marker is settled when the write is — `busy` falls only once the
+  // podium shows the next question (or the write was refused, Page.tsx) — and cleared on every
+  // change of the current question, so it can never outlive the press that set it.
   const podium = useRef<HTMLDivElement>(null);
   const nextPressed = useRef(false);
+  const currentId = current?.id;
   useEffect(() => {
-    if (!nextPressed.current || mayDeliver) return;
+    if (busy) return;
+    const pressed = nextPressed.current;
     nextPressed.current = false;
+    if (!pressed || mayDeliver) return;
     const active = document.activeElement;
     if (active === null || active === document.body) podium.current?.focus();
-  }, [mayDeliver, current?.id]);
+  }, [busy, mayDeliver, currentId]);
   const next = (): void => {
     nextPressed.current = true;
     onNext();
@@ -191,6 +200,8 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
         ref={podium}
         data-testid="stage-current"
         tabIndex={-1}
+        role="group"
+        aria-label={t('stage.current.group')}
         className="flex min-h-0 flex-1 items-center justify-center"
       >
         <EmptyState
@@ -212,6 +223,8 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
       ref={podium}
       data-testid="stage-current"
       tabIndex={-1}
+      role="group"
+      aria-label={t('stage.current.group')}
       className="flex min-h-0 flex-1 flex-col gap-6"
     >
       <div className="min-h-0 flex-1 overflow-y-auto">

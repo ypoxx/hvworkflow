@@ -223,6 +223,11 @@ export function QuestionDetail({
    * take (`_actions` no longer offers them), and the focus they held falls to `<body>`. It is
    * moved to the block that shows the outcome — the new status or the Freigabe — so the person
    * (and a screen reader) lands on what just happened, and a second Enter there changes nothing.
+   *
+   * Review round 1, finding 4: the marker is settled when the write is — `busy` falls only once the
+   * page shows the new version (or the write was refused, answers/Page.tsx), so that is the render
+   * in which the button is either gone (success) or still there (refusal); either way the marker is
+   * cleared. A different question remounts this component (`key={question.id}`), which clears it too.
    */
   const approvalBlock = useRef<HTMLDivElement>(null);
   const stepTaken = useRef<'submit' | 'approve' | null>(null);
@@ -243,13 +248,13 @@ export function QuestionDetail({
   const mayWithdraw = may.includes('question.withdraw');
 
   useEffect(() => {
+    if (busy) return;
     const taken = stepTaken.current;
-    if (taken === null) return;
-    if ((taken === 'submit' && maySubmit) || (taken === 'approve' && mayApprove)) return;
     stepTaken.current = null;
+    if (taken === null) return;
     const active = document.activeElement;
     if (active === null || active === document.body) approvalBlock.current?.focus();
-  }, [maySubmit, mayApprove]);
+  }, [busy]);
 
   const dirty = draft.trim() !== '';
   // Exactly one primary action (D2): the step that moves this question on — unless something is
@@ -439,8 +444,11 @@ export function QuestionDetail({
           <div
             ref={approvalBlock}
             data-testid="approval-block"
-            // Focus target only (see `stepTaken`), never a Tab stop of its own.
+            // Focus target only (see `stepTaken`), never a Tab stop of its own; a named group so that
+            // a screen reader says what it has landed on (review round 1, finding 6).
             tabIndex={-1}
+            role="group"
+            aria-label={t('answers.approval.group')}
             className={cx(
               'flex items-center gap-2 rounded-md border px-3 py-2',
               seal !== undefined
@@ -554,10 +562,10 @@ export function QuestionDetail({
                 setDraft('');
                 setSources('');
               }}
-              onSave={() => {
-                if (busy || !dirty) return;
-                onAction({ kind: 'draft', text: draft, sources });
-              }}
+              // No guard of its own: a locked button (`aria-disabled`: busy or empty) never calls
+              // this — Button.tsx swallows the click — and a second press in the same task before
+              // the lock renders is refused by the page's own write lock.
+              onSave={() => onAction({ kind: 'draft', text: draft, sources })}
             />
           )}
         </div>

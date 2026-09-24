@@ -13,6 +13,7 @@ export const stageEn: typeof stageDe = {
   'stage.only.enter': 'Switch to podium only',
   'stage.only.leave': 'Leave podium only',
   'stage.current.label': 'Reading now',
+  'stage.current.group': 'Question on the podium',
   'stage.current.empty.title': 'The podium is clear',
   'stage.current.empty.body':
     'No question is on the podium. Approved answers are sent to the podium by the approver.',
