@@ -89,8 +89,15 @@ drei Bedingungen der Spec:
    grün unten).
 3. **Nie weiter als die Spec meint, kein „beides erlauben":** die Regel wählt genau eine Deutung, nie
    beide — derselbe Test prüft zusätzlich, dass `docs/README.md` (die alte, falsche Deutung) danach
-   *nicht* mehr durchgeht (`carriedDocsReadme`, Status 1). Es wird also nichts weiter erlaubt, nur die
-   falsche Verzeichnis-Deutung durch die richtige (Wurzel-)Deutung ersetzt.
+   *nicht* mehr durchgeht (`carriedDocsReadme`, Status 1).
+
+   *Korrektur (Minor 3, Nacharbeit nach Review):* der ursprüngliche Schlusssatz hier lautete „Es wird
+   also nichts weiter erlaubt, nur die falsche Verzeichnis-Deutung durch die richtige (Wurzel-)Deutung
+   ersetzt." Das war zu pauschal formuliert und traf so nicht zu: der Blocker/Major-Befund der Nacharbeit
+   unten zeigt zwei Wege, wie genau diese Version der Regel doch weiter erlauben konnte, als die Spec
+   meint — über die Quelle der Existenzprüfung (Arbeitsbaum statt Merge-Basis, Blocker) und über
+   mehrdeutige bloße Namen, die an beiden Orten real sind (Major). Die jetzige Fassung der Regel (siehe
+   Nacharbeit) behebt beides.
 
 Ich habe bewusst nicht "bulletiert vs. Fließtext" als Unterscheidung gewählt (naheliegend, weil 020s
 Kurzform in einem `- `-Aufzählungspunkt steht und takt-007s Absatz keiner ist): `takt-003-nacharbeit-015.md`
@@ -234,6 +241,155 @@ Touched:
 - `scripts/fixtures/task-completed/docs/slices/906b-regulaer-offen.md` (neu)
 - `scripts/fixtures/task-completed/docs/slices/takt-905b-kleinaenderung-offen.md` (neu)
 - `docs/slices/takt-010-scheibenumfang-luecken.md` (dieser Bericht)
+
+### Nacharbeit nach Review und Codex
+
+Ausgelöst durch das unabhängige Review (Opus, Betrieb: „nacharbeiten", 1 Blocker, 1 Major, 2 Minor,
+2 Nit) und Codex' P2 auf PR #27 (derselbe Grund wie der Blocker). Ausgangspunkt `HEAD` `68564a2`. Zwei
+Fach-Commits (Tests, dann Fix — der Fix deckt Blocker, Major und Nit 6 zusammen ab, da alle drei
+dieselben paar Zeilen in `scripts/slice-scope.mjs` betreffen); Testname und zusammengefasste Ausgabe je
+rot → grün:
+
+1. **BLOCKER (und Codex P2 auf PR #27, derselbe Grund)** (`scripts/slice-scope.test.mjs`): `isRealRootFile`
+   prüfte `existsSync` gegen den ausgecheckten Arbeitsbaum — genau den Baum, den der zu prüfende Diff
+   selbst erzeugt. Ein von der Scheibe selbst neu angelegter Wurzeltreffer zählte dadurch fälschlich als
+   Wurzeldatei (verbreitert den eigenen Umfang); umgekehrt fiel eine von der Scheibe gelöschte
+   Wurzeldatei fälschlich auf die vererbte Verzeichnis-Deutung zurück. Rot:
+   ```
+   # "a root file created by the slice itself must not count as a root file"
+   slice-scope: 1 changed file(s), all within "docs/slices/016-x.md"'s "Files allowed" list (3 pattern(s)).
+   0 !== 1
+
+   # "(reverse) a root file deleted by the slice must still resolve to root"
+   slice-scope: 1 file(s) outside "docs/slices/016-x.md"'s "Files allowed" list:
+     003-y.spec.ts
+   1 !== 0
+   ```
+   Fix: `makeRootFileChecker(root, mergeBase)` prüft jetzt `git cat-file -e <mergeBase>:<pfad>` — die
+   Merge-Basis wird dafür in `main()` vor dem Parsen von „Files allowed" aufgelöst (vorher geschah das
+   erst kurz vor der Diff-Berechnung, danach). Im `--diff`-Modus (Tests, kein Branch, kein
+   Merge-Basis-Begriff) bleibt es unverändert beim Arbeitsbaum, dokumentiert im Docstring. Grün: beide
+   Tests ok, Gesamtlauf `# tests 20 / # pass 20 / # fail 0` (`slice-scope.test.mjs`).
+2. **MAJOR** (`scripts/slice-scope.test.mjs`, „an ambiguous bare name …"): wenn ein bloßer Name an der
+   Wurzel *und* im vererbten Verzeichnis zugleich real ist, gewann bisher stillschweigend die Wurzel.
+   Rot:
+   ```
+   slice-scope: 1 changed file(s), all within "docs/slices/016-x.md"'s "Files allowed" list (3 pattern(s)).
+   0 !== 1
+   ```
+   Fix: `extractGlobs` sammelt solche Namen jetzt in `ambiguous` statt sie aufzulösen; `main()` meldet sie
+   und bricht mit Exit 1 ab („ambiguous bare name(s) — write the full path instead"). Grün: Test ok,
+   gleicher Gesamtlauf wie oben.
+
+   Vollabgleich über alle echten Specs in `docs/slices/` (Skript unter
+   `/tmp/claude-0/-home-user-hvworkflow/ba1d545a-db2b-57e2-a725-96ea31145014/scratchpad/ambiguity-audit.mjs`,
+   nicht Teil des Repos — reine Prüfhilfe, dieselbe Bullet-/Backtick-/`currentDir`-Logik wie
+   `extractGlobs`, gegen den aktuellen Arbeitsbaum als Stellvertreter für „die Merge-Basis jeder dieser
+   bereits angenommenen Specs"):
+   ```
+   004-api-server.md: 1 ambiguous bare name(s)
+     `package.json` also exists at `apps/api/package.json`
+   ```
+   Genau die vom Reviewer genannte Ausnahme, sonst keine (`(none)` für jede andere Spec). `004` ist
+   längst angenommen und wird von keinem laufenden Branch mehr geprüft; keine Spec-Änderung (Nicht-Ziel).
+3. **Minor 3** (dieser Bericht, Abschnitt „Regel für Ziel 3", Punkt 3): der Schlusssatz „Es wird also
+   nichts weiter erlaubt, nur die falsche Verzeichnis-Deutung durch die richtige (Wurzel-)Deutung
+   ersetzt" war zu pauschal und ist durch den Blocker/Major-Befund oben widerlegt (die Wurzel-Bevorzugung
+   *konnte* mehr erlauben, als die Spec meinte — über die Existenzquelle und über Mehrdeutigkeit). Text
+   oben korrigiert, mit Verweis hierher.
+4. **Minor 4** (`scripts/hooks/task-completed.test.mjs`, „a completed plain 905 is blocked …"): die
+   Rückrichtung war ungetestet — eine reine „905" darf die Annahme ihres Buchstaben-Geschwisters „905b"
+   nicht leihen. Kein roter Lauf: die Regel aus Ziel 2 behandelte diesen Fall schon richtig (`findSpecFile`
+   hält beide Präfixe über den Bindestrich auseinander); der neue Test sichert das nur ab, unter
+   Verwendung der vorhandenen Fixture `905-regulaer-offen.md`. Lief beim ersten Versuch grün
+   (`# tests 22 / # pass 22 / # fail 0`).
+5. **Nit 5** (`scripts/hooks/task-completed.test.mjs:156-160`): die Zusicherung auf „takt-905b" prüfte nur
+   die extrahierte Nummer in der Meldung, nicht den tatsächlich gelesenen Spec-Dateinamen — ein Treffer
+   auf die falsche Datei wäre am Text allein nicht erkennbar gewesen. Ergänzt um
+   `assert.match(r.stderr, /takt-905b-kleinaenderung-offen\.md/)`. Kein roter Lauf (dieselbe bereits
+   korrekte Auflösung wie Punkt 4); Nachweis reine Testschärfung, gleicher Gesamtlauf.
+6. **Nit 6** (`scripts/slice-scope.mjs:308`, `scripts/hooks/task-completed.mjs`-Docstring von
+   `findSpecFile`): beide nannten nur „NNN", obwohl ein Großbuchstaben-Suffix (`010B`) von keinem der
+   beiden Skripte erkannt wird und still durchfällt (`slice-scope` überspringt, `task-completed` prüft
+   nichts). Entscheidung: das Namensschema bleibt bewusst klein geschrieben (kein neues Namensschema,
+   Nicht-Ziel dieser Scheibe; alle echten Vorkommen — `010b`, die Fixtures dieser Nacharbeit — sind
+   klein) — nur die Meldungen wurden berichtigt, sie nennen jetzt „NNNx" (`claude/slice-NNNx-…` bzw.
+   `docs/slices/NNNx-*.md`) statt weiterhin nur „NNN" zu behaupten. Kein Test (reiner Text); Nachweis ist
+   der geänderte Wortlaut selbst (siehe Diff) und dass `assert.match(r.stdout, /skipping/)` in den
+   bestehenden Skip-Tests unverändert grün bleibt (die Tests prüfen nur auf „skipping", nicht auf den
+   genauen Wortlaut).
+
+`pnpm -C /home/user/wt/takt test:scripts` (nach beiden Fach-Commits, vollständiger Lauf):
+```
+1..206
+# tests 206
+# suites 0
+# pass 206
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7681.060727
+```
+
+Akzeptanzkriterium 2, erneut geprüft nach der Nacharbeit (derselbe Arbeitsbaum `/home/user/wt/010b`,
+unverändert, siehe oben):
+```
+slice-scope: 30 changed file(s), all within "docs/slices/010b-lesepfade-oberflaeche.md"'s "Files allowed" list (19 pattern(s)).
+exit: 0
+```
+Unverändert gegenüber der ersten Abgabe — die 010b-Spec hat keine mehrdeutigen bloßen Namen, also
+betrifft sie weder der Blocker- noch der Major-Fix inhaltlich; die Prüfung selbst (Merge-Basis statt
+Arbeitsbaum) läuft jetzt intern anders, mit demselben Ergebnis.
+
+`pnpm -C /home/user/wt/takt gates` (Tail, wörtlich, nach beiden Fach-Commits, Commit `365b623`, clean
+tree — dieser Bericht-Commit selbst kommt danach):
+```
+slice-scope: 10 changed file(s), all within "docs/slices/takt-010-scheibenumfang-luecken.md"'s "Files allowed" list (6 pattern(s)).
+```
+```
+1..206
+# tests 206
+# suites 0
+# pass 206
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11590.576058
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DwK4D-x4.css                        39.98 kB │ gzip:   8.67 kB
+dist/assets/index-BImqnPVW.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,201.28 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+✓ built in 1.30s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 365b623, tree 32b789473989…
+```
+
+Touched (Nacharbeit, zusätzlich zur ersten Abgabe):
+- `scripts/slice-scope.mjs`, `scripts/slice-scope.test.mjs`
+- `scripts/hooks/task-completed.mjs` (nur Docstring, Nit 6), `scripts/hooks/task-completed.test.mjs`
+- `docs/slices/takt-010-scheibenumfang-luecken.md` (dieser Abschnitt, Minor-3-Korrektur oben)
+
+Commits: `8b1a020` (Tests), `365b623` (Fix), dieser Commit (Bericht).
 
 ## Review findings
 
