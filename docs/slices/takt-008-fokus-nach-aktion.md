@@ -1,6 +1,6 @@
 # takt-008 — Fokus nach einer Aktion bleibt am Bedienelement
 
-**Status:** spec
+**Status:** review bestanden (Nachprüfung 24.09.)
 **Klasse:** S (Kleinänderungsspur, Produktplan 5.9) · Risikoklasse niedrig · Lanes: web-capture, web-answers, web-stage,
 e2e (nur `013-tastaturpfad.spec.ts`). 010b ist gemergt (`0a5eae3`).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -200,3 +200,19 @@ Playwright 43/43, axe ohne serious/critical. Urteil: nicht mergebereit wegen Bef
 8. **nit** — Leerer Entwurfsknopf ist Tab-Halt und wird als nicht verfügbar angesagt; zulässiges Muster. Bleibt.
 
 Entscheidung des Architekten: 1–6 in dieser Scheibe beheben; 7 und 8 bleiben wie sie sind.
+
+Nachprüfung (Opus 5.5, frischer Kontext, HEAD `956a376`): Gates exit 0, Playwright 43/43, axe ohne serious/critical.
+Befunde 1–6 behoben, je mit Gegenprobe (Sperren entfernt → 013i rot; Fokusaufruf entfernt → 013h rot; langsames und
+fehlschlagendes Nachlesen gesperrt bzw. freigegeben). Urteil: mergebereit.
+
+- **N1 minor** — Nach einer Ablehnung (412, jemand anderes schrieb zuerst) wird `stepTaken`/`nextPressed` schon beim
+  Freigeben der Sperre gelöscht; verschwindet der Knopf erst mit dem Nachlesen, fällt der Fokus auf BODY
+  (`QuestionDetail.tsx:250-257`, `Podium.tsx:184-191`). Nur bei zwei gleichzeitig Schreibenden erreichbar.
+- **N2 nit** — Fehler eines älteren Schreibens gibt die Sperre eines neueren frei (`answers/Page.tsx:105-107`,
+  `stage/Page.tsx:272-273, 370-371`); nur eigene Sperre freigeben.
+- **N3 nit** — `nextPressed` überlebt, wenn `deliver` ohne Schreiben zurückkehrt (`Podium.tsx:192-195`).
+- **N4 nit** — Status-Zeile und „Touched“ im Bericht; Status vom Architekten nachgezogen, die drei PNGs aus `ef97c5e`
+  gehören zu Touched.
+
+Entscheidung des Architekten (Stoppregel, takt-012): N1–N3 sind nicht im Demo erreichbar und gehören zur Klasse
+„Zustand hängt am Ladevorgang“; sie gehen als Ziel 6 in 010c. N4 hier erledigt.
