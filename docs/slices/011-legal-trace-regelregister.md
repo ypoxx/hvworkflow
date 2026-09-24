@@ -48,6 +48,12 @@ Trace)" (`geplant in Scheibe 011`); ADR 0012 (Vorabzug an Recht nach 011)
    keine Änderungsgeschichte (sie steht im Bericht). Wörter wie „Review“ oder „geprüft“ kommen in `legalRef` und in
    den Beschreibungen nicht vor, weil Recht sie als eigene Prüfung lesen würde (E15, Leitplanken 11). Fordert die
    zitierte Stelle mehr, als die Regel tut, steht „teilweise“ oder „nicht umgesetzt“ mit dem fehlenden Teil dabei.
+6. **Nachgeschärft nach dem vierten Codex-Lauf (24.09.2026): jede Wirkung einer Regel ist belegt oder als unbelegt
+   benannt.** Eine Regel hat oft mehr als eine Wirkung: der Stand wechselt, Felder werden festgehalten (z. B.
+   Tagesordnungspunkt und Bühnenzuordnung bei R-TRANS-01), Folgen treten ein (z. B. eine Freigabe erlischt bei
+   R-TRANS-03). Für jede der 22 Regeln listet der Bericht ihre Wirkungen aus dem Code (Übergangszeile, `build()` in
+   `api.ts`, Guards) und nennt je Wirkung die Fundstelle oder „nicht belegt“. Das Zitat in `legalRef` deckt jede
+   Wirkung ab oder sagt, welche Wirkung ohne Beleg ist. Verhalten und Rechte ändern sich nicht.
 
 ## Ziel
 
