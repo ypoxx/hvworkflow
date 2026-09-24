@@ -98,7 +98,11 @@ const OTHER_RULES: readonly RuleEntry[] = [
       'fehlt" (can(), permissions.ts). The domain API answers 403 with this rule id, except for a ' +
       'single question the actor may neither read nor act on: that answers the same 404 as an ' +
       'unknown id (Festlegung 3 of slice 010, no derivable ids), and the rule id does not reach the ' +
-      'response.',
+      'response. This holds once the input checks before transition() have passed: some writes check ' +
+      'their input first and answer 422 before can() runs, also for an actor without the write ' +
+      'permission: classifyQuestion (track, agenda item, stage assignment), assignQuestion (unit), ' +
+      'draftAnswer (empty text), returnQuestion and withdrawQuestion (empty reason). The other writes ' +
+      'check the permission first.',
     legalRef: {
       source: 'Rechtekonzept',
       citation:

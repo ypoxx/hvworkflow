@@ -1285,3 +1285,12 @@ Exit 0.
 3. P2 — Querschnitt `version`: das Erfassen erhöht nicht. **Umgang:** schon in `6541259` behoben (Runde 7, Nit 3).
 
 `docs/legal-trace.md` nur über `npx vitest run -u` neu erzeugt (86 grün); Wahrheitstabelle byte-gleich zu `417bc6d`.
+
+### Codex auf `af308a0`
+
+1. P2 — R-PERM-01 behauptete 403/404 bei fehlendem Schreibrecht ohne Ausnahme; fünf Schreibaufrufe prüfen ihre Eingabe
+   vor `can()` und antworten zuerst 422 (api.ts: `classifyQuestion` 534–540, `assignQuestion` 548, `draftAnswer` 556,
+   `returnQuestion` 587, `withdrawQuestion` 616). **Umgang:** Beschreibung eingeschränkt und alle fünf genannt (am Code
+   geprüft, nicht nur die drei von Codex); die übrigen Schreibaufrufe prüfen das Recht zuerst. Offener Punkt 17 (für
+   010/021): Recht vor Eingabe prüfen — heute verrät ein 422 z. B., ob ein TOP oder eine Einheit existiert, auch ohne
+   Schreibrecht.
