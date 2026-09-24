@@ -34,6 +34,16 @@ Haiku nicht besetzt
    gilt die Besetzung aus `.claude/agents/`: Opus 5.5, Mechanik Sonnet 5"). Bestehende Messzeilen werden nicht
    geändert.
 
+5. **Nachtrag des Architekten (nach dem Bau).** Akzeptanzkriterium 1 und die Nicht-Ziele widersprachen sich an drei
+   Stellen, die Modellnamen in Zielen bzw. im Absatz 5.9 tragen (Zeilen 606, 826, 866). Entscheidung: auch diese werden
+   auf Rollen umgestellt, ohne sonst etwas am Ziel zu ändern; ebenso die übrigen Modellnennungen „Opus" in Plan-Zeilen 234,
+   340, 349, 994, und „fremdes Modell" bei Anleitungstests (B14, Tabelle 6.1 Spalte „Zusätzlich", Leitplanken Zeile 220)
+   wird „Agent in frischem Kontext ohne Vorwissen". Die schon geänderten Zeilen 194 und 1122 sind damit gedeckt.
+   Akzeptanzkriterium 2 erlaubt zusätzlich genau diese Zeilen.
+6. **Tor auf gestapeltem Branch.** Solange takt-011 nicht gemergt ist, läuft `slice-scope` mit
+   `--base claude/takt-011-plan-service`; nach dem Merge von takt-011 wird der Integrationsbranch eingemergt und
+   `pnpm gates` unverändert neu gelaufen.
+
 ## Ziel
 
 - **A** `docs/qualitaetsleitplanken-produktreife.md`: Risikoklassen-Spalte „Review" (Zeilen 120–122) ohne „anderes
