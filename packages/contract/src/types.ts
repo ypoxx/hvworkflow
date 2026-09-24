@@ -11,7 +11,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the current meeting */
+        /**
+         * Get the current meeting (alias)
+         * @deprecated
+         * @description Alias for the current meeting (aktuelle HV): the same resource as `GET /meetings/{meetingId}` with the id of the running meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (Plan 3, "Jahrgang und Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
+         */
         get: operations["getMeeting"];
         put?: never;
         post?: never;
@@ -28,7 +32,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List agenda items (Tagesordnungspunkte) */
+        /**
+         * List agenda items (Tagesordnungspunkte) of the current meeting (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/agenda-items` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["listAgendaItems"];
         put?: never;
         post?: never;
@@ -45,7 +53,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List answering units (Fachbereiche) */
+        /**
+         * List answering units (Fachbereiche) of the current meeting (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/units` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["listUnits"];
         put?: never;
         post?: never;
@@ -62,10 +74,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List speakers (Wortmeldeliste), ordered by round and position */
+        /**
+         * List speakers (Wortmeldeliste) of the current meeting, ordered by round and position (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/speakers` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["listSpeakers"];
         put?: never;
-        /** Register a speaker (Wortmeldung aufnehmen) */
+        /**
+         * Register a speaker (Wortmeldung aufnehmen) in the current meeting (alias)
+         * @deprecated
+         * @description Alias for `POST /meetings/{meetingId}/speakers` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         post: operations["registerSpeaker"];
         delete?: never;
         options?: never;
@@ -81,7 +101,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set the order of speakers within a round (Reihenfolge ändern) */
+        /**
+         * Set the order of speakers within a round (Reihenfolge ändern) of the current meeting (alias)
+         * @deprecated
+         * @description Alias for `PUT /meetings/{meetingId}/speakers/order` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         put: operations["reorderSpeakers"];
         post?: never;
         delete?: never;
@@ -117,12 +141,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List speeches (Redebeiträge) */
+        /**
+         * List speeches (Redebeiträge) of the current meeting (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/contributions` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["listContributions"];
         put?: never;
         /**
-         * Capture a speech (Redebeitrag erfassen)
-         * @description Creates the immutable text of a speech. Questions are then atomised out of it with `captureQuestions`. Later, transcript segments arrive through the ingest interface and become contributions the same way.
+         * Capture a speech (Redebeitrag erfassen) in the current meeting (alias)
+         * @deprecated
+         * @description Alias for `POST /meetings/{meetingId}/contributions` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5. Creates the immutable text of a speech. Questions are then atomised out of it with `captureQuestions`. Later, transcript segments arrive through the ingest interface and become contributions the same way.
          */
         post: operations["captureContribution"];
         delete?: never;
@@ -169,6 +198,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contributions/{contributionId}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contributionId: components["parameters"]["ContributionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take over a speech for atomisation (Redebeitrag übernehmen) — soft lock with expiry
+         * @description Since 0.3.0 (slice 028, register E36): a claim (Übernahme) is a soft lock — data, not a hard lock — with a server-side time to live (10 minutes by default); expiry releases it. Who holds the claim is visible in `claim` on the resource and in the events `ContributionClaimed` / `ContributionReleased`. Permission `contribution.claim`. `409` when another actor holds an unexpired claim (rule id from slice 028 in `ruleId`).
+         */
+        post: operations["claimContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contributions/{contributionId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contributionId: components["parameters"]["ContributionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release a claimed speech (Übernahme zurückgeben)
+         * @description Since 0.3.0 (slice 028). Permission `contribution.claim`; only the holder releases (an override is a decision of slice 040, `admin.override`, not part of 0.3.0). `409` when the speech is not claimed or claimed by someone else.
+         */
+        post: operations["releaseContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/questions": {
         parameters: {
             query?: never;
@@ -176,7 +249,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List questions with filters */
+        /**
+         * List questions of the current meeting with filters (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/questions` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["listQuestions"];
         put?: never;
         post?: never;
@@ -235,7 +312,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Classify a question (Klassifizieren) — answer track, agenda item, stage assignment */
+        /** Classify a question (Klassifizieren) — answer track, agenda item, podium seat */
         post: operations["classifyQuestion"];
         delete?: never;
         options?: never;
@@ -436,6 +513,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions/{questionId}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take over a question for drafting (Einzelfrage übernehmen) — soft lock with expiry
+         * @description Since 0.3.0 (slice 028, register E36): the assignment stays with the answering unit; the person is visible only through this claim (Übernahme, weiche Sperre), never through an automatic personal assignment (ADR 0013). Time to live 10 minutes by default; expiry releases. Permission `question.claim`. `409` when another actor holds an unexpired claim.
+         */
+        post: operations["claimQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/{questionId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release a claimed question (Übernahme zurückgeben)
+         * @description Since 0.3.0 (slice 028). Permission `question.claim`; only the holder releases. `409` when the question is not claimed or claimed by someone else.
+         */
+        post: operations["releaseQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stage": {
         parameters: {
             query?: never;
@@ -443,7 +564,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Podium view (Bühne) — current question, queue, counters */
+        /**
+         * Podium view (Bühne) of the current meeting — current question, queue, counters (alias)
+         * @deprecated
+         * @description Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         */
         get: operations["getStage"];
         put?: never;
         post?: never;
@@ -460,8 +585,588 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Append-only event feed. Poll with `after` = last seen sequence number. */
+        /**
+         * Append-only event feed. Poll with `after` = last seen sequence number.
+         * @description Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no meeting prefix; `meetingId` (since 0.3.0) filters, `lastSeq` stays the global cursor. Permission `event.read`.
+         */
         get: operations["listEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Realtime event stream (Server-Sent Events) with resumption
+         * @description Since 0.3.0 (slice 035, ADR 0014). `text/event-stream`: every message carries one `Event` as JSON in `data:` and its `seq` in `id:`; a comment line is sent as heartbeat every 15 s. Resume with `after` or the `Last-Event-ID` header (the browser sends it on reconnect). The same read permission as `listEvents` applies per delivered event (`event.read` plus the read scopes of slice 010): no event reaches a reader who may not read it. Polling `/events` stays the fallback. In-app alarms (`NotificationRaised`, slice 085) travel on this stream later.
+         */
+        get: operations["streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List meetings (Jahrgänge)
+         * @description Since 0.3.0 (slice 025). Every signed-in actor may read the list, like the meeting itself (Festlegung 1 of slice 010: master data needs no read permission of its own). Sorted by `date` descending.
+         */
+        get: operations["listMeetings"];
+        put?: never;
+        /**
+         * Create a meeting (Jahrgang anlegen), optionally cloned from an earlier one
+         * @description Since 0.3.0 (slice 040). Permission `admin.meetings.manage`. With `cloneFromMeetingId` the master data of that meeting (agenda items, units, podium seats) is copied; speakers, contributions, questions and events are never copied. Emits `MeetingCreated` (payload `clonedFromMeetingId` when cloned). A second legal entity is not modelled (ADR 0011, B-list).
+         */
+        post: operations["createMeeting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a meeting (canonical form of `GET /meeting`)
+         * @description Since 0.3.0 (slice 025). The `ETag` is the meeting's `version` (admin writes send it as `If-Match`, slice 040).
+         */
+        get: operations["getMeetingById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/agenda-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List agenda items (Tagesordnungspunkte) of a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /agenda-items`.
+         */
+        get: operations["listMeetingAgendaItems"];
+        /**
+         * Set the agenda (Tagesordnung) of a meeting — the whole list
+         * @description Since 0.3.0 (slice 040). Permission `agenda.manage`. The list replaces the agenda; an item that keeps its `id` keeps its progress timestamps and its questions. `409` after the configuration freeze (R-ADM-03, slice 040) or when an item to be removed already has questions.
+         */
+        put: operations["replaceMeetingAgendaItems"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/agenda-items/{agendaItemId}/opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call an agenda item (Tagesordnungspunkt aufrufen) — emits `AgendaItemOpened`
+         * @description Since 0.3.0 (slice 025, rule table R-MTG). Permission `agenda.manage`. `409` when the meeting is not running or the item is already open (rule id in `ruleId`).
+         */
+        post: operations["openAgendaItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/agenda-items/{agendaItemId}/voting/opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the voting on an agenda item (Abstimmung eröffnen) — emits `VotingOpened`
+         * @description Since 0.3.0 (slice 025, R-MTG). Permission `agenda.manage`. `409` when the item is not open.
+         */
+        post: operations["openVoting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/agenda-items/{agendaItemId}/voting/closure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close the voting on an agenda item (Abstimmung schließen) — emits `VotingClosed`
+         * @description Since 0.3.0 (slice 025, R-MTG). Permission `agenda.manage`. `409` when the voting is not open.
+         */
+        post: operations["closeVoting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List answering units (Fachbereiche) of a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /units`.
+         */
+        get: operations["listMeetingUnits"];
+        /**
+         * Set the answering units (Fachbereiche) of a meeting — the whole list
+         * @description Since 0.3.0 (slice 040). Permission `admin.units.manage`. A unit that keeps its `id` keeps its assignments; `409` after the configuration freeze (R-ADM-03) or when a unit to be removed still has assigned questions.
+         */
+        put: operations["replaceMeetingUnits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/stage-seats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List the podium seats (Bühnenplätze) of a meeting
+         * @description Since 0.3.0 (slice 040, ADR 0006): the seat list replaces the `StageAssignment` enum; the four enum values become the default seats of the seed. Readable by every signed-in actor (master data); classification sets `seatId` from it.
+         */
+        get: operations["listMeetingStageSeats"];
+        /**
+         * Set the podium seats (Bühnenplätze) of a meeting with person and device per seat
+         * @description Since 0.3.0 (slice 040). Permission `admin.seats.manage`. `personId` and `deviceId` per seat are resolved in the service for the podium filter (ADR 0006: the context never comes from the client). `409` after the configuration freeze (R-ADM-03).
+         */
+        put: operations["replaceMeetingStageSeats"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/role-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List role assignments (Rollenzuordnungen) of a meeting
+         * @description Since 0.3.0 (slice 026, ADR 0004): the administered assignment table is the one truth for roles; identity-provider groups are only a suggestion (`/auth/me`). Permission `admin.roles.manage`. Revoked assignments are included with `revokedAt`.
+         */
+        get: operations["listRoleAssignments"];
+        put?: never;
+        /**
+         * Assign a role to a subject for this meeting (Rolle zuordnen) — emits `RoleAssigned`
+         * @description Since 0.3.0 (slice 026). Permission `admin.roles.manage`. `unitId` is optional and binds the role to one answering unit (an `expert` without a unit cannot read questions, slice 026). `expiresAt` defaults to the end of the meeting (auto-expiry). Emergency accounts are ordinary assignments flagged by the identity adapter (slice 029), never a separate path.
+         */
+        post: operations["assignRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/role-assignments/{assignmentId}/revocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                assignmentId: components["parameters"]["AssignmentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a role assignment (Rolle entziehen) — emits `RoleRevoked`
+         * @description Since 0.3.0 (slice 026). Permission `admin.roles.manage`. Revocation is a new event, never a change to the assignment event (rule 7). `409` when already revoked. Takes effect on the subject's next request; the session block list (slice 029) ends a running session.
+         */
+        post: operations["revokeRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/config-freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze the configuration of a meeting (Konfigurationsfreeze) — emits `ConfigFrozen`
+         * @description Since 0.3.0 (slice 040; docs/rollen-und-rechtekonzept.md, "Eingefrorener Snapshot je HV-Jahrgang"). Permission `admin.config.freeze`. The service hashes the effective rights table, the transition table and the master data into `configHash`; after the freeze every master-data change is `409` R-ADM-03 unless the actor overrides with a reason (slice 040). `409` when already frozen.
+         */
+        post: operations["freezeMeetingConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/speakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List speakers (Wortmeldeliste) of a meeting, ordered by round and position
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /speakers`. Permission `speaker.read`.
+         */
+        get: operations["listMeetingSpeakers"];
+        put?: never;
+        /**
+         * Register a speaker (Wortmeldung aufnehmen) in a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `POST /speakers`. Permission `speaker.register`.
+         */
+        post: operations["registerMeetingSpeaker"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/speakers/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the order of speakers within a round (Reihenfolge ändern) of a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `PUT /speakers/order`. Permission `speaker.reorder`.
+         */
+        put: operations["reorderMeetingSpeakers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List speeches (Redebeiträge) of a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /contributions`. Permission `contribution.read`.
+         */
+        get: operations["listMeetingContributions"];
+        put?: never;
+        /**
+         * Capture a speech (Redebeitrag erfassen) in a meeting
+         * @description Since 0.3.0 (slice 025); canonical form of `POST /contributions`. Permission `contribution.capture`. `409` when the meeting does not accept captures any more (rule table R-MTG, slice 025).
+         */
+        post: operations["captureMeetingContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List questions of a meeting with filters
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /questions`. Permissions `question.read` or `question.read.delivered` (R-PERM-03 scope applies, slice 010).
+         */
+        get: operations["listMeetingQuestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/stage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Podium view (Bühne) of a meeting — current question, queue, counters
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a client parameter (slices 040, 047); a `seat` query parameter is a 0.4.0 matter (slice 043).
+         */
+        get: operations["getMeetingStage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start the sign-in (Anmeldung) — redirects the browser to the identity provider
+         * @description Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a confidential client; the browser is redirected to the identity provider and never sees a token. No credential needed (`security: []`). `503` when no identity provider is configured (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in). A `2xx` response does not exist for this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
+         */
+        get: operations["login"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Complete the sign-in — exchanges the code, sets the session cookie, redirects into the application
+         * @description Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer, audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice 026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie. `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any open meeting; `503` when no identity provider is configured. No `2xx` by design.
+         */
+        get: operations["completeLogin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the session (Abmelden) — clears the cookie and blocks the session id
+         * @description Since 0.3.0 (slice 029). Requires the session cookie; a demo actor has no session to end.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who am I — the signed-in actor, roles from the assignment table, session expiry
+         * @description Since 0.3.0 (slice 029). In the demo this is the `X-Actor` identity. `idpGroups` lists the identity provider's groups as a suggestion for the administrator; they never become a role by themselves (ADR 0004). `csrfToken` is required on state-changing calls under the `session` scheme (slice 029; header name defined there).
+         */
+        get: operations["getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/transparency-notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Transparency notice (Transparenzhinweis, Art. 13 GDPR — unverified, E15) for the sign-in page
+         * @description Since 0.3.0 (slice 029; shown by the sign-in page of slice 030 in German and English). The text is deployment configuration, not contract content; it is readable without any credential (`security: []`) because it is displayed before sign-in. Legal review of the text is pending (register E15): the interface shows it as unverified until then.
+         */
+        get: operations["getTransparencyNotice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness — the process answers
+         * @description Since 0.3.0 (slice 033). No credential (`security: []`), no data beyond `status`.
+         */
+        get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness — clock/NTP status (slice 033), database and migration state (slice 027)
+         * @description Since 0.3.0 (slice 033). No credential (`security: []`). `503` with the same body when a check fails; the deploy smoke test of slice 037 rolls back on it.
+         */
+        get: operations["getReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics in Prometheus text exposition format — the five aggregate indicators, none per person
+         * @description Since 0.3.0 (slice 033, ADR 0013). Exactly the indicators of the generated evaluation catalogue (age of the oldest open question, backlog per unit, inflow per 5 min, questions in legal clearing > 10 min, events per minute); no indicator per subject, ever (allowlist gate of slice 033). Protected by the `metricsBearer` token from the service configuration: the consumer is the scraper, not an actor, so no `can()` decision and no `_actions` apply.
+         */
+        get: operations["getMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -499,7 +1204,7 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06 (slice 025). Administration after the configuration freeze: R-ADM-01..04 (slice 040). */
             ruleId?: string;
         };
         /**
@@ -511,22 +1216,47 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
             displayName?: string;
+            /** @description Since 0.3.0 (slice 026, ADR 0009): key into the person table; events carry it instead of a clear name */
+            personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010).
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026).
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "question.capture" | "question.classify" | "question.assign" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "demo.seed";
+        /**
+         * @description Lifecycle of a meeting (Jahrgang): preparation → running → closed (rule table R-MTG, slice 025; the actions come with slice 040)
+         * @enum {string}
+         */
+        MeetingStatus: "preparation" | "running" | "closed";
+        /**
+         * @description Format profile of the meeting (Formatprofil, register E20 — built on the default, "auf Standard gebaut" in slice 023): `presence` (Präsenz-HV), `hybrid`, `virtual`. Default `presence`. In 0.3.0 the value is recorded only; the presence rules apply in every format until a format-specific slice (068) reads it.
+         * @default presence
+         * @enum {string}
+         */
+        MeetingFormat: "presence" | "hybrid" | "virtual";
         Meeting: {
+            /** @description The meeting id (`meetingId` on speakers, contributions, questions and events) */
             id: string;
             /** @example Ordentliche Hauptversammlung 2027 */
             title: string;
             legalEntity?: string;
             /** Format: date */
             date: string;
-            /** @enum {string} */
-            status: "preparation" | "running" | "closed";
+            status: components["schemas"]["MeetingStatus"];
+            format?: components["schemas"]["MeetingFormat"];
             currentRound: number;
+            /** @description Since 0.3.0 (slice 040): optimistic-locking counter for administration writes, also the ETag of `GET /meetings/{meetingId}` */
+            version?: number;
+            /** @description Since 0.3.0 (slice 040): set when the master data was cloned from an earlier meeting */
+            clonedFromMeetingId?: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (slice 040): set by the configuration freeze
+             */
+            configFrozenAt?: string;
+            /** @description Since 0.3.0 (slice 040): SHA-256 over rights table, transition table and master data at the freeze */
+            configHash?: string;
             /** @description Aggregate counters for the header and the podium */
             counts: {
                 speakers?: number;
@@ -538,10 +1268,49 @@ export interface components {
                 byStatus?: {
                     [key: string]: number;
                 };
+                /** @description Since 0.3.0 (slice 040): open questions per answering unit, keyed by `unitId` */
+                byUnit?: {
+                    [key: string]: number;
+                };
+                /** @description Since 0.3.0 (slice 040): staged questions per podium seat, keyed by `seatId` */
+                bySeat?: {
+                    [key: string]: number;
+                };
             };
+        };
+        /** @description Since 0.3.0 (slice 040): body of `createMeeting` */
+        MeetingCreate: {
+            title: string;
+            /** Format: date */
+            date: string;
+            legalEntity?: string;
+            format?: components["schemas"]["MeetingFormat"];
+            /** @description Copy agenda items, units and podium seats from this meeting (Jahrgang klonen) */
+            cloneFromMeetingId?: string;
         };
         AgendaItem: {
             id: string;
+            number: number;
+            title: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (slice 025): set by `AgendaItemOpened`
+             */
+            openedAt?: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (slice 025): set by `VotingOpened`
+             */
+            votingOpenedAt?: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (slice 025): set by `VotingClosed`
+             */
+            votingClosedAt?: string;
+        };
+        /** @description Since 0.3.0 (slice 040): one item of `replaceMeetingAgendaItems`; without `id` the server assigns one */
+        AgendaItemInput: {
+            id?: string;
             number: number;
             title: string;
         };
@@ -550,14 +1319,136 @@ export interface components {
             name: string;
             shortName?: string;
         };
+        /** @description Since 0.3.0 (slice 040): one item of `replaceMeetingUnits`; without `id` the server assigns one */
+        UnitInput: {
+            id?: string;
+            name: string;
+            shortName?: string;
+        };
+        /** @description Since 0.3.0 (slice 040, ADR 0006): a podium seat (Bühnenplatz) of a meeting. Replaces the `StageAssignment` enum; the four enum values are the ids of the default seats in the seed (`supervisory_board_chair`, `ceo`, `cfo`, `board_member`). `personId` and `deviceId` let the service resolve which queue a podium device sees; the client never states its seat. */
+        StageSeat: {
+            id: string;
+            /** @description Display label, e.g. "Vorstandsvorsitz" */
+            label: string;
+            personId?: string;
+            deviceId?: string;
+            /** @description Order on the podium */
+            position?: number;
+        };
+        /** @description Since 0.3.0 (slice 040): one item of `replaceMeetingStageSeats`; without `id` the server assigns one */
+        StageSeatInput: {
+            id?: string;
+            label: string;
+            personId?: string;
+            deviceId?: string;
+            position?: number;
+        };
+        /** @description Since 0.3.0 (slice 026, ADR 0004): one row of the administered assignment table, projected from `RoleAssigned`/`RoleRevoked` */
+        RoleAssignment: {
+            id: string;
+            meetingId: string;
+            /** @description Subject of the identity provider (pseudonymous id), or the demo actor id */
+            subjectId: string;
+            /** @description Key into the person table (ADR 0009), when known */
+            personId?: string;
+            role: components["schemas"]["Role"];
+            /** @description Binds the role to one answering unit (optional) */
+            unitId?: string;
+            /**
+             * Format: date-time
+             * @description Defaults to the end of the meeting; the role vanishes afterwards (auto-expiry)
+             */
+            expiresAt?: string;
+            /** @description Set when this assignment is one of the two deputies of another holder (slice 040) */
+            deputyForSubjectId?: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: components["schemas"]["Actor"];
+            /** Format: date-time */
+            revokedAt?: string;
+            revokedBy?: components["schemas"]["Actor"];
+        };
+        /** @description Since 0.3.0 (slice 026): body of `assignRole` */
+        RoleAssignmentCreate: {
+            subjectId: string;
+            personId?: string;
+            role: components["schemas"]["Role"];
+            unitId?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            deputyForSubjectId?: string;
+        };
+        /** @description Since 0.3.0 (slice 040): result of `freezeMeetingConfig`, also mirrored on `Meeting.configFrozenAt`/`configHash` */
+        ConfigFreeze: {
+            meetingId: string;
+            /** Format: date-time */
+            frozenAt: string;
+            frozenBy: components["schemas"]["Actor"];
+            configHash: string;
+        };
+        /** @description Since 0.3.0 (slice 029): response of `GET /auth/me` */
+        Session: {
+            actor: components["schemas"]["Actor"];
+            subjectId?: string;
+            personId?: string;
+            /** @description All roles from the assignment table valid now; `actor.role` is the active one */
+            roles?: components["schemas"]["Role"][];
+            /**
+             * Format: date-time
+             * @description Session expiry (14 h with silent refresh, ADR 0004); absent for the demo actor
+             */
+            expiresAt?: string;
+            /** @description Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004) */
+            idpGroups?: string[];
+            /** @description Token to send on state-changing calls under the `session` scheme (slice 029) */
+            csrfToken?: string;
+        };
+        /** @description Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15) */
+        TransparencyNotice: {
+            /** @description Version of the configured text, shown next to it */
+            version: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            text: {
+                de: string;
+                en: string;
+            };
+            /**
+             * Format: uri
+             * @description Link to the summary of the data protection impact assessment (DSFA) shown on the sign-in page (slice 030)
+             */
+            dataProtectionSummaryUrl?: string;
+        };
+        Health: {
+            /** @enum {string} */
+            status: "ok";
+        };
+        /** @description Since 0.3.0 (slice 033): readiness with one entry per check (`clock` for the NTP status; `db` and `migrations` from slice 027) */
+        Readiness: {
+            /** @enum {string} */
+            status: "ready" | "not_ready";
+            checks: {
+                [key: string]: {
+                    /** @enum {string} */
+                    status: "ok" | "fail";
+                    detail?: string;
+                };
+            };
+            /** Format: date-time */
+            serverTime?: string;
+        };
         /** @enum {string} */
         SpeakerStatus: "waiting" | "speaking" | "finished" | "withdrawn";
         Speaker: {
             id: string;
+            /** @description Since 0.3.0 (slice 025): the meeting this request to speak belongs to. Pflicht ab 0.3.1, Scheibe 028. */
+            meetingId?: string;
             /** @description Running number of the request to speak */
             number: number;
             /** @description Pseudonym in the demo; real name only via the register interface */
             displayName: string;
+            /** @description Since 0.3.0 (slice 026, ADR 0009): key into the person table; the clear name is resolved on read for holders of `question.identity.reveal` */
+            personId?: string;
             organisation?: string;
             /**
              * @deprecated
@@ -606,34 +1497,91 @@ export interface components {
              */
             requestedMinutes?: number;
         };
+        /** @description Body of `reorderSpeakers` / `reorderMeetingSpeakers` */
+        SpeakerOrder: {
+            round: number;
+            speakerIds: string[];
+        };
         /** @description Character offsets into the contribution text, half-open interval */
         TextSpan: {
             start: number;
             end: number;
         };
+        /**
+         * @description Since 0.3.0 (ADR 0011, B4): who stated `occurredAt`. Only `server` is authoritative (`recordedAt`, the server clock); `device` (a podium or capture device, e.g. an offline intention), `paper` (paper path: the time written on the sheet) and `transcript` (the transcription tool's timecode) are statements of the sender and are labelled as such in every export. A statement in the future is rejected (422).
+         * @enum {string}
+         */
+        OccurredAtSource: "server" | "device" | "paper" | "transcript";
+        /**
+         * @description Since 0.3.0 (ADR 0009, register E16): `record` (Niederschrift-relevant), `working` (working data), `technical`. Retention periods per class are a pending decision of legal and the data protection officer; until then nothing is deleted (no deletion logic in the beta).
+         * @enum {string}
+         */
+        RetentionClass: "record" | "working" | "technical";
+        /** @description Since 0.3.0 (slice 028, E36): who took over a speech or question (Übernahme, weiche Sperre) and until when */
+        Claim: {
+            actorId: string;
+            personId?: string;
+            /** Format: date-time */
+            claimedAt: string;
+            /**
+             * Format: date-time
+             * @description Expiry releases the claim without any further event
+             */
+            expiresAt: string;
+        };
         Contribution: {
             id: string;
+            /** @description Since 0.3.0 (slice 025). Pflicht ab 0.3.1, Scheibe 028. */
+            meetingId?: string;
             speakerId: string;
             text: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Server time of the capture (the same instant as the event's `recordedAt`)
+             */
             capturedAt: string;
             /**
+             * Format: date-time
+             * @description Since 0.3.0 (ADR 0011): the sender's statement of when the speech happened, when it differs from `capturedAt` (paper, transcript, device)
+             */
+            occurredAt?: string;
+            occurredAtSource?: components["schemas"]["OccurredAtSource"];
+            /**
+             * @description Where the text came from. `paper` since 0.3.0 (paper path, slice 025).
              * @default manual
              * @enum {string}
              */
-            source: "manual" | "transcript";
+            source: "manual" | "transcript" | "paper";
             questionIds: string[];
             /** @description How much of the text is covered by captured questions (Restabdeckung) */
             coverage: {
                 coveredRatio: number;
                 uncovered: components["schemas"]["TextSpan"][];
             };
+            /** @description Since 0.3.0 (slice 028): optimistic-locking counter, also the ETag. Pflicht ab 0.3.1, Scheibe 028. */
+            version?: number;
+            claim?: components["schemas"]["Claim"];
+            /** @description Since 0.3.0: actions the calling actor may perform on this speech right now (claim, release, capture questions) */
+            _actions?: components["schemas"]["Action"][];
         };
         ContributionCapture: {
             speakerId: string;
             text: string;
-            /** @enum {string} */
-            source?: "manual" | "transcript";
+            /**
+             * @description `paper` since 0.3.0
+             * @enum {string}
+             */
+            source?: "manual" | "transcript" | "paper";
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (ADR 0011): the sender's statement; requires `occurredAtSource`; never becomes `recordedAt`; a value in the future is a 422
+             */
+            occurredAt?: string;
+            /**
+             * @description Since 0.3.0: source of the stated `occurredAt`; a client cannot claim `server`
+             * @enum {string}
+             */
+            occurredAtSource?: "device" | "paper" | "transcript";
         };
         /**
          * @description The three answer tracks (Antwortpfade). `podium` = free answer by the board (Pfad A), `fast_track` = reference to an existing publication (Pfad B), `expert_track` = specialist answer followed by legal clearing (Pfad C).
@@ -641,7 +1589,8 @@ export interface components {
          */
         Track: "podium" | "fast_track" | "expert_track";
         /**
-         * @description Who answers on the podium (Bühnenzuordnung)
+         * @deprecated
+         * @description Who answers on the podium (Bühnenzuordnung). Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006): replaced by the podium seat list `StageSeat` and `seatId`; the four values are the ids of the default seats in the seed, so a value here equals the `seatId` of that default seat. Removal is a 0.5 matter (no slice in Plan 5 names it yet); slice 040 builds the seat list, the interface follows in 056.
          * @enum {string}
          */
         StageAssignment: "supervisory_board_chair" | "ceo" | "cfo" | "board_member";
@@ -667,6 +1616,8 @@ export interface components {
         };
         Question: {
             id: string;
+            /** @description Since 0.3.0 (slice 025): question numbers F-n restart per meeting. Pflicht ab 0.3.1, Scheibe 028. */
+            meetingId?: string;
             /** @example F-0417 */
             number: string;
             contributionId: string;
@@ -677,8 +1628,15 @@ export interface components {
             status: components["schemas"]["QuestionStatus"];
             track?: components["schemas"]["Track"];
             agendaItemId?: string;
+            /**
+             * @deprecated
+             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5: use `seatId` (ADR 0006)
+             */
             stageAssignment?: components["schemas"]["StageAssignment"];
+            /** @description Since 0.3.0 (slice 040, ADR 0006): the podium seat (Bühnenplatz) that answers; one of `listMeetingStageSeats` */
+            seatId?: string;
             unitId?: string;
+            claim?: components["schemas"]["Claim"];
             answers: components["schemas"]["AnswerVersion"][];
             approval?: components["schemas"]["Approval"];
             returnReason?: string;
@@ -702,7 +1660,13 @@ export interface components {
         Classification: {
             track: components["schemas"]["Track"];
             agendaItemId?: string;
+            /**
+             * @deprecated
+             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5: send `seatId` (ADR 0006); until slice 040 the server maps a value here to the default seat of the same id
+             */
             stageAssignment?: components["schemas"]["StageAssignment"];
+            /** @description Since 0.3.0 (slice 040): podium seat that answers; must be a seat of the meeting (422 otherwise) */
+            seatId?: string;
         };
         AnswerDraft: {
             text: string;
@@ -723,18 +1687,76 @@ export interface components {
             /** @description Optional remark of the clearing lawyer (Anmerkung) */
             note?: string;
         };
-        /** @description One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per event type additively: an event of type `QuestionLegalCleared` carries `QuestionLegalClearedPayload`; every other type keeps the open object. */
+        /** @description Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event's `subjectId` is the meeting */
+        AgendaItemEventPayload: {
+            agendaItemId: string;
+            /** @description Agenda item number at the time of the event, for readers without the master data */
+            number?: number;
+        };
+        /** @description Since 0.3.0 (slice 026, ADR 0004): payload of `RoleAssigned` and `RoleRevoked`; the event's `subjectId` is the assignment id */
+        RoleAssignmentEventPayload: {
+            assignmentId: string;
+            subjectId: string;
+            role: components["schemas"]["Role"];
+            unitId?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** @description Revocation reason, when given */
+            reason?: string;
+        };
+        /** @description Since 0.3.0 (slice 024, ADR 0009/0011): the only part of a payload that may carry personal data. `keyId` names the key of the meeting (per Jahrgang) behind the codec port; in the beta the codec is the identity codec, but `keyId` is set from the first event so switching the key on later is an export into a new database, never a change to the log. Every other field of the payload is free of personal data; events carry `personId`, never a clear name. */
+        PiiEnvelope: {
+            keyId: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** @description One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned`/`RoleRevoked` carry `RoleAssignmentEventPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); every other type keeps the open object. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.1" become required with slice 028. A broken chain is a load error naming the `seq` (slice 024). */
         Event: {
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "MeetingCreated" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged";
-            /** Format: date-time */
+            type: "MeetingCreated" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "ContributionClaimed" | "ContributionReleased" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "QuestionClaimed" | "QuestionReleased" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged" | "AgendaItemOpened" | "VotingOpened" | "VotingClosed" | "RoleAssigned" | "RoleRevoked" | "ConfigFrozen";
+            /**
+             * Format: date-time
+             * @description Recorded time (server clock). Since 0.3.0 the same instant as `recordedAt`, which is the name ADR 0011 gives it; `at` stays for 0.x readers.
+             */
             at: string;
             actor: components["schemas"]["Actor"];
             /** @description Id of the aggregate the event belongs to */
             subjectId?: string;
+            /** @description Since 0.3.0: envelope version, `2` from slice 024 (v1 events exist only in JSONL dev data and are upcast on load). Pflicht ab 0.3.1, Scheibe 028. */
+            schemaVersion?: number;
+            /** @description Since 0.3.0 (ADR 0011): the meeting (Jahrgang) the event belongs to. Pflicht ab 0.3.1, Scheibe 028. */
+            meetingId?: string;
+            /** @description Since 0.3.0: the `Idempotency-Key` of the write that produced the event, when the client sent one; replays after a restart are answered from it (slice 028) */
+            idempotencyKey?: string;
+            /** @description Since 0.3.0: id of the event that caused this one (e.g. the intention a podium device buffered offline), when any */
+            causationId?: string;
+            /** @description Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string. Pflicht ab 0.3.1, Scheibe 028. */
+            prevHash?: string;
+            /** @description Since 0.3.0: SHA-256 (hex) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028. */
+            hash?: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0 (ADR 0011): the authoritative time, always from the server clock (injected clock port, rule 8); never a device time. Pflicht ab 0.3.1, Scheibe 028.
+             */
+            recordedAt?: string;
+            /**
+             * Format: date-time
+             * @description Since 0.3.0: when the fact happened according to `occurredAtSource`; equals `recordedAt` for source `server`. Pflicht ab 0.3.1, Scheibe 028.
+             */
+            occurredAt?: string;
+            /** @description Pflicht ab 0.3.1, Scheibe 028. */
+            occurredAtSource?: components["schemas"]["OccurredAtSource"];
+            /** @description Pflicht ab 0.3.1, Scheibe 028. */
+            retentionClass?: components["schemas"]["RetentionClass"];
+            /** @description Since 0.3.0 (ADR 0009): `false` in the beta; a hold is set by a later event, never by editing this one. Pflicht ab 0.3.1, Scheibe 028. */
+            legalHold?: boolean;
+            /** @description Since 0.3.0 (ADR 0009): the person the event is about (e.g. the speaker), as a key into the person table; masked in the standard read path (ADR 0013, `event.read.personal` from slice 047) */
+            personId?: string;
             payload: {
+                pii?: components["schemas"]["PiiEnvelope"];
+            } & {
                 [key: string]: unknown;
             };
         };
@@ -744,15 +1766,62 @@ export interface components {
         QuestionUpdated: {
             headers: {
                 ETag: components["headers"]["ETag"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["Question"];
             };
         };
+        /** @description OK */
+        QuestionList: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    items: components["schemas"]["Question"][];
+                    total: number;
+                };
+            };
+        };
+        /** @description Updated speech with new ETag and current `_actions` (since 0.3.0) */
+        ContributionUpdated: {
+            headers: {
+                ETag: components["headers"]["ETag"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Contribution"];
+            };
+        };
+        /** @description The agenda item after the transition; `ETag` is the meeting's new version (since 0.3.0) */
+        AgendaItemUpdated: {
+            headers: {
+                ETag: components["headers"]["ETag"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["AgendaItem"];
+            };
+        };
+        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029) or a missing metrics token. Documented since 0.3.0 on the operations introduced with the `session` scheme; the other operations follow in 0.4.0 (slice 043, review 012 point 18). */
+        Unauthorized: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`): R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010) — e.g. a `listQuestions` status filter naming a status outside the actor's `question.read.delivered` scope. */
         Forbidden: {
             headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
@@ -762,15 +1831,17 @@ export interface components {
         /** @description Not found */
         NotFound: {
             headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description The transition is not allowed from the current status */
+        /** @description The transition is not allowed from the current status (rule id in `ruleId`) */
         Conflict: {
             headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
@@ -780,6 +1851,7 @@ export interface components {
         /** @description If-Match did not match the current ETag */
         PreconditionFailed: {
             headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
@@ -789,6 +1861,17 @@ export interface components {
         /** @description Validation failed */
         Unprocessable: {
             headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The service cannot serve this now (e.g. no identity provider configured, a readiness check failed) */
+        ServiceUnavailable: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
@@ -797,18 +1880,42 @@ export interface components {
         };
     };
     parameters: {
-        /** @description Client-generated key. A replay with the same key returns the original result. */
+        /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
         IdempotencyKey: string;
-        /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+        /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
         IfMatch: string;
         SpeakerId: string;
         ContributionId: string;
         QuestionId: string;
+        /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+        MeetingId: string;
+        AgendaItemId: string;
+        AssignmentId: string;
+        /** @description Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global */
+        MeetingIdFilter: string;
+        /** @description Last seen global sequence number */
+        After: number;
+        /** @description Sent by the browser on reconnect; the same meaning as `after` */
+        LastEventId: string;
+        RoundFilter: number;
+        SpeakerStatusFilter: components["schemas"]["SpeakerStatus"];
+        SpeakerIdFilter: string;
+        QuestionStatusFilter: components["schemas"]["QuestionStatus"][];
+        TrackFilter: components["schemas"]["Track"];
+        UnitIdFilter: string;
+        ContributionIdFilter: string;
+        AgendaItemIdFilter: string;
+        /** @description Full-text search over question and answer text */
+        FullTextFilter: string;
+        QuestionLimit: number;
+        QuestionOffset: number;
     };
     requestBodies: never;
     headers: {
         /** @description Opaque version tag, changes with every write. */
         ETag: string;
+        /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header. */
+        "X-Server-Time": string;
     };
     pathItems: never;
 }
@@ -826,6 +1933,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -847,6 +1955,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -868,6 +1977,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -880,8 +1990,8 @@ export interface operations {
     listSpeakers: {
         parameters: {
             query?: {
-                round?: number;
-                status?: components["schemas"]["SpeakerStatus"];
+                round?: components["parameters"]["RoundFilter"];
+                status?: components["parameters"]["SpeakerStatusFilter"];
             };
             header?: never;
             path?: never;
@@ -892,6 +2002,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -905,7 +2016,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -920,6 +2031,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -934,7 +2046,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -942,16 +2054,14 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    round: number;
-                    speakerIds: string[];
-                };
+                "application/json": components["schemas"]["SpeakerOrder"];
             };
         };
         responses: {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -977,6 +2087,7 @@ export interface operations {
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -991,9 +2102,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1011,6 +2122,7 @@ export interface operations {
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1026,7 +2138,7 @@ export interface operations {
     listContributions: {
         parameters: {
             query?: {
-                speakerId?: string;
+                speakerId?: components["parameters"]["SpeakerIdFilter"];
             };
             header?: never;
             path?: never;
@@ -1037,6 +2149,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1050,7 +2163,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -1065,6 +2178,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1089,6 +2203,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1103,7 +2218,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -1122,6 +2237,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1133,19 +2249,65 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    claimContribution: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                contributionId: components["parameters"]["ContributionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ContributionUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    releaseContribution: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                contributionId: components["parameters"]["ContributionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ContributionUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
     listQuestions: {
         parameters: {
             query?: {
-                status?: components["schemas"]["QuestionStatus"][];
-                track?: components["schemas"]["Track"];
-                unitId?: string;
-                speakerId?: string;
-                contributionId?: string;
-                agendaItemId?: string;
+                status?: components["parameters"]["QuestionStatusFilter"];
+                track?: components["parameters"]["TrackFilter"];
+                unitId?: components["parameters"]["UnitIdFilter"];
+                speakerId?: components["parameters"]["SpeakerIdFilter"];
+                contributionId?: components["parameters"]["ContributionIdFilter"];
+                agendaItemId?: components["parameters"]["AgendaItemIdFilter"];
                 /** @description Full-text search over question and answer text */
-                q?: string;
-                limit?: number;
-                offset?: number;
+                q?: components["parameters"]["FullTextFilter"];
+                limit?: components["parameters"]["QuestionLimit"];
+                offset?: components["parameters"]["QuestionOffset"];
             };
             header?: never;
             path?: never;
@@ -1153,18 +2315,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items: components["schemas"]["Question"][];
-                        total: number;
-                    };
-                };
-            };
+            200: components["responses"]["QuestionList"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1183,6 +2334,7 @@ export interface operations {
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1207,6 +2359,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1221,9 +2374,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1249,9 +2402,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1278,9 +2431,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1306,9 +2459,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1329,9 +2482,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1359,9 +2512,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1388,9 +2541,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1411,9 +2564,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1434,9 +2587,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1457,9 +2610,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1486,9 +2639,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Client-generated key. A replay with the same key returns the original result. */
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-                /** @description ETag of the resource the client last saw. Mismatch yields 412. */
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
             path: {
@@ -1511,6 +2664,52 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
         };
     };
+    claimQuestion: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["QuestionUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    releaseQuestion: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["QuestionUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
     getStage: {
         parameters: {
             query?: never;
@@ -1523,6 +2722,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1535,8 +2735,11 @@ export interface operations {
     listEvents: {
         parameters: {
             query?: {
-                after?: number;
+                /** @description Last seen global sequence number */
+                after?: components["parameters"]["After"];
                 limit?: number;
+                /** @description Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global */
+                meetingId?: components["parameters"]["MeetingIdFilter"];
             };
             header?: never;
             path?: never;
@@ -1547,6 +2750,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1557,6 +2761,937 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query?: {
+                /** @description Last seen global sequence number */
+                after?: components["parameters"]["After"];
+                /** @description Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global */
+                meetingId?: components["parameters"]["MeetingIdFilter"];
+            };
+            header?: {
+                /** @description Sent by the browser on reconnect; the same meaning as `after` */
+                "Last-Event-ID"?: components["parameters"]["LastEventId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stream opened; messages follow until the client closes the connection */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listMeetings: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["MeetingStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Meeting"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createMeeting: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Meeting"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMeetingById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Meeting"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMeetingAgendaItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgendaItem"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceMeetingAgendaItems: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgendaItemInput"][];
+            };
+        };
+        responses: {
+            /** @description OK — the agenda after the change; `ETag` is the meeting's new version */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgendaItem"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    openAgendaItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AgendaItemUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    openVoting: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AgendaItemUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    closeVoting: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                agendaItemId: components["parameters"]["AgendaItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AgendaItemUpdated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    listMeetingUnits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Unit"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceMeetingUnits: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnitInput"][];
+            };
+        };
+        responses: {
+            /** @description OK — the units after the change; `ETag` is the meeting's new version */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Unit"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMeetingStageSeats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageSeat"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceMeetingStageSeats: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageSeatInput"][];
+            };
+        };
+        responses: {
+            /** @description OK — the seats after the change; `ETag` is the meeting's new version */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageSeat"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRoleAssignments: {
+        parameters: {
+            query?: {
+                subjectId?: string;
+                role?: components["schemas"]["Role"];
+            };
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignment"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    assignRole: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeRole: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+                assignmentId: components["parameters"]["AssignmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK — the assignment with `revokedAt` set */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    freezeMeetingConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigFreeze"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    listMeetingSpeakers: {
+        parameters: {
+            query?: {
+                round?: components["parameters"]["RoundFilter"];
+                status?: components["parameters"]["SpeakerStatusFilter"];
+            };
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    registerMeetingSpeaker: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerRegistration"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    reorderMeetingSpeakers: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerOrder"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMeetingContributions: {
+        parameters: {
+            query?: {
+                speakerId?: components["parameters"]["SpeakerIdFilter"];
+            };
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contribution"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    captureMeetingContribution: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContributionCapture"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contribution"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMeetingQuestions: {
+        parameters: {
+            query?: {
+                status?: components["parameters"]["QuestionStatusFilter"];
+                track?: components["parameters"]["TrackFilter"];
+                unitId?: components["parameters"]["UnitIdFilter"];
+                speakerId?: components["parameters"]["SpeakerIdFilter"];
+                contributionId?: components["parameters"]["ContributionIdFilter"];
+                agendaItemId?: components["parameters"]["AgendaItemIdFilter"];
+                /** @description Full-text search over question and answer text */
+                q?: components["parameters"]["FullTextFilter"];
+                limit?: components["parameters"]["QuestionLimit"];
+                offset?: components["parameters"]["QuestionOffset"];
+            };
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["QuestionList"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMeetingStage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageView"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    login: {
+        parameters: {
+            query?: {
+                /** @description Relative path inside the application to return to after sign-in; anything else is ignored (open-redirect guard) */
+                returnTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the identity provider */
+            302: {
+                headers: {
+                    Location?: string;
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    completeLogin: {
+        parameters: {
+            query: {
+                code: string;
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in; redirect to `returnTo` or the application root */
+            302: {
+                headers: {
+                    Location?: string;
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or replayed authorization response */
+            400: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out; the cookie is cleared */
+            204: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getTransparencyNotice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransparencyNotice"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ready */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readiness"];
+                };
+            };
+            /** @description Not ready — at least one check failed */
+            503: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    getMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     seedDemo: {
@@ -1580,6 +3715,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content: {
