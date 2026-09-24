@@ -1140,8 +1140,36 @@ paths:
       security: []
       responses:
         # The status in the body agrees with the HTTP status (Codex on PR #25).
-        '200': { description: Ready, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { allOf: [ { $ref: '#/components/schemas/Readiness' }, { type: object, properties: { status: { const: ready } } } ] } } } }
-        '503': { description: Not ready — at least one check failed, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { allOf: [ { $ref: '#/components/schemas/Readiness' }, { type: object, properties: { status: { const: not_ready } } } ] } } } }
+        # Codex round 5: `ready` also means every check is `ok`; `not_ready` means at least one is `fail`.
+        '200':
+          description: Ready — every check is `ok`
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Readiness' }
+                  - type: object
+                    properties:
+                      status: { const: ready }
+                      checks: { type: object, additionalProperties: { type: object, properties: { status: { const: ok } } } }
+        '503':
+          description: Not ready — at least one check is `fail`
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Readiness' }
+                  - type: object
+                    properties:
+                      status: { const: not_ready }
+                      checks:
+                        type: object
+                        anyOf:
+                          - { required: [clock], properties: { clock: { type: object, properties: { status: { const: fail } } } } }
+                          - { required: [db], properties: { db: { type: object, properties: { status: { const: fail } } } } }
+                          - { required: [migrations], properties: { migrations: { type: object, properties: { status: { const: fail } } } } }
   /metrics:
     servers: [ { url: /, description: 'Outside /v1: scraped by the monitoring stack' } ]
     get:
@@ -1236,14 +1264,16 @@ components:
       required: false
       schema: { type: string }
       description: >-
-        Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`),
+        Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`SignedInSession.csrfToken`),
         sent on every state-changing call made under the `session` scheme — the double-submit pattern:
         a cross-site form cannot add a custom request header, and a script from another origin forces
         a CORS preflight, so the header's presence plus the value check proves the request came from
         the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP
         cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session`
         scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id
-        defined there); under `demoActor` it is ignored. Declared on every state-changing operation,
+        defined there — OpenAPI cannot make a header required for one security scheme only, so the
+        document keeps it optional and the service decides); under `demoActor` it is ignored.
+        Declared on every state-changing operation,
         `logout` included; not on `seedDemo` (demo only).
     SpeakerId: { name: speakerId, in: path, required: true, schema: { type: string } }
     ContributionId: { name: contributionId, in: path, required: true, schema: { type: string } }
@@ -1371,12 +1401,35 @@ components:
       enum: [moderation, capture, expert, legal, approver, podium, admin, observer, coordination]
     Actor:
       type: object
+      description: >-
+        The acting person as a projection (answer versions, approvals, role assignments, the
+        session): `displayName` is resolved on read (from slice 026 through the person table and the
+        right `question.identity.reveal`). Events use `EventActor` instead — from envelope v2 (slice 024)
+        an event carries no clear name (ADR 0009/0011).
       required: [id, role]
       properties:
         id: { type: string }
         role: { $ref: '#/components/schemas/Role' }
         displayName: { type: string }
-        personId: { type: string, description: 'Since 0.3.0 (slice 026, ADR 0009): key into the person table; events carry it instead of a clear name' }
+        personId: { type: string, description: 'Since 0.3.0 (slice 026, ADR 0009): key into the person table' }
+    EventActor:
+      type: object
+      description: >-
+        Since 0.3.0 (Codex round 5): the actor of an event. Events carry `personId` instead of a clear
+        name (ADR 0009/0011). `displayName` is still allowed on the events the 0.2.1 service writes
+        (all of them carry it: the demo actors of the seed) — forbidding it now would invalidate
+        today's `listEvents` and `getQuestionHistory` responses. It is forbidden on every envelope v2
+        event (`Event` with `schemaVersion`, slice 024; `dependentSchemas` on `Event`), so it leaves
+        the wire with slice 024 and the schema with 0.5 (ADR 0015).
+      required: [id, role]
+      properties:
+        id: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        displayName:
+          type: string
+          deprecated: true
+          description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Scheibe 024 (envelope v2: an event with `schemaVersion` must not carry it), removed from the schema with 0.5; present today only on pre-v2 events'
+        personId: { type: string, description: 'Since 0.3.0 (slice 026, ADR 0009): key into the person table; masked in the standard read path (ADR 0013)' }
     Action:
       type: string
       description: >
@@ -1585,17 +1638,44 @@ components:
         frozenBy: { $ref: '#/components/schemas/Actor' }
         configHash: { type: string }
     Session:
+      description: >-
+        Since 0.3.0 (slice 029): response of `GET /auth/me`. Two variants, told apart by `scheme` —
+        the name of the security scheme that authenticated the call (Codex round 5): `demoActor` has
+        no session and therefore no token and no expiry; `session` always carries `subjectId`,
+        `roles`, `expiresAt` and `csrfToken`, so a client under the cookie scheme can rely on the token.
+      oneOf:
+        - { $ref: '#/components/schemas/DemoSession' }
+        - { $ref: '#/components/schemas/SignedInSession' }
+      discriminator:
+        propertyName: scheme
+        mapping:
+          demoActor: '#/components/schemas/DemoSession'
+          session: '#/components/schemas/SignedInSession'
+    DemoSession:
       type: object
-      description: 'Since 0.3.0 (slice 029): response of `GET /auth/me`'
-      required: [actor]
+      description: '`GET /auth/me` under the `demoActor` header (only with `HV_DEMO=1`): the header identity; nothing to refresh, nothing to protect against CSRF'
+      required: [scheme, actor]
       properties:
+        scheme: { type: string, const: demoActor }
         actor: { $ref: '#/components/schemas/Actor' }
-        subjectId: { type: string }
-        personId: { type: string }
-        roles: { type: array, items: { $ref: '#/components/schemas/Role' }, description: 'All roles from the assignment table valid now; `actor.role` is the active one' }
-        expiresAt: { type: string, format: date-time, description: 'Session expiry (14 h with silent refresh, ADR 0004); absent for the demo actor' }
+        roles: { type: array, minItems: 1, maxItems: 1, items: { $ref: '#/components/schemas/Role' }, description: 'The one role of the header (equal to `actor.role` — prose, JSON Schema cannot compare values), for symmetry with the session variant' }
+        # No session, so nothing that belongs to one (Codex round 5): a client that finds a token here
+        # would send it, and one that finds an expiry would schedule a refresh that cannot happen.
+        csrfToken: false
+        expiresAt: false
+    SignedInSession:
+      type: object
+      description: '`GET /auth/me` under the `session` cookie (slice 029, ADR 0004)'
+      required: [scheme, actor, subjectId, roles, expiresAt, csrfToken]
+      properties:
+        scheme: { type: string, const: session }
+        actor: { $ref: '#/components/schemas/Actor' }
+        subjectId: { type: string, description: 'Subject of the identity provider (pseudonymous id)' }
+        personId: { type: string, description: 'Key into the person table (ADR 0009), when known' }
+        roles: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Role' }, description: 'All roles from the assignment table valid now; `actor.role` is the active one. A subject without any role never gets a session (403 at `completeLogin`).' }
+        expiresAt: { type: string, format: date-time, description: 'Session expiry (14 h with silent refresh, ADR 0004)' }
         idpGroups: { type: array, items: { type: string }, description: 'Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004)' }
-        csrfToken: { type: string, description: 'Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029)' }
+        csrfToken: { type: string, minLength: 1, description: 'Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029)' }
     TransparencyNotice:
       type: object
       description: 'Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15)'
@@ -1617,21 +1697,40 @@ components:
         status: { type: string, enum: [ok] }
     Readiness:
       type: object
-      description: 'Since 0.3.0 (slice 033): readiness with one entry per check (`clock` for the NTP status; `db` and `migrations` from slice 027)'
+      description: >-
+        Since 0.3.0 (slice 033): readiness with exactly the three checks `clock` (NTP status, 033),
+        `db` and `migrations` (027, which precedes 033 in the plan) — all three required (Codex round
+        5) and no other names (`additionalProperties: false`), because `/readyz` answers without credential.
+        `ready` means every check is `ok`, `not_ready` means at least one is `fail`; both are bound to
+        the HTTP status at the operation (200 / 503). With the JSONL development adapter (027 keeps
+        it) `db` is `ok` when the log file is readable and writable and `migrations` is `ok` (nothing
+        to migrate); `not_configured` means no event store is configured at all.
       required: [status, checks]
       properties:
         status: { type: string, enum: [ready, not_ready] }
         checks:
           type: object
-          # Check names are a closed list: /readyz answers without credential (review 023).
-          propertyNames: { enum: [clock, db, migrations] }
-          additionalProperties:
-            type: object
-            required: [status]
-            properties:
-              status: { type: string, enum: [ok, fail] }
-              code: { $ref: '#/components/schemas/ReadinessCheckCode' }
+          required: [clock, db, migrations]
+          properties:
+            clock: { $ref: '#/components/schemas/ReadinessCheck' }
+            db: { $ref: '#/components/schemas/ReadinessCheck' }
+            migrations: { $ref: '#/components/schemas/ReadinessCheck' }
+          # A closed list: `/readyz` answers without credential (review 023).
+          additionalProperties: false
         serverTime: { type: string, format: date-time }
+    ReadinessCheck:
+      description: 'One readiness check: `ok` carries no code, `fail` always carries one (Codex round 5)'
+      oneOf:
+        - type: object
+          required: [status]
+          properties:
+            status: { type: string, const: ok }
+            code: false
+        - type: object
+          required: [status, code]
+          properties:
+            status: { type: string, const: fail }
+            code: { $ref: '#/components/schemas/ReadinessCheckCode' }
     ReadinessCheckCode:
       type: string
       description: >-
@@ -1985,7 +2084,18 @@ components:
         the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with
         `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All
         of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.1" become required with slice 028.
-        A broken chain is a load error naming the `seq` (slice 024).
+        Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and
+        `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion`
+        requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`,
+        `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.1, because the
+        core carries it only from 025) and forbids `actor.displayName`. An event served over HTTP is
+        never v1 (v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON
+        Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt`
+        equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming
+        the `seq` (slice 024). Payload fields outside `pii` are free of personal data from slice 026
+        (its test "no displayName in event payloads"); until then the seed's `SpeakerRegistered`
+        payload carries the speaker's demo pseudonym as `displayName` — a 0.2 payload the schema
+        cannot forbid without failing today's responses.
       required: [seq, id, type, at, actor, payload]
       properties:
         seq: { type: integer }
@@ -2022,7 +2132,7 @@ components:
             - RoleRevoked
             - ConfigFrozen
         at: { type: string, format: date-time, description: 'Recorded time (server clock). Since 0.3.0 the same instant as `recordedAt`, which is the name ADR 0011 gives it; `at` stays for 0.x readers.' }
-        actor: { $ref: '#/components/schemas/Actor' }
+        actor: { $ref: '#/components/schemas/EventActor' }
         subjectId: { type: string, description: Id of the aggregate the event belongs to }
         schemaVersion: { type: integer, minimum: 1, description: 'Since 0.3.0: envelope version, `2` from slice 024 (v1 events exist only in JSONL dev data and are upcast on load). Pflicht ab 0.3.1, Scheibe 028.' }
         meetingId: { type: string, description: 'Since 0.3.0 (ADR 0011): the meeting (Jahrgang) the event belongs to. Pflicht ab 0.3.1, Scheibe 028.' }
@@ -2045,6 +2155,21 @@ components:
           additionalProperties: true
           properties:
             pii: { $ref: '#/components/schemas/PiiEnvelope' }
+      # Envelope invariants (Codex round 5): the two times come together or not at all; a hash is only
+      # meaningful with its predecessor (the first event's `prevHash` is the empty string); a
+      # `schemaVersion` marks a complete v2 envelope as slice 024 writes it. `meetingId` is not in that
+      # list: the core gets it with 025, after 024; it becomes required with 0.3.1 (028).
+      dependentRequired:
+        occurredAt: [occurredAtSource]
+        occurredAtSource: [occurredAt]
+        hash: [prevHash]
+        prevHash: [hash]
+        schemaVersion: [prevHash, hash, recordedAt, occurredAt, occurredAtSource, retentionClass, legalHold]
+      # A v2 envelope never carries a clear name of the actor (ADR 0009/0011; `EventActor.displayName`).
+      dependentSchemas:
+        schemaVersion:
+          properties:
+            actor: { properties: { displayName: false } }
       if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
       then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
       else:

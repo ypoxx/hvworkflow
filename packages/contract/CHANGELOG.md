@@ -20,7 +20,9 @@ fields marked "Pflicht ab 0.3.1" mandatory. Reworked before the merge after the 
 Codex findings (24.09.2026): request schemas of existing operations are back to their 0.2.1 shape
 (see "Compatibility" under Changed), `X-CSRF-Token` declared, `ReadinessCheckCode` instead of free
 text, 404 on the alias operations with the current-meeting rule, 409 on `registerSpeaker` and
-`captureContribution`.
+`captureContribution`. Invariant sweep after Codex round 5 (24.09.2026): invariants that were prose
+are now schema — `dependentRequired` pairs, `oneOf` variants, required checks, `EventActor` for
+events (see Added and Deprecated).
 
 Decisions of the architect (Festlegungen, reasoning in `docs/slices/023-vertrag-0-3-0-fundament.md`):
 (a) meeting scope is expressed at the collection: canonical `/meetings/{meetingId}/…` for the ten
@@ -116,6 +118,20 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
 - `409 Conflict` documented on `registerSpeaker` and `captureContribution` (the alias paths), so the
   R-MTG rules of 025 (no capture after the debate closed) need no further contract cycle; the
   canonical counterparts share the handler.
+- **Invariants as schema (Codex round 5).** `EventActor` for `Event.actor` (`id`, `role`, `personId`;
+  `displayName` deprecated, see Deprecated) — `Actor` stays for projections (answer versions,
+  approvals, role assignments, the session). On `Event`: `dependentRequired` `occurredAt` ↔
+  `occurredAtSource`, `hash` ↔ `prevHash`, `schemaVersion` → the v2 envelope of slice 024 (`prevHash`,
+  `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId`
+  is left out because the core carries it only from 025 and 0.3.1 requires it anyway), and
+  `dependentSchemas`: an event with `schemaVersion` carries no `actor.displayName`. `Session` is a
+  `oneOf` of `DemoSession` (`scheme: demoActor`, exactly one role, no `csrfToken`, no `expiresAt`)
+  and `SignedInSession` (`scheme: session`; `subjectId`, `roles` (≥ 1), `expiresAt`, `csrfToken`
+  required) with a `discriminator` on `scheme`. `Readiness.checks` has exactly the required
+  properties `clock`, `db`, `migrations` (027 precedes 033; `additionalProperties: false` replaces
+  `propertyNames`); each is a `ReadinessCheck` (`ok` without `code`, `fail` with `code`); the 200
+  binds every check to `ok`, the 503 at least one to `fail`. Today's events (all 0.2 shape, all with
+  `actor.displayName`) stay valid.
 
 ### Changed
 
@@ -156,6 +172,11 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
 - `StageAssignment`, `Question.stageAssignment`, `Classification.stageAssignment` — veraltet seit
   0.3.0, entfallen mit Vertrag 0.5 (ADR 0006): replaced by `StageSeat`/`seatId`; the four enum values
   are the ids of the default seats (040), so a value equals the `seatId` of that seat.
+- `EventActor.displayName` — veraltet seit 0.3.0, entfällt mit Scheibe 024 (envelope v2): every
+  event of today's service carries it (the demo actors of the seed), so it stays allowed on events
+  without `schemaVersion`; an event with `schemaVersion` must not carry it (`dependentSchemas` on
+  `Event`), so it leaves the wire with 024; the property leaves the schema with 0.5 (ADR 0009/0011,
+  ADR 0015; Codex round 5).
 - Security scheme `oidc` — `x-deprecated: true` (a security scheme has no `deprecated` field),
   veraltet seit 0.3.0, entfällt mit Vertrag 0.5: contradicts ADR 0004 (no token in the browser).
 
