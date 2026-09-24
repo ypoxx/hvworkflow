@@ -31,18 +31,20 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const RULE_ID_RE = /\bR-[A-Z]+-\d{2,}\b/g;
 
 /** Every `.ts` file under `root` (relative to the repo root), depth-first, optionally excluding any
- * path segment named `__tests__` and/or any of `excludeBasenames`. */
+ * path segment named `__tests__` and/or any of `excludePaths` (repository-relative). */
 function collectTsFiles(
   root: string,
-  { excludeTests, excludeBasenames = [] }: { excludeTests: boolean; excludeBasenames?: readonly string[] },
+  { excludeTests, excludePaths = [] }: { excludeTests: boolean; excludePaths?: readonly string[] },
 ): string[] {
-  const excluded = new Set(excludeBasenames);
+  // Full repository-relative paths, not basenames: a future `rules.ts` in a subfolder must still be
+  // scanned (Legal recheck, nit).
+  const excluded = new Set(excludePaths.map((p) => join(ROOT, p)));
   const out: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       if (excludeTests && entry === '__tests__') continue;
-      if (excluded.has(entry)) continue;
       const full = join(dir, entry);
+      if (excluded.has(full)) continue;
       const st = statSync(full);
       if (st.isDirectory()) walk(full);
       else if (entry.endsWith('.ts')) out.push(full);
@@ -66,7 +68,7 @@ describe('rule register', () => {
   // construction, so leaving it in would make check 2 (stale register entry) vacuously pass no
   // matter what — every id would always "be found in code" via its own register entry.
   const productionFiles = [
-    ...collectTsFiles('packages/domain/src', { excludeTests: true, excludeBasenames: ['rules.ts'] }),
+    ...collectTsFiles('packages/domain/src', { excludeTests: true, excludePaths: ['packages/domain/src/rules.ts'] }),
     ...collectTsFiles('apps/api/src', { excludeTests: true }),
   ];
   const testFiles = [

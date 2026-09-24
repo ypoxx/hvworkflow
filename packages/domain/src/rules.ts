@@ -9,7 +9,8 @@
  * is `'Prozess'` or `'Leitplanken'` and `citation` names the document and section that actually
  * describes the rule. No citation here is invented or supplied from memory; where a document covers
  * only part of what the rule does, or only a related but distinct concept, the citation says so
- * instead of pretending otherwise (rework after the legal review, e.g. R-TRANS-00, R-TRANS-02,
+ * instead of pretending otherwise (after an agent review from the legal perspective, which is not a
+ * review by Recht, E15; e.g. R-TRANS-00, R-TRANS-02,
  * R-TRANS-05, R-TRANS-11, R-TRANS-12, R-GUARD-05 below all name a gap or a scope mismatch in words,
  * never by silently dropping the honest half of the sentence).
  * `verified` is the literal `false`: only the legal review (E15, 076) changes that, never this slice.
@@ -64,12 +65,12 @@ const OTHER_RULES: readonly RuleEntry[] = [
     kind: 'Übergang',
     description:
       'resolveTransition()\'s own internal rule id (transitions.ts): a terminal status accepts no ' +
-      'further action, and an action with no matching transition row, is a conflict. The HTTP layer ' +
-      '(api.ts `transition()`, Festlegung 8 of slice 010) reports this rule id and the real reason ' +
+      'further action, and an action with no matching transition row, is a conflict. The domain API ' +
+      '(api.ts `transition()`, which apps/api wraps; Festlegung 8 of slice 010) reports this rule id and the real reason ' +
       'only to an actor who can also read the question; an actor who holds the action\'s own ' +
       'permission but cannot read the question gets a generic 409 with no rule id instead, so ' +
       '`ruleId: "R-TRANS-00"` never reaches a response about a question outside that actor\'s read ' +
-      'access (rework after the legal review, Codex P2 on PR #24).',
+      'access.',
     legalRef: {
       source: 'Leitplanken',
       citation:
@@ -80,7 +81,7 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'nur das Antwortformat (409 mit Regel-ID), nicht die Terminalität der Stände selbst. Für ' +
         'Letztere nennt weder docs/anforderungen-recherche.md noch ' +
         'docs/ist-analyse-und-schnittstellen.md eine Fundstelle — das ist eine Architekturentscheidung ' +
-        '(`TERMINAL_STATUSES`, types.ts), keine externe Vorgabe (rework nach Legal-Review, major 3).',
+        '(`TERMINAL_STATUSES`, types.ts), keine externe Vorgabe.',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
       docHash: null,
       verified: false,
@@ -97,10 +98,9 @@ const OTHER_RULES: readonly RuleEntry[] = [
       citation:
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
         'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."). Regel-ID ' +
-        '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament für ' +
-        'die erste lauffähige Version") — nicht neu eingeführt in Scheibe 010 (rework nach ' +
-        'Legal-Review, minor 4: dort kamen nur R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von ' +
-        'docs/slices/010-lesepfade-leserechte.md).',
+        '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament fuer ' +
+        'die erste lauffaehige Version") — nicht neu eingeführt in Scheibe 010 (dort kamen nur ' +
+        'R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von docs/slices/010-lesepfade-leserechte.md).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -137,8 +137,9 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'statusabhängiger Sichtbarkeitsbeschränkung wie "Leseumfang", auch wenn die Zeile selbst von ' +
         'der Bühnenzuordnung spricht, nicht vom Lesestatus. Regel-ID eingeführt in ' +
         'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang") — dort die genauere ' +
-        'Herleitung (rework nach Legal-Review, minor 3: nicht mehr Zeile 91, die "Status → erlaubte ' +
-        'Übergänge" beschreibt und damit R-TRANS/Guard-Umfang, nicht Leseumfang, betrifft).',
+        'Herleitung. Durch diese Regel nicht umgesetzt: die Bühnenzuordnung für den Vorstand selbst ' +
+        '(Attributregel, laut Scheibe 010 für 047 vorgesehen); R-PERM-03 betrifft heute nur den ' +
+        'Leseumfang von `question.read.delivered` (permissions.ts).',
       docVersion: null,
       docHash: null,
       verified: false,

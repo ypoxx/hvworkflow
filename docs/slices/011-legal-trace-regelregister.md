@@ -44,6 +44,10 @@ Trace)" (`geplant in Scheibe 011`); ADR 0012 (Vorabzug an Recht nach 011)
 4. **`x-legal-notice` in `openapi.yaml` berichtigt 023**, nicht diese Scheibe. Grund: jede Änderung an `openapi.yaml`
    ist eine Vertragsversion und gehört in die serielle Lane contract; 023 läuft parallel. Der Bericht nennt den
    Wortlaut, den 011 dafür vorschlägt.
+5. **Nachgeschärft nach der Legal-Nachprüfung (24.09.2026):** Ein Zitat enthält nur Quelle, Lücke und Ableitung,
+   keine Änderungsgeschichte (sie steht im Bericht). Wörter wie „Review“ oder „geprüft“ kommen in `legalRef` und in
+   den Beschreibungen nicht vor, weil Recht sie als eigene Prüfung lesen würde (E15, Leitplanken 11). Fordert die
+   zitierte Stelle mehr, als die Regel tut, steht „teilweise“ oder „nicht umgesetzt“ mit dem fehlenden Teil dabei.
 
 ## Ziel
 
@@ -438,6 +442,60 @@ Touched:
 - `docs/agentische-entwicklung-plan.md` (nur die Stand-Spalte der Zeile „Regeltabellen-Tests (mit Legal Trace)")
 - `docs/slices/011-legal-trace-regelregister.md` (dieser Bericht)
 
+### 8. Nacharbeit des Orchestrators nach der Legal-Nachprüfung
+
+Die eine Nacharbeitsrunde des Bauers war verbraucht; die Nachprüfung fand zwei neue Hauptbefunde, beide reine
+Textstellen. Der Orchestrator hat die Spec nachgeschärft (Festlegung 5) und sie selbst behoben (nach oben
+abgewichen):
+
+- R-TRANS-10 zitiert ist:58-59 (Antwortprüfung durch Legal · FOO/GC) jetzt mit „Nicht umgesetzt: keine
+  Antwortprüfung durch Legal oder FOO/GC; den Abschluss lösen die Berechtigten von `question.close` aus (heute podium
+  und admin), ohne Entscheidung „Antwort ausreichend?““.
+- Alle Hinweise „rework nach Legal-Review …“ sind aus `legalRef` und Beschreibungen entfernt (R-TRANS-00, -02, -05,
+  -06, -07, -10, -11, -12, R-PERM-01, -03); die Änderungsgeschichte steht in Abschnitt 7 und hier.
+- R-PERM-03: „Durch diese Regel nicht umgesetzt: die Bühnenzuordnung für den Vorstand selbst (Attributregel, laut
+  Scheibe 010 für 047 vorgesehen)“.
+- R-TRANS-00: „die Domänen-API (api.ts `transition()`, die apps/api umhüllt)“ statt „HTTP-Schicht“.
+- R-PERM-01: Commit-Betreff wörtlich („Fundament fuer die erste lauffaehige Version“).
+- Scan-Test: `rules.ts` wird über den vollen Pfad ausgeschlossen, nicht über den Dateinamen.
+- `docs/legal-trace.md` über `vitest run -u` neu erzeugt; Wahrheitstabelle unverändert.
+
+**Offen (weitergetragen, damit die offengelegten Lücken nicht nur Tabellenzellen bleiben):**
+
+1. Vier-Augen „Ersteller ≠ Freigeber“ (Rechtekonzept §4, nicht konfigurierbar) und Pflichtfeld Freigabevermerk —
+   im Plan als R-GUARD-06 in Scheibe 021 (B6); bis dahin hält `legal` `answer.draft` und `question.approve`.
+   Punkt für den Eigentümer.
+2. Antwortprüfung „Antwort ausreichend?“ vor dem Abschluss (ist:58-59) — keine Scheibe benannt; zur Einordnung durch
+   den Architekten.
+3. Merge reversibel mit Ähnlichkeitsscore (Recherche:147) — keine Scheibe benannt; zur Einordnung.
+4. Zuweisung an Personen statt Einheiten (Recherche:221) — keine Scheibe benannt; zur Einordnung.
+
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 (Perspektive Legal) · 24.09.2026 · Urteil: nacharbeiten** (0/2/4 + nits), dazu Codex auf PR
+#24 (1 × P2). Mechanik geprüft und für gut befunden: Register ohne zweite Liste, roter Lauf nachgestellt,
+Guard-Tests keine Tautologien, Wahrheitstabelle unverändert, kein `node:` in der Domäne.
+
+1. major · R-TRANS-11: „kein wörtlicher Beleg“ falsch (Recherche:285), Analogie zu ist:44 eine Rechtsbewertung, Quelle
+   „Prozess“ ohne Prozessquelle → Recherche:285 als Zählkategorie, ausdrücklich nicht der Pfad Recherche:24.
+2. major · Zitate verlangen mehr, als die Regel tut, ohne es zu sagen (R-TRANS-02 Personenzuweisung, R-TRANS-12 und
+   R-GUARD-05 Merge reversibel, R-TRANS-05 Freigabevermerk und Vier-Augen) → „teilweise“ bzw. „nicht umgesetzt“.
+3. minor · falsche Stellen (R-PERM-03, R-TRANS-07, R-TRANS-06, R-TRANS-00) → berichtigt.
+4. minor · R-PERM-01 „eingeführt in 010“ falsch → seit a0c38c4.
+5. minor · Scan prüfte nur eine Richtung → auch veraltete Registereinträge fallen auf (roter Lauf R-STALE-01).
+6. minor · Bericht zählte falsch → berichtigt.
+7. nits (Ableitung kennzeichnen, R-TRANS-10 eigene Stelle, veraltete Guard-Szenarien, „Prüfpunkt“) → erledigt.
+- Codex P2 · R-TRANS-00 behauptete, beide Konfliktfälle kämen mit dieser ID zurück; seit 010 Festlegung 8 verbirgt die
+  API sie vor Nicht-Lesern → als interne ID beschrieben.
+
+**Runde 2 · Nachprüfung Opus 5.5 (Legal) · Urteil: nacharbeiten** (0/2/2 + nits):
+
+1. major · R-TRANS-10 zitiert die Antwortprüfung durch Legal · FOO/GC ohne Lückenvermerk; Recht läse „abgeschlossen“
+   als „Legal hat die Antwort für ausreichend befunden“.
+2. major · „Rework nach Legal-Review“ in rund zwölf Zitaten; Recht läse das als eigene Prüfung (E15).
+3. minor · R-PERM-03 → Zeile :93 betrifft den Vorstand, die Regel nur observer.
+4. minor · offengelegte Lücken nicht als offene Punkte weitergetragen.
+5. nits (Domänen-API statt HTTP-Schicht, Commit-Betreff wörtlich, Ausschluss über den vollen Pfad).
+
+Die Nacharbeitsrunde des Bauers war verbraucht → Spec nachgeschärft (Festlegung 5), Behebung durch den Orchestrator,
+siehe Bericht Abschnitt 8; Nachprüfung der Behebung durch Opus (Legal).

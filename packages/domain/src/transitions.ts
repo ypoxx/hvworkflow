@@ -148,7 +148,7 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Rechtekonzept',
       citation:
         'docs/rollen-und-rechtekonzept.md:107 (2.4: Übergang `classified` → `expert_answering`, ' +
-        'Pflichtfeld "Segment"). Offene Lücke (rework nach Legal-Review, major 2): ' +
+        'Pflichtfeld "Segment"). Offene Lücke: ' +
         'docs/anforderungen-recherche.md:221 fordert „Zuweisung an Personen statt Postfächer, mit ' +
         'Anwesenheitsstatus, hinterlegten Vertretern, automatischer Umleitung … und \'Take next\'"; ' +
         'diese Regel weist nur eine Einheit (`unitId`) zu, keine Person — teilweise umgesetzt, nicht ' +
@@ -205,7 +205,7 @@ export const TRANSITIONS: readonly Transition[] = [
       citation:
         'docs/rollen-und-rechtekonzept.md:109 (Abschnitt 2.4, Übergang legal_clearing → ' +
         'ready_for_stage, Berechtigung answer.approve.legal, Pflichtfelder "Freigabevermerk" und ' +
-        'Vier-Augen "Ersteller ≠ Freigeber"). Nicht umgesetzt (rework nach Legal-Review, major 2): ' +
+        'Vier-Augen "Ersteller ≠ Freigeber"). Nicht umgesetzt: ' +
         '`approveQuestion` nimmt keinen Freigabevermerk entgegen, und es gibt keinen Guard ' +
         '"Ersteller ≠ Freigeber" — die Rolle `legal` hält sowohl `answer.draft` als auch ' +
         '`question.approve` (permissions.ts), obwohl Rechtekonzept §4 (docs/rollen-und-' +
@@ -229,9 +229,7 @@ export const TRANSITIONS: readonly Transition[] = [
         'docs/rollen-und-rechtekonzept.md:110 (Abschnitt 2.4, Übergang legal_clearing → ' +
         'expert_answering, Pflichtfeld "Rückgabegrund" — passt genau zum Pflichtfeld `reason` dieser ' +
         'Regel); ergänzend docs/ist-analyse-und-schnittstellen.md:90 (Bühnenansicht-Aktion "Antwort ' +
-        'zurückgeben" → zurück ins Backoffice). Rework nach Legal-Review, minor: nicht mehr ' +
-        'ist-analyse.md:59 (das ist die separate Qualitätsschleife nach der Bühne, Zeile 58-59, siehe ' +
-        'R-TRANS-10).',
+        'zurückgeben" → zurück ins Backoffice).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -247,9 +245,7 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:92 ("es laufen nur die zugeordneten und ' +
-        'freigegebenen Fragen ein") — rework nach Legal-Review, minor: nicht mehr Zeile 57 ("→ Bühne: ' +
-        'Frage wird verlesen"), die den Bühnenschritt insgesamt beschreibt, nicht die Zugangsregel ' +
-        '"nur freigegeben".',
+        'freigegebenen Fragen ein").',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -297,10 +293,10 @@ export const TRANSITIONS: readonly Transition[] = [
       citation:
         'docs/ist-analyse-und-schnittstellen.md:58-59 ("10 Antwortprüfung (Legal · FOO/GC) → ' +
         'Entscheidung \'Antwort ausreichend?\' — Ja: Frage beantwortet") — ein eigener ' +
-        'Abschluss-Schritt nach der Bühne, getrennt vom Vorlesen (R-TRANS-09). Rework nach ' +
-        'Legal-Review, minor: nicht mehr Zeile 89, die dieselbe Aktion für beide Schritte ' +
-        '("vorgelesen, weiter" → abgeschlossen) beschreibt, weil das IST-Tool "vorgelesen" und ' +
-        '"abgeschlossen" nicht als zwei getrennte Stände führt.',
+        'Abschluss-Schritt nach der Bühne, getrennt vom Vorlesen (R-TRANS-09). Nicht umgesetzt: ' +
+        'keine Antwortprüfung durch Legal oder FOO/GC; den Abschluss lösen die Berechtigten von ' +
+        '`question.close` aus (heute podium und admin, permissions.ts), ohne Entscheidung "Antwort ' +
+        'ausreichend?" und ohne deren Festhalten.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -322,10 +318,7 @@ export const TRANSITIONS: readonly Transition[] = [
         'Stand, mit Begründung, in den Stand `withdrawn`) steht in keinem der beiden ' +
         'Recherche-Dokumente. Ableitung: das ist NICHT dasselbe wie "Kein Auskunftsanspruch" ' +
         '(docs/anforderungen-recherche.md:24), das dort ausdrücklich ein eigener Statuspfad mit ' +
-        'eigener Rechtsfolge ist, getrennt von "Verweigerung trotz Anspruchs". Rework nach ' +
-        'Legal-Review, major 1: die vorherige Fassung behauptete fälschlich "kein wörtlicher Beleg" ' +
-        'und zog eine Analogie zu ist-analyse.md:44 ("kein Antwortbedarf" → Direktabschluss), die ' +
-        'eine Rechtsbewertung war und daher entfernt wurde.',
+        'eigener Rechtsfolge ist, getrennt von "Verweigerung trotz Anspruchs".',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -342,8 +335,7 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Recherche',
       citation:
         'docs/anforderungen-recherche.md:147 ("[MUSS] Dublettenerkennung auf Trefferquote statt ' +
-        'Präzision kalibrieren ..."). Teilweise (rework ' +
-        'nach Legal-Review, major 2): die Zeile fordert "Merge reversibel, mit Nutzer, Zeitstempel ' +
+        'Präzision kalibrieren ..."). Teilweise: die Zeile fordert "Merge reversibel, mit Nutzer, Zeitstempel ' +
         'und Ähnlichkeitsscore protokolliert" — `merged` ist hier aber ein Terminalstand ' +
         '(`TERMINAL_STATUSES`), es gibt kein Unmerge und keinen gespeicherten Ähnlichkeitsscore.',
       docVersion: null,
