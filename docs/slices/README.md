@@ -8,7 +8,7 @@ the review findings (R3) and the acceptance mark (step 7 of the cycle). Template
 
 **Status:** spec | in progress | review | rework | accepted
 **Risikoklasse:** niedrig/mittel/hoch · AStd · Kalenderdatum (Woche NN) · Lane: …
-**Rolle/Modell:** [role] · [model]; Review [reviewer_model]
+**Rolle:** [role]; Review in frischem Kontext [Perspektive] (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** …
 **Quellen-IDs:** Plan section NNN; Audit code; Register entry
 **Depends on:** NNN (gemergt)

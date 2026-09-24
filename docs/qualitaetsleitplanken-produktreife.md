@@ -117,9 +117,9 @@ Was aus der Klasse folgt, steht im Plan (6.1, 6.3) und wird hier nur zusammengef
 
 | Klasse | Mindestnachweis | Review |
 |---|---|---|
-| hoch | Positiv- und Negativtest je Auslöser, ein Fehler- oder Wiederherstellungsfall; bei Rechten und Übergängen der Wahrheitstabellen-Diff **vor** dem Bau in der Spec | anderes Modell mit benannter Perspektive; Lesebefund der Spec vor dem Bau; nie gebündelt |
-| mittel | Test des geänderten Verhaltens oder Vertrags; Doku- und Betriebswirkung in der Spec bewertet | anderes Modell |
-| niedrig | vorhandene Tore; bei sichtbarer Änderung Screenshot | anderes Modell; Bündelung derselben Lane erlaubt |
+| hoch | Positiv- und Negativtest je Auslöser, ein Fehler- oder Wiederherstellungsfall; bei Rechten und Übergängen der Wahrheitstabellen-Diff **vor** dem Bau in der Spec | frischer Kontext mit benannter Perspektive; Lesebefund der Spec vor dem Bau; nie gebündelt |
+| mittel | Test des geänderten Verhaltens oder Vertrags; Doku- und Betriebswirkung in der Spec bewertet | frischer Kontext |
+| niedrig | vorhandene Tore; bei sichtbarer Änderung Screenshot | frischer Kontext; Bündelung derselben Lane erlaubt |
 
 **Herabstufen entscheidet der Mensch.** Ein Agent stuft nie herab. Die Spec trägt dann die Zeile
 „Herabstufung freigegeben von <Mensch> am <Datum>"; ab Scheibe 016 blockiert `scripts/downgrade-check.mjs`
@@ -132,15 +132,15 @@ Rollen abgebildet, die es heute gibt:
 
 | Perspektive | Checkliste | Trägt heute | Ausgelöst durch |
 |---|---|---|---|
-| Domäne, Legal | 6.1 | Reviewer (Opus) mit Perspektive Legal; Normzitate bleiben `verified:false` bis Recht antwortet (E15) | Regel, Status, Freigabe, Verweigerung, Frist |
+| Domäne, Legal | 6.1 | Reviewer mit Perspektive Legal; Normzitate bleiben `verified:false` bis Recht antwortet (E15) | Regel, Status, Freigabe, Verweigerung, Frist |
 | Architektur | 1.3, 6.2 | Architekt beim Spec-Schreiben; Reviewer prüft die Grenzen | neue Module, Ports, Abhängigkeiten |
 | Security | 6.5 | Reviewer mit Perspektive Security; Sicherheitsreview des Architekten an den Prüfpunkten 3, 4 und 7 | Rechte, Identität, Sitzung, Secrets, Export |
 | Datenschutz | 6.6 | Reviewer mit Perspektive Datenschutz; Zulieferung an DSB und Betriebsrat über den Eigentümer (E13, E14) | Personenbezug, Auswertung, Aufbewahrung |
 | Betrieb | 6.7, 6.8 | Reviewer mit Perspektive Betrieb; privilegierte Schritte führt der Eigentümer nach Checkliste aus | Persistenz, Deploy, Konfiguration, Notbetrieb |
-| UX, Barrierefreiheit | 6.9 | Design-Kritik (Fable, D1–D10) vor dem Review | sichtbare Oberfläche |
+| UX, Barrierefreiheit | 6.9 | Design-Kritik (D1–D10) vor dem Review | sichtbare Oberfläche |
 | Integration, KI | 6.4, 6.10 | Reviewer; Anbieterfragen über das Register (E3a, E3b, E18) | Nachbarsysteme, Agentenfunktionen |
 
-Reviewt immer ein anderes Modell als das bauende (Regel 3). Fehlt für eine Perspektive eine menschliche Fachperson,
+Review in frischem Kontext, nie durch den Bauenden (Regel 3). Fehlt für eine Perspektive eine menschliche Fachperson,
 wird daraus eine Registerzeile mit Standardannahme, kein „blockiert" und keine neue Zuständigkeit.
 
 ## 6. Qualitätschecks
@@ -216,7 +216,7 @@ Registerzeile E13/E14 (Abschnitt 11): Die Scheibe baut BV-verträglich und liefe
 
 ### 6.11 Dokumentation
 - [ ] README und AGENTS.md stimmen mit dem Stand; tragende Entscheidungen stehen als ADR; Kommentare erklären das Warum mit Regel-ID oder ADR.
-- [ ] Betrieb, Administration und Integration haben getrennte Anleitungen; jede wird einmal von einem fremden Modell befolgt.
+- [ ] Betrieb, Administration und Integration haben getrennte Anleitungen; jede wird einmal von einem Agenten in frischem Kontext ohne Vorwissen befolgt.
 
 ### 6.12 Einfachheit
 - [ ] Vorhandene Konzepte vor neuen; eine neue Abstraktion löst mindestens zwei heutige Fälle oder schützt eine Grenze aus 1.3.
@@ -312,7 +312,7 @@ gegebene Antwort → E29 · Last und Pilotumfang → E12, E49 (Last selbst: B11,
   `coordination`, capture verliert classify/assign, legal erhält `question.legal.clear` statt approve); Oberfläche
   nur über e2e-Personas; Doku. Nicht ausgelöst: Vertrag (kam mit 019), Persistenz, Personenbezug, Betrieb, KI.
 - **Risikoklasse (4).** Hoch, zwei Auslöser (Rechte, Freigabe); herabstufen dürfte nur ein Mensch, hier zu Unrecht.
-- **Perspektiven (5, 7).** Legal und Security → Reviewer (Opus) mit dieser Perspektive; Lesebefund der Spec vor dem
+- **Perspektiven (5, 7).** Legal und Security → Reviewer mit dieser Perspektive; Lesebefund der Spec vor dem
   Bau; Wahrheitstabellen-Diff in der Spec; kein gebündeltes Review.
 - **Checks, die die Spec übernimmt:**
 

@@ -24,7 +24,7 @@ fehlt der Menüpunkt „Branches" unter Settings ganz.
 4. **Branch name pattern**: `claude/dax-shareholder-meeting-workflow-0s934z` eintragen (für `main`
    später eine zweite Regel mit Muster `main`).
 5. **Require a pull request before merging** aktivieren (mindestens eine Genehmigung ist nicht
-   Teil dieser Scheibe — Regel 3 „ein anderes Modell reviewt" läuft heute außerhalb von GitHub;
+   Teil dieser Scheibe — Regel 3 „Review in frischem Kontext" läuft heute außerhalb von GitHub;
    diese Kleinänderung ist eine spätere Entscheidung des Eigentümers). Diese Einstellung beendet
    jeden direkten Push auf den Branch, nicht nur den Merge-Knopf: ein heute üblicher Squash-Merge
    per API/CLI (`gh pr merge --squash` o. ä.) funktioniert danach weiterhin — er läuft technisch
