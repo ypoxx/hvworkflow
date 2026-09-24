@@ -81,7 +81,10 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'nur das Antwortformat (409 mit Regel-ID), nicht die Terminalität der Stände selbst. Für ' +
         'Letztere nennt weder docs/anforderungen-recherche.md noch ' +
         'docs/ist-analyse-und-schnittstellen.md eine Fundstelle — das ist eine Architekturentscheidung ' +
-        '(`TERMINAL_STATUSES`, types.ts), keine externe Vorgabe.',
+        '(`TERMINAL_STATUSES`, types.ts), keine externe Vorgabe. Auch die Maskierung selbst — ein ' +
+        'Akteur ohne Leserecht auf die Frage bekommt weder Regel-ID noch Stand, sondern nur einen ' +
+        'generischen 409 — hat keine Fundstelle in Recherche oder Ist-Analyse; sie ist eine ' +
+        'Architekturentscheidung (`transition()`, api.ts), keine externe Vorgabe.',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
       docHash: null,
       verified: false,
@@ -103,7 +106,10 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."). Regel-ID ' +
         '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament fuer ' +
         'die erste lauffaehige Version") — nicht neu eingeführt in Scheibe 010 (dort kamen nur ' +
-        'R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von docs/slices/010-lesepfade-leserechte.md).',
+        'R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von docs/slices/010-lesepfade-leserechte.md). ' +
+        'Die 404-Maskierung für eine Frage, die der Akteur weder lesen noch bearbeiten darf ' +
+        '(Festlegung 3 von docs/slices/010-lesepfade-leserechte.md), hat ebenfalls keine Fundstelle ' +
+        'in Recherche oder Ist-Analyse; sie ist eine Architekturentscheidung, keine externe Vorgabe.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -122,7 +128,10 @@ const OTHER_RULES: readonly RuleEntry[] = [
       citation:
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
         'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."); Regel-ID ' +
-        'eingeführt in docs/slices/010-lesepfade-leserechte.md, Festlegung 6',
+        'eingeführt in docs/slices/010-lesepfade-leserechte.md, Festlegung 6. Die 404-Maskierung für ' +
+        'eine Frage, die der Akteur nicht lesen darf (Festlegung 3 von docs/slices/010-lesepfade-' +
+        'leserechte.md), hat ebenfalls keine Fundstelle in Recherche oder Ist-Analyse; sie ist eine ' +
+        'Architekturentscheidung, keine externe Vorgabe.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -146,7 +155,10 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang") — dort die genauere ' +
         'Herleitung. Durch diese Regel nicht umgesetzt: die Bühnenzuordnung für den Vorstand selbst ' +
         '(Attributregel, laut Scheibe 010 für 047 vorgesehen); R-PERM-03 betrifft heute nur den ' +
-        'Leseumfang von `question.read.delivered` (permissions.ts).',
+        'Leseumfang von `question.read.delivered` (permissions.ts). Die 404-Maskierung für eine ' +
+        'einzelne Frage außerhalb des Leseumfangs (Festlegung 3 von docs/slices/010-lesepfade-' +
+        'leserechte.md) hat ebenfalls keine Fundstelle in Recherche oder Ist-Analyse; sie ist eine ' +
+        'Architekturentscheidung, keine externe Vorgabe.',
       docVersion: null,
       docHash: null,
       verified: false,

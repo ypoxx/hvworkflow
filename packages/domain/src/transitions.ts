@@ -131,7 +131,12 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:42-43 (P3 Klassifizierung und Aufteilung: "5 Frage ' +
-        'klassifizieren → Zuordnung zu Pfad A, B oder C")',
+        'klassifizieren → Zuordnung zu Pfad A, B oder C") belegt das Pflichtfeld `track`. Die beiden ' +
+        'übrigen Felder dieser Zeile haben je eine eigene Fundstelle: `agendaItemId` ' +
+        '(Tagesordnungspunkt) in docs/anforderungen-recherche.md:62 ("[MUSS] TOP-Zuordnung als ' +
+        'hartes Pflichtfeld"); `stageAssignment` (Bühnenzuordnung) in ' +
+        'docs/ist-analyse-und-schnittstellen.md:80 ("Bühnenzuordnung (Aufsichtsrat / Vorstand / ' +
+        'CFO)").',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -170,7 +175,10 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:52 (Antwortpfad C "Expert Track": "6 fachliche ' +
-        'Beantwortung")',
+        'Beantwortung") belegt das Hinzufügen einer Antwortversion selbst. Die Folge, dass eine ' +
+        'neue Version eine bestehende Freigabe erlöschen lässt (`invalidatedApprovalOfVersion`), ' +
+        'steht in docs/rollen-und-rechtekonzept.md:163 (Abschnitt 4: "Keine Freigabe ohne Bindung ' +
+        'an die Textversion. Jede Textänderung nach Freigabe setzt sie zurück.").',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -187,7 +195,9 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:52 (Antwortpfad C: "7 Legal Clearing"; Spalte ' +
-        '"Rechtsprüfung vor der Bühne: ja, eigener Schritt")',
+        '"Rechtsprüfung vor der Bühne: ja, eigener Schritt"). Ableitung: welche Version dabei ' +
+        'geprüft wird (`answerVersion`), hat keine eigene Fundstelle — das Feld hält nur die zuletzt ' +
+        'entworfene Version fest (R-TRANS-03).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -229,7 +239,10 @@ export const TRANSITIONS: readonly Transition[] = [
         'docs/rollen-und-rechtekonzept.md:110 (Abschnitt 2.4, Übergang legal_clearing → ' +
         'expert_answering, Pflichtfeld "Rückgabegrund" — passt genau zum Pflichtfeld `reason` dieser ' +
         'Regel); ergänzend docs/ist-analyse-und-schnittstellen.md:90 (Bühnenansicht-Aktion "Antwort ' +
-        'zurückgeben" → zurück ins Backoffice).',
+        'zurückgeben" → zurück ins Backoffice). Ableitung: dass eine Podiumsfrage dabei nach ' +
+        '`classified` statt `answer_drafted` zurückgeht, hat keine eigene Fundstelle — Podiumsfragen ' +
+        'durchlaufen `answer_drafted` nie (R-TRANS-08), ein Rücksprung dorthin wäre ein Stand, den ' +
+        'diese Fragen nie hatten.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -245,7 +258,9 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:92 ("es laufen nur die zugeordneten und ' +
-        'freigegebenen Fragen ein").',
+        'freigegebenen Fragen ein"). Ableitung: die Reihenfolge selbst (`stagePosition`) hat keine ' +
+        'eigene Fundstelle; sie ist die naheliegende Umsetzung eines Einlaufs mehrerer Fragen ("es ' +
+        'laufen … ein").',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -262,7 +277,9 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:50 (Antwortpfad A "No-Brainer": "\'freie\' ' +
-        'Beantwortung ohne weitere Recherche" durch den Vorstand, keine Rechtsprüfung vor der Bühne)',
+        'Beantwortung ohne weitere Recherche" durch den Vorstand, keine Rechtsprüfung vor der Bühne). ' +
+        'Ableitung: `stagePosition` selbst hat keine eigene Fundstelle, siehe R-TRANS-07 (derselbe ' +
+        'Zähler für beide Zeilen, die in `staged` münden).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -276,7 +293,11 @@ export const TRANSITIONS: readonly Transition[] = [
     description: 'Read out on the podium (Vorgelesen).',
     legalRef: {
       source: 'Prozess',
-      citation: 'docs/ist-analyse-und-schnittstellen.md:89 (Bühnenansicht-Aktion "vorgelesen, weiter")',
+      citation:
+        'docs/ist-analyse-und-schnittstellen.md:89 (Bühnenansicht-Aktion "vorgelesen, weiter"). ' +
+        'Ableitung: das Festhalten der ausgelieferten Version (`answerVersion`, nur wenn eine ' +
+        'Freigabe vorliegt) hat keine eigene Fundstelle; es spiegelt nur die freigegebene Version ' +
+        '(R-TRANS-05) — bei Podiumsfragen ohne Freigabe bleibt das Feld leer.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -318,7 +339,9 @@ export const TRANSITIONS: readonly Transition[] = [
         'Stand, mit Begründung, in den Stand `withdrawn`) steht in keinem der beiden ' +
         'Recherche-Dokumente. Ableitung: das ist NICHT dasselbe wie "Kein Auskunftsanspruch" ' +
         '(docs/anforderungen-recherche.md:24), das dort ausdrücklich ein eigener Statuspfad mit ' +
-        'eigener Rechtsfolge ist, getrennt von "Verweigerung trotz Anspruchs".',
+        'eigener Rechtsfolge ist, getrennt von "Verweigerung trotz Anspruchs". Das Pflichtfeld ' +
+        '`reason` hat ebenfalls keine Fundstelle in den beiden Recherche-Dokumenten — nicht belegt, ' +
+        'wie der Übergang selbst.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -337,7 +360,10 @@ export const TRANSITIONS: readonly Transition[] = [
         'docs/anforderungen-recherche.md:147 ("[MUSS] Dublettenerkennung auf Trefferquote statt ' +
         'Präzision kalibrieren ..."). Teilweise: die Zeile fordert "Merge reversibel, mit Nutzer, Zeitstempel ' +
         'und Ähnlichkeitsscore protokolliert" — `merged` ist hier aber ein Terminalstand ' +
-        '(`TERMINAL_STATUSES`), es gibt kein Unmerge und keinen gespeicherten Ähnlichkeitsscore.',
+        '(`TERMINAL_STATUSES`), es gibt kein Unmerge und keinen gespeicherten Ähnlichkeitsscore. ' +
+        'Ableitung: der Bestandscheck des Zielobjekts (`intoQuestionId`, dieselbe 404-Maskierung wie ' +
+        'R-TRANS-00, `requireQuestionFor` in api.ts) hat ebenfalls keine Fundstelle in Recherche oder ' +
+        'Ist-Analyse — Architekturentscheidung, keine externe Vorgabe.',
       docVersion: null,
       docHash: null,
       verified: false,
