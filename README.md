@@ -19,21 +19,38 @@ Protokollierung und Nachbereitung bis zur Anfechtungsverteidigung.
 | [`docs/design-prinzipien.md`](docs/design-prinzipien.md) | Was „beste Oberfläche" für dieses Werkzeug heißt: zehn Prinzipien, Muster, Checkliste der Design-Kritik. |
 | [`docs/adr/0001-vorlage-annahme.md`](docs/adr/0001-vorlage-annahme.md) | Vorlage zur Annahme von ADR 0001 an Prüfpunkt 1: was angenommen wird, was nicht, Nachweise je Grenze, Beschlussfeld. |
 | [`docs/adr/0002-demo-betriebsart-in-process.md`](docs/adr/0002-demo-betriebsart-in-process.md) | Demo-Betriebsart: der Anwendungskern läuft im Browser hinter dem Vertrag; der HTTP-Dienst nutzt denselben Kern. |
-| [`docs/adr/`](docs/adr/) | ADR 0003–0016, vorgeschlagen (Scheibe 015): Persistenz, Identität, Antwortformat, Bühne je Gerät, Deployment, Integrationen, Aufbewahrung, Pilotmodus, Ereignis-Umschlag, Zustandsmodell, Protokollebenen, Realtime, Vertragsversionierung, Agenten-Arbeitsmodell. Annahme je Prüfpunkt (Plan Abschnitt 4). |
+| [`docs/adr/0003-persistenz-ereignislog.md`](docs/adr/0003-persistenz-ereignislog.md) | Architekturentscheidung (ADR), vorgeschlagen: Persistenz des Ereignislogs — Postgres, nur anhängend. Annahme Prüfpunkt 3. |
+| [`docs/adr/0004-identitaet-oidc-bff.md`](docs/adr/0004-identitaet-oidc-bff.md) | Architekturentscheidung (ADR), vorgeschlagen: Identität — OIDC über einen BFF im Dienst. Annahme Prüfpunkt 3. |
+| [`docs/adr/0005-antwortformat.md`](docs/adr/0005-antwortformat.md) | Architekturentscheidung (ADR), vorgeschlagen: Antwortformat — Blockdokument mit Whitelist. Annahme Prüfpunkt 5. |
+| [`docs/adr/0006-buehne-je-geraet-und-antwortbuendel.md`](docs/adr/0006-buehne-je-geraet-und-antwortbuendel.md) | Architekturentscheidung (ADR), vorgeschlagen: Bühne je Person und Gerät, Antwortbündel. Annahme Prüfpunkt 5. |
+| [`docs/adr/0007-deployment-hosting-umgebungen.md`](docs/adr/0007-deployment-hosting-umgebungen.md) | Architekturentscheidung (ADR), vorgeschlagen: Deployment, Hosting und Umgebungen. Annahme Prüfpunkt 3. |
+| [`docs/adr/0008-integrationen.md`](docs/adr/0008-integrationen.md) | Architekturentscheidung (ADR), vorgeschlagen: Integrationen — ein kanonischer Vertrag je Nachbarsystem. Annahme Prüfpunkt 5. |
+| [`docs/adr/0009-aufbewahrung-vertraulichkeit-personentabelle.md`](docs/adr/0009-aufbewahrung-vertraulichkeit-personentabelle.md) | Architekturentscheidung (ADR), vorgeschlagen: Aufbewahrung, Vertraulichkeit, Krypto-Umschlag und Personentabelle. Annahme Prüfpunkt 4, ergänzt nach 073. |
+| [`docs/adr/0010-pilotmodus-uebungsbetrieb.md`](docs/adr/0010-pilotmodus-uebungsbetrieb.md) | Architekturentscheidung (ADR), vorgeschlagen: Pilotmodus und Übungsbetrieb. Annahme Prüfpunkt 3. |
+| [`docs/adr/0011-ereignis-umschlag-v2.md`](docs/adr/0011-ereignis-umschlag-v2.md) | Architekturentscheidung (ADR), vorgeschlagen: Ereignis-Umschlag v2. Annahme Prüfpunkt 3. |
+| [`docs/adr/0012-zustandsmodell-und-verweigerung.md`](docs/adr/0012-zustandsmodell-und-verweigerung.md) | Architekturentscheidung (ADR), vorgeschlagen: Zustandsmodell und Verweigerung. Annahme Prüfpunkt 4, Umsetzer und Recht. |
+| [`docs/adr/0013-zwei-protokollebenen.md`](docs/adr/0013-zwei-protokollebenen.md) | Architekturentscheidung (ADR), vorgeschlagen: Zwei Protokollebenen. Annahme Prüfpunkt 4. |
+| [`docs/adr/0014-realtime-sse.md`](docs/adr/0014-realtime-sse.md) | Architekturentscheidung (ADR), vorgeschlagen: Realtime über Server-Sent Events. Annahme Prüfpunkt 3. |
+| [`docs/adr/0015-vertragsversionierung.md`](docs/adr/0015-vertragsversionierung.md) | Architekturentscheidung (ADR), vorgeschlagen: Vertragsversionierung. Annahme Prüfpunkt 1. |
+| [`docs/adr/0016-agenten-arbeitsmodell.md`](docs/adr/0016-agenten-arbeitsmodell.md) | Architekturentscheidung (ADR), vorgeschlagen: Agenten-Arbeitsmodell. Annahme Prüfpunkt 1. |
 | [`docs/entscheidungsregister.md`](docs/entscheidungsregister.md) | Entscheidungsregister E1–E49 mit Eigentümer, Fälligkeit, Rückfalltrigger, Kosten bei Änderung und Vermerk „auf Standard gebaut" (Scheibe 014). |
 | [`docs/glossar.md`](docs/glossar.md) | Hausvokabular ↔ Code, verbindlich für Oberfläche und Contract. |
 | [`docs/slices/`](docs/slices/) | Eine Spezifikation je Scheibe mit Nachweisen, Review-Befunden und Nacharbeit — wie gebaut wurde. |
 | [`docs/demo-skript.md`](docs/demo-skript.md) | Drehbuch der Vorführung, bekannte Punkte, Lesereihenfolge für Entwickler. |
 | [`docs/messung.md`](docs/messung.md) | Verbrauch, Reviewrunden und Befunde je Scheibe — die Zahlen hinter der These. |
 | [`docs/evidence/`](docs/evidence/) | Screenshots aus den automatisierten Durchläufen, zuletzt im Endzustand erzeugt. |
-| [`docs/feedback/`](docs/feedback/) | Auswertung von Rückmeldungen: je Aussage berücksichtigt, geplant, neu oder unklar, mit Folge, Aufwand und Rückfragen. |
+| [`docs/feedback/2026-09-quickview-projektleitung.md`](docs/feedback/2026-09-quickview-projektleitung.md) | Feedback-Auswertung der Quickview der HV-Projektleitung: je Aussage berücksichtigt, geplant, neu oder unklar, als Grundlage für die Vervollständigung. |
+| [`docs/feedback/2026-10-fragenpaket-woche-1.md`](docs/feedback/2026-10-fragenpaket-woche-1.md) | Fragenpaket Woche 1: Fragen an die HV-Projektleitung, jede mit Bezug zu ihrer Zeile im Entscheidungsregister. |
+| [`docs/feedback/2026-10-fragenpaket-wortmeldeliste.png`](docs/feedback/2026-10-fragenpaket-wortmeldeliste.png) | Nummerierter Screenshot der Wortmeldeliste der Demo (Anhang zum Fragenpaket Woche 1); die Legende der Bedienelemente steht im Anhang von `docs/feedback/2026-10-fragenpaket-woche-1.md`. |
 | [`docs/produktplan-beta.md`](docs/produktplan-beta.md) | Plan für die KI-Agenten vom MVP zur soliden Beta: Beta-Kriterien B1–B18, Standardannahmen mit Änderungskosten, 80 Scheiben in sieben Meilensteinen, Kalender in Agentenzeit aus dem Abhängigkeitsgraphen, Prüfpunkte, Token, Risiken, Entscheidungsregister. |
 | [`docs/qualitaetsleitplanken-produktreife.md`](docs/qualitaetsleitplanken-produktreife.md) | Qualitätsleitplanken für Spec-Autoren und Reviewer: Risikoklassen, Perspektiven auf heutige Rollen, Qualitätschecks, Nachweise, durchgerechnetes Beispiel. Keine zweite Arbeitsordnung. |
 | [`docs/abdeckungsmatrix.md`](docs/abdeckungsmatrix.md) | Anforderungs-Traceability: welche Anforderung aus docs/anforderungen-recherche.md durch welche Scheibe gebaut wird. |
 | [`docs/changelog-projektleitung.md`](docs/changelog-projektleitung.md) | Zusammenfassung von Änderungen für die Projektleitung: was sich am Beta-Plan seit der letzten Rückmeldung geändert hat, neue Termine, neue Erkenntnisse. |
-| [`docs/betrieb/`](docs/betrieb/) | Betriebliche Dokumentation: Branch-Schutz und Deployment-Richtlinien. |
-| [`docs/datenschutz/`](docs/datenschutz/) | Datenschutz: DSFA-Vorentwurf und Begleitdokumentation. |
-| [`docs/sicherheit/`](docs/sicherheit/) | Sicherheit: Bedrohungsmodell, Penetrationstests-Scope, Reviewer-Checkliste für die Sicherheitsperspektive je Scheibe. |
+| [`docs/betrieb/branch-schutz.md`](docs/betrieb/branch-schutz.md) | Checkliste für den Eigentümer: Branch-Schutz setzen, ein privilegierter Schritt, den kein Agent ausführen darf. |
+| [`docs/datenschutz/dsfa-vorentwurf.md`](docs/datenschutz/dsfa-vorentwurf.md) | DSFA-Vorentwurf für das HV-Tool (Beta), Status ungeprüft, Adressat die oder der Datenschutzbeauftragte. |
+| [`docs/sicherheit/bedrohungsmodell.md`](docs/sicherheit/bedrohungsmodell.md) | Bedrohungsmodell v1 für das HV-Tool (Beta), Prüfhilfe mit Perspektive Security für Reviewer, Sicherheitsreview des Architekten und Pentest. |
+| [`docs/sicherheit/pentest-scope.md`](docs/sicherheit/pentest-scope.md) | Pentest-Scope für das HV-Tool (Beta): Grundlage der Bestellung, noch keine Bestellung und keine Anfrage an Dritte. |
+| [`docs/sicherheit/reviewer-checkliste-sicherheit.md`](docs/sicherheit/reviewer-checkliste-sicherheit.md) | Reviewer-Checkliste Sicherheit: Prüfhilfe für Reviews mit Perspektive Security. |
 
 ## Lauffähige Version
 
