@@ -874,7 +874,7 @@ arbeitet es:
 - Die Probe läuft erst, wenn die Wortmeldungs-Abfrage geantwortet hat und keine Wortmeldung
   ergab (verweigert, gescheitert oder leer).
 - Weil die Probe dabei während eines Nachladens kurz „ready“ antwortet, ändert sich der Zustand
-  „keine Leseberechtigung“ erst, wenn alle drei Abfragen geantwortet haben. Sonst würde der
+  „keine Leseberechtigung“ erst, wenn alle drei Abfragen geantwortet haben. (Korrektur in Runde 5: das galt nur ohne Latenz, siehe „Nacharbeit Runde 5“.) Sonst würde der
   Schreibtisch kurz aufblitzen (Prinzip 8).
 
 **A** (`stage/Page.tsx`): scheitert `getStage` mit etwas anderem als einer Leseverweigerung, bekommt
@@ -1029,6 +1029,227 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
 - `apps/web/e2e/010b-lesepfade.spec.ts`
 - `docs/slices/010b-lesepfade-oberflaeche.md`
 
+## Nacharbeit Runde 5
+
+Runde 5: Nachprüfung auf 948a721 (Urteil „annehmen“; 1 Minor, 1 Nit, 2 optionale Nits), dazu Codex
+auf 948a721 (zwei P2). Befunde und Umgang stehen unter „Review findings“. Zuerst kamen die Tests
+(Commit `6631130`), dann die Fixes:
+
+| Punkt | Commit |
+|---|---|
+| **Codex P2-A** (Beantwortung und Historie: gescopte Liste ohne die gewählte Frage) | `7f76dc9` |
+| **Codex P2-B** (Bühne: eine Antwort der vorigen Rolle wird übernommen) | `e64af10` |
+| Runde 5 Befund 1 (Erfassung: Flackern bei Latenz) | `bd9e250` |
+| Runde 5 Nit 2 (ein Toast je Auswahl-Durchgang) | `7f76dc9` |
+| Runde 5 Nit 3 (`actor.id` statt Objektidentität) | `e64af10` |
+| Runde 5 Nit 4 (MutationObserver im Test „Runde 4 (B)“) | `6631130` |
+| Test „Runde 4 (A)“ angepasst (siehe unten) | `150b81a` |
+| Bericht | dieser Commit |
+
+**Codex P2-A, als Erweiterung derselben Klasse** (`createDetailProblemGate`, je eine Kopie in
+`answers/lib.ts` und `history/lib.ts`):
+- `settleMain` nimmt jetzt zusätzlich `omits(id)` an: die Antwort der Hauptabfrage lässt die
+  gewählte Frage bekanntermaßen aus. Ein Fehler der Detailabfrage zu einer solchen Frage verfällt
+  genauso wie bei einer verweigerten Liste.
+- `omits` gibt es nur für eine vollständige Liste: ohne serverseitigen Filter (Suche, Antwortpfad,
+  Einheit, TOP) und ohne Abschnitt durch das Limit. Eine gefilterte Liste sagt nichts darüber, was
+  sie weglässt.
+- Beide Ansichten blenden die Auswahl aus, solange die Liste verweigert ist oder sie als
+  vollständige Liste auslässt (`selectionHidden`). Dann gibt es keine Detailabfrage, kein Detail
+  und keine `_actions` der vorigen Rolle. Die Auswahl selbst bleibt erhalten: nach dem Wechsel
+  zurück erscheint sie wieder.
+
+**Nit 2:** der Gate zählt Auswahl-Durchgänge (`select()` bei jedem Wechsel der Auswahl). A
+(Fehler, Toast), dann B, dann wieder A meldet den zweiten Fehler von A. Die Testtabelle hat in
+beiden Features zwei neue Fälle: den sechsten für Nit 2 und den siebten für P2-A.
+
+**Codex P2-B** (`stage/Page.tsx`):
+- Jede `getStage`-Antwort ist an den anfragenden Akteur gebunden. Hat sich
+  `getActor().id` seit der Anfrage geändert, wird die Antwort verworfen. Gelesen wird im Moment
+  der Antwort, nicht aus React-State; kein Render muss vorher laufen.
+- Ein Akteurwechsel verwirft außerdem den angezeigten Stand der vorigen Rolle (`setStage(null)`).
+  So kann auch ein späterer 500 (Befund A aus Runde 4) ihn nicht zurückgeben.
+- Damit ist die Randlücke geschlossen, die der Bericht zu Runde 4 unter B genannt hatte.
+- Folge für den Test „Runde 4 (A)“: er hat das fehlschlagende Nachladen bisher durch einen
+  Rollenwechsel podium → admin ausgelöst. Der verwirft den Stand jetzt absichtlich. Der Test löst
+  das Nachladen deshalb durch ein gewöhnliches Ereignis aus (admin legt eine Wortmeldung an).
+  Gegenprobe: mit vorübergehend entfernter Zeile `stageRef.current = shownRef.current` ist der
+  angepasste Test rot (`Expected: 1, Received: 0` bei den `deliverQuestion`-Aufrufen), mit der
+  Zeile grün.
+
+**Nit 3:** der Vergleich läuft über `actor.id`, nicht über die Identität des Objekts. Das hält auch
+bei einem frischen Identitätsobjekt für dieselbe Person (OIDC-Token-Refresh).
+
+**Befund 1** (`capture/useCapture.ts`, `capture/Page.tsx`): `useAsync` liefert jetzt `settled`.
+Das heißt: der Status hat für den Schlüssel dieses Renders geantwortet. `settled` in der Erfassung
+verlangt das für alle drei Abfragen.
+
+**Korrektur zu Codex P2-1 im Bericht „Nacharbeit Runde 4“:** der Satz „ändert sich der Zustand
+‚keine Leseberechtigung‘ erst, wenn alle drei Abfragen geantwortet haben“ stimmte nur ohne Latenz.
+Direkt nach einem Schlüsselwechsel meldete `useAsync` noch den Status des vorigen Schlüssels. Mit
+Latenz fiel der Zustand bei jedem `version`-Sprung für einen Render weg; das hat der neue Test
+„Runde 5 (1)“ auf 948a721 gemessen. Seit `bd9e250` stimmt der Satz.
+
+**Rote Läufe.** Wörtlich kopiert. Weggelassen sind Leerzeilen sowie Call-Log-, Trace- und
+Error-Context-Zeilen.
+
+(a) Die neuen e2e mit dem Code von 948a721 (`E2E_PORT=4391 npx playwright test
+e2e/010b-lesepfade.spec.ts --grep "948a721|Runde 5|Runde 4 \(B\)" --reporter=list`):
+- „Runde 4 (B)“ ist grün, weil B seit Runde 4 behoben ist. Der Test hat jetzt zusätzlich einen
+  MutationObserver (Nit 4).
+- Die `[WebServer] … Unhandled rejection`-Zeilen dieses Laufs stammen aus dem Latenz-Patch des
+  P2-B-Tests. Der Test fängt die zurückgehaltene Ablehnung jetzt ab.
+
+```
+Running 5 tests using 1 worker
+  ✓  1 [chromium] › e2e/010b-lesepfade.spec.ts:778:1 › Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle (3.5s)
+  ✘  2 [chromium] › e2e/010b-lesepfade.spec.ts:846:1 › Codex P2-A (948a721): Beantwortung — Wechsel zu observer bei offener, nicht vorgelesener Frage (7.1s)
+  ✘  3 [chromium] › e2e/010b-lesepfade.spec.ts:872:1 › Codex P2-A (948a721): Historie — Wechsel zu observer bei gewählter, nicht vorgelesener Frage (7.5s)
+  ✘  4 [chromium] › e2e/010b-lesepfade.spec.ts:895:1 › Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Rolle unterwegs ist, wird nicht übernommen (2.3s)
+  ✘  5 [chromium] › e2e/010b-lesepfade.spec.ts:953:1 › Runde 5 (1): Erfassung — der Zustand "keine Leseberechtigung" flackert bei Latenz nicht (2.8s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:846:1 › Codex P2-A (948a721): Beantwortung — Wechsel zu observer bei offener, nicht vorgelesener Frage 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  locator('[aria-live="polite"] [role="status"]')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+        at expectNoErrorToast (/home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:77:70)
+        at /home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:867:3
+  2) [chromium] › e2e/010b-lesepfade.spec.ts:872:1 › Codex P2-A (948a721): Historie — Wechsel zu observer bei gewählter, nicht vorgelesener Frage 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  locator('[aria-live="polite"] [role="status"]')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+        at expectNoErrorToast (/home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:77:70)
+        at /home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:890:3
+  3) [chromium] › e2e/010b-lesepfade.spec.ts:895:1 › Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Rolle unterwegs ist, wird nicht übernommen 
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: false
+    Received: true
+    > 944 |   expect(await page.evaluate(() => (window as unknown as { __sawStale: boolean }).__sawStale)).toBe(false);
+          |                                                                                                ^
+  4) [chromium] › e2e/010b-lesepfade.spec.ts:953:1 › Runde 5 (1): Erfassung — der Zustand "keine Leseberechtigung" flackert bei Latenz nicht 
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: 0
+    Received: 1
+    > 994 |   expect(await page.evaluate(() => (window as unknown as { __lostForbidden: number }).__lostForbidden)).toBe(0);
+          |                                                                                                         ^
+  4 failed
+  1 passed (29.1s)
+```
+
+(b) Nit 2 als Unit-Lauf. Gate und Tag wie in `useBacklog.ts` auf 948a721 (`${load}:${selectedId}`)
+laufen über A (Fehler), B und wieder A (Fehler). Die Testdatei war temporär und ist wieder
+gelöscht (`npx vitest run src/features/answers/oldgate.tmp.test.ts`):
+
+```
+ ❯ src/features/answers/oldgate.tmp.test.ts (1 test | 1 failed) 10ms
+     × A fails (shown), B, then A again fails: shown again — a new pass (nit 2, round 5) 9ms
+AssertionError: expected [ 'first' ] to deeply equal [ 'first', 'second' ]
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+```
+
+**Grüner Lauf** nach den Fixes, derselbe e2e-Befehl wie in (a), wörtlich:
+
+```
+Running 5 tests using 1 worker
+  ✓  1 [chromium] › e2e/010b-lesepfade.spec.ts:778:1 › Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle (3.5s)
+  ✓  2 [chromium] › e2e/010b-lesepfade.spec.ts:846:1 › Codex P2-A (948a721): Beantwortung — Wechsel zu observer bei offener, nicht vorgelesener Frage (2.0s)
+  ✓  3 [chromium] › e2e/010b-lesepfade.spec.ts:872:1 › Codex P2-A (948a721): Historie — Wechsel zu observer bei gewählter, nicht vorgelesener Frage (2.3s)
+  ✓  4 [chromium] › e2e/010b-lesepfade.spec.ts:895:1 › Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Rolle unterwegs ist, wird nicht übernommen (2.5s)
+  ✓  5 [chromium] › e2e/010b-lesepfade.spec.ts:955:1 › Runde 5 (1): Erfassung — der Zustand "keine Leseberechtigung" flackert bei Latenz nicht (2.7s)
+  5 passed (15.6s)
+```
+
+Die Gate-Tabellen in `answers/lib.test.ts` und `history/lib.test.ts` sind grün: 27 Tests in
+beiden Dateien zusammen.
+
+**Ganze Playwright-Suite** auf Commit `150b81a` (`E2E_PORT=4391 npx playwright test
+--reporter=list`, Chromium unter `/opt/pw-browsers`):
+- 41 passed (2.9m), exit 0.
+- Alle 90 axe-Zeilen melden 0 serious/critical.
+- Danach `git checkout -- docs/evidence`.
+- Ein erster Lauf auf `bd9e250` hatte „Runde 4 (A)“ rot (1 failed, 40 passed). Grund war die
+  Wechselwirkung mit P2-B, siehe oben. Der Test ist in `150b81a` angepasst.
+
+```
+  41 passed (2.9m)
+```
+
+**`pnpm -C /home/user/wt/010b gates`** auf Commit `150b81a`, exit 0, Log über `mktemp`. Das Ende
+steht wörtlich da, nur die ANSI-Farbcodes sind entfernt:
+
+```
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6373.949934
+
+> @hv/web@0.0.0 build /home/user/wt/010b/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-DVvT9WbR.js                        540.82 kB │ gzip: 158.10 kB │ map: 2,258.48 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.24s
+mark-test-run: wrote /home/user/wt/010b/.claude/state/last-test-run (clean tree) at commit 150b81a, tree ac29e7e5133a…
+```
+
+Im selben Lauf:
+- `vocabulary-check: ok`.
+- `i18n-literal check: 0 literals found`.
+- `role-literals` grün.
+- `arch`: dieselben 7 vorbestehenden Warnungen, 0 Fehler.
+- `oxlint`: 25 Warnungen, unverändert.
+- Tests: `packages/domain` 72/72, `apps/web` 87/87, `apps/api` 49/49.
+- `slice-scope --slice 010b` explizit aufgerufen:
+
+```
+slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflaeche.md"'s "Files allowed" list (19 pattern(s)).
+```
+
+**Offen (Folgearbeit, kein Sicherheitsbezug):** in der Beantwortung mit aktivem serverseitigem
+Filter (Suche, Antwortpfad, Einheit, TOP) kann die Liste nicht sagen, was sie weglässt.
+- Was dann passiert: wechselt in diesem Zustand die Rolle zu einer, die die offene Frage nicht
+  lesen darf, erscheint noch ein Fehler-Toast.
+- Was nicht passiert: das Detail und seine `_actions` verschwinden trotzdem, weil der maskierte
+  404 von `getQuestion` sie leert.
+- Warum nicht jetzt behoben: die Lücke zu schließen hieße, die Filter der Beantwortung ganz in den
+  Speicher zu verlegen oder eine zweite, ungefilterte Liste zu laden. Beides geht über diese
+  Scheibe hinaus.
+
+**Touched (Runde 5):**
+- `apps/web/src/features/answers/useBacklog.ts`, `lib.ts`, `lib.test.ts`
+- `apps/web/src/features/history/Page.tsx`, `lib.ts`, `lib.test.ts`
+- `apps/web/src/features/stage/Page.tsx`
+- `apps/web/src/features/capture/useCapture.ts`, `Page.tsx`
+- `apps/web/e2e/010b-lesepfade.spec.ts`
+- `docs/slices/010b-lesepfade-oberflaeche.md`
+
 ## Review findings
 
 (vom Reviewer)
@@ -1097,17 +1318,17 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
 ### Runde 5 — Nachprüfung auf 948a721: annehmen
 
 - 1 (minor), `capture/Page.tsx:90-108`: `settled` does not check which key a status belongs to. With latency, the designed state flickers `[false,true]` on every version jump. Fix: `useAsync` returns the key its status belongs to, and `settled` requires the current key for all three reads (alternatively, freeze `needsProbe` while `speakers.status === 'loading'`). Add an e2e with the latency patch and a MutationObserver, following the "Runde 3 (4)" pattern. Qualify the P2-1 claim in the Bericht.
-  - **Umgang:** UMGANG5_1
+  - **Umgang:** angenommen, behoben in `bd9e250` (erste Variante): `useAsync` liefert `settled`, gebunden an den Schlüssel des Renders. `settled` in der Erfassung verlangt das für alle drei Abfragen. e2e „Runde 5 (1)“ mit Latenz-Patch und MutationObserver, rot/grün im Bericht „Nacharbeit Runde 5“. Die Aussage zu P2-1 im Bericht zu Runde 4 ist eingeschränkt.
 - 2 (nit), `answers/lib.ts:237` and `history/lib.ts:175`: select A (error, toast), then B (ok), then A again: the second error stays silent. Make the tag unique per selection pass, and add a sixth case to both test tables.
-  - **Umgang:** UMGANG5_2
+  - **Umgang:** angenommen, behoben in `7f76dc9`: der Gate zählt Auswahl-Durchgänge (`select()`). In beiden Tabellen steht ein sechster Fall; roter Unit-Lauf gegen den Stand von 948a721 im Bericht.
 - 3 (nit, optional): compare `actor.id` instead of object identity (OIDC).
-  - **Umgang:** UMGANG5_3
+  - **Umgang:** angenommen, in `e64af10`: der Vergleich läuft über `actor.id`.
 - 4 (nit, optional): MutationObserver in the "Runde 4 (B)" test.
-  - **Umgang:** UMGANG5_4
+  - **Umgang:** angenommen, in `6631130`: der Test „Runde 4 (B)“ hat einen MutationObserver, der im selben Task wie der Wechsel scharf geschaltet wird.
 
 ### Codex auf 948a721
 
 - P2-A, `answers/useBacklog.ts:167` and the same in HistoryPage: an unrestricted actor has an undelivered question open, then switches to observer. `listQuestions` succeeds with a scoped list, so `refused=false`; `getQuestion` and `getQuestionHistory` get the masked 404, raise a toast, and the previous actor's detail and `_actions` stay visible. Fix: a successful list that does not contain the selected id must clear the selection and swallow its detail failures — an extension of the `createDetailProblemGate` class, not a special case. e2e: admin selects an undelivered question, switches to observer; no toast, no detail, no `_actions` from before.
-  - **Umgang:** UMGANG5_A
+  - **Umgang:** angenommen, als Erweiterung der Klasse behoben in `7f76dc9`: `createDetailProblemGate` nimmt `omits(id)` einer vollständigen Liste an; `selectionHidden` blendet die Auswahl in Beantwortung und Historie aus. Zwei e2e „Codex P2-A (948a721)“, rot/grün im Bericht. Offen als Folgearbeit: eine Liste mit aktivem serverseitigem Filter, siehe Bericht.
 - P2-B, `stage/Page.tsx:202`: if the actor changes while `getStage()` is still pending, the old promise can resolve before the version bump and install the previous actor's stage and `_actions`. Tie each request to the actor, or invalidate it synchronously on an actor change. Test with the latency patch.
-  - **Umgang:** UMGANG5_B
+  - **Umgang:** angenommen, behoben in `e64af10`: jede `getStage`-Antwort ist an `getActor().id` zur Zeit der Anfrage gebunden, und ein Akteurwechsel verwirft den Stand der vorigen Rolle. e2e „Codex P2-B (948a721)“ mit Latenz-Patch (zurückgehaltene Antwort, im selben Task wie der Wechsel freigegeben), rot/grün im Bericht.
