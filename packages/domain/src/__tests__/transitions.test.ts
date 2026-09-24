@@ -3,7 +3,7 @@
  * Role × Status × Action, diffed against the committed file (docs gate "Policy-Wahrheitstabelle").
  */
 import { describe, expect, it } from 'vitest';
-import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS } from '../transitions.js';
+import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, type Guard } from '../transitions.js';
 import { can } from '../api.js';
 import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Permission } from '../types.js';
 import { ROLE_PERMISSIONS, READ_PERMISSION_LIST, READ_SCOPES } from '../permissions.js';
@@ -82,6 +82,71 @@ describe('transition table', () => {
     expect(podium.ok && podium.to).toBe('classified');
     expect(expert.ok && expert.to).toBe('answer_drafted');
   });
+});
+
+/**
+ * Slice 011, Festlegung 3: one generated test per guard, collected from `TRANSITIONS[].guards` (no
+ * duplicates, no second list) — each one checked once satisfied and once violated. This is how a
+ * guard counts as "has a test" for `apps/api/src/__tests__/rule-register.test.ts` without its rule id
+ * needing to appear literally anywhere. A guard added later without an entry here fails loudly
+ * instead of silently passing "untested".
+ */
+const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?]; violates: [QuestionRecord, unknown?] }> = {
+  'R-GUARD-01': {
+    satisfies: [question({ answers: [{ version: 1, text: 'a', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }] })],
+    violates: [question({ answers: [] })],
+  },
+  'R-GUARD-02': {
+    satisfies: [question({ track: 'podium' })],
+    violates: [question({ track: 'expert_track' })],
+  },
+  'R-GUARD-03': {
+    satisfies: [question({ track: 'fast_track' })],
+    violates: [question({ track: 'podium' })],
+  },
+  'R-GUARD-04': {
+    satisfies: [
+      question({
+        answers: [
+          { version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+          { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+        ],
+      }),
+      { answerVersion: 2 },
+    ],
+    violates: [
+      question({
+        answers: [
+          { version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+          { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+        ],
+      }),
+      { answerVersion: 1 },
+    ],
+  },
+  'R-GUARD-05': {
+    satisfies: [question({ id: 'q1' }), { intoQuestionId: 'q2' }],
+    violates: [question({ id: 'q1' }), { intoQuestionId: 'q1' }],
+  },
+};
+
+describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {
+  const guards = new Map<string, Guard>();
+  for (const t of TRANSITIONS) for (const g of t.guards ?? []) if (!guards.has(g.ruleId)) guards.set(g.ruleId, g);
+
+  it('every guard has a scenario in GUARD_SCENARIOS', () => {
+    const missing = [...guards.keys()].filter((id) => !GUARD_SCENARIOS[id]);
+    expect(missing, `guard(s) without a test scenario: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  for (const [ruleId, guard] of guards) {
+    it(`${ruleId}: guard — ${guard.description}`, () => {
+      const scenario = GUARD_SCENARIOS[ruleId];
+      if (!scenario) return; // reported by the "every guard has a scenario" test above
+      expect(guard.check(...scenario.satisfies)).toBe(true);
+      expect(guard.check(...scenario.violates)).toBe(false);
+    });
+  }
 });
 
 describe('policy truth table (Role × Status × Action, Role × Leserecht)', () => {
