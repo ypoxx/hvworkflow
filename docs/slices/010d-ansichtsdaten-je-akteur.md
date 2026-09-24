@@ -1,6 +1,6 @@
 # 010d — Ansichtsdaten gehören dem Schlüssel des Akteurs
 
-**Status:** Nacharbeit Runde 1 gebaut (Befunde 1–4, 6), Nachprüfung offen
+**Status:** Nacharbeit Runde 2 gebaut (N1, N2; N3 in der Folgeliste), Nachprüfung offen
 **Risikoklasse:** niedrig · 1 AStd · Lanes: web-speakers, web-capture, web-answers, web-history, e2e (eigene Datei).
 Startet nach 010c (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -71,7 +71,8 @@ Keine Änderung an Kern, Vertrag, Dienst, Rechten; kein neues Token; kein gemein
 ## Bericht
 
 Commits Runde 0: `7c593f0` (Tests, rot), `74b8cab` (Änderung), `24dd4e4` (Bericht). Runde 1: `25db979` (Änderung
-und e2e, **letzter Code-Commit**, Gates), dieser Commit (Bericht).
+und e2e), `97eba3e` (Bericht). Runde 2: `5ac160f` (Änderung und e2e, **letzter Code-Commit**, Gates), dieser
+Commit (Bericht).
 
 ```
 Slice: 010d-ansichtsdaten-je-akteur
@@ -81,17 +82,42 @@ Done: Daten mit _actions gehören dem Schlüssel des Akteurs: Wortmeldungen, Erf
       schließen. Beantwortung: Listenfehler ohne Zeilen → gestalteter Fehlerzustand mit "Erneut
       versuchen" (2 neue Schlüssel de/en), nie "Kein Treffer". Ausgang eines Schreibens nur, solange
       seine Frage für denselben Akteur gezeigt und noch gewählt ist; der Hinweis „Stand veraltet“
-      gehört seiner Frage. Runde 1: 412 außerhalb der Ansicht und Bestätigung mit Fragennummer (i18n),
-      ein Abruf je gescheitertem Ereignisstrom, Fokus nach „Erneut versuchen“, neutraler Fehlertext.
+      gehört seiner Frage; das Leeren des Entwurfs hängt an der gezeigten Frage (Runde 2). Runde 1: 412 außerhalb der Ansicht und Bestätigung mit Fragennummer (i18n),
+      ein Abruf je gescheitertem Ereignisstrom, Fokus nach „Erneut versuchen“ (auch ohne Zeilen,
+      Runde 2), neutraler Fehlertext.
       Ziel 4/5: Testschärfung und Harness ohne await.
-Evidence: pnpm gates auf 25db979, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite
-      94/94 (2 Worker) und 94/94 (1 Worker, taskset -c 0,1); 010d-Datei --repeat-each=3 zweimal
-      72/72 und 72/72; rote Läufe: Runde 1 8 rot / 16 grün auf 74b8cab (genau die neuen bzw.
-      geänderten Tests), Runde 0 17 rot / 2 grün auf e303cc1; axe ohne serious/critical, auch in den
+Evidence: pnpm gates auf 5ac160f, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite
+      96/96 (2 Worker) und 96/96 (1 Worker, taskset -c 0,1); 010d-Datei --repeat-each=3 zweimal
+      78/78 und 78/78; rote Läufe: Runde 2 2 rot / 24 grün auf 97eba3e (genau N1 und N2),
+      Runde 1 8 rot / 16 grün auf 74b8cab, Runde 0 17 rot / 2 grün auf e303cc1; axe ohne serious/critical, auch in den
       Ladezuständen; docs/evidence/010d-beantwortung-ladefehler.png (neu aufgenommen, Text geändert).
 Open: siehe "Offen" unten.
 Touched: siehe "Touched" unten.
 ```
+
+### Nacharbeit Runde 2 (N1, N2; Entscheidung des Architekten Runde 2)
+
+- **N1 (Regression aus Befund 1), gespeicherter Entwurf bleibt im Editor von A:** Die Auswahlprüfung aus
+  Runde 1 sperrte auch das Leeren des Entwurfs. Während B lädt, ist aber gerade der Editor von A noch
+  eingehängt, mit dem gespeicherten Text; wer zu A zurückkehrt, fand ihn dort wie ungespeichert, und ein
+  weiteres Enter speicherte ihn ein zweites Mal. Jetzt zwei Prüfungen in `run` (`answers/Page.tsx`):
+  `onScreen()` — die Frage ist für denselben Akteur gezeigt — entscheidet über `onDone` (Entwurf leeren);
+  `stillShown()` — gezeigt **und** gewählt — über Dialog schließen und „Stand veraltet“. Ist B schon
+  geladen, ist der Editor von A abgebaut; der Entwurf von B wird dann nicht angefasst (Ziel 3 bleibt). e2e
+  genau nach P3c (Filter „Entwurf“, damit A nach der neuen Version in der Liste bleibt): Entwurf auf A
+  gehalten, `getQuestion` gehalten, Klick auf B, Entwurf gelingt, Klick auf A, Freigabe der Lesevorgänge →
+  eine Version mehr, Editor leer, „Antwort entwerfen“ `aria-disabled`. Rot auf `97eba3e`.
+- **N2, erneuter Versuch ohne Zeilen:** `useBacklog` zählt beantwortete Listenabfragen (`listAnswered`,
+  steigt je Antwort genau einmal — bereit, verweigert oder gescheitert). `WorkList` merkt sich beim Druck auf
+  „Erneut versuchen“ den Stand und erledigt den Versuch mit der ersten danach beantworteten Abfrage, was
+  immer sie brachte; die Marke wird dann gelöscht (vorher nur, wenn Zeilen kamen). Liegt der Fokus dann auf
+  BODY: Zeilen → Liste; keine Zeilen → der Knopf des leeren Zustands („Auswahl zurücksetzen“, bei einem
+  neuen Fehler „Erneut versuchen“), ohne einen solchen Knopf das Suchfeld. Ein Zähler statt des
+  Ladezustands, weil ein sofort beantworteter Versuch den Ladezustand gar nicht rendert. e2e: Suche ohne
+  Treffer, nächste Listenabfrage scheitert, „Erneut versuchen“ mit Enter → „Kein Treffer“, Fokus auf
+  „Auswahl zurücksetzen“, Enter dort lädt die Zeilen. Rot auf `97eba3e`. Der Fall ohne Filter (leerer
+  Bestand, Fokus auf die Suche) hat keinen e2e: im Demo-Korpus liest jede Rolle mit Leserecht Zeilen.
+- **N3:** nicht geändert, Folgeliste (Entscheidung des Architekten).
 
 ### Nacharbeit Runde 1 (Befunde 1–4 und 6; Entscheidung des Architekten)
 
@@ -167,9 +193,10 @@ der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwe
   versuchen“); er bleibt stehen, solange derselbe Akteur neu liest (Runde 1, Befund 4), und die rechte Seite
   schweigt dann wie bei der Verweigerung statt „Wählen Sie links …“. Ein Fehler derselben Rolle bei
   vorhandenen Zeilen lässt die Zeilen stehen (Toast wie bisher).
-  **Ausgang eines Schreibens:** wirkt nur, wenn im Moment der Antwort seine Frage für denselben Akteur
-  gezeigt wird **und** noch die gewählte ist (`shown` mit `selectedId`, nach jedem Commit per
-  `useLayoutEffect` gesetzt): Dialog schließen, Entwurf leeren (`onDone`), „Stand veraltet“. Der Hinweis
+  **Ausgang eines Schreibens:** Dialog schließen und „Stand veraltet“ wirken nur, wenn im Moment der
+  Antwort seine Frage für denselben Akteur gezeigt wird **und** noch die gewählte ist (`shown` mit
+  `selectedId`, nach jedem Commit per `useLayoutEffect` gesetzt); das Leeren des Entwurfs (`onDone`) nur,
+  wenn seine Frage für denselben Akteur gezeigt wird — ihr Editor ist dann eingehängt (Runde 2, N1). Der Hinweis
   selbst trägt seine Frage (`staleFor`) und steht nur über ihr. Sonst meldet ein Toast die Ablehnung — ein
   412 im Hauswortlaut mit Fragennummer, jede andere Ablehnung wie bisher —, eine Ablehnung bleibt nie
   unbemerkt; die Erfolgsmeldung nennt Schritt und Fragennummer und steht immer. Den Akteur zusätzlich zur
@@ -221,11 +248,11 @@ der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwe
 
 ### Evidence
 
-**`pnpm gates` auf `25db979` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 181, api 57, scripts
+**`pnpm gates` auf `5ac160f` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 181, api 57, scripts
 206/206. `slice-scope: 21 changed file(s), all within "docs/slices/010d-ansichtsdaten-je-akteur.md"'s "Files
-allowed" list (7 pattern(s)).` (dazu die bekannte Warnung, dass „Files allowed“ seit `e303cc1` vom Architekten
-ergänzt wurde, `4fdf98f`). Runde 0: Gates auf `74b8cab` ebenfalls Exit 0, oxlint 23 Warnungen statt 24. Schluss
-wörtlich (nur ANSI-Farbcodes entfernt):
+allowed" list (7 pattern(s)).` (dazu die bekannte Warnung zu „Files allowed“, `4fdf98f`). oxlint 23 Warnungen
+(vor der Scheibe 24). Gates auf `74b8cab` (Runde 0) und `25db979` (Runde 1) ebenfalls Exit 0. Schluss wörtlich (nur
+ANSI-Farbcodes entfernt):
 
 ```
 > tsc -b && vite build
@@ -241,7 +268,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-Dwnrtg1l.js                        572.34 kB │ gzip: 167.38 kB │ map: 2,370.88 kB
+dist/assets/index-CCBBrcpO.js                        572.60 kB │ gzip: 167.42 kB │ map: 2,372.91 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -250,8 +277,25 @@ dist/assets/index-Dwnrtg1l.js                        572.34 kB │ gzip: 167.38 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.62s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 25db979, tree 04e0ef5c3712…
+✓ built in 1.68s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 5ac160f, tree 0590db9b36b2…
+```
+
+**Playwright Runde 2** (eigener Port 6211, Chromium unter `/opt/pw-browsers`), Code von `5ac160f`:
+- ganze Suite: `96 passed (6.2m)` (2 Worker) und `96 passed (11.2m)` (1 Worker, `taskset -c 0,1`, wie der CI-Läufer mit 2
+  CPUs); axe in allen Szenarien ohne serious/critical.
+- `e2e/010d-ansichtsdaten.spec.ts` (26 Tests) mit `--repeat-each=3`, zwei Läufe: `78 passed (3.8m)` und
+  `78 passed (3.3m)`.
+- Der 010d-Screenshot ist unverändert (seine Ansicht hat sich in Runde 2 nicht geändert).
+
+**Roter Lauf Runde 2:** die e2e-Datei aus `5ac160f` gegen den Code von `97eba3e` (`git stash` nur
+`apps/web/src`): `2 failed, 24 passed (1.9m)`; rot sind genau die zwei neuen Tests:
+
+```
+  ✘  25 Runde 2 (N1): … Entwurf auf A gelingt, während B lädt; zurück zu A   answer-editor  Expected: ""  Received: "Entwurf zu A."
+  ✘  26 Runde 2 (N2): … "Erneut versuchen" liefert keine Zeile               button "Auswahl zurücksetzen"  Expected: focused  Received: inactive
+  2 failed
+  24 passed (1.9m)
 ```
 
 **Playwright Runde 1** (eigener Port 5593, Chromium unter `/opt/pw-browsers`), Code von `25db979`:
@@ -329,6 +373,8 @@ der Testdatei: `failAlways` für den ersten Abruf, axe im Ladezustand, der Wortm
   Strom „Noch keine Ereignisse“ (vorher genauso beim ersten Abruf; nach einem Rollenwechsel standen dort
   vorher die Daten der vorigen Rolle). Ein Fehlerzustand bräuchte neue `history.*`-Schlüssel.
 - **Historie, beide Hauptabfragen scheitern:** zwei Toasts (aus 010c, unverändert).
+- **N3 (Runde 2):** kein Beschäftigt-Signal während des erneuten Versuchs, Zähler „0 von 0“ im Fehlerzustand —
+  Folgeliste, zusammen mit dem gestalteten Ladefehler der Historie.
 - **Ladezustände werden nicht angesagt** (Befund 5, angenommen); eigene `history.*`-Schlüssel folgen mit dem
   gestalteten Ladefehler der Historie (Folgepunkt des Architekten).
 - **Andere Ablehnungen außerhalb der Ansicht** (403, 409, 5xx einer nicht mehr gezeigten Frage) zeigen wie
