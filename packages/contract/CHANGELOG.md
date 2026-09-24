@@ -188,6 +188,15 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   and `ETagRequired` bound to the entity-tag syntax (today's service sends `"v<n>"`, checked by the
   whole API suite). The contract test helper validates the value of every declared response header
   that is present, not only the presence of the required ones.
+- Cookie scope and chain genesis (Codex on f611116, 24.09.2026): the `completeLogin` cookie also
+  requires `Path=/` (a cookie set from `/auth/callback` without it would stay under `/auth` and never
+  reach `/v1`) and forbids any other `Path`, any `Domain` (host-only) and a second `SameSite` other
+  than `Lax`/`Strict`; forbidden attribute names match in any case. The `logout` clearing cookie
+  requires the same scope (`Path=/`, no `Domain`), because a browser only replaces a cookie with the
+  same name, path and domain. `Event.seq` has `minimum: 1`; in a v2 envelope (`schemaVersion`
+  present) `prevHash` is `""` exactly at `seq` 1 and a `Sha256Hex` from `seq` 2 on
+  (`dependentSchemas.schemaVersion`, so today's events without an envelope are untouched — live probe
+  2329 events, `seq` 1..2329).
 
 ### Changed
 

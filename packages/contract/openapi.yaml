@@ -1104,12 +1104,18 @@ paths:
                 comes into being. Codex on 50cc738 (SECURITY): the value is at least 32 cookie octets
                 (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and
                 `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a
-                `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Attribute names in
-                the canonical case the service writes. Prose only: an `Expires` in the past (JSON
-                Schema cannot compare dates).
+                `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Codex on f611116:
+                `Path=/` is required and no other `Path` may follow (set from `/auth/callback`, a cookie
+                without it would be scoped to `/auth` and never reach `/v1`); `Domain` is forbidden
+                (host-only cookie: no sibling or parent host receives the session); a second `SameSite`
+                other than `Lax`/`Strict` is forbidden (the browser keeps the last one). Required
+                attributes in the canonical case the service writes (a lower-case variant is rejected,
+                never admitted); forbidden attributes in any case (RFC 6265 names are case-insensitive,
+                so `domain=` cannot slip through). Prose only: an `Expires` in the past (JSON Schema
+                cannot compare dates) and the randomness of the value.
               schema:
                 type: string
-                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*Max-Age=(?:0|-))'
+                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*[Ss][Aa][Mm][Ee][Ss][Ii][Tt][Ee]=(?!(?:Lax|Strict)\s*(?:;|$)))(?!.*;\s*[Mm][Aa][Xx]-[Aa][Gg][Ee]=\s*(?:0|-))'
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
@@ -1131,8 +1137,13 @@ paths:
             # Security sweep after Codex on 50cc738: "the cookie is cleared" as a schema.
             Set-Cookie:
               required: true
-              description: 'Clears the `hv_session` cookie: empty value and `Max-Age=0`. Blocking the session id server-side (block list) is prose — it is not visible in the response.'
-              schema: { type: string, pattern: '^hv_session=(?=;|$)(?=.*;\s*Max-Age=0\s*(?:;|$))' }
+              description: >-
+                Clears the `hv_session` cookie: empty value and `Max-Age=0`, with the same scope as the
+                cookie it replaces — `Path=/` and no `Domain` (Codex on f611116; a browser only overwrites
+                a cookie with the same name, path and domain, so a clearing cookie on another path would
+                leave the session in place). Blocking the session id server-side (block list) is prose —
+                it is not visible in the response.
+              schema: { type: string, pattern: '^hv_session=(?=;|$)(?=.*;\s*Max-Age=0\s*(?:;|$))(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)' }
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -2278,7 +2289,8 @@ components:
         `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion`
         requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`,
         `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.1, because the
-        core carries it only from 025) and forbids `actor.displayName`; conversely none of those seven
+        core carries it only from 025) and forbids `actor.displayName` and binds the genesis
+        (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven
         fields appears without `schemaVersion`, so a half envelope never validates; the agenda and
         role events require `subjectId`. An event served over HTTP is never v1 (`schemaVersion`
         minimum 2; v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON
@@ -2290,7 +2302,7 @@ components:
         cannot forbid without failing today's responses.
       required: [seq, id, type, at, actor, payload]
       properties:
-        seq: { type: integer }
+        seq: { type: integer, minimum: 1, description: 'Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024).' }
         id: { type: string }
         type:
           type: string
@@ -2330,7 +2342,7 @@ components:
         meetingId: { type: string, description: 'Since 0.3.0 (ADR 0011): the meeting (Jahrgang) the event belongs to. Pflicht ab 0.3.1, Scheibe 028.' }
         idempotencyKey: { type: string, minLength: 1, maxLength: 128, description: 'Since 0.3.0: the `Idempotency-Key` of the write that produced the event, when the client sent one; replays after a restart are answered from it (slice 028)' }
         causationId: { type: string, description: 'Since 0.3.0: id of the event that caused this one (e.g. the intention a podium device buffered offline), when any' }
-        prevHash: { type: string, pattern: '^(?:[0-9a-f]{64})?$', description: 'Since 0.3.0: `hash` of the previous event in the global chain; the first event carries the empty string (genesis). 64 lower-case hex digits or empty (Codex on 50cc738). Pflicht ab 0.3.1, Scheibe 028.' }
+        prevHash: { type: string, pattern: '^(?:[0-9a-f]{64})?$', description: 'Since 0.3.0: `hash` of the previous event in the global chain; the first event (`seq` 1) carries the empty string (genesis), every later one 64 lower-case hex digits (Codex on 50cc738 and f611116; bound to `seq` under `dependentSchemas.schemaVersion`). Pflicht ab 0.3.1, Scheibe 028.' }
         hash: { $ref: '#/components/schemas/Sha256Hex', description: 'Since 0.3.0: SHA-256 (lower-case hex, Codex on 50cc738) over the canonical JSON of this envelope without `hash`. Pflicht ab 0.3.1, Scheibe 028.' }
         recordedAt: { type: string, format: date-time, description: 'Since 0.3.0 (ADR 0011): the authoritative time, always from the server clock (injected clock port, rule 8); never a device time. Pflicht ab 0.3.1, Scheibe 028.' }
         occurredAt: { type: string, format: date-time, description: 'Since 0.3.0: when the fact happened according to `occurredAtSource`; equals `recordedAt` for source `server`. Pflicht ab 0.3.1, Scheibe 028.' }
@@ -2363,10 +2375,16 @@ components:
         legalHold: [schemaVersion]
         schemaVersion: [prevHash, hash, recordedAt, occurredAt, occurredAtSource, retentionClass, legalHold]
       # A v2 envelope never carries a clear name of the actor (ADR 0009/0011; `EventActor.displayName`).
+      # Genesis (Codex on f611116): in a v2 envelope `prevHash` is empty exactly at `seq` 1 and a
+      # SHA-256 from `seq` 2 on. Under `dependentSchemas.schemaVersion`, so the events of today's
+      # service (no envelope, no `prevHash`) are untouched.
       dependentSchemas:
         schemaVersion:
           properties:
             actor: { properties: { displayName: false } }
+          if: { required: [seq], properties: { seq: { const: 1 } } }
+          then: { properties: { prevHash: { const: '' } } }
+          else: { properties: { prevHash: { $ref: '#/components/schemas/Sha256Hex' } } }
       if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
       then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
       else:
