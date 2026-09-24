@@ -1160,9 +1160,10 @@ Grund.
 | `HttpOnly` | Pflicht | — | Schema, wie `Secure` |
 | `SameSite` | `Lax` oder `Strict` Pflicht; ein weiteres `SameSite` mit anderem Wert verboten (**neu**; der Browser nimmt das letzte) | — | Schema |
 | `Max-Age` | nicht `0`, nicht negativ, jede Schreibweise (verschärft) | `Max-Age=0` Pflicht | Schema. Obergrenze 14 h: Prosa, die Dauer der Sitzung bestimmt der Dienst serverseitig (ADR 0004), ein Sitzungscookie ohne `Max-Age` ist zulässig |
-| `Expires` | — | — | Prosa: JSON Schema vergleicht keine Daten (ein `Expires` in der Vergangenheit bleibt ungeprüft) |
+| `Expires` | verboten, jede Schreibweise (**seit `b860584`**) | verboten (**seit `b860584`**) | Schema. Lebensdauer nur über `Max-Age`: RFC 6265 gibt `Max-Age` Vorrang, alle heutigen Browser unterstützen es, und Hono setzt beim Löschen nur `Max-Age=0`. `Expires` ist das einzige Attribut, dessen Wert ein Komma enthält („Thu, 01 Jan …"). Ohne `Expires` kann das Muster jedes Komma verbieten, und ein zusammengefügter Mehrfach-Header scheitert. Damit entfällt auch die frühere Prosa-Lücke „`Expires` in der Vergangenheit" |
 | Schreibweise | Pflichtattribute kanonisch (eine andere Schreibweise wird abgelehnt, nie zugelassen), verbotene Attribute in jeder Schreibweise | ebenso | Schema. RFC 6265 behandelt Attributnamen ohne Unterscheidung von Groß- und Kleinschreibung, deshalb dürfen verbotene Attribute über keine Schreibweise hineinkommen |
-| mehrere `Set-Cookie` | — | — | Prosa: OpenAPI beschreibt einen Header einmal. Ein zweites Cookie in derselben Antwort landet in `Headers.get` hinter `, `, und die verbietenden Lookaheads greifen dann auch dort (streng, nicht lax) |
+| Mehrfach-Header (**Codex auf 929d0d7, `b860584`**) | genau ein `hv_session` je Antwort (Beschreibung); **jeder Wert wird einzeln geprüft** (`Headers.getSetCookie()`, nie das zusammengefügte `Headers.get()`); Sicherheitsnetz im Muster: kein Komma, kein zweites `hv_session=`, kein `Expires` | ebenso: Löschcookie und danach ein lebendes Ersatzcookie wird abgelehnt | Schema für die einzelne Zeile, Testhelfer für die Antwort: OpenAPI beschreibt einen Header nur einmal, die Zahl der Zeilen kann ein Schema nicht zählen. Der Testhelfer prüft jede Zeile, erlaubt höchstens ein Sitzungscookie und lehnt jedes Cookie an einer Antwort ohne deklariertes `Set-Cookie` ab. *Korrektur:* die frühere Zeile hier („verbietende Lookaheads greifen auch dort") war falsch, denn die erlaubenden Lookaheads wurden schon vom ersten Cookie erfüllt |
+| andere Header bei Mehrfach-Headern (**geprüft, `b860584`**) | `Location` (`SameOriginPath`: kein Leerzeichen, also scheitert `/, https://…`), `ETag`/`ETagRequired` (kein zweites `"`), `X-Server-Time` (ein `date-time`): ein zusammengefügtes Duplikat passt nicht auf ihr Schema. `Cache-Control` ist ein Listen-Header (RFC 9110 5.3), das Zusammenfügen ist dort die definierte Bedeutung, und `no-store` in einer der Zeilen gilt | — | Schema; per Wegwerf-Test belegt (zwei `Location`, `"v1", "v2"`, zwei Zeitstempel abgelehnt; `public, no-store` zulässig) |
 
 **Ketteneigenschaften (ADR 0011, 024):**
 
@@ -1231,6 +1232,80 @@ chain genesis" unter Added.
 ✓ built in 1.34s
 mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit fb2b63b, tree 35aa62150f9b…
 ```
+
+### Mehrere Set-Cookie-Zeilen nach Codex auf 929d0d7
+
+Commit `b860584` (Vertrag, Typen, CHANGELOG, Testhelfer); dieser Bericht im Folgecommit. **Ursache:** der
+Testhelfer prüfte `Set-Cookie` über `Headers.get()`, und das fügt mehrere Zeilen mit `, ` zusammen. Die erlaubenden
+Lookaheads (`HttpOnly`, `Secure`, `SameSite`, `Path=/`) erfüllte das erste Cookie, ein zweites blieb ungeprüft. Der
+Browser wendet das zweite zuletzt an. **Behebung an der Ursache, nicht am Muster:**
+
+1. `apps/api/src/__tests__/helpers.ts`: `Set-Cookie` wird Zeile für Zeile über `res.headers.getSetCookie()` gelesen,
+   jede Zeile einzeln gegen das Schema geprüft. Danach höchstens ein Cookie mit dem Namen des Sicherheitsschemas
+   `session` (`hv_session`, aus dem Vertrag gelesen) je Antwort. Ein Cookie an einer Antwort, deren Vertrag kein
+   `Set-Cookie` deklariert, schlägt fehl. Die Prüfung liegt vor dem Treffer des Abdeckungstors.
+2. Schema (Sicherheitsnetz): beide Muster verbieten Komma, ein zweites `hv_session=` und `Expires`. Beide
+   Beschreibungen versprechen genau ein Sitzungscookie je Antwort und schreiben die Einzelprüfung je Zeile vor.
+3. Cookie-Tabelle oben: Zeile „Mehrfach-Header" mit der Regel „jeder Wert wird einzeln geprüft", Zeile `Expires`
+   (jetzt verboten, mit Begründung), Zeile „andere Header bei Mehrfach-Headern".
+
+**Test zuerst** (Wegwerf-Test `apps/api/src/__tests__/zz-mehrfach-cookie.test.ts` mit dem Codex-Beispiel für Anmelden
+und Abmelden, danach gelöscht). Rot gegen 929d0d7 (nur der Test hinzugefügt):
+
+```
+ × login: the Codex example (second cookie without HttpOnly/Secure/SameSite) is rejected 64ms
+ × login: two valid hv_session cookies in one response are rejected 2ms
+ × logout: deletion followed by a live replacement is rejected 3ms
+ × a session cookie on a response that does not declare Set-Cookie is rejected 7ms
+ × schema safety net: a comma-joined value, a second hv_session and Expires are rejected 2ms
+AssertionError: promise resolved "Response { status: 302, … 'Set-Cookie': 'hv_session=AAAA…; Path=/; HttpOnly; Secure; SameSite=Lax; Priority=High, hv_session=BBBB…; Path=/' … }" instead of rejecting
+      Tests  5 failed (5)
+```
+
+In einem ersten Entwurf des Tests wurden zwei Fälle zufällig abgelehnt. Ihr erstes Cookie endete auf `SameSite=Lax,`
+bzw. `Path=/,`, und ein *verbietender* Lookahead griff. Die Fälle wurden auf das Codex-Muster (`; Priority=High`
+vor dem Komma) umgestellt und prüfen die erwartete Meldung. Der rote Lauf oben ist der nach dieser Umstellung. Grün
+nach der Änderung, dazu ein sechster Fall für die anderen Header (bestehendes Verhalten, ohne roten Lauf):
+
+```
+ ✓ login: the Codex example (second cookie without HttpOnly/Secure/SameSite) is rejected 56ms
+ ✓ login: two valid hv_session cookies in one response are rejected 1ms
+ ✓ logout: deletion followed by a live replacement is rejected 3ms
+ ✓ a session cookie on a response that does not declare Set-Cookie is rejected 3ms
+ ✓ schema safety net: a comma-joined value, a second hv_session and Expires are rejected 1ms
+ ✓ other headers: a duplicated single-valued header fails its schema after comma joining 4ms
+      Tests  6 passed (6)
+```
+
+**Live-Probe** (Wegwerf-Test, danach gelöscht; alle Aufrufe über `req()`, Zählung der `Set-Cookie`-Zeilen):
+
+```
+PROBE seed=200 events=2329 seq=1..2329 questions=300 histories=300 meeting=200 problems=404,401,403 setCookieLines=0
+ ✓ src/__tests__/zz-live-probe.test.ts > live probe on the seeded service 566ms
+      Tests  1 passed (1)
+```
+
+Der heutige Dienst setzt kein Cookie, die neue Regel „kein Cookie ohne deklariertes `Set-Cookie`" trifft ihn also
+nicht. API-Suite 49/49, auch mit `CONTRACT_GATE_STRICT=1`. **`contract:lint`:** `You have 6 warnings.`
+**`pnpm contract:types`:** zweimal gleiche SHA-256 (`b7fd5389…`); Typen-Diff nur Beschreibungen.
+
+**`pnpm gates`** (Commit `b860584`, eigenes Log via `mktemp`, Exit 0). Zeilen desselben Laufs: `You have 6 warnings.`;
+`packages/domain Tests 72 passed (72)`; `apps/web Tests 48 passed (48)`; `apps/api Tests 49 passed (49)`;
+`operation-coverage: 65 operations …, 29 exercised by tests, 36 pre-declared` / `ok`; `vocabulary-check: ok`;
+`slice-scope: 10 changed file(s), all within … "Files allowed" list`; `plan-graph: ok.`; `# tests 196`, `# pass 196`,
+`# fail 0`; Ende wörtlich:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.11s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit b860584, tree 1990ad19e8a8…
+```
+
+**Offen für 029:** hält der BFF den OIDC-`state` (oder PKCE/nonce) in einem eigenen Cookie, muss der Vertrag es
+deklarieren, bevor `login` oder `completeLogin` es setzt oder löscht. Heute lehnt der Testhelfer jedes Cookie ab,
+das nicht dem deklarierten `hv_session`-Schema entspricht; an `login` ist gar kein `Set-Cookie` deklariert. Ebenso
+braucht die „stille Verlängerung" (ADR 0004) ein deklariertes `Set-Cookie` an der Antwort, die das Cookie erneuert.
+Beides ist gewollt (Vertrag zuerst) und gehört in die Spec von 029.
 
 ## Review findings
 
@@ -1339,3 +1414,13 @@ auf f611116", vollständige Attribut- und Kettenliste):
   `SameSite` außer `Lax`/`Strict`, verbotene Attribute in jeder Schreibweise. **behoben in fb2b63b**
 - P2 · `prevHash: ""` bei jedem `seq` gültig → unter `dependentSchemas.schemaVersion`: leer genau bei `seq` 1, ab
   `seq` 2 `Sha256Hex`; dazu `seq` `minimum: 1`. Ereignisse ohne Umschlag unberührt (Probe). **behoben in fb2b63b**
+
+**Codex auf 929d0d7** (1 × P1 SECURITY), behoben in `b860584` (Bericht „Mehrere Set-Cookie-Zeilen nach Codex auf
+929d0d7"):
+
+- P1 SECURITY · `Headers.get('set-cookie')` fügt mehrere Zeilen zusammen, das zweite Cookie blieb ungeprüft
+  (Anmelden: zweites `hv_session` ohne `HttpOnly`/`Secure`/`SameSite`; Abmelden: Löschung, danach lebendes
+  Ersatzcookie). Ursache behoben: der Testhelfer prüft jede Zeile einzeln (`getSetCookie()`), erlaubt höchstens ein
+  `hv_session` je Antwort und lehnt Cookies an Antworten ohne deklariertes `Set-Cookie` ab. Sicherheitsnetz im
+  Schema: kein Komma, kein zweites `hv_session=`, kein `Expires` (nur `Max-Age`). Beschreibung: genau ein
+  Sitzungscookie je Antwort. Andere Header geprüft (Tabelle). **behoben in b860584**
