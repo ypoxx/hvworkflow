@@ -40,9 +40,14 @@ Haiku nicht besetzt
    340, 349, 994, und „fremdes Modell" bei Anleitungstests (B14, Tabelle 6.1 Spalte „Zusätzlich", Leitplanken Zeile 220)
    wird „Agent in frischem Kontext ohne Vorwissen". Die schon geänderten Zeilen 194 und 1122 sind damit gedeckt.
    Akzeptanzkriterium 2 erlaubt zusätzlich genau diese Zeilen.
-6. **Tor auf gestapeltem Branch.** Solange takt-011 nicht gemergt ist, läuft `slice-scope` mit
-   `--base claude/takt-011-plan-service`; nach dem Merge von takt-011 wird der Integrationsbranch eingemergt und
-   `pnpm gates` unverändert neu gelaufen.
+6. **Tor auf gestapeltem Branch und Merge-Reihenfolge.** takt-013 wird erst nach takt-012 (gemergt, `6545026`) und
+   takt-011 gemergt. Solange takt-011 nicht gemergt ist, läuft `slice-scope` mit `--base claude/takt-011-plan-service`;
+   nach dem Merge von takt-011 wird der Integrationsbranch eingemergt und `pnpm gates` unverändert neu gelaufen.
+7. **Zweiter Nachtrag (nach dem Review).** Freigegeben sind zusätzlich: Zeile 343 ganz (Beschreibung von
+   `reviewer-sonnet.md` als optionale Zweitmeinung), Zeile 797 (Anleitungstest, wie Festlegung 5), in Zeile 606 der Zusatz
+   „mit Perspektive Legal" (entspricht der alten Rollenzeile „Stichprobe … mit Perspektive Legal") und „Implementierer-
+   Backend" in den Zeilen 606 und 608 (044 liegt in der Lane core). Außerdem die Spec-Vorlage `docs/slices/README.md`,
+   Zeile „Rolle/Modell" → „Rolle" (Festlegung 2 gilt auch für neue Specs).
 
 ## Ziel
 
@@ -73,6 +78,7 @@ takt-012 ihn hinterlassen hat (Fable und Haiku stehen dort als „nicht mehr bes
 - `docs/adr/0016-agenten-arbeitsmodell.md`
 - `docs/betrieb/branch-schutz.md`
 - `docs/slices/takt-013-folgepunkte-opus55.md`
+- `docs/slices/README.md` (nur die Zeile „Rolle/Modell“ der Vorlage, Festlegung 7)
 
 ## Akzeptanzkriterium
 
@@ -177,3 +183,16 @@ umgestellt: Plan Zeile 797 „von einem fremden Modell befolgt" → „von einem
 befolgt" (Festlegung 5, Anleitungstests); Zeile 343 „reviewer-sonnet.md für Opus-gebaute Scheiben" → „reviewer-sonnet.md
 als optionale Zweitmeinung" (Beschreibung der Rollendatei seit takt-012). plan-honesty, plan-graph, vocabulary und
 slice-scope (`--base claude/takt-011-plan-service`) danach grün.
+
+**Runde 1 — Review Opus 5.5, frischer Kontext, auf `8533046`:** annehmen, mit Merge-Reihenfolge.
+
+1. major — takt-012 nicht im Stapel, AGENTS.md/R3 verlangten dort noch „anderes Modell". **Umgang:** Integrationsbranch
+   (mit takt-012) in takt-011 und takt-011 in takt-013 gemergt (`31e6d55`, `b23bbbf`); Festlegung 6 nennt die Reihenfolge.
+2. minor — Zeilen 343 (ganz) und 797 nicht durch eine Festlegung gedeckt. **Umgang:** Festlegung 7.
+3. minor — Bericht veraltet (Open, Nachweis auf `9f9a883`). **Umgang:** Nachweis mit unverändertem `pnpm gates` nach dem
+   Merge von takt-011 folgt als letzter Bericht-Nachtrag; Open ist durch den Nachtrag des Orchestrators erledigt.
+4. minor — Zeile 606 „mit Perspektive Legal" neu. **Umgang:** in Festlegung 7 freigegeben.
+5. minor — „Implementierer" ohne Zusatz in 606/608. **Umgang:** „Implementierer-Backend".
+6. minor (außerhalb) — Spec-Vorlage `docs/slices/README.md` verlangt „Rolle/Modell". **Umgang:** in diese Scheibe
+   aufgenommen (Festlegung 7), Vorlage heißt jetzt „Rolle: …; Review in frischem Kontext".
+
