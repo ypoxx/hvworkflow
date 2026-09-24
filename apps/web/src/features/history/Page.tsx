@@ -121,19 +121,40 @@ export function HistoryPage() {
   // below stayed `null` forever: the timeline could never open, even though the actor could read
   // every question fine. Split apart, a denied Nebenabfrage now only costs the names it feeds
   // `eventSummary`'s subject column (Ereignisstrom) — the rest of the view stands.
+  //
+  // Nit 9 (review round 2): `listUnits`/`listAgendaItems` (Stammdaten, Festlegung 1 of
+  // docs/slices/010-lesepfade-leserechte.md — every signed-in role may read them, no `can()` check
+  // at all) stayed bundled with `listQuestions` here, which is exactly the same shape of bug in
+  // reverse: the Hauptabfrage's own 403 (podium, neither `question.read` nor
+  // `question.read.delivered`) used to reject a `Promise.all` that also held two reads which can
+  // never fail — `units`/`agendaItems` never populated either, for no reason of their own.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.listUnits(), api.listAgendaItems(), api.listQuestions({ limit: 2000 })])
-      .then(([nextUnits, nextAgenda, page]) => {
+    Promise.all([api.listUnits(), api.listAgendaItems()])
+      .then(([nextUnits, nextAgenda]) => {
         if (cancelled) return;
         setUnits(nextUnits);
         setAgendaItems(nextAgenda);
+      })
+      .catch(problem);
+    return () => {
+      cancelled = true;
+    };
+  }, [version]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listQuestions({ limit: 2000 })
+      .then((page) => {
+        if (cancelled) return;
         setCorpus(page.items);
         setMainForbidden(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (isReadForbidden(error)) {
+          setCorpus([]);
           setMainForbidden(true);
           return;
         }
@@ -155,7 +176,11 @@ export function HistoryPage() {
       .catch((error: unknown) => {
         if (cancelled) return;
         // Ziel 2: a Nebenabfrage never blocks the view and never toasts for a read refusal — the
-        // event summaries simply carry fewer names (`eventSubject`, eventSummary.ts).
+        // event summaries simply carry fewer names (`eventSubject`, eventSummary.ts). Nit 10
+        // (review round 2): cleared, not left holding a previous, more privileged role's names —
+        // `version` bumps on every actor switch (api/useApiVersion.ts), so a role that has just
+        // lost `speaker.read` must not go on showing who it can no longer look up.
+        setSpeakerNames(new Map());
         if (isReadForbidden(error)) return;
         problem(error);
       });
@@ -249,8 +274,13 @@ export function HistoryPage() {
         if (cancelled) return;
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who holds no `event.read` at all — a gestalteter Zustand, not
-          // an error toast.
+          // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds
+          // `streamLastSeq` to 0 — a role that regains `event.read` later must not see the
+          // `lastSeq === streamLastSeq` short-circuit above skip its own first, honest read back.
           setStreamForbidden(true);
+          setStreamWindow([]);
+          setCurve([]);
+          setStreamLastSeq(0);
           return;
         }
         problem(error);
@@ -287,7 +317,9 @@ export function HistoryPage() {
       <PageHeader title={t('page.history.title')} description={t('page.history.description')} />
 
       {mainForbidden ? (
-        <div data-testid="history-forbidden" className="grid min-h-0 flex-1">
+        // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on
+        // its own, the moment a role switch replaces the whole view with it.
+        <div data-testid="history-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState
               icon={Lock}
@@ -426,8 +458,13 @@ export function HistoryPage() {
                     : t('history.question.label', { number: selected.number })
               }
               description={
+                // Minor 3 (review round 2): a stale "letzte n Ereignisse" from before the role
+                // switched must not linger next to the refused state — `stream` is cleared to `[]`
+                // the moment `streamForbidden` is set, but the count line itself has to go too.
                 tab === 'stream'
-                  ? t('history.stream.description', { n: stream.length })
+                  ? streamForbidden
+                    ? undefined
+                    : t('history.stream.description', { n: stream.length })
                   : selected === null
                     ? undefined
                     : excerpt(selected.text, 110)
@@ -464,7 +501,9 @@ export function HistoryPage() {
               >
                 {tab === 'stream' ? (
                   streamForbidden ? (
-                    <div className="p-4" data-testid="history-stream-forbidden">
+                    // Minor 5 (review round 2): `role="status"` announces the refusal to a screen
+                    // reader on its own, the moment the "Ereignisstrom" tab opens on it.
+                    <div className="p-4" data-testid="history-stream-forbidden" role="status">
                       <EmptyState
                         icon={Lock}
                         title={t('history.stream.forbidden.title')}
@@ -483,7 +522,9 @@ export function HistoryPage() {
                     />
                   </div>
                 ) : historyForbidden ? (
-                  <div className="p-4" data-testid="history-timeline-forbidden">
+                  // Minor 5 (review round 2): `role="status"` announces the refusal to a screen
+                  // reader on its own, the moment a result is selected under this role.
+                  <div className="p-4" data-testid="history-timeline-forbidden" role="status">
                     <EmptyState
                       icon={Lock}
                       title={t('history.timeline.forbidden.title')}

@@ -36,6 +36,11 @@ export function excerpt(text: string, max = 80): string {
  * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
  * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
  * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4).
+ *
+ * Test gap 8c (review round 2): identical in `speakers/useSpeakers.ts`, `capture/useCapture.ts`,
+ * `answers/lib.ts` and `stage/lib.ts` — see `speakers/useSpeakers.ts`'s copy for why this stays
+ * five small local copies rather than one shared module. Covered by its own test here
+ * (`lib.test.ts`).
  */
 export function isReadForbidden(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
