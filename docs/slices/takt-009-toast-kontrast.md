@@ -398,4 +398,20 @@ den Screenshot-Pfad ergänzt hat. Exit-Code `0`; kein Fehler.
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 · Opus 5.5 (Barrierefreiheit) · 24.09.2026 · Urteil: annehmen** (0/0/3 + 3 nits), dazu Codex auf PR #23
+(1 × P1). Nacharbeit durch den Bauer.
+
+1. minor · nichts bewies, dass der Toast während axe noch sichtbar war (schließt nach 9 s) → Sichtbarkeit nach
+   `checkAxe` geprüft.
+2. minor · „hängt nie an einem Leserecht“ stimmt seit 010 nicht für die Regelzeile (Festlegung 8: Regel-ID nur für
+   Leser der Frage) → Abhängigkeit von `question.read` der Rolle capture benannt; der Test schlüge laut fehl.
+3. minor · zwei Befunde außerhalb des Umfangs (Schließen-Symbol ≈ 2,48:1 unter 3:1, WCAG 1.4.11; Toast schließt ohne
+   Pause, WCAG 2.2.1) → unter Offen, Folgepunkte beim Orchestrator.
+4.–6. nits (Verweis AX-020-01, admin hält ebenfalls `question.merge`, veraltete Zeilenangabe) → behoben.
+- Codex P1 · kein Screenshot, AGENTS.md Regel 2 (die Spec hatte ihn vergessen) → „Files allowed“ ergänzt,
+  `docs/evidence/takt-009-toast.png` vom e2e angelegt und committet.
+
+**Runde 2 · Nachprüfung Opus 5.5 · Urteil: annehmen** (1 nit: Kommentar nannte Codex als Quelle eines Review-Befunds →
+vom Orchestrator berichtigt). e2e auf der Basis mit 010: 18/18. Nebenbefund, vorbestehend seit 001 und außerhalb des
+Umfangs: der Toast zeigt Titel und Text des Kerns englisch in der deutschen Oberfläche (`toastStore.ts:52–53`,
+AGENTS.md Regel 10) → eigene Scheibe. Codex, zweiter Lauf auf `bd3905e`: ohne Befund.

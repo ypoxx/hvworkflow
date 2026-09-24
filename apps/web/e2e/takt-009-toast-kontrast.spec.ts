@@ -14,7 +14,7 @@
  * person mistyping the wrong number would, and `api.mergeQuestion(question.id, targetId, …)`
  * (`Page.tsx`) then sends `id === intoQuestionId`.
  *
- * Rework after review (Codex minor 2, slice 010 now in the base): the *rule line on screen* is not
+ * Rework after review (minor 2, slice 010 now in the base): the *rule line on screen* is not
  * as read-independent as the guard itself. `transition()` (`packages/domain/src/api.ts`,
  * Festlegung 8, slice 010) only puts the reason and the rule id on the 409 when the actor can also
  * read the question (`can(actor, 'question.read', q).allow`); otherwise the problem is the generic
