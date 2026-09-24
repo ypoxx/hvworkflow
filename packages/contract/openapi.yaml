@@ -32,7 +32,8 @@ info:
     would accept and ignore it today). The current meeting behind the alias paths is the meeting in
     status `running` with the latest `date` (several running: the latest `date` wins, ties: the latest
     `MeetingCreated`); when none is running, the meeting with the latest `date` regardless of status;
-    when no meeting exists at all, every alias answers 404.
+    when no meeting exists at all, every alias answers 404 (from slice 025; until then the service
+    serves its single built-in meeting).
 
     Authentication (since 0.3.0, ADR 0004): production uses the `session` cookie issued by the
     BFF endpoints under `/auth` (slice 029); the demo uses the `demoActor` header. The browser never
@@ -1618,6 +1619,8 @@ components:
         status: { type: string, enum: [ready, not_ready] }
         checks:
           type: object
+          # Check names are a closed list: /readyz answers without credential (review 023).
+          propertyNames: { enum: [clock, db, migrations] }
           additionalProperties:
             type: object
             required: [status]

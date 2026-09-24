@@ -540,7 +540,7 @@ Version bleibt 0.3.0; alles additiv; Dateien innerhalb „Files allowed"; kein D
    openapi-typescript rendert beide Felder als optional (ein Typ kann die Abhängigkeit nicht ausdrücken; ein
    `if/then` könnte es genauso wenig). Verbleibende sichtbare Erweiterungen stehen im CHANGELOG unter „Changed →
    Compatibility": Antwort-Enums (`Action` +8, `Event.type` +10, `Contribution.source` +`paper`), optionale
-   Antwortfelder, der optionale Header `X-CSRF-Token` an 21 Bestandsoperationen (reiner String, heute ignoriert),
+   Antwortfelder, der optionale Header `X-CSRF-Token` an 16 Bestandsoperationen (reiner String, heute ignoriert),
    dokumentierte, noch nicht erzeugte Status (404 an den Aliassen, 409 an `registerSpeaker`/`captureContribution`,
    Header `X-Server-Time`). Die Behauptung „alle 29 Bestandsrouten unverändert" oben ist korrigiert.
 2. *Tor zählt Phantomtreffer (major).* `helpers.ts` zeichnet erst nach der Statusprüfung auf und nur für einen
@@ -699,4 +699,28 @@ gates exit=0
 
 ## Review findings
 
-(vom Reviewer)
+**Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
+eingearbeitet.
+
+**Runde 1 · Opus 5.5 · 24.09.2026 · Urteil: nacharbeiten** (0/3/6 + 1 nit), dazu Codex auf PR #25 (2 × P1):
+
+1. major · neue Anfragefelder an Bestandsoperationen wirkten sofort (der Dienst validiert gegen den Vertrag):
+   `source: paper` landete im nur anhängenden Protokoll, `occurredAt` und `seatId` wurden still verworfen, der Filter
+   `meetingId` an `/events` tat nichts → Felder nur an der neuen Operation, `seatId` und der Filter nach 0.4.0 (043).
+2. major · das Tor zählte Aufrufe nicht vorhandener Routen (401, 404-Rückfall) als ausgeübt → nur dokumentierte
+   2xx/3xx unter der deklarierten Basis-URL zählen; rot/grün im Bericht.
+3. major · 27 Allowlist-Einträge gehören Scheiben ohne Service-Lane → im Feld `reason` benannt, Planänderung takt-011
+   durch den Orchestrator.
+4.–9. minor · Aufzählungen erweitert (Kompatibilitätsregel), `-t`-Filter, Basis-URL, `/readyz` ohne Freitext, 409 an
+   den Alias-Pfaden, „aktuelle Versammlung“ und CSRF-Header → behoben.
+10. nit · `Unauthorized` nennt die drei Operationen → behoben.
+- Codex P1 · CSRF-Header nicht deklariert → `X-CSRF-Token` an allen schreibenden Operationen.
+- Codex P1 · `occurredAt` ohne `occurredAtSource` erlaubt → `dependentRequired` in beide Richtungen.
+
+**Runde 2 · Nachprüfung Opus 5.5 · Urteil: annehmen** (4 nits; Dienst selbst geprobt: `paper` → 422, keine
+Bestandsanfrage scheitert neu, Tor zählt keine Scheinaufrufe). Nits vom Orchestrator: Zählung „21“ → 16 (nachgerechnet:
+16 Bestands- und 18 neue Operationen tragen den Header); 404 ohne Versammlung gilt ab 025; Namen der Prüfungen an
+`/readyz` als geschlossene Liste (`propertyNames`). Offen, weitergetragen: der Gleichstand „latest `MeetingCreated`“
+ist für Clients nicht nachvollziehbar (`Meeting` trägt keine Anlagezeit, `listMeetings` sortiert nur nach `date`) →
+030 nutzt `getMeeting` bis 0.5, Klärung in 043. Unbekannte Felder im Anfragekörper werden weiter still ignoriert (kein
+`additionalProperties: false`, Stand 0.2.1) → 043.

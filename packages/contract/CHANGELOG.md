@@ -138,7 +138,7 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   `QuestionReleased`, `AgendaItemOpened`, `VotingOpened`, `VotingClosed`, `RoleAssigned`,
   `RoleRevoked`, `ConfigFrozen`), `Contribution.source` +`paper` — none produced by the service yet;
   (2) optional response fields added everywhere (never set by the service yet); (3) the optional
-  header parameter `X-CSRF-Token` on the 21 existing state-changing operations (ignored by today's
+  header parameter `X-CSRF-Token` on the 16 existing state-changing operations (ignored by today's
   service; a plain string, so no request can newly fail on it); (4) documented but not yet produced:
   `404` on the alias operations other than `getMeeting`, `409` on `registerSpeaker` and
   `captureContribution`, the response header `X-Server-Time` (optional, sent from 033).
