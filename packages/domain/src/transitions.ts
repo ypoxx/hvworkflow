@@ -202,9 +202,11 @@ export const TRANSITIONS: readonly Transition[] = [
         'Kapitalmarktkommunikation") verlangt "Jede Antwort an eine belastbare Quelle mit ' +
         'Fundstelle gebunden"; hier ist nur der Antworttext Pflicht, `sources` ist optional ' +
         '(api.ts `draftAnswer`), und auch R-TRANS-04 verlangt keine Quelle. Jede Version hält ' +
-        'Zeitpunkt und Ersteller fest (`createdAt`, `createdBy`, api.ts `draftAnswer`): den ' +
-        'Zeitstempel je Wortlautversion verlangt docs/anforderungen-recherche.md:205 ' +
-        '("Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion"); den Ersteller ' +
+        'Zeitpunkt und Ersteller fest (`createdAt`, `createdBy`, api.ts `draftAnswer`). Zum ' +
+        'Zeitpunkt teilweise zu docs/anforderungen-recherche.md:205 ("Serverseitiger, ' +
+        'NTP-synchronisierter Zeitstempel für Eingang, jede Statusänderung und jede ' +
+        'Wortlautversion"): Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert ' +
+        'nicht sichergestellt (Demo: Browser-Uhr, apps/web/src/api/index.ts:46). Den Ersteller ' +
         'setzt Rechtekonzept Abschnitt 4 "Ersteller ≠ Freigeber" (docs/rollen-und-' +
         'rechtekonzept.md:156) voraus (Ableitung; der Guard dazu fehlt, siehe R-TRANS-05). Nicht ' +
         'belegt: ein Entwurf schon aus `classified`, ohne Zuweisung an eine Einheit (R-TRANS-02). ' +
@@ -267,7 +269,8 @@ export const TRANSITIONS: readonly Transition[] = [
         '`QuestionApproved`). Teilweise zu docs/anforderungen-recherche.md:227 ("Kryptografische ' +
         'Versiegelung freigegebener Antworten — Hash über den exakten Text, signiert vom ' +
         'Freigebenden, mit qualifiziertem Zeitstempel"): Freigebender und Zeitpunkt stehen fest, ' +
-        'Hash, Signatur und qualifizierter Zeitstempel fehlen.',
+        'Hash, Signatur, qualifizierter Zeitstempel und "die Podiumsansicht verifiziert vor ' +
+        'Anzeige" fehlen.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -289,12 +292,19 @@ export const TRANSITIONS: readonly Transition[] = [
         'zurück ins Backoffice), das trägt auch die Folge, dass die Frage die Bühnen-Warteschlange ' +
         'verlässt (`stagePosition` entfällt). Aus `approved` nicht belegt. Ableitung: nach der ' +
         'Freigabe und vor der Bühne steht die Frage wie im Legal Clearing noch im Backoffice. Aus ' +
-        '`delivered` nicht belegt. Ableitung: am nächsten kommen docs/ist-analyse-und-' +
-        'schnittstellen.md:59 (nach der Antwortprüfung "Nein: Qualitätsschleife zurück zu Schritt ' +
-        '5") und docs/anforderungen-recherche.md:255 ("Rückkanal Podium → Backoffice (\'unzureichend, ' +
-        'bitte nachschärfen\', \'nur teilweise beantwortet\' …)"); beide setzen eine Bewertung der ' +
-        'gegebenen Antwort voraus, die das Tool nicht festhält (R-TRANS-10), und ist:59 führt zurück ' +
-        'zur Klassifizierung (Schritt 5), nicht zum Antwortentwurf. Ableitung: dass eine Podiumsfrage ' +
+        '`delivered` teilweise belegt durch docs/anforderungen-recherche.md:255 (Rückkanal Podium → ' +
+        'Backoffice mit Grund: "Rückkanal Podium → Backoffice (\'unzureichend, bitte ' +
+        'nachschärfen\', \'nur teilweise beantwortet\', \'frei formuliert abgewichen\') plus ' +
+        'Erfassung der Ist-Antwort und Diff gegen den Soll-Text mit automatischem Prüfauftrag ab ' +
+        'einer Abweichungsschwelle"); nicht umgesetzt: feste Kategorien, Erfassung der Ist-Antwort, ' +
+        'Diff gegen den Soll-Text, automatischer Prüfauftrag. Ableitung: ' +
+        'docs/ist-analyse-und-schnittstellen.md:59 (nach der Antwortprüfung "Nein: ' +
+        'Qualitätsschleife zurück zu Schritt 5") führt zurück zur Klassifizierung (Schritt 5); ' +
+        'hier geht eine Textfrage zum Antwortentwurf, nur eine Podiumsfrage nach `classified`. ' +
+        'Nicht belegt: eine Frage aus `delivered` fällt aus dem Zähler der vorgelesenen Fragen und ' +
+        'zählt wieder als offen, eine Frage aus `staged` fällt aus dem Zähler der Fragen auf der ' +
+        'Bühne (state.ts `refreshCounts`; Ableitung: Zähldefinition aus ' +
+        'docs/anforderungen-recherche.md:285 fehlt). Ableitung: dass eine Podiumsfrage ' +
         'nach `classified` statt `answer_drafted` zurückgeht, hat keine eigene Fundstelle — ' +
         'Podiumsfragen durchlaufen `answer_drafted` nie (R-TRANS-08). Nicht belegt: dass bei einem ' +
         'Rücksprung nach `classified` eine Freigabe entfällt (Ableitung: eine Podiumsfrage erreicht ' +
@@ -351,7 +361,8 @@ export const TRANSITIONS: readonly Transition[] = [
         'der Bühne": "keine"). docs/ist-analyse-und-schnittstellen.md:92 ("es laufen nur die ' +
         'zugeordneten und freigegebenen Fragen ein"): Teilweise: die Bühnenzuordnung ist keine ' +
         'Voraussetzung für `staged` (optional); Sicht nach Zuordnung siehe R-PERM-03, nicht ' +
-        'umgesetzt. Ableitung: "freigegeben" kann für Pfad A keine Rechtsfreigabe meinen, ist:50 ' +
+        'umgesetzt. Ableitung: "freigegeben" kann für Pfad A keine Rechtsfreigabe meinen, ' +
+        'docs/ist-analyse-und-schnittstellen.md:50 ' +
         'sieht keine vor; eine Podiumsfrage kommt ohne Freigabe auf die Bühne. Nicht umgesetzt: das ' +
         'Gate aus docs/ist-analyse-und-schnittstellen.md:135-137 (Abschnitt 5 "Delta — was das neue ' +
         'Tool zusätzlich leisten muss", Punkt 7: "Pfad A … hat heute vor dem ' +
@@ -374,10 +385,11 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:89 (Bühnenansicht-Aktion "vorgelesen, weiter"). ' +
-        'Teilweise: ist:89 führt "vorgelesen, weiter" unmittelbar zu "Status abgeschlossen"; hier ' +
+        'Teilweise: docs/ist-analyse-und-schnittstellen.md:89 führt "vorgelesen, weiter" unmittelbar zu "Status abgeschlossen"; hier ' +
         'endet die Aktion in `delivered`, abgeschlossen wird erst über den eigenen Schritt ' +
         'R-TRANS-10. Ableitung: die Zähler (state.ts `refreshCounts`) führen eine Frage in ' +
-        '`delivered` schon als vorgelesen und nicht mehr als offen, wie ist:89 es für den ' +
+        '`delivered` schon als vorgelesen und nicht mehr als offen, wie ' +
+        'docs/ist-analyse-und-schnittstellen.md:89 es für den ' +
         'abgeschlossenen Stand beschreibt. Festhalten der freigegebenen Version zum Zeitpunkt des ' +
         'Vorlesens (Soll); was tatsächlich gesprochen wurde (Ist), wird nicht erfasst. Die Version ' +
         'steht nur im Ereignis `QuestionDelivered` (`answerVersion`, api.ts `deliverQuestion`, nur ' +
@@ -414,7 +426,8 @@ export const TRANSITIONS: readonly Transition[] = [
         'Entscheidung \'Antwort ausreichend?\' — Ja: Frage beantwortet") — ein eigener ' +
         'Abschluss-Schritt nach der Bühne, getrennt vom Vorlesen (R-TRANS-09). Ableitung: ' +
         'docs/ist-analyse-und-schnittstellen.md:89 kennt diesen zweiten Schritt nicht, dort setzt ' +
-        'schon "vorgelesen, weiter" den Status abgeschlossen; die Trennung folgt ist:58-59. Nicht ' +
+        'schon "vorgelesen, weiter" den Status abgeschlossen; die Trennung folgt ' +
+        'docs/ist-analyse-und-schnittstellen.md:58-59. Nicht ' +
         'umgesetzt: ' +
         'keine Antwortprüfung durch Legal oder FOO/GC; den Abschluss lösen die Berechtigten von ' +
         '`question.close` aus (heute podium und admin, permissions.ts), ohne Entscheidung "Antwort ' +
@@ -454,7 +467,7 @@ export const TRANSITIONS: readonly Transition[] = [
         'Projektion nicht). Nicht belegt: eine schon vorgelesene Frage (aus `delivered`) fällt beim ' +
         'Zurückziehen aus dem Zähler der vorgelesenen Fragen heraus (state.ts `refreshCounts`). ' +
         'Ableitung: ob sie dann als zurückgezogen oder als beantwortet zählt, legt erst die ' +
-        'Zähldefinition aus :285 fest, die es noch nicht gibt.',
+        'Zähldefinition aus docs/anforderungen-recherche.md:285 fest, die es noch nicht gibt.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -484,9 +497,12 @@ export const TRANSITIONS: readonly Transition[] = [
         'Zeile sagt dazu: "Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet." ' +
         'Nicht belegt: eine Freigabe, `deliveredAt` oder ein Rückgabegrund, die nach R-TRANS-06 an ' +
         'einer Frage in `answer_drafted` stehen geblieben sind, bleiben auch an der ' +
-        'zusammengeführten Frage stehen (Ableitung wie bei R-TRANS-06). Ableitung: der Bestandscheck des Zielobjekts (`intoQuestionId`, dieselbe 404-Maskierung wie ' +
-        'R-TRANS-00, `requireQuestionFor` in api.ts) hat ebenfalls keine Fundstelle in Recherche oder ' +
-        'Ist-Analyse — Architekturentscheidung, keine externe Vorgabe.',
+        'zusammengeführten Frage stehen (Ableitung wie bei R-TRANS-06). Nicht belegt: der ' +
+        'Bestandscheck des Zielobjekts (`intoQuestionId`, `requireQuestionFor` in api.ts) — ' +
+        'Architekturentscheidung, keine externe Vorgabe. Er maskiert nicht nach Leserecht: wer ' +
+        '`question.merge` hält, erreicht die Zielsuche erst, nachdem `can()` dieses Recht bestätigt hat, und bekommt jede ' +
+        'vorhandene Frage als Ziel, auch eine, die er nicht lesen darf; 404 nur für eine unbekannte ' +
+        'ID. Die Existenz eines Ziels ist damit für jeden sichtbar, der `question.merge` hält.',
       docVersion: null,
       docHash: null,
       verified: false,

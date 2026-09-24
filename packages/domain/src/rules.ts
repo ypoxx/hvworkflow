@@ -168,15 +168,110 @@ const OTHER_RULES: readonly RuleEntry[] = [
     kind: 'Idempotenz',
     description:
       'An idempotency key is scoped to the calling actor and the operation; a replay of the same key ' +
-      'returns the first result instead of re-executing (createInProcessApi, api.ts).',
+      'returns the first successful result instead of re-executing (createInProcessApi, api.ts). A ' +
+      'first call that fails (403, 409, 422 …) is not cached; a retry runs again.',
     legalRef: {
       source: 'Leitplanken',
       citation:
         'Checklistenpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
         'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
         'docs/qualitaetsleitplanken-produktreife.md:167 (Checkliste 6.3: "Wiederholungen sind ' +
-        'idempotent je Akteur und Operation")',
+        'idempotent je Akteur und Operation"). Teilweise: gibt das erste erfolgreiche Ergebnis ' +
+        'zurück; fehlgeschlagene Erstaufrufe werden nicht zwischengespeichert (api.ts `idempotent`), ' +
+        'eine Wiederholung läuft erneut durch und kann anders ausgehen. Ableitung: ein ' +
+        'fehlgeschlagener Aufruf hängt kein Ereignis an, eine doppelte Wirkung entsteht so nicht.',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
+      docHash: null,
+      verified: false,
+    },
+  },
+];
+
+/** An effect every question-changing rule has, which hangs on no single rule id (Festlegung 1: no new
+ * id for it). Listed so that docs/legal-trace.md — the document Recht receives — shows it with a trace. */
+export interface CrossCuttingEffect {
+  readonly effect: string;
+  /** Where the effect happens in the code. */
+  readonly code: string;
+  readonly legalRef: LegalRef;
+}
+
+/**
+ * Cross-cutting effects (Querschnitt), rendered as their own section of docs/legal-trace.md by the
+ * snapshot test in `__tests__/rules.test.ts`. Not part of `ruleRegister()`: none of them is a rule id.
+ */
+export const CROSS_CUTTING_EFFECTS: readonly CrossCuttingEffect[] = [
+  {
+    effect: 'Jedes Frage-Ereignis erhöht die Version der Frage (`version`), Grundlage für If-Match/ETag.',
+    code: 'state.ts `touch`; api.ts `checkIfMatch`',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'Checklistenpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9): ' +
+        'docs/qualitaetsleitplanken-produktreife.md:175 (Checkliste 6.4: "Erfolg, 400/422, 403, 404, ' +
+        '409, 412, 428 und 500 sind konsistent als Problem-Details mit Regel-ID modelliert") stützt ' +
+        'nur das Antwortformat für 412/428. Nicht belegt: die Versionszählung selbst. Ableitung: ' +
+        'Architekturentscheidung gegen verlorene Änderungen bei gleichzeitiger Bearbeitung, keine ' +
+        'Vorgabe in Recherche oder Ist-Analyse.',
+      docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    effect: 'Jedes Frage-Ereignis setzt den Bearbeitungszeitpunkt der Frage (`updatedAt`).',
+    code: 'state.ts `touch`',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'docs/ist-analyse-und-schnittstellen.md:81 ("Zeitstempel Erstellung und Bearbeitung"). ' +
+        'Teilweise zu docs/anforderungen-recherche.md:205 ("Serverseitiger, NTP-synchronisierter ' +
+        'Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion"): Zeitpunkt aus der ' +
+        'eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo: ' +
+        'Browser-Uhr, apps/web/src/api/index.ts:46).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    effect:
+      'Jede Änderung ist ein angehängtes Ereignis mit Zeitpunkt (`at`) und Akteur (`actor`); ' +
+      'Ereignisse werden nur angehängt, nie überschrieben oder entfernt.',
+    code: 'api.ts `append`; Ereignisspeicher',
+    legalRef: {
+      source: 'Recherche',
+      citation:
+        'Teilweise zu docs/anforderungen-recherche.md:205 ("Serverseitiger, NTP-synchronisierter ' +
+        'Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion"): Zeitpunkt aus der ' +
+        'eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo: ' +
+        'Browser-Uhr, apps/web/src/api/index.ts:46). Akteur: nicht belegt als eigenes Feld. ' +
+        'Ableitung: docs/rollen-und-rechtekonzept.md:158-160 (Abschnitt 4: "Keine physische ' +
+        'Löschung … eines Auditeintrags", "Kein Abschalten des Audit-Logs") setzt ein Protokoll ' +
+        'voraus, das den Handelnden nennt.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    effect:
+      'Nach jedem Ereignis werden die Zähler aus den Ständen neu berechnet: auf der Bühne ' +
+      '(`staged`), vorgelesen (`delivered` und `closed`), offen (alles außer `closed`, ' +
+      '`withdrawn`, `merged`, `delivered`), je Stand.',
+    code: 'state.ts `refreshCounts`; api.ts `getStage` (`deliveredCount`, `openCount`)',
+    legalRef: {
+      source: 'Recherche',
+      citation:
+        'docs/anforderungen-recherche.md:285 ("[MUSS] Verbindliche Zähldefinition vor der ' +
+        'Einberufung. Was ist eine Frage? Zählen Dubletten, Nachfragen, zurückgezogene? Von Recht ' +
+        'und Kommunikation gemeinsam freigegeben, vom Tool exakt so berechnet …"). Nicht umgesetzt: ' +
+        'eine freigegebene Zähldefinition gibt es nicht; die Zähler folgen allein dem Stand, so ' +
+        'zählt eine zurückgezogene oder zusammengeführte Frage nicht mehr als offen, und eine ' +
+        'vorgelesene Frage fällt nach Rückgabe oder Zurückziehen aus dem Zähler der vorgelesenen. ' +
+        'Teilweise zu docs/ist-analyse-und-schnittstellen.md:88 ("Zähler je Person: gesamt / in ' +
+        'Bearbeitung / bereit zum Vorlesen / abgeschlossen"): ein Zähler für alle, nicht je Person.',
+      docVersion: null,
       docHash: null,
       verified: false,
     },
