@@ -75,13 +75,19 @@ export function CapturePage() {
    * Erfassung at all?") directly, rather than inferring an answer from a resolved prerequisite. It
    * never has to know that `contribution.read` and `speaker.read` are always granted together; it
    * just tries the read that decides it.
+   *
+   * Minor 1 (review round 3): the probe runs only while no Wortmeldung is resolved. Once one is,
+   * the per-speaker load above is itself the Hauptabfrage and answers the same question — a second,
+   * unfiltered call on every `version` fetched the whole corpus only to throw it away, and on a 500
+   * raised a second toast for the same failure.
    */
   const contributionsProbe = useAsync<readonly Contribution[]>(
-    () => api.listContributions(),
+    () => (speakerId === null ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)),
     NO_CONTRIBUTIONS,
-    `cp:${version}`,
+    `cp:${version}:${speakerId === null}`,
   );
-  const forbidden = contributionsProbe.status === 'forbidden';
+  const forbidden =
+    contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
   // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
   const contribution =
@@ -183,8 +189,9 @@ export function CapturePage() {
       />
 
       {forbidden ? (
-        // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on
-        // its own, the moment a role switch replaces the desk with it.
+        // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+        // (review round 3): a live region mounted together with its content is often not
+        // announced, so this is a hint to assistive technology, not a guaranteed announcement.
         <div data-testid="capture-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState
