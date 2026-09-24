@@ -8,13 +8,15 @@ import { Eye, Lock } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
+import { useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import { EmptyState, PageHeader, Panel, SplitPane, showProblem } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
-import { useAsync, useHoveredQuestion } from './useCapture';
+import { NO_VERDICT, readVerdict, useAsync, useHoveredQuestion } from './useCapture';
+import type { ReadVerdict } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
@@ -86,9 +88,13 @@ export function CapturePage() {
    * answered yet — the probe used to fetch the whole corpus right then, although a speaker would
    * be resolved a moment later. It now runs only when the lookup has answered and produced no
    * speaker at all (refused, failed, or a meeting without any Wortmeldung).
+   *
+   * Slice 010c, Ziel 3: "answered" means answered for the current key (`speakers.settled`, actor
+   * and `version`). `status` alone still reported the previous key's refusal in the render after a
+   * switch from a refused role to one that may read — the probe then fetched the whole corpus
+   * unfiltered, although the new role's lookup was about to resolve a Wortmeldung.
    */
-  const needsProbe =
-    speakerId === null && speakers.status !== 'loading' && speakers.data.length === 0;
+  const needsProbe = speakerId === null && speakers.settled && speakers.data.length === 0;
   const contributionsProbe = useAsync<readonly Contribution[]>(
     () => (needsProbe ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)),
     NO_CONTRIBUTIONS,
@@ -104,10 +110,26 @@ export function CapturePage() {
    * from `cp:…:false` in the render where the key has just become `cp:…:true`) — that stale status
    * lifted the refusal for one render on every version jump with latency.
    */
-  const verdict = contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
+  //
+  // Slice 010c: the verdict comes from `readVerdict` (useCapture.ts), fed with the one read that
+  // actually asked — the probe or the per-speaker load; the other answers "ready" without asking. A
+  // refusal belongs to the actor: a plain failure of the same actor's next read keeps it (review
+  // round 1, finding 4).
+  const actorId = useActor().id;
+  const asked = needsProbe ? contributionsProbe : speakerId !== null ? contributions : null;
   const settled = speakers.settled && contributionsProbe.settled && contributions.settled;
-  const [forbidden, setForbidden] = useState(false);
-  if (settled && forbidden !== verdict) setForbidden(verdict);
+  const [shownVerdict, setShownVerdict] = useState<ReadVerdict>(NO_VERDICT);
+  const verdict = settled
+    ? readVerdict(
+        shownVerdict,
+        // No read asked (the lookup resolved speakers, the Wortmeldung is not chosen yet): the
+        // table row "no reads" — the same actor keeps its verdict, another starts unrefused.
+        asked === null ? [] : [{ read: asked.read, key: asked.key }],
+        actorId,
+      )
+    : shownVerdict;
+  if (verdict !== shownVerdict) setShownVerdict(verdict);
+  const forbidden = verdict.forbidden;
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
   // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
   const contribution =

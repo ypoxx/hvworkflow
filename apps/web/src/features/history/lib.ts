@@ -154,28 +154,48 @@ export interface DetailProblemGate {
   /** The selection changed: a new pass begins. */
   select(): void;
   /**
-   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id)`: its answer is
-   * known to leave `id` out — only a complete, unfiltered list can know that; a filtered one says
-   * nothing about what it does not show.
+   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id, error)`: its
+   * answer is known to leave `id` out, so that this failure of its detail read says nothing new —
+   * only a complete, unfiltered list can know that for any failure; a filtered one says nothing
+   * about what it does not show (slice 010c, Ziel 5: see `listOmits` in answers/lib.ts for the one
+   * narrow exception, which looks at the failure itself).
    */
-  settleMain(load: string, refused: boolean, omits?: (id: string) => boolean): void;
+  settleMain(
+    load: string,
+    refused: boolean,
+    omits?: (id: string, error: unknown) => boolean,
+  ): void;
   /** A detail read of `id` in `load` failed with something other than a read refusal. */
   report(load: string, id: string, error: unknown): void;
 }
 
 export function createDetailProblemGate(show: (error: unknown) => void): DetailProblemGate {
-  let verdict: { load: string; refused: boolean; omits: (id: string) => boolean } | null = null;
+  let verdict: {
+    load: string;
+    refused: boolean;
+    omits: (id: string, error: unknown) => boolean;
+  } | null = null;
   let pass = 0;
-  let pending: { load: string; pass: number; id: string; error: unknown } | null = null;
+  // Slice 010c, review round 3 (R3-1): every failure of the pass is kept, not only the first one.
+  // Since `omits` looks at the failure itself, their order must not decide the outcome — a masked
+  // 404 of one detail read that arrives first must not hide a 5xx of the other.
+  let pending: {
+    load: string;
+    pass: number;
+    failures: { id: string; error: unknown }[];
+  } | null = null;
   let shown: string | null = null;
   const flush = (): void => {
     if (pending === null || verdict === null || pending.load !== verdict.load) return;
-    const { load, id, error } = pending;
+    const { load, failures } = pending;
     const key = `${load}:${pending.pass}`;
     pending = null;
-    if (verdict.refused || verdict.omits(id) || key === shown) return;
+    if (verdict.refused || key === shown) return;
+    const omits = verdict.omits;
+    const first = failures.find(({ id, error }) => !omits(id, error));
+    if (first === undefined) return;
     shown = key;
-    show(error);
+    show(first.error);
   };
   return {
     select() {
@@ -188,9 +208,85 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     },
     report(load, id, error) {
       const key = `${load}:${pass}`;
-      if (key === shown || (pending !== null && `${pending.load}:${pending.pass}` === key)) return;
-      pending = { load, pass, id, error };
+      if (key === shown) return;
+      if (pending === null || `${pending.load}:${pending.pass}` !== key) {
+        pending = { load, pass, failures: [] };
+      }
+      pending.failures.push({ id, error });
       flush();
     },
   };
+}
+
+/**
+ * Slice 010c (Lesezustand je Ladevorgang): a read state — ready, refused, failed — belongs to the
+ * load that produced it, and a load is keyed by the actor who asked and the `version` it asked at.
+ * Two rules follow, and every view keeps both:
+ * - An answer counts only for its own load (`isCurrentLoad`). One that was overtaken — a newer
+ *   `version`, or another actor in the gap before the `version` bump that follows every actor
+ *   switch (api/useApiVersion.ts) — never reports.
+ * - The view's verdict ("keine Leseberechtigung" or not) changes only once every read it depends on
+ *   has answered for the current key (`readVerdict`). Until then the previous verdict stands, so
+ *   nothing flickers while a load is on its way (design principle 8; review round 1, finding 7).
+ *   A refusal belongs to the actor it was given to (review round 1, finding 4): a ready answer or a
+ *   refusal replaces it, and so does a failure of another actor's load — but a plain failure of the
+ *   same actor's next load says nothing new about that actor's rights, and the refusal stands.
+ *
+ * Kept as a small local copy per feature (`speakers/useSpeakers.ts`, `capture/useCapture.ts`,
+ * `answers/lib.ts`, `stage/lib.ts`, `history/lib.ts`) — the spec allows no shared folder outside the
+ * features — and covered by the same test table in each.
+ */
+export type ReadStatus = 'ready' | 'forbidden' | 'error';
+
+/** What one load answered, and which load that was. */
+export interface KeyedRead {
+  readonly key: string;
+  readonly status: ReadStatus;
+}
+
+/** The verdict a view shows, and the actor it was reached for (`null` before any). */
+export interface ReadVerdict {
+  readonly actor: string | null;
+  readonly forbidden: boolean;
+}
+
+export const NO_VERDICT: ReadVerdict = { actor: null, forbidden: false };
+
+/** The key of one load: who asked, and at which `version` (plus, where needed, what was asked). */
+export function loadKey(actorId: string, version: number | string): string {
+  return JSON.stringify([actorId, String(version)]);
+}
+
+/**
+ * Whether an answer asked under `requested` still speaks for the view. `current` is the view's key
+ * at the moment the answer arrives, or `null` once the view has moved on (its effect was cleaned up).
+ */
+export function isCurrentLoad(requested: string, current: string | null): boolean {
+  return current !== null && requested === current;
+}
+
+/**
+ * The verdict a view shows for `actorId`: `previous` until every read has answered for its own
+ * current key, then "refused" if one of those answers is a refusal — or if every one of them failed
+ * and the previous refusal was this very actor's. An unchanged verdict is returned as the same
+ * object, so a caller may store it during render without looping.
+ */
+export function readVerdict(
+  previous: ReadVerdict,
+  reads: readonly { read: KeyedRead | null; key: string }[],
+  actorId: string,
+): ReadVerdict {
+  const answers: ReadStatus[] = [];
+  for (const { read, key } of reads) {
+    if (read === null || read.key !== key) return previous;
+    answers.push(read.status);
+  }
+  const keepsRefusal =
+    previous.forbidden &&
+    previous.actor === actorId &&
+    answers.every((status) => status === 'error');
+  const forbidden = answers.includes('forbidden') || keepsRefusal;
+  return previous.actor === actorId && previous.forbidden === forbidden
+    ? previous
+    : { actor: actorId, forbidden };
 }

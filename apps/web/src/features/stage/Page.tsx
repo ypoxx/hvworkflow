@@ -28,7 +28,15 @@ import {
 } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { Podium, StageQueue } from './Podium';
-import { isInteractiveTarget, isReadForbidden } from './lib';
+import {
+  NO_VERDICT,
+  isCurrentLoad,
+  isInteractiveTarget,
+  isReadForbidden,
+  loadKey,
+  readVerdict,
+} from './lib';
+import type { KeyedRead, ReadVerdict } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -40,6 +48,18 @@ const WORK_ACTIONS: readonly Permission[] = [
   'answer.draft',
   'question.approve',
 ];
+
+/**
+ * takt-008: the question a "Vorgelesen, weiter" was written against, as it was read. Slice 010c,
+ * Ziel 6 (N2 of takt-008's Nachprüfung): `answered` is set once the write itself has answered, so
+ * that a failed read-back frees only a lock that is waiting for the record, never one whose write is
+ * still on its way.
+ */
+interface DeliverLock {
+  id: string;
+  version: number;
+  answered: boolean;
+}
 
 /** `null`: no explicit choice yet — the default may still be derived from the actor's rights. */
 function loadStoredStageOnly(): boolean | null {
@@ -164,7 +184,12 @@ export function StagePage() {
   const [loading, setLoading] = useState(true);
   // Ziel 1 (slice 010b): `getStage` is the Hauptabfrage of the Bühne — set from the 403's ruleId
   // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
-  const [forbidden, setForbidden] = useState(false);
+  // Slice 010c: the answer carries the key of its load, and the refusal is the verdict of the
+  // current key (`readVerdict`, lib.ts). A refusal belongs to the actor: a plain failure of the
+  // same actor's next load keeps it (review round 1, finding 4 — it used to give way to "Die Bühne
+  // ist frei"); an actor change resets it below.
+  const [stageRead, setStageRead] = useState<KeyedRead | null>(null);
+  const [shownVerdict, setShownVerdict] = useState<ReadVerdict>(NO_VERDICT);
   const [busy, setBusy] = useState(false);
   /**
    * takt-008: the question being read out, as it was read. "Vorgelesen, weiter" keeps focus while
@@ -173,9 +198,9 @@ export function StagePage() {
    * answered, or a second press would act on the old copy and meet its own 412 and a problem toast
    * (review round 1, finding 3). Released at once when the write, or the read-back, fails.
    */
-  const [delivering, setDelivering] = useState<{ id: string; version: number } | null>(null);
+  const [delivering, setDelivering] = useState<DeliverLock | null>(null);
   // The same lock for a second activation in the same task, before React has rendered it.
-  const writing = useRef(false);
+  const writing = useRef<DeliverLock | null>(null);
   const stageBusy = busy || delivering !== null;
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
@@ -205,7 +230,7 @@ export function StagePage() {
     setDelivering(null);
   }
   useEffect(() => {
-    if (delivering === null) writing.current = false;
+    if (delivering === null) writing.current = null;
   }, [delivering]);
 
   /**
@@ -226,8 +251,15 @@ export function StagePage() {
     setLayoutActorId(actorId);
     setLoading(true);
     setStage(null);
-    setForbidden(false);
+    setShownVerdict({ actor: actorId, forbidden: false });
   }
+  const verdict = readVerdict(
+    shownVerdict,
+    [{ read: stageRead, key: loadKey(actorId, `${version}:${nonce}`) }],
+    actorId,
+  );
+  if (verdict !== shownVerdict) setShownVerdict(verdict);
+  const forbidden = verdict.forbidden;
 
   useEffect(() => {
     let cancelled = false;
@@ -242,15 +274,18 @@ export function StagePage() {
     // that would cancel this effect — it then belongs to the previous actor, with that actor's
     // question and `_actions`, and is dropped. `getActor()` is read at the moment of the answer, not
     // from React state, so no render has to happen first.
-    const requestedBy = getActor().id;
-    const stale = (): boolean => cancelled || getActor().id !== requestedBy;
+    //
+    // Slice 010c: the same rule as in every other view, with the same key (`loadKey`, lib.ts).
+    const requested = loadKey(getActor().id, `${version}:${nonce}`);
+    const stale = (): boolean =>
+      !isCurrentLoad(requested, cancelled ? null : loadKey(getActor().id, `${version}:${nonce}`));
     api
       .getStage()
       .then((next) => {
         if (stale()) return;
         setStage(next);
         setLoading(false);
-        setForbidden(false);
+        setStageRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
         if (stale()) return;
@@ -261,16 +296,24 @@ export function StagePage() {
           // `version`) must not go on reading out or returning a previous role's stale question
           // with Space/R (the keyboard handler below reads `stageRef.current`, which this clears).
           setStage(null);
-          setForbidden(true);
+          setStageRead({ key: requested, status: 'forbidden' });
           return;
         }
         // Minor A (review round 4): the podium goes on showing the last record it had, so the
         // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
         // next event. The server still decides every write (a stale record meets its 412/403).
         stageRef.current = shownRef.current;
+        // Slice 010c: a failure is this load's answer too; a refusal of the same actor stands
+        // (`readVerdict`), one of another actor was already reset with the actor change above.
+        setStageRead({ key: requested, status: 'error' });
         // takt-008: the record the lock waits for will not come — the podium acts on what it shows.
-        writing.current = false;
-        setDelivering(null);
+        // Slice 010c, Ziel 6 (N2): only if the write has answered; a write still on its way keeps
+        // its lock, or a second press would send a second "Vorgelesen".
+        const lock = writing.current;
+        if (lock !== null && lock.answered) {
+          writing.current = null;
+          setDelivering((held) => (held === lock ? null : held));
+        }
         // The language is read at call time so that a language switch does not refetch the podium.
         showProblem(error, translate(getLang(), 'toast.problem'));
       });
@@ -281,15 +324,19 @@ export function StagePage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Slice 010c: the probe's `_actions` decide the "Nur Bühne" default — an answer asked for the
+    // previous actor must not decide it for the next one.
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     api
       .listQuestions({ limit: 1 })
       .then((page) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setProbeActions(page.items[0]?._actions ?? []);
         setProbeLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setProbeLoading(false);
+        if (isCurrentLoad(requested, current())) setProbeLoading(false);
         /* the default then simply falls back to whatever the Bühnenfragen already show */
       });
     return () => {
@@ -345,33 +392,48 @@ export function StagePage() {
     });
   }, []);
 
-  /** Read out: deliver, and close straight away where the record allows it. One click, one hand. */
-  const deliver = useCallback(async () => {
+  /**
+   * Read out: deliver, and close straight away where the record allows it. One click, one hand.
+   *
+   * Slice 010c, Ziel 6 (N3 of takt-008's Nachprüfung): says whether a write was started. Nothing is
+   * written while there is no record to act on (the read after a new `version` is still on its
+   * way), the record offers no delivery, or a write is already in flight — and a press that wrote
+   * nothing must not leave a focus marker behind (Podium.tsx).
+   */
+  const deliver = useCallback((): boolean => {
     const current = stageRef.current?.current;
-    if (current === null || current === undefined) return;
-    if (!current._actions.includes('question.deliver')) return;
-    if (writing.current) return;
-    writing.current = true;
-    setDelivering({ id: current.id, version: current.version });
-    try {
-      const delivered = await api.deliverQuestion(current.id, { ifMatch: etagOf(current.version) });
-      const alsoClose = delivered._actions.includes('question.close');
-      if (alsoClose) {
-        await api.closeQuestion(delivered.id, { ifMatch: etagOf(delivered.version) });
+    if (current === null || current === undefined) return false;
+    if (!current._actions.includes('question.deliver')) return false;
+    if (writing.current !== null) return false;
+    const lock: DeliverLock = { id: current.id, version: current.version, answered: false };
+    writing.current = lock;
+    setDelivering(lock);
+    void (async () => {
+      try {
+        const delivered = await api.deliverQuestion(current.id, {
+          ifMatch: etagOf(current.version),
+        });
+        const alsoClose = delivered._actions.includes('question.close');
+        if (alsoClose) {
+          await api.closeQuestion(delivered.id, { ifMatch: etagOf(delivered.version) });
+        }
+        lock.answered = true;
+        showToast({
+          tone: 'success',
+          title: alsoClose ? t('stage.toast.closed') : t('stage.toast.delivered'),
+          detail: delivered.number,
+        });
+      } catch (error) {
+        showProblem(error, t('toast.problem'));
+        // Refused: nothing to wait for — unlock at once. Slice 010c, Ziel 6 (N2): only this
+        // write's own lock; a newer write may already hold the next one.
+        if (writing.current === lock) writing.current = null;
+        setDelivering((held) => (held === lock ? null : held));
+        // A refusal — 412 above all — means the podium is looking at an old copy. Refetch.
+        reload();
       }
-      showToast({
-        tone: 'success',
-        title: alsoClose ? t('stage.toast.closed') : t('stage.toast.delivered'),
-        detail: delivered.number,
-      });
-    } catch (error) {
-      showProblem(error, t('toast.problem'));
-      // Refused: nothing to wait for — unlock at once.
-      writing.current = false;
-      setDelivering(null);
-      // A refusal — 412 above all — means the podium is looking at an old copy. Refetch.
-      reload();
-    }
+    })();
+    return true;
   }, [reload, t]);
 
   const returnAnswer = useCallback(
@@ -416,7 +478,7 @@ export function StagePage() {
       if (isInteractiveTarget(event.target) && !(isR && fromPodiumButton)) return;
       if (event.code === 'Space') {
         event.preventDefault();
-        void deliver();
+        deliver();
         return;
       }
       if (isR) {
@@ -535,7 +597,7 @@ export function StagePage() {
     <Podium
       stage={view}
       busy={stageBusy}
-      onNext={() => void deliver()}
+      onNext={deliver}
       onReturn={() => setReturnOpen(true)}
     />
   );
