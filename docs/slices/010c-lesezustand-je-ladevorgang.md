@@ -1,6 +1,6 @@
 # 010c — Lesezustand je Ladevorgang
 
-**Status:** Nacharbeit Runde 1 erledigt, bereit für Review Runde 2 (Code `5a4f3c5`)
+**Status:** Nacharbeit Runde 2 erledigt, bereit für Review Runde 3 (Code `cae59a5`)
 **Risikoklasse:** niedrig · 0,75 AStd · Lanes: web-speakers, web-capture, web-answers, web-stage, web-history, e2e (eigene
 Datei). Startet nach takt-008 (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -65,9 +65,10 @@ außerhalb der Features.
 
 ## Bericht
 
-**Status:** Nacharbeit Runde 1 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
-`7f17174` (Bericht). Runde 1: `5c83da4` (neue und umgedrehte e2e, rot auf `7f17174`), `5a4f3c5` (Änderung,
-letzter Code-Commit), dieser Commit (Screenshot und Bericht).
+**Status:** Nacharbeit Runde 2 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
+`7f17174` (Bericht). Runde 1: `5c83da4` (e2e, rot auf `7f17174`), `5a4f3c5` (Änderung), `30032b7` (Screenshot
+und Bericht). Runde 2: `c43e7a2` (e2e, rot auf `30032b7`), `cae59a5` (Änderung, **letzter Code-Commit**),
+dieser Commit (Bericht).
 
 ```
 Slice: 010c-lesezustand-je-ladevorgang
@@ -75,18 +76,40 @@ Done: Jeder Lesezustand trägt den Schlüssel seines Ladevorgangs (Akteur und ve
       loadKey/isCurrentLoad/readVerdict mit derselben Unit-Tabelle, in allen fünf Ansichten benutzt. Eine
       Verweigerung gehört dem Akteur: ein Fehler der neuen Rolle hebt sie auf, ein Fehler derselben Rolle nicht;
       Erfassungssonde wartet speakers.settled ab; Antworten der vorigen Rolle verfallen (auch Detailabrufe der
-      Beantwortung); Serverfilter-Toast nur im ersten Ladevorgang nach dem Wechsel; takt-008 N1–N3 behoben.
-Evidence: pnpm gates auf 5a4f3c5, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 66/66, 010c-Datei
-      23/23 (--repeat-each=3: 69/69); rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e, Runde 1 8 rot / 15 grün
-      auf 7f17174 (alle acht neuen bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
+      Beantwortung); Serverfilter: für eine Auswahl eines anderen Akteurs wird nur der maskierte 404
+      geschluckt, jeder andere Fehler gemeldet; takt-008 N1–N3 behoben.
+Evidence: pnpm gates auf cae59a5, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 68/68, 010c-Datei
+      25/25, --repeat-each=3 zweimal: 75/75 und 75/75; rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e,
+      Runde 1 8 rot / 15 grün auf 7f17174, Runde 2 2 rot / 23 grün auf 30032b7 (jeweils genau die neuen
+      bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
 Open: siehe "Offen" unten (Daten der vorigen Rolle bis zur ersten Antwort und „Kein Treffer" nach einem
-      ersten 500 → 010d; zwei Toasts in der Historie; Ziel 5 im ersten Ladevorgang nach dem Wechsel).
+      ersten 500 → 010d; zwei Toasts in der Historie).
 Touched: siehe "Touched" unten.
 ```
 
+### Nacharbeit Runde 2 (N1–N3; Entscheidung des Architekten Runde 2)
+
+- **N1/N2 (Befund 1 neu gefasst):** Die Übernahme der Auswahl nach der ersten Listenantwort (Runde 1,
+  `adoptSelection`, `version:nonce`) ist entfernt; sie hat den maskierten 404 einer für die neue Rolle
+  unlesbaren Auswahl ab dem zweiten Ladevorgang bei jedem Ereignis als Toast gemeldet. Jetzt gilt die
+  Markierung „Auswahl von anderem Akteur" (`selectedBy`) so lange wie die Auswahl, wie auf `7f17174`, und
+  `listOmits` verschluckt in diesem Fall nur den 404: ein 5xx und jeder andere Fehler wird gemeldet, auch
+  im ersten Ladevorgang nach dem Wechsel. Dafür reicht das Gate den Fehler an `omits(id, error)` weiter
+  (`createDetailProblemGate` in `answers/lib.ts` und `history/lib.ts`, beide Kopien gleich geändert, je ein
+  neuer Testfall; die vollständige Liste lässt wie bisher jeden Fehler aus). Befund 1 bleibt behoben: der
+  Befund-1-e2e (moderation liest die Auswahl, Suche ohne sie, 500 → genau ein Toast) ist grün.
+  Neue e2e: „Runde 2 (N1)" (Ziel-5-Aufbau, dann zwei fremde Ereignisse → nach jedem 0 Toasts) und „Runde 2"
+  (Ziel-5-Aufbau, erste Detailabfrage nach dem Wechsel mit 500 → genau ein Toast); beide rot auf `30032b7`.
+- **N2 (Wiederholungszahl):** Der Bericht der Runde 1 nannte `69 passed` für einen `--repeat-each=3`-Lauf.
+  Dieser eine Lauf war echt, aber nicht belastbar: die Nachprüfung sah „Ziel 5" 1 von 3 rot, Ursache war N1
+  (die Übernahme im selben Ladevorgang). Jetzt zwei dateiweite Läufe `--repeat-each=3`, beide unten.
+- **N3:** Zeile „keine Lesevorgänge" in der `readVerdict`-Tabelle, in allen fünf Kopien byte-gleich (md5
+  verglichen): dieselbe Rolle behält ihr Urteil, eine andere beginnt ohne Verweigerung. Dazu ein Kommentar
+  an der Stelle in `capture/Page.tsx`, die `readVerdict` ohne Lesevorgang ruft.
+
 ### Nacharbeit Runde 1 (Befunde 1, 3, 4, 6, 8, 9; Entscheidung des Architekten)
 
-- **Befund 1** (`answers/useBacklog.ts`): `selectedBy` hält Akteur und Ladevorgang. Die Auswahl gilt als
+- **Befund 1** (in Runde 2 ersetzt, siehe oben) (`answers/useBacklog.ts`): `selectedBy` hielt Akteur und Ladevorgang. Die Auswahl gilt als
   „von einem anderen Akteur" nur bis zum Ladevorgang (`version:nonce`), in dem die Liste der neuen Rolle zum
   ersten Mal geantwortet hat; ab dem nächsten gehört sie der neuen Rolle, und ein echter Fehler der
   Detailabfrage zeigt wieder einen Toast. Den ganzen Ladevorgang, nicht nur die erste Antwort: eine
@@ -130,10 +153,11 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
   Urteil (kein Flackern, Prinzip 8; Befund 7 vom Architekten so angenommen). Dann gilt: eine Verweigerung
   setzt es, „bereit" hebt es auf, ein Fehler hebt es nur auf, wenn das vorige Urteil einem anderen Akteur
   galt. Ein unverändertes Urteil ist dasselbe Objekt (darf im Render gespeichert werden, ohne Schleife).
-- Unit-Tabelle (zwölf Fälle, in allen fünf `*.test.ts` gleich): gleicher Schlüssel, neuere `version`,
+- Unit-Tabelle (13 Fälle, in allen fünf `*.test.ts` gleich): gleicher Schlüssel, neuere `version`,
   anderer Akteur bei gleicher `version`, verlassene Ansicht, keine Kollision, Fehler der neuen Rolle hebt
   auf, Fehler derselben Rolle hält, Verweigerung/Bereit, laufender Ladevorgang lässt das Urteil stehen,
-  unverändertes Urteil ist dasselbe Objekt, mehrere Abrufe, dieselbe Rolle hält nur bei lauter Fehlern.
+  unverändertes Urteil ist dasselbe Objekt, mehrere Abrufe, dieselbe Rolle hält nur bei lauter Fehlern,
+  keine Lesevorgänge (Runde 2, N3).
 
 ### Je Ziel
 
@@ -154,7 +178,8 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
    einem 500, Befund 4).
 5. **Serverfilter-Toast — gelöst, nicht offen.** `listOmits` (answers/lib.ts, mit Unit-Tests): eine
    gefilterte Liste gilt als „lässt die Auswahl aus", wenn die Auswahl von einem anderen Akteur stammt —
-   seit Befund 1 nur im ersten Ladevorgang nach dem Wechsel. Begründung: direkt nach einem Rollenwechsel ist
+   seit Runde 2 nur für den maskierten 404, so lange die Auswahl besteht; ein 5xx oder anderer Fehler wird
+   immer gemeldet. Begründung: direkt nach einem Rollenwechsel ist
    eine Auswahl, die die Liste der neuen Rolle nicht enthält, nicht von einer unlesbaren zu unterscheiden
    (der maskierte 404 ist Absicht, Festlegung 3 von 010); ein Toast dort wäre irreführend. Eine zweite,
    ungefilterte Liste wäre ein zusätzlicher Vollabruf je `version` nur für diesen Randfall. Ohne
@@ -171,11 +196,11 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
 
 ### Evidence
 
-**`pnpm gates` auf `5a4f3c5` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 150, api 57, scripts
+**`pnpm gates` auf `cae59a5` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 157, api 57, scripts
 206/206. `slice-scope` meldet dazu eine Warnung, weil der Architekt „Files allowed" nach `452e89e` um
 `docs/evidence/010c-*.png` ergänzt hat (`b85b080`): `slice-scope: warning — "docs/slices/010c-lesezustand-je-ladevorgang.md"'s
 "Files allowed" section differs from its version at the commit that introduced it (452e89e).` und
-`slice-scope: 19 changed file(s), all within "docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed"
+`slice-scope: 20 changed file(s), all within "docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed"
 list (4 pattern(s)).` Schluss wörtlich (nur ANSI-Farbcodes entfernt):
 
 ```
@@ -193,7 +218,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-CJsh8hML.js                        568.42 kB │ gzip: 166.22 kB │ map: 2,342.56 kB
+dist/assets/index-lLKPwRkT.js                        568.29 kB │ gzip: 166.15 kB │ map: 2,342.73 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -202,15 +227,27 @@ dist/assets/index-CJsh8hML.js                        568.42 kB │ gzip: 166.22 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.47s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 5a4f3c5, tree 98b3c4098072…
+✓ built in 1.60s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit cae59a5, tree e851c5caace6…
 ```
 
-**Playwright** (eigener Port 4977, Chromium unter `/opt/pw-browsers`), auf dem Baum von `5a4f3c5`:
-- ganze Suite: `66 passed (5.2m)`, axe in allen Szenarien „0 serious/critical".
-- `e2e/010c-lesezustand.spec.ts`: `23 passed`; mit `--repeat-each=3`: `69 passed (2.5m)`.
-- Der Screenshot stammt aus dem Lauf der ganzen Suite; alle übrigen PNGs, die die Suite überschreibt,
-  wurden mit `git checkout -- docs/evidence` zurückgesetzt.
+**Playwright** (eigener Port 4989, Chromium unter `/opt/pw-browsers`), auf dem Baum von `cae59a5`:
+- ganze Suite: `68 passed (5.2m)`, axe in allen Szenarien „0 serious/critical".
+- `e2e/010c-lesezustand.spec.ts` dateiweit mit `--repeat-each=3`, zwei Läufe nacheinander: `75 passed (2.8m)`
+  und `75 passed (2.8m)` (je 25 Tests × 3, kein Fehlschlag).
+- Der Screenshot `010c-beantwortung-erster-abruf-500.png` bleibt der aus `30032b7`: die Ansicht im e2e
+  „Ziel 1" hat sich in Runde 2 nicht geändert; die Läufe haben alle PNGs überschrieben, sie wurden mit
+  `git checkout -- docs/evidence` zurückgesetzt.
+
+**Roter Lauf Runde 2** der e2e-Datei aus `c43e7a2` gegen den Code von `30032b7` (`git stash` nur
+`apps/web/src`): `2 failed, 23 passed`, rot sind genau die zwei neuen Tests:
+
+```
+  ✘  14 … 010c Runde 2 (N1): Beantwortung — Suche aktiv, Wechsel zu observer, danach zwei fremde Ereignisse: kein Toast   Toasts  Expected: 0  Received: 1
+  ✘  15 … 010c Runde 2: Beantwortung — Suche aktiv, Wechsel zu observer, erste Detailabfrage mit 500: ein Toast           Toasts  Expected: 1  Received: 0
+  2 failed
+  23 passed (1.5m)
+```
 
 **Roter Lauf Runde 1** der e2e-Datei aus `5c83da4` gegen den Code von `7f17174` (`git stash` nur
 `apps/web/src`): `8 failed, 15 passed`, rot sind genau die acht neuen bzw. umgedrehten Tests. Ergebniszeilen
@@ -265,9 +302,10 @@ Administration, Akteur im selben Task gesetzt und zurückgesetzt (die Ansicht si
   (Befund 4, vorbestehender Teil, auch im Screenshot zu sehen), Ausgang eines älteren Schreibens auf der
   jetzt gezeigten Frage (Befund 5).
 - **Historie, beide Hauptabfragen scheitern:** zwei Toasts (einer je Abruf), vorher genauso.
-- **Ziel 5, bewusster Preis:** im ersten Ladevorgang nach einem Rollenwechsel wird auch ein echter Fehler
-  (500) der Detailabfrage einer Auswahl geschluckt, die die gefilterte Liste der neuen Rolle nicht enthält.
-  Ab dem nächsten Ladevorgang zeigt er einen Toast (Befund 1).
+- **Ziel 5, Restpreis:** für eine Auswahl eines anderen Akteurs, die die gefilterte Liste der neuen Rolle
+  nicht enthält, wird ein 404 der Detailabfrage geschluckt, so lange die Auswahl besteht. Ein 404 heißt hier
+  immer „nicht lesbar oder nicht vorhanden" (maskiert, Festlegung 3 von 010); jeder andere Fehler zeigt
+  einen Toast.
 
 ### Touched
 
