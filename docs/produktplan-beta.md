@@ -364,7 +364,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Wahrheitstabelle mit Leseaktionen neu generiert und im Spec freigegeben; Negativtests je Rolle (observer 403 auf `?status=answer_drafted`, podium 403 auf /events); Playwright: Historie unter observer zeigt Leerzustand; pnpm gates
   - *Offene Entscheidung:* —
 - **011 · Legal-Trace-Feld und Regelregister** — mittel · 1,5 AStd · Kalender 07.10.2026 (W2) · Lanes: core
-  - *Ziel:* Transition und Guard erhalten `legalRef {source, citation, docVersion, docHash, verified:false}`; Test „jede Regel-ID hat legalRef und mindestens einen Test" (22 IDs heute, wächst mit R-SPK, R-MTG, R-PROC, R-ADM); openapi.yaml `x-legal-notice` berichtigt; docs/legal-trace.md wird aus der Tabelle generiert; Regelregister zählt ehrlich (20, nicht 24); nach dem Merge geht ein Vorabzug des Regelregisters mit ADR 0012 (vorgeschlagen) über den Eigentümer an Recht.
+  - *Ziel:* Transition und Guard erhalten `legalRef {source, citation, docVersion, docHash, verified:false}`; Test „jede Regel-ID hat legalRef und mindestens einen Test" (22 IDs heute, wächst mit R-SPK, R-MTG, R-PROC, R-ADM); openapi.yaml `x-legal-notice` berichtigt; docs/legal-trace.md wird aus der Tabelle generiert; Regelregister zählt ehrlich (22, nicht 24); nach dem Merge geht ein Vorabzug des Regelregisters mit ADR 0012 (vorgeschlagen) über den Eigentümer an Recht.
   - *Abhängigkeiten:* 010
   - *Rolle/Modell:* Implementierer-Backend · Sonnet; Review Opus
   - *Nachweise:* generierte docs/legal-trace.md eingecheckt; Testausgabe „22 Regel-IDs, 22 legalRef, 0 verified"; pnpm gates

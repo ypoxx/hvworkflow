@@ -29,6 +29,10 @@ Lane `service` für genau die Routen ihrer Operationen, und ihr Ziel nennt das E
    Kopfzeile „Stand am 23. September 2026“ bleibt unverändert (sie beschreibt den Stand dieses Tages vor 010).
 4. **Plan-Ehrlichkeit:** `node scripts/plan-honesty.mjs` bleibt grün.
 
+**Nachtrag des Architekten (nach dem Bau):** Der Bauer fand in derselben Zeile eine dritte Zählstelle, „Regelregister
+zählt ehrlich (20, nicht 24)“. Entscheidung: sie wird ebenfalls 22 (dieselbe Zählung, sonst widerspricht die Zeile sich
+selbst). Akzeptanzkriterium 1 gilt damit für drei Zählstellen.
+
 ## Nicht-Ziele
 
 Keine andere Planzeile, keine Kalenderverschiebung, keine Änderung an der Allowlist oder am Vertrag.
