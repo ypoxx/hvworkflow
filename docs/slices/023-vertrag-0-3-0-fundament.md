@@ -1010,7 +1010,9 @@ Kennung oder eine Zeit trägt (iii).
 | Versprechen (Stelle) | Bindung im Schema | Prosa, weil … |
 |---|---|---|
 | Sitzungscookie HttpOnly, Secure, SameSite (`completeLogin` 302, Schema `session`) | `Set-Cookie` Pflicht, Muster: Wert ≥ 32 Cookie-Oktette, Lookaheads für `HttpOnly`, `Secure`, `SameSite=Lax\|Strict`, kein `Max-Age=0`/negativ (**Codex 1**) | `Expires` in der Vergangenheit: JSON Schema vergleicht keine Daten; Groß-/Kleinschreibung der Attribute: kanonisch, wie der Dienst schreibt |
-| Abmelden löscht das Cookie (`logout` 204) | `Set-Cookie` Pflicht, `^hv_session=` leer mit `Max-Age=0` (**neu**) | Sperrliste der Sitzungskennung ist serverseitig, in der Antwort nicht sichtbar |
+| Abmelden löscht das Cookie (`logout` 204) | `Set-Cookie` Pflicht, `^hv_session=` leer mit `Max-Age=0` (**neu**); seit `fb2b63b` auch `Path=/` und kein `Domain` (gleicher Geltungsbereich wie das Sitzungscookie) | Sperrliste der Sitzungskennung ist serverseitig, in der Antwort nicht sichtbar |
+| Sitzungscookie erreicht `/v1` (`completeLogin` 302; Nachtrag Codex auf f611116, `fb2b63b`) | `Path=/` Pflicht, jedes andere `Path` verboten (auch als zweites Attribut) | — |
+| Sitzungscookie nur für den eigenen Host (Nachtrag Codex auf f611116, `fb2b63b`) | `Domain` verboten, in jeder Schreibweise (host-only) | — |
 | Kein offener Redirect (`login.returnTo`, `completeLogin` 302 `Location`) | neues Schema `SameOriginPath` (`^/`, nicht `//` oder `/\`, kein Backslash, kein Leer- oder Steuerzeichen, ≤ 512) als `Location` (**Codex 2**) | `returnTo` selbst bleibt ohne Muster: ein fremder Wert wird ignoriert (Umleitung nach `/`), nicht abgelehnt — die Beschreibung nennt dieselbe Regel |
 | Weiterleitung zum IdP (`login` 302 `Location`) | `format: uri`, Pflicht | nicht auf `https:` gebunden: der lokale und e2e-Keycloak (031) läuft auf http://localhost |
 | Nichts auf dem Anmeldeweg wird zwischengespeichert (Sitzung, CSRF-Token, `state`) | neuer Header `CacheControlNoStore` (Pflicht, `no-store` als Direktive) an `login` 302, `completeLogin` 302, `logout` 204, `getSession` 200 (**neu**) | Problemantworten (400/401/403/503) tragen kein Geheimnis und bleiben geteilt |
@@ -1139,6 +1141,97 @@ bekommen (043 oder Kleinänderung vor 034; Entscheidung des Orchestrators). (2) 
 HSTS, `X-Content-Type-Options`) aus 034 sind Plattformheader, keine Vertragsheader; nicht deklariert. (3) `401` von
 `getMetrics` ohne `WWW-Authenticate: Bearer` (RFC 6750) — kein Versprechen im Vertrag, Kandidat für 033/043.
 
+### Cookie-Attribute und Kette nach Codex auf f611116
+
+Commit `fb2b63b` (Vertrag, Typen, CHANGELOG); dieser Bericht im Folgecommit. **Ursache:** in der vorigen Runde gab es
+keine vollständige Liste der Attribute und keine der Ketteneigenschaften. Die Tabelle aus (i) listete nur die
+Attribute, die in der Beschreibung standen. Deshalb unten beide Listen vollständig, je Eintrag Schema oder Prosa mit
+Grund.
+
+**Cookie-Attribute (RFC 6265)** — Sitzungscookie aus `completeLogin` 302 und Löschcookie aus `logout` 204:
+
+| Attribut | Sitzungscookie (`completeLogin`) | Löschcookie (`logout`) | Schema / Prosa, Grund |
+|---|---|---|---|
+| Name | `hv_session` (Anker `^hv_session=`) | `hv_session` | Schema. Das Präfix `__Host-` wäre die Browser-Absicherung derselben Regeln (Secure, `Path=/`, kein `Domain`). Es ist nicht übernommen: das Sicherheitsschema `session` heißt `hv_session`, und die drei Regeln sind jetzt auf der ausstellenden Seite gebunden. Kandidat für 029 |
+| Wert | ≥ 32 Cookie-Oktette (`%x21 / %x23-2B / %x2D-3A / %x3C-5B / %x5D-7E`), nie leer | leer | Schema. Zufälligkeit des Werts: Prosa, ein Schema sieht keine Entropie |
+| `Path` | `Path=/` Pflicht, jedes andere `Path` verboten (**neu, Codex 1**) | ebenso (**neu**) | Schema. Aus `/auth/callback` gesetzt ohne `Path=/` gälte das Cookie nur unter `/auth`; ein Löschcookie mit anderem Pfad ersetzt das Sitzungscookie nicht |
+| `Domain` | verboten, jede Schreibweise (**neu**) | verboten (**neu**) | Schema: host-only, kein Geschwister- oder Elternhost erhält die Sitzung |
+| `Secure` | Pflicht | — | Schema. Beim Löschcookie nicht nötig: der Browser ersetzt nach Name, Pfad und Domain |
+| `HttpOnly` | Pflicht | — | Schema, wie `Secure` |
+| `SameSite` | `Lax` oder `Strict` Pflicht; ein weiteres `SameSite` mit anderem Wert verboten (**neu**; der Browser nimmt das letzte) | — | Schema |
+| `Max-Age` | nicht `0`, nicht negativ, jede Schreibweise (verschärft) | `Max-Age=0` Pflicht | Schema. Obergrenze 14 h: Prosa, die Dauer der Sitzung bestimmt der Dienst serverseitig (ADR 0004), ein Sitzungscookie ohne `Max-Age` ist zulässig |
+| `Expires` | — | — | Prosa: JSON Schema vergleicht keine Daten (ein `Expires` in der Vergangenheit bleibt ungeprüft) |
+| Schreibweise | Pflichtattribute kanonisch (eine andere Schreibweise wird abgelehnt, nie zugelassen), verbotene Attribute in jeder Schreibweise | ebenso | Schema. RFC 6265 behandelt Attributnamen ohne Unterscheidung von Groß- und Kleinschreibung, deshalb dürfen verbotene Attribute über keine Schreibweise hineinkommen |
+| mehrere `Set-Cookie` | — | — | Prosa: OpenAPI beschreibt einen Header einmal. Ein zweites Cookie in derselben Antwort landet in `Headers.get` hinter `, `, und die verbietenden Lookaheads greifen dann auch dort (streng, nicht lax) |
+
+**Ketteneigenschaften (ADR 0011, 024):**
+
+| Eigenschaft | Schema / Prosa | Grund |
+|---|---|---|
+| `seq` ganzzahlig, beginnt bei 1 | Schema: `minimum: 1` (**neu**) | heute sicher: Probe `seq=1..2329` |
+| `seq` global und lückenlos | Prosa | ein Schema für ein einzelnes Ereignis sieht seine Nachbarn nicht; 024 prüft beim Laden (Ladefehler mit `seq`); die Probe bestätigt heute `gapFree=true` |
+| Genesis: `prevHash` leer genau bei `seq` 1 | Schema: `dependentSchemas.schemaVersion` mit `if seq = 1 then prevHash = "" else prevHash: Sha256Hex` (**neu, Codex 2**) | nur mit Umschlag v2, Ereignisse ohne Umschlag bleiben unberührt (Probe: 0 von 2329 mit Umschlag, alle gültig) |
+| `prevHash` ab `seq` 2 ein SHA-256 | Schema (dieselbe Regel) | — |
+| `prevHash` = `hash` des Ereignisses `seq − 1` | Prosa | Vergleich zweier Elemente; 024 (Ladefehler), Clients können es an einer `listEvents`-Seite prüfen |
+| `hash` Format | Schema: `Sha256Hex` (Runde davor) | — |
+| `hash` = SHA-256 über das kanonische JSON ohne `hash` | Prosa | ein Schema rechnet nicht; 024 legt die Kanonisierung fest |
+| `hash` und `prevHash` nur zusammen und nur mit `schemaVersion` | Schema: `dependentRequired` (Runde 4) | — |
+| `schemaVersion` ≥ 2 über HTTP | Schema: `minimum: 2` (Runde 4) | — |
+
+**Test zuerst** (Wegwerf-Test `apps/api/src/__tests__/zz-cookie-kette.test.ts`, danach gelöscht; Cookies über
+`req()` gegen eine Wegwerf-App, Ereignisse über `expectValid`). Rot gegen f611116 (nur der Test hinzugefügt):
+
+```
+ × 1: session cookie needs Path=/ and no Domain; no second Path or SameSite 57ms
+ × 1: clearing cookie on logout needs Path=/ and no Domain 3ms
+ × 2: prevHash empty only at seq 1, only with schemaVersion 25ms
+ × chain: seq starts at 1 1ms
+AssertionError: promise resolved "Response { status: 302, … 'Set-Cookie': 'hv_session=A1b2…; HttpOnly; Secure; SameSite=Lax' … }" instead of rejecting
+AssertionError: promise resolved "Response { status: 204, … 'Set-Cookie': 'hv_session=; Max-Age=0' … }" instead of rejecting
+AssertionError: expected [Function] to throw an error
+AssertionError: expected [Function] to throw an error
+      Tests  4 failed (4)
+```
+
+Ablehnungsfälle im Test: ohne `Path`, `Path=/auth`, `Path=/; Path=/auth`, `Domain=example.com`, `domain=example.com`,
+zusätzliches `SameSite=None`, `max-age=0`; Löschcookie ohne `Path`, mit `Path=/auth`, mit `Domain`; `seq` 2 mit leerem
+`prevHash`, `seq` 1 mit Hash als `prevHash`, `seq` 0. Zulässig und geprüft: Attribute in anderer Reihenfolge, ein
+v1-Ereignis mit `seq` 7 ohne Umschlag. Grün nach der Änderung:
+
+```
+ ✓ 1: session cookie needs Path=/ and no Domain; no second Path or SameSite 49ms
+ ✓ 1: clearing cookie on logout needs Path=/ and no Domain 3ms
+ ✓ 2: prevHash empty only at seq 1, only with schemaVersion 23ms
+ ✓ chain: seq starts at 1 1ms
+      Tests  4 passed (4)
+```
+
+**Live-Probe** (Wegwerf-Test, danach gelöscht; alle Aufrufe über `req()`):
+
+```
+PROBE seed=200 events=2329 seq=1..2329 gapFree=true withEnvelope=0 questions=300 histories=300 meeting=200 problems=404,401,403
+ ✓ src/__tests__/zz-live-probe.test.ts > live probe on the seeded service 569ms
+      Tests  1 passed (1)
+```
+
+Bestehende API-Suite 49/49, auch mit `CONTRACT_GATE_STRICT=1`. **`contract:lint`:** `You have 6 warnings.`
+**`pnpm contract:types`:** zweimal gleiche SHA-256 (`ba77ee9a…`). **Typen-Diff:** nur Beschreibungen
+(`dependentSchemas` und `pattern` erscheinen nicht in den Typen). **CHANGELOG 0.3.0:** Eintrag „Cookie scope and
+chain genesis" unter Added.
+
+**`pnpm gates`** (Commit `fb2b63b`, eigenes Log via `mktemp`, Exit 0). Zeilen desselben Laufs: `You have 6 warnings.`;
+`packages/domain Tests 72 passed (72)`; `apps/web Tests 48 passed (48)`; `apps/api Tests 49 passed (49)`;
+`operation-coverage: 65 operations …, 29 exercised by tests, 36 pre-declared` / `ok`; `vocabulary-check: ok`;
+`slice-scope: 10 changed file(s), all within … "Files allowed" list`; `plan-graph: ok.`; `# tests 196`, `# pass 196`,
+`# fail 0`; Ende wörtlich:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.34s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit fb2b63b, tree 35aa62150f9b…
+```
+
 ## Review findings
 
 **Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
@@ -1237,3 +1330,12 @@ systematische Durchgang (Bericht „Sicherheits-Durchgang nach Codex auf 50cc738
 - P2 · `hash`/`prevHash` ohne Format → `Sha256Hex`, `prevHash` gleich oder leer. **behoben in 2d2b553**
 - Durchgang, zusätzlich: `logout` löscht das Cookie (Pflicht-`Set-Cookie`), `no-store` auf dem Anmeldeweg,
   `csrfToken`-Format, `SubjectId`, `configHash`, `Event.idempotencyKey`, ETag-Syntax. **behoben in 2d2b553**
+
+**Codex auf f611116** (1 × P1, 1 × P2), beide in `fb2b63b` behoben (Bericht „Cookie-Attribute und Kette nach Codex
+auf f611116", vollständige Attribut- und Kettenliste):
+
+- P1 · Sitzungscookie ohne `Path=/` gültig (aus `/auth/callback` gesetzt, erreichte es `/v1` nie) → `Path=/` Pflicht,
+  jedes andere `Path` verboten; ebenso am Löschcookie von `logout`; dazu `Domain` verboten (host-only), kein zweites
+  `SameSite` außer `Lax`/`Strict`, verbotene Attribute in jeder Schreibweise. **behoben in fb2b63b**
+- P2 · `prevHash: ""` bei jedem `seq` gültig → unter `dependentSchemas.schemaVersion`: leer genau bei `seq` 1, ab
+  `seq` 2 `Sha256Hex`; dazu `seq` `minimum: 1`. Ereignisse ohne Umschlag unberührt (Probe). **behoben in fb2b63b**
