@@ -150,4 +150,27 @@ am Knopf „Neuer Redebeitrag" (nur für 013i).
 
 ## Review findings
 
-(vom Reviewer)
+Runde 1 (Opus 5.5, frischer Kontext, Perspektive Barrierefreiheit; Basis `0a5eae3`, HEAD `ef97c5e`). Gates exit 0,
+Playwright 43/43, axe ohne serious/critical. Urteil: nicht mergebereit wegen Befund 1.
+
+1. **major** — Taste R (Zurückgeben) wirkt nach „Vorgelesen, weiter“ nicht mehr: `stage-next` behält den Fokus, der
+   Tastenhandler der Bühne ignoriert Ziele vom Typ BUTTON (`stage/Page.tsx:388`, `Podium.tsx:59`). Sonde: Enter auf
+   `stage-next`, dann `r` → kein Dialog (normal und „Nur Bühne“); auch nach Mausklick. Erwartet: R/r für die eigenen
+   Bühnenknöpfe durchlassen (nicht die Leertaste), Testschritt in 013e oder 013h.
+2. **minor** — 013i beweist die neuen Sperren nur für `capture-submit`; die anderen Paare wären auch vor der Änderung
+   grün. Erwartet: synchrones Doppelpaar für `answer-submit-draft` (mit Text), `answer-submit-review`,
+   `answer-approve`, dazu eine Prüfung, dass die Aktivierung eines gesperrten Button nichts schreibt.
+3. **minor** — Nach jedem Schreiben ein Fenster, in dem ein zweiter Druck den Hinweis „Stand veraltet“ (Bühne: Fehler-
+   Toast) zeigt (`answers/Page.tsx:80-83`, `QuestionDetail.tsx:362/375`, `stage/Page.tsx:349-351`). Heute nicht
+   erreichbar (kein HTTP-Adapter). Erwartet: Sperre bis `question.version` bzw. `stage.current.id` gewechselt hat.
+4. **minor** — Pfad „letzte Frage auf der Bühne“ (Fokus auf `stage-current`) ohne Test; `nextPressed` und
+   `stepTaken` können veralten. Erwartet: Test in 013h, beide Merker beim Abschluss des Schreibens bzw. beim Wechsel
+   von `current?.id`/`question.id` zurücksetzen.
+5. **minor** — Bericht veraltet (Screenshots sind mit `ef97c5e` eingecheckt; Status; Gates-Ausgabe nicht von HEAD).
+   Der Nachtrag in Files allowed ist vom Architekten (`ef97c5e`, Orchestrator-Commit), freigegeben.
+6. **nit** — `approval-block` und `stage-current` sind `div` mit `tabIndex=-1` ohne Rolle und Namen; `role="group"`
+   mit `aria-label` aus dem Wörterbuch erwägen.
+7. **nit** — Gesperrter Bühnenknopf im Kontrastmodus kaum sichtbar (vorhandene Tokens, nur Millisekunden). Bleibt.
+8. **nit** — Leerer Entwurfsknopf ist Tab-Halt und wird als nicht verfügbar angesagt; zulässiges Muster. Bleibt.
+
+Entscheidung des Architekten: 1–6 in dieser Scheibe beheben; 7 und 8 bleiben wie sie sind.
