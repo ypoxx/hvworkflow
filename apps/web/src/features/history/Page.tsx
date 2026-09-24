@@ -28,6 +28,7 @@ import {
   RESULT_LIMIT,
   STREAM_LIMIT,
   STREAM_SCAN_LIMIT,
+  createDetailProblemGate,
   excerpt,
   isReadForbidden,
   loadCurve,
@@ -115,6 +116,17 @@ export function HistoryPage() {
   // Ziel 3: the "Ereignisstrom" tab (`listEvents`).
   const [streamForbidden, setStreamForbidden] = useState(false);
 
+  /**
+   * Codex P2-2 on 4f0d231 (the same class as Codex (b) on 7f542b6 in the Beantwortung, see
+   * `createDetailProblemGate` in lib.ts): the selected question's `getQuestionHistory` runs next
+   * to the Hauptabfrage `listQuestions`. After a switch to a role without any question read, the
+   * list is refused with R-PERM-02 while the history read answers with the masked 404 — a failure
+   * of the detail read is therefore shown only once the corpus read of the same `version` has
+   * answered and was not refused. The history read itself does not wait (nit C, review round 4);
+   * it only stops while the view is known to be refused (`mainForbidden`).
+   */
+  const gate = useMemo(() => createDetailProblemGate(problem), []);
+
   // Ziel 2 (Nebenabfragen, Regression from slice 010): `listSpeakers` used to share this effect's
   // `Promise.all` with units/agendaItems/corpus — a denied `listSpeakers` (expert, legal, approver
   // hold no `speaker.read`) rejected the whole group, so `corpus` never populated and `selected`
@@ -150,20 +162,23 @@ export function HistoryPage() {
         if (cancelled) return;
         setCorpus(page.items);
         setMainForbidden(false);
+        gate.settleMain(String(version), false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (isReadForbidden(error)) {
           setCorpus([]);
           setMainForbidden(true);
+          gate.settleMain(String(version), true);
           return;
         }
         problem(error);
+        gate.settleMain(String(version), false);
       });
     return () => {
       cancelled = true;
     };
-  }, [version]);
+  }, [version, gate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,12 +233,13 @@ export function HistoryPage() {
   }, [version, search]);
 
   useEffect(() => {
-    if (selectedId === null) {
+    if (selectedId === null || mainForbidden) {
       setHistory([]);
       setHistoryForbidden(false);
       return undefined;
     }
     let cancelled = false;
+    const load = String(version);
     api
       .getQuestionHistory(selectedId)
       .then((events) => {
@@ -240,12 +256,12 @@ export function HistoryPage() {
           setHistoryForbidden(true);
           return;
         }
-        problem(error);
+        gate.report(load, `${load}:${selectedId}`, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, selectedId]);
+  }, [version, selectedId, mainForbidden, gate]);
 
   useEffect(() => {
     if (tab !== 'stream') return undefined;

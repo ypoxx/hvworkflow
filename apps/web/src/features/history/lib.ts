@@ -128,3 +128,53 @@ export function loadCurve(events: readonly DomainEvent[], now: number): number[]
   }
   return counts;
 }
+
+/**
+ * Codex (b) on 7f542b6 and Codex P2-2 on 4f0d231 — one class of bug: a detail read (the one
+ * selected question) runs next to the view's Hauptabfrage (the list). After a switch to a role
+ * without any question read, the list is refused with R-PERM-02, but the detail read of the
+ * question still selected answers with the masked 404 (Festlegung 3 of
+ * docs/slices/010-lesepfade-leserechte.md), which `isReadForbidden` rightly does not treat as a
+ * read refusal — so it used to become an error toast on top of the gestaltete Zustand.
+ *
+ * The gate holds a detail read's failure back until the Hauptabfrage of the same load (`load`,
+ * e.g. the API version) has answered: refused, the failure is dropped; not refused, it is shown —
+ * once per selection (`tag`), however many detail reads of it fail (minor 2, review round 3). A
+ * load the next one overtakes never reports: its successor reads again. Nothing here waits with
+ * the reads themselves (nit C, review round 4) — only the toast waits.
+ *
+ * Kept as a small local copy per feature that has a detail read (`answers/lib.ts`,
+ * `history/lib.ts`), like `isReadForbidden` (test gap 8c, review round 2); covered by the same test
+ * table in each feature's `lib.test.ts`.
+ */
+export interface DetailProblemGate {
+  /** The Hauptabfrage of `load` has answered; `refused` when it was a read refusal. */
+  settleMain(load: string, refused: boolean): void;
+  /** A detail read of `load` failed with something other than a read refusal. */
+  report(load: string, tag: string, error: unknown): void;
+}
+
+export function createDetailProblemGate(show: (error: unknown) => void): DetailProblemGate {
+  let verdict: { load: string; refused: boolean } | null = null;
+  let pending: { load: string; tag: string; error: unknown } | null = null;
+  let shownTag: string | null = null;
+  const flush = (): void => {
+    if (pending === null || verdict === null || pending.load !== verdict.load) return;
+    const { tag, error } = pending;
+    pending = null;
+    if (verdict.refused || tag === shownTag) return;
+    shownTag = tag;
+    show(error);
+  };
+  return {
+    settleMain(load, refused) {
+      verdict = { load, refused };
+      flush();
+    },
+    report(load, tag, error) {
+      if (tag === shownTag || pending?.tag === tag) return;
+      pending = { load, tag, error };
+      flush();
+    },
+  };
+}

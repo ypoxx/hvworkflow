@@ -7,7 +7,7 @@
  * here.
  */
 import { describe, expect, it } from 'vitest';
-import { isReadForbidden, wordDiff } from './lib';
+import { createDetailProblemGate, isReadForbidden, wordDiff } from './lib';
 
 describe('wordDiff', () => {
   it('identical texts yield only equal parts', () => {
@@ -55,5 +55,53 @@ describe('isReadForbidden', () => {
 
   it('500 (a real fault, not a rule): false — still becomes an error toast', () => {
     expect(isReadForbidden({ status: 500 })).toBe(false);
+  });
+});
+
+/** Codex (b) on 7f542b6, Codex P2-2 on 4f0d231, nit C of review round 4 — the same table in
+ *  `answers/lib.test.ts` and `history/lib.test.ts`. */
+describe('createDetailProblemGate', () => {
+  const setup = () => {
+    const shown: unknown[] = [];
+    return { shown, gate: createDetailProblemGate((error) => shown.push(error)) };
+  };
+
+  it('main refused, detail failed first: nothing shown (masked 404 after a role switch)', () => {
+    const { shown, gate } = setup();
+    gate.report('2', '2:q1', { status: 404 });
+    gate.settleMain('2', true);
+    expect(shown).toEqual([]);
+  });
+
+  it('main refused first, detail failed after: nothing shown', () => {
+    const { shown, gate } = setup();
+    gate.settleMain('2', true);
+    gate.report('2', '2:q1', { status: 404 });
+    expect(shown).toEqual([]);
+  });
+
+  it('main answered, detail failed: shown once, a second failure of the same selection is not', () => {
+    const { shown, gate } = setup();
+    gate.settleMain('2', false);
+    gate.report('2', '2:q1', 'a');
+    gate.report('2', '2:q1', 'b');
+    expect(shown).toEqual(['a']);
+  });
+
+  it('detail failed before main answered (not refused): shown when main answers', () => {
+    const { shown, gate } = setup();
+    gate.report('3', '3:q1', 'a');
+    expect(shown).toEqual([]);
+    gate.settleMain('3', false);
+    expect(shown).toEqual(['a']);
+  });
+
+  it('an overtaken load never reports, the next selection still does', () => {
+    const { shown, gate } = setup();
+    gate.settleMain('1', false);
+    gate.report('2', '2:q1', 'old');
+    gate.report('3', '3:q2', 'new');
+    gate.settleMain('3', false);
+    expect(shown).toEqual(['new']);
   });
 });
