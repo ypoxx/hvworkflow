@@ -376,3 +376,18 @@ dann so lange wie die Auswahl (wie auf `7f17174`). Befund 1 bleibt damit behoben
 Ziel-5-Aufbau plus zwei fremde Ereignisse → 0 Toasts; und der Befund-1-e2e (500 → genau ein Toast) bleibt grün, auch im
 ersten Ladevorgang nach dem Wechsel. N3: eine Tabellenzeile „keine Lesevorgänge“ in allen fünf Kopien. Bericht mit den
 echten Wiederholungszahlen.
+
+Runde 3 (Nachprüfung, Opus 5.5, frischer Kontext, HEAD `6703a26`): Gates exit 0, Playwright 68/68, axe ohne
+serious/critical, 010c-Datei zweimal 75/75 mit `--repeat-each=3`. N1–N3 und die Befunde 3, 4, 6, 8 halten; Gate-Kopien
+und Tabellen byte-gleich.
+
+- **R3-1 major (eng)** — `report` im Detail-Gate behält nur den ersten Fehler eines Durchgangs
+  (`answers/lib.ts:283` mit `:263-270`, ebenso `history/lib.ts:201`, `:181`). Seit `omits(id, error)` entscheidet die
+  Reihenfolge: kommt der maskierte 404 von `getQuestionHistory` vor dem 5xx von `getQuestion` und antwortet die Liste
+  zuletzt, wird der 5xx verworfen und der 404 geschluckt → kein Toast, leere Detailansicht. Sonde: `listQuestions`
+  600 ms verzögert, `getQuestion` 500, Wechsel zu observer → 0 Toasts (P8–P11); Kontrolle ohne Wechsel 1.
+
+Entscheidung des Architekten (Runde 3): im Gate (beide Kopien identisch) alle Fehler eines Durchgangs halten; `flush`
+zeigt den ersten, den `omits(id, error)` nicht schluckt; ein Toast je Durchgang bleibt. Unit-Zeile in beiden
+`lib.test.ts` (404, dann 500, dann Liste ohne die Auswahl → gezeigt: 500) und ein e2e mit verzögerter Liste und 500 nach
+dem 404 → genau ein Toast, rot auf `6703a26`.
