@@ -175,33 +175,45 @@ Kein Regel-Eintrag in dieser Scheibe trägt eine Norm (§ 131 Abs. 3 AktG bindet
 Verweigerung, außerhalb dieser Scheibe — Festlegung 1); die Spalte „Recherche-Zeile für die Norm" bleibt deshalb für
 jede Zeile leer/entfällt. `source`/`citation` je Regel-ID, mit Dateizeile:
 
-| Regel-ID | Art | Quelle | Fundstelle |
-|---|---|---|---|
-| R-TRANS-00 | Übergang | Leitplanken | `docs/qualitaetsleitplanken-produktreife.md:175` (6.4: 409 u. a. konsistent mit Regel-ID) |
-| R-TRANS-01 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:42-43` (P3: „Frage klassifizieren → Zuordnung zu Pfad A, B oder C") |
-| R-TRANS-02 | Übergang | Recherche | `docs/anforderungen-recherche.md:221` („Zuweisung an Personen statt Postfächer …") |
-| R-TRANS-03 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „6 fachliche Beantwortung") |
-| R-TRANS-04 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „7 Legal Clearing"; „ja, eigener Schritt") |
-| R-TRANS-05 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:109` (2.4: `legal_clearing → ready_for_stage`, `answer.approve.legal`) |
-| R-TRANS-06 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:59,90` („Qualitätsschleife zurück zu Schritt 5"; „Antwort zurückgeben") |
-| R-TRANS-07 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:57` („→ Bühne: Frage wird verlesen") |
-| R-TRANS-08 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A No-Brainer: freie Beantwortung durch den Vorstand) |
-| R-TRANS-09 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:89` („vorgelesen, weiter") |
-| R-TRANS-10 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:89` (dieselbe Aktion; das IST-Tool trennt „vorgelesen"/„abgeschlossen" nicht) |
-| R-TRANS-11 | Übergang | Prozess | **kein wörtlicher Beleg** — nächstliegende Analogie `docs/ist-analyse-und-schnittstellen.md:44` („kein Antwortbedarf" → Direktabschluss); Begriff nur in `docs/glossar.md:33` |
-| R-TRANS-12 | Übergang | Recherche | `docs/anforderungen-recherche.md:147` („Dublettenerkennung …; Merge reversibel …") |
-| R-GUARD-01 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (erst Beantwortung, dann Legal Clearing) |
-| R-GUARD-02 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A: freie Beantwortung ohne Text) |
-| R-GUARD-03 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:51-52` (Pfade B/C: Antwort mit Text) |
-| R-GUARD-04 | Guard | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:163` (4: „Keine Freigabe ohne Bindung an die Textversion …") |
-| R-GUARD-05 | Guard | Recherche | `docs/anforderungen-recherche.md:147` (Merge — Ziel/Quelle müssen verschiedene Fragen sein) |
-| R-PERM-01 | Recht | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:141` (3.4 „Deny by default"); ID eingeführt `docs/slices/010-lesepfade-leserechte.md` Festlegung 6 |
-| R-PERM-02 | Recht | Rechtekonzept | dieselbe Fundstelle wie R-PERM-01 |
-| R-PERM-03 | Recht | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:91` (2.3 Kontextattribut „Status"); ID eingeführt `docs/slices/010-lesepfade-leserechte.md` Festlegung 2 |
-| R-IDEM-01 | Idempotenz | Leitplanken | `docs/qualitaetsleitplanken-produktreife.md:167` (6.3: „Wiederholungen sind idempotent je Akteur und Operation") |
+Stand nach der Nacharbeit (Abschnitt 7); mehrere Zeilen tragen jetzt eine Quelle, eine Lücke oder eine Ableitung
+explizit im Wortlaut, statt sie zu verschweigen oder eine Anforderung als erfüllt zu unterstellen, die die Regel
+nicht umsetzt:
 
-R-TRANS-11 ist die einzige Zeile ohne wörtlichen Beleg in den beiden Recherche-Dokumenten; das steht so auch im
-generierten `docs/legal-trace.md` (kein Zitat wurde erfunden, Leitplanken 11).
+| Regel-ID | Art | Quelle | Fundstelle | Anmerkung |
+|---|---|---|---|---|
+| R-TRANS-00 | Übergang | Leitplanken | `docs/qualitaetsleitplanken-produktreife.md:175` (Prüfpunkt 6.4: 409 u. a. konsistent mit Regel-ID) | stützt nur das Antwortformat; Terminalität selbst ohne Fundstelle in Recherche/Ist-Analyse (Architekturentscheidung) |
+| R-TRANS-01 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:42-43` (P3: „Frage klassifizieren → Zuordnung zu Pfad A, B oder C") | — |
+| R-TRANS-02 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:107` (2.4: `classified → expert_answering`, Pflichtfeld „Segment") | offene Lücke: Recherche:221 fordert Personenzuweisung, Regel weist nur eine Einheit zu |
+| R-TRANS-03 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „6 fachliche Beantwortung") | — |
+| R-TRANS-04 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „7 Legal Clearing"; „ja, eigener Schritt") | — |
+| R-TRANS-05 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:109` (2.4: `legal_clearing → ready_for_stage`, Pflichtfelder Freigabevermerk, Vier-Augen) | nicht umgesetzt: Freigabevermerk, Ersteller ≠ Freigeber (§4, Zeile 156); keine Verhaltensänderung in dieser Scheibe |
+| R-TRANS-06 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:110` (2.4: `legal_clearing → expert_answering`, Pflichtfeld „Rückgabegrund") | ergänzend ist-analyse:90 („Antwort zurückgeben") |
+| R-TRANS-07 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:92` („nur die zugeordneten und freigegebenen Fragen") | — |
+| R-TRANS-08 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A No-Brainer: freie Beantwortung durch den Vorstand) | — |
+| R-TRANS-09 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:89` („vorgelesen, weiter") | — |
+| R-TRANS-10 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:58-59` (Antwortprüfung Legal → „Ja: Frage beantwortet") | eigener Abschluss-Schritt, getrennt von R-TRANS-09 |
+| R-TRANS-11 | Übergang | Recherche | `docs/anforderungen-recherche.md:285` (Zähldefinition: „zurückgezogene" als Zählkategorie) | Übergang selbst ohne Fundstelle; Ableitung: NICHT dasselbe wie „Kein Auskunftsanspruch" (Recherche:24) |
+| R-TRANS-12 | Übergang | Recherche | `docs/anforderungen-recherche.md:147` („Dublettenerkennung …") | teilweise: `merged` ist terminal, kein Unmerge, kein Ähnlichkeitsscore |
+| R-GUARD-01 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (erst Beantwortung, dann Legal Clearing) | Ableitung: Prüfung setzt Antwort voraus |
+| R-GUARD-02 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A: freie Beantwortung ohne Text) | — |
+| R-GUARD-03 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:51-52` (Pfade B/C: Antwort über Publikation bzw. fachliche Beantwortung) | Ableitung: beide mit Text |
+| R-GUARD-04 | Guard | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:163` (4: „Keine Freigabe ohne Bindung an die Textversion …") | — |
+| R-GUARD-05 | Guard | Recherche | `docs/anforderungen-recherche.md:147` (Dublettenerkennung) | Ableitung: Ziel/Quelle müssen verschieden sein; teilweise wie R-TRANS-12 |
+| R-PERM-01 | Recht | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:141` (3.4 „Deny by default") | Regel-ID zugeordnet seit a0c38c4 (02.09.2026) — nicht neu in Scheibe 010 |
+| R-PERM-02 | Recht | Rechtekonzept | dieselbe Fundstelle wie R-PERM-01 | ID eingeführt in Scheibe 010, Festlegung 6 (das stimmt für diese ID) |
+| R-PERM-03 | Recht | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:93` (2.3 Kontextattribut „Bühnenzuordnung") | Ableitung: gleiche Art Sichtbarkeitsbeschränkung wie „Leseumfang"; ID eingeführt Scheibe 010 Festlegung 2 |
+| R-IDEM-01 | Idempotenz | Leitplanken | `docs/qualitaetsleitplanken-produktreife.md:167` (Prüfpunkt 6.3: „Wiederholungen sind idempotent je Akteur und Operation") | Prüfpunkt, kein Regel-Charakter (Leitplanken:8-9) |
+
+Korrektur zu Punkt 6 der Legal-Review: Die vorherige Fassung dieses Berichts behauptete „R-TRANS-11 ist die einzige
+Zeile ohne wörtlichen Beleg in den beiden Recherche-Dokumenten". Das war falsch — neun der 22 Zeilen zitieren als
+Quelle weder `docs/anforderungen-recherche.md` noch `docs/ist-analyse-und-schnittstellen.md`, sondern Rechtekonzept
+oder Leitplanken, und zwar bewusst, weil dort die genauere oder einzige echte Fundstelle liegt: R-TRANS-00
+(Leitplanken), R-TRANS-02, R-TRANS-05, R-TRANS-06 (Rechtekonzept), R-GUARD-04 (Rechtekonzept), R-PERM-01, R-PERM-02,
+R-PERM-03 (Rechtekonzept), R-IDEM-01 (Leitplanken). Das ist kein Fehler, sondern Festlegung 2: „Prozess"/„Leitplanken"
+bzw. Rechtekonzept sind die richtige `source`, sobald keines der beiden Recherche-Dokumente die Regel selbst
+beschreibt. Einzig R-TRANS-11 hat eine Sonderrolle: es zitiert zwar `docs/anforderungen-recherche.md:285`
+(`source: 'Recherche'`), aber die Zeile deckt nur eine benachbarte Zählkategorie ab, nicht den Übergang selbst — das
+ist im Text der Zeile selbst ausdrücklich gesagt, nicht verschwiegen.
 
 ### 3. Wo jede der 22 Regel-IDs getestet ist
 
@@ -299,12 +311,124 @@ mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) 
 `git diff --exit-code -- packages/domain/policy-truth-table.md`: leer (Akzeptanz 2, verifiziert vor und nach jedem
 Commit).
 
+### 7. Nacharbeit nach Legal-Review und Codex
+
+Eine Nacharbeitsrunde: Opus-Legal-Review (Vorabzug an Recht, E15) fand 1 major-Baustein mit vier Unterpunkten plus
+mehrere minor-Befunde und Nits; Codex fand ein P2 auf PR #24. Alle Befunde 1–8 aus der Rückmeldung sind behoben:
+
+1. R-TRANS-11: `source: 'Recherche'`, zitiert jetzt `:285` (Zähldefinition, „zurückgezogene" als Zählkategorie);
+   Analogie zu `ist-analyse.md:44` entfernt (war eine Rechtsbewertung); Ableitung ausdrücklich als NICHT dasselbe
+   wie „Kein Auskunftsanspruch" (`Recherche:24`) markiert.
+2. Ehrliche Lücken/Teilweise-Kennzeichnung ergänzt bei R-TRANS-02 (Rechtekonzept:107 statt Recherche:221, Lücke
+   benannt), R-TRANS-12/R-GUARD-05 („teilweise: nicht reversibel, kein Ähnlichkeitsscore"), R-TRANS-05 („nicht
+   umgesetzt: Freigabevermerk, Ersteller ≠ Freigeber", ohne Verhaltens- oder Rechteänderung).
+3. Falsche Fundstellen korrigiert: R-PERM-03 → `rollen:93`; R-TRANS-07 → `ist:92`; R-TRANS-06 → `rollen:110`;
+   R-TRANS-00 benennt jetzt ausdrücklich, dass `Leitplanken:175` nur das 409-Format stützt, nicht die Terminalität.
+4. R-PERM-01: „zugeordnet (Schreibrecht fehlt) seit a0c38c4 (02.09.2026)" statt der falschen Behauptung, die
+   Regel-ID sei in Scheibe 010 eingeführt worden (das stimmt nur für R-PERM-02/R-PERM-03).
+5. `apps/api/src/__tests__/rule-register.test.ts`: `rules.ts` aus dem Scan ausgeschlossen; neuer Test prüft beide
+   Richtungen (Code → Register **und** Register → Code). Roter Lauf mit einer verwaisten `OTHER_RULES`-Zeile
+   (`R-STALE-01`, danach zurückgesetzt — `git diff` war leer):
+
+   ```
+    ✓ src/__tests__/rule-register.test.ts > rule register > every rule id used in production code has a register entry 2ms
+    × src/__tests__/rule-register.test.ts > rule register > every register entry corresponds to a rule id actually used in production code (no stale entries, rules.ts excluded from the scan) 8ms
+      → register entry(ies) with no matching production code (stale): R-STALE-01: expected [ 'R-STALE-01' ] to deeply equal []
+    ✓ src/__tests__/rule-register.test.ts > rule register > every register entry has a legalRef 0ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > no register entry is verified 0ms
+    × src/__tests__/rule-register.test.ts > rule register > every register entry has at least one test (transition row, guard, or literal rule id in a test file) 1ms
+      → rule id(s) with no test: R-STALE-01: expected [ 'R-STALE-01' ] to deeply equal []
+    ✓ src/__tests__/rule-register.test.ts > rule register > prints the honest count 1ms
+
+    Test Files  1 failed (1)
+         Tests  2 failed | 4 passed (6)
+   ```
+
+   Grüner Lauf danach (isoliert, `--reporter=verbose`), mit der Zählzeile:
+
+   ```
+   stdout | src/__tests__/rule-register.test.ts > rule register > prints the honest count
+   22 Regel-IDs, 22 legalRef, 0 verified
+
+    ✓ src/__tests__/rule-register.test.ts > rule register > every rule id used in production code has a register entry 2ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > every register entry corresponds to a rule id actually used in production code (no stale entries, rules.ts excluded from the scan) 0ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > every register entry has a legalRef 0ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > no register entry is verified 0ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > every register entry has at least one test (transition row, guard, or literal rule id in a test file) 0ms
+    ✓ src/__tests__/rule-register.test.ts > rule register > prints the honest count 1ms
+
+    Test Files  1 passed (1)
+         Tests  6 passed (6)
+   ```
+
+6. Der falsche Satz „R-TRANS-11 ist die einzige Zeile ohne wörtlichen Beleg in den beiden Recherche-Dokumenten" in
+   Abschnitt 2 ist ersetzt (neun Zeilen zitieren bewusst Rechtekonzept/Leitplanken statt der beiden
+   Recherche-Dokumente — das ist Festlegung 2, kein Fehler).
+7. Nits behoben: „Ableitung:" vor eigenen Schlussfolgerungen (R-GUARD-01/03/05); R-TRANS-00/R-IDEM-01 nennen die
+   Leitplanken jetzt als „Prüfpunkt, kein Regel-Charakter" (`Leitplanken:8-9`); R-TRANS-10 zitiert `ist:58-59`
+   (eigener Abschluss-Schritt); `GUARD_SCENARIOS` hat einen neuen Test gegen verwaiste Einträge
+   (`transitions.test.ts`).
+8. Codex P2 (`rules.ts:64`): Die R-TRANS-00-Beschreibung nennt jetzt ausdrücklich, dass `resolveTransition()`s Regel-
+   ID intern ist und die API sie für eine Frage, die der Akteur nicht lesen darf, hinter einem generischen 409 ohne
+   Regel-ID maskiert (Festlegung 8, Scheibe 010). Propagiert über den Schnappschuss in `docs/legal-trace.md`.
+
+`docs/legal-trace.md` neu generiert (`toMatchFileSnapshot`, nie handbearbeitet); `policy-truth-table.md` weiterhin
+byte-gleich (`git diff --exit-code` leer, erneut geprüft).
+
+`pnpm gates`-Ende nach der Nacharbeit (verbatim):
+
+```
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+
+> hvworkflow@0.1.0 i18n-literals /home/user/wt/011
+> node scripts/i18n-literal-check.mjs
+
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+
+> hvworkflow@0.1.0 slice-scope /home/user/wt/011
+> node scripts/slice-scope.mjs
+
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+
+> hvworkflow@0.1.0 downgrade-check /home/user/wt/011
+> node scripts/downgrade-check.mjs
+
+Downgrade check: 14 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+
+> hvworkflow@0.1.0 plan-graph /home/user/wt/011
+> node scripts/plan-graph.mjs
+
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+  missing dependencies: 0
+  cycles: 0
+  dependency-order problems: 0
+  same-day lane-sharing warnings: 0
+
+plan-graph: ok.
+...
+> @hv/web@0.0.0 build /home/user/wt/011/apps/web
+> tsc -b && vite build
+...
+✓ built in 1.12s
+mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) at commit c9ff931, tree 8a1e1db14841…
+```
+
+Davor im selben Lauf: `packages/domain test: Test Files 6 passed (6), Tests 85 passed (85)`; `apps/api test: Test
+Files 6 passed (6), Tests 55 passed (55)`; `apps/web test: Test Files 4 passed (4), Tests 48 passed (48)`; `arch`:
+„0 errors, 7 warnings" (dieselben sieben vorbestehenden `web-features-i18n-domain-types-only`-Befunde wie vor der
+Nacharbeit, unverändert durch diesen Diff). Kein FAIL/not-ok im gesamten Lauf.
+
+`node scripts/slice-scope.mjs` (separater Lauf nach der Nacharbeit): `slice-scope: 9 changed file(s), all within
+"docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).`
+
 Open:
 - `docs/produktplan-beta.md`s drei veraltete Zahl-Nennungen (Abschnitt 4 oben) sind nur gemeldet — eine Korrektur
   braucht eine eigene Scheibe oder den Orchestrator-Tagesbericht, weil die Datei nicht in „Files allowed" steht.
 - `x-legal-notice` bleibt unverändert (Festlegung 4); der Wortlaut oben ist ein Vorschlag für 023.
 - Der Vorabzug von `docs/legal-trace.md` mit ADR 0012 an Recht (E15) ist Sache des Orchestrator-Tagesberichts
   (Arbeitsweise), nicht dieser Scheibe.
+- Der rote Lauf für Punkt 5 (Abschnitt 7) nutzte eine temporäre `R-STALE-01`-Zeile in `rules.ts`, die vor dem
+  nächsten Commit vollständig zurückgesetzt wurde (`git diff` danach leer); kein Rest davon ist committet.
 
 Touched:
 - `packages/domain/src/transitions.ts`, `packages/domain/src/rules.ts` (neu), `packages/domain/src/index.ts`
