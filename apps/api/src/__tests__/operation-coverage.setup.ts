@@ -82,6 +82,12 @@ export async function teardown(): Promise<void> {
     log(`skipped — filtered run (${ranFiles.length} of ${testFiles.length} test files); only a full run proves coverage.`);
     return;
   }
+  // Review 023, point 5: `vitest run -t "<pattern>"` runs every file but only the matching tests, so
+  // the file count above is complete while the hits are not — a false red without this skip.
+  if (project.globalConfig.testNamePattern !== undefined) {
+    log(`skipped — test-name filter (-t ${String(project.globalConfig.testNamePattern)}) set; only a full run proves coverage.`);
+    return;
+  }
 
   const allowlist = readAllowlist();
   const allowed = new Set(allowlist.map((e) => e.operationId));
