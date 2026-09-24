@@ -799,17 +799,199 @@ test('Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht
   }, API_MODULE);
 
   // The overlay covers the header's role switcher, so the actor is switched through the demo
-  // actor store directly — the same call the switcher makes.
+  // actor store directly — the same call the switcher makes. Nit 4 (review round 5): a
+  // MutationObserver, armed in the same task as the switch, records whether the overlay is still in
+  // the DOM at any later mutation — `toBeVisible` on the skeleton alone would not see a short flash.
   await page.evaluate(async (url) => {
     const mod = (await import(/* @vite-ignore */ url)) as {
       DEMO_ACTORS: readonly { role: string }[];
       setActor: (actor: unknown) => void;
     };
+    const w = window as unknown as { __overlayAfterSwitch: boolean };
+    w.__overlayAfterSwitch = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="stage-only"]') !== null) w.__overlayAfterSwitch = true;
+    }).observe(document, { childList: true, subtree: true, attributes: true });
     mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.role === 'expert'));
   }, ACTOR_MODULE);
 
   await expect(page.getByTestId('stage-deciding')).toBeVisible();
   await expect(page.getByTestId('stage-only')).toHaveCount(0);
   await expect(page.getByTestId('stage-forbidden')).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as { __overlayAfterSwitch: boolean }).__overlayAfterSwitch),
+  ).toBe(false);
   await expectNoErrorToast(page);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Review round 5 (Nachprüfung auf 948a721) and Codex on 948a721. Run red against 948a721 first;
+// the Bericht, "Nacharbeit Runde 5", quotes both runs.
+// ---------------------------------------------------------------------------------------------
+
+/** Switches the demo actor in the running app without the header — the call the switcher makes. */
+async function switchActor(page: Page, role: string): Promise<void> {
+  await page.evaluate(
+    async ([url, wanted]) => {
+      const mod = (await import(/* @vite-ignore */ url!)) as {
+        DEMO_ACTORS: readonly { role: string }[];
+        setActor: (actor: unknown) => void;
+      };
+      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.role === wanted));
+    },
+    [ACTOR_MODULE, role],
+  );
+}
+
+test('Codex P2-A (948a721): Beantwortung — Wechsel zu observer bei offener, nicht vorgelesener Frage', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  // "zugewiesen" (`assigned`): not delivered, so outside observer's `question.read.delivered`.
+  await page.getByRole('group', { name: 'Stand' }).getByRole('button', { name: /^zugewiesen/ }).click();
+  const row = page.locator('[data-testid="answers-row"][data-status="assigned"]').first();
+  await row.click();
+  const detail = page.getByTestId('answers-detail');
+  await expect(detail).toBeVisible();
+  // admin's own steps for this question — the `_actions` that must not outlive the switch.
+  await expect(detail.getByRole('toolbar')).toBeVisible();
+
+  // observer's list succeeds (scoped), but no longer contains the open question; its
+  // `getQuestion`/`getQuestionHistory` answer with the masked 404.
+  await asRole(page, 'observer');
+  await expect(page.getByTestId('answers-forbidden')).toHaveCount(0);
+  await expectNoErrorToast(page);
+  await expect(detail).toHaveCount(0);
+  await expect(page.getByRole('toolbar', { name: 'Schritte zu dieser Einzelfrage' })).toHaveCount(0);
+});
+
+test('Codex P2-A (948a721): Historie — Wechsel zu observer bei gewählter, nicht vorgelesener Frage', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-history').click();
+  await expect(page).toHaveURL(/\/history$/);
+  const results = page.getByTestId('history-result');
+  await expect(results.first()).toBeVisible();
+  const words = await historyResultStatusWords(page);
+  const index = words.findIndex((word) => word !== 'vorgelesen' && word !== 'abgeschlossen');
+  expect(index).toBeGreaterThanOrEqual(0);
+  await results.nth(index).click();
+  await expect(page.getByTestId('history-timeline')).toBeVisible();
+
+  await asRole(page, 'observer');
+  await expect(page.getByTestId('history-forbidden')).toHaveCount(0);
+  await expectNoErrorToast(page);
+  await expect(page.getByTestId('history-timeline')).toHaveCount(0);
+  await expect(page.getByTestId('history-timeline-forbidden')).toHaveCount(0);
+});
+
+test('Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Rolle unterwegs ist, wird nicht übernommen', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-current-number')).toBeVisible();
+
+  // Latency patch: every `getStage` is answered by the API at once — for the actor current at
+  // that moment — but handed to the page only when the test releases it.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const w = window as unknown as { __held: (() => void)[]; __release: () => void };
+    w.__held = [];
+    w.__release = () => {
+      for (const deliver of w.__held.splice(0)) deliver();
+    };
+    const original = api['getStage']!.bind(api);
+    api['getStage'] = (...args: unknown[]) => {
+      const answer = original(...args);
+      // Handled later, on release — this only keeps a held refusal from counting as unhandled.
+      answer.catch(() => undefined);
+      return new Promise((resolve, reject) => {
+        w.__held.push(() => void answer.then(resolve, reject));
+      });
+    };
+  }, API_MODULE);
+
+  // podium's own `getStage` is now on its way (held) ...
+  await asRole(page, 'podium');
+  await expect(page.getByTestId('stage-deciding')).toBeVisible();
+
+  // ... and arrives in the very task in which the actor becomes expert, which may not read the
+  // stage. A MutationObserver records whether podium's question shows at any moment after.
+  await page.evaluate(async (url) => {
+    const mod = (await import(/* @vite-ignore */ url)) as {
+      DEMO_ACTORS: readonly { role: string }[];
+      setActor: (actor: unknown) => void;
+    };
+    const w = window as unknown as { __release: () => void; __sawStale: boolean };
+    w.__sawStale = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="stage-current"]') !== null) w.__sawStale = true;
+    }).observe(document, { childList: true, subtree: true });
+    w.__release();
+    mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.role === 'expert'));
+  }, ACTOR_MODULE);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as unknown as { __sawStale: boolean }).__sawStale)).toBe(false);
+
+  // expert's own answer (a refusal) is released last.
+  await page.evaluate(() => (window as unknown as { __release: () => void }).__release());
+  await expect(page.getByTestId('stage-forbidden')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __sawStale: boolean }).__sawStale)).toBe(false);
+  await expectNoErrorToast(page);
+});
+
+test('Runde 5 (1): Erfassung — der Zustand "keine Leseberechtigung" flackert bei Latenz nicht', async ({ page }) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'observer');
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
+  await expect(page.getByTestId('capture-forbidden')).toBeVisible();
+
+  // The Wortmeldung lookup answers 300 ms late from now on.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const original = api['listSpeakers']!.bind(api);
+    api['listSpeakers'] = (...args: unknown[]) =>
+      new Promise((resolve, reject) => {
+        window.setTimeout(() => void original(...args).then(resolve, reject), 300);
+      });
+  }, API_MODULE);
+
+  // Records every removal of the gestaltete Zustand from the DOM, however brief.
+  await page.evaluate(() => {
+    const w = window as unknown as { __lostForbidden: number };
+    w.__lostForbidden = 0;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.removedNodes) {
+          if (
+            node instanceof Element &&
+            (node.matches('[data-testid="capture-forbidden"]') ||
+              node.querySelector('[data-testid="capture-forbidden"]') !== null)
+          ) {
+            w.__lostForbidden += 1;
+          }
+        }
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+
+  // podium may read neither Wortmeldungen nor Redebeiträge either: a version jump, same verdict.
+  await switchActor(page, 'podium');
+  await page.waitForTimeout(1000);
+  await expect(page.getByTestId('capture-forbidden')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __lostForbidden: number }).__lostForbidden)).toBe(0);
 });

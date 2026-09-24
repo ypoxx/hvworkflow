@@ -1093,3 +1093,21 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
   - **Umgang:** angenommen, behoben in `a3ae45d`: die Probe läuft erst, wenn die Wortmeldungs-Abfrage geantwortet hat und keine Wortmeldung ergab. Das e2e „Codex P2-1 (4f0d231)“ zeichnet vom ersten Aufruf an auf, rot/grün im Bericht.
 - P2-2, `history/Page.tsx:243`: select a question, then switch to podium. The list is refused, but `getQuestionHistory` gets the masked 404 and raises a toast over `history-forbidden`. The same class as Codex (b) in answers: fix the class at its root — every place in the five features where a detail request runs next to a list or main request that can be refused, gated the same way, preferably through one small local pattern per feature. Test first: history with a question selected, switch to podium, then `expectNoErrorToast` plus `history-forbidden`.
   - **Umgang:** angenommen, als Klasse behoben in `8cbc85d`: `createDetailProblemGate` je Feature mit Detailabfrage (Beantwortung, Historie). Die Liste der geprüften Stellen in allen fünf Features steht im Bericht „Nacharbeit Runde 4“. e2e „Codex P2-2 (4f0d231)“, rot/grün im Bericht.
+
+### Runde 5 — Nachprüfung auf 948a721: annehmen
+
+- 1 (minor), `capture/Page.tsx:90-108`: `settled` does not check which key a status belongs to. With latency, the designed state flickers `[false,true]` on every version jump. Fix: `useAsync` returns the key its status belongs to, and `settled` requires the current key for all three reads (alternatively, freeze `needsProbe` while `speakers.status === 'loading'`). Add an e2e with the latency patch and a MutationObserver, following the "Runde 3 (4)" pattern. Qualify the P2-1 claim in the Bericht.
+  - **Umgang:** UMGANG5_1
+- 2 (nit), `answers/lib.ts:237` and `history/lib.ts:175`: select A (error, toast), then B (ok), then A again: the second error stays silent. Make the tag unique per selection pass, and add a sixth case to both test tables.
+  - **Umgang:** UMGANG5_2
+- 3 (nit, optional): compare `actor.id` instead of object identity (OIDC).
+  - **Umgang:** UMGANG5_3
+- 4 (nit, optional): MutationObserver in the "Runde 4 (B)" test.
+  - **Umgang:** UMGANG5_4
+
+### Codex auf 948a721
+
+- P2-A, `answers/useBacklog.ts:167` and the same in HistoryPage: an unrestricted actor has an undelivered question open, then switches to observer. `listQuestions` succeeds with a scoped list, so `refused=false`; `getQuestion` and `getQuestionHistory` get the masked 404, raise a toast, and the previous actor's detail and `_actions` stay visible. Fix: a successful list that does not contain the selected id must clear the selection and swallow its detail failures — an extension of the `createDetailProblemGate` class, not a special case. e2e: admin selects an undelivered question, switches to observer; no toast, no detail, no `_actions` from before.
+  - **Umgang:** UMGANG5_A
+- P2-B, `stage/Page.tsx:202`: if the actor changes while `getStage()` is still pending, the old promise can resolve before the version bump and install the previous actor's stage and `_actions`. Tie each request to the actor, or invalidate it synchronously on an actor change. Test with the latency patch.
+  - **Umgang:** UMGANG5_B
