@@ -1257,3 +1257,19 @@ weitere volle Runde vertretbar). Behoben in `e029ca1`, Bericht Abschnitt 13:
 - (c) P2 · Querschnittswirkungen fehlen in `docs/legal-trace.md`. Umgang: `CROSS_CUTTING_EFFECTS` in `rules.ts`,
   generierter Abschnitt „Querschnitt (ohne Regel-ID)" über den Schnappschusstest, keine neue Regel-ID; offener
   Punkt 15 geschlossen.
+
+### Runde 7 — Legal-Endprüfung auf `aeeff5f`
+
+Urteil: nacharbeiten (1 minor, 2 nit), danach „annehmen" am Diff abzuhaken. Alle fünf Befunde der Runde 6 und die drei
+Codex-Punkte auf `6deab48` bestätigt erledigt; Wahrheitstabelle byte-gleich, `pnpm gates` des Prüfers auf `aeeff5f`
+Exit 0.
+
+1. minor — Querschnitt „Ereignis mit Zeitpunkt und Akteur" sagt „nie überschrieben oder entfernt", in der Demo löscht
+   `resetDemo` das ganze Protokoll des Geräts für jede Rolle. **Umgang:** Satz „Demo: `resetDemo` … nicht erfüllt, der
+   Speicher der Domäne selbst ändert und löscht nichts" im Zitat ergänzt (Orchestrator, Folgecommit).
+2. nit — R-TRANS-12, offener Punkt 16: heute ohne Folge, weil beide Rollen mit `question.merge` alle Fragen lesen.
+   **Umgang:** Halbsatz „heute ohne Folge …, wirksam, sobald ein Merge-Recht ohne volles Leserecht vergeben wird" ergänzt.
+3. nit — Querschnitt `version`: das erste Ereignis setzt 1, erhöht nicht. **Umgang:** „setzt … auf 1, jedes weitere
+   erhöht sie".
+
+`docs/legal-trace.md` danach nur über `npx vitest run -u` neu erzeugt (86 Tests grün).

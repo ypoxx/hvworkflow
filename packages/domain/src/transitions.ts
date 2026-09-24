@@ -502,7 +502,9 @@ export const TRANSITIONS: readonly Transition[] = [
         'Architekturentscheidung, keine externe Vorgabe. Er maskiert nicht nach Leserecht: wer ' +
         '`question.merge` hält, erreicht die Zielsuche erst, nachdem `can()` dieses Recht bestätigt hat, und bekommt jede ' +
         'vorhandene Frage als Ziel, auch eine, die er nicht lesen darf; 404 nur für eine unbekannte ' +
-        'ID. Die Existenz eines Ziels ist damit für jeden sichtbar, der `question.merge` hält.',
+        'ID. Die Existenz eines Ziels ist damit für jeden sichtbar, der `question.merge` hält; heute ' +
+        'ohne Folge (beide Rollen mit `question.merge` lesen alle Fragen), wirksam, sobald ein ' +
+        'Merge-Recht ohne volles Leserecht vergeben wird.',
       docVersion: null,
       docHash: null,
       verified: false,

@@ -202,7 +202,7 @@ export interface CrossCuttingEffect {
  */
 export const CROSS_CUTTING_EFFECTS: readonly CrossCuttingEffect[] = [
   {
-    effect: 'Jedes Frage-Ereignis erhöht die Version der Frage (`version`), Grundlage für If-Match/ETag.',
+    effect: 'Das erste Frage-Ereignis setzt die Version der Frage (`version`) auf 1, jedes weitere erhöht sie; Grundlage für If-Match/ETag.',
     code: 'state.ts `touch`; api.ts `checkIfMatch`',
     legalRef: {
       source: 'Leitplanken',
@@ -248,7 +248,9 @@ export const CROSS_CUTTING_EFFECTS: readonly CrossCuttingEffect[] = [
         'Browser-Uhr, apps/web/src/api/index.ts:46). Akteur: nicht belegt als eigenes Feld. ' +
         'Ableitung: docs/rollen-und-rechtekonzept.md:158-160 (Abschnitt 4: "Keine physische ' +
         'Löschung … eines Auditeintrags", "Kein Abschalten des Audit-Logs") setzt ein Protokoll ' +
-        'voraus, das den Handelnden nennt.',
+        'voraus, das den Handelnden nennt. Demo: `resetDemo` (apps/web/src/api/index.ts:72-79) löscht ' +
+        'das gesamte Protokoll des Geräts, für jede Rolle; docs/rollen-und-rechtekonzept.md:158-160 ist ' +
+        'in der Demo nicht erfüllt, der Speicher der Domäne selbst ändert und löscht nichts.',
       docVersion: null,
       docHash: null,
       verified: false,
