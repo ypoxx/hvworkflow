@@ -997,6 +997,148 @@ mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) 
 Hinweis zu „Offen/Service-Lane-Lücke" oben: der Text beschreibt den Stand vor takt-011; die Allowlist-Texte sind
 jetzt auf den Stand nach dem Merge von takt-011 (PR #29) formuliert.
 
+### Sicherheits-Durchgang nach Codex auf 50cc738
+
+Commit `2d2b553` (Vertrag, Typen, CHANGELOG, Testhelfer); dieser Bericht im Folgecommit. **Ursache:** dreimal in
+Folge fand Codex im Anmelde- und Sicherheitsbereich eine weitere Invariante, weil bisher Einzelfunde nachgezogen
+wurden. Dieser Durchgang geht deshalb jede Stelle durch, an der eine Beschreibung ein Sicherheitsversprechen gibt (i),
+das `Action`-Enum gegen jedes im Plan genannte Recht (ii) und jedes Zeichenkettenfeld, das einen Hash, ein Token, eine
+Kennung oder eine Zeit trägt (iii).
+
+**(i) Sicherheitsversprechen → Schema-Bindung oder Prosa mit Grund**
+
+| Versprechen (Stelle) | Bindung im Schema | Prosa, weil … |
+|---|---|---|
+| Sitzungscookie HttpOnly, Secure, SameSite (`completeLogin` 302, Schema `session`) | `Set-Cookie` Pflicht, Muster: Wert ≥ 32 Cookie-Oktette, Lookaheads für `HttpOnly`, `Secure`, `SameSite=Lax\|Strict`, kein `Max-Age=0`/negativ (**Codex 1**) | `Expires` in der Vergangenheit: JSON Schema vergleicht keine Daten; Groß-/Kleinschreibung der Attribute: kanonisch, wie der Dienst schreibt |
+| Abmelden löscht das Cookie (`logout` 204) | `Set-Cookie` Pflicht, `^hv_session=` leer mit `Max-Age=0` (**neu**) | Sperrliste der Sitzungskennung ist serverseitig, in der Antwort nicht sichtbar |
+| Kein offener Redirect (`login.returnTo`, `completeLogin` 302 `Location`) | neues Schema `SameOriginPath` (`^/`, nicht `//` oder `/\`, kein Backslash, kein Leer- oder Steuerzeichen, ≤ 512) als `Location` (**Codex 2**) | `returnTo` selbst bleibt ohne Muster: ein fremder Wert wird ignoriert (Umleitung nach `/`), nicht abgelehnt — die Beschreibung nennt dieselbe Regel |
+| Weiterleitung zum IdP (`login` 302 `Location`) | `format: uri`, Pflicht | nicht auf `https:` gebunden: der lokale und e2e-Keycloak (031) läuft auf http://localhost |
+| Nichts auf dem Anmeldeweg wird zwischengespeichert (Sitzung, CSRF-Token, `state`) | neuer Header `CacheControlNoStore` (Pflicht, `no-store` als Direktive) an `login` 302, `completeLogin` 302, `logout` 204, `getSession` 200 (**neu**) | Problemantworten (400/401/403/503) tragen kein Geheimnis und bleiben geteilt |
+| CSRF-Token Pflicht unter `session` | `CsrfTokenRequired` an `logout` (Pflicht, `minLength: 1`); `SignedInSession.csrfToken` Pflicht, `^[A-Za-z0-9_-]{32,}$`; `DemoSession.csrfToken: false` | `CsrfToken` an den übrigen Operationen optional: OpenAPI kann einen Header nicht an ein Sicherheitsschema binden; kein Formatmuster auf der Anfrage (ein 422 mit Format verriete dem Fälscher, was zu senden ist; falsches Token ist 403 aus 029) |
+| Sitzungsablauf 14 h mit stiller Verlängerung | `SignedInSession.expiresAt` Pflicht, `date-time`; `DemoSession.expiresAt: false` | Dauer relativ zu „jetzt": kein Wertevergleich in JSON Schema |
+| Maskierung / keine Klarnamen in Ereignissen | v2-Ereignis ohne `actor.displayName` (`dependentSchemas`); `SubjectId` ohne `@` und Leerzeichen an allen Subjektkennungen (**neu**) | `personId`-Maskierung im Standardlesepfad hängt vom Recht des Aufrufers ab (Antwortschema kennt ihn nicht); „kein Name" in einer Kennung ist nicht von einer opaken Kennung unterscheidbar; `RoleRevokedPayload.reason` ist Freitext |
+| Keine internen Angaben ohne Anmeldung (`/readyz`, 503, `completeLogin`-Fehler) | `/readyz`: Prüfnamen geschlossen, Varianten geschlossen, Codes je Prüfung (Runde 4); `Problem.status` je Antwort `const` | `detail` ist Freitext (feste Sätze je Ursache, Prosa an `ServiceUnavailable` und `completeLogin`) |
+| `/metrics` nur für den Abfrager, keine Kennzahl je Person | `security: [metricsBearer]`, 401 dokumentiert | Prometheus-Text ist kein JSON; die Kennzahlen-Allowlist prüft 033 |
+| CORS | — | kein Versprechen im Vertrag (Vertrag ist same-origin, `servers: /v1`); der Dienst erlaubt CORS nur im Demo-Modus für den Vite-Dev-Server (`apps/api/src/app.ts`) |
+| Ratenbegrenzung | — | kein Versprechen im Vertrag; siehe Offen (034 „Limits" braucht 413/429 im Vertrag) |
+| ETag als Versionsmarke für `If-Match` | `ETag`/`ETagRequired` auf Entity-Tag-Syntax `^(?:W/)?"[!#-~]*"$` (**neu**; heute `"v<n>"`, von der ganzen API-Suite geprüft) | — |
+
+**(ii) `Action` gegen jedes im Plan genannte Recht** (`grep` über `docs/produktplan-beta.md` nach `question.`, `admin.`,
+`meeting.`, `speaker.`, `contribution.`, `stage.`, `event.`, `agenda.`, `answer.`, `debate.`, `export.`, `ingest.`,
+`history.`, `record.` u. a.; `record.html`/`record.json`/`config.ts` sind Dateinamen):
+
+| Recht | braucht (Scheibe, Datum) | Vertragslane der Scheibe | bis heute im Vertrag | Entscheidung |
+|---|---|---|---|---|
+| `question.identity.reveal` | 026 (16.10.) vergibt und prüft; 067 | nein (core) | nein | **jetzt** (**Codex 3**) — 043 listet es, liegt aber nach 026 (23.10.) |
+| `admin.override` | 040 (03.11.) Änderung nach Freeze mit Grund | nein (core) | nein | **jetzt** — 043 listet es nicht |
+| `question.read.protected` | 047 (10.11.) | nein (core) | nein | **jetzt** — 043 listet es nicht |
+| `event.read.personal` | 047 (10.11.), ADR 0009/0013 | nein (core) | nein | **jetzt** — 043 listet es nicht |
+| `question.refuse.propose`, `question.refuse.approve` | 044 (06.11.) | nein | nein | 043 (23.10., Vertragslane, in seiner Zielliste) |
+| `question.forward` | 048 (05.11.) | nein | nein | 043 (Zielliste) |
+| `export.dossier` | 051 (11.11.) | nein | nein | 043 (Zielliste) |
+| `ingest.write` | 064 (26.11.) | nein | nein | 043 (Zielliste) |
+| `debate.close` | 087 (17.11.) | nein | nein | 043 (Zielliste) |
+| `round.assemble`, `procedure.record`, `cockpit.read` | 053/050/061 | nein | nein | 043 (Zielliste) |
+| `agenda.manage`, `admin.roles.manage`, `question.legal.clear`, `question.read`, `event.read`, `stage.read`, `speaker.read`, `contribution.read`, `history.read`, `question.classify`, `question.assign`, `question.approve`, `answer.draft` | — | — | ja | — |
+
+Rechtekonzept (`docs/rollen-und-rechtekonzept.md`) nennt dazu Altbezeichner (`question.answer.draft`,
+`question.answer.approve.*`, `speech.round.reorder`, `stage.mark.delivered`, `user.role` …); der Plan ersetzt sie
+(Zeile 70: „verschiedene Vokabulare"), 052 baut das Rechtekonzept um — kein Vertragsbezeichner.
+
+**(iii) Hash-, Token-, Kennungs- und Zeitfelder**
+
+| Klasse | Felder | Einschränkung | heute sicher? |
+|---|---|---|---|
+| Zeit | alle `*At`, `at`, `serverTime`, `X-Server-Time` | `format: date-time` (alle schon vorher) | ja (Probe) |
+| Hash | `Event.hash`, `Meeting.configHash`, `ConfigFreeze.configHash` | neues Schema `Sha256Hex` `^[0-9a-f]{64}$` (**Codex 5**) | ja: kein heutiges Ereignis trägt `hash` (Probe: 0 von 2329) |
+| Hash-Vorgänger | `Event.prevHash` | `^(?:[0-9a-f]{64})?$` (leer = Genesis) (**Codex 5**) | ja (nicht gesendet) |
+| Token | `SignedInSession.csrfToken` | `^[A-Za-z0-9_-]{32,}$` (**neu**) | ja (029, nicht gebaut) |
+| Token | `hv_session`-Wert | ≥ 32 Cookie-Oktette (im `Set-Cookie`-Muster) | ja (029) |
+| Token | `X-CSRF-Token` (Anfrage) | nur `minLength: 1` an `logout` | bewusst kein Muster (siehe i) |
+| Subjekt | `RoleAssignment.subjectId`/`deputyForSubjectId`, `RoleAssignmentCreate.*`, `RoleAssignedPayload.*`, `RoleRevokedPayload.subjectId`, `DemoSession.subjectId`, `SignedInSession.subjectId` | neues Schema `SubjectId` (1–255, kein `@`, kein Leerraum) (**neu**) | ja (neue Schemata; Demo-Akteur-Kennungen wie `admin` passen) |
+| Schlüssel | `Event.idempotencyKey` | 1–128 wie der Header `Idempotency-Key` (**neu**) | ja (nicht gesendet) |
+| Versionsmarke | `ETag`, `ETagRequired` | Entity-Tag-Syntax (**neu**) | ja: `"v9"` u. a., 11 verschiedene Werte in der Probe, ganze API-Suite grün |
+| Kennungen | `id`, `meetingId`, `speakerId`, `questionId`, `personId`, `keyId`, `causationId`, `assignmentId`, `deviceId`, Pfadparameter | keine (opak) | Absicht: Kennungen erzeugt der Kern, ihr Format ist nicht Vertragsinhalt; ein Muster auf Pfadparametern bestehender Operationen würde Anfragen verengen (siehe „Compatibility") |
+| Regelkennung | `Problem.ruleId` | keine | Regelregister (011) prüft das Format; kein Sicherheitsfeld |
+| `Last-Event-ID` | Header | `^[0-9]+$` (schon vorher) | ja |
+
+**Test zuerst** (Wegwerf-Test `apps/api/src/__tests__/zz-sicherheit.test.ts`, danach gelöscht; Header über `req()`
+gegen eine Wegwerf-App, Körper über `expectValid`; je ein Ablehnungsfall pro Codex-Punkt und pro Treffer). Rot gegen
+50cc738 (nur der Test hinzugefügt):
+
+```
+ × Codex 1: Set-Cookie on completeLogin needs value, HttpOnly, Secure, SameSite Lax|Strict
+ × Codex 2: completeLogin Location is a same-origin path
+ × Codex 3 + sweep ii: Action has the identifiers later slices need
+ × Codex 4: helper validates required header values
+ × Codex 5: hash and prevHash are SHA-256 hex, prevHash may be empty
+ × sweep i: logout clears the cookie
+ × sweep i: no-store on auth responses
+ × sweep iii: csrfToken and session cookie value are long enough
+ × sweep iii: subject ids are never e-mail addresses
+ × sweep iii: configHash is SHA-256 hex
+ × sweep iii: event idempotencyKey bounded like the header
+ × sweep iii: ETag is an entity-tag
+      Tests  12 failed (12)
+```
+
+Grün nach der Änderung:
+
+```
+ ✓ Codex 1: Set-Cookie on completeLogin needs value, HttpOnly, Secure, SameSite Lax|Strict 60ms
+ ✓ Codex 2: completeLogin Location is a same-origin path 3ms
+ ✓ Codex 3 + sweep ii: Action has the identifiers later slices need 1ms
+ ✓ Codex 4: helper validates required header values 1ms
+ ✓ Codex 5: hash and prevHash are SHA-256 hex, prevHash may be empty 20ms
+ ✓ sweep i: logout clears the cookie 2ms
+ ✓ sweep i: no-store on auth responses 15ms
+ ✓ sweep iii: csrfToken and session cookie value are long enough 1ms
+ ✓ sweep iii: subject ids are never e-mail addresses 8ms
+ ✓ sweep iii: configHash is SHA-256 hex 6ms
+ ✓ sweep iii: event idempotencyKey bounded like the header 0ms
+ ✓ sweep iii: ETag is an entity-tag 3ms
+      Tests  12 passed (12)
+```
+
+**Live-Probe** (Wegwerf-Test, danach gelöscht; jede Antwort über `req()`, also mit Status, Körper und jetzt auch den
+Werten aller deklarierten Header, dazu `expectValid`):
+
+```
+PROBE seed=200 events=2329 withSchemaVersionOrHash=0 questions=300 histories=300 getQuestion-ETags=11 (e.g. "v9") meeting=200 problems=404,401,403
+ ✓ src/__tests__/zz-live-probe.test.ts > live probe on the seeded service 697ms
+      Tests  1 passed (1)
+```
+
+Die bestehende API-Suite bleibt 49/49 grün, auch mit `CONTRACT_GATE_STRICT=1`; keine Bestandsoperation verletzt einen
+Header-Wert. **`contract:lint`:** `You have 6 warnings.` **`pnpm contract:types`:** zweimal gleiche SHA-256
+(`a9f11255…`). **Typen-Diff:** neue Schemata `SameOriginPath`, `Sha256Hex`, `SubjectId`, Header
+`CacheControlNoStore`; `Action` +4; Subjekt- und Hashfelder referenzieren die neuen Schemata; `Location` von
+`completeLogin` ist `SameOriginPath`; `Set-Cookie` an `logout`, `Cache-Control` an vier Antworten.
+
+**`pnpm gates`** (Commit `2d2b553`, eigenes Log via `mktemp`, Exit 0). Zeilen desselben Laufs: `You have 6 warnings.`;
+`packages/domain Tests 72 passed (72)`; `apps/web Tests 48 passed (48)`; `apps/api Tests 49 passed (49)`;
+`operation-coverage: 65 operations …, 29 exercised by tests, 36 pre-declared` / `ok`; `vocabulary-check: ok`;
+`slice-scope: 10 changed file(s), all within … "Files allowed" list`; `plan-graph: ok.`; `# tests 196`, `# pass 196`,
+`# fail 0`; Ende wörtlich:
+
+```
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+…
+dist/assets/index-BoqUekbh.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,200.90 kB
+…
+✓ built in 2.13s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit 2d2b553, tree f976ef578e55…
+```
+
+**Offen aus dem Durchgang:** (1) 034 („Limits, Sicherheitsheader") hat keine Vertragslane; gibt der Dienst dort 413
+oder 429 zurück, ist das ein undokumentierter Status und der Testhelfer schlägt an — der Vertrag muss 413/429 vorher
+bekommen (043 oder Kleinänderung vor 034; Entscheidung des Orchestrators). (2) Allgemeine Sicherheitsheader (CSP,
+HSTS, `X-Content-Type-Options`) aus 034 sind Plattformheader, keine Vertragsheader; nicht deklariert. (3) `401` von
+`getMetrics` ohne `WWW-Authenticate: Bearer` (RFC 6750) — kein Versprechen im Vertrag, Kandidat für 033/043.
+
 ## Review findings
 
 **Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
@@ -1080,3 +1222,18 @@ in `f5a02e5` behoben, Nachweise unter „Letzte Kleinrunde":
 - P2 · SECURITY · `ReadinessCheck` offen für `detail` → beide Varianten `additionalProperties: false`. **behoben**
 - P2 · `helpers.ts` zählte Antworten ohne Pflicht-Header als ausgeübt → `assertRequiredHeaders()` vor dem Treffer;
   rot/grün mit Wegwerf-App; bestehende Suite 49/49 grün, keine Bestandsoperation betroffen. **behoben**
+
+**Codex auf 50cc738** (3 × P1, 2 × P2; zwei davon SECURITY und merge-blockierend), alle in `2d2b553` behoben, dazu der
+systematische Durchgang (Bericht „Sicherheits-Durchgang nach Codex auf 50cc738"):
+
+- P1 SECURITY · `completeLogin` `Set-Cookie` nahm `hv_session=wert` ohne Attribute und leere/löschende Cookies an →
+  Wert ≥ 32 Oktette, `HttpOnly`, `Secure`, `SameSite=Lax|Strict` per Lookahead, kein `Max-Age=0`. **behoben in 2d2b553**
+- P1 SECURITY · `completeLogin` `Location` unbeschränkt → `SameOriginPath` (dieselbe Regel wie `returnTo`).
+  **behoben in 2d2b553**
+- P1 · `question.identity.reveal` fehlte für 026 → im `Action`-Enum, dazu aus dem Durchgang `admin.override`,
+  `question.read.protected`, `event.read.personal`. **behoben in 2d2b553**
+- P2 · `assertRequiredHeaders` prüfte nur Anwesenheit → `assertResponseHeaders` validiert jeden deklarierten, gesendeten
+  Header mit Ajv vor dem Treffer. **behoben in 2d2b553**
+- P2 · `hash`/`prevHash` ohne Format → `Sha256Hex`, `prevHash` gleich oder leer. **behoben in 2d2b553**
+- Durchgang, zusätzlich: `logout` löscht das Cookie (Pflicht-`Set-Cookie`), `no-store` auf dem Anmeldeweg,
+  `csrfToken`-Format, `SubjectId`, `configHash`, `Event.idempotencyKey`, ETag-Syntax. **behoben in 2d2b553**
