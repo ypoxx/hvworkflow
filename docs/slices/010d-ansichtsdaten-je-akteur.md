@@ -1,6 +1,6 @@
 # 010d — Ansichtsdaten gehören dem Schlüssel des Akteurs
 
-**Status:** Nacharbeit Runde 2 gebaut (N1, N2; N3 in der Folgeliste), Nachprüfung offen
+**Status:** review bestanden (Runde 3, 24.09.)
 **Risikoklasse:** niedrig · 1 AStd · Lanes: web-speakers, web-capture, web-answers, web-history, e2e (eigene Datei).
 Startet nach 010c (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -435,3 +435,15 @@ mergebereit, N1 vor dem Merge empfohlen.
 Entscheidung des Architekten (Runde 2): N1 und N2 in dieser Scheibe (Entwurf leeren bindet an die Frage, nicht an die
 Auswahl; Banner und Dialog behalten die Auswahlprüfung; je ein e2e, N1 rot auf `97eba3e`). N3 geht mit dem gestalteten
 Ladefehler der Historie in die Folgeliste.
+
+Runde 3 (enge Nachprüfung N1/N2, Opus 5.5, frischer Kontext, HEAD `d2c7796`): Gates exit 0, 010d-Datei 78/78 mit
+`--repeat-each=3`, 010c-Datei 27/27. N1 und N2 behoben, je per Sonde (Text auf B bleibt; Text einer anderen Rolle bleibt;
+Fokus nur von BODY, kein doppelter Sprung). Urteil: mergebereit.
+
+- **minor, nicht neu** — `onScreen()` prüft Frage und Akteur, nicht die Editor-Instanz: verlässt man A während einer
+  langsamen Speicherantwort und kehrt zurück, leert der späte Erfolg den neu getippten Text (`answers/Page.tsx:150-153,
+  166`; Sonden P3b, P4, P5). Schon in Runde 1 so.
+- **nit** — Wiederholungsmarke `retriedAt` überlebt einen Rollenwechsel (`answers/WorkList.tsx:339-353`).
+
+Entscheidung des Architekten (Runde 3, Stoppregel): beide in die Folgeliste (Entwurf nur leeren, wenn der Editor noch den
+gespeicherten Text enthält; Marke an den Akteur binden), zusammen mit N3 und dem gestalteten Ladefehler der Historie.
