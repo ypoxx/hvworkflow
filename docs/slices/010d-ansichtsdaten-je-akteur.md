@@ -1,6 +1,6 @@
 # 010d — Ansichtsdaten gehören dem Schlüssel des Akteurs
 
-**Status:** gebaut, Review offen
+**Status:** Nacharbeit Runde 1 gebaut (Befunde 1–4, 6), Nachprüfung offen
 **Risikoklasse:** niedrig · 1 AStd · Lanes: web-speakers, web-capture, web-answers, web-history, e2e (eigene Datei).
 Startet nach 010c (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -70,7 +70,8 @@ Keine Änderung an Kern, Vertrag, Dienst, Rechten; kein neues Token; kein gemein
 
 ## Bericht
 
-Commits: `7c593f0` (Tests, rot), `74b8cab` (Änderung, **letzter Code-Commit**, Gates), dieser Commit (Bericht).
+Commits Runde 0: `7c593f0` (Tests, rot), `74b8cab` (Änderung), `24dd4e4` (Bericht). Runde 1: `25db979` (Änderung
+und e2e, **letzter Code-Commit**, Gates), dieser Commit (Bericht).
 
 ```
 Slice: 010d-ansichtsdaten-je-akteur
@@ -79,15 +80,60 @@ Done: Daten mit _actions gehören dem Schlüssel des Akteurs: Wortmeldungen, Erf
       Tabelle); bis zur ersten Antwort der neuen Rolle Skelett, keine Knöpfe, Dialoge der vorigen Rolle
       schließen. Beantwortung: Listenfehler ohne Zeilen → gestalteter Fehlerzustand mit "Erneut
       versuchen" (2 neue Schlüssel de/en), nie "Kein Treffer". Ausgang eines Schreibens nur, solange
-      seine Frage für denselben Akteur gezeigt wird. Ziel 4/5: Testschärfung und Harness ohne await.
-Evidence: pnpm gates auf 74b8cab, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite
-      89/89 (2 Worker) und 89/89 (1 Worker, taskset -c 0,1); 010d-Datei --repeat-each=3
-      zweimal 57/57 und 57/57; roter Lauf der endgültigen 010d-Datei gegen den Code von e303cc1:
-      17 rot / 2 grün (die zwei Gegenproben); axe ohne serious/critical, auch in den Ladezuständen;
-      docs/evidence/010d-beantwortung-ladefehler.png.
+      seine Frage für denselben Akteur gezeigt und noch gewählt ist; der Hinweis „Stand veraltet“
+      gehört seiner Frage. Runde 1: 412 außerhalb der Ansicht und Bestätigung mit Fragennummer (i18n),
+      ein Abruf je gescheitertem Ereignisstrom, Fokus nach „Erneut versuchen“, neutraler Fehlertext.
+      Ziel 4/5: Testschärfung und Harness ohne await.
+Evidence: pnpm gates auf 25db979, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite
+      94/94 (2 Worker) und 94/94 (1 Worker, taskset -c 0,1); 010d-Datei --repeat-each=3 zweimal
+      72/72 und 72/72; rote Läufe: Runde 1 8 rot / 16 grün auf 74b8cab (genau die neuen bzw.
+      geänderten Tests), Runde 0 17 rot / 2 grün auf e303cc1; axe ohne serious/critical, auch in den
+      Ladezuständen; docs/evidence/010d-beantwortung-ladefehler.png (neu aufgenommen, Text geändert).
 Open: siehe "Offen" unten.
 Touched: siehe "Touched" unten.
 ```
+
+### Nacharbeit Runde 1 (Befunde 1–4 und 6; Entscheidung des Architekten)
+
+- **Befund 1 (major), „Stand veraltet“ von A über B:** zwei Stellen, beide geändert. (a) Der Hinweis ist
+  kein Schalter der Seite mehr, sondern trägt seine Frage (`staleFor`), das Banner steht nur bei
+  `staleFor === question.id`. (b) Der Ausgang eines Schreibens verlangt zusätzlich, dass seine Frage noch
+  die **gewählte** ist (`shown.selectedId`): Während B lädt, zeigt die Detailansicht noch A, die Person ist
+  aber schon bei B — der 412 von A geht dann als Toast. Ohne (b) stünde das Banner kurz über A und
+  verschwände mit B, ungelesen.
+  Nachgeprüft für dasselbe Fenster: **Dialog schließen** — während A schreibt, ist A gesperrt, ein Dialog
+  auf B kann erst nach dem Laden von B aufgehen; mit (b) schließt der Erfolg von A ohnehin keinen Dialog,
+  solange B gewählt ist. **Entwurf leeren** — mit (b) wird der Entwurf von A nicht mehr geleert, wenn B
+  schon gewählt ist; die Detailansicht von A (mit dem gespeicherten Text) wird mit dem Laden von B
+  abgebaut, der Text kommt nirgends wieder. Kehrt die Person zu A zurück, bevor A antwortet, wirkt der
+  Ausgang wieder auf A. e2e „Runde 1 (Befund 1)“ mit gehaltenem `getQuestion`, rot auf `74b8cab`.
+- **Befund 2, 412-Toast:** ein 412 für eine nicht mehr gezeigte Frage zeigt `answers.toast.stale.title`
+  („Nicht übernommen“) und `answers.toast.stale.body` („„{action}“ für Einzelfrage {number} wurde nicht
+  übernommen: Die Frage wurde inzwischen geändert.“), die Bestätigung `answers.toast.step` („Einzelfrage
+  {number}: {action}“); je de/en, Paritätstest 461 → 464. Kein vorhandener Schlüssel passte
+  (`answers.stale.banner` sagt „Ansicht neu geladen“, das stimmt für eine andere Frage nicht). Die e2e
+  benutzen einen **echten** 412: „Freigeben“ auf A wird gehalten, bevor es die API erreicht; jemand anderes
+  gibt A zurück und legt es wieder zur Prüfung vor — derselbe Stand, dieselbe Antwortversion, ein neuerer
+  Datensatz —, so passiert das gehaltene Schreiben jede Übergangsprüfung und scheitert nur an seinem
+  `ifMatch` („Precondition failed“ vom Kern; ein neuer Entwurf hätte einen 409 ergeben, weil der Kern den
+  Übergang vor `ifMatch` prüft). Der Toast darf „Precondition“ nicht enthalten.
+- **Befund 3, Ereignisstrom:** Ursache war die Abhängigkeit `streamOwned` (und schon vorher `streamLastSeq`):
+  ein gescheitertes Ende setzte den eigenen Stand, das startete den Effekt ein zweites Mal. Jetzt liest der
+  Effekt `lastSeq` und Besitzer über `streamRef` (per `useLayoutEffect` nach jedem Commit gesetzt) und hängt
+  nur an `version` und Reiter. Nebenwirkung: nach einem erfolgreichen Fensterabruf entfällt der bisherige
+  überflüssige zweite Endabruf. e2e: Ende immer 500 → genau ein Abruf, ein Toast, beim ersten Öffnen und
+  nach observer → admin.
+- **Befund 4, Fokus nach „Erneut versuchen“:** `listFailed` hängt nicht mehr am laufenden Ladevorgang,
+  sondern heißt „die letzte beantwortete Listenabfrage dieses Akteurs ist gescheitert, und er hat keine
+  Zeilen“ — der Fehlerzustand und damit der fokussierte Knopf bleiben während des erneuten Lesens stehen
+  (wie in der Wortmeldeliste). Scheitert es wieder, bleibt der Fokus auf dem Knopf. Kommen Zeilen, geht der
+  Fokus auf die Liste (`role="listbox"`, Name „Liste der Einzelfragen“), wo die Pfeiltasten wirken — nur,
+  wenn er auf BODY gefallen ist. Zwei e2e mit Tastatur (Enter): Erfolg → Liste fokussiert, Pfeil nach unten
+  öffnet die erste Frage; Misserfolg (300 ms verzögert, damit der Ladezustand dazwischen gerendert wird) →
+  Knopf fokussiert.
+- **Befund 6:** „Der Bestand konnte gerade nicht gelesen werden.“ / „The corpus could not be read just
+  now.“; der Screenshot ist neu aufgenommen, weil sich sein Text geändert hat.
+- **Befund 5:** angenommen, unverändert.
 
 ### Invarianten je Ansicht
 
@@ -116,23 +162,27 @@ der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwe
   schließt mit seiner Frage.
 - **Beantwortung:** Zeilen, Zähler, Einzelfrage mit `_actions` und ihr Verlauf nur aus Ladevorgängen des
   aktuellen Akteurs; sonst Listenskelett und „Einzelfrage wird geladen …“. Aktionsdialoge und „Stand
-  veraltet“ gehen beim Akteurwechsel. Liste gescheitert (dieser Akteur, aktuelle `version`, nichts lädt)
-  und keine Zeilen → Fehlerzustand `answers-list-error` (EmptyState, TriangleAlert, „Erneut versuchen“ ruft
-  `reload`); die rechte Seite schweigt dann wie bei der Verweigerung statt „Wählen Sie links …“. Ein
-  Fehler derselben Rolle bei vorhandenen Zeilen lässt die Zeilen stehen (Toast wie bisher).
-  **Ausgang eines Schreibens:** wirkt nur, wenn im Moment der Antwort dieselbe Frage für denselben Akteur
-  gezeigt wird (`shown`, nach jedem Commit per `useLayoutEffect` gesetzt): Dialog schließen, Entwurf leeren
-  (`onDone`), „Stand veraltet“. Sonst meldet ein Toast die Ablehnung (auch den 412) — eine Ablehnung bleibt
-  nie unbemerkt; die Erfolgsmeldung nennt den Schritt und steht immer. Den Akteur zusätzlich zur `id` zu
-  vergleichen geht über den Wortlaut von Ziel 3 hinaus: es folgt aus Ziel 1 (der Ausgang gehört dem, der
-  geschrieben hat) und hat einen eigenen e2e.
+  veraltet“ gehen beim Akteurwechsel. Die letzte beantwortete Listenabfrage dieses Akteurs ist gescheitert
+  und er hat keine Zeilen → Fehlerzustand `answers-list-error` (EmptyState, TriangleAlert, „Erneut
+  versuchen“); er bleibt stehen, solange derselbe Akteur neu liest (Runde 1, Befund 4), und die rechte Seite
+  schweigt dann wie bei der Verweigerung statt „Wählen Sie links …“. Ein Fehler derselben Rolle bei
+  vorhandenen Zeilen lässt die Zeilen stehen (Toast wie bisher).
+  **Ausgang eines Schreibens:** wirkt nur, wenn im Moment der Antwort seine Frage für denselben Akteur
+  gezeigt wird **und** noch die gewählte ist (`shown` mit `selectedId`, nach jedem Commit per
+  `useLayoutEffect` gesetzt): Dialog schließen, Entwurf leeren (`onDone`), „Stand veraltet“. Der Hinweis
+  selbst trägt seine Frage (`staleFor`) und steht nur über ihr. Sonst meldet ein Toast die Ablehnung — ein
+  412 im Hauswortlaut mit Fragennummer, jede andere Ablehnung wie bisher —, eine Ablehnung bleibt nie
+  unbemerkt; die Erfolgsmeldung nennt Schritt und Fragennummer und steht immer. Den Akteur zusätzlich zur
+  `id` zu vergleichen geht über den Wortlaut von Ziel 3 hinaus: es folgt aus Ziel 1 (der Ausgang gehört
+  dem, der geschrieben hat) und hat einen eigenen e2e.
 - **Historie:** Trefferzeilen, Korpus (und damit die gewählte Frage), Vorgangshistorie, Ereignisstrom und
   Rednernamen nur aus Ladevorgängen des aktuellen Akteurs; sonst Skelett links und rechts (statt „Keine
   Einzelfrage gewählt“ oder „Noch keine Ereignisse“). Die Vorgangshistorie gehört außerdem zu ihrer Frage
   (vorher standen beim Auswahlwechsel kurz die Ereignisse der vorigen Frage unter dem neuen Titel). Der
   Strom überspringt ein unverändertes Ende nur, wenn dieser Akteur das Fenster gelesen hat (R10 bleibt für
   gewöhnliche Ereignisse; nach einem Wechsel wird einmal gelesen — im Demo hält nur admin `event.read`, und
-  eine Verweigerung setzte `lastSeq` schon bisher auf 0).
+  eine Verweigerung setzte `lastSeq` schon bisher auf 0). Der Effekt des Stroms hängt nur an `version` und
+  Reiter und liest seinen eigenen Stand über eine Ref (Runde 1, Befund 3): keine Antwort startet ihn neu.
 - **Barrierefreiheit:** Die Skelette der Beantwortung und der Historie trugen `aria-label` auf einem `div`
   ohne Rolle; axe meldet das als `aria-prohibited-attr` (serious), sichtbar erst jetzt, weil 010d sie nach
   jedem Rollenwechsel zeigt und die e2e axe im Ladezustand prüfen. Jetzt `role="status"` mit `aria-busy`.
@@ -150,7 +200,8 @@ der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwe
    (Liste und Einzelfrage) in beiden Reihenfolgen → Fehlerzustand, zwei Toasts, nichts der vorigen Rolle;
    Gegenprobe derselben Rolle (Zeilen bleiben). Neue Schlüssel `answers.list.error.title`/`.body`,
    Paritätstest 459 → 461.
-3. Ziel 3: e2e 412 auf A nach Wechsel zu B (kein Banner über B, ein Toast „Testfehler“); Erfolg auf A nach
+3. Ziel 3: e2e echter 412 auf A nach Wechsel zu B (kein Banner über B, ein Toast „Nicht übernommen“ mit der
+   Nummer von A; Runde 1); dasselbe, während B noch lädt (Runde 1, Befund 1); Erfolg auf A nach
    Wechsel zu B (Rückgabedialog auf B bleibt offen, Text bleibt); Entwurf auf A gespeichert, Wechsel zu B,
    A gelingt (Entwurf auf B bleibt); 412 auf A nach Rollenwechsel bei weiter gezeigtem A (kein Banner);
    Gegenprobe 412 auf der gezeigten Frage (Banner, kein Toast).
@@ -170,10 +221,11 @@ der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwe
 
 ### Evidence
 
-**`pnpm gates` auf `74b8cab` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 181, api 57, scripts
+**`pnpm gates` auf `25db979` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 181, api 57, scripts
 206/206. `slice-scope: 21 changed file(s), all within "docs/slices/010d-ansichtsdaten-je-akteur.md"'s "Files
-allowed" list (7 pattern(s)).` oxlint: 23 Warnungen, vorher 24 (keine neue). Schluss wörtlich (nur
-ANSI-Farbcodes entfernt):
+allowed" list (7 pattern(s)).` (dazu die bekannte Warnung, dass „Files allowed“ seit `e303cc1` vom Architekten
+ergänzt wurde, `4fdf98f`). Runde 0: Gates auf `74b8cab` ebenfalls Exit 0, oxlint 23 Warnungen statt 24. Schluss
+wörtlich (nur ANSI-Farbcodes entfernt):
 
 ```
 > tsc -b && vite build
@@ -189,7 +241,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-CfNioku_.js                        571.29 kB │ gzip: 167.11 kB │ map: 2,366.42 kB
+dist/assets/index-Dwnrtg1l.js                        572.34 kB │ gzip: 167.38 kB │ map: 2,370.88 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -199,10 +251,36 @@ dist/assets/index-CfNioku_.js                        571.29 kB │ gzip: 167.11 
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 1.62s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 74b8cab, tree 4d6a48298670…
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 25db979, tree 04e0ef5c3712…
 ```
 
-**Playwright** (eigener Port 5593, Chromium unter `/opt/pw-browsers`), Code von `74b8cab`:
+**Playwright Runde 1** (eigener Port 5593, Chromium unter `/opt/pw-browsers`), Code von `25db979`:
+- ganze Suite: `94 passed (6.1m)` (2 Worker) und `94 passed (11.2m)` (1 Worker, `taskset -c 0,1`, wie der CI-Läufer mit 2
+  CPUs); axe in allen Szenarien ohne serious/critical.
+- `e2e/010d-ansichtsdaten.spec.ts` (24 Tests) mit `--repeat-each=3`, zwei Läufe: `72 passed (2.9m)` und
+  `72 passed (2.9m)`.
+
+**Roter Lauf Runde 1:** die e2e-Datei aus `25db979` gegen den Code von `74b8cab` (`git stash` nur
+`apps/web/src`): `8 failed, 16 passed (2.1m)`; rot sind genau die neuen bzw. für Runde 1 geänderten Tests:
+
+```
+  ✘  10 Ziel 2: … erster Abruf mit 500 …                      answers-list-error  Expected substring: "Der Bestand konnte gerade nicht gelesen werden."
+  ✘  15 Ziel 3: … echter 412 auf A nach dem Wechsel zu B …     Toasts  Expected substring: "Nicht übernommen"  Received: "Precondition failedResourc…"
+  ✘  16 Runde 1 (Befund 1): … echter 412 auf A, während B noch lädt   stale-banner  Expected: 0  Received: 1
+  ✘  17 Ziel 3: … Erfolg auf A nach dem Wechsel zu B …          Toasts  Expected substring: "Einzelfrage F-0076"  Received: "ÜbernommenFreigeben"
+  ✘  21 Runde 1 (Befund 4): … scheitert wieder: Fokus bleibt   Erneut versuchen  Expected: focused  Received: inactive
+  ✘  22 Runde 1 (Befund 4): … gelingt: Fokus auf die Liste     listbox "Liste der Einzelfragen"  Expected: focused  Received: inactive
+  ✘  23 Runde 1 (Befund 3): Ereignisstrom — Ende immer 500      Toasts  Expected: 1  Received: 2
+  ✘  24 Runde 1 (Befund 3): Ereignisstrom — observer → admin    Toasts  Expected: 1  Received: 2
+  8 failed
+  16 passed (2.1m)
+```
+
+(Vor dem endgültigen Stand lief die Datei einmal mit einem Entwurf statt Rückgabe/Vorlage als „anderer
+Stelle“ — das ergab einen 409, keinen 412 — und mit sofortigem Scheitern des erneuten Versuchs, bei dem der
+Ladezustand nie gerendert wird und Test 21 schon auf `74b8cab` grün war; beides ist oben behoben.)
+
+**Playwright Runde 0**, Code von `74b8cab`:
 - ganze Suite: `89 passed (6.2m)` (2 Worker, auf dem Baum, der als `74b8cab` eingecheckt wurde) und
   `89 passed (11.1m)` (1 Worker, `taskset -c 0,1`, wie der CI-Läufer mit 2 CPUs, nach dem Commit); axe in
   allen Szenarien ohne serious/critical.
@@ -210,7 +288,7 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
 - Die von den Läufen überschriebenen PNGs anderer Scheiben sind mit `git checkout -- docs/evidence`
   zurückgesetzt; eingecheckt ist nur `docs/evidence/010d-beantwortung-ladefehler.png`.
 
-**Roter Lauf** der endgültigen e2e-Datei gegen den Code von `e303cc1` (`git stash` nur `apps/web/src`, die
+**Roter Lauf Runde 0** der damaligen e2e-Datei gegen den Code von `e303cc1` (`git stash` nur `apps/web/src`, die
 Unit-Tests aus `7c593f0` blieben): `17 failed, 2 passed (2.6m)`; grün sind genau die zwei Gegenproben.
 Ergebniszeilen, rechts die Assertion aus demselben Lauf:
 
@@ -229,7 +307,7 @@ Ergebniszeilen, rechts die Assertion aus demselben Lauf:
   ✘  12 Ziel 2: Beantwortung — … listQuestions scheitert vor getQuestion …           answers-list-error  Expected: visible
   ✘  13 Ziel 2: Beantwortung — … getQuestion scheitert vor listQuestions …           answers-list-error  Expected: visible
   ✓  14 Ziel 2 (Gegenprobe): … dieselbe Rolle, die Zeilen bleiben                    (soll grün bleiben)
-  ✘  15 Ziel 3: Beantwortung — 412 auf A nach dem Wechsel zu B …                    stale-banner  Expected: 0  Received: 1
+  ✘  15 Ziel 3: Beantwortung — 412 auf A nach dem Wechsel zu B …                    stale-banner  Expected: 0  Received: 1  (in Runde 1 auf echten 412 umgestellt)
   ✘  16 Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: Dialog …         answer-return-reason  Expected: visible
   ✘  17 Ziel 3: Beantwortung — Erfolg eines Entwurfs auf A …                        answer-editor  Expected: "Entwurf zu B, noch nicht gespeichert."  Received: ""
   ✘  18 Ziel 3: Beantwortung — 412 auf A nach einem Rollenwechsel …                 stale-banner  Expected: 0  Received: 1
@@ -251,6 +329,10 @@ der Testdatei: `failAlways` für den ersten Abruf, axe im Ladezustand, der Wortm
   Strom „Noch keine Ereignisse“ (vorher genauso beim ersten Abruf; nach einem Rollenwechsel standen dort
   vorher die Daten der vorigen Rolle). Ein Fehlerzustand bräuchte neue `history.*`-Schlüssel.
 - **Historie, beide Hauptabfragen scheitern:** zwei Toasts (aus 010c, unverändert).
+- **Ladezustände werden nicht angesagt** (Befund 5, angenommen); eigene `history.*`-Schlüssel folgen mit dem
+  gestalteten Ladefehler der Historie (Folgepunkt des Architekten).
+- **Andere Ablehnungen außerhalb der Ansicht** (403, 409, 5xx einer nicht mehr gezeigten Frage) zeigen wie
+  bisher den Toast des Servers; nur der 412 hat einen eigenen Wortlaut mit Nummer (Befund 2 nennt nur ihn).
 - **Eingetippter Text** (Entwurf der Beantwortung, Redebeitrag im Erfassungsformular) ist kein Datum des
   Servers und hängt nicht am Akteur; der Beantwortungsentwurf geht beim Rollenwechsel mit der Einzelfrage
   (die Detailansicht wird neu aufgebaut), das Erfassungsformular behält seinen Text.
