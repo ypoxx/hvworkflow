@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import type { Announcements, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Eye, ListOrdered, Plus, TriangleAlert } from 'lucide-react';
+import { Eye, ListOrdered, Lock, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
@@ -108,14 +108,16 @@ export function SpeakersPage() {
    * contract carries no `_actions` list for it; the permission bundle that may change a Wortmeldung
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
-  const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
+  const mayRegister =
+    view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
   /**
    * Point #26 (feedback, slice 020): a role without any write right on the Wortmeldeliste used to
    * see no register button and no row actions with no explanation at all. Derived from `_actions`
    * alone, never from the role name (AGENTS.md rule 4).
    */
   const mayWriteSpeakers = view.some(
-    (speaker) => speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
+    (speaker) =>
+      speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
   );
   const readOnly = view.length > 0 && !mayWriteSpeakers;
 
@@ -293,6 +295,9 @@ export function SpeakersPage() {
   ) : undefined;
 
   const empty = status !== 'loading' && view.length === 0;
+  // Ziel 1 (slice 010b): recognised by the 403's ruleId in `useSpeakers`, never by the role
+  // itself (AGENTS.md rule 4) — nothing here names a role.
+  const forbidden = status === 'forbidden';
 
   // m3 (review round 1): the hint sits in the header's own meta slot, next to the title, the same
   // place `registerButton` would go — not a loose line that pushes the rest of the page down.
@@ -305,7 +310,9 @@ export function SpeakersPage() {
       {t('speakers.readonly.hint')}
     </span>
   ) : undefined;
-  const headerMeta = registerButton ?? readOnlyHint;
+  // Slice 010b: a role that cannot even read the list has nothing to register into and no row to
+  // act on — the header shows neither the register button nor the read-only hint while forbidden.
+  const headerMeta = forbidden ? undefined : (registerButton ?? readOnlyHint);
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -315,7 +322,18 @@ export function SpeakersPage() {
         {...(headerMeta !== undefined ? { actions: headerMeta } : {})}
       />
 
-      {status === 'error' && view.length === 0 ? (
+      {forbidden ? (
+        <div data-testid="speakers-forbidden" className="grid min-h-0 flex-1">
+          <Panel bodyClassName="grid place-items-center">
+            <EmptyState
+              icon={Lock}
+              title={t('speakers.forbidden.title')}
+              description={t('speakers.forbidden.body')}
+              className="w-full max-w-xl"
+            />
+          </Panel>
+        </div>
+      ) : status === 'error' && view.length === 0 ? (
         <Panel bodyClassName="grid place-items-center">
           <EmptyState
             icon={TriangleAlert}
