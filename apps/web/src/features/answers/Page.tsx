@@ -7,11 +7,12 @@
  * on refusal — a 412 means somebody else wrote first, and the record, not the interface, says what
  * is true afterwards.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, WriteOptions } from '@hv/domain';
 import { api } from '../../api';
+import { useActor } from '../../api/actor';
 import {
   EmptyState,
   Panel,
@@ -32,10 +33,24 @@ import type { Filters } from './useBacklog';
 
 type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | null;
 
-/** The question a write was made against, as it was read (takt-008). */
+/** The question a write was made against, as it was read (takt-008), and by whom (slice 010d). */
 interface WriteLock {
   id: string;
+  /** The number the person knows the question by — named in the confirmation (010d, round 1). */
+  number: string;
   version: number;
+  actorId: string;
+}
+
+/**
+ * The question on screen, the actor it was read for, and the selection the person has made (slice
+ * 010d, Ziel 3). The last differs from the first while a newly selected question still loads: the
+ * detail then shows the previous one, but the person has already moved on (review round 1, finding 1).
+ */
+interface Shown {
+  id: string;
+  actorId: string;
+  selectedId: string | null;
 }
 
 export function AnswersPage() {
@@ -57,10 +72,37 @@ export function AnswersPage() {
   const busy = lock !== null;
   const [draftResetToken, setDraftResetToken] = useState(0);
   // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
-  const [stale, setStale] = useState(false);
+  // Slice 010d, review round 1, finding 1: the notice names the question it is about and stands
+  // only above that one — a flag of the page landed above the next question once it had loaded.
+  const [staleFor, setStaleFor] = useState<string | null>(null);
 
   const backlog = useBacklog(filters, selectedId);
   const { reload, selected: question } = backlog;
+  const actorId = useActor().id;
+
+  /**
+   * Slice 010d, Ziel 1: an action dialog and the "Stand veraltet" notice belong to the actor who
+   * opened or caused them. On an actor change both go in the same render (compared by `id`, never
+   * by role, AGENTS.md rule 4): the next actor has been offered nothing yet.
+   */
+  const [viewActorId, setViewActorId] = useState(actorId);
+  if (viewActorId !== actorId) {
+    setViewActorId(actorId);
+    setDialog(null);
+    setStaleFor(null);
+  }
+
+  /**
+   * Slice 010d, Ziel 3: the question on screen at this moment, read when a write answers. The
+   * outcome of a write — "Stand veraltet", closing its dialog, emptying the draft — applies only
+   * while its own question is still the one shown, for the actor who wrote. Otherwise it would land
+   * on whatever question (or role) is shown by then. Kept after each commit, so it is exactly what
+   * the person sees.
+   */
+  const shown = useRef<Shown | null>(null);
+  useLayoutEffect(() => {
+    shown.current = question === null ? null : { id: question.id, actorId, selectedId };
+  }, [question, actorId, selectedId]);
 
   // Adjusted during render: the render that shows the new version is the one that unlocks.
   if (
@@ -75,7 +117,7 @@ export function AnswersPage() {
 
   // A fresh look at a (possibly different) question starts without yesterday's notice.
   useEffect(() => {
-    setStale(false);
+    setStaleFor(null);
   }, [selectedId]);
 
   /**
@@ -83,25 +125,61 @@ export function AnswersPage() {
    * is only used to name the step in the confirmation — the decision was made by `_actions`.
    */
   const run = useCallback(
-    async (permission: Permission, write: (options: WriteOptions) => Promise<unknown>) => {
-      if (question === null || writing.current !== null) return false;
-      const taken = { id: question.id, version: question.version };
+    async (
+      permission: Permission,
+      write: (options: WriteOptions) => Promise<unknown>,
+      onDone?: () => void,
+    ): Promise<void> => {
+      if (question === null || writing.current !== null) return;
+      const taken: WriteLock = {
+        id: question.id,
+        number: question.number,
+        version: question.version,
+        actorId,
+      };
       writing.current = taken;
       setLock(taken);
+      const step = { number: taken.number, action: actionLabel(t, permission) };
+      // Slice 010d, Ziel 3: read at the moment of the answer, not when the write was sent — the
+      // question is on screen for the actor who wrote, and it is still the one selected (review
+      // round 1, finding 1: while the next selection loads, the detail still shows this one).
+      //
+      // Review round 2 (N1): emptying the draft is bound to the question on screen, not to the
+      // selection — while the next selection loads, the editor of this very question is still
+      // mounted with the saved text, and a person who comes back finds it there as if unsaved.
+      const onScreen = (): boolean =>
+        shown.current !== null &&
+        shown.current.id === taken.id &&
+        shown.current.actorId === taken.actorId;
+      const stillShown = (): boolean =>
+        onScreen() && shown.current !== null && shown.current.selectedId === taken.id;
       try {
         await write({ ifMatch: etagOf(question.version) });
+        // The confirmation names the step and the question (review round 1, finding 2), so it
+        // stands wherever the person is by now.
         showToast({
           tone: 'success',
           title: t('answers.toast.done'),
-          detail: actionLabel(t, permission),
+          detail: t('answers.toast.step', step),
         });
-        setDialog(null);
-        return true;
+        if (stillShown()) setDialog(null);
+        if (onScreen()) onDone?.();
       } catch (error) {
         // 412: somebody else wrote first — say so above the detail and reload; keep the toast for
-        // every other refusal (403/409 among them).
-        if (problemStatus(error) === 412) setStale(true);
-        else showProblem(error, t('toast.problem'));
+        // every other refusal (403/409 among them). Slice 010d, Ziel 3: the notice stands above the
+        // question it is about; once that question is no longer shown, the refusal is still
+        // reported, as a toast in the house's words with the question's number (review round 1,
+        // finding 2) — the server's own sentence names neither.
+        if (problemStatus(error) === 412) {
+          if (stillShown()) setStaleFor(taken.id);
+          else {
+            showToast({
+              tone: 'danger',
+              title: t('answers.toast.stale.title'),
+              detail: t('answers.toast.stale.body', step),
+            });
+          }
+        } else showProblem(error, t('toast.problem'));
         // Refused: nothing changed on the record, so nothing to wait for — unlock at once. Slice
         // 010c, Ziel 6 (N2 of takt-008's Nachprüfung): only this write's own lock. Its lock may
         // already have fallen (the page moved on to another question), and a newer write may hold
@@ -109,10 +187,9 @@ export function AnswersPage() {
         if (writing.current === taken) writing.current = null;
         setLock((held) => (held === taken ? null : held));
         reload();
-        return false;
       }
     },
-    [question, reload, t],
+    [question, actorId, reload, t],
   );
 
   const onAction = useCallback(
@@ -122,15 +199,17 @@ export function AnswersPage() {
       switch (action.kind) {
         case 'draft': {
           const sources = splitSources(action.sources);
-          void run('answer.draft', (options) =>
-            api.draftAnswer(
-              id,
-              { text: action.text.trim(), ...(sources.length > 0 ? { sources } : {}) },
-              options,
-            ),
-          ).then((ok) => {
-            if (ok) setDraftResetToken((value) => value + 1);
-          });
+          void run(
+            'answer.draft',
+            (options) =>
+              api.draftAnswer(
+                id,
+                { text: action.text.trim(), ...(sources.length > 0 ? { sources } : {}) },
+                options,
+              ),
+            // Only the draft of the question it was written for (slice 010d, Ziel 3).
+            () => setDraftResetToken((value) => value + 1),
+          );
           break;
         }
         case 'submit_review':
@@ -168,6 +247,11 @@ export function AnswersPage() {
     return page.items.find((item) => item.number.toLowerCase() === wanted)?.id;
   }, []);
 
+  // Slice 010d, Ziel 2: the list could not be read and nothing is open — its own Fehlerzustand
+  // (WorkList.tsx) says what happened; "select a question on the left" would not be true.
+  const detailSilent =
+    backlog.listForbidden || (backlog.listFailed && question === null && !backlog.selectedLoading);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <PageHeader title={t('page.answers.title')} description={t('page.answers.description')} />
@@ -192,7 +276,9 @@ export function AnswersPage() {
           // question on the left" is not honest when there is no left to select one from. The
           // Hauptabfrage's own gestalteter Zustand (`answers-forbidden`, WorkList.tsx) already
           // covers the whole story; the right pane says nothing rather than something misleading.
-          backlog.listForbidden ? null : question === null ? (
+          //
+          // Slice 010d, Ziel 2: the same when the list could not be read (`detailSilent`).
+          detailSilent ? null : question === null ? (
             <Panel className="h-full" bodyClassName="flex items-center justify-center">
               <EmptyState
                 icon={FileQuestion}
@@ -208,12 +294,12 @@ export function AnswersPage() {
             </Panel>
           ) : (
             <div data-testid="answers-detail" className="flex h-full min-h-0 flex-col gap-2">
-              {stale && (
+              {staleFor === question.id && (
                 <StaleBanner
                   testId="stale-banner"
                   message={t('answers.stale.banner')}
                   onReload={() => {
-                    setStale(false);
+                    setStaleFor(null);
                     reload();
                   }}
                 />

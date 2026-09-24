@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
-import { Lock, Search, X } from 'lucide-react';
+import { Lock, Search, TriangleAlert, X } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { QUESTION_STATUSES, TERMINAL_STATUSES, TRACKS } from '@hv/domain';
 import {
@@ -222,11 +222,12 @@ function columnsFor(showTrack: boolean, showUnit: boolean): string {
 export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: WorkListProps) {
   const t = useT();
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [box, setBox] = useState({ height: 600, width: 640 });
   const [now, setNow] = useState(() => Date.now());
 
-  const { items, counts, total, listLoading, listForbidden, units } = backlog;
+  const { items, counts, total, listLoading, listFailed, listForbidden, units } = backlog;
 
   // The age column is only honest if it moves on its own.
   useEffect(() => {
@@ -322,6 +323,35 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
     [items, onSelect, selectedId],
   );
 
+  /**
+   * Slice 010d, review round 1, finding 4: "Erneut versuchen" sits in the error panel, which stays
+   * up while the list is read again (`listFailed`) — a failed retry leaves the focus on the button.
+   * Once rows arrive the panel goes with the focused button; the focus then goes to the list rather
+   * than falling to `<body>`, and only if nothing else took it in the meantime.
+   *
+   * Review round 2 (N2): the retry is settled by the first list read answered after it
+   * (`listAnswered` rises once per answered read), whatever it answered — rows, none, or another
+   * failure — and the mark is cleared then, not only when rows come. With no rows the focus goes to
+   * the step the empty state offers ("Auswahl zurücksetzen", or "Erneut versuchen" if it failed
+   * again), without one to the search field.
+   */
+  const { reload, listAnswered } = backlog;
+  const retriedAt = useRef<number | null>(null);
+  const emptyPaneRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const retry = useCallback(() => {
+    retriedAt.current = listAnswered;
+    reload();
+  }, [listAnswered, reload]);
+  useEffect(() => {
+    if (retriedAt.current === null || listAnswered <= retriedAt.current) return;
+    retriedAt.current = null;
+    const active = document.activeElement;
+    if (active !== null && active !== document.body) return;
+    if (items.length > 0) listboxRef.current?.focus();
+    else (emptyPaneRef.current?.querySelector('button') ?? searchRef.current)?.focus();
+  }, [listAnswered, items]);
+
   const activeRow =
     selectedId !== null && windowed.some((question) => question.id === selectedId)
       ? `answers-row-${selectedId}`
@@ -402,6 +432,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
               className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-400"
             />
             <input
+              ref={searchRef}
               type="search"
               data-testid="answers-search"
               aria-label={t('answers.search.label')}
@@ -490,9 +521,31 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {items.length === 0 ? (
-          <div className="p-4">
-            {listLoading ? (
-              <div className="space-y-1.5" aria-label={t('answers.list.loading')} aria-busy="true">
+          <div ref={emptyPaneRef} className="p-4">
+            {listFailed ? (
+              // Slice 010d, Ziel 2: the list could not be read — say so and offer the one step that
+              // helps. "Kein Treffer … Auswahl zurücksetzen" would claim an answer that never came.
+              <div data-testid="answers-list-error">
+                <EmptyState
+                  icon={TriangleAlert}
+                  title={t('answers.list.error.title')}
+                  description={t('answers.list.error.body')}
+                  action={
+                    <Button size="sm" variant="secondary" onClick={retry}>
+                      {t('common.retry')}
+                    </Button>
+                  }
+                />
+              </div>
+            ) : listLoading ? (
+              // Slice 010d: shown after every role switch now. `role="status"` gives the label a
+              // role to name — on a bare div axe rejects `aria-label` (aria-prohibited-attr, serious).
+              <div
+                role="status"
+                className="space-y-1.5"
+                aria-label={t('answers.list.loading')}
+                aria-busy="true"
+              >
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((line) => (
                   <div key={line} className="h-8 animate-pulse rounded-sm bg-ink-50" />
                 ))}
@@ -515,6 +568,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         ) : (
           <div style={{ height: items.length * ROW_HEIGHT }} className="relative">
             <div
+              ref={listboxRef}
               role="listbox"
               tabIndex={0}
               aria-label={t('answers.list.label')}

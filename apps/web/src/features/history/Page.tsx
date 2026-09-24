@@ -6,7 +6,7 @@
  * corpus, the course of one question (`getQuestionHistory`), and the tail of the meeting
  * (`listEvents`). Nothing is derived, nothing is cached across a version change.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { History, Lock, Search } from 'lucide-react';
 import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
 import { api } from '../../api';
@@ -33,6 +33,7 @@ import {
   excerpt,
   isCurrentLoad,
   isReadForbidden,
+  keyBelongsTo,
   loadCurve,
   loadKey,
   NO_VERDICT,
@@ -41,6 +42,11 @@ import {
 import type { KeyedRead, ReadVerdict } from './lib';
 
 type Tab = 'question' | 'stream';
+
+const NO_QUESTIONS: readonly Question[] = [];
+const NO_EVENTS: readonly DomainEvent[] = [];
+const NO_CURVE: readonly number[] = [];
+const NO_NAMES: ReadonlyMap<string, string> = new Map();
 
 function problem(error: unknown): void {
   showProblem(error, translate(getLang(), 'toast.problem'));
@@ -97,21 +103,47 @@ export function HistoryPage() {
   const [tab, setTab] = useState<Tab>('question');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [results, setResults] = useState<readonly Question[]>([]);
-  const [total, setTotal] = useState(0);
-  const [resultsLoading, setResultsLoading] = useState(true);
-  const [corpus, setCorpus] = useState<readonly Question[]>([]);
+  /**
+   * Slice 010d, Ziel 1: every record of this view is kept with the key of the load that read it and
+   * handed out only to that load's actor (`keyBelongsTo`, lib.ts) — the result rows, the corpus
+   * (and with it the selected question), its Vorgangshistorie, the Ereignisstrom and the speaker
+   * names. After a role switch nothing the previous role could read stands for the one response
+   * time until the new role has answered; the panes show their skeleton instead. A newer `version`
+   * of the same actor keeps them on screen while it loads (design principle 8).
+   */
+  const [resultsState, setResultsState] = useState<{
+    key: string;
+    items: readonly Question[];
+    total: number;
+  } | null>(null);
+  const [resultsLoadingState, setResultsLoading] = useState(true);
+  const [corpusState, setCorpusState] = useState<{
+    key: string;
+    items: readonly Question[];
+    complete: boolean;
+  } | null>(null);
   const [units, setUnits] = useState<readonly Unit[]>([]);
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
-  const [speakerNames, setSpeakerNames] = useState<ReadonlyMap<string, string>>(new Map());
-  const [history, setHistory] = useState<readonly DomainEvent[]>([]);
-  // The tail read for the "Ereignisstrom" tab: `streamWindow` is the bounded read itself (`stream`,
-  // the reversed table slice, is derived from it); `curve`, the bucketed Lastkurve, is recomputed
-  // in the same place the read happens, so it is bucketed once per fetched tail, keyed on
-  // `streamLastSeq` — never on a render that leaves the tail untouched (R10, 007 rework).
-  const [streamWindow, setStreamWindow] = useState<readonly DomainEvent[]>([]);
-  const [streamLastSeq, setStreamLastSeq] = useState(0);
-  const [curve, setCurve] = useState<readonly number[]>([]);
+  const [namesState, setNamesState] = useState<{
+    key: string;
+    names: ReadonlyMap<string, string>;
+  } | null>(null);
+  const [historyState, setHistory] = useState<{
+    key: string;
+    questionId: string;
+    events: readonly DomainEvent[];
+  } | null>(null);
+  // The tail read for the "Ereignisstrom" tab: `window` is the bounded read itself (`stream`, the
+  // reversed table slice, is derived from it); `curve`, the bucketed Lastkurve, is recomputed in
+  // the same place the read happens, so it is bucketed once per fetched tail, keyed on `lastSeq` —
+  // never on a render that leaves the tail untouched (R10, 007 rework). Slice 010d: `key` is the
+  // load that read it.
+  const [streamState, setStreamState] = useState<{
+    key: string | null;
+    lastSeq: number;
+    window: readonly DomainEvent[];
+    curve: readonly number[];
+  }>({ key: null, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE });
   // Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Historie — set from the 403's
   // ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
@@ -139,9 +171,6 @@ export function HistoryPage() {
   );
   if (mainVerdict !== shownMainVerdict) setShownMainVerdict(mainVerdict);
   const mainForbidden = mainVerdict.forbidden;
-  // Codex P2-A on 948a721: whether `corpus` is the whole of what this actor may read (nothing cut
-  // off by the limit) — only then does "not in the corpus" mean "not readable".
-  const [corpusComplete, setCorpusComplete] = useState(false);
   // Ziel 3: the "Vorgangshistorie" tab of one selected question (`getQuestionHistory`).
   const [timelineRead, setTimelineRead] = useState<KeyedRead | null>(null);
   const [shownTimelineVerdict, setShownTimelineVerdict] = useState<ReadVerdict>(NO_VERDICT);
@@ -158,6 +187,36 @@ export function HistoryPage() {
   const streamVerdict = readVerdict(shownStreamVerdict, [{ read: streamRead, key: mainKey }], actorId);
   if (streamVerdict !== shownStreamVerdict) setShownStreamVerdict(streamVerdict);
   const streamForbidden = streamVerdict.forbidden;
+
+  // Slice 010d, Ziel 1: what this actor may be shown of each record (see above).
+  const resultsOwned = resultsState !== null && keyBelongsTo(resultsState.key, actorId);
+  const results = resultsOwned ? resultsState.items : NO_QUESTIONS;
+  const total = resultsOwned ? resultsState.total : 0;
+  const resultsLoading = resultsLoadingState || !resultsOwned;
+  const corpusOwned = corpusState !== null && keyBelongsTo(corpusState.key, actorId);
+  const corpus = corpusOwned ? corpusState.items : NO_QUESTIONS;
+  const speakerNames =
+    namesState !== null && keyBelongsTo(namesState.key, actorId) ? namesState.names : NO_NAMES;
+  const history =
+    historyState !== null &&
+    historyState.questionId === selectedId &&
+    keyBelongsTo(historyState.key, actorId)
+      ? historyState.events
+      : null;
+  const streamOwned = keyBelongsTo(streamState.key, actorId);
+  const streamWindow = streamOwned ? streamState.window : NO_EVENTS;
+  const curve = streamOwned ? streamState.curve : NO_CURVE;
+  /**
+   * Slice 010d, review round 1, finding 3: the stream effect reads its own record through this ref
+   * instead of depending on it. As a dependency (`streamOwned`, and before it `streamLastSeq`) every
+   * answer of the effect ran it again — a failed read of the tail set the record, which started the
+   * effect a second time: two reads, two toasts. Now only a new `version` or the tab starts it.
+   * Kept after each commit, before any effect of that commit runs.
+   */
+  const streamRef = useRef(streamState);
+  useLayoutEffect(() => {
+    streamRef.current = streamState;
+  });
 
   /**
    * Codex P2-2 on 4f0d231 (the same class as Codex (b) on 7f542b6 in the Beantwortung, see
@@ -210,21 +269,25 @@ export function HistoryPage() {
         if (!isCurrentLoad(requested, current())) return;
         const complete = page.items.length >= page.total;
         const ids = new Set(page.items.map((question) => question.id));
-        setCorpus(page.items);
-        setCorpusComplete(complete);
+        setCorpusState({ key: requested, items: page.items, complete });
         setCorpusRead({ key: requested, status: 'ready' });
         gate.settleMain(String(version), false, complete ? (id) => !ids.has(id) : undefined);
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
-          setCorpus([]);
-          setCorpusComplete(false);
+          setCorpusState({ key: requested, items: NO_QUESTIONS, complete: false });
           setCorpusRead({ key: requested, status: 'forbidden' });
           gate.settleMain(String(version), true);
           return;
         }
         setCorpusRead({ key: requested, status: 'error' });
+        // Slice 010d: the same actor keeps what it had; a corpus another actor read gives way to none.
+        setCorpusState((previous) =>
+          previous !== null && keyBelongsTo(previous.key, getActor().id)
+            ? previous
+            : { key: requested, items: NO_QUESTIONS, complete: false },
+        );
         problem(error);
         gate.settleMain(String(version), false);
       });
@@ -243,7 +306,10 @@ export function HistoryPage() {
       .listSpeakers()
       .then((speakers) => {
         if (!isCurrentLoad(requested, current())) return;
-        setSpeakerNames(new Map(speakers.map((speaker) => [speaker.id, speaker.displayName])));
+        setNamesState({
+          key: requested,
+          names: new Map(speakers.map((speaker) => [speaker.id, speaker.displayName])),
+        });
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
@@ -252,7 +318,7 @@ export function HistoryPage() {
         // (review round 2): cleared, not left holding a previous, more privileged role's names —
         // `version` bumps on every actor switch (api/useApiVersion.ts), so a role that has just
         // lost `speaker.read` must not go on showing who it can no longer look up.
-        setSpeakerNames(new Map());
+        setNamesState({ key: requested, names: NO_NAMES });
         if (isReadForbidden(error)) return;
         problem(error);
       });
@@ -270,8 +336,11 @@ export function HistoryPage() {
       .listQuestions({ limit: RESULT_LIMIT, ...(search !== '' ? { q: search } : {}) })
       .then((page) => {
         if (!isCurrentLoad(requested, current())) return;
-        setResults([...page.items].sort((a, b) => a.number.localeCompare(b.number)));
-        setTotal(page.total);
+        setResultsState({
+          key: requested,
+          items: [...page.items].sort((a, b) => a.number.localeCompare(b.number)),
+          total: page.total,
+        });
         setResultsLoading(false);
         setResultsRead({ key: requested, status: 'ready' });
       })
@@ -279,18 +348,26 @@ export function HistoryPage() {
         if (!isCurrentLoad(requested, current())) return;
         setResultsLoading(false);
         if (isReadForbidden(error)) {
-          setResults([]);
-          setTotal(0);
+          setResultsState({ key: requested, items: NO_QUESTIONS, total: 0 });
           setResultsRead({ key: requested, status: 'forbidden' });
           return;
         }
         setResultsRead({ key: requested, status: 'error' });
+        setResultsState((previous) =>
+          previous !== null && keyBelongsTo(previous.key, getActor().id)
+            ? previous
+            : { key: requested, items: NO_QUESTIONS, total: 0 },
+        );
         problem(error);
       });
     return () => {
       cancelled = true;
     };
   }, [version, search]);
+
+  // Codex P2-A on 948a721: only a complete corpus (nothing cut off by the limit) of this very actor
+  // says that "not in the corpus" means "not readable".
+  const corpusComplete = corpusOwned && corpusState.complete;
 
   /**
    * Codex P2-A on 948a721: no history read while the view cannot show the selection — the whole
@@ -311,7 +388,7 @@ export function HistoryPage() {
     const requested = loadKey(getActor().id, scope);
     if (selectedId === null || selectionHidden) {
       // Nothing to read is an answer too: no refusal stands for this key.
-      setHistory([]);
+      setHistory(null);
       setTimelineRead({ key: requested, status: 'ready' });
       return undefined;
     }
@@ -322,7 +399,7 @@ export function HistoryPage() {
       .getQuestionHistory(selectedId)
       .then((events) => {
         if (!isCurrentLoad(requested, current())) return;
-        setHistory(events);
+        setHistory({ key: requested, questionId: selectedId, events });
         setTimelineRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
@@ -330,11 +407,11 @@ export function HistoryPage() {
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who may find the question (`question.read.delivered`) but holds
           // no `history.read` — a gestalteter Zustand, not an error toast.
-          setHistory([]);
+          setHistory({ key: requested, questionId: selectedId, events: NO_EVENTS });
           setTimelineRead({ key: requested, status: 'forbidden' });
           return;
         }
-        setHistory([]);
+        setHistory({ key: requested, questionId: selectedId, events: NO_EVENTS });
         // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
         // another actor (`readVerdict`).
         setTimelineRead({ key: requested, status: 'error' });
@@ -360,14 +437,20 @@ export function HistoryPage() {
       .then(({ lastSeq }) => {
         if (!isCurrentLoad(requested, current())) return undefined;
         setStreamRead({ key: requested, status: 'ready' });
-        if (lastSeq === streamLastSeq) return undefined;
+        // Slice 010d: an unchanged tail is skipped only if this actor read it; a window another
+        // actor read is not shown (`streamOwned`) and is read again, once.
+        const held = streamRef.current;
+        if (lastSeq === held.lastSeq && keyBelongsTo(held.key, getActor().id)) return undefined;
         return api
           .listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT)
           .then((page) => {
             if (!isCurrentLoad(requested, current())) return;
-            setStreamLastSeq(lastSeq);
-            setStreamWindow(page.items);
-            setCurve(loadCurve(page.items, Date.now()));
+            setStreamState({
+              key: requested,
+              lastSeq,
+              window: page.items,
+              curve: loadCurve(page.items, Date.now()),
+            });
           });
       })
       .catch((error: unknown) => {
@@ -375,23 +458,26 @@ export function HistoryPage() {
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who holds no `event.read` at all — a gestalteter Zustand, not
           // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds
-          // `streamLastSeq` to 0 — a role that regains `event.read` later must not see the
-          // `lastSeq === streamLastSeq` short-circuit above skip its own first, honest read back.
+          // `lastSeq` to 0 — a role that regains `event.read` later must not see the
+          // unchanged-tail short-circuit above skip its own first, honest read back.
           setStreamRead({ key: requested, status: 'forbidden' });
-          setStreamWindow([]);
-          setCurve([]);
-          setStreamLastSeq(0);
+          setStreamState({ key: requested, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE });
           return;
         }
         // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
         // another actor (`readVerdict`).
         setStreamRead({ key: requested, status: 'error' });
+        setStreamState((previous) =>
+          keyBelongsTo(previous.key, getActor().id)
+            ? previous
+            : { key: requested, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE },
+        );
         problem(error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, tab, streamLastSeq]);
+  }, [version, tab]);
 
   const stream = useMemo(() => streamWindow.slice(-STREAM_LIMIT).reverse(), [streamWindow]);
 
@@ -408,6 +494,24 @@ export function HistoryPage() {
   const selected = useMemo(
     () => corpus.find((question) => question.id === selectedId) ?? null,
     [corpus, selectedId],
+  );
+
+  /**
+   * Slice 010d: the right pane's loading state, while this actor's own record is on its way — the
+   * same skeleton the result list shows (design principle 8), under the wording the Bühne already
+   * borrows from the Beantwortung for its own skeleton.
+   */
+  const paneLoading = (
+    <div
+      role="status"
+      className="space-y-1.5 p-4"
+      aria-busy="true"
+      aria-label={t('answers.list.loading')}
+    >
+      {[0, 1, 2, 3, 4, 5].map((line) => (
+        <div key={line} className="h-10 animate-pulse rounded-sm bg-ink-50" />
+      ))}
+    </div>
   );
 
   const select = useCallback((id: string) => {
@@ -476,7 +580,10 @@ export function HistoryPage() {
                 {results.length === 0 ? (
                   <div className="p-4">
                     {resultsLoading ? (
+                      // Slice 010d: `role="status"` gives the label a role to name — on a bare
+                      // div axe rejects `aria-label` (aria-prohibited-attr, serious).
                       <div
+                        role="status"
                         className="space-y-1.5"
                         aria-busy="true"
                         aria-label={t('history.results.loading')}
@@ -566,7 +673,7 @@ export function HistoryPage() {
                 // switched must not linger next to the refused state — `stream` is cleared to `[]`
                 // the moment `streamForbidden` is set, but the count line itself has to go too.
                 tab === 'stream'
-                  ? streamForbidden
+                  ? streamForbidden || !streamOwned
                     ? undefined
                     : t('history.stream.description', { n: stream.length })
                   : selected === null
@@ -616,17 +723,25 @@ export function HistoryPage() {
                         description={t('history.stream.forbidden.body')}
                       />
                     </div>
+                  ) : !streamOwned ? (
+                    paneLoading
                   ) : (
                     <EventStream events={stream} context={context} curve={curve} />
                   )
                 ) : selected === null ? (
-                  <div className="p-4">
-                    <EmptyState
-                      icon={History}
-                      title={t('history.timeline.empty.title')}
-                      description={t('history.timeline.empty.body')}
-                    />
-                  </div>
+                  // Slice 010d: a selection whose record this actor has not read yet is loading,
+                  // not "no question chosen".
+                  selectedId !== null && !corpusOwned ? (
+                    paneLoading
+                  ) : (
+                    <div className="p-4">
+                      <EmptyState
+                        icon={History}
+                        title={t('history.timeline.empty.title')}
+                        description={t('history.timeline.empty.body')}
+                      />
+                    </div>
+                  )
                 ) : historyForbidden ? (
                   // Minor 5 (review round 2): `role="status"` marks the refusal as a status
                   // message. Nit 6 (review round 3): a live region mounted together with its
@@ -639,6 +754,8 @@ export function HistoryPage() {
                       description={t('history.timeline.forbidden.body')}
                     />
                   </div>
+                ) : history === null ? (
+                  paneLoading
                 ) : (
                   <div className="px-4 py-4">
                     <HistoryKpiLine events={history} />

@@ -42,11 +42,20 @@ export function isReadForbidden(error: unknown): boolean {
   return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
 }
 
+const NO_SPEAKERS: readonly Speaker[] = [];
+
 export function useSpeakers(): SpeakersState {
   const version = useApiVersion();
   const [token, setToken] = useState(0);
   const [read, setRead] = useState<KeyedRead | null>(null);
-  const [speakers, setSpeakers] = useState<readonly Speaker[]>([]);
+  /**
+   * Slice 010d, Ziel 1: the list is kept with the key of the load that read it, and handed out only
+   * to that load's actor (`keyBelongsTo`). After a role switch the previous role's rows — with its
+   * `_actions`: call, finish, move, withdraw, drag — are not offered for the one response time
+   * until the new role has answered; the page shows its skeleton instead. A newer `version` of the
+   * same actor keeps the rows on screen while it loads (nothing jumps, design principle 8).
+   */
+  const [list, setList] = useState<{ key: string; speakers: readonly Speaker[] } | null>(null);
 
   /**
    * Slice 010c, Ziel 4: every answer used to be set as it came — ready, refused and failed alike —
@@ -69,7 +78,7 @@ export function useSpeakers(): SpeakersState {
       .listSpeakers()
       .then((next) => {
         if (!isCurrentLoad(requested, current())) return;
-        setSpeakers(next);
+        setList({ key: requested, speakers: next });
         setRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
@@ -77,7 +86,7 @@ export function useSpeakers(): SpeakersState {
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — the Wortmeldeliste
           // is simply not readable in this role.
-          setSpeakers([]);
+          setList({ key: requested, speakers: NO_SPEAKERS });
           setRead({ key: requested, status: 'forbidden' });
           return;
         }
@@ -91,12 +100,15 @@ export function useSpeakers(): SpeakersState {
   }, [version, token]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
-  // The refusal is the verdict's; a stored refusal the verdict does not carry is still on its way.
+  // The refusal is the verdict's; a stored refusal the verdict does not carry is still on its way,
+  // and so is any answer given to another actor (slice 010d) — its "ready" or "error" says nothing
+  // about this actor's list.
   const status: LoadStatus = verdict.forbidden
     ? 'forbidden'
-    : read === null || read.status === 'forbidden'
+    : read === null || read.status === 'forbidden' || !keyBelongsTo(read.key, actorId)
       ? 'loading'
       : read.status;
+  const speakers = list !== null && keyBelongsTo(list.key, actorId) ? list.speakers : NO_SPEAKERS;
   return { status, speakers, reload };
 }
 
@@ -171,4 +183,22 @@ export function readVerdict(
   return previous.actor === actorId && previous.forbidden === forbidden
     ? previous
     : { actor: actorId, forbidden };
+}
+
+/**
+ * Slice 010d (Ansichtsdaten gehören dem Schlüssel des Akteurs): whether data loaded under `key` may
+ * be offered to `actorId` — only data of that very actor, at any `version`. Data of another actor
+ * (the previous role, until the new one has answered) carries that actor's `_actions` and read
+ * scope; it is not offered (design principle 9), and the view shows its loading state instead.
+ * `null`: nothing loaded yet. The actor is read from the key as a whole (`loadKey` is JSON), so
+ * one id that is a prefix of another never matches.
+ *
+ * Kept as a small local copy per feature that holds such data (`speakers/useSpeakers.ts`,
+ * `capture/useCapture.ts`, `answers/lib.ts`, `history/lib.ts`), next to the 010c pattern above, and
+ * covered by the same test table in each.
+ */
+export function keyBelongsTo(key: string | null, actorId: string): boolean {
+  if (key === null) return false;
+  const [owner] = JSON.parse(key) as unknown[];
+  return owner === actorId;
 }

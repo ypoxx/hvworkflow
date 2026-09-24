@@ -18,6 +18,7 @@ import { Eye, ListOrdered, Lock, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
+import { useActor } from '../../api/actor';
 import { Button, EmptyState, Panel, PageHeader, showProblem } from '../../components';
 import { actionLabel, getLang, translate, useT } from '../../i18n';
 import { useMeeting } from '../../app/useMeeting';
@@ -66,7 +67,14 @@ export function SpeakersPage() {
 
   // While a reorder is in flight the list shows the new order; the refetch then confirms it.
   const [override, setOverride] = useState<readonly Speaker[] | null>(null);
-  useEffect(() => setOverride(null), [speakers]);
+  // Slice 010d: the override belongs to the list it was made on, and any other list — the refetch,
+  // or none at all after a role switch (`useSpeakers` hands out another actor's rows to nobody) —
+  // drops it in the same render. An effect would commit one frame of the previous role's rows.
+  const [overrideOf, setOverrideOf] = useState(speakers);
+  if (overrideOf !== speakers) {
+    setOverrideOf(speakers);
+    setOverride(null);
+  }
   const view = override ?? speakers;
   // Read by the drag handlers and the announcements, which run outside the render pass.
   const viewRef = useRef<readonly Speaker[]>(view);
@@ -78,6 +86,19 @@ export function SpeakersPage() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [moving, setMoving] = useState<Speaker | null>(null);
   const [roundOpen, setRoundOpen] = useState<Readonly<Record<number, boolean>>>({});
+
+  /**
+   * Slice 010d, Ziel 1: a dialog belongs to the actor who opened it from their own `_actions`. On
+   * an actor change it closes in the same render (compared by `id`, never by role, AGENTS.md rule
+   * 4) — the next actor has offered nothing yet, and may not be allowed what it would submit.
+   */
+  const actorId = useActor().id;
+  const [dialogActorId, setDialogActorId] = useState(actorId);
+  if (dialogActorId !== actorId) {
+    setDialogActorId(actorId);
+    setRegisterOpen(false);
+    setMoving(null);
+  }
 
   const speaking = useMemo(() => view.find((s) => s.status === 'speaking'), [view]);
   const next = useMemo(() => view.find((s) => s.status === 'waiting'), [view]);
@@ -108,7 +129,13 @@ export function SpeakersPage() {
    * contract carries no `_actions` list for it; the permission bundle that may change a Wortmeldung
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
-  const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
+  //
+  // Slice 010d: an empty list offers it only once it is this actor's answer (`status` "ready"); while
+  // the list loads — after a role switch, too — there is nothing yet to read the right from.
+  const mayRegister =
+    view.length > 0
+      ? view.some((speaker) => speaker._actions.includes('speaker.update'))
+      : status === 'ready';
   /**
    * Point #26 (feedback, slice 020): a role without any write right on the Wortmeldeliste used to
    * see no register button and no row actions with no explanation at all. Derived from `_actions`
