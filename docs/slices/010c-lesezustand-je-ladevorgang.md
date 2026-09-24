@@ -1,6 +1,6 @@
 # 010c — Lesezustand je Ladevorgang
 
-**Status:** Nacharbeit Runde 2 erledigt, bereit für Review Runde 3 (Code `cae59a5`)
+**Status:** Nacharbeit Runde 3 erledigt, bereit für Review Runde 4 (Code `439f737`)
 **Risikoklasse:** niedrig · 0,75 AStd · Lanes: web-speakers, web-capture, web-answers, web-stage, web-history, e2e (eigene
 Datei). Startet nach takt-008 (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -65,10 +65,10 @@ außerhalb der Features.
 
 ## Bericht
 
-**Status:** Nacharbeit Runde 2 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
+**Status:** Nacharbeit Runde 3 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
 `7f17174` (Bericht). Runde 1: `5c83da4` (e2e, rot auf `7f17174`), `5a4f3c5` (Änderung), `30032b7` (Screenshot
-und Bericht). Runde 2: `c43e7a2` (e2e, rot auf `30032b7`), `cae59a5` (Änderung, **letzter Code-Commit**),
-dieser Commit (Bericht).
+und Bericht). Runde 2: `c43e7a2` (e2e, rot auf `30032b7`), `cae59a5` (Änderung), `6703a26` (Bericht). Runde 3:
+`a59760b` (e2e, rot auf `6703a26`), `439f737` (Änderung, **letzter Code-Commit**), dieser Commit (Bericht).
 
 ```
 Slice: 010c-lesezustand-je-ladevorgang
@@ -77,15 +77,32 @@ Done: Jeder Lesezustand trägt den Schlüssel seines Ladevorgangs (Akteur und ve
       Verweigerung gehört dem Akteur: ein Fehler der neuen Rolle hebt sie auf, ein Fehler derselben Rolle nicht;
       Erfassungssonde wartet speakers.settled ab; Antworten der vorigen Rolle verfallen (auch Detailabrufe der
       Beantwortung); Serverfilter: für eine Auswahl eines anderen Akteurs wird nur der maskierte 404
-      geschluckt, jeder andere Fehler gemeldet; takt-008 N1–N3 behoben.
-Evidence: pnpm gates auf cae59a5, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 68/68, 010c-Datei
-      25/25, --repeat-each=3 zweimal: 75/75 und 75/75; rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e,
-      Runde 1 8 rot / 15 grün auf 7f17174, Runde 2 2 rot / 23 grün auf 30032b7 (jeweils genau die neuen
-      bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
+      geschluckt, jeder andere Fehler gemeldet — unabhängig von der Reihenfolge der Fehler (das Gate hält alle
+      Fehler eines Durchgangs); takt-008 N1–N3 behoben.
+Evidence: pnpm gates auf 439f737, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 70/70, 010c-Datei
+      27/27, --repeat-each=3 zweimal: 81/81 und 81/81; rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e,
+      Runde 1 8 rot / 15 grün auf 7f17174, Runde 2 2 rot / 23 grün auf 30032b7, Runde 3 2 rot / 25 grün auf
+      6703a26 (jeweils genau die neuen bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
 Open: siehe "Offen" unten (Daten der vorigen Rolle bis zur ersten Antwort und „Kein Treffer" nach einem
       ersten 500 → 010d; zwei Toasts in der Historie).
 Touched: siehe "Touched" unten.
 ```
+
+### Nacharbeit Runde 3 (R3-1; Entscheidung des Architekten Runde 3)
+
+- **R3-1:** `createDetailProblemGate` (in `answers/lib.ts` und `history/lib.ts` byte-gleich geändert) hält
+  jetzt jeden Fehler eines Durchgangs statt nur des ersten. `flush` zeigt den ersten Fehler, den
+  `omits(id, error)` nicht schluckt; ein Toast je Durchgang bleibt, ein Durchgang ohne solchen Fehler zeigt
+  keinen. Damit entscheidet die Reihenfolge nicht mehr: ein maskierter 404 der einen Detailabfrage, der vor
+  dem 5xx der anderen ankommt, verdeckt ihn nicht mehr, wenn die Liste zuletzt antwortet.
+- Unit-Zeile in beiden `lib.test.ts` (Gate-Blöcke weiter byte-gleich): 404, dann 500, dann Liste ohne die
+  Auswahl → gezeigt `[500]`; dazu die Spiegelung (500, dann 404 → `[500]`) und zwei 404 → nichts.
+- Zwei e2e „Runde 3 (R3-1)" (Liste 600 ms verzögert; der 500 der einen Detailabfrage kommt 150 ms nach dem
+  404 der anderen; Wechsel zu observer → genau ein Toast), in beiden Reihenfolgen: `getQuestion` 500 nach
+  dem 404 von `getQuestionHistory` und umgekehrt. Beide rot auf `6703a26`.
+- Die Sonde der Nachprüfung (`zz-probe-r3.spec.ts`, P1–P12, C1, D10) lief einmal, vorübergehend nach
+  `apps/web/e2e/` kopiert und danach wieder gelöscht, gegen `439f737`: `20 passed (1.4m)`. Sie ist nicht
+  eingecheckt.
 
 ### Nacharbeit Runde 2 (N1–N3; Entscheidung des Architekten Runde 2)
 
@@ -196,7 +213,7 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
 
 ### Evidence
 
-**`pnpm gates` auf `cae59a5` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 157, api 57, scripts
+**`pnpm gates` auf `439f737` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 159, api 57, scripts
 206/206. `slice-scope` meldet dazu eine Warnung, weil der Architekt „Files allowed" nach `452e89e` um
 `docs/evidence/010c-*.png` ergänzt hat (`b85b080`): `slice-scope: warning — "docs/slices/010c-lesezustand-je-ladevorgang.md"'s
 "Files allowed" section differs from its version at the commit that introduced it (452e89e).` und
@@ -218,7 +235,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-lLKPwRkT.js                        568.29 kB │ gzip: 166.15 kB │ map: 2,342.73 kB
+dist/assets/index-DlBe9xYy.js                        568.48 kB │ gzip: 166.24 kB │ map: 2,343.99 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -227,17 +244,26 @@ dist/assets/index-lLKPwRkT.js                        568.29 kB │ gzip: 166.15 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.60s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit cae59a5, tree e851c5caace6…
+✓ built in 1.64s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 439f737, tree 3ab291049c6c…
 ```
 
-**Playwright** (eigener Port 4989, Chromium unter `/opt/pw-browsers`), auf dem Baum von `cae59a5`:
-- ganze Suite: `68 passed (5.2m)`, axe in allen Szenarien „0 serious/critical".
-- `e2e/010c-lesezustand.spec.ts` dateiweit mit `--repeat-each=3`, zwei Läufe nacheinander: `75 passed (2.8m)`
-  und `75 passed (2.8m)` (je 25 Tests × 3, kein Fehlschlag).
-- Der Screenshot `010c-beantwortung-erster-abruf-500.png` bleibt der aus `30032b7`: die Ansicht im e2e
-  „Ziel 1" hat sich in Runde 2 nicht geändert; die Läufe haben alle PNGs überschrieben, sie wurden mit
-  `git checkout -- docs/evidence` zurückgesetzt.
+**Playwright** (eigener Port 5147, Chromium unter `/opt/pw-browsers`), auf dem Baum von `439f737`:
+- ganze Suite: `70 passed (5.1m)`, axe in allen Szenarien „0 serious/critical".
+- `e2e/010c-lesezustand.spec.ts` dateiweit mit `--repeat-each=3`, zwei Läufe nacheinander: `81 passed (3.0m)`
+  und `81 passed (3.0m)` (je 27 Tests × 3, kein Fehlschlag).
+- Der Screenshot `010c-beantwortung-erster-abruf-500.png` bleibt der aus `30032b7` (Ansicht unverändert);
+  alle von den Läufen überschriebenen PNGs wurden mit `git checkout -- docs/evidence` zurückgesetzt.
+
+**Roter Lauf Runde 3** der e2e-Datei aus `a59760b` gegen den Code von `6703a26` (`git stash` nur
+`apps/web/src`): `2 failed, 25 passed (1.6m)`, rot sind genau die zwei neuen Tests:
+
+```
+  ✘  16 … 010c Runde 3 (R3-1): Beantwortung — Liste zuletzt, getQuestion 500 nach dem 404 von getQuestionHistory, Wechsel zu observer: ein Toast   Toasts  Expected: 1  Received: 0
+  ✘  17 … 010c Runde 3 (R3-1): Beantwortung — Liste zuletzt, getQuestionHistory 500 nach dem 404 von getQuestion, Wechsel zu observer: ein Toast   Toasts  Expected: 1  Received: 0
+  2 failed
+  25 passed (1.6m)
+```
 
 **Roter Lauf Runde 2** der e2e-Datei aus `c43e7a2` gegen den Code von `30032b7` (`git stash` nur
 `apps/web/src`): `2 failed, 23 passed`, rot sind genau die zwei neuen Tests:
