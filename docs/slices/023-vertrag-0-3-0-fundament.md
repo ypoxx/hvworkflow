@@ -129,7 +129,389 @@ grüner Lauf des Tors, `pnpm gates`-Ende.
 
 ## Bericht
 
-(vom Architekten)
+(vom Architekten, Fable 5.1, 24.09.2026; Branch `claude/slice-023-vertrag`, nicht gepusht)
+
+```
+Slice: 023-vertrag-0-3-0-fundament
+Done: Vertrag 0.3.0 rein additiv (29 → 65 Operationen, 26 → 47 Schemata, 25 → 33 Rechtebezeichner, 18 → 28
+      Ereignistypen; kein Feld entfernt, keines Pflicht, alle 29 Bestandsrouten unverändert, alle Bestandstests
+      unverändert grün): Jahrgang (/meetings, kanonische Sammlungspfade, Alias veraltet), Umschlag v2 flach auf
+      Event, Meeting.format, counts.byUnit/bySeat, Contribution.version, StageSeat/seatId, Claim/Release,
+      Tagesordnungsereignisse, Rollenzuordnung, Konfigurationsfreeze, /v1/stream, /healthz, /readyz, /metrics,
+      /auth/* mit Schema session, Transparenzhinweis, X-Server-Time an jeder Antwort, x-legal-notice berichtigt.
+      Tor „jede operationId ausgeübt oder deklariert" gebaut (Vitest-globalSetup + Trefferdateien); Allowlist mit
+      36 Einträgen, expires 2026-11-25; CHANGELOG 0.3.0 mit Festlegungen (a)–(e).
+Evidence: pnpm gates exit 0 (Ende unten, Commit a35291c); contract:lint 0 Fehler, 6 benannte Warnungen; Vertragstor
+      (a)–(d) grün, auch mit CONTRACT_GATE_STRICT=1; Tor aus Ziel 5: drei rote Läufe und der grüne Lauf unten;
+      pnpm contract:types zweimal mit gleicher SHA-256 (b6be193c…); slice-scope: 10 Dateien, alle erlaubt.
+      Kein Screenshot (reine Vertragsscheibe), docs/evidence/ unverändert.
+Open: siehe „Offen" unten — vor allem drei kleine Vertragsfelder, die 025 für seinen HTTP-Nachweis „paper mit
+      früherem occurredAt und Grund → 201 mit lateEntry" braucht und die bewusst nicht in 023 sind.
+Touched: packages/contract/openapi.yaml, packages/contract/src/types.ts (generiert), packages/contract/allowlist.json,
+      packages/contract/CHANGELOG.md, packages/contract/package.json, apps/api/src/__tests__/helpers.ts,
+      apps/api/src/__tests__/contract.test.ts, apps/api/src/__tests__/operation-coverage.setup.ts (neu),
+      apps/api/vitest.config.ts, docs/slices/023-vertrag-0-3-0-fundament.md. apps/api/package.json unberührt
+      (das test-Skript bleibt `vitest run`, weil das Tor im globalSetup läuft).
+```
+
+### Festlegungen des Architekten (Ziel 6)
+
+**(a) Kanonische Pfade und Alias — Form: Geltungsbereich an der Sammlung, Kennung am Element.** Kanonisch
+`/v1/meetings/{meetingId}/…` gibt es genau für das, was eine *Sammlung eines Jahrgangs* ist: `GET /meetings/{id}`
+(`getMeetingById`), `agenda-items`, `units`, `speakers` (GET, POST), `speakers/order`, `contributions` (GET, POST),
+`questions`, `stage` — zehn Operationen. Alles, was eine *global eindeutige eigene Kennung* hat
+(`/speakers/{speakerId}`, `/contributions/{contributionId}`, `/contributions/{id}/questions`,
+`/questions/{questionId}/…`), bleibt ohne Präfix und ist damit bereits kanonisch: die Kennung trägt den Jahrgang
+(`meetingId` in der Ressource), ein Präfix wäre Redundanz. Die unpräfixierten Sammlungspfade aus 0.1/0.2 (`/meeting`,
+`/agenda-items`, `/units`, `/speakers`, `/speakers/order`, `/contributions`, `/questions`, `/stage`) bleiben als
+Alias der aktuellen HV bis Vertrag 0.5 (Plan 3) und sind ab 0.3.0 `deprecated: true` mit Hinweis auf die kanonische
+Form. `/events` und der neue `/stream` sind **keine** Aliasse und werden nicht dupliziert: `seq` ist global lückenlos
+(ADR 0011), also sind sie globale Ströme mit optionalem `meetingId`-Filter (ADR 0014 „Jahrgangsfilter").
+Neue Ressourcen (Bühnenplätze, Rollenzuordnungen, Freeze, Tagesordnungsfortschritt) gibt es nur kanonisch.
+*Gegen die Kriterien:* Doppelung 10 statt 29 Operationen, jede mit `$ref` auf gemeinsame Parameter, Bodies und
+Antworten (`components/parameters`, `SpeakerOrder`, `QuestionList`), also ohne Schema-Doppelung; das Tor aus Ziel 5
+bleibt aussagekräftig, weil jede kanonische Operation eine eigene, echte `operationId` mit Ablauf in der Allowlist ist
+(025 löscht die zehn Einträge, wenn `contract.test.ts` sie trifft); 025 kann ohne Vertragszyklus bauen (dieselben
+Handler zweimal montieren, Alias = laufender Jahrgang; `matchOperationId` in `apps/api/src/contractSchema.ts` trennt
+Alias und kanonische Form über die Segmentzahl); 030 hat eine eindeutige Basis `/v1` für alle Fachoperationen — nur
+`/healthz`, `/readyz`, `/metrics`, `/auth/*` liegen per `servers`-Überschreibung je Pfad auf `/`, wie die Spec vorgibt.
+*Verworfen:* Server-Variable `/v1/meetings/{meetingId}` als Basis (kollidiert mit `GET /v1/meetings` und `/v1/meeting`,
+braucht drei Basen im Client, und das Tor sähe die kanonische Form gar nicht); 29 Duplikate (Allowlist würde zur
+Regel statt zur Ausnahme, nach 0.5 blieben 29 künstliche Namen); Path-Item-`$ref` (doppelte `operationId`s sind
+ungültig, und `contractSchema.ts` würde die Duplikate weder sehen noch treffen).
+
+**(b) Umschlagfelder flach auf `Event`, kein Unterobjekt.** Gründe: die Persistenzform aus Plan 3 ist eine flache
+Tabelle (`seq, id, meeting_id, type, occurred_at, occurred_at_source, recorded_at, actor, subject_id, payload,
+prev_hash, hash, schema_version, retention_class, legal_hold`) — Vertrag und Spalten sind 1:1; das kanonische JSON
+für die Hash-Kette (024) bleibt einstufig und die Regel „Hash über den Umschlag ohne `hash`" ist ohne Verschachtelungs-
+konvention formulierbar; das heutige Ereignis ist schon flach (`seq, id, type, at, actor, subjectId, payload`), ein
+Unterobjekt hätte zwei Stilebenen erzeugt. `at` bleibt Pflicht und ist ab 0.3.0 derselbe Zeitpunkt wie `recordedAt`
+(ADR-0011-Name); ein Veralten von `at` ist eine 0.5-Frage, weil kein Plan-5-Eintrag den Rückbau benennt. Der einzige
+Unterteil ist `payload.pii` (`PiiEnvelope`, `keyId` Pflicht innerhalb), weil ADR 0009/0011 genau diesen markierten
+Payload-Teil verlangen. Bindungen je Ereignistyp (QuestionLegalCleared, drei Tagesordnungsereignisse, RoleAssigned/
+RoleRevoked) liegen als verschachteltes `if`/`then`/`else`, nicht als `allOf`, weil openapi-typescript `allOf` mit
+`if` als `& (unknown & unknown)` rendert; verschachtelt bleibt der generierte `Event`-Typ sauber (Probe im Bericht-Lauf).
+
+**(c) Transparenzhinweis: `GET /auth/transparency-notice`, `security: []`, Schema `TransparencyNotice`
+(`version`, `text.de`, `text.en`, `updatedAt?`, `dataProtectionSummaryUrl?`).** Eigener Lesepfad ohne Anmeldung, weil
+die Anmeldeseite (030) ihn vor der Anmeldung zeigt; unter `/auth`, weil er zum Anmeldeweg gehört (029 liefert den
+Text als Konfiguration); zwei Sprachen im Objekt statt `Accept-Language`, weil Regel 10 beide Sprachen ohnehin
+verlangt und der Client sie gleichzeitig braucht (Umschalter). Der Text selbst steht nicht im Vertrag (Konfiguration,
+Rechtsprüfung E15 offen; die Oberfläche zeigt ihn als ungeprüft).
+
+**(d) Neue Rechtebezeichner (nur Bezeichner; Vergabe in `ROLE_PERMISSIONS` durch die umsetzende Scheibe, bis dahin
+deny by default):** `contribution.claim`, `question.claim` (Übernahme *und* Rückgabe unter einem Recht; wer zurückgeben
+darf — nur der Halter — ist ein Guard in der Domäne, kein zweites Recht; 028), `agenda.manage` (fest, 025),
+`admin.roles.manage` (fest, 026), `admin.meetings.manage` (Jahrgang anlegen/klonen, 040), `admin.units.manage`
+(Fachbereiche, 040), `admin.seats.manage` (Bühnenplätze, 040), `admin.config.freeze` (040). Namensschema wie im
+Bestand (`<nomen>.<verb>`), Admin-Rechte unter `admin.*`, weil 088 die TOTP-Pflicht an „`admin.*`" knüpft. Kein
+Recht für `/v1/stream` (ADR 0014: Prüfung je Ereignis mit `event.read` wie `listEvents`), keines für
+`listMeetings`/`listMeetingStageSeats` (Stammdaten, Festlegung 1 aus 010: jede angemeldete Rolle liest sie), keines
+für `/metrics` (kein Akteur, siehe e). `admin.override` (040) ist absichtlich nicht deklariert: in 0.3.0 gibt es keine
+Operation, die es braucht; 043 (23.10.) liegt vor 040 (03.11.).
+
+**(e) Ohne Anmeldung (`security: []`): `getHealth` (/healthz), `getReadiness` (/readyz), `login`, `completeLogin`,
+`getTransparencyNotice`.** `/metrics` ist durch ein eigenes Schema `metricsBearer` (`http`/`bearer`, statisches Token
+aus der Dienstkonfiguration 034) geschützt: der Konsument ist der Scraper, kein Akteur — keine `can()`-Entscheidung,
+keine `_actions`, und der Endpunkt gibt nur die fünf fachlichen Kennzahlen aus ADR 0013 aus, nie etwas je Person.
+`logout` verlangt `session`; `getSession` (/auth/me) erbt die globale Oder-Liste und liefert in der Demo die
+`X-Actor`-Identität. Globales `security` ist `[ {demoActor}, {session} ]`; `session` ist `apiKey`/`cookie`
+`hv_session`; `oidc` trägt `x-deprecated: true` plus Satz in der `description` (kein `deprecated`-Feld an
+Security-Schemes, `contract:lint` sonst rot). Neue Antwort `Unauthorized` (401) nur an `logout`, `getSession`,
+`getMetrics` — die 401-Lücke der Bestandsoperationen ist eine der fünf Lücken aus Review 012 Punkt 18 und bleibt bei 043.
+
+### Abdeckungstabelle (Akzeptanzkriterium 3): Plan 5.4 Zeile 023 → Vertrag → Scheibe → Allowlist
+
+| Punkt der Planzeile | Stelle im Vertrag | Umsetzende Scheibe | Allowlist-Eintrag |
+|---|---|---|---|
+| `meetingId` auf Speaker, Contribution, Question, Ereignissen | `Speaker.meetingId`, `Contribution.meetingId`, `Question.meetingId`, `Event.meetingId` (optional, „Pflicht ab 0.3.1, Scheibe 028") | 025 (Kern), 028 (Pflicht) | — (Felder) |
+| `GET`/`POST /v1/meetings` | `/meetings` → `listMeetings`, `createMeeting`; Schemata `Meeting` (+`format`, `version`, `clonedFromMeetingId`), `MeetingCreate`, `MeetingStatus` | 025 (list), 040 (create/klonen) | listMeetings (025), createMeeting (040) |
+| `/v1/meetings/{id}/…` kanonisch, `/v1/meeting` Alias | `/meetings/{meetingId}` + 9 Sammlungspfade; 10 Alias-Operationen `deprecated: true` (Festlegung a) | 025 | getMeetingById, listMeetingAgendaItems, listMeetingUnits, listMeetingSpeakers, registerMeetingSpeaker, reorderMeetingSpeakers, listMeetingContributions, captureMeetingContribution, listMeetingQuestions, getMeetingStage (alle 025) |
+| Umschlagfelder schemaVersion, idempotencyKey, causationId, prevHash, hash, recordedAt, occurredAt/occurredAtSource, retentionClass, legalHold, personId | `Event.*` flach (Festlegung b); `OccurredAtSource` (`server \| device \| paper \| transcript`), `RetentionClass`; Eingang der Absenderangabe über `ContributionCapture.occurredAt`/`occurredAtSource` (`device \| paper \| transcript`), `Contribution.occurredAt`/`occurredAtSource`; `source` + `paper` | 024 (Kern), 028 (Pflicht) | — (Felder) |
+| `Contribution.version` | `Contribution.version` (optional, „Pflicht ab 0.3.1, Scheibe 028"); Antwort `ContributionUpdated` mit ETag | 028 | — |
+| If-Match und neue Pflichtfelder zunächst optional mit Ablauf | `IfMatch` unverändert optional, Beschreibung nennt 0.3.1/028 und die `deliverQuestion`-Ausnahme; jedes künftige Pflichtfeld trägt „Pflicht ab 0.3.1, Scheibe 028" (Liste im CHANGELOG) | 028 | — |
+| `Meeting.format` presence/hybrid/virtual | `MeetingFormat` (Standard `presence`, „auf Standard gebaut", E20), `Meeting.format`, `MeetingCreate.format` | 023 (Feld), 068 (Auswertung) | — |
+| Tagesordnungsereignisse AgendaItemOpened, VotingOpened, VotingClosed | `Event.type` + 3; `AgendaItemEventPayload` gebunden; Operationen `…/agenda-items/{agendaItemId}/opening`, `…/voting/opening`, `…/voting/closure`; `AgendaItem.openedAt/votingOpenedAt/votingClosedAt`; Recht `agenda.manage` | 025 | openAgendaItem, openVoting, closeVoting (025) |
+| `POST` claim/release auf Redebeitrag und Einzelfrage | `/contributions/{id}/claim`, `…/release`, `/questions/{id}/claim`, `…/release`; `Claim` auf beiden; Ereignistypen ContributionClaimed/Released, QuestionClaimed/Released; Rechte `contribution.claim`, `question.claim`; `Contribution._actions` | 028 | claimContribution, releaseContribution, claimQuestion, releaseQuestion (028) |
+| `/healthz`, `/readyz`, `/metrics` | Pfade mit `servers: /`; `Health`, `Readiness` (200/503); `/metrics` text/plain hinter `metricsBearer` | 033 (readyz-DB-Teil 027) | getHealth, getReadiness, getMetrics (033) |
+| `GET /v1/stream` | `/stream` text/event-stream, `after`, `meetingId`, Header `Last-Event-ID` | 035 | streamEvents (035) |
+| Sicherheitsschema `session` (Cookie), `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/me` | `securitySchemes.session`; `/auth/login` (302/503), `/auth/callback` (302/400/403/503), `/auth/logout` (204/401), `/auth/me` (`Session`, 200/401); globales `security` Oder-Liste; `oidc` x-deprecated | 029 | login, completeLogin, logout, getSession (029) |
+| Admin: Jahrgang anlegen/klonen | `createMeeting` mit `cloneFromMeetingId`; Recht `admin.meetings.manage` | 040 | createMeeting (040) |
+| Admin: Fachbereiche | `PUT /meetings/{id}/units` (`UnitInput`), `GET` kanonisch; Recht `admin.units.manage` | 040 | replaceMeetingUnits (040), listMeetingUnits (025) |
+| Admin: TOPs | `PUT /meetings/{id}/agenda-items` (`AgendaItemInput`); Recht `agenda.manage` | 040 | replaceMeetingAgendaItems (040) |
+| Admin: Bühnenplatzliste je Jahrgang statt Enum, Person und Gerät je Platz | `StageSeat {id, label, personId?, deviceId?, position?}`, `StageSeatInput`; `GET`/`PUT /meetings/{id}/stage-seats`; `Question.seatId`, `Classification.seatId`; `StageAssignment` und beide `stageAssignment`-Felder `deprecated` („veraltet seit 0.3.0, entfällt mit 0.5"); Recht `admin.seats.manage` | 040 (Kern), 056 (Oberfläche) | listMeetingStageSeats, replaceMeetingStageSeats (040) |
+| Admin: Rollenzuordnung mit optionaler `unitId` als RoleAssigned/RoleRevoked | `/meetings/{id}/role-assignments` (GET, POST), `…/{assignmentId}/revocation`; `RoleAssignment`, `RoleAssignmentCreate` (`unitId?`, `expiresAt?`, `deputyForSubjectId?`); Ereignistypen + `RoleAssignmentEventPayload` gebunden; `Actor.personId`; Recht `admin.roles.manage` | 026 | listRoleAssignments, assignRole, revokeRole (026) |
+| Admin: Konfigurationsfreeze | `POST /meetings/{id}/config-freeze` → `ConfigFreeze`; `Meeting.configFrozenAt/configHash`; Ereignistyp `ConfigFrozen`; R-ADM-01..04 in `Problem.ruleId`; Recht `admin.config.freeze` | 040 | freezeMeetingConfig (040) |
+| Transparenzhinweis-Feld für die Anmeldeseite | `GET /auth/transparency-notice` → `TransparencyNotice` (Festlegung c) | 029 (Text), 030 (Anzeige) | getTransparencyNotice (029) |
+| Header `X-Server-Time` | `components/headers/X-Server-Time`, an jeder der 65 Operationen auf jeder Antwort referenziert (auch 204/302/4xx/5xx über die geteilten `components/responses`) | 033 (senden), 032 (lesen) | — |
+| `counts.byUnit`, `counts.bySeat` auf Meeting | `Meeting.counts.byUnit`, `Meeting.counts.bySeat` (additionalProperties integer) | 040 | — |
+| CHANGELOG 0.3.0 | `packages/contract/CHANGELOG.md` `## [0.3.0] - 2026-09-24` mit Added/Changed/Deprecated je Punkt mit Scheibe | 023 | — |
+| Allowlist mit Ablauf | `allowlist.json`: 36 Einträge, `expires` 2026-11-25 (M2-Ende 11.11. + 14 Tage), `slice` ∈ {025, 026, 028, 029, 033, 035, 040} | 023 | s. o. |
+| Spec Ziel 8: `x-legal-notice` | `info.x-legal-notice` neu: kein Normzitat im Vertrag; `legalRef` an jeder Regel ab 011, Register `docs/legal-trace.md`, alles `verified: false` (E15). 011 lief nicht vorher (kein `docs/legal-trace.md`, keine 011-Spec im Worktree), daher eigener Wortlaut | 023 | — |
+| Spec Ziel 7: `Event.payload.pii` mit `keyId` | `PiiEnvelope` (`keyId` Pflicht, additionalProperties), `Event.payload.properties.pii` | 024 | — |
+
+### Neue `operationId`s (Akzeptanzkriterium 5) — alle `expires` 2026-11-25
+
+025: listMeetings, getMeetingById, listMeetingAgendaItems, listMeetingUnits, listMeetingSpeakers, registerMeetingSpeaker,
+reorderMeetingSpeakers, listMeetingContributions, captureMeetingContribution, listMeetingQuestions, getMeetingStage,
+openAgendaItem, openVoting, closeVoting (14) · 026: listRoleAssignments, assignRole, revokeRole (3) · 028:
+claimContribution, releaseContribution, claimQuestion, releaseQuestion (4) · 029: login, completeLogin, logout,
+getSession, getTransparencyNotice (5) · 033: getHealth, getReadiness, getMetrics (3) · 035: streamEvents (1) · 040:
+createMeeting, replaceMeetingAgendaItems, replaceMeetingUnits, listMeetingStageSeats, replaceMeetingStageSeats,
+freezeMeetingConfig (6). Summe 36; 29 + 36 = 65 = Zahl im Vertragstor.
+
+### Typen-Diff (Akzeptanzkriterium 5), `pnpm contract:types`
+
+`packages/contract/src/types.ts`: 2 682 Einfügungen, 546 Löschungen (1 592 → 3 728 Zeilen); zweiter Lauf ohne Diff
+(SHA-256 `b6be193cd0ef…` vor und nach dem Lauf). Inhalt: `paths` 29 → 65 Einträge (26 neue Pfade), `operations`
+29 → 65; `components.schemas` 26 → 47 (neu: MeetingStatus, MeetingFormat, MeetingCreate, AgendaItemInput, UnitInput,
+StageSeat, StageSeatInput, RoleAssignment, RoleAssignmentCreate, ConfigFreeze, Session, TransparencyNotice, Health,
+Readiness, SpeakerOrder, OccurredAtSource, RetentionClass, Claim, AgendaItemEventPayload, RoleAssignmentEventPayload,
+PiiEnvelope); `components.parameters` 5 → 21, `headers` 1 → 2, `responses` 6 → 11. `Event` erhält 12 optionale
+Umschlagfelder und `payload.pii?`, der Typ bleibt eine flache Struktur ohne `& unknown`; `Meeting` erhält
+`format?`, `version?`, `clonedFromMeetingId?`, `configFrozenAt?`, `configHash?`, `counts.byUnit?`, `counts.bySeat?`,
+`status` verweist auf `MeetingStatus` (gleiche Werte); `Question`/`Classification`: `stageAssignment?` mit
+`@deprecated`, neu `seatId?`, `claim?`, `meetingId?`; `Contribution`: `meetingId?`, `version?`, `occurredAt?`,
+`occurredAtSource?`, `claim?`, `_actions?`, `source` + `"paper"`; `Speaker`: `meetingId?`, `personId?`; `Actor.personId?`;
+`Action` 25 → 33 Werte; `Event.type` 18 → 28 Werte. Die zehn Alias-Operationen tragen `@deprecated`. Kein Feld wurde
+Pflicht, nichts entfernt; `pnpm -r typecheck` (contract, domain, api, web) grün ohne Änderung an einer anderen Datei.
+
+### `contract:lint` (Ziel 9): 0 Fehler, 6 Warnungen (alle strukturell, akzeptiert)
+
+```
+[1] openapi.yaml:1020 #/paths/~1auth~1login/get/responses      Operation must have at least one `2XX` response.
+[2] openapi.yaml:1020 #/paths/~1auth~1login/get/responses      Operation must have at least one `4XX` response.
+[3] openapi.yaml:1039 #/paths/~1auth~1callback/get/responses   Operation must have at least one `2XX` response.
+[4] openapi.yaml:1093 #/paths/~1healthz/get/responses          Operation must have at least one `4XX` response.
+[5] openapi.yaml:1106 #/paths/~1readyz/get/responses           Operation must have at least one `4XX` response.
+[6] openapi.yaml:1168 #/components/securitySchemes/oidc        Security scheme: "oidc" is never used.
+packages/contract/openapi.yaml: validated in 161ms
+Woohoo! Your API description is valid. 🎉
+You have 6 warnings.
+```
+
+Vorher (0.2.1): 1 Warnung (oidc). Neu sind 1–5: `login`/`completeLogin` antworten nur mit 302 (BFF-Weiterleitung,
+ADR 0004), Sonden und Weiterleitung haben keinen 4xx-Fall; ein erfundener 2xx/4xx wäre eine falsche Zusage.
+
+### Tor aus Ziel 5: Bauweise und Läufe
+
+Bauweise: `helpers.ts` hängt jede `operationId`, die `matchOperationId` in `req()` trifft, an eine Trefferdatei je
+Prozess in einem Verzeichnis, das `operation-coverage.setup.ts` (Vitest `globalSetup`, `apps/api/vitest.config.ts`)
+in `setup()` anlegt und per `project.provide()`/`inject()` an die isolierten Worker gibt. `teardown()` faltet die
+Dateien aller Testdateien, liest `allowlist.json` neben `@hv/contract/openapi.yaml` und prüft: jede `operationId` des
+Vertrags ausgeübt oder deklariert; kein deklarierter Eintrag ausgeübt. Vitest protokolliert einen Teardown-Fehler nur
+(„error during close", Exit 0), deshalb setzt das Tor selbst `process.exitCode = 1`. Gefilterte Läufe (`vitest run
+negative`) und Läufe mit Testfehlern überspringen mit Hinweis statt still. Das `test`-Skript bleibt `vitest run`.
+Bestand: alle 29 Operationen von 0.2.1 werden schon von `req()` getroffen (erster Lauf des Tors vor der
+Vertragsänderung: „29 operations in the contract, 29 exercised by tests, 0 pre-declared … ok"); kein Aufruf war zu
+ergänzen. Der Kommentar des `>= 29`-Sanity-Tests in `contract.test.ts` verweist jetzt auf das Tor statt selbst
+Abdeckung zu behaupten.
+
+**Roter Lauf 1 — neue Operationen ohne Allowlist-Eintrag** (Vertrag 0.3.0, `allowlist.json` noch `[]`; wörtlich,
+Stacktrace-Zeilen entfernt):
+
+```
+ Test Files  5 passed (5)
+      Tests  49 passed (49)
+operation-coverage: 65 operations in the contract, 29 exercised by tests, 0 pre-declared in allowlist.json
+  FAIL  "claimContribution" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "releaseContribution" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "claimQuestion" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "releaseQuestion" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "streamEvents" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetings" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "createMeeting" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getMeetingById" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingAgendaItems" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "replaceMeetingAgendaItems" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "openAgendaItem" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "openVoting" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "closeVoting" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingUnits" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "replaceMeetingUnits" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingStageSeats" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "replaceMeetingStageSeats" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listRoleAssignments" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "assignRole" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "revokeRole" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "freezeMeetingConfig" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingSpeakers" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "registerMeetingSpeaker" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "reorderMeetingSpeakers" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingContributions" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "captureMeetingContribution" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "listMeetingQuestions" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getMeetingStage" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "login" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "completeLogin" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "logout" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getSession" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getTransparencyNotice" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getHealth" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getReadiness" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+  FAIL  "getMetrics" is neither exercised by a test (no req() call reaches it) nor pre-declared in packages/contract/allowlist.json — add a test or an allowlist entry with an expiry date (ADR 0015).
+operation-coverage: 36 failure(s)
+error during close Error: operation-coverage gate: 36 failure(s) (see above)
+exit=1
+```
+
+**Roter Lauf 2 — Allowlist-Eintrag, der zugleich ausgeübt ist** (`getMeeting` lokal an die fertige Allowlist
+angehängt, danach zurückgesetzt, `cmp` gegen die gute Kopie identisch):
+
+```
+operation-coverage: 65 operations in the contract, 29 exercised by tests, 37 pre-declared in allowlist.json
+  FAIL  "getMeeting" is pre-declared in allowlist.json (slice 023, expires 2026-11-25) but a test exercises it — the entry is overdue, remove it.
+operation-coverage: 1 failure(s)
+error during close Error: operation-coverage gate: 1 failure(s) (see above)
+exit=1
+```
+
+**Roter Lauf 3 — abgelaufener Allowlist-Eintrag** (Akzeptanzkriterium 4; `streamEvents` lokal auf `expires`
+2026-09-01 gesetzt, `pnpm --filter @hv/contract test`, danach zurückgesetzt):
+
+```
+  ok    (b) CHANGELOG.md has a section for 0.3.0
+  ok    (c) openapi.yaml changed against merge base d4c7393; version 0.2.1 -> 0.3.0
+  FAIL  (d) allowlist[29] operationId "streamEvents" expired on 2026-09-01 (today 2026-09-24, slice 035) — implement it or remove it from the contract
+contract gate: 1 failure(s)
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @hv/contract@0.3.0 test: `node scripts/check.mjs`
+Exit status 1
+exit=1
+```
+
+Nebenbefund aus dem Tor-Bau, lokal geprüft: gefilterter Lauf `vitest run negative` → „operation-coverage: skipped —
+filtered run (1 of 5 test files); only a full run proves coverage.", Exit 0.
+
+**Grüner Lauf** (`pnpm exec vitest run` in `apps/api`, Allowlist mit 36 Einträgen):
+
+```
+ Test Files  5 passed (5)
+      Tests  49 passed (49)
+operation-coverage: 65 operations in the contract, 29 exercised by tests, 36 pre-declared in allowlist.json
+operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+exit=0
+```
+
+**Vertragstor grün** (`pnpm --filter @hv/contract test`; mit `CONTRACT_GATE_STRICT=1` identisch):
+
+```
+contract gate: packages/contract/openapi.yaml (info.version 0.3.0, 65 operations)
+  ok    (a) info.version 0.3.0 = package.json version
+  ok    (b) CHANGELOG.md has a section for 0.3.0
+  ok    (c) openapi.yaml changed against merge base d4c7393; version 0.2.1 -> 0.3.0
+  ok    (d) allowlist.json well-formed, 36 pre-declared operation(s), none expired (today 2026-09-24)
+contract gate: ok
+```
+
+### `pnpm gates` (Exit 0, Commit a35291c; Zeilen desselben Laufs, dann das Ende wörtlich)
+
+```
+packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.3.0, 65 operations)
+packages/contract test: contract gate: ok
+packages/domain test:  Test Files  5 passed (5)
+packages/domain test:       Tests  72 passed (72)
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  48 passed (48)
+apps/api test:  Test Files  5 passed (5)
+apps/api test:       Tests  49 passed (49)
+apps/api test: operation-coverage: 65 operations in the contract, 29 exercised by tests, 36 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+vocabulary-check: ok
+x 7 dependency violations (0 errors, 7 warnings). 137 modules, 504 dependencies cruised.   <- Bestand (apps/web features)
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 10 changed file(s), all within "docs/slices/023-vertrag-0-3-0-fundament.md"'s "Files allowed" list (12 pattern(s)).
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+plan-graph: ok.
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11849.98315
+
+> @hv/web@0.0.0 build /home/user/wt/023/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-BoqUekbh.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,200.90 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.62s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit a35291c, tree d28de2d2ca05…
+gates exit=0
+```
+
+`node scripts/slice-scope.mjs` (einzeln): `slice-scope: 10 changed file(s), all within
+"docs/slices/023-vertrag-0-3-0-fundament.md"'s "Files allowed" list (12 pattern(s)).` Exit 0. Das Ende von
+`pnpm gates` stammt vom Stand vor dem Bericht-Commit; der Bericht ändert nur diese Datei, die schnellen
+Dokumententore (slice-scope, downgrade-check, plan-honesty, vocabulary) liefen danach noch einmal grün.
+
+### Neue Begriffe für die nächste Glossar-Kleinänderung (nicht in dieser Scheibe)
+
+Jahrgang (meeting, `meetingId`; Alias „aktuelle HV" = `/v1/meeting`) · Bühnenplatz (podium seat, `StageSeat`,
+`seatId`; Glossarzeile existiert ohne Code-Spalte, jetzt „ab 0.3.0 im Vertrag, Kern 040") · Aufbewahrungsklasse
+(retention class, `RetentionClass`) · Übernahme (claim, `Claim`, `contribution.claim`, `question.claim`) ·
+Rollenzuordnung (role assignment, `RoleAssignment`) · Konfigurationsfreeze (configuration freeze, `ConfigFreeze`,
+`ConfigFrozen`) · Transparenzhinweis (transparency notice, `TransparencyNotice`) · Umschlag (event envelope,
+`Event.*`, `PiiEnvelope`) · Absenderangabe der Zeit (`occurredAt`/`occurredAtSource`) gegenüber maßgeblicher Zeit
+(`recordedAt`) · Sitzung (session, `session`-Cookie, `Session`).
+
+### Offen (mit Grund)
+
+- **025 braucht für seinen HTTP-Nachweis „paper mit früherem occurredAt und Grund → 201 mit lateEntry" drei kleine
+  Vertragsfelder, die 023 bewusst nicht enthält:** `ContributionCapture.lateEntryReason` (Pflichtgrund),
+  `Contribution.lateEntry` (Kennzeichen) und ein Schluss-der-Debatte-Zeitpunkt (`Meeting.debateClosedAt` samt
+  Ereignistyp; die Aktion `debate.close` liegt laut Plan in 0.4.0/043). Grund für das Weglassen: nicht in Plan-Zeile
+  023, und 043 (23.10.) liegt nach 025 (15.10.), 025 hat aber keine Vertragslane. Vorschlag an den Orchestrator:
+  Kleinänderung (takt) vor 025 mit genau diesen drei optionalen Feldern plus Ereignistyp `DebateClosed` — oder 025
+  weist R-MTG-03 auf Domänenebene nach und die Felder kommen mit 043. Eingang der Absenderzeit (`occurredAt`,
+  `occurredAtSource`, `source: paper`) ist in 0.3.0 bereits vorhanden.
+- **Ereignistypen, die 040 für Stammdatenänderungen emittieren wird** (Fachbereiche, TOPs, Bühnenplätze,
+  Jahrgangs-Lebenszyklus preparation→running→closed) sind nicht deklariert, weil Plan-Zeile 023 nur die drei
+  Tagesordnungsereignisse nennt und 040 ihre Form festlegt; `Event.type` ist ein geschlossenes Enum, die Typen müssen
+  daher mit 043 (vor 040) in den Vertrag. Gleiches gilt für Lebenszyklus-Operationen (040 „Meeting-Lebenszyklus-
+  Aktionen") und `admin.override`.
+- **Meeting-Konfigurationsfelder** `podiumVisibility` (ADR 0006, 047), `pseudonymiseForUnits` (026), `notes` (046)
+  fehlen absichtlich: nicht in Zeile 023; 043 ist der Ort.
+- **Deklariert, aber nicht gebunden:** die Payloads von ContributionClaimed/Released, QuestionClaimed/Released und
+  ConfigFrozen bleiben offene Objekte (028/040 legen die Form fest); gebunden sind nur QuestionLegalCleared (0.2.0),
+  die drei Tagesordnungsereignisse und RoleAssigned/RoleRevoked, deren Form Spec bzw. ADR vorgeben.
+- **Alias-Deprecation und 030:** weil die zehn Alias-Operationen `deprecated` sind, muss der generierte Client (030)
+  die kanonischen Operationen benutzen und die aktuelle HV über `listMeetings?status=running` (oder bis 0.5 über den
+  Alias `getMeeting`) auflösen. Die Oberfläche der Demo spricht `HvApi` in-process und ist nicht betroffen.
+- **`matchOperationId` (`apps/api/src/contractSchema.ts`) schneidet nur `/v1` ab.** Für `/healthz`, `/readyz`,
+  `/metrics`, `/auth/*` passt das (Pfadschlüssel ohne Präfix, Tests rufen sie direkt auf); 025 montiert die
+  kanonischen Routen zusätzlich, ohne dass sich hier etwas ändern muss. Nicht Teil dieser Scheibe.
+- **Vitest-Verhalten als Randnotiz für Reviewer:** ein Fehler im `globalSetup`-Teardown setzt den Exit-Code nicht
+  (nur „error during close"); das Tor setzt deshalb `process.exitCode = 1` selbst und wirft zusätzlich, damit die
+  Meldung in der Vitest-Ausgabe erscheint. Belegt durch die roten Läufe oben (`exit=1`).
+- `oidc` bleibt als unbenutztes, `x-deprecated` Schema (1 Lint-Warnung, Bestand seit 0.1.0) bis 0.5.
+- Glossar, Rechtekonzept, DSFA: Nachführung durch den Orchestrator (Nicht-Ziel); Begriffsliste oben.
+
+### Commits auf `claude/slice-023-vertrag` (nicht gepusht)
+
+1. `9638430 test(api): Tor „jede operationId ausgeübt oder deklariert" als Vitest-globalSetup (Scheibe 023) [skip netlify]`
+2. `a35291c feat(contract): Vertragspaket 0.3.0 Fundament, rein additiv, 36 Operationen vorab deklariert (Scheibe 023) [skip netlify]`
+3. Bericht (diese Datei): `docs: Bericht Scheibe 023 mit Festlegungen, Abdeckungstabelle, roten und grünen Läufen (Scheibe 023) [skip netlify]`
 
 ## Review findings
 
