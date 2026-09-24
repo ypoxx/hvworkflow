@@ -3665,6 +3665,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getSession: {
@@ -3749,7 +3750,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Readiness"];
+                    "application/json": components["schemas"]["Readiness"] & {
+                        /** @constant */
+                        status?: "ready";
+                    };
                 };
             };
             /** @description Not ready — at least one check failed */
@@ -3759,7 +3763,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Readiness"];
+                    "application/json": components["schemas"]["Readiness"] & {
+                        /** @constant */
+                        status?: "not_ready";
+                    };
                 };
             };
         };

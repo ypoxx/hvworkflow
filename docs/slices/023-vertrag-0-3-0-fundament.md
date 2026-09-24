@@ -745,3 +745,9 @@ Prüfung (fehlender Medientyp, Zeichensatz, `problem+json`, falscher Medientyp j
 unverändert (29 ausgeübt), Zählung 16 bestätigt, `propertyNames` von Ajv durchgesetzt. Nits vom Orchestrator
 behoben: `Last-Event-ID` nur als Ziffernfolge, ein falscher Wert ist 422; Medientyp im Testhelfer ohne
 Groß-/Kleinschreibung.
+
+**Codex auf PR #25, vierter Lauf (2 × P1), vom Orchestrator behoben:** `logout` trägt den CSRF-Header, dokumentierte aber
+kein 403 → `Forbidden` ergänzt; eine Skriptprüfung über alle 34 Operationen mit CSRF-Header findet keine weitere ohne
+403. `/readyz` erlaubte 200 mit `not_ready` und 503 mit `ready` → die Schemata sind an den HTTP-Status gebunden
+(`allOf` mit `const`). Probe mit dem Vertragsvalidator des Dienstes (Wegwerf-Test, danach gelöscht): vorher
+„1 failed“, nachher „1 passed“.

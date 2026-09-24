@@ -1086,6 +1086,7 @@ paths:
       responses:
         '204': { description: Signed out; the cookie is cleared, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /auth/me:
     servers: [ { url: /, description: 'Outside /v1' } ]
     get:
@@ -1138,8 +1139,9 @@ paths:
         fails; the deploy smoke test of slice 037 rolls back on it.
       security: []
       responses:
-        '200': { description: Ready, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Readiness' } } } }
-        '503': { description: Not ready — at least one check failed, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Readiness' } } } }
+        # The status in the body agrees with the HTTP status (Codex on PR #25).
+        '200': { description: Ready, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { allOf: [ { $ref: '#/components/schemas/Readiness' }, { type: object, properties: { status: { const: ready } } } ] } } } }
+        '503': { description: Not ready — at least one check failed, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { allOf: [ { $ref: '#/components/schemas/Readiness' }, { type: object, properties: { status: { const: not_ready } } } ] } } } }
   /metrics:
     servers: [ { url: /, description: 'Outside /v1: scraped by the monitoring stack' } ]
     get:
