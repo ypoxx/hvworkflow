@@ -17,6 +17,10 @@ import type { Locator, Page } from '@playwright/test';
 import { checkAxe } from './support/axe';
 
 const SEEDED_QUESTIONS = 800;
+
+/** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
+const evidence = (name: string): string =>
+  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 const API_MODULE = '/src/api/index.ts';
 const ACTOR_MODULE = '/src/api/actor.ts';
 
@@ -330,6 +334,9 @@ test('010c Ziel 1: Beantwortung — podium → expert, erste Liste mit 500: kein
 
   await expectOneToast(page);
   await expect(page.getByTestId('answers-forbidden')).toHaveCount(0);
+  // Review round 1, finding 8 (Regel 2): the evidence — toast visible, no refusal.
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('010c-beantwortung-erster-abruf-500.png') });
   await checkAxe(page, 'answers (010c, failed first read after a refused role)');
 });
 
@@ -493,25 +500,114 @@ test('010c Ziel 4: Bühne — expert → admin, erster Abruf mit 500: kein "kein
   await expect(page.getByTestId('stage-forbidden')).toHaveCount(0);
 });
 
-test('010c Ziel 4: Bühne — dieselbe Rolle, auf eine Verweigerung folgt ein 500: der Fehler löst die Verweigerung ab', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await waitForCorpus(page);
-  await asRole(page, 'expert');
-  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
-  await page.getByTestId('nav-stage').click();
-  await expect(page).toHaveURL(/\/stage$/);
-  await expect(page.getByTestId('stage-forbidden')).toBeVisible();
+// ---------------------------------------------------------------------------------------------
+// Review round 1, finding 4: a refusal belongs to the actor. The same role, only a new `version`,
+// and that load fails with a plain 500: the refusal stands, and the failure still shows a toast.
+// ---------------------------------------------------------------------------------------------
 
-  // The same actor, a new `version` (somebody else's event), and this load fails with a 500: the
-  // refusal belonged to the previous load and does not stand for this one.
-  await failOnce(page, 'getStage');
-  await unrelatedEvent(page, 'Testperson 010c Bühne');
+interface SameRole {
+  name: string;
+  role: string;
+  nav: string;
+  forbidden: string;
+  /** The reads that fail once, as `[method, match]`; the toast count is one per failed read. */
+  fail: readonly [string, Record<string, unknown> | undefined][];
+  before?: (page: Page) => Promise<void>;
+}
 
-  await expectOneToast(page);
-  await expect(page.getByTestId('stage-forbidden')).toHaveCount(0);
-});
+const SAME_ROLE: readonly SameRole[] = [
+  {
+    name: 'Beantwortung',
+    role: 'podium',
+    nav: 'nav-answers',
+    forbidden: 'answers-forbidden',
+    fail: [['listQuestions', { limit: 2000 }]],
+  },
+  {
+    name: 'Historie',
+    role: 'podium',
+    nav: 'nav-history',
+    forbidden: 'history-forbidden',
+    fail: [
+      ['listQuestions', { limit: 2000 }],
+      ['listQuestions', { limit: 200 }],
+    ],
+  },
+  {
+    name: 'Wortmeldeliste',
+    role: 'podium',
+    nav: 'nav-speakers',
+    forbidden: 'speakers-forbidden',
+    fail: [['listSpeakers', undefined]],
+  },
+  {
+    name: 'Erfassung',
+    role: 'podium',
+    nav: 'nav-capture',
+    forbidden: 'capture-forbidden',
+    fail: [['listContributions', undefined]],
+  },
+  {
+    name: 'Bühne',
+    role: 'expert',
+    nav: 'nav-stage',
+    forbidden: 'stage-forbidden',
+    fail: [['getStage', undefined]],
+    before: async (page) => {
+      await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+    },
+  },
+];
+
+for (const view of SAME_ROLE) {
+  test(`010c Befund 4: ${view.name} — dieselbe Rolle, auf eine Verweigerung folgt ein 500: die Verweigerung bleibt, ein Toast`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await waitForCorpus(page);
+    await asRole(page, view.role);
+    await view.before?.(page);
+    await page.getByTestId(view.nav).click();
+    await expect(page.getByTestId(view.forbidden)).toBeVisible();
+
+    // Each named read fails once; several reads of one method are counted apart by their match.
+    await installHarness(page);
+    await page.evaluate(
+      async ([url, fails]) => {
+        const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
+        const w = window as unknown as Harness;
+        const pending = [...(fails as [string, Record<string, unknown> | null][])];
+        for (const name of new Set(pending.map(([method]) => method))) {
+          const original = w.__original[name]!;
+          api[name] = (...args: unknown[]) => {
+            const first = args[0] as Record<string, unknown> | undefined;
+            const at = pending.findIndex(
+              ([method, wanted]) =>
+                method === name &&
+                (wanted === null ||
+                  (typeof first === 'object' &&
+                    first !== null &&
+                    Object.entries(wanted).every(([k, v]) => first[k] === v))),
+            );
+            if (at >= 0) {
+              pending.splice(at, 1);
+              return Promise.reject({ status: 500, title: 'Testfehler', detail: '010c, absichtlich' });
+            }
+            return original(...args);
+          };
+        }
+      },
+      [API_MODULE, view.fail.map(([method, match]) => [method, match ?? null])] as const,
+    );
+    await unrelatedEvent(page, `Testperson 010c ${view.name}`);
+
+    await expect(toasts(page)).toHaveCount(view.fail.length);
+    await page.waitForTimeout(300);
+    await settle(page);
+    await expect(toasts(page)).toHaveCount(view.fail.length);
+    await expect(page.getByTestId(view.forbidden)).toBeVisible();
+  });
+}
 
 // ---------------------------------------------------------------------------------------------
 // Ziel 5: Beantwortung with a server-side filter and a role switch.
@@ -568,6 +664,130 @@ test('010c Ziel 5 (Gegenprobe): Beantwortung — Suche ohne die offene Frage, di
   await failOnce(page, 'getQuestion');
   await unrelatedEvent(page, 'Testperson 010c Gegenprobe');
   await expectOneToast(page);
+});
+
+test('010c Befund 1: Beantwortung — nach dem Wechsel liest die neue Rolle die Auswahl, dann Suche ohne sie: ein 500 zeigt einen Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  const rows = page.getByTestId('answers-row');
+  const number = (await rows.nth(0).getAttribute('data-number'))!;
+  const other = (await rows.nth(1).getAttribute('data-number'))!;
+  await rows.nth(0).click();
+  const detailNumber = page.getByTestId('answers-detail-number');
+  await expect(detailNumber).toHaveText(number);
+
+  // moderation may read the selection: after its first list answer the selection is its own.
+  await asRole(page, 'moderation');
+  await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toBeVisible();
+  await expect(detailNumber).toHaveText(number);
+  await settle(page);
+
+  // A search that leaves the selection out, then a real fault of its detail read on the next load.
+  await page.getByTestId('answers-search').fill(other);
+  await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toHaveCount(0);
+  await failOnce(page, 'getQuestion');
+  await unrelatedEvent(page, 'Testperson 010c Befund 1');
+  await expectOneToast(page);
+});
+
+/**
+ * Review round 1, finding 3: the detail reads of the Beantwortung. The previous actor's answer is
+ * held and handed over in the very task in which the actor switches back — in the gap before the
+ * `version` bump. A MutationObserver records whether it reached the screen.
+ */
+async function releaseInGap(page: Page, method: string, role: string, testId: string, watch: 'removed' | 'added'): Promise<void> {
+  await page.evaluate(
+    async ([url, name, wanted, id, mode]) => {
+      const mod = (await import(/* @vite-ignore */ url!)) as {
+        DEMO_ACTORS: readonly { role: string }[];
+        setActor: (actor: unknown) => void;
+      };
+      const w = window as unknown as Harness & { __saw: boolean };
+      w.__saw = false;
+      const selector = `[data-testid="${id}"]`;
+      new MutationObserver((records) => {
+        if (mode === 'added') {
+          if (document.querySelector(selector) !== null) w.__saw = true;
+          return;
+        }
+        for (const record of records) {
+          for (const node of record.removedNodes) {
+            if (node instanceof Element && (node.matches(selector) || node.querySelector(selector) !== null)) {
+              w.__saw = true;
+            }
+          }
+        }
+      }).observe(document, { childList: true, subtree: true });
+      for (const call of w.__held[name!]!.splice(0)) void call.answer!.then(call.resolve, call.reject);
+      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.role === wanted));
+    },
+    [ACTOR_MODULE, method, role, testId, watch],
+  );
+  await page.waitForTimeout(300);
+}
+
+const sawIt = (page: Page): Promise<boolean> =>
+  page.evaluate(() => (window as unknown as { __saw: boolean }).__saw);
+
+test('010c Befund 3: Beantwortung — eine Einzelfrage, die noch für die vorige Rolle unterwegs ist, wird nicht übernommen', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'legal');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  await page.getByTestId('answers-filter-status-in_review').click();
+  await page.getByTestId('answers-row').first().click();
+  const approve = page.getByTestId('answer-approve');
+  await expect(approve).toBeVisible();
+
+  // expert's own `getQuestion` (no "Freigeben" among its `_actions`) is held ...
+  await holdCalls(page, 'getQuestion', true);
+  await switchActor(page, 'expert');
+  await expect.poll(() => callCount(page, 'getQuestion')).toBeGreaterThan(0);
+  // ... and handed over as the actor becomes legal again.
+  await releaseInGap(page, 'getQuestion', 'legal', 'answer-approve', 'removed');
+  expect(await sawIt(page)).toBe(false);
+
+  await releaseAll(page, 'getQuestion');
+  await expect(approve).toBeVisible();
+  expect(await sawIt(page)).toBe(false);
+  await expect(toasts(page)).toHaveCount(0);
+});
+
+test('010c Befund 3: Beantwortung — eine Verlaufsverweigerung der vorigen Rolle wird nicht übernommen', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  // "vorgelesen": observer may read the question, but not its history.
+  await page.getByTestId('answers-filter-status-delivered').click();
+  await page.getByTestId('answers-row').first().click();
+  await expect(page.getByTestId('answers-detail')).toBeVisible();
+  await expect(page.getByTestId('answers-history-forbidden')).toHaveCount(0);
+
+  // observer's own `getQuestionHistory` (a refusal) is held ...
+  await holdCalls(page, 'getQuestionHistory', true);
+  await switchActor(page, 'observer');
+  await expect.poll(() => callCount(page, 'getQuestionHistory')).toBeGreaterThan(0);
+  // ... and handed over as the actor becomes admin again.
+  await releaseInGap(page, 'getQuestionHistory', 'admin', 'answers-history-forbidden', 'added');
+  expect(await sawIt(page)).toBe(false);
+
+  await releaseAll(page, 'getQuestionHistory');
+  await expect(page.getByTestId('answers-detail')).toBeVisible();
+  await settle(page);
+  expect(await sawIt(page)).toBe(false);
+  await expect(page.getByTestId('answers-history-forbidden')).toHaveCount(0);
 });
 
 // ---------------------------------------------------------------------------------------------
