@@ -317,3 +317,24 @@ Entscheidung des Architekten:
   Zustände des aktuellen Schlüssels“ gilt für Antworten, nicht für den Übergang.
 - 2, 5 und der schon bestehende Teil von 4 (Beantwortung) gehen in die Folgescheibe 010d „Ansichtsdaten gehören dem
   Schlüssel des Akteurs; gestalteter Ladefehler; alte Schreibvorgänge wirken nur auf ihre Frage“.
+
+Runde 2 (Nachprüfung, Opus 5.5, frischer Kontext, HEAD `30032b7`): Gates exit 0, Playwright 66/66, axe ohne
+serious/critical. Befunde 3, 4, 6, 8 behoben (Regel „Verweigerung gehört dem Akteur“ in allen fünf Ansichten per Sonde
+bestätigt, keine Falle nach Rechtewechsel; Musterblöcke und Tabellen byte-gleich). Befund 1 wie vorgegeben behoben, aber:
+
+- **N1 major** — Nach der Übernahme der Auswahl durch die neue Rolle (erste Listenantwort) wird der maskierte 404 einer
+  Auswahl, die die neue Rolle nicht lesen darf, ab dem zweiten Ladevorgang bei **jedem** Ereignis als Toast gemeldet
+  (englischer Titel, Live-Region wiederholt). Sonde: admin wählt, sucht, Wechsel zu observer → 0, nach einem Ereignis
+  1, nach zwei 2 Toasts; auf `7f17174` 0/0/0. Ursache ist die Vorgabe des Architekten zu Befund 1.
+  (`answers/useBacklog.ts:202-207, 228-236, 248, 257`, `answers/lib.ts:236`)
+- **N2 major (gleiche Ursache)** — e2e „Ziel 5 … kein Toast“ 1 von 3 rot im dateiweiten `--repeat-each=3`; der Bericht
+  nennt 69/69.
+- **N3 nit** — `capture/Page.tsx:124-129` ruft `readVerdict` ohne Lesevorgänge; die Tabellen decken den Fall nicht ab.
+- Befund 9: Bericht nicht aktuell (Wiederholungszahl, Ziel 5).
+
+Entscheidung des Architekten (Runde 2): Vorgabe zu Befund 1 wird ersetzt. Für „Auswahl von anderem Akteur“ wird nur ein
+404 verschluckt; ein 5xx (und jeder andere Fehler) ist immer ein echter Fehler und wird gemeldet. Die Markierung gilt
+dann so lange wie die Auswahl (wie auf `7f17174`). Befund 1 bleibt damit behoben, N1/N2 entfallen. Dazu ein e2e:
+Ziel-5-Aufbau plus zwei fremde Ereignisse → 0 Toasts; und der Befund-1-e2e (500 → genau ein Toast) bleibt grün, auch im
+ersten Ladevorgang nach dem Wechsel. N3: eine Tabellenzeile „keine Lesevorgänge“ in allen fünf Kopien. Bericht mit den
+echten Wiederholungszahlen.
