@@ -7,8 +7,11 @@
  * `docs/anforderungen-recherche.md` or `docs/ist-analyse-und-schnittstellen.md` ties that norm
  * explicitly to the rule's subject (file and line, named in the slice's report) — otherwise `source`
  * is `'Prozess'` or `'Leitplanken'` and `citation` names the document and section that actually
- * describes the rule. No citation here is invented or supplied from memory; where neither research
- * document says anything, the citation says so instead of pretending otherwise (R-TRANS-11).
+ * describes the rule. No citation here is invented or supplied from memory; where a document covers
+ * only part of what the rule does, or only a related but distinct concept, the citation says so
+ * instead of pretending otherwise (rework after the legal review, e.g. R-TRANS-00, R-TRANS-02,
+ * R-TRANS-05, R-TRANS-11, R-TRANS-12, R-GUARD-05 below all name a gap or a scope mismatch in words,
+ * never by silently dropping the honest half of the sentence).
  * `verified` is the literal `false`: only the legal review (E15, 076) changes that, never this slice.
  */
 import { TRANSITIONS } from './transitions.js';
@@ -60,13 +63,24 @@ const OTHER_RULES: readonly RuleEntry[] = [
     ruleId: 'R-TRANS-00',
     kind: 'Übergang',
     description:
-      'A terminal status accepts no further action, and an action with no matching transition row ' +
-      'is a conflict — both reported as 409 with this rule id (resolveTransition, transitions.ts).',
+      'resolveTransition()\'s own internal rule id (transitions.ts): a terminal status accepts no ' +
+      'further action, and an action with no matching transition row, is a conflict. The HTTP layer ' +
+      '(api.ts `transition()`, Festlegung 8 of slice 010) reports this rule id and the real reason ' +
+      'only to an actor who can also read the question; an actor who holds the action\'s own ' +
+      'permission but cannot read the question gets a generic 409 with no rule id instead, so ' +
+      '`ruleId: "R-TRANS-00"` never reaches a response about a question outside that actor\'s read ' +
+      'access (rework after the legal review, Codex P2 on PR #24).',
     legalRef: {
       source: 'Leitplanken',
       citation:
-        'docs/qualitaetsleitplanken-produktreife.md:175 (Abschnitt 6.4: "Erfolg, 400/422, 403, 404, ' +
-        '409, 412, 428 und 500 sind konsistent als Problem-Details mit Regel-ID modelliert")',
+        'Prüfpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
+        'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
+        'docs/qualitaetsleitplanken-produktreife.md:175 (Checkliste 6.4: "Erfolg, 400/422, 403, 404, ' +
+        '409, 412, 428 und 500 sind konsistent als Problem-Details mit Regel-ID modelliert") stützt ' +
+        'nur das Antwortformat (409 mit Regel-ID), nicht die Terminalität der Stände selbst. Für ' +
+        'Letztere nennt weder docs/anforderungen-recherche.md noch ' +
+        'docs/ist-analyse-und-schnittstellen.md eine Fundstelle — das ist eine Architekturentscheidung ' +
+        '(`TERMINAL_STATUSES`, types.ts), keine externe Vorgabe (rework nach Legal-Review, major 3).',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
       docHash: null,
       verified: false,
@@ -82,8 +96,11 @@ const OTHER_RULES: readonly RuleEntry[] = [
       source: 'Rechtekonzept',
       citation:
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
-        'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."); Regel-ID ' +
-        'eingeführt in docs/slices/010-lesepfade-leserechte.md, Festlegung 6',
+        'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."). Regel-ID ' +
+        '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament für ' +
+        'die erste lauffähige Version") — nicht neu eingeführt in Scheibe 010 (rework nach ' +
+        'Legal-Review, minor 4: dort kamen nur R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von ' +
+        'docs/slices/010-lesepfade-leserechte.md).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -115,9 +132,13 @@ const OTHER_RULES: readonly RuleEntry[] = [
     legalRef: {
       source: 'Rechtekonzept',
       citation:
-        'docs/rollen-und-rechtekonzept.md:91 (Abschnitt 2.3, Kontextattribut "Status": "erlaubte ' +
-        'Übergänge — Expert Track darf nur ins juristische Clearing"); Regel-ID eingeführt in ' +
-        'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang")',
+        'docs/rollen-und-rechtekonzept.md:93 (Abschnitt 2.3, Kontextattribut "Bühnenzuordnung": "der ' +
+        'Vorstand sieht nur, was ihm zugeordnet **und** bereit ist"). Ableitung: dieselbe Art ' +
+        'statusabhängiger Sichtbarkeitsbeschränkung wie "Leseumfang", auch wenn die Zeile selbst von ' +
+        'der Bühnenzuordnung spricht, nicht vom Lesestatus. Regel-ID eingeführt in ' +
+        'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang") — dort die genauere ' +
+        'Herleitung (rework nach Legal-Review, minor 3: nicht mehr Zeile 91, die "Status → erlaubte ' +
+        'Übergänge" beschreibt und damit R-TRANS/Guard-Umfang, nicht Leseumfang, betrifft).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -132,7 +153,9 @@ const OTHER_RULES: readonly RuleEntry[] = [
     legalRef: {
       source: 'Leitplanken',
       citation:
-        'docs/qualitaetsleitplanken-produktreife.md:167 (Abschnitt 6.3: "Wiederholungen sind ' +
+        'Prüfpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
+        'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
+        'docs/qualitaetsleitplanken-produktreife.md:167 (Checkliste 6.3: "Wiederholungen sind ' +
         'idempotent je Akteur und Operation")',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
       docHash: null,

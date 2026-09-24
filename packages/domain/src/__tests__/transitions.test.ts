@@ -139,6 +139,11 @@ describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {
     expect(missing, `guard(s) without a test scenario: ${missing.join(', ')}`).toEqual([]);
   });
 
+  it('GUARD_SCENARIOS has no stale entry for a guard that no longer exists (rework after Codex/Legal review)', () => {
+    const stale = Object.keys(GUARD_SCENARIOS).filter((id) => !guards.has(id));
+    expect(stale, `GUARD_SCENARIOS entry(ies) for a guard no longer in TRANSITIONS[].guards: ${stale.join(', ')}`).toEqual([]);
+  });
+
   for (const [ruleId, guard] of guards) {
     it(`${ruleId}: guard — ${guard.description}`, () => {
       const scenario = GUARD_SCENARIOS[ruleId];

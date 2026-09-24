@@ -4,11 +4,18 @@
  * under `packages/domain` because it reads source files with `node:fs`, and the domain must never
  * import a Node core module, not even in a test (`arch`, rule `domain-no-node-core-modules`).
  *
- * Two checks:
+ * Three checks:
  *   1. Every rule id mentioned anywhere in `packages/domain/src/**\/*.ts` or `apps/api/src/**\/*.ts`
- *      (excluding `__tests__`) is a member of `ruleRegister()` (`@hv/domain`) — an id used in
- *      production code without a register entry is the red run the spec asks to capture.
- *   2. Every register entry either is a `TRANSITIONS` row (its own generated test in
+ *      (excluding `__tests__` *and* `rules.ts` itself) is a member of `ruleRegister()` (`@hv/domain`)
+ *      — an id used in production code without a register entry is a red run.
+ *   2. Every register entry corresponds to a rule id still used somewhere in that same scan — a
+ *      register entry with no matching code is a stale entry (rework after Codex's P2 on PR #24:
+ *      `rules.ts` is excluded from the scan on *both* sides of this check, because it lists every
+ *      register id as a literal by construction and would otherwise make a stale entry unfindable —
+ *      every id in `OTHER_RULES` still has to show up elsewhere, e.g. `R-TRANS-00` in
+ *      `resolveTransition()`, `R-PERM-01..03` in `permissions.ts`/`api.ts`, `R-IDEM-01` in the
+ *      `api.ts` doc comment it names).
+ *   3. Every register entry either is a `TRANSITIONS` row (its own generated test in
  *      `transitions.test.ts`), a guard (its own generated test, same file), or its id appears
  *      literally in some `*.test.ts` file under `packages/domain/src/__tests__/` or
  *      `apps/api/src/__tests__/` — "has a test" per Festlegung 3.
@@ -24,12 +31,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const RULE_ID_RE = /\bR-[A-Z]+-\d{2,}\b/g;
 
 /** Every `.ts` file under `root` (relative to the repo root), depth-first, optionally excluding any
- * path segment named `__tests__`. */
-function collectTsFiles(root: string, { excludeTests }: { excludeTests: boolean }): string[] {
+ * path segment named `__tests__` and/or any of `excludeBasenames`. */
+function collectTsFiles(
+  root: string,
+  { excludeTests, excludeBasenames = [] }: { excludeTests: boolean; excludeBasenames?: readonly string[] },
+): string[] {
+  const excluded = new Set(excludeBasenames);
   const out: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       if (excludeTests && entry === '__tests__') continue;
+      if (excluded.has(entry)) continue;
       const full = join(dir, entry);
       const st = statSync(full);
       if (st.isDirectory()) walk(full);
@@ -50,8 +62,11 @@ function ruleIdsIn(files: readonly string[]): Set<string> {
 }
 
 describe('rule register', () => {
+  // `rules.ts` is excluded here (Codex P2, PR #24): it lists every register id as a literal by
+  // construction, so leaving it in would make check 2 (stale register entry) vacuously pass no
+  // matter what — every id would always "be found in code" via its own register entry.
   const productionFiles = [
-    ...collectTsFiles('packages/domain/src', { excludeTests: true }),
+    ...collectTsFiles('packages/domain/src', { excludeTests: true, excludeBasenames: ['rules.ts'] }),
     ...collectTsFiles('apps/api/src', { excludeTests: true }),
   ];
   const testFiles = [
@@ -69,6 +84,11 @@ describe('rule register', () => {
   it('every rule id used in production code has a register entry', () => {
     const missing = [...idsInProductionCode].filter((id) => !registerIds.has(id));
     expect(missing, `rule id(s) used in code without a ruleRegister() entry: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('every register entry corresponds to a rule id actually used in production code (no stale entries, rules.ts excluded from the scan)', () => {
+    const stale = [...registerIds].filter((id) => !idsInProductionCode.has(id));
+    expect(stale, `register entry(ies) with no matching production code (stale): ${stale.join(', ')}`).toEqual([]);
   });
 
   it('every register entry has a legalRef', () => {
