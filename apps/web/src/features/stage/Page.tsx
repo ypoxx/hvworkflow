@@ -10,15 +10,24 @@
  * away for a minute cannot overwrite a return that happened in the meantime.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Contrast, Maximize2, Minimize2 } from 'lucide-react';
+import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
-import { Button, Dialog, Panel, PageHeader, cx, showProblem, showToast } from '../../components';
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  Panel,
+  PageHeader,
+  cx,
+  showProblem,
+  showToast,
+} from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { Podium, StageQueue } from './Podium';
-import { isInteractiveTarget } from './lib';
+import { isInteractiveTarget, isReadForbidden } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -152,6 +161,9 @@ export function StagePage() {
 
   const [stage, setStage] = useState<StageView | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ziel 1 (slice 010b): `getStage` is the Hauptabfrage of the Bühne — set from the 403's ruleId
+  // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
+  const [forbidden, setForbidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
@@ -177,10 +189,16 @@ export function StagePage() {
         if (cancelled) return;
         setStage(next);
         setLoading(false);
+        setForbidden(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setLoading(false);
+        if (isReadForbidden(error)) {
+          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast.
+          setForbidden(true);
+          return;
+        }
         // The language is read at call time so that a language switch does not refetch the podium.
         showProblem(error, translate(getLang(), 'toast.problem'));
       });
@@ -417,6 +435,15 @@ export function StagePage() {
       <div className="h-16 w-3/4 animate-pulse rounded-sm bg-ink-50" />
       <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
     </div>
+  ) : forbidden ? (
+    <div data-testid="stage-forbidden" className="flex min-h-0 flex-1 items-center justify-center">
+      <EmptyState
+        icon={Lock}
+        title={t('stage.forbidden.title')}
+        description={t('stage.forbidden.body')}
+        className="max-w-xl"
+      />
+    </div>
   ) : (
     <Podium
       stage={view}
@@ -449,9 +476,14 @@ export function StagePage() {
         </div>
         <div className="flex min-h-0 flex-1 gap-8 px-8 py-6">
           {podium}
-          <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
-            <StageQueue stage={view} />
-          </aside>
+          {/* Ziel 1 (slice 010b): a role that cannot even read the stage sees no queue built from
+           *  data it does not have — an empty aside next to the gestaltete Zustand would otherwise
+           *  read as "nothing is queued", not "unknown, forbidden". */}
+          {!forbidden && (
+            <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
+              <StageQueue stage={view} />
+            </aside>
+          )}
         </div>
         {dialog}
       </div>
@@ -463,22 +495,28 @@ export function StagePage() {
       <PageHeader
         title={t('page.stage.title')}
         description={t('page.stage.description')}
-        actions={
-          <>
-            {counters}
-            {toggle}
-          </>
-        }
+        {...(forbidden
+          ? {}
+          : {
+              actions: (
+                <>
+                  {counters}
+                  {toggle}
+                </>
+              ),
+            })}
       />
       <div className="flex min-h-0 flex-1 gap-4">
         <Panel className="min-w-0 flex-1" bodyClassName="flex min-h-0 flex-col">
           {podium}
         </Panel>
-        <div className="hidden w-72 shrink-0 lg:block">
-          <Panel className="h-full" bodyClassName="flex min-h-0 flex-col">
-            <StageQueue stage={view} />
-          </Panel>
-        </div>
+        {!forbidden && (
+          <div className="hidden w-72 shrink-0 lg:block">
+            <Panel className="h-full" bodyClassName="flex min-h-0 flex-col">
+              <StageQueue stage={view} />
+            </Panel>
+          </div>
+        )}
       </div>
       {dialog}
     </div>
