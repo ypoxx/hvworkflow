@@ -1122,7 +1122,32 @@ geändert oder gelöscht" → „nie überschrieben oder entfernt"; „nach der 
 Recht bestätigt hat"). Übrig nur wörtliche Zitate („Prüfauftrag" aus Recherche:255, auch im vorgegebenen Wortlaut)
 und Verhaltensbeschreibungen („erneut", „neu berechnet").
 
-`pnpm gates`: siehe unten.
+`pnpm -C /home/user/wt/011 gates` auf dem committeten Stand `6b2754a` (sauberer Baum), eigene Logdatei über
+`mktemp`, Exit 0. Wörtliche Zeilen aus dem Lauf (Testsummen, Tore, Ende; Vite-Hinweise weggelassen):
+
+```
+packages/domain test:       Tests  86 passed (86)
+apps/web test:       Tests  48 passed (48)
+apps/api test:       Tests  55 passed (55)
+vocabulary-check: ok
+x 7 dependency violations (0 errors, 7 warnings). 139 modules, 505 dependencies cruised.
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+Downgrade check: 14 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+...
+# pass 196
+# fail 0
+...
+✓ 1715 modules transformed.
+dist/assets/index-BGNk1Y-M.js                        552.70 kB │ gzip: 162.37 kB │ map: 2,227.38 kB
+✓ built in 1.65s
+mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) at commit 6b2754a, tree db4502818d87…
+```
+
+Kein `FAIL`/`not ok` im Lauf (`grep -c` = 0); `arch`: dieselben sieben vorbestehenden Warnungen. Dieser Absatz kam
+in einem reinen `docs/`-Commit danach dazu.
 
 ## Review findings
 
