@@ -174,7 +174,14 @@ exit: 0
 Das Tor identifiziert den Branch, ordnet ihn der richtigen (`010b`-) Spec zu und prüft echte 30
 geänderte Dateien gegen deren 19 Muster — nicht die 010-Spec, und kein Überspringen mehr.
 
-`pnpm -C /home/user/wt/takt gates` (Tail, wörtlich, nach Commit aller Fach-Änderungen):
+`pnpm -C /home/user/wt/takt gates` (Tail, wörtlich, Stand nach den beiden Fach-Commits, Commit `8feb02e`
+— dieser Bericht-Commit selbst kommt danach). Die `slice-scope`-Zeile darin bestätigt nebenbei, dass das
+Tor jetzt den echten, committeten Diff dieser Scheibe sieht (bei noch unverändertem Arbeitsbaum, direkt
+nach dem Spec-Commit, war nur „1 changed file(s)" sichtbar — der `git diff` des Tors sieht nur Commits,
+keine unverzeichneten Änderungen; nach beiden Fach-Commits korrekt alle zehn):
+```
+slice-scope: 10 changed file(s), all within "docs/slices/takt-010-scheibenumfang-luecken.md"'s "Files allowed" list (6 pattern(s)).
+```
 ```
 1..202
 # tests 202
@@ -184,7 +191,7 @@ geänderte Dateien gegen deren 19 Muster — nicht die 010-Spec, und kein Übers
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6735.082502
+# duration_ms 6739.665159
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -209,17 +216,14 @@ dist/assets/index-BImqnPVW.js                        532.22 kB │ gzip: 156.05 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.15s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (signature 94a6d3fd9632…) at commit 2ba5265, tree 399ca9d7971b…
+✓ built in 1.18s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 8feb02e, tree 399ca9d7971b…
 ```
 
 Open:
 - Kein offener Punkt aus dem Ziel. Die drei nicht geforderten, aber schon oben erwähnten Nebenwirkungen
   von Ziel 3 (`004-api-server.md` korrekt gelesen, `takt-003-…` unverändert korrekt gelesen) sind reine
   Beobachtungen an bereits angenommenen Alt-Specs, keine Änderung an ihnen (Nicht-Ziel).
-- `pnpm gates` oben stammt vom Commit-Stand nach den drei Fach-Commits; dieser Bericht-Commit selbst
-  kommt danach (wie bei takt-006/-007 üblich) und wurde nicht erneut gegen `pnpm gates` laufen gelassen,
-  da er nur diese Spec-Datei ändert.
 
 Touched:
 - `scripts/slice-scope.mjs`, `scripts/slice-scope.test.mjs`
