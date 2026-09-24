@@ -615,6 +615,8 @@ bzw. der Stand nach Abschnitt 8) ist durch den obigen ersetzt — er war nach di
 nicht mehr der letzte Lauf auf dem tatsächlich committeten Stand. Beide Läufe zeigen dasselbe Bild (grün,
 0 fail), nur der Diff dazwischen ist die Wirkungen-Nacharbeit dieses Abschnitts.
 
+**Nachtrag Orchestrator:** Vor dem Push hat der Orchestrator den fehlenden Vermerk `[skip netlify]` im Betreff ergänzt (`git filter-branch --msg-filter`, nichts war gepusht). Dadurch änderten sich die Commit-Kennungen: `b1f4457` → `f08979a`, `c0d1f1d` → `389fa10`; der Inhalt ist gleich. `pnpm gates` auf `389fa10`, eigener Lauf des Orchestrators: Exit 0.
+
 ## Review findings
 
 **Runde 1 · Opus 5.5 (Perspektive Legal) · 24.09.2026 · Urteil: nacharbeiten** (0/2/4 + nits), dazu Codex auf PR
