@@ -32,6 +32,7 @@ Kein neues Token, keine Umgestaltung der Ansichten, keine Änderung an Kern, Ver
 `apps/web/src/features/capture/**`, `apps/web/src/features/answers/**`, `apps/web/src/features/stage/**`,
 `apps/web/src/components/Button.tsx` (nur falls `aria-disabled` dort zentral gebraucht wird),
 `apps/web/e2e/013-tastaturpfad.spec.ts`, diese Datei (`docs/slices/takt-008-fokus-nach-aktion.md`, Bericht).
+`docs/evidence/takt-008-*.png` (Nachtrag des Architekten 24.09.: Beweis-Screenshots nach Regel 2, in der Spec vergessen).
 
 ## Akzeptanzkriterium
 
