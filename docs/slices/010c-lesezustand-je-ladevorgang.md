@@ -1,6 +1,6 @@
 # 010c — Lesezustand je Ladevorgang
 
-**Status:** review bestanden (Runde 4, 24.09.)
+**Status:** review bestanden (Runde 4, 24.09.); CI-Befund auf `62f347b` behoben (`4cfabd9`), Nachprüfung offen
 **Risikoklasse:** niedrig · 0,75 AStd · Lanes: web-speakers, web-capture, web-answers, web-stage, web-history, e2e (eigene
 Datei). Startet nach takt-008 (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -66,10 +66,11 @@ außerhalb der Features.
 
 ## Bericht
 
-**Status:** review bestanden (Runde 4, 24.09.)
-`7f17174` (Bericht). Runde 1: `5c83da4` (e2e, rot auf `7f17174`), `5a4f3c5` (Änderung), `30032b7` (Screenshot
+**Status:** review bestanden (Runde 4, 24.09.); CI-Befund auf `62f347b` behoben. Commits Runde 0: `08b8f25` (e2e,
+rot), `4bf3a0c` (Änderung), `7f17174` (Bericht). Runde 1: `5c83da4` (e2e, rot auf `7f17174`), `5a4f3c5` (Änderung), `30032b7` (Screenshot
 und Bericht). Runde 2: `c43e7a2` (e2e, rot auf `30032b7`), `cae59a5` (Änderung), `6703a26` (Bericht). Runde 3:
-`a59760b` (e2e, rot auf `6703a26`), `439f737` (Änderung, **letzter Code-Commit**), dieser Commit (Bericht).
+`a59760b` (e2e, rot auf `6703a26`), `439f737` (Änderung), `6a007a7` (Bericht). CI-Befund: `4cfabd9` (nur e2e,
+**letzter Code-Commit**), dieser Commit (Bericht).
 
 ```
 Slice: 010c-lesezustand-je-ladevorgang
@@ -80,14 +81,56 @@ Done: Jeder Lesezustand trägt den Schlüssel seines Ladevorgangs (Akteur und ve
       Beantwortung); Serverfilter: für eine Auswahl eines anderen Akteurs wird nur der maskierte 404
       geschluckt, jeder andere Fehler gemeldet — unabhängig von der Reihenfolge der Fehler (das Gate hält alle
       Fehler eines Durchgangs); takt-008 N1–N3 behoben.
-Evidence: pnpm gates auf 439f737, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 70/70, 010c-Datei
-      27/27, --repeat-each=3 zweimal: 81/81 und 81/81; rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e,
+Evidence: pnpm gates auf 4cfabd9, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite zweimal 70/70
+      (2 Worker; 1 Worker auf 2 CPUs wie CI); beide CI-Tests mit --repeat-each=20: 40/40; 010c-Datei 27/27,
+      --repeat-each=3 zweimal (Runde 3): 81/81 und 81/81; rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e,
       Runde 1 8 rot / 15 grün auf 7f17174, Runde 2 2 rot / 23 grün auf 30032b7, Runde 3 2 rot / 25 grün auf
       6703a26 (jeweils genau die neuen bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
 Open: siehe "Offen" unten (Daten der vorigen Rolle bis zur ersten Antwort und „Kein Treffer" nach einem
       ersten 500 → 010d; zwei Toasts in der Historie).
 Touched: siehe "Touched" unten.
 ```
+
+### CI-Befund auf `62f347b` (zwei e2e rot, Code unverändert seit `6a007a7`)
+
+**1. `010c Befund 4: Historie …` — „Resulting promise was garbage collected." in `unrelatedEvent`.**
+Ursache: in der Testhilfe, nicht im Produkt. Playwright meldet diesen Fehler, wenn Chromium den Promise
+verwirft, auf den das `page.evaluate` wartet, weil er noch offen und von nichts mehr erreichbar ist, das ihn
+erfüllen könnte (Chromium „Promise was collected"; eine Navigation gäbe „Execution context was destroyed").
+`unrelatedEvent` wartete auf drei Promises: zwei `import()` der App-Module und das Schreiben. Das Schreiben
+kann nicht offen bleiben: das In-Process-`registerSpeaker` ist eine `async`-Funktion mit synchronem Rumpf
+(`idempotent` → `append` → `store.append` schreibt und benachrichtigt synchron, `packages/domain/src/store.ts`),
+sein Promise ist beim Zurückkehren schon erfüllt oder abgelehnt. Offen bleiben konnten nur die dynamischen
+Importe — je Hilfsaufruf zwei, einige hundert je Lauf. Lokal nicht nachgestellt: 20× der Test allein, 3× die
+ganze 010c-Datei mit 1 Worker auf 2 CPUs (81/81), 40 Importe mit erzwungener Speicherbereinigung
+zwischen `import()` und Warten (`--js-flags=--expose-gc`) und 60 Durchläufe des `unrelatedEvent`-Rumpfs in der
+Historie als podium, davon 30 mit `gc()` vor dem Warten — alle 100 ohne Fehler, dazu alle
+Vollläufe dieser Scheibe mit der alten Hilfe grün. Da kein Produktpfad offen bleibt, ist das kein
+Produktfehler, sondern eine Robustheitslücke der Hilfe; behoben ohne Wiederholung:
+- `installHarness` löst die zwei App-Module **einmal je Seite** auf (`__modules`), gleich nach dem Laden des
+  Korpus in `waitForCorpus`, wenn die Seite ruht. Alle anderen Hilfen und Tests arbeiten mit diesen Handles;
+  die Datei enthält danach nur noch diesen einen `import()`-Aufruf (vorher 15 Stellen).
+- `unrelatedEvent` ist ein **synchrones** `evaluate` — es wartet in der Seite auf nichts. Den Ausgang des
+  Schreibens legt es in `__writes` ab, der Test fragt ihn danach mit `expect.poll` ab und verlangt `ok`
+  (ein abgelehntes Schreiben würde damit sichtbar, statt verschluckt).
+
+**2. `013h` — `expect(look.background).toBe(look.locked)`, erwartet `rgb(247, 246, 244)`, gelesen
+`rgb(230, 233, 242)`.** Ursache: die Farbüberblendung, nicht der Sperrzustand. Der Knopf trägt
+`transition-colors duration-100` (`components/Button.tsx`); nach dem Speichern wechselt er von primär
+(accent-600 `rgb(29, 78, 216)`) in den gesperrten Grund ink-50 `rgb(247, 246, 244)`. Der gelesene Wert liegt
+auf allen drei Kanälen 92 % auf diesem Weg (29 + 0,92 · 218 = 230, 78 + 0,92 · 168 = 233, 216 + 0,92 · 28 = 242);
+`aria-disabled="true"` war unmittelbar davor schon geprüft. Nachgestellt: mit
+`Animation.setPlaybackRate(0.05)` (CDP, alle Überblendungen 20× langsamer, nur in einer nicht eingecheckten
+Kopie des Tests) ist die alte Prüfung rot — gelesen `rgb(234, 236, 242)`, wieder mitten auf dem Weg — und
+die neue grün. Behebung in `013-tastaturpfad.spec.ts`: der Hintergrund wird mit `expect.poll` bis zum
+gesperrten Token abgewartet, weiter mit `toBe` genau auf ink-50 (keine „irgendeine Farbe"), die Deckkraft
+danach wie bisher genau `1`; kein fester Schlaf.
+
+Belege auf `4cfabd9` (Port 5311, Chromium unter `/opt/pw-browsers`):
+- beide Tests zusammen mit `--repeat-each=20`: `40 passed (8.7m)`.
+- ganze Suite zweimal: `70 passed (5.0m)` (2 Worker) und `70 passed (9.7m)` (1 Worker, `taskset -c 0,1`, wie
+  der CI-Läufer mit 2 CPUs); axe in beiden ohne serious/critical.
+- 013h unter 20× langsamer Überblendung: alte Fassung rot, neue grün (s. o.).
 
 ### Nacharbeit Runde 3 (R3-1; Entscheidung des Architekten Runde 3)
 
@@ -214,12 +257,10 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
 
 ### Evidence
 
-**`pnpm gates` auf `439f737` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 159, api 57, scripts
-206/206. `slice-scope` meldet dazu eine Warnung, weil der Architekt „Files allowed" nach `452e89e` um
-`docs/evidence/010c-*.png` ergänzt hat (`b85b080`): `slice-scope: warning — "docs/slices/010c-lesezustand-je-ladevorgang.md"'s
-"Files allowed" section differs from its version at the commit that introduced it (452e89e).` und
-`slice-scope: 20 changed file(s), all within "docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed"
-list (4 pattern(s)).` Schluss wörtlich (nur ANSI-Farbcodes entfernt):
+**`pnpm gates` auf `4cfabd9` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 159, api 57, scripts
+206/206. `slice-scope` meldet die bekannte Warnung („Files allowed" seit `452e89e` vom Architekten ergänzt) und
+`slice-scope: 21 changed file(s), all within "docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed"
+list (6 pattern(s)).` Schluss wörtlich (nur ANSI-Farbcodes entfernt):
 
 ```
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
@@ -245,11 +286,11 @@ dist/assets/index-DlBe9xYy.js                        568.48 kB │ gzip: 166.24 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.64s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 439f737, tree 3ab291049c6c…
+✓ built in 1.57s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 4cfabd9, tree 3a6ecd7d4966…
 ```
 
-**Playwright** (eigener Port 5147, Chromium unter `/opt/pw-browsers`), auf dem Baum von `439f737`:
+**Playwright Runde 3** (eigener Port 5147, Chromium unter `/opt/pw-browsers`), auf dem Baum von `439f737`:
 - ganze Suite: `70 passed (5.1m)`, axe in allen Szenarien „0 serious/critical".
 - `e2e/010c-lesezustand.spec.ts` dateiweit mit `--repeat-each=3`, zwei Läufe nacheinander: `81 passed (3.0m)`
   und `81 passed (3.0m)` (je 27 Tests × 3, kein Fehlschlag).
@@ -342,6 +383,7 @@ Administration, Akteur im selben Task gesetzt und zurückgesetzt (die Ansicht si
 - `apps/web/src/features/history/Page.tsx`, `lib.ts`, `lib.test.ts`
 - `apps/web/src/features/speakers/useSpeakers.ts`, `useSpeakers.test.ts`
 - `apps/web/src/features/stage/Page.tsx`, `Podium.tsx`, `lib.ts`, `lib.test.ts`
+- `apps/web/e2e/013-tastaturpfad.spec.ts` (nur 013h, CI-Befund)
 - `docs/evidence/010c-beantwortung-erster-abruf-500.png` (neu)
 - `docs/slices/010c-lesezustand-je-ladevorgang.md` (Status und Bericht)
 
