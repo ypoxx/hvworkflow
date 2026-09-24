@@ -166,6 +166,9 @@ export function StagePage() {
   // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
   const [forbidden, setForbidden] = useState(false);
   const [busy, setBusy] = useState(false);
+  // takt-008: "Vorgelesen, weiter" keeps focus while it writes (`aria-disabled`, Podium.tsx), so a
+  // second activation can arrive before React has re-rendered `busy` — one write at a time.
+  const writing = useRef(false);
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
   // either layout (see the early return below) — not a silent stand-in for `false` any more.
@@ -325,6 +328,8 @@ export function StagePage() {
     const current = stageRef.current?.current;
     if (current === null || current === undefined) return;
     if (!current._actions.includes('question.deliver')) return;
+    if (writing.current) return;
+    writing.current = true;
     setBusy(true);
     try {
       const delivered = await api.deliverQuestion(current.id, { ifMatch: etagOf(current.version) });
@@ -342,6 +347,7 @@ export function StagePage() {
       // A refusal — 412 above all — means the podium is looking at an old copy. Refetch.
       reload();
     } finally {
+      writing.current = false;
       setBusy(false);
     }
   }, [reload, t]);

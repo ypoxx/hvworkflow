@@ -7,7 +7,7 @@
  * on refusal — a 412 means somebody else wrote first, and the record, not the interface, says what
  * is true afterwards.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, WriteOptions } from '@hv/domain';
@@ -38,6 +38,9 @@ export function AnswersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [busy, setBusy] = useState(false);
+  // takt-008: buttons locked with `aria-disabled` keep focus, so a second activation can arrive
+  // before React has re-rendered `busy` (two clicks in one task). One write at a time, decided here.
+  const writing = useRef(false);
   const [draftResetToken, setDraftResetToken] = useState(0);
   // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
   const [stale, setStale] = useState(false);
@@ -56,7 +59,8 @@ export function AnswersPage() {
    */
   const run = useCallback(
     async (permission: Permission, write: (options: WriteOptions) => Promise<unknown>) => {
-      if (question === null) return false;
+      if (question === null || writing.current) return false;
+      writing.current = true;
       setBusy(true);
       try {
         await write({ ifMatch: etagOf(question.version) });
@@ -75,6 +79,7 @@ export function AnswersPage() {
         reload();
         return false;
       } finally {
+        writing.current = false;
         setBusy(false);
       }
     },

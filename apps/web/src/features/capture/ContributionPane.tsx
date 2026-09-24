@@ -3,7 +3,7 @@
  * desk is writing a new Redebeitrag down (textarea) or it is working on one that exists — then the
  * text is read-only, tinted where it is already covered, and the atomisation tools sit under it.
  */
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert } from 'lucide-react';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, cx } from '../../components';
@@ -84,6 +84,23 @@ export function ContributionPane({
   const [draft, setDraft] = useState('');
   const [free, setFree] = useState('');
   const [composing, setComposing] = useState(false);
+  // takt-008: the field for the next Einzelfrage — where focus goes after either write on this pane.
+  const freeInput = useRef<HTMLInputElement | null>(null);
+  // Set when a Redebeitrag was written: the form (and the button that held focus) is gone, and the
+  // field only mounts once the new Redebeitrag has been read back — focus follows it there.
+  const focusFreeOnMount = useRef(false);
+  const attachFreeInput = useCallback((element: HTMLInputElement | null) => {
+    freeInput.current = element;
+    if (element === null || !focusFreeOnMount.current) return;
+    focusFreeOnMount.current = false;
+    // Only focus that was lost with the unmounted form is moved — never focus the person has
+    // already put somewhere else in the meantime.
+    const active = document.activeElement;
+    if (active === null || active === document.body) element.focus();
+  }, []);
+  // A second activation before React has re-rendered `writing` (e.g. two clicks in one task) must
+  // not write the same Redebeitrag twice.
+  const submitting = useRef(false);
 
   const speaker = speakers.find((s) => s.id === speakerId);
   // Without a Redebeitrag there is nothing to read, so the desk starts writing straight away.
@@ -93,6 +110,7 @@ export function ContributionPane({
     setComposing(false);
     setDraft('');
     setFree('');
+    focusFreeOnMount.current = false;
   }, [speakerId]);
 
   const rounds = new Map<number, Speaker[]>();
@@ -103,11 +121,21 @@ export function ContributionPane({
   }
 
   const submitText = async (): Promise<void> => {
-    if (draft.trim() === '') return;
-    const ok = await onWrite(draft.trim());
-    if (ok) {
-      setDraft('');
-      setComposing(false);
+    if (writing || submitting.current || draft.trim() === '') return;
+    submitting.current = true;
+    // Armed before the write, not after: the in-process demo reads the new Redebeitrag back (and
+    // mounts the field) within the same chain of promises, before this function resumes.
+    focusFreeOnMount.current = true;
+    try {
+      const ok = await onWrite(draft.trim());
+      if (ok) {
+        setDraft('');
+        setComposing(false);
+      } else {
+        focusFreeOnMount.current = false;
+      }
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -115,6 +143,9 @@ export function ContributionPane({
     if (free.trim() === '') return;
     onCaptureQuestions([{ text: free.trim() }]);
     setFree('');
+    // takt-008: emptying the field disables "Hinzufügen" — had it held focus, focus would fall to
+    // `<body>`. It goes back to the field, where the next Einzelfrage is typed.
+    freeInput.current?.focus();
   };
 
   return (
@@ -129,6 +160,7 @@ export function ContributionPane({
           <Button
             variant="ghost"
             size="sm"
+            data-testid="capture-contribution-new"
             onClick={() => setComposing(true)}
             icon={<Plus size={14} strokeWidth={2} aria-hidden="true" />}
           >
@@ -141,6 +173,7 @@ export function ContributionPane({
           <div className="flex items-end gap-2 py-1">
             <Field label={t('capture.free.label')} htmlFor={`${ids}-free`} className="flex-1">
               <input
+                ref={attachFreeInput}
                 id={`${ids}-free`}
                 data-testid="capture-free-input"
                 className={FIELD_CONTROL}
@@ -298,7 +331,12 @@ export function ContributionPane({
               <Button
                 variant="primary"
                 data-testid="capture-submit"
-                disabled={writing || draft.trim() === ''}
+                // takt-008: locked while writing with `aria-disabled`, not `disabled` — it keeps
+                // focus, so a refused write leaves the person where they were. An empty draft
+                // still uses `disabled`: while typing, focus is in the text field; after a
+                // successful write, `attachFreeInput` above moves it on.
+                disabled={draft.trim() === ''}
+                aria-disabled={writing}
                 onClick={() => void submitText()}
                 icon={<PencilLine size={16} strokeWidth={1.75} aria-hidden="true" />}
               >

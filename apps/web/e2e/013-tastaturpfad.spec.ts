@@ -10,9 +10,9 @@
  * What is still a click, honestly, and why:
  *   - the demo's own role switcher (AGENTS.md rule 4 — not a Kernszene, the one place a role name
  *     may appear);
- *   - in scene (b) and in the dedicated "known-bad" test below, registering and calling a *second*
- *     Wortmeldung as a prerequisite (not the scene under test — scene (a) already proves that same
- *     registration is itself fully keyboard-operable).
+ *   - in scene (b) and in the dedicated focus-after-action tests below (013h/013i, takt-008),
+ *     registering and calling a *second* Wortmeldung as a prerequisite (not the scene under test —
+ *     scene (a) already proves that same registration is itself fully keyboard-operable).
  * Everything else — page navigation, the status filter chips, dismissing a confirmation toast,
  * typing into a field already reached by Tab — is real keyboard input: `Alt+1`…`Alt+5` (never a
  * click on a `nav-*` link), Tab/Enter on the filter chips, waiting a toast out
@@ -20,8 +20,8 @@
  * put the caret in the field (not `.fill()`, which does not dispatch real key events).
  *
  * `.focus()` (not a click) only ever finds the button/field a real `Tab` walk (`tabToTestId`,
- * `tabUntil`) has already proven reachable, or — in the dedicated "known-bad" test, which checks
- * *where* focus lands, not whether it is visible — positions directly on a button whose own
+ * `tabUntil`) has already proven reachable, or — in 013h/013i (takt-008), which check *where*
+ * focus lands after an action and that it writes once — positions directly on a button whose own
  * reachability is already proven by the scene it is copied from.
  */
 import { expect, test } from '@playwright/test';
@@ -309,10 +309,9 @@ test('013b: Redebeitrag erfassen und mit der Tastatur in Einzelfragen zerlegen',
   await assertFocusVisible(page, { testId: 'capture-submit' });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
-  // Review round 1, major 2: `capture-submit` is one of the known-bad "focus lost after an action"
-  // steps this slice's own test surfaced (`disabled={writing}`, same shape as `disabled={busy}`
-  // elsewhere) — not asserted here as if it worked; see the dedicated `test.fail()` below and the
-  // Bericht "Offen".
+  // takt-008: the form (and with it `capture-submit`) is gone once the Redebeitrag is written —
+  // focus is moved on to the field that adds the first Einzelfrage, the desk's next step.
+  await assertFocusVisible(page, { testId: 'capture-free-input' });
 
   // Zerlegen ohne Maus: the batch dialog needs no text selection at all — Tab/Shift+Tab/Enter/Escape.
   await tabToTestId(page, 'capture-suggest', 20);
@@ -345,8 +344,9 @@ test('013b: Redebeitrag erfassen und mit der Tastatur in Einzelfragen zerlegen',
   await assertFocusVisible(page, { testId: 'capture-free-add' });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('capture-question-card')).toHaveCount(QUESTIONS.length + 1);
-  // Also known-bad (`disabled={free.trim() === ''}` clears and disables the button the instant it
-  // succeeds) — see the dedicated test below, not asserted here.
+  // takt-008: the emptied field disables the button, so focus goes back to the field for the next
+  // Einzelfrage.
+  await assertFocusVisible(page, { testId: 'capture-free-input' });
 });
 
 /** Filters to a status by Tab/Enter (review round 1, minor 4 — no click on the chip), then reaches
@@ -392,8 +392,9 @@ test('013c: Antwort entwerfen und mit der Tastatur weiterleiten', async ({ page 
   await assertFocusVisible(page, { testId: 'answer-submit-draft' });
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
-  // Review round 1, major 2: `answer-submit-draft` is one of the known-bad steps — focus is not
-  // asserted here (it would fail); see the dedicated `test.fail()` test and the Bericht "Offen".
+  // takt-008: the emptied editor makes the button `aria-disabled`, not `disabled` — it keeps focus.
+  await assertFocusVisible(page, { testId: 'answer-submit-draft' });
+  await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
   // The confirmation toast this raises (`answers/Page.tsx`'s shared `run()`) is waited out, not
   // clicked, before the next Tab search needs a clean run (review round 1, major 2 + minor 4).
   await waitForToastsGone(page);
@@ -405,7 +406,8 @@ test('013c: Antwort entwerfen und mit der Tastatur weiterleiten', async ({ page 
   await page.screenshot({ path: evidence('013-fokus-beantwortung.png') });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
-  // `answer-submit-review` is also known-bad — see the dedicated test below.
+  // takt-008: the button is gone with the step; focus moves to the block that shows its outcome.
+  await assertFocusVisible(page, { testId: 'approval-block' });
 });
 
 test('013d: Freigeben mit der Tastatur', async ({ page }) => {
@@ -421,7 +423,8 @@ test('013d: Freigeben mit der Tastatur', async ({ page }) => {
   await assertFocusVisible(page, { testId: 'answer-approve' });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
-  // `answer-approve` is also known-bad — see the dedicated test below.
+  // takt-008: as after `answer-submit-review` — focus on the block that shows the Freigabe.
+  await assertFocusVisible(page, { testId: 'approval-block' });
 });
 
 test('013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur', async ({ page }) => {
@@ -448,118 +451,293 @@ test('013e: Auf der Bühne "Vorgelesen, weiter" mit der Tastatur', async ({ page
   await page.screenshot({ path: evidence('013-fokus-buehne.png') });
   await page.keyboard.press('Space');
   await expect(currentNumber).not.toHaveText(before);
-  // `stage-next` is also known-bad (the finding that started this list) — see the dedicated test.
+  // takt-008: `aria-disabled` while writing — the button keeps focus for the next question.
+  await assertFocusVisible(page, { testId: 'stage-next' });
 });
 
 /**
- * Review round 1, major 2: a real product defect this slice's own keyboard-path test surfaced —
- * `disabled={busy}` (and the identically-shaped `disabled={writing}`/`disabled={free.trim() === ''}`)
- * blurs the just-activated button to `<body>` the instant the guard flips true (a disabled element
- * cannot hold focus, a native browser rule), and nothing moves focus back once it re-enables. Fixing
- * it needs feature-file edits beyond Ziel 1's "small axe fixes" allowance (`Podium.tsx`/`Page.tsx` for
- * stage, `AnswerEditor.tsx`/`Page.tsx` for answers, `ContributionPane.tsx` for capture) — recorded
- * here as a characterisation test: each of the six actions asserts the known-bad state exactly
- * (focus lands on `BODY`). Fixing any single action therefore turns this test red at once, and
- * takt-008 flips exactly that line to the correct expectation (review round 2: one `test.fail()` over
- * six soft checks hid partial fixes, Codex on PR #19; checking `testId !== null` instead of `BODY`
- * would have missed a fix that moves focus to an element without a testid, Opus). `expect.soft` so
- * every action is reported in one run. Positioning is `.focus()`, not a fresh Tab walk — this test is
- * about *where* focus lands after the action, not about reachability (already proven by the scenes
- * above). Setup uses mouse clicks and `.fill()` (register, call, filter chips, row selection): they
- * only prepare state and are not part of any keyboard path under test.
+ * takt-008 (turns around `013-bekannt`, the characterisation test of review round 1, major 2):
+ * after Enter/Space on each of the six actions, focus stays on — or is moved to — a visible,
+ * sensible element, never `<body>`. Before takt-008, `disabled={busy}` (and the identically shaped
+ * `disabled={writing}`/`disabled={free.trim() === ''}`) blurred the just-activated button to
+ * `<body>` the instant the guard flipped true, and nothing moved focus back.
+ *
+ * Where focus is expected, per action (the reasoning is in the takt-008 Bericht):
+ *   - `capture-submit`       → `capture-free-input` (the form is gone; the next step is the first
+ *                              Einzelfrage),
+ *   - `capture-free-add`     → `capture-free-input` (the emptied field disables the button; the
+ *                              next Einzelfrage is typed there),
+ *   - `answer-submit-draft`  → `answer-submit-draft` itself, now `aria-disabled` (emptied editor),
+ *   - `answer-submit-review` → `approval-block` (the button is gone with the step; the block shows
+ *                              the outcome),
+ *   - `answer-approve`       → `approval-block` (same),
+ *   - `stage-next`           → `stage-next` itself (`aria-disabled` while writing, then the next
+ *                              question's "Vorgelesen, weiter").
+ *
+ * Positioning is `.focus()`, not a fresh Tab walk — this test is about *where* focus lands after
+ * the action, not about reachability (already proven by the scenes above, which now assert the
+ * same targets after a real Tab walk). Setup uses mouse clicks and `.fill()` (register, call,
+ * filter chips, row selection): they only prepare state and are not part of any keyboard path
+ * under test.
  */
-test(
-  '013-bekannt: Fokus nach Aktion — Charakterisierung, der Fokus landet heute auf BODY (takt-008)',
-  {
-    annotation: {
-      type: 'issue',
-      description:
-        'Fokus nach Aktion: disabled={busy} entzieht dem Knopf den Fokus — Folge-Kleinänderung takt-008',
+test('013h: Fokus nach Aktion bleibt sichtbar am Bedienelement, nie auf BODY (takt-008)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+
+  await asRole(page, 'moderation');
+  await page.getByTestId('speaker-register').click();
+  await page.getByTestId('speaker-register-name').fill('Fokus Testperson 013');
+  await page.getByTestId('speaker-register-submit').click();
+  const speakerRow = page
+    .locator('[data-testid="speaker-row"]')
+    .filter({ hasText: 'Fokus Testperson 013' });
+  await speakerRow.getByTestId('speaker-call').click();
+
+  await asRole(page, 'capture');
+  await page.keyboard.press('Alt+2');
+  await expect(page).toHaveURL(/\/capture$/);
+  await page.getByTestId('capture-text').focus();
+  await page.keyboard.type('Sehr geehrte Damen und Herren. Wie hoch war der Umsatz? Vielen Dank.');
+  await page.getByTestId('capture-submit').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
+  await assertFocusVisible(page, { testId: 'capture-free-input' });
+
+  await page.keyboard.type('Wie viele Stimmrechte waren vertreten?');
+  await page.getByTestId('capture-free-add').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
+  await assertFocusVisible(page, { testId: 'capture-free-input' });
+
+  await asRole(page, 'expert');
+  await page.keyboard.press('Alt+3');
+  await expect(page).toHaveURL(/\/answers$/);
+  await page.getByTestId('answers-filter-status-assigned').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'assigned');
+  await page.getByTestId('answers-row').first().click();
+  await page.getByTestId('answer-editor').focus();
+  await page.keyboard.type('Antworttext für den Fokustest.');
+  await page.getByTestId('answer-submit-draft').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
+  await assertFocusVisible(page, { testId: 'answer-submit-draft' });
+  await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
+  // D8: the `aria-disabled` state is visibly locked, not only an attribute for assistive
+  // technology — the neutral `ink-50` ground of Button.tsx — and not by opacity, which would fade
+  // the focus ring the button keeps along with it.
+  const look = await page.getByTestId('answer-submit-draft').evaluate((el) => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor = 'var(--color-ink-50)';
+    document.body.append(probe);
+    const locked = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const style = getComputedStyle(el);
+    return { background: style.backgroundColor, locked, opacity: style.opacity };
+  });
+  expect(look.background).toBe(look.locked);
+  expect(look.opacity).toBe('1');
+  await checkAxe(page, 'answers (Entwurf gespeichert, Knopf aria-disabled)');
+  await waitForToastsGone(page);
+  // Evidence: the focused, `aria-disabled` button — ring and disabled look together (scrolling
+  // does not move focus).
+  const draftButton = page.getByTestId('answer-submit-draft');
+  await draftButton.scrollIntoViewIfNeeded();
+  await page.evaluate(() => document.fonts.ready);
+  await draftButton
+    .locator('xpath=ancestor::section[1]')
+    .screenshot({ path: evidence('takt-008-fokus-entwurf-aria-disabled.png') });
+  await assertFocusVisible(page, { testId: 'answer-submit-draft' });
+
+  await page.getByTestId('answer-submit-review').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
+  await assertFocusVisible(page, { testId: 'approval-block' });
+
+  await waitForToastsGone(page);
+  await asRole(page, 'legal');
+  await page.keyboard.press('Alt+3');
+  await page.getByTestId('answers-filter-status-in_review').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
+  await page.getByTestId('answers-row').first().click();
+  await page.getByTestId('answer-approve').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
+  await assertFocusVisible(page, { testId: 'approval-block' });
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('takt-008-fokus-nach-freigabe.png') });
+
+  await waitForToastsGone(page);
+  await asRole(page, 'podium');
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await page.keyboard.press('Alt+4');
+  await expect(page).toHaveURL(/\/stage$/);
+  const currentNumber = page.getByTestId('stage-current-number');
+  await expect(currentNumber).toBeVisible();
+  const before = await currentNumber.innerText();
+  await page.getByTestId('stage-next').focus();
+  await page.keyboard.press('Space');
+  await expect(currentNumber).not.toHaveText(before);
+  await assertFocusVisible(page, { testId: 'stage-next' });
+  await checkAxe(page, 'stage (nach Vorgelesen, weiter)');
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('takt-008-fokus-nach-buehne.png') });
+});
+
+/** `api/index.ts`'s own storage key: the demo event log of this device (ADR 0002). */
+const EVENT_LOG_KEY = 'hv-demo-events-v1';
+
+/** The number of events of one type in the persisted event log — "exactly one event" (takt-008,
+ *  acceptance criterion 2) is read off the record itself, not off whatever a view happens to show. */
+async function countEvents(page: Page, type: string): Promise<number> {
+  return page.evaluate(
+    ({ key, wanted }) => {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return 0;
+      return (JSON.parse(raw) as { type: string }[]).filter((event) => event.type === wanted)
+        .length;
     },
-  },
-  async ({ page }) => {
-    await page.goto('/');
-    await waitForCorpus(page);
+    { key: EVENT_LOG_KEY, wanted: type },
+  );
+}
 
-    await asRole(page, 'moderation');
-    await page.getByTestId('speaker-register').click();
-    await page.getByTestId('speaker-register-name').fill('Fokus Testperson 013');
-    await page.getByTestId('speaker-register-submit').click();
-    const speakerRow = page
-      .locator('[data-testid="speaker-row"]')
-      .filter({ hasText: 'Fokus Testperson 013' });
-    await speakerRow.getByTestId('speaker-call').click();
+/** The log is saved debounced (150 ms, `api/index.ts`): a count is only read once two readings
+ *  half a second apart agree — before an action (setup writes still in flight) and after it (a
+ *  late second event would only show up in a later save). */
+async function settledCount(page: Page, type: string): Promise<number> {
+  for (;;) {
+    const first = await countEvents(page, type);
+    await page.waitForTimeout(500);
+    const second = await countEvents(page, type);
+    if (first === second) return second;
+  }
+}
 
-    await asRole(page, 'capture');
-    await page.keyboard.press('Alt+2');
-    await expect(page).toHaveURL(/\/capture$/);
-    const textarea = page.getByTestId('capture-text');
-    await textarea.focus();
-    await page.keyboard.type('Sehr geehrte Damen und Herren. Wie hoch war der Umsatz? Vielen Dank.');
-    const submit = page.getByTestId('capture-submit');
-    await submit.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach capture-submit (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
+/**
+ * takt-008, acceptance criterion 2: a button that keeps (or hands on) focus must not write twice.
+ * Enter is pressed twice in quick succession on each write button whose second activation would
+ * duplicate content (a second Redebeitrag, a second Einzelfrage, a second answer version) or repeat
+ * a status step — and exactly one event of that type is added to the log.
+ *
+ * `stage-next` is different on purpose: the button stays and, once the first write is done, rightly
+ * stands for the *next* question — a second press after that is a second "Vorgelesen, weiter", not a
+ * double trigger (and was one before takt-008 too, via the Space shortcut on `<body>`). What must not
+ * happen there is a second write while the first is still in flight; the in-process demo answers
+ * faster than two key presses, so that window is exercised directly: two activations in the same
+ * task, before React could re-render `busy` — exactly one `QuestionDelivered`. The same synchronous
+ * pair is also fired at `capture-submit`, where it proves the handler's own guard.
+ */
+test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein Ereignis (takt-008)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
 
-    const freeInput = page.getByTestId('capture-free-input');
-    await freeInput.focus();
-    await page.keyboard.type('Wie viele Stimmrechte waren vertreten?');
-    const freeAdd = page.getByTestId('capture-free-add');
-    await freeAdd.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach capture-free-add (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
+  await asRole(page, 'moderation');
+  await page.getByTestId('speaker-register').click();
+  await page.getByTestId('speaker-register-name').fill('Doppelt Testperson 013');
+  await page.getByTestId('speaker-register-submit').click();
+  await page
+    .locator('[data-testid="speaker-row"]')
+    .filter({ hasText: 'Doppelt Testperson 013' })
+    .getByTestId('speaker-call')
+    .click();
 
-    await asRole(page, 'expert');
-    await page.keyboard.press('Alt+3');
-    await expect(page).toHaveURL(/\/answers$/);
-    await page.getByTestId('answers-filter-status-assigned').click();
-    await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'assigned');
-    await page.getByTestId('answers-row').first().click();
-    const editor = page.getByTestId('answer-editor');
-    await editor.focus();
-    await page.keyboard.type('Antworttext für den Fokustest.');
-    const submitDraft = page.getByTestId('answer-submit-draft');
-    await submitDraft.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-submit-draft (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
+  await asRole(page, 'capture');
+  await page.keyboard.press('Alt+2');
+  await expect(page).toHaveURL(/\/capture$/);
 
-    await waitForToastsGone(page);
-    const submitReview = page.getByTestId('answer-submit-review');
-    await submitReview.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-submit-review (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
+  // capture-submit — Enter, Enter.
+  let before = await settledCount(page, 'ContributionCaptured');
+  await page.getByTestId('capture-text').focus();
+  await page.keyboard.type('Sehr geehrte Damen und Herren. Wie hoch war der Umsatz? Vielen Dank.');
+  await page.getByTestId('capture-submit').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
+  expect(await settledCount(page, 'ContributionCaptured')).toBe(before + 1);
 
-    await waitForToastsGone(page);
-    await asRole(page, 'legal');
-    await page.keyboard.press('Alt+3');
-    await page.getByTestId('answers-filter-status-in_review').click();
-    await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
-    await page.getByTestId('answers-row').first().click();
-    const approve = page.getByTestId('answer-approve');
-    await approve.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach answer-approve (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
+  // capture-free-add — Enter, Enter.
+  before = await settledCount(page, 'QuestionCaptured');
+  await page.getByTestId('capture-free-input').focus();
+  await page.keyboard.type('Wie viele Stimmrechte waren vertreten?');
+  await page.getByTestId('capture-free-add').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
+  expect(await settledCount(page, 'QuestionCaptured')).toBe(before + 1);
 
-    await waitForToastsGone(page);
-    await asRole(page, 'podium');
-    await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
-    await page.keyboard.press('Alt+4');
-    await expect(page).toHaveURL(/\/stage$/);
-    const currentNumber = page.getByTestId('stage-current-number');
-    await expect(currentNumber).toBeVisible();
-    const before = await currentNumber.innerText();
-    const nextButton = page.getByTestId('stage-next');
-    await nextButton.focus();
-    await page.keyboard.press('Space');
-    await expect(currentNumber).not.toHaveText(before);
-    expect.soft((await focusSnapshot(page)).tag, 'Fokus nach stage-next (bekannter Fehler, takt-008 dreht diese Zeile um)').toBe('BODY');
-  },
-);
+  // capture-submit — two activations in one task, before any re-render (the handler's own guard).
+  await page.getByTestId('capture-contribution-new').focus();
+  await page.keyboard.press('Enter');
+  await page.getByTestId('capture-text').focus();
+  await page.keyboard.type('Noch ein Redebeitrag. Wann kommt die Dividende?');
+  before = await settledCount(page, 'ContributionCaptured');
+  await page.getByTestId('capture-submit').evaluate((el) => {
+    (el as HTMLButtonElement).click();
+    (el as HTMLButtonElement).click();
+  });
+  await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
+  expect(await settledCount(page, 'ContributionCaptured')).toBe(before + 1);
+
+  // answer-submit-draft — Enter, Enter.
+  await asRole(page, 'expert');
+  await page.keyboard.press('Alt+3');
+  await expect(page).toHaveURL(/\/answers$/);
+  await page.getByTestId('answers-filter-status-assigned').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'assigned');
+  await page.getByTestId('answers-row').first().click();
+  await page.getByTestId('answer-editor').focus();
+  await page.keyboard.type('Antworttext für den Doppeltest.');
+  before = await settledCount(page, 'AnswerDrafted');
+  await page.getByTestId('answer-submit-draft').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
+  expect(await settledCount(page, 'AnswerDrafted')).toBe(before + 1);
+  await expect(page.locator('[data-testid="answer-version"]')).toHaveCount(1);
+
+  // answer-submit-review — Enter, Enter.
+  await waitForToastsGone(page);
+  before = await settledCount(page, 'QuestionSubmittedForReview');
+  await page.getByTestId('answer-submit-review').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
+  expect(await settledCount(page, 'QuestionSubmittedForReview')).toBe(before + 1);
+
+  // answer-approve — Enter, Enter.
+  await waitForToastsGone(page);
+  await asRole(page, 'legal');
+  await page.keyboard.press('Alt+3');
+  await page.getByTestId('answers-filter-status-in_review').click();
+  await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
+  await page.getByTestId('answers-row').first().click();
+  before = await settledCount(page, 'QuestionApproved');
+  await page.getByTestId('answer-approve').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
+  expect(await settledCount(page, 'QuestionApproved')).toBe(before + 1);
+
+  // stage-next — two activations in one task (see above for why not Enter, Enter).
+  await waitForToastsGone(page);
+  await asRole(page, 'podium');
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await page.keyboard.press('Alt+4');
+  await expect(page).toHaveURL(/\/stage$/);
+  const currentNumber = page.getByTestId('stage-current-number');
+  await expect(currentNumber).toBeVisible();
+  const shown = await currentNumber.innerText();
+  before = await settledCount(page, 'QuestionDelivered');
+  await page.getByTestId('stage-next').evaluate((el) => {
+    (el as HTMLButtonElement).click();
+    (el as HTMLButtonElement).click();
+  });
+  await expect(currentNumber).not.toHaveText(shown);
+  expect(await settledCount(page, 'QuestionDelivered')).toBe(before + 1);
+});
 
 async function motionOf(
   locator: Locator,
