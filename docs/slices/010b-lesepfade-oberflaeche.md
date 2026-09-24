@@ -556,3 +556,46 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
 ## Review findings
 
 (vom Reviewer)
+
+### Runde 3 — Nachprüfung Opus 5.5 auf 7f542b6: annehmen
+
+1. minor, `apps/web/src/features/capture/Page.tsx:79-84`.
+   - `contributionsProbe` makes a second, unfiltered `listContributions()` call on every `version`. It fetches the whole corpus and throws the data away.
+   - On a 500 or network error it shows two toasts.
+   - Fix: run the probe only while `speakerId === null`, for example the loader `speakerId === null ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)` with key `cp:${version}:${speakerId === null}`, and `forbidden = probe forbidden || contributions forbidden`. The alternative is a single unfiltered call that filters locally.
+   - **Umgang:** UMGANG1
+2. minor, `apps/web/src/features/answers/useBacklog.ts:161-223`.
+   - After the split, `selectedHistory` and `selectedHistoryForbidden` keep the previous question's state when the selection changes. `lapsedApproval(question, history)` at `QuestionDetail.tsx:248` then computes with the wrong events, which can briefly show a false "Freigabe erloschen".
+   - A 404 or 500 on both calls shows two toasts.
+   - Fix: store the history together with its `questionId` and pass it on only when it matches `selected.id`, or reset it on a `selectedId` change. Show at most one toast.
+   - **Umgang:** UMGANG2
+3. minor, test gap in `e2e/010b-lesepfade.spec.ts:283-290`.
+   - No test covers a stale event count after switching roles, or the reset of `streamLastSeq`.
+   - Add an e2e: admin on the event stream, switch to observer, the count is gone; back to admin, the stream is filled again.
+   - **Umgang:** UMGANG3
+4. minor, `apps/web/src/features/stage/Page.tsx:483`.
+   - `stageOnly && !forbidden` only applies once the 403 has arrived. While loading, the fullscreen overlay with counters flashes and then jumps, which violates design principle #8.
+   - When switching roles, the old `stage` stays in `stageRef`.
+   - Fix: defer the layout decision until the first `getStage` result is known, as the `stage-deciding` skeleton already does. Reset forbidden and stage on a `version` change. The `!forbidden` at `:500` is dead code; remove it.
+   - **Umgang:** UMGANG4
+5. minor, test gap in `e2e/010b-lesepfade.spec.ts:176-179`.
+   - The space-bar check would not have failed before the fix.
+   - Start as podium with a current question, switch to expert, press space, then check that the delivered count or the event count stays the same.
+   - **Umgang:** UMGANG5
+6. nit: the `role="status"` comments promise reliable announcements. A live region that is mounted together with its content is often not announced. Tone down the comments.
+   - **Umgang:** UMGANG6
+7. nit: in the Bericht, mark the fixes for nits 9 and 10 in `history/Page.tsx` as "ohne Test, nicht beobachtbar".
+   - **Umgang:** UMGANG7
+
+### Codex auf 7f542b6
+
+(a) P2, `useBacklog.ts:202`: history from question A stays in place while B loads, so `lapsedApproval` can mix the two. This is the same as finding 2 of Runde 3; the same fix covers it.
+   - **Umgang:** UMGANGA
+
+(b) P2, `useBacklog.ts:187`:
+   - Setup: a question is selected, then the actor switches to a role without question read access.
+   - `listQuestions` correctly renders `answers-forbidden`.
+   - The concurrent `getQuestion` call gets the API's masked 404, which carries no R-PERM-02/03, so it falls through to `problem(error)` and shows an error toast on top of the designed state.
+   - Fix: once the main query is forbidden, ignore or cancel the detail request, or clear the selection.
+   - Test first: e2e with admin, select a question, switch to a role without `question.read`, then check `expectNoErrorToast` and `answers-forbidden`. Include the red run.
+   - **Umgang:** UMGANGB

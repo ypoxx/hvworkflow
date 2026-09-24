@@ -85,6 +85,23 @@ async function historyResultStatusWords(page: Page): Promise<string[]> {
   );
 }
 
+/**
+ * Review round 3: the demo API runs in-process (ADR 0002), so there is no network request to
+ * intercept or count. Vite's dev server hands `page.evaluate` the very module instance the app
+ * imported, so a test can wrap one `HvApi` method in place — to count its calls, hold its answer
+ * back, or fail it with a 500 — and the app's next call goes through the wrapper.
+ */
+const API_MODULE = '/src/api/index.ts';
+
+/** The shell's toast stack (see `expectNoErrorToast` above for why it is scoped this way). */
+const toasts = (page: Page) => page.locator('[aria-live="polite"] [role="status"]');
+
+async function settle(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+}
+
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test('Wortmeldeliste unter podium zeigt den Zustand "keine Leseberechtigung"', async ({ page }) => {
@@ -387,4 +404,262 @@ test('Historie unter podium zeigt den Zustand "keine Leseberechtigung"', async (
 
   await expectNoErrorToast(page);
   await checkAxe(page, 'history (podium, no read permission, whole view)');
+});
+
+// ---------------------------------------------------------------------------------------------
+// Review round 3 (Nachprüfung Opus 5.5 auf 7f542b6) and Codex on 7f542b6. Each test below was run
+// red against 7f542b6 before its fix (the Bericht, "Nacharbeit Runde 3", quotes both runs).
+// ---------------------------------------------------------------------------------------------
+
+type Wrapped = Record<string, (...args: unknown[]) => Promise<unknown>>;
+interface Probe {
+  __calls: unknown[];
+  __fail: boolean;
+}
+
+test('Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein 500 bringt einen Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+
+  // Every call's filter is recorded; `__fail` turns every call into a 500 (not a read refusal).
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const w = window as unknown as Probe;
+    w.__calls = [];
+    w.__fail = false;
+    const original = api['listContributions']!.bind(api);
+    api['listContributions'] = (...args: unknown[]) => {
+      w.__calls.push(args[0] ?? null);
+      return w.__fail
+        ? Promise.reject({ status: 500, title: 'Testfehler', detail: 'Runde 3, absichtlich' })
+        : original(...args);
+    };
+  }, API_MODULE);
+
+  // moderation and capture both hold `speaker.read` and `contribution.read`: the desk resolves a
+  // Wortmeldung under either, and switching between them only bumps `version`.
+  await asRole(page, 'moderation');
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as Probe).__calls.some((call) => call !== null && typeof call === 'object'),
+      ),
+    )
+    .toBe(true);
+  await settle(page);
+  await expect(toasts(page)).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const w = window as unknown as Probe;
+    w.__calls = [];
+    w.__fail = true;
+  });
+  await asRole(page, 'capture');
+  await expect.poll(() => page.evaluate(() => (window as unknown as Probe).__calls.length)).toBeGreaterThan(0);
+  await settle(page);
+
+  // A Wortmeldung is resolved, so no unfiltered call of the whole corpus is needed any more …
+  const calls = await page.evaluate(() => (window as unknown as Probe).__calls);
+  expect(calls.filter((call) => call === null)).toEqual([]);
+  // … and one failed load is one toast, not two.
+  await expect(toasts(page)).toHaveCount(1);
+});
+
+test('Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage', async ({ page }) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'moderation');
+
+  // The first question opened gets a lapsed approval appended to its real history; every later
+  // question's history is held back and never arrives, so what the detail shows for it can only
+  // come from its own (unknown) history — never from the previous question's.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const original = api['getQuestionHistory']!.bind(api);
+    let first: unknown;
+    api['getQuestionHistory'] = (id: unknown) => {
+      if (first === undefined) first = id;
+      if (id !== first) return new Promise(() => undefined);
+      return original(id).then((events) => [
+        ...(events as unknown[]),
+        {
+          seq: Number.MAX_SAFE_INTEGER,
+          type: 'AnswerDrafted',
+          at: '2026-06-01T10:00:00.000Z',
+          payload: { questionId: id, answer: { version: 2 }, invalidatedApprovalOfVersion: 1 },
+        },
+      ]);
+    };
+  }, API_MODULE);
+
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  // "zugewiesen" (`assigned`): no answer yet, so no approval of its own that would hide a lapsed one.
+  await page.getByRole('group', { name: 'Stand' }).getByRole('button', { name: /^zugewiesen/ }).click();
+  const fresh = page.locator('[data-testid="answers-row"][data-status="assigned"]');
+  await expect(fresh.nth(1)).toBeVisible();
+
+  await fresh.nth(0).click();
+  await expect(page.getByTestId('approval-lapsed')).toBeVisible();
+
+  const second = await fresh.nth(1).getAttribute('data-number');
+  await fresh.nth(1).click();
+  await expect(page.getByTestId('answers-detail-number')).toHaveText(second ?? '');
+  await settle(page);
+  await expect(page.getByTestId('approval-lapsed')).toHaveCount(0);
+});
+
+test('Runde 3 (2): Beantwortung — scheitern Einzelfrage und Verlauf beide, erscheint ein Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'moderation');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  const rows = page.getByTestId('answers-row');
+  await expect(rows.first()).toBeVisible();
+
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const fail = () => Promise.reject({ status: 500, title: 'Testfehler', detail: 'Runde 3, absichtlich' });
+    api['getQuestion'] = fail;
+    api['getQuestionHistory'] = fail;
+  }, API_MODULE);
+
+  await rows.first().click();
+  await expect(toasts(page).first()).toBeVisible();
+  await settle(page);
+  await expect(toasts(page)).toHaveCount(1);
+});
+
+test('Codex (b): Beantwortung — Rollenwechsel ohne Leserecht bei offener Einzelfrage bringt keinen Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  const rows = page.getByTestId('answers-row');
+  await expect(rows.first()).toBeVisible();
+  await rows.first().click();
+  await expect(page.getByTestId('answers-detail')).toBeVisible();
+
+  // podium holds neither `question.read` nor `question.read.delivered`: the list refuses with
+  // R-PERM-02, but the open question's own `getQuestion` answers with the masked 404, which is no
+  // read refusal and would become a toast on top of the gestaltete Zustand.
+  await asRole(page, 'podium');
+  await expect(page.getByTestId('answers-forbidden')).toBeVisible();
+  await expectNoErrorToast(page);
+  await expect(page.getByTestId('answers-detail')).toHaveCount(0);
+});
+
+test('Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin', async ({ page }) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-history').click();
+  await expect(page).toHaveURL(/\/history$/);
+  await page.getByTestId('history-tab-stream').click();
+
+  const countLine = page.getByText(/Die letzten \d+ Ereignisse/);
+  await expect(page.getByTestId('history-event').first()).toBeVisible();
+  await expect(countLine).toBeVisible();
+
+  // observer holds no `event.read`: the count of the previous role must go with the stream.
+  await asRole(page, 'observer');
+  await expect(page.getByTestId('history-stream-forbidden')).toBeVisible();
+  await expect(countLine).toHaveCount(0);
+  await expect(page.getByTestId('history-event')).toHaveCount(0);
+
+  // Back to admin: `streamLastSeq` was rewound, so the unchanged log is read again, not skipped.
+  await asRole(page, 'admin');
+  await expect(page.getByTestId('history-stream')).toBeVisible();
+  await expect(page.getByTestId('history-event').first()).toBeVisible();
+  await expect(countLine).toBeVisible();
+  await expect(countLine).not.toHaveText(/Die letzten 0 Ereignisse/);
+  await expectNoErrorToast(page);
+});
+
+test('Runde 3 (4): Bühne — ein gespeichertes "Nur Bühne" blitzt nicht auf, bevor getStage antwortet', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('hv-stage-only-v1', '1');
+    // Records whether the fullscreen overlay was ever in the DOM, however briefly.
+    const w = window as unknown as { __sawStageOnly: boolean };
+    w.__sawStageOnly = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="stage-only"]') !== null) w.__sawStageOnly = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto('/');
+  await waitForCorpus(page);
+
+  // `getStage` answers one and a half seconds late — long enough to see what stands meanwhile.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const original = api['getStage']!.bind(api);
+    api['getStage'] = (...args: unknown[]) =>
+      new Promise((resolve, reject) => {
+        window.setTimeout(() => void original(...args).then(resolve, reject), 1500);
+      });
+  }, API_MODULE);
+
+  await asRole(page, 'expert');
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-deciding')).toBeVisible();
+  await expect(page.getByTestId('stage-counter-delivered')).toHaveCount(0);
+
+  await expect(page.getByTestId('stage-forbidden')).toBeVisible();
+  await expect(page.getByTestId('stage-only')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __sawStageOnly: boolean }).__sawStageOnly)).toBe(
+    false,
+  );
+  await expectNoErrorToast(page);
+});
+
+test('Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Leertaste liefert nichts aus', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'podium');
+  // The ordinary shell, so the role switcher stays reachable (as in 013e).
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-current-number')).toBeVisible();
+
+  // The server refuses a delivery by expert anyway (R-PERM-01), so the delivered count alone would
+  // stay the same even without the fix; what the fix prevents is the attempt itself — counted here
+  // — and the error toast its refusal would raise.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const w = window as unknown as Probe;
+    w.__calls = [];
+    const original = api['deliverQuestion']!.bind(api);
+    api['deliverQuestion'] = (...args: unknown[]) => {
+      w.__calls.push(args[0] ?? null);
+      return original(...args);
+    };
+  }, API_MODULE);
+
+  await asRole(page, 'expert');
+  const forbidden = page.getByTestId('stage-forbidden');
+  await expect(forbidden).toBeVisible();
+  // Off the nav/role-switcher controls, so the shortcut handler actually sees the key.
+  await forbidden.click();
+  await page.keyboard.press('Space');
+  await settle(page);
+
+  expect(await page.evaluate(() => (window as unknown as Probe).__calls.length)).toBe(0);
+  await expectNoErrorToast(page);
+  await expect(page.getByTestId('stage-current')).toHaveCount(0);
 });
