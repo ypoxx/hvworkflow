@@ -438,8 +438,8 @@ Open:
 - Der Vorabzug von `docs/legal-trace.md` mit ADR 0012 an Recht (E15) ist Sache des Orchestrator-Tagesberichts
   (Arbeitsweise), nicht dieser Scheibe.
 - Die fachlichen Lücken, die die Zitate offenlegen, stehen als offene Punkte 1–8 in Abschnitt 8 (Punkte 5–8 seit
-  Abschnitt 10: TOP-Zuordnung, Quelle als Pflichtfeld, Merge-Ziel ohne Standprüfung, Bühnenreihenfolge) und 9–15 in
-  Abschnitt 12 (aus dem Vollinventar, Abschnitt 11).
+  Abschnitt 10: TOP-Zuordnung, Quelle als Pflichtfeld, Merge-Ziel ohne Standprüfung, Bühnenreihenfolge) und 9–16 in
+  Abschnitt 12 (aus dem Vollinventar, Abschnitt 11; Punkt 15 in Abschnitt 13 geschlossen, Punkt 16 aus Codex).
 - Der rote Lauf für Punkt 5 (Abschnitt 7) nutzte eine temporäre `R-STALE-01`-Zeile in `rules.ts`, die vor dem
   nächsten Commit vollständig zurückgesetzt wurde (`git diff` danach leer); kein Rest davon ist committet.
 
@@ -529,7 +529,8 @@ gefundenen Wirkungen ergänzt und mit „ergänzt in Abschnitt 12" markiert.
 | R-TRANS-06 | Stand → `classified` (Podium) / `answer_drafted` (sonst), Feld `reason` — aus `in_review` | `docs/rollen-und-rechtekonzept.md:110` „Pflichtfeld Rückgabegrund" |
 | R-TRANS-06 | dasselbe — aus `staged` | `docs/ist-analyse-und-schnittstellen.md:90` „Antwort zurückgeben" → zurück ins Backoffice |
 | R-TRANS-06 | dasselbe — aus `approved` | nicht belegt (Ableitung: nach der Freigabe und vor der Bühne steht die Frage wie im Legal Clearing noch im Backoffice) — ergänzt in Abschnitt 12 |
-| R-TRANS-06 | dasselbe — aus `delivered` | nicht belegt (Ableitung: am nächsten ist:59 „Nein: Qualitätsschleife zurück zu Schritt 5" und Recherche:255 „Rückkanal Podium → Backoffice"; beide setzen eine Bewertung der gegebenen Antwort voraus, die das Tool nicht festhält; ist:59 führt zur Klassifizierung, nicht zum Antwortentwurf) — ergänzt in Abschnitt 12 |
+| R-TRANS-06 | dasselbe — aus `delivered` | teilweise belegt durch Recherche:255 (Rückkanal Podium → Backoffice mit Grund); nicht umgesetzt: feste Kategorien, Erfassung der Ist-Antwort, Diff gegen den Soll-Text, automatischer Prüfauftrag; Ableitung: ist:59 „Qualitätsschleife zurück zu Schritt 5" führt zur Klassifizierung — berichtigt in Abschnitt 13 |
+| R-TRANS-06 | Folge: Zähler — aus `delivered` vorgelesen − 1, offen + 1; aus `staged` auf der Bühne − 1 (`state.ts:53-55`) | nicht belegt (Ableitung: Zähldefinition aus Recherche:285 fehlt) — ergänzt in Abschnitt 13 |
 | R-TRANS-06 | Folge: beim Rücksprung nach `answer_drafted` bleibt `approval` stehen (`state.ts:235-243`, nur `:241` löscht, und nur für `classified`) | nicht belegt (Ableitung: die Freigabe hängt an der Version, R-GUARD-04; erst R-TRANS-03 hebt sie auf, sonst muss R-TRANS-05 sie erneut erteilen) — ergänzt in Abschnitt 12 |
 | R-TRANS-06 | Folge: aus `delivered` bleibt `deliveredAt` stehen, in beiden Zweigen | nicht belegt (Ableitung: das Vorlesen bleibt eine Tatsache; ein erneutes Vorlesen überschreibt den Zeitpunkt in der Projektion) — ergänzt in Abschnitt 12 |
 | R-TRANS-06 | Folge: `returnReason` bleibt bis zur nächsten Version (R-TRANS-03), bei Podiumsfragen auf Dauer | nicht belegt (Ableitung: zeigt den letzten, nicht einen offenen Rückgabegrund) — ergänzt in Abschnitt 12 |
@@ -549,7 +550,7 @@ gefundenen Wirkungen ergänzt und mit „ergänzt in Abschnitt 12" markiert.
 | R-TRANS-11 | Feld `reason` | nicht belegt |
 | R-TRANS-11 | Folge: `stagePosition` entfällt, eine Frage aus `staged` verlässt die Warteschlange (`state.ts:275`) | nicht belegt (Ableitung: ist:92 lässt nur zugeordnete und freigegebene Fragen einlaufen; eine zurückgezogene gehört nicht mehr dazu) |
 | R-TRANS-12 | Stand → `merged`, Feld `intoQuestionId` | `docs/anforderungen-recherche.md:147` „Dublettenerkennung" (teilweise: kein Unmerge, kein Ähnlichkeitsscore) |
-| R-TRANS-12 | Bestandscheck des Zielobjekts (404-Maskierung wie R-TRANS-00) | nicht belegt (Architekturentscheidung, `requireQuestionFor` in `api.ts`) |
+| R-TRANS-12 | Bestandscheck des Zielobjekts, ~~404-Maskierung wie R-TRANS-00~~ ohne Lesemaskierung: wer `question.merge` hält, erhält jede vorhandene Frage als Ziel, 404 nur für eine unbekannte ID (`api.ts:279-284`, `:631`) | nicht belegt (Architekturentscheidung) — berichtigt in Abschnitt 13 (Codex) |
 | R-TRANS-12 | Ziel wird nur auf Bestand, nicht auf seinen Stand hin angenommen (`api.ts:279-288`, `mergeQuestion`): auch ein `withdrawn`-, `merged`- oder `closed`-Ziel | teilweise: `docs/anforderungen-recherche.md:147` „Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet" — das Ziel kommt selbst nicht (mehr) auf die Bühne (zurückgezogen, abgeschlossen) oder nur über eine Kette, die der Code nicht auflöst (zusammengeführt) |
 | R-GUARD-01 | Verweigerung: keine Antwortversion vorhanden | `docs/ist-analyse-und-schnittstellen.md:52` „erst 6 fachliche Beantwortung, dann 7 Legal Clearing" |
 | R-GUARD-02 | Verweigerung: Track ≠ `podium` | `docs/ist-analyse-und-schnittstellen.md:50` „No-Brainer: freie Beantwortung" |
@@ -566,7 +567,7 @@ gefundenen Wirkungen ergänzt und mit „ergänzt in Abschnitt 12" markiert.
 | R-PERM-03 | 403 bei Statusfilter außerhalb des Leseumfangs | `docs/rollen-und-rechtekonzept.md:93` „Bühnenzuordnung", Ableitung |
 | R-PERM-03 | 404-Maskierung für eine einzelne Frage außerhalb des Leseumfangs | nicht belegt (Architekturentscheidung, Festlegung 3 von Scheibe 010) |
 | R-PERM-03 | Bühnenzuordnung für den Vorstand selbst | nicht umgesetzt (bereits so benannt) |
-| R-IDEM-01 | Replay liefert erstes Ergebnis statt Neuausführung, Scope Akteur+Operation | `docs/qualitaetsleitplanken-produktreife.md:167` Checkliste 6.3 |
+| R-IDEM-01 | Replay liefert das erste **erfolgreiche** Ergebnis statt Neuausführung, Scope Akteur+Operation; fehlgeschlagene Erstaufrufe werden nicht zwischengespeichert (`api.ts:304-311`, berichtigt in Abschnitt 13) | `docs/qualitaetsleitplanken-produktreife.md:167` Checkliste 6.3 |
 
 **Zitate geändert (13 von 22 Regeln)** — jeweils die zuvor fehlende Wirkung ergänzt, keine der bereits
 vorhandenen Fundstellen oder Lücken-Kennzeichnungen entfernt: R-TRANS-00, R-TRANS-01, R-TRANS-03,
@@ -809,7 +810,7 @@ setzen R-TRANS-06 und R-TRANS-11, löschen kann ihn nur R-TRANS-03. `deliveredAt
 | R-TRANS-09 | `question.deliver` | `staged` | `delivered` | – | – | `QuestionDelivered` |
 | R-TRANS-10 | `question.close` | `delivered` | `closed` | – | – | `QuestionClosed` |
 | R-TRANS-11 | `question.withdraw` | `captured`, `classified`, `assigned`, `answer_drafted`, `in_review`, `approved`, `staged`, `delivered` | `withdrawn` | – | Grund nicht leer (616) | `QuestionWithdrawn` |
-| R-TRANS-12 | `question.merge` | `captured`, `classified`, `assigned`, `answer_drafted` | `merged` | R-GUARD-05 | Ziel existiert und ist für den Akteur erreichbar, sonst 404 (631) | `QuestionMerged` |
+| R-TRANS-12 | `question.merge` | `captured`, `classified`, `assigned`, `answer_drafted` | `merged` | R-GUARD-05 | Ziel existiert, sonst 404 (631); keine Leseprüfung, weil `question.merge` schon bestätigt ist (279-284; berichtigt in Abschnitt 13) | `QuestionMerged` |
 
 Guards nach Erreichbarkeit: R-GUARD-01 ist bei R-TRANS-04 und -05 nach den Pfaden der Tabelle immer erfüllt
 (`answer_drafted` erreicht eine Frage nur über R-TRANS-03 oder als Textfrage mit Version über R-TRANS-06); er
@@ -839,7 +840,7 @@ Spalte „legalRef": ob das Zitat der Regel diese Wirkung abdeckt („neu" = mit
 | R-TRANS-02 | beide | Guard R-GUARD-03 | belegt: ist:51-52 (Ableitung: beide Pfade mit Text) | ja |
 | R-TRANS-03 | alle fünf | neue Version: `version`, `text` (213) | belegt: ist:52 „`6` fachliche Beantwortung" | ja |
 | R-TRANS-03 | alle fünf | `sources` optional | teilweise: Rechtekonzept:108 „Antworttext, Quelle"; Recherche:101 (unter „[MUSS] Konsistenztest gegen die letzte Kapitalmarktkommunikation") „Jede Antwort an eine belastbare Quelle mit Fundstelle gebunden" | ja (Kontext neu) |
-| R-TRANS-03 | alle fünf | `createdAt` (`api.ts:564`) | belegt: Recherche:205 „Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion" | neu |
+| R-TRANS-03 | alle fünf | `createdAt` (`api.ts:564`) | teilweise: Recherche:205 „Serverseitiger, NTP-synchronisierter Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion" — Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo: Browser-Uhr, `apps/web/src/api/index.ts:46`) | ja (berichtigt in Abschnitt 13) |
 | R-TRANS-03 | alle fünf | `createdBy` (`api.ts:565`) | nicht belegt. Ableitung: Rechtekonzept:156 „Ersteller ≠ Freigeber" setzt den Ersteller voraus (Guard fehlt, R-TRANS-05) | neu |
 | R-TRANS-03 | `classified` | `status` → `answer_drafted` ohne Zuweisung | nicht belegt. Ableitung: Rechtekonzept:107 verlangt vorher „Segment"; für Fast Track nennt ist:51 ein festes „Fast-Track-Team aus Kommunikation und Legal" | neu |
 | R-TRANS-03 | `assigned` | `status` → `answer_drafted` | belegt: ist:52 „`6` fachliche Beantwortung" | ja |
@@ -861,7 +862,10 @@ Spalte „legalRef": ob das Zitat der Regel diese Wirkung abdeckt („neu" = mit
 | R-TRANS-06 | `in_review` | → `answer_drafted`, `returnReason` (238-239) | belegt: Rechtekonzept:110 „`legal_clearing` \| `expert_answering` \| `question.forward` \| Rückgabegrund" | ja |
 | R-TRANS-06 | `approved` | → `answer_drafted`, `returnReason` | nicht belegt. Ableitung: nach der Freigabe, vor der Bühne, noch im Backoffice | neu |
 | R-TRANS-06 | `staged` | → `answer_drafted` bzw. `classified`, `returnReason`, `stagePosition` gelöscht (240) | belegt: ist:90 „**„Antwort zurückgeben"** → zurück ins Backoffice." | ja |
-| R-TRANS-06 | `delivered` | → `answer_drafted` bzw. `classified`, `returnReason`, `stagePosition` gelöscht (240) | nicht belegt. Ableitung: am nächsten ist:59 „Nein: **Qualitätsschleife zurück zu Schritt `5`**" und Recherche:255 „Rückkanal Podium → Backoffice („unzureichend, bitte nachschärfen", „nur teilweise beantwortet" …)"; beide setzen eine Bewertung der gegebenen Antwort voraus, die das Tool nicht festhält; ist:59 führt zur Klassifizierung | neu |
+| R-TRANS-06 | `delivered` | → `answer_drafted` bzw. `classified`, `returnReason` (Pflichtfeld, `api.ts:587`; gesetzt `state.ts:239`), `stagePosition` gelöscht (240); `podium` hält `question.return` (`permissions.ts:57`) | teilweise: Recherche:255 „Rückkanal Podium → Backoffice („unzureichend, bitte nachschärfen", „nur teilweise beantwortet", „frei formuliert abgewichen") plus Erfassung der Ist-Antwort und Diff gegen den Soll-Text mit automatischem Prüfauftrag ab einer Abweichungsschwelle" — nicht umgesetzt: feste Kategorien, Erfassung der Ist-Antwort, Diff gegen den Soll-Text, automatischer Prüfauftrag. Ableitung: ist:59 „Nein: **Qualitätsschleife zurück zu Schritt `5`**" führt zur Klassifizierung | ja (berichtigt in Abschnitt 13) |
+| R-TRANS-06 | `delivered` | Zähler: vorgelesen − 1, offen + 1 (`state.ts:54-55`) | nicht belegt. Ableitung: Zähldefinition aus Recherche:285 fehlt | ja (Abschnitt 13) |
+| R-TRANS-06 | `staged` | Zähler: auf der Bühne − 1 (`state.ts:53`); offen unverändert | nicht belegt. Ableitung wie oben | ja (Abschnitt 13) |
+| R-TRANS-06 | `in_review`, `approved` | Zähler: nur `byStatus` (52), offen unverändert | Ableitung: folgt dem Stand | – |
 | R-TRANS-06 | `staged`, `delivered` (Podium) | Ziel `classified` statt `answer_drafted` (`transitions.ts`, `to`) | nicht belegt. Ableitung: Podiumsfragen durchlaufen `answer_drafted` nie | ja |
 | R-TRANS-06 | `staged`, `delivered` (Podium) | `approval` löschen (241) | ohne Wirkung (Podiumsfrage ohne Freigabe); nicht belegt | ja |
 | R-TRANS-06 | `approved`, `staged`, `delivered` (Text); `in_review` mit stehender Freigabe | `approval` bleibt stehen (241 greift nur für `classified`) | nicht belegt. Ableitung: die Freigabe hängt an der Version (R-GUARD-04); ohne neue Version muss R-TRANS-05 sie erneut erteilen | neu |
@@ -893,14 +897,15 @@ Spalte „legalRef": ob das Zitat der Regel diese Wirkung abdeckt („neu" = mit
 | R-TRANS-11 | `delivered` | Zähler: vorgelesen − 1 | nicht belegt. Ableitung: die Zähldefinition aus Recherche:285 gibt es noch nicht | neu |
 | R-TRANS-11 | die übrigen sieben | Zähler: offen − 1 | Ableitung: Recherche:285 lässt offen, ob zurückgezogene zählen | – |
 | R-TRANS-12 | alle vier | `status` → `merged`, `mergedIntoId` (282-283) | teilweise: Recherche:147 „Merge reversibel, mit Nutzer, Zeitstempel und Ähnlichkeitsscore protokolliert" — Nutzer und Zeitpunkt im Ereignis, kein Score, nicht umkehrbar | ja (Nutzer/Zeitpunkt neu) |
-| R-TRANS-12 | alle vier | Ziel muss existieren und erreichbar sein (`api.ts:631`) | nicht belegt (Architekturentscheidung) | ja |
+| R-TRANS-12 | alle vier | Ziel muss existieren (`api.ts:631`); jede vorhandene Frage, auch eine nicht lesbare, weil `requireQuestionFor` im Zweig „Recht vorhanden" nicht nach Leserecht maskiert (`api.ts:281-283`) | nicht belegt (Architekturentscheidung); die Existenz eines Ziels ist für jeden sichtbar, der `question.merge` hält | ja (berichtigt in Abschnitt 13) |
 | R-TRANS-12 | alle vier | Ziel in beliebigem Stand | teilweise: Recherche:147 „Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet." | ja (Wortlaut neu) |
 | R-TRANS-12 | alle vier | Zähler: offen − 1, unabhängig vom Ziel | nicht belegt. Ableitung: folgt dem Endstand | neu |
 | R-TRANS-12 | `answer_drafted` nach R-TRANS-06 | `approval`, `deliveredAt`, `returnReason` bleiben stehen | nicht belegt. Ableitung wie R-TRANS-06 | neu |
 | R-TRANS-12 | alle vier | Guard R-GUARD-05 | belegt: Recherche:147 (Ableitung: Ziel ≠ Quelle) | ja |
-| alle | alle | `version` + 1 (`touch`, 87) | nicht belegt. Ableitung: Architekturentscheidung für If-Match (`api.ts:290`, `checkIfMatch`) | nein (Querschnitt, s. Abschnitt 12 Open) |
-| alle | alle | `updatedAt` (`touch`, 88) | belegt: ist:81 „Zeitstempel Erstellung und Bearbeitung" | nein (Querschnitt) |
-| alle | alle | Ereignis mit Zeitpunkt und Akteur | belegt: Recherche:205 „Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion" | nein (Querschnitt) |
+| alle | alle | `version` + 1 (`touch`, 87) | nicht belegt. Ableitung: Architekturentscheidung für If-Match (`api.ts:290`, `checkIfMatch`) | Querschnitt in `docs/legal-trace.md` (Abschnitt 13) |
+| alle | alle | `updatedAt` (`touch`, 88) | belegt: ist:81 „Zeitstempel Erstellung und Bearbeitung"; teilweise: Recherche:205 „Serverseitiger, NTP-synchronisierter Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion" — Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo: Browser-Uhr, `apps/web/src/api/index.ts:46`) | Querschnitt in `docs/legal-trace.md` (Abschnitt 13) |
+| alle | alle | Ereignis mit Zeitpunkt und Akteur | teilweise: Recherche:205 „Serverseitiger, NTP-synchronisierter Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion" — Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo: Browser-Uhr, `apps/web/src/api/index.ts:46`); Akteur nicht belegt (Ableitung aus Rechtekonzept:158-160, Audit-Log) | Querschnitt in `docs/legal-trace.md` (Abschnitt 13) |
+| alle | alle | Zähler (`refreshCounts`, 45-75) | nicht umgesetzt: Recherche:285 „Verbindliche Zähldefinition vor der Einberufung"; teilweise zu ist:88 „Zähler je Person" | Querschnitt in `docs/legal-trace.md` (Abschnitt 13) |
 
 #### (iv) `grep` über alle `legalRef`-Texte und Beschreibungen
 
@@ -957,7 +962,7 @@ Zitattext in `legalRef` (`packages/domain/src/transitions.ts`, `packages/domain/
 4. R-TRANS-06: je Ausgangsstand. Aus `in_review` belegt (Rechtekonzept:110), aus `staged` belegt (ist:90), aus
    `approved` und aus `delivered` „nicht belegt" mit Ableitung. Beim Rücksprung nach `answer_drafted` bleiben
    `approval` und `deliveredAt` stehen (`state.ts:235-243`), beide „nicht belegt" mit Ableitung; Abschnitt 9 ergänzt.
-   **Abweichung:** Für `delivered` nennt die Ableitung ist:59 („Qualitätsschleife zurück zu Schritt 5") und
+   **Abweichung (überholt, s. Abschnitt 13 Punkt 2):** Für `delivered` nennt die Ableitung ist:59 („Qualitätsschleife zurück zu Schritt 5") und
    Recherche:255 („Rückkanal Podium → Backoffice", „nur teilweise beantwortet") als die nächsten Stellen. Beide
    liegen nahe am Gegenstand; sie wegzulassen hieße, sie zu verschweigen. Die Bewertung bleibt „nicht belegt", weil
    beide eine Bewertung der gegebenen Antwort voraussetzen, die das Tool nicht festhält, und ist:59 zur
@@ -978,7 +983,7 @@ zählt jedes Feld jedes Ereignisses auf, (iii) bewertet es je `from`-Stand.
 **Aus der Tabelle, über die gemeldeten Befunde hinaus** (gleich behandelt, alle im `legalRef`):
 
 - R-TRANS-02 aus `assigned` (Umhängen der Einheit): teilweise gegen Recherche:220 („jedes Umrouten mit Historie").
-- R-TRANS-03: Entwurf schon aus `classified` ohne Zuweisung, nicht belegt; `createdAt` belegt (Recherche:205),
+- R-TRANS-03: Entwurf schon aus `classified` ohne Zuweisung, nicht belegt; `createdAt` ~~belegt~~ teilweise (Recherche:205, Abschnitt 13),
   `createdBy` Ableitung aus Rechtekonzept:156.
 - R-TRANS-05: `approvedAt`/`approvedBy` sind wie `deliveredAt` projizierte, sichtbare Felder; teilweise gegen
   Recherche:227 (kein Hash, keine Signatur, kein qualifizierter Zeitstempel).
@@ -1013,10 +1018,15 @@ nichts aus. `docs/legal-trace.md` nur über `npx vitest run -u` erzeugt („Snap
 12. Gate vor der Bühne für Pfad A (ist:135-137).
 13. Fast Track durchläuft ein eigenes Legal Clearing, das ist:51 nicht vorsieht; Entwurf ohne Zuweisung aus
     `classified`.
-14. Zählung nach dem Zurückziehen einer vorgelesenen Frage (Recherche:285).
-15. Querschnittswirkungen (`touch`: `version`, `updatedAt`; Zeitpunkt und Akteur jedes Ereignisses; Zähler) sind nur
-    in Abschnitt 11 belegt, nicht in einem `legalRef` — es gibt keine Regel-ID, an der sie hängen. Entscheidung
-    offen, ob dafür eine eigene Regel-ID ins Register gehört (das wäre eine Änderung über Festlegung 1 hinaus).
+14. Zählung nach dem Zurückziehen (R-TRANS-11) oder der Rückgabe (R-TRANS-06) einer vorgelesenen Frage: sie fällt
+    aus dem Zähler der vorgelesenen Fragen, nach einer Rückgabe zählt sie wieder als offen; die Zähldefinition
+    (Recherche:285) fehlt.
+15. ~~Querschnittswirkungen … nur in Abschnitt 11 belegt, nicht in einem `legalRef`.~~ **Geschlossen in Abschnitt
+    13:** `docs/legal-trace.md` hat jetzt einen generierten Abschnitt „Querschnitt (ohne Regel-ID)" aus
+    `CROSS_CUTTING_EFFECTS` (`rules.ts`), ohne neue Regel-ID.
+16. Merge-Ziel ohne Lesemaskierung (Codex auf 6deab48): wer `question.merge` hält, erfährt über `intoQuestionId`,
+    ob eine Frage existiert, auch wenn er sie nicht lesen darf, und kann in sie zusammenführen. Ob das ein
+    Offenlegungsrisiko ist, gehört zu 010 (Lesepfade) oder 021 (Rechte), nicht zu 011; kein Code geändert.
 
 `pnpm -C /home/user/wt/011 gates` auf dem committeten Stand `94db590` (sauberer Baum), eigene Logdatei über
 `mktemp`, Exit 0. Wörtliche Zeilen aus dem Lauf (Testsummen, Tore, Ende; Vite-Hinweise zu Sourcemap und
@@ -1048,6 +1058,71 @@ mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) 
 
 Kein `FAIL`/`not ok` im Lauf (`grep`); `arch`: dieselben sieben vorbestehenden Warnungen. Dieser Absatz kam in
 einem reinen `docs/`-Commit danach dazu.
+
+### 13. Letzte Textrunde
+
+Legal-Nachprüfung auf 6deab48 (Urteil „nacharbeiten", 3 minor und 2 nit, alles Zitat- oder Inventartext) und Codex
+auf 6deab48 (3 × P2). Commit `e029ca1`. Geändert: Zeichenketten in `packages/domain/src/transitions.ts` und
+`packages/domain/src/rules.ts`, in `rules.ts` außerdem der neue Typ `CrossCuttingEffect` und die Konstante
+`CROSS_CUTTING_EFFECTS`, in `packages/domain/src/__tests__/rules.test.ts` deren Ausgabe im Schnappschuss und ein
+Test (`legalRef` vorhanden, Quelle aus der festen Liste, `verified: false`). Alle Dateien stehen in „Files allowed".
+Keine neue Regel-ID, kein Verhalten, kein Recht, kein Übergang, kein Guard geändert; im Diff von `transitions.ts`
+ist jede geänderte Zeile eine Zeichenkette. `docs/legal-trace.md` nur über `npx vitest run -u` („Snapshots 1
+updated", 86 Tests grün). `git diff --exit-code 417bc6d -- packages/domain/policy-truth-table.md`: leer.
+
+1. **Recherche:205 war als „belegt" geführt.** Jetzt mit „Serverseitiger, NTP-synchronisierter" zitiert und
+   „teilweise: Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert nicht sichergestellt (Demo:
+   Browser-Uhr, apps/web/src/api/index.ts:46)" — nachgelesen: dort steht `clock: () => new Date()`. Geändert an
+   allen Stellen, die :205 zitieren: R-TRANS-03 (`createdAt`), Abschnitt 11 (iii) R-TRANS-03 und die
+   Querschnittszeilen `updatedAt` und „Ereignis mit Zeitpunkt und Akteur", Abschnitt 12 (durchgestrichen und
+   berichtigt), die beiden Querschnittseinträge in `CROSS_CUTTING_EFFECTS`. Weitere Zitate von :205 gibt es nicht
+   (`grep ":205"`).
+2. **R-TRANS-06 aus `delivered`.** Die Begründung zu Recherche:255 war falsch: die Zeile beschreibt genau den
+   Rückkanal Podium → Backoffice mit Grund, „nur teilweise beantwortet" setzt das Vorlesen voraus; `podium` hält
+   `question.return` (`permissions.ts:57`), der Grund ist Pflicht (`api.ts:587`) und wird festgehalten
+   (`state.ts:239`). Neu: „aus `delivered` teilweise belegt durch Recherche:255 (Rückkanal Podium → Backoffice mit
+   Grund); nicht umgesetzt: feste Kategorien, Erfassung der Ist-Antwort, Diff gegen den Soll-Text, automatischer
+   Prüfauftrag"; ist:59 bleibt als Ableitung mit dem Verweis auf Schritt 5. Die Abweichung in Abschnitt 12 Punkt 4
+   ist damit überholt und so markiert; Abschnitte 9 und 11 berichtigt.
+3. **Zähler bei R-TRANS-06.** Nach `refreshCounts` (`state.ts:53-55`): aus `delivered` vorgelesen − 1 und offen
+   + 1, aus `staged` auf der Bühne − 1. Zeilen in Abschnitt 11 (iii) und 9; im `legalRef`: „Nicht belegt: eine
+   Frage aus `delivered` fällt aus dem Zähler der vorgelesenen Fragen und zählt wieder als offen, eine Frage aus
+   `staged` fällt aus dem Zähler der Fragen auf der Bühne (… Ableitung: Zähldefinition aus
+   docs/anforderungen-recherche.md:285 fehlt)". Offener Punkt 14 umfasst jetzt R-TRANS-06.
+4. **Kurzverweise ohne Dateinamen.** R-TRANS-11 „:285" → `docs/anforderungen-recherche.md:285`. Suche über alle
+   Zitate nach Verweisen ohne Dateinamen (`ist:`, `Recherche:`, `Rechtekonzept:`, `:NNN`) fand außerdem ist:59
+   (R-TRANS-06, dabei ohnehin neu gefasst), ist:50 (R-TRANS-08), ist:89 zweimal (R-TRANS-09) und ist:58-59
+   (R-TRANS-10); alle auf `docs/ist-analyse-und-schnittstellen.md:…` gestellt. Die Suche danach ist leer.
+5. **R-TRANS-05 gegen Recherche:227:** „die Podiumsansicht verifiziert vor Anzeige" in die Liste des Fehlenden.
+
+**Codex auf 6deab48:**
+
+- (a) **R-TRANS-12, Merge-Ziel.** Nachgelesen in `api.ts`: `transition()` verlangt `question.merge` (`api.ts:330-332`)
+  vor `build`; in `build` ruft `mergeQuestion` `requireQuestionFor(intoQuestionId, 'question.merge')` (`:631`), das
+  bei vorhandenem Recht nur auf Existenz prüft und jede vorhandene Frage zurückgibt (`:281-283`), ohne Leserecht.
+  Die Behauptung „dieselbe 404-Maskierung wie R-TRANS-00" war falsch. Neu: keine Lesemaskierung, 404 nur für eine
+  unbekannte ID, „die Existenz eines Ziels ist damit für jeden sichtbar, der `question.merge` hält". Abschnitte 9
+  und 11 berichtigt; offener Punkt 16 (Offenlegungsrisiko, für 010 oder 021; kein Code in 011).
+- (b) **R-IDEM-01.** Nachgelesen: `idempotent` (`api.ts:304-311`) speichert das Ergebnis erst nach `run()`; wirft
+  `run()` (403, 409, 422 …), wird nichts gespeichert, und eine Wiederholung läuft erneut. Beschreibung und Zitat
+  jetzt: „gibt das erste erfolgreiche Ergebnis zurück; fehlgeschlagene Erstaufrufe werden nicht
+  zwischengespeichert" (im Zitat als „Teilweise" gegen Leitplanken:167, mit der Ableitung, dass ein fehlgeschlagener
+  Aufruf kein Ereignis anhängt). Abschnitt 9 berichtigt.
+- (c) **Querschnitt in `docs/legal-trace.md`.** Neuer generierter Abschnitt „Querschnitt (ohne Regel-ID)" aus
+  `CROSS_CUTTING_EFFECTS` in `rules.ts` (neben dem Register, nicht in `ruleRegister()`): `version` (Leitplanken:175
+  nur Antwortformat, Zählung selbst nicht belegt), `updatedAt` (ist:81 belegt, Recherche:205 teilweise), Ereignis
+  mit Zeitpunkt und Akteur (Recherche:205 teilweise mit der Lücke serverseitig/NTP; Akteur Ableitung aus
+  Rechtekonzept:158-160), Zähler (Recherche:285 nicht umgesetzt, ist:88 teilweise). Keine neue Regel-ID
+  (Festlegung 1); die Register-Zählung bleibt 22. Offener Punkt 15 geschlossen. Die Bindung an 076 und den Vorabzug
+  (ADR 0012) aus der Legal-Nachprüfung ist damit gegenstandslos: Recht bekommt den Querschnitt schon mit
+  `docs/legal-trace.md`.
+
+Festlegung 5, `grep` wie in Abschnitt 11 (iv) über die neuen Texte: zwei eigene Treffer umformuliert („nichts wird
+geändert oder gelöscht" → „nie überschrieben oder entfernt"; „nach der Rechteprüfung" → „nachdem `can()` dieses
+Recht bestätigt hat"). Übrig nur wörtliche Zitate („Prüfauftrag" aus Recherche:255, auch im vorgegebenen Wortlaut)
+und Verhaltensbeschreibungen („erneut", „neu berechnet").
+
+`pnpm gates`: siehe unten.
 
 ## Review findings
 
@@ -1126,3 +1201,34 @@ Vollinventar (Bericht Abschnitte 11 und 12), Zitattext in `80bf863`:
   R-TRANS-09 „teilweise" gegen Recherche:277 (`80bf863`), Ausschluss in Abschnitt 10 berichtigt.
 - ist:89 „vorgelesen, weiter" → abgeschlossen, der Code geht nach `delivered` und braucht R-TRANS-10 → behoben:
   „Teilweise" bei R-TRANS-09, „Ableitung" bei R-TRANS-10 (`80bf863`).
+
+**Runde 6 — Legal-Nachprüfung auf 6deab48 · Urteil: nacharbeiten** (3 minor, 2 nit; danach „annehmen" ohne
+weitere volle Runde vertretbar). Behoben in `e029ca1`, Bericht Abschnitt 13:
+
+1. minor · Recherche:205 als „belegt" geführt, fordert serverseitig und NTP-synchronisiert.
+   Umgang: überall „teilweise" mit der Lücke (Demo: Browser-Uhr, `apps/web/src/api/index.ts:46`); alle Zitate von
+   :205 geprüft (R-TRANS-03, Abschnitte 11 und 12, Querschnitt).
+2. minor · R-TRANS-06 aus `delivered`: Begründung zu Recherche:255 falsch.
+   Umgang: „teilweise belegt durch Recherche:255 (Rückkanal Podium → Backoffice mit Grund); nicht umgesetzt: feste
+   Kategorien, Erfassung der Ist-Antwort, Diff gegen den Soll-Text, automatischer Prüfauftrag"; ist:59 als
+   Ableitung; Abschnitt 12 Punkt 4 als überholt markiert.
+3. minor · Inventar R-TRANS-06 ohne Zähler.
+   Umgang: Zeilen in Abschnitt 11 (iii) und 9, Satz im `legalRef`, offener Punkt 14 um R-TRANS-06 erweitert.
+4. nit · R-TRANS-11 „:285" ohne Dateinamen.
+   Umgang: voller Pfad; dieselbe Suche fand ist:50, ist:59, ist:89 (2×), ist:58-59, alle auf den vollen Pfad.
+5. nit · R-TRANS-05 gegen Recherche:227 ohne „die Podiumsansicht verifiziert vor Anzeige".
+   Umgang: ergänzt.
+- Offener Punkt 15 (Querschnitt an 076/Vorabzug binden). Umgang: überholt durch Codex (c) — der Querschnitt steht
+  jetzt generiert in `docs/legal-trace.md`; Punkt 15 geschlossen.
+
+**Codex auf 6deab48** (3 × P2), alle behoben in `e029ca1`:
+
+- (a) P2 · R-TRANS-12: Zielsuche maskiert nicht nach Leserecht; Zitat und Bericht behaupteten es. Umgang: in
+  `api.ts:279-284, 330-332, 631` nachgelesen und bestätigt; Zitat und Abschnitte 9/11 berichtigt; offener Punkt 16
+  (Offenlegungsrisiko) für 010/021, kein Code in 011.
+- (b) P2 · R-IDEM-01: nur erfolgreiche Ergebnisse werden zwischengespeichert. Umgang: in `api.ts:304-311`
+  bestätigt; Beschreibung und Zitat „gibt das erste erfolgreiche Ergebnis zurück; fehlgeschlagene Erstaufrufe
+  werden nicht zwischengespeichert"; Abschnitt 9 berichtigt.
+- (c) P2 · Querschnittswirkungen fehlen in `docs/legal-trace.md`. Umgang: `CROSS_CUTTING_EFFECTS` in `rules.ts`,
+  generierter Abschnitt „Querschnitt (ohne Regel-ID)" über den Schnappschusstest, keine neue Regel-ID; offener
+  Punkt 15 geschlossen.
