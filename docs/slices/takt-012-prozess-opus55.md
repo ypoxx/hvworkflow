@@ -18,9 +18,11 @@ Haiku-Nachweise, Codex-Schleifen ohne Ende bei 023 und takt-006, eingefügte gat
    sieht, nicht durch ein anderes Modell. Wer baut, prüft nicht — auch nicht in derselben Sitzung.
 3. **Codex-Stoppregel:** Codex prüft nach dem Review und nach der Nacharbeit. Einen Merge halten nur P1-Befunde mit
    nachvollziehbarer Probe und jeder Befund zu Sicherheit, Recht oder Datenschutz auf. Andere P2 werden Folgepunkte in
-   der Spec. Nach zwei Codex-Läufen ohne neuen P1 entscheidet der Orchestrator über den Merge; Offene Befunde zu Sicherheit, Recht oder Datenschutz halten den Merge auch nach zwei Läufen auf; sie schließt nur eine Behebung oder eine benannte Fachperson, nicht der Orchestrator.
+   der Spec. Nach zwei Codex-Läufen ohne neuen P1 entscheidet der Orchestrator über den Merge. Offene Befunde zu
+   Sicherheit, Recht oder Datenschutz halten den Merge auch nach zwei Läufen auf; sie schließt nur eine Behebung oder
+   eine benannte Fachperson, nicht der Orchestrator.
 4. **Nachweisform (AGENTS.md Regel 2):** Der Bericht nennt den Commit, auf dem `pnpm gates` lief, und fügt den Schluss
-   der Ausgabe einmal wörtlich ein. Reine Doku-Commits danach brauchen keinen neuen Lauf; die CI am PR ist der
+   der Ausgabe einmal wörtlich ein. Reine Doku-Commits danach brauchen keinen neuen lokalen Lauf; die CI am PR ist der
    laufende Nachweis; gemergt wird nur mit grüner CI auf dem letzten Commit des PR.
 5. **Kostentabelle** im Entwicklungsplan auf den Stand vom 24.09.2026 (Opus 5.5: 4 $ / 20 $ je Million Token).
 
@@ -98,3 +100,7 @@ Umfang 9 Dateien in der Liste, Modellangaben gültig (`opus`, `sonnet`).
 „anderes Modell“, Risikoklassen-Spalte, „Design-Kritik (Fable)“) — eigene Folge-Scheibe, inhaltlich am dringendsten;
 B `docs/produktplan-beta.md` Zeile 7 (Besetzung im Präsens), 343, 440 („Review Fable“ für den Sicherheits-Lesebefund);
 C `docs/bauplan-demo.md` Vermerk „ersetzt durch takt-012“; D `docs/messung.md` Modellzuordnung künftiger Zeilen.
+
+**Runde 2 — Nachprüfung Opus 5.5 auf `a02f56b`:** annehmen. Alle 12 Befunde erledigt, eigener `pnpm gates`-Lauf auf
+`a02f56b` Exit 0. Nits 1–3 (Satzbau Mechaniker, Großschreibung nach Semikolon, „lokalen Lauf“ in Ziel 4) im
+Folgecommit behoben; Nit 4 (Zeilenbreite einzelner neuer Zeilen) nur in der Mechaniker-Datei, sonst Kosmetik ohne Tor.
