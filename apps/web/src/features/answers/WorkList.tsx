@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
-import { Search, X } from 'lucide-react';
+import { Lock, Search, X } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { QUESTION_STATUSES, TERMINAL_STATUSES, TRACKS } from '@hv/domain';
 import {
@@ -226,7 +226,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
   const [box, setBox] = useState({ height: 600, width: 640 });
   const [now, setNow] = useState(() => Date.now());
 
-  const { items, counts, total, listLoading, units } = backlog;
+  const { items, counts, total, listLoading, listForbidden, units } = backlog;
 
   // The age column is only honest if it moves on its own.
   useEffect(() => {
@@ -327,6 +327,24 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
       ? `answers-row-${selectedId}`
       : undefined;
 
+  // Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Beantwortung — the whole panel
+  // (filters included, there is nothing to filter) becomes the gestaltete Zustand, recognised by
+  // the 403's ruleId alone (AGENTS.md rule 4).
+  if (listForbidden) {
+    return (
+      <div data-testid="answers-forbidden" className="h-full">
+        <Panel className="h-full" bodyClassName="grid place-items-center">
+          <EmptyState
+            icon={Lock}
+            title={t('answers.forbidden.title')}
+            description={t('answers.forbidden.body')}
+            className="w-full max-w-xl"
+          />
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <Panel
       className="h-full"
@@ -348,7 +366,11 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
       }
     >
       <div className="flex shrink-0 flex-col gap-2.5 border-b border-line px-4 py-3">
-        <div className="flex items-start gap-3" role="group" aria-label={t('answers.filter.status.label')}>
+        <div
+          className="flex items-start gap-3"
+          role="group"
+          aria-label={t('answers.filter.status.label')}
+        >
           <div className="min-w-0 flex-1 pt-px">
             <ProcessStrip
               segments={statusSegments}

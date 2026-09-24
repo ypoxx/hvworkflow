@@ -14,7 +14,7 @@ import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
 import { showProblem } from '../../components';
 import { getLang, translate } from '../../i18n';
-import { LIST_LIMIT } from './lib';
+import { LIST_LIMIT, isReadForbidden } from './lib';
 
 export type StatusFilter = QuestionStatus | 'all';
 export type TrackFilter = Track | 'all';
@@ -58,6 +58,10 @@ export interface Backlog {
   /** Size of that same list — the number the "Alle" chip carries. */
   total: number;
   listLoading: boolean;
+  /** Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Beantwortung — set from the
+   *  403's ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
+   *  `question.read.delivered`. */
+  listForbidden: boolean;
   selected: Question | null;
   selectedLoading: boolean;
   /** The event log of the open question — the only source for a lapsed approval. */
@@ -89,6 +93,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
 
   const [pool, setPool] = useState<readonly Question[]>([]);
   const [listLoading, setListLoading] = useState(true);
+  const [listForbidden, setListForbidden] = useState(false);
   const [selected, setSelected] = useState<Question | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<readonly DomainEvent[]>([]);
   const [selectedLoading, setSelectedLoading] = useState(false);
@@ -127,10 +132,18 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         if (cancelled) return;
         setPool(page.items);
         setListLoading(false);
+        setListForbidden(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setListLoading(false);
+        if (isReadForbidden(error)) {
+          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — e.g. podium, who
+          // holds neither `question.read` nor `question.read.delivered` at all.
+          setPool([]);
+          setListForbidden(true);
+          return;
+        }
         problem(error);
       });
     return () => {
@@ -160,6 +173,10 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         setSelected(null);
         setSelectedHistory([]);
         setSelectedLoading(false);
+        // A denied read here is a run-time fact of one question (e.g. an observer who cannot
+        // read a merge target's history) rather than the Hauptabfrage of this view — no
+        // gestalteter Zustand of its own (Nicht-Ziele), but still no error toast (Ziel 5).
+        if (isReadForbidden(error)) return;
         problem(error);
       });
     return () => {
@@ -192,6 +209,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     counts,
     total: pool.length,
     listLoading,
+    listForbidden,
     selected,
     selectedLoading,
     selectedHistory,

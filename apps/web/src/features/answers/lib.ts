@@ -39,6 +39,17 @@ export function problemStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * A denied read (R-PERM-02 "no read permission" or R-PERM-03 "read scope exceeded", slice 010).
+ * Read by ruleId alone, never by role name (AGENTS.md rule 4, slice 010b Ziel 4) — the interface
+ * renders a gestalteter Zustand for it instead of an error toast (slice 010b Ziel 1).
+ */
+export function isReadForbidden(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
+  return problemStatus(error) === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
+}
+
 /** The first 90 characters, the amount a 36px row can carry without shouting. */
 export function excerpt(text: string, max = 90): string {
   return text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`;
@@ -136,9 +147,7 @@ export function wordDiff(a: string, b: string): DiffPart[] {
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       lcs[i]![j] =
-        left[i] === right[j]
-          ? lcs[i + 1]![j + 1]! + 1
-          : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+        left[i] === right[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
     }
   }
 
