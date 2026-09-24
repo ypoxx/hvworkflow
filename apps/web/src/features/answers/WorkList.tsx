@@ -332,7 +332,9 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
   // the 403's ruleId alone (AGENTS.md rule 4).
   if (listForbidden) {
     return (
-      <div data-testid="answers-forbidden" className="h-full">
+      // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on its
+      // own, the moment a role switch replaces the backlog with it.
+      <div data-testid="answers-forbidden" role="status" className="h-full">
         <Panel className="h-full" bodyClassName="grid place-items-center">
           <EmptyState
             icon={Lock}
@@ -366,11 +368,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
       }
     >
       <div className="flex shrink-0 flex-col gap-2.5 border-b border-line px-4 py-3">
-        <div
-          className="flex items-start gap-3"
-          role="group"
-          aria-label={t('answers.filter.status.label')}
-        >
+        <div className="flex items-start gap-3" role="group" aria-label={t('answers.filter.status.label')}>
           <div className="min-w-0 flex-1 pt-px">
             <ProcessStrip
               segments={statusSegments}

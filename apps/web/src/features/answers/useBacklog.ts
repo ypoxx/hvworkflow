@@ -66,6 +66,12 @@ export interface Backlog {
   selectedLoading: boolean;
   /** The event log of the open question — the only source for a lapsed approval. */
   selectedHistory: readonly DomainEvent[];
+  /** Major (review round 2): `getQuestion` and `getQuestionHistory` used to share one
+   *  `Promise.all` — a denied `getQuestionHistory` (e.g. observer, no `history.read`) rejected the
+   *  whole pair, so `selected` stayed `null` and a row click looked like nothing had happened at
+   *  all. Split apart: the question shows regardless, and this flag says where its history would
+   *  be instead. */
+  selectedHistoryForbidden: boolean;
   units: readonly Unit[];
   agendaItems: readonly AgendaItem[];
   reload: () => void;
@@ -96,6 +102,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const [listForbidden, setListForbidden] = useState(false);
   const [selected, setSelected] = useState<Question | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<readonly DomainEvent[]>([]);
+  const [selectedHistoryForbidden, setSelectedHistoryForbidden] = useState(false);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [units, setUnits] = useState<readonly Unit[]>([]);
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
@@ -151,32 +158,63 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     };
   }, [version, nonce, search, track, unitId, agendaItemId]);
 
-  // The open question and its history travel together: the detail shows facts from both, and one
-  // without the other would show a state that never existed.
+  // Major (review round 2): the open question and its history used to travel together in one
+  // `Promise.all` — a denied `getQuestionHistory` (e.g. observer, no `history.read`) rejected the
+  // whole pair and `selected` stayed `null`, so a row click looked like nothing had happened.
+  // `getQuestion` alone decides whether the question shows at all (a 404 — outside the actor's own
+  // read scope, Festlegung 3 of docs/slices/010-lesepfade-leserechte.md — is the only reason it
+  // would not); its history is a fact about that one question, not the Hauptabfrage of this view,
+  // and is fetched — and can fail — on its own.
   useEffect(() => {
     if (selectedId === null) {
       setSelected(null);
-      setSelectedHistory([]);
       return undefined;
     }
     let cancelled = false;
     setSelectedLoading(true);
-    Promise.all([api.getQuestion(selectedId), api.getQuestionHistory(selectedId)])
-      .then(([question, history]) => {
+    api
+      .getQuestion(selectedId)
+      .then((question) => {
         if (cancelled) return;
         setSelected(question);
-        setSelectedHistory(history);
         setSelectedLoading(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setSelected(null);
-        setSelectedHistory([]);
         setSelectedLoading(false);
-        // A denied read here is a run-time fact of one question (e.g. an observer who cannot
-        // read a merge target's history) rather than the Hauptabfrage of this view — no
-        // gestalteter Zustand of its own (Nicht-Ziele), but still no error toast (Ziel 5).
         if (isReadForbidden(error)) return;
+        problem(error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [version, nonce, selectedId]);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      setSelectedHistory([]);
+      setSelectedHistoryForbidden(false);
+      return undefined;
+    }
+    let cancelled = false;
+    api
+      .getQuestionHistory(selectedId)
+      .then((history) => {
+        if (cancelled) return;
+        setSelectedHistory(history);
+        setSelectedHistoryForbidden(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setSelectedHistory([]);
+        if (isReadForbidden(error)) {
+          // Put the refused state where its history would be (review round 2) — never an error
+          // toast for a read refusal (Ziel 5).
+          setSelectedHistoryForbidden(true);
+          return;
+        }
+        setSelectedHistoryForbidden(false);
         problem(error);
       });
     return () => {
@@ -213,6 +251,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     selected,
     selectedLoading,
     selectedHistory,
+    selectedHistoryForbidden,
     units,
     agendaItems,
     reload,
