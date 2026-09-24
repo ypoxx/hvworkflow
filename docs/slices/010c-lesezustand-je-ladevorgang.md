@@ -48,6 +48,7 @@ außerhalb der Features.
 - `apps/web/e2e/010c-lesezustand.spec.ts` (neu)
 - `docs/slices/010c-lesezustand-je-ladevorgang.md`
 - `docs/evidence/010c-*.png` (Nachtrag des Architekten 24.09.: Beweis-Screenshot nach Regel 2, Review-Befund 8)
+- `apps/web/e2e/013-tastaturpfad.spec.ts` (Nachtrag des Architekten 24.09.: nur Robustheit von 013h, CI-Befund auf `62f347b`)
 
 ## Akzeptanzkriterium
 
@@ -428,3 +429,11 @@ Durchgang, veralteter Ladevorgang, Auswahlwechsel mitten im Durchgang, Puffersch
   `history/lib.test.ts:121`).
 
 Entscheidung des Architekten (Runde 4): beide nits gehen nach 010d (Testschärfung, kein Verhaltensunterschied).
+
+CI auf `62f347b` (nur Spec-Änderung gegenüber dem grünen `6a007a7`), ein Lauf rot, 68/70:
+- `010c-lesezustand.spec.ts:570` „Befund 4: Historie …“ — `page.evaluate: Resulting promise was garbage collected` in
+  `unrelatedEvent` (`:232`).
+- `013-tastaturpfad.spec.ts:547` 013h — Hintergrund `rgb(230, 233, 242)` statt `ink-50` `rgb(247, 246, 244)`: einmalige
+  Messung, vermutlich mitten im Farbübergang.
+Entscheidung des Architekten: kein Wiederholungslauf als Beweis; Ursache beider Schwankungen beheben (Testrobustheit
+oder Code, je nach Befund), dann mehrfach wiederholt belegen.
