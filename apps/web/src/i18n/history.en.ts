@@ -47,13 +47,13 @@ export const historyEn: typeof historyDe = {
   // Slice 010b (read paths in the interface): the states a 403 R-PERM-02/03 render instead of a
   // toast, recognised by ruleId alone (docs/slices/010b-lesepfade-oberflaeche.md, goals 1-3).
   // Whole view — no role at all may read `listQuestions` here (e.g. podium).
-  'history.forbidden.title': 'This role has no read permission for this view.',
-  'history.forbidden.body': 'The history is not open for reading in this role.',
+  'history.forbidden.title': 'This role has no read permission for this view',
+  'history.forbidden.body': 'This role may not read the history.',
   // The "History of one question" tab (`getQuestionHistory`) — e.g. observer, who may find the
   // question but holds no `history.read` (Nebenabfrage split, goals 2/3).
-  'history.timeline.forbidden.title': 'This role has no read permission for the history of this question.',
-  'history.timeline.forbidden.body': 'This role may not view the course of this question.',
+  'history.timeline.forbidden.title': 'This role has no read permission for the history of this question',
+  'history.timeline.forbidden.body': 'This role may not read the course of this question.',
   // The "Event stream" tab (`listEvents`) — e.g. observer, who holds no `event.read`.
-  'history.stream.forbidden.title': 'This role has no read permission for the event stream.',
-  'history.stream.forbidden.body': 'The event stream is not open for reading in this role.',
+  'history.stream.forbidden.title': 'This role has no read permission for the event stream',
+  'history.stream.forbidden.body': 'This role may not read the event stream.',
 };

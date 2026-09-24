@@ -44,6 +44,6 @@ export const captureEn: typeof captureDe = {
   'capture.readonly.hint': 'Read only in this role',
   // Slice 010b: the state a 403 R-PERM-02/03 on `listContributions` renders instead of a toast
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
-  'capture.forbidden.title': 'This role has no read permission for this view.',
-  'capture.forbidden.body': 'Capture is not open for reading in this role.',
+  'capture.forbidden.title': 'This role has no read permission for this view',
+  'capture.forbidden.body': 'This role may not read Capture.',
 };

@@ -85,6 +85,10 @@ export const answersEn: typeof answersDe = {
   'answers.readonly.hint': 'Read only in this role',
   // Slice 010b: the state a 403 R-PERM-02/03 on `listQuestions` renders instead of a toast
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
-  'answers.forbidden.title': 'This role has no read permission for this view.',
-  'answers.forbidden.body': 'The answer backlog is not open for reading in this role.',
+  'answers.forbidden.title': 'This role has no read permission for this view',
+  'answers.forbidden.body': 'This role may not read Answering.',
+  // Major (review round 2): `getQuestionHistory` of an open question is a Nebenabfrage, not a
+  // gestalteter Zustand of the whole view — the question stays visible, only its course is
+  // missing, exactly where it would stand (the lapsed-approval note).
+  'answers.history.forbidden': 'This role may not read the course of this question.',
 };

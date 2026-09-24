@@ -67,6 +67,6 @@ export const speakersEn: typeof speakersDe = {
   'speakers.readonly.hint': 'Read only in this role',
   // Slice 010b (read paths in the interface): the state a 403 R-PERM-02/03 on `listSpeakers`
   // renders instead of a toast (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
-  'speakers.forbidden.title': 'This role has no read permission for this view.',
-  'speakers.forbidden.body': 'The speakers list is not open for reading in this role.',
+  'speakers.forbidden.title': 'This role has no read permission for this view',
+  'speakers.forbidden.body': 'This role may not read the speakers list.',
 };

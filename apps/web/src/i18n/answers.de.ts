@@ -84,5 +84,9 @@ export const answersDe = {
   // Slice 010b: the state a 403 R-PERM-02/03 on `listQuestions` renders instead of a toast
   // (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
   'answers.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
-  'answers.forbidden.body': 'Die Beantwortung ist für diese Rolle nicht zum Lesen freigegeben.',
+  'answers.forbidden.body': 'Diese Rolle darf die Beantwortung nicht lesen.',
+  // Major (review round 2): `getQuestionHistory` einer offenen Einzelfrage ist eine Nebenabfrage,
+  // kein eigener gestalteter Zustand der ganzen Ansicht — die Einzelfrage bleibt sichtbar, nur der
+  // Verlauf fehlt, an genau der Stelle, an der er stünde (Freigabe-Erloschen-Hinweis).
+  'answers.history.forbidden': 'Diese Rolle darf den Verlauf dieser Einzelfrage nicht lesen.',
 };

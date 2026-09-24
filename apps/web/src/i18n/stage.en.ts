@@ -45,6 +45,6 @@ export const stageEn: typeof stageDe = {
   'stage.contrast.leave': 'Switch off contrast',
   // Slice 010b: the state a 403 R-PERM-02/03 on `getStage` renders instead of a toast
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
-  'stage.forbidden.title': 'This role has no read permission for this view.',
-  'stage.forbidden.body': 'The podium is not open for reading in this role.',
+  'stage.forbidden.title': 'This role has no read permission for this view',
+  'stage.forbidden.body': 'This role may not read the podium.',
 };
