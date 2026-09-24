@@ -1,14 +1,15 @@
 /**
  * Slice 001 — the shell. Proves the three things a reviewer has to see with their own eyes: the
- * synthetic corpus really is behind the counters, the role can be switched to the capture persona,
+ * synthetic corpus really is behind the counters, the role can be switched (capture desk → meeting office),
  * and switching the language actually changes every visible string, header included.
  *
  * Slice 010 (Lesepfade unter can() mit Leserechten): this used to switch to `podium`, which no
  * longer holds `speaker.read` (Festlegung 4) — switching to it while still on `/speakers` refetches
  * the list under a role that gets 403'd, leaving a stray error toast whose rule-id text fails the
  * axe colour-contrast check below (a pre-existing contrast defect, out of this slice's scope; the
- * designed "no read permission" state is 010b's job). `capture` demonstrates the same role-switch
- * mechanism without tripping over the read grant.
+ * designed "no read permission" state is 010b's job). The demo already starts as `capture`, so the
+ * switch goes to `moderation`, which also holds `speaker.read` — a visible change without tripping
+ * over the read grant (Nachprüfung B, point 1).
  */
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';

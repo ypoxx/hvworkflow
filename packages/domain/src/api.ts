@@ -249,7 +249,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   };
   // Every decision in this file goes through `can()` (AGENTS.md rule 4, Codex on PR #21), even where
   // no question is involved and `can()` is the bare permission check today — a scope or context rule
-  // added to `can()` later then reaches every read and write path without a second edit.
+  // added to `can()` later then reaches every decision point without a second edit.
   const requirePermission = (p: Permission): void => {
     const d = can(actor(), p);
     if (!d.allow) throw new ApiProblem(403, 'Forbidden', d.reason, d.ruleId);

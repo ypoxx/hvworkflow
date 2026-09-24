@@ -1098,6 +1098,27 @@ und der tatsächliche Testschritt danach — **vorher:**
 
 Der Orchestrator legt diese Änderung dem Eigentümer vor (Ziel 5, `abnahme.spec.ts`-Zeile).
 
+**Nachtrag Orchestrator (Nachprüfung B, Nacharbeit `0e39998`):** Die Tabelle und der Nachher-Block oben geben den Stand des Bauers wieder. Endstand: `001-shell.spec.ts` wechselt `capture` → `moderation` (die Demo startet schon als capture, der Wechsel zu capture war wirkungslos). `history.read` ist neu in 010; vorher hatte `getQuestionHistory` keine Rechteprüfung, „hielt schon vorher“ und „verlor“ sind deshalb ungenau: unter Festlegung 4 hält moderation `history.read`, podium nicht. Nachher-Text in `abnahme.spec.ts`, wörtlich aus der Datei:
+
+```
+ * One Wortmeldung is registered and called to the microphone (Versammlungsbüro), its Redebeitrag is
+ * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
+ * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
+ * exactly version 1 (Legal Clearing), put on the podium and read out (Freigabe, Podium) — and the
+ * history, read by the Versammlungsbüro (under slice 010's Festlegung 4 moderation holds
+ * `history.read`, podium does not), proves every one of those steps afterwards.
+ */
+```
+```
+  /* ---------- Historie: every step of this one question is on the record. Slice 010 puts the
+   * history behind `history.read` (Festlegung 4): moderation holds it together with `question.read`,
+   * podium does not (it holds `stage.read`), so the Versammlungsbüro reads the history;
+   * the acceptance sentence itself (docs/erste-version-und-offene-fragen.md §1) is unaffected, it
+   * ends at "schließt sie ab". ---------- */
+  await asRole(page, 'moderation');
+  await page.getByTestId('nav-history').click();
+```
+
 **Merge-Test-Namen (Ziel 7, Nachprüfung A):**
 
 - Domäne (`packages/domain/src/__tests__/api.test.ts`): `mergeQuestion: a delivered primary question
@@ -1241,10 +1262,15 @@ Orchestrator (nach oben abgewichen, Scheibe über dem Tokenbudget):
 3. minor · Kontrast des Fehler-Toasts (`Toast.tsx:53`, vorbestehend) → takt-009.
 4. minor · Kommentar in `abnahme.spec.ts` („ohne Rollenwechsel“) falsch → Grund für `hv-stage-only-v1=0` genannt.
 5. minor · Domänentest verglich nur Status, Regel-ID und Text → ganzes Problem-Dokument (`toProblem()`).
-6. nit · „podium verlor `history.read`“ ungenau (`history.read` ist neu in 010) → umformuliert.
+6. nit · „podium verlor `history.read`“ ungenau (`history.read` ist neu in 010) → in den e2e-Kommentaren umformuliert, im
+   Bericht per Nachtrag berichtigt (Nachprüfung der Nacharbeit).
 7. nit · wirkungsloser `asRole('expert')` in 020 und ungenauer Kommentar → entfernt bzw. umformuliert.
 
 **Codex auf PR #21 (P1):** Die neuen Leseprüfungen riefen `hasPermission()` direkt statt `can()` (AGENTS.md Regel 4);
 eine spätere Umfangs- oder Kontextregel in `can()` hätte sie nicht erreicht → jeder Aufruf in `api.ts` geht über
 `can()`, `hasPermission` steht nur noch in `can()` selbst. Ohne Frage liefert `can()` dieselbe Entscheidung, das
 Verhalten ändert sich nicht (Domäne 72/72, API 49/49).
+
+**Nachprüfung der Nacharbeit · Opus 5.5 · 24.09.2026 · Urteil: annehmen** (0/0/1 + 2 nits): `can()`-Ersatz an allen
+sechs Stellen ohne Frage verhaltensgleich geprüft; minor: Bericht widersprach noch dem Code (001-Wechsel, Nachher-Text der
+Abnahme) → Nachtrag unter der Tabelle; nits: Docstring von 001 und Kommentar an `requirePermission` → berichtigt.
