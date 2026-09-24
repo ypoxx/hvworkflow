@@ -1273,3 +1273,15 @@ Exit 0.
    erhöht sie".
 
 `docs/legal-trace.md` danach nur über `npx vitest run -u` neu erzeugt (86 Tests grün).
+
+### Codex auf `aeeff5f`
+
+1. P2 — Änderungsgeschichte in Zitaten (R-PERM-01 „seit Commit a0c38c4", R-PERM-02/03 „eingeführt in …"), Festlegung 5.
+   **Umgang:** entfernt; R-PERM-01 nennt nur „das Schreibrecht fehlt", R-PERM-02/03 verweisen als „Herleitung" auf
+   Scheibe 010 (Quelle, keine Geschichte). Suche nach „eingeführt|seit Commit" in `rules.ts`/`transitions.ts`: leer.
+2. P2 — R-TRANS-12: eine nach R-TRANS-06 aus `delivered` nach `classified` zurückgegebene Frage behält `deliveredAt`
+   und Rückgabegrund (state.ts `QuestionReturned` löscht nur die Freigabe) und kann dann zusammengeführt werden.
+   **Umgang:** „Nicht belegt"-Satz um diesen Fall erweitert.
+3. P2 — Querschnitt `version`: das Erfassen erhöht nicht. **Umgang:** schon in `6541259` behoben (Runde 7, Nit 3).
+
+`docs/legal-trace.md` nur über `npx vitest run -u` neu erzeugt (86 grün); Wahrheitstabelle byte-gleich zu `417bc6d`.

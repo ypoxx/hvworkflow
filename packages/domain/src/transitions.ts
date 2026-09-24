@@ -496,7 +496,8 @@ export const TRANSITIONS: readonly Transition[] = [
         'dann nicht mehr als offen (state.ts `refreshCounts`), unabhängig vom Stand des Ziels. Die ' +
         'Zeile sagt dazu: "Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet." ' +
         'Nicht belegt: eine Freigabe, `deliveredAt` oder ein Rückgabegrund, die nach R-TRANS-06 an ' +
-        'einer Frage in `answer_drafted` stehen geblieben sind, bleiben auch an der ' +
+        'einer Frage in `answer_drafted` stehen geblieben sind, und `deliveredAt` und Rückgabegrund einer ' +
+        'nach R-TRANS-06 aus `delivered` nach `classified` zurückgegebenen Frage, bleiben auch an der ' +
         'zusammengeführten Frage stehen (Ableitung wie bei R-TRANS-06). Nicht belegt: der ' +
         'Bestandscheck des Zielobjekts (`intoQuestionId`, `requireQuestionFor` in api.ts) — ' +
         'Architekturentscheidung, keine externe Vorgabe. Er maskiert nicht nach Leserecht: wer ' +

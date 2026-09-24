@@ -104,8 +104,7 @@ const OTHER_RULES: readonly RuleEntry[] = [
       citation:
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
         'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."). Regel-ID ' +
-        '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament fuer ' +
-        'die erste lauffaehige Version"). ' +
+        '"R-PERM-01": das Schreibrecht fehlt. ' +
         'Die 404-Maskierung für eine Frage, die der Akteur weder lesen noch bearbeiten darf ' +
         '(Festlegung 3 von docs/slices/010-lesepfade-leserechte.md), hat ebenfalls keine Fundstelle ' +
         'in Recherche oder Ist-Analyse; sie ist eine Architekturentscheidung, keine externe Vorgabe.',
@@ -126,8 +125,8 @@ const OTHER_RULES: readonly RuleEntry[] = [
       source: 'Rechtekonzept',
       citation:
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
-        'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."); Regel-ID ' +
-        'eingeführt in docs/slices/010-lesepfade-leserechte.md, Festlegung 6. Die 404-Maskierung für ' +
+        'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."); Herleitung ' +
+        'der Regel-ID: docs/slices/010-lesepfade-leserechte.md, Festlegung 6. Die 404-Maskierung für ' +
         'eine Frage, die der Akteur nicht lesen darf (Festlegung 3 von docs/slices/010-lesepfade-' +
         'leserechte.md), hat ebenfalls keine Fundstelle in Recherche oder Ist-Analyse; sie ist eine ' +
         'Architekturentscheidung, keine externe Vorgabe.',
@@ -150,9 +149,8 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'docs/rollen-und-rechtekonzept.md:93 (Abschnitt 2.3, Kontextattribut "Bühnenzuordnung": "der ' +
         'Vorstand sieht nur, was ihm zugeordnet **und** bereit ist"). Ableitung: dieselbe Art ' +
         'statusabhängiger Sichtbarkeitsbeschränkung wie "Leseumfang", auch wenn die Zeile selbst von ' +
-        'der Bühnenzuordnung spricht, nicht vom Lesestatus. Regel-ID eingeführt in ' +
-        'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang") — dort die genauere ' +
-        'Herleitung. Durch diese Regel nicht umgesetzt: die Bühnenzuordnung für den Vorstand selbst ' +
+        'der Bühnenzuordnung spricht, nicht vom Lesestatus. Genauere Herleitung: ' +
+        'docs/slices/010-lesepfade-leserechte.md, Festlegung 2 ("Leseumfang"). Durch diese Regel nicht umgesetzt: die Bühnenzuordnung für den Vorstand selbst ' +
         '(Attributregel, laut Scheibe 010 für 047 vorgesehen); R-PERM-03 betrifft heute nur den ' +
         'Leseumfang von `question.read.delivered` (permissions.ts). Die 404-Maskierung für eine ' +
         'einzelne Frage außerhalb des Leseumfangs (Festlegung 3 von docs/slices/010-lesepfade-' +
