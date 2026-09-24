@@ -183,6 +183,12 @@ export function StagePage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Minor 4 (review round 3): `version` bumps on every actor switch (api/useApiVersion.ts). Until
+    // this version's own answer is in, the keyboard has no record to act on — the previous one
+    // may belong to a role that could read (and deliver) what this one cannot. Only the ref the
+    // shortcuts read is cleared: blanking the visible podium on every bump would make it jump on
+    // every new event too (design principle 8), and the fresh answer replaces it within the load.
+    stageRef.current = null;
     api
       .getStage()
       .then((next) => {
@@ -359,11 +365,16 @@ export function StagePage() {
   }, [deliver, returnOpen, forbidden]);
 
   /**
-   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, the same shape
-   * `loading` already uses, so a role whose default turns out to be "Nur Bühne" never flashes the
-   * ordinary shell first (design-prinzipien.md #8, "nichts springt").
+   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, so a role whose
+   * default turns out to be "Nur Bühne" never flashes the ordinary shell first
+   * (design-prinzipien.md #8, "nichts springt").
+   *
+   * Minor 4 (review round 3): nor until the first `getStage` answer is known (`loading`). A stored
+   * "Nur Bühne" is decided at once, but whether it applies depends on that answer — a role refused
+   * `stage.read` gets the ordinary layout — so the fullscreen overlay and its counters used to
+   * flash for the length of the load and then jump away.
    */
-  if (stageOnly === null) {
+  if (stageOnly === null || loading) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4" data-testid="stage-deciding">
         <PageHeader title={t('page.stage.title')} description={t('page.stage.description')} />
@@ -433,19 +444,10 @@ export function StagePage() {
     </Button>
   );
 
-  const podium = loading ? (
-    <div
-      aria-busy="true"
-      aria-label={t('answers.list.loading')}
-      className="flex min-h-0 flex-1 flex-col gap-4"
-    >
-      <div className="h-5 w-40 animate-pulse rounded-sm bg-ink-50" />
-      <div className="h-16 w-3/4 animate-pulse rounded-sm bg-ink-50" />
-      <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
-    </div>
-  ) : forbidden ? (
-    // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on its
-    // own, the moment a role switch replaces the podium with it.
+  const podium = forbidden ? (
+    // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+    // (review round 3): a live region mounted together with its content is often not announced,
+    // so this is a hint to assistive technology, not a guaranteed announcement.
     <div
       data-testid="stage-forbidden"
       role="status"
@@ -494,14 +496,11 @@ export function StagePage() {
         </div>
         <div className="flex min-h-0 flex-1 gap-8 px-8 py-6">
           {podium}
-          {/* Ziel 1 (slice 010b): a role that cannot even read the stage sees no queue built from
-           *  data it does not have — an empty aside next to the gestaltete Zustand would otherwise
-           *  read as "nothing is queued", not "unknown, forbidden". */}
-          {!forbidden && (
-            <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
-              <StageQueue stage={view} />
-            </aside>
-          )}
+          {/* Minor 4 (review round 3): no `!forbidden` guard here — this overlay only renders for
+           *  a role that can read the stage (see the condition above). */}
+          <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
+            <StageQueue stage={view} />
+          </aside>
         </div>
         {dialog}
       </div>
