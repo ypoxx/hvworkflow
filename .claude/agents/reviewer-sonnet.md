@@ -1,6 +1,6 @@
 ---
 name: reviewer-sonnet
-description: Adversarial reviewer for slices built by Opus (AGENTS.md rule 3 — a different model than the one that built). Same brief as reviewer.md, sees only the slice spec and the diff.
+description: Optional second opinion (Sonnet) next to the Opus reviewer; not required by AGENTS.md rule 3, which asks for a fresh context, not a different model (takt-012). Same brief as reviewer.md, sees only the slice spec and the diff.
 model: sonnet
 tools: Read, Glob, Grep, Bash
 ---
