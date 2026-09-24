@@ -108,16 +108,14 @@ export function SpeakersPage() {
    * contract carries no `_actions` list for it; the permission bundle that may change a Wortmeldung
    * is the same one that may take a new one, so the offer follows `speaker.update` on the list.
    */
-  const mayRegister =
-    view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
+  const mayRegister = view.length === 0 || view.some((speaker) => speaker._actions.includes('speaker.update'));
   /**
    * Point #26 (feedback, slice 020): a role without any write right on the Wortmeldeliste used to
    * see no register button and no row actions with no explanation at all. Derived from `_actions`
    * alone, never from the role name (AGENTS.md rule 4).
    */
   const mayWriteSpeakers = view.some(
-    (speaker) =>
-      speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
+    (speaker) => speaker._actions.includes('speaker.update') || speaker._actions.includes('speaker.reorder'),
   );
   const readOnly = view.length > 0 && !mayWriteSpeakers;
 
@@ -323,7 +321,11 @@ export function SpeakersPage() {
       />
 
       {forbidden ? (
-        <div data-testid="speakers-forbidden" className="grid min-h-0 flex-1">
+        // Minor 5 (review round 2): `role="status"` (an implicit polite live region) so a screen
+        // reader announces the refusal on its own, the moment a role switch replaces the list with
+        // it — the same reason a demo role switcher exists at all: the actor can change without a
+        // full page reload, and the state must say so out loud, not only visually.
+        <div data-testid="speakers-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState
               icon={Lock}
