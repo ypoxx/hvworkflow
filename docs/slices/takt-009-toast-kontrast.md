@@ -32,7 +32,11 @@ keine Änderung an anderen e2e-Dateien.
 
 - `apps/web/src/components/Toast.tsx`
 - `apps/web/e2e/takt-009-toast-kontrast.spec.ts`
+- `docs/evidence/takt-009-toast.png` (neu)
 - `docs/slices/takt-009-toast-kontrast.md`
+
+Nachtrag Orchestrator nach Codex (P1): AGENTS.md Regel 2 verlangt für Oberflächenarbeit einen Screenshot; die erste Fassung
+dieser Spec hatte ihn vergessen. Der e2e-Test legt ihn an, committet wird nur diese eine Datei unter docs/evidence.
 
 ## Akzeptanzkriterium
 
