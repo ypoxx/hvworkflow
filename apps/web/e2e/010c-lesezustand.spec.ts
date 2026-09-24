@@ -643,6 +643,54 @@ test('010c Ziel 5: Beantwortung — Suche aktiv, Wechsel zu observer bei offener
   await expect(page.getByTestId('answers-forbidden')).toHaveCount(0);
 });
 
+/** Ziel 5's setup: admin opens an undelivered question, then a search that still shows it. */
+async function openAssignedAndSearch(page: Page): Promise<string> {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  await page.getByTestId('answers-filter-status-assigned').click();
+  const row = page.locator('[data-testid="answers-row"][data-status="assigned"]').first();
+  const number = (await row.getAttribute('data-number'))!;
+  await row.click();
+  await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
+  await page.getByTestId('answers-search').fill(number);
+  await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toBeVisible();
+  // Let the debounced search settle before anything else happens.
+  await page.waitForTimeout(400);
+  await settle(page);
+  return number;
+}
+
+test('010c Runde 2 (N1): Beantwortung — Suche aktiv, Wechsel zu observer, danach zwei fremde Ereignisse: kein Toast', async ({
+  page,
+}) => {
+  const number = await openAssignedAndSearch(page);
+  await asRole(page, 'observer');
+  await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toHaveCount(0);
+  await expect(page.getByTestId('answers-detail')).toHaveCount(0);
+
+  // The masked 404 of a selection observer cannot read is no fault — not now, not on later events.
+  for (const name of ['Testperson 010c N1 a', 'Testperson 010c N1 b']) {
+    await unrelatedEvent(page, name);
+    await page.waitForTimeout(300);
+    await settle(page);
+    await expect(toasts(page)).toHaveCount(0);
+  }
+});
+
+test('010c Runde 2: Beantwortung — Suche aktiv, Wechsel zu observer, erste Detailabfrage mit 500: ein Toast', async ({
+  page,
+}) => {
+  await openAssignedAndSearch(page);
+  // A real fault in the very first load after the switch is shown, even though the selection was
+  // made by another actor and the filtered list leaves it out; only the masked 404 is swallowed.
+  await failOnce(page, 'getQuestion');
+  await asRole(page, 'observer');
+  await expectOneToast(page);
+});
+
 test('010c Ziel 5 (Gegenprobe): Beantwortung — Suche ohne die offene Frage, dieselbe Rolle, Detail mit 500: der Toast bleibt', async ({
   page,
 }) => {
