@@ -328,19 +328,29 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
    * up while the list is read again (`listFailed`) — a failed retry leaves the focus on the button.
    * Once rows arrive the panel goes with the focused button; the focus then goes to the list rather
    * than falling to `<body>`, and only if nothing else took it in the meantime.
+   *
+   * Review round 2 (N2): the retry is settled by the first list read answered after it
+   * (`listAnswered` rises once per answered read), whatever it answered — rows, none, or another
+   * failure — and the mark is cleared then, not only when rows come. With no rows the focus goes to
+   * the step the empty state offers ("Auswahl zurücksetzen", or "Erneut versuchen" if it failed
+   * again), without one to the search field.
    */
-  const retried = useRef(false);
-  const { reload } = backlog;
+  const { reload, listAnswered } = backlog;
+  const retriedAt = useRef<number | null>(null);
+  const emptyPaneRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const retry = useCallback(() => {
-    retried.current = true;
+    retriedAt.current = listAnswered;
     reload();
-  }, [reload]);
+  }, [listAnswered, reload]);
   useEffect(() => {
-    if (!retried.current || items.length === 0) return;
-    retried.current = false;
+    if (retriedAt.current === null || listAnswered <= retriedAt.current) return;
+    retriedAt.current = null;
     const active = document.activeElement;
-    if (active === null || active === document.body) listboxRef.current?.focus();
-  }, [items]);
+    if (active !== null && active !== document.body) return;
+    if (items.length > 0) listboxRef.current?.focus();
+    else (emptyPaneRef.current?.querySelector('button') ?? searchRef.current)?.focus();
+  }, [listAnswered, items]);
 
   const activeRow =
     selectedId !== null && windowed.some((question) => question.id === selectedId)
@@ -422,6 +432,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
               className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-400"
             />
             <input
+              ref={searchRef}
               type="search"
               data-testid="answers-search"
               aria-label={t('answers.search.label')}
@@ -510,7 +521,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {items.length === 0 ? (
-          <div className="p-4">
+          <div ref={emptyPaneRef} className="p-4">
             {listFailed ? (
               // Slice 010d, Ziel 2: the list could not be read — say so and offer the one step that
               // helps. "Kein Treffer … Auswahl zurücksetzen" would claim an answer that never came.

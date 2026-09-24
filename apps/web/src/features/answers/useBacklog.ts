@@ -74,6 +74,10 @@ export interface Backlog {
    *  shows a gestalteter Fehlerzustand, never "Kein Treffer". It stands while this actor reads again
    *  (review round 1, finding 4: the panel, and the focus on its button, stay until rows arrive). */
   listFailed: boolean;
+  /** Slice 010d, review round 2 (N2): how many list reads of this view have answered — ready,
+   *  refused or failed. Rises exactly once per answered read, so a caller can tell "my retry has
+   *  been answered" apart from the render in which the retry was only asked for. */
+  listAnswered: number;
   /** Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Beantwortung — set from the
    *  403's ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
    *  `question.read.delivered`. */
@@ -131,6 +135,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     complete: boolean;
   } | null>(null);
   const [listLoadingState, setListLoading] = useState(true);
+  const [listAnswered, setListAnswered] = useState(0);
   /**
    * Slice 010c, Ziel 1: the list's answer carries the key of its load (actor and `version`), and
    * "keine Leseberechtigung" is the verdict of the current key only (`readVerdict`, lib.ts). It used
@@ -252,6 +257,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         setPoolState({ key: requested, items: page.items, complete });
         setListLoading(false);
         setListRead({ key: requested, status: 'ready' });
+        setListAnswered((count) => count + 1);
         gate.settleMain(`${version}:${nonce}`, false, listOmits(ids, complete, selectedByOther));
       })
       .catch((error: unknown) => {
@@ -262,12 +268,14 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           // holds neither `question.read` nor `question.read.delivered` at all.
           setPoolState({ key: requested, items: NO_QUESTIONS, complete: false });
           setListRead({ key: requested, status: 'forbidden' });
+          setListAnswered((count) => count + 1);
           gate.settleMain(`${version}:${nonce}`, true);
           return;
         }
         // Slice 010c, Ziel 1: a failure is this load's answer too — it replaces a refusal given to
         // another actor instead of leaving it standing (`readVerdict`).
         setListRead({ key: requested, status: 'error' });
+        setListAnswered((count) => count + 1);
         // Slice 010d: the same actor keeps the rows it already had; rows another actor read give
         // way to none — this actor has none yet, and the list says it failed (Ziel 2).
         setPoolState((previous) =>
@@ -414,6 +422,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     total: pool.length,
     listLoading,
     listFailed,
+    listAnswered,
     listForbidden,
     selected,
     selectedLoading,

@@ -143,11 +143,16 @@ export function AnswersPage() {
       // Slice 010d, Ziel 3: read at the moment of the answer, not when the write was sent — the
       // question is on screen for the actor who wrote, and it is still the one selected (review
       // round 1, finding 1: while the next selection loads, the detail still shows this one).
-      const stillShown = (): boolean =>
+      //
+      // Review round 2 (N1): emptying the draft is bound to the question on screen, not to the
+      // selection — while the next selection loads, the editor of this very question is still
+      // mounted with the saved text, and a person who comes back finds it there as if unsaved.
+      const onScreen = (): boolean =>
         shown.current !== null &&
         shown.current.id === taken.id &&
-        shown.current.selectedId === taken.id &&
         shown.current.actorId === taken.actorId;
+      const stillShown = (): boolean =>
+        onScreen() && shown.current !== null && shown.current.selectedId === taken.id;
       try {
         await write({ ifMatch: etagOf(question.version) });
         // The confirmation names the step and the question (review round 1, finding 2), so it
@@ -157,10 +162,8 @@ export function AnswersPage() {
           title: t('answers.toast.done'),
           detail: t('answers.toast.step', step),
         });
-        if (stillShown()) {
-          setDialog(null);
-          onDone?.();
-        }
+        if (stillShown()) setDialog(null);
+        if (onScreen()) onDone?.();
       } catch (error) {
         // 412: somebody else wrote first — say so above the detail and reload; keep the toast for
         // every other refusal (403/409 among them). Slice 010d, Ziel 3: the notice stands above the

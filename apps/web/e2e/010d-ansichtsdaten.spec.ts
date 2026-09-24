@@ -925,3 +925,85 @@ test('010d Runde 1 (Befund 3): Historie, Ereignisstrom — observer → admin, E
   expect(await callCount(page, 'listEvents')).toBe(1);
   await expect(page.getByTestId('history-stream-forbidden')).toHaveCount(0);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Review round 2: N1 (the saved draft is emptied on its own question) and N2 (focus after a retry
+// that answers with no rows).
+// ---------------------------------------------------------------------------------------------
+
+test('010d Runde 2 (N1): Beantwortung — Entwurf auf A gelingt, während B lädt; zurück zu A: der Editor ist leer', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'legal');
+  await page.getByTestId('nav-answers').click();
+  await expect(page).toHaveURL(/\/answers$/);
+  // "Entwurf": a new version keeps the question in this filter, so A can be clicked again.
+  await page.getByTestId('answers-filter-status-answer_drafted').click();
+  const rows = page.getByTestId('answers-row');
+  await expect(rows.nth(1)).toBeVisible();
+  const first = (await rows.nth(0).getAttribute('data-number'))!;
+  const second = (await rows.nth(1).getAttribute('data-number'))!;
+  const rowA = page.locator(`[data-testid="answers-row"][data-number="${first}"]`);
+  const rowB = page.locator(`[data-testid="answers-row"][data-number="${second}"]`);
+  const detailNumber = page.getByTestId('answers-detail-number');
+  const editor = page.getByTestId('answer-editor');
+
+  await rowA.click();
+  await expect(detailNumber).toHaveText(first);
+  const versionsBefore = await page.getByTestId('answer-version').count();
+  await editor.fill('Entwurf zu A.');
+  await holdCalls(page, 'draftAnswer', false);
+  await page.getByTestId('answer-submit-draft').click();
+  await expect.poll(() => callCount(page, 'draftAnswer')).toBe(1);
+
+  // B is selected but held: A's detail, with its editor, stays mounted.
+  await holdCalls(page, 'getQuestion', true);
+  await rowB.click();
+  await expect.poll(() => callCount(page, 'getQuestion')).toBeGreaterThan(0);
+  await expect(detailNumber).toHaveText(first);
+
+  await runHeld(page, 'draftAnswer', 0);
+  await expect(toasts(page)).toHaveCount(1);
+  await expect(toasts(page)).toContainText(`Einzelfrage ${first}`);
+
+  await rowA.click();
+  await releaseAll(page, 'getQuestion');
+  await expect(detailNumber).toHaveText(first);
+  await expect(page.getByTestId('answer-version')).toHaveCount(versionsBefore + 1);
+  await settle(page);
+  // Saved is saved: the editor is empty, and Enter on its button saves nothing twice.
+  await expect(editor).toHaveValue('');
+  await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('010d Runde 2 (N2): Beantwortung — "Erneut versuchen" liefert keine Zeile: der Fokus geht auf "Auswahl zurücksetzen"', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'expert');
+  await page.getByTestId('nav-answers').click();
+  await expect(page.getByTestId('answers-row').first()).toBeVisible();
+  // A search that finds nothing, then the next read of the list fails.
+  await page.getByTestId('answers-search').fill('010d-kein-treffer');
+  await expect(page.getByText('Kein Treffer')).toBeVisible();
+  await failAlways(page, 'listQuestions', { limit: 2000 });
+  await unrelatedEvent(page, 'Testperson 010d N2');
+  const failed = page.getByTestId('answers-list-error');
+  await expect(failed).toBeVisible();
+
+  await restore(page, 'listQuestions');
+  await failed.getByRole('button', { name: 'Erneut versuchen' }).focus();
+  await page.keyboard.press('Enter');
+  // The empty state's own button — the panel header carries a second one with the same name.
+  const reset = page.getByRole('button', { name: 'Auswahl zurücksetzen' }).last();
+  await expect(page.getByText('Kein Treffer')).toBeVisible();
+  await expect(failed).toHaveCount(0);
+  await settle(page);
+  await expect(reset).toBeFocused();
+  // The step it offers works from there.
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('answers-row').first()).toBeVisible();
+});
