@@ -8,8 +8,16 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
-import { ACTOR, req } from './helpers.ts';
-import { allOperationIds, expectValid } from '../contractSchema.ts';
+import { ACTOR, OPERATIONS_0_2, UNDOCUMENTED_STATUS_EXCEPTIONS, req } from './helpers.ts';
+import {
+  allOperationIds,
+  documentedStatuses,
+  expectValid,
+  openapiDoc,
+  operations,
+  paramsFor,
+  resolvePointer,
+} from '../contractSchema.ts';
 
 interface QuestionLike {
   id: string;
@@ -163,5 +171,84 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     expectValid('mergeQuestion', 200, merged);
     expect(merged.status).toBe('merged');
     expect(merged.mergedIntoId).toBe(into.id);
+  });
+});
+
+// ---- response reconciliation (slice 023, goal 5 with the architect's addendum; Codex on 2779e0b) ----
+
+type Schema = Record<string, unknown>;
+
+/** Follows `$ref` until a schema that is not a bare reference (plain JSON Pointer into the document). */
+function deref(node: unknown): Schema {
+  let current = node as Schema;
+  for (let guard = 0; current !== undefined && typeof current['$ref'] === 'string'; guard++) {
+    if (guard > 20) throw new Error('Circular $ref in the contract.');
+    current = resolvePointer(current['$ref'] as string) as Schema;
+  }
+  return current;
+}
+
+/**
+ * Whether a query or header value — always a string on the wire, coerced by `coerceParamValue` in
+ * `contractSchema.ts` — can fail the schema `validateOperation` checks it against: a non-string type
+ * (a non-numeric `limit`), an enum, a pattern, a length or range bound, a format, or an array whose
+ * items can fail. A plain `{ type: string }` accepts every string and never yields a 422.
+ */
+function canReject(node: unknown): boolean {
+  const schema = deref(node);
+  if (schema === undefined) return false;
+  if (schema['type'] === 'array') {
+    return 'minItems' in schema || 'maxItems' in schema || canReject(schema['items']);
+  }
+  if (schema['type'] !== undefined && schema['type'] !== 'string') return true;
+  const constraining = ['enum', 'const', 'pattern', 'minLength', 'maxLength', 'format', 'minimum', 'maximum',
+    'exclusiveMinimum', 'exclusiveMaximum', 'allOf', 'anyOf', 'oneOf', 'not'];
+  return constraining.some((keyword) => keyword in schema);
+}
+
+/**
+ * The statuses the service's generic layer can produce for an operation, derived only from contract
+ * properties (table in the slice report "Antwort-Abgleich"):
+ * 422 — a query/header parameter that can fail its schema, or a request body (`validate.ts`, invalid
+ *       JSON in `http.ts`);
+ * 401 — a non-empty `security` (`actor.ts`, `app.ts`; the session and bearer schemes from 029/033);
+ * 404 — a path parameter (domain lookups, `NotFound`);
+ * 412 — an `If-Match` parameter (optimistic locking in `packages/domain/src/api.ts`).
+ */
+function generatedStatuses(operationId: string): number[] {
+  const op = operations[operationId]!;
+  const node = openapiDoc.paths[op.path][op.method] as { security?: Record<string, unknown>[]; requestBody?: unknown };
+  const params = paramsFor(operationId);
+  const statuses: number[] = [];
+  const rejectable = params.some(
+    (p) => (p.in === 'query' || p.in === 'header') && canReject(resolvePointer(p.schemaPointer.slice('openapi'.length))),
+  );
+  if (rejectable || node.requestBody !== undefined) statuses.push(422);
+  const security = node.security ?? (openapiDoc.security as Record<string, unknown>[]);
+  if (security.length > 0 && security.every((requirement) => Object.keys(requirement).length > 0)) statuses.push(401);
+  if (params.some((p) => p.in === 'path')) statuses.push(404);
+  if (params.some((p) => p.name === 'If-Match')) statuses.push(412);
+  return statuses;
+}
+
+describe('contract: every status the generic layer can produce is documented or a reasoned exception', () => {
+  it('no operation lacks a generated status (422/401/404/412)', () => {
+    const gaps: string[] = [];
+    for (const operationId of allOperationIds) {
+      const documented = documentedStatuses(operationId);
+      const excepted = UNDOCUMENTED_STATUS_EXCEPTIONS[operationId] ?? [];
+      const missing = generatedStatuses(operationId).filter((s) => !documented.includes(String(s)) && !excepted.includes(s));
+      if (missing.length > 0) gaps.push(`${operationId}: ${missing.join(', ')} (documents ${documented.join(', ')})`);
+    }
+    expect(gaps, `operations whose contract lacks a status the service can produce:\n${gaps.join('\n')}`).toEqual([]);
+  });
+
+  it('the exception list names only 0.2 operations and only statuses the contract does not document', () => {
+    const stale: string[] = [];
+    for (const [operationId, statuses] of Object.entries(UNDOCUMENTED_STATUS_EXCEPTIONS)) {
+      if (!OPERATIONS_0_2.includes(operationId) || !allOperationIds.includes(operationId)) stale.push(`${operationId}: not a 0.2 operation`);
+      else for (const s of statuses) if (documentedStatuses(operationId).includes(String(s))) stale.push(`${operationId}: ${s} is documented now`);
+    }
+    expect(stale).toEqual([]);
   });
 });

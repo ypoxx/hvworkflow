@@ -204,6 +204,22 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   (lifetime only through `Max-Age`; `Expires` is the only attribute whose value holds a comma). The
   contract test helper validates every `Set-Cookie` line separately, allows at most one session
   cookie per response and rejects any cookie on a response whose contract declares no `Set-Cookie`.
+- Response reconciliation (Codex on 2779e0b; architect's addendum to slice 023): every status the
+  service's generic layer produces from a contract property is documented — 422 for a request body
+  or a query/header parameter that can fail its schema, 401 for a non-empty `security`, 404 for a
+  path parameter, 412 for `If-Match`. Added (responses only, nothing removed, no request schema
+  changed): `401` on the 28 operations new in 0.3.0 with actor security that lacked it; `422` on
+  `streamEvents`, `listMeetings`, `listMeetingSpeakers`, `listMeetingQuestions`,
+  `listRoleAssignments`, `claimContribution`, `releaseContribution`, `claimQuestion`,
+  `releaseQuestion`, `openAgendaItem`, `openVoting`, `closeVoting`, `revokeRole`,
+  `freezeMeetingConfig`, `login` (`returnTo` over 512 characters; a foreign target stays ignored) and
+  `logout` (empty `X-CSRF-Token`), and — additively on 0.2 operations, the status today's service
+  already returns — on `listSpeakers`, `assignQuestion`, `submitForReview`, `stageQuestion`,
+  `deliverQuestion`, `closeQuestion`, `mergeQuestion`, `listEvents` and `seedDemo` (mostly an
+  `Idempotency-Key` over 128 characters or an out-of-range query value). The five gaps of review 012
+  point 18 (401 on the 0.2 operations; 422 on `listQuestions`, `returnQuestion`, `withdrawQuestion`)
+  stay reasoned exceptions for 0.4.0 (slice 043). A test in `apps/api/src/__tests__/contract.test.ts`
+  enforces the rule for every operation against the one exception list in the test helper.
 
 ### Changed
 
@@ -232,9 +248,10 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   service; a plain string, so no request can newly fail on it); (4) documented but not yet produced:
   `404` on the alias operations other than `getMeeting`, `409` on `registerSpeaker` and
   `captureContribution`, the response header `X-Server-Time` (optional, sent from 033).
-- `contract:lint` (redocly recommended) reports 6 warnings, all accepted and structural: `login` and
-  `completeLogin` have no 2xx (they redirect), `login`, `getHealth`, `getReadiness` have no 4xx
-  (probes and a redirect have none), `oidc` is unused (deprecated, kept for 0.2 readers).
+- `contract:lint` (redocly recommended) reports 5 warnings, all accepted and structural: `login` and
+  `completeLogin` have no 2xx (they redirect), `getHealth` and `getReadiness` have no 4xx (probes
+  have none), `oidc` is unused (deprecated, kept for 0.2 readers). The sixth, "`login` has no 4xx",
+  went away with its `422` (Codex on 2779e0b).
 
 ### Deprecated
 

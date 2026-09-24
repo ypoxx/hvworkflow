@@ -150,6 +150,7 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     post:
       tags: [speakers]
       operationId: registerSpeaker
@@ -295,10 +296,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/ContributionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /contributions/{contributionId}/release:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
     post:
@@ -312,10 +315,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/ContributionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions:
     get:
       tags: [questions]
@@ -398,6 +403,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/answers:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -431,6 +437,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/approvals:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -489,6 +496,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/delivery:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -502,6 +510,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/closure:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -515,6 +524,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/withdrawal:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -559,6 +569,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/claim:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -573,10 +584,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /questions/{questionId}/release:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -589,10 +602,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /stage:
     get:
       tags: [stage]
@@ -633,6 +648,7 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/Event' } }
                   lastSeq: { type: integer }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /stream:
     get:
       tags: [events]
@@ -658,7 +674,9 @@ paths:
           content:
             text/event-stream:
               schema: { type: string, description: 'SSE framing; each `data:` line is one `Event` JSON document' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   # ---- meetings (Jahrgang) — canonical since 0.3.0 --------------------------------------------------
   /meetings:
     get:
@@ -673,7 +691,9 @@ paths:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/MeetingStatus' } }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Meeting' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     post:
       tags: [meeting, admin]
       operationId: createMeeting
@@ -689,6 +709,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/MeetingCreate' } } }
       responses:
         '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
@@ -701,6 +722,7 @@ paths:
       description: Since 0.3.0 (slice 025). The `ETag` is the meeting's `version` (admin writes send it as `If-Match`, slice 040).
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /meetings/{meetingId}/agenda-items:
@@ -712,6 +734,7 @@ paths:
       description: Since 0.3.0 (slice 025); canonical form of `GET /agenda-items`.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
@@ -728,6 +751,7 @@ paths:
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItemInput' } } } }
       responses:
         '200': { description: OK — the agenda after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -745,10 +769,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/opening:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
     post:
@@ -759,10 +785,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/closure:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
     post:
@@ -773,10 +801,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/units:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -786,6 +816,7 @@ paths:
       description: Since 0.3.0 (slice 025); canonical form of `GET /units`.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
@@ -802,6 +833,7 @@ paths:
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UnitInput' } } } }
       responses:
         '200': { description: OK — the units after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -819,6 +851,7 @@ paths:
         (master data); classification sets `seatId` from it.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeat' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
@@ -835,6 +868,7 @@ paths:
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeatInput' } } } }
       responses:
         '200': { description: OK — the seats after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeat' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -855,8 +889,10 @@ paths:
         - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RoleAssignment' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     post:
       tags: [admin]
       operationId: assignRole
@@ -872,6 +908,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/RoleAssignmentCreate' } } }
       responses:
         '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/RoleAssignment' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -897,9 +934,11 @@ paths:
                 reason: { type: string, minLength: 1 }
       responses:
         '200': { description: OK — the assignment with `revokedAt` set, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/RoleAssignment' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/config-freeze:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     post:
@@ -915,10 +954,12 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/ConfigFreeze' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/speakers:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -931,8 +972,10 @@ paths:
         - { $ref: '#/components/parameters/SpeakerStatusFilter' }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     post:
       tags: [speakers]
       operationId: registerMeetingSpeaker
@@ -944,6 +987,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerRegistration' } } }
       responses:
         '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -961,6 +1005,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerOrder' } } }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
@@ -975,6 +1020,7 @@ paths:
         - { $ref: '#/components/parameters/SpeakerIdFilter' }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
@@ -993,6 +1039,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/MeetingContributionCapture' } } }
       responses:
         '201': { description: 'Created — `ETag` is `Contribution.version` (optional, as on `getContribution`)', headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -1018,8 +1065,10 @@ paths:
         - { $ref: '#/components/parameters/QuestionOffset' }
       responses:
         '200': { $ref: '#/components/responses/QuestionList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /meetings/{meetingId}/stage:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -1032,6 +1081,7 @@ paths:
         client parameter (slices 040, 047); a `seat` query parameter is a 0.4.0 matter (slice 043).
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   # ---- sign-in through the BFF (ADR 0004) — outside /v1 ---------------------------------------------
@@ -1045,18 +1095,20 @@ paths:
         Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a
         confidential client; the browser is redirected to the identity provider and never sees a
         token. No credential needed (`security: []`). `503` when no identity provider is configured
-        (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in). A `2xx` response does not exist for
-        this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
+        (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than
+        512 characters. A `2xx` response does not exist for this operation by design (lint warning
+        accepted, see CHANGELOG 0.3.0).
       security: []
       parameters:
         - name: returnTo
           in: query
           description: >-
-            Relative path inside the application to return to after sign-in (open-redirect guard). The
-            service keeps it only when it matches `SameOriginPath` — the same rule the `Location` of
-            `completeLogin` is bound to — and otherwise ignores it (redirect to `/`). Ignored rather than
-            rejected, so a stale bookmark never ends on an error page; the schema therefore keeps only
-            the length limit here.
+            Relative path inside the application to return to after sign-in (open-redirect guard). Too
+            long (over 512 characters) → 422, because the length limit protects the service and the
+            state it keeps for the round trip; a foreign target → ignored: the service keeps the value
+            only when it matches `SameOriginPath` — the same rule the `Location` of `completeLogin` is
+            bound to — and otherwise redirects to `/`, so a stale bookmark never ends on an error page
+            (architect's addendum after Codex on 2779e0b).
           schema: { type: string, maxLength: 512 }
       responses:
         '302':
@@ -1067,6 +1119,7 @@ paths:
             Location: { required: true, schema: { type: string, format: uri } }
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /auth/callback:
     servers: [ { url: /, description: 'Outside /v1: the identity provider redirects the browser here' } ]
@@ -1134,7 +1187,9 @@ paths:
       tags: [auth]
       operationId: logout
       summary: End the session (Abmelden) — clears the cookie and blocks the session id
-      description: Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end.
+      description: >-
+        Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no
+        session to end. An empty `X-CSRF-Token` is a 422 (schema `minLength: 1`); a wrong one a 403.
       security: [ { session: [] } ]
       parameters: [ { $ref: '#/components/parameters/CsrfTokenRequired' } ]
       responses:
@@ -1158,6 +1213,7 @@ paths:
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /auth/me:
     servers: [ { url: /, description: 'Outside /v1' } ]
     get:
@@ -1275,6 +1331,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
 components:
   securitySchemes:
     demoActor:
@@ -1438,11 +1495,12 @@ components:
     Unauthorized:
       description: >-
         No valid credential: no session cookie, an expired or blocked session, a wrong audience
-        (slice 029) or a missing metrics token. Documented in 0.3.0 on exactly three operations —
-        `logout`, `getSession` (`/auth/me`) and `getMetrics` — the ones that arrive with the `session`
-        and `metricsBearer` schemes. The 401 the demo header path already produces on every other
-        operation stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18
-        (0.4.0, slice 043).
+        (slice 029), a missing metrics token, or — in the demo — a missing, malformed or unknown
+        `X-Actor`. Documented on every operation new in 0.3.0 that has a non-empty `security` (Codex
+        on 2779e0b: every status the generic layer produces from a contract property is documented,
+        checked for every operation in `apps/api/src/__tests__/contract.test.ts`). On the 29
+        operations of 0.2 the 401 stays undocumented in 0.3.0; it is one of the five gaps of review 012
+        point 18 (0.4.0, slice 043) and the reasoned exception in the test helper.
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 401 } } } ] } } }
     Forbidden:
@@ -1468,7 +1526,12 @@ components:
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 412 } } } ] } } }
     Unprocessable:
-      description: Validation failed
+      description: >-
+        Validation failed: the request body, a query parameter or a header parameter does not match
+        its contract schema (`validateOperation` in the service), or the body is not valid JSON. Since
+        0.3.0 documented on every operation with a request body or a parameter that can fail its
+        schema (Codex on 2779e0b), except `listQuestions`, `returnQuestion` and `withdrawQuestion`
+        (review 012 point 18, slice 043).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 422 } } } ] } } }
     ServiceUnavailable:

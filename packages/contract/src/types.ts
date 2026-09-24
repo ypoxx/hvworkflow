@@ -1024,7 +1024,7 @@ export interface paths {
         };
         /**
          * Start the sign-in (Anmeldung) — redirects the browser to the identity provider
-         * @description Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a confidential client; the browser is redirected to the identity provider and never sees a token. No credential needed (`security: []`). `503` when no identity provider is configured (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in). A `2xx` response does not exist for this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
+         * @description Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a confidential client; the browser is redirected to the identity provider and never sees a token. No credential needed (`security: []`). `503` when no identity provider is configured (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than 512 characters. A `2xx` response does not exist for this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
          */
         get: operations["login"];
         put?: never;
@@ -1066,7 +1066,7 @@ export interface paths {
         put?: never;
         /**
          * End the session (Abmelden) — clears the cookie and blocks the session id
-         * @description Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end.
+         * @description Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end. An empty `X-CSRF-Token` is a 422 (schema `minLength: 1`); a wrong one a 403.
          */
         post: operations["logout"];
         delete?: never;
@@ -1900,7 +1900,7 @@ export interface components {
                 "application/json": components["schemas"]["AgendaItem"];
             };
         };
-        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029) or a missing metrics token. Documented in 0.3.0 on exactly three operations — `logout`, `getSession` (`/auth/me`) and `getMetrics` — the ones that arrive with the `session` and `metricsBearer` schemes. The 401 the demo header path already produces on every other operation stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18 (0.4.0, slice 043). */
+        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029), a missing metrics token, or — in the demo — a missing, malformed or unknown `X-Actor`. Documented on every operation new in 0.3.0 that has a non-empty `security` (Codex on 2779e0b: every status the generic layer produces from a contract property is documented, checked for every operation in `apps/api/src/__tests__/contract.test.ts`). On the 29 operations of 0.2 the 401 stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18 (0.4.0, slice 043) and the reasoned exception in the test helper. */
         Unauthorized: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
@@ -1965,7 +1965,7 @@ export interface components {
                 };
             };
         };
-        /** @description Validation failed */
+        /** @description Validation failed: the request body, a query parameter or a header parameter does not match its contract schema (`validateOperation` in the service), or the body is not valid JSON. Since 0.3.0 documented on every operation with a request body or a parameter that can fail its schema (Codex on 2779e0b), except `listQuestions`, `returnQuestion` and `withdrawQuestion` (review 012 point 18, slice 043). */
         Unprocessable: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
@@ -2135,6 +2135,7 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     registerSpeaker: {
@@ -2410,10 +2411,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["ContributionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     releaseContribution: {
@@ -2435,10 +2438,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["ContributionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listQuestions: {
@@ -2576,6 +2581,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     draftAnswer: {
@@ -2631,6 +2637,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     approveQuestion: {
@@ -2719,6 +2726,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     deliverQuestion: {
@@ -2744,6 +2752,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     closeQuestion: {
@@ -2769,6 +2778,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     withdrawQuestion: {
@@ -2831,6 +2841,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     claimQuestion: {
@@ -2852,10 +2863,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     releaseQuestion: {
@@ -2877,10 +2890,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getStage: {
@@ -2933,6 +2948,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     streamEvents: {
@@ -2962,7 +2978,9 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listMeetings: {
@@ -2986,7 +3004,9 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     createMeeting: {
@@ -3018,6 +3038,7 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
@@ -3046,6 +3067,7 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3072,6 +3094,7 @@ export interface operations {
                     "application/json": components["schemas"]["AgendaItem"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3110,6 +3133,7 @@ export interface operations {
                     "application/json": components["schemas"]["AgendaItem"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3138,10 +3162,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["AgendaItemUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     openVoting: {
@@ -3165,10 +3191,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["AgendaItemUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     closeVoting: {
@@ -3192,10 +3220,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["AgendaItemUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listMeetingUnits: {
@@ -3220,6 +3250,7 @@ export interface operations {
                     "application/json": components["schemas"]["Unit"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3258,6 +3289,7 @@ export interface operations {
                     "application/json": components["schemas"]["Unit"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3287,6 +3319,7 @@ export interface operations {
                     "application/json": components["schemas"]["StageSeat"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3325,6 +3358,7 @@ export interface operations {
                     "application/json": components["schemas"]["StageSeat"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3357,8 +3391,10 @@ export interface operations {
                     "application/json": components["schemas"]["RoleAssignment"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     assignRole: {
@@ -3392,6 +3428,7 @@ export interface operations {
                     "application/json": components["schemas"]["RoleAssignment"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3432,9 +3469,11 @@ export interface operations {
                     "application/json": components["schemas"]["RoleAssignment"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     freezeMeetingConfig: {
@@ -3467,10 +3506,12 @@ export interface operations {
                     "application/json": components["schemas"]["ConfigFreeze"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listMeetingSpeakers: {
@@ -3498,8 +3539,10 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     registerMeetingSpeaker: {
@@ -3533,6 +3576,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3570,6 +3614,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
@@ -3599,6 +3644,7 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3635,6 +3681,7 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -3665,8 +3712,10 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionList"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getMeetingStage: {
@@ -3691,6 +3740,7 @@ export interface operations {
                     "application/json": components["schemas"]["StageView"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -3698,7 +3748,7 @@ export interface operations {
     login: {
         parameters: {
             query?: {
-                /** @description Relative path inside the application to return to after sign-in (open-redirect guard). The service keeps it only when it matches `SameOriginPath` — the same rule the `Location` of `completeLogin` is bound to — and otherwise ignores it (redirect to `/`). Ignored rather than rejected, so a stale bookmark never ends on an error page; the schema therefore keeps only the length limit here. */
+                /** @description Relative path inside the application to return to after sign-in (open-redirect guard). Too long (over 512 characters) → 422, because the length limit protects the service and the state it keeps for the round trip; a foreign target → ignored: the service keeps the value only when it matches `SameOriginPath` — the same rule the `Location` of `completeLogin` is bound to — and otherwise redirects to `/`, so a stale bookmark never ends on an error page (architect's addendum after Codex on 2779e0b). */
                 returnTo?: string;
             };
             header?: never;
@@ -3717,6 +3767,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            422: components["responses"]["Unprocessable"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -3787,6 +3838,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getSession: {
@@ -3966,6 +4018,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
 }
