@@ -1,6 +1,6 @@
 # 010c — Lesezustand je Ladevorgang
 
-**Status:** spec
+**Status:** Nacharbeit Runde 1 erledigt, bereit für Review Runde 2 (Code `5a4f3c5`)
 **Risikoklasse:** niedrig · 0,75 AStd · Lanes: web-speakers, web-capture, web-answers, web-stage, web-history, e2e (eigene
 Datei). Startet nach takt-008 (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -65,22 +65,56 @@ außerhalb der Features.
 
 ## Bericht
 
-**Status:** fertig, bereit für Review. Commits: `08b8f25` (e2e zuerst, rot), `4bf3a0c` (Änderung und
-Unit-Tabellen), dieser Commit (Bericht).
+**Status:** Nacharbeit Runde 1 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
+`7f17174` (Bericht). Runde 1: `5c83da4` (neue und umgedrehte e2e, rot auf `7f17174`), `5a4f3c5` (Änderung,
+letzter Code-Commit), dieser Commit (Screenshot und Bericht).
 
 ```
 Slice: 010c-lesezustand-je-ladevorgang
 Done: Jeder Lesezustand trägt den Schlüssel seines Ladevorgangs (Akteur und version); je Feature
-      loadKey/isCurrentLoad/settledFor/readVerdict mit derselben Unit-Tabelle. Ein Fehler der neuen Rolle
-      hebt "keine Leseberechtigung" auf (Beantwortung, Historie ×3, Bühne), die Erfassungssonde wartet
-      speakers.settled ab, Antworten der vorigen Rolle verfallen; Serverfilter-Toast und takt-008 N1–N3 behoben.
-Evidence: pnpm gates auf 4bf3a0c, Exit 0 (Schluss unten wörtlich); Playwright 59/59, 010c-Datei 16/16
-      (dazu --repeat-each=3: 48/48); roter Lauf vorher 14 rot / 2 grün (unten). Keine Screenshots
-      (docs/evidence nicht in Files allowed).
-Open: siehe "Offen" unten (Daten der vorigen Rolle bis zur ersten Antwort, zwei Toasts in der Historie,
-      geschluckter Detailfehler nach Rollenwechsel mit Filter).
+      loadKey/isCurrentLoad/readVerdict mit derselben Unit-Tabelle, in allen fünf Ansichten benutzt. Eine
+      Verweigerung gehört dem Akteur: ein Fehler der neuen Rolle hebt sie auf, ein Fehler derselben Rolle nicht;
+      Erfassungssonde wartet speakers.settled ab; Antworten der vorigen Rolle verfallen (auch Detailabrufe der
+      Beantwortung); Serverfilter-Toast nur im ersten Ladevorgang nach dem Wechsel; takt-008 N1–N3 behoben.
+Evidence: pnpm gates auf 5a4f3c5, Exit 0 (Schluss unten, einmal, wörtlich); Playwright 66/66, 010c-Datei
+      23/23 (--repeat-each=3: 69/69); rote Läufe: Runde 0 14 rot / 2 grün auf 452e89e, Runde 1 8 rot / 15 grün
+      auf 7f17174 (alle acht neuen bzw. umgedrehten Tests rot); docs/evidence/010c-beantwortung-erster-abruf-500.png.
+Open: siehe "Offen" unten (Daten der vorigen Rolle bis zur ersten Antwort und „Kein Treffer" nach einem
+      ersten 500 → 010d; zwei Toasts in der Historie; Ziel 5 im ersten Ladevorgang nach dem Wechsel).
 Touched: siehe "Touched" unten.
 ```
+
+### Nacharbeit Runde 1 (Befunde 1, 3, 4, 6, 8, 9; Entscheidung des Architekten)
+
+- **Befund 1** (`answers/useBacklog.ts`): `selectedBy` hält Akteur und Ladevorgang. Die Auswahl gilt als
+  „von einem anderen Akteur" nur bis zum Ladevorgang (`version:nonce`), in dem die Liste der neuen Rolle zum
+  ersten Mal geantwortet hat; ab dem nächsten gehört sie der neuen Rolle, und ein echter Fehler der
+  Detailabfrage zeigt wieder einen Toast. Den ganzen Ladevorgang, nicht nur die erste Antwort: eine
+  Filteränderung setzt denselben Ladevorgang im Gate neu (`settleMain`) und hätte den geschluckten
+  maskierten 404 dieses Ladevorgangs sonst doch noch als Toast gezeigt (beim ersten Versuch, nur die erste
+  Antwort zu zählen, wurde „Ziel 5" in `--repeat-each=3` zweimal rot — daher diese Fassung).
+- **Befund 3**: `getQuestion`, `getQuestionHistory` und Einheiten/TOP der Beantwortung mit
+  `requested`/`current()` und `isCurrentLoad`. Zwei e2e mit gehaltener Antwort der vorigen Rolle, in der
+  Lücke übergeben: „Freigeben" verschwindet nicht, `answers-history-forbidden` erscheint nicht.
+- **Befund 4 (nur der neue Bühnenfall, dazu dieselbe Regel überall):** `readVerdict(previous, reads, actorId)`
+  hält das Urteil mit seinem Akteur (`ReadVerdict`). Eine Verweigerung wird ersetzt durch eine Antwort
+  „bereit" oder eine Verweigerung, und durch einen Fehler nur, wenn sich der Akteur geändert hat; ein
+  gewöhnlicher Fehler derselben Rolle (nur neue `version`) lässt sie stehen, der Toast erscheint trotzdem.
+  Mehrere Abrufe (Historie): die Verweigerung bleibt nur, wenn alle scheitern. Angewandt in allen fünf
+  Ansichten über `readVerdict`: Beantwortung, Historie (Hauptabfrage, Zeitleiste, Ereignisstrom),
+  Wortmeldeliste (`useSpeakers` leitet `status` aus dem Urteil ab), Erfassung (das Urteil liest den Abruf,
+  der wirklich gefragt hat: Sonde oder Abruf je Wortmeldung), Bühne (der Akteurwechsel setzt das Urteil
+  weiter im Render zurück). Der bisherige e2e „Bühne — dieselbe Rolle … der Fehler löst die Verweigerung ab"
+  ist umgedreht und als Tabelle über alle fünf Ansichten geführt. „Kein Treffer" nach einem ersten 500 in der
+  Beantwortung bleibt wie vorgegeben für 010d.
+- **Befund 6:** `settledFor` ist nicht mehr exportiert (in `readVerdict` aufgegangen). `readVerdict`,
+  `KeyedRead`, `ReadVerdict`, `NO_VERDICT` werden durch Befund 4 in allen fünf Features benutzt, auch in
+  speakers, stage und capture; darum bleiben sie. Die fünf Kopien (Code und Tabelle) sind weiter
+  byte-gleich (md5 der Blöcke verglichen).
+- **Befund 8:** `docs/evidence/010c-beantwortung-erster-abruf-500.png`, aufgenommen im e2e „Ziel 1"
+  (podium → expert, erste Liste 500): Toast sichtbar, kein „keine Leseberechtigung". Zu sehen ist auch der
+  vorbestehende Leerzustand „Kein Treffer" (Befund 4, Teil Beantwortung, geht an 010d).
+- **Befund 9:** Status-Zeile gesetzt.
 
 ### Das Muster
 
@@ -91,39 +125,40 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
   im Moment der Antwort gebildet (`getActor()` aus dem Akteur-Speicher, `null` nach dem Aufräumen des
   Effekts). Damit verfällt auch eine Antwort, die in der Lücke zwischen Akteurwechsel und `version`-Sprung
   ankommt (dieselbe Regel wie Codex P2-B aus 010b auf der Bühne, jetzt überall).
-- `readVerdict(previous, reads)`: das Urteil „keine Leseberechtigung" ändert sich erst, wenn alle Abrufe,
-  von denen es abhängt, für den aktuellen Schlüssel geantwortet haben; dann ersetzt ihre Antwort es, auch
-  ein gewöhnlicher Fehler. Bis dahin steht das vorige Urteil (kein Flackern, Prinzip 8; so verlangt es
-  schon der 010b-Test „Runde 5 (1)" der Erfassung).
-- Unit-Tabelle (zehn Fälle, in allen fünf `*.test.ts` gleich): gleicher Schlüssel, neuere `version`,
-  anderer Akteur bei gleicher `version`, verlassene Ansicht, keine Kollision, `settledFor`, Fehler löst
-  Verweigerung ab, Verweigerung/Bereit, laufender Ladevorgang lässt das Urteil stehen, mehrere Abrufe.
+- `readVerdict(previous, reads, actorId)`: das Urteil „keine Leseberechtigung" ändert sich erst, wenn alle
+  Abrufe, von denen es abhängt, für den aktuellen Schlüssel geantwortet haben. Bis dahin steht das vorige
+  Urteil (kein Flackern, Prinzip 8; Befund 7 vom Architekten so angenommen). Dann gilt: eine Verweigerung
+  setzt es, „bereit" hebt es auf, ein Fehler hebt es nur auf, wenn das vorige Urteil einem anderen Akteur
+  galt. Ein unverändertes Urteil ist dasselbe Objekt (darf im Render gespeichert werden, ohne Schleife).
+- Unit-Tabelle (zwölf Fälle, in allen fünf `*.test.ts` gleich): gleicher Schlüssel, neuere `version`,
+  anderer Akteur bei gleicher `version`, verlassene Ansicht, keine Kollision, Fehler der neuen Rolle hebt
+  auf, Fehler derselben Rolle hält, Verweigerung/Bereit, laufender Ladevorgang lässt das Urteil stehen,
+  unverändertes Urteil ist dasselbe Objekt, mehrere Abrufe, dieselbe Rolle hält nur bei lauter Fehlern.
 
 ### Je Ziel
 
 1. `answers/useBacklog.ts`: `listRead` (Schlüssel und Status) statt `setListForbidden`; `listForbidden`
-   kommt aus `readVerdict`. Ein 500 setzt `error` und hebt die Verweigerung auf.
+   kommt aus `readVerdict`. Ein 500 der neuen Rolle hebt die Verweigerung auf, einer derselben Rolle nicht.
 2. `history/Page.tsx`: Zeitleiste (Schlüssel mit gewählter Frage), Ereignisstrom und — dieselbe Klasse —
    die Hauptabfrage (`corpus` und Trefferliste, beide müssen geantwortet haben) je mit Schlüssel und
    `readVerdict`. Auch `listSpeakers` (Namen) verwirft Antworten der vorigen Rolle.
 3. `capture`: `useAsync` bildet den Schlüssel mit dem Akteur (`settled` ist im Render direkt nach dem
-   Akteurwechsel falsch), `needsProbe` wartet `speakers.settled` ab. Kein ungefilterter Abruf mehr beim
-   Wechsel von verweigert zu berechtigt (Aufrufzähler im e2e).
-4. **Wortmeldeliste:** die Klasse „Fehler lässt Verweigerung stehen" kommt nicht vor (jede Antwort setzt
-   den Status), wohl aber die Lücke: eine Verweigerung der vorigen Rolle, die zwischen Akteurwechsel und
-   `version`-Sprung ankommt, wurde übernommen (e2e rot). Jetzt `isCurrentLoad`. **Bühne:** nach einem
-   Rollenwechsel kommt die Klasse nicht vor, weil der Akteurwechsel das Urteil schon im Render zurücksetzt
-   (Minor B, Runde 4 von 010b) — der e2e „expert → admin, 500" war vorher schon grün. Gleich behandelt
-   trotzdem: der Schlüssel ersetzt `requestedBy`, die Sonde für „Nur Bühne" verwirft Antworten der vorigen
-   Rolle, und bei derselben Rolle löst ein 500 eine Verweigerung des vorigen Ladevorgangs ab (e2e rot/grün).
+   Akteurwechsel falsch) und gibt `read`/`key` für `readVerdict` heraus; `needsProbe` wartet
+   `speakers.settled` ab. Kein ungefilterter Abruf mehr beim Wechsel von verweigert zu berechtigt.
+4. **Wortmeldeliste:** eine Verweigerung der vorigen Rolle, die zwischen Akteurwechsel und `version`-Sprung
+   ankam, wurde übernommen (e2e rot); jetzt `isCurrentLoad`, und das Urteil kommt aus `readVerdict`.
+   **Bühne:** nach einem Rollenwechsel kam die Klasse nicht vor, weil der Akteurwechsel das Urteil schon im
+   Render zurücksetzt (Minor B, Runde 4 von 010b) — der e2e „expert → admin, 500" war vorher schon grün.
+   Gleich behandelt trotzdem: Schlüssel statt `requestedBy`, die Sonde für „Nur Bühne" verwirft Antworten
+   der vorigen Rolle, das Urteil kommt aus `readVerdict` (bei derselben Rolle bleibt die Verweigerung nach
+   einem 500, Befund 4).
 5. **Serverfilter-Toast — gelöst, nicht offen.** `listOmits` (answers/lib.ts, mit Unit-Tests): eine
-   gefilterte Liste gilt als „lässt die Auswahl aus", wenn die Auswahl von einem anderen Akteur stammt
-   (`selectedBy`, gesetzt beim Wechsel der Auswahl). Begründung: direkt nach einem Rollenwechsel ist eine
-   Auswahl, die die Liste der neuen Rolle nicht enthält, nicht von einer unlesbaren zu unterscheiden (der
-   maskierte 404 ist Absicht, Festlegung 3 von 010); ein Toast dort wäre irreführend. Eine zweite,
+   gefilterte Liste gilt als „lässt die Auswahl aus", wenn die Auswahl von einem anderen Akteur stammt —
+   seit Befund 1 nur im ersten Ladevorgang nach dem Wechsel. Begründung: direkt nach einem Rollenwechsel ist
+   eine Auswahl, die die Liste der neuen Rolle nicht enthält, nicht von einer unlesbaren zu unterscheiden
+   (der maskierte 404 ist Absicht, Festlegung 3 von 010); ein Toast dort wäre irreführend. Eine zweite,
    ungefilterte Liste wäre ein zusätzlicher Vollabruf je `version` nur für diesen Randfall. Ohne
-   Rollenwechsel bleibt alles wie bisher: die Gegenprobe (dieselbe Rolle, Suche ohne die offene Frage,
-   Detail 500) zeigt weiter genau einen Toast.
+   Rollenwechsel bleibt alles wie bisher (Gegenprobe: genau ein Toast).
 6. takt-008 N1–N3:
    - **N1:** Der Fokusmerker hält den Stand, auf dem gedrückt wurde (`QuestionDetail.tsx`: die Frage,
      `Podium.tsx`: die `StageView`). Er wird erst gelöscht, wenn ein danach gelesener Stand gerendert ist
@@ -136,9 +171,12 @@ Je Feature eine lokale Kopie (kein gemeinsamer Ordner, Vorbild `stage/lib.ts`), 
 
 ### Evidence
 
-**`pnpm gates` auf `4bf3a0c`, Exit 0.** `slice-scope: 19 changed file(s), all within
-"docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed" list (3 pattern(s)).` Tests: domain 86,
-web 140, api 57, scripts 206/206. Schluss wörtlich (nur ANSI-Farbcodes entfernt):
+**`pnpm gates` auf `5a4f3c5` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 150, api 57, scripts
+206/206. `slice-scope` meldet dazu eine Warnung, weil der Architekt „Files allowed" nach `452e89e` um
+`docs/evidence/010c-*.png` ergänzt hat (`b85b080`): `slice-scope: warning — "docs/slices/010c-lesezustand-je-ladevorgang.md"'s
+"Files allowed" section differs from its version at the commit that introduced it (452e89e).` und
+`slice-scope: 19 changed file(s), all within "docs/slices/010c-lesezustand-je-ladevorgang.md"'s "Files allowed"
+list (4 pattern(s)).` Schluss wörtlich (nur ANSI-Farbcodes entfernt):
 
 ```
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
@@ -155,7 +193,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-DMvNzZzF.js                        566.36 kB │ gzip: 165.83 kB │ map: 2,329.56 kB
+dist/assets/index-CJsh8hML.js                        568.42 kB │ gzip: 166.22 kB │ map: 2,342.56 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -164,16 +202,34 @@ dist/assets/index-DMvNzZzF.js                        566.36 kB │ gzip: 165.83 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.55s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 4bf3a0c, tree 7fa696723914…
+✓ built in 1.47s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 5a4f3c5, tree 98b3c4098072…
 ```
 
-**Playwright** (eigener Port 4917, Chromium unter `/opt/pw-browsers`):
-- ganze Suite auf dem Baum von `4bf3a0c` (Tree `7fa6967`): `59 passed (5.2m)`, axe in allen Szenarien
-  „0 serious/critical".
-- `e2e/010c-lesezustand.spec.ts`: `16 passed (49.9s)`; mit `--repeat-each=3`: `48 passed (1.8m)`.
+**Playwright** (eigener Port 4977, Chromium unter `/opt/pw-browsers`), auf dem Baum von `5a4f3c5`:
+- ganze Suite: `66 passed (5.2m)`, axe in allen Szenarien „0 serious/critical".
+- `e2e/010c-lesezustand.spec.ts`: `23 passed`; mit `--repeat-each=3`: `69 passed (2.5m)`.
+- Der Screenshot stammt aus dem Lauf der ganzen Suite; alle übrigen PNGs, die die Suite überschreibt,
+  wurden mit `git checkout -- docs/evidence` zurückgesetzt.
 
-**Roter Lauf** der endgültigen e2e-Datei gegen den Code von `452e89e` (`git stash` nur `apps/web/src`):
+**Roter Lauf Runde 1** der e2e-Datei aus `5c83da4` gegen den Code von `7f17174` (`git stash` nur
+`apps/web/src`): `8 failed, 15 passed`, rot sind genau die acht neuen bzw. umgedrehten Tests. Ergebniszeilen
+zusammengezogen wie unten, rechts die Assertion aus demselben Lauf:
+
+```
+  ✘   8 … 010c Befund 4: Beantwortung — dieselbe Rolle, Verweigerung, dann 500 …     answers-forbidden  Expected: visible  (element(s) not found)
+  ✘   9 … 010c Befund 4: Historie — dieselbe Rolle …                                 history-forbidden  Expected: visible  (element(s) not found)
+  ✘  10 … 010c Befund 4: Wortmeldeliste — dieselbe Rolle …                           speakers-forbidden  Expected: visible  (element(s) not found)
+  ✘  11 … 010c Befund 4: Erfassung — dieselbe Rolle …                                capture-forbidden  Expected: visible  (element(s) not found)
+  ✘  12 … 010c Befund 4: Bühne — dieselbe Rolle …                                    stage-forbidden  Expected: visible  (element(s) not found)
+  ✘  15 … 010c Befund 1: Beantwortung — neue Rolle liest die Auswahl, Suche ohne sie, 500   Toasts  Expected: 1  Received: 0
+  ✘  16 … 010c Befund 3: Beantwortung — Einzelfrage der vorigen Rolle …              __saw (answer-approve entfernt)  Expected: false  Received: true
+  ✘  17 … 010c Befund 3: Beantwortung — Verlaufsverweigerung der vorigen Rolle …     __saw (answers-history-forbidden)  Expected: false  Received: true
+  8 failed
+  15 passed
+```
+
+**Roter Lauf Runde 0** (erste Fassung der e2e-Datei) gegen den Code von `452e89e` (`git stash` nur `apps/web/src`):
 `14 failed, 2 passed`. Wörtlich die Ergebniszeilen (Laufzeiten, Stacks und Call-Logs weggelassen):
 
 ```
@@ -184,7 +240,7 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
   ✘   5 … 010c Ziel 3: Erfassung — observer → moderation …                              calls.filter(null)  Expected: []  Received: [null] (ein ungefilterter Abruf)
   ✘   6 … 010c Ziel 4: Wortmeldeliste — Verweigerung der vorigen Rolle …                __sawForbidden  Expected: false  Received: true
   ✓   7 … 010c Ziel 4: Bühne — expert → admin, erster Abruf mit 500 …                   (Klasse kommt nicht vor, siehe Ziel 4)
-  ✘   8 … 010c Ziel 4: Bühne — dieselbe Rolle, Verweigerung, dann 500 …                 stage-forbidden  Expected: 0  Received: 1
+  ✘   8 … 010c Ziel 4: Bühne — dieselbe Rolle, Verweigerung, dann 500 …                 stage-forbidden  Expected: 0  Received: 1  (Test in Runde 1 umgedreht, siehe Befund 4)
   ✘   9 … 010c Ziel 5: Beantwortung — Suche aktiv, Wechsel zu observer …                Toasts  Expected: 0  Received: 1
   ✓  10 … 010c Ziel 5 (Gegenprobe): … dieselbe Rolle, Detail mit 500: der Toast bleibt  (Gegenprobe, soll grün bleiben)
   ✘  11 … 010c Ziel 6 (N1): Beantwortung — nach einem 412 auf "Freigeben" …             Fokus  Expected: "approval-block"  Received: "BODY"
@@ -204,21 +260,14 @@ Administration, Akteur im selben Task gesetzt und zurückgesetzt (die Ansicht si
 
 ### Offen
 
-- **Daten der vorigen Rolle bis zur ersten Antwort** (bereit-Zustand mit `_actions`): Wortmeldeliste,
-  Beantwortung, Historie und Erfassung zeigen nach einem Rollenwechsel die Zeilen der vorigen Rolle, bis
-  die neue Rolle geantwortet hat (die Bühne setzt beim Akteurwechsel zurück). Nicht Ziel dieser Scheibe,
-  die Schreibvorgänge entscheidet weiter der Dienst; nur im Demo erreichbar (in Produktion wechselt der
-  Akteur nicht in der Sitzung). Kandidat für eine Folgescheibe, wenn gewünscht.
-- **Historie, beide Hauptabfragen scheitern:** zwei Toasts (einer je Abruf). Vorher genauso; die
-  Verweigerung hängt jetzt nicht mehr.
-- **Ziel 5, bewusster Preis:** nach einem Rollenwechsel wird auch ein echter Fehler (500) der Detailabfrage
-  einer Auswahl geschluckt, die die gefilterte Liste der neuen Rolle nicht enthält. Das Detail verschwindet
-  trotzdem (die Abfrage scheitert).
-- **Bühne, dieselbe Rolle, 500 nach Verweigerung:** statt „keine Leseberechtigung" steht nun die leere
-  Bühne mit Toast, bis die nächste Antwort kommt (Regel des Musters: nur Zustände des aktuellen
-  Schlüssels). Bei gespeichertem „Nur Bühne" ist das das leere Overlay.
-- Keine Screenshots: `docs/evidence/` steht nicht in Files allowed; die Suite hat vorhandene PNGs
-  überschrieben, sie wurden mit `git checkout -- docs/evidence` zurückgesetzt.
+- **An 010d (Entscheidung des Architekten):** Zeilen und `_actions` der vorigen Rolle bis zur ersten
+  Antwort (Befund 2), „Kein Treffer … Auswahl zurücksetzen" nach einem ersten 500 in der Beantwortung
+  (Befund 4, vorbestehender Teil, auch im Screenshot zu sehen), Ausgang eines älteren Schreibens auf der
+  jetzt gezeigten Frage (Befund 5).
+- **Historie, beide Hauptabfragen scheitern:** zwei Toasts (einer je Abruf), vorher genauso.
+- **Ziel 5, bewusster Preis:** im ersten Ladevorgang nach einem Rollenwechsel wird auch ein echter Fehler
+  (500) der Detailabfrage einer Auswahl geschluckt, die die gefilterte Liste der neuen Rolle nicht enthält.
+  Ab dem nächsten Ladevorgang zeigt er einen Toast (Befund 1).
 
 ### Touched
 
@@ -228,7 +277,8 @@ Administration, Akteur im selben Task gesetzt und zurückgesetzt (die Ansicht si
 - `apps/web/src/features/history/Page.tsx`, `lib.ts`, `lib.test.ts`
 - `apps/web/src/features/speakers/useSpeakers.ts`, `useSpeakers.test.ts`
 - `apps/web/src/features/stage/Page.tsx`, `Podium.tsx`, `lib.ts`, `lib.test.ts`
-- `docs/slices/010c-lesezustand-je-ladevorgang.md` (dieser Bericht)
+- `docs/evidence/010c-beantwortung-erster-abruf-500.png` (neu)
+- `docs/slices/010c-lesezustand-je-ladevorgang.md` (Status und Bericht)
 
 ## Review findings
 
