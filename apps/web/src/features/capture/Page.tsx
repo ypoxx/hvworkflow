@@ -4,12 +4,12 @@
  * covered. Everything runs through `HvApi`; every list refetches on `useApiVersion()`.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, Lock } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
 import { useApiVersion } from '../../api/useApiVersion';
-import { PageHeader, SplitPane, showProblem } from '../../components';
+import { EmptyState, PageHeader, Panel, SplitPane, showProblem } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
@@ -138,12 +138,16 @@ export function CapturePage() {
 
   const { hoveredQuestionId, onHoverQuestion } = useHoveredQuestion();
 
+  // Ziel 1 (slice 010b): `listContributions` is the Hauptabfrage of the Erfassung — recognised by
+  // the 403's ruleId in `useAsync` (AGENTS.md rule 4), never by a role name.
+  const forbidden = contributions.status === 'forbidden';
+
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader
         title={t('page.capture.title')}
         description={t('page.capture.description')}
-        {...(knowsCaptureRight && !canCapture
+        {...(!forbidden && knowsCaptureRight && !canCapture
           ? {
               // m3 (review round 1): the header's own meta slot, next to the title — not a loose
               // line that shifts the split pane below it.
@@ -160,42 +164,55 @@ export function CapturePage() {
           : {})}
       />
 
-      <SplitPane
-        storageKey="hv-capture-split-v1"
-        initial={55}
-        className="min-h-0 flex-1"
-        left={
-          <ContributionPane
-            speakers={speakers.data}
-            speakerId={speakerId}
-            onSelectSpeaker={selectSpeaker}
-            contributions={contributions.data}
-            contribution={contribution}
-            onSelectContribution={setChosenContribution}
-            loading={contributions.status === 'loading'}
-            failed={contributions.status === 'error'}
-            onRetry={contributions.reload}
-            canCapture={canCapture}
-            writing={writing}
-            onWrite={writeContribution}
-            onCaptureQuestions={(items) => void captureQuestions(items)}
-            onOpenSuggest={() => setSuggestOpen(true)}
-            questions={questions.data.items}
-            hoveredQuestionId={hoveredQuestionId}
-            onHoverQuestion={onHoverQuestion}
-          />
-        }
-        right={
-          <QuestionsPane
-            questions={questions.data.items}
-            loading={questions.status === 'loading'}
-            failed={questions.status === 'error'}
-            onProblem={refetch}
-            hoveredQuestionId={hoveredQuestionId}
-            onHoverQuestion={onHoverQuestion}
-          />
-        }
-      />
+      {forbidden ? (
+        <div data-testid="capture-forbidden" className="grid min-h-0 flex-1">
+          <Panel bodyClassName="grid place-items-center">
+            <EmptyState
+              icon={Lock}
+              title={t('capture.forbidden.title')}
+              description={t('capture.forbidden.body')}
+              className="w-full max-w-xl"
+            />
+          </Panel>
+        </div>
+      ) : (
+        <SplitPane
+          storageKey="hv-capture-split-v1"
+          initial={55}
+          className="min-h-0 flex-1"
+          left={
+            <ContributionPane
+              speakers={speakers.data}
+              speakerId={speakerId}
+              onSelectSpeaker={selectSpeaker}
+              contributions={contributions.data}
+              contribution={contribution}
+              onSelectContribution={setChosenContribution}
+              loading={contributions.status === 'loading'}
+              failed={contributions.status === 'error'}
+              onRetry={contributions.reload}
+              canCapture={canCapture}
+              writing={writing}
+              onWrite={writeContribution}
+              onCaptureQuestions={(items) => void captureQuestions(items)}
+              onOpenSuggest={() => setSuggestOpen(true)}
+              questions={questions.data.items}
+              hoveredQuestionId={hoveredQuestionId}
+              onHoverQuestion={onHoverQuestion}
+            />
+          }
+          right={
+            <QuestionsPane
+              questions={questions.data.items}
+              loading={questions.status === 'loading'}
+              failed={questions.status === 'error'}
+              onProblem={refetch}
+              hoveredQuestionId={hoveredQuestionId}
+              onHoverQuestion={onHoverQuestion}
+            />
+          }
+        />
+      )}
 
       {contribution !== undefined && (
         <SuggestDialog
