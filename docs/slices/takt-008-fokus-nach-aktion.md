@@ -51,14 +51,43 @@ Kein neues Token, keine Umgestaltung der Ansichten, keine Änderung an Kern, Ver
 
 ## Bericht
 
+**Status:** Runde 1 nachgearbeitet (Befunde 1–6); bereit für Review Runde 2. Code-Stand `864024c`
+(`33c3fa3` Scheibe, `fbdd56e` Befunde 1–4 und 6, `864024c` Schlüsselzahl im Paritätstest).
+
 ```
 Slice: takt-008-fokus-nach-aktion
 Done: Nach Enter/Leertaste auf capture-submit, capture-free-add, answer-submit-draft, answer-submit-review,
-      answer-approve und stage-next steht der Fokus sichtbar auf einem sinnvollen Element, nie auf BODY;
-      013-bekannt ist umgedreht (013h) und 013b–013e prüfen dasselbe nach echtem Tab-Weg; 013i prüft
-      Doppelauslösung am Ereignislog (genau ein Ereignis je Aktion).
-Evidence: pnpm gates auf Commit 33c3fa3 (Exit 0; slice-scope: "9 changed file(s), all within … Files allowed"):
+      answer-approve und stage-next steht der Fokus sichtbar auf einem sinnvollen Element, nie auf BODY
+      (013h, umgedrehtes 013-bekannt; 013b–013e nach echtem Tab-Weg); Schreibsperren halten bis der neue
+      Stand sichtbar ist, R wirkt auf den Bühnenknöpfen; 013i beweist die Sperren am Ereignislog.
+Evidence: pnpm gates auf Commit 864024c, Exit 0 — slice-scope: "18 changed file(s), all within
+          "docs/slices/takt-008-fokus-nach-aktion.md"'s "Files allowed" list (10 pattern(s))." (plus der
+          erwartete Hinweis, dass Files allowed seit 2fad2f3 ergänzt wurde); Vitest domain 86/86,
+          web 87/87, api 57/57. Tail siehe unten.
+          Playwright (Port 4687, Chromium /opt/pw-browsers) auf dem Code-Stand von fbdd56e (864024c ändert nur
+          den Unit-Test): ganze Suite "43 passed (4.7m)", 013-tastaturpfad.spec.ts "9 passed (2.9m)";
+          axe ohne serious/critical in 013h (Beantwortung mit aria-disabled-Knopf, Bühne nach "Vorgelesen,
+          weiter", Bühne leer).
+          Screenshots, eingecheckt: docs/evidence/takt-008-fokus-entwurf-aria-disabled.png,
+          docs/evidence/takt-008-fokus-nach-freigabe.png, docs/evidence/takt-008-fokus-nach-buehne.png
+          (ef97c5e, Architekt), docs/evidence/takt-008-fokus-buehne-leer.png (fbdd56e).
+Open: 1. stage-next: ein zweiter Druck NACH dem Wechsel zur nächsten Frage liest diese vor — gewollt, ein
+         neues "Vorgelesen, weiter", keine Doppelauslösung. Entprellung wäre eine Produktentscheidung.
+      2. Gleiche Form, nicht Teil der sechs Aktionen, unverändert: answer-stage, answer-assign/return/merge/
+         withdraw und stage-return-submit (`disabled={busy}`), Dialog-Submit-Knöpfe; stage-return
+         (returnAnswer) nutzt weiter das alte `busy` ohne Sperre bis zum neuen Stand.
+      3. capture-submit: bei leerem Entwurf nativ disabled (Opacity), beim Schreiben aria-disabled (Farben).
+      4. Befunde 7 und 8 bleiben laut Architekt wie sie sind.
+Touched: apps/web/src/components/Button.tsx, apps/web/src/features/capture/ContributionPane.tsx,
+         apps/web/src/features/answers/AnswerEditor.tsx, apps/web/src/features/answers/QuestionDetail.tsx,
+         apps/web/src/features/answers/Page.tsx, apps/web/src/features/stage/Podium.tsx,
+         apps/web/src/features/stage/Page.tsx, apps/web/src/i18n/answers.de.ts, apps/web/src/i18n/answers.en.ts,
+         apps/web/src/i18n/stage.de.ts, apps/web/src/i18n/stage.en.ts, apps/web/src/i18n/parity.test.ts,
+         apps/web/e2e/013-tastaturpfad.spec.ts, docs/evidence/takt-008-fokus-buehne-leer.png,
+         docs/slices/takt-008-fokus-nach-aktion.md
 ```
+
+`pnpm gates`, Commit `864024c`, Tail:
 
 ```
 # tests 206
@@ -68,7 +97,7 @@ Evidence: pnpm gates auf Commit 33c3fa3 (Exit 0; slice-scope: "9 changed file(s)
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 8774.714494
+# duration_ms 9170.586939
 
 > @hv/web@0.0.0 build /home/user/wt/takt/apps/web
 > tsc -b && vite build
@@ -84,7 +113,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
-dist/assets/index-D-8rkdaW.js                        563.01 kB │ gzip: 164.88 kB │ map: 2,294.73 kB
+dist/assets/index-tbYHRrES.js                        563.84 kB │ gzip: 165.08 kB │ map: 2,299.84 kB
 
 [plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -93,62 +122,57 @@ dist/assets/index-D-8rkdaW.js                        563.01 kB │ gzip: 164.88 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.38s
-mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 33c3fa3, tree ff2cdc5db47c…
+✓ built in 1.42s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 864024c, tree ff508b140884…
 ```
 
-```
-          Playwright (eigener Port 4687, Chromium /opt/pw-browsers): ganze Suite "43 passed (3.7m)",
-          013-tastaturpfad.spec.ts "9 passed (2.1m)"; axe in 013h (answers mit aria-disabled-Knopf,
-          stage nach "Vorgelesen, weiter") ohne serious/critical.
-          Screenshots (von 013h erzeugt, NICHT committet, siehe Open):
-          docs/evidence/takt-008-fokus-entwurf-aria-disabled.png, docs/evidence/takt-008-fokus-nach-freigabe.png,
-          docs/evidence/takt-008-fokus-nach-buehne.png
-Open: 1. Screenshots nicht committet: docs/evidence/** steht nicht in "Files allowed" dieser Spec, und
-         slice-scope schlägt mit ihnen fehl (Probelauf: "1 file(s) outside … docs/evidence/takt-008-fokus-nach-buehne.png",
-         exit 1). Sie liegen untracked im Worktree; 013h schreibt sie bei jedem Lauf neu. Entscheidung beim
-         Orchestrator (Allowlist um docs/evidence/takt-008-*.png erweitern oder die screenshot()-Aufrufe streichen).
-      2. stage-next: zweimal Enter/Leertaste NACH Abschluss des ersten Schreibens liest die nächste Frage vor —
-         das ist ein zweites "Vorgelesen, weiter", keine Doppelauslösung (vor takt-008 genauso, über die
-         Leertaste auf BODY). Gesperrt ist die Überlappung: 013i löst zweimal im selben Durchlauf der Ereignisschleife aus → genau ein
-         QuestionDelivered. Eine Entprellung für die Bühne wäre eine Produktentscheidung, nicht Teil dieser Spec.
-      3. answer-submit-review/approve: zwischen "busy aus" und dem Nachladen der Frage liegt ein Render-Fenster,
-         in dem der Knopf noch steht; eine zweite Auslösung dort trifft ifMatch mit alter Version → 412 und
-         Stale-Hinweis, kein zweites Ereignis. Im In-Process-Demo nicht per Tastatur erreichbar; mit HTTP-Dienst
-         evtl. sichtbar. Nicht behoben, weil es den Ladepfad von useBacklog berührt.
-      4. Gleiche Form, nicht Teil der sechs Aktionen, unverändert: answer-stage, answer-assign/return/merge/
-         withdraw (disabled={busy}), stage-return-submit, Dialog-Submit-Knöpfe.
-      5. capture-submit bleibt bei leerem Entwurf nativ disabled (Opacity-Look), beim Schreiben aria-disabled
-         (Farb-Look) — zwei gesperrte Looks am selben Knopf, nur für die Dauer des Schreibens sichtbar.
-Touched: apps/web/src/components/Button.tsx, apps/web/src/features/capture/ContributionPane.tsx,
-         apps/web/src/features/answers/AnswerEditor.tsx, apps/web/src/features/answers/QuestionDetail.tsx,
-         apps/web/src/features/answers/Page.tsx, apps/web/src/features/stage/Podium.tsx,
-         apps/web/src/features/stage/Page.tsx, apps/web/e2e/013-tastaturpfad.spec.ts,
-         docs/slices/takt-008-fokus-nach-aktion.md
-```
-
-**Begründung je Stelle** (Ziel 1: aria-disabled oder gezielter Fokus)
+**Fokus je Stelle** (Ziel 1: aria-disabled oder gezielter Fokus)
 
 | Aktion | Lösung | Fokus danach | Warum |
 |---|---|---|---|
-| `capture-submit` | `aria-disabled` während des Schreibens + Ref-Sperre im Handler; gezielter Fokus | `capture-free-input` | Das Formular verschwindet mit dem Schreiben, der Knopf kann den Fokus nicht behalten. Nächster Schritt am Pult ist die erste Einzelfrage; ein zweites Enter im leeren Feld schreibt nichts. Fokus wird per Callback-Ref beim Einhängen des Feldes gesetzt, nur wenn er auf BODY gefallen ist. Die Marke wird *vor* dem Schreiben gesetzt, weil die In-Process-API den neuen Redebeitrag schon innerhalb derselben Promise-Kette zurückliest und das Feld einhängt (erster Versuch danach: Fokus blieb auf BODY). Bei Fehlschlag bleibt der Knopf (aria-disabled hielt den Fokus). |
-| `capture-free-add` | gezielter Fokus, `disabled` bei leerem Feld bleibt | `capture-free-input` | Das Leeren des Feldes sperrt den Knopf; der Fokus wird im selben Handler vorher ins Feld gesetzt, wo die nächste Einzelfrage getippt wird — deckungsgleich mit Enter im Feld. |
-| `answer-submit-draft` | `aria-disabled={busy \|\| empty}` statt `disabled` | der Knopf selbst | Der Knopf bleibt stehen; die Position im Formular ändert sich nicht, ein zweites Enter ist wirkungslos. Der Entwurf wird jetzt beim Rendern (nicht im Effekt) geleert, damit der Render, der `busy` aufhebt, schon den leeren Entwurf trägt — sonst gäbe es einen Frame mit altem Text und freiem Knopf. Kein Fokus auf „Zur Prüfung", weil ein schnelles zweites Enter dort einen Statusschritt auslösen würde. |
-| `answer-submit-review` | `aria-disabled={busy}` + gezielter Fokus | `approval-block` (`tabIndex=-1`) | Der Knopf verschwindet mit dem Schritt (`_actions`). Der Block zeigt das Ergebnis („Legal Clearing"); Screenreader lesen es beim Fokus, ein zweites Enter ändert nichts. Kein Tab-Stopp eigener Art. |
-| `answer-approve` | wie oben | `approval-block` | Zeigt die Freigabe mit Version, Person, Zeit. |
-| `stage-next` | `aria-disabled={busy}` am PodiumButton + Handler-Guard + Ref-Sperre in `deliver` | der Knopf selbst | Der Knopf bleibt stehen und steht danach für die nächste Frage. War es die letzte Frage (Knopf verschwindet), geht der Fokus auf `stage-current` (`tabIndex=-1`, zeigt den Leerzustand). |
+| `capture-submit` | `aria-disabled` beim Schreiben + Ref-Sperre im Handler; gezielter Fokus | `capture-free-input` | Das Formular verschwindet; nächster Schritt ist die erste Einzelfrage, ein zweites Enter im leeren Feld schreibt nichts. Callback-Ref beim Einhängen des Feldes, nur wenn der Fokus auf BODY liegt; die Marke wird *vor* dem Schreiben gesetzt (die In-Process-API liest den Redebeitrag in derselben Promise-Kette zurück), bei Fehlschlag gelöscht. |
+| `capture-free-add` | gezielter Fokus; `disabled` bei leerem Feld bleibt | `capture-free-input` | Der Fokus geht im Handler ins Feld, bevor das Leeren den Knopf sperrt; dort wird die nächste Einzelfrage getippt. |
+| `answer-submit-draft` | `aria-disabled={busy \|\| empty}` | der Knopf selbst | Position bleibt, zweites Enter wirkungslos. Entwurf wird beim Rendern geleert, damit der entsperrende Render schon leer ist. Kein Fokus auf „Zur Prüfung": ein schnelles zweites Enter löste dort einen Statusschritt aus. |
+| `answer-submit-review` | `aria-disabled={busy}` + gezielter Fokus | `approval-block` | Der Knopf geht mit dem Schritt; der Block zeigt das Ergebnis. |
+| `answer-approve` | wie oben | `approval-block` | Zeigt die Freigabe. |
+| `stage-next` | `aria-disabled` am PodiumButton + Sperre in `deliver` | der Knopf selbst; nach der letzten Frage `stage-current` | Der Knopf steht danach für die nächste Frage. |
 
-**Gesperrter Zustand (Ziel 3):** `aria-disabled` wird zentral in `Button.tsx` behandelt (Klick wird geschluckt,
-`preventDefault` auch für Submit) und über vorhandene Tokens gezeigt: `border-line`, `bg-ink-50`, `text-ink-400`,
-`pointer-events-none`. Nicht über `opacity-45` wie `disabled`: Opacity blendet den Fokusring mit aus — gemessen
-~1,9:1 statt 4,9:1 (accent-500 auf sunken), unter den 3:1 eines Fokusindikators. 013h prüft Hintergrund = ink-50 und
-Opacity = 1; axe ohne serious/critical. PodiumButton gleich (Kontrastmodus: ink-50/ink-400/line sind dort umdefiniert).
+**Gesperrter Zustand (Ziel 3):** `Button.tsx` behandelt `aria-disabled` zentral (Klick geschluckt, `preventDefault`
+auch für Submit) und zeigt ihn mit `border-line`, `bg-ink-50`, `text-ink-400`, nicht mit `opacity-45`: Opacity
+blendet den Fokusring mit aus (gemessen ~1,9:1 statt ~4,9:1, unter 3:1). PodiumButton gleich.
 
-**Doppelauslösung (Akzeptanz 2):** 013i zählt Ereignisse im persistierten Log (`hv-demo-events-v1`, entprellt 150 ms,
-daher zwei übereinstimmende Lesungen im Abstand 500 ms): Enter-Enter auf capture-submit, capture-free-add,
-answer-submit-draft, answer-submit-review, answer-approve → je genau +1; zwei Auslösungen im selben Durchlauf der Ereignisschleife auf
-capture-submit und stage-next (vor jedem Re-Render) → je genau +1. Neu: `data-testid="capture-contribution-new"`
-am Knopf „Neuer Redebeitrag" (nur für 013i).
+**Entscheidungen Runde 1**
+
+1. *major, R nach „Vorgelesen, weiter":* Die Bühnenknöpfe tragen `data-podium-key`; der Tastenhandler lässt nur
+   `r`/`R` aus ihnen durch (vor `isInteractiveTarget`). Leertaste nicht: der fokussierte Knopf löst beim Loslassen
+   selbst aus, der Handler würde doppelt vorlesen. Tests: 013e (Leertaste, dann `r` → `stage-return-reason`
+   sichtbar, Escape → Fokus zurück auf `stage-next`), 013h (dasselbe nach Mausklick).
+2. *013i beweist die Sperren:* Zwei Aktivierungen im selben Durchlauf der Ereignisschleife (vor jedem Re-Render)
+   für `answer-submit-draft` (mit Text im Editor), `answer-submit-review` und `answer-approve` (je auf einer weiteren
+   Einzelfrage), dazu ein gesperrter Button (geleerter Editor) per Enter und per Klick: kein Ereignis. Jede Stelle
+   prüft zusätzlich, dass weder Banner „Stand veraltet" noch Problem-Toast erscheint — denn ein zweiter Schreibversuch
+   mit alter Version erzeugt dank ifMatch ohnehin kein zweites Ereignis, nur eine 412; erst der Hinweis macht die
+   Sperre sichtbar. Der eigene Guard in `QuestionDetail`s `onSave` entfällt, Button.tsx ist die eine Stelle.
+   **Gegenprobe (vorübergehend entfernt, danach wiederhergestellt, Prüfungen dafür auf `expect.soft`):**
+   - ohne `writing`-Ref in `answers/Page.tsx`: Entwurfspaar → Banner „Stand veraltet" (412); Prüfungs- und
+     Freigabepaar → je Problem-Toast; alle drei rot.
+   - ohne Klick-Schlucken in `Button.tsx`: Enter-Enter auf dem Entwurfsknopf und der Test „gesperrter Button"
+     → Problem-Toasts (422, leerer Entwurf); rot.
+   - ohne Sperre in `stage/Page.tsx` `deliver`: Bühnenpaar → Problem-Toast (412); rot.
+3. *Sperre bis zum neuen Stand:* Beantwortung sperrt mit `{id, version}` der Einzelfrage, gegen die geschrieben
+   wurde, frei erst im Render, der eine andere Version, eine andere oder keine Einzelfrage zeigt (beim Rendern
+   angepasst), sofort bei Ablehnung. `busy` ist daraus abgeleitet. Bühne ebenso mit `{id, version}` der aktuellen
+   Frage; zusätzlich frei, wenn das Nachladen der Bühne fehlschlägt (sonst hinge sie). Ein Ref hält dieselbe Sperre
+   für zwei Aktivierungen im selben Durchlauf.
+4. *Merker:* `stepTaken` und `nextPressed` werden ausgewertet und gelöscht, wenn `busy` fällt — das ist der Render
+   mit dem neuen Stand (Erfolg: Knopf weg → Fokus auf den Block; Ablehnung: Knopf da → nur löschen). `nextPressed`
+   zusätzlich bei jedem Wechsel von `current?.id`; `QuestionDetail` wird je `question.id` neu eingehängt. Test in
+   013h: Bühne leer vorlesen → `stage-next` weg, Fokus sichtbar auf `stage-current`, axe ok, Screenshot
+   `takt-008-fokus-buehne-leer.png`.
+5. *Bericht:* dieser Abschnitt; Screenshots eingecheckt (siehe Evidence).
+6. *Rollen:* `approval-block` und `stage-current` (beide Varianten) haben `role="group"` und `aria-label` aus neuen
+   Schlüsseln `answers.approval.group` („Stand und Freigabe" / „Status and approval") und `stage.current.group`
+   („Frage auf der Bühne" / „Question on the podium"); Paritätstest 457 → 459. 013h prüft Rolle und Namen.
 
 ## Review findings
 
