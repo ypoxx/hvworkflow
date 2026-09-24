@@ -216,7 +216,7 @@ Registerzeile E13/E14 (Abschnitt 11): Die Scheibe baut BV-verträglich und liefe
 
 ### 6.11 Dokumentation
 - [ ] README und AGENTS.md stimmen mit dem Stand; tragende Entscheidungen stehen als ADR; Kommentare erklären das Warum mit Regel-ID oder ADR.
-- [ ] Betrieb, Administration und Integration haben getrennte Anleitungen; jede wird einmal von einem fremden Modell befolgt.
+- [ ] Betrieb, Administration und Integration haben getrennte Anleitungen; jede wird einmal von einem Agenten in frischem Kontext ohne Vorwissen befolgt.
 
 ### 6.12 Einfachheit
 - [ ] Vorhandene Konzepte vor neuen; eine neue Abstraktion löst mindestens zwei heutige Fälle oder schützt eine Grenze aus 1.3.
