@@ -98,12 +98,14 @@ export function CapturePage() {
    * The verdict changes only once every read it depends on has answered: while the lookup is
    * reloading, `needsProbe` is briefly false and the probe answers "ready" without asking — that
    * must not lift a refusal for a moment and show the desk in between (design principle 8).
+   *
+   * Minor 1 (review round 5): "answered" means answered for the key of this render. Right after
+   * a key changes, a load still reports the status of its previous key (e.g. the probe's "ready"
+   * from `cp:…:false` in the render where the key has just become `cp:…:true`) — that stale status
+   * lifted the refusal for one render on every version jump with latency.
    */
   const verdict = contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
-  const settled =
-    speakers.status !== 'loading' &&
-    contributionsProbe.status !== 'loading' &&
-    contributions.status !== 'loading';
+  const settled = speakers.settled && contributionsProbe.settled && contributions.settled;
   const [forbidden, setForbidden] = useState(false);
   if (settled && forbidden !== verdict) setForbidden(verdict);
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);

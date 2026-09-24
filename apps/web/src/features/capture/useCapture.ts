@@ -29,6 +29,12 @@ export interface AsyncState<T> {
   status: LoadStatus;
   data: T;
   reload: () => void;
+  /**
+   * Minor 1 (review round 5): `status` has answered for the `key` of this very render. Right after
+   * the key changes, `status` still belongs to the previous key until the loading effect has run —
+   * a caller that combines several loads must not read that stale status as the current verdict.
+   */
+  settled: boolean;
 }
 
 /**
@@ -59,9 +65,10 @@ export function isReadForbidden(error: unknown): boolean {
  * one string instead of a dependency list so that the dependency of this hook stays checkable.
  */
 export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string): AsyncState<T> {
-  const [state, setState] = useState<{ status: LoadStatus; data: T }>({
+  const [state, setState] = useState<{ status: LoadStatus; data: T; key: string }>({
     status: 'loading',
     data: fallback,
+    key,
   });
   const [token, setToken] = useState(0);
 
@@ -80,23 +87,23 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
 
   useEffect(() => {
     let cancelled = false;
-    setState((previous) => ({ status: 'loading', data: previous.data }));
+    setState((previous) => ({ status: 'loading', data: previous.data, key }));
     loaderRef
       .current()
       .then((data) => {
-        if (!cancelled) setState({ status: 'ready', data });
+        if (!cancelled) setState({ status: 'ready', data, key });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — and the data resets
           // to the fallback rather than keeping a stale, no-longer-readable list on screen.
-          setState({ status: 'forbidden', data: fallbackRef.current });
+          setState({ status: 'forbidden', data: fallbackRef.current, key });
           return;
         }
         // The language is read at call time: a language switch must not re-run the load.
         showProblem(error, translate(getLang(), 'toast.problem'));
-        setState((previous) => ({ status: 'error', data: previous.data }));
+        setState((previous) => ({ status: 'error', data: previous.data, key }));
       });
     return () => {
       cancelled = true;
@@ -104,5 +111,10 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
   }, [token, key]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
-  return { status: state.status, data: state.data, reload };
+  return {
+    status: state.status,
+    data: state.data,
+    reload,
+    settled: state.key === key && state.status !== 'loading',
+  };
 }
