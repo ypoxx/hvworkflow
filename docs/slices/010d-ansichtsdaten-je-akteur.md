@@ -1,6 +1,6 @@
 # 010d — Ansichtsdaten gehören dem Schlüssel des Akteurs
 
-**Status:** spec
+**Status:** gebaut, Review offen
 **Risikoklasse:** niedrig · 1 AStd · Lanes: web-speakers, web-capture, web-answers, web-history, e2e (eigene Datei).
 Startet nach 010c (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -70,7 +70,202 @@ Keine Änderung an Kern, Vertrag, Dienst, Rechten; kein neues Token; kein gemein
 
 ## Bericht
 
-(vom Implementierer)
+Commits: `7c593f0` (Tests, rot), `74b8cab` (Änderung, **letzter Code-Commit**, Gates), dieser Commit (Bericht).
+
+```
+Slice: 010d-ansichtsdaten-je-akteur
+Done: Daten mit _actions gehören dem Schlüssel des Akteurs: Wortmeldungen, Erfassung, Beantwortung und
+      Historie geben Daten nur dem Akteur ihres Ladevorgangs (keyBelongsTo, je Feature mit derselben
+      Tabelle); bis zur ersten Antwort der neuen Rolle Skelett, keine Knöpfe, Dialoge der vorigen Rolle
+      schließen. Beantwortung: Listenfehler ohne Zeilen → gestalteter Fehlerzustand mit "Erneut
+      versuchen" (2 neue Schlüssel de/en), nie "Kein Treffer". Ausgang eines Schreibens nur, solange
+      seine Frage für denselben Akteur gezeigt wird. Ziel 4/5: Testschärfung und Harness ohne await.
+Evidence: pnpm gates auf 74b8cab, Exit 0 (Schluss unten, einmal, wörtlich); Playwright ganze Suite
+      89/89 (2 Worker) und 89/89 (1 Worker, taskset -c 0,1); 010d-Datei --repeat-each=3
+      zweimal 57/57 und 57/57; roter Lauf der endgültigen 010d-Datei gegen den Code von e303cc1:
+      17 rot / 2 grün (die zwei Gegenproben); axe ohne serious/critical, auch in den Ladezuständen;
+      docs/evidence/010d-beantwortung-ladefehler.png.
+Open: siehe "Offen" unten.
+Touched: siehe "Touched" unten.
+```
+
+### Invarianten je Ansicht
+
+Vor dem Code festgelegt, dann je Invariante unter den Reihenfolgen geprüft, die sie brechen (späte Antwort
+der vorigen Rolle, langsame Liste, zwei Fehler in beiden Reihenfolgen, Auswahlwechsel mitten im Schreiben).
+
+- **Gemeinsam (Muster):** `keyBelongsTo(key, actorId)` — Daten, die unter `key` gelesen wurden, werden nur
+  dessen Akteur angeboten, bei jeder `version` (derselbe Akteur behält seine Daten beim Nachladen, Prinzip 8).
+  Der Akteur wird aus dem ganzen JSON-Schlüssel gelesen (kein Präfixvergleich). Neuer Block direkt nach dem
+  010c-Block in `speakers/useSpeakers.ts`, `capture/useCapture.ts`, `answers/lib.ts`, `history/lib.ts`,
+  byte-gleich (md5 `70cd0bc11de0`), mit derselben Tabelle von fünf Fällen in den vier `*.test.ts` (md5
+  `9da48a348c90`). Die Bühne braucht ihn nicht (sie setzt beim Akteurwechsel im Render zurück, Minor B von
+  010b). Die 010c-Blöcke sind unverändert und in allen fünf Kopien weiter byte-gleich (md5 `dfdb1d7aeb68`).
+  Ein Lesefehler des neuen Akteurs ersetzt Daten eines anderen Akteurs durch leere eigene (sonst stünde
+  „lädt“ bis zum nächsten Ereignis); derselbe Akteur behält seine.
+- **Wortmeldungen:** Zeilen, „Jetzt spricht“, Zeilenknöpfe, Ziehgriffe, „Wortmeldung aufnehmen“ und der
+  Lesehinweis kommen nur aus einer Liste des aktuellen Akteurs; sonst Skelett (oder die stehende
+  Verweigerung aus 010c). „Aufnehmen“ bei leerer Liste nur, wenn diese leere Liste die Antwort dieses Akteurs
+  ist (`status` „ready“), nicht während des Ladens. Die Reihenfolge-Vorschau (`override`) gehört zur Liste,
+  auf der sie gemacht wurde, und fällt im selben Render (vorher Effekt, ein Frame alte Zeilen). Aufnahme- und
+  Verschiebedialog schließen beim Akteurwechsel im selben Render (Vergleich über die `id`).
+- **Erfassung:** `useAsync` hält `dataKey` (wer gelesen hat) getrennt von `key` (was gerade lädt) und gibt
+  Daten nur dem eigenen Akteur, sonst den Fallback mit Status „loading“; damit kommen die Pultrechte
+  (`deskActions`: erfassen, einordnen, Vorschläge, freie Einzelfrage, neuer Redebeitrag, Alt+Q) nie aus
+  `_actions` der vorigen Rolle. Der Vorschlagsdialog schließt beim Akteurwechsel; der Einordnungsdialog
+  schließt mit seiner Frage.
+- **Beantwortung:** Zeilen, Zähler, Einzelfrage mit `_actions` und ihr Verlauf nur aus Ladevorgängen des
+  aktuellen Akteurs; sonst Listenskelett und „Einzelfrage wird geladen …“. Aktionsdialoge und „Stand
+  veraltet“ gehen beim Akteurwechsel. Liste gescheitert (dieser Akteur, aktuelle `version`, nichts lädt)
+  und keine Zeilen → Fehlerzustand `answers-list-error` (EmptyState, TriangleAlert, „Erneut versuchen“ ruft
+  `reload`); die rechte Seite schweigt dann wie bei der Verweigerung statt „Wählen Sie links …“. Ein
+  Fehler derselben Rolle bei vorhandenen Zeilen lässt die Zeilen stehen (Toast wie bisher).
+  **Ausgang eines Schreibens:** wirkt nur, wenn im Moment der Antwort dieselbe Frage für denselben Akteur
+  gezeigt wird (`shown`, nach jedem Commit per `useLayoutEffect` gesetzt): Dialog schließen, Entwurf leeren
+  (`onDone`), „Stand veraltet“. Sonst meldet ein Toast die Ablehnung (auch den 412) — eine Ablehnung bleibt
+  nie unbemerkt; die Erfolgsmeldung nennt den Schritt und steht immer. Den Akteur zusätzlich zur `id` zu
+  vergleichen geht über den Wortlaut von Ziel 3 hinaus: es folgt aus Ziel 1 (der Ausgang gehört dem, der
+  geschrieben hat) und hat einen eigenen e2e.
+- **Historie:** Trefferzeilen, Korpus (und damit die gewählte Frage), Vorgangshistorie, Ereignisstrom und
+  Rednernamen nur aus Ladevorgängen des aktuellen Akteurs; sonst Skelett links und rechts (statt „Keine
+  Einzelfrage gewählt“ oder „Noch keine Ereignisse“). Die Vorgangshistorie gehört außerdem zu ihrer Frage
+  (vorher standen beim Auswahlwechsel kurz die Ereignisse der vorigen Frage unter dem neuen Titel). Der
+  Strom überspringt ein unverändertes Ende nur, wenn dieser Akteur das Fenster gelesen hat (R10 bleibt für
+  gewöhnliche Ereignisse; nach einem Wechsel wird einmal gelesen — im Demo hält nur admin `event.read`, und
+  eine Verweigerung setzte `lastSeq` schon bisher auf 0).
+- **Barrierefreiheit:** Die Skelette der Beantwortung und der Historie trugen `aria-label` auf einem `div`
+  ohne Rolle; axe meldet das als `aria-prohibited-attr` (serious), sichtbar erst jetzt, weil 010d sie nach
+  jedem Rollenwechsel zeigt und die e2e axe im Ladezustand prüfen. Jetzt `role="status"` mit `aria-busy`.
+
+### Je Ziel
+
+1. Ziel 1: siehe Invarianten. e2e (je rot vor der Änderung): Wortmeldeliste moderation → capture mit
+   zurückgehaltener Liste; dieselbe mit erstem 500 (Fehlerzustand statt Zeilen der vorigen Rolle);
+   Aufnahmedialog schließt; Erfassung capture → moderation mit drei zurückgehaltenen Lesevorgängen;
+   Beantwortung legal → expert (Liste, Einzelfrage, Verlauf zurückgehalten); langsame Liste (die Einzelfrage
+   der neuen Rolle erscheint mit deren Schritten, keine Zeile der vorigen); Rückgabedialog schließt;
+   Historie admin → observer (Hauptabfrage und Verlauf zurückgehalten); Ereignisstrom admin → observer.
+2. Ziel 2: e2e erster Abruf 500 (Fehlerzustand, Toast, kein „Kein Treffer“, kein „Keine Einzelfrage
+   gewählt“, Screenshot, axe; „Erneut versuchen“ lädt die Zeilen); Rollenwechsel mit erstem 500; zwei Fehler
+   (Liste und Einzelfrage) in beiden Reihenfolgen → Fehlerzustand, zwei Toasts, nichts der vorigen Rolle;
+   Gegenprobe derselben Rolle (Zeilen bleiben). Neue Schlüssel `answers.list.error.title`/`.body`,
+   Paritätstest 459 → 461.
+3. Ziel 3: e2e 412 auf A nach Wechsel zu B (kein Banner über B, ein Toast „Testfehler“); Erfolg auf A nach
+   Wechsel zu B (Rückgabedialog auf B bleibt offen, Text bleibt); Entwurf auf A gespeichert, Wechsel zu B,
+   A gelingt (Entwurf auf B bleibt); 412 auf A nach Rollenwechsel bei weiter gezeigtem A (kein Banner);
+   Gegenprobe 412 auf der gezeigten Frage (Banner, kein Toast).
+4. Ziel 4: R3-1-e2e prüft zusätzlich `toContainText('Testfehler')` (der Toast ist der 500, nicht der
+   maskierte 404). Unit-Zeile „Liste zuerst“ (404 geschluckt, 500 gezeigt, weiterer Fehler unterdrückt) in
+   `answers/lib.test.ts` und `history/lib.test.ts`, Gate-Testblöcke byte-gleich (md5 `b93f2411b1b0`). Beides
+   ist Testschärfung ohne Verhaltensänderung und war auf dem alten Code schon grün — rot vorher geht hier
+   nicht.
+5. Ziel 5: gewählt ist die erste Variante, keine Begründung: `installHarness` (in beiden Dateien) startet
+   die zwei `import()` in einem synchronen `evaluate` und kehrt sofort zurück; die Importe melden in
+   `__harness` (`loading`/`ready`/`failed: …`), der Test fragt es mit `expect.poll` ab. Kein `evaluate` der
+   beiden Dateien wartet damit mehr auf einen offenen Promise in der Seite; ein gescheiterter Import zeigt
+   sich als eigene Meldung. `unrelatedEvent` verträgt `null`/`undefined`:
+   `(error as { detail?: string } | null)?.detail ?? String(error)`. Hinweis zu Files allowed: die Zeile
+   nennt `010c-lesezustand.spec.ts` „(nur Ziel 4)“, Ziel 5 verweist aber auf `:118` und `:280` derselben
+   Datei; beide Änderungen stehen dort, sonst nichts.
+
+### Evidence
+
+**`pnpm gates` auf `74b8cab` (letzter Code-Commit), Exit 0.** Tests: domain 86, web 181, api 57, scripts
+206/206. `slice-scope: 21 changed file(s), all within "docs/slices/010d-ansichtsdaten-je-akteur.md"'s "Files
+allowed" list (7 pattern(s)).` oxlint: 23 Warnungen, vorher 24 (keine neue). Schluss wörtlich (nur
+ANSI-Farbcodes entfernt):
+
+```
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1715 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-BHYxwywz.css                        40.30 kB │ gzip:   8.71 kB
+dist/assets/index-CfNioku_.js                        571.29 kB │ gzip: 167.11 kB │ map: 2,366.42 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.62s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit 74b8cab, tree 4d6a48298670…
+```
+
+**Playwright** (eigener Port 5593, Chromium unter `/opt/pw-browsers`), Code von `74b8cab`:
+- ganze Suite: `89 passed (6.2m)` (2 Worker, auf dem Baum, der als `74b8cab` eingecheckt wurde) und
+  `89 passed (11.1m)` (1 Worker, `taskset -c 0,1`, wie der CI-Läufer mit 2 CPUs, nach dem Commit); axe in
+  allen Szenarien ohne serious/critical.
+- `e2e/010d-ansichtsdaten.spec.ts` mit `--repeat-each=3`, zwei Läufe: `57 passed (2.4m)` und `57 passed (2.4m)`.
+- Die von den Läufen überschriebenen PNGs anderer Scheiben sind mit `git checkout -- docs/evidence`
+  zurückgesetzt; eingecheckt ist nur `docs/evidence/010d-beantwortung-ladefehler.png`.
+
+**Roter Lauf** der endgültigen e2e-Datei gegen den Code von `e303cc1` (`git stash` nur `apps/web/src`, die
+Unit-Tests aus `7c593f0` blieben): `17 failed, 2 passed (2.6m)`; grün sind genau die zwei Gegenproben.
+Ergebniszeilen, rechts die Assertion aus demselben Lauf:
+
+```
+  ✘   1 Ziel 1: Wortmeldeliste — moderation → capture, Liste zurückgehalten …        speaker-register  Expected: 0  Received: 1
+  ✘   2 Ziel 1: Wortmeldeliste — moderation → capture, erster Abruf mit 500 …        "Die Wortmeldeliste konnte nicht geladen werden"  Expected: visible
+  ✘   3 Ziel 1: Wortmeldeliste — ein Dialog der vorigen Rolle schließt …            speaker-register-name  Expected: 0  Received: 1
+  ✘   4 Ziel 1: Erfassung — capture → moderation, Lesevorgänge zurückgehalten …     capture-contribution-new  Expected: 0  Received: 1
+  ✘   5 Ziel 1: Beantwortung — legal → expert, Liste und Einzelfrage zurückgehalten  answer-return  Expected: 0  Received: 1
+  ✘   6 Ziel 1: Beantwortung — langsame Liste …                                     answers-row  Expected: 0  Received: 18
+  ✘   7 Ziel 1: Beantwortung — ein Dialog der vorigen Rolle schließt …              answer-return-reason  Expected: 0  Received: 1
+  ✘   8 Ziel 1: Historie — admin → observer, Hauptabfrage und Verlauf zurückgehalten history-result  Expected: 0  Received: 200
+  ✘   9 Ziel 1: Historie, Ereignisstrom — admin → observer …                        history-stream  Expected: 0  Received: 1
+  ✘  10 Ziel 2: Beantwortung — erster Abruf mit 500 …                               answers-list-error  Expected: visible
+  ✘  11 Ziel 2: Beantwortung — Rollenwechsel, erster Abruf der neuen Rolle mit 500   answers-list-error  Expected: visible
+  ✘  12 Ziel 2: Beantwortung — … listQuestions scheitert vor getQuestion …           answers-list-error  Expected: visible
+  ✘  13 Ziel 2: Beantwortung — … getQuestion scheitert vor listQuestions …           answers-list-error  Expected: visible
+  ✓  14 Ziel 2 (Gegenprobe): … dieselbe Rolle, die Zeilen bleiben                    (soll grün bleiben)
+  ✘  15 Ziel 3: Beantwortung — 412 auf A nach dem Wechsel zu B …                    stale-banner  Expected: 0  Received: 1
+  ✘  16 Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: Dialog …         answer-return-reason  Expected: visible
+  ✘  17 Ziel 3: Beantwortung — Erfolg eines Entwurfs auf A …                        answer-editor  Expected: "Entwurf zu B, noch nicht gespeichert."  Received: ""
+  ✘  18 Ziel 3: Beantwortung — 412 auf A nach einem Rollenwechsel …                 stale-banner  Expected: 0  Received: 1
+  ✓  19 Ziel 3 (Gegenprobe): … 412 auf der gezeigten Frage: Banner, kein Toast       (soll grün bleiben)
+  17 failed
+  2 passed (2.6m)
+```
+
+(Testtitel gekürzt, Präfix „010d“ weggelassen.) Der erste rote Lauf auf `7c593f0` (vor drei Nachträgen an
+der Testdatei: `failAlways` für den ersten Abruf, axe im Ladezustand, der Wortmeldeliste-500-Test) war
+`16 failed, 2 passed (2.5m)`.
+
+### Offen
+
+- **Bühne, Skelett `stage-deciding`:** dasselbe `aria-label` auf einem `div` ohne Rolle
+  (`stage/Page.tsx:515`), axe `aria-prohibited-attr` (serious), sobald axe im Ladezustand prüft. Außerhalb
+  von Files allowed, nicht geändert.
+- **Historie, Ziel 2 dort nicht verlangt:** ein gescheiterter erster Abruf zeigt links „Kein Treffer“ und im
+  Strom „Noch keine Ereignisse“ (vorher genauso beim ersten Abruf; nach einem Rollenwechsel standen dort
+  vorher die Daten der vorigen Rolle). Ein Fehlerzustand bräuchte neue `history.*`-Schlüssel.
+- **Historie, beide Hauptabfragen scheitern:** zwei Toasts (aus 010c, unverändert).
+- **Eingetippter Text** (Entwurf der Beantwortung, Redebeitrag im Erfassungsformular) ist kein Datum des
+  Servers und hängt nicht am Akteur; der Beantwortungsentwurf geht beim Rollenwechsel mit der Einzelfrage
+  (die Detailansicht wird neu aufgebaut), das Erfassungsformular behält seinen Text.
+
+### Touched
+
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (neu)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (Ziel 4 und 5: R3-1-Toast-Text, `installHarness`, `unrelatedEvent`)
+- `apps/web/src/features/answers/Page.tsx`, `WorkList.tsx`, `lib.ts`, `lib.test.ts`, `useBacklog.ts`
+- `apps/web/src/features/capture/Page.tsx`, `useCapture.ts`, `useCapture.test.ts`
+- `apps/web/src/features/history/Page.tsx`, `lib.ts`, `lib.test.ts`
+- `apps/web/src/features/speakers/Page.tsx`, `useSpeakers.ts`, `useSpeakers.test.ts`
+- `apps/web/src/i18n/answers.de.ts`, `answers.en.ts`, `parity.test.ts` (nur die Schlüsselzahl)
+- `docs/evidence/010d-beantwortung-ladefehler.png` (neu)
+- `docs/slices/010d-ansichtsdaten-je-akteur.md` (Status und Bericht)
 
 ## Review findings
 
