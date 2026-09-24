@@ -393,4 +393,22 @@ Commits: `8b1a020` (Tests), `365b623` (Fix), dieser Commit (Bericht).
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 — Opus 5.5, frischer Kontext, Perspektive Betrieb, auf `68564a2`:** nacharbeiten.
+1 Blocker (Existenzprüfung der Wurzeldatei gegen den Arbeitsbaum, den der Diff selbst erzeugt), 1 Major
+(mehrdeutiger bloßer Name: Wurzel gewinnt still), 2 Minor (zu pauschaler Satz im Bericht; Rückrichtung
+905 → 905b ungetestet), 2 Nit (Zusicherung auf den gelesenen Spec-Dateinamen; Meldungen nennen nur „NNN").
+Alle sechs behoben, siehe Bericht, Abschnitt „Nacharbeit nach Review und Codex“.
+
+**Codex auf PR #27:** P2 (Wurzeldatei gegen den Arbeitsbaum geprüft) = derselbe Grund wie der Blocker, mit ihm
+behoben. Auf `f8f55cd`: „Didn't find any major issues“.
+
+**Runde 2 — Nachprüfung Opus 5.5 auf `f8f55cd`:** annehmen. Blocker, Codex-P2 und Major geprüft mit eigenen
+Wegwerf-Tests (neu angelegte Wurzeldatei → Exit 1, auch CI-artig mit `GITHUB_HEAD_REF`; gelöschte Wurzeldatei
+→ Exit 0; nicht auflösbare Basis → lokal übersprungen, in CI Exit 1). `test:scripts`: `# tests 206 / # pass 206
+/ # fail 0`.
+
+Offen, als Folgepunkt (minor, blockiert nicht): Die Mehrdeutigkeitsprüfung in `extractGlobs` greift nur, wenn
+der exakte Verzeichnispfad existiert. „`apps/web/src/x.ts`, `package.json`“ meint vermutlich
+`apps/web/package.json`; weil `apps/web/src/package.json` nicht existiert, gewinnt still die Wurzel-`package.json`.
+Vorschlag: Warnung, wann immer eine Wurzeldatei eine Verzeichnis-Deutung schlägt, oder `package.json` unter
+`apps/*`/`packages/*` als mehrdeutig behandeln.
