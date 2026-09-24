@@ -269,4 +269,26 @@ der Testdatei: `failAlways` für den ersten Abruf, axe im Ladezustand, der Wortm
 
 ## Review findings
 
-(vom Reviewer)
+Runde 1 (Opus 5.5, frischer Kontext, Perspektive Barrierefreiheit und D9/Regel 4; HEAD `4fdf98f`, Code `74b8cab`):
+Gates exit 0, Playwright 89/89, 010d-Datei 57/57 mit `--repeat-each=3`, axe ohne serious/critical auch in
+Ladezuständen; `keyBelongsTo`-Block und Tabelle in vier Features byte-gleich, 010c-Blöcke unverändert. Ziel 1 per Sonde
+bestätigt (keine Knöpfe der vorigen Rolle, kein Hängen im Skelett). Urteil: nicht mergebereit wegen Befund 1.
+
+1. **major** — Ziel 3: „Stand veraltet“ von A landet über B. Während B lädt, ist `backlog.selected` noch A, also
+   `stillShown()` wahr; der 412 von A setzt `stale`, das Banner erscheint über B (`answers/Page.tsx:94-96, 110-112,
+   129-132, 150`). Sonde: Freigeben auf A gehalten, `getQuestion` gehalten, Klick auf B, 412 → Banner über B.
+2. **minor** — Toast für einen 412 außerhalb der Ansicht ist roher Servertext auf Englisch ohne Fragennummer
+   (`answers/Page.tsx:150-151`); Erfolgstoast nennt die Frage ebenfalls nicht.
+3. **minor, Regression** — Ereignisstrom: ein gescheitertes Lesen des Endes gibt zwei Toasts und zwei Abrufe
+   (`history/Page.tsx:458-463`, Abhängigkeit `streamOwned` `:469`).
+4. **minor (Barrierefreiheit)** — Fokus nach „Erneut versuchen“ fällt auf BODY; nichts wird angesagt
+   (`answers/WorkList.tsx:494-523`).
+5. **nit** — Skelette mit `role="status"` gültig, aber stumm; Historie nutzt `answers.list.loading`.
+6. **nit** — Fehlertext sagt immer „nicht erreichbar“ (`i18n/answers.de.ts:10`, `answers.en.ts:12`).
+
+Entscheidung des Architekten: 1–4 und 6 in dieser Scheibe beheben. 1: Hinweis an seine Frage binden
+(`staleFor === question.id`), e2e für das Fenster „B lädt noch“ (rot auf `74b8cab`). 2: 412 außerhalb der Ansicht mit
+i18n-Text und Fragennummer; Erfolgstoast nennt die Nummer (neue Schlüssel de/en erlaubt). 3: Ereignisstrom ohne
+zweiten Abruf, e2e „Ende immer 500 → genau ein Toast“. 4: Fehlerzustand bleibt während des erneuten Ladens stehen
+oder Fokus geht nach dem Laden auf die Liste; e2e prüft Fokus. 6: neutraler Text. 5 angenommen (Ladezustand wird nicht
+angesagt); eigene `history.*`-Schlüssel folgen mit dem gestalteten Ladefehler der Historie (Folgepunkt).
