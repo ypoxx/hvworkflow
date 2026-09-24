@@ -1318,6 +1318,144 @@ das nicht dem deklarierten `hv_session`-Schema entspricht; an `login` ist gar ke
 braucht die „stille Verlängerung" (ADR 0004) ein deklariertes `Set-Cookie` an der Antwort, die das Cookie erneuert.
 Beides ist gewollt (Vertrag zuerst) und gehört in die Spec von 029.
 
+### Antwort-Abgleich nach Codex auf 2779e0b
+
+Commit `02020fd` (Vertrag, Typen, CHANGELOG, `helpers.ts`, `contract.test.ts`). Grundlage ist der Nachtrag des
+Architekten (Commit `1745fe3`, vor „Files allowed"). Dieser Bericht steht im Folgecommit. **Ursache:** niemand hat die
+deklarierten Antworten einer Operation mit dem abgeglichen, was die generische Schicht des Dienstes erzeugen kann.
+`streamEvents` versprach in `LastEventId` ein 422 und deklarierte nur 200/403. `validateOperation` erzeugt dieses 422,
+und die Vertragsprüfung hätte den legitimen Fehlerweg abgelehnt. **Behebung an der Klasse:** Ableitungstabelle, eine
+Prüfung für jede Operation, Nachtrag aller gefundenen Antworten.
+
+**Ableitung: welcher Status aus welcher Vertragseigenschaft** (gelesen aus `apps/api/src` und
+`packages/domain/src/api.ts`):
+
+| Status | Quelle im Code | Auslösende Vertragseigenschaft | in der Prüfung |
+|---|---|---|---|
+| 422 | `validate.ts:38` (`validateParam`) | ein Query- oder Header-Parameter, dessen Schema einen String ablehnen kann: Typ ≠ string (nicht-numerisches `limit`), `enum`, `pattern`, `minLength`/`maxLength`, `minimum`/`maximum`, `format`, Array mit ablehnbaren Elementen. Ein nacktes `{type: string}` lehnt nie ab | ja |
+| 422 | `validate.ts:48`, `http.ts:17` (kein gültiges JSON) | ein `requestBody` | ja |
+| 401 | `actor.ts:13/19/26`, `app.ts:96` | nicht leere `security` (demoActor, ab 029 `session`, ab 033 `metricsBearer`) | ja |
+| 404 | Domänen-Lookups, `NotFound` | ein Pfadparameter | ja |
+| 412 | `packages/domain/src/api.ts:293` | ein `If-Match`-Parameter | ja |
+| 403 | `can()` in der Domäne; `app.ts:302` (Demo aus) | fachlich (Rechte), nicht aus der Form ableitbar. Heute an jeder Operation mit Akteur dokumentiert außer `getSession` (liest nur die eigene Identität) | nein, Domäne |
+| 409 | Übergangstabelle, Konflikte | fachlich, nicht aus der Form ableitbar | nein, Domäne |
+| 400 | `http.ts:34` (fehlender Pfadparameter) | über das Routing praktisch unerreichbar | nein |
+| 404 | `app.ts:148` (unbekannte Route) | keine Operation, also kein Treffer | nein |
+| 500 | `problem.ts:14` | jede Operation; per Konvention nicht dokumentiert | nein |
+
+Pfadparameter prüft `validateOperation` nicht; ihr Schema erzeugt kein 422, nur das 404 der Domäne.
+
+**Die Prüfung** (`apps/api/src/__tests__/contract.test.ts`, zwei Fälle in einem neuen `describe`):
+- (1) Für **jede** Operation des Vertrags wird die Menge der erzeugbaren Status aus der Tabelle berechnet. Jeder Status
+  muss dokumentiert sein oder in `UNDOCUMENTED_STATUS_EXCEPTIONS` stehen. Die Meldung listet alle Lücken auf einmal.
+- (2) Die Ausnahmeliste nennt nur 0.2-Operationen und nur Status, die der Vertrag nicht dokumentiert. Schließt 043 eine
+  Lücke, muss die Ausnahme also mit heraus.
+
+Die Ausnahmeliste bleibt die eine in `helpers.ts`. Geändert ist nur ihre Form: der Platzhalter `'*': [401]` ist durch
+die ausdrückliche Liste `OPERATIONS_0_2` (die 29 Operationen aus 0.2) ersetzt. Sonst hätte der Platzhalter die 401 der
+neuen Operationen verdeckt, und genau die sollen jetzt dokumentiert sein. Die fünf Lücken aus Review 012 Punkt 18 sind
+inhaltlich unverändert: 401 an allen 0.2-Operationen, 422 an `listQuestions`, `returnQuestion`, `withdrawQuestion`.
+
+**Rot** gegen `1745fe3`: der Vertrag ist dort unverändert gegenüber `2779e0b`, nur der Nachtrag in der Spec kam
+hinzu. Hinzugefügt waren nur die Prüfung und die umgestellte Ausnahmeliste:
+
+```
+ × contract: every status the generic layer can produce is documented or a reasoned exception > no operation lacks a generated status (422/401/404/412) 10ms
+ ✓ contract: every status the generic layer can produce is documented or a reasoned exception > the exception list names only 0.2 operations and only statuses the contract does not document 1ms
+      Tests  1 failed | 9 passed (10)
+   → operations whose contract lacks a status the service can produce:
+listSpeakers: 422 (documents 200, 403, 404)
+claimContribution: 422, 401 (documents 200, 403, 404, 409, 412)
+releaseContribution: 422, 401 (documents 200, 403, 404, 409, 412)
+assignQuestion: 422 (documents 200, 403, 404, 409, 412)
+submitForReview: 422 (documents 200, 403, 404, 409, 412)
+stageQuestion: 422 (documents 200, 403, 404, 409, 412)
+deliverQuestion: 422 (documents 200, 403, 404, 409, 412)
+closeQuestion: 422 (documents 200, 403, 404, 409, 412)
+mergeQuestion: 422 (documents 200, 403, 404, 409, 412)
+claimQuestion: 422, 401 (documents 200, 403, 404, 409, 412)
+releaseQuestion: 422, 401 (documents 200, 403, 404, 409, 412)
+listEvents: 422 (documents 200, 403)
+streamEvents: 422, 401 (documents 200, 403)
+listMeetings: 422, 401 (documents 200, 403)
+createMeeting: 401 (documents 201, 403, 404, 422)
+getMeetingById: 401 (documents 200, 403, 404)
+listMeetingAgendaItems: 401 (documents 200, 403, 404)
+replaceMeetingAgendaItems: 401 (documents 200, 403, 404, 409, 412, 422)
+openAgendaItem: 422, 401 (documents 200, 403, 404, 409, 412)
+openVoting: 422, 401 (documents 200, 403, 404, 409, 412)
+closeVoting: 422, 401 (documents 200, 403, 404, 409, 412)
+listMeetingUnits: 401 (documents 200, 403, 404)
+replaceMeetingUnits: 401 (documents 200, 403, 404, 409, 412, 422)
+listMeetingStageSeats: 401 (documents 200, 403, 404)
+replaceMeetingStageSeats: 401 (documents 200, 403, 404, 409, 412, 422)
+listRoleAssignments: 422, 401 (documents 200, 403, 404)
+assignRole: 401 (documents 201, 403, 404, 409, 422)
+revokeRole: 422, 401 (documents 200, 403, 404, 409)
+freezeMeetingConfig: 422, 401 (documents 200, 403, 404, 409, 412)
+listMeetingSpeakers: 422, 401 (documents 200, 403, 404)
+registerMeetingSpeaker: 401 (documents 201, 403, 404, 409, 422)
+reorderMeetingSpeakers: 401 (documents 200, 403, 404, 422)
+listMeetingContributions: 401 (documents 200, 403, 404)
+captureMeetingContribution: 401 (documents 201, 403, 404, 409, 422)
+listMeetingQuestions: 422, 401 (documents 200, 403, 404)
+getMeetingStage: 401 (documents 200, 403, 404)
+login: 422 (documents 302, 503)
+logout: 422 (documents 204, 401, 403)
+seedDemo: 422 (documents 200, 403)
+```
+
+**Nachgetragen:** 39 Operationen, 53 Antworten, nur `+`-Zeilen an `responses`. Jede Antwort ist ein `$ref` auf die
+geteilten Antworten `Unauthorized` (28 Mal) bzw. `Unprocessable` (25 Mal). Entfernt wurde keine Antwort, und kein
+Anfrageschema wurde geändert; die übrigen Diff-Zeilen sind Beschreibungen. `Unauthorized` beschreibt den neuen
+Geltungsbereich, `Unprocessable` nennt die Ursachen. `login`: „zu lang → 422, fremdes Ziel → ignoriert" (`returnTo`
+behält `maxLength: 512`). `logout`: leeres `X-CSRF-Token` → 422, falsches → 403. **Grün:**
+
+```
+ ✓ contract: every status the generic layer can produce is documented or a reasoned exception > no operation lacks a generated status (422/401/404/412) 4ms
+ ✓ contract: every status the generic layer can produce is documented or a reasoned exception > the exception list names only 0.2 operations and only statuses the contract does not document 1ms
+      Tests  10 passed (10)
+```
+
+**Heutiger Dienst unverändert:** kein Dienstcode ist berührt, kein Anfrageschema, also validiert `validateOperation`
+wie vorher. **Live-Probe** (Wegwerf-Test, danach gelöscht; alle Aufrufe über `req()`, dazu drei der neu
+dokumentierten 422: `GET /v1/events?limit=0`, `GET /v1/speakers?round=0`, `stageQuestion` mit 129 Zeichen
+`Idempotency-Key`):
+
+```
+PROBE seed=200 events=2329 questions=300 histories=300 meeting=200 problems=404,401,403 newly-documented=422,422,422
+ ✓ src/__tests__/zz-live-probe.test.ts > live probe on the seeded service 554ms
+      Tests  1 passed (1)
+```
+
+Dieselbe Probe gegen den alten Vertrag (Stand `1745fe3`, danach zurückgesetzt) scheitert. Das 422 gab es also schon,
+es war nur nicht dokumentiert:
+
+```
+Error: GET /v1/events ("listEvents") returned undocumented status 422 (contract documents: 200, 403). Add a reasoned exception in helpers.ts (UNDOCUMENTED_STATUS_EXCEPTIONS) or fix the contract/service.
+      Tests  1 failed (1)
+```
+
+API-Suite 51/51 (49 + die zwei neuen Fälle), auch mit `CONTRACT_GATE_STRICT=1`. **`contract:lint`:** `You have 5
+warnings.` Die sechste Warnung, „`login` hat kein 4xx", entfiel mit dessen 422; die übrigen fünf sind unverändert,
+der CHANGELOG ist nachgeführt. **`pnpm contract:types`:** zweimal gleiche SHA-256 (`ee1e12e4…`). Typen-Diff: 28 ×
+`401: components["responses"]["Unauthorized"]`, 25 × `422: components["responses"]["Unprocessable"]`, Beschreibungen.
+
+**`pnpm gates`** (Commit `02020fd`, eigenes Log via `mktemp`, Exit 0). Zeilen desselben Laufs: `You have 5 warnings.`;
+`packages/domain Tests 72 passed (72)`; `apps/web Tests 48 passed (48)`; `apps/api Tests 51 passed (51)`;
+`operation-coverage: 65 operations …, 29 exercised by tests, 36 pre-declared` / `ok`; `vocabulary-check: ok`;
+`slice-scope: 10 changed file(s), all within … "Files allowed" list`; `plan-graph: ok.`; `# tests 196`, `# pass 196`,
+`# fail 0`; Ende wörtlich:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.31s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (clean tree) at commit 02020fd, tree f2e65e1fc9c3…
+```
+
+**Für 043:** der Abgleich zählt die fünf Lücken, sobald sie geschlossen werden. Die Ausnahmeprüfung (Fall 2)
+erzwingt, dass die Einträge aus `UNDOCUMENTED_STATUS_EXCEPTIONS` dann mit herausgehen.
+
 ## Review findings
 
 **Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
@@ -1435,3 +1573,17 @@ auf f611116", vollständige Attribut- und Kettenliste):
   `hv_session` je Antwort und lehnt Cookies an Antworten ohne deklariertes `Set-Cookie` ab. Sicherheitsnetz im
   Schema: kein Komma, kein zweites `hv_session=`, kein `Expires` (nur `Max-Age`). Beschreibung: genau ein
   Sitzungscookie je Antwort. Andere Header geprüft (Tabelle). **behoben in b860584**
+
+**Codex auf 2779e0b** (1 × P1), behoben in `02020fd`, nach Rückfrage und Nachtrag des Architekten (`1745fe3`,
+Option 1). Bericht: „Antwort-Abgleich nach Codex auf 2779e0b".
+
+- P1 · `streamEvents` versprach 422 und deklarierte nur 200/403, ebenso `listMeetings`, `listMeetingSpeakers`,
+  `listMeetingQuestions`, `listRoleAssignments`. Die Klasse ist behoben:
+  - Ableitungstabelle Status ← Vertragseigenschaft.
+  - Prüfung für jede Operation in `contract.test.ts`, mit der einen Ausnahmeliste aus `helpers.ts`; `'*'` ist durch
+    `OPERATIONS_0_2` ersetzt.
+  - 53 Antworten an 39 Operationen nachgetragen: 401 an 28 neuen, 422 an 16 neuen und 9 Bestandsoperationen, nur
+    ergänzt.
+  - Die fünf Lücken aus 012/18 bleiben Ausnahmen für 043.
+  - Dienst unverändert (Live-Probe).
+  **behoben in 02020fd**
