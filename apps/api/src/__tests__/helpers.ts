@@ -139,7 +139,7 @@ async function assertMatchesContract(method: string, path: string, res: Response
   assertUnderDeclaredBaseUrl(operationId, method, pathname);
 
   const status = res.status;
-  const contentType = (res.headers.get('content-type') ?? 'application/json').split(';')[0]!.trim();
+  const contentType = (res.headers.get('content-type') ?? 'application/json').split(';')[0]!.trim().toLowerCase();
   const body = await readBodyFor(res, contentType);
 
   if (isExceptedStatus(operationId, status)) {

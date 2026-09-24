@@ -1251,7 +1251,7 @@ components:
     AssignmentId: { name: assignmentId, in: path, required: true, schema: { type: string } }
     MeetingIdFilter: { name: meetingId, in: query, required: false, schema: { type: string }, description: 'Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global' }
     After: { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: 'Last seen global sequence number' }
-    LastEventId: { name: Last-Event-ID, in: header, required: false, schema: { type: string }, description: 'Sent by the browser on reconnect; the same meaning as `after`' }
+    LastEventId: { name: Last-Event-ID, in: header, required: false, schema: { type: string, pattern: '^[0-9]+$' }, description: 'Sent by the browser on reconnect; the same meaning as `after` (a sequence number). A value that is not a non-negative integer is a 422.' }
     RoundFilter: { name: round, in: query, schema: { type: integer, minimum: 1 } }
     SpeakerStatusFilter: { name: status, in: query, schema: { $ref: '#/components/schemas/SpeakerStatus' } }
     SpeakerIdFilter: { name: speakerId, in: query, schema: { type: string } }

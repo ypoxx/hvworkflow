@@ -1908,7 +1908,7 @@ export interface components {
         MeetingIdFilter: string;
         /** @description Last seen global sequence number */
         After: number;
-        /** @description Sent by the browser on reconnect; the same meaning as `after` */
+        /** @description Sent by the browser on reconnect; the same meaning as `after` (a sequence number). A value that is not a non-negative integer is a 422. */
         LastEventId: string;
         RoundFilter: number;
         SpeakerStatusFilter: components["schemas"]["SpeakerStatus"];
@@ -2835,7 +2835,7 @@ export interface operations {
                 meetingId?: components["parameters"]["MeetingIdFilter"];
             };
             header?: {
-                /** @description Sent by the browser on reconnect; the same meaning as `after` */
+                /** @description Sent by the browser on reconnect; the same meaning as `after` (a sequence number). A value that is not a non-negative integer is a 422. */
                 "Last-Event-ID"?: components["parameters"]["LastEventId"];
             };
             path?: never;

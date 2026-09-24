@@ -739,3 +739,9 @@ Probe mit einer Wegwerf-App, die wie die künftigen Handler antwortet (Wegwerf-T
 `× SSE is not buffered 5007ms` (Zeitüberschreitung) und `× metrics text/plain is not JSON-parsed` mit
 `SyntaxError: Unexpected token 'h', "hv_events_total 1`. Nachher: `Tests 51 passed (51)`, und das Tor meldet
 `getMetrics` und `streamEvents` als ausgeübt („overdue“) — sie zählen also, sobald 033 und 035 sie bauen.
+
+**Runde 3 · Nachprüfung Opus 5.5 der Orchestrator-Behebungen · Urteil: annehmen** (2 nits): kein JSON entgeht der
+Prüfung (fehlender Medientyp, Zeichensatz, `problem+json`, falscher Medientyp je geprobt), bestehende Tests
+unverändert (29 ausgeübt), Zählung 16 bestätigt, `propertyNames` von Ajv durchgesetzt. Nits vom Orchestrator
+behoben: `Last-Event-ID` nur als Ziffernfolge, ein falscher Wert ist 422; Medientyp im Testhelfer ohne
+Groß-/Kleinschreibung.
