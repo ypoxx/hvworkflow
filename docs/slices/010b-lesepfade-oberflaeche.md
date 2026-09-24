@@ -1332,3 +1332,25 @@ Filter (Suche, Antwortpfad, Einheit, TOP) kann die Liste nicht sagen, was sie we
   - **Umgang:** angenommen, als Erweiterung der Klasse behoben in `7f76dc9`: `createDetailProblemGate` nimmt `omits(id)` einer vollständigen Liste an; `selectionHidden` blendet die Auswahl in Beantwortung und Historie aus. Zwei e2e „Codex P2-A (948a721)“, rot/grün im Bericht. Offen als Folgearbeit: eine Liste mit aktivem serverseitigem Filter, siehe Bericht.
 - P2-B, `stage/Page.tsx:202`: if the actor changes while `getStage()` is still pending, the old promise can resolve before the version bump and install the previous actor's stage and `_actions`. Tie each request to the actor, or invalidate it synchronously on an actor change. Test with the latency patch.
   - **Umgang:** angenommen, behoben in `e64af10`: jede `getStage`-Antwort ist an `getActor().id` zur Zeit der Anfrage gebunden, und ein Akteurwechsel verwirft den Stand der vorigen Rolle. e2e „Codex P2-B (948a721)“ mit Latenz-Patch (zurückgehaltene Antwort, im selben Task wie der Wechsel freigegeben), rot/grün im Bericht.
+
+### Codex auf `adec621` — Folgepunkte (Stoppregel, Entwicklungsplan Abschnitt 4)
+
+Vierter Codex-Lauf in Folge ohne P0/P1; kein Befund mit Bezug zu Sicherheit, Recht oder Datenschutz (alle vier zeigen
+eher zu wenig als zu viel). Nach der Codex-Stoppregel werden sie Folgepunkte; der Orchestrator entscheidet über den Merge.
+
+Klasse (drei der vier): **ein Verweigerungszustand hängt nicht am Ladevorgang, der ihn erzeugt hat.** Nach einem
+Rollenwechsel von einer verweigerten zu einer berechtigten Rolle bleibt „keine Leseberechtigung" stehen, wenn der erste
+Abruf der neuen Rolle mit einem gewöhnlichen Fehler (Netz, 500) scheitert:
+1. `answers/useBacklog.ts:195` — `listForbidden` bleibt gesetzt.
+2. `history/Page.tsx:281` — `historyForbidden` (Zeitleiste) bleibt gesetzt.
+3. `history/Page.tsx:324` — `streamForbidden` (Ereignisstrom) bleibt gesetzt.
+
+Einzelpunkt:
+4. `capture/Page.tsx:91` — nach einem Schlüsselwechsel kann `speakers.status` noch zum alten Schlüssel gehören;
+   `needsProbe` sollte `speakers.settled` für den aktuellen Schlüssel abwarten (sonst ein unnötiger ungefilterter Abruf
+   beim Wechsel von verweigert zu berechtigt).
+
+Dazu aus Runde 5: Beantwortung mit aktivem Serverfilter und Rollenwechsel zeigt noch einen Fehler-Toast.
+
+**Folgescheibe:** „Lesezustand je Ladevorgang" — Verweigerung und Fehler werden an den Ladevorgang (Schlüssel) gebunden,
+einmal als Muster für alle fünf Ansichten, mit e2e je Ansicht (Latenz- und Fehler-Patch). Spec folgt vom Architekten.
