@@ -58,17 +58,19 @@ describe('isReadForbidden', () => {
   });
 });
 
-/** Codex (b) on 7f542b6, Codex P2-2 on 4f0d231, nit C of review round 4 — the same table in
- *  `answers/lib.test.ts` and `history/lib.test.ts`. */
+/** Codex (b) on 7f542b6, Codex P2-2 on 4f0d231, Codex P2-A on 948a721, nit C of review round 4
+ *  and nit 2 of review round 5 — the same table in `answers/lib.test.ts` and `history/lib.test.ts`. */
 describe('createDetailProblemGate', () => {
   const setup = () => {
     const shown: unknown[] = [];
-    return { shown, gate: createDetailProblemGate((error) => shown.push(error)) };
+    const gate = createDetailProblemGate((error) => shown.push(error));
+    gate.select();
+    return { shown, gate };
   };
 
   it('main refused, detail failed first: nothing shown (masked 404 after a role switch)', () => {
     const { shown, gate } = setup();
-    gate.report('2', '2:q1', { status: 404 });
+    gate.report('2', 'q1', { status: 404 });
     gate.settleMain('2', true);
     expect(shown).toEqual([]);
   });
@@ -76,21 +78,21 @@ describe('createDetailProblemGate', () => {
   it('main refused first, detail failed after: nothing shown', () => {
     const { shown, gate } = setup();
     gate.settleMain('2', true);
-    gate.report('2', '2:q1', { status: 404 });
+    gate.report('2', 'q1', { status: 404 });
     expect(shown).toEqual([]);
   });
 
-  it('main answered, detail failed: shown once, a second failure of the same selection is not', () => {
+  it('main answered, detail failed: shown once, a second failure of the same pass is not', () => {
     const { shown, gate } = setup();
     gate.settleMain('2', false);
-    gate.report('2', '2:q1', 'a');
-    gate.report('2', '2:q1', 'b');
+    gate.report('2', 'q1', 'a');
+    gate.report('2', 'q1', 'b');
     expect(shown).toEqual(['a']);
   });
 
   it('detail failed before main answered (not refused): shown when main answers', () => {
     const { shown, gate } = setup();
-    gate.report('3', '3:q1', 'a');
+    gate.report('3', 'q1', 'a');
     expect(shown).toEqual([]);
     gate.settleMain('3', false);
     expect(shown).toEqual(['a']);
@@ -99,9 +101,28 @@ describe('createDetailProblemGate', () => {
   it('an overtaken load never reports, the next selection still does', () => {
     const { shown, gate } = setup();
     gate.settleMain('1', false);
-    gate.report('2', '2:q1', 'old');
-    gate.report('3', '3:q2', 'new');
+    gate.report('2', 'q1', 'old');
+    gate.select();
+    gate.report('3', 'q2', 'new');
     gate.settleMain('3', false);
     expect(shown).toEqual(['new']);
+  });
+
+  it('A fails (shown), B, then A again fails: shown again — a new pass (nit 2, round 5)', () => {
+    const { shown, gate } = setup();
+    gate.settleMain('1', false);
+    gate.report('1', 'A', 'first');
+    gate.select();
+    gate.select();
+    gate.report('1', 'A', 'second');
+    expect(shown).toEqual(['first', 'second']);
+  });
+
+  it('main answered but leaves the question out (scoped list): nothing shown (Codex P2-A)', () => {
+    const { shown, gate } = setup();
+    gate.report('4', 'q1', { status: 404 });
+    gate.settleMain('4', false, (id) => id === 'q1');
+    gate.report('4', 'q1', { status: 404 });
+    expect(shown).toEqual([]);
   });
 });

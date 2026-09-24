@@ -102,6 +102,10 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const [pool, setPool] = useState<readonly Question[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listForbidden, setListForbidden] = useState(false);
+  // Codex P2-A on 948a721: whether `pool` is the whole of what this actor may read — no
+  // server-side filter, nothing cut off by the limit. Only then does "not in the list" mean "not
+  // readable"; a filtered list says nothing about what it leaves out.
+  const [poolComplete, setPoolComplete] = useState(false);
   const [selected, setSelected] = useState<Question | null>(null);
   // Minor 2 (review round 3), Codex (a) on 7f542b6: the history is stored together with the id of
   // the question it belongs to and handed out only while that question is the one shown — while B
@@ -127,7 +131,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
    *
    * Nit C (review round 4): the detail reads no longer wait for the list to settle — at an event
    * rate above the list's response time that wait never ended. They wait only for a known refusal
-   * (`listForbidden`); only the toast waits for the list's verdict, and a load the next version
+   * (`selectionHidden` below); only the toast waits for the list's verdict, and a load the next version
    * overtakes simply never reports (its successor reads again). Minor 2 (review round 3) holds:
    * one failed selection is one toast, whichever of the two reads reports first.
    */
@@ -161,10 +165,18 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
       })
       .then((page) => {
         if (cancelled) return;
+        const complete =
+          search === '' &&
+          track === ALL &&
+          unitId === ALL &&
+          agendaItemId === ALL &&
+          page.items.length >= page.total;
+        const ids = new Set(page.items.map((question) => question.id));
         setPool(page.items);
+        setPoolComplete(complete);
         setListLoading(false);
         setListForbidden(false);
-        gate.settleMain(`${version}:${nonce}`, false);
+        gate.settleMain(`${version}:${nonce}`, false, complete ? (id) => !ids.has(id) : undefined);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -173,6 +185,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — e.g. podium, who
           // holds neither `question.read` nor `question.read.delivered` at all.
           setPool([]);
+          setPoolComplete(false);
           setListForbidden(true);
           gate.settleMain(`${version}:${nonce}`, true);
           return;
@@ -186,6 +199,21 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     };
   }, [version, nonce, search, track, unitId, agendaItemId, gate]);
 
+  /**
+   * Codex P2-A on 948a721: the selection is hidden — no detail read, no detail, no `_actions` of
+   * the previous actor — while the view cannot show it: the list is refused (podium), or it is the
+   * complete list of this actor and leaves the question out (observer, and a question that has not
+   * been read out). The selection itself is kept, so switching back shows it again.
+   */
+  const selectionHidden =
+    listForbidden ||
+    (selectedId !== null && poolComplete && !pool.some((question) => question.id === selectedId));
+
+  // Nit 2 (review round 5): each change of the selection is a new pass for the gate's one toast.
+  useEffect(() => {
+    gate.select();
+  }, [selectedId, gate]);
+
   // Major (review round 2): the open question and its history used to travel together in one
   // `Promise.all` — a denied `getQuestionHistory` (e.g. observer, no `history.read`) rejected the
   // whole pair and `selected` stayed `null`, so a row click looked like nothing had happened.
@@ -194,7 +222,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   // would not); its history is a fact about that one question, not the Hauptabfrage of this view,
   // and is fetched — and can fail — on its own.
   useEffect(() => {
-    if (selectedId === null || listForbidden) {
+    if (selectedId === null || selectionHidden) {
       setSelected(null);
       setSelectedLoading(false);
       return undefined;
@@ -213,15 +241,15 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         setSelected(null);
         setSelectedLoading(false);
         if (isReadForbidden(error)) return;
-        gate.report(load, `${load}:${selectedId}`, error);
+        gate.report(load, selectedId, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [load, listForbidden, selectedId, gate]);
+  }, [load, selectionHidden, selectedId, gate]);
 
   useEffect(() => {
-    if (selectedId === null || listForbidden) {
+    if (selectedId === null || selectionHidden) {
       setHistory(null);
       return undefined;
     }
@@ -241,12 +269,12 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           return;
         }
         setHistory({ questionId: selectedId, events: [], forbidden: false });
-        gate.report(load, `${load}:${selectedId}`, error);
+        gate.report(load, selectedId, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [load, listForbidden, selectedId, gate]);
+  }, [load, selectionHidden, selectedId, gate]);
 
   // Only the history of the question actually on screen is handed on (minor 2, review round 3).
   const ownHistory = selected !== null && history?.questionId === selected.id ? history : null;

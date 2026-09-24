@@ -111,6 +111,9 @@ export function HistoryPage() {
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
   // `question.read.delivered` and simply sees fewer rows (Ziel 3).
   const [mainForbidden, setMainForbidden] = useState(false);
+  // Codex P2-A on 948a721: whether `corpus` is the whole of what this actor may read (nothing cut
+  // off by the limit) — only then does "not in the corpus" mean "not readable".
+  const [corpusComplete, setCorpusComplete] = useState(false);
   // Ziel 3: the "Vorgangshistorie" tab of one selected question (`getQuestionHistory`).
   const [historyForbidden, setHistoryForbidden] = useState(false);
   // Ziel 3: the "Ereignisstrom" tab (`listEvents`).
@@ -160,14 +163,18 @@ export function HistoryPage() {
       .listQuestions({ limit: 2000 })
       .then((page) => {
         if (cancelled) return;
+        const complete = page.items.length >= page.total;
+        const ids = new Set(page.items.map((question) => question.id));
         setCorpus(page.items);
+        setCorpusComplete(complete);
         setMainForbidden(false);
-        gate.settleMain(String(version), false);
+        gate.settleMain(String(version), false, complete ? (id) => !ids.has(id) : undefined);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (isReadForbidden(error)) {
           setCorpus([]);
+          setCorpusComplete(false);
           setMainForbidden(true);
           gate.settleMain(String(version), true);
           return;
@@ -232,8 +239,22 @@ export function HistoryPage() {
     };
   }, [version, search]);
 
+  /**
+   * Codex P2-A on 948a721: no history read while the view cannot show the selection — the whole
+   * view is refused (podium), or the complete corpus of this actor leaves the question out
+   * (observer, and a question that has not been read out).
+   */
+  const selectionHidden =
+    mainForbidden ||
+    (selectedId !== null && corpusComplete && !corpus.some((question) => question.id === selectedId));
+
+  // Nit 2 (review round 5): each change of the selection is a new pass for the gate's one toast.
   useEffect(() => {
-    if (selectedId === null || mainForbidden) {
+    gate.select();
+  }, [selectedId, gate]);
+
+  useEffect(() => {
+    if (selectedId === null || selectionHidden) {
       setHistory([]);
       setHistoryForbidden(false);
       return undefined;
@@ -256,12 +277,13 @@ export function HistoryPage() {
           setHistoryForbidden(true);
           return;
         }
-        gate.report(load, `${load}:${selectedId}`, error);
+        setHistory([]);
+        gate.report(load, selectedId, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, selectedId, mainForbidden, gate]);
+  }, [version, selectedId, selectionHidden, gate]);
 
   useEffect(() => {
     if (tab !== 'stream') return undefined;
