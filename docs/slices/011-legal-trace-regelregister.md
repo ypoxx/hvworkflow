@@ -1018,7 +1018,36 @@ nichts aus. `docs/legal-trace.md` nur über `npx vitest run -u` erzeugt („Snap
     in Abschnitt 11 belegt, nicht in einem `legalRef` — es gibt keine Regel-ID, an der sie hängen. Entscheidung
     offen, ob dafür eine eigene Regel-ID ins Register gehört (das wäre eine Änderung über Festlegung 1 hinaus).
 
-`pnpm gates`: siehe unten.
+`pnpm -C /home/user/wt/011 gates` auf dem committeten Stand `94db590` (sauberer Baum), eigene Logdatei über
+`mktemp`, Exit 0. Wörtliche Zeilen aus dem Lauf (Testsummen, Tore, Ende; Vite-Hinweise zu Sourcemap und
+Chunkgröße weggelassen):
+
+```
+packages/domain test:  Test Files  6 passed (6)
+packages/domain test:       Tests  85 passed (85)
+apps/api test:  Test Files  6 passed (6)
+apps/api test:       Tests  55 passed (55)
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  48 passed (48)
+vocabulary-check: ok
+x 7 dependency violations (0 errors, 7 warnings). 139 modules, 505 dependencies cruised.
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+Downgrade check: 14 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+...
+# pass 196
+# fail 0
+...
+✓ 1715 modules transformed.
+dist/assets/index-DAY79I4w.js                        551.56 kB │ gzip: 162.02 kB │ map: 2,226.00 kB
+✓ built in 1.27s
+mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) at commit 94db590, tree 760e1d1107d4…
+```
+
+Kein `FAIL`/`not ok` im Lauf (`grep`); `arch`: dieselben sieben vorbestehenden Warnungen. Dieser Absatz kam in
+einem reinen `docs/`-Commit danach dazu.
 
 ## Review findings
 
