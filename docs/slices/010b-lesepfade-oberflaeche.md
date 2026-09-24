@@ -825,6 +825,210 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
 - `apps/web/e2e/010b-lesepfade.spec.ts` (sieben neue Szenarien, Helfer)
 - `docs/slices/010b-lesepfade-oberflaeche.md` (Befunde und dieser Bericht)
 
+## Nacharbeit Runde 4
+
+Runde 4: Nachprüfung auf 4f0d231 (Urteil „annehmen“, 2 Minor, 2 Nits), dazu Codex auf 4f0d231
+(zwei P2). Befunde und Umgang stehen unter „Review findings“. Zuerst kamen die Tests (Commit
+`9eb3c76`), dann die Fixes:
+
+| Punkt | Commit |
+|---|---|
+| **Codex P2-1** (Erfassung: Probe vor der Wortmeldungs-Abfrage) | `a3ae45d` |
+| **Codex P2-2** (Historie: maskierter 404 als Toast), als Klasse behoben, zusammen mit Nit C | `8cbc85d` |
+| Runde 4 A und B (Bühne) | `0953c18` |
+| Nit D (Doc-Kommentar der e2e-Datei) | `9eb3c76` |
+| Bericht | dieser Commit |
+
+**Codex P2-2 als Klasse.** Der Fehler entsteht so: neben der Hauptabfrage einer Ansicht läuft eine
+Detailabfrage zu einer gewählten ID. Nach einem Rollenwechsel verweigert die Hauptabfrage mit
+R-PERM-02, die Detailabfrage bekommt aber den maskierten 404 (Festlegung 3 von Scheibe 010). Den
+behandelt `isReadForbidden` zu Recht nicht als Leseverweigerung, also wurde er zum Toast.
+
+Geprüft habe ich jeden Leseaufruf der fünf Features:
+
+| Feature | Aufrufe | Befund |
+|---|---|---|
+| Wortmeldeliste | nur `listSpeakers` (Hauptabfrage) | keine Detailabfrage, nichts zu schützen |
+| Erfassung | `listSpeakers`, `listContributions` (Hauptabfrage und Probe), `listQuestions({ contributionId })`, `listQuestions({ limit: 1 })` | nur Listen; sie antworten nie mit 404, eine Verweigerung ist immer 403 R-PERM-02/03 und wird in `useAsync` zum Zustand, nicht zum Toast |
+| Beantwortung | `listQuestions` (Hauptabfrage), `getQuestion` und `getQuestionHistory` (Details), `listUnits`/`listAgendaItems` (Stammdaten, nie verweigert); `listQuestions({ q })` in `Page.tsx` löst nur die Nummer im Zusammenführen-Dialog auf (Nutzeraktion) | **betroffen**, jetzt geschützt |
+| Bühne | `getStage` (Hauptabfrage), `listQuestions({ limit: 1 })` (Probe, deren `catch` still ist) | keine Detailabfrage |
+| Historie | `listQuestions` ×2 (Hauptabfrage), `getQuestionHistory` (Detail), `listSpeakers` (Nebenabfrage, eigene Verweigerung), `listEvents` (eigene Hauptabfrage des Reiters, 403 statt 404), Stammdaten | **betroffen**, jetzt geschützt |
+
+Die Muster in `packages/domain/src/api.ts` bestätigen das: 404 werfen nur `getQuestion`,
+`getQuestionHistory` und `get*`-Einzelabrufe; `listSpeakers`, `listContributions`,
+`listQuestions` und `getStage` werfen nur 403.
+
+Das eine lokale Muster ist `createDetailProblemGate`, je eine Kopie in `answers/lib.ts` und
+`history/lib.ts`. Beide Kopien haben dieselbe Testtabelle mit 5 Fällen in `lib.test.ts`. So
+arbeitet es:
+- Der Fehler einer Detailabfrage wird zurückgehalten, bis die Hauptabfrage desselben Ladevorgangs
+  geantwortet hat.
+- War sie verweigert, verfällt der Fehler. Sonst erscheint er, einmal je Auswahl (Runde 3,
+  Befund 2).
+- Nit C: die Detailabfragen selbst warten nicht mehr auf die Liste. Das alte `detailGate` wurde bei
+  hoher Ereignisrate nie fertig. Die Abfragen stoppen nur bei einer bekannten Verweigerung
+  (`listForbidden` bzw. `mainForbidden`). Ein Ladevorgang, den der nächste überholt, meldet nie;
+  sein Nachfolger liest ohnehin neu.
+
+**Codex P2-1** (`capture/Page.tsx`):
+- Die Probe läuft erst, wenn die Wortmeldungs-Abfrage geantwortet hat und keine Wortmeldung
+  ergab (verweigert, gescheitert oder leer).
+- Weil die Probe dabei während eines Nachladens kurz „ready“ antwortet, ändert sich der Zustand
+  „keine Leseberechtigung“ erst, wenn alle drei Abfragen geantwortet haben. Sonst würde der
+  Schreibtisch kurz aufblitzen (Prinzip 8).
+
+**A** (`stage/Page.tsx`): scheitert `getStage` mit etwas anderem als einer Leseverweigerung, bekommt
+`stageRef` den noch angezeigten Stand zurück (`shownRef`). Jeden Schreibvorgang entscheidet
+weiterhin der Dienst.
+
+**B** (`stage/Page.tsx`):
+- Ein Akteurwechsel setzt `loading` zurück; bis zur ersten Antwort steht das Skelett
+  `stage-deciding`. Bei einem gewöhnlichen Ereignis passiert das nicht.
+- Das geschieht beim Rendern, nicht erst in einem Effekt; so wird kein Frame des alten Overlays
+  gezeichnet.
+- Der Akteur wird über `useActor()` erkannt und nach Identität verglichen, nie nach Rollenname
+  (Regel 4).
+- Bekannte Randlücke: eine noch laufende `getStage`-Antwort der vorigen `version` könnte in der
+  Lücke zwischen Akteurwechsel und `version`-Sprung ankommen. Im In-Process-Betrieb ist das nicht
+  zu beobachten.
+
+**Roter Lauf** auf den neuen Tests mit dem Code von 4f0d231
+(`E2E_PORT=4391 npx playwright test e2e/010b-lesepfade.spec.ts --grep "4f0d231|Runde 4"
+--reporter=list`). Weggelassen sind Leerzeilen sowie Call-Log-, Trace- und Error-Context-Zeilen;
+sonst ist der Text wörtlich:
+
+```
+Running 4 tests using 1 worker
+  ✘  1 [chromium] › e2e/010b-lesepfade.spec.ts:680:1 › Codex P2-1 (4f0d231): Erfassung fragt vom ersten Aufruf an nicht ungefiltert, wenn es Wortmeldungen gibt (2.2s)
+  ✘  2 [chromium] › e2e/010b-lesepfade.spec.ts:718:1 › Codex P2-2 (4f0d231): Historie — Rollenwechsel ohne Leserecht bei gewählter Frage bringt keinen Toast (7.5s)
+  ✘  3 [chromium] › e2e/010b-lesepfade.spec.ts:738:1 › Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, weiter" auf die angezeigte Frage (7.3s)
+  ✘  4 [chromium] › e2e/010b-lesepfade.spec.ts:778:1 › Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle (6.9s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:680:1 › Codex P2-1 (4f0d231): Erfassung fragt vom ersten Aufruf an nicht ungefiltert, wenn es Wortmeldungen gibt 
+    Error: expect(received).toEqual(expected) // deep equality
+    - Expected  - 1
+    + Received  + 5
+    - Array []
+    + Array [
+    +   null,
+    +   null,
+    +   null,
+    + ]
+    > 714 |   expect(calls.filter((call) => call === null)).toEqual([]);
+          |                                                 ^
+  2) [chromium] › e2e/010b-lesepfade.spec.ts:718:1 › Codex P2-2 (4f0d231): Historie — Rollenwechsel ohne Leserecht bei gewählter Frage bringt keinen Toast 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  locator('[aria-live="polite"] [role="status"]')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+        at expectNoErrorToast (/home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:77:70)
+        at /home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:735:3
+  3) [chromium] › e2e/010b-lesepfade.spec.ts:738:1 › Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, weiter" auf die angezeigte Frage 
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: 1
+    Received: 0
+    - Timeout 5000ms exceeded while waiting on the predicate
+    > 775 |   await expect.poll(() => page.evaluate(() => (window as unknown as Probe).__calls.length)).toBe(1);
+          |                                                                                             ^
+  4) [chromium] › e2e/010b-lesepfade.spec.ts:778:1 › Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle 
+    Error: expect(locator).toBeVisible() failed
+    Locator: getByTestId('stage-deciding')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+    > 811 |   await expect(page.getByTestId('stage-deciding')).toBeVisible();
+          |                                                    ^
+  4 failed
+```
+
+**Grüner Lauf** nach den Fixes, derselbe Befehl, wörtlich:
+
+```
+Running 4 tests using 1 worker
+  ✓  1 [chromium] › e2e/010b-lesepfade.spec.ts:680:1 › Codex P2-1 (4f0d231): Erfassung fragt vom ersten Aufruf an nicht ungefiltert, wenn es Wortmeldungen gibt (2.1s)
+  ✓  2 [chromium] › e2e/010b-lesepfade.spec.ts:718:1 › Codex P2-2 (4f0d231): Historie — Rollenwechsel ohne Leserecht bei gewählter Frage bringt keinen Toast (2.4s)
+  ✓  3 [chromium] › e2e/010b-lesepfade.spec.ts:738:1 › Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, weiter" auf die angezeigte Frage (1.9s)
+  ✓  4 [chromium] › e2e/010b-lesepfade.spec.ts:778:1 › Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle (3.7s)
+  4 passed (12.5s)
+```
+
+Nit C hat keinen eigenen e2e-Test: eine Ereignisrate über der Antwortzeit der Liste lässt sich im
+In-Process-Betrieb nicht zuverlässig erzeugen. Belegt ist er über die Unit-Tabelle von
+`createDetailProblemGate`; der Fall „ein überholter Ladevorgang meldet nie, die nächste Auswahl
+schon“ gehört dazu. Die e2e-Tests aus Runde 3 zu Codex (a) und (b) bleiben grün.
+
+**Ganze Playwright-Suite** auf Commit `0953c18` (`E2E_PORT=4391 npx playwright test
+--reporter=list`, Chromium unter `/opt/pw-browsers`):
+- 37 passed (3.5m), exit 0.
+- Alle 90 axe-Zeilen melden 0 serious/critical.
+- Danach `git checkout -- docs/evidence`.
+
+```
+  37 passed (3.5m)
+```
+
+**`pnpm -C /home/user/wt/010b gates`** auf Commit `0953c18`, exit 0, Log über `mktemp`. Das Ende
+steht wörtlich da, nur die ANSI-Farbcodes sind entfernt:
+
+```
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7045.326793
+
+> @hv/web@0.0.0 build /home/user/wt/010b/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-CdF10d4X.js                        540.03 kB │ gzip: 157.68 kB │ map: 2,251.17 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.27s
+mark-test-run: wrote /home/user/wt/010b/.claude/state/last-test-run (clean tree) at commit 0953c18, tree 0c25e40ab577…
+```
+
+Im selben Lauf:
+- `vocabulary-check: ok`.
+- `i18n-literal check: 0 literals found`.
+- `role-literals` grün.
+- `arch`: dieselben 7 vorbestehenden Warnungen, 0 Fehler.
+- `oxlint`: 25 Warnungen, unverändert.
+- Tests: `packages/domain` 72/72, `apps/web` 83/83 (10 neue Gate-Fälle), `apps/api` 49/49.
+- `slice-scope --slice 010b` explizit aufgerufen:
+
+```
+slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflaeche.md"'s "Files allowed" list (19 pattern(s)).
+```
+
+**Touched (Runde 4):**
+- `apps/web/src/features/capture/Page.tsx`
+- `apps/web/src/features/answers/useBacklog.ts`, `lib.ts`, `lib.test.ts`
+- `apps/web/src/features/history/Page.tsx`, `lib.ts`, `lib.test.ts`
+- `apps/web/src/features/stage/Page.tsx`
+- `apps/web/e2e/010b-lesepfade.spec.ts`
+- `docs/slices/010b-lesepfade-oberflaeche.md`
+
 ## Review findings
 
 (vom Reviewer)
@@ -875,17 +1079,17 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
 ### Runde 4 — Nachprüfung auf 4f0d231: annehmen
 
 - A (minor), `stage/Page.tsx:191` together with :213/:288/:314/:352: if `getStage` fails with a non-403 error, `stageRef` stays null, and "Vorgelesen, weiter" (button and space/R) silently does nothing until the next event. Fix it by storing `stage` with its `version` and acting only when they match, or by resetting the ref to the visible stage in the error branch. Test with a 500 through your `page.evaluate` patch.
-  - **Umgang:** UMGANG4A
+  - **Umgang:** angenommen, behoben in `0953c18` (zweite Variante): im Fehlerzweig bekommt `stageRef` den angezeigten Stand zurück. e2e „Runde 4 (A)“ mit einem 500 über den `page.evaluate`-Patch, rot/grün im Bericht „Nacharbeit Runde 4“.
 - B (minor), `stage/Page.tsx:485`: when the role changes on an open page while the podium overlay is shown, the previous role's overlay is visible for one response time. Preferred fix: set `loading` again on an actor change (not on every event). Otherwise add an "Offen" line with the reason.
-  - **Umgang:** UMGANG4B
+  - **Umgang:** angenommen, behoben in `0953c18` (bevorzugte Variante): ein Akteurwechsel setzt `loading` zurück, ein gewöhnliches Ereignis nicht. Der Akteur wird nach Identität verglichen, nicht nach Rollenname. e2e „Runde 4 (B)“, rot/grün im Bericht.
 - C (nit), `answers/useBacklog.ts:186/213/241`: if the event rate is higher than the list's response time, `detailGate` never settles. Wait only for the "refused" outcome, or for the first response after an actor change; at the very least add a comment. Consider this together with Codex P2-2, since it is the same gate.
-  - **Umgang:** UMGANG4C
+  - **Umgang:** angenommen, behoben in `8cbc85d` zusammen mit Codex P2-2: `detailGate` ist entfallen. Die Detailabfragen warten nur noch auf eine bekannte Verweigerung; auf das Urteil der Liste wartet nur der Toast (`createDetailProblemGate`). Belegt über die Unit-Tabelle; ein e2e ist im In-Process-Betrieb nicht zuverlässig herzustellen.
 - D (nit), in the doc comment of the e2e file (e2e/010b-lesepfade.spec.ts:95): "Patch nur gegen `vite` dev, nicht gegen einen Build; eigener Port je Worktree."
-  - **Umgang:** UMGANG4D
+  - **Umgang:** angenommen, in `9eb3c76` wörtlich übernommen, mit einer Begründung.
 
 ### Codex auf 4f0d231
 
 - P2-1, `capture/Page.tsx:85`: on a fresh /capture visit without `?speaker`, `speakerId` is null at first render, so the probe loads the whole corpus before `listSpeakers` sets `fallbackSpeaker`. Wait with the probe until the speaker lookup has settled without producing a speaker. The round-3 test clears the call log too late to catch this; test from the very first call.
-  - **Umgang:** UMGANGP1
+  - **Umgang:** angenommen, behoben in `a3ae45d`: die Probe läuft erst, wenn die Wortmeldungs-Abfrage geantwortet hat und keine Wortmeldung ergab. Das e2e „Codex P2-1 (4f0d231)“ zeichnet vom ersten Aufruf an auf, rot/grün im Bericht.
 - P2-2, `history/Page.tsx:243`: select a question, then switch to podium. The list is refused, but `getQuestionHistory` gets the masked 404 and raises a toast over `history-forbidden`. The same class as Codex (b) in answers: fix the class at its root — every place in the five features where a detail request runs next to a list or main request that can be refused, gated the same way, preferably through one small local pattern per feature. Test first: history with a question selected, switch to podium, then `expectNoErrorToast` plus `history-forbidden`.
-  - **Umgang:** UMGANGP2
+  - **Umgang:** angenommen, als Klasse behoben in `8cbc85d`: `createDetailProblemGate` je Feature mit Detailabfrage (Beantwortung, Historie). Die Liste der geprüften Stellen in allen fünf Features steht im Bericht „Nacharbeit Runde 4“. e2e „Codex P2-2 (4f0d231)“, rot/grün im Bericht.
