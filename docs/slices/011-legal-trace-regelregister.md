@@ -477,6 +477,144 @@ abgewichen):
 3. Merge reversibel mit Ähnlichkeitsscore (Recherche:147) — keine Scheibe benannt; zur Einordnung.
 4. Zuweisung an Personen statt Einheiten (Recherche:221) — keine Scheibe benannt; zur Einordnung.
 
+### 9. Wirkungen je Regel (Festlegung 6)
+
+Vierter Codex-Lauf: eine Regel-Zeile kann mehrere Wirkungen haben (Stand, Feld, Folge, Verweigerung), und
+ein Zitat, das nur eine davon trägt, ist trotzdem unvollständig. Für jede der 22 Regeln steht unten jede
+Wirkung aus dem Code (Übergangszeile, `build()` in `api.ts`, Guard, `can()`/`permissions.ts`) mit ihrer
+Fundstelle oder „nicht belegt“. Eine Verweigerung, die als eigene Regel-ID zurückkommt (Guard, R-TRANS-00,
+R-PERM-01..03), ist dort selbst aufgeführt, nicht noch einmal bei der Zeile, die sie auslöst. Ein
+Protokollfeld, das nur den Wechsel selbst hält (`fromStatus`/`toStatus` bei R-TRANS-06), ist die
+Ereignisprotokoll-Pflicht selbst (AGENTS.md R7, Events sind Anhänge) und deshalb nicht gesondert
+aufgeführt.
+
+| Regel-ID | Wirkung | Fundstelle oder „nicht belegt" |
+|---|---|---|
+| R-TRANS-01 | Stand → `classified` | `docs/ist-analyse-und-schnittstellen.md:42-43` „Frage klassifizieren → Zuordnung zu Pfad A, B oder C" |
+| R-TRANS-01 | Feld `track` | dieselbe Stelle |
+| R-TRANS-01 | Feld `agendaItemId` (Tagesordnungspunkt) | `docs/anforderungen-recherche.md:62` „TOP-Zuordnung als hartes Pflichtfeld" |
+| R-TRANS-01 | Feld `stageAssignment` (Bühnenzuordnung) | `docs/ist-analyse-und-schnittstellen.md:80` „Bühnenzuordnung (Aufsichtsrat / Vorstand / CFO)" |
+| R-TRANS-02 | Stand → `assigned`, Feld `unitId` | `docs/rollen-und-rechtekonzept.md:107` „Pflichtfeld Segment" (teilweise: Personenzuweisung aus Recherche:221 nicht umgesetzt) |
+| R-TRANS-03 | Stand → `answer_drafted`, Feld Antwortversion | `docs/ist-analyse-und-schnittstellen.md:52` „6 fachliche Beantwortung" |
+| R-TRANS-03 | Folge: eine bestehende Freigabe erlischt (`invalidatedApprovalOfVersion`) | `docs/rollen-und-rechtekonzept.md:163` „Keine Freigabe ohne Bindung an die Textversion. Jede Textänderung nach Freigabe setzt sie zurück." |
+| R-TRANS-04 | Stand → `in_review` | `docs/ist-analyse-und-schnittstellen.md:52` „7 Legal Clearing" |
+| R-TRANS-04 | Feld `answerVersion` | nicht belegt (Ableitung: hält nur die zuletzt entworfene Version fest, R-TRANS-03) |
+| R-TRANS-05 | Stand → `approved`, Feld `answerVersion` | `docs/rollen-und-rechtekonzept.md:109` „legal_clearing → ready_for_stage" |
+| R-TRANS-05 | Pflichtfeld Freigabevermerk, Vier-Augen | nicht umgesetzt (bereits so benannt, `rollen:109`/`156`) |
+| R-TRANS-06 | Stand → `classified` (Podium) / `answer_drafted` (sonst), Feld `reason` | `docs/rollen-und-rechtekonzept.md:110` „Pflichtfeld Rückgabegrund"; ergänzend `ist-analyse:90` |
+| R-TRANS-06 | Verzweigung nach Antwortpfad selbst | nicht belegt (Ableitung: Podiumsfragen durchlaufen `answer_drafted` nie, R-TRANS-08) |
+| R-TRANS-07 | Stand → `staged` | `docs/ist-analyse-und-schnittstellen.md:92` „es laufen nur die zugeordneten und freigegebenen Fragen ein" |
+| R-TRANS-07 | Feld `stagePosition` | nicht belegt (Ableitung: naheliegende Umsetzung eines Einlaufs mehrerer Fragen) |
+| R-TRANS-08 | Stand → `staged` (Podiumspfad) | `docs/ist-analyse-und-schnittstellen.md:50` „keine Rechtsprüfung vor der Bühne" |
+| R-TRANS-08 | Feld `stagePosition` | nicht belegt (siehe R-TRANS-07) |
+| R-TRANS-09 | Stand → `delivered` | `docs/ist-analyse-und-schnittstellen.md:89` „vorgelesen, weiter" |
+| R-TRANS-09 | Feld `answerVersion` (nur bei Freigabe) | nicht belegt (Ableitung: spiegelt die freigegebene Version, R-TRANS-05) |
+| R-TRANS-10 | Stand → `closed` | `docs/ist-analyse-und-schnittstellen.md:58-59`, bereits als „nicht umgesetzt: keine Antwortprüfung durch Legal/FOO/GC" benannt |
+| R-TRANS-11 | Stand → `withdrawn` | nicht belegt (Recherche:285 nennt nur die Zählkategorie, ausdrücklich nicht der Übergang) |
+| R-TRANS-11 | Feld `reason` | nicht belegt |
+| R-TRANS-12 | Stand → `merged`, Feld `intoQuestionId` | `docs/anforderungen-recherche.md:147` „Dublettenerkennung" (teilweise: kein Unmerge, kein Ähnlichkeitsscore) |
+| R-TRANS-12 | Bestandscheck des Zielobjekts (404-Maskierung wie R-TRANS-00) | nicht belegt (Architekturentscheidung, `requireQuestionFor` in `api.ts`) |
+| R-GUARD-01 | Verweigerung: keine Antwortversion vorhanden | `docs/ist-analyse-und-schnittstellen.md:52` „erst 6 fachliche Beantwortung, dann 7 Legal Clearing" |
+| R-GUARD-02 | Verweigerung: Track ≠ `podium` | `docs/ist-analyse-und-schnittstellen.md:50` „No-Brainer: freie Beantwortung" |
+| R-GUARD-03 | Verweigerung: Track = `podium` | `docs/ist-analyse-und-schnittstellen.md:51-52` „Fast Track/Expert Track erzeugen einen Text" |
+| R-GUARD-04 | Verweigerung: genannte oder einzige Version ist nicht die letzte | `docs/rollen-und-rechtekonzept.md:163` „Keine Freigabe ohne Bindung an die Textversion" (deckt auch den Fall ohne Payload — dieselbe Bindung) |
+| R-GUARD-05 | Verweigerung: Ziel = Quelle des Merges | `docs/anforderungen-recherche.md:147`, Ableitung (teilweise wie R-TRANS-12) |
+| R-TRANS-00 | Verweigerung: terminaler Stand / keine passende Zeile | nicht belegt (Architekturentscheidung, `TERMINAL_STATUSES`) |
+| R-TRANS-00 | 409-Antwortformat mit Regel-ID | `docs/qualitaetsleitplanken-produktreife.md:175` Checkliste 6.4 |
+| R-TRANS-00 | Maskierung (409 ohne Regel-ID für Nicht-Leser) | nicht belegt (Architekturentscheidung, `transition()` in `api.ts`) |
+| R-PERM-01 | 403 mit Regel-ID bei fehlendem Schreibrecht | `docs/rollen-und-rechtekonzept.md:141` „Deny by default" |
+| R-PERM-01 | 404-Maskierung für eine weder lesbare noch bearbeitbare Frage | nicht belegt (Architekturentscheidung, Festlegung 3 von Scheibe 010) |
+| R-PERM-02 | 403 mit Regel-ID bei fehlendem Leserecht | `docs/rollen-und-rechtekonzept.md:141` „Deny by default" |
+| R-PERM-02 | 404-Maskierung für eine nicht lesbare Frage | nicht belegt (Architekturentscheidung, Festlegung 3 von Scheibe 010) |
+| R-PERM-03 | 403 bei Statusfilter außerhalb des Leseumfangs | `docs/rollen-und-rechtekonzept.md:93` „Bühnenzuordnung", Ableitung |
+| R-PERM-03 | 404-Maskierung für eine einzelne Frage außerhalb des Leseumfangs | nicht belegt (Architekturentscheidung, Festlegung 3 von Scheibe 010) |
+| R-PERM-03 | Bühnenzuordnung für den Vorstand selbst | nicht umgesetzt (bereits so benannt) |
+| R-IDEM-01 | Replay liefert erstes Ergebnis statt Neuausführung, Scope Akteur+Operation | `docs/qualitaetsleitplanken-produktreife.md:167` Checkliste 6.3 |
+
+**Zitate geändert (13 von 22 Regeln)** — jeweils die zuvor fehlende Wirkung ergänzt, keine der bereits
+vorhandenen Fundstellen oder Lücken-Kennzeichnungen entfernt: R-TRANS-00, R-TRANS-01, R-TRANS-03,
+R-TRANS-04, R-TRANS-06, R-TRANS-07, R-TRANS-08, R-TRANS-09, R-TRANS-11, R-TRANS-12, R-PERM-01, R-PERM-02,
+R-PERM-03. Unverändert, weil bereits jede Wirkung deckten: R-TRANS-02, R-TRANS-05, R-TRANS-10,
+R-GUARD-01..05, R-IDEM-01.
+
+Verhalten, Übergänge, Guards und Rechte sind dabei nicht angefasst:
+`git diff --exit-code -- packages/domain/policy-truth-table.md` bleibt leer (geprüft nach dem Commit unten).
+`docs/legal-trace.md` wurde über `npx vitest run -u` (in `packages/domain`) neu erzeugt, nie von Hand.
+
+`node /home/user/wt/011/scripts/slice-scope.mjs`:
+
+```
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+```
+
+`pnpm -C /home/user/wt/011 gates`, Ende (verbatim), gelaufen auf dem committeten Stand `b1f4457` (fix(domain):
+jede Wirkung einer Regel belegt oder als unbelegt benannt, Scheibe 011) — dieser Bericht-Abschnitt selbst kam
+danach dazu; `mark-test-run` hasht nur `apps/`, `packages/`, `scripts/`, ein reiner `docs/`-Zusatz ändert daran
+nichts:
+
+```
+packages/domain test:  Test Files  6 passed (6)
+packages/domain test:       Tests  85 passed (85)
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  48 passed (48)
+apps/api test:  Test Files  6 passed (6)
+apps/api test:       Tests  55 passed (55)
+
+> hvworkflow@0.1.0 vocabulary /home/user/wt/011
+> node scripts/vocabulary-check.mjs
+
+vocabulary-check: ok
+...
+x 7 dependency violations (0 errors, 7 warnings). 139 modules, 505 dependencies cruised.
+
+> hvworkflow@0.1.0 role-literals /home/user/wt/011
+> node scripts/role-literal-check.mjs
+
+> hvworkflow@0.1.0 now-check /home/user/wt/011
+> node scripts/now-check.mjs
+
+> hvworkflow@0.1.0 plan-honesty /home/user/wt/011
+> node scripts/plan-honesty.mjs
+
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+
+slice-scope: 9 changed file(s), all within "docs/slices/011-legal-trace-regelregister.md"'s "Files allowed" list (9 pattern(s)).
+
+Downgrade check: 14 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+  missing dependencies: 0
+  cycles: 0
+  dependency-order problems: 0
+  same-day lane-sharing warnings: 0
+
+plan-graph: ok.
+...
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6482.015928
+
+> @hv/web@0.0.0 build /home/user/wt/011/apps/web
+> tsc -b && vite build
+...
+✓ built in 1.10s
+mark-test-run: wrote /home/user/wt/011/.claude/state/last-test-run (clean tree) at commit b1f4457, tree 6ca337b2c94a…
+```
+
+Kein FAIL/`not ok` im gesamten Lauf (geprüft per `grep`); `arch`: „0 errors, 7 warnings" — dieselben sieben
+vorbestehenden `web-features-i18n-domain-types-only`-Befunde wie in jedem früheren Lauf dieser Scheibe,
+unverändert durch diesen Diff.
+
+**Hinweis zum vorigen `pnpm gates`-Ende in Abschnitt 7/8:** Der dort eingefügte Lauf (Commit `c9ff931`
+bzw. der Stand nach Abschnitt 8) ist durch den obigen ersetzt — er war nach diesem, vierten Codex-Lauf
+nicht mehr der letzte Lauf auf dem tatsächlich committeten Stand. Beide Läufe zeigen dasselbe Bild (grün,
+0 fail), nur der Diff dazwischen ist die Wirkungen-Nacharbeit dieses Abschnitts.
+
 ## Review findings
 
 **Runde 1 · Opus 5.5 (Perspektive Legal) · 24.09.2026 · Urteil: nacharbeiten** (0/2/4 + nits), dazu Codex auf PR
