@@ -80,14 +80,32 @@ export function CapturePage() {
    * the per-speaker load above is itself the Hauptabfrage and answers the same question — a second,
    * unfiltered call on every `version` fetched the whole corpus only to throw it away, and on a 500
    * raised a second toast for the same failure.
+   *
+   * Codex P2-1 on 4f0d231: nor before the Wortmeldung lookup has settled. On a fresh visit without
+   * `?speaker`, `speakerId` is `null` at the first render only because `listSpeakers` has not
+   * answered yet — the probe used to fetch the whole corpus right then, although a speaker would
+   * be resolved a moment later. It now runs only when the lookup has answered and produced no
+   * speaker at all (refused, failed, or a meeting without any Wortmeldung).
    */
+  const needsProbe =
+    speakerId === null && speakers.status !== 'loading' && speakers.data.length === 0;
   const contributionsProbe = useAsync<readonly Contribution[]>(
-    () => (speakerId === null ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)),
+    () => (needsProbe ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)),
     NO_CONTRIBUTIONS,
-    `cp:${version}:${speakerId === null}`,
+    `cp:${version}:${needsProbe}`,
   );
-  const forbidden =
-    contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
+  /**
+   * The verdict changes only once every read it depends on has answered: while the lookup is
+   * reloading, `needsProbe` is briefly false and the probe answers "ready" without asking — that
+   * must not lift a refusal for a moment and show the desk in between (design principle 8).
+   */
+  const verdict = contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
+  const settled =
+    speakers.status !== 'loading' &&
+    contributionsProbe.status !== 'loading' &&
+    contributions.status !== 'loading';
+  const [forbidden, setForbidden] = useState(false);
+  if (settled && forbidden !== verdict) setForbidden(verdict);
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
   // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
   const contribution =
