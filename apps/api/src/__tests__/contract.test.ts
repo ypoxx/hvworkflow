@@ -33,9 +33,10 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     expect(res.status).toBe(200);
   });
 
-  it('every operationId in the contract is exercised by this test suite', () => {
-    // A sanity check, not a substitute for `expectValid`: it only proves the contract still has the
-    // 29 operations this suite was written against, so a silently added/removed path is noticed.
+  it('the contract still has at least the 29 operations this suite was written against', () => {
+    // A sanity check only. The real gate "every operationId is exercised by a test or pre-declared in
+    // packages/contract/allowlist.json" runs after the whole suite, in the Vitest globalSetup
+    // `operation-coverage.setup.ts` (slice 023, goal 5), over the hits `req()` records in helpers.ts.
     expect(allOperationIds.length).toBeGreaterThanOrEqual(29);
   });
 

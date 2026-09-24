@@ -11,8 +11,25 @@
  * service are *not* changed to close them here (that is 019, contract 0.2.0); each gap gets one
  * reasoned exception below instead of silently skipping validation.
  */
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { inject } from 'vitest';
 import type { App } from '../app.ts';
 import { documentedStatuses, expectValid, expectValidProblem, matchOperationId } from '../contractSchema.ts';
+
+/**
+ * Operation-coverage gate (slice 023, goal 5): every `operationId` a test reaches through `req()` is
+ * appended to a per-process hit file; `operation-coverage.setup.ts` (Vitest `globalSetup`) folds the
+ * files of all workers after the run and checks the contract against them and the allowlist. The
+ * directory comes from that setup through `provide()`/`inject()` — the only channel from the main
+ * process into isolated workers. Appends are O_APPEND-atomic for lines this short, so one file per
+ * process is enough even under the threads pool.
+ */
+function recordOperationHit(operationId: string): void {
+  const dir = inject('operationCoverageDir') as string | undefined;
+  if (dir === undefined) return; // not running under apps/api/vitest.config.ts — nothing to record into
+  appendFileSync(join(dir, `${process.pid}.log`), `${operationId}\n`);
+}
 
 export interface ReqOptions {
   actor?: string;
@@ -67,6 +84,7 @@ async function assertMatchesContract(method: string, path: string, res: Response
         'route the test suite exercises must be in the contract (AGENTS.md rule 6).',
     );
   }
+  recordOperationHit(operationId);
 
   const status = res.status;
   const contentType = (res.headers.get('content-type') ?? 'application/json').split(';')[0]!.trim();
