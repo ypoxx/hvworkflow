@@ -21,6 +21,7 @@ import {
   NO_VERDICT,
   isCurrentLoad,
   isReadForbidden,
+  keyBelongsTo,
   listOmits,
   loadKey,
   readVerdict,
@@ -69,6 +70,9 @@ export interface Backlog {
   /** Size of that same list — the number the "Alle" chip carries. */
   total: number;
   listLoading: boolean;
+  /** Slice 010d, Ziel 2: this actor's last list read failed and no newer one is on its way — the
+   *  list shows a gestalteter Fehlerzustand where it has no rows, never "Kein Treffer". */
+  listFailed: boolean;
   /** Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Beantwortung — set from the
    *  403's ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
    *  `question.read.delivered`. */
@@ -89,6 +93,7 @@ export interface Backlog {
 }
 
 const NO_EVENTS: readonly DomainEvent[] = [];
+const NO_QUESTIONS: readonly Question[] = [];
 
 /** Read the language at call time so that a message never re-runs the effect that raised it. */
 function problem(error: unknown): void {
@@ -110,8 +115,21 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((value) => value + 1), []);
 
-  const [pool, setPool] = useState<readonly Question[]>([]);
-  const [listLoading, setListLoading] = useState(true);
+  /**
+   * Slice 010d, Ziel 1: every record of this view is kept with the key of the load that read it
+   * and handed out only to that load's actor (`keyBelongsTo`, lib.ts) — the list (`pool`, with
+   * whether it is complete), the open question and its history. After a role switch the previous
+   * role's rows, its question and that question's `_actions` are not offered for the one response
+   * time until the new role has answered; the list shows its skeleton and the detail "wird
+   * geladen" instead (design principle 9). A newer `version` of the same actor keeps them on screen
+   * while it loads (principle 8).
+   */
+  const [poolState, setPoolState] = useState<{
+    key: string;
+    items: readonly Question[];
+    complete: boolean;
+  } | null>(null);
+  const [listLoadingState, setListLoading] = useState(true);
   /**
    * Slice 010c, Ziel 1: the list's answer carries the key of its load (actor and `version`), and
    * "keine Leseberechtigung" is the verdict of the current key only (`readVerdict`, lib.ts). It used
@@ -126,6 +144,16 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const listVerdict = readVerdict(shownVerdict, [{ read: listRead, key: listKey }], actorId);
   if (listVerdict !== shownVerdict) setShownVerdict(listVerdict);
   const listForbidden = listVerdict.forbidden;
+  const poolOwned = poolState !== null && keyBelongsTo(poolState.key, actorId);
+  const pool = poolOwned ? poolState.items : NO_QUESTIONS;
+  // Codex P2-A on 948a721: whether `pool` is the whole of what this actor may read — no
+  // server-side filter, nothing cut off by the limit. Only then does "not in the list" mean "not
+  // readable"; a filtered list says nothing about what it leaves out.
+  const poolComplete = poolOwned && poolState.complete;
+  const listLoading = listLoadingState || !poolOwned;
+  // Slice 010d, Ziel 2: a failure of this actor's current list read, with nothing newer on its way.
+  const listFailed =
+    !listLoading && listRead !== null && listRead.status === 'error' && listRead.key === listKey;
   /**
    * Slice 010c, Ziel 5: who made the current selection. A selection of another actor that the new
    * actor's list leaves out is taken as not readable, even when that list is filtered
@@ -135,20 +163,19 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
    * lasts as long as the selection.
    */
   const selectedBy = useRef<string | null>(null);
-  // Codex P2-A on 948a721: whether `pool` is the whole of what this actor may read — no
-  // server-side filter, nothing cut off by the limit. Only then does "not in the list" mean "not
-  // readable"; a filtered list says nothing about what it leaves out.
-  const [poolComplete, setPoolComplete] = useState(false);
-  const [selected, setSelected] = useState<Question | null>(null);
+  const [selectedState, setSelected] = useState<{ key: string; question: Question | null } | null>(
+    null,
+  );
   // Minor 2 (review round 3), Codex (a) on 7f542b6: the history is stored together with the id of
   // the question it belongs to and handed out only while that question is the one shown — while B
   // loads, A's events must not reach `lapsedApproval(B, …)` and show a false "Freigabe erloschen".
   const [history, setHistory] = useState<{
+    key: string;
     questionId: string;
     events: readonly DomainEvent[];
     forbidden: boolean;
   } | null>(null);
-  const [selectedLoading, setSelectedLoading] = useState(false);
+  const [selectedLoadingState, setSelectedLoading] = useState(false);
   const [units, setUnits] = useState<readonly Unit[]>([]);
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
 
@@ -216,8 +243,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           page.items.length >= page.total;
         const ids = new Set(page.items.map((question) => question.id));
         const selectedByOther = selectedBy.current !== null && selectedBy.current !== getActor().id;
-        setPool(page.items);
-        setPoolComplete(complete);
+        setPoolState({ key: requested, items: page.items, complete });
         setListLoading(false);
         setListRead({ key: requested, status: 'ready' });
         gate.settleMain(`${version}:${nonce}`, false, listOmits(ids, complete, selectedByOther));
@@ -228,8 +254,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — e.g. podium, who
           // holds neither `question.read` nor `question.read.delivered` at all.
-          setPool([]);
-          setPoolComplete(false);
+          setPoolState({ key: requested, items: NO_QUESTIONS, complete: false });
           setListRead({ key: requested, status: 'forbidden' });
           gate.settleMain(`${version}:${nonce}`, true);
           return;
@@ -237,6 +262,13 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         // Slice 010c, Ziel 1: a failure is this load's answer too — it replaces a refusal given to
         // another actor instead of leaving it standing (`readVerdict`).
         setListRead({ key: requested, status: 'error' });
+        // Slice 010d: the same actor keeps the rows it already had; rows another actor read give
+        // way to none — this actor has none yet, and the list says it failed (Ziel 2).
+        setPoolState((previous) =>
+          previous !== null && keyBelongsTo(previous.key, getActor().id)
+            ? previous
+            : { key: requested, items: NO_QUESTIONS, complete: false },
+        );
         problem(error);
         // A list that failed for another reason does not say the detail is unreadable.
         gate.settleMain(`${version}:${nonce}`, false);
@@ -285,12 +317,12 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
       .getQuestion(selectedId)
       .then((question) => {
         if (!isCurrentLoad(requested, current())) return;
-        setSelected(question);
+        setSelected({ key: requested, question });
         setSelectedLoading(false);
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
-        setSelected(null);
+        setSelected({ key: requested, question: null });
         setSelectedLoading(false);
         if (isReadForbidden(error)) return;
         gate.report(load, selectedId, error);
@@ -314,17 +346,17 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
       .getQuestionHistory(selectedId)
       .then((events) => {
         if (!isCurrentLoad(requested, current())) return;
-        setHistory({ questionId: selectedId, events, forbidden: false });
+        setHistory({ key: requested, questionId: selectedId, events, forbidden: false });
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
           // Put the refused state where its history would be (review round 2) — never an error
           // toast for a read refusal (Ziel 5).
-          setHistory({ questionId: selectedId, events: [], forbidden: true });
+          setHistory({ key: requested, questionId: selectedId, events: [], forbidden: true });
           return;
         }
-        setHistory({ questionId: selectedId, events: [], forbidden: false });
+        setHistory({ key: requested, questionId: selectedId, events: [], forbidden: false });
         gate.report(load, selectedId, error);
       });
     return () => {
@@ -332,8 +364,23 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     };
   }, [load, selectionHidden, selectedId, gate]);
 
-  // Only the history of the question actually on screen is handed on (minor 2, review round 3).
-  const ownHistory = selected !== null && history?.questionId === selected.id ? history : null;
+  // Slice 010d: the open question, only to the actor it was read for; while another actor's copy
+  // stands and the selection is to be read, the detail says "wird geladen".
+  const selectedOwned = selectedState !== null && keyBelongsTo(selectedState.key, actorId);
+  const selected = selectedOwned ? selectedState.question : null;
+  const selectedLoading =
+    selectedLoadingState ||
+    (selectedState !== null && !selectedOwned && selectedId !== null && !selectionHidden);
+
+  // Only the history of the question actually on screen is handed on (minor 2, review round 3),
+  // and only to the actor it was read for (slice 010d).
+  const ownHistory =
+    selected !== null &&
+    history !== null &&
+    history.questionId === selected.id &&
+    keyBelongsTo(history.key, actorId)
+      ? history
+      : null;
 
   const counts = useMemo(() => {
     const next = Object.fromEntries(QUESTION_STATUSES.map((status) => [status, 0])) as Record<
@@ -360,6 +407,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     counts,
     total: pool.length,
     listLoading,
+    listFailed,
     listForbidden,
     selected,
     selectedLoading,

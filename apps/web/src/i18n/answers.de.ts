@@ -6,6 +6,8 @@ export const answersDe = {
   'answers.list.empty.title': 'Kein Treffer',
   'answers.list.empty.body':
     'Zu dieser Auswahl gibt es keine Einzelfrage. Setzen Sie die Auswahl zurück oder ändern Sie den Suchtext.',
+  'answers.list.error.title': 'Die Einzelfragen konnten nicht geladen werden',
+  'answers.list.error.body': 'Der Bestand ist gerade nicht erreichbar.',
   'answers.search.label': 'Suche',
   'answers.search.placeholder': 'Nummer, Redner, Frage- oder Antworttext',
   'answers.filter.status.label': 'Stand',

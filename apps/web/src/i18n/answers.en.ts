@@ -8,6 +8,8 @@ export const answersEn: typeof answersDe = {
   'answers.list.empty.title': 'No match',
   'answers.list.empty.body':
     'No question matches this selection. Clear the selection or change the search text.',
+  'answers.list.error.title': 'The questions could not be loaded',
+  'answers.list.error.body': 'The corpus cannot be reached at the moment.',
   'answers.search.label': 'Search',
   'answers.search.placeholder': 'Number, speaker, question or answer text',
   'answers.filter.status.label': 'Status',

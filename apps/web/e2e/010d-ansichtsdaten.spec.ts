@@ -148,6 +148,42 @@ async function failOnce(
 }
 
 /**
+ * Every call of `method` whose first argument has every field of `match` is refused with a 500
+ * until `restore` — for a view's first read, which is not its first call: `useApiVersion` bumps once
+ * on mount and cancels the load that started before it.
+ */
+async function failAlways(page: Page, method: string, match: Record<string, unknown>): Promise<void> {
+  await page.evaluate(
+    ([url, name, wanted]) => {
+      const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
+      const w = window as unknown as Harness;
+      const original = w.__original[name as string]!;
+      api[name as string] = (...args: unknown[]) => {
+        const first = args[0] as Record<string, unknown> | undefined;
+        const fits =
+          typeof first === 'object' &&
+          first !== null &&
+          Object.entries(wanted as Record<string, unknown>).every(([k, v]) => first[k] === v);
+        if (fits) return Promise.reject({ status: 500, title: 'Testfehler', detail: '010d, absichtlich' });
+        return original(...args);
+      };
+    },
+    [API_MODULE, method, match] as const,
+  );
+}
+
+/** Puts the unpatched `method` back. */
+async function restore(page: Page, method: string): Promise<void> {
+  await page.evaluate(
+    ([url, name]) => {
+      const { api } = ((window as unknown as Harness).__modules[url!]) as { api: Wrapped };
+      api[name!] = (window as unknown as Harness).__original[name!]!;
+    },
+    [API_MODULE, method],
+  );
+}
+
+/**
  * Every call of `method` is held back. `answerNow`: the API answers at once — for the actor current
  * at that moment — and only the hand-over to the page waits. Otherwise the call does not reach the
  * API at all until the test runs or refuses it.
@@ -344,6 +380,7 @@ test('010d Ziel 1: Wortmeldeliste — moderation → capture, Liste zurückgehal
 
   await expectAbsent(page, [...SPEAKER_ACTIONS, 'speaker-row', 'speakers-readonly-hint']);
   await expect(page.getByText('Wortmeldeliste wird geladen')).toBeVisible();
+  await checkAxe(page, 'speakers (010d, loading after a role switch)');
 
   // capture's own answer: its rows, read-only, without a single step.
   await releaseAll(page, 'listSpeakers');
@@ -352,6 +389,22 @@ test('010d Ziel 1: Wortmeldeliste — moderation → capture, Liste zurückgehal
   await expectAbsent(page, SPEAKER_ACTIONS);
   await expect(toasts(page)).toHaveCount(0);
   await checkAxe(page, 'speakers (010d, role switch)');
+});
+
+test('010d Ziel 1: Wortmeldeliste — moderation → capture, erster Abruf mit 500: Fehlerzustand, keine Zeile der vorigen Rolle', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'moderation');
+  await page.getByTestId('nav-speakers').click();
+  await expect(page.getByTestId('speaker-move').first()).toBeVisible();
+
+  await failOnce(page, 'listSpeakers');
+  await switchActor(page, 'capture');
+  await expect(page.getByText('Die Wortmeldeliste konnte nicht geladen werden')).toBeVisible();
+  await expectAbsent(page, [...SPEAKER_ACTIONS, 'speaker-row']);
+  await expect(toasts(page)).toHaveCount(1);
 });
 
 test('010d Ziel 1: Wortmeldeliste — ein Dialog der vorigen Rolle schließt mit dem Rollenwechsel', async ({
@@ -391,6 +444,7 @@ test('010d Ziel 1: Erfassung — capture → moderation, Lesevorgänge zurückge
   await expect.poll(() => callCount(page, 'listQuestions')).toBeGreaterThan(0);
 
   await expectAbsent(page, [...CAPTURE_ACTIONS, 'capture-question-card', 'capture-readonly-hint']);
+  await checkAxe(page, 'capture (010d, loading after a role switch)');
 
   for (const method of ['listSpeakers', 'listContributions', 'listQuestions']) {
     await releaseAll(page, method);
@@ -419,6 +473,7 @@ test('010d Ziel 1: Beantwortung — legal → expert, Liste und Einzelfrage zur�
   await expectAbsent(page, [...ANSWER_ACTIONS, 'answers-row', 'answers-detail', 'answers-readonly-hint']);
   await expect(page.locator('[aria-label="Bestand wird geladen …"][aria-busy="true"]')).toBeVisible();
   await expect(page.getByText('Einzelfrage wird geladen …')).toBeVisible();
+  await checkAxe(page, 'answers (010d, loading after a role switch)');
 
   for (const method of ['listQuestions', 'getQuestion', 'getQuestionHistory']) {
     await releaseAll(page, method);
@@ -486,6 +541,7 @@ test('010d Ziel 1: Historie — admin → observer, Hauptabfrage und Verlauf zur
   await expectAbsent(page, ['history-result', 'history-timeline', 'history-event', 'history-kpi']);
   await expect(page.locator('[aria-label="Bestand wird durchsucht …"][aria-busy="true"]')).toBeVisible();
   await expect(page.locator('[aria-label="Bestand wird geladen …"][aria-busy="true"]')).toBeVisible();
+  await checkAxe(page, 'history (010d, loading after a role switch)');
 
   for (const method of ['listQuestions', 'getQuestionHistory']) {
     await releaseAll(page, method);
@@ -528,7 +584,7 @@ test('010d Ziel 2: Beantwortung — erster Abruf mit 500: Fehlerzustand, kein "K
   await page.goto('/');
   await waitForCorpus(page);
   await asRole(page, 'expert');
-  await failOnce(page, 'listQuestions', { limit: 2000 });
+  await failAlways(page, 'listQuestions', { limit: 2000 });
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
 
@@ -542,6 +598,7 @@ test('010d Ziel 2: Beantwortung — erster Abruf mit 500: Fehlerzustand, kein "K
   await page.screenshot({ path: evidence('010d-beantwortung-ladefehler.png') });
   await checkAxe(page, 'answers (010d, failed first read)');
 
+  await restore(page, 'listQuestions');
   await failed.getByRole('button', { name: 'Erneut versuchen' }).click();
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
   await expect(failed).toHaveCount(0);

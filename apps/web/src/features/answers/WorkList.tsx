@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
-import { Lock, Search, X } from 'lucide-react';
+import { Lock, Search, TriangleAlert, X } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { QUESTION_STATUSES, TERMINAL_STATUSES, TRACKS } from '@hv/domain';
 import {
@@ -226,7 +226,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
   const [box, setBox] = useState({ height: 600, width: 640 });
   const [now, setNow] = useState(() => Date.now());
 
-  const { items, counts, total, listLoading, listForbidden, units } = backlog;
+  const { items, counts, total, listLoading, listFailed, listForbidden, units } = backlog;
 
   // The age column is only honest if it moves on its own.
   useEffect(() => {
@@ -492,10 +492,32 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         {items.length === 0 ? (
           <div className="p-4">
             {listLoading ? (
-              <div className="space-y-1.5" aria-label={t('answers.list.loading')} aria-busy="true">
+              // Slice 010d: shown after every role switch now. `role="status"` gives the label a
+              // role to name — on a bare div axe rejects `aria-label` (aria-prohibited-attr, serious).
+              <div
+                role="status"
+                className="space-y-1.5"
+                aria-label={t('answers.list.loading')}
+                aria-busy="true"
+              >
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((line) => (
                   <div key={line} className="h-8 animate-pulse rounded-sm bg-ink-50" />
                 ))}
+              </div>
+            ) : listFailed ? (
+              // Slice 010d, Ziel 2: the list could not be read — say so and offer the one step that
+              // helps. "Kein Treffer … Auswahl zurücksetzen" would claim an answer that never came.
+              <div data-testid="answers-list-error">
+                <EmptyState
+                  icon={TriangleAlert}
+                  title={t('answers.list.error.title')}
+                  description={t('answers.list.error.body')}
+                  action={
+                    <Button size="sm" variant="secondary" onClick={backlog.reload}>
+                      {t('common.retry')}
+                    </Button>
+                  }
+                />
               </div>
             ) : (
               <EmptyState

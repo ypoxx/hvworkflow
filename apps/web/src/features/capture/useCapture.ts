@@ -77,10 +77,25 @@ export function isReadForbidden(error: unknown): boolean {
  * of an overtaken `key`.
  */
 export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string): AsyncState<T> {
-  const current = loadKey(useActor().id, key);
-  const [state, setState] = useState<{ status: LoadStatus; data: T; key: string }>({
+  const actorId = useActor().id;
+  const current = loadKey(actorId, key);
+  /**
+   * Slice 010d, Ziel 1: `data` carries the key of the load that read it (`dataKey`), apart from
+   * `key`, which names the load in progress. Data is handed out only to its own actor
+   * (`keyBelongsTo`): after a role switch the previous role's records — and with them its
+   * `_actions`, from which the desk reads what it may capture or classify — give way to the fallback
+   * and a "loading" status until the new role has answered. The same actor keeps its data on screen
+   * while the next `version` loads (design principle 8).
+   */
+  const [state, setState] = useState<{
+    status: LoadStatus;
+    data: T;
+    dataKey: string | null;
+    key: string;
+  }>({
     status: 'loading',
     data: fallback,
+    dataKey: null,
     key: current,
   });
   const [token, setToken] = useState(0);
@@ -102,23 +117,30 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
     let cancelled = false;
     const requested = loadKey(getActor().id, key);
     const now = (): string | null => (cancelled ? null : loadKey(getActor().id, key));
-    setState((previous) => ({ status: 'loading', data: previous.data, key: requested }));
+    setState((previous) => ({ ...previous, status: 'loading', key: requested }));
     loaderRef
       .current()
       .then((data) => {
-        if (isCurrentLoad(requested, now())) setState({ status: 'ready', data, key: requested });
+        if (isCurrentLoad(requested, now())) {
+          setState({ status: 'ready', data, dataKey: requested, key: requested });
+        }
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, now())) return;
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — and the data resets
           // to the fallback rather than keeping a stale, no-longer-readable list on screen.
-          setState({ status: 'forbidden', data: fallbackRef.current, key: requested });
+          setState({
+            status: 'forbidden',
+            data: fallbackRef.current,
+            dataKey: requested,
+            key: requested,
+          });
           return;
         }
         // The language is read at call time: a language switch must not re-run the load.
         showProblem(error, translate(getLang(), 'toast.problem'));
-        setState((previous) => ({ status: 'error', data: previous.data, key: requested }));
+        setState((previous) => ({ ...previous, status: 'error', key: requested }));
       });
     return () => {
       cancelled = true;
@@ -126,9 +148,11 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
   }, [token, key]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
+  const owned = keyBelongsTo(state.dataKey, actorId);
   return {
-    status: state.status,
-    data: state.data,
+    // Slice 010d: a status reached for another actor says nothing about this one's data.
+    status: keyBelongsTo(state.key, actorId) ? state.status : 'loading',
+    data: owned ? state.data : fallback,
     reload,
     settled: state.status !== 'loading' && isCurrentLoad(state.key, current),
     read: state.status === 'loading' ? null : { key: state.key, status: state.status },
@@ -207,4 +231,22 @@ export function readVerdict(
   return previous.actor === actorId && previous.forbidden === forbidden
     ? previous
     : { actor: actorId, forbidden };
+}
+
+/**
+ * Slice 010d (Ansichtsdaten gehören dem Schlüssel des Akteurs): whether data loaded under `key` may
+ * be offered to `actorId` — only data of that very actor, at any `version`. Data of another actor
+ * (the previous role, until the new one has answered) carries that actor's `_actions` and read
+ * scope; it is not offered (design principle 9), and the view shows its loading state instead.
+ * `null`: nothing loaded yet. The actor is read from the key as a whole (`loadKey` is JSON), so
+ * one id that is a prefix of another never matches.
+ *
+ * Kept as a small local copy per feature that holds such data (`speakers/useSpeakers.ts`,
+ * `capture/useCapture.ts`, `answers/lib.ts`, `history/lib.ts`), next to the 010c pattern above, and
+ * covered by the same test table in each.
+ */
+export function keyBelongsTo(key: string | null, actorId: string): boolean {
+  if (key === null) return false;
+  const [owner] = JSON.parse(key) as unknown[];
+  return owner === actorId;
 }

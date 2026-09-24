@@ -163,6 +163,17 @@ export function CapturePage() {
 
   const [writing, setWriting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  /**
+   * Slice 010d, Ziel 1: the proposal dialog belongs to the actor who opened it. On an actor change
+   * it closes in the same render (compared by `id`, never by role, AGENTS.md rule 4) — it would
+   * otherwise open again over the next actor's desk once its Redebeitrag is read. The classify
+   * dialog needs no such rule: it closes with its question, which `useAsync` hands to nobody else.
+   */
+  const [dialogActorId, setDialogActorId] = useState(actorId);
+  if (dialogActorId !== actorId) {
+    setDialogActorId(actorId);
+    setSuggestOpen(false);
+  }
 
   const writeContribution = useCallback(
     async (text: string): Promise<boolean> => {

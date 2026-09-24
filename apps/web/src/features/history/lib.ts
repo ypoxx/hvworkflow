@@ -290,3 +290,21 @@ export function readVerdict(
     ? previous
     : { actor: actorId, forbidden };
 }
+
+/**
+ * Slice 010d (Ansichtsdaten gehören dem Schlüssel des Akteurs): whether data loaded under `key` may
+ * be offered to `actorId` — only data of that very actor, at any `version`. Data of another actor
+ * (the previous role, until the new one has answered) carries that actor's `_actions` and read
+ * scope; it is not offered (design principle 9), and the view shows its loading state instead.
+ * `null`: nothing loaded yet. The actor is read from the key as a whole (`loadKey` is JSON), so
+ * one id that is a prefix of another never matches.
+ *
+ * Kept as a small local copy per feature that holds such data (`speakers/useSpeakers.ts`,
+ * `capture/useCapture.ts`, `answers/lib.ts`, `history/lib.ts`), next to the 010c pattern above, and
+ * covered by the same test table in each.
+ */
+export function keyBelongsTo(key: string | null, actorId: string): boolean {
+  if (key === null) return false;
+  const [owner] = JSON.parse(key) as unknown[];
+  return owner === actorId;
+}

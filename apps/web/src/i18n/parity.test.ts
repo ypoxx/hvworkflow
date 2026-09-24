@@ -145,13 +145,15 @@ describe('i18n parity checks', () => {
   // Nacharbeit nach Review (Runde 2): +1, `answers.history.forbidden` — the Nebenabfrage
   // `getQuestionHistory` of one open question is refused independently of the Hauptabfrage (major
   // finding); rendered where its lapsed-approval note would otherwise stand.
-  it('(f) Total key count is 459 across all modules and matches de and en', () => {
+  // Slice 010d, Ziel 2: +2, `answers.list.error.title`/`.body` — the Beantwortung's list read failed
+  // and there are no rows: a gestalteter Fehlerzustand instead of "Kein Treffer".
+  it('(f) Total key count is 461 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(459);
-    expect(deKeys).toBe(459);
-    expect(enKeys).toBe(459);
+    expect(totalKeys).toBe(461);
+    expect(deKeys).toBe(461);
+    expect(enKeys).toBe(461);
   });
 });
