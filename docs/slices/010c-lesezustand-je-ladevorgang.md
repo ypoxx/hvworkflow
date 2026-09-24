@@ -1,6 +1,6 @@
 # 010c — Lesezustand je Ladevorgang
 
-**Status:** Nacharbeit Runde 3 erledigt, bereit für Review Runde 4 (Code `439f737`)
+**Status:** review bestanden (Runde 4, 24.09.)
 **Risikoklasse:** niedrig · 0,75 AStd · Lanes: web-speakers, web-capture, web-answers, web-stage, web-history, e2e (eigene
 Datei). Startet nach takt-008 (dieselben Feature-Verzeichnisse).
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Barrierefreiheit)
@@ -65,7 +65,7 @@ außerhalb der Features.
 
 ## Bericht
 
-**Status:** Nacharbeit Runde 3 erledigt. Commits Runde 0: `08b8f25` (e2e, rot), `4bf3a0c` (Änderung),
+**Status:** review bestanden (Runde 4, 24.09.)
 `7f17174` (Bericht). Runde 1: `5c83da4` (e2e, rot auf `7f17174`), `5a4f3c5` (Änderung), `30032b7` (Screenshot
 und Bericht). Runde 2: `c43e7a2` (e2e, rot auf `30032b7`), `cae59a5` (Änderung), `6703a26` (Bericht). Runde 3:
 `a59760b` (e2e, rot auf `6703a26`), `439f737` (Änderung, **letzter Code-Commit**), dieser Commit (Bericht).
@@ -417,3 +417,14 @@ Entscheidung des Architekten (Runde 3): im Gate (beide Kopien identisch) alle Fe
 zeigt den ersten, den `omits(id, error)` nicht schluckt; ein Toast je Durchgang bleibt. Unit-Zeile in beiden
 `lib.test.ts` (404, dann 500, dann Liste ohne die Auswahl → gezeigt: 500) und ein e2e mit verzögerter Liste und 500 nach
 dem 404 → genau ein Toast, rot auf `6703a26`.
+
+Runde 4 (enge Nachprüfung nur R3-1, Opus 5.5, frischer Kontext, HEAD `6a007a7`): Gate hält alle Fehler eines
+Durchgangs, zeigt den ersten nicht geschluckten, ein Toast je Durchgang; zwölf Randfälle per Sonde grün (veralteter
+Durchgang, veralteter Ladevorgang, Auswahlwechsel mitten im Durchgang, Pufferschranke, keine Liste). Neue e2e 10/10 mit
+`--repeat-each=5`, rot auf dem alten Gate; Sonde der Runde 3 20/20; 010b + 010c 51/51; Gates exit 0. Urteil: mergebereit.
+
+- **nit** — R3-1-e2e prüft nur die Anzahl der Toasts, nicht den Text (`010c-lesezustand.spec.ts:715-717`).
+- **nit** — Unit-Tabelle deckt nur „Liste zuletzt“ ab, nicht „Liste zuerst“ (`answers/lib.test.ts:151`,
+  `history/lib.test.ts:121`).
+
+Entscheidung des Architekten (Runde 4): beide nits gehen nach 010d (Testschärfung, kein Verhaltensunterschied).
