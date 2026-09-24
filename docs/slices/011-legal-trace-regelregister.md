@@ -192,18 +192,18 @@ nicht umsetzt:
 | Regel-ID | Art | Quelle | Fundstelle | Anmerkung |
 |---|---|---|---|---|
 | R-TRANS-00 | Übergang | Leitplanken | `docs/qualitaetsleitplanken-produktreife.md:175` (Prüfpunkt 6.4: 409 u. a. konsistent mit Regel-ID) | stützt nur das Antwortformat; Terminalität selbst ohne Fundstelle in Recherche/Ist-Analyse (Architekturentscheidung) |
-| R-TRANS-01 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:42-43` (P3: „Frage klassifizieren → Zuordnung zu Pfad A, B oder C") | — |
+| R-TRANS-01 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:42-43` (P3: „Frage klassifizieren → Zuordnung zu Pfad A, B oder C") | teilweise für `agendaItemId` (Recherche:62): optional, keine Mehrfachzuordnung, Umhängen ohne Vermerk (Abschnitt 10) |
 | R-TRANS-02 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:107` (2.4: `classified → expert_answering`, Pflichtfeld „Segment") | offene Lücke: Recherche:221 fordert Personenzuweisung, Regel weist nur eine Einheit zu |
-| R-TRANS-03 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „6 fachliche Beantwortung") | — |
+| R-TRANS-03 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „6 fachliche Beantwortung") | teilweise: Quelle optional statt Pflichtfeld (Rechtekonzept:108, Recherche:101; Abschnitt 10) |
 | R-TRANS-04 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (Pfad C: „7 Legal Clearing"; „ja, eigener Schritt") | — |
 | R-TRANS-05 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:109` (2.4: `legal_clearing → ready_for_stage`, Pflichtfelder Freigabevermerk, Vier-Augen) | nicht umgesetzt: Freigabevermerk, Ersteller ≠ Freigeber (§4, Zeile 156); keine Verhaltensänderung in dieser Scheibe |
 | R-TRANS-06 | Übergang | Rechtekonzept | `docs/rollen-und-rechtekonzept.md:110` (2.4: `legal_clearing → expert_answering`, Pflichtfeld „Rückgabegrund") | ergänzend ist-analyse:90 („Antwort zurückgeben") |
-| R-TRANS-07 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:92` („nur die zugeordneten und freigegebenen Fragen") | — |
-| R-TRANS-08 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A No-Brainer: freie Beantwortung durch den Vorstand) | — |
-| R-TRANS-09 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:89` („vorgelesen, weiter") | — |
+| R-TRANS-07 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:92` („nur die zugeordneten und freigegebenen Fragen") | `stagePosition` nicht belegt (Architekturentscheidung: globale Warteschlange); ist:87 nennt eine andere Sortierung |
+| R-TRANS-08 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A No-Brainer: freie Beantwortung durch den Vorstand) | `stagePosition` wie R-TRANS-07 |
+| R-TRANS-09 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:89` („vorgelesen, weiter") | `answerVersion`: Recherche:103 (Soll-Ist-Abgleich), der Abgleich selbst nicht umgesetzt |
 | R-TRANS-10 | Übergang | Prozess | `docs/ist-analyse-und-schnittstellen.md:58-59` (Antwortprüfung Legal → „Ja: Frage beantwortet") | eigener Abschluss-Schritt, getrennt von R-TRANS-09 |
 | R-TRANS-11 | Übergang | Recherche | `docs/anforderungen-recherche.md:285` (Zähldefinition: „zurückgezogene" als Zählkategorie) | Übergang selbst ohne Fundstelle; Ableitung: NICHT dasselbe wie „Kein Auskunftsanspruch" (Recherche:24) |
-| R-TRANS-12 | Übergang | Recherche | `docs/anforderungen-recherche.md:147` („Dublettenerkennung …") | teilweise: `merged` ist terminal, kein Unmerge, kein Ähnlichkeitsscore |
+| R-TRANS-12 | Übergang | Recherche | `docs/anforderungen-recherche.md:147` („Dublettenerkennung …") | teilweise: `merged` ist terminal, kein Unmerge, kein Ähnlichkeitsscore, Ziel ohne Standprüfung (Abschnitt 10) |
 | R-GUARD-01 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:52` (erst Beantwortung, dann Legal Clearing) | Ableitung: Prüfung setzt Antwort voraus |
 | R-GUARD-02 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:50` (Pfad A: freie Beantwortung ohne Text) | — |
 | R-GUARD-03 | Guard | Prozess | `docs/ist-analyse-und-schnittstellen.md:51-52` (Pfade B/C: Antwort über Publikation bzw. fachliche Beantwortung) | Ableitung: beide mit Text |
@@ -437,6 +437,8 @@ Open:
 - `x-legal-notice` bleibt unverändert (Festlegung 4); der Wortlaut oben ist ein Vorschlag für 023.
 - Der Vorabzug von `docs/legal-trace.md` mit ADR 0012 an Recht (E15) ist Sache des Orchestrator-Tagesberichts
   (Arbeitsweise), nicht dieser Scheibe.
+- Die fachlichen Lücken, die die Zitate offenlegen, stehen als offene Punkte 1–8 in Abschnitt 8 (Punkte 5–8 seit
+  Abschnitt 10: TOP-Zuordnung, Quelle als Pflichtfeld, Merge-Ziel ohne Standprüfung, Bühnenreihenfolge).
 - Der rote Lauf für Punkt 5 (Abschnitt 7) nutzte eine temporäre `R-STALE-01`-Zeile in `rules.ts`, die vor dem
   nächsten Commit vollständig zurückgesetzt wurde (`git diff` danach leer); kein Rest davon ist committet.
 
@@ -476,6 +478,17 @@ abgewichen):
    den Architekten.
 3. Merge reversibel mit Ähnlichkeitsscore (Recherche:147) — keine Scheibe benannt; zur Einordnung.
 4. Zuweisung an Personen statt Einheiten (Recherche:221) — keine Scheibe benannt; zur Einordnung.
+5. TOP-Zuordnung (Recherche:62) — heute optional, genau ein Tagesordnungspunkt, Umhängen nur aus `captured`/
+   `classified` ohne Vermerk „von … nach …", und ein erneutes Klassifizieren ohne Punkt löscht die Zuordnung. Die
+   Recherche fordert ein hartes Pflichtfeld mit Mehrfachzuordnung und Umhängen mit Historie („Ohne TOP-Bezug ist
+   weder die Erforderlichkeit prüfbar …"). Keine Scheibe benannt; zur Einordnung (Abschnitt 10).
+6. Quelle als Pflichtfeld der Antwort (Rechtekonzept:108, Recherche:101) — `sources` ist optional; keine Scheibe
+   benannt; zur Einordnung.
+7. Merge-Ziel ohne Standprüfung (Recherche:147 „gilt als nicht beantwortet") — eine Frage lässt sich in eine
+   zurückgezogene, zusammengeführte oder abgeschlossene Frage zusammenführen und wird dann nie beantwortet; keine
+   Scheibe benannt; zur Einordnung.
+8. Bühnenreihenfolge (ist:87 „nach Fragesteller und vor allem nach Bühnenzuordnung") — heute eine globale
+   Warteschlange; zur Einordnung durch den Architekten.
 
 ### 9. Wirkungen je Regel (Festlegung 6)
 
@@ -492,10 +505,14 @@ aufgeführt.
 |---|---|---|
 | R-TRANS-01 | Stand → `classified` | `docs/ist-analyse-und-schnittstellen.md:42-43` „Frage klassifizieren → Zuordnung zu Pfad A, B oder C" |
 | R-TRANS-01 | Feld `track` | dieselbe Stelle |
-| R-TRANS-01 | Feld `agendaItemId` (Tagesordnungspunkt) | `docs/anforderungen-recherche.md:62` „TOP-Zuordnung als hartes Pflichtfeld" |
+| R-TRANS-01 | Feld `agendaItemId` (Tagesordnungspunkt) | `docs/anforderungen-recherche.md:62` „TOP-Zuordnung als hartes Pflichtfeld, Mehrfachzuordnung erlaubt, Umhängen mit Historie" — teilweise: optional statt Pflichtfeld (`types.ts:246`, `api.ts:535` prüft nur einen genannten Punkt); keine Mehrfachzuordnung (ein einzelner Wert); Umhängen nur durch erneutes Klassifizieren aus `captured`/`classified`, jede Klassifizierung als eigenes Ereignis im Protokoll, aber ohne Vermerk „von … nach …" |
+| R-TRANS-01 | Folge: erneutes Klassifizieren ohne `agendaItemId` entfernt die bestehende Zuordnung (`state.ts:195-196`) | nicht belegt; widerspricht Recherche:62 („hartes Pflichtfeld"), als Teil von „teilweise" benannt |
 | R-TRANS-01 | Feld `stageAssignment` (Bühnenzuordnung) | `docs/ist-analyse-und-schnittstellen.md:80` „Bühnenzuordnung (Aufsichtsrat / Vorstand / CFO)" |
 | R-TRANS-02 | Stand → `assigned`, Feld `unitId` | `docs/rollen-und-rechtekonzept.md:107` „Pflichtfeld Segment" (teilweise: Personenzuweisung aus Recherche:221 nicht umgesetzt) |
 | R-TRANS-03 | Stand → `answer_drafted`, Feld Antwortversion | `docs/ist-analyse-und-schnittstellen.md:52` „6 fachliche Beantwortung" |
+| R-TRANS-03 | Feld `sources` (Quelle), optional (`api.ts:566`) | teilweise: `docs/rollen-und-rechtekonzept.md:108` nennt „Antworttext, Quelle" als Pflichtfelder für `expert_answering → legal_clearing`, `docs/anforderungen-recherche.md:101` „Jede Antwort an eine belastbare Quelle mit Fundstelle gebunden"; hier ist nur der Text Pflicht, auch R-TRANS-04 verlangt keine Quelle |
+| R-TRANS-03 | Folge: eine neue Version holt die Frage aus `in_review` zurück nach `answer_drafted` | nicht belegt (Ableitung: nur die jeweils letzte Version geht über R-TRANS-04 erneut in die Prüfung, R-GUARD-04) |
+| R-TRANS-03 | Folge: ein bestehender Rückgabegrund entfällt (`state.ts`, `AnswerDrafted`) | nicht belegt (Ableitung: er betraf die zurückgegebene Version) |
 | R-TRANS-03 | Folge: eine bestehende Freigabe erlischt (`invalidatedApprovalOfVersion`) | `docs/rollen-und-rechtekonzept.md:163` „Keine Freigabe ohne Bindung an die Textversion. Jede Textänderung nach Freigabe setzt sie zurück." |
 | R-TRANS-04 | Stand → `in_review` | `docs/ist-analyse-und-schnittstellen.md:52` „7 Legal Clearing" |
 | R-TRANS-04 | Feld `answerVersion` | nicht belegt (Ableitung: hält nur die zuletzt entworfene Version fest, R-TRANS-03) |
@@ -503,17 +520,22 @@ aufgeführt.
 | R-TRANS-05 | Pflichtfeld Freigabevermerk, Vier-Augen | nicht umgesetzt (bereits so benannt, `rollen:109`/`156`) |
 | R-TRANS-06 | Stand → `classified` (Podium) / `answer_drafted` (sonst), Feld `reason` | `docs/rollen-und-rechtekonzept.md:110` „Pflichtfeld Rückgabegrund"; ergänzend `ist-analyse:90` |
 | R-TRANS-06 | Verzweigung nach Antwortpfad selbst | nicht belegt (Ableitung: Podiumsfragen durchlaufen `answer_drafted` nie, R-TRANS-08) |
+| R-TRANS-06 | Folge: `stagePosition` entfällt, die Frage verlässt die Bühnen-Warteschlange (`state.ts:240`) | `docs/ist-analyse-und-schnittstellen.md:90` „Antwort zurückgeben" → zurück ins Backoffice |
+| R-TRANS-06 | Folge: bei Rücksprung nach `classified` entfällt eine Freigabe | nicht belegt (Ableitung: eine Podiumsfrage erreicht `approved` nie, die Löschung greift heute ins Leere) |
 | R-TRANS-07 | Stand → `staged` | `docs/ist-analyse-und-schnittstellen.md:92` „es laufen nur die zugeordneten und freigegebenen Fragen ein" |
-| R-TRANS-07 | Feld `stagePosition` | nicht belegt (Ableitung: naheliegende Umsetzung eines Einlaufs mehrerer Fragen) |
+| R-TRANS-07 | Feld `stagePosition` | nicht belegt (Architekturentscheidung: globale Warteschlange); `docs/ist-analyse-und-schnittstellen.md:87` nennt eine andere Sortierung („nach Fragesteller und vor allem nach Bühnenzuordnung") |
 | R-TRANS-08 | Stand → `staged` (Podiumspfad) | `docs/ist-analyse-und-schnittstellen.md:50` „keine Rechtsprüfung vor der Bühne" |
-| R-TRANS-08 | Feld `stagePosition` | nicht belegt (siehe R-TRANS-07) |
+| R-TRANS-08 | Feld `stagePosition` | nicht belegt (Architekturentscheidung: globale Warteschlange, derselbe Zähler wie R-TRANS-07); ist:87 nennt eine andere Sortierung |
 | R-TRANS-09 | Stand → `delivered` | `docs/ist-analyse-und-schnittstellen.md:89` „vorgelesen, weiter" |
-| R-TRANS-09 | Feld `answerVersion` (nur bei Freigabe) | nicht belegt (Ableitung: spiegelt die freigegebene Version, R-TRANS-05) |
+| R-TRANS-09 | Feld `answerVersion` (nur bei Freigabe) | `docs/anforderungen-recherche.md:103` „Soll-Ist-Abgleich der tatsächlich gesprochenen Antwort gegen den freigegebenen Wortlaut" (Ableitung: der Abgleich braucht die freigegebene Version als Soll); nicht umgesetzt: der Abgleich selbst, Overdisclosure-Alarm, Pflichtfeld absichtlich/unabsichtlich |
 | R-TRANS-10 | Stand → `closed` | `docs/ist-analyse-und-schnittstellen.md:58-59`, bereits als „nicht umgesetzt: keine Antwortprüfung durch Legal/FOO/GC" benannt |
+| R-TRANS-10 | Folge: `stagePosition` entfällt (`state.ts:266`) | nicht belegt (Ableitung: die Frage hat die Warteschlange schon mit R-TRANS-09 verlassen, `getStage` zeigt nur `staged`; die Löschung räumt nur das Feld auf) |
 | R-TRANS-11 | Stand → `withdrawn` | nicht belegt (Recherche:285 nennt nur die Zählkategorie, ausdrücklich nicht der Übergang) |
 | R-TRANS-11 | Feld `reason` | nicht belegt |
+| R-TRANS-11 | Folge: `stagePosition` entfällt, eine Frage aus `staged` verlässt die Warteschlange (`state.ts:275`) | nicht belegt (Ableitung: ist:92 lässt nur zugeordnete und freigegebene Fragen einlaufen; eine zurückgezogene gehört nicht mehr dazu) |
 | R-TRANS-12 | Stand → `merged`, Feld `intoQuestionId` | `docs/anforderungen-recherche.md:147` „Dublettenerkennung" (teilweise: kein Unmerge, kein Ähnlichkeitsscore) |
 | R-TRANS-12 | Bestandscheck des Zielobjekts (404-Maskierung wie R-TRANS-00) | nicht belegt (Architekturentscheidung, `requireQuestionFor` in `api.ts`) |
+| R-TRANS-12 | Ziel wird nur auf Bestand, nicht auf seinen Stand hin angenommen (`api.ts:279-288`, `mergeQuestion`): auch ein `withdrawn`-, `merged`- oder `closed`-Ziel | teilweise: `docs/anforderungen-recherche.md:147` „Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet" — die zusammengeführte Frage kommt dann nie mehr auf die Bühne |
 | R-GUARD-01 | Verweigerung: keine Antwortversion vorhanden | `docs/ist-analyse-und-schnittstellen.md:52` „erst 6 fachliche Beantwortung, dann 7 Legal Clearing" |
 | R-GUARD-02 | Verweigerung: Track ≠ `podium` | `docs/ist-analyse-und-schnittstellen.md:50` „No-Brainer: freie Beantwortung" |
 | R-GUARD-03 | Verweigerung: Track = `podium` | `docs/ist-analyse-und-schnittstellen.md:51-52` „Fast Track/Expert Track erzeugen einen Text" |
@@ -616,6 +638,46 @@ nicht mehr der letzte Lauf auf dem tatsächlich committeten Stand. Beide Läufe 
 0 fail), nur der Diff dazwischen ist die Wirkungen-Nacharbeit dieses Abschnitts.
 
 **Nachtrag Orchestrator:** Vor dem Push hat der Orchestrator den fehlenden Vermerk `[skip netlify]` im Betreff ergänzt (`git filter-branch --msg-filter`, nichts war gepusht). Dadurch änderten sich die Commit-Kennungen: `b1f4457` → `f08979a`, `c0d1f1d` → `389fa10`; der Inhalt ist gleich. `pnpm gates` auf `389fa10`, eigener Lauf des Orchestrators: Exit 0.
+
+### 10. Letzte Legal-Befunde
+
+Letzte Nachprüfung Opus 5.5 (Legal), Urteil „nacharbeiten" (0/1/3 + 1 nit). Jede Fundstelle vor der Änderung
+gegen Code und Dokument nachgelesen. Geändert nur `legalRef`-Zitate in `packages/domain/src/transitions.ts`, der
+Schnappschuss `docs/legal-trace.md` (über `npx vitest run -u` in `packages/domain`) und dieser Bericht. Kein
+Verhalten, kein Recht, kein Übergang, kein Guard geändert.
+
+1. **major · R-TRANS-01, Tagesordnungspunkt.** Zitat von Recherche:62 vollständig („… Mehrfachzuordnung
+   erlaubt, Umhängen mit Historie. Ohne TOP-Bezug ist weder die Erforderlichkeit prüfbar …") und „Teilweise für
+   `agendaItemId`" mit drei Teilen. Nachgeprüft: optional (`types.ts:246`; `api.ts:535` prüft nur einen genannten
+   Punkt auf Bestand) — stimmt; keine Mehrfachzuordnung (ein `string`) — stimmt; „Umhängen ohne Historie" stimmt
+   **so nicht**: erneutes Klassifizieren aus `captured`/`classified` hängt ein neues `QuestionClassified`-Ereignis an,
+   das im Verlauf der Frage steht. Das Zitat sagt deshalb genauer: Umhängen nur durch erneutes Klassifizieren und
+   nur aus `captured`/`classified`, jede Klassifizierung als eigenes Ereignis, kein Vermerk „von … nach …", und ein
+   Klassifizieren ohne `agendaItemId` entfernt die Zuordnung (`state.ts:195-196`). Offen Punkt 5 (Abschnitt 8).
+2. **minor · R-TRANS-07/-08, `stagePosition`.** „naheliegende Umsetzung" ersetzt durch „nicht belegt
+   (Architekturentscheidung: globale Warteschlange)"; ist:87 mit der anderen Sortierung zitiert. Nachgeprüft:
+   `stageQuestion` vergibt `stageCounter + 1`, `getStage` sortiert nur danach. Offen Punkt 8.
+3. **minor · fehlende Wirkungen.** R-TRANS-03: `sources` optional (`api.ts:566`) als „teilweise" gegen
+   Rechtekonzept:108 („Antworttext, Quelle"), ergänzend Recherche:101; Rückholung aus `in_review` „nicht belegt"
+   mit Ableitung. R-TRANS-06: `stagePosition` entfällt (`state.ts:240`), belegt durch ist:90. R-TRANS-10
+   (`state.ts:266`) und R-TRANS-11 (`state.ts:275`): „nicht belegt" mit Ableitung. Beim Nachlesen zwei weitere
+   Wirkungen gefunden und ebenso behandelt: R-TRANS-03 löscht einen Rückgabegrund, R-TRANS-06 löscht beim
+   Rücksprung nach `classified` eine Freigabe (beide „nicht belegt", Ableitung). Die Zeitpunkt- und Akteur-Felder
+   aus dem Ereignis (`approvedAt`/`approvedBy`, `deliveredAt`) sind wie `fromStatus`/`toStatus` die
+   Ereignisprotokoll-Pflicht selbst und nicht gesondert aufgeführt. Offen Punkt 6.
+4. **minor · R-TRANS-12, Merge-Ziel.** „Teilweise auch beim Ziel": nur Bestand, nicht der Stand; zurückgezogene,
+   zusammengeführte oder abgeschlossene Ziele werden angenommen, die Frage kommt nie mehr auf die Bühne;
+   Recherche:147 „gilt als nicht beantwortet" zitiert. Nachgeprüft: `mergeQuestion` ruft im `build` nur
+   `requireQuestionFor` (`api.ts:279-288`). Offen Punkt 7.
+5. **nit · R-TRANS-09, `answerVersion`.** Recherche:103 (Soll-Ist-Abgleich gegen den freigegebenen Wortlaut)
+   zitiert, mit „Ableitung:" und „nicht umgesetzt: der Abgleich selbst, Overdisclosure-Alarm, Pflichtfeld
+   absichtlich/unabsichtlich".
+
+Tabelle in Abschnitt 9 entsprechend ergänzt. Festlegung 5 eingehalten: kein Verlaufshinweis und kein „Review"
+oder „geprüft" in den neuen Zitaten (`grep` auf die geänderten Zeilen).
+`git diff --exit-code -- packages/domain/policy-truth-table.md`: leer.
+
+`pnpm gates`-Ende: folgt im nächsten Commit dieses Abschnitts, gelaufen auf dem committeten Stand.
 
 ## Review findings
 
