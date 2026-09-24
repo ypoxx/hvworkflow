@@ -130,14 +130,19 @@ Aus der Claude-Code-Dokumentation und Erfahrungsberichten:
 | Empfohlene Teamgröße | 3–5 Agenten, nicht überlappende Dateien, eigene Worktrees |
 | Kontextdatei (CLAUDE.md / AGENTS.md) | unter 200 Zeilen; alles Weitere in verlinkte Dokumente |
 
-Listenpreise je Million Token (Stand der Preistabelle Juni 2026, vor Nutzung erneut prüfen):
+Listenpreise je Million Token (Stand 24.09.2026, vor Nutzung erneut prüfen). Besetzung seit takt-012
+(Entscheid des Eigentümers vom 24.09.2026):
 
 | Modell | Eingabe | Ausgabe | Rolle in diesem Plan |
 |---|---|---|---|
-| Fable 5.1 | 10 $ | 50 $ | Architektur, Domänenmodell, Sicherheitsreview, letzte Instanz |
-| Opus 5 | 5 $ | 25 $ | Planung je Scheibe, gegnerisches Review |
-| Sonnet 5 | 2 $ | 10 $ | Implementierung Backend und Oberfläche |
-| Haiku 4.5 | 1 $ | 5 $ | Mechanik: Testdaten, Lint-Fixes, Doku-Abgleich, Übersetzungsschlüssel |
+| Opus 5.5 | 4 $ | 20 $ | Architektur, Planung, Implementierung, gegnerisches Review, Design-Kritik |
+| Sonnet 5 | 2 $ | 10 $ | Mechanik ohne Entwurfsentscheidung: Testdaten, Lint-Fixes, Doku-Abgleich, Übersetzungsschlüssel |
+| Fable 5.1 | 10 $ | 50 $ | nicht mehr besetzt |
+| Haiku 4.5 | 1 $ | 5 $ | nicht mehr besetzt (Nachweise am Bautag B1 mehrfach nicht wörtlich) |
+
+Opus 5.5 erreicht nach Anbieterangabe die Qualität von Opus 5 in etwa der Hälfte der Züge und Token;
+am Bautag B1 brauchten Sonnet-Bauten mittlerer und hoher Risikoklasse fast immer eine volle
+Nacharbeitsrunde. Der Preisvorteil günstiger Bauer trägt deshalb nur bei reiner Mechanik.
 
 Cache-Lesezugriffe kosten etwa ein Zehntel des Eingabepreises, Batch-Verarbeitung die Hälfte.
 Stabile, lange Kontexte (AGENTS.md, Spec, OpenAPI) sind deshalb günstig, wechselnde Kontexte teuer.
@@ -153,10 +158,10 @@ beziehen können.
 |---|---|---|
 | R1 | Keine Scheibe ohne Spec. Die Spec nennt Ziel, Nicht-Ziel, betroffene Regel-IDs, Abnahmekriterium und die Dateien, die berührt werden dürfen. | Fehlerklasse 1 (~42 %) |
 | R2 | Eine Scheibe ist ein Tag Arbeit eines Agenten oder kleiner. Größeres wird geteilt. | kleine Diffs sind prüfbar; Rückbau billig |
-| R3 | Wer implementiert, prüft nicht. Review immer durch ein anderes Modell in frischem Kontext, das nur Spec und Diff sieht. | Verifikationslücke; Selbstbestätigung |
+| R3 | Wer implementiert, prüft nicht. Review immer in frischem Kontext (eigener Reviewer-Agent), der nur Spec und Diff sieht; die Unabhängigkeit kommt aus dem Kontext, nicht aus einem anderen Modell. | Verifikationslücke; Selbstbestätigung |
 | R4 | Abschluss nur mit Beweis: Testausgabe, Lint-Report, bei Oberfläche Screenshot. Behauptungen zählen nicht. | stille Fehler |
 | R5 | Deterministische Tore vor jedem Merge, außerhalb der Agentensitzung (CI). Hooks sind die erste Linie, CI die letzte. | Stop-Hook ist überstimmbar |
-| R6 | Teuer plant und prüft, günstig baut. Modellwahl steht in der Rollendefinition, nicht im Ermessen des Agenten. | Kostenhebel bis 14-fach |
+| R6 | Ein starkes Modell plant, baut und prüft; ein günstiges nur reine Mechanik. Modellwahl steht in der Rollendefinition (`.claude/agents/`), nicht in der Spec und nicht im Ermessen des Agenten. | Nacharbeit kostet mehr als der Preisunterschied (Bautag B1) |
 | R7 | Parallel nur auf getrennten Dateien und in eigenen Worktrees. Sonst sequenziell. | Merge-Konflikte fressen den Gewinn |
 | R8 | Höchstens fünf Agenten gleichzeitig; im Zweifel drei. | Abstimmungsfehler (~37 %) wachsen mit der Zahl |
 | R9 | Der Agent bekommt nur den Zugriff der Scheibe: keine Produktionszugänge, keine Echtdaten, kein Deployment ohne Freigabe. | Berechtigungsvorfälle |
@@ -174,20 +179,22 @@ versioniert und für die Entwickler lesbar.
 
 | Rolle | Modell | Aufgabe | Werkzeuge | Kostenklasse |
 |---|---|---|---|---|
-| **Architekt** | Fable 5.1 | Domänenmodell, Statusmaschine, OpenAPI-Vertrag, Regeltabellen, ADRs. Entscheidet Schnitt der Scheiben. Wird selten gerufen, nie für Codezeilen. | lesen, schreiben in `docs/`, `openapi/` | hoch, selten |
-| **Planer** | Opus 5 | Übersetzt eine Scheibe in einen Auftrag: Dateien, Schritte, Tests, Abnahmekriterium. Kein Code. | lesen | mittel, je Scheibe einmal |
-| **Implementierer Backend** | Sonnet 5 | Setzt den Auftrag um, schreibt Tests zuerst, läuft in eigenem Worktree. | lesen, schreiben, Tests ausführen; kein `git push`, kein Netzwerk | niedrig, Hauptvolumen |
-| **Implementierer Oberfläche** | Sonnet 5 | Wie Backend, zusätzlich Screenshot-Pflicht über Playwright. | wie oben plus Browser | niedrig, Hauptvolumen |
-| **Reviewer** | Opus 5 | Sieht nur Spec, Regel-IDs und Diff. Sucht Abweichung von der Spec, fehlende Tests, Hausvokabular, Randfälle. Gibt Befund, ändert nichts. | lesen, Tests ausführen | mittel, je Scheibe einmal |
-| **Mechaniker** | Haiku 4.5 | Synthetische Testdaten, Lint-Korrekturen, Übersetzungsschlüssel DE/EN, Doku-Abgleich, Log-Auswertung. | eng begrenzt je Auftrag | sehr niedrig |
+| **Architekt** | Opus 5.5 | Domänenmodell, Statusmaschine, OpenAPI-Vertrag, Regeltabellen, ADRs. Entscheidet Schnitt der Scheiben. Wird selten gerufen, nie für Codezeilen. | lesen, schreiben in `docs/`, `openapi/` | hoch, selten |
+| **Planer** | Opus 5.5 | Übersetzt eine Scheibe in einen Auftrag: Dateien, Schritte, Tests, Abnahmekriterium. Kein Code. | lesen | mittel, je Scheibe einmal |
+| **Implementierer Backend** | Opus 5.5 | Setzt den Auftrag um, schreibt Tests zuerst, läuft in eigenem Worktree. | lesen, schreiben, Tests ausführen; kein `git push`, kein Netzwerk | niedrig, Hauptvolumen |
+| **Implementierer Oberfläche** | Opus 5.5 | Wie Backend, zusätzlich Screenshot-Pflicht über Playwright. | wie oben plus Browser | niedrig, Hauptvolumen |
+| **Reviewer** | Opus 5.5 | Sieht nur Spec, Regel-IDs und Diff. Sucht Abweichung von der Spec, fehlende Tests, Hausvokabular, Randfälle. Gibt Befund, ändert nichts. | lesen, Tests ausführen | mittel, je Scheibe einmal |
+| **Mechaniker** | Sonnet 5 | Synthetische Testdaten, Lint-Korrekturen, Übersetzungsschlüssel DE/EN, Doku-Abgleich, Log-Auswertung. | eng begrenzt je Auftrag | sehr niedrig |
 
 **Sicherheitsreview** ist keine eigene Rolle, sondern ein Modus des Architekten an den Prüfpunkten 3, 4 und 7, über den gesamten Stand, mit den Ergebnissen der statischen Analyse als Eingabe. Die Sicherheitsperspektive wird je Scheibe im Opus-Review durch die Checkliste `docs/sicherheit/reviewer-checkliste-sicherheit.md` berücksichtigt.
 
-**Warum nicht durchgehend das stärkste Modell?** Weil die Berichte zeigen, dass die Ergebnisqualität
-bei kleinen, gut spezifizierten Scheiben vom Reviewer bestimmt wird, nicht vom Schreiber — und
-weil die Kostendifferenz das Fünffache ist. **Warum nicht durchgehend das günstigste?** Weil
-Domänenmodell, Statusmaschine und Rechtekonzept die Stellen sind, an denen ein Fehler später nicht
-korrigierbar ist. Dort zahlt sich Qualität um Größenordnungen aus.
+**Warum durchgehend Opus 5.5?** Die ursprüngliche Annahme war, dass bei kleinen, gut spezifizierten
+Scheiben der Reviewer die Qualität bestimmt und ein günstiger Schreiber genügt. Am Bautag B1 hat das
+nicht getragen: Sonnet-Bauten mittlerer und hoher Risikoklasse brauchten fast immer eine volle
+Nacharbeitsrunde, Haiku-Nachweise waren mehrfach nicht wörtlich. Opus 5.5 kostet weniger als Opus 5
+und braucht nach Anbieterangabe etwa halb so viele Züge; die gesparte Nacharbeit wiegt den
+Preisunterschied auf. **Warum nicht auch für Mechanik?** Weil dort keine Entwurfsentscheidung fällt und
+ein Fehler im Review sofort sichtbar ist.
 
 **Subagenten statt Agententeams als Standard.** Agententeams (mehrere gleichberechtigte Sitzungen
 mit gemeinsamem Aufgabenspeicher) sind experimentell und kosten das Zwei- bis Siebenfache. Für dieses
@@ -219,6 +226,18 @@ die Erzählung statt den Code.
 
 **Wenn eine Scheibe zweimal durch Schritt 6 geht,** wird sie gestoppt und zurück zum Architekten
 gegeben. Meist ist dann die Spec falsch, nicht der Code.
+
+**Codex als zweiter Prüfer, mit Stoppregel.** Codex prüft den PR nach dem Review und nach der
+Nacharbeit. Einen Merge halten nur auf: P1-Befunde mit nachvollziehbarer Probe und jeder Befund zu
+Sicherheit, Recht oder Datenschutz. Andere P2 werden Folgepunkte in der Spec. Kehrt eine Befundklasse
+wieder, wird die Ursache behoben (ein systematischer Durchgang), nicht der Einzelfall. Nach zwei
+Codex-Läufen ohne neuen P1 entscheidet der Orchestrator über den Merge; ohne diese Regel liefen am
+Bautag B1 Scheiben durch fünf bis sieben Codex-Runden.
+
+**Nachweisform.** Der Bericht nennt den Commit, auf dem `pnpm gates` lief, und fügt den Schluss der
+Ausgabe einmal wörtlich ein. Reine Doku-Commits danach brauchen keinen neuen Lauf; die CI am PR ist
+der laufende Nachweis. Eingefügte Ausgaben, die jede Nacharbeit wieder veralten lässt, sind kein
+Gewinn an Sicherheit.
 
 ---
 
