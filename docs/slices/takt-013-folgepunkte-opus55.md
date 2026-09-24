@@ -96,34 +96,38 @@ takt-012 ihn hinterlassen hat (Fable und Haiku stehen dort als „nicht mehr bes
 ## Bericht
 
 Slice: takt-013-folgepunkte-opus55
-Done: A–F umgesetzt auf `99392d2`: alle 80 Zeilen „*Rolle/Modell:*" in Abschnitt 5 heißen „*Rolle:*" und nennen nur
-Rollen (Sonderfälle 044, 056, Sicherheits-Lesebefunde nach Festlegung 2); Zeile 7, Klammerinhalt 343, Tabelle 6.1,
-Absatz danach, 6.2 und 6.3 ohne Modellnamen und mit frischem Kontext statt anderem Modell; Leitplanken, ADR 0016 (mit
-Satz „Geändert am 24.09.2026"), Branch-Schutz nach Festlegung 1 und 3; Vermerke in bauplan-demo und messung.
+Done: A–F auf `99392d2`, Festlegung 5 auf `9f9a883`: alle 80 Zeilen „*Rolle/Modell:*" in Abschnitt 5 heißen „*Rolle:*"
+und nennen nur Rollen; Zeile 7, Klammerinhalt 343, Tabelle 6.1, Absatz 911, 6.2 und 6.3 sowie die Zeilen aus
+Festlegung 5 (36, 194, 234, 340, 349, 606, 826, 866, 994, 1122) ohne Modellnamen und mit frischem Kontext statt
+anderem Modell; Leitplanken (auch Anleitungstest Zeile 219), ADR 0016 (Satz „Geändert am 24.09.2026"), Branch-Schutz
+nach Festlegung 1 und 3; Vermerke in bauplan-demo und messung nach Festlegung 4.
 Evidence:
 
-Kriterium 1:
+Kriterium 1 (auf `9f9a883`):
 ```
 $ grep -niE "fable|haiku" docs/produktplan-beta.md docs/qualitaetsleitplanken-produktreife.md docs/adr/0016-agenten-arbeitsmodell.md docs/betrieb/branch-schutz.md
-docs/produktplan-beta.md:606:  - *Ziel:* … Höchstes rechtliches Risiko: Opus baut, Sonnet reviewt, Fable prüft stichprobenartig; …
-docs/produktplan-beta.md:826:  - *Ziel:* … Zwei-Stunden-Test durch ein fremdes Modell (Haiku) mit Stolperstellen-Protokoll; …
-docs/produktplan-beta.md:866:**Kleinänderungsspur.** … Haiku oder Sonnet baut, Sonnet oder Opus reviewt. …
-$ grep -niE "anderes? Modell|dasselbe Modell" (dieselben Dateien)
-docs/produktplan-beta.md:911:… Unabhängigkeit im Review entsteht durch frischen Kontext, der nur Spec und Diff sieht, nicht durch ein anderes Modell (Regel 3). …
-docs/produktplan-beta.md:919:- **Review.** … ein Review in frischem Kontext, der nur Spec und Diff sieht (Regel 3); ein anderes Modell ist dafür nicht nötig, wer baut, prüft aber nicht. …
+$ echo $?
+1
+$ grep -niE "anderes? Modell|dasselbe Modell" docs/produktplan-beta.md docs/qualitaetsleitplanken-produktreife.md docs/adr/0016-agenten-arbeitsmodell.md docs/betrieb/branch-schutz.md
+docs/produktplan-beta.md:911:Perspektiven (Security, Datenschutz, Legal, Betrieb) sind Checklisten im Spec und in reviewer.md, keine neuen Agentenrollen. Agentendefinitionen ab 016: architekt.md, planer.md, design-kritiker.md, reviewer.md, reviewer-sonnet.md, implementierer-backend.md, implementierer-oberflaeche.md, mechaniker.md; das Modell je Rolle steht nur dort. Unabhängigkeit im Review entsteht durch frischen Kontext, der nur Spec und Diff sieht, nicht durch ein anderes Modell (Regel 3). Jede Hoch-Spec und jede ADR bekommt vor dem Bau einen Lesebefund des Reviewers in frischem Kontext.
+docs/produktplan-beta.md:919:- **Review.** Jede Scheibe bekommt nach dem ersten grünen Torlauf ein Review in frischem Kontext, der nur Spec und Diff sieht (Regel 3); ein anderes Modell ist dafür nicht nötig, wer baut, prüft aber nicht. Nacharbeit höchstens eine Runde; danach geht die Scheibe an den Planer zurück, weil meist die Spec falsch ist.
 docs/adr/0016-agenten-arbeitsmodell.md:5:Geändert am 24.09.2026 (takt-013): Review-Paarung und die verworfene Option „dasselbe Modell reviewt" an
 docs/adr/0016-agenten-arbeitsmodell.md:7:Kontext, nicht durch ein anderes Modell. Die übrigen Entscheidungen bleiben unverändert.
 docs/adr/0016-agenten-arbeitsmodell.md:33:  wer baut, prüft nicht, auch nicht in derselben Sitzung. Ein anderes Modell ist dafür nicht nötig.
 docs/adr/0016-agenten-arbeitsmodell.md:82:- **Der Bauende reviewt selbst oder in derselben Sitzung.** Verworfen: Regel 3. Dass dasselbe Modell
 docs/adr/0016-agenten-arbeitsmodell.md:83:  in frischem Kontext reviewt, ist dagegen erlaubt (takt-012); ein anderes Modell ist keine Pflicht.
 ```
-(Zeilen 606, 826, 866 hier gekürzt, im Terminal vollständig; die drei Treffer siehe „Open".)
+Alle Treffer sagen, dass kein anderes Modell nötig ist (ADR Zeile 5 zitiert die alte Option im Änderungsvermerk).
 
-Kriterium 2: `grep -c "Rolle/Modell" docs/produktplan-beta.md` → `0`. `git diff` in Abschnitt 5: nur Rollenzeilen und
-Zeile 343 (Klammerinhalt `(Fable)`, `(Opus)`, `(Fable, …)` entfernt). Außerhalb von Abschnitt 5 geändert: Zeile 7,
-6.1-Tabelle und Absatz 911, 6.2 (915), 6.3 (919, 923, 924) sowie außerhalb der genannten Bereiche **Zeile 194**
-(Abschnitt 3, „Haiku:" → „Mechaniker:") und **Zeile 1122** (Risikotabelle, „044 mit Opus-Bau, Sonnet-Review und
-Fable-Stichprobe" → Review in frischem Kontext plus Stichprobe des Architekten) für Kriterium 1.
+Kriterium 2: `grep -c "Rolle/Modell" docs/produktplan-beta.md` → `0`. Geänderte Zeilen in `docs/produktplan-beta.md`
+laut `git diff -U0 ec27a8a` (Beginn der Hunks, `n,k` = k Zeilen ab n):
+`7 36 194 234 315 321 327 333 339,2 343 345 349 351 357 363 369 386 392 398 404 410 416 422 440 446 452 458 464 470 476
+482 488 494 500 506 512 518 524 530 536 542 548 554 560 566 584 590 596 602 606 608 614 620 626 632 638 644 650 667 673
+679 685 691 697 703 709 715 721 727 745 751 757 763 769 775 781 787 804 810 816 822 826 828 834 840 846 852 858 866 901
+903,7 911 915 919 923,2 994 1122`. Davon in Abschnitt 5 (Zeilen 255–896): die 80 Rollenzeilen, 343 (Klammerinhalt),
+dazu nach Festlegung 5 die Zeilen 340, 349, 606, 826, 866 — je nur die Modellnennung; Ziele sonst, Kalender, Lanes,
+Abhängigkeiten und „Stand" unberührt. Außerhalb von Abschnitt 5: 7, 36, 194, 234 (Festlegung 5 bzw. Ziel B), 901–911
+(Tabelle 6.1 mit Absatz), 915, 919, 923–924 (6.2, 6.3), 994, 1122 (Festlegung 5).
 
 Kriterium 3:
 ```
@@ -139,34 +143,28 @@ $ node scripts/plan-honesty.mjs
 Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
 ```
 
-Kriterium 4: `pnpm gates` auf `99392d2` endet mit Exit 1 in `slice-scope`, nur weil der Branch auf takt-011 gestapelt
-ist (Arbeitsweise) und die Integrationsbasis dessen Spec mitzählt:
-```
-slice-scope: 1 file(s) outside "docs/slices/takt-013-folgepunkte-opus55.md"'s "Files allowed" list:
-  docs/slices/takt-011-plan-service-lane.md
- ELIFECYCLE  Command failed with exit code 1.
-```
-Dieselbe Kette mit `node scripts/slice-scope.mjs --base claude/takt-011-plan-service` an dieser Stelle, Exit 0:
+Kriterium 4: nach Festlegung 6 die `gates`-Kette auf `9f9a883` mit `node scripts/slice-scope.mjs --base
+claude/takt-011-plan-service` an Stelle von `pnpm slice-scope`, einschließlich `mark-test-run`, Exit 0, Schluss:
 ```
 packages/domain test:       Tests  72 passed (72)
 apps/web test:       Tests  48 passed (48)
 apps/api test:       Tests  49 passed (49)
 vocabulary-check: ok
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
 slice-scope: 7 changed file(s), all within "docs/slices/takt-013-folgepunkte-opus55.md"'s "Files allowed" list (7 pattern(s)).
 Downgrade check: 13 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
 plan-graph: ok.
 # pass 206
 # fail 0
-✓ built in 1.23s
+✓ built in 1.19s
+mark-test-run: wrote /home/user/wt/prozess/.claude/state/last-test-run (clean tree) at commit 9f9a883, tree 32b789473989…
 ```
-Nach dem Merge von takt-011 ist `pnpm gates` ohne Umweg zu wiederholen (CI am PR).
+Unverändertes `pnpm gates` läuft nach dem Merge von takt-011 (Festlegung 6); dieser Bericht ist ein reiner Doku-Commit
+danach.
 
-Open: Kriterium 1 nicht ganz erfüllt, Konflikt in der Spec: Zeilen 606 und 826 sind Ziele gemergter bzw. geplanter
-Scheiben (044, Doku-Paket), Zeile 866 ist der Absatz 5.9; Nicht-Ziele und Kriterium 2 verbieten Änderungen dort. Der
-Architekt entscheidet, ob diese drei Stellen in einer eigenen Mini-Spec nachgezogen werden. Außerdem stehen „fremdes
-Modell" (Zeile 36, B14; Tabelle 6.1 „Zusätzlich" bei Dokumenten; Leitplanken Zeile 220) für das Befolgen von
-Anleitungen unverändert, weil das kein Review ist. „Opus" bleibt in Zeilen 234, 340, 349, 994 (Abschnitte 3, 5 Ziele/
-Nachweise, 7) als Rollenhinweis stehen; das ist das aktuelle Modell, aber nach Festlegung 2 ebenfalls ein Kandidat.
+Open: Außerhalb der Liste aus Festlegung 5 stehen noch „fremden Modell" in Zeile 797 (Nachweiszeile M6, Anleitungen
+befolgt) und „reviewer-sonnet.md für Opus-gebaute Scheiben" in Ziel 343 außerhalb der Klammern; beide unverändert, weil
+nicht freigegeben. Kein Treffer für Kriterium 1.
 Touched: `docs/produktplan-beta.md`, `docs/qualitaetsleitplanken-produktreife.md`, `docs/bauplan-demo.md`,
 `docs/messung.md`, `docs/adr/0016-agenten-arbeitsmodell.md`, `docs/betrieb/branch-schutz.md`, diese Spec.
 
