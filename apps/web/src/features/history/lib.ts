@@ -31,6 +31,19 @@ export function excerpt(text: string, max = 80): string {
   return text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`;
 }
 
+/**
+ * A denied read (R-PERM-02 "no read permission" or R-PERM-03 "read scope exceeded", slice 010).
+ * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
+ * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
+ * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4).
+ */
+export function isReadForbidden(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = 'status' in error ? (error as { status: unknown }).status : undefined;
+  const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
+  return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
