@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import type { Announcements, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Eye, ListOrdered, Plus, TriangleAlert } from 'lucide-react';
+import { Eye, ListOrdered, Lock, Plus, TriangleAlert } from 'lucide-react';
 import type { Speaker, SpeakerRegistration } from '@hv/domain';
 import { etagOf } from '@hv/domain';
 import { api } from '../../api';
@@ -293,6 +293,9 @@ export function SpeakersPage() {
   ) : undefined;
 
   const empty = status !== 'loading' && view.length === 0;
+  // Ziel 1 (slice 010b): recognised by the 403's ruleId in `useSpeakers`, never by the role
+  // itself (AGENTS.md rule 4) — nothing here names a role.
+  const forbidden = status === 'forbidden';
 
   // m3 (review round 1): the hint sits in the header's own meta slot, next to the title, the same
   // place `registerButton` would go — not a loose line that pushes the rest of the page down.
@@ -305,7 +308,9 @@ export function SpeakersPage() {
       {t('speakers.readonly.hint')}
     </span>
   ) : undefined;
-  const headerMeta = registerButton ?? readOnlyHint;
+  // Slice 010b: a role that cannot even read the list has nothing to register into and no row to
+  // act on — the header shows neither the register button nor the read-only hint while forbidden.
+  const headerMeta = forbidden ? undefined : (registerButton ?? readOnlyHint);
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -315,7 +320,21 @@ export function SpeakersPage() {
         {...(headerMeta !== undefined ? { actions: headerMeta } : {})}
       />
 
-      {status === 'error' && view.length === 0 ? (
+      {forbidden ? (
+        // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+        // (review round 3): a live region mounted together with its content is often not announced,
+        // so this is a hint to assistive technology, not a guaranteed announcement.
+        <div data-testid="speakers-forbidden" role="status" className="grid min-h-0 flex-1">
+          <Panel bodyClassName="grid place-items-center">
+            <EmptyState
+              icon={Lock}
+              title={t('speakers.forbidden.title')}
+              description={t('speakers.forbidden.body')}
+              className="w-full max-w-xl"
+            />
+          </Panel>
+        </div>
+      ) : status === 'error' && view.length === 0 ? (
         <Panel bodyClassName="grid place-items-center">
           <EmptyState
             icon={TriangleAlert}

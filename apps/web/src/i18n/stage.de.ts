@@ -41,4 +41,8 @@ export const stageDe = {
   'stage.contrast.label': 'Kontrast',
   'stage.contrast.enter': 'Kontrast einschalten',
   'stage.contrast.leave': 'Kontrast ausschalten',
+  // Slice 010b: the state a 403 R-PERM-02/03 on `getStage` renders instead of a toast
+  // (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
+  'stage.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
+  'stage.forbidden.body': 'Diese Rolle darf die Bühne nicht lesen.',
 };

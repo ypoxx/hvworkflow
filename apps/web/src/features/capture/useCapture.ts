@@ -23,25 +23,52 @@ export function useHoveredQuestion(): HoveredQuestion {
   return { hoveredQuestionId, onHoverQuestion };
 }
 
-export type LoadStatus = 'loading' | 'ready' | 'error';
+export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden';
 
 export interface AsyncState<T> {
   status: LoadStatus;
   data: T;
   reload: () => void;
+  /**
+   * Minor 1 (review round 5): `status` has answered for the `key` of this very render. Right after
+   * the key changes, `status` still belongs to the previous key until the loading effect has run —
+   * a caller that combines several loads must not read that stale status as the current verdict.
+   */
+  settled: boolean;
+}
+
+/**
+ * A denied read (R-PERM-02 "no read permission" or R-PERM-03 "read scope exceeded", slice 010).
+ * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
+ * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
+ * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4).
+ *
+ * Test gap 8c (review round 2): identical in `speakers/useSpeakers.ts`, `answers/lib.ts`,
+ * `stage/lib.ts` and `history/lib.ts` — see `speakers/useSpeakers.ts`'s copy for why this stays
+ * five small local copies rather than one shared module. Covered by its own test here
+ * (`useCapture.test.ts`).
+ */
+export function isReadForbidden(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = 'status' in error ? (error as { status: unknown }).status : undefined;
+  const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
+  return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
 }
 
 /**
  * One loader with the house's failure behaviour: the data on screen stays while the next answer is
- * fetched (nothing jumps, design principle 8) and a refused call becomes a toast.
+ * fetched (nothing jumps, design principle 8) and a refused call becomes a toast — except a denied
+ * read (Ziel 1, slice 010b), which becomes the `'forbidden'` status instead: a gestalteter Zustand,
+ * never a toast.
  *
  * `key` is what the load depends on — the API version plus the ids of the current selection. It is
  * one string instead of a dependency list so that the dependency of this hook stays checkable.
  */
 export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string): AsyncState<T> {
-  const [state, setState] = useState<{ status: LoadStatus; data: T }>({
+  const [state, setState] = useState<{ status: LoadStatus; data: T; key: string }>({
     status: 'loading',
     data: fallback,
+    key,
   });
   const [token, setToken] = useState(0);
 
@@ -50,20 +77,33 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
   useEffect(() => {
     loaderRef.current = loader;
   });
+  // Same idea, for the value a denied read below resets to — `fallback` is stable in every caller
+  // (a module-level constant such as `NO_SPEAKERS`), but a ref keeps the loading effect's own
+  // dependency list exactly `[token, key]` (the two things the load actually depends on).
+  const fallbackRef = useRef(fallback);
+  useEffect(() => {
+    fallbackRef.current = fallback;
+  });
 
   useEffect(() => {
     let cancelled = false;
-    setState((previous) => ({ status: 'loading', data: previous.data }));
+    setState((previous) => ({ status: 'loading', data: previous.data, key }));
     loaderRef
       .current()
       .then((data) => {
-        if (!cancelled) setState({ status: 'ready', data });
+        if (!cancelled) setState({ status: 'ready', data, key });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        if (isReadForbidden(error)) {
+          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — and the data resets
+          // to the fallback rather than keeping a stale, no-longer-readable list on screen.
+          setState({ status: 'forbidden', data: fallbackRef.current, key });
+          return;
+        }
         // The language is read at call time: a language switch must not re-run the load.
         showProblem(error, translate(getLang(), 'toast.problem'));
-        setState((previous) => ({ status: 'error', data: previous.data }));
+        setState((previous) => ({ status: 'error', data: previous.data, key }));
       });
     return () => {
       cancelled = true;
@@ -71,5 +111,10 @@ export function useAsync<T>(loader: () => Promise<T>, fallback: T, key: string):
   }, [token, key]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
-  return { status: state.status, data: state.data, reload };
+  return {
+    status: state.status,
+    data: state.data,
+    reload,
+    settled: state.key === key && state.status !== 'loading',
+  };
 }

@@ -63,4 +63,8 @@ export const speakersDe = {
   'speakers.error.title': 'Die Wortmeldeliste konnte nicht geladen werden',
   'speakers.error.body': 'Der Bestand ist gerade nicht erreichbar.',
   'speakers.readonly.hint': 'In dieser Rolle nur lesen',
+  // Slice 010b (Lesepfade in der Oberfläche): the state a 403 R-PERM-02/03 on `listSpeakers`
+  // renders instead of a toast (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
+  'speakers.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
+  'speakers.forbidden.body': 'Diese Rolle darf die Wortmeldeliste nicht lesen.',
 };

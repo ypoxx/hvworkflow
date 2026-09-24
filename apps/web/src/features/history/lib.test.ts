@@ -1,40 +1,12 @@
 /**
- * `wordDiff` — the word-level diff behind "Änderung gegenüber Version n-1" (slice 007, point 3).
  * `isReadForbidden` — the sole thing that decides between the "keine Leseberechtigung" state and a
  * generic error toast (slice 010b, Ziel 1/4). Test gap 8c (review round 2): every copy of this
- * function (`speakers/useSpeakers.ts`, `capture/useCapture.ts`, `stage/lib.ts`, `history/lib.ts`)
+ * function (`speakers/useSpeakers.ts`, `capture/useCapture.ts`, `answers/lib.ts`, `stage/lib.ts`)
  * carries the same table, so a change to one that silently drifts from the others fails loudly
  * here.
  */
 import { describe, expect, it } from 'vitest';
-import { createDetailProblemGate, isReadForbidden, wordDiff } from './lib';
-
-describe('wordDiff', () => {
-  it('identical texts yield only equal parts', () => {
-    const text = 'Die Ausschüttungsquote lag bei 47 Prozent.';
-    expect(wordDiff(text, text)).toEqual([{ type: 'equal', text }]);
-  });
-
-  it('an insertion adds a part without touching what was already there', () => {
-    const a = 'Die Quote lag bei 47 Prozent.';
-    const b = 'Die Quote lag bei 47 Prozent. Beleg: Geschäftsbericht Seite 42.';
-    expect(wordDiff(a, b)).toEqual([
-      { type: 'equal', text: 'Die Quote lag bei 47 Prozent.' },
-      { type: 'added', text: 'Beleg: Geschäftsbericht Seite 42.' },
-    ]);
-  });
-
-  it('a replacement removes the old words and adds the new ones', () => {
-    const a = 'Die Quote lag bei 40 Prozent.';
-    const b = 'Die Quote lag bei 47 Prozent.';
-    expect(wordDiff(a, b)).toEqual([
-      { type: 'equal', text: 'Die Quote lag bei' },
-      { type: 'removed', text: '40' },
-      { type: 'added', text: '47' },
-      { type: 'equal', text: 'Prozent.' },
-    ]);
-  });
-});
+import { createDetailProblemGate, isReadForbidden } from './lib';
 
 describe('isReadForbidden', () => {
   it('R-PERM-02 (no read permission): true', () => {

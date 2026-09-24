@@ -138,13 +138,20 @@ describe('i18n parity checks', () => {
   // (`speaker.read`, `contribution.read`, `question.read.delivered`, `stage.read`, `history.read`,
   // `event.read`), needed so `apps/web/src/i18n/labels.ts`'s `ACTION_KEYS` stays an exhaustive map
   // over `Permission` (AGENTS.md rule 10 — every permission label goes through the dictionary).
-  it('(f) Total key count is 442 across all modules and matches de and en', () => {
+  // Slice 010b (Lesepfade in der Oberfläche): +14 versus the 442 of slice 010 — one
+  // `<feature>.forbidden.title`/`.body` pair per main-query read state (speakers, capture, answers,
+  // stage, history: 5 × 2 = 10) plus the two Historie sub-states, `history.timeline.forbidden.*` and
+  // `history.stream.forbidden.*` (2 × 2 = 4), Ziel 1/2/3 of docs/slices/010b-lesepfade-oberflaeche.md.
+  // Nacharbeit nach Review (Runde 2): +1, `answers.history.forbidden` — the Nebenabfrage
+  // `getQuestionHistory` of one open question is refused independently of the Hauptabfrage (major
+  // finding); rendered where its lapsed-approval note would otherwise stand.
+  it('(f) Total key count is 457 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(442);
-    expect(deKeys).toBe(442);
-    expect(enKeys).toBe(442);
+    expect(totalKeys).toBe(457);
+    expect(deKeys).toBe(457);
+    expect(enKeys).toBe(457);
   });
 });

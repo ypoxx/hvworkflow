@@ -154,7 +154,11 @@ export function AnswersPage() {
           />
         }
         right={
-          question === null ? (
+          // Minor 6 (review round 2): the backlog is itself unreadable (e.g. podium) — "select a
+          // question on the left" is not honest when there is no left to select one from. The
+          // Hauptabfrage's own gestalteter Zustand (`answers-forbidden`, WorkList.tsx) already
+          // covers the whole story; the right pane says nothing rather than something misleading.
+          backlog.listForbidden ? null : question === null ? (
             <Panel className="h-full" bodyClassName="flex items-center justify-center">
               <EmptyState
                 icon={FileQuestion}
@@ -185,6 +189,7 @@ export function AnswersPage() {
                   key={question.id}
                   question={question}
                   history={backlog.selectedHistory}
+                  historyForbidden={backlog.selectedHistoryForbidden}
                   units={backlog.units}
                   busy={busy}
                   draftResetToken={draftResetToken}

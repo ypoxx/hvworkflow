@@ -7,7 +7,7 @@
  * `question._actions`. What may not be done is not shown — it is not greyed out (principle 9).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Eye, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Lock, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
 import { Link } from 'react-router';
 import type { DomainEvent, Question, Unit } from '@hv/domain';
 import { TERMINAL_STATUSES } from '@hv/domain';
@@ -84,8 +84,13 @@ export type DetailAction =
 
 interface QuestionDetailProps {
   question: Question;
-  /** The events of this question; carries the fact of a lapsed approval. */
+  /** The events of this question; carries the fact of a lapsed approval. Empty, and meaningless,
+   *  while `historyForbidden` is true. */
   history: readonly DomainEvent[];
+  /** Major (review round 2): `getQuestionHistory` is a Nebenabfrage of this one question, fetched
+   *  and can fail on its own — this shows the refused state exactly where the lapsed-approval note
+   *  would otherwise stand, instead of silently pretending there never was one. */
+  historyForbidden: boolean;
   units: readonly Unit[];
   busy: boolean;
   /** Bumped by the page after a version was written; the editor then starts empty again. */
@@ -186,6 +191,7 @@ function VersionCard({
 export function QuestionDetail({
   question,
   history,
+  historyForbidden,
   units,
   busy,
   draftResetToken,
@@ -432,6 +438,22 @@ export function QuestionDetail({
               </>
             )}
           </div>
+
+          {/* Major (review round 2): the Nebenabfrage `getQuestionHistory` failed for this one
+           * question — put the refused state exactly where its finding (a lapsed approval) would
+           * otherwise stand, `role="status"` marks it as a status message (minor 5) — a
+           * hint to assistive technology, not a guaranteed announcement: a live region mounted
+           * together with its content is often not announced (nit 6, review round 3). */}
+          {historyForbidden && (
+            <p
+              data-testid="answers-history-forbidden"
+              role="status"
+              className="flex items-center gap-2 rounded-md border border-line-strong bg-ink-50 px-3 py-2 text-[13px] text-ink-600"
+            >
+              <Lock size={16} strokeWidth={1.75} className="shrink-0 text-ink-400" aria-hidden="true" />
+              {t('answers.history.forbidden')}
+            </p>
+          )}
 
           {/* A seal the newest text has voided. Read from the event log, never from the status. */}
           {lapsed !== undefined && (

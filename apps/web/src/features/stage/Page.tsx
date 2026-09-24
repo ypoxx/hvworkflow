@@ -10,15 +10,25 @@
  * away for a minute cannot overwrite a return that happened in the meantime.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Contrast, Maximize2, Minimize2 } from 'lucide-react';
+import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
+import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
-import { Button, Dialog, Panel, PageHeader, cx, showProblem, showToast } from '../../components';
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  Panel,
+  PageHeader,
+  cx,
+  showProblem,
+  showToast,
+} from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { Podium, StageQueue } from './Podium';
-import { isInteractiveTarget } from './lib';
+import { isInteractiveTarget, isReadForbidden } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -152,6 +162,9 @@ export function StagePage() {
 
   const [stage, setStage] = useState<StageView | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ziel 1 (slice 010b): `getStage` is the Hauptabfrage of the Bühne — set from the 403's ruleId
+  // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
+  const [forbidden, setForbidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
@@ -165,22 +178,74 @@ export function StagePage() {
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
+  // Minor A (review round 4): the record on screen, kept apart from `stageRef` — a load that fails
+  // with anything but a read refusal hands the shortcuts back the record the podium still shows.
+  const shownRef = useRef<StageView | null>(null);
   useEffect(() => {
     stageRef.current = stage;
+    shownRef.current = stage;
   }, [stage]);
+
+  /**
+   * Minor B (review round 4): an actor change on an open page decides the layout afresh — back to
+   * the `stage-deciding` skeleton until this actor's first `getStage` answer is in, so a stored
+   * "Nur Bühne" overlay of the previous role does not stand for one response time. Only on an
+   * actor change, never on an ordinary event (design principle 8). Adjusted during render, so not
+   * even one frame of the old overlay is committed.
+   *
+   * Nit 3 (review round 5): the actor is compared by its `id` — stable across a fresh identity
+   * object for the same person (an OIDC token refresh) — never by role name (AGENTS.md rule 4).
+   * Codex P2-B on 948a721: the previous actor's record is dropped here too, so no later failure
+   * (minor A, review round 4) can hand it back to the shortcuts or the screen.
+   */
+  const actorId = useActor().id;
+  const [layoutActorId, setLayoutActorId] = useState(actorId);
+  if (layoutActorId !== actorId) {
+    setLayoutActorId(actorId);
+    setLoading(true);
+    setStage(null);
+    setForbidden(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
+    // Minor 4 (review round 3): `version` bumps on every actor switch (api/useApiVersion.ts). Until
+    // this version's own answer is in, the keyboard has no record to act on — the previous one
+    // may belong to a role that could read (and deliver) what this one cannot. Only the ref the
+    // shortcuts read is cleared: blanking the visible podium on every bump would make it jump on
+    // every new event too (design principle 8), and the fresh answer replaces it within the load.
+    stageRef.current = null;
+    // Codex P2-B on 948a721: every answer is tied to the actor it was asked for. The actor can
+    // change while the request is on its way, and the answer can arrive before the `version` bump
+    // that would cancel this effect — it then belongs to the previous actor, with that actor's
+    // question and `_actions`, and is dropped. `getActor()` is read at the moment of the answer, not
+    // from React state, so no render has to happen first.
+    const requestedBy = getActor().id;
+    const stale = (): boolean => cancelled || getActor().id !== requestedBy;
     api
       .getStage()
       .then((next) => {
-        if (cancelled) return;
+        if (stale()) return;
         setStage(next);
         setLoading(false);
+        setForbidden(false);
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (stale()) return;
         setLoading(false);
+        if (isReadForbidden(error)) {
+          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast. Minor 4 (review round
+          // 2): `setStage(null)` too — a role that has just lost `stage.read` (a role switch bumps
+          // `version`) must not go on reading out or returning a previous role's stale question
+          // with Space/R (the keyboard handler below reads `stageRef.current`, which this clears).
+          setStage(null);
+          setForbidden(true);
+          return;
+        }
+        // Minor A (review round 4): the podium goes on showing the last record it had, so the
+        // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
+        // next event. The server still decides every write (a stale record meets its 412/403).
+        stageRef.current = shownRef.current;
         // The language is read at call time so that a language switch does not refetch the podium.
         showProblem(error, translate(getLang(), 'toast.problem'));
       });
@@ -302,6 +367,10 @@ export function StagePage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      // Minor 4 (review round 2): a role without `stage.read` has no current question of its own
+      // to act on — `stage` is `null` (cleared above) by the time this can fire, but the shortcuts
+      // are refused outright rather than relying on `deliver`/`setReturnOpen` to no-op quietly.
+      if (forbidden) return;
       if (returnOpen) return; // the dialog owns the keyboard
       // B1 (review round 1): the queue preview (`QueuePreview` in Podium.tsx) is a dialog too, and
       // it has no state of its own up here to check like `returnOpen` — Space must not deliver the
@@ -330,14 +399,19 @@ export function StagePage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deliver, returnOpen]);
+  }, [deliver, returnOpen, forbidden]);
 
   /**
-   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, the same shape
-   * `loading` already uses, so a role whose default turns out to be "Nur Bühne" never flashes the
-   * ordinary shell first (design-prinzipien.md #8, "nichts springt").
+   * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, so a role whose
+   * default turns out to be "Nur Bühne" never flashes the ordinary shell first
+   * (design-prinzipien.md #8, "nichts springt").
+   *
+   * Minor 4 (review round 3): nor until the first `getStage` answer is known (`loading`). A stored
+   * "Nur Bühne" is decided at once, but whether it applies depends on that answer — a role refused
+   * `stage.read` gets the ordinary layout — so the fullscreen overlay and its counters used to
+   * flash for the length of the load and then jump away.
    */
-  if (stageOnly === null) {
+  if (stageOnly === null || loading) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4" data-testid="stage-deciding">
         <PageHeader title={t('page.stage.title')} description={t('page.stage.description')} />
@@ -407,15 +481,21 @@ export function StagePage() {
     </Button>
   );
 
-  const podium = loading ? (
+  const podium = forbidden ? (
+    // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+    // (review round 3): a live region mounted together with its content is often not announced,
+    // so this is a hint to assistive technology, not a guaranteed announcement.
     <div
-      aria-busy="true"
-      aria-label={t('answers.list.loading')}
-      className="flex min-h-0 flex-1 flex-col gap-4"
+      data-testid="stage-forbidden"
+      role="status"
+      className="flex min-h-0 flex-1 items-center justify-center"
     >
-      <div className="h-5 w-40 animate-pulse rounded-sm bg-ink-50" />
-      <div className="h-16 w-3/4 animate-pulse rounded-sm bg-ink-50" />
-      <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
+      <EmptyState
+        icon={Lock}
+        title={t('stage.forbidden.title')}
+        description={t('stage.forbidden.body')}
+        className="max-w-xl"
+      />
     </div>
   ) : (
     <Podium
@@ -435,7 +515,11 @@ export function StagePage() {
     />
   );
 
-  if (stageOnly) {
+  // Minor 4 (review round 2): a stored "Nur Bühne" choice (`hv-stage-only-v1=1`) is a fact about
+  // the device, not about whether this role may currently read the stage at all — a role that has
+  // lost `stage.read` since falls back to the ordinary layout below, rather than a fullscreen
+  // overlay whose own counters/contrast/toggle chrome would have nothing real to show either.
+  if (stageOnly && !forbidden) {
     return (
       <div
         data-testid="stage-only"
@@ -449,6 +533,8 @@ export function StagePage() {
         </div>
         <div className="flex min-h-0 flex-1 gap-8 px-8 py-6">
           {podium}
+          {/* Minor 4 (review round 3): no `!forbidden` guard here — this overlay only renders for
+           *  a role that can read the stage (see the condition above). */}
           <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
             <StageQueue stage={view} />
           </aside>
@@ -463,22 +549,28 @@ export function StagePage() {
       <PageHeader
         title={t('page.stage.title')}
         description={t('page.stage.description')}
-        actions={
-          <>
-            {counters}
-            {toggle}
-          </>
-        }
+        {...(forbidden
+          ? {}
+          : {
+              actions: (
+                <>
+                  {counters}
+                  {toggle}
+                </>
+              ),
+            })}
       />
       <div className="flex min-h-0 flex-1 gap-4">
         <Panel className="min-w-0 flex-1" bodyClassName="flex min-h-0 flex-col">
           {podium}
         </Panel>
-        <div className="hidden w-72 shrink-0 lg:block">
-          <Panel className="h-full" bodyClassName="flex min-h-0 flex-col">
-            <StageQueue stage={view} />
-          </Panel>
-        </div>
+        {!forbidden && (
+          <div className="hidden w-72 shrink-0 lg:block">
+            <Panel className="h-full" bodyClassName="flex min-h-0 flex-col">
+              <StageQueue stage={view} />
+            </Panel>
+          </div>
+        )}
       </div>
       {dialog}
     </div>

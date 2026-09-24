@@ -31,6 +31,24 @@ export function excerpt(text: string, max = 80): string {
   return text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`;
 }
 
+/**
+ * A denied read (R-PERM-02 "no read permission" or R-PERM-03 "read scope exceeded", slice 010).
+ * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
+ * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
+ * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4).
+ *
+ * Test gap 8c (review round 2): identical in `speakers/useSpeakers.ts`, `capture/useCapture.ts`,
+ * `answers/lib.ts` and `stage/lib.ts` — see `speakers/useSpeakers.ts`'s copy for why this stays
+ * five small local copies rather than one shared module. Covered by its own test here
+ * (`lib.test.ts`).
+ */
+export function isReadForbidden(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = 'status' in error ? (error as { status: unknown }).status : undefined;
+  const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
+  return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -109,4 +127,70 @@ export function loadCurve(events: readonly DomainEvent[], now: number): number[]
     counts[index] = (counts[index] ?? 0) + 1;
   }
   return counts;
+}
+
+/**
+ * Codex (b) on 7f542b6, Codex P2-2 on 4f0d231 and Codex P2-A on 948a721 — one class of bug: a
+ * detail read (the one selected question) runs next to the view's Hauptabfrage (the list). After
+ * a role switch the selected question may no longer be readable, and its detail read then answers
+ * with the masked 404 (Festlegung 3 of docs/slices/010-lesepfade-leserechte.md), which
+ * `isReadForbidden` rightly does not treat as a read refusal — so it used to become an error toast.
+ * Two shapes: the list itself is refused (podium, R-PERM-02), or the list succeeds but, scoped,
+ * no longer contains the question (observer, `question.read.delivered`, and an undelivered one).
+ *
+ * The gate holds a detail read's failure back until the Hauptabfrage of the same load (`load`,
+ * e.g. the API version) has answered. It is dropped when that answer was a refusal or is known to
+ * leave the question out (`omits`); otherwise it is shown — once per selection pass, however many
+ * detail reads of it fail (minor 2, review round 3). Nit 2 (review round 5): a pass starts with
+ * every `select()`, so A (failed, shown), B, then A again reports A's failure afresh. A load the
+ * next one overtakes never reports: its successor reads again. Nothing here holds the reads
+ * themselves back (nit C, review round 4) — only the toast waits.
+ *
+ * Kept as a small local copy per feature that has a detail read (`answers/lib.ts`,
+ * `history/lib.ts`), like `isReadForbidden` (test gap 8c, review round 2); covered by the same test
+ * table in each feature's `lib.test.ts`.
+ */
+export interface DetailProblemGate {
+  /** The selection changed: a new pass begins. */
+  select(): void;
+  /**
+   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id)`: its answer is
+   * known to leave `id` out — only a complete, unfiltered list can know that; a filtered one says
+   * nothing about what it does not show.
+   */
+  settleMain(load: string, refused: boolean, omits?: (id: string) => boolean): void;
+  /** A detail read of `id` in `load` failed with something other than a read refusal. */
+  report(load: string, id: string, error: unknown): void;
+}
+
+export function createDetailProblemGate(show: (error: unknown) => void): DetailProblemGate {
+  let verdict: { load: string; refused: boolean; omits: (id: string) => boolean } | null = null;
+  let pass = 0;
+  let pending: { load: string; pass: number; id: string; error: unknown } | null = null;
+  let shown: string | null = null;
+  const flush = (): void => {
+    if (pending === null || verdict === null || pending.load !== verdict.load) return;
+    const { load, id, error } = pending;
+    const key = `${load}:${pending.pass}`;
+    pending = null;
+    if (verdict.refused || verdict.omits(id) || key === shown) return;
+    shown = key;
+    show(error);
+  };
+  return {
+    select() {
+      pass += 1;
+      pending = null;
+    },
+    settleMain(load, refused, omits = () => false) {
+      verdict = { load, refused, omits };
+      flush();
+    },
+    report(load, id, error) {
+      const key = `${load}:${pass}`;
+      if (key === shown || (pending !== null && `${pending.load}:${pending.pass}` === key)) return;
+      pending = { load, pass, id, error };
+      flush();
+    },
+  };
 }

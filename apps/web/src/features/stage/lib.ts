@@ -30,3 +30,22 @@ export function isInteractiveTarget(target: EventTarget | null): boolean {
     ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)
   );
 }
+
+/**
+ * A denied read (R-PERM-02 "no read permission" or R-PERM-03 "read scope exceeded", slice 010).
+ * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
+ * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
+ * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4) — e.g. expert, who
+ * holds `question.read` but no `stage.read`.
+ *
+ * Test gap 8c (review round 2): identical in `speakers/useSpeakers.ts`, `capture/useCapture.ts`,
+ * `answers/lib.ts` and `history/lib.ts` — see `speakers/useSpeakers.ts`'s copy for why this stays
+ * five small local copies rather than one shared module. Covered by its own test here
+ * (`lib.test.ts`).
+ */
+export function isReadForbidden(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = 'status' in error ? (error as { status: unknown }).status : undefined;
+  const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
+  return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
+}
