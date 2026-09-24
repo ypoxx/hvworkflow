@@ -14,6 +14,7 @@ import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
+import { useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import {
   Button,
@@ -177,9 +178,28 @@ export function StagePage() {
 
   // The keyboard handler must see the current record without being rebound on every fetch.
   const stageRef = useRef<StageView | null>(null);
+  // Minor A (review round 4): the record on screen, kept apart from `stageRef` — a load that fails
+  // with anything but a read refusal hands the shortcuts back the record the podium still shows.
+  const shownRef = useRef<StageView | null>(null);
   useEffect(() => {
     stageRef.current = stage;
+    shownRef.current = stage;
   }, [stage]);
+
+  /**
+   * Minor B (review round 4): an actor change on an open page decides the layout afresh — back to
+   * the `stage-deciding` skeleton until this actor's first `getStage` answer is in, so a stored
+   * "Nur Bühne" overlay of the previous role does not stand for one response time. Only on an
+   * actor change, never on an ordinary event (design principle 8). The actor is compared by
+   * identity, never by role name (AGENTS.md rule 4); adjusted during render, so not even one frame
+   * of the old overlay is committed.
+   */
+  const actor = useActor();
+  const [layoutActor, setLayoutActor] = useState(actor);
+  if (layoutActor !== actor) {
+    setLayoutActor(actor);
+    setLoading(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +229,10 @@ export function StagePage() {
           setForbidden(true);
           return;
         }
+        // Minor A (review round 4): the podium goes on showing the last record it had, so the
+        // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
+        // next event. The server still decides every write (a stale record meets its 412/403).
+        stageRef.current = shownRef.current;
         // The language is read at call time so that a language switch does not refetch the podium.
         showProblem(error, translate(getLang(), 'toast.problem'));
       });
