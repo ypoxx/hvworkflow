@@ -553,6 +553,278 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
   `010b-stage-expert-{de,en}.png` (neu erzeugt, inhaltlich unverändert)
 - `docs/slices/010b-lesepfade-oberflaeche.md` (diese Nacharbeit)
 
+## Nacharbeit Runde 3
+
+Runde 3: Nachprüfung Opus 5.5 auf 7f542b6 (Urteil „annehmen“, 5 Minor, 2 Nits), dazu Codex auf
+7f542b6 (zwei P2). Befunde und Umgang stehen unter „Review findings“. Zuerst kamen die Tests
+(Commit `6683469`), dann die Fixes, je Bereich ein Commit:
+
+| Punkt | Commit |
+|---|---|
+| Runde 3 Befund 1 (Erfassung) | `d1d1d1e` |
+| Runde 3 Befund 2, **Codex (a)** und **Codex (b)** (Beantwortung) | `5e1cb30` |
+| Runde 3 Befund 4 (Bühne) | `2a6c70a` |
+| Runde 3 Befunde 3 und 5 (nur Tests) | `6683469` |
+| Nit 6 (Kommentare zu `role="status"`) | `809ce5c`, Erfassung und Bühne in `d1d1d1e`/`2a6c70a` |
+| Nit 7 (Bericht) | dieser Bericht-Commit |
+
+Die neuen e2e hängen sich an das In-Process-API (ADR 0002). Vites Dev-Server gibt `page.evaluate`
+dieselbe Modulinstanz `/src/api/index.ts`, die die App nutzt. Der Test ersetzt dort eine
+`HvApi`-Methode, um Aufrufe zu zählen, eine Antwort zu verzögern oder einen 500 zu liefern. Code
+außerhalb der erlaubten Dateien wird dabei nicht geändert.
+
+1. **Erfassung** (`capture/Page.tsx`): die Probe `listContributions()` läuft nur, solange keine
+   Wortmeldung aufgelöst ist. `forbidden` kommt aus der Probe oder aus der Abfrage je Wortmeldung.
+2. **Beantwortung** (`answers/useBacklog.ts`):
+   - Der Verlauf wird mit seiner `questionId` gespeichert und nur weitergegeben, wenn er zu
+     `selected.id` gehört.
+   - Scheitern beide Detailabfragen einer Auswahl, erscheint höchstens ein Toast.
+   - Codex (b): die Detailabfragen warten, bis die Liste für dieselbe `version`/`nonce`
+     geantwortet hat. Bei verweigerter Liste laufen sie nicht, die Auswahl wird geleert.
+   - Beim Laden bleibt das angezeigte Detail stehen (Prinzip 8).
+3. **Ereignisstrom:** nur ein Test, der Fix stammt aus Runde 2.
+4. **Bühne** (`stage/Page.tsx`):
+   - Das Layout wartet auf die erste `getStage`-Antwort (`stage-deciding`), das Overlay blitzt
+     nicht mehr auf.
+   - Bei jedem Laden wird `stageRef` geleert. Leertaste und R wirken erst auf die Antwort der
+     aktuellen `version`.
+   - Das tote `!forbidden` im Overlay ist entfernt.
+   - Der Ladezweig in `podium` ist entfallen, weil er nicht mehr erreichbar ist.
+   - Abweichung vom Vorschlag: der sichtbare `stage`/`forbidden`-Zustand wird bei einem
+     `version`-Wechsel nicht zurückgesetzt. Begründung unter „Review findings“, Befund 4.
+5. **Leertaste nach Rollenwechsel:** nur ein Test, der Fix stammt aus Runde 2.
+6. **Nit 6:** die Kommentare zu `role="status"` versprechen keine Ansage mehr.
+7. **Nit 7 — Korrektur zu „Nacharbeit nach Review und Codex“ oben:** die Fixes zu Nit 9
+   (Stammdaten getrennt von `listQuestions`) und Nit 10 (`speakerNames` wird bei Verweigerung
+   geleert) in `history/Page.tsx` sind **ohne Test, nicht beobachtbar**.
+   - Nit 9: `listUnits`/`listAgendaItems` scheitern für keine Rolle, und unter podium steht ohnehin
+     die ganze Ansicht im Zustand „keine Leseberechtigung“.
+   - Nit 10: `speakerNames` liest nur der Ereignisstrom. `event.read` hält nur admin, und admin hat
+     immer auch `speaker.read` (siehe Test gap 8a).
+
+**Rote Läufe.** Wörtlich kopiert. Mein Filter `grep -v "^\s*$"` hat nur Leerzeilen entfernt.
+
+(a) Befunde 1, 2 und 4 sowie Codex (b), auf dem Code von 7f542b6 mit den neuen Tests
+(`E2E_PORT=4391 npx playwright test e2e/010b-lesepfade.spec.ts --grep "Runde 3|Codex"
+--reporter=list`):
+- Die Tests 3 und 5 waren hier grün, siehe (c).
+- Test 2 scheiterte in diesem ersten Lauf an der Vorbereitung: in der sichtbaren Liste gab es
+  keine Zeile `new`. Er filtert seitdem über den Chip „zugewiesen“. Sein roter Lauf steht unter (b).
+
+```
+Running 7 tests using 1 worker
+  ✘  1 [chromium] › e2e/010b-lesepfade.spec.ts:420:1 › Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein 500 bringt einen Toast (2.2s)
+  ✘  2 [chromium] › e2e/010b-lesepfade.spec.ts:472:1 › Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage (6.9s)
+  ✘  3 [chromium] › e2e/010b-lesepfade.spec.ts:514:1 › Runde 3 (2): Beantwortung — scheitern Einzelfrage und Verlauf beide, erscheint ein Toast (7.1s)
+  ✘  4 [chromium] › e2e/010b-lesepfade.spec.ts:538:1 › Codex (b): Beantwortung — Rollenwechsel ohne Leserecht bei offener Einzelfrage bringt keinen Toast (7.6s)
+  ✓  5 [chromium] › e2e/010b-lesepfade.spec.ts:560:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin (3.1s)
+  ✘  6 [chromium] › e2e/010b-lesepfade.spec.ts:587:1 › Runde 3 (4): Bühne — ein gespeichertes "Nur Bühne" blitzt nicht auf, bevor getStage antwortet (7.0s)
+  ✓  7 [chromium] › e2e/010b-lesepfade.spec.ts:626:1 › Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Leertaste liefert nichts aus (2.1s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:420:1 › Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein 500 bringt einen Toast 
+    Error: expect(received).toEqual(expected) // deep equality
+    - Expected  - 1
+    + Received  + 3
+    - Array []
+    + Array [
+    +   null,
+    + ]
+      465 |   // A Wortmeldung is resolved, so no unfiltered call of the whole corpus is needed any more …
+      466 |   const calls = await page.evaluate(() => (window as unknown as Probe).__calls);
+    > 467 |   expect(calls.filter((call) => call === null)).toEqual([]);
+          |                                                 ^
+      468 |   // … and one failed load is one toast, not two.
+      469 |   await expect(toasts(page)).toHaveCount(1);
+      470 | });
+  3) [chromium] › e2e/010b-lesepfade.spec.ts:514:1 › Runde 3 (2): Beantwortung — scheitern Einzelfrage und Verlauf beide, erscheint ein Toast 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  locator('[aria-live="polite"] [role="status"]')
+    Expected: 1
+    Received: 2
+    Timeout:  5000ms
+      533 |   await expect(toasts(page).first()).toBeVisible();
+      534 |   await settle(page);
+    > 535 |   await expect(toasts(page)).toHaveCount(1);
+          |                              ^
+  4) [chromium] › e2e/010b-lesepfade.spec.ts:538:1 › Codex (b): Beantwortung — Rollenwechsel ohne Leserecht bei offener Einzelfrage bringt keinen Toast 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  locator('[aria-live="polite"] [role="status"]')
+    Expected: 0
+    Received: 2
+    Timeout:  5000ms
+        at expectNoErrorToast (/home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:76:70)
+        at /home/user/wt/010b/apps/web/e2e/010b-lesepfade.spec.ts:556:3
+  5) [chromium] › e2e/010b-lesepfade.spec.ts:587:1 › Runde 3 (4): Bühne — ein gespeichertes "Nur Bühne" blitzt nicht auf, bevor getStage antwortet 
+    Error: expect(locator).toBeVisible() failed
+    Locator: getByTestId('stage-deciding')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+    > 615 |   await expect(page.getByTestId('stage-deciding')).toBeVisible();
+          |                                                    ^
+  5 failed
+  2 passed (44.6s)
+```
+
+In diesem Block sind Call-Log-, Trace- und Error-Context-Zeilen weggelassen. Den Block zu Test 2
+zeigt (b). Sonst ist nichts verändert.
+
+(b) Befund 2 / Codex (a), die fertige Testfassung auf dem Code von 7f542b6
+(`--grep "Codex \(a\)"`):
+
+```
+Running 1 test using 1 worker
+  ✘  1 [chromium] › e2e/010b-lesepfade.spec.ts:472:1 › Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage (7.3s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:472:1 › Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  getByTestId('approval-lapsed')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByTestId('approval-lapsed')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+      511 |   await expect(page.getByTestId('answers-detail-number')).toHaveText(second ?? '');
+      512 |   await settle(page);
+    > 513 |   await expect(page.getByTestId('approval-lapsed')).toHaveCount(0);
+          |                                                     ^
+  1 failed
+```
+
+(c) Befunde 3 und 5: auf 7f542b6 grün, weil der Fix aus Runde 2 schon da war. Für den roten Lauf
+habe ich diesen Fix vorübergehend zurückgenommen und danach wiederhergestellt:
+- in `history/Page.tsx`: `setStreamLastSeq(0)` und die `streamForbidden`-Weiche der Beschreibung;
+- in `stage/Page.tsx`: `setStage(null)` und `if (forbidden) return;`.
+
+```
+Running 2 tests using 1 worker
+  ✘  1 [chromium] › e2e/010b-lesepfade.spec.ts:562:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin (7.8s)
+  ✘  2 [chromium] › e2e/010b-lesepfade.spec.ts:628:1 › Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Leertaste liefert nichts aus (2.0s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:562:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin 
+    Error: expect(locator).toHaveCount(expected) failed
+    Locator:  getByText(/Die letzten \d+ Ereignisse/)
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+    > 577 |   await expect(countLine).toHaveCount(0);
+          |                           ^
+  2) [chromium] › e2e/010b-lesepfade.spec.ts:628:1 › Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Leertaste liefert nichts aus 
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: 0
+    Received: 1
+    > 662 |   expect(await page.evaluate(() => (window as unknown as Probe).__calls.length)).toBe(0);
+          |                                                                                  ^
+  2 failed
+```
+
+In einem zweiten Lauf habe ich nur `setStreamLastSeq(0)` zurückgenommen. Dieser Lauf zeigt, dass
+Test 3 auch das Zurücksetzen von `streamLastSeq` prüft:
+
+```
+Running 1 test using 1 worker
+  ✘  1 [chromium] › e2e/010b-lesepfade.spec.ts:562:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin (7.8s)
+  1) [chromium] › e2e/010b-lesepfade.spec.ts:562:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin 
+    Error: expect(locator).toBeVisible() failed
+    Locator: getByTestId('history-stream')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+      580 |   // Back to admin: `streamLastSeq` was rewound, so the unchanged log is read again, not skipped.
+      581 |   await asRole(page, 'admin');
+    > 582 |   await expect(page.getByTestId('history-stream')).toBeVisible();
+          |                                                    ^
+  1 failed
+```
+
+**Grüner Lauf** nach den Fixes (derselbe Befehl wie in (a), wörtlich):
+
+```
+Running 7 tests using 1 worker
+  ✓  1 [chromium] › e2e/010b-lesepfade.spec.ts:421:1 › Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein 500 bringt einen Toast (2.0s)
+  ✓  2 [chromium] › e2e/010b-lesepfade.spec.ts:473:1 › Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage (2.1s)
+  ✓  3 [chromium] › e2e/010b-lesepfade.spec.ts:517:1 › Runde 3 (2): Beantwortung — scheitern Einzelfrage und Verlauf beide, erscheint ein Toast (2.1s)
+  ✓  4 [chromium] › e2e/010b-lesepfade.spec.ts:541:1 › Codex (b): Beantwortung — Rollenwechsel ohne Leserecht bei offener Einzelfrage bringt keinen Toast (2.1s)
+  ✓  5 [chromium] › e2e/010b-lesepfade.spec.ts:563:1 › Runde 3 (3): Ereignisstrom — Rollenwechsel admin → observer → admin (3.1s)
+  ✓  6 [chromium] › e2e/010b-lesepfade.spec.ts:590:1 › Runde 3 (4): Bühne — ein gespeichertes "Nur Bühne" blitzt nicht auf, bevor getStage antwortet (3.4s)
+  ✓  7 [chromium] › e2e/010b-lesepfade.spec.ts:629:1 › Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Leertaste liefert nichts aus (1.7s)
+  7 passed (19.1s)
+```
+
+**Ganze Playwright-Suite** auf Commit `809ce5c` (`E2E_PORT=4391 npx playwright test
+--reporter=list`, Chromium unter `/opt/pw-browsers`):
+- 33 passed (2.7m), exit 0.
+- Alle 90 axe-Zeilen melden 0 serious/critical.
+- Danach `git checkout -- docs/evidence`, weil die Spec keinen neuen Screenshot verlangt.
+
+```
+  33 passed (2.7m)
+```
+
+**`pnpm -C /home/user/wt/010b gates`** auf Commit `809ce5c`, exit 0. Das Ende steht wörtlich da, nur die ANSI-Farbcodes sind entfernt:
+
+```
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6556.384921
+
+> @hv/web@0.0.0 build /home/user/wt/010b/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-DW1LJ5aU.js                        539.23 kB │ gzip: 157.33 kB │ map: 2,242.15 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.18s
+mark-test-run: wrote /home/user/wt/010b/.claude/state/last-test-run (clean tree) at commit 809ce5c, tree d8cce19f8e88…
+```
+
+Im selben Lauf:
+- `vocabulary-check: ok`.
+- `i18n-literal check: 0 literals found`.
+- `role-literals` grün.
+- `arch`: dieselben 7 vorbestehenden Warnungen, 0 Fehler.
+- `oxlint`: 25 Warnungen, genauso viele wie auf 7f542b6.
+- Tests: `packages/domain` 72/72, `apps/web` 73/73, `apps/api` 49/49.
+- Der `slice-scope`-Aufruf der Gates überspringt wie bisher, weil der Branchname die Endung `010b`
+  trägt. Explizit aufgerufen mit `node scripts/slice-scope.mjs --slice 010b`:
+
+```
+slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflaeche.md"'s "Files allowed" list (19 pattern(s)).
+```
+
+**Touched (Runde 3):**
+- `apps/web/src/features/capture/Page.tsx`
+- `apps/web/src/features/answers/useBacklog.ts`, `QuestionDetail.tsx` und `WorkList.tsx` (bei den
+  letzten beiden nur Kommentare)
+- `apps/web/src/features/stage/Page.tsx`
+- `apps/web/src/features/history/Page.tsx`, `apps/web/src/features/speakers/Page.tsx` (nur
+  Kommentare)
+- `apps/web/e2e/010b-lesepfade.spec.ts` (sieben neue Szenarien, Helfer)
+- `docs/slices/010b-lesepfade-oberflaeche.md` (Befunde und dieser Bericht)
+
 ## Review findings
 
 (vom Reviewer)
@@ -563,34 +835,34 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
    - `contributionsProbe` makes a second, unfiltered `listContributions()` call on every `version`. It fetches the whole corpus and throws the data away.
    - On a 500 or network error it shows two toasts.
    - Fix: run the probe only while `speakerId === null`, for example the loader `speakerId === null ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)` with key `cp:${version}:${speakerId === null}`, and `forbidden = probe forbidden || contributions forbidden`. The alternative is a single unfiltered call that filters locally.
-   - **Umgang:** UMGANG1
+   - **Umgang:** angenommen, behoben in `d1d1d1e` wie vorgeschlagen (Probe nur bei `speakerId === null`, Schlüssel `cp:${version}:${speakerId === null}`, `forbidden` aus beiden). e2e „Runde 3 (1)“, rot/grün im Bericht „Nacharbeit Runde 3“.
 2. minor, `apps/web/src/features/answers/useBacklog.ts:161-223`.
    - After the split, `selectedHistory` and `selectedHistoryForbidden` keep the previous question's state when the selection changes. `lapsedApproval(question, history)` at `QuestionDetail.tsx:248` then computes with the wrong events, which can briefly show a false "Freigabe erloschen".
    - A 404 or 500 on both calls shows two toasts.
    - Fix: store the history together with its `questionId` and pass it on only when it matches `selected.id`, or reset it on a `selectedId` change. Show at most one toast.
-   - **Umgang:** UMGANG2
+   - **Umgang:** angenommen, behoben in `5e1cb30`: der Verlauf wird mit seiner `questionId` gespeichert und nur weitergegeben, wenn sie `selected.id` entspricht; ein Toast je Auswahl (`problemOnce`). Zwei e2e „Runde 3 (2)“, rot/grün im Bericht.
 3. minor, test gap in `e2e/010b-lesepfade.spec.ts:283-290`.
    - No test covers a stale event count after switching roles, or the reset of `streamLastSeq`.
    - Add an e2e: admin on the event stream, switch to observer, the count is gone; back to admin, the stream is filled again.
-   - **Umgang:** UMGANG3
+   - **Umgang:** angenommen, e2e „Runde 3 (3)“ in `6683469`. Auf 7f542b6 grün (der Fix aus Runde 2 war da); rot gegen den vorübergehend zurückgenommenen Fix aus Runde 2, zwei Läufe im Bericht.
 4. minor, `apps/web/src/features/stage/Page.tsx:483`.
    - `stageOnly && !forbidden` only applies once the 403 has arrived. While loading, the fullscreen overlay with counters flashes and then jumps, which violates design principle #8.
    - When switching roles, the old `stage` stays in `stageRef`.
    - Fix: defer the layout decision until the first `getStage` result is known, as the `stage-deciding` skeleton already does. Reset forbidden and stage on a `version` change. The `!forbidden` at `:500` is dead code; remove it.
-   - **Umgang:** UMGANG4
+   - **Umgang:** angenommen, behoben in `2a6c70a`, mit einer Abweichung: das Layout wartet auf die erste `getStage`-Antwort (Skelett `stage-deciding`), `!forbidden` im Overlay ist entfernt. Bei jedem `version`-Wechsel wird nur `stageRef` geleert, nicht der sichtbare `stage`/`forbidden`-Zustand, weil `version` bei jedem neuen Ereignis steigt und die Bühne sonst bei jedem Ereignis springen würde (Prinzip 8). e2e „Runde 3 (4)“, rot/grün im Bericht.
 5. minor, test gap in `e2e/010b-lesepfade.spec.ts:176-179`.
    - The space-bar check would not have failed before the fix.
    - Start as podium with a current question, switch to expert, press space, then check that the delivered count or the event count stays the same.
-   - **Umgang:** UMGANG5
+   - **Umgang:** angenommen, e2e „Runde 3 (5)“ in `6683469`. Sie zählt die Aufrufe von `deliverQuestion` und prüft auf Fehler-Toasts, nicht die Zahl der Vorgelesenen: der Dienst lehnt eine Auslieferung durch expert ohnehin ab (R-PERM-01), also bliebe diese Zahl auch ohne den Fix gleich. Rot gegen den vorübergehend zurückgenommenen Fix aus Runde 2.
 6. nit: the `role="status"` comments promise reliable announcements. A live region that is mounted together with its content is often not announced. Tone down the comments.
-   - **Umgang:** UMGANG6
+   - **Umgang:** angenommen, in `809ce5c` (sowie in `d1d1d1e`/`2a6c70a` für Erfassung und Bühne): alle Kommentare zu `role="status"` versprechen keine Ansage mehr, nur noch einen Hinweis an Hilfstechnik.
 7. nit: in the Bericht, mark the fixes for nits 9 and 10 in `history/Page.tsx` as "ohne Test, nicht beobachtbar".
-   - **Umgang:** UMGANG7
+   - **Umgang:** angenommen, im Bericht unten („Nacharbeit Runde 3“, Punkt 7) markiert.
 
 ### Codex auf 7f542b6
 
 (a) P2, `useBacklog.ts:202`: history from question A stays in place while B loads, so `lapsedApproval` can mix the two. This is the same as finding 2 of Runde 3; the same fix covers it.
-   - **Umgang:** UMGANGA
+   - **Umgang:** angenommen, derselbe Fix wie Runde 3 Befund 2, Commit `5e1cb30`; e2e „Runde 3 (2) / Codex (a)“.
 
 (b) P2, `useBacklog.ts:187`:
    - Setup: a question is selected, then the actor switches to a role without question read access.
@@ -598,4 +870,4 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
    - The concurrent `getQuestion` call gets the API's masked 404, which carries no R-PERM-02/03, so it falls through to `problem(error)` and shows an error toast on top of the designed state.
    - Fix: once the main query is forbidden, ignore or cancel the detail request, or clear the selection.
    - Test first: e2e with admin, select a question, switch to a role without `question.read`, then check `expectNoErrorToast` and `answers-forbidden`. Include the red run.
-   - **Umgang:** UMGANGB
+   - **Umgang:** angenommen, behoben in `5e1cb30`: die Detailabfragen warten, bis die Liste für dieselbe `version`/`nonce` geantwortet hat, und laufen gar nicht, wenn sie verweigert ist; die Auswahl wird dann geleert. e2e „Codex (b)“, rot/grün im Bericht.
