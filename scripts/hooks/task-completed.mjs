@@ -38,7 +38,14 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SLICES_DIR = 'docs/slices';
 // Codex on PR #20 (round 2): keep the namespace — "takt-006" must not resolve to "006-*.md".
-const SLICE_NUMBER_RE = /\b(takt-)?(\d{3})\b/g;
+// takt-010 goal 2: an optional single lowercase letter suffix (e.g. "010b") is part of the number too
+// — a digit and a following letter are both \w, so plain `\d{3}\b` never found a trailing boundary
+// right after the digits of "010b" at all, and the whole match failed silently (neither "010b" nor,
+// wrongly, "010" was extracted) — the same class of namespace confusion as "takt-006" vs "006", fixed
+// for that case in takt-006. "010b" must be checked against its own spec, never against plain "010",
+// and vice versa; `findSpecFile` below already keeps them apart on its own (its prefix always includes
+// the trailing hyphen), so capturing the fuller number here is the only change needed.
+const SLICE_NUMBER_RE = /\b(takt-)?(\d{3}[a-z]?)\b/g;
 const ACCEPTED_STATUS_RE = /^\*\*Status:\*\*\s*(accepted|angenommen)\b/m;
 
 function readStdinJson() {
@@ -66,8 +73,13 @@ function parseArgs(argv) {
   return out;
 }
 
-/** `docs/slices/takt-NNN-*.md` for a `takt-NNN` mention, otherwise `docs/slices/NNN-*.md`, relative to
- * `root` — `undefined` if it does not exist. The two namespaces never stand in for each other. */
+/** `docs/slices/takt-NNN-*.md` (or, with a lettered slice, `docs/slices/takt-NNNx-*.md`) for a
+ * `takt-NNN`/`takt-NNNx` mention, otherwise `docs/slices/NNN-*.md`/`docs/slices/NNNx-*.md`, relative to
+ * `root` — `undefined` if it does not exist. Neither namespace, nor a plain number and its own lettered
+ * sibling (`NNN` vs `NNNx`), ever stand in for each other (takt-010 rework nit 6: named here as "NNNx"
+ * rather than just "NNN" — a single *lowercase* letter only; an upper-case suffix like `010B` is not
+ * matched by `SLICE_NUMBER_RE` at all and is therefore nothing to check, same as any other unrelated
+ * text). */
 function findSpecFile(root, number, isTakt) {
   const dir = join(root, SLICES_DIR);
   if (!existsSync(dir)) return undefined;

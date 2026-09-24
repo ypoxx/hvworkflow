@@ -271,3 +271,187 @@ test('takt-006 point 3 green: "Files allowed" unchanged since the spec-introduci
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// takt-010 goal 1: a letter-suffixed slice (e.g. "010b") is its own slice, distinct from the plain
+// "010" — today the branch regex requires `\d{3}-` right after the number, so `claude/slice-010b-…`
+// never matches at all and the gate skips it entirely (Quellen-ID: Bericht of 010b, "wird vom Tor
+// übersprungen").
+test('takt-010 goal 1: a claude/slice-NNNb-… branch is checked against its own NNNb spec, not skipped, and not confused with plain NNN', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    // Both a plain "010" spec and a lettered "010b" spec exist side by side — the file whose glob
+    // actually applies to the changed file proves which spec was picked.
+    writeFileSync(
+      join(dir, 'docs', 'slices', '010-y.md'),
+      '# 010 — Y\n\n## Files allowed\n\n- `docs/slices/010-y.md`\n- `apps/web/src/only-010.tsx`\n',
+    );
+    writeFileSync(
+      join(dir, 'docs', 'slices', '010b-x.md'),
+      '# 010b — X\n\n## Files allowed\n\n- `docs/slices/010b-x.md`\n- `apps/web/src/only-010b.tsx`\n',
+    );
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-010b-lesepfade-ui'], { cwd: dir });
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir });
+
+    const r = runIsolated(['--diff', 'apps/web/src/only-010b.tsx'], dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /skipping/);
+    assert.match(r.stdout, /010b-x\.md/);
+
+    // A file that is only allowed under plain "010" must still be rejected — proof "010b" did not
+    // silently fall back to (or merge with) "010"'s allow-list.
+    const r2 = runIsolated(['--diff', 'apps/web/src/only-010.tsx'], dir);
+    assert.equal(r2.status, 1, r2.stdout + r2.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-010 goal 3: a bare filename (no "/") that is itself a real file at the repository root is that
+// root file — never the directory of an earlier full path in the same paragraph carried onto it. This
+// reproduces the first version of the takt-007 spec (git show c9d6655:docs/slices/takt-007-…md), whose
+// "Files allowed" was a plain paragraph — not a bulleted list — of
+// `` `docs/agentische-entwicklung-plan.md` (…), `README.md`, `docs/slices/…md` (…). ``, which today
+// resolves the bare `README.md` to `docs/README.md`.
+test('takt-010 goal 3: a bare filename matching a real root file resolves to the root, not a carried directory (takt-007 first version)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    writeFileSync(join(dir, 'README.md'), '# root readme\n');
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'agentische-entwicklung-plan.md'), '# plan\n');
+    const specPath = join(dir, 'docs', 'slices', '905-fixture.md');
+    // Verbatim shape of takt-007's first version: a plain paragraph, no "- " bullets at all.
+    writeFileSync(
+      specPath,
+      '# 905 — Fixture\n\n**Status:** spec\n\n## Files allowed\n\n' +
+        '`docs/agentische-entwicklung-plan.md` (nur Abschnitt 3), `README.md`, `docs/slices/905-fixture.md` (Bericht).\n',
+    );
+
+    const rootReadme = runIsolated(['--spec', 'docs/slices/905-fixture.md', '--diff', 'README.md'], dir);
+    assert.equal(rootReadme.status, 0, rootReadme.stdout + rootReadme.stderr);
+
+    // Condition 3 (never wider than the spec means): the same bare name is not *also* accepted under
+    // the carried directory — exactly one interpretation applies, not both.
+    const carriedDocsReadme = runIsolated(['--spec', 'docs/slices/905-fixture.md', '--diff', 'docs/README.md'], dir);
+    assert.equal(carriedDocsReadme.status, 1, carriedDocsReadme.stdout + carriedDocsReadme.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-010 goal 3 regression: 020's shorthand (a bare filename after a full path *within the same
+// bullet*, none of them real root files) must keep resolving against that path's directory.
+test('takt-010 goal 3 regression: 020-style bare filenames that are not real root files still carry the directory', () => {
+  const r = run([
+    '--spec',
+    FIXTURE_SPEC,
+    '--diff',
+    [
+      'scripts/fixtures/slice-scope/900-fixture.md',
+      'apps/web/e2e/002-x.spec.ts',
+      'apps/web/e2e/003-y.spec.ts',
+      'apps/web/e2e/abnahme.spec.ts',
+    ].join(','),
+  ]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+// ---- takt-010 rework: blocker (same root cause as Codex's P2 on PR #27) and major findings ----------
+//
+// Both scenarios below need a real git branch (not `--diff`) — the whole bug was that root-file
+// existence was decided from the *checked-out working tree*, which is exactly the tree the diff under
+// review itself produces. They reuse the "m4: a warning …" test's origin/fetch setup so `git merge-base`
+// resolves for real.
+function setUpMergeBaseRepo(dir, specText, baseFiles) {
+  mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+  writeFileSync(join(dir, 'docs', 'slices', '016-x.md'), specText);
+  for (const [relPath, content] of Object.entries(baseFiles)) {
+    mkdirSync(join(dir, ...relPath.split('/').slice(0, -1)), { recursive: true });
+    writeFileSync(join(dir, relPath), content);
+  }
+  spawnSync('git', ['init', '-q'], { cwd: dir });
+  spawnSync('git', ['checkout', '-q', '-b', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+  spawnSync('git', ['add', '-A'], { cwd: dir });
+  spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+  spawnSync('git', ['remote', 'add', 'origin', dir], { cwd: dir });
+  spawnSync('git', ['fetch', '-q', 'origin', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+  spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-016-agenten'], { cwd: dir });
+}
+
+function runOnSlice016(dir) {
+  return spawnSync('node', [SCRIPT, '--root', dir, '--slice', '016'], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_HEAD_REF: '', CI: '' },
+  });
+}
+
+// 020-style spec used by both blocker scenarios: the bare `003-y.spec.ts` after the full path
+// `apps/web/e2e/002-x.spec.ts` (in the same bullet) is meant to carry that directory.
+const SHORTHAND_SPEC =
+  '# 016 — X\n\n## Files allowed\n\n- Alt-Specs `apps/web/e2e/002-x.spec.ts`, `003-y.spec.ts`\n- `docs/slices/016-x.md`\n';
+
+test('takt-010 rework blocker (and Codex P2): a root file created by the slice itself must not count as a root file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    setUpMergeBaseRepo(dir, SHORTHAND_SPEC, { 'apps/web/e2e/002-x.spec.ts': '// existing\n' });
+    // On the slice branch only: commit a root-level file sharing the bare name from its own spec — not
+    // the carried-directory file the spec's shorthand actually means. At the merge-base this file does
+    // not exist at the root at all.
+    writeFileSync(join(dir, '003-y.spec.ts'), '// not the real target — added on the slice branch only\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add root file'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /003-y\.spec\.ts/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-010 rework blocker (reverse, Codex P2): a root file deleted by the slice must still resolve to root, not fall back to the carried directory', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    // The root file already exists *before* the slice branches off — removing/moving it is exactly the
+    // slice's job, and it is still the file the spec's bare name means (there is no
+    // `apps/web/e2e/003-y.spec.ts` at the merge-base in this scenario, only the root one).
+    setUpMergeBaseRepo(dir, SHORTHAND_SPEC, {
+      'apps/web/e2e/002-x.spec.ts': '// existing\n',
+      '003-y.spec.ts': '// pre-existing root file, to be removed by this slice\n',
+    });
+    spawnSync('git', ['rm', '-q', '003-y.spec.ts'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'remove root file'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-010 rework major: an ambiguous bare name (real at both the root and the carried directory, at the merge-base) fails loudly instead of silently preferring root', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    setUpMergeBaseRepo(
+      dir,
+      '# 016 — X\n\n## Files allowed\n\n- `apps/web/src/x.ts`, `package.json` (dependency for the web app)\n- `docs/slices/016-x.md`\n',
+      {
+        'apps/web/src/x.ts': '// existing\n',
+        'package.json': '{}\n', // root manifest
+        'apps/web/src/package.json': '{}\n', // also real, in the carried directory
+      },
+    );
+    writeFileSync(join(dir, 'package.json'), '{"x":1}\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'edit root package.json'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /ambiguous/);
+    assert.match(r.stderr, /package\.json/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

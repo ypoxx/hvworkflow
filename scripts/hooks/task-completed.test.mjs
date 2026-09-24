@@ -135,3 +135,41 @@ test('codex round 2 green: a completed "Scheibe 904" still resolves to the accep
   const r = run([{ content: 'Scheibe 904 fertig', status: 'completed' }]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+// takt-010 goal 2: today SLICE_NUMBER_RE requires a word boundary right after the three digits, but a
+// digit and a following letter are both \w — so "906b" never matches at all (neither as "906b" nor,
+// wrongly, as "906") and the hook silently has nothing to check. "906b" must be checked against its
+// own spec, never against the plain, already-accepted "906" (same class of namespace confusion as
+// "takt-006" vs "006", fixed for that case in takt-006).
+test('takt-010 goal 2 red/green: a completed "906b" is blocked on its own (not yet accepted) spec, even though plain 906 is accepted', () => {
+  const r = run([{ content: 'finish slice 906b', status: 'completed' }]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 906b/);
+});
+
+test('takt-010 goal 2 green: a completed "905b" passes on its own accepted spec (stdout names it, proof it was actually checked)', () => {
+  const r = run([{ content: 'finish slice 905b', status: 'completed' }]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /905b/);
+});
+
+test('takt-010 goal 2 red/green: a completed "takt-905b" is checked against takt-905b, not against 905b or 905', () => {
+  const r = run([{ content: 'takt-905b fertig', status: 'completed' }]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice takt-905b/);
+  // Nit 5 (Nacharbeit): name the resolved spec path itself, not just the number in the message — a
+  // wrong match on plain "905" (whose own spec happens to be accepted) would otherwise still print
+  // "names slice takt-905b" (the number extracted from the text is unaffected by which spec file was
+  // actually read) while silently checking the wrong file's acceptance status.
+  assert.match(r.stderr, /takt-905b-kleinaenderung-offen\.md/);
+});
+
+// Minor 4 (Nacharbeit): the reverse direction was untested — a plain "905" must not borrow the
+// acceptance of its lettered sibling "905b" (905b-regulaer-angenommen.md is accepted; 905 itself,
+// 905-regulaer-offen.md, is not).
+test('takt-010 rework minor 4: a completed plain "905" is blocked on its own spec, even though its lettered sibling 905b is accepted', () => {
+  const r = run([{ content: 'finish slice 905', status: 'completed' }]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 905\b/);
+  assert.match(r.stderr, /905-regulaer-offen\.md/);
+});
