@@ -271,3 +271,89 @@ test('takt-006 point 3 green: "Files allowed" unchanged since the spec-introduci
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// takt-010 goal 1: a letter-suffixed slice (e.g. "010b") is its own slice, distinct from the plain
+// "010" — today the branch regex requires `\d{3}-` right after the number, so `claude/slice-010b-…`
+// never matches at all and the gate skips it entirely (Quellen-ID: Bericht of 010b, "wird vom Tor
+// übersprungen").
+test('takt-010 goal 1: a claude/slice-NNNb-… branch is checked against its own NNNb spec, not skipped, and not confused with plain NNN', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    // Both a plain "010" spec and a lettered "010b" spec exist side by side — the file whose glob
+    // actually applies to the changed file proves which spec was picked.
+    writeFileSync(
+      join(dir, 'docs', 'slices', '010-y.md'),
+      '# 010 — Y\n\n## Files allowed\n\n- `docs/slices/010-y.md`\n- `apps/web/src/only-010.tsx`\n',
+    );
+    writeFileSync(
+      join(dir, 'docs', 'slices', '010b-x.md'),
+      '# 010b — X\n\n## Files allowed\n\n- `docs/slices/010b-x.md`\n- `apps/web/src/only-010b.tsx`\n',
+    );
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-010b-lesepfade-ui'], { cwd: dir });
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { cwd: dir });
+
+    const r = runIsolated(['--diff', 'apps/web/src/only-010b.tsx'], dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /skipping/);
+    assert.match(r.stdout, /010b-x\.md/);
+
+    // A file that is only allowed under plain "010" must still be rejected — proof "010b" did not
+    // silently fall back to (or merge with) "010"'s allow-list.
+    const r2 = runIsolated(['--diff', 'apps/web/src/only-010.tsx'], dir);
+    assert.equal(r2.status, 1, r2.stdout + r2.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-010 goal 3: a bare filename (no "/") that is itself a real file at the repository root is that
+// root file — never the directory of an earlier full path in the same paragraph carried onto it. This
+// reproduces the first version of the takt-007 spec (git show c9d6655:docs/slices/takt-007-…md), whose
+// "Files allowed" was a plain paragraph — not a bulleted list — of
+// `` `docs/agentische-entwicklung-plan.md` (…), `README.md`, `docs/slices/…md` (…). ``, which today
+// resolves the bare `README.md` to `docs/README.md`.
+test('takt-010 goal 3: a bare filename matching a real root file resolves to the root, not a carried directory (takt-007 first version)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    writeFileSync(join(dir, 'README.md'), '# root readme\n');
+    mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'agentische-entwicklung-plan.md'), '# plan\n');
+    const specPath = join(dir, 'docs', 'slices', '905-fixture.md');
+    // Verbatim shape of takt-007's first version: a plain paragraph, no "- " bullets at all.
+    writeFileSync(
+      specPath,
+      '# 905 — Fixture\n\n**Status:** spec\n\n## Files allowed\n\n' +
+        '`docs/agentische-entwicklung-plan.md` (nur Abschnitt 3), `README.md`, `docs/slices/905-fixture.md` (Bericht).\n',
+    );
+
+    const rootReadme = runIsolated(['--spec', 'docs/slices/905-fixture.md', '--diff', 'README.md'], dir);
+    assert.equal(rootReadme.status, 0, rootReadme.stdout + rootReadme.stderr);
+
+    // Condition 3 (never wider than the spec means): the same bare name is not *also* accepted under
+    // the carried directory — exactly one interpretation applies, not both.
+    const carriedDocsReadme = runIsolated(['--spec', 'docs/slices/905-fixture.md', '--diff', 'docs/README.md'], dir);
+    assert.equal(carriedDocsReadme.status, 1, carriedDocsReadme.stdout + carriedDocsReadme.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// takt-010 goal 3 regression: 020's shorthand (a bare filename after a full path *within the same
+// bullet*, none of them real root files) must keep resolving against that path's directory.
+test('takt-010 goal 3 regression: 020-style bare filenames that are not real root files still carry the directory', () => {
+  const r = run([
+    '--spec',
+    FIXTURE_SPEC,
+    '--diff',
+    [
+      'scripts/fixtures/slice-scope/900-fixture.md',
+      'apps/web/e2e/002-x.spec.ts',
+      'apps/web/e2e/003-y.spec.ts',
+      'apps/web/e2e/abnahme.spec.ts',
+    ].join(','),
+  ]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
