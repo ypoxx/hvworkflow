@@ -91,8 +91,15 @@ async function historyResultStatusWords(page: Page): Promise<string[]> {
  * intercept or count. Vite's dev server hands `page.evaluate` the very module instance the app
  * imported, so a test can wrap one `HvApi` method in place — to count its calls, hold its answer
  * back, or fail it with a 500 — and the app's next call goes through the wrapper.
+ *
+ * Nit D (review round 4): Patch nur gegen `vite` dev, nicht gegen einen Build; eigener Port je
+ * Worktree (E2E_PORT). A production bundle has no `/src/api/index.ts` to import, and two worktrees
+ * sharing one dev server would patch each other's module.
  */
 const API_MODULE = '/src/api/index.ts';
+/** The demo actor store — only the tests use it, to switch the actor without the header (review
+ *  round 4, B: the "Nur Bühne" overlay covers the role switcher). */
+const ACTOR_MODULE = '/src/api/actor.ts';
 
 /** The shell's toast stack (see `expectNoErrorToast` above for why it is scoped this way). */
 const toasts = (page: Page) => page.locator('[aria-live="polite"] [role="status"]');
@@ -663,4 +670,146 @@ test('Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Lee
   expect(await page.evaluate(() => (window as unknown as Probe).__calls.length)).toBe(0);
   await expectNoErrorToast(page);
   await expect(page.getByTestId('stage-current')).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Review round 4 (Nachprüfung auf 4f0d231) and Codex on 4f0d231. Run red against 4f0d231 first;
+// the Bericht, "Nacharbeit Runde 4", quotes both runs.
+// ---------------------------------------------------------------------------------------------
+
+test('Codex P2-1 (4f0d231): Erfassung fragt vom ersten Aufruf an nicht ungefiltert, wenn es Wortmeldungen gibt', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'moderation');
+  // Away from the desk first, so the patch below is in place before the desk mounts afresh
+  // (no `?speaker`) — every call from the very first one is recorded.
+  await page.getByTestId('nav-speakers').click();
+  await expect(page).toHaveURL(/\/speakers$/);
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const w = window as unknown as Probe;
+    w.__calls = [];
+    const original = api['listContributions']!.bind(api);
+    api['listContributions'] = (...args: unknown[]) => {
+      w.__calls.push(args[0] ?? null);
+      return original(...args);
+    };
+  }, API_MODULE);
+
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as Probe).__calls.some((call) => call !== null && typeof call === 'object'),
+      ),
+    )
+    .toBe(true);
+  await settle(page);
+  // moderation can read the Wortmeldungen, so the desk resolves one — the unfiltered probe for
+  // "may this role read Erfassung at all?" is never needed.
+  const calls = await page.evaluate(() => (window as unknown as Probe).__calls);
+  expect(calls.filter((call) => call === null)).toEqual([]);
+  await expectNoErrorToast(page);
+});
+
+test('Codex P2-2 (4f0d231): Historie — Rollenwechsel ohne Leserecht bei gewählter Frage bringt keinen Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-history').click();
+  await expect(page).toHaveURL(/\/history$/);
+  const results = page.getByTestId('history-result');
+  await expect(results.first()).toBeVisible();
+  await results.first().click();
+  await expect(page.getByTestId('history-timeline')).toBeVisible();
+
+  // podium: the list refuses with R-PERM-02, the selected question's `getQuestionHistory` answers
+  // with the masked 404 — which must not become a toast on top of the gestaltete Zustand.
+  await asRole(page, 'podium');
+  await expect(page.getByTestId('history-forbidden')).toBeVisible();
+  await expectNoErrorToast(page);
+});
+
+test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, weiter" auf die angezeigte Frage', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'podium');
+  await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  const currentNumber = page.getByTestId('stage-current-number');
+  await expect(currentNumber).toBeVisible();
+
+  // The next `getStage` fails once with a 500; every `deliverQuestion` is counted.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const w = window as unknown as Probe;
+    w.__calls = [];
+    const originalStage = api['getStage']!.bind(api);
+    let failed = false;
+    api['getStage'] = (...args: unknown[]) => {
+      if (failed) return originalStage(...args);
+      failed = true;
+      return Promise.reject({ status: 500, title: 'Testfehler', detail: 'Runde 4, absichtlich' });
+    };
+    const originalDeliver = api['deliverQuestion']!.bind(api);
+    api['deliverQuestion'] = (...args: unknown[]) => {
+      w.__calls.push(args[0] ?? null);
+      return originalDeliver(...args);
+    };
+  }, API_MODULE);
+
+  // admin may deliver too; the switch only bumps `version`, and that reload fails.
+  await asRole(page, 'admin');
+  await expect(toasts(page)).toHaveCount(1);
+  await expect(currentNumber).toBeVisible();
+
+  await page.getByTestId('stage-next').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as Probe).__calls.length)).toBe(1);
+});
+
+test('Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht das Overlay der vorigen Rolle', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('hv-stage-only-v1', '1');
+  });
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'podium');
+  await page.getByTestId('nav-stage').click();
+  await expect(page).toHaveURL(/\/stage$/);
+  await expect(page.getByTestId('stage-only')).toBeVisible();
+
+  // `getStage` answers one and a half seconds late from now on.
+  await page.evaluate(async (url) => {
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const original = api['getStage']!.bind(api);
+    api['getStage'] = (...args: unknown[]) =>
+      new Promise((resolve, reject) => {
+        window.setTimeout(() => void original(...args).then(resolve, reject), 1500);
+      });
+  }, API_MODULE);
+
+  // The overlay covers the header's role switcher, so the actor is switched through the demo
+  // actor store directly — the same call the switcher makes.
+  await page.evaluate(async (url) => {
+    const mod = (await import(/* @vite-ignore */ url)) as {
+      DEMO_ACTORS: readonly { role: string }[];
+      setActor: (actor: unknown) => void;
+    };
+    mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.role === 'expert'));
+  }, ACTOR_MODULE);
+
+  await expect(page.getByTestId('stage-deciding')).toBeVisible();
+  await expect(page.getByTestId('stage-only')).toHaveCount(0);
+  await expect(page.getByTestId('stage-forbidden')).toBeVisible();
+  await expectNoErrorToast(page);
 });

@@ -871,3 +871,21 @@ slice-scope: 37 changed file(s), all within "docs/slices/010b-lesepfade-oberflae
    - Fix: once the main query is forbidden, ignore or cancel the detail request, or clear the selection.
    - Test first: e2e with admin, select a question, switch to a role without `question.read`, then check `expectNoErrorToast` and `answers-forbidden`. Include the red run.
    - **Umgang:** angenommen, behoben in `5e1cb30`: die Detailabfragen warten, bis die Liste für dieselbe `version`/`nonce` geantwortet hat, und laufen gar nicht, wenn sie verweigert ist; die Auswahl wird dann geleert. e2e „Codex (b)“, rot/grün im Bericht.
+
+### Runde 4 — Nachprüfung auf 4f0d231: annehmen
+
+- A (minor), `stage/Page.tsx:191` together with :213/:288/:314/:352: if `getStage` fails with a non-403 error, `stageRef` stays null, and "Vorgelesen, weiter" (button and space/R) silently does nothing until the next event. Fix it by storing `stage` with its `version` and acting only when they match, or by resetting the ref to the visible stage in the error branch. Test with a 500 through your `page.evaluate` patch.
+  - **Umgang:** UMGANG4A
+- B (minor), `stage/Page.tsx:485`: when the role changes on an open page while the podium overlay is shown, the previous role's overlay is visible for one response time. Preferred fix: set `loading` again on an actor change (not on every event). Otherwise add an "Offen" line with the reason.
+  - **Umgang:** UMGANG4B
+- C (nit), `answers/useBacklog.ts:186/213/241`: if the event rate is higher than the list's response time, `detailGate` never settles. Wait only for the "refused" outcome, or for the first response after an actor change; at the very least add a comment. Consider this together with Codex P2-2, since it is the same gate.
+  - **Umgang:** UMGANG4C
+- D (nit), in the doc comment of the e2e file (e2e/010b-lesepfade.spec.ts:95): "Patch nur gegen `vite` dev, nicht gegen einen Build; eigener Port je Worktree."
+  - **Umgang:** UMGANG4D
+
+### Codex auf 4f0d231
+
+- P2-1, `capture/Page.tsx:85`: on a fresh /capture visit without `?speaker`, `speakerId` is null at first render, so the probe loads the whole corpus before `listSpeakers` sets `fallbackSpeaker`. Wait with the probe until the speaker lookup has settled without producing a speaker. The round-3 test clears the call log too late to catch this; test from the very first call.
+  - **Umgang:** UMGANGP1
+- P2-2, `history/Page.tsx:243`: select a question, then switch to podium. The list is refused, but `getQuestionHistory` gets the masked 404 and raises a toast over `history-forbidden`. The same class as Codex (b) in answers: fix the class at its root — every place in the five features where a detail request runs next to a list or main request that can be refused, gated the same way, preferably through one small local pattern per feature. Test first: history with a question selected, switch to podium, then `expectNoErrorToast` plus `history-forbidden`.
+  - **Umgang:** UMGANGP2
