@@ -44,7 +44,7 @@ Keine andere Planzeile, keine Kalenderverschiebung, keine Änderung an der Allow
 
 ## Akzeptanzkriterium
 
-1. `git diff` zeigt nur die vier Kopfzeilen, die vier Ziel-Sätze und die zwei Zählstellen der Zeile 011.
+1. `git diff` zeigt nur die vier Kopfzeilen, die vier Ziel-Sätze und die drei Zählstellen der Zeile 011 (siehe Nachtrag des Architekten).
 2. Ausgabe von `node scripts/plan-graph.mjs` und `node scripts/plan-honesty.mjs` wörtlich im Bericht.
 3. `pnpm gates` grün (Tail wörtlich).
 
@@ -65,7 +65,8 @@ Bauer: Opus 5.5, 24.09.2026. Plan-Änderung als Commit `a501513`; `pnpm gates` l
    der Allowlist im Worktree von 023 abgelesen und nicht kopiert: 025 hat 14 Einträge, 026 hat 3, 028 hat 4, 040 hat 6.
 2. Kalender: keine Verschiebung. plan-graph meldet keine Lane-Überschneidung am selben Tag.
 3. Regelzählung Zeile 011: „20 IDs heute“ → „22 IDs heute“ und Testausgabe „22 Regel-IDs, 22 legalRef, 0 verified“.
-   Die Kopfzeile „Stand am 23. September 2026“ ist unverändert.
+   Die Kopfzeile „Stand am 23. September 2026“ ist unverändert. Nachtrag (Orchestrator, `f7affda`): dritte Zählstelle
+   „(20, nicht 24)“ → „(22, nicht 24)“, gemäß Nachtrag des Architekten.
 4. Plan-Ehrlichkeit grün.
 
 **Ausgabe `node scripts/plan-graph.mjs` (wörtlich)**
@@ -108,11 +109,32 @@ mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree)
 
 **Offen**
 
-- Zeile 011 enthält noch eine dritte Zahl, „Regelregister zählt ehrlich (20, nicht 24)“. Die Spec nennt nur zwei
-  Zählstellen (Akzeptanzkriterium 1), deshalb ist diese Stelle unverändert. Ob sie auf 22 gehört, entscheidet der Architekt.
 - Die Gründe in den Allowlist-Einträgen verweisen noch auf eine „Planänderung des Orchestrators (takt-011)“, die noch
-  kommt. Die Allowlist ist ein Nicht-Ziel und bleibt hier unverändert.
+  kommt. Die Allowlist ist ein Nicht-Ziel und bleibt hier unverändert; berichtigt wird in 023 vor dessen Merge.
+
+**Nachweis auf `f7affda`** (Lauf des Reviewers, Exit 0; danach nur dieser Doku-Commit):
+```
+packages/domain test:       Tests  72 passed (72)
+apps/web test:       Tests  48 passed (48)
+apps/api test:       Tests  49 passed (49)
+vocabulary-check: ok
+slice-scope: 2 changed file(s), all within "docs/slices/takt-011-plan-service-lane.md"'s "Files allowed" list (2 pattern(s)).
+plan-graph: ok.
+# pass 206
+# fail 0
+✓ built in 1.23s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit f7affda, tree 32b789473989…
+```
 
 ## Review findings
 
-(vom Reviewer)
+**Runde 1 — Opus 5.5, frischer Kontext, auf `f7affda`:** annehmen. Umfang eingehalten, Operationszahlen je Scheibe
+gegen die Allowlist von 023 (`8ef3ad2`) bestätigt (029, 033, 035 tragen `service` schon), „22“ nachgezählt (18 in
+`transitions.ts`, R-PERM-01..03, R-IDEM-01), Kalender unverschoben, plan-graph und plan-honesty grün.
+
+1. minor — Nachweis nur auf `a501513`: behoben, Lauf auf `f7affda` im Bericht.
+2. minor — Bericht nach dem Nachtrag nicht nachgezogen: behoben (Erledigt 3, Offen).
+3. minor — Akzeptanzkriterium 1 sagte „zwei Zählstellen“: behoben, jetzt „drei“.
+4. Hinweis — Zeile 028 sagt schon vorher „der Allowlist-Eintrag entfällt“ (If-Match, 0.3.1), das kann mit dem neuen Satz
+   verwechselt werden: nicht Teil dieses Diffs, Folgepunkt für den Architekten.
+5. Hinweis — `reason`-Texte der Allowlist in 023 veralten mit diesem Merge: wird in 023 vor dessen Merge berichtigt.
