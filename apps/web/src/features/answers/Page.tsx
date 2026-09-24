@@ -36,14 +36,21 @@ type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | null;
 /** The question a write was made against, as it was read (takt-008), and by whom (slice 010d). */
 interface WriteLock {
   id: string;
+  /** The number the person knows the question by — named in the confirmation (010d, round 1). */
+  number: string;
   version: number;
   actorId: string;
 }
 
-/** The question on screen and the actor it was read for (slice 010d, Ziel 3). */
+/**
+ * The question on screen, the actor it was read for, and the selection the person has made (slice
+ * 010d, Ziel 3). The last differs from the first while a newly selected question still loads: the
+ * detail then shows the previous one, but the person has already moved on (review round 1, finding 1).
+ */
 interface Shown {
   id: string;
   actorId: string;
+  selectedId: string | null;
 }
 
 export function AnswersPage() {
@@ -65,7 +72,9 @@ export function AnswersPage() {
   const busy = lock !== null;
   const [draftResetToken, setDraftResetToken] = useState(0);
   // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
-  const [stale, setStale] = useState(false);
+  // Slice 010d, review round 1, finding 1: the notice names the question it is about and stands
+  // only above that one — a flag of the page landed above the next question once it had loaded.
+  const [staleFor, setStaleFor] = useState<string | null>(null);
 
   const backlog = useBacklog(filters, selectedId);
   const { reload, selected: question } = backlog;
@@ -80,7 +89,7 @@ export function AnswersPage() {
   if (viewActorId !== actorId) {
     setViewActorId(actorId);
     setDialog(null);
-    setStale(false);
+    setStaleFor(null);
   }
 
   /**
@@ -92,8 +101,8 @@ export function AnswersPage() {
    */
   const shown = useRef<Shown | null>(null);
   useLayoutEffect(() => {
-    shown.current = question === null ? null : { id: question.id, actorId };
-  }, [question, actorId]);
+    shown.current = question === null ? null : { id: question.id, actorId, selectedId };
+  }, [question, actorId, selectedId]);
 
   // Adjusted during render: the render that shows the new version is the one that unlocks.
   if (
@@ -108,7 +117,7 @@ export function AnswersPage() {
 
   // A fresh look at a (possibly different) question starts without yesterday's notice.
   useEffect(() => {
-    setStale(false);
+    setStaleFor(null);
   }, [selectedId]);
 
   /**
@@ -122,21 +131,31 @@ export function AnswersPage() {
       onDone?: () => void,
     ): Promise<void> => {
       if (question === null || writing.current !== null) return;
-      const taken: WriteLock = { id: question.id, version: question.version, actorId };
+      const taken: WriteLock = {
+        id: question.id,
+        number: question.number,
+        version: question.version,
+        actorId,
+      };
       writing.current = taken;
       setLock(taken);
-      // Slice 010d, Ziel 3: read at the moment of the answer, not when the write was sent.
+      const step = { number: taken.number, action: actionLabel(t, permission) };
+      // Slice 010d, Ziel 3: read at the moment of the answer, not when the write was sent — the
+      // question is on screen for the actor who wrote, and it is still the one selected (review
+      // round 1, finding 1: while the next selection loads, the detail still shows this one).
       const stillShown = (): boolean =>
         shown.current !== null &&
         shown.current.id === taken.id &&
+        shown.current.selectedId === taken.id &&
         shown.current.actorId === taken.actorId;
       try {
         await write({ ifMatch: etagOf(question.version) });
-        // The confirmation names the step, so it stands wherever the person is by now.
+        // The confirmation names the step and the question (review round 1, finding 2), so it
+        // stands wherever the person is by now.
         showToast({
           tone: 'success',
           title: t('answers.toast.done'),
-          detail: actionLabel(t, permission),
+          detail: t('answers.toast.step', step),
         });
         if (stillShown()) {
           setDialog(null);
@@ -146,9 +165,18 @@ export function AnswersPage() {
         // 412: somebody else wrote first — say so above the detail and reload; keep the toast for
         // every other refusal (403/409 among them). Slice 010d, Ziel 3: the notice stands above the
         // question it is about; once that question is no longer shown, the refusal is still
-        // reported, as a toast.
-        if (problemStatus(error) === 412 && stillShown()) setStale(true);
-        else showProblem(error, t('toast.problem'));
+        // reported, as a toast in the house's words with the question's number (review round 1,
+        // finding 2) — the server's own sentence names neither.
+        if (problemStatus(error) === 412) {
+          if (stillShown()) setStaleFor(taken.id);
+          else {
+            showToast({
+              tone: 'danger',
+              title: t('answers.toast.stale.title'),
+              detail: t('answers.toast.stale.body', step),
+            });
+          }
+        } else showProblem(error, t('toast.problem'));
         // Refused: nothing changed on the record, so nothing to wait for — unlock at once. Slice
         // 010c, Ziel 6 (N2 of takt-008's Nachprüfung): only this write's own lock. Its lock may
         // already have fallen (the page moved on to another question), and a newer write may hold
@@ -263,12 +291,12 @@ export function AnswersPage() {
             </Panel>
           ) : (
             <div data-testid="answers-detail" className="flex h-full min-h-0 flex-col gap-2">
-              {stale && (
+              {staleFor === question.id && (
                 <StaleBanner
                   testId="stale-banner"
                   message={t('answers.stale.banner')}
                   onReload={() => {
-                    setStale(false);
+                    setStaleFor(null);
                     reload();
                   }}
                 />

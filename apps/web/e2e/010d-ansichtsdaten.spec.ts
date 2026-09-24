@@ -148,27 +148,41 @@ async function failOnce(
 }
 
 /**
- * Every call of `method` whose first argument has every field of `match` is refused with a 500
- * until `restore` — for a view's first read, which is not its first call: `useApiVersion` bumps once
- * on mount and cancels the load that started before it.
+ * Every call of `method` whose first argument has every field of `match` (every call, with `null`)
+ * is refused with a 500 until `restore` — for a view's first read, which is not its first call:
+ * `useApiVersion` bumps once on mount and cancels the load that started before it. Every call is
+ * counted in `__calls[method]`.
  */
-async function failAlways(page: Page, method: string, match: Record<string, unknown>): Promise<void> {
+async function failAlways(
+  page: Page,
+  method: string,
+  match: Record<string, unknown> | null,
+  afterMs = 0,
+): Promise<void> {
   await page.evaluate(
-    ([url, name, wanted]) => {
+    ([url, name, wanted, later]) => {
       const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
       const w = window as unknown as Harness;
       const original = w.__original[name as string]!;
+      const calls: unknown[] = [];
+      w.__calls[name as string] = calls;
       api[name as string] = (...args: unknown[]) => {
+        calls.push(args[0] ?? null);
         const first = args[0] as Record<string, unknown> | undefined;
         const fits =
-          typeof first === 'object' &&
-          first !== null &&
-          Object.entries(wanted as Record<string, unknown>).every(([k, v]) => first[k] === v);
-        if (fits) return Promise.reject({ status: 500, title: 'Testfehler', detail: '010d, absichtlich' });
+          wanted === null ||
+          (typeof first === 'object' &&
+            first !== null &&
+            Object.entries(wanted as Record<string, unknown>).every(([k, v]) => first[k] === v));
+        if (fits) {
+          const fault = { status: 500, title: 'Testfehler', detail: '010d, absichtlich' };
+          if (later === 0) return Promise.reject(fault);
+          return new Promise((_, reject) => window.setTimeout(() => reject(fault), later as number));
+        }
         return original(...args);
       };
     },
-    [API_MODULE, method, match] as const,
+    [API_MODULE, method, match, afterMs] as const,
   );
 }
 
@@ -278,10 +292,19 @@ async function switchActor(page: Page, role: string): Promise<void> {
  * page; the outcome is polled.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
+  await elsewhere(page, 'registerSpeaker', [{ displayName: name, kind: 'shareholder' }]);
+}
+
+/**
+ * A write from somebody else — the administration persona, on the unpatched API, the actor swapped
+ * and restored in the same task. Synchronous: the evaluate awaits nothing in the page; the outcome
+ * is polled and must be `ok`.
+ */
+async function elsewhere(page: Page, method: string, args: unknown[]): Promise<void> {
   const index = await page.evaluate(
-    ([actorUrl, displayName]) => {
+    ([actorUrl, name, callArgs]) => {
       const w = window as unknown as Harness & { __writes?: string[] };
-      const mod = w.__modules[actorUrl!] as {
+      const mod = w.__modules[actorUrl as string] as {
         DEMO_ACTORS: readonly { id: string }[];
         getActor: () => unknown;
         setActor: (actor: unknown) => void;
@@ -291,7 +314,7 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
       let written: Promise<unknown>;
       try {
-        written = w.__original['registerSpeaker']!({ displayName, kind: 'shareholder' });
+        written = w.__original[name as string]!(...(callArgs as unknown[]));
       } finally {
         mod.setActor(before);
       }
@@ -303,7 +326,7 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       );
       return at;
     },
-    [ACTOR_MODULE, name],
+    [ACTOR_MODULE, method, args] as const,
   );
   await expect
     .poll(() => page.evaluate((at) => (window as unknown as { __writes: string[] }).__writes[at], index))
@@ -591,6 +614,8 @@ test('010d Ziel 2: Beantwortung — erster Abruf mit 500: Fehlerzustand, kein "K
   const failed = page.getByTestId('answers-list-error');
   await expect(failed).toBeVisible();
   await expect(failed).toContainText('Die Einzelfragen konnten nicht geladen werden');
+  // Review round 1, finding 6: neutral wording — the demo runs in the browser, nothing was "unreachable".
+  await expect(failed).toContainText('Der Bestand konnte gerade nicht gelesen werden.');
   await expect(page.getByText('Kein Treffer')).toHaveCount(0);
   await expect(page.getByText('Keine Einzelfrage gewählt')).toHaveCount(0);
   await expect(toasts(page)).toHaveCount(1);
@@ -661,28 +686,76 @@ test('010d Ziel 2 (Gegenprobe): Beantwortung — dieselbe Rolle, ein Abruf mit 5
 // Ziel 3: the outcome of a write applies only to its own question, for its own actor.
 // ---------------------------------------------------------------------------------------------
 
-test('010d Ziel 3: Beantwortung — 412 auf A nach dem Wechsel zu B: kein "Stand veraltet" über B, ein Toast', async ({
-  page,
-}) => {
+/**
+ * A real 412: "Freigeben" on A is held before it reaches the API; somebody else then returns A and
+ * submits it for review again — the same status and answer version, a newer record — so the held
+ * write passes every transition guard and meets only its outgrown `ifMatch`. Returns A's number and
+ * the locator of B, found by its number.
+ */
+async function approveAThenChangeElsewhere(
+  page: Page,
+): Promise<{ first: string; second: string; rowB: Locator }> {
   await answersInReviewAsLegal(page);
   const rows = page.getByTestId('answers-row');
-  const detailNumber = page.getByTestId('answers-detail-number');
-  await holdCalls(page, 'approveQuestion', false);
-
-  await rows.nth(0).click();
-  await page.getByTestId('answer-approve').click();
+  const first = (await rows.nth(0).getAttribute('data-number'))!;
+  const firstId = (await rows.nth(0).getAttribute('id'))!.replace('answers-row-', '');
   const second = (await rows.nth(1).getAttribute('data-number'))!;
-  await rows.nth(1).click();
+  const rowB = page.locator(`[data-testid="answers-row"][data-number="${second}"]`);
+  await holdCalls(page, 'approveQuestion', false);
+  await rows.nth(0).click();
+  await expect(page.getByTestId('answers-detail-number')).toHaveText(first);
+  await page.getByTestId('answer-approve').click();
+  await expect.poll(() => callCount(page, 'approveQuestion')).toBe(1);
+  await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.']);
+  await elsewhere(page, 'submitForReview', [firstId]);
+  return { first, second, rowB };
+}
+
+/** The toast for a refusal of A that is no longer on screen: house words, A's number, no server text. */
+async function expectStaleToastFor(page: Page, number: string): Promise<void> {
+  await expect(toasts(page)).toHaveCount(1);
+  await expect(toasts(page)).toContainText('Nicht übernommen');
+  await expect(toasts(page)).toContainText(`„Freigeben“ für Einzelfrage ${number}`);
+  await expect(toasts(page)).not.toContainText('Precondition');
+}
+
+test('010d Ziel 3: Beantwortung — echter 412 auf A nach dem Wechsel zu B: kein "Stand veraltet" über B, ein Toast mit der Nummer von A', async ({
+  page,
+}) => {
+  const { first, second, rowB } = await approveAThenChangeElsewhere(page);
+  const detailNumber = page.getByTestId('answers-detail-number');
+  await rowB.click();
   await expect(detailNumber).toHaveText(second);
 
-  await refuseHeld(page, 'approveQuestion', 0, 412);
+  await runHeld(page, 'approveQuestion', 0);
   await page.waitForTimeout(300);
   await settle(page);
   await expect(page.getByTestId('stale-banner')).toHaveCount(0);
   await expect(detailNumber).toHaveText(second);
   // A's refusal is still reported — as a toast, since A is no longer on screen.
-  await expect(toasts(page)).toHaveCount(1);
-  await expect(toasts(page)).toContainText('Testfehler');
+  await expectStaleToastFor(page, first);
+});
+
+test('010d Runde 1 (Befund 1): Beantwortung — echter 412 auf A, während B noch lädt: kein "Stand veraltet" über B', async ({
+  page,
+}) => {
+  const { first, second, rowB } = await approveAThenChangeElsewhere(page);
+  const detailNumber = page.getByTestId('answers-detail-number');
+  // B is selected, but its record is held: the detail still shows A when A's 412 arrives.
+  await holdCalls(page, 'getQuestion', true);
+  await rowB.click();
+  await expect.poll(() => callCount(page, 'getQuestion')).toBeGreaterThan(0);
+  await expect(detailNumber).toHaveText(first);
+
+  await runHeld(page, 'approveQuestion', 0);
+  await page.waitForTimeout(300);
+  await settle(page);
+  await releaseAll(page, 'getQuestion');
+  await expect(detailNumber).toHaveText(second);
+  await page.waitForTimeout(300);
+  await settle(page);
+  await expect(page.getByTestId('stale-banner')).toHaveCount(0);
+  await expectStaleToastFor(page, first);
 });
 
 test('010d Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: der Dialog auf B bleibt offen', async ({
@@ -690,6 +763,7 @@ test('010d Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: der Dial
 }) => {
   await answersInReviewAsLegal(page);
   const rows = page.getByTestId('answers-row');
+  const first = (await rows.nth(0).getAttribute('data-number'))!;
   await holdCalls(page, 'approveQuestion', false);
 
   await rows.nth(0).click();
@@ -703,6 +777,8 @@ test('010d Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: der Dial
 
   await runHeld(page, 'approveQuestion', 0);
   await expect(toasts(page)).toHaveCount(1);
+  // Review round 1, finding 2: the confirmation names the question it was for.
+  await expect(toasts(page)).toContainText(`Einzelfrage ${first}`);
   await page.waitForTimeout(300);
   await settle(page);
   await expect(reason).toBeVisible();
@@ -765,4 +841,87 @@ test('010d Ziel 3 (Gegenprobe): Beantwortung — 412 auf der gezeigten Frage: "S
   await page.waitForTimeout(300);
   await settle(page);
   await expect(toasts(page)).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Review round 1, findings 3 and 4: one read per failed Ereignisstrom, focus after "Erneut versuchen".
+// ---------------------------------------------------------------------------------------------
+
+/** The Beantwortung as expert, every list read failing: the error panel, one toast. */
+async function answersFailingAsExpert(page: Page): Promise<Locator> {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'expert');
+  await failAlways(page, 'listQuestions', { limit: 2000 });
+  await page.getByTestId('nav-answers').click();
+  await expect(page.getByTestId('answers-list-error')).toBeVisible();
+  await expect(toasts(page)).toHaveCount(1);
+  return page.getByTestId('answers-list-error').getByRole('button', { name: 'Erneut versuchen' });
+}
+
+test('010d Runde 1 (Befund 4): Beantwortung — "Erneut versuchen" scheitert wieder: der Fokus bleibt auf dem Knopf', async ({
+  page,
+}) => {
+  const retry = await answersFailingAsExpert(page);
+  // The retry fails 300 ms late, so its loading state is on screen in between.
+  await failAlways(page, 'listQuestions', { limit: 2000 }, 300);
+  await retry.focus();
+  await page.keyboard.press('Enter');
+  await expect(toasts(page)).toHaveCount(2);
+  await settle(page);
+  await expect(page.getByTestId('answers-list-error')).toBeVisible();
+  await expect(retry).toBeFocused();
+});
+
+test('010d Runde 1 (Befund 4): Beantwortung — "Erneut versuchen" gelingt: der Fokus geht auf die Liste, nicht auf BODY', async ({
+  page,
+}) => {
+  const retry = await answersFailingAsExpert(page);
+  await restore(page, 'listQuestions');
+  await retry.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('answers-row').first()).toBeVisible();
+  await settle(page);
+  await expect(page.getByRole('listbox', { name: 'Liste der Einzelfragen' })).toBeFocused();
+  // …and the list is where the arrow keys work: the first press selects the first question.
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('answers-detail')).toBeVisible();
+});
+
+test('010d Runde 1 (Befund 3): Historie, Ereignisstrom — Ende immer 500: genau ein Abruf, ein Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  await page.getByTestId('nav-history').click();
+  await expect(page.getByTestId('history-result').first()).toBeVisible();
+  await failAlways(page, 'listEvents', null);
+  await page.getByTestId('history-tab-stream').click();
+
+  await expect(toasts(page)).toHaveCount(1);
+  await page.waitForTimeout(500);
+  await settle(page);
+  await expect(toasts(page)).toHaveCount(1);
+  expect(await callCount(page, 'listEvents')).toBe(1);
+});
+
+test('010d Runde 1 (Befund 3): Historie, Ereignisstrom — observer → admin, Ende immer 500: genau ein Abruf, ein Toast', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForCorpus(page);
+  await asRole(page, 'observer');
+  await page.getByTestId('nav-history').click();
+  await page.getByTestId('history-tab-stream').click();
+  await expect(page.getByTestId('history-stream-forbidden')).toBeVisible();
+
+  await failAlways(page, 'listEvents', null);
+  await switchActor(page, 'admin');
+  await expect(toasts(page)).toHaveCount(1);
+  await page.waitForTimeout(500);
+  await settle(page);
+  await expect(toasts(page)).toHaveCount(1);
+  expect(await callCount(page, 'listEvents')).toBe(1);
+  await expect(page.getByTestId('history-stream-forbidden')).toHaveCount(0);
 });

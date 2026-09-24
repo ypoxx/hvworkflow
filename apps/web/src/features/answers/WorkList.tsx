@@ -222,6 +222,7 @@ function columnsFor(showTrack: boolean, showUnit: boolean): string {
 export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: WorkListProps) {
   const t = useT();
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [box, setBox] = useState({ height: 600, width: 640 });
   const [now, setNow] = useState(() => Date.now());
@@ -321,6 +322,25 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
     },
     [items, onSelect, selectedId],
   );
+
+  /**
+   * Slice 010d, review round 1, finding 4: "Erneut versuchen" sits in the error panel, which stays
+   * up while the list is read again (`listFailed`) — a failed retry leaves the focus on the button.
+   * Once rows arrive the panel goes with the focused button; the focus then goes to the list rather
+   * than falling to `<body>`, and only if nothing else took it in the meantime.
+   */
+  const retried = useRef(false);
+  const { reload } = backlog;
+  const retry = useCallback(() => {
+    retried.current = true;
+    reload();
+  }, [reload]);
+  useEffect(() => {
+    if (!retried.current || items.length === 0) return;
+    retried.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) listboxRef.current?.focus();
+  }, [items]);
 
   const activeRow =
     selectedId !== null && windowed.some((question) => question.id === selectedId)
@@ -491,7 +511,22 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
       >
         {items.length === 0 ? (
           <div className="p-4">
-            {listLoading ? (
+            {listFailed ? (
+              // Slice 010d, Ziel 2: the list could not be read — say so and offer the one step that
+              // helps. "Kein Treffer … Auswahl zurücksetzen" would claim an answer that never came.
+              <div data-testid="answers-list-error">
+                <EmptyState
+                  icon={TriangleAlert}
+                  title={t('answers.list.error.title')}
+                  description={t('answers.list.error.body')}
+                  action={
+                    <Button size="sm" variant="secondary" onClick={retry}>
+                      {t('common.retry')}
+                    </Button>
+                  }
+                />
+              </div>
+            ) : listLoading ? (
               // Slice 010d: shown after every role switch now. `role="status"` gives the label a
               // role to name — on a bare div axe rejects `aria-label` (aria-prohibited-attr, serious).
               <div
@@ -503,21 +538,6 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((line) => (
                   <div key={line} className="h-8 animate-pulse rounded-sm bg-ink-50" />
                 ))}
-              </div>
-            ) : listFailed ? (
-              // Slice 010d, Ziel 2: the list could not be read — say so and offer the one step that
-              // helps. "Kein Treffer … Auswahl zurücksetzen" would claim an answer that never came.
-              <div data-testid="answers-list-error">
-                <EmptyState
-                  icon={TriangleAlert}
-                  title={t('answers.list.error.title')}
-                  description={t('answers.list.error.body')}
-                  action={
-                    <Button size="sm" variant="secondary" onClick={backlog.reload}>
-                      {t('common.retry')}
-                    </Button>
-                  }
-                />
               </div>
             ) : (
               <EmptyState
@@ -537,6 +557,7 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
         ) : (
           <div style={{ height: items.length * ROW_HEIGHT }} className="relative">
             <div
+              ref={listboxRef}
               role="listbox"
               tabIndex={0}
               aria-label={t('answers.list.label')}

@@ -6,7 +6,7 @@
  * corpus, the course of one question (`getQuestionHistory`), and the tail of the meeting
  * (`listEvents`). Nothing is derived, nothing is cached across a version change.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { History, Lock, Search } from 'lucide-react';
 import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
 import { api } from '../../api';
@@ -206,7 +206,17 @@ export function HistoryPage() {
   const streamOwned = keyBelongsTo(streamState.key, actorId);
   const streamWindow = streamOwned ? streamState.window : NO_EVENTS;
   const curve = streamOwned ? streamState.curve : NO_CURVE;
-  const streamLastSeq = streamState.lastSeq;
+  /**
+   * Slice 010d, review round 1, finding 3: the stream effect reads its own record through this ref
+   * instead of depending on it. As a dependency (`streamOwned`, and before it `streamLastSeq`) every
+   * answer of the effect ran it again — a failed read of the tail set the record, which started the
+   * effect a second time: two reads, two toasts. Now only a new `version` or the tab starts it.
+   * Kept after each commit, before any effect of that commit runs.
+   */
+  const streamRef = useRef(streamState);
+  useLayoutEffect(() => {
+    streamRef.current = streamState;
+  });
 
   /**
    * Codex P2-2 on 4f0d231 (the same class as Codex (b) on 7f542b6 in the Beantwortung, see
@@ -429,7 +439,8 @@ export function HistoryPage() {
         setStreamRead({ key: requested, status: 'ready' });
         // Slice 010d: an unchanged tail is skipped only if this actor read it; a window another
         // actor read is not shown (`streamOwned`) and is read again, once.
-        if (lastSeq === streamLastSeq && streamOwned) return undefined;
+        const held = streamRef.current;
+        if (lastSeq === held.lastSeq && keyBelongsTo(held.key, getActor().id)) return undefined;
         return api
           .listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT)
           .then((page) => {
@@ -447,8 +458,8 @@ export function HistoryPage() {
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who holds no `event.read` at all — a gestalteter Zustand, not
           // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds
-          // `streamLastSeq` to 0 — a role that regains `event.read` later must not see the
-          // `lastSeq === streamLastSeq` short-circuit above skip its own first, honest read back.
+          // `lastSeq` to 0 — a role that regains `event.read` later must not see the
+          // unchanged-tail short-circuit above skip its own first, honest read back.
           setStreamRead({ key: requested, status: 'forbidden' });
           setStreamState({ key: requested, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE });
           return;
@@ -466,7 +477,7 @@ export function HistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [version, tab, streamLastSeq, streamOwned]);
+  }, [version, tab]);
 
   const stream = useMemo(() => streamWindow.slice(-STREAM_LIMIT).reverse(), [streamWindow]);
 

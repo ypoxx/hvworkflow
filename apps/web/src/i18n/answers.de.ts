@@ -7,7 +7,7 @@ export const answersDe = {
   'answers.list.empty.body':
     'Zu dieser Auswahl gibt es keine Einzelfrage. Setzen Sie die Auswahl zurück oder ändern Sie den Suchtext.',
   'answers.list.error.title': 'Die Einzelfragen konnten nicht geladen werden',
-  'answers.list.error.body': 'Der Bestand ist gerade nicht erreichbar.',
+  'answers.list.error.body': 'Der Bestand konnte gerade nicht gelesen werden.',
   'answers.search.label': 'Suche',
   'answers.search.placeholder': 'Nummer, Redner, Frage- oder Antworttext',
   'answers.filter.status.label': 'Stand',
@@ -81,6 +81,10 @@ export const answersDe = {
     'Die Einzelfrage wird mit Begründung aus dem Bestand genommen. Der Vorgang bleibt in der Historie sichtbar.',
   'answers.withdraw.reason': 'Begründung',
   'answers.toast.done': 'Übernommen',
+  'answers.toast.step': 'Einzelfrage {number}: {action}',
+  'answers.toast.stale.title': 'Nicht übernommen',
+  'answers.toast.stale.body':
+    '„{action}“ für Einzelfrage {number} wurde nicht übernommen: Die Frage wurde inzwischen geändert.',
   'answers.stale.banner': 'Stand wurde inzwischen geändert, Ansicht neu geladen',
   'answers.diff.toggle': 'Änderung gegenüber Version {previous}',
   'answers.readonly.hint': 'In dieser Rolle nur lesen',

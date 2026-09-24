@@ -70,8 +70,9 @@ export interface Backlog {
   /** Size of that same list — the number the "Alle" chip carries. */
   total: number;
   listLoading: boolean;
-  /** Slice 010d, Ziel 2: this actor's last list read failed and no newer one is on its way — the
-   *  list shows a gestalteter Fehlerzustand where it has no rows, never "Kein Treffer". */
+  /** Slice 010d, Ziel 2: this actor's last answered list read failed and it has no rows — the list
+   *  shows a gestalteter Fehlerzustand, never "Kein Treffer". It stands while this actor reads again
+   *  (review round 1, finding 4: the panel, and the focus on its button, stay until rows arrive). */
   listFailed: boolean;
   /** Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Beantwortung — set from the
    *  403's ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
@@ -151,9 +152,14 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   // readable"; a filtered list says nothing about what it leaves out.
   const poolComplete = poolOwned && poolState.complete;
   const listLoading = listLoadingState || !poolOwned;
-  // Slice 010d, Ziel 2: a failure of this actor's current list read, with nothing newer on its way.
+  // Slice 010d, Ziel 2: this actor's last answered list read failed, and there are no rows of its
+  // own. Not tied to the load in progress: a retry of the same actor keeps the panel up.
   const listFailed =
-    !listLoading && listRead !== null && listRead.status === 'error' && listRead.key === listKey;
+    listRead !== null &&
+    listRead.status === 'error' &&
+    keyBelongsTo(listRead.key, actorId) &&
+    poolOwned &&
+    pool.length === 0;
   /**
    * Slice 010c, Ziel 5: who made the current selection. A selection of another actor that the new
    * actor's list leaves out is taken as not readable, even when that list is filtered

@@ -9,7 +9,7 @@ export const answersEn: typeof answersDe = {
   'answers.list.empty.body':
     'No question matches this selection. Clear the selection or change the search text.',
   'answers.list.error.title': 'The questions could not be loaded',
-  'answers.list.error.body': 'The corpus cannot be reached at the moment.',
+  'answers.list.error.body': 'The corpus could not be read just now.',
   'answers.search.label': 'Search',
   'answers.search.placeholder': 'Number, speaker, question or answer text',
   'answers.filter.status.label': 'Status',
@@ -83,6 +83,10 @@ export const answersEn: typeof answersDe = {
     'The question is taken out of the corpus, with a reason. The history keeps the record.',
   'answers.withdraw.reason': 'Reason',
   'answers.toast.done': 'Applied',
+  'answers.toast.step': 'Question {number}: {action}',
+  'answers.toast.stale.title': 'Not applied',
+  'answers.toast.stale.body':
+    '“{action}” for question {number} was not applied: the question was changed in the meantime.',
   'answers.stale.banner': 'The record has changed in the meantime; the view was reloaded',
   'answers.diff.toggle': 'Change from version {previous}',
   'answers.readonly.hint': 'Read only in this role',
