@@ -607,7 +607,7 @@ export interface paths {
         };
         /**
          * Realtime event stream (Server-Sent Events) with resumption
-         * @description Since 0.3.0 (slice 035, ADR 0014). `text/event-stream`: every message carries one `Event` as JSON in `data:` and its `seq` in `id:`; a comment line is sent as heartbeat every 15 s. Resume with `after` or the `Last-Event-ID` header (the browser sends it on reconnect). The same read permission as `listEvents` applies per delivered event (`event.read` plus the read scopes of slice 010): no event reaches a reader who may not read it. Polling `/events` stays the fallback. In-app alarms (`NotificationRaised`, slice 085) travel on this stream later.
+         * @description Since 0.3.0 (slice 035, ADR 0014). `text/event-stream`: every message carries one `Event` as JSON in `data:` and its `seq` in `id:`; a comment line is sent as heartbeat every 15 s. Resume with `after` or the `Last-Event-ID` header (the browser sends it on reconnect). When both are present, `Last-Event-ID` wins: it is the newer cursor on a reconnect, `after` applies to the first connection only (Codex on PR #25). The same read permission as `listEvents` applies per delivered event (`event.read` plus the read scopes of slice 010): no event reaches a reader who may not read it. Polling `/events` stays the fallback. In-app alarms (`NotificationRaised`, slice 085) travel on this stream later.
          */
         get: operations["streamEvents"];
         put?: never;

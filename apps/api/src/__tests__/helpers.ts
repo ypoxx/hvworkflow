@@ -79,10 +79,18 @@ function isExceptedStatus(operationId: string, status: number): boolean {
   return UNDOCUMENTED_STATUS_EXCEPTIONS[operationId]?.includes(status) ?? false;
 }
 
-/** Every response this suite provokes is JSON (`c.json()` or the shared `problemResponse`, never empty). */
-async function readJsonBody(res: Response): Promise<unknown> {
-  const text = await res.text();
-  return text === '' ? undefined : JSON.parse(text);
+/**
+ * Read a response body for validation by its media type (Codex on PR #25): an event stream never
+ * ends, so it is never buffered here (the caller reads or cancels it); JSON (`application/json`,
+ * `application/problem+json`) is parsed; any other type (`text/plain` for `/metrics`) is validated as
+ * the raw string. Always on a clone, so the caller can still read the body.
+ */
+async function readBodyFor(res: Response, contentType: string): Promise<unknown> {
+  if (contentType === 'text/event-stream') return undefined;
+  const text = await res.clone().text();
+  if (text === '') return undefined;
+  const isJson = contentType === 'application/json' || contentType.endsWith('+json');
+  return isJson ? JSON.parse(text) : text;
 }
 
 /**
@@ -132,7 +140,7 @@ async function assertMatchesContract(method: string, path: string, res: Response
 
   const status = res.status;
   const contentType = (res.headers.get('content-type') ?? 'application/json').split(';')[0]!.trim();
-  const body = await readJsonBody(res.clone());
+  const body = await readBodyFor(res, contentType);
 
   if (isExceptedStatus(operationId, status)) {
     // Every exception above is an error path (401/422): still hold it to the shared Problem shape.
@@ -153,6 +161,15 @@ async function assertMatchesContract(method: string, path: string, res: Response
     // A documented response without `content` (204, 302): the body must be empty, nothing to validate.
     if (body !== undefined) {
       throw new Error(`${method} ${pathname} ("${operationId}") returned ${status} with a body, but the contract declares none.`);
+    }
+  } else if (contentType === 'text/event-stream') {
+    // Not buffered (see readBodyFor): what the contract can check here is the declared media type.
+    const content = responseObjectOf(operationId, status)?.['content'] as Record<string, unknown>;
+    if (!(contentType in content)) {
+      throw new Error(
+        `${method} ${pathname} ("${operationId}") returned ${contentType}, but the contract declares ` +
+          `${Object.keys(content).join(', ')} for ${status}.`,
+      );
     }
   } else {
     expectValid(operationId, status, body, contentType);

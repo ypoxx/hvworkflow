@@ -724,3 +724,18 @@ Bestandsanfrage scheitert neu, Tor zählt keine Scheinaufrufe). Nits vom Orchest
 ist für Clients nicht nachvollziehbar (`Meeting` trägt keine Anlagezeit, `listMeetings` sortiert nur nach `date`) →
 030 nutzt `getMeeting` bis 0.5, Klärung in 043. Unbekannte Felder im Anfragekörper werden weiter still ignoriert (kein
 `additionalProperties: false`, Stand 0.2.1) → 043.
+
+**Codex auf PR #25, dritter Lauf (2 × P1, 1 × P2), vom Orchestrator behoben** (die Nacharbeitsrunde des Bauers war
+verbraucht):
+
+- P1 · `req()` hätte einen endlosen SSE-Strom (`streamEvents`, 035) mit `res.text()` gepuffert und nie zurückgegeben
+  → der Helfer liest einen Körper nach Medientyp: `text/event-stream` gar nicht (geprüft wird der deklarierte
+  Medientyp), JSON wird geparst, alles andere als Text validiert.
+- P1 · `getMetrics` (`text/plain`, 033) wäre an `JSON.parse` gescheitert → siehe oben.
+- P2 · Vorrang zwischen `after` und `Last-Event-ID` war offen → `Last-Event-ID` gewinnt, `after` gilt nur für die
+  erste Verbindung.
+
+Probe mit einer Wegwerf-App, die wie die künftigen Handler antwortet (Wegwerf-Test danach gelöscht). Vorher:
+`× SSE is not buffered 5007ms` (Zeitüberschreitung) und `× metrics text/plain is not JSON-parsed` mit
+`SyntaxError: Unexpected token 'h', "hv_events_total 1`. Nachher: `Tests 51 passed (51)`, und das Tor meldet
+`getMetrics` und `streamEvents` als ausgeübt („overdue“) — sie zählen also, sobald 033 und 035 sie bauen.
