@@ -55,17 +55,33 @@ dieser Spec hatte ihn vergessen. Der e2e-Test legt ihn an, committet wird nur di
 
 **Auslöser:** eine Zusammenführung einer `classified`-Einzelfrage in sich selbst. `question.merge`
 (R-TRANS-12, `packages/domain/src/transitions.ts`) trägt den eigenen Wächter R-GUARD-05
-(`notMergingIntoSelf`, "A question cannot be merged into itself."); der Wächter wertet allein die
-*Nutzlast* aus (`intoQuestionId === q.id`), nie eine Leseberechtigung, und verweigert die Schreibung
-für jede Rolle, die überhaupt zusammenführen darf, bei jedem Lauf. Die Oberfläche erreicht ihn ohne
-Test-Haken: In der Beantwortung (Rolle `capture`, die zusammen mit `moderation` `question.merge`
-trägt, `packages/domain/src/permissions.ts`) eine `classified`-Zeile auswählen (Status ist im
-800-Fragen-Korpus immer belegt, `packages/domain/src/seed.ts`), die eigene Nummer von der Zeile
-ablesen (`data-number`), den Zusammenführen-Dialog öffnen und exakt diese Nummer als Ziel eintragen.
-`MergeDialog.onResolve` (`ActionDialogs.tsx`) löst die Nummer über `HvApi.listQuestions` zur eigenen
-ID auf, genau wie bei einem Vertipper; `api.mergeQuestion(question.id, targetId, …)` (`Page.tsx`)
-schickt damit `id === intoQuestionId`, R-GUARD-05 verweigert mit 409, und `showProblem`
-(`toastStore.ts`) hebt einen Danger-Toast mit der Regelzeile.
+(`notMergingIntoSelf`, "A question cannot be merged into itself."); der Wächter selbst wertet allein
+die *Nutzlast* aus (`intoQuestionId === q.id`), nie eine Leseberechtigung, und verweigert die
+Schreibung für jede Rolle, die überhaupt zusammenführen darf, bei jedem Lauf. Die Oberfläche erreicht
+ihn ohne Test-Haken: In der Beantwortung (Rolle `capture`, die zusammen mit `moderation`
+`question.merge` trägt — auch `admin` hält es, wie jede Berechtigung, `packages/domain/src/permissions.ts`)
+eine `classified`-Zeile auswählen (Status ist im 800-Fragen-Korpus immer belegt,
+`packages/domain/src/seed.ts`), die eigene Nummer von der Zeile ablesen (`data-number`), den
+Zusammenführen-Dialog öffnen und exakt diese Nummer als Ziel eintragen. `MergeDialog.onResolve`
+(`ActionDialogs.tsx`) löst die Nummer über `HvApi.listQuestions` zur eigenen ID auf, genau wie bei
+einem Vertipper; `api.mergeQuestion(question.id, targetId, …)` (`Page.tsx`) schickt damit
+`id === intoQuestionId`, R-GUARD-05 verweigert mit 409, und `showProblem` (`toastStore.ts`) hebt
+einen Danger-Toast mit der Regelzeile.
+
+**Nacharbeit-Korrektur (minor 2, nach Scheibe 010):** die Aussage "hängt nicht von Leserechten ab"
+galt nur für den *Wächter* R-GUARD-05, nicht für die *Regelzeile auf dem Bildschirm*. Scheibe 010
+(`packages/domain/src/api.ts`, `transition()`, Festlegung 8, jetzt in dieser Basis) benennt Grund und
+`ruleId` bei einem 409 nur, wenn die handelnde Person die Frage auch lesen darf
+(`can(actor, 'question.read', q).allow`); sonst lautet die Meldung generisch "Transition not
+allowed." ganz ohne Regel-Id. `capture` hält `question.read` uneingeschränkt (nicht auf einen Status
+begrenzt) und sieht deshalb bei jeder Frage, unabhängig von deren Status, Grund und Regel-Id — der
+Test braucht also kein zusätzliches Leserecht über das hinaus, was `capture` an diesem Arbeitsplatz
+ohnehin für alles hat, aber die Regelzeile selbst hängt jetzt nachweislich von einem Leserecht ab.
+Bliebe `capture` (oder eine andere Rolle mit `question.merge`) ohne `question.read` auf diese Frage,
+bekäme sie einen Toast ohne Regelzeile, `ruleLine`-Prüfung in
+`apps/web/e2e/takt-009-toast-kontrast.spec.ts` fände kein `p.font-mono` mit "R-GUARD-05" mehr und der
+Test schlüge laut fehl statt still durchzulaufen — geprüft mit demselben Testlauf auf der gemergten
+Basis (siehe "Nacharbeit nach Review und Codex" unten).
 
 Geprüfte und verworfene Kandidaten:
 - Eine veraltete `answerVersion` bei `question.approve` (R-GUARD-04): `QuestionDetail.tsx` schickt
@@ -165,7 +181,7 @@ review surface for no gain"; kein `prefers-color-scheme`/`forced-colors`/`prefer
 im Stylesheet). `.stage-contrast` (Zeile 184ff.) ist kein zweites Thema, sondern eine auf die
 Bühnenansicht beschränkte Variablen-Überschreibung, per Klasse auf dem `<div>` von
 `features/stage/Page.tsx:442`; der Toast-Stapel selbst hängt als Geschwister von `{children}` direkt
-unter `ToastProvider` (`components/Toast.tsx:72–87`, gerendert von `app/App.tsx:67`), also nicht als
+unter `ToastProvider` (`components/Toast.tsx:76–91`, gerendert von `app/App.tsx:67`), also nicht als
 Nachfahre dieses `<div>` — die überschriebenen `--color-ink-*`-Variablen erreichen den Toast auch auf
 der "Nur Bühne"-Ansicht nie (CSS-Variablen vererben sich nur an Nachfahren im DOM-Baum). Die
 Kontrastprüfung betrifft damit nur das eine, helle Thema; ein "Kontrastmodus", der den Toast
@@ -256,8 +272,129 @@ Exit code `0`.
 
 ## Offen
 
-Keins. `docs/evidence` wurde nach jedem Playwright-Lauf mit `git checkout -- docs/evidence`
-zurückgesetzt (Schritt 6 der Arbeitsanweisung); diese Scheibe committet dort nichts.
+Nichts an dieser Scheibe selbst; zwei außerhalb ihres Umfangs gefundene Barrierefreiheits-Befunde am
+selben Bauteil, als Anschlussarbeiten (nicht Teil von `Toast.tsx`s Regelzeile, kein Bestandteil
+dieser Scheibe, siehe "Nicht-Ziele" — keine Umgestaltung des Toasts):
+
+1. Der Schließen-Knopf-Pfeil (`components/Toast.tsx:63–70`, `X`-Icon in einem Knopf ohne eigenen
+   Hintergrund) führt `text-ink-400` (`#a8a49c`) auf `#ffffff`: `L(#a8a49c) = 0.372760`,
+   Kontrast `= (1.000000+0.05)/(0.372760+0.05) = 1.05/0.422760 = 2.4837` → **≈ 2,48:1**, unter den
+   3:1, die WCAG 2.2 1.4.11 ("Non-text Contrast") für grafische Bedienelemente verlangt.
+2. Danger-Toasts (und jeder andere Toast) verschwinden nach `DISMISS_AFTER_MS` (`Toast.tsx:25`,
+   Zeitgeber in der `useEffect` Zeile 31–34) fest nach 9 Sekunden, ohne bei Hover oder Fokus zu
+   pausieren — WCAG 2.2 2.2.1 ("Timing Adjustable") verlangt, eine solche Zeitgrenze abschalten,
+   anpassen oder verlängern zu können, wenn sie nicht mindestens 20 Stunden beträgt.
+
+`docs/evidence` wurde nach jedem Playwright-Lauf mit `git checkout -- docs/evidence` zurückgesetzt
+(Schritt 6 der Arbeitsanweisung); diese Scheibe committet dort ausschließlich
+`docs/evidence/takt-009-toast.png` (Files-allowed-Nachtrag des Orchestrators, Codex P1).
+
+## Nacharbeit nach Review und Codex
+
+Ein Nacharbeitsdurchlauf auf der gemergten Basis (Scheibe 010 jetzt in dieser Basis, Commit
+`0fcb87b`; Screenshot-Nachtrag, Commit `8341442`):
+
+1. **Codex P1 (AGENTS.md Regel 2):** Screenshot `docs/evidence/takt-009-toast.png` wird jetzt vom
+   e2e-Test selbst angelegt (`page.screenshot(...)`, mit dem `evidence()`-Helfer aus den anderen
+   Spezifikationen), sobald die Regelzeile sichtbar ist, und ist die einzige Datei, die aus
+   `docs/evidence` committet wird.
+2. **minor 1:** `await expect(ruleLine).toBeVisible()` läuft jetzt auch *nach* `checkAxe` — Beweis,
+   dass der Toast während beider axe-Durchläufe noch auf dem Bildschirm stand, nicht durch
+   `DISMISS_AFTER_MS` (9 s) währenddessen verschwunden ist.
+3. **minor 2:** siehe "Nacharbeit-Korrektur" oben im Auslöser-Absatz — die Behauptung, die Regelzeile
+   hänge nie von einem Leserecht ab, war seit Scheibe 010 (Festlegung 8) falsch; korrigiert im
+   e2e-Kommentar (`apps/web/e2e/takt-009-toast-kontrast.spec.ts:17–26`) und hier im Bericht.
+4. **minor 3:** die zwei Anschlussbefunde stehen jetzt nummeriert unter "Offen" oben.
+5. **Nits:** `Toast.tsx`-Kommentar umformuliert (kein "AX-020 debt", kein "per theme" mehr, siehe
+   `components/Toast.tsx:54–57`); "eine von zwei Rollen" korrigiert zu "capture (admin hält es auch)"
+   in e2e-Kommentar und Bericht; die veraltete Zeilenangabe `Toast.tsx:72–87` auf die jetzige
+   `Toast.tsx:76–91` korrigiert.
+
+**Playwright, volle Suite** (`E2E_PORT=4381 pnpm --filter @hv/web e2e -- takt-009`, auf der gemergten
+Basis, Commit `8341442`; Anfang, die eigene Zeile und Tail wörtlich):
+
+```
+> @hv/web@0.0.0 e2e /home/user/wt/takt/apps/web
+> playwright test -- takt-009
+
+
+Running 18 tests using 2 workers
+
+[axe] shell (speakers, capture, de) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+[axe] shell (speakers, capture, de) (b, color-contrast only, named exceptions excluded): 0 violation group(s), 0 serious/critical
+[axe] speakers (moderation, Wortmeldeliste) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+...
+[axe] toast (Regelzeile, Selbst-Zusammenführung abgelehnt) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+[axe] toast (Regelzeile, Selbst-Zusammenführung abgelehnt) (b, color-contrast only, named exceptions excluded): 0 violation group(s), 0 serious/critical
+  ✓  18 [chromium] › e2e/takt-009-toast-kontrast.spec.ts:68:1 › takt-009: Regelzeile im Toast bei verweigerter Selbst-Zusammenführung — Kontrast und axe (3.5s)
+[axe] answers (Abnahme, freigegeben) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+[axe] answers (Abnahme, freigegeben) (b, color-contrast only, named exceptions excluded): 0 violation group(s), 0 serious/critical
+[timing] /stage view after navigation: 95.1 ms
+[timing] stage-next presses to reach F-0801: 9
+[axe] stage (Abnahme, vorbereitete Antwort) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+[axe] stage (Abnahme, vorbereitete Antwort) (b, color-contrast only, named exceptions excluded): 0 violation group(s), 0 serious/critical
+[axe] history (Abnahme, Zeitleiste) (a, all rules except color-contrast, no exclusions): 0 violation group(s), 0 serious/critical
+[axe] history (Abnahme, Zeitleiste) (b, color-contrast only, named exceptions excluded): 0 violation group(s), 0 serious/critical
+  ✓  14 [chromium] › e2e/abnahme.spec.ts:88:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (53.4s)
+
+  18 passed (2.4m)
+```
+
+`git checkout -- docs/evidence` lief danach; einzige verbliebene Datei unter `docs/evidence`:
+`docs/evidence/takt-009-toast.png` (neu, unversioniert bis zum folgenden Commit).
+
+**`pnpm -C /home/user/wt/takt gates`** (Tail, wörtlich):
+
+```
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7749.714046
+
+> @hv/web@0.0.0 build /home/user/wt/takt/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DwK4D-x4.css                        39.98 kB │ gzip:   8.67 kB
+dist/assets/index-BImqnPVW.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,201.28 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.17s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (signature 3940ba550a73…) at commit 8341442, tree 37f7c82c2e40…
+```
+
+Exit code `0`.
+
+**`node /home/user/wt/takt/scripts/slice-scope.mjs`** (wörtlich):
+
+```
+slice-scope: warning — "docs/slices/takt-009-toast-kontrast.md"'s "Files allowed" section differs from its version at the commit that introduced it (28f9e9d).
+slice-scope: 3 changed file(s), all within "docs/slices/takt-009-toast-kontrast.md"'s "Files allowed" list (4 pattern(s)).
+```
+
+Die Warnung ist erwartet und harmlos: sie meldet, dass "Files allowed" sich seit der Einführung der
+Spezifikation geändert hat — genau der Codex-P1-Nachtrag des Orchestrators (Commit `8341442`), der
+den Screenshot-Pfad ergänzt hat. Exit-Code `0`; kein Fehler.
 
 ## Review findings
 
