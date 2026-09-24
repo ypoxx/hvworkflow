@@ -108,13 +108,18 @@ async function installHarness(page: Page): Promise<void> {
 
 /**
  * The next call of `method` whose first argument has every field of `match` (any call without
- * `match`) is refused with a 500; every call is counted in `__calls[method]` (its first argument,
- * `null` when there is none).
+ * `match`) is refused with a 500 — `afterMs` later, if given; every call is counted in
+ * `__calls[method]` (its first argument, `null` when there is none).
  */
-async function failOnce(page: Page, method: string, match?: Record<string, unknown>): Promise<void> {
+async function failOnce(
+  page: Page,
+  method: string,
+  match?: Record<string, unknown>,
+  afterMs = 0,
+): Promise<void> {
   await installHarness(page);
   await page.evaluate(
-    async ([url, name, wanted]) => {
+    async ([url, name, wanted, later]) => {
       const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
       const w = window as unknown as Harness;
       const original = w.__original[name as string]!;
@@ -131,12 +136,14 @@ async function failOnce(page: Page, method: string, match?: Record<string, unkno
             Object.entries(wanted as Record<string, unknown>).every(([k, v]) => first[k] === v));
         if (!failed && fits) {
           failed = true;
-          return Promise.reject({ status: 500, title: 'Testfehler', detail: '010c, absichtlich' });
+          const fault = { status: 500, title: 'Testfehler', detail: '010c, absichtlich' };
+          if (later === 0) return Promise.reject(fault);
+          return new Promise((_, reject) => window.setTimeout(() => reject(fault), later as number));
         }
         return original(...args);
       };
     },
-    [API_MODULE, method, match ?? null] as const,
+    [API_MODULE, method, match ?? null, afterMs] as const,
   );
 }
 
@@ -690,6 +697,27 @@ test('010c Runde 2: Beantwortung — Suche aktiv, Wechsel zu observer, erste Det
   await asRole(page, 'observer');
   await expectOneToast(page);
 });
+
+/**
+ * Review round 3, R3-1: the gate used to keep only the first failure of a pass. With the list
+ * answering last (600 ms late), the masked 404 of one detail read arriving first hid the 500 of the
+ * other one arriving after it (150 ms late) — no toast at all. Both orders are covered.
+ */
+for (const [late, masked] of [
+  ['getQuestion', 'getQuestionHistory'],
+  ['getQuestionHistory', 'getQuestion'],
+] as const) {
+  test(`010c Runde 3 (R3-1): Beantwortung — Liste zuletzt, ${late} 500 nach dem 404 von ${masked}, Wechsel zu observer: ein Toast`, async ({
+    page,
+  }) => {
+    await openAssignedAndSearch(page);
+    await delayCalls(page, 'listQuestions', 600);
+    await failOnce(page, late, undefined, 150);
+    await asRole(page, 'observer');
+    await page.waitForTimeout(800);
+    await expectOneToast(page);
+  });
+}
 
 test('010c Ziel 5 (Gegenprobe): Beantwortung — Suche ohne die offene Frage, dieselbe Rolle, Detail mit 500: der Toast bleibt', async ({
   page,
