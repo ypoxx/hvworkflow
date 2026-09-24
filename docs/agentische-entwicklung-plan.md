@@ -181,7 +181,7 @@ versioniert und für die Entwickler lesbar.
 | **Reviewer** | Opus 5 | Sieht nur Spec, Regel-IDs und Diff. Sucht Abweichung von der Spec, fehlende Tests, Hausvokabular, Randfälle. Gibt Befund, ändert nichts. | lesen, Tests ausführen | mittel, je Scheibe einmal |
 | **Mechaniker** | Haiku 4.5 | Synthetische Testdaten, Lint-Korrekturen, Übersetzungsschlüssel DE/EN, Doku-Abgleich, Log-Auswertung. | eng begrenzt je Auftrag | sehr niedrig |
 
-**Sicherheitsreview** ist keine eigene Rolle, sondern ein Modus des Architekten an den Prüfpunkten 3, 4 und 7, einmal je Meilenstein über den gesamten Stand, mit den Ergebnissen der statischen Analyse als Eingabe. Die Sicherheitsperspektive wird je Scheibe im Opus-Review durch die Checkliste `docs/sicherheit/reviewer-checkliste-sicherheit.md` berücksichtigt.
+**Sicherheitsreview** ist keine eigene Rolle, sondern ein Modus des Architekten an den Prüfpunkten 3, 4 und 7, über den gesamten Stand, mit den Ergebnissen der statischen Analyse als Eingabe. Die Sicherheitsperspektive wird je Scheibe im Opus-Review durch die Checkliste `docs/sicherheit/reviewer-checkliste-sicherheit.md` berücksichtigt.
 
 **Warum nicht durchgehend das stärkste Modell?** Weil die Berichte zeigen, dass die Ergebnisqualität
 bei kleinen, gut spezifizierten Scheiben vom Reviewer bestimmt wird, nicht vom Schreiber — und

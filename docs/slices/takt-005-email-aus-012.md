@@ -52,35 +52,43 @@ Historie entscheidet der Eigentümer). Keine anderen Wortlautänderungen im Beri
 
 ## Bericht
 
-**git diff --stat against working tree:**
+**Nachweis-Ersatz durch takt-007, 23.09.2026:** Die beiden folgenden Nachweise (Diff-Stat und E-Mail-Scan) stammten
+von einem früheren Stand vor dem Squash und wurden am 23.09.2026 durch takt-007 ersetzt: der Diff-Stat durch den
+Squash-Commit, der Scan durch die Mengenform, ausgeführt auf `27333c4` (Branch von takt-007). Die Mengenform bleibt
+beim Einfügen in einen Bericht gleich und gilt deshalb auch für jeden späteren Stand, der keine neue Adresse bringt.
+Die Zählung endet mit Exit 1, weil `grep -c` bei 0 Treffern so endet; als Tor wäre sie umzudrehen.
+
+**`git show --stat --format= e79c69d` (Squash-Commit von takt-005 gegen seinen Vorgänger), ausgeführt von takt-007:**
 ```
-docs/adr/0015-vertragsversionierung.md         | 3 +++
-docs/produktplan-beta.md                       | 2 +-
-docs/slices/012-architektur-sicherheitstore.md | 2 +-
-3 files changed, 5 insertions(+), 2 deletions(-)
+ docs/adr/0015-vertragsversionierung.md         |   3 +
+ docs/produktplan-beta.md                       |   2 +-
+ docs/slices/012-architektur-sicherheitstore.md |   2 +-
+ docs/slices/takt-005-email-aus-012.md          | 192 +++++++++++++++++++++++++
+ 4 files changed, 197 insertions(+), 2 deletions(-)
 ```
 
-**E-Mail-Adressen im Arbeitsbaum:**
+**E-Mail-Adressen im Arbeitsbaum, als Menge verschiedener Adressen** (neu gefasst nach dem Codex-Befund auf
+PR #22: eine Liste aller Fundstellen wächst mit jedem Einfügen in einen Bericht, so dass ein eingefügter Lauf nie
+den Endstand zeigt; die Menge der verschiedenen Adressen und die Zählung der übrigen Fundstellen bleiben beim
+Einfügen gleich). Beide Befehle laufen über den Arbeitsbaum einschließlich dieses Berichts:
+
 ```
-docs/slices/016-agenten-hooks-tore.md:853:Grün: `git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten` und
-docs/slices/takt-005-email-aus-012.md:19:   im Bericht, jede verbleibende Fundstelle einzeln begründet (z. B. `noreply@anthropic.com` in Commit-Vorlagen,
-scripts/hooks/mark-test-run.test.mjs:40:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/pre-tool-use-bash.test.mjs:124:  const r = runCommand('git -C /home/user/wt/016 -c user.email=t@t.invalid push origin claude/slice-016-agenten');
-scripts/hooks/stop-check.test.mjs:26:  git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'init']);
-scripts/hooks/stop-check.test.mjs:132:    git(dir, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add gitignore']);
-scripts/slice-scope.test.mjs:181:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
-scripts/slice-scope.test.mjs:188:    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+$ git grep -ohE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**' | sort -u
+noreply@anthropic.com
+t@t.invalid
+$ git grep -nE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}" -- . ':!pnpm-lock.yaml' ':!**/node_modules/**' | grep -cvE 't@t\.invalid|noreply@anthropic\.com'
+0
 ```
 
-Begründung jeder Fundstelle:
-1. `docs/slices/016-agenten-hooks-tore.md:853`: `t@t.invalid` ist eine Test-Adresse in einem Git-Befehl-Beispiel, nicht real.
-2. `docs/slices/takt-005-email-aus-012.md:19`: `noreply@anthropic.com` ist die Automatisierungs-Adresse in Commit-Vorlage-Beispielen, wie in der Spec angegeben.
-3. `scripts/hooks/mark-test-run.test.mjs:40`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-4. `scripts/hooks/pre-tool-use-bash.test.mjs:124`: `t@t.invalid` ist eine Test-Adresse in Git-Befehl-String für Tests.
-5. `scripts/hooks/stop-check.test.mjs:26`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-6. `scripts/hooks/stop-check.test.mjs:132`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-7. `scripts/slice-scope.test.mjs:181`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
-8. `scripts/slice-scope.test.mjs:188`: `t@t.invalid` ist eine Test-Adresse in Git-Config für Testautomatisierung.
+Begründung je Adresse:
+1. `t@t.invalid`: Die Domain `.invalid` ist nach RFC 2606 reserviert und nie zustellbar. Git-Identität in
+   Testfixtures (`-c user.email=…` in `scripts/**/*.test.mjs`), ein Befehlsbeispiel in der Spec von 016 und
+   Zitate davon in dieser Datei und im Bericht von takt-007.
+2. `noreply@anthropic.com`: Automatisierungs-Adresse aus Commit-Vorlagen (Co-Authored-By), keine Person; nur als
+   Beispiel in dieser Spec und Zitate davon.
+
+Die zweite Zeile zählt alle Fundstellen, die keine der beiden Adressen enthalten: 0. Eine persönliche Adresse
+steht damit nirgends im Arbeitsbaum.
 
 **plan-graph.mjs:**
 ```
