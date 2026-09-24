@@ -197,6 +197,13 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   present) `prevHash` is `""` exactly at `seq` 1 and a `Sha256Hex` from `seq` 2 on
   (`dependentSchemas.schemaVersion`, so today's events without an envelope are untouched — live probe
   2329 events, `seq` 1..2329).
+- Several `Set-Cookie` lines (Codex on 929d0d7, SECURITY): exactly one `hv_session` cookie per
+  response on `completeLogin` and `logout`, stated in both descriptions. The schema describes one
+  header line and must be applied to every line on its own (`Headers.getSetCookie()`), never to the
+  comma-joined value. Safety net in both patterns: no comma, no second `hv_session=` and no `Expires`
+  (lifetime only through `Max-Age`; `Expires` is the only attribute whose value holds a comma). The
+  contract test helper validates every `Set-Cookie` line separately, allows at most one session
+  cookie per response and rejects any cookie on a response whose contract declares no `Set-Cookie`.
 
 ### Changed
 

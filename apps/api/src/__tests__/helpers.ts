@@ -151,6 +151,9 @@ function headerValidator(schemaPointer: string): ValidateFunction {
   return validate;
 }
 
+/** The session cookie's name, from the contract's `session` security scheme (`hv_session`). */
+const SESSION_COOKIE = (openapiDoc.components.securitySchemes.session as { name: string }).name;
+
 /**
  * Codex on 8ef3ad2 and on 50cc738: a response that lacks a header the contract marks `required: true`
  * for its status (`ETag` on the 0.3.0 writes, `Location`, `Set-Cookie` and `Cache-Control` on the
@@ -158,32 +161,54 @@ function headerValidator(schemaPointer: string): ValidateFunction {
  * the origin, a cookie without `HttpOnly`, an `ETag` that is no entity-tag), breaks the contract as
  * much as a wrong body does: the test fails and the call is never a coverage hit. Optional headers
  * are validated when present.
+ *
+ * Codex on 929d0d7 (SECURITY): `Headers.get('set-cookie')` joins several `Set-Cookie` lines with
+ * ", ", so a pattern checked on the joined value is satisfied by the first cookie while a second one
+ * — applied last by the browser — goes unchecked. Every `Set-Cookie` line is therefore read on its
+ * own (`getSetCookie()`) and validated alone; a response carries at most one session cookie; and a
+ * response whose contract declares no `Set-Cookie` sets no cookie at all. Every other header in the
+ * contract is either single-valued with a schema that a comma-joined duplicate cannot match
+ * (`Location` as `SameOriginPath` has no whitespace, `ETag` no second quote, `X-Server-Time` is one
+ * date-time) or a list header where joining is the defined meaning (`Cache-Control`, RFC 9110 5.3).
  */
 function assertResponseHeaders(operationId: string, method: string, pathname: string, res: Response): void {
+  const where = `${method} ${pathname} ("${operationId}") returned ${res.status}`;
   const base = responsePointerOf(operationId, res.status);
   const headers = (resolvePointer(base) as Record<string, unknown> | undefined)?.['headers'] as
     | Record<string, Record<string, unknown>>
     | undefined;
+  const setCookies = res.headers.getSetCookie();
+  const declaresSetCookie = Object.keys(headers ?? {}).some((name) => name.toLowerCase() === 'set-cookie');
+  if (setCookies.length > 0 && !declaresSetCookie) {
+    throw new Error(`${where} with a cookie (${setCookies.join(' | ')}), but the contract does not declare "Set-Cookie" for this status.`);
+  }
   for (const [name, raw] of Object.entries(headers ?? {})) {
     const pointer = '$ref' in raw ? (raw['$ref'] as string) : `${base}/headers/${escapePointer(name)}`;
     const header = resolvePointer(pointer) as { required?: boolean };
-    const value = res.headers.get(name);
-    if (value === null) {
+    const isSetCookie = name.toLowerCase() === 'set-cookie';
+    const joined = res.headers.get(name);
+    const values = isSetCookie ? setCookies : joined === null ? [] : [joined];
+    if (values.length === 0) {
       if (header.required === true) {
-        throw new Error(
-          `${method} ${pathname} ("${operationId}") returned ${res.status} without the response header ` +
-            `"${name}", which the contract marks as required for this status.`,
-        );
+        throw new Error(`${where} without the response header "${name}", which the contract marks as required for this status.`);
       }
       continue;
     }
     const validate = headerValidator(`${pointer}/schema`);
-    if (!validate(value)) {
-      throw new Error(
-        `${method} ${pathname} ("${operationId}") returned ${res.status} with response header "${name}: ${value}", ` +
-          `which does not match its contract schema:\n${JSON.stringify(validate.errors, null, 2)}`,
-      );
+    for (const value of values) {
+      if (!validate(value)) {
+        throw new Error(
+          `${where} with response header "${name}: ${value}", which does not match its contract schema:\n` +
+            JSON.stringify(validate.errors, null, 2),
+        );
+      }
     }
+  }
+  // After the per-line check, so a malformed line is reported as such; two well-formed session
+  // cookies are still one too many (the browser keeps the last).
+  const sessionCookies = setCookies.filter((line) => line.trimStart().startsWith(`${SESSION_COOKIE}=`));
+  if (sessionCookies.length > 1) {
+    throw new Error(`${where} with more than one "${SESSION_COOKIE}" cookie (${sessionCookies.length}); the contract allows exactly one per response.`);
   }
 }
 

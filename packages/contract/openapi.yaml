@@ -1111,11 +1111,18 @@ paths:
                 other than `Lax`/`Strict` is forbidden (the browser keeps the last one). Required
                 attributes in the canonical case the service writes (a lower-case variant is rejected,
                 never admitted); forbidden attributes in any case (RFC 6265 names are case-insensitive,
-                so `domain=` cannot slip through). Prose only: an `Expires` in the past (JSON Schema
-                cannot compare dates) and the randomness of the value.
+                so `domain=` cannot slip through). Codex on 929d0d7 (SECURITY): exactly one session
+                cookie per response — one `Set-Cookie` header line named `hv_session`, never a second
+                one that the browser could apply last. The schema describes one header line; a client
+                or test must validate every `Set-Cookie` line on its own (`Headers.getSetCookie()`),
+                never the comma-joined `Headers.get()`. As a safety net the value contains no comma
+                and no second `hv_session=`, which is possible because `Expires` is forbidden and
+                lifetime is expressed only by `Max-Age` (RFC 6265 gives `Max-Age` precedence; `Expires`
+                is the only attribute whose value contains a comma). Prose only: the randomness of the
+                value.
               schema:
                 type: string
-                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*[Ss][Aa][Mm][Ee][Ss][Ii][Tt][Ee]=(?!(?:Lax|Strict)\s*(?:;|$)))(?!.*;\s*[Mm][Aa][Xx]-[Aa][Gg][Ee]=\s*(?:0|-))'
+                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?!.*,)(?!.*hv_session=)(?!.*;\s*[Ee][Xx][Pp][Ii][Rr][Ee][Ss]=)(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*[Ss][Aa][Mm][Ee][Ss][Ii][Tt][Ee]=(?!(?:Lax|Strict)\s*(?:;|$)))(?!.*;\s*[Mm][Aa][Xx]-[Aa][Gg][Ee]=\s*(?:0|-))'
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
@@ -1141,9 +1148,12 @@ paths:
                 Clears the `hv_session` cookie: empty value and `Max-Age=0`, with the same scope as the
                 cookie it replaces — `Path=/` and no `Domain` (Codex on f611116; a browser only overwrites
                 a cookie with the same name, path and domain, so a clearing cookie on another path would
-                leave the session in place). Blocking the session id server-side (block list) is prose —
-                it is not visible in the response.
-              schema: { type: string, pattern: '^hv_session=(?=;|$)(?=.*;\s*Max-Age=0\s*(?:;|$))(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)' }
+                leave the session in place). Exactly one `hv_session` cookie in the response (Codex on
+                929d0d7, SECURITY): a clearing cookie followed by a live replacement would sign the user
+                back in; validated per header line, and as a safety net no comma, no second
+                `hv_session=` and no `Expires` in the value (`Max-Age=0` only). Blocking the session id
+                server-side (block list) is prose — it is not visible in the response.
+              schema: { type: string, pattern: '^hv_session=(?=;|$)(?!.*,)(?!.*hv_session=)(?!.*;\s*[Ee][Xx][Pp][Ii][Rr][Ee][Ss]=)(?=.*;\s*Max-Age=0\s*(?:;|$))(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)' }
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '401': { $ref: '#/components/responses/Unauthorized' }
