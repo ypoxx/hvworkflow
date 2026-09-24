@@ -195,7 +195,11 @@ export function StagePage() {
         if (cancelled) return;
         setLoading(false);
         if (isReadForbidden(error)) {
-          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast.
+          // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast. Minor 4 (review round
+          // 2): `setStage(null)` too — a role that has just lost `stage.read` (a role switch bumps
+          // `version`) must not go on reading out or returning a previous role's stale question
+          // with Space/R (the keyboard handler below reads `stageRef.current`, which this clears).
+          setStage(null);
           setForbidden(true);
           return;
         }
@@ -320,6 +324,10 @@ export function StagePage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      // Minor 4 (review round 2): a role without `stage.read` has no current question of its own
+      // to act on — `stage` is `null` (cleared above) by the time this can fire, but the shortcuts
+      // are refused outright rather than relying on `deliver`/`setReturnOpen` to no-op quietly.
+      if (forbidden) return;
       if (returnOpen) return; // the dialog owns the keyboard
       // B1 (review round 1): the queue preview (`QueuePreview` in Podium.tsx) is a dialog too, and
       // it has no state of its own up here to check like `returnOpen` — Space must not deliver the
@@ -348,7 +356,7 @@ export function StagePage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deliver, returnOpen]);
+  }, [deliver, returnOpen, forbidden]);
 
   /**
    * m2: neither layout renders until "Nur Bühne" is decided — a skeleton instead, the same shape
@@ -436,7 +444,13 @@ export function StagePage() {
       <div className="h-32 w-full animate-pulse rounded-sm bg-ink-50" />
     </div>
   ) : forbidden ? (
-    <div data-testid="stage-forbidden" className="flex min-h-0 flex-1 items-center justify-center">
+    // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on its
+    // own, the moment a role switch replaces the podium with it.
+    <div
+      data-testid="stage-forbidden"
+      role="status"
+      className="flex min-h-0 flex-1 items-center justify-center"
+    >
       <EmptyState
         icon={Lock}
         title={t('stage.forbidden.title')}
@@ -462,7 +476,11 @@ export function StagePage() {
     />
   );
 
-  if (stageOnly) {
+  // Minor 4 (review round 2): a stored "Nur Bühne" choice (`hv-stage-only-v1=1`) is a fact about
+  // the device, not about whether this role may currently read the stage at all — a role that has
+  // lost `stage.read` since falls back to the ordinary layout below, rather than a fullscreen
+  // overlay whose own counters/contrast/toggle chrome would have nothing real to show either.
+  if (stageOnly && !forbidden) {
     return (
       <div
         data-testid="stage-only"
