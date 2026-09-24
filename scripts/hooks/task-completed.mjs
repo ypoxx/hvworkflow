@@ -73,8 +73,13 @@ function parseArgs(argv) {
   return out;
 }
 
-/** `docs/slices/takt-NNN-*.md` for a `takt-NNN` mention, otherwise `docs/slices/NNN-*.md`, relative to
- * `root` — `undefined` if it does not exist. The two namespaces never stand in for each other. */
+/** `docs/slices/takt-NNN-*.md` (or, with a lettered slice, `docs/slices/takt-NNNx-*.md`) for a
+ * `takt-NNN`/`takt-NNNx` mention, otherwise `docs/slices/NNN-*.md`/`docs/slices/NNNx-*.md`, relative to
+ * `root` — `undefined` if it does not exist. Neither namespace, nor a plain number and its own lettered
+ * sibling (`NNN` vs `NNNx`), ever stand in for each other (takt-010 rework nit 6: named here as "NNNx"
+ * rather than just "NNN" — a single *lowercase* letter only; an upper-case suffix like `010B` is not
+ * matched by `SLICE_NUMBER_RE` at all and is therefore nothing to check, same as any other unrelated
+ * text). */
 function findSpecFile(root, number, isTakt) {
   const dir = join(root, SLICES_DIR);
   if (!existsSync(dir)) return undefined;

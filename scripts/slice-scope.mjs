@@ -20,15 +20,18 @@
  * only when the spec's list already allows `package.json` (the root manifest).
  *
  * Skips (exit 0, with a note) rather than failing when the branch does not follow the
- * `claude/slice-NNN[a-z]?-…`/`claude/takt-NNN[a-z]?-…` naming scheme (a single optional lowercase
- * letter suffix, e.g. `010b`, is its own slice, distinct from plain `010` — takt-010 goal 1) and no
- * `--slice`/`--takt`/`--spec` was given
- * (e.g. the orchestrator's own day-report branch) — this is the only situation this gate treats as
- * "not applicable". Once a slice/takt branch *is* identified, every later failure is a hard exit 1,
- * including the merge-base/integration ref being unresolvable: round 1, M1 found that a silent skip
- * there in CI (`CI` env var set) is indistinguishable from "not applicable" and could mask the gate
- * going inert; locally (no `CI` env var) that same situation still only logs a note and exits 0,
- * mirroring `packages/contract/scripts/check.mjs`'s check (c) for a normal offline/local run.
+ * `claude/slice-NNN-…`/`claude/takt-NNN-…` naming scheme — or its lettered-suffix form,
+ * `claude/slice-NNNx-…`/`claude/takt-NNNx-…` (a single *lowercase* letter, e.g. `010b`, is its own
+ * slice, distinct from plain `010` — takt-010 goal 1; the message says so explicitly, takt-010 rework
+ * nit 6, so an upper-case suffix like `010B`, which this gate does not recognise at all and therefore
+ * skips silently, is at least named as "NNNx" rather than left looking like an unmatched `NNN`) — and no
+ * `--slice`/`--takt`/`--spec` was given (e.g. the orchestrator's own day-report branch) — this is the
+ * only situation this gate treats as "not applicable". Once a slice/takt branch *is* identified, every
+ * later failure is a hard exit 1, including the merge-base/integration ref being unresolvable: round 1,
+ * M1 found that a silent skip there in CI (`CI` env var set) is indistinguishable from "not applicable"
+ * and could mask the gate going inert; locally (no `CI` env var) that same situation still only logs a
+ * note and exits 0, mirroring `packages/contract/scripts/check.mjs`'s check (c) for a normal
+ * offline/local run.
  *
  * Run as `pnpm slice-scope` (part of `pnpm gates`) or directly, e.g.
  * `node scripts/slice-scope.mjs --slice 016`. Deterministic apart from the git/network dependency in
@@ -118,27 +121,36 @@ function extractFilesAllowedSection(specText) {
   return lines.slice(startIdx + 1, endIdx).join('\n');
 }
 
-/** takt-010 goal 3: a bare filename (no `/` at all) that is itself a real file directly at the
- * repository root is that root file — the directory of an earlier full path in the same paragraph is
- * never carried onto it. Without this, the first version of the takt-007 spec (a plain paragraph, not
- * a bulleted list: `` `docs/agentische-entwicklung-plan.md` (…), `README.md`, `docs/slices/…md` (…). ``)
- * turned the bare `README.md` into `docs/README.md`.
+/** takt-010 rework (blocker; same root cause as Codex's P2 on PR #27): whether a bare name is a real
+ * file must be decided from a *fixed* reference point — the merge-base with the integration branch,
+ * i.e. the state the slice branched off, before any of the slice's own commits — never the working tree
+ * of the branch currently under review. That tree already contains the very diff being validated: a
+ * slice could otherwise add a root file sharing a bare name from its own "Files allowed" (e.g. commit a
+ * root-level `003-y.spec.ts` when the spec's shorthand — 020's — means `apps/web/e2e/003-y.spec.ts`)
+ * purely to make this gate reinterpret that name as "root" for itself, silently widening its own scope
+ * to whatever it just added there; conversely a slice that genuinely *deletes* a root file named in its
+ * spec would wrongly fall back to the carried-directory reading the moment that file is gone from the
+ * tree. `git cat-file -e <ref>:<path>` checks a path exists in a tree-ish without checking anything out.
  *
- * A glob with wildcard characters (`*`, `?`, `{`) is never resolved this way — it cannot name a single
- * real file, and existing specs rely on the carry-over for exactly such globs (e.g. takt-003's
- * `` `docs/adr/0003-*.md`, `0009-*.md`, `0010-*.md`, … `` — every one of those bare names is meant to
- * live in `docs/adr/`, and none of them is a real file at the repository root anyway). This is a
- * narrower reading, never a wider one (a bare name is either the root file it names, when one really
- * exists, or the carried directory — never both): 020's shorthand (`003-y.spec.ts`, `abnahme.spec.ts`
- * after `apps/web/e2e/002-x.spec.ts`) is untouched by it, because none of those names exist as real
- * files at the repository root at all. */
-function isRealRootFile(root, bareName) {
-  if (/[*?{]/.test(bareName)) return false;
-  try {
-    return existsSync(join(root, bareName));
-  } catch {
-    return false;
-  }
+ * In `--diff` mode there is no merge-base at all — bypassing git entirely is the whole point of `--diff`
+ * (tests) — so `mergeBase` is `undefined` and the only thing to check against is the actual working tree
+ * at `root`; this mirrors how `--diff` already bypasses git for the changed-file list itself. */
+function makeRootFileChecker(root, mergeBase) {
+  return (relPath) => {
+    if (mergeBase === undefined) {
+      try {
+        return existsSync(join(root, relPath));
+      } catch {
+        return false;
+      }
+    }
+    try {
+      git(root, ['cat-file', '-e', `${mergeBase}:${relPath}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 }
 
 /** Every backtick-quoted span in the section is a path glob — the convention every spec in
@@ -150,9 +162,25 @@ function isRealRootFile(root, bareName) {
  * third live in `apps/web/e2e/` too, not at the repository root. The directory context resets at every
  * new bullet (a line starting with `- `), so an unrelated bare name in its *own* bullet (e.g.
  * `` `package.json` (Root, nur Skripte) ``) is never accidentally prefixed with some earlier bullet's
- * directory. takt-010 goal 3: except when the bare name is itself a real file at the repository root
- * (`isRealRootFile`) — then the carry-over never applies, root wins. */
-function extractGlobs(sectionText, root) {
+ * directory.
+ *
+ * takt-010 goal 3, reworked: a bare, wildcard-free name is checked against `pathExistsAtRef` both as
+ * the root path and as the carried (directory-prefixed) path.
+ *   - Root only exists → the root file wins (fixes the first version of the takt-007 spec, whose bare
+ *     `README.md` used to inherit `docs/` from the previous full path in the same paragraph).
+ *   - Carried only exists (or neither exists, e.g. a brand-new file) → the carried directory wins,
+ *     unchanged from round 1's m4 (020's shorthand; also takt-003's bare ADR filenames, which never
+ *     reach this branch at all because they carry a wildcard, see below).
+ *   - **Both exist (takt-010 rework, Major finding)**: this is genuinely ambiguous — the spec's own
+ *     text does not say which one is meant — so the name is collected in `ambiguous` instead of being
+ *     resolved one way or the other; the caller fails loudly rather than silently preferring root ("if
+ *     both the carried path and the root path exist at the merge base, fail with a clear message").
+ *
+ * A glob with wildcard characters (`*`, `?`, `{`) is never resolved this way — it cannot name a single
+ * real file, and existing specs rely on the carry-over for exactly such globs (e.g. takt-003's
+ * `` `docs/adr/0003-*.md`, `0009-*.md`, `0010-*.md`, … `` — every one of those bare names is meant to
+ * live in `docs/adr/`). */
+function extractGlobs(sectionText, pathExistsAtRef) {
   const lines = sectionText.split('\n');
   const bullets = [];
   let current = [];
@@ -167,19 +195,33 @@ function extractGlobs(sectionText, root) {
   if (current.length > 0) bullets.push(current.join('\n'));
 
   const globs = [];
+  const ambiguous = [];
   for (const bulletText of bullets) {
     let currentDir;
     for (const m of bulletText.matchAll(/`([^`]+)`/g)) {
       let glob = m[1];
       if (glob.includes('/')) {
         currentDir = glob.slice(0, glob.lastIndexOf('/'));
-      } else if (currentDir && !isRealRootFile(root, glob)) {
-        glob = `${currentDir}/${glob}`;
+      } else if (currentDir) {
+        if (/[*?{]/.test(glob)) {
+          glob = `${currentDir}/${glob}`;
+        } else {
+          const carriedPath = `${currentDir}/${glob}`;
+          const rootExists = pathExistsAtRef(glob);
+          const carriedExists = pathExistsAtRef(carriedPath);
+          if (rootExists && carriedExists) {
+            ambiguous.push({ bareName: glob, carriedPath });
+          } else if (rootExists) {
+            // glob stays the bare root name
+          } else {
+            glob = carriedPath;
+          }
+        }
       }
       globs.push(glob);
     }
   }
-  return globs;
+  return { globs, ambiguous };
 }
 
 function findSpecFile(root, kind, number) {
@@ -219,12 +261,6 @@ function detectSliceFromBranch(root) {
 
 function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
-function gitChangedFiles(root, base) {
-  const mergeBase = git(root, ['merge-base', 'HEAD', base]).trim();
-  const out = git(root, ['diff', '--name-only', `${mergeBase}...HEAD`]);
-  return { mergeBase, changed: out.split('\n').filter(Boolean) };
 }
 
 /** The first commit, reachable from `HEAD` but not from `mergeBase`, that adds `specRelPath` —
@@ -305,7 +341,11 @@ function main(argv) {
     } else {
       const detected = detectSliceFromBranch(root);
       if (!detected) {
-        console.log('slice-scope: not on a claude/slice-NNN-…/claude/takt-NNN-… branch (checked GITHUB_HEAD_REF and git HEAD) and no --slice/--takt/--spec given — skipping.');
+        console.log(
+          'slice-scope: not on a claude/slice-NNN-…/claude/takt-NNN-… branch, or their lettered-suffix ' +
+            'form claude/slice-NNNx-…/claude/takt-NNNx-… (checked GITHUB_HEAD_REF and git HEAD) and no ' +
+            '--slice/--takt/--spec given — skipping.',
+        );
         return 0;
       }
       kind = detected.kind;
@@ -326,7 +366,42 @@ function main(argv) {
     console.error(`slice-scope: ${specRelPath} has no "## Files allowed" section.`);
     return 1;
   }
-  const globs = extractGlobs(sectionText, root);
+
+  // takt-010 rework (blocker/Codex P2): the merge-base is resolved here, *before* parsing "Files
+  // allowed", because a bare name's root-vs-carried-directory reading (`makeRootFileChecker`) must be
+  // decided against that fixed reference point, not the (still-to-be-diffed) working tree. `--diff`
+  // mode has no merge-base at all — bypassing git is the whole point of `--diff` — so it is skipped here
+  // and `mergeBase` stays `undefined`.
+  let mergeBase;
+  if (!args.diff) {
+    try {
+      mergeBase = git(root, ['merge-base', 'HEAD', args.base]).trim();
+    } catch (e) {
+      const reason = e.message.split('\n')[0];
+      if (inCI && sliceIdentified) {
+        console.error(
+          `slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — failing instead of ` +
+            'skipping: a slice/takt branch is identified and CI is set (round 1, M1).',
+        );
+        return 1;
+      }
+      console.log(`slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — skipping.`);
+      return 0;
+    }
+  }
+
+  const pathExistsAtRef = makeRootFileChecker(root, mergeBase);
+  const { globs, ambiguous } = extractGlobs(sectionText, pathExistsAtRef);
+  if (ambiguous.length > 0) {
+    console.error(
+      `slice-scope: ${specRelPath}'s "Files allowed" section has ${ambiguous.length} ambiguous bare ` +
+        'name(s) — write the full path instead:',
+    );
+    for (const a of ambiguous) {
+      console.error(`  \`${a.bareName}\` matches both the repository root and \`${a.carriedPath}\``);
+    }
+    return 1;
+  }
   if (globs.length === 0) {
     console.error(`slice-scope: ${specRelPath}'s "Files allowed" section has no backtick-quoted path.`);
     return 1;
@@ -348,12 +423,12 @@ function main(argv) {
   if (patterns.some((p) => p.re.test('package.json'))) alwaysAllowed.add('pnpm-lock.yaml');
 
   let changed;
-  let mergeBase;
   if (args.diff) {
     changed = args.diff;
   } else {
     try {
-      ({ mergeBase, changed } = gitChangedFiles(root, args.base));
+      const out = git(root, ['diff', '--name-only', `${mergeBase}...HEAD`]);
+      changed = out.split('\n').filter(Boolean);
       const filesAllowedChange = filesAllowedChangedSinceMergeBase(root, mergeBase, specRelPath, sectionText);
       if (filesAllowedChange?.changed) {
         const where = filesAllowedChange.viaIntroducingCommit
@@ -365,12 +440,12 @@ function main(argv) {
       const reason = e.message.split('\n')[0];
       if (inCI && sliceIdentified) {
         console.error(
-          `slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — failing instead of ` +
+          `slice-scope: could not resolve the diff against ${args.base} (${reason}) — failing instead of ` +
             'skipping: a slice/takt branch is identified and CI is set (round 1, M1).',
         );
         return 1;
       }
-      console.log(`slice-scope: could not resolve the merge-base with ${args.base} (${reason}) — skipping.`);
+      console.log(`slice-scope: could not resolve the diff against ${args.base} (${reason}) — skipping.`);
       return 0;
     }
   }
