@@ -59,8 +59,9 @@ async function waitForCorpus(page: Page): Promise<void> {
 /**
  * Toasts (`components/Toast.tsx`) render as `role="status"` inside the shell's one
  * `aria-live="polite"` stack (`ToastProvider`) — scoped to that container, not to `role="status"`
- * alone: minor 5 (review round 2) gives every gestaltete Zustand the same role so a screen reader
- * announces it too, and an unscoped selector would find those instead of an actual toast.
+ * alone: minor 5 (review round 2) gives every gestaltete Zustand the same role (a status message;
+ * whether a screen reader announces it is not guaranteed, nit 6 of review round 3), and an unscoped
+ * selector would find those instead of an actual toast.
  *
  * Nit 11a: `expect(...).toHaveCount(0)` resolves the instant the count reads zero — it does not
  * wait out its own timeout to see whether a toast is still on its way in. The in-process demo API

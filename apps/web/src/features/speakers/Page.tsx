@@ -321,10 +321,9 @@ export function SpeakersPage() {
       />
 
       {forbidden ? (
-        // Minor 5 (review round 2): `role="status"` (an implicit polite live region) so a screen
-        // reader announces the refusal on its own, the moment a role switch replaces the list with
-        // it — the same reason a demo role switcher exists at all: the actor can change without a
-        // full page reload, and the state must say so out loud, not only visually.
+        // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+        // (review round 3): a live region mounted together with its content is often not announced,
+        // so this is a hint to assistive technology, not a guaranteed announcement.
         <div data-testid="speakers-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState

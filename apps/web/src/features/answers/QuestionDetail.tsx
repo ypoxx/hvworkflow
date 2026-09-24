@@ -441,8 +441,9 @@ export function QuestionDetail({
 
           {/* Major (review round 2): the Nebenabfrage `getQuestionHistory` failed for this one
            * question — put the refused state exactly where its finding (a lapsed approval) would
-           * otherwise stand, `role="status"` so a screen reader announces it (minor 5), rather than
-           * silently rendering as if there had never been one. */}
+           * otherwise stand, `role="status"` marks it as a status message (minor 5) — a
+           * hint to assistive technology, not a guaranteed announcement: a live region mounted
+           * together with its content is often not announced (nit 6, review round 3). */}
           {historyForbidden && (
             <p
               data-testid="answers-history-forbidden"

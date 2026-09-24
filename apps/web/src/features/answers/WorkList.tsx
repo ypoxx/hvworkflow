@@ -332,8 +332,9 @@ export function WorkList({ filters, onFilters, backlog, selectedId, onSelect }: 
   // the 403's ruleId alone (AGENTS.md rule 4).
   if (listForbidden) {
     return (
-      // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on its
-      // own, the moment a role switch replaces the backlog with it.
+      // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+      // (review round 3): a live region mounted together with its content is often not announced,
+      // so this is a hint to assistive technology, not a guaranteed announcement.
       <div data-testid="answers-forbidden" role="status" className="h-full">
         <Panel className="h-full" bodyClassName="grid place-items-center">
           <EmptyState

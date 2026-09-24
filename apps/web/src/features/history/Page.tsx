@@ -317,8 +317,9 @@ export function HistoryPage() {
       <PageHeader title={t('page.history.title')} description={t('page.history.description')} />
 
       {mainForbidden ? (
-        // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on
-        // its own, the moment a role switch replaces the whole view with it.
+        // Minor 5 (review round 2): `role="status"` marks the refusal as a status message. Nit 6
+        // (review round 3): a live region mounted together with its content is often not announced,
+        // so this is a hint to assistive technology, not a guaranteed announcement.
         <div data-testid="history-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState
@@ -501,8 +502,10 @@ export function HistoryPage() {
               >
                 {tab === 'stream' ? (
                   streamForbidden ? (
-                    // Minor 5 (review round 2): `role="status"` announces the refusal to a screen
-                    // reader on its own, the moment the "Ereignisstrom" tab opens on it.
+                    // Minor 5 (review round 2): `role="status"` marks the refusal as a status
+                    // message. Nit 6 (review round 3): a live region mounted together with its
+                    // content is often not announced, so this is a hint to assistive technology,
+                    // not a guaranteed announcement.
                     <div className="p-4" data-testid="history-stream-forbidden" role="status">
                       <EmptyState
                         icon={Lock}
@@ -522,8 +525,10 @@ export function HistoryPage() {
                     />
                   </div>
                 ) : historyForbidden ? (
-                  // Minor 5 (review round 2): `role="status"` announces the refusal to a screen
-                  // reader on its own, the moment a result is selected under this role.
+                  // Minor 5 (review round 2): `role="status"` marks the refusal as a status
+                  // message. Nit 6 (review round 3): a live region mounted together with its
+                  // content is often not announced, so this is a hint to assistive technology, not
+                  // a guaranteed announcement.
                   <div className="p-4" data-testid="history-timeline-forbidden" role="status">
                     <EmptyState
                       icon={Lock}
