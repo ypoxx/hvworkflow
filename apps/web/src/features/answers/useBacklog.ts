@@ -7,7 +7,7 @@
  * Refetching is bound to `useApiVersion()` (new events, changed actor) and to `reload()`, which
  * every refused write calls: the record is the truth, the interface never patches state locally.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaItem, DomainEvent, Question, QuestionStatus, Track, Unit } from '@hv/domain';
 import { QUESTION_STATUSES } from '@hv/domain';
 import { api } from '../../api';
@@ -77,6 +77,8 @@ export interface Backlog {
   reload: () => void;
 }
 
+const NO_EVENTS: readonly DomainEvent[] = [];
+
 /** Read the language at call time so that a message never re-runs the effect that raised it. */
 function problem(error: unknown): void {
   showProblem(error, translate(getLang(), 'toast.problem'));
@@ -101,8 +103,17 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   const [listLoading, setListLoading] = useState(true);
   const [listForbidden, setListForbidden] = useState(false);
   const [selected, setSelected] = useState<Question | null>(null);
-  const [selectedHistory, setSelectedHistory] = useState<readonly DomainEvent[]>([]);
-  const [selectedHistoryForbidden, setSelectedHistoryForbidden] = useState(false);
+  // Minor 2 (review round 3), Codex (a) on 7f542b6: the history is stored together with the id of
+  // the question it belongs to and handed out only while that question is the one shown — while B
+  // loads, A's events must not reach `lapsedApproval(B, …)` and show a false "Freigabe erloschen".
+  const [history, setHistory] = useState<{
+    questionId: string;
+    events: readonly DomainEvent[];
+    forbidden: boolean;
+  } | null>(null);
+  // Codex (b) on 7f542b6: the version and nonce the list last settled on, and whether it was
+  // refused — the detail loads wait for it (see below).
+  const [listSettled, setListSettled] = useState<string | null>(null);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [units, setUnits] = useState<readonly Unit[]>([]);
   const [agendaItems, setAgendaItems] = useState<readonly AgendaItem[]>([]);
@@ -140,6 +151,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         setPool(page.items);
         setListLoading(false);
         setListForbidden(false);
+        setListSettled(`${version}:${nonce}`);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -149,14 +161,41 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           // holds neither `question.read` nor `question.read.delivered` at all.
           setPool([]);
           setListForbidden(true);
+          setListSettled(`${version}:${nonce}:forbidden`);
           return;
         }
         problem(error);
+        // A list that failed for another reason does not say the detail is unreadable: let it try.
+        setListSettled(`${version}:${nonce}`);
       });
     return () => {
       cancelled = true;
     };
   }, [version, nonce, search, track, unitId, agendaItemId]);
+
+  /**
+   * Codex (b) on 7f542b6: the detail reads wait until the list has settled for this very
+   * `version`/`nonce`, and do not run at all once the list is refused. A role switch bumps
+   * `version`; a role without any question read (podium) is refused the list with R-PERM-02, but
+   * `getQuestion` for the question still open answers with the masked 404 (Festlegung 3 of
+   * docs/slices/010-lesepfade-leserechte.md) — no read refusal by rule id, so it used to become an
+   * error toast on top of the gestaltete Zustand. While the list is loading, the detail on screen
+   * stays as it is (nothing jumps, design principle 8).
+   */
+  const current = `${version}:${nonce}`;
+  const detailGate =
+    listSettled === current ? 'open' : listSettled === `${current}:forbidden` ? 'closed' : 'wait';
+
+  /**
+   * Minor 2 (review round 3): the question and its history fail independently (review round 2),
+   * but one failed selection is one toast — whichever of the two reports first claims it.
+   */
+  const toastedFor = useRef<string | null>(null);
+  const problemOnce = useCallback((key: string, error: unknown) => {
+    if (toastedFor.current === key) return;
+    toastedFor.current = key;
+    problem(error);
+  }, []);
 
   // Major (review round 2): the open question and its history used to travel together in one
   // `Promise.all` — a denied `getQuestionHistory` (e.g. observer, no `history.read`) rejected the
@@ -166,11 +205,14 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   // would not); its history is a fact about that one question, not the Hauptabfrage of this view,
   // and is fetched — and can fail — on its own.
   useEffect(() => {
-    if (selectedId === null) {
+    if (selectedId === null || detailGate === 'closed') {
       setSelected(null);
+      setSelectedLoading(false);
       return undefined;
     }
+    if (detailGate === 'wait') return undefined;
     let cancelled = false;
+    const key = `${current}:${selectedId}`;
     setSelectedLoading(true);
     api
       .getQuestion(selectedId)
@@ -184,43 +226,45 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         setSelected(null);
         setSelectedLoading(false);
         if (isReadForbidden(error)) return;
-        problem(error);
+        problemOnce(key, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, nonce, selectedId]);
+  }, [current, detailGate, selectedId, problemOnce]);
 
   useEffect(() => {
-    if (selectedId === null) {
-      setSelectedHistory([]);
-      setSelectedHistoryForbidden(false);
+    if (selectedId === null || detailGate === 'closed') {
+      setHistory(null);
       return undefined;
     }
+    if (detailGate === 'wait') return undefined;
     let cancelled = false;
+    const key = `${current}:${selectedId}`;
     api
       .getQuestionHistory(selectedId)
-      .then((history) => {
+      .then((events) => {
         if (cancelled) return;
-        setSelectedHistory(history);
-        setSelectedHistoryForbidden(false);
+        setHistory({ questionId: selectedId, events, forbidden: false });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setSelectedHistory([]);
         if (isReadForbidden(error)) {
           // Put the refused state where its history would be (review round 2) — never an error
           // toast for a read refusal (Ziel 5).
-          setSelectedHistoryForbidden(true);
+          setHistory({ questionId: selectedId, events: [], forbidden: true });
           return;
         }
-        setSelectedHistoryForbidden(false);
-        problem(error);
+        setHistory({ questionId: selectedId, events: [], forbidden: false });
+        problemOnce(key, error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, nonce, selectedId]);
+  }, [current, detailGate, selectedId, problemOnce]);
+
+  // Only the history of the question actually on screen is handed on (minor 2, review round 3).
+  const ownHistory = selected !== null && history?.questionId === selected.id ? history : null;
 
   const counts = useMemo(() => {
     const next = Object.fromEntries(QUESTION_STATUSES.map((status) => [status, 0])) as Record<
@@ -250,8 +294,8 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     listForbidden,
     selected,
     selectedLoading,
-    selectedHistory,
-    selectedHistoryForbidden,
+    selectedHistory: ownHistory?.events ?? NO_EVENTS,
+    selectedHistoryForbidden: ownHistory?.forbidden ?? false,
     units,
     agendaItems,
     reload,
