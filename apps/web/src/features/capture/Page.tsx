@@ -60,6 +60,28 @@ export function CapturePage() {
     NO_CONTRIBUTIONS,
     `c:${version}:${speakerId ?? ''}`,
   );
+  /**
+   * Blocker (review round 2, also Codex P1): `listContributions` (Ziel 1's Hauptabfrage) used to
+   * run only once `speakerId` resolved — and `speakerId` only ever comes from a successful
+   * `listSpeakers` above. Every role denied `contribution.read` is also denied `speaker.read`
+   * (docs/slices/010-lesepfade-leserechte.md Festlegung 4), so `speakers.data` stayed `[]`,
+   * `speakerId` stayed `null`, the per-speaker load above never even called the API, and the
+   * refused role saw the ordinary "no contribution chosen" empty desk instead of the gestaltete
+   * Zustand — with the read-only hint on top of it, since the desk actions probe below still
+   * succeeded on `question.read` alone.
+   *
+   * A second, unconditional call to the very same Hauptabfrage — no `speakerId`, so it runs
+   * regardless of whether one was ever resolved — asks the real question ("may this role read
+   * Erfassung at all?") directly, rather than inferring an answer from a resolved prerequisite. It
+   * never has to know that `contribution.read` and `speaker.read` are always granted together; it
+   * just tries the read that decides it.
+   */
+  const contributionsProbe = useAsync<readonly Contribution[]>(
+    () => api.listContributions(),
+    NO_CONTRIBUTIONS,
+    `cp:${version}`,
+  );
+  const forbidden = contributionsProbe.status === 'forbidden';
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
   // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
   const contribution =
@@ -138,10 +160,6 @@ export function CapturePage() {
 
   const { hoveredQuestionId, onHoverQuestion } = useHoveredQuestion();
 
-  // Ziel 1 (slice 010b): `listContributions` is the Hauptabfrage of the Erfassung — recognised by
-  // the 403's ruleId in `useAsync` (AGENTS.md rule 4), never by a role name.
-  const forbidden = contributions.status === 'forbidden';
-
   return (
     <div className="flex h-full min-h-125 flex-col gap-5">
       <PageHeader
@@ -165,7 +183,9 @@ export function CapturePage() {
       />
 
       {forbidden ? (
-        <div data-testid="capture-forbidden" className="grid min-h-0 flex-1">
+        // Minor 5 (review round 2): `role="status"` announces the refusal to a screen reader on
+        // its own, the moment a role switch replaces the desk with it.
+        <div data-testid="capture-forbidden" role="status" className="grid min-h-0 flex-1">
           <Panel bodyClassName="grid place-items-center">
             <EmptyState
               icon={Lock}

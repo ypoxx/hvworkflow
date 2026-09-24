@@ -36,8 +36,13 @@ export interface AsyncState<T> {
  * Structural, not `instanceof`: the interface talks to `HvApi`, and an HTTP adapter hands out a
  * plain problem object rather than the domain's error class. Read by ruleId alone, never by role
  * name (AGENTS.md rule 4, docs/slices/010b-lesepfade-oberflaeche.md Ziel 4).
+ *
+ * Test gap 8c (review round 2): identical in `speakers/useSpeakers.ts`, `answers/lib.ts`,
+ * `stage/lib.ts` and `history/lib.ts` — see `speakers/useSpeakers.ts`'s copy for why this stays
+ * five small local copies rather than one shared module. Covered by its own test here
+ * (`useCapture.test.ts`).
  */
-function isReadForbidden(error: unknown): boolean {
+export function isReadForbidden(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const status = 'status' in error ? (error as { status: unknown }).status : undefined;
   const ruleId = 'ruleId' in error ? (error as { ruleId: unknown }).ruleId : undefined;
