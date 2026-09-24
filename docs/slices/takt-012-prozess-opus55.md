@@ -51,7 +51,28 @@ geschriebenen Specs bleiben als Geschichte stehen; für laufende Arbeit gilt die
 
 ## Bericht
 
-(vom Orchestrator)
+Slice: takt-012-prozess-opus55
+Done: Besetzung in `.claude/agents/` (Opus 5.5 für alle Rollen außer Mechaniker = Sonnet 5; kein Fable, kein Haiku);
+AGENTS.md Regel 2 und 3, Plan R3, R6, Abschnitte 1.7, 3, 4 und Kurzfassung angeglichen; Codex-Stoppregel mit Vorbehalt
+für Sicherheit, Recht, Datenschutz; Nachweisform mit grüner CI als Merge-Bedingung.
+Evidence: `pnpm gates` auf `7c067d1`, Exit 0, Schluss:
+```
+packages/domain test:       Tests  72 passed (72)
+apps/web test:       Tests  48 passed (48)
+apps/api test:       Tests  49 passed (49)
+vocabulary-check: ok
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+slice-scope: 9 changed file(s), all within "docs/slices/takt-012-prozess-opus55.md"'s "Files allowed" list (11 pattern(s)).
+Downgrade check: 13 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+# pass 196
+# fail 0
+✓ built in 1.19s
+mark-test-run: wrote /home/user/wt/prozess/.claude/state/last-test-run (clean tree) at commit 7c067d1, tree d31c64c36b4d…
+```
+Dieser Bericht selbst ist ein reiner Doku-Commit danach (neue Nachweisform); die CI am PR ist der laufende Nachweis.
+Open: Folgepunkte A–D unten (Dateien außerhalb dieser Scheibe).
+Touched: `AGENTS.md`, `docs/agentische-entwicklung-plan.md`, `.claude/agents/{architekt,design-kritiker,implementierer-backend,implementierer-oberflaeche,mechaniker,reviewer-sonnet}.md`, diese Spec.
 
 ## Review findings
 
