@@ -22,7 +22,8 @@ Codex findings (24.09.2026): request schemas of existing operations are back to 
 text, 404 on the alias operations with the current-meeting rule, 409 on `registerSpeaker` and
 `captureContribution`. Invariant sweep after Codex round 5 (24.09.2026): invariants that were prose
 are now schema — `dependentRequired` pairs, `oneOf` variants, required checks, `EventActor` for
-events (see Added and Deprecated).
+events, one payload per role event, `Problem.status` bound to the HTTP status, required `ETag` and
+`Location` where promised (see Added and Deprecated).
 
 Decisions of the architect (Festlegungen, reasoning in `docs/slices/023-vertrag-0-3-0-fundament.md`):
 (a) meeting scope is expressed at the collection: canonical `/meetings/{meetingId}/…` for the ten
@@ -66,7 +67,7 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   unchanged service would drop it silently today); rule ids R-ADM-01..04 named in `Problem.ruleId`.
 - **Role assignments** (026, ADR 0004, `admin.roles.manage`): `listRoleAssignments`, `assignRole`,
   `revokeRole`; `RoleAssignment`, `RoleAssignmentCreate`; events `RoleAssigned`/`RoleRevoked` with
-  `RoleAssignmentEventPayload` (optional `unitId`); `Actor.personId`.
+  `RoleAssignedPayload` (optional `unitId`) and `RoleRevokedPayload`; `Actor.personId`.
 - **Claim/release** (028, register E36): `claimContribution`, `releaseContribution`,
   `claimQuestion`, `releaseQuestion` (`POST …/claim`, `POST …/release`); `Claim` on `Contribution`
   and `Question`; events `ContributionClaimed`, `ContributionReleased`, `QuestionClaimed`,
@@ -118,20 +119,42 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
 - `409 Conflict` documented on `registerSpeaker` and `captureContribution` (the alias paths), so the
   R-MTG rules of 025 (no capture after the debate closed) need no further contract cycle; the
   canonical counterparts share the handler.
-- **Invariants as schema (Codex round 5).** `EventActor` for `Event.actor` (`id`, `role`, `personId`;
-  `displayName` deprecated, see Deprecated) — `Actor` stays for projections (answer versions,
-  approvals, role assignments, the session). On `Event`: `dependentRequired` `occurredAt` ↔
-  `occurredAtSource`, `hash` ↔ `prevHash`, `schemaVersion` → the v2 envelope of slice 024 (`prevHash`,
-  `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId`
-  is left out because the core carries it only from 025 and 0.3.1 requires it anyway), and
-  `dependentSchemas`: an event with `schemaVersion` carries no `actor.displayName`. `Session` is a
-  `oneOf` of `DemoSession` (`scheme: demoActor`, exactly one role, no `csrfToken`, no `expiresAt`)
-  and `SignedInSession` (`scheme: session`; `subjectId`, `roles` (≥ 1), `expiresAt`, `csrfToken`
-  required) with a `discriminator` on `scheme`. `Readiness.checks` has exactly the required
-  properties `clock`, `db`, `migrations` (027 precedes 033; `additionalProperties: false` replaces
-  `propertyNames`); each is a `ReadinessCheck` (`ok` without `code`, `fail` with `code`); the 200
-  binds every check to `ok`, the 503 at least one to `fail`. Today's events (all 0.2 shape, all with
-  `actor.displayName`) stay valid.
+- **Invariants as schema (Codex round 5).** Every schema and operation new in 0.3.0 was swept for
+  prose invariants; what JSON Schema can express is now schema (the list of places checked is in the
+  report of slice 023). `EventActor` for `Event.actor` (`id`, `role`, `personId`; `displayName`
+  deprecated, see Deprecated) — `Actor` stays for projections (answer versions, approvals, role
+  assignments, the session). On `Event`: `dependentRequired` `occurredAt` ↔ `occurredAtSource`,
+  `hash` ↔ `prevHash`, `schemaVersion` → the v2 envelope of slice 024 (`prevHash`, `hash`,
+  `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` is left
+  out because the core carries it only from 025 and 0.3.1 requires it anyway), and
+  `dependentSchemas`: an event with `schemaVersion` carries no `actor.displayName`. Pairs on
+  projections: `Contribution` `occurredAt` ↔ `occurredAtSource`; `Meeting` `configFrozenAt` ↔
+  `configHash`; `AgendaItem` `votingOpenedAt` → `openedAt` (as `openVoting` states: `409` when the
+  item is not open), `votingClosedAt` → `votingOpenedAt`; `RoleAssignment` `revokedAt` ↔
+  `revokedBy`; `Question` `stageAssignment` and `seatId` name the same default seat when both are
+  present. `Session` is a `oneOf` of `DemoSession` (`scheme: demoActor`, exactly one role, no
+  `csrfToken`, no `expiresAt`) and `SignedInSession` (`scheme: session`; `subjectId`, `roles` (≥ 1),
+  `expiresAt`, `csrfToken` required) with a `discriminator` on `scheme`. `Readiness.checks` has
+  exactly the required properties `clock`, `db`, `migrations` (027 precedes 033;
+  `additionalProperties: false` replaces `propertyNames`); each is a `ReadinessCheck` (`ok` without
+  `code`, `fail` with `code`); the 200 binds every check to `ok`, the 503 at least one to `fail`.
+  Event payloads: `AgendaItemEventPayload.number` required; `RoleAssignmentEventPayload` split into
+  `RoleAssignedPayload` (now with `deputyForSubjectId`, which `RoleAssignment` projects) and
+  `RoleRevokedPayload` (`reason`), each forbidding the other's fields. Every problem response binds
+  `Problem.status` to its HTTP status (`const`; shared responses and the `completeLogin` 400).
+  Header `ETagRequired` (`required: true`) on the new operations that promise an ETag
+  (`createMeeting`, `getMeetingById`, the three `replace…` operations, `freezeMeetingConfig`,
+  `AgendaItemUpdated`, `ContributionUpdated`); `Location` required on both 302.
+  `TransparencyNotice.version`, `text.de`, `text.en` non-empty. Nothing narrows a request of an
+  existing operation; the narrowed responses of existing operations (problem `status`, `Event`,
+  `Question`) are exactly what today's service sends — the whole API suite and a live probe validate
+  them. Deliberately prose, because JSON Schema cannot compare two values, inspect free text or bind
+  a header to one security scheme: `at` = `recordedAt`; `occurredAt` = `recordedAt` for source
+  `server`; `legalHold` false in the beta; `Claim.expiresAt` after `claimedAt`; the order of the
+  agenda instants; `DemoSession.roles` = `[actor.role]`; `X-CSRF-Token` required under `session`
+  only; no personal data in `RoleRevokedPayload.reason`, in problem `detail` on the operations
+  without credential, and in payloads outside `pii` (the seed's `SpeakerRegistered.displayName`
+  pseudonym stays until slice 026).
 
 ### Changed
 

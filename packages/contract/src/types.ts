@@ -1044,7 +1044,7 @@ export interface paths {
         };
         /**
          * Complete the sign-in — exchanges the code, sets the session cookie, redirects into the application
-         * @description Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer, audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice 026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie. `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any open meeting; `503` when no identity provider is configured. No `2xx` by design.
+         * @description Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer, audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice 026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie. `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any open meeting; `503` when no identity provider is configured. No `2xx` by design. The call carries no credential yet, so no problem `detail` names the subject, its e-mail address or the identity provider's error text (ADR 0009; prose, Codex round 5).
          */
         get: operations["completeLogin"];
         put?: never;
@@ -1196,7 +1196,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description RFC 9457 problem details, extended with the rule id that produced the decision. */
+        /** @description RFC 9457 problem details, extended with the rule id that produced the decision. `status` equals the HTTP status; since 0.3.0 every problem response binds it with `const` (Codex round 5; today's service builds the HTTP status from this field, so no response changes). */
         Problem: {
             /** Format: uri */
             type: string;
@@ -1444,6 +1444,7 @@ export interface components {
             version: string;
             /** Format: date-time */
             updatedAt?: string;
+            /** @description Both languages non-empty (rule 10; Codex round 5): the sign-in page never shows a blank notice */
             text: {
                 de: string;
                 en: string;
@@ -1565,7 +1566,7 @@ export interface components {
          * @enum {string}
          */
         RetentionClass: "record" | "working" | "technical";
-        /** @description Since 0.3.0 (slice 028, E36): who took over a speech or question (Übernahme, weiche Sperre) and until when */
+        /** @description Since 0.3.0 (slice 028, E36): who took over a speech or question (Übernahme, weiche Sperre) and until when. `expiresAt` lies after `claimedAt` (prose — JSON Schema cannot compare values) */
         Claim: {
             actorId: string;
             personId?: string;
@@ -1741,22 +1742,35 @@ export interface components {
             /** @description Optional remark of the clearing lawyer (Anmerkung) */
             note?: string;
         };
-        /** @description Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event's `subjectId` is the meeting */
+        /** @description Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event's `subjectId` is the meeting. `number` is required (Codex round 5) because it is there for readers without the master data — an optional copy would fail exactly them */
         AgendaItemEventPayload: {
             agendaItemId: string;
             /** @description Agenda item number at the time of the event, for readers without the master data */
-            number?: number;
+            number: number;
         };
-        /** @description Since 0.3.0 (slice 026, ADR 0004): payload of `RoleAssigned` and `RoleRevoked`; the event's `subjectId` is the assignment id */
-        RoleAssignmentEventPayload: {
+        /** @description Since 0.3.0 (slice 026, ADR 0004): payload of `RoleAssigned`; the event's `subjectId` is the assignment id, the event's `personId` the person when known. Carries every field `RoleAssignment` projects that is not in the envelope (`deputyForSubjectId` included, Codex round 5). One payload per event type (split in round 5), so a field of one type cannot appear on the other. */
+        RoleAssignedPayload: {
             assignmentId: string;
+            /** @description Pseudonymous subject id of the identity provider or the demo actor id — never a name or an e-mail address (ADR 0009) */
             subjectId: string;
             role: components["schemas"]["Role"];
             unitId?: string;
             /** Format: date-time */
             expiresAt?: string;
+            deputyForSubjectId?: string;
+            reason?: never;
+        };
+        /** @description Since 0.3.0 (slice 026): payload of `RoleRevoked`; the event's `subjectId` is the assignment id. `reason` is the administrator's text from `revokeRole` and holds no personal data (ADR 0009; prose — a schema cannot inspect free text) */
+        RoleRevokedPayload: {
+            assignmentId: string;
+            /** @description Pseudonymous subject id, as on `RoleAssigned` */
+            subjectId: string;
+            role: components["schemas"]["Role"];
             /** @description Revocation reason, when given */
             reason?: string;
+            unitId?: never;
+            expiresAt?: never;
+            deputyForSubjectId?: never;
         };
         /** @description Since 0.3.0 (slice 024, ADR 0009/0011): the only part of a payload that may carry personal data. `keyId` names the key of the meeting (per Jahrgang) behind the codec port; in the beta the codec is the identity codec, but `keyId` is set from the first event so switching the key on later is an export into a new database, never a change to the log. Every other field of the payload is free of personal data; events carry `personId`, never a clear name. */
         PiiEnvelope: {
@@ -1764,7 +1778,7 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        /** @description One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned`/`RoleRevoked` carry `RoleAssignmentEventPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); every other type keeps the open object. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.1" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.1, because the core carries it only from 025) and forbids `actor.displayName`. An event served over HTTP is never v1 (v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). Payload fields outside `pii` are free of personal data from slice 026 (its test "no displayName in event payloads"); until then the seed's `SpeakerRegistered` payload carries the speaker's demo pseudonym as `displayName` — a 0.2 payload the schema cannot forbid without failing today's responses. */
+        /** @description One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); every other type keeps the open object. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.1" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.1, because the core carries it only from 025) and forbids `actor.displayName`. An event served over HTTP is never v1 (v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). Payload fields outside `pii` are free of personal data from slice 026 (its test "no displayName in event payloads"); until then the seed's `SpeakerRegistered` payload carries the speaker's demo pseudonym as `displayName` — a 0.2 payload the schema cannot forbid without failing today's responses. */
         Event: {
             seq: number;
             id: string;
@@ -1843,7 +1857,7 @@ export interface components {
         /** @description Updated speech with new ETag and current `_actions` (since 0.3.0) */
         ContributionUpdated: {
             headers: {
-                ETag: components["headers"]["ETag"];
+                ETag: components["headers"]["ETagRequired"];
                 "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
@@ -1854,7 +1868,7 @@ export interface components {
         /** @description The agenda item after the transition; `ETag` is the meeting's new version (since 0.3.0) */
         AgendaItemUpdated: {
             headers: {
-                ETag: components["headers"]["ETag"];
+                ETag: components["headers"]["ETagRequired"];
                 "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
@@ -1869,7 +1883,10 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 401;
+                };
             };
         };
         /** @description The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`): R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; documented since 0.2.0, enforced on the read operations from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010) — e.g. a `listQuestions` status filter naming a status outside the actor's `question.read.delivered` scope. */
@@ -1879,7 +1896,10 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 403;
+                };
             };
         };
         /** @description Not found */
@@ -1889,7 +1909,10 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 404;
+                };
             };
         };
         /** @description The transition is not allowed from the current status (rule id in `ruleId`) */
@@ -1899,7 +1922,10 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 409;
+                };
             };
         };
         /** @description If-Match did not match the current ETag */
@@ -1909,7 +1935,10 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 412;
+                };
             };
         };
         /** @description Validation failed */
@@ -1919,17 +1948,23 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 422;
+                };
             };
         };
-        /** @description The service cannot serve this now (e.g. no identity provider configured, a readiness check failed) */
+        /** @description The service cannot serve this now (e.g. no identity provider configured). Used only on operations without credential (`login`, `completeLogin`, `getHealth`), so `detail` is a fixed sentence per cause, never a host name, a driver or identity-provider error text (review 023, Codex round 5; prose — a schema cannot inspect free text; `/readyz` uses codes instead). */
         ServiceUnavailable: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
                 [name: string]: unknown;
             };
             content: {
-                "application/problem+json": components["schemas"]["Problem"];
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 503;
+                };
             };
         };
     };
@@ -1970,6 +2005,8 @@ export interface components {
     headers: {
         /** @description Opaque version tag, changes with every write. */
         ETag: string;
+        /** @description Since 0.3.0 (Codex round 5): the same opaque version tag as `ETag`, always sent. Used on the responses of operations new in 0.3.0 whose description promises an ETag (meeting, agenda, units, seats, freeze, agenda progress, speech claim/release), because the next write sends it back as `If-Match`. The 0.2 responses keep the optional `ETag`. */
+        ETagRequired: string;
         /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header; optional (no `required: true`) because the unchanged 0.3.0 service does not send it yet. */
         "X-Server-Time": string;
     };
@@ -2944,7 +2981,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -2972,7 +3009,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3036,7 +3073,7 @@ export interface operations {
             /** @description OK — the agenda after the change; `ETag` is the meeting's new version */
             200: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3184,7 +3221,7 @@ export interface operations {
             /** @description OK — the units after the change; `ETag` is the meeting's new version */
             200: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3251,7 +3288,7 @@ export interface operations {
             /** @description OK — the seats after the change; `ETag` is the meeting's new version */
             200: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3393,7 +3430,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
-                    ETag: components["headers"]["ETag"];
+                    ETag: components["headers"]["ETagRequired"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3643,7 +3680,7 @@ export interface operations {
             /** @description Redirect to the identity provider */
             302: {
                 headers: {
-                    Location?: string;
+                    Location: string;
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3667,7 +3704,7 @@ export interface operations {
             /** @description Signed in; redirect to `returnTo` or the application root */
             302: {
                 headers: {
-                    Location?: string;
+                    Location: string;
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -3680,7 +3717,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["Problem"];
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 400;
+                    };
                 };
             };
             403: components["responses"]["Forbidden"];

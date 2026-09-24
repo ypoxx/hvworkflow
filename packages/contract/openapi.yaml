@@ -688,7 +688,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/MeetingCreate' } } }
       responses:
-        '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
@@ -700,7 +700,7 @@ paths:
       summary: Get a meeting (canonical form of `GET /meeting`)
       description: Since 0.3.0 (slice 025). The `ETag` is the meeting's `version` (admin writes send it as `If-Match`, slice 040).
       responses:
-        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /meetings/{meetingId}/agenda-items:
@@ -727,7 +727,7 @@ paths:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItemInput' } } } }
       responses:
-        '200': { description: OK — the agenda after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+        '200': { description: OK — the agenda after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -801,7 +801,7 @@ paths:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UnitInput' } } } }
       responses:
-        '200': { description: OK — the units after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+        '200': { description: OK — the units after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -834,7 +834,7 @@ paths:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeatInput' } } } }
       responses:
-        '200': { description: OK — the seats after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeat' } } } } }
+        '200': { description: OK — the seats after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeat' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -914,7 +914,7 @@ paths:
         `409` when already frozen.
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
-        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/ConfigFreeze' } } } }
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/ConfigFreeze' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -1051,7 +1051,7 @@ paths:
       parameters:
         - { name: returnTo, in: query, description: 'Relative path inside the application to return to after sign-in; anything else is ignored (open-redirect guard)', schema: { type: string, maxLength: 512 } }
       responses:
-        '302': { description: Redirect to the identity provider, headers: { Location: { schema: { type: string, format: uri } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
+        '302': { description: Redirect to the identity provider, headers: { Location: { required: true, schema: { type: string, format: uri } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /auth/callback:
     servers: [ { url: /, description: 'Outside /v1: the identity provider redirects the browser here' } ]
@@ -1064,14 +1064,16 @@ paths:
         audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice
         026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie.
         `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any
-        open meeting; `503` when no identity provider is configured. No `2xx` by design.
+        open meeting; `503` when no identity provider is configured. No `2xx` by design. The call
+        carries no credential yet, so no problem `detail` names the subject, its e-mail address or
+        the identity provider's error text (ADR 0009; prose, Codex round 5).
       security: []
       parameters:
         - { name: code, in: query, required: true, schema: { type: string } }
         - { name: state, in: query, required: true, schema: { type: string } }
       responses:
-        '302': { description: Signed in; redirect to `returnTo` or the application root, headers: { Location: { schema: { type: string } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
-        '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '302': { description: Signed in; redirect to `returnTo` or the application root, headers: { Location: { required: true, schema: { type: string } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
+        '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /auth/logout:
@@ -1299,6 +1301,14 @@ components:
     ETag:
       schema: { type: string }
       description: Opaque version tag, changes with every write.
+    ETagRequired:
+      required: true
+      schema: { type: string }
+      description: >-
+        Since 0.3.0 (Codex round 5): the same opaque version tag as `ETag`, always sent. Used on the
+        responses of operations new in 0.3.0 whose description promises an ETag (meeting, agenda,
+        units, seats, freeze, agenda progress, speech claim/release), because the next write sends
+        it back as `If-Match`. The 0.2 responses keep the optional `ETag`.
     X-Server-Time:
       schema: { type: string, format: date-time }
       description: >-
@@ -1325,11 +1335,11 @@ components:
               total: { type: integer }
     ContributionUpdated:
       description: Updated speech with new ETag and current `_actions` (since 0.3.0)
-      headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+      headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } }
     AgendaItemUpdated:
       description: The agenda item after the transition; `ETag` is the meeting's new version (since 0.3.0)
-      headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+      headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/json: { schema: { $ref: '#/components/schemas/AgendaItem' } } }
     Unauthorized:
       description: >-
@@ -1340,7 +1350,7 @@ components:
         operation stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18
         (0.4.0, slice 043).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 401 } } } ] } } }
     Forbidden:
       description: >-
         The actor may not perform this action (deny reason in `detail`, rule id in `ruleId`):
@@ -1350,31 +1360,38 @@ components:
         `listQuestions` status filter naming a status outside the actor's `question.read.delivered`
         scope.
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 403 } } } ] } } }
     NotFound:
       description: Not found
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 404 } } } ] } } }
     Conflict:
       description: The transition is not allowed from the current status (rule id in `ruleId`)
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
     PreconditionFailed:
       description: If-Match did not match the current ETag
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 412 } } } ] } } }
     Unprocessable:
       description: Validation failed
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 422 } } } ] } } }
     ServiceUnavailable:
-      description: The service cannot serve this now (e.g. no identity provider configured, a readiness check failed)
+      description: >-
+        The service cannot serve this now (e.g. no identity provider configured). Used only on
+        operations without credential (`login`, `completeLogin`, `getHealth`), so `detail` is a fixed
+        sentence per cause, never a host name, a driver or identity-provider error text (review 023,
+        Codex round 5; prose — a schema cannot inspect free text; `/readyz` uses codes instead).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
-      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
   schemas:
     Problem:
       type: object
-      description: RFC 9457 problem details, extended with the rule id that produced the decision.
+      description: >-
+        RFC 9457 problem details, extended with the rule id that produced the decision. `status`
+        equals the HTTP status; since 0.3.0 every problem response binds it with `const` (Codex round
+        5; today's service builds the HTTP status from this field, so no response changes).
       required: [type, title, status]
       properties:
         type: { type: string, format: uri }
@@ -1533,6 +1550,10 @@ components:
               type: object
               description: 'Since 0.3.0 (slice 040): staged questions per podium seat, keyed by `seatId`'
               additionalProperties: { type: integer }
+      # A freeze is a pair (Codex round 5): the time without the hash proves nothing, and vice versa.
+      dependentRequired:
+        configFrozenAt: [configHash]
+        configHash: [configFrozenAt]
     MeetingCreate:
       type: object
       description: 'Since 0.3.0 (slice 040): body of `createMeeting`'
@@ -1553,6 +1574,11 @@ components:
         openedAt: { type: string, format: date-time, description: 'Since 0.3.0 (slice 025): set by `AgendaItemOpened`' }
         votingOpenedAt: { type: string, format: date-time, description: 'Since 0.3.0 (slice 025): set by `VotingOpened`' }
         votingClosedAt: { type: string, format: date-time, description: 'Since 0.3.0 (slice 025): set by `VotingClosed`' }
+      # Progress is ordered (R-MTG, slice 025): no voting before the item was called, no closing before
+      # opening. The order of the three instants themselves is prose — JSON Schema cannot compare values.
+      dependentRequired:
+        votingOpenedAt: [openedAt]
+        votingClosedAt: [votingOpenedAt, openedAt]
     AgendaItemInput:
       type: object
       description: 'Since 0.3.0 (slice 040): one item of `replaceMeetingAgendaItems`; without `id` the server assigns one'
@@ -1617,6 +1643,9 @@ components:
         assignedBy: { $ref: '#/components/schemas/Actor' }
         revokedAt: { type: string, format: date-time }
         revokedBy: { $ref: '#/components/schemas/Actor' }
+      dependentRequired:
+        revokedAt: [revokedBy]
+        revokedBy: [revokedAt]
     RoleAssignmentCreate:
       type: object
       description: 'Since 0.3.0 (slice 026): body of `assignRole`'
@@ -1681,14 +1710,15 @@ components:
       description: 'Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15)'
       required: [version, text]
       properties:
-        version: { type: string, description: 'Version of the configured text, shown next to it' }
+        version: { type: string, minLength: 1, description: 'Version of the configured text, shown next to it' }
         updatedAt: { type: string, format: date-time }
         text:
           type: object
+          description: 'Both languages non-empty (rule 10; Codex round 5): the sign-in page never shows a blank notice'
           required: [de, en]
           properties:
-            de: { type: string }
-            en: { type: string }
+            de: { type: string, minLength: 1 }
+            en: { type: string, minLength: 1 }
         dataProtectionSummaryUrl: { type: string, format: uri, description: 'Link to the summary of the data protection impact assessment (DSFA) shown on the sign-in page (slice 030)' }
     Health:
       type: object
@@ -1700,11 +1730,11 @@ components:
       description: >-
         Since 0.3.0 (slice 033): readiness with exactly the three checks `clock` (NTP status, 033),
         `db` and `migrations` (027, which precedes 033 in the plan) — all three required (Codex round
-        5) and no other names (`additionalProperties: false`), because `/readyz` answers without credential.
-        `ready` means every check is `ok`, `not_ready` means at least one is `fail`; both are bound to
-        the HTTP status at the operation (200 / 503). With the JSONL development adapter (027 keeps
-        it) `db` is `ok` when the log file is readable and writable and `migrations` is `ok` (nothing
-        to migrate); `not_configured` means no event store is configured at all.
+        5) and no other names (`additionalProperties: false`), because `/readyz` answers without
+        credential. `ready` means every check is `ok`, `not_ready` means at least one is `fail`; both
+        are bound to the HTTP status at the operation (200 / 503). With the JSONL development adapter
+        (027 keeps it) `db` is `ok` when the log file is readable and writable and `migrations` is
+        `ok` (nothing to migrate); `not_configured` means no event store is configured at all.
       required: [status, checks]
       properties:
         status: { type: string, enum: [ready, not_ready] }
@@ -1835,7 +1865,7 @@ components:
       enum: [record, working, technical]
     Claim:
       type: object
-      description: 'Since 0.3.0 (slice 028, E36): who took over a speech or question (Übernahme, weiche Sperre) and until when'
+      description: 'Since 0.3.0 (slice 028, E36): who took over a speech or question (Übernahme, weiche Sperre) and until when. `expiresAt` lies after `claimedAt` (prose — JSON Schema cannot compare values)'
       required: [actorId, claimedAt, expiresAt]
       properties:
         actorId: { type: string }
@@ -1872,6 +1902,9 @@ components:
           type: array
           description: 'Since 0.3.0: actions the calling actor may perform on this speech right now (claim, release, capture questions)'
           items: { $ref: '#/components/schemas/Action' }
+      dependentRequired:
+        occurredAt: [occurredAtSource]
+        occurredAtSource: [occurredAt]
     ContributionCapture:
       type: object
       description: >-
@@ -1993,6 +2026,16 @@ components:
           type: array
           description: Actions the calling actor may perform on this question right now
           items: { $ref: '#/components/schemas/Action' }
+      # Codex round 5: the deprecated enum and its successor never disagree. The four enum values are
+      # the ids of the default seats, so when both are present they are the same string; a question on
+      # any other seat carries `seatId` only. Today's service never sets `seatId` (040).
+      if: { required: [stageAssignment, seatId], properties: { stageAssignment: { type: string }, seatId: { type: string } } }
+      then:
+        anyOf:
+          - { properties: { stageAssignment: { const: supervisory_board_chair }, seatId: { const: supervisory_board_chair } } }
+          - { properties: { stageAssignment: { const: ceo }, seatId: { const: ceo } } }
+          - { properties: { stageAssignment: { const: cfo }, seatId: { const: cfo } } }
+          - { properties: { stageAssignment: { const: board_member }, seatId: { const: board_member } } }
     QuestionCapture:
       type: object
       required: [text]
@@ -2043,22 +2086,40 @@ components:
         note: { type: string, description: Optional remark of the clearing lawyer (Anmerkung) }
     AgendaItemEventPayload:
       type: object
-      description: 'Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event''s `subjectId` is the meeting'
-      required: [agendaItemId]
+      description: 'Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event''s `subjectId` is the meeting. `number` is required (Codex round 5) because it is there for readers without the master data — an optional copy would fail exactly them'
+      required: [agendaItemId, number]
       properties:
         agendaItemId: { type: string }
-        number: { type: integer, description: 'Agenda item number at the time of the event, for readers without the master data' }
-    RoleAssignmentEventPayload:
+        number: { type: integer, minimum: 1, description: 'Agenda item number at the time of the event, for readers without the master data' }
+    RoleAssignedPayload:
       type: object
-      description: 'Since 0.3.0 (slice 026, ADR 0004): payload of `RoleAssigned` and `RoleRevoked`; the event''s `subjectId` is the assignment id'
+      description: >-
+        Since 0.3.0 (slice 026, ADR 0004): payload of `RoleAssigned`; the event's `subjectId` is the
+        assignment id, the event's `personId` the person when known. Carries every field
+        `RoleAssignment` projects that is not in the envelope (`deputyForSubjectId` included, Codex
+        round 5). One payload per event type (split in round 5), so a field of one type cannot appear
+        on the other.
       required: [assignmentId, subjectId, role]
       properties:
         assignmentId: { type: string }
-        subjectId: { type: string }
+        subjectId: { type: string, description: 'Pseudonymous subject id of the identity provider or the demo actor id — never a name or an e-mail address (ADR 0009)' }
         role: { $ref: '#/components/schemas/Role' }
         unitId: { type: string }
         expiresAt: { type: string, format: date-time }
-        reason: { type: string, description: 'Revocation reason, when given' }
+        deputyForSubjectId: { type: string }
+        reason: false
+    RoleRevokedPayload:
+      type: object
+      description: 'Since 0.3.0 (slice 026): payload of `RoleRevoked`; the event''s `subjectId` is the assignment id. `reason` is the administrator''s text from `revokeRole` and holds no personal data (ADR 0009; prose — a schema cannot inspect free text)'
+      required: [assignmentId, subjectId, role]
+      properties:
+        assignmentId: { type: string }
+        subjectId: { type: string, description: 'Pseudonymous subject id, as on `RoleAssigned`' }
+        role: { $ref: '#/components/schemas/Role' }
+        reason: { type: string, minLength: 1, description: 'Revocation reason, when given' }
+        unitId: false
+        expiresAt: false
+        deputyForSubjectId: false
     PiiEnvelope:
       type: object
       description: >-
@@ -2077,7 +2138,7 @@ components:
         One immutable fact. The sequence number is global and gap-free. Payload schemas are bound per
         event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`,
         `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`,
-        `RoleAssigned`/`RoleRevoked` carry `RoleAssignmentEventPayload` (bound with nested
+        `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload` (bound with nested
         `if`/`then`/`else`, invisible to the generated types); every other type keeps the open object.
         Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`,
         `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of
@@ -2176,5 +2237,8 @@ components:
         if: { required: [type], properties: { type: { enum: [AgendaItemOpened, VotingOpened, VotingClosed] } } }
         then: { properties: { payload: { $ref: '#/components/schemas/AgendaItemEventPayload' } } }
         else:
-          if: { required: [type], properties: { type: { enum: [RoleAssigned, RoleRevoked] } } }
-          then: { properties: { payload: { $ref: '#/components/schemas/RoleAssignmentEventPayload' } } }
+          if: { required: [type], properties: { type: { const: RoleAssigned } } }
+          then: { properties: { payload: { $ref: '#/components/schemas/RoleAssignedPayload' } } }
+          else:
+            if: { required: [type], properties: { type: { const: RoleRevoked } } }
+            then: { properties: { payload: { $ref: '#/components/schemas/RoleRevokedPayload' } } }
