@@ -105,6 +105,18 @@ describe('createDetailProblemGate', () => {
     gate.report('4', 'q1', { status: 404 });
     expect(shown).toEqual([]);
   });
+
+  it('omits sees the failure: a 404 left out is dropped, a 500 is shown (slice 010c, round 2)', () => {
+    const { shown, gate } = setup();
+    const onlyMasked = (id: string, error: unknown) =>
+      id === 'q1' && (error as { status?: number }).status === 404;
+    gate.settleMain('5', false, onlyMasked);
+    gate.report('5', 'q1', { status: 404 });
+    expect(shown).toEqual([]);
+    gate.select();
+    gate.report('5', 'q1', { status: 500 });
+    expect(shown).toEqual([{ status: 500 }]);
+  });
 });
 
 /**
@@ -212,5 +224,12 @@ describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
         'u-exp-fin',
       ).forbidden,
     ).toBe(false);
+  });
+
+  it('readVerdict: no reads (nothing was asked): the same actor keeps its verdict, another starts unrefused', () => {
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, [], 'u-exp-fin')).toBe(refused);
+    expect(readVerdict(refused, [], 'u-podium')).toEqual({ actor: 'u-podium', forbidden: false });
+    expect(readVerdict(NO_VERDICT, [], 'u-exp-fin')).toEqual({ actor: 'u-exp-fin', forbidden: false });
   });
 });

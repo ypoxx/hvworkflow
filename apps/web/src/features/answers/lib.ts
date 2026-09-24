@@ -216,11 +216,17 @@ export interface DetailProblemGate {
   /** The selection changed: a new pass begins. */
   select(): void;
   /**
-   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id)`: its answer is
-   * known to leave `id` out — only a complete, unfiltered list can know that; a filtered one says
-   * nothing about what it does not show.
+   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id, error)`: its
+   * answer is known to leave `id` out, so that this failure of its detail read says nothing new —
+   * only a complete, unfiltered list can know that for any failure; a filtered one says nothing
+   * about what it does not show (slice 010c, Ziel 5: see `listOmits` in answers/lib.ts for the one
+   * narrow exception, which looks at the failure itself).
    */
-  settleMain(load: string, refused: boolean, omits?: (id: string) => boolean): void;
+  settleMain(
+    load: string,
+    refused: boolean,
+    omits?: (id: string, error: unknown) => boolean,
+  ): void;
   /** A detail read of `id` in `load` failed with something other than a read refusal. */
   report(load: string, id: string, error: unknown): void;
 }
@@ -229,20 +235,28 @@ export interface DetailProblemGate {
  * Slice 010c, Ziel 5 (Serverfilter-Toast, round 5 of 010b): what the list's answer can say it
  * leaves out, for `DetailProblemGate.settleMain`. A complete list knows (Codex P2-A on 948a721). A
  * filtered list knows nothing about what it does not show — unless the selection was made by
- * another actor: right after a role switch, a selection the new actor's list does not contain is
- * taken as unreadable, and the detail read's masked 404 is swallowed rather than toasted. Without a
- * role switch a filtered-out selection is ordinary, and a real fault of its detail read still shows.
+ * another actor: after a role switch, a selection the new actor's list does not contain may simply
+ * be unreadable, and its detail read then answers with the masked 404 (Festlegung 3 of slice 010).
+ * Review round 2 (decision of the architect): only that 404 is swallowed, for as long as the
+ * selection lasts; a 5xx or any other failure is a real fault and still shows. Without a role
+ * switch a filtered-out selection is ordinary, and every failure of its detail read shows.
  */
 export function listOmits(
   ids: ReadonlySet<string>,
   complete: boolean,
   selectedByOther: boolean,
-): ((id: string) => boolean) | undefined {
-  return complete || selectedByOther ? (id) => !ids.has(id) : undefined;
+): ((id: string, error: unknown) => boolean) | undefined {
+  if (complete) return (id) => !ids.has(id);
+  if (selectedByOther) return (id, error) => !ids.has(id) && problemStatus(error) === 404;
+  return undefined;
 }
 
 export function createDetailProblemGate(show: (error: unknown) => void): DetailProblemGate {
-  let verdict: { load: string; refused: boolean; omits: (id: string) => boolean } | null = null;
+  let verdict: {
+    load: string;
+    refused: boolean;
+    omits: (id: string, error: unknown) => boolean;
+  } | null = null;
   let pass = 0;
   let pending: { load: string; pass: number; id: string; error: unknown } | null = null;
   let shown: string | null = null;
@@ -251,7 +265,7 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     const { load, id, error } = pending;
     const key = `${load}:${pending.pass}`;
     pending = null;
-    if (verdict.refused || verdict.omits(id) || key === shown) return;
+    if (verdict.refused || verdict.omits(id, error) || key === shown) return;
     shown = key;
     show(error);
   };

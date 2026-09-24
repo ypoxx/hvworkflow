@@ -122,6 +122,8 @@ export function CapturePage() {
   const verdict = settled
     ? readVerdict(
         shownVerdict,
+        // No read asked (the lookup resolved speakers, the Wortmeldung is not chosen yet): the
+        // table row "no reads" — the same actor keeps its verdict, another starts unrefused.
         asked === null ? [] : [{ read: asked.read, key: asked.key }],
         actorId,
       )

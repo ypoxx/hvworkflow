@@ -135,6 +135,18 @@ describe('createDetailProblemGate', () => {
     gate.report('4', 'q1', { status: 404 });
     expect(shown).toEqual([]);
   });
+
+  it('omits sees the failure: a 404 left out is dropped, a 500 is shown (slice 010c, round 2)', () => {
+    const { shown, gate } = setup();
+    const onlyMasked = (id: string, error: unknown) =>
+      id === 'q1' && (error as { status?: number }).status === 404;
+    gate.settleMain('5', false, onlyMasked);
+    gate.report('5', 'q1', { status: 404 });
+    expect(shown).toEqual([]);
+    gate.select();
+    gate.report('5', 'q1', { status: 500 });
+    expect(shown).toEqual([{ status: 500 }]);
+  });
 });
 
 /**
@@ -243,22 +255,33 @@ describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
       ).forbidden,
     ).toBe(false);
   });
+
+  it('readVerdict: no reads (nothing was asked): the same actor keeps its verdict, another starts unrefused', () => {
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, [], 'u-exp-fin')).toBe(refused);
+    expect(readVerdict(refused, [], 'u-podium')).toEqual({ actor: 'u-podium', forbidden: false });
+    expect(readVerdict(NO_VERDICT, [], 'u-exp-fin')).toEqual({ actor: 'u-exp-fin', forbidden: false });
+  });
 });
 
 describe('listOmits (slice 010c, Ziel 5)', () => {
   const ids = new Set(['q-1']);
+  const masked = { status: 404 };
+  const fault = { status: 500 };
 
-  it('a complete list leaves out what it does not contain', () => {
-    expect(listOmits(ids, true, false)?.('q-2')).toBe(true);
-    expect(listOmits(ids, true, false)?.('q-1')).toBe(false);
+  it('a complete list leaves out what it does not contain, whatever the failure', () => {
+    expect(listOmits(ids, true, false)?.('q-2', fault)).toBe(true);
+    expect(listOmits(ids, true, false)?.('q-1', masked)).toBe(false);
   });
 
   it('a filtered list, same actor: says nothing (a real detail fault still shows)', () => {
     expect(listOmits(ids, false, false)).toBeUndefined();
   });
 
-  it('a filtered list, selection made by another actor: a missing selection is left out', () => {
-    expect(listOmits(ids, false, true)?.('q-2')).toBe(true);
-    expect(listOmits(ids, false, true)?.('q-1')).toBe(false);
+  it('a filtered list, selection made by another actor: only the masked 404 is left out', () => {
+    expect(listOmits(ids, false, true)?.('q-2', masked)).toBe(true);
+    expect(listOmits(ids, false, true)?.('q-2', fault)).toBe(false);
+    expect(listOmits(ids, false, true)?.('q-2', new Error('network'))).toBe(false);
+    expect(listOmits(ids, false, true)?.('q-1', masked)).toBe(false);
   });
 });

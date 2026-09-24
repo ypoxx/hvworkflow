@@ -129,13 +129,12 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   /**
    * Slice 010c, Ziel 5: who made the current selection. A selection of another actor that the new
    * actor's list leaves out is taken as not readable, even when that list is filtered
-   * (`listOmits`). Review round 1, finding 1: only for the load in which the new actor's list
-   * first answered — from the next load (`version` or reload) on, the selection counts as this
-   * actor's, and a real fault of its detail read shows again. The whole load, not just its first
-   * answer: a filter change re-settles the same load, and must not turn a swallowed masked 404 of
-   * that load into a toast after all.
+   * (`listOmits`) — but only its masked 404 is swallowed; a 5xx or any other failure is a real
+   * fault and shows (review round 2, decision of the architect, replacing the "adopt after the
+   * first list answer" rule of round 1, which toasted that 404 on every later event). The marker
+   * lasts as long as the selection.
    */
-  const selectedBy = useRef<{ actor: string; adoptedIn: string | null } | null>(null);
+  const selectedBy = useRef<string | null>(null);
   // Codex P2-A on 948a721: whether `pool` is the whole of what this actor may read — no
   // server-side filter, nothing cut off by the limit. Only then does "not in the list" mean "not
   // readable"; a filtered list says nothing about what it leaves out.
@@ -198,14 +197,6 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     // the `version` bump is dropped too.
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
-    // Review round 1, finding 1: once this actor's list has answered, the selection is its own.
-    const adoptSelection = (): void => {
-      const selection = selectedBy.current;
-      const actor = getActor().id;
-      if (selection !== null && selection.actor !== actor) {
-        selectedBy.current = { actor, adoptedIn: `${version}:${nonce}` };
-      }
-    };
     setListLoading(true);
     api
       .listQuestions({
@@ -224,16 +215,12 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           agendaItemId === ALL &&
           page.items.length >= page.total;
         const ids = new Set(page.items.map((question) => question.id));
-        const selection = selectedBy.current;
-        const selectedByOther =
-          selection !== null &&
-          (selection.actor !== getActor().id || selection.adoptedIn === `${version}:${nonce}`);
+        const selectedByOther = selectedBy.current !== null && selectedBy.current !== getActor().id;
         setPool(page.items);
         setPoolComplete(complete);
         setListLoading(false);
         setListRead({ key: requested, status: 'ready' });
         gate.settleMain(`${version}:${nonce}`, false, listOmits(ids, complete, selectedByOther));
-        adoptSelection();
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
@@ -245,7 +232,6 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           setPoolComplete(false);
           setListRead({ key: requested, status: 'forbidden' });
           gate.settleMain(`${version}:${nonce}`, true);
-          adoptSelection();
           return;
         }
         // Slice 010c, Ziel 1: a failure is this load's answer too — it replaces a refusal given to
@@ -254,7 +240,6 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         problem(error);
         // A list that failed for another reason does not say the detail is unreadable.
         gate.settleMain(`${version}:${nonce}`, false);
-        adoptSelection();
       });
     return () => {
       cancelled = true;
@@ -274,7 +259,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   // Nit 2 (review round 5): each change of the selection is a new pass for the gate's one toast.
   useEffect(() => {
     gate.select();
-    selectedBy.current = selectedId === null ? null : { actor: getActor().id, adoptedIn: null };
+    selectedBy.current = selectedId === null ? null : getActor().id;
   }, [selectedId, gate]);
 
   // Major (review round 2): the open question and its history used to travel together in one

@@ -154,17 +154,27 @@ export interface DetailProblemGate {
   /** The selection changed: a new pass begins. */
   select(): void;
   /**
-   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id)`: its answer is
-   * known to leave `id` out — only a complete, unfiltered list can know that; a filtered one says
-   * nothing about what it does not show.
+   * The Hauptabfrage of `load` has answered. `refused`: a read refusal. `omits(id, error)`: its
+   * answer is known to leave `id` out, so that this failure of its detail read says nothing new —
+   * only a complete, unfiltered list can know that for any failure; a filtered one says nothing
+   * about what it does not show (slice 010c, Ziel 5: see `listOmits` in answers/lib.ts for the one
+   * narrow exception, which looks at the failure itself).
    */
-  settleMain(load: string, refused: boolean, omits?: (id: string) => boolean): void;
+  settleMain(
+    load: string,
+    refused: boolean,
+    omits?: (id: string, error: unknown) => boolean,
+  ): void;
   /** A detail read of `id` in `load` failed with something other than a read refusal. */
   report(load: string, id: string, error: unknown): void;
 }
 
 export function createDetailProblemGate(show: (error: unknown) => void): DetailProblemGate {
-  let verdict: { load: string; refused: boolean; omits: (id: string) => boolean } | null = null;
+  let verdict: {
+    load: string;
+    refused: boolean;
+    omits: (id: string, error: unknown) => boolean;
+  } | null = null;
   let pass = 0;
   let pending: { load: string; pass: number; id: string; error: unknown } | null = null;
   let shown: string | null = null;
@@ -173,7 +183,7 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     const { load, id, error } = pending;
     const key = `${load}:${pending.pass}`;
     pending = null;
-    if (verdict.refused || verdict.omits(id) || key === shown) return;
+    if (verdict.refused || verdict.omits(id, error) || key === shown) return;
     shown = key;
     show(error);
   };

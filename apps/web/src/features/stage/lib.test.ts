@@ -137,4 +137,11 @@ describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
       ).forbidden,
     ).toBe(false);
   });
+
+  it('readVerdict: no reads (nothing was asked): the same actor keeps its verdict, another starts unrefused', () => {
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, [], 'u-exp-fin')).toBe(refused);
+    expect(readVerdict(refused, [], 'u-podium')).toEqual({ actor: 'u-podium', forbidden: false });
+    expect(readVerdict(NO_VERDICT, [], 'u-exp-fin')).toEqual({ actor: 'u-exp-fin', forbidden: false });
+  });
 });
