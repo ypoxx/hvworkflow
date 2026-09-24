@@ -14,7 +14,7 @@ import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, StageView } from '@hv/domain';
 import { api } from '../../api';
-import { useActor } from '../../api/actor';
+import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import {
   Button,
@@ -190,15 +190,21 @@ export function StagePage() {
    * Minor B (review round 4): an actor change on an open page decides the layout afresh — back to
    * the `stage-deciding` skeleton until this actor's first `getStage` answer is in, so a stored
    * "Nur Bühne" overlay of the previous role does not stand for one response time. Only on an
-   * actor change, never on an ordinary event (design principle 8). The actor is compared by
-   * identity, never by role name (AGENTS.md rule 4); adjusted during render, so not even one frame
-   * of the old overlay is committed.
+   * actor change, never on an ordinary event (design principle 8). Adjusted during render, so not
+   * even one frame of the old overlay is committed.
+   *
+   * Nit 3 (review round 5): the actor is compared by its `id` — stable across a fresh identity
+   * object for the same person (an OIDC token refresh) — never by role name (AGENTS.md rule 4).
+   * Codex P2-B on 948a721: the previous actor's record is dropped here too, so no later failure
+   * (minor A, review round 4) can hand it back to the shortcuts or the screen.
    */
-  const actor = useActor();
-  const [layoutActor, setLayoutActor] = useState(actor);
-  if (layoutActor !== actor) {
-    setLayoutActor(actor);
+  const actorId = useActor().id;
+  const [layoutActorId, setLayoutActorId] = useState(actorId);
+  if (layoutActorId !== actorId) {
+    setLayoutActorId(actorId);
     setLoading(true);
+    setStage(null);
+    setForbidden(false);
   }
 
   useEffect(() => {
@@ -209,16 +215,23 @@ export function StagePage() {
     // shortcuts read is cleared: blanking the visible podium on every bump would make it jump on
     // every new event too (design principle 8), and the fresh answer replaces it within the load.
     stageRef.current = null;
+    // Codex P2-B on 948a721: every answer is tied to the actor it was asked for. The actor can
+    // change while the request is on its way, and the answer can arrive before the `version` bump
+    // that would cancel this effect — it then belongs to the previous actor, with that actor's
+    // question and `_actions`, and is dropped. `getActor()` is read at the moment of the answer, not
+    // from React state, so no render has to happen first.
+    const requestedBy = getActor().id;
+    const stale = (): boolean => cancelled || getActor().id !== requestedBy;
     api
       .getStage()
       .then((next) => {
-        if (cancelled) return;
+        if (stale()) return;
         setStage(next);
         setLoading(false);
         setForbidden(false);
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (stale()) return;
         setLoading(false);
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast. Minor 4 (review round
