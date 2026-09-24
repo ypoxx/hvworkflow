@@ -74,7 +74,7 @@ const OTHER_RULES: readonly RuleEntry[] = [
     legalRef: {
       source: 'Leitplanken',
       citation:
-        'Prüfpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
+        'Checklistenpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
         'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
         'docs/qualitaetsleitplanken-produktreife.md:175 (Checkliste 6.4: "Erfolg, 400/422, 403, 404, ' +
         '409, 412, 428 und 500 sind konsistent als Problem-Details mit Regel-ID modelliert") stützt ' +
@@ -105,8 +105,7 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'docs/rollen-und-rechtekonzept.md:141 (Abschnitt 3, Punkt 4 "Deny by default": "Eine neue ' +
         'Aktion ist zunächst für niemanden erlaubt und muss ausdrücklich vergeben werden."). Regel-ID ' +
         '"R-PERM-01" zugeordnet (Schreibrecht fehlt) seit Commit a0c38c4 (02.09.2026, "Fundament fuer ' +
-        'die erste lauffaehige Version") — nicht neu eingeführt in Scheibe 010 (dort kamen nur ' +
-        'R-PERM-02 und R-PERM-03 dazu, Festlegung 6/2 von docs/slices/010-lesepfade-leserechte.md). ' +
+        'die erste lauffaehige Version"). ' +
         'Die 404-Maskierung für eine Frage, die der Akteur weder lesen noch bearbeiten darf ' +
         '(Festlegung 3 von docs/slices/010-lesepfade-leserechte.md), hat ebenfalls keine Fundstelle ' +
         'in Recherche oder Ist-Analyse; sie ist eine Architekturentscheidung, keine externe Vorgabe.',
@@ -173,7 +172,7 @@ const OTHER_RULES: readonly RuleEntry[] = [
     legalRef: {
       source: 'Leitplanken',
       citation:
-        'Prüfpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
+        'Checklistenpunkt, kein Regel-Charakter (docs/qualitaetsleitplanken-produktreife.md:8-9: "Dieses ' +
         'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
         'docs/qualitaetsleitplanken-produktreife.md:167 (Checkliste 6.3: "Wiederholungen sind ' +
         'idempotent je Akteur und Operation")',

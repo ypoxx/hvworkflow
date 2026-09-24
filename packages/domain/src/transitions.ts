@@ -41,8 +41,8 @@ const hasAnswer: Guard = {
     source: 'Prozess',
     citation:
       'docs/ist-analyse-und-schnittstellen.md:52 (Antwortpfad C "Expert Track": erst "6 fachliche ' +
-      'Beantwortung", dann "7 Legal Clearing"). Ableitung: die Prüfung setzt eine vorliegende Antwort ' +
-      'voraus.',
+      'Beantwortung", dann "7 Legal Clearing"). Ableitung: das Legal Clearing setzt eine vorliegende ' +
+      'Antwort voraus.',
     docVersion: null,
     docHash: null,
     verified: false,
@@ -56,7 +56,8 @@ const isPodiumTrack: Guard = {
     source: 'Prozess',
     citation:
       'docs/ist-analyse-und-schnittstellen.md:50 (Antwortpfad A "No-Brainer": "\'freie\' Beantwortung ' +
-      'ohne weitere Recherche" durch den Vorstand, keine Rechtsprüfung vor der Bühne)',
+      'ohne weitere Recherche", verantwortlich "Vorstand", Spalte "Rechtsprüfung vor der Bühne": ' +
+      '"keine")',
     docVersion: null,
     docHash: null,
     verified: false,
@@ -109,7 +110,7 @@ const notMergingIntoSelf: Guard = {
       'docs/anforderungen-recherche.md:147 ("[MUSS] Dublettenerkennung auf Trefferquote statt ' +
       'Präzision kalibrieren ..."). Ableitung: Ziel und Quelle des Merges müssen zwei unterschiedliche ' +
       'Fragen sein. Teilweise wie R-TRANS-12: die Zeile selbst spricht von "Merge reversibel, mit ' +
-      'Nutzer, Zeitstempel und Ähnlichkeitsscore protokolliert" — dieser Guard prüft davon nur die ' +
+      'Nutzer, Zeitstempel und Ähnlichkeitsscore protokolliert" — dieser Guard verlangt davon nur die ' +
       'Verschiedenheit von Ziel und Quelle, nichts zur Reversibilität oder zum Score.',
     docVersion: null,
     docHash: null,
@@ -144,7 +145,11 @@ export const TRANSITIONS: readonly Transition[] = [
         'Klassifizieren und nur aus `captured` oder `classified`; jede Klassifizierung steht als ' +
         'eigenes Ereignis im Ereignisprotokoll (Verlauf der Frage), einen eigenen Vermerk "umgehängt ' +
         'von … nach …" gibt es nicht, und ein erneutes Klassifizieren ohne `agendaItemId` entfernt ' +
-        'die bestehende Zuordnung (state.ts, `QuestionClassified`).',
+        'die bestehende Zuordnung (state.ts, `QuestionClassified`). Nicht belegt: dass ein erneutes ' +
+        'Klassifizieren ohne `stageAssignment` ebenso die bestehende Bühnenzuordnung entfernt ' +
+        '(state.ts, `QuestionClassified`). Ableitung: jede Klassifizierung ersetzt die vorige ' +
+        'vollständig; docs/ist-analyse-und-schnittstellen.md:80 nennt die Bühnenzuordnung nur als ' +
+        'Feld der Frage, ohne Regel für ihr Entfernen.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -165,7 +170,11 @@ export const TRANSITIONS: readonly Transition[] = [
         'docs/anforderungen-recherche.md:221 fordert „Zuweisung an Personen statt Postfächer, mit ' +
         'Anwesenheitsstatus, hinterlegten Vertretern, automatischer Umleitung … und \'Take next\'"; ' +
         'diese Regel weist nur eine Einheit (`unitId`) zu, keine Person — teilweise umgesetzt, nicht ' +
-        'die in der Recherche beschriebene Personenzuweisung.',
+        'die in der Recherche beschriebene Personenzuweisung. Teilweise für die Zuweisung aus ' +
+        '`assigned` (Umhängen an eine andere Einheit): docs/anforderungen-recherche.md:220 verlangt ' +
+        '"Mehrfachzuweisung mit einem federführenden Bereich, jedes Umrouten mit Historie"; hier ' +
+        'ersetzt die neue Einheit die bisherige (`unitId`, genau ein Wert), jede Zuweisung steht als ' +
+        'eigenes Ereignis im Ereignisprotokoll, einen Vermerk "von … nach …" gibt es nicht.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -189,13 +198,23 @@ export const TRANSITIONS: readonly Transition[] = [
         'an die Textversion. Jede Textänderung nach Freigabe setzt sie zurück."). Teilweise für ' +
         'die Quelle: docs/rollen-und-rechtekonzept.md:108 (2.4: Übergang `expert_answering` → ' +
         '`legal_clearing`) nennt "Antworttext, Quelle" als Pflichtfelder, und ' +
-        'docs/anforderungen-recherche.md:101 verlangt "Jede Antwort an eine belastbare Quelle mit ' +
+        'docs/anforderungen-recherche.md:101 (unter "[MUSS] Konsistenztest gegen die letzte ' +
+        'Kapitalmarktkommunikation") verlangt "Jede Antwort an eine belastbare Quelle mit ' +
         'Fundstelle gebunden"; hier ist nur der Antworttext Pflicht, `sources` ist optional ' +
-        '(api.ts `draftAnswer`), und auch R-TRANS-04 verlangt keine Quelle. Nicht belegt: dass ' +
-        'eine neue Version eine Frage aus `in_review` zurück nach `answer_drafted` holt (Ableitung: ' +
-        'nur die jeweils letzte Version geht über R-TRANS-04 erneut in die Prüfung, R-GUARD-04), ' +
-        'und dass ein bestehender Rückgabegrund dabei entfällt (Ableitung: er betraf die ' +
-        'zurückgegebene Version).',
+        '(api.ts `draftAnswer`), und auch R-TRANS-04 verlangt keine Quelle. Jede Version hält ' +
+        'Zeitpunkt und Ersteller fest (`createdAt`, `createdBy`, api.ts `draftAnswer`): den ' +
+        'Zeitstempel je Wortlautversion verlangt docs/anforderungen-recherche.md:205 ' +
+        '("Zeitstempel für Eingang, jede Statusänderung und jede Wortlautversion"); den Ersteller ' +
+        'setzt Rechtekonzept Abschnitt 4 "Ersteller ≠ Freigeber" (docs/rollen-und-' +
+        'rechtekonzept.md:156) voraus (Ableitung; der Guard dazu fehlt, siehe R-TRANS-05). Nicht ' +
+        'belegt: ein Entwurf schon aus `classified`, ohne Zuweisung an eine Einheit (R-TRANS-02). ' +
+        'Ableitung: docs/rollen-und-rechtekonzept.md:107 sieht vor der fachlichen Beantwortung das ' +
+        'Pflichtfeld "Segment" vor; für Fast Track nennt docs/ist-analyse-und-schnittstellen.md:51 ' +
+        'ein festes "Fast-Track-Team aus Kommunikation und Legal" statt einer Zuweisung. Nicht ' +
+        'belegt: dass eine neue Version eine Frage aus `in_review` zurück nach `answer_drafted` holt ' +
+        '(Ableitung: nur die jeweils letzte Version geht über R-TRANS-04 erneut ins Legal Clearing, ' +
+        'R-GUARD-04), und dass ein bestehender Rückgabegrund dabei entfällt (Ableitung: er betraf ' +
+        'die zurückgegebene Version).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -212,8 +231,12 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:52 (Antwortpfad C: "7 Legal Clearing"; Spalte ' +
-        '"Rechtsprüfung vor der Bühne: ja, eigener Schritt"). Ableitung: welche Version dabei ' +
-        'geprüft wird (`answerVersion`), hat keine eigene Fundstelle — das Feld hält nur die zuletzt ' +
+        '"Rechtsprüfung vor der Bühne": "ja, eigener Schritt"). Für Fast Track nicht belegt: ' +
+        'docs/ist-analyse-und-schnittstellen.md:51 sieht keinen eigenen Clearing-Schritt vor ' +
+        '(Spalte "Rechtsprüfung vor der Bühne": "im Team enthalten"); hier durchläuft auch Pfad B ' +
+        '`in_review`/`approved`. Ableitung: welche Version dabei ins Legal Clearing geht ' +
+        '(`answerVersion`, nur im Ereignis dieses Übergangs, nicht in der Projektion), hat keine ' +
+        'eigene Fundstelle — das Feld hält nur die zuletzt ' +
         'entworfene Version fest (R-TRANS-03).',
       docVersion: null,
       docHash: null,
@@ -237,8 +260,14 @@ export const TRANSITIONS: readonly Transition[] = [
         '"Ersteller ≠ Freigeber" — die Rolle `legal` hält sowohl `answer.draft` als auch ' +
         '`question.approve` (permissions.ts), obwohl Rechtekonzept §4 (docs/rollen-und-' +
         'rechtekonzept.md:156) das Vier-Augen-Prinzip als nicht konfigurierbar bezeichnet ("Kein ' +
-        'Recht und keine Rollenkombination kann das Vier-Augen-Prinzip abschalten"). Diese Scheibe ' +
-        'ändert daran nichts — nur ehrliche Kennzeichnung, kein Verhaltens- oder Rechteumbau.',
+        'Recht und keine Rollenkombination kann das Vier-Augen-Prinzip abschalten"). Für Fast Track nicht belegt: docs/ist-analyse-und-schnittstellen.md:51 sieht keinen ' +
+        'eigenen Clearing-Schritt vor (Spalte "Rechtsprüfung vor der Bühne": "im Team enthalten"); ' +
+        'hier durchläuft auch Pfad B `in_review`/`approved`. Die Freigabe hält Version, Zeitpunkt ' +
+        'und Freigebenden fest (`approval.answerVersion`, `approvedAt`, `approvedBy`; state.ts ' +
+        '`QuestionApproved`). Teilweise zu docs/anforderungen-recherche.md:227 ("Kryptografische ' +
+        'Versiegelung freigegebener Antworten — Hash über den exakten Text, signiert vom ' +
+        'Freigebenden, mit qualifiziertem Zeitstempel"): Freigebender und Zeitpunkt stehen fest, ' +
+        'Hash, Signatur und qualifizierter Zeitstempel fehlen.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -253,17 +282,34 @@ export const TRANSITIONS: readonly Transition[] = [
     legalRef: {
       source: 'Rechtekonzept',
       citation:
-        'docs/rollen-und-rechtekonzept.md:110 (Abschnitt 2.4, Übergang legal_clearing → ' +
-        'expert_answering, Pflichtfeld "Rückgabegrund" — passt genau zum Pflichtfeld `reason` dieser ' +
-        'Regel); ergänzend docs/ist-analyse-und-schnittstellen.md:90 (Bühnenansicht-Aktion "Antwort ' +
-        'zurückgeben" → zurück ins Backoffice). Ableitung: dass eine Podiumsfrage dabei nach ' +
-        '`classified` statt `answer_drafted` zurückgeht, hat keine eigene Fundstelle — Podiumsfragen ' +
-        'durchlaufen `answer_drafted` nie (R-TRANS-08), ein Rücksprung dorthin wäre ein Stand, den ' +
-        'diese Fragen nie hatten. Die Folge, dass eine Frage aus `staged` die Bühnen-Warteschlange ' +
-        'verlässt (`stagePosition` entfällt), trägt ebenfalls ist-analyse:90 ("Antwort zurückgeben" ' +
-        '→ zurück ins Backoffice). Nicht belegt: dass bei einem Rücksprung nach `classified` eine ' +
-        'Freigabe entfällt (Ableitung: eine Podiumsfrage erreicht `approved` nie, die Löschung ' +
-        'greift heute ins Leere).',
+        'Je Ausgangsstand: aus `in_review` belegt durch docs/rollen-und-rechtekonzept.md:110 ' +
+        '(Abschnitt 2.4, Übergang legal_clearing → expert_answering, Pflichtfeld "Rückgabegrund" — ' +
+        'passt zum Pflichtfeld `reason` dieser Regel); aus `staged` belegt durch ' +
+        'docs/ist-analyse-und-schnittstellen.md:90 (Bühnenansicht-Aktion "Antwort zurückgeben" → ' +
+        'zurück ins Backoffice), das trägt auch die Folge, dass die Frage die Bühnen-Warteschlange ' +
+        'verlässt (`stagePosition` entfällt). Aus `approved` nicht belegt. Ableitung: nach der ' +
+        'Freigabe und vor der Bühne steht die Frage wie im Legal Clearing noch im Backoffice. Aus ' +
+        '`delivered` nicht belegt. Ableitung: am nächsten kommen docs/ist-analyse-und-' +
+        'schnittstellen.md:59 (nach der Antwortprüfung "Nein: Qualitätsschleife zurück zu Schritt ' +
+        '5") und docs/anforderungen-recherche.md:255 ("Rückkanal Podium → Backoffice (\'unzureichend, ' +
+        'bitte nachschärfen\', \'nur teilweise beantwortet\' …)"); beide setzen eine Bewertung der ' +
+        'gegebenen Antwort voraus, die das Tool nicht festhält (R-TRANS-10), und ist:59 führt zurück ' +
+        'zur Klassifizierung (Schritt 5), nicht zum Antwortentwurf. Ableitung: dass eine Podiumsfrage ' +
+        'nach `classified` statt `answer_drafted` zurückgeht, hat keine eigene Fundstelle — ' +
+        'Podiumsfragen durchlaufen `answer_drafted` nie (R-TRANS-08). Nicht belegt: dass bei einem ' +
+        'Rücksprung nach `classified` eine Freigabe entfällt (Ableitung: eine Podiumsfrage erreicht ' +
+        '`approved` nie, die Löschung greift heute ins Leere). Nicht belegt: beim Rücksprung nach ' +
+        '`answer_drafted` bleibt eine bestehende Freigabe stehen (state.ts `QuestionReturned`) und ' +
+        'erscheint weiter an der Frage in `answer_drafted` und `in_review`. Ableitung: die Freigabe ' +
+        'hängt an einer Version (R-GUARD-04), erst eine neue Version hebt sie auf (R-TRANS-03); ohne ' +
+        'neue Version muss R-TRANS-05 sie erneut erteilen, bevor die Frage auf die Bühne kann ' +
+        '(R-TRANS-07 nur aus `approved`). Nicht belegt: in beiden Zweigen bleibt `deliveredAt` einer ' +
+        'schon vorgelesenen Frage stehen (Ableitung: das Vorlesen bleibt eine Tatsache; ein erneutes ' +
+        'Vorlesen überschreibt den Zeitpunkt in der Projektion, das Ereignisprotokoll behält beide). ' +
+        'Nicht belegt: der Rückgabegrund (`returnReason`) bleibt an der Frage, bis R-TRANS-03 eine ' +
+        'neue Version anlegt; eine Podiumsfrage erhält nie eine Version, bei ihr bleibt er auch nach ' +
+        'erneutem Klassifizieren, Bühne und Vorlesen stehen (Ableitung: er zeigt den letzten ' +
+        'Rückgabegrund, nicht einen offenen).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -279,7 +325,9 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:92 ("es laufen nur die zugeordneten und ' +
-        'freigegebenen Fragen ein"). Die Reihenfolge (`stagePosition`) ist nicht belegt ' +
+        'freigegebenen Fragen ein"). Teilweise: die Bühnenzuordnung ist keine Voraussetzung für ' +
+        '`staged` (optional); Sicht nach Zuordnung siehe R-PERM-03, nicht umgesetzt. Die ' +
+        'Reihenfolge (`stagePosition`) ist nicht belegt ' +
         '(Architekturentscheidung: eine globale Warteschlange in der Reihenfolge, in der Fragen auf ' +
         'die Bühne gestellt werden); docs/ist-analyse-und-schnittstellen.md:87 nennt eine andere ' +
         'Sortierung ("Sortierung nach Fragesteller und vor allem nach Bühnenzuordnung").',
@@ -299,8 +347,16 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:50 (Antwortpfad A "No-Brainer": "\'freie\' ' +
-        'Beantwortung ohne weitere Recherche" durch den Vorstand, keine Rechtsprüfung vor der Bühne). ' +
-        'Die Reihenfolge (`stagePosition`) ist nicht belegt (Architekturentscheidung: globale ' +
+        'Beantwortung ohne weitere Recherche", verantwortlich "Vorstand", Spalte "Rechtsprüfung vor ' +
+        'der Bühne": "keine"). docs/ist-analyse-und-schnittstellen.md:92 ("es laufen nur die ' +
+        'zugeordneten und freigegebenen Fragen ein"): Teilweise: die Bühnenzuordnung ist keine ' +
+        'Voraussetzung für `staged` (optional); Sicht nach Zuordnung siehe R-PERM-03, nicht ' +
+        'umgesetzt. Ableitung: "freigegeben" kann für Pfad A keine Rechtsfreigabe meinen, ist:50 ' +
+        'sieht keine vor; eine Podiumsfrage kommt ohne Freigabe auf die Bühne. Nicht umgesetzt: das ' +
+        'Gate aus docs/ist-analyse-und-schnittstellen.md:135-137 (Abschnitt 5 "Delta — was das neue ' +
+        'Tool zusätzlich leisten muss", Punkt 7: "Pfad A … hat heute vor dem ' +
+        'Verlesen keine Rechtsprüfung. Mindestens ein schnelles, protokolliertes Gate ist nötig, das ' +
+        'eine kursrelevante Antwort vor dem Podium anhalten kann"). Die Reihenfolge (`stagePosition`) ist nicht belegt (Architekturentscheidung: globale ' +
         'Warteschlange, derselbe Zähler wie R-TRANS-07); docs/ist-analyse-und-schnittstellen.md:87 ' +
         'nennt eine andere Sortierung ("nach Fragesteller und vor allem nach Bühnenzuordnung").',
       docVersion: null,
@@ -318,12 +374,28 @@ export const TRANSITIONS: readonly Transition[] = [
       source: 'Prozess',
       citation:
         'docs/ist-analyse-und-schnittstellen.md:89 (Bühnenansicht-Aktion "vorgelesen, weiter"). ' +
-        'Das Festhalten der vorgelesenen Version (`answerVersion`, nur wenn eine Freigabe vorliegt) ' +
-        'stützt docs/anforderungen-recherche.md:103 ("Soll-Ist-Abgleich der tatsächlich gesprochenen ' +
+        'Teilweise: ist:89 führt "vorgelesen, weiter" unmittelbar zu "Status abgeschlossen"; hier ' +
+        'endet die Aktion in `delivered`, abgeschlossen wird erst über den eigenen Schritt ' +
+        'R-TRANS-10. Ableitung: die Zähler (state.ts `refreshCounts`) führen eine Frage in ' +
+        '`delivered` schon als vorgelesen und nicht mehr als offen, wie ist:89 es für den ' +
+        'abgeschlossenen Stand beschreibt. Festhalten der freigegebenen Version zum Zeitpunkt des ' +
+        'Vorlesens (Soll); was tatsächlich gesprochen wurde (Ist), wird nicht erfasst. Die Version ' +
+        'steht nur im Ereignis `QuestionDelivered` (`answerVersion`, api.ts `deliverQuestion`, nur ' +
+        'wenn eine Freigabe vorliegt), nicht in der Projektion; das stützt ' +
+        'docs/anforderungen-recherche.md:103 ("Soll-Ist-Abgleich der tatsächlich gesprochenen ' +
         'Antwort gegen den freigegebenen Wortlaut"). Ableitung: der Abgleich braucht die ' +
-        'freigegebene Version als Soll; bei Podiumsfragen ohne Freigabe bleibt das Feld leer. Nicht ' +
-        'umgesetzt: der Abgleich selbst, der Overdisclosure-Alarm und das Pflichtfeld ' +
-        'absichtlich/unabsichtlich aus derselben Zeile.',
+        'freigegebene Version als Soll; bei Podiumsfragen ohne Freigabe fehlt das Feld. Nicht ' +
+        'umgesetzt aus derselben Zeile: der Abgleich selbst, der Overdisclosure-Alarm, die ' +
+        'Handlungsoptionen "Klarstellung im Saal, Nachhol-Veröffentlichung, Korrektur der ' +
+        'Q&A-Publikation" und das Pflichtfeld absichtlich/unabsichtlich. Der Zeitpunkt des ' +
+        'Vorlesens (`deliveredAt`, state.ts `QuestionDelivered`, über die API sichtbar): teilweise zu ' +
+        'docs/anforderungen-recherche.md:277 ("Delivery als eigene Entität, nicht als Boolean: ' +
+        'Zeitpunkt, Kanal …, Antwortender, Fundstelle, verwendete Antwortversion. Eine Frage kann ' +
+        'mehrere Deliveries haben."). Zeitpunkt und (im Ereignis) Version sind festgehalten; Kanal, ' +
+        'Antwortender und Fundstelle fehlen, und die Projektion hält nur einen Zeitpunkt — ein ' +
+        'erneutes Vorlesen nach R-TRANS-06 überschreibt ihn, nur das Ereignisprotokoll behält ' +
+        'beide. Ableitung: `stagePosition` bleibt in `delivered` stehen und entfällt erst mit ' +
+        'R-TRANS-10; die Bühnenansicht zeigt nur `staged` (api.ts `getStage`).',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -340,7 +412,10 @@ export const TRANSITIONS: readonly Transition[] = [
       citation:
         'docs/ist-analyse-und-schnittstellen.md:58-59 ("10 Antwortprüfung (Legal · FOO/GC) → ' +
         'Entscheidung \'Antwort ausreichend?\' — Ja: Frage beantwortet") — ein eigener ' +
-        'Abschluss-Schritt nach der Bühne, getrennt vom Vorlesen (R-TRANS-09). Nicht umgesetzt: ' +
+        'Abschluss-Schritt nach der Bühne, getrennt vom Vorlesen (R-TRANS-09). Ableitung: ' +
+        'docs/ist-analyse-und-schnittstellen.md:89 kennt diesen zweiten Schritt nicht, dort setzt ' +
+        'schon "vorgelesen, weiter" den Status abgeschlossen; die Trennung folgt ist:58-59. Nicht ' +
+        'umgesetzt: ' +
         'keine Antwortprüfung durch Legal oder FOO/GC; den Abschluss lösen die Berechtigten von ' +
         '`question.close` aus (heute podium und admin, permissions.ts), ohne Entscheidung "Antwort ' +
         'ausreichend?" und ohne deren Festhalten. Nicht belegt: dass `stagePosition` beim ' +
@@ -372,7 +447,14 @@ export const TRANSITIONS: readonly Transition[] = [
         'wie der Übergang selbst. Ebenfalls nicht belegt: dass eine zurückgezogene Frage aus ' +
         '`staged` die Bühnen-Warteschlange verlässt (`stagePosition` entfällt). Ableitung: ' +
         'docs/ist-analyse-und-schnittstellen.md:92 lässt nur zugeordnete und freigegebene Fragen ' +
-        'auf die Bühne einlaufen; eine zurückgezogene gehört nicht mehr dazu.',
+        'auf die Bühne einlaufen; eine zurückgezogene gehört nicht mehr dazu. Nicht belegt: die ' +
+        'Begründung landet im selben Feld wie ein Rückgabegrund (`returnReason`, state.ts ' +
+        '`QuestionWithdrawn`) und ersetzt einen dort stehenden; eine Freigabe und `deliveredAt` ' +
+        'bleiben stehen (Ableitung: das Ereignisprotokoll trennt beide Gründe nach Ereignistyp, die ' +
+        'Projektion nicht). Nicht belegt: eine schon vorgelesene Frage (aus `delivered`) fällt beim ' +
+        'Zurückziehen aus dem Zähler der vorgelesenen Fragen heraus (state.ts `refreshCounts`). ' +
+        'Ableitung: ob sie dann als zurückgezogen oder als beantwortet zählt, legt erst die ' +
+        'Zähldefinition aus :285 fest, die es noch nicht gibt.',
       docVersion: null,
       docHash: null,
       verified: false,
@@ -391,12 +473,18 @@ export const TRANSITIONS: readonly Transition[] = [
         'docs/anforderungen-recherche.md:147 ("[MUSS] Dublettenerkennung auf Trefferquote statt ' +
         'Präzision kalibrieren ..."). Teilweise: die Zeile fordert "Merge reversibel, mit Nutzer, Zeitstempel ' +
         'und Ähnlichkeitsscore protokolliert" — `merged` ist hier aber ein Terminalstand ' +
-        '(`TERMINAL_STATUSES`), es gibt kein Unmerge und keinen gespeicherten Ähnlichkeitsscore. ' +
+        '(`TERMINAL_STATUSES`), es gibt kein Unmerge und keinen gespeicherten Ähnlichkeitsscore; ' +
+        'Nutzer und Zeitstempel stehen im Ereignis `QuestionMerged` (Akteur, Zeitpunkt). ' +
         'Teilweise auch beim Ziel: es muss nur existieren, sein Stand spielt keine Rolle ' +
         '(api.ts `mergeQuestion`, `requireQuestionFor`); eine Frage lässt sich auch in eine ' +
-        'zurückgezogene, selbst zusammengeführte oder abgeschlossene Frage zusammenführen und kommt ' +
-        'dann nie mehr auf die Bühne. Die Zeile sagt dazu: "Eine fälschlich weggeclusterte Frage ' +
-        'gilt als nicht beantwortet." Ableitung: der Bestandscheck des Zielobjekts (`intoQuestionId`, dieselbe 404-Maskierung wie ' +
+        'zurückgezogene, selbst zusammengeführte oder abgeschlossene Frage zusammenführen, und das ' +
+        'Ziel kommt selbst nicht (mehr) auf die Bühne (zurückgezogen, abgeschlossen) oder nur über ' +
+        'eine Kette, die der Code nicht auflöst (zusammengeführt). Die zusammengeführte Frage zählt ' +
+        'dann nicht mehr als offen (state.ts `refreshCounts`), unabhängig vom Stand des Ziels. Die ' +
+        'Zeile sagt dazu: "Eine fälschlich weggeclusterte Frage gilt als nicht beantwortet." ' +
+        'Nicht belegt: eine Freigabe, `deliveredAt` oder ein Rückgabegrund, die nach R-TRANS-06 an ' +
+        'einer Frage in `answer_drafted` stehen geblieben sind, bleiben auch an der ' +
+        'zusammengeführten Frage stehen (Ableitung wie bei R-TRANS-06). Ableitung: der Bestandscheck des Zielobjekts (`intoQuestionId`, dieselbe 404-Maskierung wie ' +
         'R-TRANS-00, `requireQuestionFor` in api.ts) hat ebenfalls keine Fundstelle in Recherche oder ' +
         'Ist-Analyse — Architekturentscheidung, keine externe Vorgabe.',
       docVersion: null,
