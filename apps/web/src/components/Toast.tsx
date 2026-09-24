@@ -51,7 +51,11 @@ function Toast({ toast }: { toast: ToastMessage }) {
           <p className="mt-0.5 text-[13px] text-ink-600">{toast.detail}</p>
         )}
         {toast.ruleId !== undefined && (
-          <p className="mt-1.5 font-mono text-2xs text-ink-500">
+          // takt-009: `text-ink-500` on `bg-surface` measured ~3.9:1 (same class of debt as
+          // AX-020-01, found in the 010 review) — `text-ink-600` is the next step up the same
+          // warm-grey ramp and clears 4.5:1 (Bericht has the arithmetic, index.css). This surface
+          // has only one theme, so there is no per-theme case to track separately.
+          <p className="mt-1.5 font-mono text-2xs text-ink-600">
             {t('toast.rule')} {toast.ruleId}
           </p>
         )}
