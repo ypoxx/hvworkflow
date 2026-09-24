@@ -33,6 +33,13 @@ Lane `service` für genau die Routen ihrer Operationen, und ihr Ziel nennt das E
 zählt ehrlich (20, nicht 24)“. Entscheidung: sie wird ebenfalls 22 (dieselbe Zählung, sonst widerspricht die Zeile sich
 selbst). Akzeptanzkriterium 1 gilt damit für drei Zählstellen.
 
+**Zweiter Nachtrag des Architekten (Codex auf `b444f4c`, P2):** `packages/contract/**` gehört der Lane `contract`; ohne
+Ausnahme könnten 025, 026, 028 und 040 ihre Allowlist-Einträge nicht entfernen, ohne ihren Umfang zu verlassen.
+Entscheidung: eine schmale Ausnahme in der Lane-Tabelle 5.1, Zeile `contract` — jede Scheibe darf die Einträge der
+Allowlist entfernen, deren Feld `slice` ihre Nummer trägt, und sonst nichts an der Datei ändern. Die Specs der vier
+Scheiben nennen `packages/contract/allowlist.json` dann in „Files allowed“. Akzeptanzkriterium 1 umfasst damit
+zusätzlich diese Bemerkung in 5.1.
+
 ## Nicht-Ziele
 
 Keine andere Planzeile, keine Kalenderverschiebung, keine Änderung an der Allowlist oder am Vertrag.

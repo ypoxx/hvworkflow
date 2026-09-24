@@ -282,7 +282,7 @@ Eine Scheibe darf nur ihre Lane(s), ihre eigene Datei `docs/slices/NNN-*.md`, ih
 
 | Lane | Dateien | Bemerkung |
 |---|---|---|
-| contract | `packages/contract/**` | seriell; der Architekt schreibt die Vertragspakete (019, 023, 043) vor den Implementierern; 028 und 080 ändern den Vertrag in engem Rahmen |
+| contract | `packages/contract/**` | seriell; der Architekt schreibt die Vertragspakete (019, 023, 043) vor den Implementierern; 028 und 080 ändern den Vertrag in engem Rahmen; `packages/contract/allowlist.json`: jede Scheibe darf die Einträge entfernen, deren Feld `slice` ihre Nummer trägt, sonst nichts daran ändern (takt-011) |
 | core | `packages/domain/src/**` außer `store.ts`, `packages/domain/policy-*.md` | seriell (Wahrheitstabelle ist ein Snapshot); eine aktive Scheibe zur Zeit |
 | persist | `packages/domain/src/store.ts`, `apps/api/src/persistence/**`, `apps/api/migrations/**` | |
 | service | `apps/api/src/**` außer persistence | 027 darf `apps/api/src/server.ts` zum Verdrahten berühren |
