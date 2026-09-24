@@ -51,7 +51,63 @@ Keine andere Planzeile, keine Kalenderverschiebung, keine Änderung an der Allow
 
 ## Bericht
 
-(vom Bauer)
+Bauer: Opus 5.5, 24.09.2026. Plan-Änderung als Commit `a501513`; `pnpm gates` lief auf `a501513` (sauberer Baum), Exit 0.
+
+**Erledigt**
+
+1. Lanes: Die Kopfzeilen von 025, 026, 028 und 040 tragen zusätzlich `service`. Das Ziel jeder dieser Scheiben endet mit
+   dem Satz, dass sie die Routen ihrer Operationen aus Vertrag 0.3.0 im Dienst (`apps/api/src`) montiert und deren
+   Einträge aus `packages/contract/allowlist.json` entfernt (Operationen dort über Feld `slice`). Die Zuordnung ist aus
+   der Allowlist im Worktree von 023 abgelesen und nicht kopiert: 025 hat 14 Einträge, 026 hat 3, 028 hat 4, 040 hat 6.
+2. Kalender: keine Verschiebung. plan-graph meldet keine Lane-Überschneidung am selben Tag.
+3. Regelzählung Zeile 011: „20 IDs heute“ → „22 IDs heute“ und Testausgabe „22 Regel-IDs, 22 legalRef, 0 verified“.
+   Die Kopfzeile „Stand am 23. September 2026“ ist unverändert.
+4. Plan-Ehrlichkeit grün.
+
+**Ausgabe `node scripts/plan-graph.mjs` (wörtlich)**
+
+```
+plan-graph: 80 slice(s) found in docs/produktplan-beta.md section 5.
+  missing dependencies: 0
+  cycles: 0
+  dependency-order problems: 0
+  same-day lane-sharing warnings: 0
+
+plan-graph: ok.
+```
+
+**Ausgabe `node scripts/plan-honesty.mjs` (wörtlich)**
+
+```
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+```
+
+**`pnpm gates` auf `a501513`, Tail (Exit 0)**
+
+```
+packages/domain test:       Tests  72 passed (72)
+apps/web test:       Tests  48 passed (48)
+apps/api test:       Tests  49 passed (49)
+vocabulary-check: ok
+slice-scope: 2 changed file(s), all within "docs/slices/takt-011-plan-service-lane.md"'s "Files allowed" list (2 pattern(s)).
+plan-graph: ok.
+# tests 206
+# pass 206
+# fail 0
+...
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.65s
+mark-test-run: wrote /home/user/wt/takt/.claude/state/last-test-run (clean tree) at commit a501513, tree 32b789473989…
+```
+
+(Die Zeilen über „...“ sind wörtlich aus derselben Ausgabe herausgesucht; alles ab „...“ ist das echte Ende.)
+
+**Offen**
+
+- Zeile 011 enthält noch eine dritte Zahl, „Regelregister zählt ehrlich (20, nicht 24)“. Die Spec nennt nur zwei
+  Zählstellen (Akzeptanzkriterium 1), deshalb ist diese Stelle unverändert. Ob sie auf 22 gehört, entscheidet der Architekt.
+- Die Gründe in den Allowlist-Einträgen verweisen noch auf eine „Planänderung des Orchestrators (takt-011)“, die noch
+  kommt. Die Allowlist ist ein Nicht-Ziel und bleibt hier unverändert.
 
 ## Review findings
 
