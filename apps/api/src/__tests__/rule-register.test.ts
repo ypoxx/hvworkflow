@@ -71,9 +71,18 @@ describe('rule register', () => {
     ...collectTsFiles('packages/domain/src', { excludeTests: true, excludePaths: ['packages/domain/src/rules.ts'] }),
     ...collectTsFiles('apps/api/src', { excludeTests: true }),
   ];
+  // The two meta-tests about the register itself are excluded too (Codex P2, PR #24): they name rule
+  // ids in comments and in the snapshot of docs/legal-trace.md, so counting them would let "every
+  // register entry has at least one test" pass with no real test behind an id.
   const testFiles = [
-    ...collectTsFiles('packages/domain/src/__tests__', { excludeTests: false }),
-    ...collectTsFiles('apps/api/src/__tests__', { excludeTests: false }),
+    ...collectTsFiles('packages/domain/src/__tests__', {
+      excludeTests: false,
+      excludePaths: ['packages/domain/src/__tests__/rules.test.ts'],
+    }),
+    ...collectTsFiles('apps/api/src/__tests__', {
+      excludeTests: false,
+      excludePaths: ['apps/api/src/__tests__/rule-register.test.ts'],
+    }),
   ];
 
   const entries = ruleRegister();

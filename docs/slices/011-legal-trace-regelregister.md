@@ -506,3 +506,11 @@ siehe Bericht Abschnitt 8; Nachprüfung der Behebung durch Opus (Legal).
 clearing“. Dazu Codex auf PR #24 (1 × P2): R-PERM-01 versprach immer 403, obwohl die API bei einer Frage, die der
 Akteur weder lesen noch bearbeiten darf, dasselbe 404 wie für eine unbekannte ID antwortet → R-PERM-01, -02 und -03
 beschreiben jetzt die Entscheidung und die 404-Maskierung (Festlegung 3 von 010). Behoben vom Orchestrator.
+
+**Codex auf PR #24, weiterer Lauf (1 × P2):** Der Scan-Test zählte sich selbst und `rules.test.ts` zum Testkorpus;
+seine Kopfzeile nennt die IDs aus `OTHER_RULES`, sodass „jede Regel hat einen Test“ auch ohne echten Test bestanden
+hätte → beide Meta-Tests sind über den vollen Pfad aus dem Korpus genommen (Orchestrator). Jede der fünf Regeln
+außerhalb der Tabelle hat weiter echte Tests (R-TRANS-00: api, transitions, negative; R-PERM-01: api, transitions,
+negative, read-rights; R-PERM-02: api, transitions, read-rights; R-PERM-03: api, read-rights; R-IDEM-01: api,
+negative). Probe mit einer Wegwerf-ID `R-META-99`, die nur im Produktionscode und im Kommentar des Scan-Tests
+steht: mit dem Ausschluss „1 failed | 5 passed (6)“, ohne ihn „6 passed (6)“; Wegwerf-Änderungen zurückgesetzt.
