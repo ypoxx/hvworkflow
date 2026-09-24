@@ -127,6 +127,25 @@ function responseObjectOf(operationId: string, status: number): Record<string, u
   return node;
 }
 
+/**
+ * Codex on 8ef3ad2: a response that lacks a header the contract marks `required: true` for its status
+ * (`ETag` on the 0.3.0 writes, `Location` on the sign-in redirects, `Set-Cookie` on the callback)
+ * breaks the contract as much as a wrong body does, so it fails the test and is never a coverage hit.
+ * Optional headers (the 0.2 `ETag`, `X-Server-Time`) are not checked here.
+ */
+function assertRequiredHeaders(operationId: string, method: string, pathname: string, res: Response): void {
+  const headers = (responseObjectOf(operationId, res.status)?.['headers'] ?? {}) as Record<string, Record<string, unknown>>;
+  for (const [name, raw] of Object.entries(headers)) {
+    const header = ('$ref' in raw ? resolvePointer(raw['$ref'] as string) : raw) as { required?: boolean };
+    if (header.required === true && res.headers.get(name) === null) {
+      throw new Error(
+        `${method} ${pathname} ("${operationId}") returned ${res.status} without the response header ` +
+          `"${name}", which the contract marks as required for this status.`,
+      );
+    }
+  }
+}
+
 async function assertMatchesContract(method: string, path: string, res: Response): Promise<void> {
   const pathname = (path.split('?')[0] ?? path);
   const operationId = matchOperationId(method, pathname);
@@ -174,6 +193,7 @@ async function assertMatchesContract(method: string, path: string, res: Response
   } else {
     expectValid(operationId, status, body, contentType);
   }
+  assertRequiredHeaders(operationId, method, pathname, res);
   // Only a documented success counts as exercising the operation (review 023, point 2).
   if (status >= 200 && status < 400) recordOperationHit(operationId);
 }

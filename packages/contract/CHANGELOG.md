@@ -155,6 +155,22 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   only; no personal data in `RoleRevokedPayload.reason`, in problem `detail` on the operations
   without credential, and in payloads outside `pii` (the seed's `SpeakerRegistered.displayName`
   pseudonym stays until slice 026).
+- Last small round (Opus recheck and Codex on 8ef3ad2, 24.09.2026), all additive against today's
+  service: `Readiness.checks` narrows the codes per check (`clock`: `clock_unsynced`, `clock_drift`,
+  `timeout`; `db`: `not_configured`, `unreachable`, `timeout`; `migrations`: `migrations_pending`,
+  `not_configured`, `unreachable`, `timeout`) and both `ReadinessCheck` variants are closed
+  (`additionalProperties: false`), so `/readyz` carries no free text. `Event`: every v2 envelope
+  field (`hash`, `prevHash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`,
+  `legalHold`) requires `schemaVersion`, whose minimum is now `2` (no v1 event on the wire); the
+  agenda and role events require `subjectId`. `Contribution.occurredAtSource` is
+  `device | paper | transcript` (never `server`), as in `MeetingContributionCapture`. Optional `ETag`
+  (= `Contribution.version`) on the `getContribution` 200 and the `captureMeetingContribution` 201.
+  `DemoSession` declares `subjectId` (= `actor.id`) and forbids `idpGroups` and `personId`.
+  `completeLogin` 302 requires `Set-Cookie` (`hv_session=…`). `logout` takes the new parameter
+  `CsrfTokenRequired` (`X-CSRF-Token`, `required: true`), because `session` is its only scheme. The
+  contract test helper now fails a response that lacks a header marked `required: true` and does not
+  count it as exercised. None of these responses or requests is produced or accepted by the 0.2.1
+  service today (live probe: 2329 seed events, none with `schemaVersion`, all valid).
 
 ### Changed
 

@@ -253,7 +253,7 @@ paths:
       operationId: getContribution
       summary: Get a speech with its coverage (Restabdeckung)
       responses:
-        '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '200': { description: 'OK — `ETag` is `Contribution.version`, the value `claimContribution`/`releaseContribution` send back as `If-Match` (optional here: a 0.2 operation)', headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /contributions/{contributionId}/questions:
@@ -992,7 +992,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/MeetingContributionCapture' } } }
       responses:
-        '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '201': { description: 'Created — `ETag` is `Contribution.version` (optional, as on `getContribution`)', headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -1072,7 +1072,16 @@ paths:
         - { name: code, in: query, required: true, schema: { type: string } }
         - { name: state, in: query, required: true, schema: { type: string } }
       responses:
-        '302': { description: Signed in; redirect to `returnTo` or the application root, headers: { Location: { required: true, schema: { type: string } }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
+        '302':
+          description: Signed in; redirect to `returnTo` or the application root
+          headers:
+            Location: { required: true, schema: { type: string } }
+            # Codex on 8ef3ad2: a 302 without the cookie would be a sign-in that signed no one in.
+            Set-Cookie:
+              required: true
+              schema: { type: string, pattern: '^hv_session=' }
+              description: 'Sets the `hv_session` cookie of the `session` scheme (HttpOnly, Secure, SameSite; ADR 0004). The only way a session comes into being.'
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -1084,7 +1093,7 @@ paths:
       summary: End the session (Abmelden) — clears the cookie and blocks the session id
       description: Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end.
       security: [ { session: [] } ]
-      parameters: [ { $ref: '#/components/parameters/CsrfToken' } ]
+      parameters: [ { $ref: '#/components/parameters/CsrfTokenRequired' } ]
       responses:
         '204': { description: Signed out; the cookie is cleared, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1275,8 +1284,17 @@ components:
         scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id
         defined there — OpenAPI cannot make a header required for one security scheme only, so the
         document keeps it optional and the service decides); under `demoActor` it is ignored.
-        Declared on every state-changing operation,
-        `logout` included; not on `seedDemo` (demo only).
+        Declared on every state-changing operation except `logout`, which takes `CsrfTokenRequired`;
+        not on `seedDemo` (demo only).
+    CsrfTokenRequired:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string, minLength: 1 }
+      description: >-
+        Since 0.3.0 (Codex on 8ef3ad2): the same header as `CsrfToken`, required. Used by `logout`,
+        the one operation whose only security scheme is `session` — there the token is never optional,
+        so generated clients must type it as required.
     SpeakerId: { name: speakerId, in: path, required: true, schema: { type: string } }
     ContributionId: { name: contributionId, in: path, required: true, schema: { type: string } }
     QuestionId: { name: questionId, in: path, required: true, schema: { type: string } }
@@ -1308,7 +1326,11 @@ components:
         Since 0.3.0 (Codex round 5): the same opaque version tag as `ETag`, always sent. Used on the
         responses of operations new in 0.3.0 whose description promises an ETag (meeting, agenda,
         units, seats, freeze, agenda progress, speech claim/release), because the next write sends
-        it back as `If-Match`. The 0.2 responses keep the optional `ETag`.
+        it back as `If-Match`. The 0.2 responses keep the optional `ETag`. `claimQuestion` and
+        `releaseQuestion` are new in 0.3.0 but answer with the shared `QuestionUpdated` response and
+        therefore the optional `ETag`: that response is the 200 of every 0.2 question write, and
+        making its header required would change eleven 0.2 operations at once (the 0.2.1 service
+        does send it; tightening all of them is a 0.4 question).
     X-Server-Time:
       schema: { type: string, format: date-time }
       description: >-
@@ -1688,6 +1710,10 @@ components:
         scheme: { type: string, const: demoActor }
         actor: { $ref: '#/components/schemas/Actor' }
         roles: { type: array, minItems: 1, maxItems: 1, items: { $ref: '#/components/schemas/Role' }, description: 'The one role of the header (equal to `actor.role` — prose, JSON Schema cannot compare values), for symmetry with the session variant' }
+        subjectId: { type: string, description: 'The actor id of the header, equal to `actor.id` (prose — JSON Schema cannot compare values); declared so a client can read `subjectId` under both schemes' }
+        # No identity provider and no person table behind a header identity (Opus recheck on 8ef3ad2).
+        idpGroups: false
+        personId: false
         # No session, so nothing that belongs to one (Codex round 5): a client that finds a token here
         # would send it, and one that finds an expiry would schedule a refresh that cannot happen.
         csrfToken: false
@@ -1741,26 +1767,43 @@ components:
         checks:
           type: object
           required: [clock, db, migrations]
+          # Each check names only the codes that can be its own (Opus recheck on 8ef3ad2, point a):
+          # a clock check never fails with `unreachable`, a database check never with `clock_drift`.
           properties:
-            clock: { $ref: '#/components/schemas/ReadinessCheck' }
-            db: { $ref: '#/components/schemas/ReadinessCheck' }
-            migrations: { $ref: '#/components/schemas/ReadinessCheck' }
+            clock:
+              allOf:
+                - { $ref: '#/components/schemas/ReadinessCheck' }
+                - { properties: { code: { enum: [clock_unsynced, clock_drift, timeout] } } }
+            db:
+              allOf:
+                - { $ref: '#/components/schemas/ReadinessCheck' }
+                - { properties: { code: { enum: [not_configured, unreachable, timeout] } } }
+            migrations:
+              allOf:
+                - { $ref: '#/components/schemas/ReadinessCheck' }
+                - { properties: { code: { enum: [migrations_pending, not_configured, unreachable, timeout] } } }
           # A closed list: `/readyz` answers without credential (review 023).
           additionalProperties: false
         serverTime: { type: string, format: date-time }
     ReadinessCheck:
-      description: 'One readiness check: `ok` carries no code, `fail` always carries one (Codex round 5)'
+      description: >-
+        One readiness check: `ok` carries no code, `fail` always carries one (Codex round 5). Both
+        variants are closed (`additionalProperties: false`, Codex on 8ef3ad2): `/readyz` answers
+        without credential, so no `detail`, host name or driver text can ride along. Which codes a
+        check may carry is narrowed per check on `Readiness.checks`.
       oneOf:
         - type: object
           required: [status]
           properties:
             status: { type: string, const: ok }
             code: false
+          additionalProperties: false
         - type: object
           required: [status, code]
           properties:
             status: { type: string, const: fail }
             code: { $ref: '#/components/schemas/ReadinessCheckCode' }
+          additionalProperties: false
     ReadinessCheckCode:
       type: string
       description: >-
@@ -1882,7 +1925,10 @@ components:
         text: { type: string }
         capturedAt: { type: string, format: date-time, description: 'Server time of the capture (the same instant as the event''s `recordedAt`)' }
         occurredAt: { type: string, format: date-time, description: 'Since 0.3.0 (ADR 0011): the sender''s statement of when the speech happened, when it differs from `capturedAt` (paper, transcript, device)' }
-        occurredAtSource: { $ref: '#/components/schemas/OccurredAtSource' }
+        occurredAtSource:
+          type: string
+          enum: [device, paper, transcript]
+          description: 'Source of the stated `occurredAt`, as sent with `captureMeetingContribution` — never `server` (Opus recheck on 8ef3ad2): the server time of the capture is `capturedAt`'
         source:
           type: string
           enum: [manual, transcript, paper]
@@ -2149,8 +2195,10 @@ components:
         `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion`
         requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`,
         `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.1, because the
-        core carries it only from 025) and forbids `actor.displayName`. An event served over HTTP is
-        never v1 (v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON
+        core carries it only from 025) and forbids `actor.displayName`; conversely none of those seven
+        fields appears without `schemaVersion`, so a half envelope never validates; the agenda and
+        role events require `subjectId`. An event served over HTTP is never v1 (`schemaVersion`
+        minimum 2; v1 exists only in JSONL dev data and is upcast on load). Prose only, because JSON
         Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt`
         equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming
         the `seq` (slice 024). Payload fields outside `pii` are free of personal data from slice 026
@@ -2195,7 +2243,7 @@ components:
         at: { type: string, format: date-time, description: 'Recorded time (server clock). Since 0.3.0 the same instant as `recordedAt`, which is the name ADR 0011 gives it; `at` stays for 0.x readers.' }
         actor: { $ref: '#/components/schemas/EventActor' }
         subjectId: { type: string, description: Id of the aggregate the event belongs to }
-        schemaVersion: { type: integer, minimum: 1, description: 'Since 0.3.0: envelope version, `2` from slice 024 (v1 events exist only in JSONL dev data and are upcast on load). Pflicht ab 0.3.1, Scheibe 028.' }
+        schemaVersion: { type: integer, minimum: 2, description: 'Since 0.3.0: envelope version, `2` from slice 024. Never `1` on the wire (minimum 2, Opus recheck on 8ef3ad2): v1 events exist only in JSONL dev data and are upcast on load, so an event without `schemaVersion` is a 0.2 event of the unchanged service. Pflicht ab 0.3.1, Scheibe 028.' }
         meetingId: { type: string, description: 'Since 0.3.0 (ADR 0011): the meeting (Jahrgang) the event belongs to. Pflicht ab 0.3.1, Scheibe 028.' }
         idempotencyKey: { type: string, description: 'Since 0.3.0: the `Idempotency-Key` of the write that produced the event, when the client sent one; replays after a restart are answered from it (slice 028)' }
         causationId: { type: string, description: 'Since 0.3.0: id of the event that caused this one (e.g. the intention a podium device buffered offline), when any' }
@@ -2219,12 +2267,17 @@ components:
       # Envelope invariants (Codex round 5): the two times come together or not at all; a hash is only
       # meaningful with its predecessor (the first event's `prevHash` is the empty string); a
       # `schemaVersion` marks a complete v2 envelope as slice 024 writes it. `meetingId` is not in that
-      # list: the core gets it with 025, after 024; it becomes required with 0.3.1 (028).
+      # list: the core gets it with 025, after 024; it becomes required with 0.3.1 (028). The reverse
+      # also holds (Opus recheck on 8ef3ad2, point b): a v2-only field never appears without
+      # `schemaVersion`, so no half envelope passes — safe, because the 0.2.1 service sends none of them.
       dependentRequired:
-        occurredAt: [occurredAtSource]
-        occurredAtSource: [occurredAt]
-        hash: [prevHash]
-        prevHash: [hash]
+        occurredAt: [occurredAtSource, schemaVersion]
+        occurredAtSource: [occurredAt, schemaVersion]
+        hash: [prevHash, schemaVersion]
+        prevHash: [hash, schemaVersion]
+        recordedAt: [schemaVersion]
+        retentionClass: [schemaVersion]
+        legalHold: [schemaVersion]
         schemaVersion: [prevHash, hash, recordedAt, occurredAt, occurredAtSource, retentionClass, legalHold]
       # A v2 envelope never carries a clear name of the actor (ADR 0009/0011; `EventActor.displayName`).
       dependentSchemas:
@@ -2235,10 +2288,12 @@ components:
       then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
       else:
         if: { required: [type], properties: { type: { enum: [AgendaItemOpened, VotingOpened, VotingClosed] } } }
-        then: { properties: { payload: { $ref: '#/components/schemas/AgendaItemEventPayload' } } }
+        # The agenda and role events always name their aggregate (the meeting, the assignment) in
+        # `subjectId` (Opus recheck on 8ef3ad2, point d); none of these types is produced today.
+        then: { required: [subjectId], properties: { subjectId: { type: string }, payload: { $ref: '#/components/schemas/AgendaItemEventPayload' } } }
         else:
           if: { required: [type], properties: { type: { const: RoleAssigned } } }
-          then: { properties: { payload: { $ref: '#/components/schemas/RoleAssignedPayload' } } }
+          then: { required: [subjectId], properties: { subjectId: { type: string }, payload: { $ref: '#/components/schemas/RoleAssignedPayload' } } }
           else:
             if: { required: [type], properties: { type: { const: RoleRevoked } } }
-            then: { properties: { payload: { $ref: '#/components/schemas/RoleRevokedPayload' } } }
+            then: { required: [subjectId], properties: { subjectId: { type: string }, payload: { $ref: '#/components/schemas/RoleRevokedPayload' } } }
