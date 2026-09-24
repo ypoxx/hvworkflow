@@ -40,4 +40,8 @@ export const captureDe = {
   'capture.key.alt': 'Alt',
   'capture.key.q': 'Q',
   'capture.readonly.hint': 'In dieser Rolle nur lesen',
+  // Slice 010b: the state a 403 R-PERM-02/03 on `listContributions` renders instead of a toast
+  // (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
+  'capture.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
+  'capture.forbidden.body': 'Die Erfassung ist für diese Rolle nicht zum Lesen freigegeben.',
 };

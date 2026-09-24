@@ -42,4 +42,16 @@ export const historyDe = {
   'history.kpi.returns': 'Rückgaben',
   'history.kpi.running': 'läuft',
   'history.sparkline.caption': 'Ereignisse je 5 Minuten, letzte 2 Stunden',
+  // Slice 010b (Lesepfade in der Oberfläche): the states a 403 R-PERM-02/03 render instead of a
+  // toast, recognised by ruleId alone (docs/slices/010b-lesepfade-oberflaeche.md, Ziele 1–3).
+  // Whole view — no role at all may read `listQuestions` here (e.g. podium).
+  'history.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
+  'history.forbidden.body': 'Die Vorgangshistorie ist für diese Rolle nicht zum Lesen freigegeben.',
+  // The "Vorgangshistorie" tab of one selected question (`getQuestionHistory`) — e.g. observer,
+  // who may find the question but holds no `history.read` (Nebenabfrage split, Ziel 2/3).
+  'history.timeline.forbidden.title': 'In dieser Rolle keine Leseberechtigung für die Vorgangshistorie dieser Frage',
+  'history.timeline.forbidden.body': 'Diese Rolle darf den Verlauf dieser Einzelfrage nicht einsehen.',
+  // The "Ereignisstrom" tab (`listEvents`) — e.g. observer, who holds no `event.read`.
+  'history.stream.forbidden.title': 'In dieser Rolle keine Leseberechtigung für den Ereignisstrom',
+  'history.stream.forbidden.body': 'Der Ereignisstrom ist für diese Rolle nicht zum Lesen freigegeben.',
 };

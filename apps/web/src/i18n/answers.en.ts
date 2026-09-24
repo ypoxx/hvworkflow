@@ -83,4 +83,8 @@ export const answersEn: typeof answersDe = {
   'answers.stale.banner': 'The record has changed in the meantime; the view was reloaded',
   'answers.diff.toggle': 'Change from version {previous}',
   'answers.readonly.hint': 'Read only in this role',
+  // Slice 010b: the state a 403 R-PERM-02/03 on `listQuestions` renders instead of a toast
+  // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
+  'answers.forbidden.title': 'This role has no read permission for this view.',
+  'answers.forbidden.body': 'The answer backlog is not open for reading in this role.',
 };
