@@ -41,6 +41,8 @@ interface Harness {
   __modules: Record<string, unknown>;
   /** Outcomes of the writes `unrelatedEvent` started, by number. */
   __writes: string[];
+  /** `installHarness`'s own progress: `loading`, `ready`, or `failed: …` (slice 010d, Ziel 5). */
+  __harness: string;
 }
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -109,28 +111,38 @@ async function tabTo(page: Page, testId: string, maxSteps = 60): Promise<void> {
  * the in-process `registerSpeaker` appends synchronously). The helpers now resolve the modules once
  * here, at an idle moment right after the corpus is loaded, and every later evaluate is
  * import-free; `unrelatedEvent` awaits nothing in the page at all.
+ *
+ * Slice 010d, Ziel 5: nor does this one. The evaluate starts the two imports and returns at once;
+ * the imports report into `__harness`, which the test polls — no evaluate of this file waits on a
+ * pending promise in the page any more, and a failed import shows as its own message.
  */
 async function installHarness(page: Page): Promise<void> {
   await page.evaluate(
-    async ([apiUrl, actorUrl]) => {
+    ([apiUrl, actorUrl]) => {
       const w = window as unknown as Harness;
-      if (w.__original !== undefined) return;
-      const [apiModule, actorModule] = await Promise.all([
-        import(/* @vite-ignore */ apiUrl!),
-        import(/* @vite-ignore */ actorUrl!),
-      ]);
-      const { api } = apiModule as { api: Wrapped };
-      w.__modules = { [apiUrl!]: apiModule, [actorUrl!]: actorModule };
-      w.__writes = [];
-      w.__calls = {};
-      w.__held = {};
-      w.__original = {};
-      for (const name of Object.keys(api)) {
-        if (typeof api[name] === 'function') w.__original[name] = api[name]!.bind(api);
-      }
+      if (w.__harness !== undefined) return;
+      w.__harness = 'loading';
+      void Promise.all([import(/* @vite-ignore */ apiUrl!), import(/* @vite-ignore */ actorUrl!)]).then(
+        ([apiModule, actorModule]) => {
+          const { api } = apiModule as { api: Wrapped };
+          w.__modules = { [apiUrl!]: apiModule, [actorUrl!]: actorModule };
+          w.__writes = [];
+          w.__calls = {};
+          w.__held = {};
+          w.__original = {};
+          for (const name of Object.keys(api)) {
+            if (typeof api[name] === 'function') w.__original[name] = api[name]!.bind(api);
+          }
+          w.__harness = 'ready';
+        },
+        (error: unknown) => {
+          w.__harness = `failed: ${String(error)}`;
+        },
+      );
     },
     [API_MODULE, ACTOR_MODULE],
   );
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).__harness)).toBe('ready');
 }
 
 /**
@@ -277,7 +289,9 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       const at = w.__writes.push('pending') - 1;
       written.then(
         () => (w.__writes[at] = 'ok'),
-        (error: unknown) => (w.__writes[at] = `failed: ${String((error as { detail?: string }).detail ?? error)}`),
+        // Slice 010d, Ziel 5: a refusal without a body (`null`, `undefined`) is reported, not thrown on.
+        (error: unknown) =>
+          (w.__writes[at] = `failed: ${(error as { detail?: string } | null)?.detail ?? String(error)}`),
       );
       return at;
     },
@@ -755,6 +769,8 @@ for (const [late, masked] of [
     await asRole(page, 'observer');
     await page.waitForTimeout(800);
     await expectOneToast(page);
+    // Slice 010d, Ziel 4 (nit of round 4): the one toast is the 500, not the masked 404.
+    await expect(toasts(page)).toContainText('Testfehler');
   });
 }
 

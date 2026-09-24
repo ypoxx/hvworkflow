@@ -10,6 +10,7 @@ import {
   createDetailProblemGate,
   isCurrentLoad,
   isReadForbidden,
+  keyBelongsTo,
   loadKey,
   NO_VERDICT,
   readVerdict,
@@ -137,6 +138,19 @@ describe('createDetailProblemGate', () => {
     both.gate.settleMain('6', false, onlyMasked);
     expect(both.shown).toEqual([]);
   });
+
+  it('every failure of a pass counts, list first: 404 dropped, 500 shown, a further failure not (010d, Ziel 4)', () => {
+    const onlyMasked = (id: string, error: unknown) =>
+      id === 'q1' && (error as { status?: number }).status === 404;
+    const { shown, gate } = setup();
+    gate.settleMain('7', false, onlyMasked);
+    gate.report('7', 'q1', { status: 404 });
+    expect(shown).toEqual([]);
+    gate.report('7', 'q1', { status: 500 });
+    expect(shown).toEqual([{ status: 500 }]);
+    gate.report('7', 'q1', { status: 503 });
+    expect(shown).toEqual([{ status: 500 }]);
+  });
 });
 
 /**
@@ -251,5 +265,35 @@ describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
     expect(readVerdict(refused, [], 'u-exp-fin')).toBe(refused);
     expect(readVerdict(refused, [], 'u-podium')).toEqual({ actor: 'u-podium', forbidden: false });
     expect(readVerdict(NO_VERDICT, [], 'u-exp-fin')).toEqual({ actor: 'u-exp-fin', forbidden: false });
+  });
+});
+
+/**
+ * Slice 010d — whose data a view may offer. The same table stands in every feature that keeps a
+ * copy (`speakers/useSpeakers.test.ts`, `capture/useCapture.test.ts`, `answers/lib.test.ts`,
+ * `history/lib.test.ts`), so a copy that drifts fails.
+ */
+describe('keyBelongsTo (slice 010d)', () => {
+  it('a load of the same actor belongs to it, at any version and scope', () => {
+    expect(keyBelongsTo(loadKey('u-exp-fin', 7), 'u-exp-fin')).toBe(true);
+    expect(keyBelongsTo(loadKey('u-exp-fin', '3:q-1'), 'u-exp-fin')).toBe(true);
+  });
+
+  it('a load of another actor does not, whatever the version', () => {
+    expect(keyBelongsTo(loadKey('u-podium', 7), 'u-exp-fin')).toBe(false);
+  });
+
+  it('an actor id that is a prefix of another does not collide', () => {
+    expect(keyBelongsTo(loadKey('u-a', 1), 'u-ab')).toBe(false);
+    expect(keyBelongsTo(loadKey('u-ab', 1), 'u-a')).toBe(false);
+  });
+
+  it('an actor id with quotes or separators is compared whole', () => {
+    expect(keyBelongsTo(loadKey('a","b', 1), 'a')).toBe(false);
+    expect(keyBelongsTo(loadKey('a","b', 1), 'a","b')).toBe(true);
+  });
+
+  it('no load yet (null) belongs to nobody', () => {
+    expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
   });
 });
