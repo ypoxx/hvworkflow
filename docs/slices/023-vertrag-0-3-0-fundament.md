@@ -97,6 +97,17 @@ Eine serielle, rein additive Vertragsänderung auf 0.3.0. Kern, Dienst, Web und 
   Punkt 18 (043), kein Inhalt aus `docs/legal-trace.md` im Vertrag (nur der Verweis).
 - Keine Glossar-, Rechtekonzept- oder DSFA-Änderung (Nachführung durch den Orchestrator).
 
+**Nachtrag des Architekten (24.09.2026, nach Codex auf `2779e0b`, P1 fehlende 422):** Ziel 5 wird um einen
+Antwort-Abgleich erweitert: `apps/api/src/__tests__/contract.test.ts` darf eine Prüfung enthalten, die für **jede**
+Operation die Status verlangt, die die generische Schicht des Dienstes aus Vertragseigenschaften erzeugen kann (422 bei
+einschränkbarem Parameter oder Anfragekörper, 401 bei nicht leerer Security, 404 bei Pfad-ID, 412 bei If-Match). Einzige
+begründete Ausnahmeliste bleibt `UNDOCUMENTED_STATUS_EXCEPTIONS` in `helpers.ts`. Umfang: alle neuen 0.3.0-Operationen
+bekommen ihre 401/422 jetzt; die Bestandsoperationen aus 0.2 bekommen die neu gefundenen 422 jetzt (additiv, wie 404/409
+in früheren Runden). Die fünf Lücken aus Review 012 Punkt 18 (401 an den 0.2-Operationen; 422 an `listQuestions`,
+`returnQuestion`, `withdrawQuestion`) bleiben Ausnahmen mit Verweis auf 043 — der Nicht-Ziel-Punkt gilt weiter.
+`login`: `returnTo` behält `maxLength` (Schutz vor überlangen Werten); die Beschreibung sagt künftig „zu lang → 422,
+fremdes Ziel → ignoriert".
+
 ## Files allowed
 
 - `packages/contract/openapi.yaml`, `packages/contract/src/types.ts` (nur generiert)
