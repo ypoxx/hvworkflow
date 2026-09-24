@@ -258,16 +258,26 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     omits: (id: string, error: unknown) => boolean;
   } | null = null;
   let pass = 0;
-  let pending: { load: string; pass: number; id: string; error: unknown } | null = null;
+  // Slice 010c, review round 3 (R3-1): every failure of the pass is kept, not only the first one.
+  // Since `omits` looks at the failure itself, their order must not decide the outcome — a masked
+  // 404 of one detail read that arrives first must not hide a 5xx of the other.
+  let pending: {
+    load: string;
+    pass: number;
+    failures: { id: string; error: unknown }[];
+  } | null = null;
   let shown: string | null = null;
   const flush = (): void => {
     if (pending === null || verdict === null || pending.load !== verdict.load) return;
-    const { load, id, error } = pending;
+    const { load, failures } = pending;
     const key = `${load}:${pending.pass}`;
     pending = null;
-    if (verdict.refused || verdict.omits(id, error) || key === shown) return;
+    if (verdict.refused || key === shown) return;
+    const omits = verdict.omits;
+    const first = failures.find(({ id, error }) => !omits(id, error));
+    if (first === undefined) return;
     shown = key;
-    show(error);
+    show(first.error);
   };
   return {
     select() {
@@ -280,8 +290,11 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     },
     report(load, id, error) {
       const key = `${load}:${pass}`;
-      if (key === shown || (pending !== null && `${pending.load}:${pending.pass}` === key)) return;
-      pending = { load, pass, id, error };
+      if (key === shown) return;
+      if (pending === null || `${pending.load}:${pending.pass}` !== key) {
+        pending = { load, pass, failures: [] };
+      }
+      pending.failures.push({ id, error });
       flush();
     },
   };

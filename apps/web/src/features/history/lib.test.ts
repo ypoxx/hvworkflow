@@ -117,6 +117,26 @@ describe('createDetailProblemGate', () => {
     gate.report('5', 'q1', { status: 500 });
     expect(shown).toEqual([{ status: 500 }]);
   });
+
+  it('every failure of a pass counts: 404 then 500, list last and without the selection → 500 (R3-1)', () => {
+    const onlyMasked = (id: string, error: unknown) =>
+      id === 'q1' && (error as { status?: number }).status === 404;
+    const first = setup();
+    first.gate.report('6', 'q1', { status: 404 });
+    first.gate.report('6', 'q1', { status: 500 });
+    first.gate.settleMain('6', false, onlyMasked);
+    expect(first.shown).toEqual([{ status: 500 }]);
+    const mirror = setup();
+    mirror.gate.report('6', 'q1', { status: 500 });
+    mirror.gate.report('6', 'q1', { status: 404 });
+    mirror.gate.settleMain('6', false, onlyMasked);
+    expect(mirror.shown).toEqual([{ status: 500 }]);
+    const both = setup();
+    both.gate.report('6', 'q1', { status: 404 });
+    both.gate.report('6', 'q1', { status: 404 });
+    both.gate.settleMain('6', false, onlyMasked);
+    expect(both.shown).toEqual([]);
+  });
 });
 
 /**
