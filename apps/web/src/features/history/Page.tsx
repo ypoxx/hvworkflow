@@ -35,9 +35,10 @@ import {
   isReadForbidden,
   loadCurve,
   loadKey,
+  NO_VERDICT,
   readVerdict,
 } from './lib';
-import type { KeyedRead } from './lib';
+import type { KeyedRead, ReadVerdict } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -120,33 +121,43 @@ export function HistoryPage() {
   // selected question for the Vorgangshistorie), and each "keine Leseberechtigung" is the verdict of
   // the current key (`readVerdict`, lib.ts). They used to be bare flags that only a successful read
   // cleared — after a switch from a refused role, a 500 on the new role's first read left the
-  // refusal standing (Ziel 2).
+  // refusal standing (Ziel 2). A refusal belongs to the actor: a plain failure of the same actor's
+  // next load keeps it (review round 1, finding 4).
   const actorId = useActor().id;
   const mainKey = loadKey(actorId, version);
   const timelineKey = loadKey(actorId, `${version}:${selectedId ?? ''}`);
   const [corpusRead, setCorpusRead] = useState<KeyedRead | null>(null);
   const [resultsRead, setResultsRead] = useState<KeyedRead | null>(null);
-  const [shownMainForbidden, setShownMainForbidden] = useState(false);
-  const mainForbidden = readVerdict(shownMainForbidden, [
-    { read: corpusRead, key: mainKey },
-    { read: resultsRead, key: mainKey },
-  ]);
-  if (mainForbidden !== shownMainForbidden) setShownMainForbidden(mainForbidden);
+  const [shownMainVerdict, setShownMainVerdict] = useState<ReadVerdict>(NO_VERDICT);
+  const mainVerdict = readVerdict(
+    shownMainVerdict,
+    [
+      { read: corpusRead, key: mainKey },
+      { read: resultsRead, key: mainKey },
+    ],
+    actorId,
+  );
+  if (mainVerdict !== shownMainVerdict) setShownMainVerdict(mainVerdict);
+  const mainForbidden = mainVerdict.forbidden;
   // Codex P2-A on 948a721: whether `corpus` is the whole of what this actor may read (nothing cut
   // off by the limit) — only then does "not in the corpus" mean "not readable".
   const [corpusComplete, setCorpusComplete] = useState(false);
   // Ziel 3: the "Vorgangshistorie" tab of one selected question (`getQuestionHistory`).
   const [timelineRead, setTimelineRead] = useState<KeyedRead | null>(null);
-  const [shownHistoryForbidden, setShownHistoryForbidden] = useState(false);
-  const historyForbidden = readVerdict(shownHistoryForbidden, [
-    { read: timelineRead, key: timelineKey },
-  ]);
-  if (historyForbidden !== shownHistoryForbidden) setShownHistoryForbidden(historyForbidden);
+  const [shownTimelineVerdict, setShownTimelineVerdict] = useState<ReadVerdict>(NO_VERDICT);
+  const timelineVerdict = readVerdict(
+    shownTimelineVerdict,
+    [{ read: timelineRead, key: timelineKey }],
+    actorId,
+  );
+  if (timelineVerdict !== shownTimelineVerdict) setShownTimelineVerdict(timelineVerdict);
+  const historyForbidden = timelineVerdict.forbidden;
   // Ziel 3: the "Ereignisstrom" tab (`listEvents`).
   const [streamRead, setStreamRead] = useState<KeyedRead | null>(null);
-  const [shownStreamForbidden, setShownStreamForbidden] = useState(false);
-  const streamForbidden = readVerdict(shownStreamForbidden, [{ read: streamRead, key: mainKey }]);
-  if (streamForbidden !== shownStreamForbidden) setShownStreamForbidden(streamForbidden);
+  const [shownStreamVerdict, setShownStreamVerdict] = useState<ReadVerdict>(NO_VERDICT);
+  const streamVerdict = readVerdict(shownStreamVerdict, [{ read: streamRead, key: mainKey }], actorId);
+  if (streamVerdict !== shownStreamVerdict) setShownStreamVerdict(streamVerdict);
+  const streamForbidden = streamVerdict.forbidden;
 
   /**
    * Codex P2-2 on 4f0d231 (the same class as Codex (b) on 7f542b6 in the Beantwortung, see
@@ -324,7 +335,8 @@ export function HistoryPage() {
           return;
         }
         setHistory([]);
-        // Slice 010c, Ziel 2: the failure is this load's answer and replaces an earlier refusal.
+        // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
+        // another actor (`readVerdict`).
         setTimelineRead({ key: requested, status: 'error' });
         gate.report(load, selectedId, error);
       });
@@ -371,7 +383,8 @@ export function HistoryPage() {
           setStreamLastSeq(0);
           return;
         }
-        // Slice 010c, Ziel 2: the failure is this load's answer and replaces an earlier refusal.
+        // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
+        // another actor (`readVerdict`).
         setStreamRead({ key: requested, status: 'error' });
         problem(error);
       });

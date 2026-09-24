@@ -13,10 +13,11 @@ import {
   isReadForbidden,
   listOmits,
   loadKey,
+  NO_VERDICT,
   readVerdict,
-  settledFor,
   wordDiff,
 } from './lib';
+import type { KeyedRead } from './lib';
 
 describe('wordDiff', () => {
   it('identical texts yield only equal parts', () => {
@@ -141,8 +142,9 @@ describe('createDetailProblemGate', () => {
  * feature that keeps a copy (`speakers/useSpeakers.test.ts`, `capture/useCapture.test.ts`,
  * `answers/lib.test.ts`, `stage/lib.test.ts`, `history/lib.test.ts`), so a copy that drifts fails.
  */
-describe('loadKey, isCurrentLoad, settledFor, readVerdict (slice 010c)', () => {
+describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
   const now = loadKey('u-exp-fin', 7);
+  const one = (read: KeyedRead | null) => [{ read, key: now }];
 
   it('the same actor at the same version is the same load', () => {
     expect(loadKey('u-exp-fin', 7)).toBe(now);
@@ -166,38 +168,80 @@ describe('loadKey, isCurrentLoad, settledFor, readVerdict (slice 010c)', () => {
     expect(loadKey('a', '1:2')).not.toBe(loadKey('a:1', 2));
   });
 
-  it('settledFor: only an answer of this very key has settled', () => {
-    expect(settledFor(null, now)).toBe(false);
-    expect(settledFor({ key: loadKey('u-podium', 6), status: 'forbidden' }, now)).toBe(false);
-    expect(settledFor({ key: now, status: 'error' }, now)).toBe(true);
+  it('readVerdict: a failure of the current load lifts a refusal given to another actor', () => {
+    const podium = { actor: 'u-podium', forbidden: true };
+    expect(readVerdict(podium, one({ key: now, status: 'error' }), 'u-exp-fin')).toEqual({
+      actor: 'u-exp-fin',
+      forbidden: false,
+    });
   });
 
-  it('readVerdict: a failure of the current load lifts a refusal of an earlier one', () => {
-    expect(readVerdict(true, [{ read: { key: now, status: 'error' }, key: now }])).toBe(false);
+  it('readVerdict: a plain failure of the same actor keeps its refusal (finding 4)', () => {
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, one({ key: now, status: 'error' }), 'u-exp-fin')).toBe(refused);
   });
 
   it('readVerdict: a refusal of the current load sets it, a ready answer lifts it', () => {
-    expect(readVerdict(false, [{ read: { key: now, status: 'forbidden' }, key: now }])).toBe(true);
-    expect(readVerdict(true, [{ read: { key: now, status: 'ready' }, key: now }])).toBe(false);
+    expect(readVerdict(NO_VERDICT, one({ key: now, status: 'forbidden' }), 'u-exp-fin')).toEqual({
+      actor: 'u-exp-fin',
+      forbidden: true,
+    });
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, one({ key: now, status: 'ready' }), 'u-exp-fin').forbidden).toBe(
+      false,
+    );
   });
 
   it('readVerdict: while the current load is on its way the previous verdict stands (no flicker)', () => {
     const earlier = { key: loadKey('u-obs', 6), status: 'forbidden' as const };
-    expect(readVerdict(true, [{ read: earlier, key: now }])).toBe(true);
-    expect(readVerdict(false, [{ read: earlier, key: now }])).toBe(false);
-    expect(readVerdict(true, [{ read: null, key: now }])).toBe(true);
+    const observer = { actor: 'u-obs', forbidden: true };
+    expect(readVerdict(observer, one(earlier), 'u-exp-fin')).toBe(observer);
+    expect(readVerdict(NO_VERDICT, one(earlier), 'u-exp-fin')).toBe(NO_VERDICT);
+    expect(readVerdict(observer, one(null), 'u-exp-fin')).toBe(observer);
   });
 
-  it('readVerdict: with several reads it waits for all of them, then any refusal counts', () => {
+  it('readVerdict: an unchanged verdict is the same object (safe to store during render)', () => {
+    const ready = { actor: 'u-exp-fin', forbidden: false };
+    expect(readVerdict(ready, one({ key: now, status: 'ready' }), 'u-exp-fin')).toBe(ready);
+    expect(readVerdict(ready, one({ key: now, status: 'error' }), 'u-exp-fin')).toBe(ready);
+  });
+
+  it('readVerdict: with several reads it waits for all, then any refusal counts', () => {
     const other = loadKey('u-exp-fin', '7:q');
     const ready = { key: now, status: 'ready' as const };
-    expect(readVerdict(true, [{ read: ready, key: now }, { read: null, key: other }])).toBe(true);
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    expect(readVerdict(refused, [{ read: ready, key: now }, { read: null, key: other }], 'u-exp-fin')).toBe(
+      refused,
+    );
     expect(
-      readVerdict(false, [
-        { read: ready, key: now },
-        { read: { key: other, status: 'forbidden' }, key: other },
-      ]),
+      readVerdict(
+        NO_VERDICT,
+        [
+          { read: ready, key: now },
+          { read: { key: other, status: 'forbidden' }, key: other },
+        ],
+        'u-exp-fin',
+      ).forbidden,
     ).toBe(true);
+  });
+
+  it('readVerdict: the same actor keeps its refusal only if every read failed', () => {
+    const other = loadKey('u-exp-fin', '7:q');
+    const refused = { actor: 'u-exp-fin', forbidden: true };
+    const failed = { key: now, status: 'error' as const };
+    expect(
+      readVerdict(refused, [{ read: failed, key: now }, { read: { key: other, status: 'error' }, key: other }], 'u-exp-fin'),
+    ).toBe(refused);
+    expect(
+      readVerdict(
+        refused,
+        [
+          { read: failed, key: now },
+          { read: { key: other, status: 'ready' }, key: other },
+        ],
+        'u-exp-fin',
+      ).forbidden,
+    ).toBe(false);
   });
 });
 

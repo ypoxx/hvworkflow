@@ -8,13 +8,15 @@ import { Eye, Lock } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { api } from '../../api';
+import { useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import { EmptyState, PageHeader, Panel, SplitPane, showProblem } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
-import { useAsync, useHoveredQuestion } from './useCapture';
+import { NO_VERDICT, readVerdict, useAsync, useHoveredQuestion } from './useCapture';
+import type { ReadVerdict } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
@@ -108,10 +110,24 @@ export function CapturePage() {
    * from `cp:…:false` in the render where the key has just become `cp:…:true`) — that stale status
    * lifted the refusal for one render on every version jump with latency.
    */
-  const verdict = contributionsProbe.status === 'forbidden' || contributions.status === 'forbidden';
+  //
+  // Slice 010c: the verdict comes from `readVerdict` (useCapture.ts), fed with the one read that
+  // actually asked — the probe or the per-speaker load; the other answers "ready" without asking. A
+  // refusal belongs to the actor: a plain failure of the same actor's next read keeps it (review
+  // round 1, finding 4).
+  const actorId = useActor().id;
+  const asked = needsProbe ? contributionsProbe : speakerId !== null ? contributions : null;
   const settled = speakers.settled && contributionsProbe.settled && contributions.settled;
-  const [forbidden, setForbidden] = useState(false);
-  if (settled && forbidden !== verdict) setForbidden(verdict);
+  const [shownVerdict, setShownVerdict] = useState<ReadVerdict>(NO_VERDICT);
+  const verdict = settled
+    ? readVerdict(
+        shownVerdict,
+        asked === null ? [] : [{ read: asked.read, key: asked.key }],
+        actorId,
+      )
+    : shownVerdict;
+  if (verdict !== shownVerdict) setShownVerdict(verdict);
+  const forbidden = verdict.forbidden;
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
   // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
   const contribution =

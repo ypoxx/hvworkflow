@@ -28,7 +28,15 @@ import {
 } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { Podium, StageQueue } from './Podium';
-import { isCurrentLoad, isInteractiveTarget, isReadForbidden, loadKey } from './lib';
+import {
+  NO_VERDICT,
+  isCurrentLoad,
+  isInteractiveTarget,
+  isReadForbidden,
+  loadKey,
+  readVerdict,
+} from './lib';
+import type { KeyedRead, ReadVerdict } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -176,7 +184,12 @@ export function StagePage() {
   const [loading, setLoading] = useState(true);
   // Ziel 1 (slice 010b): `getStage` is the Hauptabfrage of the Bühne — set from the 403's ruleId
   // alone (AGENTS.md rule 4), e.g. expert, who holds `question.read` but no `stage.read`.
-  const [forbidden, setForbidden] = useState(false);
+  // Slice 010c: the answer carries the key of its load, and the refusal is the verdict of the
+  // current key (`readVerdict`, lib.ts). A refusal belongs to the actor: a plain failure of the
+  // same actor's next load keeps it (review round 1, finding 4 — it used to give way to "Die Bühne
+  // ist frei"); an actor change resets it below.
+  const [stageRead, setStageRead] = useState<KeyedRead | null>(null);
+  const [shownVerdict, setShownVerdict] = useState<ReadVerdict>(NO_VERDICT);
   const [busy, setBusy] = useState(false);
   /**
    * takt-008: the question being read out, as it was read. "Vorgelesen, weiter" keeps focus while
@@ -238,8 +251,15 @@ export function StagePage() {
     setLayoutActorId(actorId);
     setLoading(true);
     setStage(null);
-    setForbidden(false);
+    setShownVerdict({ actor: actorId, forbidden: false });
   }
+  const verdict = readVerdict(
+    shownVerdict,
+    [{ read: stageRead, key: loadKey(actorId, `${version}:${nonce}`) }],
+    actorId,
+  );
+  if (verdict !== shownVerdict) setShownVerdict(verdict);
+  const forbidden = verdict.forbidden;
 
   useEffect(() => {
     let cancelled = false;
@@ -265,7 +285,7 @@ export function StagePage() {
         if (stale()) return;
         setStage(next);
         setLoading(false);
-        setForbidden(false);
+        setStageRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
         if (stale()) return;
@@ -276,16 +296,16 @@ export function StagePage() {
           // `version`) must not go on reading out or returning a previous role's stale question
           // with Space/R (the keyboard handler below reads `stageRef.current`, which this clears).
           setStage(null);
-          setForbidden(true);
+          setStageRead({ key: requested, status: 'forbidden' });
           return;
         }
         // Minor A (review round 4): the podium goes on showing the last record it had, so the
         // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
         // next event. The server still decides every write (a stale record meets its 412/403).
         stageRef.current = shownRef.current;
-        // Slice 010c: a failure is this load's answer and replaces a refusal of an earlier load of
-        // the same actor (an actor switch resets it anyway, minor B above).
-        setForbidden(false);
+        // Slice 010c: a failure is this load's answer too; a refusal of the same actor stands
+        // (`readVerdict`), one of another actor was already reset with the actor change above.
+        setStageRead({ key: requested, status: 'error' });
         // takt-008: the record the lock waits for will not come — the podium acts on what it shows.
         // Slice 010c, Ziel 6 (N2): only if the write has answered; a write still on its way keeps
         // its lock, or a second press would send a second "Vorgelesen".
