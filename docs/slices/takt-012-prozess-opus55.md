@@ -100,6 +100,10 @@ Umfang 9 Dateien in der Liste, Modellangaben gültig (`opus`, `sonnet`).
 „anderes Modell“, Risikoklassen-Spalte, „Design-Kritik (Fable)“) — eigene Folge-Scheibe, inhaltlich am dringendsten;
 B `docs/produktplan-beta.md` Zeile 7 (Besetzung im Präsens), 343, 440 („Review Fable“ für den Sicherheits-Lesebefund);
 C `docs/bauplan-demo.md` Vermerk „ersetzt durch takt-012“; D `docs/messung.md` Modellzuordnung künftiger Zeilen.
+E `docs/adr/0016-agenten-arbeitsmodell.md:28-30, 77` verlangt „ein anderes Modell“ und verwirft ausdrücklich „dasselbe
+Modell reviewt“ — braucht eine Ergänzung oder ein Folge-ADR, das diesen Punkt ersetzt (mit A zusammen, dringend);
+F `docs/betrieb/branch-schutz.md:27-28` wiederholt „ein anderes Modell reviewt“ (Codex auf `de5890e`, P2). Bis dahin gilt:
+AGENTS.md Regel 3 und Plan R3 in der Fassung dieser Scheibe gehen vor.
 
 **Runde 2 — Nachprüfung Opus 5.5 auf `a02f56b`:** annehmen. Alle 12 Befunde erledigt, eigener `pnpm gates`-Lauf auf
 `a02f56b` Exit 0. Nits 1–3 (Satzbau Mechaniker, Großschreibung nach Semikolon, „lokalen Lauf“ in Ziel 4) im
