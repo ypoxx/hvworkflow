@@ -91,8 +91,11 @@ const OTHER_RULES: readonly RuleEntry[] = [
     ruleId: 'R-PERM-01',
     kind: 'Recht',
     description:
-      'A role without the write permission an action needs: deny (403), "Schreibrecht fehlt" ' +
-      '(hasPermission, permissions.ts).',
+      'A role without the write permission an action needs: deny with this rule id, "Schreibrecht ' +
+      'fehlt" (can(), permissions.ts). The domain API answers 403 with this rule id, except for a ' +
+      'single question the actor may neither read nor act on: that answers the same 404 as an ' +
+      'unknown id (Festlegung 3 of slice 010, no derivable ids), and the rule id does not reach the ' +
+      'response.',
     legalRef: {
       source: 'Rechtekonzept',
       citation:
@@ -111,7 +114,9 @@ const OTHER_RULES: readonly RuleEntry[] = [
     kind: 'Recht',
     description:
       'A role without a read permission listed in READ_PERMISSIONS for the method it calls: deny ' +
-      '(403), "Leserecht fehlt" (hasPermission, permissions.ts).',
+      'with this rule id, "Leserecht fehlt" (can(), permissions.ts). The domain API answers 403 with ' +
+      'this rule id, except where the actor may not read the single question concerned: that answers ' +
+      'the same 404 as an unknown id (Festlegung 3 of slice 010).',
     legalRef: {
       source: 'Rechtekonzept',
       citation:
@@ -128,7 +133,9 @@ const OTHER_RULES: readonly RuleEntry[] = [
     kind: 'Recht',
     description:
       'A read permission scoped to specific statuses (READ_SCOPES) does not cover the question\'s ' +
-      'current status: deny (403), "Leseumfang" (can(), api.ts).',
+      'current status: deny with this rule id, "Leseumfang" (can(), api.ts). A status filter outside ' +
+      'the scope answers 403 with this rule id; a single question outside the scope answers the same ' +
+      '404 as an unknown id (Festlegung 3 of slice 010).',
     legalRef: {
       source: 'Rechtekonzept',
       citation:

@@ -462,9 +462,10 @@ abgewichen):
 
 **Offen (weitergetragen, damit die offengelegten Lücken nicht nur Tabellenzellen bleiben):**
 
-1. Vier-Augen „Ersteller ≠ Freigeber“ (Rechtekonzept §4, nicht konfigurierbar) und Pflichtfeld Freigabevermerk —
-   im Plan als R-GUARD-06 in Scheibe 021 (B6); bis dahin hält `legal` `answer.draft` und `question.approve`.
-   Punkt für den Eigentümer.
+1. Vier-Augen „Ersteller ≠ Freigeber“ (Rechtekonzept §4, nicht konfigurierbar) — im Plan als R-GUARD-06 in
+   Scheibe 021 (B6); bis dahin hält `legal` `answer.draft` und `question.approve`. Punkt für den Eigentümer.
+1a. Pflichtfeld Freigabevermerk bei der Freigabe (Rechtekonzept:109) — keine Scheibe benannt (der „Freigabevermerk
+   mit Datum“ in 076 ist der Vermerk von Recht zur Vorabprüfung, nicht dieses Feld); zur Einordnung.
 2. Antwortprüfung „Antwort ausreichend?“ vor dem Abschluss (ist:58-59) — keine Scheibe benannt; zur Einordnung durch
    den Architekten.
 3. Merge reversibel mit Ähnlichkeitsscore (Recherche:147) — keine Scheibe benannt; zur Einordnung.
@@ -499,3 +500,9 @@ Guard-Tests keine Tautologien, Wahrheitstabelle unverändert, kein `node:` in de
 
 Die Nacharbeitsrunde des Bauers war verbraucht → Spec nachgeschärft (Festlegung 5), Behebung durch den Orchestrator,
 siehe Bericht Abschnitt 8; Nachprüfung der Behebung durch Opus (Legal).
+
+**Runde 3 · letzte Nachprüfung Opus 5.5 (Legal) · Urteil: annehmen** (0/0/1 + 1 nit): Freigabevermerk fälschlich
+021 zugeordnet → als eigener offener Punkt 1a; „reviewed“ in der Beschreibung von R-TRANS-12 → „before legal
+clearing“. Dazu Codex auf PR #24 (1 × P2): R-PERM-01 versprach immer 403, obwohl die API bei einer Frage, die der
+Akteur weder lesen noch bearbeiten darf, dasselbe 404 wie für eine unbekannte ID antwortet → R-PERM-01, -02 und -03
+beschreiben jetzt die Entscheidung und die 404-Maskierung (Festlegung 3 von 010). Behoben vom Orchestrator.

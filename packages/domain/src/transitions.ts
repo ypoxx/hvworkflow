@@ -330,7 +330,7 @@ export const TRANSITIONS: readonly Transition[] = [
     from: ['captured', 'classified', 'assigned', 'answer_drafted'],
     to: 'merged',
     guards: [notMergingIntoSelf],
-    description: 'Merge a duplicate (Zusammenführen) into another question before an answer is reviewed.',
+    description: 'Merge a duplicate (Zusammenführen) into another question while it is in capture or answering, before legal clearing.',
     legalRef: {
       source: 'Recherche',
       citation:
