@@ -157,4 +157,19 @@ test('takt-010 goal 2 red/green: a completed "takt-905b" is checked against takt
   const r = run([{ content: 'takt-905b fertig', status: 'completed' }]);
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /names slice takt-905b/);
+  // Nit 5 (Nacharbeit): name the resolved spec path itself, not just the number in the message — a
+  // wrong match on plain "905" (whose own spec happens to be accepted) would otherwise still print
+  // "names slice takt-905b" (the number extracted from the text is unaffected by which spec file was
+  // actually read) while silently checking the wrong file's acceptance status.
+  assert.match(r.stderr, /takt-905b-kleinaenderung-offen\.md/);
+});
+
+// Minor 4 (Nacharbeit): the reverse direction was untested — a plain "905" must not borrow the
+// acceptance of its lettered sibling "905b" (905b-regulaer-angenommen.md is accepted; 905 itself,
+// 905-regulaer-offen.md, is not).
+test('takt-010 rework minor 4: a completed plain "905" is blocked on its own spec, even though its lettered sibling 905b is accepted', () => {
+  const r = run([{ content: 'finish slice 905', status: 'completed' }]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /names slice 905\b/);
+  assert.match(r.stderr, /905-regulaer-offen\.md/);
 });

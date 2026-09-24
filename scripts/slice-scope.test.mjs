@@ -357,3 +357,101 @@ test('takt-010 goal 3 regression: 020-style bare filenames that are not real roo
   ]);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+// ---- takt-010 rework: blocker (same root cause as Codex's P2 on PR #27) and major findings ----------
+//
+// Both scenarios below need a real git branch (not `--diff`) — the whole bug was that root-file
+// existence was decided from the *checked-out working tree*, which is exactly the tree the diff under
+// review itself produces. They reuse the "m4: a warning …" test's origin/fetch setup so `git merge-base`
+// resolves for real.
+function setUpMergeBaseRepo(dir, specText, baseFiles) {
+  mkdirSync(join(dir, 'docs', 'slices'), { recursive: true });
+  writeFileSync(join(dir, 'docs', 'slices', '016-x.md'), specText);
+  for (const [relPath, content] of Object.entries(baseFiles)) {
+    mkdirSync(join(dir, ...relPath.split('/').slice(0, -1)), { recursive: true });
+    writeFileSync(join(dir, relPath), content);
+  }
+  spawnSync('git', ['init', '-q'], { cwd: dir });
+  spawnSync('git', ['checkout', '-q', '-b', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+  spawnSync('git', ['add', '-A'], { cwd: dir });
+  spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'base'], { cwd: dir });
+  spawnSync('git', ['remote', 'add', 'origin', dir], { cwd: dir });
+  spawnSync('git', ['fetch', '-q', 'origin', 'claude/dax-shareholder-meeting-workflow-0s934z'], { cwd: dir });
+  spawnSync('git', ['checkout', '-q', '-b', 'claude/slice-016-agenten'], { cwd: dir });
+}
+
+function runOnSlice016(dir) {
+  return spawnSync('node', [SCRIPT, '--root', dir, '--slice', '016'], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_HEAD_REF: '', CI: '' },
+  });
+}
+
+// 020-style spec used by both blocker scenarios: the bare `003-y.spec.ts` after the full path
+// `apps/web/e2e/002-x.spec.ts` (in the same bullet) is meant to carry that directory.
+const SHORTHAND_SPEC =
+  '# 016 — X\n\n## Files allowed\n\n- Alt-Specs `apps/web/e2e/002-x.spec.ts`, `003-y.spec.ts`\n- `docs/slices/016-x.md`\n';
+
+test('takt-010 rework blocker (and Codex P2): a root file created by the slice itself must not count as a root file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    setUpMergeBaseRepo(dir, SHORTHAND_SPEC, { 'apps/web/e2e/002-x.spec.ts': '// existing\n' });
+    // On the slice branch only: commit a root-level file sharing the bare name from its own spec — not
+    // the carried-directory file the spec's shorthand actually means. At the merge-base this file does
+    // not exist at the root at all.
+    writeFileSync(join(dir, '003-y.spec.ts'), '// not the real target — added on the slice branch only\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'add root file'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /003-y\.spec\.ts/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-010 rework blocker (reverse, Codex P2): a root file deleted by the slice must still resolve to root, not fall back to the carried directory', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    // The root file already exists *before* the slice branches off — removing/moving it is exactly the
+    // slice's job, and it is still the file the spec's bare name means (there is no
+    // `apps/web/e2e/003-y.spec.ts` at the merge-base in this scenario, only the root one).
+    setUpMergeBaseRepo(dir, SHORTHAND_SPEC, {
+      'apps/web/e2e/002-x.spec.ts': '// existing\n',
+      '003-y.spec.ts': '// pre-existing root file, to be removed by this slice\n',
+    });
+    spawnSync('git', ['rm', '-q', '003-y.spec.ts'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'remove root file'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('takt-010 rework major: an ambiguous bare name (real at both the root and the carried directory, at the merge-base) fails loudly instead of silently preferring root', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slice-scope-test-'));
+  try {
+    setUpMergeBaseRepo(
+      dir,
+      '# 016 — X\n\n## Files allowed\n\n- `apps/web/src/x.ts`, `package.json` (dependency for the web app)\n- `docs/slices/016-x.md`\n',
+      {
+        'apps/web/src/x.ts': '// existing\n',
+        'package.json': '{}\n', // root manifest
+        'apps/web/src/package.json': '{}\n', // also real, in the carried directory
+      },
+    );
+    writeFileSync(join(dir, 'package.json'), '{"x":1}\n');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '-m', 'edit root package.json'], { cwd: dir });
+
+    const r = runOnSlice016(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /ambiguous/);
+    assert.match(r.stderr, /package\.json/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
