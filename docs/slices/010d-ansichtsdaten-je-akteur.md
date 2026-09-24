@@ -49,7 +49,7 @@ Keine Änderung an Kern, Vertrag, Dienst, Rechten; kein neues Token; kein gemein
 - `apps/web/src/features/{speakers,capture,answers,history}/**`
 - `apps/web/src/i18n/{answers,speakers,capture,history}.{de,en}.ts` und `apps/web/src/i18n/parity.test.ts` (nur falls
   Ziel 2 neue Schlüssel braucht; nur die Schlüsselzahl im Paritätstest)
-- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (neu), `apps/web/e2e/010c-lesezustand.spec.ts` (nur Ziel 4)
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (neu), `apps/web/e2e/010c-lesezustand.spec.ts` (nur Ziele 4 und 5; Nachtrag des Architekten 24.09., Ziel 5 verweist auf diese Datei)
 - `docs/evidence/010d-*.png`
 - `docs/slices/010d-ansichtsdaten-je-akteur.md`
 
