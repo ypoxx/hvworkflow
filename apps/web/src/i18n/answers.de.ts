@@ -40,6 +40,7 @@ export const answersDe = {
   'answers.detail.actions': 'Schritte zu dieser Einzelfrage',
   'answers.detail.loading': 'Einzelfrage wird geladen …',
   'answers.status.label': 'Stand',
+  'answers.approval.group': 'Stand und Freigabe',
   'answers.approval.sealed': 'Freigegeben · Version {version} · {actor} · {time}',
   'answers.approval.lapsed': 'Freigabe der Version {previous} erloschen durch Version {current}',
   'answers.versions.title': 'Antwortversionen',

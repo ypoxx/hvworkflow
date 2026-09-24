@@ -7,7 +7,7 @@
  * on refusal — a 412 means somebody else wrote first, and the record, not the interface, says what
  * is true afterwards.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
 import type { Permission, WriteOptions } from '@hv/domain';
@@ -32,18 +32,46 @@ import type { Filters } from './useBacklog';
 
 type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | null;
 
+/** The question a write was made against, as it was read (takt-008). */
+interface WriteLock {
+  id: string;
+  version: number;
+}
+
 export function AnswersPage() {
   const t = useT();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
-  const [busy, setBusy] = useState(false);
+  /**
+   * takt-008: one write at a time, and the lock holds until the record on screen has caught up —
+   * not merely until the write has answered. Buttons locked with `aria-disabled` keep focus, so a
+   * second press can arrive while the detail still shows the version the first write was made
+   * against; sent on, it would only meet its own 412 and a "Stand veraltet" notice (review round 1,
+   * finding 3). Released when the question on screen is a different version or a different
+   * question (or none), and at once when the write is refused.
+   */
+  const [lock, setLock] = useState<WriteLock | null>(null);
+  // The same lock for a second activation in the same task, before React has rendered `lock`.
+  const writing = useRef<WriteLock | null>(null);
+  const busy = lock !== null;
   const [draftResetToken, setDraftResetToken] = useState(0);
   // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
   const [stale, setStale] = useState(false);
 
   const backlog = useBacklog(filters, selectedId);
   const { reload, selected: question } = backlog;
+
+  // Adjusted during render: the render that shows the new version is the one that unlocks.
+  if (
+    lock !== null &&
+    (question === null || question.id !== lock.id || question.version !== lock.version)
+  ) {
+    setLock(null);
+  }
+  useEffect(() => {
+    if (lock === null) writing.current = null;
+  }, [lock]);
 
   // A fresh look at a (possibly different) question starts without yesterday's notice.
   useEffect(() => {
@@ -56,8 +84,10 @@ export function AnswersPage() {
    */
   const run = useCallback(
     async (permission: Permission, write: (options: WriteOptions) => Promise<unknown>) => {
-      if (question === null) return false;
-      setBusy(true);
+      if (question === null || writing.current !== null) return false;
+      const taken = { id: question.id, version: question.version };
+      writing.current = taken;
+      setLock(taken);
       try {
         await write({ ifMatch: etagOf(question.version) });
         showToast({
@@ -72,10 +102,11 @@ export function AnswersPage() {
         // every other refusal (403/409 among them).
         if (problemStatus(error) === 412) setStale(true);
         else showProblem(error, t('toast.problem'));
+        // Refused: nothing changed on the record, so nothing to wait for — unlock at once.
+        writing.current = null;
+        setLock(null);
         reload();
         return false;
-      } finally {
-        setBusy(false);
       }
     },
     [question, reload, t],

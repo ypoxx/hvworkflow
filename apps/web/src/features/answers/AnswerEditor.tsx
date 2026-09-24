@@ -84,11 +84,14 @@ export function AnswerEditor({
             {t('answers.editor.discard')}
           </Button>
         )}
+        {/* takt-008: `aria-disabled`, not `disabled` — a saved version empties the editor, and a
+         *  natively disabled button would drop the focus it holds to `<body>`. Locked like this it
+         *  keeps focus, looks disabled (Button.tsx) and ignores a second Enter. */}
         <Button
           size="sm"
           variant={primary ? 'primary' : 'secondary'}
           data-testid="answer-submit-draft"
-          disabled={busy || empty}
+          aria-disabled={busy || empty}
           onClick={onSave}
         >
           {t('answers.editor.save')}

@@ -8,7 +8,7 @@
  * pixels high, which is right for a dense console and far too small for the person reading out.
  */
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CornerUpLeft, Presentation, Undo2 } from 'lucide-react';
 import type { Question, StageView } from '@hv/domain';
 import {
@@ -51,15 +51,25 @@ function PodiumButton({
     <button
       type="button"
       data-testid={testId}
-      disabled={disabled}
-      onClick={onClick}
+      // The stage's key handler (Page.tsx) lets R through from these buttons, and only from these.
+      data-podium-key=""
+      // takt-008: `aria-disabled`, not `disabled` — "Vorgelesen, weiter" is pressed from the
+      // keyboard and, once written, stands for the next question; a natively disabled button would
+      // drop its focus to `<body>` for the length of every write. Locked like this it keeps focus,
+      // looks locked through the neutral tokens (not opacity, which would fade its focus ring too,
+      // see components/Button.tsx) and ignores activations until the write is done.
+      aria-disabled={disabled}
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
       // The secondary button's text is `--color-stage-text` rather than `text-ink-800`: the same
       // near-black in the ordinary view, but still legible once Kontrastmodus turns the ground black.
-      style={variant === 'secondary' ? { color: 'var(--color-stage-text)' } : undefined}
+      style={variant === 'secondary' && !disabled ? { color: 'var(--color-stage-text)' } : undefined}
       className={cx(
         'inline-flex h-16 min-w-64 flex-1 items-center justify-center gap-3 rounded-lg border',
         'px-6 text-[18px] font-semibold transition-colors duration-100',
-        'disabled:pointer-events-none disabled:opacity-45',
+        'aria-disabled:pointer-events-none aria-disabled:border-line aria-disabled:bg-ink-50',
+        'aria-disabled:text-ink-400',
         variant === 'primary'
           ? 'border-accent-600 bg-accent-600 text-white hover:border-accent-700 hover:bg-accent-700'
           : 'border-line-strong bg-surface hover:border-ink-300 hover:bg-ink-50',
@@ -69,7 +79,7 @@ function PodiumButton({
       <span
         className={cx(
           'text-2xs font-medium',
-          variant === 'primary' ? 'text-accent-100' : 'text-ink-500',
+          disabled ? 'text-ink-400' : variant === 'primary' ? 'text-accent-100' : 'text-ink-500',
         )}
       >
         {hint}
@@ -160,10 +170,40 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
 export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
   const t = useT();
   const current = stage.current;
+  const mayDeliver = current?._actions.includes('question.deliver') ?? false;
+  // takt-008: when the question just read out was the last one (or the next may not be read out
+  // by this person), "Vorgelesen, weiter" leaves with it and its focus falls to `<body>`. It is
+  // moved to the podium itself, which then says what is (or is not) on stage.
+  //
+  // Review round 1, finding 4: the marker is settled when the write is — `busy` falls only once the
+  // podium shows the next question (or the write was refused, Page.tsx) — and cleared on every
+  // change of the current question, so it can never outlive the press that set it.
+  const podium = useRef<HTMLDivElement>(null);
+  const nextPressed = useRef(false);
+  const currentId = current?.id;
+  useEffect(() => {
+    if (busy) return;
+    const pressed = nextPressed.current;
+    nextPressed.current = false;
+    if (!pressed || mayDeliver) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body) podium.current?.focus();
+  }, [busy, mayDeliver, currentId]);
+  const next = (): void => {
+    nextPressed.current = true;
+    onNext();
+  };
 
   if (current === null) {
     return (
-      <div data-testid="stage-current" className="flex min-h-0 flex-1 items-center justify-center">
+      <div
+        ref={podium}
+        data-testid="stage-current"
+        tabIndex={-1}
+        role="group"
+        aria-label={t('stage.current.group')}
+        className="flex min-h-0 flex-1 items-center justify-center"
+      >
         <EmptyState
           icon={Presentation}
           title={t('stage.current.empty.title')}
@@ -176,11 +216,17 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
 
   const answer = approvedAnswer(current);
   const approval = current.approval;
-  const mayDeliver = current._actions.includes('question.deliver');
   const mayReturn = current._actions.includes('question.return');
 
   return (
-    <div data-testid="stage-current" className="flex min-h-0 flex-1 flex-col gap-6">
+    <div
+      ref={podium}
+      data-testid="stage-current"
+      tabIndex={-1}
+      role="group"
+      aria-label={t('stage.current.group')}
+      className="flex min-h-0 flex-1 flex-col gap-6"
+    >
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-wrap items-center gap-3">
           <span className="hv-label">{t('stage.current.label')}</span>
@@ -245,7 +291,7 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
             variant="primary"
             testId="stage-next"
             disabled={busy}
-            onClick={onNext}
+            onClick={next}
             hint={<Kbd>{t('stage.key.next')}</Kbd>}
           >
             {t('action.question.deliver')}

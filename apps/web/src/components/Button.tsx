@@ -1,8 +1,16 @@
 /**
  * The only button of the product. Four intents and two densities, so that a screen never invents its
  * own affordance and the primary action stays unique on a page.
+ *
+ * Two ways to lock a button (takt-008): `disabled` takes it out of the tab order, which also blurs
+ * it to `<body>` if it held focus the moment the lock set in. A button that is locked *because it
+ * was just pressed* (a write in flight, a field it just emptied) is locked with `aria-disabled`
+ * instead: it keeps focus, swallows clicks here (so no caller has to remember to guard its own
+ * handler against a second activation) and looks locked through the neutral ink/line tokens rather
+ * than through opacity — opacity would fade the focus ring it keeps along with it (45% leaves the
+ * accent ring at ~1.9:1, under the 3:1 a focus indicator needs; the colours keep it at ~4.9:1).
  */
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react';
 import { cx } from './cx';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -39,14 +47,20 @@ export function Button({
   className,
   type = 'button',
   children,
+  onClick,
   ...rest
 }: ButtonProps) {
+  const inert = rest['aria-disabled'] === true || rest['aria-disabled'] === 'true';
   return (
     <button
       type={type}
+      // `preventDefault` also stops a `type="submit"` button from submitting its form.
+      onClick={inert ? (event: MouseEvent<HTMLButtonElement>) => event.preventDefault() : onClick}
       className={cx(
         'inline-flex shrink-0 items-center justify-center rounded-md border font-medium',
         'transition-colors duration-100 disabled:pointer-events-none disabled:opacity-45',
+        'aria-disabled:pointer-events-none aria-disabled:border-line aria-disabled:bg-ink-50',
+        'aria-disabled:text-ink-400',
         VARIANT[variant],
         SIZE[size],
         iconOnly && ICON_ONLY[size],

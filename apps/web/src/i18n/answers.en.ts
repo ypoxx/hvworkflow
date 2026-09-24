@@ -42,6 +42,7 @@ export const answersEn: typeof answersDe = {
   'answers.detail.actions': 'Steps for this question',
   'answers.detail.loading': 'Loading the question …',
   'answers.status.label': 'Status',
+  'answers.approval.group': 'Status and approval',
   'answers.approval.sealed': 'Approved · version {version} · {actor} · {time}',
   'answers.approval.lapsed': 'Approval of version {previous} voided by version {current}',
   'answers.versions.title': 'Answer versions',
