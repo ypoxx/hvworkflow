@@ -697,6 +697,182 @@ gates exit=0
 5. `beae5bb fix(contract): 0.3.0 ohne Live-Erweiterung bestehender Anfragen — MeetingContributionCapture, X-CSRF-Token, ReadinessCheckCode, 404/409 am Alias (Scheibe 023, Nacharbeit) [skip netlify]`
 6. Bericht (diese Datei): `docs: Bericht Scheibe 023 — Nacharbeit nach Review und Codex (Scheibe 023) [skip netlify]`
 
+### Invarianten-Durchgang nach Codex (Runde 5)
+
+(Opus 5.5, 24.09.2026, Übernahme eines abgebrochenen Laufs: der vorige Bauer hinterließ uncommittete Änderungen an
+`openapi.yaml`, `CHANGELOG.md`, `types.ts`; geprüft, übernommen, an drei Stellen korrigiert — siehe „Korrekturen am
+übernommenen Stand".) Version bleibt 0.3.0; keine Anfrage einer bestehenden Operation geändert; Antworten bestehender
+Operationen nur dort enger, wo der heutige Dienst schon passt (Live-Probe und die ganze API-Suite unten). Dateien:
+nur `openapi.yaml`, `types.ts` (generiert), `CHANGELOG.md`, diese Datei.
+
+**Die vier P1 aus Runde 5**
+
+1. *Klarname im Ereignisakteur.* Probe des heutigen Dienstes (`createApp({ demoEnabled: true })`, Seed 20 Fragen):
+   `293 events, 293 with actor.displayName, 0 with schemaVersion` — jedes Ereignis trägt ihn (die Demo-Akteure aus
+   `seed.ts`). Ein Verbot jetzt bräche `listEvents`/`getQuestionHistory`. Deshalb: neues Schema `EventActor` für
+   `Event.actor` (`Actor` bleibt für Projektionen), `displayName` `deprecated: true`, „entfällt mit Scheibe 024". Das ist
+   durchgesetzt, nicht nur angekündigt: `Event.dependentSchemas.schemaVersion` verbietet `actor.displayName`
+   (`properties: { displayName: false }`) auf jedem Umschlag-v2-Ereignis — also verschwindet er mit 024 vom Draht,
+   aus dem Schema mit 0.5 (ADR 0015). CHANGELOG: Added und Deprecated.
+2. *Sitzung ohne Token.* `Session` = `oneOf` `DemoSession` | `SignedInSession`, `discriminator` auf `scheme`
+   (`demoActor` | `session`, je `const` und Pflicht, damit genau ein Zweig passt). `SignedInSession` verlangt
+   `subjectId`, `roles` (≥ 1), `expiresAt`, `csrfToken` (`minLength: 1`). `DemoSession` verbietet `csrfToken` und
+   `expiresAt` (`false`), `roles` genau ein Eintrag. `getSession` ist nicht montiert (029), keine heutige Antwort
+   betroffen. Nicht Schema: dass die Variante zum tatsächlich benutzten Sicherheitsschema passt (Grund unten).
+3. *`/readyz` ohne Pflichtprüfungen.* Planreihenfolge geprüft: 027 (19.10., „/readyz prüft ab hier DB und
+   Migrationsstand") vor 033 (26.10.). `Readiness.checks` hat jetzt `properties` `clock`, `db`, `migrations`, alle
+   `required`, `additionalProperties: false` (ersetzt `propertyNames`, gleiche Wirkung, und der Typ wird
+   `{ clock; db; migrations }` statt Index-Signatur). `ReadinessCheck`: `ok` ohne `code`, `fail` mit `code`. Die 200
+   bindet jede Prüfung an `ok`, die 503 mindestens eine an `fail`. Für den JSONL-Entwicklungsadapter, den 027 behält,
+   steht in `Readiness.description`, was `db`/`migrations` melden (sonst wäre jeder Dev-Dienst dauerhaft 503).
+4. *Zeitpaar am Umschlag.* `Event.dependentRequired`: `occurredAt` ↔ `occurredAtSource`, dazu `hash` ↔ `prevHash`
+   (das erste Ereignis trägt `prevHash: ""`, laut Beschreibung — die Paarung hält also auch für `seq` 1) und
+   `schemaVersion` → `prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`.
+
+**Korrekturen am übernommenen Stand**
+
+- `schemaVersion` → `meetingId` gestrichen: 024 schreibt den v2-Umschlag, `meetingId` kommt erst mit 025 in den Kern
+  (Plan 5.4: „meetingId überall im Kern" steht bei 025). Die Abhängigkeit hätte 024 gezwungen, gegen den Vertrag zu
+  verstoßen. `meetingId` wird mit 0.3.1 (028) ohnehin Pflicht.
+- `EventActor.displayName` war nur als „ab 024 nicht mehr gesendet" beschrieben → jetzt per `dependentSchemas`
+  erzwungen (siehe 1).
+- `not: { required: [x] }` (13 neue Lint-Warnungen `no-required-schema-properties-undefined`) → `x: false`: gleiche
+  Wirkung in Ajv, 0 neue Warnungen, und openapi-typescript erzeugt `x?: never`.
+- `DemoSession` hätte `subjectId` verbieten sollen — verworfen, denn `RoleAssignment.subjectId` ist ausdrücklich auch
+  „the demo actor id".
+- Veralteter Verweis `Session.csrfToken` in `CsrfToken` → `SignedInSession.csrfToken`.
+
+**Durchgang über jedes in 0.3.0 neue oder geänderte Schema und jede Operation** — Klassen: (a) Paarfelder,
+(b) Pflicht je Modus/Variante, (c) Wert muss zu HTTP-Status oder anderem Feld passen, (d) Personendaten gegen ADR
+0009/0011, (e) in Prosa versprochene Abdeckung.
+
+| Stelle | Klasse | Ergebnis |
+|---|---|---|
+| `Event` Umschlag | a, b | P1 4 oben; `meetingId` bewusst nicht an `schemaVersion` |
+| `Event.actor` / `EventActor` | d | P1 1 oben |
+| `Event.payload` außerhalb `pii` | d | Prosa: `SpeakerRegistered.displayName` (Pseudonym) ist 0.2-Nutzlast, ein Verbot bräche heutige Antworten; 026 hat den Test „kein displayName in Ereignis-Payloads" |
+| `Event.personId`, `Actor.personId`, `Speaker.personId`, `Claim.personId`, `StageSeat.personId` | d | Schlüssel, kein Name — unverändert |
+| `AgendaItemEventPayload` | e | `number` Pflicht (`minimum: 1`): das Feld existiert für Leser ohne Stammdaten, optional hilft es genau denen nicht |
+| `RoleAssignmentEventPayload` | b, e | geteilt in `RoleAssignedPayload` und `RoleRevokedPayload`, je mit `false` für die Felder des anderen Typs; `deputyForSubjectId` ergänzt, weil `RoleAssignment` es aus dem Ereignis projiziert, das Ereignis es aber nicht trug |
+| `RoleRevokedPayload.reason`, `revokeRole`-Body `reason` | d | Prosa: Freitext kann nicht auf Personendaten geprüft werden; Beschreibung verlangt es |
+| `Contribution` | a | `occurredAt` ↔ `occurredAtSource` (wie `MeetingContributionCapture`) |
+| `MeetingContributionCapture` | a, b | Paar bestand schon; `source: paper` verlangt *nicht* `occurredAt` (Pflicht nur für die Nacherfassung nach Schluss, zustandsabhängig, R-MTG-03 in 025) |
+| `Meeting` | a | `configFrozenAt` ↔ `configHash` |
+| `AgendaItem` | a | `votingOpenedAt` → `openedAt` (so sagt es `openVoting`: „409 when the item is not open"), `votingClosedAt` → `votingOpenedAt`; die Reihenfolge der Zeitpunkte bleibt Prosa |
+| `RoleAssignment` | a | `revokedAt` ↔ `revokedBy` |
+| `Question.stageAssignment` / `seatId` | c | `if` beide vorhanden `then` gleicher Wert (vier `const`-Paare); ein anderer Platz trägt nur `seatId`; heute setzt der Dienst `seatId` nie |
+| `Claim` | c | Prosa: `expiresAt` nach `claimedAt` |
+| `Session` / `DemoSession` / `SignedInSession` | b, c | P1 2 oben; `DemoSession.roles` = `[actor.role]` bleibt Prosa |
+| `Readiness` / `ReadinessCheck` / `/readyz` 200, 503 | b, c, d, e | P1 3 oben; Codes statt Freitext bestanden schon |
+| `Problem` in allen geteilten Fehlerantworten (401, 403, 404, 409, 412, 422, 503) und `completeLogin` 400 | c | `status` per `const` an den HTTP-Status gebunden. Der Dienst baut den HTTP-Status aus `problem.status` (`apps/api/src/problem.ts`), also passt jede heutige Antwort; Live-Probe 403/404/409/422 unten |
+| `ServiceUnavailable`, `completeLogin` 400/403, `getTransparencyNotice` 404 (ohne Anmeldung) | d | Prosa: `detail` ein fester Satz, nie Host, Treiber- oder IdP-Fehlertext, nie Subjekt oder E-Mail; ein Schema kann Freitext nicht prüfen |
+| `TransparencyNotice` | e | `version`, `text.de`, `text.en` `minLength: 1` (Regel 10: zwei Sprachen, nie leer) |
+| `login`, `completeLogin` 302 | e | `Location` `required: true` |
+| `ETag` an `createMeeting`, `getMeetingById`, `replaceMeetingAgendaItems`/`Units`/`StageSeats`, `freezeMeetingConfig`, `AgendaItemUpdated`, `ContributionUpdated` | e | neuer Header `ETagRequired` (`required: true`), weil die Beschreibungen ein ETag versprechen und der nächste Schreibaufruf es als `If-Match` braucht; die 0.2-Antworten behalten das optionale `ETag` |
+| `X-Server-Time` | e | bleibt optional: heute nicht gesendet, an bestehenden Antworten wäre Pflicht eine Verengung, die der Dienst nicht erfüllt (033) |
+| `X-CSRF-Token` | b | bleibt optional: OpenAPI kann einen Header nicht für ein einziges Sicherheitsschema zur Pflicht machen; `CsrfToken.description` sagt es |
+| `MeetingCreate`, `AgendaItemInput`, `UnitInput`, `StageSeatInput`, `RoleAssignmentCreate` | a–e | nichts zu binden; Eindeutigkeit von `number`/`id` in einer Liste ist mit `uniqueItems` nicht nach Schlüssel ausdrückbar → Prosa, 422 in 040 |
+| `StageSeat`, `ConfigFreeze`, `PiiEnvelope`, `Health`, `MeetingFormat`, `OccurredAtSource`, `RetentionClass`, `ReadinessCheckCode` | a–e | geprüft, nichts offen (`ConfigFreeze` verlangt beide Freeze-Felder schon) |
+| `ConfigFrozen`-, Claim-, Release-Nutzlasten | e | bewusst offen (028/040 legen die Form fest, „Offen" oben); Folge: `Meeting.configHash` hat noch kein gebundenes Quellfeld im Ereignis |
+| `streamEvents`, `getMetrics`, `logout`, `listMeetings`, Tagesordnungs-Operationen, Alias- und kanonische Pfade | c, e | Status und Medientypen bereits in Runde 3/4 gebunden; nichts Neues |
+
+**Bewusst Prosa, mit Grund:** JSON Schema vergleicht keine zwei Werte (`at` = `recordedAt`; `occurredAt` = `recordedAt`
+bei Quelle `server`; `Claim.expiresAt` > `claimedAt`; Reihenfolge der Tagesordnungszeitpunkte; `DemoSession.roles` =
+`[actor.role]`; `RoleAssignment.meetingId` = Pfad-`meetingId`), prüft keinen Freitext (`reason`, `detail`) und bindet
+keinen Header an ein einzelnes Sicherheitsschema (`X-CSRF-Token`). `legalHold` = `false` in der Beta ist ein
+Beta-Zustand, kein Invariant (ein späteres Ereignis setzt den Hold) — ein `const: false` müsste später zurückgenommen
+werden.
+
+**Nachweis mit den Validatoren des Dienstes** (Wegwerf-Test `apps/api/src/__tests__/zz-invariants-023.test.ts` mit
+`expectValid` aus `apps/api/src/contractSchema.ts`, 46 Fälle („accepts" oder „rejects") plus zwei Dokumentprüfungen für
+`Location`/`ETag`; ein „rejects" zählt nur bei „does not match its contract schema", nicht bei einem
+Auflösungsfehler; danach gelöscht, nicht committet. Keine Anfrageschemata geändert, daher kein `requestBodyValidator`-Fall.)
+
+Rot — derselbe Test gegen `openapi.yaml` von HEAD 0634a99:
+
+```
+     × rejects: event v2 with actor.displayName
+     × rejects: event occurredAt without occurredAtSource
+     × rejects: event occurredAtSource without occurredAt
+     × rejects: event hash without prevHash
+     × rejects: event schemaVersion without hash
+     × rejects: event schemaVersion without legalHold
+     × rejects: AgendaItemOpened without number
+     × rejects: RoleAssigned with reason
+     × rejects: RoleRevoked with unitId
+     × rejects: session variant without csrfToken
+     × rejects: session variant without expiresAt
+     × rejects: session variant with empty roles
+     × rejects: bare {actor} (0.3.0 before round 5)
+     × rejects: demo variant with csrfToken
+     × rejects: demo variant with expiresAt
+     × rejects: 200 with only clock
+     × rejects: 200 with empty checks
+     × rejects: 200 ready but a check fails
+     × rejects: 503 not_ready but every check ok
+     × rejects: fail without code
+     × rejects: ok with code
+     × rejects: contribution occurredAt without source
+     × rejects: meeting configHash without configFrozenAt
+     × rejects: agenda item votingClosedAt without votingOpenedAt
+     × rejects: agenda item votingOpenedAt without openedAt
+     × rejects: role assignment revokedAt without revokedBy
+     × rejects: question stageAssignment ceo, seatId cfo
+     × rejects: transparency notice with empty German text
+     × rejects: 403 body with status 404
+     × rejects: 503 body with status 500
+     × rejects: 400 body with status 422
+     × Location is required on both 302
+     × ETag is required on the new writes that promise it
+      Tests  33 failed | 15 passed (48)
+```
+
+(„unknown check name" war schon an HEAD rot, durch `propertyNames` aus Runde 2.) Grün gegen den neuen Vertrag:
+`Tests  48 passed (48)` — darunter die Gegenproben „event 0.2 shape with actor.displayName (today)", „event v2 without
+meetingId (024 before 025)", „RoleRevoked with reason", „demo variant", „question custom seat only", „503 with db
+unreachable", „403 body with status 403".
+
+Live-Probe des unveränderten Dienstes gegen den neuen Vertrag (`createApp({ demoEnabled: true })` per tsx,
+`expectValid` je Antwort; wörtlich):
+
+```
+POST /v1/demo/seed -> 200 application/json: valid against 0.3.0 (round 5)
+GET /v1/events?limit=5000 -> 200 application/json: valid against 0.3.0 (round 5)
+  293 events, 293 with actor.displayName, 0 with schemaVersion
+GET /v1/questions?limit=2000 -> 200 application/json: valid against 0.3.0 (round 5)
+GET /v1/questions/fr-0006q/history -> 200 application/json: valid against 0.3.0 (round 5)
+GET /v1/meeting -> 200 application/json: valid against 0.3.0 (round 5)
+POST /v1/speakers -> 403 application/problem+json: valid against 0.3.0 (round 5)
+POST /v1/contributions -> 404 application/problem+json: valid against 0.3.0 (round 5)
+POST /v1/questions/fr-0006q/delivery -> 409 application/problem+json: valid against 0.3.0 (round 5)
+PATCH /v1/speakers/sp-00004 -> 422 application/problem+json: valid against 0.3.0 (round 5)
+```
+
+`contract:lint`: 0 Fehler, dieselben 6 Warnungen wie vorher. `pnpm contract:types` zweimal: SHA-256 `844b82c77560…`
+beide Male (Zwischenstand nach Commit 1: `b8c56cd7eac5…`, ebenfalls stabil). Typen-Diff: `EventActor`;
+`Session` = `DemoSession | SignedInSession` (`csrfToken?: never` / `csrfToken: string`); `Readiness.checks` =
+`{ clock; db; migrations }` aus `ReadinessCheck` (`{ status: "ok"; code?: never } | { status: "fail"; code }`);
+`RoleAssignedPayload`/`RoleRevokedPayload` statt `RoleAssignmentEventPayload`; `AgendaItemEventPayload.number`
+Pflicht; Problemantworten `Problem & { status?: 4xx }`; `Location` und `ETagRequired` ohne `?`. Typecheck aller
+Pakete grün, API-Suite 49/49, Tor 29 ausgeübt / 36 deklariert.
+
+**Offen (mit Grund)**
+
+- *Folge für 024 (an den Orchestrator):* sobald der Kern v2 schreibt, fehlt `actor.displayName`. Heute lesen ihn
+  `apps/web/src/features/history/Timeline.tsx` (Rückfall auf `actor.id`) und die Projektion `approvedBy: e.actor`
+  (`packages/domain/src/state.ts`). 024 (Lanes core, web-api) muss Namen beim Lesen auflösen, z. B. aus dem
+  Akteursverzeichnis des Seeds, bis 026 die Personentabelle bringt. Gehört in die Spec von 024.
+- *Pflicht-Antwortheader werden nicht geprüft:* `helpers.ts` validiert Körper, keine Header; `ETagRequired` und
+  `Location` sind bis dahin Dokument. Eine Header-Prüfung gehört nicht zum Tor aus Ziel 5 und wäre eine eigene
+  Kleinänderung (oder Teil von 025/029/040).
+- `Meeting.configHash` hat erst mit der Nutzlast von `ConfigFrozen` (040) eine gebundene Quelle.
+
+**Commits** (nicht gepusht)
+
+7. `67a0003 fix(contract): Ereignisakteur ohne Klarnamen ab Umschlag v2, Umschlagpaare, Sitzungsvarianten, drei Pflichtprüfungen an /readyz (Scheibe 023) [skip netlify]`
+8. `a53a2fd fix(contract): Invarianten-Durchgang über alle neuen Schemata — Rollenereignisse je Typ, Problem-Status an HTTP-Status, ETag und Location Pflicht (Scheibe 023) [skip netlify]`
+9. Bericht (diese Datei): `docs: Bericht Scheibe 023 — Invarianten-Durchgang nach Codex Runde 5 (Scheibe 023) [skip netlify]`
+
 ## Review findings
 
 **Spec-Prüfung · Fable 5.1 · 23.09.2026 · zweimal** (2 major, 4 minor; Nachprüfung 1 major, 2 minor) → vor dem Bau
@@ -751,3 +927,8 @@ kein 403 → `Forbidden` ergänzt; eine Skriptprüfung über alle 34 Operationen
 403. `/readyz` erlaubte 200 mit `not_ready` und 503 mit `ready` → die Schemata sind an den HTTP-Status gebunden
 (`allOf` mit `const`). Probe mit dem Vertragsvalidator des Dienstes (Wegwerf-Test, danach gelöscht): vorher
 „1 failed“, nachher „1 passed“.
+
+**Codex auf PR #25, fünfter Lauf (4 × P1), vom Bauer (Opus 5.5) behoben:** `Event.actor` erlaubte einen Klarnamen,
+`/auth/me` war ohne `csrfToken` gültig, `/readyz` verlangte keine Prüfung, `Event.occurredAt` ohne
+`occurredAtSource` war gültig → Invarianten-Durchgang über jedes neue Schema, Bericht unter „Invarianten-Durchgang nach
+Codex (Runde 5)" (rot 33 / grün 48 mit den Validatoren des Dienstes).
