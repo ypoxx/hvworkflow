@@ -535,22 +535,28 @@ test('013h: Fokus nach Aktion bleibt sichtbar am Bedienelement, nie auf BODY (ta
   // D8: the `aria-disabled` state is visibly locked, not only an attribute for assistive
   // technology — the neutral `ink-50` ground of Button.tsx — and not by opacity, which would fade
   // the focus ring the button keeps along with it.
-  const look = await page.getByTestId('answer-submit-draft').evaluate((el) => {
+  const locked = await page.evaluate(() => {
     const probe = document.createElement('span');
     probe.style.backgroundColor = 'var(--color-ink-50)';
     document.body.append(probe);
-    const locked = getComputedStyle(probe).backgroundColor;
+    const value = getComputedStyle(probe).backgroundColor;
     probe.remove();
-    const style = getComputedStyle(el);
-    return { background: style.backgroundColor, locked, opacity: style.opacity };
+    return value;
   });
-  expect(look.background).toBe(look.locked);
-  expect(look.opacity).toBe('1');
+  // Slice 010c (CI finding on 62f347b): Button.tsx fades its colours (`transition-colors
+  // duration-100`), so the ground runs from the primary accent-600 into ink-50 once the lock sets
+  // in. A single read can land inside that fade — CI read rgb(230, 233, 242), 92 % of the way from
+  // accent-600 rgb(29, 78, 216) to ink-50 rgb(247, 246, 244) on all three channels. The end state is
+  // polled, and it must be exactly the locked token; the opacity is read once it is reached.
+  const draftButton = page.getByTestId('answer-submit-draft');
+  await expect
+    .poll(() => draftButton.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe(locked);
+  expect(await draftButton.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
   await checkAxe(page, 'answers (Entwurf gespeichert, Knopf aria-disabled)');
   await waitForToastsGone(page);
   // Evidence: the focused, `aria-disabled` button — ring and disabled look together (scrolling
   // does not move focus).
-  const draftButton = page.getByTestId('answer-submit-draft');
   await draftButton.scrollIntoViewIfNeeded();
   await page.evaluate(() => document.fonts.ready);
   await draftButton

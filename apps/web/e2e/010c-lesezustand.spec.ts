@@ -37,6 +37,10 @@ interface Harness {
   __calls: Record<string, unknown[]>;
   __held: Record<string, Held[]>;
   __original: Wrapped;
+  /** The app's own module instances, resolved once by `installHarness` (CI finding on 62f347b). */
+  __modules: Record<string, unknown>;
+  /** Outcomes of the writes `unrelatedEvent` started, by number. */
+  __writes: string[];
 }
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -53,6 +57,8 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
     .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+  // The only dynamic `import()` of the file, once per page and while it is idle (see installHarness).
+  await installHarness(page);
 }
 
 /** Two settled repaints (see `expectNoErrorToast` in 010b-lesepfade.spec.ts for why two). */
@@ -91,19 +97,40 @@ async function tabTo(page: Page, testId: string, maxSteps = 60): Promise<void> {
   throw new Error(`Tab did not reach ${testId}`);
 }
 
-/** Installs the harness once per page: call log, held calls, and the unpatched methods. */
+/**
+ * Installs the harness once per page: call log, held calls, the unpatched methods — and the app's
+ * two module instances the helpers work on (`__modules`).
+ *
+ * CI finding on 62f347b ("Resulting promise was garbage collected" in `unrelatedEvent`): every
+ * helper used to `await import(...)` the app's modules inside its `page.evaluate`, a few hundred
+ * times per run. That error means the promise the evaluate awaited was still pending and no longer
+ * reachable from anything that could settle it; the only awaited promises of `unrelatedEvent` that
+ * were not already settled were its two dynamic imports (the write itself settles in the same task:
+ * the in-process `registerSpeaker` appends synchronously). The helpers now resolve the modules once
+ * here, at an idle moment right after the corpus is loaded, and every later evaluate is
+ * import-free; `unrelatedEvent` awaits nothing in the page at all.
+ */
 async function installHarness(page: Page): Promise<void> {
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
-    const w = window as unknown as Harness;
-    if (w.__original !== undefined) return;
-    w.__calls = {};
-    w.__held = {};
-    w.__original = {};
-    for (const name of Object.keys(api)) {
-      if (typeof api[name] === 'function') w.__original[name] = api[name]!.bind(api);
-    }
-  }, API_MODULE);
+  await page.evaluate(
+    async ([apiUrl, actorUrl]) => {
+      const w = window as unknown as Harness;
+      if (w.__original !== undefined) return;
+      const [apiModule, actorModule] = await Promise.all([
+        import(/* @vite-ignore */ apiUrl!),
+        import(/* @vite-ignore */ actorUrl!),
+      ]);
+      const { api } = apiModule as { api: Wrapped };
+      w.__modules = { [apiUrl!]: apiModule, [actorUrl!]: actorModule };
+      w.__writes = [];
+      w.__calls = {};
+      w.__held = {};
+      w.__original = {};
+      for (const name of Object.keys(api)) {
+        if (typeof api[name] === 'function') w.__original[name] = api[name]!.bind(api);
+      }
+    },
+    [API_MODULE, ACTOR_MODULE],
+  );
 }
 
 /**
@@ -120,7 +147,7 @@ async function failOnce(
   await installHarness(page);
   await page.evaluate(
     async ([url, name, wanted, later]) => {
-      const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
+      const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
       const w = window as unknown as Harness;
       const original = w.__original[name as string]!;
       const calls: unknown[] = [];
@@ -156,7 +183,7 @@ async function holdCalls(page: Page, method: string, answerNow: boolean): Promis
   await installHarness(page);
   await page.evaluate(
     async ([url, name, now]) => {
-      const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
+      const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
       const w = window as unknown as Harness;
       const original = w.__original[name as string]!;
       const held: Held[] = [];
@@ -180,7 +207,7 @@ async function holdCalls(page: Page, method: string, answerNow: boolean): Promis
 async function releaseAll(page: Page, method: string): Promise<void> {
   await page.evaluate(
     async ([url, name]) => {
-      const { api } = (await import(/* @vite-ignore */ url!)) as { api: Wrapped };
+      const { api } = ((window as unknown as Harness).__modules[url!]) as { api: Wrapped };
       const w = window as unknown as Harness;
       api[name!] = w.__original[name!]!;
       for (const call of w.__held[name!]!.splice(0)) {
@@ -229,24 +256,36 @@ async function callCount(page: Page, method: string): Promise<number> {
  * after), only the new event.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
-  await page.evaluate(
-    async ([apiUrl, actorUrl, displayName]) => {
-      const { api } = (await import(/* @vite-ignore */ apiUrl!)) as { api: Wrapped };
-      const mod = (await import(/* @vite-ignore */ actorUrl!)) as {
+  await installHarness(page);
+  // Synchronous on purpose: the evaluate awaits nothing in the page, the outcome is polled below.
+  const index = await page.evaluate(
+    ([actorUrl, displayName]) => {
+      const w = window as unknown as Harness;
+      const mod = w.__modules[actorUrl!] as {
         DEMO_ACTORS: readonly { id: string }[];
         getActor: () => unknown;
         setActor: (actor: unknown) => void;
       };
-      const w = window as unknown as Harness;
-      const register = w.__original?.['registerSpeaker'] ?? api['registerSpeaker']!;
       const before = mod.getActor();
       mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
-      const written = register({ displayName, kind: 'shareholder' });
-      mod.setActor(before);
-      await written;
+      let written: Promise<unknown>;
+      try {
+        written = w.__original['registerSpeaker']!({ displayName, kind: 'shareholder' });
+      } finally {
+        mod.setActor(before);
+      }
+      const at = w.__writes.push('pending') - 1;
+      written.then(
+        () => (w.__writes[at] = 'ok'),
+        (error: unknown) => (w.__writes[at] = `failed: ${String((error as { detail?: string }).detail ?? error)}`),
+      );
+      return at;
     },
-    [API_MODULE, ACTOR_MODULE, name],
+    [ACTOR_MODULE, name],
   );
+  await expect
+    .poll(() => page.evaluate((at) => (window as unknown as Harness).__writes[at], index))
+    .toBe('ok');
 }
 
 /** Every call of `method` answers `ms` later (computed at call time, handed over late). */
@@ -254,7 +293,7 @@ async function delayCalls(page: Page, method: string, ms: number): Promise<void>
   await installHarness(page);
   await page.evaluate(
     async ([url, name, wait]) => {
-      const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
+      const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
       const w = window as unknown as Harness;
       const original = w.__original[name as string]!;
       api[name as string] = (...args: unknown[]) => {
@@ -304,7 +343,7 @@ async function leaveOneOnStage(page: Page): Promise<void> {
 async function switchActor(page: Page, role: string): Promise<void> {
   await page.evaluate(
     async ([url, wanted]) => {
-      const mod = (await import(/* @vite-ignore */ url!)) as {
+      const mod = ((window as unknown as Harness).__modules[url!]) as {
         DEMO_ACTORS: readonly { role: string }[];
         setActor: (actor: unknown) => void;
       };
@@ -400,7 +439,7 @@ test('010c Ziel 2 (dieselbe Klasse): Historie, Hauptabfrage — podium → admin
   // 200). Two failed reads are two toasts — one each, never a refusal.
   await installHarness(page);
   await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
     const original = w.__original['listQuestions']!;
     const failed = new Set<unknown>();
@@ -467,7 +506,7 @@ test('010c Ziel 4: Wortmeldeliste — eine Verweigerung, die noch für die vorig
   // before the `version` bump that would cancel its load. A MutationObserver records whether the
   // refusal shows at any moment after.
   await page.evaluate(async (url) => {
-    const mod = (await import(/* @vite-ignore */ url)) as {
+    const mod = ((window as unknown as Harness).__modules[url]) as {
       DEMO_ACTORS: readonly { role: string }[];
       setActor: (actor: unknown) => void;
     };
@@ -581,7 +620,7 @@ for (const view of SAME_ROLE) {
     await installHarness(page);
     await page.evaluate(
       async ([url, fails]) => {
-        const { api } = (await import(/* @vite-ignore */ url as string)) as { api: Wrapped };
+        const { api } = ((window as unknown as Harness).__modules[url as string]) as { api: Wrapped };
         const w = window as unknown as Harness;
         const pending = [...(fails as [string, Record<string, unknown> | null][])];
         for (const name of new Set(pending.map(([method]) => method))) {
@@ -779,7 +818,7 @@ test('010c Befund 1: Beantwortung — nach dem Wechsel liest die neue Rolle die 
 async function releaseInGap(page: Page, method: string, role: string, testId: string, watch: 'removed' | 'added'): Promise<void> {
   await page.evaluate(
     async ([url, name, wanted, id, mode]) => {
-      const mod = (await import(/* @vite-ignore */ url!)) as {
+      const mod = ((window as unknown as Harness).__modules[url!]) as {
         DEMO_ACTORS: readonly { role: string }[];
         setActor: (actor: unknown) => void;
       };
@@ -885,7 +924,7 @@ test('010c Ziel 6 (N1): Beantwortung — nach einem 412 auf "Freigeben" fällt d
   // Somebody else approves first: the write reaches the record, and this page is told 412.
   await installHarness(page);
   await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
     api['approveQuestion'] = async (...args: unknown[]) => {
       await w.__original['approveQuestion']!(...args);
@@ -916,7 +955,7 @@ test('010c Ziel 6 (N1): Bühne — nach einem 412 auf "Vorgelesen, weiter" fäll
 
   // Somebody else reads the last question out first: the write reaches the record, this page gets 412.
   await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
     api['deliverQuestion'] = async (...args: unknown[]) => {
       await w.__original['deliverQuestion']!(...args);
@@ -1038,7 +1077,7 @@ test('010c Ziel 6 (N3): Bühne — ein Druck ohne Schreiben lenkt den Fokus spä
   // `deliverQuestion` of the page is counted.
   await holdCalls(page, 'getStage', true);
   await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+    const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
     w.__calls['deliverQuestion'] = [];
     api['deliverQuestion'] = (...args: unknown[]) => {
