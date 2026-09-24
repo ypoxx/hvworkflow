@@ -133,8 +133,9 @@ grüner Lauf des Tors, `pnpm gates`-Ende.
 
 ```
 Slice: 023-vertrag-0-3-0-fundament
-Done: Vertrag 0.3.0 rein additiv (29 → 65 Operationen, 26 → 47 Schemata, 25 → 33 Rechtebezeichner, 18 → 28
-      Ereignistypen; kein Feld entfernt, keines Pflicht, alle 29 Bestandsrouten unverändert, alle Bestandstests
+Done: Vertrag 0.3.0 rein additiv (29 → 65 Operationen, 26 → 49 Schemata, 25 → 33 Rechtebezeichner, 18 → 28
+      Ereignistypen; kein Feld entfernt, keines Pflicht, alle 29 Bestandsrouten unverändert und — nach der
+      Nacharbeit, Korrektur der ersten Fassung — auch ihre Anfrageschemata unverändert; alle Bestandstests
       unverändert grün): Jahrgang (/meetings, kanonische Sammlungspfade, Alias veraltet), Umschlag v2 flach auf
       Event, Meeting.format, counts.byUnit/bySeat, Contribution.version, StageSeat/seatId, Claim/Release,
       Tagesordnungsereignisse, Rollenzuordnung, Konfigurationsfreeze, /v1/stream, /healthz, /readyz, /metrics,
@@ -167,6 +168,8 @@ Touched: packages/contract/openapi.yaml, packages/contract/src/types.ts (generie
 Alias der aktuellen HV bis Vertrag 0.5 (Plan 3) und sind ab 0.3.0 `deprecated: true` mit Hinweis auf die kanonische
 Form. `/events` und der neue `/stream` sind **keine** Aliasse und werden nicht dupliziert: `seq` ist global lückenlos
 (ADR 0011), also sind sie globale Ströme mit optionalem `meetingId`-Filter (ADR 0014 „Jahrgangsfilter").
+Nacharbeit: `/stream` trägt den Filter, `/events` bekommt ihn mit 0.4.0 (043), weil der unveränderte Dienst ihn
+heute annähme und still ignorierte (Punkt 1 der Nacharbeit).
 Neue Ressourcen (Bühnenplätze, Rollenzuordnungen, Freeze, Tagesordnungsfortschritt) gibt es nur kanonisch.
 *Gegen die Kriterien:* Doppelung 10 statt 29 Operationen, jede mit `$ref` auf gemeinsame Parameter, Bodies und
 Antworten (`components/parameters`, `SpeakerOrder`, `QuestionList`), also ohne Schema-Doppelung; das Tor aus Ziel 5
@@ -227,19 +230,19 @@ Security-Schemes, `contract:lint` sonst rot). Neue Antwort `Unauthorized` (401) 
 | `meetingId` auf Speaker, Contribution, Question, Ereignissen | `Speaker.meetingId`, `Contribution.meetingId`, `Question.meetingId`, `Event.meetingId` (optional, „Pflicht ab 0.3.1, Scheibe 028") | 025 (Kern), 028 (Pflicht) | — (Felder) |
 | `GET`/`POST /v1/meetings` | `/meetings` → `listMeetings`, `createMeeting`; Schemata `Meeting` (+`format`, `version`, `clonedFromMeetingId`), `MeetingCreate`, `MeetingStatus` | 025 (list), 040 (create/klonen) | listMeetings (025), createMeeting (040) |
 | `/v1/meetings/{id}/…` kanonisch, `/v1/meeting` Alias | `/meetings/{meetingId}` + 9 Sammlungspfade; 10 Alias-Operationen `deprecated: true` (Festlegung a) | 025 | getMeetingById, listMeetingAgendaItems, listMeetingUnits, listMeetingSpeakers, registerMeetingSpeaker, reorderMeetingSpeakers, listMeetingContributions, captureMeetingContribution, listMeetingQuestions, getMeetingStage (alle 025) |
-| Umschlagfelder schemaVersion, idempotencyKey, causationId, prevHash, hash, recordedAt, occurredAt/occurredAtSource, retentionClass, legalHold, personId | `Event.*` flach (Festlegung b); `OccurredAtSource` (`server \| device \| paper \| transcript`), `RetentionClass`; Eingang der Absenderangabe über `ContributionCapture.occurredAt`/`occurredAtSource` (`device \| paper \| transcript`), `Contribution.occurredAt`/`occurredAtSource`; `source` + `paper` | 024 (Kern), 028 (Pflicht) | — (Felder) |
+| Umschlagfelder schemaVersion, idempotencyKey, causationId, prevHash, hash, recordedAt, occurredAt/occurredAtSource, retentionClass, legalHold, personId | `Event.*` flach (Festlegung b); `OccurredAtSource` (`server \| device \| paper \| transcript`), `RetentionClass`; Eingang der Absenderangabe nur über `MeetingContributionCapture.occurredAt`/`occurredAtSource` (`device \| paper \| transcript`, beide oder keines: `dependentRequired`) an `captureMeetingContribution`; `Contribution.occurredAt`/`occurredAtSource` (Antwort); `source` + `paper` auf `Contribution` (Antwort) und `MeetingContributionCapture`; `ContributionCapture` (Alias) unverändert (Nacharbeit, Punkt 1) | 024 (Kern), 028 (Pflicht) | — (Felder) |
 | `Contribution.version` | `Contribution.version` (optional, „Pflicht ab 0.3.1, Scheibe 028"); Antwort `ContributionUpdated` mit ETag | 028 | — |
 | If-Match und neue Pflichtfelder zunächst optional mit Ablauf | `IfMatch` unverändert optional, Beschreibung nennt 0.3.1/028 und die `deliverQuestion`-Ausnahme; jedes künftige Pflichtfeld trägt „Pflicht ab 0.3.1, Scheibe 028" (Liste im CHANGELOG) | 028 | — |
 | `Meeting.format` presence/hybrid/virtual | `MeetingFormat` (Standard `presence`, „auf Standard gebaut", E20), `Meeting.format`, `MeetingCreate.format` | 023 (Feld), 068 (Auswertung) | — |
 | Tagesordnungsereignisse AgendaItemOpened, VotingOpened, VotingClosed | `Event.type` + 3; `AgendaItemEventPayload` gebunden; Operationen `…/agenda-items/{agendaItemId}/opening`, `…/voting/opening`, `…/voting/closure`; `AgendaItem.openedAt/votingOpenedAt/votingClosedAt`; Recht `agenda.manage` | 025 | openAgendaItem, openVoting, closeVoting (025) |
 | `POST` claim/release auf Redebeitrag und Einzelfrage | `/contributions/{id}/claim`, `…/release`, `/questions/{id}/claim`, `…/release`; `Claim` auf beiden; Ereignistypen ContributionClaimed/Released, QuestionClaimed/Released; Rechte `contribution.claim`, `question.claim`; `Contribution._actions` | 028 | claimContribution, releaseContribution, claimQuestion, releaseQuestion (028) |
-| `/healthz`, `/readyz`, `/metrics` | Pfade mit `servers: /`; `Health`, `Readiness` (200/503); `/metrics` text/plain hinter `metricsBearer` | 033 (readyz-DB-Teil 027) | getHealth, getReadiness, getMetrics (033) |
+| `/healthz`, `/readyz`, `/metrics` | Pfade mit `servers: /`; `Health`, `Readiness` (200/503, `ReadinessCheckCode` statt Freitext — Nacharbeit, Punkt 7); `/metrics` text/plain hinter `metricsBearer` | 033 (readyz-DB-Teil 027) | getHealth, getReadiness, getMetrics (033) |
 | `GET /v1/stream` | `/stream` text/event-stream, `after`, `meetingId`, Header `Last-Event-ID` | 035 | streamEvents (035) |
-| Sicherheitsschema `session` (Cookie), `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/me` | `securitySchemes.session`; `/auth/login` (302/503), `/auth/callback` (302/400/403/503), `/auth/logout` (204/401), `/auth/me` (`Session`, 200/401); globales `security` Oder-Liste; `oidc` x-deprecated | 029 | login, completeLogin, logout, getSession (029) |
+| Sicherheitsschema `session` (Cookie), `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/me` | `securitySchemes.session`; `/auth/login` (302/503), `/auth/callback` (302/400/403/503), `/auth/logout` (204/401), `/auth/me` (`Session`, 200/401); Header-Parameter `CsrfToken` (`X-CSRF-Token`) an allen 34 schreibenden Operationen (Nacharbeit, Punkt 9b); globales `security` Oder-Liste; `oidc` x-deprecated | 029 | login, completeLogin, logout, getSession (029) |
 | Admin: Jahrgang anlegen/klonen | `createMeeting` mit `cloneFromMeetingId`; Recht `admin.meetings.manage` | 040 | createMeeting (040) |
 | Admin: Fachbereiche | `PUT /meetings/{id}/units` (`UnitInput`), `GET` kanonisch; Recht `admin.units.manage` | 040 | replaceMeetingUnits (040), listMeetingUnits (025) |
 | Admin: TOPs | `PUT /meetings/{id}/agenda-items` (`AgendaItemInput`); Recht `agenda.manage` | 040 | replaceMeetingAgendaItems (040) |
-| Admin: Bühnenplatzliste je Jahrgang statt Enum, Person und Gerät je Platz | `StageSeat {id, label, personId?, deviceId?, position?}`, `StageSeatInput`; `GET`/`PUT /meetings/{id}/stage-seats`; `Question.seatId`, `Classification.seatId`; `StageAssignment` und beide `stageAssignment`-Felder `deprecated` („veraltet seit 0.3.0, entfällt mit 0.5"); Recht `admin.seats.manage` | 040 (Kern), 056 (Oberfläche) | listMeetingStageSeats, replaceMeetingStageSeats (040) |
+| Admin: Bühnenplatzliste je Jahrgang statt Enum, Person und Gerät je Platz | `StageSeat {id, label, personId?, deviceId?, position?}`, `StageSeatInput`; `GET`/`PUT /meetings/{id}/stage-seats`; `Question.seatId` (Antwort; `Classification.seatId` erst mit 0.4.0/043, weil der unveränderte Dienst es heute still verwürfe — Nacharbeit, Punkt 1); `StageAssignment` und beide `stageAssignment`-Felder `deprecated` („veraltet seit 0.3.0, entfällt mit 0.5"); Recht `admin.seats.manage` | 040 (Kern), 056 (Oberfläche) | listMeetingStageSeats, replaceMeetingStageSeats (040) |
 | Admin: Rollenzuordnung mit optionaler `unitId` als RoleAssigned/RoleRevoked | `/meetings/{id}/role-assignments` (GET, POST), `…/{assignmentId}/revocation`; `RoleAssignment`, `RoleAssignmentCreate` (`unitId?`, `expiresAt?`, `deputyForSubjectId?`); Ereignistypen + `RoleAssignmentEventPayload` gebunden; `Actor.personId`; Recht `admin.roles.manage` | 026 | listRoleAssignments, assignRole, revokeRole (026) |
 | Admin: Konfigurationsfreeze | `POST /meetings/{id}/config-freeze` → `ConfigFreeze`; `Meeting.configFrozenAt/configHash`; Ereignistyp `ConfigFrozen`; R-ADM-01..04 in `Problem.ruleId`; Recht `admin.config.freeze` | 040 | freezeMeetingConfig (040) |
 | Transparenzhinweis-Feld für die Anmeldeseite | `GET /auth/transparency-notice` → `TransparencyNotice` (Festlegung c) | 029 (Text), 030 (Anzeige) | getTransparencyNotice (029) |
@@ -267,12 +270,15 @@ freezeMeetingConfig (6). Summe 36; 29 + 36 = 65 = Zahl im Vertragstor.
 29 → 65; `components.schemas` 26 → 47 (neu: MeetingStatus, MeetingFormat, MeetingCreate, AgendaItemInput, UnitInput,
 StageSeat, StageSeatInput, RoleAssignment, RoleAssignmentCreate, ConfigFreeze, Session, TransparencyNotice, Health,
 Readiness, SpeakerOrder, OccurredAtSource, RetentionClass, Claim, AgendaItemEventPayload, RoleAssignmentEventPayload,
-PiiEnvelope); `components.parameters` 5 → 21, `headers` 1 → 2, `responses` 6 → 11. `Event` erhält 12 optionale
+PiiEnvelope; Nacharbeit: MeetingContributionCapture, ReadinessCheckCode → 49); `components.parameters` 5 → 22
+(Nacharbeit: CsrfToken), `headers` 1 → 2, `responses` 6 → 11. `Event` erhält 12 optionale
 Umschlagfelder und `payload.pii?`, der Typ bleibt eine flache Struktur ohne `& unknown`; `Meeting` erhält
 `format?`, `version?`, `clonedFromMeetingId?`, `configFrozenAt?`, `configHash?`, `counts.byUnit?`, `counts.bySeat?`,
-`status` verweist auf `MeetingStatus` (gleiche Werte); `Question`/`Classification`: `stageAssignment?` mit
-`@deprecated`, neu `seatId?`, `claim?`, `meetingId?`; `Contribution`: `meetingId?`, `version?`, `occurredAt?`,
-`occurredAtSource?`, `claim?`, `_actions?`, `source` + `"paper"`; `Speaker`: `meetingId?`, `personId?`; `Actor.personId?`;
+`status` verweist auf `MeetingStatus` (gleiche Werte); `Question`: `stageAssignment?` mit `@deprecated`, neu
+`seatId?`, `claim?`, `meetingId?`; `Classification`: `stageAssignment?` mit `@deprecated`, kein `seatId` in 0.3.0
+(Nacharbeit, Punkt 1); `Contribution`: `meetingId?`, `version?`, `occurredAt?`, `occurredAtSource?`, `claim?`,
+`_actions?`, `source` + `"paper"` (Antwort); `ContributionCapture` unverändert, neu `MeetingContributionCapture`;
+`Speaker`: `meetingId?`, `personId?`; `Actor.personId?`;
 `Action` 25 → 33 Werte; `Event.type` 18 → 28 Werte. Die zehn Alias-Operationen tragen `@deprecated`. Kein Feld wurde
 Pflicht, nichts entfernt; `pnpm -r typecheck` (contract, domain, api, web) grün ohne Änderung an einer anderen Datei.
 
@@ -295,7 +301,8 @@ ADR 0004), Sonden und Weiterleitung haben keinen 4xx-Fall; ein erfundener 2xx/4x
 
 ### Tor aus Ziel 5: Bauweise und Läufe
 
-Bauweise: `helpers.ts` hängt jede `operationId`, die `matchOperationId` in `req()` trifft, an eine Trefferdatei je
+Bauweise: `helpers.ts` hängt jede `operationId`, die `matchOperationId` in `req()` trifft und die mit einem
+dokumentierten 2xx/3xx unter ihrer deklarierten Basis-URL antwortet (Nacharbeit, Punkte 2 und 6), an eine Trefferdatei je
 Prozess in einem Verzeichnis, das `operation-coverage.setup.ts` (Vitest `globalSetup`, `apps/api/vitest.config.ts`)
 in `setup()` anlegt und per `project.provide()`/`inject()` an die isolierten Worker gibt. `teardown()` faltet die
 Dateien aller Testdateien, liest `allowlist.json` neben `@hv/contract/openapi.yaml` und prüft: jede `operationId` des
@@ -504,14 +511,191 @@ Rollenzuordnung (role assignment, `RoleAssignment`) · Konfigurationsfreeze (con
 - **Vitest-Verhalten als Randnotiz für Reviewer:** ein Fehler im `globalSetup`-Teardown setzt den Exit-Code nicht
   (nur „error during close"); das Tor setzt deshalb `process.exitCode = 1` selbst und wirft zusätzlich, damit die
   Meldung in der Vitest-Ausgabe erscheint. Belegt durch die roten Läufe oben (`exit=1`).
+- **Service-Lane-Lücke (Nacharbeit, Punkt 3):** 27 der 36 Allowlist-Einträge (025: 14, 026: 3, 028: 4, 040: 6) nennen
+  Scheiben, die laut Plan 5.1 keine Lane `service` halten und deshalb keine Route in `apps/api/src` montieren
+  können — sie könnten ihre Einträge nie zurückziehen, und am 2026-11-25 würde `check.mjs` den Integrationsbranch
+  rot machen. Das `reason`-Feld benennt das jetzt; die Planänderung (Lane service für 025/026/028/040) ist Sache
+  des Orchestrators (takt-011), `docs/produktplan-beta.md` liegt außerhalb der erlaubten Dateien.
+- **Nach 0.4.0 (043) verschoben, weil der unveränderte Dienst sie sonst heute schon wirksam hätte (Nacharbeit,
+  Punkt 1):** `Classification.seatId` (vor 040) und der `meetingId`-Filter an `listEvents` (vor 035). Der Papierpfad
+  und die Absenderzeit sind nur über `captureMeetingContribution` (`MeetingContributionCapture`) erreichbar; der
+  Alias `captureContribution` bleibt bei `manual | transcript`.
 - `oidc` bleibt als unbenutztes, `x-deprecated` Schema (1 Lint-Warnung, Bestand seit 0.1.0) bis 0.5.
 - Glossar, Rechtekonzept, DSFA: Nachführung durch den Orchestrator (Nicht-Ziel); Begriffsliste oben.
+
+### Nacharbeit nach Review und Codex (24.09.2026; Opus: 3 major, 6 minor, 1 nit; Codex: 2 P1 an PR #25)
+
+Version bleibt 0.3.0; alles additiv; Dateien innerhalb „Files allowed"; kein Dienst-Code geändert.
+
+**Änderungen je Punkt**
+
+1. *Live-Erweiterung bestehender Operationen (major).* Der Dienst validiert jede Anfrage gegen den Vertrag
+   (`apps/api/src/validate.ts`), also war die erste Fassung an drei Stellen sofort wirksam. Behoben: `source: paper`,
+   `occurredAt`, `occurredAtSource` liegen nur noch auf dem neuen Schema `MeetingContributionCapture` (Body von
+   `captureMeetingContribution`); `ContributionCapture` (Alias) ist wieder exakt 0.2.1 (`manual | transcript`).
+   `Classification.seatId` und der `meetingId`-Filter an `listEvents` sind entfernt und nach 0.4.0 (043, vor 040
+   bzw. 035) verschoben; `Question.seatId` (Antwort) und der Filter an `streamEvents` (neue Operation) bleiben.
+   Codex P1 (`occurredAt` ohne `occurredAtSource`): `dependentRequired` in beide Richtungen auf
+   `MeetingContributionCapture`; Ajv 2020 (der Validator des Dienstes) setzt es durch, redocly akzeptiert es,
+   openapi-typescript rendert beide Felder als optional (ein Typ kann die Abhängigkeit nicht ausdrücken; ein
+   `if/then` könnte es genauso wenig). Verbleibende sichtbare Erweiterungen stehen im CHANGELOG unter „Changed →
+   Compatibility": Antwort-Enums (`Action` +8, `Event.type` +10, `Contribution.source` +`paper`), optionale
+   Antwortfelder, der optionale Header `X-CSRF-Token` an 21 Bestandsoperationen (reiner String, heute ignoriert),
+   dokumentierte, noch nicht erzeugte Status (404 an den Aliassen, 409 an `registerSpeaker`/`captureContribution`,
+   Header `X-Server-Time`). Die Behauptung „alle 29 Bestandsrouten unverändert" oben ist korrigiert.
+2. *Tor zählt Phantomtreffer (major).* `helpers.ts` zeichnet erst nach der Statusprüfung auf und nur für einen
+   dokumentierten 2xx/3xx; ein ausgenommenes 401 und jede 4xx/5xx — also auch die 404 des Not-found-Fallbacks —
+   zählen nie. Antworten ohne `content` (204/302) verlangen einen leeren Body. Rot/grün unten.
+3. *Allowlist ohne Service-Lane (major).* Die 27 Einträge von 025/026/028/040 tragen im `reason` den Hinweis auf
+   die fehlende Lane und die Planänderung takt-011; `slice` bleibt der fachliche Eigentümer. Lücke unter „Offen".
+4. *Enum-Erweiterungen als Risiko benannt (minor).* Regel „unbekannte Enum-Werte und unbekannte optionale Felder
+   ignorieren" plus die Liste der Erweiterungen in `info.description` („Compatibility") und im CHANGELOG.
+5. *`-t`-Filter (minor).* `operation-coverage.setup.ts` überspringt, wenn `globalConfig.testNamePattern` gesetzt ist
+   (Lauf unten: `-t 401` → „skipped — test-name filter").
+6. *Basis-URL (minor).* `helpers.ts` prüft den Präfix gegen die `servers`-Angabe der Operation (`/` für
+   `/healthz`, `/readyz`, `/metrics`, `/auth/*`, sonst `/v1`); ein Aufruf unter der falschen Basis ist ein Testfehler,
+   kein Treffer.
+7. *`/readyz`-Freitext (minor).* `Readiness.checks.*.detail` ersetzt durch `code` (`ReadinessCheckCode`:
+   `not_configured | unreachable | timeout | migrations_pending | clock_unsynced | clock_drift`); kein Freitext auf
+   einem Endpunkt ohne Anmeldung.
+8. *409 am Alias (minor).* `registerSpeaker` und `captureContribution` dokumentieren 409 wie ihre kanonischen
+   Gegenstücke (gemeinsamer Handler, R-MTG in 025 ohne weiteren Vertragszyklus).
+9. *Zwei Definitionslücken (minor).* (a) „Aktuelle HV" hinter `/meeting`: die laufende HV mit dem spätesten `date`
+   (mehrere laufend: spätestes `date`, Gleichstand: spätestes `MeetingCreated`); läuft keine, die HV mit dem spätesten
+   `date` unabhängig vom Status; existiert keine, 404 — jetzt an allen zehn Alias-Operationen dokumentiert
+   (`getMeeting` liefert es heute schon vor dem ersten Seed; die Ausnahme in `helpers.ts` entfällt). (b) Codex P1
+   CSRF: `components/parameters/CsrfToken`, Header `X-CSRF-Token`, optional, referenziert von allen 34 schreibenden
+   Operationen einschließlich `logout` (nicht `seedDemo`, demo-only). Name: Double-Submit-Konvention der gängigen
+   Frameworks und des OWASP-Cheat-Sheets, damit kein Client-Bibliothek konfiguriert werden muss; ein Custom-Header
+   kann von einem fremden Formular nicht gesetzt werden und erzwingt bei Skripten einen CORS-Preflight. Unter
+   `session` ab 029 Pflicht (403, Regel-ID dort), unter `demoActor` ignoriert. Schema `{ type: string }` ohne
+   `maxLength`, damit keine heutige Anfrage neu scheitern kann.
+10. *Unauthorized-Wortlaut (nit).* Nennt jetzt genau `logout`, `getSession`, `getMetrics`.
+
+`contract:lint`: unverändert 0 Fehler, dieselben 6 Warnungen (login 2xx/4xx, callback 2xx, healthz 4xx, readyz 4xx,
+oidc unused). `pnpm contract:types`: +112/−20 gegenüber a35291c (34× `X-CSRF-Token?`, 10× `404`, 2× `409`,
+`MeetingContributionCapture`, `ReadinessCheckCode`, `Classification.seatId` und `Readiness…detail` entfallen),
+zweiter Lauf ohne Diff (SHA-256 `a1a99d69bd36…`). Vertragstor (a)–(d) grün, auch mit `CONTRACT_GATE_STRICT=1`.
+
+**Punkt 2 — rot, dann grün** (Scratch-Test `zz-scratch-review-023.test.ts`: `GET /v1/meetings/x/speakers` als admin,
+Route nicht montiert, Not-found-Fallback antwortet 404; danach gelöscht, nicht committet)
+
+Rot (alte `helpers.ts`, Scratch-Test vorhanden):
+
+```
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+operation-coverage: 65 operations in the contract, 30 exercised by tests, 36 pre-declared in allowlist.json
+  FAIL  "listMeetingSpeakers" is pre-declared in allowlist.json (slice 025, expires 2026-11-25) but a test exercises it — the entry is overdue, remove it.
+operation-coverage: 1 failure(s)
+error during close Error: operation-coverage gate: 1 failure(s) (see above)
+exit=1
+```
+
+Grün (neue `helpers.ts`, derselbe Scratch-Test noch vorhanden — der Phantomtreffer zählt nicht mehr):
+
+```
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+operation-coverage: 65 operations in the contract, 29 exercised by tests, 36 pre-declared in allowlist.json
+operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+exit=0
+```
+
+Punkt 5, `vitest run -t 401`: `Tests  3 passed | 46 skipped (49)` — `operation-coverage: skipped — test-name filter
+(-t /401/) set; only a full run proves coverage.`, exit 0. Voller Lauf ohne Scratch: 5 Dateien, 49 Tests, 29/36, ok.
+
+**Punkt 1 — Live-Probe gegen den unveränderten Dienst** (`createApp({ demoEnabled: true })` per tsx, Seed 20 Fragen,
+`X-Actor: admin:admin`; Ausgabe wörtlich, `speakerId` gekürzt):
+
+```
+POST /v1/contributions {"speakerId":"…","text":"Papierblatt","source":"paper","occurredAt":"2099-01-01T00:00:00Z"} -> 422 {"type":"urn:hv:problem:422","title":"Unprocessable","status":422,"detail":"Request body: /source must be equal to one of the allowed values"}
+POST /v1/contributions {"speakerId":"…","text":"Papierblatt","source":"paper"} -> 422 {"type":"urn:hv:problem:422","title":"Unprocessable","status":422,"detail":"Request body: /source must be equal to one of the allowed values"}
+POST /v1/contributions {"speakerId":"…","text":"Papierblatt","source":"paper","occurredAt":"2026-09-24T09:00:00Z","occurredAtSource":"paper"} -> 422 {"type":"urn:hv:problem:422","title":"Unprocessable","status":422,"detail":"Request body: /source must be equal to one of the allowed values"}
+POST /v1/contributions {"speakerId":"…","text":"Manuell erfasst","source":"manual"} -> 201 {"id":"d82c369b-0cf6-4060-80b7-01b20f23f757","speakerId":"sp-00002","text":"Manuell erfasst","capturedAt":"2026-09-24T01:29:53.687Z","source":"manual","questionIds":[],"coverage":{"coveredRatio":0,"uncovered":[{"start":0
+POST /v1/meetings/x/contributions (not mounted) -> 404 {"type":"urn:hv:problem:404","title":"Not found","status":404,"detail":"No such route."}
+GET /v1/events?meetingId=no-such-meeting&limit=2 -> 200 (items: 2; the filter is not declared in 0.3.0 any more, the service ignores unknown query parameters)
+```
+
+`dependentRequired` durch den Validator des Dienstes (`requestBodyValidator` aus `apps/api/src/contractSchema.ts`,
+derselbe Pfad wie `validate.ts`; die kanonische Route montiert erst 025):
+
+```
+captureMeetingContribution {"speakerId":"s","text":"t"} -> valid
+captureMeetingContribution {"speakerId":"s","text":"t","source":"paper"} -> valid
+captureMeetingContribution {"speakerId":"s","text":"t","occurredAt":"2026-09-24T09:00:00Z"} -> ["(root) must have property occurredAtSource when property occurredAt is present"]
+captureMeetingContribution {"speakerId":"s","text":"t","occurredAtSource":"paper"} -> ["(root) must have property occurredAt when property occurredAtSource is present"]
+captureMeetingContribution {"speakerId":"s","text":"t","occurredAt":"2026-09-24T09:00:00Z","occurredAtSource":"server"} -> ["/occurredAtSource must be equal to one of the allowed values"]
+captureMeetingContribution {"speakerId":"s","text":"t","source":"paper","occurredAt":"2026-09-24T09:00:00Z","occurredAtSource":"paper"} -> valid
+captureContribution (alias) {"speakerId":"s","text":"t","source":"paper"} -> ["/source must be equal to one of the allowed values"]
+```
+
+**`pnpm gates` nach der Nacharbeit** (Exit 0; gelaufen auf dem fertigen Arbeitsbaum vor den drei Nacharbeits-Commits,
+deshalb „at commit ecc728f" mit Signatur des geänderten Baums; danach änderte sich nur diese Datei. Zeilen desselben
+Laufs, dann das Ende wörtlich):
+
+```
+packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.3.0, 65 operations)
+packages/contract test: contract gate: ok
+packages/domain test:  Test Files  5 passed (5)
+packages/domain test:       Tests  72 passed (72)
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  48 passed (48)
+apps/api test:  Test Files  5 passed (5)
+apps/api test:       Tests  49 passed (49)
+apps/api test: operation-coverage: 65 operations in the contract, 29 exercised by tests, 36 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+vocabulary-check: ok
+x 7 dependency violations (0 errors, 7 warnings). 137 modules, 504 dependencies cruised.   <- Bestand (apps/web features)
+i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+slice-scope: 10 changed file(s), all within "docs/slices/023-vertrag-0-3-0-fundament.md"'s "Files allowed" list (12 pattern(s)).
+plan-graph: ok.
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7174.130631
+
+> @hv/web@0.0.0 build /home/user/wt/023/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-D5Ngkhre.css                        39.95 kB │ gzip:   8.66 kB
+dist/assets/index-BoqUekbh.js                        532.22 kB │ gzip: 156.05 kB │ map: 2,200.90 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.16s
+mark-test-run: wrote /home/user/wt/023/.claude/state/last-test-run (signature 368621ecbb82…) at commit ecc728f, tree ff311a1a1abc…
+gates exit=0
+```
+
+`node scripts/slice-scope.mjs` (einzeln, nach der Nacharbeit): `slice-scope: 10 changed file(s), all within
+"docs/slices/023-vertrag-0-3-0-fundament.md"'s "Files allowed" list (12 pattern(s)).` Exit 0.
 
 ### Commits auf `claude/slice-023-vertrag` (nicht gepusht)
 
 1. `9638430 test(api): Tor „jede operationId ausgeübt oder deklariert" als Vitest-globalSetup (Scheibe 023) [skip netlify]`
 2. `a35291c feat(contract): Vertragspaket 0.3.0 Fundament, rein additiv, 36 Operationen vorab deklariert (Scheibe 023) [skip netlify]`
-3. Bericht (diese Datei): `docs: Bericht Scheibe 023 mit Festlegungen, Abdeckungstabelle, roten und grünen Läufen (Scheibe 023) [skip netlify]`
+3. `ecc728f docs: Bericht Scheibe 023 mit Festlegungen, Abdeckungstabelle, roten und grünen Läufen (Scheibe 023) [skip netlify]`
+4. `71cb6df test(api): Tor zählt nur dokumentierte 2xx/3xx unter der deklarierten Basis-URL, -t-Filter überspringt (Scheibe 023, Nacharbeit) [skip netlify]`
+5. `beae5bb fix(contract): 0.3.0 ohne Live-Erweiterung bestehender Anfragen — MeetingContributionCapture, X-CSRF-Token, ReadinessCheckCode, 404/409 am Alias (Scheibe 023, Nacharbeit) [skip netlify]`
+6. Bericht (diese Datei): `docs: Bericht Scheibe 023 — Nacharbeit nach Review und Codex (Scheibe 023) [skip netlify]`
 
 ## Review findings
 
