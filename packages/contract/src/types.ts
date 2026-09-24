@@ -14,7 +14,7 @@ export interface paths {
         /**
          * Get the current meeting (alias)
          * @deprecated
-         * @description Alias for the current meeting (aktuelle HV): the same resource as `GET /meetings/{meetingId}` with the id of the running meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (Plan 3, "Jahrgang und Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
+         * @description Alias for the current meeting (aktuelle HV): the same resource as `GET /meetings/{meetingId}` with the id of the current meeting — the meeting in status `running` with the latest `date` (several running: the latest `date` wins, ties: the latest `MeetingCreated`); when none is running, the meeting with the latest `date` regardless of status. `404` when no meeting exists at all (today's behaviour before the first seed; every other alias resolves the same way from slice 025). Veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (Plan 3, "Jahrgang und Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
          */
         get: operations["getMeeting"];
         put?: never;
@@ -587,7 +587,7 @@ export interface paths {
         };
         /**
          * Append-only event feed. Poll with `after` = last seen sequence number.
-         * @description Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no meeting prefix; `meetingId` (since 0.3.0) filters, `lastSeq` stays the global cursor. Permission `event.read`.
+         * @description Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no meeting prefix and `lastSeq` stays the global cursor. Permission `event.read`. A `meetingId` filter arrives with 0.4.0 (slice 043, ahead of 035): not in 0.3.0, because the unchanged service would accept the parameter and silently return unfiltered events (review 023).
          */
         get: operations["listEvents"];
         put?: never;
@@ -960,7 +960,7 @@ export interface paths {
         put?: never;
         /**
          * Capture a speech (Redebeitrag erfassen) in a meeting
-         * @description Since 0.3.0 (slice 025); canonical form of `POST /contributions`. Permission `contribution.capture`. `409` when the meeting does not accept captures any more (rule table R-MTG, slice 025).
+         * @description Since 0.3.0 (slice 025); canonical form of `POST /contributions`. Permission `contribution.capture`. `409` when the meeting does not accept captures any more (rule table R-MTG, slice 025). Unlike the alias, the body is `MeetingContributionCapture`: the paper path (`source: paper`) and the sender's time statement (`occurredAt` with `occurredAtSource`) exist only here.
          */
         post: operations["captureMeetingContribution"];
         delete?: never;
@@ -1066,7 +1066,7 @@ export interface paths {
         put?: never;
         /**
          * End the session (Abmelden) — clears the cookie and blocks the session id
-         * @description Since 0.3.0 (slice 029). Requires the session cookie; a demo actor has no session to end.
+         * @description Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end.
          */
         post: operations["logout"];
         delete?: never;
@@ -1084,7 +1084,7 @@ export interface paths {
         };
         /**
          * Who am I — the signed-in actor, roles from the assignment table, session expiry
-         * @description Since 0.3.0 (slice 029). In the demo this is the `X-Actor` identity. `idpGroups` lists the identity provider's groups as a suggestion for the administrator; they never become a role by themselves (ADR 0004). `csrfToken` is required on state-changing calls under the `session` scheme (slice 029; header name defined there).
+         * @description Since 0.3.0 (slice 029). In the demo this is the `X-Actor` identity. `idpGroups` lists the identity provider's groups as a suggestion for the administrator; they never become a role by themselves (ADR 0004). `csrfToken` is sent as `X-CSRF-Token` on state-changing calls under the `session` scheme (slice 029; parameter `CsrfToken`).
          */
         get: operations["getSession"];
         put?: never;
@@ -1400,7 +1400,7 @@ export interface components {
             expiresAt?: string;
             /** @description Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004) */
             idpGroups?: string[];
-            /** @description Token to send on state-changing calls under the `session` scheme (slice 029) */
+            /** @description Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029) */
             csrfToken?: string;
         };
         /** @description Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15) */
@@ -1431,12 +1431,17 @@ export interface components {
                 [key: string]: {
                     /** @enum {string} */
                     status: "ok" | "fail";
-                    detail?: string;
+                    code?: components["schemas"]["ReadinessCheckCode"];
                 };
             };
             /** Format: date-time */
             serverTime?: string;
         };
+        /**
+         * @description Since 0.3.0 (slice 033): why a check failed, as a code — never free text, because `/readyz` answers without credential and a hostname, a port or a driver error string would leak (review 023). Codes may be added in a later minor version; clients ignore unknown ones.
+         * @enum {string}
+         */
+        ReadinessCheckCode: "not_configured" | "unreachable" | "timeout" | "migrations_pending" | "clock_unsynced" | "clock_drift";
         /** @enum {string} */
         SpeakerStatus: "waiting" | "speaking" | "finished" | "withdrawn";
         Speaker: {
@@ -1547,7 +1552,7 @@ export interface components {
             occurredAt?: string;
             occurredAtSource?: components["schemas"]["OccurredAtSource"];
             /**
-             * @description Where the text came from. `paper` since 0.3.0 (paper path, slice 025).
+             * @description Where the text came from. `paper` since 0.3.0 (paper path, slice 025; produced only through `captureMeetingContribution`) — a response-enum widening, see "Compatibility" in info.description.
              * @default manual
              * @enum {string}
              */
@@ -1564,21 +1569,29 @@ export interface components {
             /** @description Since 0.3.0: actions the calling actor may perform on this speech right now (claim, release, capture questions) */
             _actions?: components["schemas"]["Action"][];
         };
+        /** @description Body of `captureContribution` (alias). Unchanged since 0.1.0 on purpose: the service validates requests against this document, so the paper path and the sender's time statement live only on `MeetingContributionCapture` (`captureMeetingContribution`, slice 025) until the core handles them (review 023). */
         ContributionCapture: {
             speakerId: string;
             text: string;
+            /** @enum {string} */
+            source?: "manual" | "transcript";
+        };
+        /** @description Since 0.3.0 (slice 025): body of `captureMeetingContribution` — `ContributionCapture` plus the paper path (`source: paper`, Papierpfad) and the sender's time statement (ADR 0011). A stated `occurredAt` never becomes `recordedAt`; a value in the future is a 422. `occurredAt` and `occurredAtSource` come together or not at all (`dependentRequired` in both directions, enforced by the service's Ajv validator; the generated TypeScript types cannot express it). */
+        MeetingContributionCapture: {
+            speakerId: string;
+            text: string;
             /**
-             * @description `paper` since 0.3.0
+             * @description `paper` = paper path (Papierpfad, slice 025)
              * @enum {string}
              */
             source?: "manual" | "transcript" | "paper";
             /**
              * Format: date-time
-             * @description Since 0.3.0 (ADR 0011): the sender's statement; requires `occurredAtSource`; never becomes `recordedAt`; a value in the future is a 422
+             * @description The sender's statement of when the speech happened
              */
             occurredAt?: string;
             /**
-             * @description Since 0.3.0: source of the stated `occurredAt`; a client cannot claim `server`
+             * @description Source of the stated `occurredAt`; a client cannot claim `server`
              * @enum {string}
              */
             occurredAtSource?: "device" | "paper" | "transcript";
@@ -1662,11 +1675,9 @@ export interface components {
             agendaItemId?: string;
             /**
              * @deprecated
-             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5: send `seatId` (ADR 0006); until slice 040 the server maps a value here to the default seat of the same id
+             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives with 0.4.0 (slice 043, ahead of 040): not in 0.3.0, because the unchanged service would accept and silently drop it today (review 023). `Question.seatId` is already declared on the response.
              */
             stageAssignment?: components["schemas"]["StageAssignment"];
-            /** @description Since 0.3.0 (slice 040): podium seat that answers; must be a seat of the meeting (422 otherwise) */
-            seatId?: string;
         };
         AnswerDraft: {
             text: string;
@@ -1808,7 +1819,7 @@ export interface components {
                 "application/json": components["schemas"]["AgendaItem"];
             };
         };
-        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029) or a missing metrics token. Documented since 0.3.0 on the operations introduced with the `session` scheme; the other operations follow in 0.4.0 (slice 043, review 012 point 18). */
+        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029) or a missing metrics token. Documented in 0.3.0 on exactly three operations — `logout`, `getSession` (`/auth/me`) and `getMetrics` — the ones that arrive with the `session` and `metricsBearer` schemes. The 401 the demo header path already produces on every other operation stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18 (0.4.0, slice 043). */
         Unauthorized: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
@@ -1884,6 +1895,8 @@ export interface components {
         IdempotencyKey: string;
         /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
         IfMatch: string;
+        /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+        CsrfToken: string;
         SpeakerId: string;
         ContributionId: string;
         QuestionId: string;
@@ -1914,7 +1927,7 @@ export interface components {
     headers: {
         /** @description Opaque version tag, changes with every write. */
         ETag: string;
-        /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header. */
+        /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header; optional (no `required: true`) because the unchanged 0.3.0 service does not send it yet. */
         "X-Server-Time": string;
     };
     pathItems: never;
@@ -1941,6 +1954,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listAgendaItems: {
@@ -1963,6 +1977,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listUnits: {
@@ -1985,6 +2000,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listSpeakers: {
@@ -2010,6 +2026,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     registerSpeaker: {
@@ -2018,6 +2035,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -2039,6 +2058,8 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -2048,6 +2069,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -2069,6 +2092,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -2104,6 +2128,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2157,6 +2183,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     captureContribution: {
@@ -2165,6 +2192,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -2186,6 +2215,8 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -2220,6 +2251,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 contributionId: components["parameters"]["ContributionId"];
@@ -2255,6 +2288,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2278,6 +2313,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2317,6 +2354,7 @@ export interface operations {
         responses: {
             200: components["responses"]["QuestionList"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getQuestion: {
@@ -2376,6 +2414,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2404,6 +2444,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2433,6 +2475,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2461,6 +2505,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2484,6 +2530,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2514,6 +2562,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2543,6 +2593,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2566,6 +2618,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2589,6 +2643,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2612,6 +2668,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2641,6 +2699,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2670,6 +2730,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2693,6 +2755,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2730,6 +2794,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listEvents: {
@@ -2738,8 +2803,6 @@ export interface operations {
                 /** @description Last seen global sequence number */
                 after?: components["parameters"]["After"];
                 limit?: number;
-                /** @description Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global */
-                meetingId?: components["parameters"]["MeetingIdFilter"];
             };
             header?: never;
             path?: never;
@@ -2823,6 +2886,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -2908,6 +2973,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2947,6 +3014,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2972,6 +3041,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -2997,6 +3068,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -3048,6 +3121,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -3113,6 +3188,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -3181,6 +3258,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 /** @description Id of the meeting (Jahrgang), `Meeting.id` */
@@ -3216,6 +3295,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 /** @description Id of the meeting (Jahrgang), `Meeting.id` */
@@ -3253,6 +3334,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
                 /** @description ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory (428 without it) from 0.3.1 on every state-changing speaker, contribution and question operation except `deliverQuestion`, which checks the answer version hash instead (slice 028). */
                 "If-Match"?: components["parameters"]["IfMatch"];
             };
@@ -3316,6 +3399,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 /** @description Id of the meeting (Jahrgang), `Meeting.id` */
@@ -3351,6 +3436,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 /** @description Id of the meeting (Jahrgang), `Meeting.id` */
@@ -3413,6 +3500,8 @@ export interface operations {
             header?: {
                 /** @description Client-generated key. A replay with the same key returns the original result. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 /** @description Id of the meeting (Jahrgang), `Meeting.id` */
@@ -3422,7 +3511,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ContributionCapture"];
+                "application/json": components["schemas"]["MeetingContributionCapture"];
             };
         };
         responses: {
@@ -3558,7 +3647,10 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there); under `demoActor` it is ignored. Declared on every state-changing operation, `logout` included; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };

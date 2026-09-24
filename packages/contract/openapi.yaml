@@ -27,8 +27,12 @@ info:
     un-prefixed collection paths of 0.1/0.2 (`/meeting`, `/agenda-items`, `/units`, `/speakers`,
     `/speakers/order`, `/contributions`, `/questions`, `/stage`) stay served as an alias for the
     current meeting (aktuelle HV) until contract 0.5 and are marked `deprecated` since 0.3.0.
-    `/events` and `/stream` are global (the sequence number is global and gap-free) and take an
-    optional `meetingId` filter instead.
+    `/events` and `/stream` are global (the sequence number is global and gap-free); `/stream` takes
+    an optional `meetingId` filter, `/events` gets it with 0.4.0 (slice 043; the unchanged service
+    would accept and ignore it today). The current meeting behind the alias paths is the meeting in
+    status `running` with the latest `date` (several running: the latest `date` wins, ties: the latest
+    `MeetingCreated`); when none is running, the meeting with the latest `date` regardless of status;
+    when no meeting exists at all, every alias answers 404.
 
     Authentication (since 0.3.0, ADR 0004): production uses the `session` cookie issued by the
     BFF endpoints under `/auth` (slice 029); the demo uses the `demoActor` header. The browser never
@@ -36,6 +40,14 @@ info:
     `/readyz`, `/auth/login`, `/auth/callback`, `/auth/transparency-notice`. `/metrics` is for the
     scraper only and takes the `metricsBearer` token from the service configuration. `/healthz`,
     `/readyz`, `/metrics` and `/auth/*` live outside `/v1` (per-path `servers`).
+
+    Compatibility within a major version: enumerations grow in minor versions (0.3.0: `Action` +8,
+    `Event.type` +10, `Contribution.source` +`paper`, new `ReadinessCheckCode`) and optional fields
+    are added. A client must ignore an unknown enum value in a response (skip the event, hide the
+    action), ignore an unknown optional field and not fail on a documented status it has not seen
+    before. A removal is deprecated one cycle ahead (ADR 0015). Request schemas of existing
+    operations are never widened by a contract-only release: the service validates every request
+    against this document, so a widening would take effect immediately (review 023).
 
     Conventions (see docs/ist-analyse-und-schnittstellen.md, section 6):
     - Writes carry an `Idempotency-Key`; replays return the original result.
@@ -85,11 +97,16 @@ paths:
       deprecated: true
       description: >-
         Alias for the current meeting (aktuelle HV): the same resource as `GET /meetings/{meetingId}`
-        with the id of the running meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (Plan 3,
-        "Jahrgang und Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
+        with the id of the current meeting — the meeting in status `running` with the latest `date`
+        (several running: the latest `date` wins, ties: the latest `MeetingCreated`); when none is
+        running, the meeting with the latest `date` regardless of status. `404` when no meeting exists
+        at all (today's behaviour before the first seed; every other alias resolves the same way from
+        slice 025). Veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (Plan 3, "Jahrgang und
+        Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /agenda-items:
     get:
       tags: [meeting]
@@ -102,6 +119,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /units:
     get:
       tags: [meeting]
@@ -114,6 +132,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /speakers:
     get:
       tags: [speakers]
@@ -129,6 +148,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [speakers]
       operationId: registerSpeaker
@@ -137,13 +157,15 @@ paths:
       description: >-
         Alias for `POST /meetings/{meetingId}/speakers` of the current meeting. Veraltet seit 0.3.0,
         entfällt mit Vertrag 0.5.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerRegistration' } } }
       responses:
         '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   /speakers/order:
     put:
@@ -154,13 +176,14 @@ paths:
       description: >-
         Alias for `PUT /meetings/{meetingId}/speakers/order` of the current meeting. Veraltet seit
         0.3.0, entfällt mit Vertrag 0.5.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerOrder' } } }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   # ---- items with a global id: canonical as they are --------------------------------------------
   /speakers/{speakerId}:
@@ -177,7 +200,7 @@ paths:
       tags: [speakers]
       operationId: updateSpeaker
       summary: Change speaker status or round (Redner aufrufen, beenden, zurückziehen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerUpdate' } } }
@@ -201,6 +224,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [contributions]
       operationId: captureContribution
@@ -211,13 +235,15 @@ paths:
         0.3.0, entfällt mit Vertrag 0.5. Creates the immutable text of a speech. Questions are then
         atomised out of it with `captureQuestions`. Later, transcript segments arrive through the
         ingest interface and become contributions the same way.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ContributionCapture' } } }
       responses:
         '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   /contributions/{contributionId}:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -235,7 +261,7 @@ paths:
       tags: [questions]
       operationId: captureQuestions
       summary: Atomise a speech into individual questions (Einzelfragen erfassen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content:
@@ -265,7 +291,7 @@ paths:
         the claim is visible in `claim` on the resource and in the events `ContributionClaimed` /
         `ContributionReleased`. Permission `contribution.claim`. `409` when another actor holds an
         unexpired claim (rule id from slice 028 in `ruleId`).
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/ContributionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -282,7 +308,7 @@ paths:
         Since 0.3.0 (slice 028). Permission `contribution.claim`; only the holder releases (an
         override is a decision of slice 040, `admin.override`, not part of 0.3.0). `409` when the
         speech is not claimed or claimed by someone else.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/ContributionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -311,6 +337,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/QuestionList' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /questions/{questionId}:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     get:
@@ -337,7 +364,7 @@ paths:
       tags: [questions]
       operationId: classifyQuestion
       summary: Classify a question (Klassifizieren) — answer track, agenda item, podium seat
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/Classification' } } }
@@ -354,7 +381,7 @@ paths:
       tags: [questions]
       operationId: assignQuestion
       summary: Assign a question to an answering unit (Zuweisen an Fachbereich)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content:
@@ -379,7 +406,7 @@ paths:
       description: >
         Every call creates a new, immutable answer version. If the question was already approved,
         the approval is bound to the earlier version and the question falls back to `answer_drafted`.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/AnswerDraft' } } }
@@ -396,7 +423,7 @@ paths:
       tags: [questions]
       operationId: submitForReview
       summary: Submit the current answer version for legal clearing (Zur Prüfung geben)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -409,7 +436,7 @@ paths:
       tags: [questions]
       operationId: approveQuestion
       summary: Approve an answer version (Freigeben) — the approval is bound to the version
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content:
@@ -432,7 +459,7 @@ paths:
       tags: [questions]
       operationId: returnQuestion
       summary: Return a question for rework (Zurückgeben) from review, staging or the podium
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content:
@@ -454,7 +481,7 @@ paths:
       tags: [questions, stage]
       operationId: stageQuestion
       summary: Put an approved question on the podium queue (Auf die Bühne legen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -467,7 +494,7 @@ paths:
       tags: [questions, stage]
       operationId: deliverQuestion
       summary: Mark the answer as read out on the podium (Vorgelesen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -480,7 +507,7 @@ paths:
       tags: [questions]
       operationId: closeQuestion
       summary: Close a delivered question (Abschließen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -493,7 +520,7 @@ paths:
       tags: [questions]
       operationId: withdrawQuestion
       summary: Withdraw a question (Zurückgezogen) — e.g. the shareholder withdrew it
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content:
@@ -515,7 +542,7 @@ paths:
       tags: [questions]
       operationId: mergeQuestion
       summary: Merge a duplicate into another question (Zusammenführen)
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content:
@@ -542,7 +569,7 @@ paths:
         person is visible only through this claim (Übernahme, weiche Sperre), never through an
         automatic personal assignment (ADR 0013). Time to live 10 minutes by default; expiry releases.
         Permission `question.claim`. `409` when another actor holds an unexpired claim.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -558,7 +585,7 @@ paths:
       description: >-
         Since 0.3.0 (slice 028). Permission `question.claim`; only the holder releases. `409` when the
         question is not claimed or claimed by someone else.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -577,6 +604,7 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   # ---- global feeds: sequence numbers are global, the meeting is a filter --------------------------
   /events:
     get:
@@ -585,12 +613,12 @@ paths:
       summary: Append-only event feed. Poll with `after` = last seen sequence number.
       description: >-
         Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no
-        meeting prefix; `meetingId` (since 0.3.0) filters, `lastSeq` stays the global cursor.
-        Permission `event.read`.
+        meeting prefix and `lastSeq` stays the global cursor. Permission `event.read`. A `meetingId`
+        filter arrives with 0.4.0 (slice 043, ahead of 035): not in 0.3.0, because the unchanged
+        service would accept the parameter and silently return unfiltered events (review 023).
       parameters:
         - { $ref: '#/components/parameters/After' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 1000 } }
-        - { $ref: '#/components/parameters/MeetingIdFilter' }
       responses:
         '200':
           description: OK
@@ -652,7 +680,7 @@ paths:
         master data of that meeting (agenda items, units, podium seats) is copied; speakers,
         contributions, questions and events are never copied. Emits `MeetingCreated` (payload
         `clonedFromMeetingId` when cloned). A second legal entity is not modelled (ADR 0011, B-list).
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/MeetingCreate' } } }
@@ -691,7 +719,7 @@ paths:
         Since 0.3.0 (slice 040). Permission `agenda.manage`. The list replaces the agenda; an item
         that keeps its `id` keeps its progress timestamps and its questions. `409` after the
         configuration freeze (R-ADM-03, slice 040) or when an item to be removed already has questions.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItemInput' } } } }
@@ -711,7 +739,7 @@ paths:
       description: >-
         Since 0.3.0 (slice 025, rule table R-MTG). Permission `agenda.manage`. `409` when the meeting
         is not running or the item is already open (rule id in `ruleId`).
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -725,7 +753,7 @@ paths:
       operationId: openVoting
       summary: Open the voting on an agenda item (Abstimmung eröffnen) — emits `VotingOpened`
       description: Since 0.3.0 (slice 025, R-MTG). Permission `agenda.manage`. `409` when the item is not open.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -739,7 +767,7 @@ paths:
       operationId: closeVoting
       summary: Close the voting on an agenda item (Abstimmung schließen) — emits `VotingClosed`
       description: Since 0.3.0 (slice 025, R-MTG). Permission `agenda.manage`. `409` when the voting is not open.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/AgendaItemUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -765,7 +793,7 @@ paths:
         Since 0.3.0 (slice 040). Permission `admin.units.manage`. A unit that keeps its `id` keeps its
         assignments; `409` after the configuration freeze (R-ADM-03) or when a unit to be removed
         still has assigned questions.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UnitInput' } } } }
@@ -798,7 +826,7 @@ paths:
         Since 0.3.0 (slice 040). Permission `admin.seats.manage`. `personId` and `deviceId` per seat
         are resolved in the service for the podium filter (ADR 0006: the context never comes from
         the client). `409` after the configuration freeze (R-ADM-03).
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeatInput' } } } }
@@ -835,7 +863,7 @@ paths:
         role to one answering unit (an `expert` without a unit cannot read questions, slice 026).
         `expiresAt` defaults to the end of the meeting (auto-expiry). Emergency accounts are ordinary
         assignments flagged by the identity adapter (slice 029), never a separate path.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/RoleAssignmentCreate' } } }
@@ -855,7 +883,7 @@ paths:
         Since 0.3.0 (slice 026). Permission `admin.roles.manage`. Revocation is a new event, never a
         change to the assignment event (rule 7). `409` when already revoked. Takes effect on the
         subject's next request; the session block list (slice 029) ends a running session.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: false
         content:
@@ -881,7 +909,7 @@ paths:
         table, the transition table and the master data into `configHash`; after the freeze every
         master-data change is `409` R-ADM-03 unless the actor overrides with a reason (slice 040).
         `409` when already frozen.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/ConfigFreeze' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -907,7 +935,7 @@ paths:
       operationId: registerMeetingSpeaker
       summary: Register a speaker (Wortmeldung aufnehmen) in a meeting
       description: Since 0.3.0 (slice 025); canonical form of `POST /speakers`. Permission `speaker.register`.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerRegistration' } } }
@@ -924,7 +952,7 @@ paths:
       operationId: reorderMeetingSpeakers
       summary: Set the order of speakers within a round (Reihenfolge ändern) of a meeting
       description: Since 0.3.0 (slice 025); canonical form of `PUT /speakers/order`. Permission `speaker.reorder`.
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerOrder' } } }
@@ -953,11 +981,13 @@ paths:
       description: >-
         Since 0.3.0 (slice 025); canonical form of `POST /contributions`. Permission
         `contribution.capture`. `409` when the meeting does not accept captures any more (rule table
-        R-MTG, slice 025).
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+        R-MTG, slice 025). Unlike the alias, the body is `MeetingContributionCapture`: the paper path
+        (`source: paper`) and the sender's time statement (`occurredAt` with `occurredAtSource`) exist
+        only here.
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' } ]
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ContributionCapture' } } }
+        content: { application/json: { schema: { $ref: '#/components/schemas/MeetingContributionCapture' } } }
       responses:
         '201': { description: Created, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1047,8 +1077,9 @@ paths:
       tags: [auth]
       operationId: logout
       summary: End the session (Abmelden) — clears the cookie and blocks the session id
-      description: Since 0.3.0 (slice 029). Requires the session cookie; a demo actor has no session to end.
+      description: Since 0.3.0 (slice 029). Requires the session cookie and the CSRF token; a demo actor has no session to end.
       security: [ { session: [] } ]
+      parameters: [ { $ref: '#/components/parameters/CsrfToken' } ]
       responses:
         '204': { description: Signed out; the cookie is cleared, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1061,8 +1092,8 @@ paths:
       description: >-
         Since 0.3.0 (slice 029). In the demo this is the `X-Actor` identity. `idpGroups` lists the
         identity provider's groups as a suggestion for the administrator; they never become a role by
-        themselves (ADR 0004). `csrfToken` is required on state-changing calls under the `session`
-        scheme (slice 029; header name defined there).
+        themselves (ADR 0004). `csrfToken` is sent as `X-CSRF-Token` on state-changing calls under the
+        `session` scheme (slice 029; parameter `CsrfToken`).
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1158,7 +1189,9 @@ components:
         Since 0.3.0 (ADR 0004, slice 029): HttpOnly, SameSite session cookie issued by
         `GET /auth/callback` after the server-side Authorization Code flow. 14 h with silent refresh,
         idle timeout, block list of subject ids without restart (kill switch). State-changing calls
-        additionally send the CSRF token from `GET /auth/me`. The browser never holds a token.
+        additionally send the CSRF token from `GET /auth/me` in the header `X-CSRF-Token`
+        (`components/parameters/CsrfToken`, declared on every state-changing operation). The browser
+        never holds a token.
     metricsBearer:
       type: http
       scheme: bearer
@@ -1192,6 +1225,21 @@ components:
         ETag of the resource the client last saw. Mismatch yields 412. Optional in 0.3.0; mandatory
         (428 without it) from 0.3.1 on every state-changing speaker, contribution and question
         operation except `deliverQuestion`, which checks the answer version hash instead (slice 028).
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      schema: { type: string }
+      description: >-
+        Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`Session.csrfToken`),
+        sent on every state-changing call made under the `session` scheme — the double-submit pattern:
+        a cross-site form cannot add a custom request header, and a script from another origin forces
+        a CORS preflight, so the header's presence plus the value check proves the request came from
+        the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP
+        cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session`
+        scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id
+        defined there); under `demoActor` it is ignored. Declared on every state-changing operation,
+        `logout` included; not on `seedDemo` (demo only).
     SpeakerId: { name: speakerId, in: path, required: true, schema: { type: string } }
     ContributionId: { name: contributionId, in: path, required: true, schema: { type: string } }
     QuestionId: { name: questionId, in: path, required: true, schema: { type: string } }
@@ -1222,7 +1270,8 @@ components:
         Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC,
         RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from
         30 s drift (slice 032); a client clock is never the reference for a legally relevant time.
-        Declared on every response because OpenAPI has no global response header.
+        Declared on every response because OpenAPI has no global response header; optional (no
+        `required: true`) because the unchanged 0.3.0 service does not send it yet.
   responses:
     QuestionUpdated:
       description: Updated question with new ETag and current `_actions`
@@ -1250,8 +1299,11 @@ components:
     Unauthorized:
       description: >-
         No valid credential: no session cookie, an expired or blocked session, a wrong audience
-        (slice 029) or a missing metrics token. Documented since 0.3.0 on the operations introduced
-        with the `session` scheme; the other operations follow in 0.4.0 (slice 043, review 012 point 18).
+        (slice 029) or a missing metrics token. Documented in 0.3.0 on exactly three operations —
+        `logout`, `getSession` (`/auth/me`) and `getMetrics` — the ones that arrive with the `session`
+        and `metricsBearer` schemes. The 401 the demo header path already produces on every other
+        operation stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18
+        (0.4.0, slice 043).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
     Forbidden:
@@ -1538,7 +1590,7 @@ components:
         roles: { type: array, items: { $ref: '#/components/schemas/Role' }, description: 'All roles from the assignment table valid now; `actor.role` is the active one' }
         expiresAt: { type: string, format: date-time, description: 'Session expiry (14 h with silent refresh, ADR 0004); absent for the demo actor' }
         idpGroups: { type: array, items: { type: string }, description: 'Groups reported by the identity provider — a suggestion for the administrator, never a role by itself (ADR 0004)' }
-        csrfToken: { type: string, description: 'Token to send on state-changing calls under the `session` scheme (slice 029)' }
+        csrfToken: { type: string, description: 'Token to send in the `X-CSRF-Token` header on state-changing calls under the `session` scheme (slice 029)' }
     TransparencyNotice:
       type: object
       description: 'Since 0.3.0 (slice 029): transparency notice (Transparenzhinweis, Art. 13 GDPR) for the sign-in page; text from configuration, two languages (rule 10); legal review pending (E15)'
@@ -1571,8 +1623,15 @@ components:
             required: [status]
             properties:
               status: { type: string, enum: [ok, fail] }
-              detail: { type: string }
+              code: { $ref: '#/components/schemas/ReadinessCheckCode' }
         serverTime: { type: string, format: date-time }
+    ReadinessCheckCode:
+      type: string
+      description: >-
+        Since 0.3.0 (slice 033): why a check failed, as a code — never free text, because `/readyz`
+        answers without credential and a hostname, a port or a driver error string would leak (review
+        023). Codes may be added in a later minor version; clients ignore unknown ones.
+      enum: [not_configured, unreachable, timeout, migrations_pending, clock_unsynced, clock_drift]
     SpeakerStatus:
       type: string
       enum: [waiting, speaking, finished, withdrawn]
@@ -1692,7 +1751,7 @@ components:
           type: string
           enum: [manual, transcript, paper]
           default: manual
-          description: 'Where the text came from. `paper` since 0.3.0 (paper path, slice 025).'
+          description: 'Where the text came from. `paper` since 0.3.0 (paper path, slice 025; produced only through `captureMeetingContribution`) — a response-enum widening, see "Compatibility" in info.description.'
         questionIds: { type: array, items: { type: string } }
         coverage:
           type: object
@@ -1709,16 +1768,37 @@ components:
           items: { $ref: '#/components/schemas/Action' }
     ContributionCapture:
       type: object
+      description: >-
+        Body of `captureContribution` (alias). Unchanged since 0.1.0 on purpose: the service validates
+        requests against this document, so the paper path and the sender's time statement live only on
+        `MeetingContributionCapture` (`captureMeetingContribution`, slice 025) until the core handles
+        them (review 023).
       required: [speakerId, text]
       properties:
         speakerId: { type: string }
         text: { type: string, minLength: 1 }
-        source: { type: string, enum: [manual, transcript, paper], description: '`paper` since 0.3.0' }
-        occurredAt: { type: string, format: date-time, description: 'Since 0.3.0 (ADR 0011): the sender''s statement; requires `occurredAtSource`; never becomes `recordedAt`; a value in the future is a 422' }
+        source: { type: string, enum: [manual, transcript] }
+    MeetingContributionCapture:
+      type: object
+      description: >-
+        Since 0.3.0 (slice 025): body of `captureMeetingContribution` — `ContributionCapture` plus the
+        paper path (`source: paper`, Papierpfad) and the sender's time statement (ADR 0011). A stated
+        `occurredAt` never becomes `recordedAt`; a value in the future is a 422. `occurredAt` and
+        `occurredAtSource` come together or not at all (`dependentRequired` in both directions,
+        enforced by the service's Ajv validator; the generated TypeScript types cannot express it).
+      required: [speakerId, text]
+      properties:
+        speakerId: { type: string }
+        text: { type: string, minLength: 1 }
+        source: { type: string, enum: [manual, transcript, paper], description: '`paper` = paper path (Papierpfad, slice 025)' }
+        occurredAt: { type: string, format: date-time, description: 'The sender''s statement of when the speech happened' }
         occurredAtSource:
           type: string
           enum: [device, paper, transcript]
-          description: 'Since 0.3.0: source of the stated `occurredAt`; a client cannot claim `server`'
+          description: 'Source of the stated `occurredAt`; a client cannot claim `server`'
+      dependentRequired:
+        occurredAt: [occurredAtSource]
+        occurredAtSource: [occurredAt]
     Track:
       type: string
       description: >
@@ -1821,9 +1901,8 @@ components:
         agendaItemId: { type: string }
         stageAssignment:
           deprecated: true
-          description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5: send `seatId` (ADR 0006); until slice 040 the server maps a value here to the default seat of the same id'
+          description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives with 0.4.0 (slice 043, ahead of 040): not in 0.3.0, because the unchanged service would accept and silently drop it today (review 023). `Question.seatId` is already declared on the response.'
           allOf: [ { $ref: '#/components/schemas/StageAssignment' } ]
-        seatId: { type: string, description: 'Since 0.3.0 (slice 040): podium seat that answers; must be a seat of the meeting (422 otherwise)' }
     AnswerDraft:
       type: object
       required: [text]
