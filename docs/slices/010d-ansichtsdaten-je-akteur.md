@@ -374,3 +374,18 @@ i18n-Text und Fragennummer; Erfolgstoast nennt die Nummer (neue Schlüssel de/en
 zweiten Abruf, e2e „Ende immer 500 → genau ein Toast“. 4: Fehlerzustand bleibt während des erneuten Ladens stehen
 oder Fokus geht nach dem Laden auf die Liste; e2e prüft Fokus. 6: neutraler Text. 5 angenommen (Ladezustand wird nicht
 angesagt); eigene `history.*`-Schlüssel folgen mit dem gestalteten Ladefehler der Historie (Folgepunkt).
+
+Runde 2 (Nachprüfung, Opus 5.5, frischer Kontext, HEAD `97eba3e`): Gates exit 0, Playwright 94/94, 010d-Datei 72/72 mit
+`--repeat-each=3`, axe ohne serious/critical. Befunde 1–4 und 6 behoben, je mit Sonde (P1–P10); Ziel 1 hält. Urteil:
+mergebereit, N1 vor dem Merge empfohlen.
+
+- **N1 minor (Regression aus Befund 1)** — `stillShown()` verlangt jetzt auch `selectedId === taken.id` und sperrt damit
+  auch `onDone` (Entwurf leeren): Entwurf auf A gehalten, Klick auf B (B lädt), Entwurf gelingt, zurück zu A → Version 2,
+  der Editor enthält noch den Text, ein weiteres Enter speichert ihn erneut (`answers/Page.tsx:146-150, 160-163`).
+- **N2 nit** — „Erneut versuchen“ liefert null Zeilen → „Kein Treffer“, Fokus auf BODY, `retried` bleibt gesetzt
+  (`answers/WorkList.tsx:333-343`).
+- **N3 nit** — kein Beschäftigt-Signal während des erneuten Versuchs; Zähler „0 von 0“ im Fehlerzustand (vorher schon so).
+
+Entscheidung des Architekten (Runde 2): N1 und N2 in dieser Scheibe (Entwurf leeren bindet an die Frage, nicht an die
+Auswahl; Banner und Dialog behalten die Auswahlprüfung; je ein e2e, N1 rot auf `97eba3e`). N3 geht mit dem gestalteten
+Ladefehler der Historie in die Folgeliste.
