@@ -171,3 +171,9 @@ Touched: `docs/produktplan-beta.md`, `docs/qualitaetsleitplanken-produktreife.md
 ## Review findings
 
 (vom Reviewer)
+
+**Nachtrag des Orchestrators (nach dem Bericht):** Die zwei vom Bauer offen gemeldeten Stellen sind in einem Folgecommit
+umgestellt: Plan Zeile 797 „von einem fremden Modell befolgt" → „von einem Agenten in frischem Kontext ohne Vorwissen
+befolgt" (Festlegung 5, Anleitungstests); Zeile 343 „reviewer-sonnet.md für Opus-gebaute Scheiben" → „reviewer-sonnet.md
+als optionale Zweitmeinung" (Beschreibung der Rollendatei seit takt-012). plan-honesty, plan-graph, vocabulary und
+slice-scope (`--base claude/takt-011-plan-service`) danach grün.
