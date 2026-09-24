@@ -196,3 +196,25 @@ slice-scope (`--base claude/takt-011-plan-service`) danach grün.
 6. minor (außerhalb) — Spec-Vorlage `docs/slices/README.md` verlangt „Rolle/Modell". **Umgang:** in diese Scheibe
    aufgenommen (Festlegung 7), Vorlage heißt jetzt „Rolle: …; Review in frischem Kontext".
 
+
+**Nachweis nach dem Merge von takt-011 (Festlegung 6, Orchestrator):** Integrationsbranch (mit 011, 023, takt-011 als
+Squash `b71a893`) eingemergt; der Integrationsstand ist inhaltlich gleich dem Endstand `0ea76c0` von takt-011, der
+vorher eingemergt wurde, deshalb blieb der Baum von takt-013 erhalten (`9f2d223`). Differenz zum Integrationsbranch: nur
+die acht erlaubten Dateien. Unverändertes `pnpm gates` auf `9f2d223`, Exit 0:
+```
+packages/domain test:       Tests  86 passed (86)
+apps/web test:       Tests  48 passed (48)
+apps/api test:       Tests  57 passed (57)
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+vocabulary-check: ok
+Plan-honesty check: 4 table(s), 38 row(s) in section 5, every "Stand" verified.
+slice-scope: warning — "docs/slices/takt-013-folgepunkte-opus55.md"'s "Files allowed" section differs from its version at the commit that introduced it (ec27a8a).
+slice-scope: 8 changed file(s), all within "docs/slices/takt-013-folgepunkte-opus55.md"'s "Files allowed" list (8 pattern(s)).
+Downgrade check: 15 spec(s) with a number 009-099, no unauthorised risk-class downgrade against docs/produktplan-beta.md.
+plan-graph: ok.
+# pass 206
+# fail 0
+✓ built in 1.35s
+mark-test-run: wrote /home/user/wt/prozess/.claude/state/last-test-run (clean tree) at commit 9f2d223, tree e6f3c75b692d…
+```
+Die Warnung ist erwartet: Festlegung 7 hat `docs/slices/README.md` in „Files allowed" aufgenommen.
