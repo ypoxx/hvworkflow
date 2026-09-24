@@ -1,5 +1,7 @@
 # Bauplan Demo — Orchestrierung der Agenten für die erste sichtbare Version
 
+> Historischer Plan des Demo-Baus; die Besetzung ist ersetzt durch takt-012 und takt-013.
+
 **Stand:** 2. September 2026, 22:30. **Ziel:** eine Version auf hvtool.netlify.app, die den Workflow
 Ende zu Ende zeigt, in bester Oberflächenqualität, ohne die nächsten Schritte zu verbauen.
 **Gilt zusammen mit:** `docs/agentische-entwicklung-plan.md` (Regeln R1–R12, Tore),

@@ -51,5 +51,7 @@ Bautag live sein (< 1 Bautag), M-Punkte (medium) innerhalb von 2 Bautagen (< 2 B
 (large) innerhalb einer Woche (< 1 Woche). Nachricht und Live im Format `JJJJ-MM-TT HH:MM`, Zeiten
 in Europe/Berlin. `node scripts/takt.mjs [--file docs/messung.md]` liest diese Tabelle.
 
+Ab 24.09.2026 gilt die Besetzung aus `.claude/agents/`: Opus 5.5, Mechanik Sonnet 5.
+
 | Punkt | Quelle | Klasse | Nachricht | Live | Dauer (h) |
 |---|---|---|---|---|---|

@@ -2,6 +2,10 @@
 
 **Status:** vorgeschlagen · **Datum:** 23.09.2026 · **Entscheider:** Umsetzer; Eigentümer für Merge-Befugnis, Kleinänderungsregel und Nutzungsdeckel (E48, E44, E47) · **Annahme:** Prüfpunkt 1 (Plan 4)
 
+Geändert am 24.09.2026 (takt-013): Review-Paarung und die verworfene Option „dasselbe Modell reviewt" an
+AGENTS.md Regel 3 und Plan R3 in der Fassung von takt-012 angeglichen — Unabhängigkeit entsteht durch frischen
+Kontext, nicht durch ein anderes Modell. Die übrigen Entscheidungen bleiben unverändert.
+
 ## Kontext
 
 Rund 80 Scheiben werden von mehreren Agenten in parallelen Worktrees gebaut; AGENTS.md (Regeln
@@ -25,9 +29,10 @@ Standardannahme aus Plan 4 (Zeile 0016) und Plan 10 (E44, E47, E48):
   (`scripts/slice-scope.mjs`). **Plan-Graph-Prüfung** läuft als Tor.
 - **i18n je Feature-Modul** (017), **Feature-Register für Routen**, **e2e-Dateien je Scheibe** plus
   geteilte Altdateien.
-- **Review-Paarung nach Regel 3:** ein anderes Modell in frischem Kontext, das nur Spec und Diff
-  sieht; Rollen liegen in `.claude/agents/` (Architekt, Planer, Design-Kritiker, Reviewer,
-  Reviewer für Opus-gebaute Scheiben).
+- **Review-Paarung nach Regel 3:** ein Reviewer in frischem Kontext, der nur Spec und Diff sieht;
+  wer baut, prüft nicht, auch nicht in derselben Sitzung. Ein anderes Modell ist dafür nicht nötig.
+  Rollen liegen in `.claude/agents/` (Architekt, Planer, Design-Kritiker, Reviewer, optionale zweite
+  Sicht `reviewer-sonnet.md`); das Modell je Rolle steht nur dort.
 - **Merge durch den Orchestrator** nach grünen Toren und unabhängigem Review (E48, Plan 6.6); der
   Mensch sieht jeden Merge im Tagesbericht und kann ihn zurücknehmen; Deploy nach Staging und
   Übungsmandant nur nach Go des Eigentümers (Regel 11, Plan 6.7). Für die Demo als Taktfläche
@@ -74,7 +79,8 @@ Behauptung; B13 verlangt deshalb ein Plan-Ehrlichkeits-Tor.
 - **Der Mensch mergt jede Scheibe selbst.** Nicht gewählt: E48 — Orchestrator mergt nach Toren und
   Review, Rücknahme bleibt; Deploy bleibt beim Menschen. Für die Demo-Taktfläche ist der Merge-Weg
   offen (Konflikt Plan 3 / E48, siehe Entscheidung).
-- **Der Bauende reviewt selbst oder dasselbe Modell reviewt.** Verworfen: Regel 3.
+- **Der Bauende reviewt selbst oder in derselben Sitzung.** Verworfen: Regel 3. Dass dasselbe Modell
+  in frischem Kontext reviewt, ist dagegen erlaubt (takt-012); ein anderes Modell ist keine Pflicht.
 - **Sammelregel oder Sammel-Merge für Kleinänderungen.** Nicht gewählt; Option E44.
 - **Ein geteiltes i18n-Wörterbuch, geteilte e2e-Dateien.** Verworfen: Lane-Konflikte (017).
 - **Herabstufung der Risikoklasse durch einen Agenten.** Verworfen: nur mit menschlicher
