@@ -86,9 +86,13 @@ export function CapturePage() {
    * answered yet — the probe used to fetch the whole corpus right then, although a speaker would
    * be resolved a moment later. It now runs only when the lookup has answered and produced no
    * speaker at all (refused, failed, or a meeting without any Wortmeldung).
+   *
+   * Slice 010c, Ziel 3: "answered" means answered for the current key (`speakers.settled`, actor
+   * and `version`). `status` alone still reported the previous key's refusal in the render after a
+   * switch from a refused role to one that may read — the probe then fetched the whole corpus
+   * unfiltered, although the new role's lookup was about to resolve a Wortmeldung.
    */
-  const needsProbe =
-    speakerId === null && speakers.status !== 'loading' && speakers.data.length === 0;
+  const needsProbe = speakerId === null && speakers.settled && speakers.data.length === 0;
   const contributionsProbe = useAsync<readonly Contribution[]>(
     () => (needsProbe ? api.listContributions() : Promise.resolve(NO_CONTRIBUTIONS)),
     NO_CONTRIBUTIONS,

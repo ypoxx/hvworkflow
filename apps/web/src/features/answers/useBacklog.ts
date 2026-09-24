@@ -7,14 +7,24 @@
  * Refetching is bound to `useApiVersion()` (new events, changed actor) and to `reload()`, which
  * every refused write calls: the record is the truth, the interface never patches state locally.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaItem, DomainEvent, Question, QuestionStatus, Track, Unit } from '@hv/domain';
 import { QUESTION_STATUSES } from '@hv/domain';
 import { api } from '../../api';
+import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import { showProblem } from '../../components';
 import { getLang, translate } from '../../i18n';
-import { LIST_LIMIT, createDetailProblemGate, isReadForbidden } from './lib';
+import {
+  LIST_LIMIT,
+  createDetailProblemGate,
+  isCurrentLoad,
+  isReadForbidden,
+  listOmits,
+  loadKey,
+  readVerdict,
+} from './lib';
+import type { KeyedRead } from './lib';
 
 export type StatusFilter = QuestionStatus | 'all';
 export type TrackFilter = Track | 'all';
@@ -101,7 +111,21 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
 
   const [pool, setPool] = useState<readonly Question[]>([]);
   const [listLoading, setListLoading] = useState(true);
-  const [listForbidden, setListForbidden] = useState(false);
+  /**
+   * Slice 010c, Ziel 1: the list's answer carries the key of its load (actor and `version`), and
+   * "keine Leseberechtigung" is the verdict of the current key only (`readVerdict`, lib.ts). It used
+   * to be a bare flag that only a successful list cleared — after a switch from a refused role, a
+   * 500 on the new role's first read left the refusal standing.
+   */
+  const actorId = useActor().id;
+  const listKey = loadKey(actorId, version);
+  const [listRead, setListRead] = useState<KeyedRead | null>(null);
+  const [shownForbidden, setShownForbidden] = useState(false);
+  const listForbidden = readVerdict(shownForbidden, [{ read: listRead, key: listKey }]);
+  if (listForbidden !== shownForbidden) setShownForbidden(listForbidden);
+  // Slice 010c, Ziel 5: who made the current selection. A selection of another actor that the new
+  // actor's list leaves out is taken as not readable, even when that list is filtered (`listOmits`).
+  const selectedBy = useRef<string | null>(null);
   // Codex P2-A on 948a721: whether `pool` is the whole of what this actor may read — no
   // server-side filter, nothing cut off by the limit. Only then does "not in the list" mean "not
   // readable"; a filtered list says nothing about what it leaves out.
@@ -154,6 +178,11 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
 
   useEffect(() => {
     let cancelled = false;
+    // Slice 010c: the key this load answers for, and the view's key when the answer arrives —
+    // read from the actor store at that moment, so an answer in the gap between an actor switch and
+    // the `version` bump is dropped too.
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     setListLoading(true);
     api
       .listQuestions({
@@ -164,7 +193,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
         ...(agendaItemId !== ALL ? { agendaItemId } : {}),
       })
       .then((page) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         const complete =
           search === '' &&
           track === ALL &&
@@ -172,24 +201,28 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
           agendaItemId === ALL &&
           page.items.length >= page.total;
         const ids = new Set(page.items.map((question) => question.id));
+        const selectedByOther = selectedBy.current !== null && selectedBy.current !== getActor().id;
         setPool(page.items);
         setPoolComplete(complete);
         setListLoading(false);
-        setListForbidden(false);
-        gate.settleMain(`${version}:${nonce}`, false, complete ? (id) => !ids.has(id) : undefined);
+        setListRead({ key: requested, status: 'ready' });
+        gate.settleMain(`${version}:${nonce}`, false, listOmits(ids, complete, selectedByOther));
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setListLoading(false);
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — e.g. podium, who
           // holds neither `question.read` nor `question.read.delivered` at all.
           setPool([]);
           setPoolComplete(false);
-          setListForbidden(true);
+          setListRead({ key: requested, status: 'forbidden' });
           gate.settleMain(`${version}:${nonce}`, true);
           return;
         }
+        // Slice 010c, Ziel 1: a failure is this load's answer too — it replaces a refusal of an
+        // earlier load instead of leaving it standing.
+        setListRead({ key: requested, status: 'error' });
         problem(error);
         // A list that failed for another reason does not say the detail is unreadable.
         gate.settleMain(`${version}:${nonce}`, false);
@@ -212,6 +245,7 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
   // Nit 2 (review round 5): each change of the selection is a new pass for the gate's one toast.
   useEffect(() => {
     gate.select();
+    selectedBy.current = selectedId === null ? null : getActor().id;
   }, [selectedId, gate]);
 
   // Major (review round 2): the open question and its history used to travel together in one

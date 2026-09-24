@@ -224,13 +224,17 @@ export function QuestionDetail({
    * moved to the block that shows the outcome — the new status or the Freigabe — so the person
    * (and a screen reader) lands on what just happened, and a second Enter there changes nothing.
    *
-   * Review round 1, finding 4: the marker is settled when the write is — `busy` falls only once the
-   * page shows the new version (or the write was refused, answers/Page.tsx), so that is the render
-   * in which the button is either gone (success) or still there (refusal); either way the marker is
-   * cleared. A different question remounts this component (`key={question.id}`), which clears it too.
+   * Review round 1, finding 4: the marker is settled with the write. A different question remounts
+   * this component (`key={question.id}`), which clears it too.
+   *
+   * Slice 010c, Ziel 6 (N1 of takt-008's Nachprüfung): the marker holds the record the step was
+   * taken on, and is settled only once a record read after it is on screen. After a refusal the
+   * lock falls at once (answers/Page.tsx) while the page still shows the old copy; a 412 means the
+   * record did move, and the step's button leaves only with the re-read — clearing the marker when
+   * the lock fell dropped the focus to `<body>` right then.
    */
   const approvalBlock = useRef<HTMLDivElement>(null);
-  const stepTaken = useRef<'submit' | 'approve' | null>(null);
+  const stepTaken = useRef<Question | null>(null);
 
   const unit = useMemo(
     () => units.find((candidate) => candidate.id === question.unitId),
@@ -248,13 +252,17 @@ export function QuestionDetail({
   const mayWithdraw = may.includes('question.withdraw');
 
   useEffect(() => {
-    if (busy) return;
-    const taken = stepTaken.current;
-    stepTaken.current = null;
-    if (taken === null) return;
+    const takenOn = stepTaken.current;
+    if (busy || takenOn === null) return;
     const active = document.activeElement;
-    if (active === null || active === document.body) approvalBlock.current?.focus();
-  }, [busy]);
+    if (active === null || active === document.body) {
+      stepTaken.current = null;
+      approvalBlock.current?.focus();
+      return;
+    }
+    // The button kept its focus: the step is settled once a record read after it is shown.
+    if (question !== takenOn) stepTaken.current = null;
+  }, [busy, question]);
 
   const dirty = draft.trim() !== '';
   // Exactly one primary action (D2): the step that moves this question on — unless something is
@@ -366,7 +374,7 @@ export function QuestionDetail({
                 // takt-008: `aria-disabled` keeps focus while the step is written (Button.tsx).
                 aria-disabled={busy}
                 onClick={() => {
-                  stepTaken.current = 'submit';
+                  stepTaken.current = question;
                   onAction({ kind: 'submit_review' });
                 }}
               >
@@ -379,7 +387,7 @@ export function QuestionDetail({
                 variant={primary === 'approve' ? 'primary' : 'secondary'}
                 aria-disabled={busy}
                 onClick={() => {
-                  stepTaken.current = 'approve';
+                  stepTaken.current = question;
                   onAction({ kind: 'approve', version: latest });
                 }}
               >

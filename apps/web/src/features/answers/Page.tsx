@@ -102,9 +102,12 @@ export function AnswersPage() {
         // every other refusal (403/409 among them).
         if (problemStatus(error) === 412) setStale(true);
         else showProblem(error, t('toast.problem'));
-        // Refused: nothing changed on the record, so nothing to wait for — unlock at once.
-        writing.current = null;
-        setLock(null);
+        // Refused: nothing changed on the record, so nothing to wait for — unlock at once. Slice
+        // 010c, Ziel 6 (N2 of takt-008's Nachprüfung): only this write's own lock. Its lock may
+        // already have fallen (the page moved on to another question), and a newer write may hold
+        // the next one — an older write's refusal must not free that.
+        if (writing.current === taken) writing.current = null;
+        setLock((held) => (held === taken ? null : held));
         reload();
         return false;
       }

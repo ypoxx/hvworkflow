@@ -194,3 +194,57 @@ export function createDetailProblemGate(show: (error: unknown) => void): DetailP
     },
   };
 }
+
+/**
+ * Slice 010c (Lesezustand je Ladevorgang): a read state — ready, refused, failed — belongs to the
+ * load that produced it, and a load is keyed by the actor who asked and the `version` it asked at.
+ * Two rules follow, and every view keeps both:
+ * - An answer counts only for its own load (`isCurrentLoad`). One that was overtaken — a newer
+ *   `version`, or another actor in the gap before the `version` bump that follows every actor
+ *   switch (api/useApiVersion.ts) — never reports.
+ * - The view's verdict ("keine Leseberechtigung" or not) changes only once every read it depends on
+ *   has answered for the current key (`readVerdict`), and then whatever those answers say replaces
+ *   it: a refusal of an earlier load never outlives a failure of the current one. Until then the
+ *   previous verdict stands, so nothing flickers while a load is on its way (design principle 8).
+ *
+ * Kept as a small local copy per feature (`speakers/useSpeakers.ts`, `capture/useCapture.ts`,
+ * `answers/lib.ts`, `stage/lib.ts`, `history/lib.ts`) — the spec allows no shared folder outside the
+ * features — and covered by the same test table in each.
+ */
+export type ReadStatus = 'ready' | 'forbidden' | 'error';
+
+/** What one load answered, and which load that was. */
+export interface KeyedRead {
+  readonly key: string;
+  readonly status: ReadStatus;
+}
+
+/** The key of one load: who asked, and at which `version` (plus, where needed, what was asked). */
+export function loadKey(actorId: string, version: number | string): string {
+  return JSON.stringify([actorId, String(version)]);
+}
+
+/**
+ * Whether an answer asked under `requested` still speaks for the view. `current` is the view's key
+ * at the moment the answer arrives, or `null` once the view has moved on (its effect was cleaned up).
+ */
+export function isCurrentLoad(requested: string, current: string | null): boolean {
+  return current !== null && requested === current;
+}
+
+/** Whether `read` has answered for `key` — a read of an earlier key has not. */
+export function settledFor(read: KeyedRead | null, key: string): boolean {
+  return read !== null && read.key === key;
+}
+
+/**
+ * The verdict a view shows: `previous` until every read has answered for its own current key, then
+ * "refused" exactly if one of those answers is a refusal.
+ */
+export function readVerdict(
+  previous: boolean,
+  reads: readonly { read: KeyedRead | null; key: string }[],
+): boolean {
+  if (!reads.every(({ read, key }) => settledFor(read, key))) return previous;
+  return reads.some(({ read }) => read?.status === 'forbidden');
+}

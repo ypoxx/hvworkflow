@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { History, Lock, Search } from 'lucide-react';
 import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
 import { api } from '../../api';
+import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import {
   Button,
@@ -30,9 +31,13 @@ import {
   STREAM_SCAN_LIMIT,
   createDetailProblemGate,
   excerpt,
+  isCurrentLoad,
   isReadForbidden,
   loadCurve,
+  loadKey,
+  readVerdict,
 } from './lib';
+import type { KeyedRead } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -110,14 +115,38 @@ export function HistoryPage() {
   // ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
   // `question.read.delivered` and simply sees fewer rows (Ziel 3).
-  const [mainForbidden, setMainForbidden] = useState(false);
+  //
+  // Slice 010c: every read state carries the key of its load (actor and `version`, plus the
+  // selected question for the Vorgangshistorie), and each "keine Leseberechtigung" is the verdict of
+  // the current key (`readVerdict`, lib.ts). They used to be bare flags that only a successful read
+  // cleared — after a switch from a refused role, a 500 on the new role's first read left the
+  // refusal standing (Ziel 2).
+  const actorId = useActor().id;
+  const mainKey = loadKey(actorId, version);
+  const timelineKey = loadKey(actorId, `${version}:${selectedId ?? ''}`);
+  const [corpusRead, setCorpusRead] = useState<KeyedRead | null>(null);
+  const [resultsRead, setResultsRead] = useState<KeyedRead | null>(null);
+  const [shownMainForbidden, setShownMainForbidden] = useState(false);
+  const mainForbidden = readVerdict(shownMainForbidden, [
+    { read: corpusRead, key: mainKey },
+    { read: resultsRead, key: mainKey },
+  ]);
+  if (mainForbidden !== shownMainForbidden) setShownMainForbidden(mainForbidden);
   // Codex P2-A on 948a721: whether `corpus` is the whole of what this actor may read (nothing cut
   // off by the limit) — only then does "not in the corpus" mean "not readable".
   const [corpusComplete, setCorpusComplete] = useState(false);
   // Ziel 3: the "Vorgangshistorie" tab of one selected question (`getQuestionHistory`).
-  const [historyForbidden, setHistoryForbidden] = useState(false);
+  const [timelineRead, setTimelineRead] = useState<KeyedRead | null>(null);
+  const [shownHistoryForbidden, setShownHistoryForbidden] = useState(false);
+  const historyForbidden = readVerdict(shownHistoryForbidden, [
+    { read: timelineRead, key: timelineKey },
+  ]);
+  if (historyForbidden !== shownHistoryForbidden) setShownHistoryForbidden(historyForbidden);
   // Ziel 3: the "Ereignisstrom" tab (`listEvents`).
-  const [streamForbidden, setStreamForbidden] = useState(false);
+  const [streamRead, setStreamRead] = useState<KeyedRead | null>(null);
+  const [shownStreamForbidden, setShownStreamForbidden] = useState(false);
+  const streamForbidden = readVerdict(shownStreamForbidden, [{ read: streamRead, key: mainKey }]);
+  if (streamForbidden !== shownStreamForbidden) setShownStreamForbidden(streamForbidden);
 
   /**
    * Codex P2-2 on 4f0d231 (the same class as Codex (b) on 7f542b6 in the Beantwortung, see
@@ -159,26 +188,32 @@ export function HistoryPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Slice 010c: the key this load answers for, and the view's key when the answer arrives — read
+    // from the actor store at that moment, so an answer in the gap between an actor switch and the
+    // `version` bump is dropped too.
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     api
       .listQuestions({ limit: 2000 })
       .then((page) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         const complete = page.items.length >= page.total;
         const ids = new Set(page.items.map((question) => question.id));
         setCorpus(page.items);
         setCorpusComplete(complete);
-        setMainForbidden(false);
+        setCorpusRead({ key: requested, status: 'ready' });
         gate.settleMain(String(version), false, complete ? (id) => !ids.has(id) : undefined);
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
           setCorpus([]);
           setCorpusComplete(false);
-          setMainForbidden(true);
+          setCorpusRead({ key: requested, status: 'forbidden' });
           gate.settleMain(String(version), true);
           return;
         }
+        setCorpusRead({ key: requested, status: 'error' });
         problem(error);
         gate.settleMain(String(version), false);
       });
@@ -189,14 +224,18 @@ export function HistoryPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Slice 010c: names of a previous actor that land in the gap before the `version` bump are
+    // dropped like every other answer of an overtaken load.
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     api
       .listSpeakers()
       .then((speakers) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setSpeakerNames(new Map(speakers.map((speaker) => [speaker.id, speaker.displayName])));
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         // Ziel 2: a Nebenabfrage never blocks the view and never toasts for a read refusal — the
         // event summaries simply carry fewer names (`eventSubject`, eventSummary.ts). Nit 10
         // (review round 2): cleared, not left holding a previous, more privileged role's names —
@@ -213,25 +252,28 @@ export function HistoryPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     setResultsLoading(true);
     api
       .listQuestions({ limit: RESULT_LIMIT, ...(search !== '' ? { q: search } : {}) })
       .then((page) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setResults([...page.items].sort((a, b) => a.number.localeCompare(b.number)));
         setTotal(page.total);
         setResultsLoading(false);
-        setMainForbidden(false);
+        setResultsRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setResultsLoading(false);
         if (isReadForbidden(error)) {
           setResults([]);
           setTotal(0);
-          setMainForbidden(true);
+          setResultsRead({ key: requested, status: 'forbidden' });
           return;
         }
+        setResultsRead({ key: requested, status: 'error' });
         problem(error);
       });
     return () => {
@@ -254,30 +296,36 @@ export function HistoryPage() {
   }, [selectedId, gate]);
 
   useEffect(() => {
+    const scope = `${version}:${selectedId ?? ''}`;
+    const requested = loadKey(getActor().id, scope);
     if (selectedId === null || selectionHidden) {
+      // Nothing to read is an answer too: no refusal stands for this key.
       setHistory([]);
-      setHistoryForbidden(false);
+      setTimelineRead({ key: requested, status: 'ready' });
       return undefined;
     }
     let cancelled = false;
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, scope));
     const load = String(version);
     api
       .getQuestionHistory(selectedId)
       .then((events) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         setHistory(events);
-        setHistoryForbidden(false);
+        setTimelineRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who may find the question (`question.read.delivered`) but holds
           // no `history.read` — a gestalteter Zustand, not an error toast.
           setHistory([]);
-          setHistoryForbidden(true);
+          setTimelineRead({ key: requested, status: 'forbidden' });
           return;
         }
         setHistory([]);
+        // Slice 010c, Ziel 2: the failure is this load's answer and replaces an earlier refusal.
+        setTimelineRead({ key: requested, status: 'error' });
         gate.report(load, selectedId, error);
       });
     return () => {
@@ -288,6 +336,8 @@ export function HistoryPage() {
   useEffect(() => {
     if (tab !== 'stream') return undefined;
     let cancelled = false;
+    const requested = loadKey(getActor().id, version);
+    const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
     // `version` bumps on every actor switch too (api/useApiVersion.ts), which never grows the log
     // — a cheap read of just the tail `seq` first, and skipping the bounded read below when it has
     // not moved, means switching roles while this tab is open no longer re-reads the log at all
@@ -296,31 +346,33 @@ export function HistoryPage() {
     api
       .listEvents(0, 1)
       .then(({ lastSeq }) => {
-        if (cancelled) return undefined;
-        setStreamForbidden(false);
+        if (!isCurrentLoad(requested, current())) return undefined;
+        setStreamRead({ key: requested, status: 'ready' });
         if (lastSeq === streamLastSeq) return undefined;
         return api
           .listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT)
           .then((page) => {
-            if (cancelled) return;
+            if (!isCurrentLoad(requested, current())) return;
             setStreamLastSeq(lastSeq);
             setStreamWindow(page.items);
             setCurve(loadCurve(page.items, Date.now()));
           });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who holds no `event.read` at all — a gestalteter Zustand, not
           // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds
           // `streamLastSeq` to 0 — a role that regains `event.read` later must not see the
           // `lastSeq === streamLastSeq` short-circuit above skip its own first, honest read back.
-          setStreamForbidden(true);
+          setStreamRead({ key: requested, status: 'forbidden' });
           setStreamWindow([]);
           setCurve([]);
           setStreamLastSeq(0);
           return;
         }
+        // Slice 010c, Ziel 2: the failure is this load's answer and replaces an earlier refusal.
+        setStreamRead({ key: requested, status: 'error' });
         problem(error);
       });
     return () => {

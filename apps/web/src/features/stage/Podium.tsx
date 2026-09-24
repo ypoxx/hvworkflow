@@ -27,8 +27,11 @@ import { approvedAnswer, clockTime } from './lib';
 interface PodiumProps {
   stage: StageView;
   busy: boolean;
-  /** Rendered only when the record allows it — `_actions` decides, never a role. */
-  onNext: () => void;
+  /**
+   * Rendered only when the record allows it — `_actions` decides, never a role. Returns whether a
+   * write was started (slice 010c, Ziel 6: N3 of takt-008's Nachprüfung).
+   */
+  onNext: () => boolean;
   onReturn: () => void;
 }
 
@@ -175,23 +178,27 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
   // by this person), "Vorgelesen, weiter" leaves with it and its focus falls to `<body>`. It is
   // moved to the podium itself, which then says what is (or is not) on stage.
   //
-  // Review round 1, finding 4: the marker is settled when the write is — `busy` falls only once the
-  // podium shows the next question (or the write was refused, Page.tsx) — and cleared on every
-  // change of the current question, so it can never outlive the press that set it.
+  // Slice 010c, Ziel 6 (N1–N3 of takt-008's Nachprüfung): the marker holds the record the press
+  // was made on and is settled only once a record read after it is on screen — after a refusal
+  // the lock falls at once (Page.tsx) while the old copy still shows, and after a 412 the button
+  // leaves only with the re-read; clearing the marker when the lock fell dropped the focus to
+  // `<body>` right then (N1). It is set only when the press started a write (N3).
   const podium = useRef<HTMLDivElement>(null);
-  const nextPressed = useRef(false);
-  const currentId = current?.id;
+  const nextPressed = useRef<StageView | null>(null);
   useEffect(() => {
-    if (busy) return;
-    const pressed = nextPressed.current;
-    nextPressed.current = false;
-    if (!pressed || mayDeliver) return;
+    const pressedOn = nextPressed.current;
+    if (busy || pressedOn === null) return;
     const active = document.activeElement;
-    if (active === null || active === document.body) podium.current?.focus();
-  }, [busy, mayDeliver, currentId]);
+    if (active === null || active === document.body) {
+      nextPressed.current = null;
+      podium.current?.focus();
+      return;
+    }
+    // The button kept its focus (the next question may be read out too): the press is settled.
+    if (stage !== pressedOn) nextPressed.current = null;
+  }, [busy, stage]);
   const next = (): void => {
-    nextPressed.current = true;
-    onNext();
+    if (onNext()) nextPressed.current = stage;
   };
 
   if (current === null) {

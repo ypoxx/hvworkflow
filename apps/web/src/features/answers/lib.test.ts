@@ -7,7 +7,16 @@
  * here.
  */
 import { describe, expect, it } from 'vitest';
-import { createDetailProblemGate, isReadForbidden, wordDiff } from './lib';
+import {
+  createDetailProblemGate,
+  isCurrentLoad,
+  isReadForbidden,
+  listOmits,
+  loadKey,
+  readVerdict,
+  settledFor,
+  wordDiff,
+} from './lib';
 
 describe('wordDiff', () => {
   it('identical texts yield only equal parts', () => {
@@ -124,5 +133,88 @@ describe('createDetailProblemGate', () => {
     gate.settleMain('4', false, (id) => id === 'q1');
     gate.report('4', 'q1', { status: 404 });
     expect(shown).toEqual([]);
+  });
+});
+
+/**
+ * Slice 010c — the key comparison of "Lesezustand je Ladevorgang". The same table stands in every
+ * feature that keeps a copy (`speakers/useSpeakers.test.ts`, `capture/useCapture.test.ts`,
+ * `answers/lib.test.ts`, `stage/lib.test.ts`, `history/lib.test.ts`), so a copy that drifts fails.
+ */
+describe('loadKey, isCurrentLoad, settledFor, readVerdict (slice 010c)', () => {
+  const now = loadKey('u-exp-fin', 7);
+
+  it('the same actor at the same version is the same load', () => {
+    expect(loadKey('u-exp-fin', 7)).toBe(now);
+    expect(isCurrentLoad(now, loadKey('u-exp-fin', 7))).toBe(true);
+  });
+
+  it('a newer version overtakes a load: its answer does not report', () => {
+    expect(isCurrentLoad(now, loadKey('u-exp-fin', 8))).toBe(false);
+  });
+
+  it('another actor at the same version (the gap before the version bump) does not report', () => {
+    expect(isCurrentLoad(now, loadKey('u-podium', 7))).toBe(false);
+  });
+
+  it('a view that has moved on (effect cleaned up) takes no answer', () => {
+    expect(isCurrentLoad(now, null)).toBe(false);
+  });
+
+  it('keys do not collide across the actor/version boundary', () => {
+    expect(loadKey('a', 12)).not.toBe(loadKey('a1', 2));
+    expect(loadKey('a', '1:2')).not.toBe(loadKey('a:1', 2));
+  });
+
+  it('settledFor: only an answer of this very key has settled', () => {
+    expect(settledFor(null, now)).toBe(false);
+    expect(settledFor({ key: loadKey('u-podium', 6), status: 'forbidden' }, now)).toBe(false);
+    expect(settledFor({ key: now, status: 'error' }, now)).toBe(true);
+  });
+
+  it('readVerdict: a failure of the current load lifts a refusal of an earlier one', () => {
+    expect(readVerdict(true, [{ read: { key: now, status: 'error' }, key: now }])).toBe(false);
+  });
+
+  it('readVerdict: a refusal of the current load sets it, a ready answer lifts it', () => {
+    expect(readVerdict(false, [{ read: { key: now, status: 'forbidden' }, key: now }])).toBe(true);
+    expect(readVerdict(true, [{ read: { key: now, status: 'ready' }, key: now }])).toBe(false);
+  });
+
+  it('readVerdict: while the current load is on its way the previous verdict stands (no flicker)', () => {
+    const earlier = { key: loadKey('u-obs', 6), status: 'forbidden' as const };
+    expect(readVerdict(true, [{ read: earlier, key: now }])).toBe(true);
+    expect(readVerdict(false, [{ read: earlier, key: now }])).toBe(false);
+    expect(readVerdict(true, [{ read: null, key: now }])).toBe(true);
+  });
+
+  it('readVerdict: with several reads it waits for all of them, then any refusal counts', () => {
+    const other = loadKey('u-exp-fin', '7:q');
+    const ready = { key: now, status: 'ready' as const };
+    expect(readVerdict(true, [{ read: ready, key: now }, { read: null, key: other }])).toBe(true);
+    expect(
+      readVerdict(false, [
+        { read: ready, key: now },
+        { read: { key: other, status: 'forbidden' }, key: other },
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe('listOmits (slice 010c, Ziel 5)', () => {
+  const ids = new Set(['q-1']);
+
+  it('a complete list leaves out what it does not contain', () => {
+    expect(listOmits(ids, true, false)?.('q-2')).toBe(true);
+    expect(listOmits(ids, true, false)?.('q-1')).toBe(false);
+  });
+
+  it('a filtered list, same actor: says nothing (a real detail fault still shows)', () => {
+    expect(listOmits(ids, false, false)).toBeUndefined();
+  });
+
+  it('a filtered list, selection made by another actor: a missing selection is left out', () => {
+    expect(listOmits(ids, false, true)?.('q-2')).toBe(true);
+    expect(listOmits(ids, false, true)?.('q-1')).toBe(false);
   });
 });
