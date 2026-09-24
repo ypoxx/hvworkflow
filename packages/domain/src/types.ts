@@ -22,12 +22,15 @@ export interface Actor {
   displayName?: string;
 }
 
-/** Permission identifiers. Identical to the `Action` enum of the contract. */
+/** Permission identifiers. Identical to the `Action` enum of the contract (`question.legal.clear` is
+ * not in this list yet — its permission bundle arrives with slice 021). */
 export const PERMISSIONS = [
   'speaker.register',
   'speaker.reorder',
   'speaker.update',
+  'speaker.read',
   'contribution.capture',
+  'contribution.read',
   'question.capture',
   'question.classify',
   'question.assign',
@@ -41,9 +44,36 @@ export const PERMISSIONS = [
   'question.withdraw',
   'question.merge',
   'question.read',
+  'question.read.delivered',
+  'stage.read',
+  'history.read',
+  'event.read',
   'demo.seed',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
+
+/**
+ * Read methods and the permission(s) that unlock them — data, so `can()`/`hasPermission()`
+ * (packages/domain/src/api.ts, permissions.ts) never derive "is this a read?" from a permission's
+ * name (no `.endsWith('.read')`, Festlegung 6 of docs/slices/010-lesepfade-leserechte.md). More than
+ * one entry is an OR: `question.read.delivered` is a status-scoped alternative to `question.read`
+ * (R-PERM-03, see `READ_SCOPES` in permissions.ts). Master data (`getMeeting`, `listAgendaItems`,
+ * `listUnits`) has no entry — every signed-in role may read it (Festlegung 1), so the service checks
+ * only that the actor exists, never `can()`. `subscribe` (the 13th read method) has no entry either:
+ * it is checked per delivery, directly against `event.read` (Festlegung 5).
+ */
+export const READ_PERMISSIONS = {
+  listSpeakers: ['speaker.read'],
+  getSpeaker: ['speaker.read'],
+  listContributions: ['contribution.read'],
+  getContribution: ['contribution.read'],
+  listQuestions: ['question.read', 'question.read.delivered'],
+  getQuestion: ['question.read', 'question.read.delivered'],
+  getStage: ['stage.read'],
+  getQuestionHistory: ['history.read'],
+  listEvents: ['event.read'],
+} as const satisfies Record<string, readonly Permission[]>;
+export type ReadMethod = keyof typeof READ_PERMISSIONS;
 
 export const QUESTION_STATUSES = [
   'captured', // erfasst

@@ -67,6 +67,13 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'question.withdraw': 'action.question.withdraw',
   'question.merge': 'action.question.merge',
   'question.read': 'action.question.read',
+  // Read permissions (slice 010): the read methods now check them through `can()` too.
+  'speaker.read': 'action.speaker.read',
+  'contribution.read': 'action.contribution.read',
+  'question.read.delivered': 'action.question.read.delivered',
+  'stage.read': 'action.stage.read',
+  'history.read': 'action.history.read',
+  'event.read': 'action.event.read',
   'demo.seed': 'action.demo.seed',
 };
 

@@ -153,6 +153,13 @@ export const shellDe = {
   'action.question.withdraw': 'Zurückziehen',
   'action.question.merge': 'Zusammenführen',
   'action.question.read': 'Ansehen',
+  // Read permissions (Scheibe 010): rein lesende Rechte, dieselbe knappe Bezeichnung wie question.read.
+  'action.speaker.read': 'Ansehen',
+  'action.contribution.read': 'Ansehen',
+  'action.question.read.delivered': 'Ansehen',
+  'action.stage.read': 'Ansehen',
+  'action.history.read': 'Ansehen',
+  'action.event.read': 'Ansehen',
   'action.demo.seed': 'Demobestand erzeugen',
   'event.MeetingCreated': 'Hauptversammlung angelegt',
   'event.SpeakerRegistered': 'Wortmeldung aufgenommen',

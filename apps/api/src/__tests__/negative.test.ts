@@ -43,21 +43,23 @@ describe('negative cases and idempotency', () => {
     expectValidProblem(await res.json());
   });
 
-  it('403: observer may read but not classify (deny reason carries a rule id)', async () => {
+  it('404: observer classifying a captured question is masked as not found, not 403 (Festlegung 3, slice 010)', async () => {
     const listRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
     const { items } = await listRes.json();
     const q = items[0];
 
+    // Observer holds neither `question.read` (captured is outside `question.read.delivered`'s
+    // scope) nor `question.classify` — Festlegung 3's 404 precedence masks this exactly like an
+    // unknown id, so a role without any read access cannot tell which ids exist.
     const res = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: ACTOR.observer,
       body: { track: 'podium' },
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(res.headers.get('Content-Type')).toContain('application/problem+json');
     const problem = await res.json();
-    expectValid('classifyQuestion', 403, problem, 'application/problem+json');
+    expectValid('classifyQuestion', 404, problem, 'application/problem+json');
     expectValidProblem(problem);
-    expect(problem.ruleId).toBe('R-PERM-01');
   });
 
   it('403: POST /v1/demo/seed is refused unless HV_DEMO=1', async () => {
@@ -268,16 +270,17 @@ describe('negative cases and idempotency', () => {
     expect(bodyA._actions).not.toContain('question.approve'); // capture role: sanity on this actor's view
 
     // The same key replayed by an actor without the permission must be a fresh, denied request —
-    // never a cached 200 carrying the classifying actor's `_actions`.
+    // never a cached 200 carrying the classifying actor's `_actions`. `q` is now `classified`
+    // (byA's own classification), outside observer's `question.read.delivered` scope, and observer
+    // holds no `question.classify` either — 404, not 403 (Festlegung 3, "keine ableitbare ID").
     const byObserver = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: ACTOR.observer,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
-    expect(byObserver.status).toBe(403);
+    expect(byObserver.status).toBe(404);
     const observerProblem = await byObserver.json();
-    expectValid('classifyQuestion', 403, observerProblem, 'application/problem+json');
-    expect(observerProblem.ruleId).toBe('R-PERM-01');
+    expectValid('classifyQuestion', 404, observerProblem, 'application/problem+json');
 
     // The classifying actor replaying its own key still gets the original, unchanged result.
     const byAAgain = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
@@ -291,5 +294,53 @@ describe('negative cases and idempotency', () => {
     // Only the one classification actually happened: the observer's replay never appended an event.
     const after = await (await req(app, 'GET', '/v1/events?limit=1', { actor: ACTOR.admin })).json();
     expect(after.lastSeq).toBe(before.lastSeq + 1);
+  });
+
+  // Rework round after review, point 6: restore write-permission-denial coverage that the 403 -> 404
+  // changes above (Festlegung 3) removed from this file — using actors who *can* read the question,
+  // so these two are real 403s, never the 404 mask.
+
+  it('403: observer may read a delivered question but returning it is a real R-PERM-01, not the 404 mask', async () => {
+    const deliveredRes = await req(app, 'GET', '/v1/questions?status=delivered&limit=1', { actor: ACTOR.admin });
+    const q = (await deliveredRes.json()).items[0];
+
+    const getRes = await req(app, 'GET', `/v1/questions/${q.id}`, { actor: ACTOR.observer });
+    expect(getRes.status).toBe(200); // in scope — proves the 403 below is not the 404 mask
+
+    const res = await req(app, 'POST', `/v1/questions/${q.id}/returns`, {
+      actor: ACTOR.observer,
+      body: { reason: 'nicht zulässig' },
+    });
+    expect(res.status).toBe(403);
+    const problem = await res.json();
+    expectValid('returnQuestion', 403, problem, 'application/problem+json');
+    expect(problem.ruleId).toBe('R-PERM-01');
+  });
+
+  it('403: an actor who can read the question but lacks the permission gets a real R-PERM-01 on idempotency replay, not a cached success', async () => {
+    const listRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
+    const { items } = await listRes.json();
+    const q = items[0];
+
+    const key = `expert-replay-${q.id}`;
+    const byCapture = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
+      actor: ACTOR.capture,
+      headers: { 'Idempotency-Key': key },
+      body: { track: 'podium' },
+    });
+    expect(byCapture.status).toBe(200);
+
+    // expert holds unrestricted question.read (so the now-`classified` question is not the 404 mask)
+    // but not question.classify: the permission is re-checked fresh on this replay, not skipped
+    // because capture's key already produced a 200.
+    const byExpert = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
+      actor: ACTOR.expert,
+      headers: { 'Idempotency-Key': key },
+      body: { track: 'podium' },
+    });
+    expect(byExpert.status).toBe(403);
+    const problem = await byExpert.json();
+    expectValid('classifyQuestion', 403, problem, 'application/problem+json');
+    expect(problem.ruleId).toBe('R-PERM-01');
   });
 });

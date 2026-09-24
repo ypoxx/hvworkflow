@@ -133,17 +133,18 @@ describe('i18n parity checks', () => {
     expect(allKeys.length).toBe(uniqueKeys.size);
   });
 
-  // Slice 020 (Rückbau und Passung): net -1 versus the 437 of slice 017 — six keys removed
-  // (TOP left the capture card and the classify dialog entirely, and its own summary "Ändern"
-  // toggle went with it; TOP and the capture timestamp left the answers detail) against five added
-  // (a read-only hint per feature, the queue's "noch n" and the preview dialog's title).
-  it('(f) Total key count is 436 across all modules and matches de and en', () => {
+  // Slice 010 (Lesepfade unter can() mit Leserechten): +6 versus the 436 of slice 020 — one
+  // `action.*` key per read permission added to `types.ts`/`ROLE_PERMISSIONS`
+  // (`speaker.read`, `contribution.read`, `question.read.delivered`, `stage.read`, `history.read`,
+  // `event.read`), needed so `apps/web/src/i18n/labels.ts`'s `ACTION_KEYS` stays an exhaustive map
+  // over `Permission` (AGENTS.md rule 10 — every permission label goes through the dictionary).
+  it('(f) Total key count is 442 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(436);
-    expect(deKeys).toBe(436);
-    expect(enKeys).toBe(436);
+    expect(totalKeys).toBe(442);
+    expect(deKeys).toBe(442);
+    expect(enKeys).toBe(442);
   });
 });
