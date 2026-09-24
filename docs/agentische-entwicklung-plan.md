@@ -227,13 +227,13 @@ die Erzählung statt den Code.
 
 **Wenn eine Scheibe zweimal durch Schritt 6 geht,** wird sie gestoppt und zurück zum Architekten
 gegeben. Meist ist dann die Spec falsch, nicht der Code. Nacharbeit auf Codex-Befunde zählt als eigener
-Durchgang durch Schritt 6 nur, wenn sie einen haltenden Befund (P1 oder Sicherheit, Recht, Datenschutz) behebt.
+Durchgang durch Schritt 6 nur, wenn sie einen haltenden Befund (P0, P1 oder Sicherheit, Recht, Datenschutz) behebt.
 
 **Codex als zweiter Prüfer, mit Stoppregel.** Codex prüft den PR nach dem Review und nach der
-Nacharbeit. Einen Merge halten nur auf: P1-Befunde mit nachvollziehbarer Probe und jeder Befund zu
+Nacharbeit. Einen Merge halten nur auf: P0- und P1-Befunde mit nachvollziehbarer Probe und jeder Befund zu
 Sicherheit, Recht oder Datenschutz. Andere P2 werden Folgepunkte in der Spec. Kehrt eine Befundklasse
 wieder, wird die Ursache behoben (ein systematischer Durchgang), nicht der Einzelfall. Nach zwei
-Codex-Läufen ohne neuen P1 entscheidet der Orchestrator über den Merge; ohne diese Regel liefen am
+Codex-Läufen ohne neuen P0 oder P1 entscheidet der Orchestrator über den Merge; ohne diese Regel liefen am
 Bautag B1 Scheiben durch fünf bis sieben Codex-Runden. Offene Befunde zu Sicherheit, Recht oder Datenschutz halten den Merge auch nach zwei Läufen auf; sie schließt nur eine Behebung oder eine benannte Fachperson, nicht der Orchestrator.
 
 **Nachweisform.** Der Bericht nennt den Commit, auf dem `pnpm gates` lief, und fügt den Schluss der

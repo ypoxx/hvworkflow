@@ -16,9 +16,9 @@ Haiku-Nachweise, Codex-Schleifen ohne Ende bei 023 und takt-006, eingefügte gat
    nicht mehr besetzt. Die Modellwahl steht nur in `.claude/agents/*.md`; Specs nennen die Rolle, nicht das Modell.
 2. **Review-Regel (R3, AGENTS.md Regel 3):** Unabhängigkeit entsteht durch frischen Kontext, der nur Spec und Diff
    sieht, nicht durch ein anderes Modell. Wer baut, prüft nicht — auch nicht in derselben Sitzung.
-3. **Codex-Stoppregel:** Codex prüft nach dem Review und nach der Nacharbeit. Einen Merge halten nur P1-Befunde mit
+3. **Codex-Stoppregel:** Codex prüft nach dem Review und nach der Nacharbeit. Einen Merge halten nur P0- und P1-Befunde mit
    nachvollziehbarer Probe und jeder Befund zu Sicherheit, Recht oder Datenschutz auf. Andere P2 werden Folgepunkte in
-   der Spec. Nach zwei Codex-Läufen ohne neuen P1 entscheidet der Orchestrator über den Merge. Offene Befunde zu
+   der Spec. Nach zwei Codex-Läufen ohne neuen P0 oder P1 entscheidet der Orchestrator über den Merge. Offene Befunde zu
    Sicherheit, Recht oder Datenschutz halten den Merge auch nach zwei Läufen auf; sie schließt nur eine Behebung oder
    eine benannte Fachperson, nicht der Orchestrator.
 4. **Nachweisform (AGENTS.md Regel 2):** Der Bericht nennt den Commit, auf dem `pnpm gates` lief, und fügt den Schluss
@@ -104,3 +104,7 @@ C `docs/bauplan-demo.md` Vermerk „ersetzt durch takt-012“; D `docs/messung.m
 **Runde 2 — Nachprüfung Opus 5.5 auf `a02f56b`:** annehmen. Alle 12 Befunde erledigt, eigener `pnpm gates`-Lauf auf
 `a02f56b` Exit 0. Nits 1–3 (Satzbau Mechaniker, Großschreibung nach Semikolon, „lokalen Lauf“ in Ziel 4) im
 Folgecommit behoben; Nit 4 (Zeilenbreite einzelner neuer Zeilen) nur in der Mechaniker-Datei, sonst Kosmetik ohne Tor.
+
+**Codex auf `a02f56b`:** ein P1 — die Stoppregel nannte nur P1, ein P0 außerhalb von Sicherheit, Recht, Datenschutz wäre
+durchgefallen. Behoben: P0 steht jetzt neben P1 in der Halteregel, in der Zählung der Nacharbeit und in der
+Zwei-Läufe-Klausel (Plan Abschnitt 4, Ziel 3).
