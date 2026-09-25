@@ -73,41 +73,50 @@ Kein Neuaufbau der Routen je Akteur; Fokus nach der Wahl im Rollenumschalter (f�
 
 ```
 Slice: 090-eingaben-je-akteur
-Done: Beim Akteurwechsel werden die Suche der Historie und die Suche der Beantwortung geleert (Muster
-      viewActorId, Vergleich über id); die Entprellung gibt eine geleerte Suche sofort weiter, damit der
-      Begriff der vorigen Person nicht den ersten Abruf der nächsten filtert. e2e 090 mit 9 Fällen, einer
-      je Feld; drei 010c-Szenarien tippen die Suche nach dem Wechsel neu.
-Evidence: pnpm gates auf 93d9f1b grün, Schluss wörtlich:
-      ✓ built in 1.83s
-      mark-test-run: wrote /home/user/wt/s090/.claude/state/last-test-run (clean tree) at commit 93d9f1b, tree 57e970688a2f…
-      Rot vor der Änderung (beide Suchen, gleiche Meldung):
-        090: Suche der Historie / Suche der Beantwortung … Error: expect(received).not.toBe(expected)
-        Expected: not "Vertraulicher Suchbegriff"
-      e2e 090: 9/9; --repeat-each=3 27/27; taskset -c 0,1 --workers=1 9/9.
-      e2e 010c: --repeat-each=3 81/81.
-      Volle Suite: 105 passed, 0 failed; axe ohne serious/critical.
+Done: Beim Akteurwechsel werden geleert: Suche der Historie, Suche der Beantwortung (sofort, auch in
+      der Entprellung), Erfassung draft/free/offenes Formular (ContributionPane), Rückgabe-Dialog der
+      Bühne (returnOpen). Vergleich jeweils über die id. e2e 090 mit 20 Fällen, je Feld ein Wechsel zu einer
+      Rolle ohne und einer mit dem Feld; 010c-Szenarien, die sich auf die Suche stützten, tippen sie neu.
+Evidence: pnpm gates auf 725b772 grün, Schluss wörtlich:
+      ✓ built in 2.05s
+      mark-test-run: wrote /home/user/wt/s090/.claude/state/last-test-run (clean tree) at commit 725b772, tree 238d970b769d…
+      Rot vor der Änderung:
+      - Suchen (Historie, Beantwortung), vor 2aa068e/93d9f1b:
+          Error: expect(received).not.toBe(expected)  Expected: not "Vertraulicher Suchbegriff"
+      - Review R1, Erfassung (capture → admin, capture → moderation → capture; draft und free), vor 725b772:
+          Error: expect(received).not.toBe(expected)
+          Expected: not "GEHEIM-DRAFT Redebeitrag der vorigen Person."
+          Expected: not "GEHEIM-DRAFT Frage der vorigen Person?"
+          > 79 |   await expect.poll(() => valueOrAbsent(page, testId)).not.toBe(secret);
+      - Review R1, Bühne (podium → approver und podium → admin), vor 725b772:
+          Error: expect(locator).toHaveCount(expected) failed  Expected: 0  Received: 1
+          > 460 |   await expect(page.getByTestId('stage-return-reason')).toHaveCount(0);
+      - Review R1 Befund 6, Entprellung zurückgenommen (Probe, nicht committet):
+          Expected value: not "GEHEIM"  Received array: ["GEHEIM", null]        (Beantwortung)
+          Expected value: not "GEHEIM"  Received array: [null, "GEHEIM", null]  (Historie)
+      Danach: e2e 090 20/20; --repeat-each=3 60/60; taskset -c 0,1 --workers=1 20/20.
+      e2e 010c --repeat-each=3 81/81. Volle Suite 116 passed, 0 failed; axe ohne serious/critical.
       Kein Screenshot (Akzeptanzkriterium 3).
-      Angepasste 010c-Szenarien (Nachtrag des Architekten, Files allowed):
-      - "Runde 2: Suche aktiv, Wechsel zu observer, erste Detailabfrage mit 500: ein Toast": observer tippt
-        die Suche nach dem Wechsel neu, der 500 ist auf die erste Detailabfrage dieser gefilterten Liste
-        gesetzt. Prüfziel gleich: ein echter Fehler der Detailabfrage zeigt genau einen Toast, obwohl die
-        Auswahl von einer anderen Rolle stammt und die gefilterte Liste sie auslässt.
-      - "Runde 3 (R3-1) … getQuestion 500 nach dem 404 von getQuestionHistory": Verzögerung der Liste (600 ms)
-        und 500 (150 ms) werden nach dem Wechsel gesetzt und greifen beim neu getippten Suchlauf. Prüfziel
-        gleich: Liste zuletzt, maskierter 404 zuerst, der spätere 500 bleibt als ein Toast mit "Testfehler".
-      - "Runde 3 (R3-1) … getQuestionHistory 500 nach dem 404 von getQuestion": wie zuvor, andere Reihenfolge;
-        Prüfziel gleich.
-      Warum neu tippen: ohne Suche ist die Liste des observer vollständig, die Auswahl gilt als verborgen,
-      kein Detailabruf, kein Toast. Der Helfer searchAgainAfterSwitch wartet, bis die Abrufe des Wechsels
-      vorbei sind (Suche leer, keine Zeile, kein Detail, kein Toast), damit nichts danach Gesetzte von ihnen
-      verbraucht wird.
+      Angepasste 010c-Szenarien (Files allowed, Nachtrag des Architekten):
+      - "Ziel 5: Suche aktiv, Wechsel zu observer … kein Toast" und "Runde 2 (N1) … zwei fremde Ereignisse:
+        kein Toast": observer tippt die Suche nach dem Wechsel neu (searchAgainAfterSwitch,
+        typeSearchAndExpectDetailRead). Der Helfer zählt getQuestion: 0 Aufrufe bei leerer Suche (vollständige
+        Liste, Auswahl verborgen, der Test prüfte nichts), mindestens einer nach dem Neutippen. Danach dieselben
+        Zusicherungen; Prüfziel gleich: der maskierte 404 einer Auswahl einer anderen Rolle ist kein Fehler.
+      - "Runde 2 … erste Detailabfrage mit 500: ein Toast": 500 wird nach dem Wechsel auf die erste
+        Detailabfrage der neu getippten, gefilterten Liste gesetzt; Kommentar nachgezogen (nicht mehr die
+        allererste Ladung nach dem Wechsel). Prüfziel gleich: ein echter Fehler zeigt genau einen Toast.
+      - "Runde 3 (R3-1)", beide Reihenfolgen: Verzögerung der Liste (600 ms) und 500 (150 ms) greifen beim neu
+        getippten Suchlauf. Prüfziel gleich: Liste zuletzt, maskierter 404 zuerst, der 500 bleibt ein Toast
+        mit "Testfehler".
 Open: Fokus nach der Wahl im Rollenumschalter fällt auf BODY (Ursache RoleSwitcher.tsx), Folgeliste.
-      Geprüft und bereits dicht (Regressionsschutz, vor der Änderung grün): Erfassung draft und free,
-      Antwortentwurf und Quellen, Begründung Rückgabe (Beantwortung), Name bei der Registrierung,
-      Nummer im Zusammenführen-Dialog, Begründung Rückgabe auf der Bühne. Einheit im Zuweisen-Dialog und
-      SuggestDialog sind Auswahlfelder ohne getippten Text, nicht geprüft.
+      Mit einer Rolle geprüft, die das Feld auch sieht, und schon vor 090 dicht (Regressionsschutz):
+      Antwortentwurf und Quellen, Begründung Rückgabe (Beantwortung), Name bei der Registrierung, Nummer im
+      Zusammenführen-Dialog. Einheit im Zuweisen-Dialog und SuggestDialog sind Auswahlfelder ohne getippten
+      Text, nicht geprüft.
 Touched: apps/web/src/features/history/Page.tsx, apps/web/src/features/answers/Page.tsx,
-      apps/web/src/features/answers/useBacklog.ts, apps/web/e2e/090-eingaben-je-akteur.spec.ts,
+      apps/web/src/features/answers/useBacklog.ts, apps/web/src/features/capture/ContributionPane.tsx,
+      apps/web/src/features/stage/Page.tsx, apps/web/e2e/090-eingaben-je-akteur.spec.ts,
       apps/web/e2e/010c-lesezustand.spec.ts, docs/slices/090-eingaben-je-akteur.md
 ```
 
