@@ -723,6 +723,20 @@ async function openAssignedAndSearch(page: Page): Promise<string> {
   return number;
 }
 
+/**
+ * Slice 090: an actor change empties the search of the Beantwortung. Before observer types it
+ * again, the switch's own loads have to be over — observer's complete list hides the selection and
+ * its detail reads are settled — so that nothing armed afterwards is taken by them.
+ */
+async function searchAgainAfterSwitch(page: Page, number: string): Promise<void> {
+  await expect(page.getByTestId('answers-search')).toHaveValue('');
+  await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toHaveCount(0);
+  await expect(page.getByTestId('answers-detail')).toHaveCount(0);
+  await page.waitForTimeout(400);
+  await settle(page);
+  await expect(toasts(page)).toHaveCount(0);
+}
+
 test('010c Runde 2 (N1): Beantwortung — Suche aktiv, Wechsel zu observer, danach zwei fremde Ereignisse: kein Toast', async ({
   page,
 }) => {
@@ -743,11 +757,15 @@ test('010c Runde 2 (N1): Beantwortung — Suche aktiv, Wechsel zu observer, dana
 test('010c Runde 2: Beantwortung — Suche aktiv, Wechsel zu observer, erste Detailabfrage mit 500: ein Toast', async ({
   page,
 }) => {
-  await openAssignedAndSearch(page);
+  const number = await openAssignedAndSearch(page);
   // A real fault in the very first load after the switch is shown, even though the selection was
   // made by another actor and the filtered list leaves it out; only the masked 404 is swallowed.
-  await failOnce(page, 'getQuestion');
+  // Slice 090: the switch empties the search (typed text belongs to its actor), so observer types
+  // it again; the fault is armed for the first detail read of that filtered list.
   await asRole(page, 'observer');
+  await searchAgainAfterSwitch(page, number);
+  await failOnce(page, 'getQuestion');
+  await page.getByTestId('answers-search').fill(number);
   await expectOneToast(page);
 });
 
@@ -763,10 +781,14 @@ for (const [late, masked] of [
   test(`010c Runde 3 (R3-1): Beantwortung — Liste zuletzt, ${late} 500 nach dem 404 von ${masked}, Wechsel zu observer: ein Toast`, async ({
     page,
   }) => {
-    await openAssignedAndSearch(page);
+    const number = await openAssignedAndSearch(page);
+    // Slice 090: the switch empties the search, so observer types it again; the delays are armed
+    // for the loads of that filtered list, the first after the switch that shows the selection.
+    await asRole(page, 'observer');
+    await searchAgainAfterSwitch(page, number);
     await delayCalls(page, 'listQuestions', 600);
     await failOnce(page, late, undefined, 150);
-    await asRole(page, 'observer');
+    await page.getByTestId('answers-search').fill(number);
     await page.waitForTimeout(800);
     await expectOneToast(page);
     // Slice 010d, Ziel 4 (nit of round 4): the one toast is the 500, not the masked 404.

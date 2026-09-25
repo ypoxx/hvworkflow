@@ -10,10 +10,6 @@
  * Per the Nachtrag des Architekten the fix is per field, not a rebuild of the routes. The cases for
  * fields 010d already clears stay as regression guards; the cases for fields that leaked were run
  * red against the code before the change (the Bericht quotes them).
- *
- * Not here: the search of the Beantwortung (`answers-search`) also survives a switch, but emptying
- * it contradicts three 010c scenarios built on a search kept across the switch — open in the
- * Bericht, for the architect to decide.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -218,6 +214,23 @@ test('090: Suche der Historie — admin tippt, Wechsel zu observer und zurück: 
   await expect(search).toBeVisible();
   await expect.poll(() => valueOrAbsent(page, 'history-search')).toBe('');
   await checkAxe(page, 'history (090, after a role switch and back)');
+});
+
+test('090: Suche der Beantwortung — admin tippt, Wechsel zu observer und zurück: leer', async ({ page }) => {
+  await page.goto('/answers');
+  await waitForCorpus(page);
+  await asRole(page, 'admin');
+  const search = page.getByTestId('answers-search');
+  await expect(search).toBeVisible();
+  await search.fill('Vertraulicher Suchbegriff');
+
+  await asRole(page, 'observer');
+  await expect.poll(() => valueOrAbsent(page, 'answers-search')).not.toBe('Vertraulicher Suchbegriff');
+
+  await asRole(page, 'admin');
+  await expect(search).toBeVisible();
+  await expect.poll(() => valueOrAbsent(page, 'answers-search')).toBe('');
+  await checkAxe(page, 'answers (090, search after a role switch and back)');
 });
 
 test('090: Nummer im Zusammenführen-Dialog — capture tippt, Wechsel zu moderation und zurück: Dialog zu, Feld leer', async ({

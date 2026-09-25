@@ -90,6 +90,9 @@ export function AnswersPage() {
     setViewActorId(actorId);
     setDialog(null);
     setStaleFor(null);
+    // Slice 090: the search text is typed input and belongs to the actor who typed it; the other
+    // filters (status, track, unit, agenda item, sort) are choices, not text, and stay (010d).
+    setFilters((previous) => (previous.q === '' ? previous : { ...previous, q: '' }));
   }
 
   /**
