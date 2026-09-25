@@ -21,6 +21,13 @@ Der Planeintrag 080 ist für eine Scheibe zu groß (Vertrag, Kern, Seed-Umbau, e
   Der Dienst nimmt die Felder weiter an (Vertragsvalidierung, 422 bei falschem `kind` bleibt), der Kern **ignoriert**
   sie: er schreibt sie in kein neues Ereignis und gibt sie in keiner Sicht aus.
 
+**Nachtrag des Architekten (25.09., nach Rückfrage des Implementierers):** (a) Der Guard heißt `R-SPK-GUARD-01`; dafür
+wird das Muster in `apps/api/src/__tests__/rule-register.test.ts` auf `/\bR-[A-Z]+(?:-[A-Z]+)?-\d{2,}\b/g` erweitert
+und dort auch die Zeilen und Guards aus `SPEAKER_TRANSITIONS` gezählt (Datei erlaubt, nur das). (b) Ein nicht gelistetes
+Paar und derselbe Status noch einmal antworten 409 mit `R-SPK-00`, der eigenen Konfliktregel des Auflösers in
+`OTHER_RULES` (wie `R-TRANS-00` bei Fragen). (c) Seed: der verworfene Wurf für die Redezeit fällt nach `tick()`, damit
+die Zufallsfolge gleich bleibt.
+
 Befund beim Lesen: `updateSpeaker` (packages/domain/src/api.ts) prüft heute **keinen** Statusübergang; jeder Wechsel
 ist erlaubt, auch `finished → speaking`. Das ist die eigentliche Lücke, die R-SPK schließt.
 
@@ -69,7 +76,7 @@ aus `_actions` ableiten). Keine Politur aus der Folgeliste.
 - `packages/domain/src/{transitions,rules,types,events,state,api,seed}.ts`
 - `packages/domain/src/__tests__/{transitions,rules,api,seed}.test.ts`
 - `docs/legal-trace.md`, `docs/policy-truth-table.md` (nur generiert)
-- `apps/api/src/__tests__/{contract,acceptance,negative}.test.ts`
+- `apps/api/src/__tests__/{contract,acceptance,negative,rule-register}.test.ts`
 - `apps/web/src/features/speakers/**`, `apps/web/src/i18n/speakers.{de,en}.ts`
 - `apps/web/src/app/App.tsx`, `apps/web/src/features/answers/{Page,QuestionDetail}.tsx` (nur falls sie `kind` eines
   Sprechers lesen)
