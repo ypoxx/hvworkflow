@@ -137,3 +137,17 @@ Touched: apps/web/src/features/history/Page.tsx, apps/web/src/features/answers/P
 **R2** (enge Nachprüfung) auf `b232bd5`: **annehmen**. Alle Befunde geschlossen; Gegenprobe mit dem Code vor der
 Korrektur: 6 Fälle rot, Entprellungsfälle rot. `pnpm gates` grün auf `b232bd5`. Ein nit (`expectCleared` prüft
 zusätzlich `#main` per `innerText`, fügt nichts hinzu) → `docs/folgeliste.md`.
+
+**Codex** (ein Lauf bei „ready“, `8d0ef0a`): 1 × P1 (Datenschutz): Die Rückgabe-Begründung der Bühne wird erst in einem
+Effekt nach dem Öffnen geleert und kann für die nächste Person einen Frame lang aufblitzen. Ursache geprüft und
+breiter als gemeldet: dasselbe Muster in den vier Aktionsdialogen der Beantwortung und in `RegisterDialog`. Behoben
+vom Orchestrator (`08eaa2b`): jeder Dialog trägt einen Schlüssel aus Akteur-id und Dialogart (`key={`${actorId}:return`}` usw.),
+ein Wechsel baut ihn neu auf und verwirft den Text synchron. e2e: ein MutationObserver prüft beim Wiederöffnen, ob ein
+eingefügtes Feld den alten Text trägt; vor der Korrektur rot für Rückgabe (Beantwortung), Registrierung und
+Zusammenführen (`Expected: false, Received: true`), die Bühne war bereits dicht (Neuladen beim Wechsel). Danach:
+090 mit `--repeat-each=3` 60/60, unter `taskset -c 0,1` 20/20, volle Suite 116/116; `pnpm gates` grün auf `08eaa2b`:
+
+```
+✓ built in 2.31s
+mark-test-run: wrote /home/user/wt/s090/.claude/state/last-test-run (clean tree) at commit 08eaa2b, tree 3c648dcadc8c…
+```
