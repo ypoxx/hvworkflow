@@ -75,6 +75,37 @@ das Tor ihn in CI nicht von selbst).
 
 ## Bericht
 
+```
+Slice: 089-zielbild-oberflaeche
+Done: UI-Befunde U1–U11 und Zielbild Z1–Z26 als Quelle mit Status, Ort und Aufwand in AStd; Prototyp lesbar in
+      docs/zielbild/ (je Ansicht eine Datei, Schriften relativ, README mit Übernehmen/Nicht übernehmen und
+      Namenszuordnung); Matrixzeile, Register E50–E54, Plan-Zeile 089 und Zielbild-Zeilen in acht Scheiben.
+Evidence: pnpm gates auf c12f969 (Nacharbeit Runde 1), Auszug:
+      packages/domain test:       Tests  86 passed (86)
+      apps/web test:       Tests  181 passed (181)
+      apps/api test:       Tests  57 passed (57)
+      vocabulary-check: ok
+      plan-graph: ok.
+      # pass 206
+      # fail 0
+      ✓ built in 1.29s
+      mark-test-run: wrote /home/user/hvworkflow/.claude/state/last-test-run (clean tree) at commit c12f969, tree 0590db9b36b2…
+    node scripts/slice-scope.mjs --slice 089:
+      slice-scope: 20 changed file(s), all within "docs/slices/089-zielbild-oberflaeche.md"'s "Files allowed" list (7 pattern(s)).
+    Ladelauf der Repo-Fassung (python3 -m http.server aus der Wurzel, Chromium, 1440 und 390 px):
+      Ladelauf: 6 Ansichten, keine Skriptfehler, keine fehlgeschlagenen Anfragen, Inter und JetBrains Mono geladen
+    Matrixzeile: 37 IDs, keine fehlt, keine doppelt; kein Base64 in docs/zielbild/.
+    Bilder: docs/evidence/089-schreibraum.png, -rundgang.png, -lagebild.png, -teleprompter.png,
+      -telefon-schreibraum.png, -telefon-teleprompter.png
+Open: E50–E54 zur Feedback-Runde 2 (09.10.2026) und Prüfpunkt 2 (16.10.2026), E52/E53 spätestens 13.11.2026;
+      Takt-Specs für U1, U2, U4, U6–U9 beim Bau; Glossarzeilen mit den bauenden Scheiben; das Tor „Scheibenumfang"
+      prüft diesen Branch in CI nicht selbst (Name folgt nicht claude/slice-NNN-…), deshalb der Lauf mit --slice 089.
+Touched: docs/feedback/2026-09-zielbild-oberflaeche.md, docs/zielbild/** (README.md, index.html, zielbild.css,
+      js/core.js, js/schreibraum.js, js/lagebild.js, js/teleprompter.js, js/shell.js, js/rundgang.js),
+      docs/evidence/089-*.png (6), docs/abdeckungsmatrix.md, docs/entscheidungsregister.md,
+      docs/produktplan-beta.md, docs/slices/089-zielbild-oberflaeche.md
+```
+
 ## Review findings
 
 ### Runde 1 (Review in frischem Kontext, auf `6f9ea44`) — Urteil: Nacharbeit
