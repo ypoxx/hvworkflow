@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HV-Tool Zielbild</title>
+<link rel="stylesheet" href="zielbild.css">
+</head>
+<body>
+<!-- HV-Tool Zielbild (slice 089). Prototype on synthetic data; see README.md in this folder. -->
+<div class="app" id="app" data-notes="closed">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">HV</div>
+      <div>
+        <h1>Ordentliche Hauptversammlung 2026</h1>
+        <p>Beispiel AG · synthetische Demodaten · Prototyp</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Ansicht">
+      <button class="tab" role="tab" id="tab-schreibraum" data-view="schreibraum" aria-controls="v-schreibraum">Schreibraum</button>
+      <button class="tab" role="tab" id="tab-lagebild" data-view="lagebild" aria-controls="v-lagebild">Lagebild</button>
+      <button class="tab" role="tab" id="tab-teleprompter" data-view="teleprompter" aria-controls="v-teleprompter">Teleprompter</button>
+    </nav>
+    <div class="top-right">
+      <span class="clock" id="clock" title="Ortszeit Berlin, simuliert">15:42</span>
+      <button class="btn sm" id="tour-btn" type="button"></button>
+      <button class="btn sm ghost" id="notes-btn" type="button" aria-controls="notes" aria-expanded="false"></button>
+    </div>
+  </header>
+  <div class="shell">
+    <main id="main">
+      <section id="v-schreibraum" class="view" role="tabpanel" aria-labelledby="tab-schreibraum"></section>
+      <section id="v-lagebild" class="view" role="tabpanel" aria-labelledby="tab-lagebild" hidden></section>
+      <section id="v-teleprompter" class="view" role="tabpanel" aria-labelledby="tab-teleprompter" hidden></section>
+    </main>
+    <aside class="notes" id="notes" aria-label="Was in dieser Ansicht neu ist"></aside>
+  </div>
+</div>
+<div id="tip" hidden></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<div id="tour" class="tour" role="dialog" aria-label="Rundgang" hidden></div>
+<script src="js/core.js"></script>
+<script src="js/schreibraum.js"></script>
+<script src="js/lagebild.js"></script>
+<script src="js/teleprompter.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/rundgang.js"></script>
+</body>
+</html>

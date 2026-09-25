@@ -1,7 +1,7 @@
 # Entscheidungsregister
 
 **Stand:** 23.09.2026 — Prüfpunkt 0, durch den Umsetzer vorgezogen (im Plan auf den 25.09.2026 datiert):
-Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen ·
+Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen · E50–E54 ergänzt am 25.09.2026 mit Scheibe 089 ·
 **Herkunft:** Produktplan Beta (`docs/produktplan-beta.md`) Abschnitte 3, 4, 7, 10 und 11; Leitplanken
 (`docs/qualitaetsleitplanken-produktreife.md`) Abschnitt 11 · **Rang:** Ab dieser Scheibe führt dieses
 Register die offenen Entscheidungen (Leitplanken 11); Plan Abschnitt 10 bleibt die Herkunft der Zeilen.
@@ -27,7 +27,7 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 
 ---
 
-## 1. Register E1–E49
+## 1. Register E1–E54
 
 | Nr. | Entscheidung | Standardannahme | Eigentümer | Fällig | Rückfalltrigger | Kosten bei Änderung | Betroffene Scheibe(n) | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -82,6 +82,11 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 | E47 | Geld- und Nutzungsdeckel | Plan rund 110 Mio. Token; Deckel in Euro setzt der Eigentümer; Abonnement zuerst, API-Schlüssel mit Budgetgrenze, wenn der Durchsatz nicht reicht | Eigentümer | Prüfpunkt 0 (25.09.2026); Überprüfung Prüfpunkt 1 (09.10.2026) | Überprüfung am 09.10.2026 (Prüfpunkt 1); Regelkreis Plan 6.5: überschreitet ein Meilenstein sein Token-Budget um 25 % oder erreicht der Geld-Deckel seine Grenze, entscheidet der Mensch in der Entscheidungsstunde über die Streichreihenfolge nach Plan 8.6 | keine Codekosten; Token-Regelkreis (ADR 0016) | 016 | offen |
 | E48 | Merge-Befugnis beim Orchestrator | Entscheidung: Der Orchestrator mergt nach grünen Toren und unabhängigem Review ohne offenen Blocker oder Hauptbefund; der Mensch sieht jeden Merge im Tagesbericht und kann ihn zurücknehmen; Deploy nur nach Go | Eigentümer | 25.09.2026 | keiner (entschieden) | keine (entschieden) | 016 (ADR 0016) | entschieden am 23.09.2026 von Umsetzer |
 | E49 | Vorprobe im Januar | Keine; Option: fünf bis zehn Personen auf dem Übungsmandanten in W16–W17, nur mit Klarheit zu E13 | Projektleitung, Eigentümer | 11.12.2026 (Prüfpunkt 5) | 11.12.2026: ohne benannte Personen keine Vorprobe | organisatorisch; der Übungsmandant kommt aus 042 | 042 | offen |
+| E50 | Erwartungskarte: vorbereitete, vor der HV freigegebene Antworten mit Treffer je Einzelfrage in der Fokusansicht (Zielbild Z2, Scheibe 089) | Nicht in der Beta; bleibt Teil der B-Liste „Vorbereitung §7" (Plan 5.10); Z2 bleibt Bild in `docs/zielbild/` | Projektleitung | 16.10.2026 (Prüfpunkt 2) | keiner (Standard ist Nichtbau) | Eine neue Scheibe nach 055, rund 3 AStd: Katalog-Import als Datei, Treffer über die Klartextprojektion aus 055, Anzeige in 054; Vertrag: Schema für vorbereitete Antworten | 054, 055, 066 | offen |
+| E51 | Zahlenprüfung vor der Rechtsfreigabe gegen eine Faktentabelle und gegen schon vorgelesene Antworten (Zielbild Z3, Z4; Recherche SOLL Z.240; Scheibe 089) | Nicht in der Beta; Z3 und Z4 bleiben Bild | Projektleitung, Recht; Pflege der Faktentabelle Finanzen oder IR | 16.10.2026 (Prüfpunkt 2) | keiner (Standard ist Nichtbau) | Eine neue Scheibe nach 055 und 040, rund 3–4 AStd: Faktentabelle als Stammdatum, Prüfung in der Domäne, Anzeige in 054 und 059 | 040, 054, 059 | offen |
+| E52 | Vorgelesen auf der Bühne erst nach 0,6 s Halten statt sofort per Leertaste, dazu eigene Tasten für Presenter-Klicker (Bild ab) und Rückgängig (⌫) (Zielbild Z18, Befund U3; ändert Designprinzip 7 und 10; Scheibe 089) | Leertaste bleibt wie in Designprinzip 7; unabhängig davon ein Rückgängig-Fenster von 5 s als Schaltfläche ohne eigene Taste, in dem „vorgelesen" als Absicht lokal gehalten und erst danach gesendet wird (058), weil die Rolle Podium heute sofort abschließt | Projektleitung (mit einem Podiumsmitglied), Eigentümer | 13.11.2026 (vor 056) | 13.11.2026 / 056: ohne Antwort baut 056 nach Designprinzip 7 | Halten nachrüsten: Tastenhandler und Haltedauer je Gerät in 056, rund 0,5 AStd, und Designprinzip 7 anpassen; das Rückgängig-Fenster baut 058 (rund 0,5 AStd) in jedem Fall | 056, 058 | offen |
+| E53 | Kontrastmodus der Bühne (dunkler Grund, Umschalter „Kontrast" je Gerät, gebaut in 005–007) als Standard des Podiums (Zielbild Z20; Scheibe 089) | Nein: Standard bleibt hell, der Umschalter bleibt, 056 übernimmt ihn in die Anzeigeeinstellungen je Gerät | Projektleitung, Eigentümer | 13.11.2026 (vor 056) | 13.11.2026 / 056: ohne Antwort bleibt der Standard hell | Standardwert umstellen: Minuten | 056 | auf Standard gebaut am 03.09.2026 in 007 (nachgetragen mit 089, Bestätigung durch den Umsetzer an Prüfpunkt 1) |
+| E54 | Rückkanal vom Versammlungsbüro zum Bühnengerät für kurze Hinweise (Zielbild Z21; Scheibe 089) | Nicht in der Beta; bleibt B-Liste „Rollen-Chat, Souffleur-Kanal" | Projektleitung | 16.10.2026 (Prüfpunkt 2) | keiner (Standard ist Nichtbau) | Hinweis über die Alarme aus 085 mit Zielrecht der Bühne, rund 1,5 AStd | 056, 085 | offen |
 
 ---
 
@@ -171,7 +176,7 @@ Aus Plan 11.6; der Umsetzer vermerkt an jedem Datum den Stand in der betroffenen
 | Datum | Rückfall | Zeilen |
 |---|---|---|
 | 30.10.2026 | Hosting: gemieteter Staging-Host, nur Testidentitäten bis zur AVV | E10, E39 |
-| 13.11.2026 | DSFA-Review: ohne Rückmeldung bleibt Staging bei Testidentitäten | E14 |
+| 13.11.2026 | DSFA-Review: ohne Rückmeldung bleibt Staging bei Testidentitäten; Bühne (vor 056): ohne Antwort bleibt die Leertaste wie in Designprinzip 7, der Kontrastmodus bleibt Standard hell | E14, E52, E53 |
 | 27.11.2026 | IdP-Client, Betreiber, Geräte | E11, E26, E33, E43 |
 | 15.12.2026 | Pentest-Bestellung: sonst interner ZAP-Lauf | E32 |
 | 15.01.2027 | IdP-Rückfall: Keycloak-Realm und Konten aus 088 | E11 |
