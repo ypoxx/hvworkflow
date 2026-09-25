@@ -69,4 +69,45 @@ Kein Neuaufbau der Routen je Akteur; Fokus nach der Wahl im Rollenumschalter (f�
 
 ## Bericht
 
+```
+Slice: 090-eingaben-je-akteur
+Done: Die Suche der Historie wird beim Akteurwechsel geleert (Muster viewActorId, Vergleich über id); die
+      Entprellung gibt eine geleerte Suche sofort weiter, damit der Suchbegriff der vorigen Person nicht den
+      ersten Abruf der nächsten filtert. e2e 090 mit 8 Fällen, einer je Feld.
+Evidence: pnpm gates auf 2aa068e, rot nur im Planeintrag (Datei des Architekten), Schluss wörtlich:
+      plan-graph: 82 slice(s) found in docs/produktplan-beta.md section 5.
+        missing dependencies: 1
+          090 depends on 010d, which is not a slice in section 5.
+        cycles: 0
+        dependency-order problems: 0
+        same-day lane-sharing warnings: 0
+       ELIFECYCLE  Command failed with exit code 1.
+       ELIFECYCLE  Command failed with exit code 1.
+      Alle Schritte vor plan-graph grün (u. a. typecheck, lint, test, i18n-literals, slice-scope,
+      downgrade-check). Danach einzeln: test:scripts rot nur in plan-graph.test.mjs (dieselbe Ursache),
+      Web-Build grün.
+      Rot vor der Änderung (Historie):
+        090: Suche der Historie … Error: expect(received).not.toBe(expected)
+        Expected: not "Vertraulicher Suchbegriff"
+      e2e 090 danach: 8/8 grün, --repeat-each=3 24/24, taskset -c 0,1 --workers=1 8/8.
+      Volle Suite: 104 passed, 0 failed; axe: 0 serious/critical in allen 128 Durchläufen.
+      Kein Screenshot (Akzeptanzkriterium 3).
+Open: 1. Planeintrag 090: "Abhängigkeiten: 010d" nennt eine Scheibe, die nicht in Abschnitt 5 steht
+         (plan-graph, test:scripts). Behebung in docs/produktplan-beta.md, nur Architekt.
+      2. Suche der Beantwortung (answers-search) ist undicht (e2e vor der Änderung rot, gleiche Meldung).
+         Die Leerung (setFilters q '' im viewActorId-Block von answers/Page.tsx) war gebaut und im
+         e2e grün, brach aber 3 Szenarien in 010c (Runde 2 "erste Detailabfrage mit 500", Runde 3
+         R3-1 in beiden Reihenfolgen): sie setzen eine Suche voraus, die den Wechsel überlebt. Ohne Suche
+         ist die Liste des observer vollständig, die Auswahl gilt als verborgen, kein getQuestion, kein
+         Toast. Da keine bestehende Zusicherung geändert werden darf, ist die Leerung zurückgenommen und
+         der e2e-Fall nicht aufgenommen. Entscheidung des Architekten nötig.
+      3. Fokus nach der Wahl im Rollenumschalter fällt auf BODY (Ursache RoleSwitcher.tsx), Folgeliste.
+      Geprüft und bereits dicht (Regressionsschutz, vor der Änderung grün): Erfassung draft und free,
+      Antwortentwurf und Quellen, Begründung Rückgabe (Beantwortung), Name bei der Registrierung,
+      Nummer im Zusammenführen-Dialog, Begründung Rückgabe auf der Bühne. Einheit im Zuweisen-Dialog und
+      SuggestDialog sind Auswahlfelder ohne getippten Text, nicht geprüft.
+Touched: apps/web/src/features/history/Page.tsx, apps/web/e2e/090-eingaben-je-akteur.spec.ts,
+      docs/slices/090-eingaben-je-akteur.md
+```
+
 ## Review findings
