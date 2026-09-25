@@ -65,4 +65,70 @@ an Kern, Vertrag, Oberfläche. Die Web-Demo läuft In-Process (ADR 0002) und ist
 
 ## Bericht
 
+```
+Slice: 029a-demo-verriegelung
+Done: Ohne HV_DEMO=1 wählt selectAuthAdapter (actor.ts) den Adapter "keine Anmeldung": jeder /v1-Aufruf → 401,
+      X-Actor wird nicht gelesen; HV_DEMO=1 + HV_OIDC_ISSUER → createApp wirft (Start verweigert), Option oidcIssuer.
+      server.ts warnt beim Start ohne Demo; Tests in demo-lock.test.ts; BF-01 im Bedrohungsmodell "behoben (029a)".
+Evidence: pnpm gates auf Commit 7fe34c3 (exit 0), Schluss siehe unten; keine Oberfläche, daher kein Screenshot.
+Open: siehe unten (Vertragslücke 401, Rest von BF-01 bei 029).
+Touched: apps/api/src/actor.ts, apps/api/src/app.ts, apps/api/src/server.ts,
+         apps/api/src/__tests__/demo-lock.test.ts (neu), apps/api/src/__tests__/negative.test.ts,
+         docs/sicherheit/bedrohungsmodell.md (Zeile BF-01), docs/slices/029a-demo-verriegelung.md
+```
+
+**Rot vor der Änderung** (`vitest run demo-lock.test.ts negative.test.ts`, Stand b33231b + neue Tests):
+
+```
+× 401: POST /v1/demo/seed without HV_DEMO=1 already fails at sign-in, before the demo check (slice 029a)
+× 401 without demo: a valid X-Actor on a read path is not accepted
+× 401 without demo: a valid X-Actor on a write path is not accepted
+× 401 without demo does not read the header: a malformed X-Actor gets the same answer, not a parse error
+× createApp refuses to start with demo mode and an OIDC issuer, naming both variables
+Tests  5 failed | 19 passed (24)
+AssertionError: expected 404 to be 401     (Lesepfad: Actor akzeptiert, nur noch keine Versammlung)
+AssertionError: expected 201 to be 401     (Schreibpfad: Wortmeldung ohne Demo angelegt, BF-01 belegt)
+AssertionError: expected 'Malformed X-Actor header "no-role-her…' to be 'No meeting exists yet.'
+AssertionError: expected [Function] to throw an error
+AssertionError: expected 403 to be 401
+```
+
+"createApp starts with an OIDC issuer when demo mode is off" und "demo mode is unchanged … 200" waren vorher schon
+grün (sie sichern unverändertes Verhalten). Danach: `apps/api` 63/63 grün.
+
+**Probe P1 wiederholt** (Ports 8911/8912/8913, Prozesse danach beendet):
+
+```
+$ PORT=8911 pnpm --filter @hv/api start
+HV-Tool API listening on http://localhost:8911
+HV-Tool API: demo mode is off (HV_DEMO is not 1) and no other sign-in is set up — every /v1 request is answered with 401; X-Actor is ignored.
+$ curl -H 'X-Actor: x:admin' localhost:8911/v1/meeting
+{"type":"urn:hv:problem:401","title":"Unauthorized","status":401,"detail":"No sign-in path is configured: the X-Actor header is accepted only in demo mode (HV_DEMO=1), and no other sign-in is set up."}
+HTTP 401
+$ HV_DEMO=1 PORT=8912 pnpm --filter @hv/api start ; curl -H 'X-Actor: x:admin' localhost:8912/v1/meeting
+HTTP 200
+$ HV_DEMO=1 HV_OIDC_ISSUER=https://idp.example.invalid PORT=8913 pnpm --filter @hv/api start
+Error: Refusing to start: HV_DEMO=1 and HV_OIDC_ISSUER are both set. Demo mode trusts the X-Actor header and must never run next to a real sign-in; unset one of them.
+exit 1
+```
+
+**`pnpm gates` auf Commit 7fe34c3** (exit 0; Testzahlen: domain 86, web 181, api 63; slice-scope: 7 Dateien, alle
+in "Files allowed"), Schluss wörtlich:
+
+```
+✓ built in 2.08s
+mark-test-run: wrote /home/user/wt/s029a/.claude/state/last-test-run (clean tree) at commit 7fe34c3, tree 4e63791a430e…
+```
+
+**Hinweise / offen:**
+
+- Vertrag: die 0.2-Operationen `getMeeting`, `registerSpeaker`, `seedDemo` dokumentieren 401 nicht; das ist die
+  bekannte, begründete Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS` in `helpers.ts` (Lücke schließt 043). Vertrag nicht
+  geändert. Die neuen Tests prüfen den Problem-Body mit `expectValidProblem` und laufen durch `req()` (Vertragsprüfung).
+- Die Middleware hängt wie bisher an `*`: ohne Demo antwortet auch eine unbekannte Route mit 401 statt 404 (fail closed,
+  verrät keine Routen).
+- `server.ts` liest für den Log-Hinweis `HV_DEMO` selbst (gleiche Bedingung wie der Standard in `createApp`).
+- Wahrheitstabelle (`transitions.ts`), Kern, Vertrag, Oberfläche unverändert. Rest von BF-01 (OIDC, Sperrliste,
+  Notfallkonten, ADR-Nacharbeit) bleibt bei 029.
+
 ## Review findings
