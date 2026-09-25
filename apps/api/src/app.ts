@@ -32,7 +32,7 @@ import {
   type SpeakerUpdate,
   type Track,
 } from '@hv/domain';
-import { parseActorHeader } from './actor.ts';
+import { parseActorHeader, selectAuthAdapter } from './actor.ts';
 import { createFileEventLog } from './eventLog.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { problemResponse } from './problem.ts';
@@ -41,6 +41,11 @@ import { getValidatedBody, getValidatedQuery, validateOperation, type Variables 
 export interface CreateAppOptions {
   /** Defaults to `process.env.HV_DEMO === '1'` — kept overridable so tests need not touch env vars. */
   demoEnabled?: boolean;
+  /**
+   * Defaults to `process.env.HV_OIDC_ISSUER` (slice 029a). Set together with demo mode, `createApp`
+   * throws: the demo header must never be accepted where real sign-ins exist (ADR 0004).
+   */
+  oidcIssuer?: string;
   /** Defaults to `process.env.HV_EVENT_LOG`. Append-only JSON-lines file (AGENTS.md rule 7). */
   eventLogPath?: string;
   /** Overrides `eventLogPath` — lets tests inject an in-memory `Persistence` without touching disk. */
@@ -83,6 +88,10 @@ function parseSeedActorEnv(raw: string): Actor {
 
 export function createApp(options: CreateAppOptions = {}): App {
   const demoEnabled = options.demoEnabled ?? process.env['HV_DEMO'] === '1';
+  const authenticate = selectAuthAdapter({
+    demoEnabled,
+    oidcIssuer: options.oidcIssuer ?? process.env['HV_OIDC_ISSUER'],
+  });
   const eventLogPath = options.eventLogPath ?? process.env['HV_EVENT_LOG'];
   const persistence = options.persistence ?? (eventLogPath !== undefined ? createFileEventLog(eventLogPath) : undefined);
   const store = createInMemoryEventStore(persistence);
@@ -141,7 +150,8 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
-    const actor = parseActorHeader(c.req.header('X-Actor'));
+    // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
+    const actor = authenticate((name) => c.req.header(name));
     await actorStorage.run(actor, () => next());
   });
   app.onError((err, _c) => problemResponse(err));
