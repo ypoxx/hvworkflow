@@ -366,7 +366,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **011 · Legal-Trace-Feld und Regelregister** — mittel · 1,5 AStd · Kalender 07.10.2026 (W2) · Lanes: core
   - *Ziel:* Transition und Guard erhalten `legalRef {source, citation, docVersion, docHash, verified:false}`; Test „jede Regel-ID hat legalRef und mindestens einen Test" (22 IDs heute, wächst mit R-SPK, R-MTG, R-PROC, R-ADM); openapi.yaml `x-legal-notice` berichtigt; docs/legal-trace.md wird aus der Tabelle generiert; Regelregister zählt ehrlich (22, nicht 24); nach dem Merge geht ein Vorabzug des Regelregisters mit ADR 0012 (vorgeschlagen) über den Eigentümer an Recht.
-  - *Abhängigkeiten:* 010
+  - *Abhängigkeiten:* —
   - *Rolle:* Implementierer-Backend; Review
   - *Nachweise:* generierte docs/legal-trace.md eingecheckt; Testausgabe „22 Regel-IDs, 22 legalRef, 0 verified"; pnpm gates
   - *Offene Entscheidung:* Rechtsprüfung der Zitate (E15) — Inhalte bleiben „ungeprüft"
@@ -401,7 +401,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E50–E54 (neu)
 - **090 · Eingaben gehören dem Akteur (Datenschutz, aus Codex auf PR #35)** — mittel · 0,5 AStd · Kalender 25.09.2026 (W0) · Lanes: web-history, e2e
   - *Ziel:* Eingegebener Text, der einen Akteurwechsel überlebt, wird beim Wechsel verworfen (Historien-Suche und jedes weitere Feld, das der e2e-Durchgang als undicht zeigt); e2e je Eingabefeld „Rolle A tippt, Wechsel, Feld leer“.
-  - *Abhängigkeiten:* 010
+  - *Abhängigkeiten:* —
   - *Rolle:* Implementierer-Oberfläche; Review in frischem Kontext (Datenschutz)
   - *Nachweise:* e2e 090 vor der Änderung rot für jedes undichte Feld; pnpm gates
   - *Offene Entscheidung:* —
