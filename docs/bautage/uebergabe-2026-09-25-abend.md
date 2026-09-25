@@ -1,5 +1,7 @@
 # Übergabe an die nächste Orchestrator-Sitzung (25.09.2026, abends)
 
+**Integrationsbranch-Kopf bei Übergabe:** `cab1ebb` (090).
+
 Fortschreibung von `docs/bautage/uebergabe-2026-09-25.md`. **Rolle, Grenzen und Auftrag gelten unverändert** (dort
 nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, jeder Commit (auch Squash) mit
 `[skip netlify]`, keine echten Daten, Budget rund 75 USD, schlanker Review-Modus, Sitzung nach zwei bis drei Merges neu.
@@ -7,11 +9,11 @@ nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, j
 ## Stand
 
 - Gemergt heute: **029a** Demo-Verriegelung (BF-01 behoben, `fadf21b`, PR #37); **090** Eingaben gehören dem Akteur
-  (Datenschutzbefund aus PR #35, PR #38, Squash siehe Tagesbericht).
+  (Datenschutzbefund aus PR #35, `cab1ebb`, PR #38).
 - Tagesbericht `docs/bautage/2026-09-25.md` auf Branch `claude/bautag-2026-09-25`, Draft-PR **#36** (offen; am Ende
   des Bautags mergen, enthält auch diese Datei und die Folgelisten-Nachträge).
 - Keine laufenden Agenten, keine offenen Scheiben-PRs. Worktrees unter `/home/user/wt/` sind nach frischem Container weg.
-- Subagenten-Token heute: 029a ≈ 91 000; 090 ≈ 276 000 (Bau 183 000 inkl. verworfenem ersten Ansatz, Review 93 000).
+- Subagenten-Token heute: 029a ≈ 91 000; 090 ≈ 287 000 (Bau 183 000 inkl. verworfenem ersten Ansatz, Review 104 000).
   Kopfsitzung nicht gezählt. Eigentümer bitten, die Abrechnung zu prüfen (Hälfte des Budgets → Zwischenmeldung).
 
 ## Nächste Schritte (Vorschlag)
@@ -34,6 +36,7 @@ nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, j
 - Neue Scheibennummern brauchen einen Eintrag in `docs/produktplan-beta.md` Abschnitt 5 (Tor `downgrade-check`);
   `plan-graph` verlangt ein Datum `TT.MM.JJJJ (Wnn)` und Abhängigkeiten, die in Abschnitt 5 stehen (sonst „—“).
 - Nach einem Review-Nachtrag des Orchestrators den Gates-Lauf **im Bericht** nennen (Codex P1 auf #37).
+- Dialoge, die ihr Feld per Effekt beim Öffnen leeren, blitzen den alten Text einen Frame lang auf (Codex P1 auf #38). Muster: `key` aus Akteur-id und Dialogart; e2e-Wächter per MutationObserver.
 - Hook blockiert `git push` ohne ausdrückliche Remote und Branch: immer `git push origin <branch>`.
 
 ## Beim Eigentümer offen
