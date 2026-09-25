@@ -131,6 +131,14 @@ mark-test-run: wrote /home/user/wt/s029a/.claude/state/last-test-run (clean tree
 - Wahrheitstabelle (`transitions.ts`), Kern, Vertrag, Oberfläche unverändert. Rest von BF-01 (OIDC, Sperrliste,
   Notfallkonten, ADR-Nacharbeit) bleibt bei 029.
 
+**Nachtrag des Orchestrators (Codex P1 auf PR #37):** Nach dem Review-Nachtrag (leerer Issuer verriegelt ebenfalls)
+lief `pnpm gates` auf dem letzten Code-Commit `7057abb` erneut mit exit 0 (domain 86, api 63, web 181 Tests). Schluss:
+
+```
+✓ built in 2.04s
+mark-test-run: wrote /home/user/wt/s029a/.claude/state/last-test-run (clean tree) at commit 7057abb, tree bbc13e281034…
+```
+
 ## Review findings
 
 Review in frischem Kontext (Security, Opus 5.5) auf `068f750`: **annehmen**, 0 Blocker, 0 Major, 5 minor, 1 nit.
