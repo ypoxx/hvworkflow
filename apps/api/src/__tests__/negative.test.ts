@@ -62,13 +62,13 @@ describe('negative cases and idempotency', () => {
     expectValidProblem(problem);
   });
 
-  it('403: POST /v1/demo/seed is refused unless HV_DEMO=1', async () => {
+  it('401: POST /v1/demo/seed without HV_DEMO=1 already fails at sign-in, before the demo check (slice 029a)', async () => {
     const disabledApp = createApp({ demoEnabled: false });
     const res = await req(disabledApp, 'POST', '/v1/demo/seed', { actor: ACTOR.admin });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     const problem = await res.json();
-    expectValid('seedDemo', 403, problem, 'application/problem+json');
-    expect(problem.status).toBe(403);
+    expectValidProblem(problem);
+    expect(problem.status).toBe(401);
   });
 
   it('404: an unknown question, speaker and contribution are all reported as Not found', async () => {

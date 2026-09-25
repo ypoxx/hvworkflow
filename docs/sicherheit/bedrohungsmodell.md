@@ -371,7 +371,7 @@ der ADR bleibt in dieser Scheibe unverändert. Mit Scheibe 012 geschlossene Befu
 
 | ID | Grenze | Befund | Schwere | Ziel | Status |
 |---|---|---|---|---|---|
-| BF-01 | G1 | `X-Actor` wird unabhängig von `HV_DEMO` ausgewertet (`apps/api/src/app.ts:143-146`, `apps/api/src/actor.ts:11-29`); jeder, der den Port erreicht, ist jede Rolle (Probe P1). ADR 0004 (Kontext) beschreibt den Header-Pfad als an `HV_DEMO=1` gebunden → ADR-Nacharbeit. | kritisch | 029 | offen |
+| BF-01 | G1 | `X-Actor` wurde unabhängig von `HV_DEMO` ausgewertet; jeder, der den Port erreichte, war jede Rolle (Probe P1). **Geschlossen (029a):** ohne `HV_DEMO=1` wählt `selectAuthAdapter` (`apps/api/src/actor.ts`) den Adapter „keine Anmeldung“: jeder Aufruf unter `/v1` → 401, der Header wird nicht gelesen (`apps/api/src/app.ts`, Middleware); `HV_DEMO=1` plus `HV_OIDC_ISSUER` verweigert den Start (Verriegelung ADR 0004); `server.ts` meldet den Betrieb ohne Demo im Log; Probe P1 wiederholt (401 ohne, 200 mit Demo). **Rest bei 029:** OIDC-Anmeldung, Sperrliste, Notfallkonten; ADR-Nacharbeit. | kritisch | 029a / 029 | behoben (029a) |
 | BF-02 | G1 | Lesemethoden ohne Rechteprüfung (`packages/domain/src/api.ts:277-296, 343-352, 397-409, 509-525`); `observer` liest Entwürfe (Probe P2), jede Rolle das ganze Log in einem Aufruf (Probe P3). | hoch | 010 | offen |
 | BF-03 | G1 | Kein Vier-Augen: `legal` entwirft und gibt frei (`packages/domain/src/permissions.ts:33`, `packages/domain/src/transitions.ts:97-104`, Probe P5). | hoch | 021 | offen |
 | BF-04 | G1 | Kein Rechtstor vor der Bühne (`packages/domain/src/transitions.ts:112-118`). | hoch | 021 | offen |

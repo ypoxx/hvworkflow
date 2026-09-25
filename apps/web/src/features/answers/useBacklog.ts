@@ -108,6 +108,9 @@ function problem(error: unknown): void {
 /** Typing must not fire a fetch per keystroke. */
 function useDebounced(value: string, delay: number): string {
   const [debounced, setDebounced] = useState(value);
+  // Slice 090: an emptied search is empty at once. Otherwise the previous actor's term would still
+  // drive the next actor's first read for the length of the delay.
+  if (value === '' && debounced !== '') setDebounced('');
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(value), delay);
     return () => window.clearTimeout(timer);

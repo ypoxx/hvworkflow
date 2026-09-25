@@ -90,6 +90,9 @@ export function AnswersPage() {
     setViewActorId(actorId);
     setDialog(null);
     setStaleFor(null);
+    // Slice 090: the search text is typed input and belongs to the actor who typed it; the other
+    // filters (status, track, unit, agenda item, sort) are choices, not text, and stay (010d).
+    setFilters((previous) => (previous.q === '' ? previous : { ...previous, q: '' }));
   }
 
   /**
@@ -321,7 +324,9 @@ export function AnswersPage() {
         }
       />
 
+      {/* Codex P1 on PR #38: keyed to the actor so a switch remounts the dialog and drops the previous actor's text synchronously; its own reset runs in an effect, one paint too late. */}
       <ReasonDialog
+        key={`${actorId}:return`}
         open={dialog === 'return'}
         onClose={() => setDialog(null)}
         title={t('answers.return.title')}
@@ -341,6 +346,7 @@ export function AnswersPage() {
       />
 
       <ReasonDialog
+        key={`${actorId}:withdraw`}
         open={dialog === 'withdraw'}
         onClose={() => setDialog(null)}
         title={t('answers.withdraw.title')}
@@ -361,6 +367,7 @@ export function AnswersPage() {
       />
 
       <AssignDialog
+        key={`${actorId}:assign`}
         open={dialog === 'assign'}
         onClose={() => setDialog(null)}
         units={backlog.units}
@@ -375,6 +382,7 @@ export function AnswersPage() {
       />
 
       <MergeDialog
+        key={`${actorId}:merge`}
         open={dialog === 'merge'}
         onClose={() => setDialog(null)}
         busy={busy}
