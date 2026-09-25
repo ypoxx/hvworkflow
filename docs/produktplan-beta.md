@@ -399,7 +399,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Architekt; Review in frischem Kontext
   - *Nachweise:* docs/evidence/089-*.png; Ladelauf der Repo-Fassung (Skriptfehler, Schriften); `node scripts/slice-scope.mjs --slice 089`; Matrix- und Register-Diff; pnpm gates
   - *Offene Entscheidung:* E50–E54 (neu)
-- **090 · Eingaben gehören dem Akteur (Datenschutz, aus Codex auf PR #35)** — mittel · 0,5 AStd · Kalender 25.09.2026 (W0, vorgezogen) · Lanes: web-history, e2e
+- **090 · Eingaben gehören dem Akteur (Datenschutz, aus Codex auf PR #35)** — mittel · 0,5 AStd · Kalender 25.09.2026 (W0) · Lanes: web-history, e2e
   - *Ziel:* Eingegebener Text, der einen Akteurwechsel überlebt, wird beim Wechsel verworfen (Historien-Suche und jedes weitere Feld, das der e2e-Durchgang als undicht zeigt); e2e je Eingabefeld „Rolle A tippt, Wechsel, Feld leer“.
   - *Abhängigkeiten:* 010d
   - *Rolle:* Implementierer-Oberfläche; Review in frischem Kontext (Datenschutz)
