@@ -1,6 +1,6 @@
 # 029a — Demo-Verriegelung des Dienstes (BF-01)
 
-**Status:** spec
+**Status:** review bestanden (25.09.)
 **Risikoklasse:** hoch (Sicherheit) · 0,5 AStd · 25.09.2026 (W0, aus 029 vorgezogen) · Lanes: service
 **Rolle:** Implementierer-Backend; Review in frischem Kontext (Perspektive Security, Sicherheits-Checkliste des Reviewers) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 4, 11, 12; ADR 0004 (Demo-Verriegelung); `docs/sicherheit/bedrohungsmodell.md` BF-01
@@ -132,3 +132,12 @@ mark-test-run: wrote /home/user/wt/s029a/.claude/state/last-test-run (clean tree
   Notfallkonten, ADR-Nacharbeit) bleibt bei 029.
 
 ## Review findings
+
+Review in frischem Kontext (Security, Opus 5.5) auf `068f750`: **annehmen**, 0 Blocker, 0 Major, 5 minor, 1 nit.
+
+- Minor 1 und 2 (leerer oder nur aus Leerzeichen bestehender `HV_OIDC_ISSUER` umging die Verriegelung; ein explizites
+  `oidcIssuer: ''` verdrängte die Umgebungsvariable) betreffen die Sicherheit und werden deshalb in der Scheibe
+  behoben (schlanker Modus: Sicherheitsbefunde nie auf die Folgeliste). Ein definierter Issuer zählt jetzt immer,
+  auch leer; Test ergänzt. Behoben vom Orchestrator im Nachtrag-Commit.
+- Minor 3–5 (Dateikopf `actor.ts`, Log-Hinweis in `server.ts` wertet `HV_DEMO` doppelt aus, Bedrohungs-ID T-G1-S-01
+  und Missbrauchsfall fehlen in der Spec) und Nit 6 (401 für `seedDemo` nicht im Vertrag, 043) → `docs/folgeliste.md`.

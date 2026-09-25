@@ -61,8 +61,9 @@ const noSignIn: AuthAdapter = () => {
  * startup configuration, so it throws a plain `Error`, not an HTTP-shaped `ApiProblem`.
  */
 export function selectAuthAdapter(options: AuthOptions): AuthAdapter {
-  const issuer = options.oidcIssuer?.trim() ?? '';
-  if (options.demoEnabled && issuer !== '') {
+  // Any defined issuer counts, even an empty or blank one: a value lost during deployment is a
+  // configuration error, and the lock has to fail closed rather than fall back to demo mode.
+  if (options.demoEnabled && options.oidcIssuer !== undefined) {
     throw new Error(
       'Refusing to start: HV_DEMO=1 and HV_OIDC_ISSUER are both set. Demo mode trusts the X-Actor header and must never run next to a real sign-in; unset one of them.',
     );

@@ -48,6 +48,9 @@ describe('demo lock (slice 029a, BF-01)', () => {
 
   it('createApp refuses to start with demo mode and an OIDC issuer, naming both variables', () => {
     expect(() => createApp({ demoEnabled: true, oidcIssuer: ISSUER })).toThrow(/HV_DEMO.*HV_OIDC_ISSUER|HV_OIDC_ISSUER.*HV_DEMO/);
+    // Review 029a, minor 1/2: a blank or empty issuer is still a set issuer (fail closed).
+    expect(() => createApp({ demoEnabled: true, oidcIssuer: '  ' })).toThrow(/Refusing to start/);
+    expect(() => createApp({ demoEnabled: true, oidcIssuer: '' })).toThrow(/Refusing to start/);
   });
 
   it('createApp starts with an OIDC issuer when demo mode is off', () => {
