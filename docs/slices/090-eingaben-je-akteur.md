@@ -1,6 +1,6 @@
 # 090 — Eingaben gehören dem Akteur
 
-**Status:** spec
+**Status:** review bestanden (R2, 25.09.)
 **Risikoklasse:** mittel (Datenschutz) · 0,5 AStd · 25.09.2026 (W0, vorgezogen) · Lanes: web-shell, e2e (eigene Datei)
 **Rolle:** Implementierer-Oberfläche; Review in frischem Kontext (Perspektive Datenschutz) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 4, 10, 12; docs/design-prinzipien.md D9
@@ -121,3 +121,19 @@ Touched: apps/web/src/features/history/Page.tsx, apps/web/src/features/answers/P
 ```
 
 ## Review findings
+
+**R1** (frischer Kontext, Datenschutz, Opus 5.5) auf `ab75640`: **nacharbeiten**, 1 Blocker, 3 Major, 2 minor, 1 nit.
+
+1. Blocker: Erfassung `draft`/`free` überlebten den Wechsel zu einer Rolle, die das Feld auch sieht (capture → admin).
+   Die ersten e2e wechselten nur zu Rollen ohne das Feld, deren Aushängen das Leck verdeckte → behoben (`725b772`).
+2. Major: e2e ohne Wechsel zu einer Rolle mit demselben Feld → je Feld ergänzt, 20 Fälle.
+3. Major: zwei weitere 010c-Szenarien (Ziel 5, Runde 2 N1) prüften nach der Änderung nichts mehr → Suche neu getippt,
+   Detailabruf gezählt (0 ohne, ≥ 1 mit Suche).
+4. Major: Planeintrag 011 versehentlich geändert (Orchestrator, `bf2ce5e`) → wiederhergestellt (`49d5e2f`).
+5. Minor: Rückgabe-Dialog der Bühne öffnete sich für den nächsten Akteur wieder → geschlossen beim Wechsel, Test hart.
+6. Minor: Entprellung ohne Test → Abrufe mitgeschnitten, kein Abruf nach dem Wechsel trägt den alten Begriff.
+7. Nit: Kommentar in 010c → nachgezogen.
+
+**R2** (enge Nachprüfung) auf `b232bd5`: **annehmen**. Alle Befunde geschlossen; Gegenprobe mit dem Code vor der
+Korrektur: 6 Fälle rot, Entprellungsfälle rot. `pnpm gates` grün auf `b232bd5`. Ein nit (`expectCleared` prüft
+zusätzlich `#main` per `innerText`, fügt nichts hinzu) → `docs/folgeliste.md`.
