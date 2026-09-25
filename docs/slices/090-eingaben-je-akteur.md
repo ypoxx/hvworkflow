@@ -50,6 +50,8 @@ Kein Neuaufbau der Routen je Akteur; Fokus nach der Wahl im Rollenumschalter (f�
 
 - `apps/web/src/features/{history,answers,capture,stage,speakers}/**` (nur die Rücksetzung getippter Eingaben)
 - `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (neu)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (Nachtrag des Architekten 25.09.: nur die Szenarien, die sich auf eine über den
+  Akteurwechsel erhaltene Suche in der Beantwortung stützen; sie tippen die Suche nach dem Wechsel neu, ihr Prüfziel bleibt)
 - `docs/produktplan-beta.md` (nur der Eintrag 090 in Abschnitt 5, vom Architekten)
 - `docs/slices/090-eingaben-je-akteur.md`
 

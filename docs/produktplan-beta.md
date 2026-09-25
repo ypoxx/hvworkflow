@@ -401,7 +401,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E50–E54 (neu)
 - **090 · Eingaben gehören dem Akteur (Datenschutz, aus Codex auf PR #35)** — mittel · 0,5 AStd · Kalender 25.09.2026 (W0) · Lanes: web-history, e2e
   - *Ziel:* Eingegebener Text, der einen Akteurwechsel überlebt, wird beim Wechsel verworfen (Historien-Suche und jedes weitere Feld, das der e2e-Durchgang als undicht zeigt); e2e je Eingabefeld „Rolle A tippt, Wechsel, Feld leer“.
-  - *Abhängigkeiten:* 010d
+  - *Abhängigkeiten:* 010 (mit den Folgescheiben 010b–010d, gemergt)
   - *Rolle:* Implementierer-Oberfläche; Review in frischem Kontext (Datenschutz)
   - *Nachweise:* e2e 090 vor der Änderung rot für jedes undichte Feld; pnpm gates
   - *Offene Entscheidung:* —
