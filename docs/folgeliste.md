@@ -23,8 +23,6 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 - 010d Bericht · `features/stage/Page.tsx:515` · Skelett `stage-deciding` trägt `aria-label` ohne Rolle (axe serious,
   sobald der Ladezustand geprüft wird) · `role="status"` wie in 010d.
 - 010c · `features/history/Page.tsx` · zwei Toasts, wenn beide Hauptabrufe scheitern · einen Toast je Durchgang.
-- 010d Bericht · `features/capture/` · eingegebener Text ist nicht an den Akteur gebunden (Formular behält Text über
-  einen Rollenwechsel) · beim Akteurwechsel leeren oder bewusst behalten und dokumentieren.
 - takt-008 Bericht offen 2 · `features/answers/`, `features/stage/` · Knöpfe außerhalb der sechs Aktionen nutzen noch
   `disabled={busy}` (Fokus fällt nach Aktion auf BODY) · Muster aus takt-008 übernehmen.
 - takt-008 Bericht offen 3 · `features/capture/ContributionPane.tsx` · `capture-submit` hat zwei gesperrte Erscheinungen

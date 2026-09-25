@@ -55,8 +55,13 @@ bei Bedarf.
 2. Aus `docs/produktplan-beta.md` die Beta-Kernscheiben wählen, die **keine Menschen** brauchen und deren
    Abhängigkeiten gemergt sind, in Kalenderreihenfolge (W1/W2 zuerst). Hohe Priorität: **029** (BF-01 kritisch: der
    HTTP-Dienst nimmt `X-Actor` auch ohne `HV_DEMO` an — Sicherheitsbefund, braucht keinen Menschen).
-3. Höchstens drei Scheiben parallel; bei 75 USD eher zwei, damit Nacharbeit bezahlbar bleibt.
-4. Nach jedem Merge: Tagesbericht-Zeile mit Token; bei rund der Hälfte des Budgets Zwischenmeldung an den Eigentümer.
+3. **Datenschutz, vor weiteren Oberflächenscheiben:** Eingegebener Text in der Erfassung (`ContributionPane`: `draft`,
+   `free`) und im Antwortentwurf ist nicht an den Akteur gebunden und bleibt über einen Rollenwechsel sichtbar
+   (Codex auf PR #35, als Datenschutzbefund eingestuft; aus der Folgeliste herausgenommen). Kleine Scheibe: beim
+   Akteurwechsel Eingaben verwerfen, e2e „Rolle A tippt, Wechsel zu B, Feld leer“. In der Demo wechselt eine Person
+   die Rolle; in Produktion wird es relevant, sobald sich auf einem Gerät zwei Personen nacheinander anmelden.
+4. Höchstens drei Scheiben parallel; bei 75 USD eher zwei, damit Nacharbeit bezahlbar bleibt.
+5. Nach jedem Merge: Tagesbericht-Zeile mit Token; bei rund der Hälfte des Budgets Zwischenmeldung an den Eigentümer.
 
 ## Beim Eigentümer offen (nicht blockierend für den Bau)
 
