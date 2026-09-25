@@ -399,6 +399,12 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Architekt; Review in frischem Kontext
   - *Nachweise:* docs/evidence/089-*.png; Ladelauf der Repo-Fassung (Skriptfehler, Schriften); `node scripts/slice-scope.mjs --slice 089`; Matrix- und Register-Diff; pnpm gates
   - *Offene Entscheidung:* E50–E54 (neu)
+- **090 · Eingaben gehören dem Akteur (Datenschutz, aus Codex auf PR #35)** — mittel · 0,5 AStd · Kalender 25.09.2026 (W0, vorgezogen) · Lanes: web-history, e2e
+  - *Ziel:* Eingegebener Text, der einen Akteurwechsel überlebt, wird beim Wechsel verworfen (Historien-Suche und jedes weitere Feld, das der e2e-Durchgang als undicht zeigt); e2e je Eingabefeld „Rolle A tippt, Wechsel, Feld leer“.
+  - *Abhängigkeiten:* 010d
+  - *Rolle:* Implementierer-Oberfläche; Review in frischem Kontext (Datenschutz)
+  - *Nachweise:* e2e 090 vor der Änderung rot für jedes undichte Feld; pnpm gates
+  - *Offene Entscheidung:* —
 - **082 · Feature-Register für Routen, Navigation, Kürzel und Hilfe** — niedrig · 1 AStd · Kalender 05.10.2026 (W2) · Lanes: web-shell
   - *Ziel:* apps/web/src/app/featureRegistry.ts führt je Feature Route, Navigationseintrag, Tastenkürzel (Alt+n), i18n-Modul, benötigtes Recht (aus `_actions` bzw. `/auth/me`) und Hilfeschlüssel; routes.tsx, Navigation und Kurzbefehl-Dialog lesen daraus; jede spätere Scheibe mit neuer Route (041, 053, 054, 059, 061) fügt genau eine Zeile hinzu und berührt die Shell sonst nicht. Kein Rollenname im Register (Regel 4).
   - *Abhängigkeiten:* 017

@@ -17,43 +17,48 @@ der Antwortentwurf (`AnswerEditor`), die Begründungsfelder in `answers/ActionDi
 sieht, was die vorige Person getippt hat. In der Demo wechselt eine Person die Rolle; in Produktion wird es relevant,
 sobald sich zwei Personen nacheinander auf einem Gerät anmelden.
 
-Entscheidung: **nicht Feld für Feld**, sondern an einer Stelle. Der Inhalt von `<main>` (die `Routes` in
-`apps/web/src/app/AppShell.tsx`) wird mit `key={actor.id}` versehen, sodass ein Akteurwechsel jede Ansicht neu
-aufbaut und jeden lokalen Zustand verwirft (Eingaben, offene Dialoge, Auswahl, Filter). Vergleich über `id`, nie über
-die Rolle (Regel 4). Das ist auch für künftige Felder richtig, ohne dass jemand daran denken muss. Was eine Ansicht in
-`localStorage` hält (etwa der Bühnenkontrast), ist Geräteeinstellung, kein eingegebener Text, und bleibt.
+**Nachtrag des Architekten (25.09., nach dem ersten Bauversuch):** Der erste Versuch mit `key={actor.id}` an den
+`Routes` zeigte zweierlei. Erstens verwirft 010d die meisten Eingaben bereits (Erfassung `draft`/`free`, Antwortentwurf,
+Begründung, Name bei der Registrierung: die e2e dafür waren vor der Änderung schon grün). Zweitens bricht der
+Neuaufbau 25 bestehende Szenarien (Auswahl und Reiter gehen verloren, der Demo-Durchgang 003 reißt) und bringt das in
+010b bewusst beseitigte Flackern „keine Leseberechtigung“ zurück. Der Schlüssel an den Routen ist damit zu grob.
 
-Wenn der Neuaufbau eine bestehende Zusicherung aus 010c/010d bricht (etwa ein e2e, der einen offenen Zustand über den
-Wechsel erwartet), ist die Zusicherung im Sinn dieser Scheibe anzupassen, nicht der Schlüssel aufzuweichen; im Bericht
-nennen, welche und warum.
+Entscheidung: **gezielt je Feld.** Undicht ist nachweislich die Suche der Historie; jedes weitere Textfeld wird im
+e2e-Durchgang geprüft (Liste unten). Wo ein Feld den Wechsel überlebt, wird es beim Wechsel des Akteurs geleert, mit dem
+Muster aus `answers/Page.tsx` (`viewActorId`, Vergleich über `id`, nie über die Rolle, Regel 4). Auswahl, Reiter und
+Filterwahl (keine eingegebenen Texte) bleiben, wie 010d sie festlegt. Was eine Ansicht in `localStorage` hält (etwa der
+Bühnenkontrast), ist Geräteeinstellung und bleibt.
 
 ## Ziel
 
-1. Akteurwechsel verwirft jede Eingabe in `<main>`: Neuaufbau der Routen über `key={actor.id}`, ein Kommentar sagt warum.
-2. e2e-Datei `apps/web/e2e/090-eingaben-je-akteur.spec.ts`, **vor der Änderung rot**, je Feld ein Fall nach dem Muster
-   „Rolle A tippt, Wechsel zu B (und falls nötig zurück zu A), Feld ist leer bzw. Dialog geschlossen“, mindestens für:
-   Erfassung (`draft` und `free`), Antwortentwurf, Begründung in einem Aktionsdialog der Beantwortung,
-   Wortmeldung registrieren (Name). Rückwechsel zu A zeigt ebenfalls leer (kein Wiederherstellen).
-3. Ein Fall prüft, dass der Fokus nach dem Wechsel nicht auf `BODY` fällt, sondern im Rollenumschalter bleibt.
+1. Jede getippte Eingabe, die einen Akteurwechsel überlebt, wird beim Wechsel geleert. Mindestens die Suche der
+   Historie; zu prüfen außerdem: Filtertextfeld in `answers/WorkList.tsx`, Eingaben in `capture/SuggestDialog.tsx`,
+   Begründung auf der Bühne (`stage/Page.tsx`), Felder in `answers/ActionDialogs.tsx` (Einheit, Nummer). Ein Kommentar
+   an jeder Stelle sagt warum.
+2. e2e-Datei `apps/web/e2e/090-eingaben-je-akteur.spec.ts`, je Feld ein Fall „Rolle A tippt, Wechsel zu B (und falls
+   nötig zurück zu A), Feld leer bzw. Dialog geschlossen“. Die Fälle für schon dichte Felder bleiben als
+   Regressionsschutz; die Fälle für undichte Felder sind vor der Änderung rot (Ausgabe im Bericht).
+3. `docs/produktplan-beta.md` Abschnitt 5 erhält den Eintrag 090 (vom Architekten gesetzt, Tor `downgrade-check`).
 
 ## Nicht-Ziele
 
-Kein Entwurfsspeicher je Akteur (das ist Z.365 / 060), keine Änderung an Kern, Vertrag, Dienst, Rechten, i18n;
-keine Politur aus der Folgeliste (010e).
+Kein Neuaufbau der Routen je Akteur; Fokus nach der Wahl im Rollenumschalter (fällt auf `BODY`, Ursache in
+`RoleSwitcher.tsx`) → Folgeliste, nicht hier und nicht als `test.fail` im e2e. Kein Entwurfsspeicher je Akteur (Z.365 /
+060), keine Änderung an Kern, Vertrag, Dienst, Rechten, i18n; keine Politur aus der Folgeliste (010e).
 
 ## Files allowed
 
-- `apps/web/src/app/AppShell.tsx`
+- `apps/web/src/features/{history,answers,capture,stage,speakers}/**` (nur die Rücksetzung getippter Eingaben)
 - `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (neu)
-- `apps/web/e2e/010c-lesezustand.spec.ts`, `apps/web/e2e/010d-ansichtsdaten.spec.ts` (nur falls eine Zusicherung dem
-  Neuaufbau widerspricht; im Bericht begründen)
+- `docs/produktplan-beta.md` (nur der Eintrag 090 in Abschnitt 5, vom Architekten)
 - `docs/slices/090-eingaben-je-akteur.md`
 
 ## Akzeptanzkriterium
 
-1. Die e2e aus Ziel 2 und 3 sind vor der Änderung rot (Ausgabe im Bericht) und danach grün, auch mit
-   `--repeat-each=3` und einmal unter `taskset -c 0,1` mit einem Worker.
-2. Alle Playwright-Szenarien grün, axe ohne serious/critical; `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
+1. Die e2e aus Ziel 2 für undichte Felder sind vor der Änderung rot und danach grün, auch mit `--repeat-each=3` und
+   einmal unter `taskset -c 0,1` mit einem Worker.
+2. Alle Playwright-Szenarien grün (volle Suite, keine bestehende Zusicherung geändert), axe ohne serious/critical;
+   `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
 3. Kein Screenshot nötig (kein neuer sichtbarer Zustand).
 
 ## Arbeitsweise
