@@ -43,7 +43,5 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   enthält jetzt Port und Adapterwahl · Kommentar anpassen.
 - 029a R1 minor 4 · `apps/api/src/server.ts:17` · Log-Hinweis wertet `HV_DEMO` selbst aus statt die Wahl aus
   `createApp` zu übernehmen · gewählten Adapternamen zurückgeben und loggen (spätestens mit 029).
-- 029a R1 minor 5 · `docs/slices/029a-demo-verriegelung.md` · Bedrohungs-ID T-G1-S-01 und Missbrauchsfall (MF-xx) fehlen
-  (SP-6/SC-06) · in 029 nachtragen.
 - 029a R1 nit 6 · `packages/contract/openapi.yaml` · 401 für `seedDemo`, `getMeeting`, `registerSpeaker` nicht
   dokumentiert (Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS`) · 043.
