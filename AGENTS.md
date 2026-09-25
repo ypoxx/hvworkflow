@@ -49,6 +49,11 @@ its working directory between calls.
 3. **Whoever builds does not review.** Reviews run in a fresh context that sees only spec and diff —
    a separate reviewer agent, never the builder's own session. Independence comes from the fresh
    context, not from a different model (model per role: `.claude/agents/`).
+   **Lean review mode (owner, 25.09.2026):** one review per slice; a second, narrow re-check only
+   for blocker/major. Minor and nit findings are not reworked: they go to `docs/folgeliste.md` for a
+   later bundled pass. Codex reviews once, when the PR goes ready; only P0/P1 or any security, legal or
+   privacy finding holds a merge, everything else goes to the list. High-risk or important slices are
+   built and reviewed with Opus; low-risk slices may be reviewed with Sonnet. The orchestrator is Opus.
 4. **Rights are data.** Never compare a role name in interface or server code. The interface renders
    what `_actions` allows; the server decides through `can()` in `packages/domain/src/api.ts`.
    The only places a role name may appear: `ROLE_PERMISSIONS` and the demo role switcher.
