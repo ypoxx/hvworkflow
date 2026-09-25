@@ -81,7 +81,14 @@ Slice: 089-zielbild-oberflaeche
 Done: UI-Befunde U1–U11 und Zielbild Z1–Z26 als Quelle mit Status, Ort und Aufwand in AStd; Prototyp lesbar in
       docs/zielbild/ (je Ansicht eine Datei, Schriften relativ, README mit Übernehmen/Nicht übernehmen und
       Namenszuordnung); Matrixzeile, Register E50–E54, Plan-Zeile 089 und Zielbild-Zeilen in acht Scheiben.
-Evidence: pnpm gates auf c12f969 (Nacharbeit Runde 1), Auszug:
+Evidence: pnpm gates auf c00e4b8 (letzter inhaltlicher Stand), Ende der Ausgabe wörtlich:
+      (!) Some chunks are larger than 500 kB after minification. Consider:
+      - Using dynamic import() to code-split the application
+      - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+      - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+      ✓ built in 1.11s
+      mark-test-run: wrote /home/user/hvworkflow/.claude/state/last-test-run (clean tree) at commit c00e4b8, tree 0590db9b36b2…
+    Zählzeilen aus demselben Lauf:
       packages/domain test:       Tests  86 passed (86)
       apps/web test:       Tests  181 passed (181)
       apps/api test:       Tests  57 passed (57)
@@ -89,8 +96,6 @@ Evidence: pnpm gates auf c12f969 (Nacharbeit Runde 1), Auszug:
       plan-graph: ok.
       # pass 206
       # fail 0
-      ✓ built in 1.29s
-      mark-test-run: wrote /home/user/hvworkflow/.claude/state/last-test-run (clean tree) at commit c12f969, tree 0590db9b36b2…
     node scripts/slice-scope.mjs --slice 089:
       slice-scope: 20 changed file(s), all within "docs/slices/089-zielbild-oberflaeche.md"'s "Files allowed" list (7 pattern(s)).
     Ladelauf der Repo-Fassung (python3 -m http.server aus der Wurzel, Chromium, 1440 und 390 px):
