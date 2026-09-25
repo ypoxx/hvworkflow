@@ -366,7 +366,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **011 · Legal-Trace-Feld und Regelregister** — mittel · 1,5 AStd · Kalender 07.10.2026 (W2) · Lanes: core
   - *Ziel:* Transition und Guard erhalten `legalRef {source, citation, docVersion, docHash, verified:false}`; Test „jede Regel-ID hat legalRef und mindestens einen Test" (22 IDs heute, wächst mit R-SPK, R-MTG, R-PROC, R-ADM); openapi.yaml `x-legal-notice` berichtigt; docs/legal-trace.md wird aus der Tabelle generiert; Regelregister zählt ehrlich (22, nicht 24); nach dem Merge geht ein Vorabzug des Regelregisters mit ADR 0012 (vorgeschlagen) über den Eigentümer an Recht.
-  - *Abhängigkeiten:* —
+  - *Abhängigkeiten:* 010
   - *Rolle:* Implementierer-Backend; Review
   - *Nachweise:* generierte docs/legal-trace.md eingecheckt; Testausgabe „22 Regel-IDs, 22 legalRef, 0 verified"; pnpm gates
   - *Offene Entscheidung:* Rechtsprüfung der Zitate (E15) — Inhalte bleiben „ungeprüft"
