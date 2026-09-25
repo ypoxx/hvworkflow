@@ -353,7 +353,8 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.
-- *Verhindert durch:* T-Q-T-04, T-G1-S-01; Startabbruch bei `HV_DEMO=1` mit Issuer (029), Konfigurationsschema
+- *Verhindert durch:* T-Q-T-04, T-G1-S-01; Startabbruch bei `HV_DEMO=1` mit Issuer (gebaut in 029a, Test
+  `apps/api/src/__tests__/demo-lock.test.ts`; ohne `HV_DEMO=1` wird `X-Actor` nicht gelesen), Konfigurationsschema
   (034), Seed nur in `training` (042).
 - *Erkennung:* Health-Smoke nach dem Deploy prüft die Betriebsart (Zielvorschlag für 037); Banner je Modus
   (042).

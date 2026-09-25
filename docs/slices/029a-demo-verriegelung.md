@@ -3,7 +3,8 @@
 **Status:** review bestanden (25.09.)
 **Risikoklasse:** hoch (Sicherheit) · 0,5 AStd · 25.09.2026 (W0, aus 029 vorgezogen) · Lanes: service
 **Rolle:** Implementierer-Backend; Review in frischem Kontext (Perspektive Security, Sicherheits-Checkliste des Reviewers) (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** AGENTS.md Regeln 1, 2, 4, 11, 12; ADR 0004 (Demo-Verriegelung); `docs/sicherheit/bedrohungsmodell.md` BF-01
+**Rule ids:** AGENTS.md Regeln 1, 2, 4, 11, 12; ADR 0004 (Demo-Verriegelung); `docs/sicherheit/bedrohungsmodell.md` BF-01, Bedrohung T-G1-S-01 (Abschnitt 6), Missbrauchsfall MF-08 (Abschnitt 7;
+Nachtrag 25.09. nach Codex P1 auf PR #36, SP-6/SC-06)
 **Quellen-IDs:** Plan-Scheibe 029 (Nachweise „X-Actor ohne Demo 401“, „HV_DEMO=1 mit Issuer → Start verweigert“); 039 Probe P1
 **Depends on:** 010 (gemergt `d4c7393`), 023 (gemergt `daece57`)
 **Perspektive:** Security · **Glossar: neue Begriffe:** nein

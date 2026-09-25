@@ -27,8 +27,21 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   `disabled={busy}` (Fokus fällt nach Aktion auf BODY) · Muster aus takt-008 übernehmen.
 - takt-008 Bericht offen 3 · `features/capture/ContributionPane.tsx` · `capture-submit` hat zwei gesperrte Erscheinungen
   (leer: nativ gesperrt; beim Schreiben: `aria-disabled`) · vereinheitlichen.
+- 090 Bau · `apps/web/src/app/RoleSwitcher.tsx` · nach der Wahl eines Eintrags fällt der Fokus auf `BODY` (der
+  gewählte Menüpunkt wird ausgehängt) · Fokus auf den Auslöser des Umschalters zurückgeben, e2e dazu.
 
 ## Tests
 
 - 010c CI-Korrektur minor · `apps/web/e2e/010c-lesezustand.spec.ts:118` · ein `import()` mit `await` bleibt in
   `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.
+- 090 R2 nit · `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (`expectCleared`) · Prüfung von `#main` per
+  `not.toContainText` sieht keine Feldwerte und fügt nichts hinzu · streichen oder auf Feldwerte umstellen.
+
+## Dienst: Anmeldung (vor oder mit 029)
+
+- 029a R1 minor 3 · `apps/api/src/actor.ts:1-5` · Dateikopf nennt die Datei noch „demo authentication adapter“, sie
+  enthält jetzt Port und Adapterwahl · Kommentar anpassen.
+- 029a R1 minor 4 · `apps/api/src/server.ts:17` · Log-Hinweis wertet `HV_DEMO` selbst aus statt die Wahl aus
+  `createApp` zu übernehmen · gewählten Adapternamen zurückgeben und loggen (spätestens mit 029).
+- 029a R1 nit 6 · `packages/contract/openapi.yaml` · 401 für `seedDemo`, `getMeeting`, `registerSpeaker` nicht
+  dokumentiert (Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS`) · 043.
