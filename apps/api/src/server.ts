@@ -14,4 +14,11 @@ const app = createApp({ seedOnStart: true });
 serve({ fetch: app.fetch, port }, (info) => {
   // eslint-disable-next-line no-console
   console.log(`HV-Tool API listening on http://localhost:${info.port}`);
+  if (process.env['HV_DEMO'] !== '1') {
+    // Slice 029a (BF-01): without demo mode there is no sign-in path yet, so every /v1 call is a 401.
+    // eslint-disable-next-line no-console
+    console.warn(
+      'HV-Tool API: demo mode is off (HV_DEMO is not 1) and no other sign-in is set up — every /v1 request is answered with 401; X-Actor is ignored.',
+    );
+  }
 });
