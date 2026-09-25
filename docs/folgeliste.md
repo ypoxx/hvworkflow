@@ -27,6 +27,8 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   `disabled={busy}` (Fokus fällt nach Aktion auf BODY) · Muster aus takt-008 übernehmen.
 - takt-008 Bericht offen 3 · `features/capture/ContributionPane.tsx` · `capture-submit` hat zwei gesperrte Erscheinungen
   (leer: nativ gesperrt; beim Schreiben: `aria-disabled`) · vereinheitlichen.
+- 090 Bau · `apps/web/src/app/RoleSwitcher.tsx` · nach der Wahl eines Eintrags fällt der Fokus auf `BODY` (der
+  gewählte Menüpunkt wird ausgehängt) · Fokus auf den Auslöser des Umschalters zurückgeben, e2e dazu.
 
 ## Tests
 
