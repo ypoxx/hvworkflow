@@ -274,7 +274,7 @@ Jede Zeile löst sich in eine Scheibe, einen Nach-Beta-Eintrag (B-Liste, 5.10, m
 | Recherche SOLL, bewusst mitgenommen | Z.351 Kill-Switch (Sperrliste, billig mit 029) | 029 |
 | Recherche MUSS Recht (tragend) | Z.63/64 Verweigerung · Z.70 Nachfragen · Z.74/259 Verfahrensereignisse · Z.78 Restanten-Feststellung · Z.80 Korrektur · Z.91/422 Rechtstor · Z.103 Soll-Ist · Z.104/126 Legal Hold · Z.116 Pseudonymisierung · Z.129/130 zwei Protokollebenen mit Auswertung zu zweit · Z.231 Vier-Augen · Z.277 Delivery-Entität · Z.449 Auskunftsschuldner, Aufsichtsrat | 044 · 046 · 050 · 087 · 046 · 021 · 049 · 024 · 026 (Standard an)/067 · 033/047 · 021 · 049 · 048, 040/047 |
 | Kritik der Gegenlese (fünf Linsen) | Blocker und Hauptbefunde zu Kalender, Rechtstor, Papierpfad, Vertrag zuerst, Kapazität, Token, Governance | 080–088 neu; Änderungen in 019, 021, 023, 025, 051, 058, 076 u. a.; Abschnitte 3, 4, 6, 8, 10 |
-| Zielbild Oberfläche (`docs/feedback/2026-09-zielbild-oberflaeche.md`, Prototyp `docs/zielbild/`) | Befunde U1–U11 · Zielbild Z1–Z26 | 054 (Z1, Z5, Z7–Z9), 055 (Z6), 061 (Z10–Z13), 087 (Z14), 050/085 (Z15), 056/057 (Z16, Z17, Z19, Z22), 062 (Z26), 026 (U10), 080 (U11), 021/053 (U5) · Takt-Spur (U1, U2, U4, U6–U9) · Register E50–E54 (Z2–Z4, Z18, Z20, Z21, U3) · bewusst nein: Z24, Z25 · gebaut: Z23 (020) |
+| Zielbild Oberfläche (`docs/feedback/2026-09-zielbild-oberflaeche.md`, Prototyp `docs/zielbild/`) | Befunde U1–U11 · Zielbild Z1–Z26 | 089 (Übernahme) · 054 (Z1, Z5, Z7–Z9), 055 (Z6), 061 (Z10–Z13), 087 (Z14), 050/085 (Z15), 056/057 (Z16, Z17, Z19, Z22), 062 (Z26), 026 (U10), 080 (U11), 021/053 (U5) · Takt-Spur (U1, U2, U4, U6–U9) · Register E50–E54 (Z2–Z4, Z18, Z20, Z21, U3) · bewusst nein: Z24, Z25 · gebaut: Z23 (020) |
 | Recherche MUSS übrig (§7, §8 Aktionärskanal, MAR-Ampel, PDF/A, Publikation, KI-Anbieter, Nebenstränge, Ethical Wall, Suche, SAML …) | — | B-Liste 5.10 |
 
 ### 5.1 Lanes — Dateibesitz für parallele Arbeit
@@ -295,7 +295,7 @@ Eine Scheibe darf nur ihre Lane(s), ihre eigene Datei `docs/slices/NNN-*.md`, ih
 | infra | `.github/**`, `scripts/**`, `docker/**`, `netlify.toml`, `.claude/**`, `apps/web/vite.config.ts` | |
 | manifests | `package.json`, `apps/*/package.json`, `packages/*/package.json`, `pnpm-lock.yaml` | additiv für jede Scheibe, die das Paket in der Spec nennt; das Lockfile regeneriert der Mechaniker beim Merge |
 | docs-plan | `AGENTS.md`, `README.md`, `docs/agentische-entwicklung-plan.md`, `docs/glossar.md`, `docs/slices/README.md`, dieser Plan | |
-| docs-<bereich> | `docs/entscheidungsregister.md` (register), `docs/adr/**` (adr, nur Architekt), `docs/betrieb/**`, `docs/sicherheit/**`, `docs/datenschutz/**`, `docs/legal*` und Rechtekonzept (legal), `docs/feedback/**` und `docs/messung.md` (feedback), `docs/entwicklung/**`, `docs/integration/**`, `docs/admin/**` (entwicklung) | je Bereich eine Lane |
+| docs-<bereich> | `docs/entscheidungsregister.md` (register), `docs/adr/**` (adr, nur Architekt), `docs/betrieb/**`, `docs/sicherheit/**`, `docs/datenschutz/**`, `docs/legal*` und Rechtekonzept (legal), `docs/feedback/**`, `docs/zielbild/**` und `docs/messung.md` (feedback), `docs/entwicklung/**`, `docs/integration/**`, `docs/admin/**` (entwicklung) | je Bereich eine Lane |
 
 Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Grenze kommt aus der Übersicht des Orchestrators und den Nutzungsgrenzen der Modelle, nicht aus der Zeit eines Menschen. Ausgenommen sind 074 (Pentest-Begleitung) und 078 (Generalprobe), die an feste Termine gebunden sind.
 
@@ -394,10 +394,10 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* docs/evidence/020-*.png je Ansicht DE/EN mit Feedback-Nummern; Playwright: Vorschau ohne Zustandsänderung; axe grün; Takt-Zeile
   - *Offene Entscheidung:* —
 - **089 · Zielbild Oberfläche als Quelle: Prototyp im Repositorium, Register E50–E54, Zuordnung zu den Scheiben** — niedrig · 1,5 AStd · Kalender 02.10.2026 (W1) · Lanes: docs-feedback, docs-register, docs-plan
-  - *Ziel:* UI-Bewertung (U1–U11) und Prototyp (Z1–Z26) als Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md` mit IDs; der Prototyp als lesbare Referenz in `docs/zielbild/` mit Anleitung, was die Scheiben übernehmen und was nicht; Bilder `docs/evidence/089-*.png`; Zeile in der Abdeckungsmatrix (5.0 und `docs/abdeckungsmatrix.md`); Registerzeilen E50–E54 für die Konflikte mit der B-Liste, mit Designprinzip 7 und mit dem hellen Theme; Zeile *Zielbild (089)* in 050, 054, 055, 056, 058, 061, 062, 087. Nicht-Ziele: keine Änderung an der Oberfläche, keine Entscheidung, kein Glossareintrag.
+  - *Ziel:* UI-Bewertung (U1–U11) und Prototyp (Z1–Z26) als Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md` mit IDs; der Prototyp als lesbare Referenz in `docs/zielbild/` mit Anleitung, was die Scheiben übernehmen und was nicht; Bilder `docs/evidence/089-*.png`; Zeile in der Abdeckungsmatrix (5.0 und `docs/abdeckungsmatrix.md`); Registerzeilen E50–E54 für die Punkte, die der B-Liste oder Designprinzip 7 widersprechen oder einen Standardwert ändern (Kontrastmodus der Bühne); Zeile *Zielbild (089)* in 050, 054, 055, 056, 058, 061, 062, 087. Nicht-Ziele: keine Änderung an der Oberfläche, keine Entscheidung, kein Glossareintrag. Vorgezogen gebaut am 25.09.2026.
   - *Abhängigkeiten:* 014
   - *Rolle:* Architekt; Review in frischem Kontext
-  - *Nachweise:* docs/evidence/089-*.png; Matrix- und Register-Diff; pnpm gates
+  - *Nachweise:* docs/evidence/089-*.png; Ladelauf der Repo-Fassung (Skriptfehler, Schriften); `node scripts/slice-scope.mjs --slice 089`; Matrix- und Register-Diff; pnpm gates
   - *Offene Entscheidung:* E50–E54 (neu)
 - **082 · Feature-Register für Routen, Navigation, Kürzel und Hilfe** — niedrig · 1 AStd · Kalender 05.10.2026 (W2) · Lanes: web-shell
   - *Ziel:* apps/web/src/app/featureRegistry.ts führt je Feature Route, Navigationseintrag, Tastenkürzel (Alt+n), i18n-Modul, benötigtes Recht (aus `_actions` bzw. `/auth/me`) und Hilfeschlüssel; routes.tsx, Navigation und Kurzbefehl-Dialog lesen daraus; jede spätere Scheibe mit neuer Route (041, 053, 054, 059, 061) fügt genau eine Zeile hinzu und berührt die Shell sonst nicht. Kein Rollenname im Register (Regel 4).
@@ -623,7 +623,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **050 · Verfahrensereignisse: Protokollierungsverlangen, Widerspruch, Anordnungen** — mittel · 1,5 AStd · Kalender 09.11.2026 (W7) · Lanes: core, web-capture
   - *Ziel:* ProtocolRequested, ObjectionRaised, ChairOrderRecorded als Ereignisse erster Klasse mit R-PROC-01..03, occurredAt/recordedAt, Notarmarkierung, Recht procedure.record (moderation, capture, legal); Schnellaktionen in der Erfassung; Historie-Filter; Alarm (085) an Inhaber von question.legal.clear bei Widerspruch; Aufnahme in die Niederschrift-Anlage.
-  - *Zielbild (089):* Z15 (Widerspruch als eigener Kanal über dem Lagebild, Übergabe an den Notar mit Empfangsvermerk). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z15 (Widerspruch als eigener Kanal über dem Lagebild, Übergabe an den Notar mit Empfangsvermerk). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 025, 043, 085
   - *Rolle:* Implementierer-Backend + Mechaniker (Schnellaktionen); Review mit Perspektive Legal
   - *Nachweise:* Tests je R-PROC-Zeile; Screenshot Schnellaktion und Historie-Filter
@@ -654,7 +654,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **087 · Restanten-Feststellung vor Debattenschluss** — hoch · 2 AStd · Kalender 17.11.2026 (W8) · Lanes: core, web-cockpit
   - *Ziel:* Ereignis RemainderListConfirmed {Liste der Einzelfragen mit Stand eingegangen / beantwortet / verweigert / offen, Hash, bestätigt durch Inhaber von debate.close (Standard moderation, approver), occurredAt}; Guard R-MTG-07: debateClosed nur nach bestätigter Restantenliste, deren Hash dem aktuellen Stand entspricht; Ansicht „Offene Fragen vor Schluss" im Leitstand mit namentlicher Liste und Quittung; Aufnahme in die Niederschrift-Anlage (081). Quelle: Recherche Z.78.
-  - *Zielbild (089):* Z14 (Rednerwand als Ansicht „Offene Fragen vor Schluss"). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z14 (Rednerwand als Ansicht „Offene Fragen vor Schluss"). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 025, 043, 061
   - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review mit Perspektive Legal
   - *Nachweise:* Test debateClosed ohne Bestätigung → 409 R-MTG-07; Test Liste veraltet (neue Frage nach Bestätigung) → 409; Wahrheitstabellen-Diff; Screenshot Leitstand
@@ -678,21 +678,21 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E1 Rollenname (nur i18n)
 - **054 · Fokusansicht der Beantworter** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-focus
   - *Ziel:* Route /my: nur eigene Zuweisungen (Einheit/Person), keine Filter, Doppelklick öffnet Vollbild-Schreibmodus, Enter/Escape-Pfad, Lesehinweis bei fehlendem Recht, TOP und Erfassungszeit ausgeblendet, Rückgabegrund prominent, „Weiterleiten" als primäre Aktion mit Dialog für Einheit und Grund (Übergang aus 048); Alt+6 über das Feature-Register (082).
-  - *Zielbild (089):* Z1, Z5, Z7, Z8, Z9; Z2–Z4 erst nach E50 und E51. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z1, Z5, Z7, Z8, Z9 (Weiterleiten nach E5 zum nächsten Schritt; die Übergabe an einen anderen Fachbereich bleibt die zweite Aktion im Dialog); Z2–Z4 und das Treffer-Kennzeichen erst nach E50 und E51. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 036, 021, 048, 082
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots inkl. Weiterleiten-Dialog; Playwright Doppelklick → Vollbild → speichern; axe grün
   - *Offene Entscheidung:* —
 - **061 · Leitstand mit fachlichen Kennzahlen** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-cockpit
   - *Ziel:* Route /cockpit (Recht cockpit.read, Standard coordination, moderation, admin; eine Zeile im Feature-Register 082): Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, „Fragen ohne Endstatus" vor Debattenschluss; Drill-down auf Liste; Platz für den Kanarienfrage-Status (gefüllt durch 086); Werte aus /metrics oder Projektion; keine personenbezogenen Kennzahlen (Negativtest, Allowlist).
-  - *Zielbild (089):* Z10–Z13. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z10–Z13. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 033, 043, 082, 040
   - *Rolle:* Implementierer-Oberfläche; Review mit Perspektive Datenschutz
   - *Nachweise:* Test keine Kennzahl je subject; Screenshot; axe grün
   - *Offene Entscheidung:* —
 - **055 · Antwortformat: Normalisierung im Kern, Editor, einheitlicher Renderer** — mittel · 3 AStd · Kalender 18.11.2026 (W8) · Lanes: core, web-components
   - *Ziel:* AnswerVersion.body als Blockdokument (paragraph, list; bold, italic, highlight) plus text (Klartextprojektion); Normalisierung in der Domäne (Whitelist, leere Blöcke zusammenführen, idempotent); Editor mit Tastenkürzeln und Einfügen aus Word (Normalisierung beim Speichern und Weiterleiten); Renderer-Komponente für Bühne, Historie, Export; Diff auf der Klartextprojektion; Nachweise für ADR 0005.
-  - *Zielbild (089):* Z6. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z6. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 043, 054
   - *Rolle:* Implementierer-Backend (Normalisierung) + Implementierer-Oberfläche (Editor, Renderer); Design-Kritik; Review
   - *Nachweise:* Test verbotene Marke wird entfernt, Idempotenz der Normalisierung; Screenshots Bühne und Historie mit Format; pnpm gates + e2e
@@ -705,7 +705,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **056 · Bühne je Gerät mit eigenem Bundle** — hoch · 3 AStd · Kalender 19.11.2026 (W8) · Lanes: web-stage, infra
   - *Ziel:* StageView je Bühnenplatz über getStage-Filter aus 047 mit Sortierstrategie (Standard stagePosition), eigener Reihenfolge und Fortschritt; Vorblättern ohne Vorgelesen; Anzeigeeinstellungen je Gerät (Schriftgröße, Zeilenabstand, Gewicht, Kontrast, „alle mit Markierung" nur wenn podiumVisibility=all_marked) in localStorage; Inhalt beim Öffnen eingefroren mit Hinweisstreifen bei Korrektur; Tastaturhandler an die Ansicht und Gerätekennung gebunden; eigenes minimales Podium-Bundle (< 150 kB gzip) mit Größen-Tor; 200 %-Zoom-Screenshot; Nachweise für ADR 0006.
-  - *Zielbild (089):* Z16, Z17, Z19, Z22; Z18 nach E52, Z20 nach E53. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z16 (Vorschau und „noch n" gibt es seit 020), Z17, Z19, Z22; das Halten aus Z18 nur nach E52, dann mit Anpassung von Designprinzip 7; Z20 nach E53 (der Kontrastmodus ist gebaut, offen ist nur der Standardwert). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 049, 047, 055, 036
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik in frischem Kontext (nicht die Sitzung, die die Spec schrieb); Review
   - *Nachweise:* Test podium auf Platz ceo sieht keine cfo-Fragen im Standard; Playwright Vorblättern ohne Zustandsänderung, Korrektur zeigt Streifen; Screenshots je Einstellung; Bündelgröße; Zeitbudget Bühnenwechsel p90 < 150 ms
@@ -718,7 +718,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E2 Zusammenstellungsregel (Strategie-Feld)
 - **058 · Podium offline: Lesepuffer, Absichtswarteschlange, Wiederaufnahme, Test auf realer Geräteklasse** — hoch · 2,5 AStd · Kalender 23.11.2026 (W9) · Lanes: web-stage
   - *Ziel:* Bühne hält die nächsten 20–30 freigegebenen Antworten des eigenen Bühnenplatzes in IndexedDB, zeigt bei Verbindungsverlust „Stand HH:MM:SS" und liest weiter; „Vorgelesen" wird offline als Absicht mit Gerätezeit (occurredAt, Quelle device) und Idempotenzschlüssel gepuffert, die Frage bleibt staged und zeigt „nicht bestätigt", bis der Dienst die Absicht nach Wiederverbindung anwendet; keine Statuslogik im Client (ADR 0001, Regel 5); Wiederaufnahme über SSE Last-Event-ID; kein Service Worker für Code; datenfreier Fehler-Beacon (Gerätekennung, Fehlerklasse, Zeit) an die Betriebsauswertung; Offline-Test einmal auf der realen Geräteklasse (E33) mit Screenshot.
-  - *Zielbild (089):* Z18 (Rückgängig als lokal gehaltene Absicht, wenn E52 so entschieden ist). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z18, Teil Rückgängig-Fenster: „vorgelesen" wird 5 s lokal als Absicht gehalten und erst danach gesendet (im Standard von E52, rund 0,5 AStd zusätzlich). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 056, 028
   - *Rolle:* Implementierer-Oberfläche; Review mit Perspektive Betrieb
   - *Nachweise:* Playwright context.setOffline 20 s, Vorgelesen als Absicht, online, der Dienst wendet an, Ereignis trägt occurredAt mit Quelle device und recordedAt vom Dienst; Test keine Doppelanlage nach Wiederverbindung; Test geänderte Version → Vermerk statt 412; Screenshot vom Podiumsgerät
@@ -731,7 +731,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **062 · Onboarding, Kontexthilfe, Login-Check, Barrierefreiheit-Nacharbeit** — niedrig · 2 AStd · Kalender 25.11.2026 (W9) · Lanes: web-shell, web-components
   - *Ziel:* Rollenkarte beim ersten Login (Was darf ich, wo fange ich an), generiert aus ROLE_PERMISSIONS und Wahrheitstabelle, druckbar DE/EN; „?"-Kontexthilfe als Shell-Komponente, die je Feature einen Hilfeschlüssel aus dem Feature-Register liest; Login-Check-Seite (Anmeldung, Rolle, Gerät, Netz zu /readyz) für die Generalprobe; gebündelte Live-Regionen „polite" bei Bühnenwechsel; Tastaturpfad-Specs aus 013 um die neuen Ansichten ergänzt; 200 %-Zoom; axe-Befunde aus M1–M4 geschlossen.
-  - *Zielbild (089):* Z26. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10.
+  - *Zielbild (089):* Z26. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
   - *Abhängigkeiten:* 013, 059, 058, 082
   - *Rolle:* Implementierer-Oberfläche + Mechaniker (i18n, Druckvorlage); Review
   - *Nachweise:* Screenshots Rollenkarte je Rolle und Login-Check; Playwright Tastaturpfad-Specs; axe-Bericht 0 moderate+

@@ -17,7 +17,7 @@ const NOTES = {
   lagebild: [
     { t: 'Eine große Zahl', d: 'Die älteste unbeantwortete Frage ist die Kennzahl, die direkt auf das Anfechtungsrisiko einzahlt.', s: '.hero' },
     { t: 'Fluss statt Zähler', d: 'Jede Frage ist ein Punkt. Wo sich Punkte stauen, liegt der Engpass. Farbe und Form zeigen das Alter, jeder Spaltenkopf das Tempo der letzten 15 Minuten. Ein Klick zeigt den Faden der Frage.', s: '.flow-map' },
-    { t: 'Prognose aus dem Tempo', d: 'Wann der Stau bei Legal abgebaut ist und wann die nächste Antwortrunde voll ist, gerechnet aus dem aktuellen Tempo.', s: '.tile-legal, .tile-round' },
+    { t: 'Prognose aus dem Tempo', d: 'Wann der Stau im Legal Clearing abgebaut ist und wann die nächste Antwortrunde voll ist, gerechnet aus dem aktuellen Tempo.', s: '.tile-legal, .tile-round' },
     { t: 'Rednerwand', d: 'Je Wortmeldung ein Punkt pro Frage. Ein Klick zeigt, wann und von wem geantwortet wurde. Für den Moment, in dem die Versammlungsleitung fragt, ob alle Fragen beantwortet sind.', s: '.wall' },
     { t: 'Eigener Kanal für Widersprüche', d: 'Widerspruch und Protokollierungsverlangen laufen nie im Fragenstrom, sondern mit Übergabe an den Notar per Klick.', s: '.alarm' },
     { t: 'Zeitraffer', d: 'Die Ansicht läuft live, eine Minute je 2,5 Sekunden. Anhalten mit dem Knopf „Live“.', s: '[data-act="live"]' }
@@ -27,7 +27,7 @@ const NOTES = {
     { t: 'Halten statt Tippen', d: 'Weiter geht es erst nach kurzem Halten, per Maus, Finger oder Leertaste. Danach bleiben fünf Sekunden für „Rückgängig“. Ein Presenter-Klicker (Bild ab) schaltet sofort, ebenfalls mit Rückgängig.', s: '.hold' },
     { t: 'Umbruch an Satzgrenzen', d: 'Jeder Satz beginnt in einer neuen Zeile, damit beim Vorlesen nichts mitten im Satz umbricht.', s: '.st-answer' },
     { t: 'Anzeige je Gerät', d: 'Schriftgröße, Zeilenabstand und Saallicht stellt jede Person selbst ein, das Gerät merkt es sich (Rückmeldung 6).', s: '.st-tools' },
-    { t: 'Ruhige Zeile aus dem Backoffice', d: 'Nachrichten erscheinen über dem Text und verdecken ihn nie.', s: '#st-msg' },
+    { t: 'Ruhige Zeile aus dem Versammlungsbüro', d: 'Nachrichten erscheinen über dem Text und verdecken ihn nie.', s: '#st-msg' },
     { t: 'Vorschau ohne Folgen', d: 'Ein Klick in der Setliste zeigt eine Antwort vorab, ohne sie als vorgelesen zu markieren.', s: '.st-list' },
     { t: 'Zurückgeben ist leise', d: 'Die seltene Korrektur ist ein kleiner Textknopf, nicht der größte auf der Seite.', s: '.st-return' },
     { t: 'Nur Bühne', d: 'Blendet Navigation und Hinweise aus, so wie das Gerät auf der Bühne aussieht. Esc kehrt zurück.', s: '.tbtn[data-key="only"]' }

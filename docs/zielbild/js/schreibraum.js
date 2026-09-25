@@ -217,7 +217,7 @@ function renderChecks() {
         ico(x.st === 'ok' ? 'check' : x.st === 'none' ? 'help' : 'alert', 16), h('span', { class: 'v' }, x.key), h('span', { class: 'l' }, FACT_LABEL[x.st]), h('span', { class: 's' }, x.src)),
       x.fix && editor.contentEditable === 'true' ? h('button', { class: 'btn sm fix', type: 'button', onclick: () => applyFix(x) }, ico('check', 13), x.fix + ' einsetzen') : null)))
       : h('p', { class: 'muted' }, hasText ? 'Keine Zahlen im Text.' : 'Noch kein Antworttext.'),
-    h('p', { class: 'fine' }, 'Legal sieht dieselben Markierungen. Die Prüfung ersetzt keine Freigabe.'));
+    h('p', { class: 'fine' }, 'Recht sieht dieselben Markierungen. Die Prüfung ersetzt keine Freigabe.'));
   const srcs = [...new Set(f.filter((x) => x.st === 'ok').map((x) => x.src))];
   put($('#sr-src'), h('h3', { class: 'cap' }, 'Belege zur Antwort'),
     srcs.length ? h('ul', { class: 'srcs' }, srcs.map((s) => h('li', null, ico('file', 15), s))) : h('p', { class: 'muted' }, 'Noch keine Belege. Sie ergeben sich aus den geprüften Zahlen.'));
@@ -253,7 +253,7 @@ function renderSRFoot() {
   if (SR.confirm && conflicts.length) {
     conf.hidden = false;
     put(conf, ico('alert', 16),
-      h('span', null, conflicts.length === 1 ? 'Eine Zahl widerspricht einer schon vorgelesenen Antwort. Legal sieht die Markierung.' : conflicts.length + ' Zahlen widersprechen schon vorgelesenen Antworten. Legal sieht die Markierungen.'),
+      h('span', null, conflicts.length === 1 ? 'Eine Zahl widerspricht einer schon vorgelesenen Antwort. Recht sieht die Markierung.' : conflicts.length + ' Zahlen widersprechen schon vorgelesenen Antworten. Recht sieht die Markierungen.'),
       h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { SR.confirm = false; renderSRFoot(); flashNum(conflicts[0].el); } }, 'Zur Zahl'),
       h('button', { class: 'btn sm', type: 'button', id: 'confirm-go', onclick: () => forward(true) }, 'Trotzdem weiterleiten'));
   } else conf.hidden = true;
