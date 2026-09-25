@@ -54,6 +54,9 @@ function problem(error: unknown): void {
 
 function useDebounced(value: string, delay: number): string {
   const [debounced, setDebounced] = useState(value);
+  // Slice 090: an emptied search is empty at once. Otherwise the previous actor's term would still
+  // drive the next actor's first read for the length of the delay.
+  if (value === '' && debounced !== '') setDebounced('');
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(value), delay);
     return () => window.clearTimeout(timer);
@@ -156,6 +159,17 @@ export function HistoryPage() {
   // refusal standing (Ziel 2). A refusal belongs to the actor: a plain failure of the same actor's
   // next load keeps it (review round 1, finding 4).
   const actorId = useActor().id;
+  /**
+   * Slice 090: the search is text the person typed, and it belongs to them. On an actor change it
+   * is emptied in the same render (compared by `id`, never by role, AGENTS.md rule 4), so the next
+   * person at the device neither sees the term nor gets results filtered by it. Tab and selection
+   * are not typed text and stay (010d).
+   */
+  const [queryActorId, setQueryActorId] = useState(actorId);
+  if (queryActorId !== actorId) {
+    setQueryActorId(actorId);
+    setQuery('');
+  }
   const mainKey = loadKey(actorId, version);
   const timelineKey = loadKey(actorId, `${version}:${selectedId ?? ''}`);
   const [corpusRead, setCorpusRead] = useState<KeyedRead | null>(null);
