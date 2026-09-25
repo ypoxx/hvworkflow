@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert } from 'lucide-react';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, cx } from '../../components';
+import { useActor } from '../../api/actor';
 import { actionLabel, useLang, useT } from '../../i18n';
 import { ContributionText } from './ContributionText';
 import { CoverageBar } from './CoverageBar';
@@ -84,6 +85,20 @@ export function ContributionPane({
   const [draft, setDraft] = useState('');
   const [free, setFree] = useState('');
   const [composing, setComposing] = useState(false);
+  /**
+   * Slice 090 (review R1, finding 1): typed text belongs to the actor who typed it. A role that
+   * also sees this pane (admin, moderation) keeps it mounted across the switch, so the draft, the
+   * free question and the open form are emptied in the same render when the actor changes —
+   * compared by `id`, never by role (AGENTS.md rule 4).
+   */
+  const actorId = useActor().id;
+  const [textActorId, setTextActorId] = useState(actorId);
+  if (textActorId !== actorId) {
+    setTextActorId(actorId);
+    setDraft('');
+    setFree('');
+    setComposing(false);
+  }
   // takt-008: the field for the next Einzelfrage — where focus goes after either write on this pane.
   const freeInput = useRef<HTMLInputElement | null>(null);
   // Set when a Redebeitrag was written: the form (and the button that held focus) is gone, and the

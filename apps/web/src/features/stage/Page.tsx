@@ -249,6 +249,9 @@ export function StagePage() {
   const [layoutActorId, setLayoutActorId] = useState(actorId);
   if (layoutActorId !== actorId) {
     setLayoutActorId(actorId);
+    // Slice 090 (review R1, finding 5): the return dialog and its reason belong to the actor who
+    // opened it; the next actor starts with it closed.
+    setReturnOpen(false);
     setLoading(true);
     setStage(null);
     setShownVerdict({ actor: actorId, forbidden: false });
