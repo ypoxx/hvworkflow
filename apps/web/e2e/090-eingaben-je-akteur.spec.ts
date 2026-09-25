@@ -65,6 +65,28 @@ async function waitForCorpus(page: Page): Promise<void> {
 }
 
 /** The value of a field if it is on screen, `null` if it is not — polled, never read once. */
+/**
+ * Codex P1 on PR #38: a dialog that empties its field in an effect after opening can still paint
+ * the previous actor's text for one frame. A MutationObserver callback runs before that effect's
+ * paint, so it sees any field that is inserted carrying the secret.
+ */
+async function watchForSecret(page: Page, secret: string): Promise<void> {
+  await page.evaluate((needle) => {
+    const w = window as unknown as { __secretSeen?: boolean };
+    w.__secretSeen = false;
+    const scan = (): void => {
+      for (const el of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')) {
+        if (el.value.includes(needle)) w.__secretSeen = true;
+      }
+    };
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }, secret);
+}
+
+async function secretSeen(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as { __secretSeen?: boolean }).__secretSeen === true);
+}
+
 async function valueOrAbsent(page: Page, testId: string): Promise<string | null> {
   const field = page.getByTestId(testId);
   if ((await field.count()) === 0) return null;
@@ -412,8 +434,10 @@ test('090 R1: Begründung der Rückgabe — legal tippt, Wechsel zu admin (darf 
   await switchActor(page, 'admin');
   await expect(page.getByTestId('answer-return')).toBeVisible();
   await expect(page.getByTestId('answer-return-reason')).toHaveCount(0);
+  await watchForSecret(page, DRAFT);
   await page.getByTestId('answer-return').click();
   await expect.poll(() => valueOrAbsent(page, 'answer-return-reason')).toBe('');
+  expect(await secretSeen(page)).toBe(false);
 });
 
 test('090 R1: Wortmeldung registrieren (Name) — moderation tippt, Wechsel zu admin (darf auch registrieren): Dialog zu, neu geöffnet leer', async ({
@@ -428,8 +452,10 @@ test('090 R1: Wortmeldung registrieren (Name) — moderation tippt, Wechsel zu a
   await switchActor(page, 'admin');
   await expect(page.getByTestId('speaker-register')).toBeVisible();
   await expect(page.getByTestId('speaker-register-name')).toHaveCount(0);
+  await watchForSecret(page, DRAFT);
   await page.getByTestId('speaker-register').click();
   await expect.poll(() => valueOrAbsent(page, 'speaker-register-name')).toBe('');
+  expect(await secretSeen(page)).toBe(false);
 });
 
 test('090 R1: Nummer im Zusammenführen-Dialog — capture tippt, Wechsel zu admin (darf auch zusammenführen): Dialog zu, neu geöffnet leer', async ({
@@ -442,8 +468,10 @@ test('090 R1: Nummer im Zusammenführen-Dialog — capture tippt, Wechsel zu adm
   await switchActor(page, 'admin');
   await expect(page.getByTestId('answer-merge')).toBeVisible();
   await expect(page.getByTestId('answer-merge-target')).toHaveCount(0);
+  await watchForSecret(page, 'F-0001');
   await page.getByTestId('answer-merge').click();
   await expect.poll(() => valueOrAbsent(page, 'answer-merge-target')).toBe('');
+  expect(await secretSeen(page)).toBe(false);
 });
 
 test('090 R1: Begründung der Rückgabe auf der Bühne — podium tippt, Wechsel zu admin (darf auch zurückgeben): Dialog zu, neu geöffnet leer', async ({
@@ -458,8 +486,10 @@ test('090 R1: Begründung der Rückgabe auf der Bühne — podium tippt, Wechsel
   await switchActor(page, 'admin');
   await expect(page.getByTestId('stage-return')).toBeVisible();
   await expect(page.getByTestId('stage-return-reason')).toHaveCount(0);
+  await watchForSecret(page, DRAFT);
   await page.getByTestId('stage-return').click();
   await expect.poll(() => valueOrAbsent(page, 'stage-return-reason')).toBe('');
+  expect(await secretSeen(page)).toBe(false);
 });
 
 for (const [view, field] of [

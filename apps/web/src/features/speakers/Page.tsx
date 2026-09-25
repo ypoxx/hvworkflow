@@ -429,7 +429,9 @@ export function SpeakersPage() {
         </>
       )}
 
+      {/* Codex P1 on PR #38: keyed to the actor so a switch remounts the dialog and drops the previous actor's text synchronously; its own reset runs in an effect, one paint too late. */}
       <RegisterDialog
+        key={actorId}
         open={registerOpen}
         onClose={() => setRegisterOpen(false)}
         rounds={roundNumbers}

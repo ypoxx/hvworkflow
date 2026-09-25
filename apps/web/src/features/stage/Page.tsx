@@ -607,6 +607,7 @@ export function StagePage() {
 
   const dialog = (
     <ReturnDialog
+      key={actorId}
       open={returnOpen}
       busy={stageBusy}
       onClose={() => setReturnOpen(false)}
