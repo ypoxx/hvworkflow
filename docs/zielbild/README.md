@@ -21,8 +21,8 @@ Registerzeile (E50–E54), und bis zur Antwort gilt deren Standardannahme.
 - Aufbau, Raster und Abstände der Ansichten, Hierarchie, genau eine primäre Aktion je Ansicht
 - Wortlaut der Beschriftungen und Hinweise, nach der Zuordnung unter „Namen im Prototyp"; Leer- und
   Hinweiszustände
-- Interaktionsmuster: Übernehmen mit Rückgängig, Korrektur per Klick, Rückgängig-Fenster, Vorschau ohne
-  Folgen, Faden als Drill-down, eingeklappte erledigte Zeilen
+- Interaktionsmuster: Übernehmen mit Rückgängig, Korrektur per Klick, Rückgängig-Fenster als Schaltfläche,
+  Vorschau ohne Folgen, Faden als Drill-down, eingeklappte erledigte Zeilen
 - die hellen Token-Werte in `zielbild.css`; sie spiegeln `apps/web/src/styles/index.css`
 
 **Nicht übernehmen**, weil der Prototyp an diesen Stellen die Hausregeln bewusst auslässt:
@@ -36,7 +36,7 @@ Registerzeile (E50–E54), und bis zur Antwort gilt deren Standardannahme.
 | eigene Uhr `S.now`, Zeitraffer | Zeit aus der injizierten Uhr des Dienstes (Regel 8, Scheibe 032) |
 | ein globaler Zustand, Vanilla-JS, `innerHTML` für Symbole und für Entwürfe und Rückgängig im Editor | React-Komponenten aus `apps/web/src/components`, Daten über `HvApi` (Regel 6); der Antworttext als Blockdokument mit Normalisierung aus 055 |
 | dunkler Satz für alle Ansichten, wenn das Betriebssystem dunkel eingestellt ist | alle Ansichten hell (`index.css`); die Bühne hat den Kontrastmodus `.stage-contrast` mit Umschalter je Gerät, Standardwert nach E53 |
-| „Halten statt Tippen" auf der Bühne | nur nach E52; bis dahin Leertaste wie in Designprinzip 7, dazu das Rückgängig-Fenster aus 058 |
+| „Halten statt Tippen" auf der Bühne, Bild ab und Pfeil rechts für „weiter", ⌫ für Rückgängig | nur nach E52; bis dahin Leertaste wie in Designprinzip 7 und 10, dazu das Rückgängig-Fenster aus 058 als Schaltfläche ohne eigene Taste |
 | Faktentabelle, Erwartungskarte, Rückkanal als feste Daten | erst nach E50, E51, E54; Quelle und Vertrag klärt die jeweilige Scheibe |
 | Rundgang, Hinweisspalte, Zeitraffer | Vorführhilfen; im Produkt höchstens die Kontexthilfe aus 062 |
 
@@ -49,7 +49,8 @@ Registerzeile (E50–E54), und bis zur Antwort gilt deren Standardannahme.
 | Teleprompter | Bühne je Gerät (056) |
 | Recht (Rolle), Legal Clearing (Schritt) | wie im Glossar; „Legal" allein ist keine Rolle |
 | Versammlungsbüro | wie im Glossar; nicht „Backoffice" |
-| Erwartungskarte, Rednerwand, Setliste, Faden, Saallicht, Vorlesezeit | neu; ins Glossar mit der Scheibe, die den Begriff in die Oberfläche bringt |
+| Saallicht | der vorhandene Umschalter „Kontrast" (`stage.contrast.*`), umgekehrt beschriftet; ein Umschalter, nicht zwei |
+| Erwartungskarte, Rednerwand, Setliste, Faden, Vorlesezeit | neu; ins Glossar mit der Scheibe, die den Begriff in die Oberfläche bringt |
 
 ## Öffnen
 

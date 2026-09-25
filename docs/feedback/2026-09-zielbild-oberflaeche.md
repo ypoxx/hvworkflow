@@ -68,8 +68,8 @@ die Takt-Spur (Plan 5.9); jeder bekommt beim Bau seine Mini-Spec `docs/slices/ta
 |---|---|---|---|---|---|
 | Z16 | Eigene Setliste mit Fortschritt („3 von 6") und Restzeit; Vorschau ohne „vorgelesen" | #7, #10, E7 | plan; Vorschau und „noch n" ist (020) | 056 (Runde: 057) | — |
 | Z17 | Jeder Satz beginnt in einer neuen Zeile; kein Scrollen der Antwort | Recherche Z.250 | neu | 056 | 0,25 |
-| Z18 | Rückgängig-Fenster von 5 s nach „vorgelesen": die Absicht wird lokal gehalten und erst danach gesendet; ein Presenter-Klicker schaltet sofort, ebenfalls mit Rückgängig. Dazu, nur nach E52: Weiter erst nach 0,6 s Halten (Finger, Maus, Leertaste) mit Rückmeldung „Etwas länger halten" | U3; das Halten ändert Designprinzip 7 | E52 | 058 (Rückgängig-Fenster, im Standard), 056 (Halten, nach E52) | 0,5 (058); 0,5 (056, nach E52) |
-| Z19 | Anzeige je Gerät: Schriftgröße, Zeilenabstand, Saallicht, im Gerät gemerkt | #6 | plan | 056 | — |
+| Z18 | Rückgängig-Fenster von 5 s nach „vorgelesen" als Schaltfläche ohne eigene Taste: die Absicht wird lokal gehalten und erst danach gesendet. Nur nach E52: weiter erst nach 0,6 s Halten (Finger, Maus, Leertaste) mit Rückmeldung „Etwas länger halten", ein Presenter-Klicker (Bild ab) schaltet sofort, Rückgängig auch per Taste (⌫) | U3; Halten und zusätzliche Tasten ändern Designprinzip 7 und 10 | E52 | 058 (Rückgängig-Fenster, im Standard), 056 (Halten, nach E52) | 0,5 (058); 0,5 (056, nach E52) |
+| Z19 | Anzeige je Gerät: Schriftgröße, Zeilenabstand, Kontrast (im Prototyp „Saallicht", umgekehrt beschriftet; derselbe Umschalter wie Z20), im Gerät gemerkt | #6 | plan | 056 | — |
 | Z20 | Dunkler Grund als Standard des Podiums. Der Kontrastmodus mit dunklem Grund ist gebaut (Umschalter „Kontrast" je Gerät, Standard hell, 005/007); offen ist nur der Standardwert | Blendung unter Bühnenlicht | E53 | 056 | Minuten |
 | Z21 | Ruhige Zeile aus dem Versammlungsbüro über dem Text, verdeckt ihn nie | Recherche Z.253, Z.261 (Souffleur-Kanal, B-Liste) | E54 | — (bei Ja 056, 085) | 1,5 (nach E54) |
 | Z22 | „Antwort zurückgeben" als leiser Textknopf mit Grundauswahl, nicht als zweitgrößte Fläche | U5 | neu | 056 | 0,25 |
@@ -95,25 +95,24 @@ für E52 und E53 spätestens bis 13.11.2026 vor 056.
 |---|---|---|
 | E50 | Soll der Fachbereich schon in der Beta vorbereitete, vor der HV freigegebene Antworten angeboten bekommen (Erwartungskarte)? | Nein, bleibt Teil der B-Liste „Vorbereitung §7"; Z2 bleibt Bild. |
 | E51 | Soll das Tool Zahlen im Antworttext gegen eine Faktentabelle und gegen schon vorgelesene Antworten prüfen, bevor Recht freigibt? Wer pflegt die Faktentabelle? | Nein in der Beta; Z3 und Z4 bleiben Bild. |
-| E52 | Soll „vorgelesen" auf der Bühne erst nach kurzem Halten gelten? | Nein bis zur Antwort: die Leertaste bleibt wie in Designprinzip 7. Das Rückgängig-Fenster von fünf Sekunden kommt in jedem Fall (058), weil es Designprinzip 7 nicht ändert und „vorgelesen" in der Rolle Podium heute sofort abschließt. |
+| E52 | Soll „vorgelesen" auf der Bühne erst nach kurzem Halten gelten, und sollen Presenter-Klicker und Rückgängig eigene Tasten bekommen? | Nein bis zur Antwort: die Leertaste bleibt wie in Designprinzip 7. Das Rückgängig-Fenster von fünf Sekunden kommt in jedem Fall als Schaltfläche ohne eigene Taste (058), weil es keine Taste hinzufügt und „vorgelesen" in der Rolle Podium heute sofort abschließt. |
 | E53 | Soll der vorhandene Kontrastmodus der Bühne (dunkler Grund) Standard des Podiums werden? | Nein: Standard bleibt hell, der Umschalter „Kontrast" bleibt, 056 übernimmt ihn in die Anzeigeeinstellungen je Gerät. |
 | E54 | Braucht die Bühne einen Rückkanal für kurze Hinweise des Versammlungsbüros? | Nein in der Beta, bleibt B-Liste „Rollen-Chat, Souffleur-Kanal". |
 
 ## 4. Wie die Scheiben das Zielbild nutzen
 
 - Die acht Scheiben 050, 054, 055, 056, 058, 061, 062 und 087 tragen im Plan eine Zeile *Zielbild (089)*
-  mit ihren Z-Nummern. Für 021/053, 026, 057, 059, 080 und 085 steht der Punkt nur hier und in der
-  Abdeckungsmatrix; ihre Spec zitiert die ID. Jede Spec übernimmt ihre Punkte als Text; der Prototyp ist
+  mit ihren Z-Nummern. Für 021/053, 026, 057, 080 und 085 steht der Punkt nur hier und in der
+  Abdeckungsmatrix, für 059 nur hier (Z3, nach E51); ihre Spec zitiert die ID. Jede Spec übernimmt ihre Punkte als Text; der Prototyp ist
   Gestaltungsreferenz, nicht Spec.
-- **Aufwand.** Ohne Entscheidung kommen in M4 rund 3,75 AStd hinzu: 054 +0,5 (Z5, Z9, bisher 2), 056 +0,5
-  (Z17, Z22, bisher 3), 058 +0,5 (Z18 Rückgängig-Fenster, bisher 2,5), 061 +1,75 (Z11, Z12, Z13, bisher 2),
-  087 +0,5 (Z14, bisher 2). Die Takt-Spur trägt rund 2,25 AStd (U1, U2, U4, U6–U9). Nach einem Ja zu E50,
+- **Aufwand.** Ohne Entscheidung kommen rund 3,75 AStd hinzu, in M4 3,25: 054 +0,5 (Z5, Z9, bisher 2), 056
+  +0,5 (Z17, Z22, bisher 3), 058 +0,5 (Z18 Rückgängig-Fenster, bisher 2,5), 061 +1,75 (Z11, Z12, Z13,
+  bisher 2); in M3 0,5: 087 +0,5 (Z14, bisher 2). Die Takt-Spur trägt rund 2,25 AStd (U1, U2, U4, U6–U9). Nach einem Ja zu E50,
   E51, E52 oder E54 kämen bis zu rund 9 AStd dazu. Jede betroffene Spec schätzt neu; die Differenz geht an
   Prüfpunkt 2 (16.10.2026) und in die Budgettabelle je Meilenstein (Plan 6.5). Keine Scheibe kommt dadurch
   über das Doppelte ihrer AStd.
 - **Begriffe.** Die Namen im Prototyp sind Arbeitsnamen; die Zuordnung zum Hausvokabular steht in der
-  README unter „Namen im Prototyp". Neue Begriffe (Erwartungskarte, Rednerwand, Setliste, Faden, Saallicht,
-  Vorlesezeit) kommen mit der Scheibe ins Glossar, die sie in die Oberfläche bringt.
+  README unter „Namen im Prototyp". Neue Begriffe (Erwartungskarte, Rednerwand, Setliste, Faden, Vorlesezeit) kommen mit der Scheibe ins Glossar, die sie in die Oberfläche bringt.
 - Implementierer öffnen `docs/zielbild/` (Anleitung in der README dort) und bauen die Ansicht mit den
   Mitteln des Produkts: `HvApi`, `_actions`, Übergangstabelle, i18n DE/EN.
 - Die Design-Kritik vergleicht den Screenshot der gebauten Ansicht mit `docs/evidence/089-*.png`.

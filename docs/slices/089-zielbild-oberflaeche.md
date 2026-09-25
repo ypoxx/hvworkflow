@@ -1,6 +1,6 @@
 # 089 — Zielbild Oberfläche als Quelle: Prototyp im Repositorium, Register E50–E54, Zuordnung zu den Scheiben
 
-**Status:** review (Nachprüfung nach Runde 1)
+**Status:** angenommen (Nachprüfung Runde 2: annehmen nach Kleinbefunden; Kleinbefunde 1–9 eingearbeitet, nicht erneut geprüft)
 **Risikoklasse:** niedrig · 1,5 AStd · Kalender 02.10.2026 (W1), vorgezogen auf 25.09.2026 · Lanes: docs-feedback,
 docs-register, docs-plan (dazu das neue Verzeichnis `docs/zielbild/`, das dieser Scheibe gehört)
 **Rolle:** Architekt; Review in frischem Kontext (Modell nur in `.claude/agents/`, takt-012)
@@ -41,7 +41,8 @@ Agenten der Oberflächen-Scheiben finden den Prototyp im Repositorium, statt bei
 
 - Keine Änderung an `apps/**`, `packages/**`, Tests oder Toren; der Prototyp wird nicht gebaut, nicht verlinkt
   und nicht ausgeliefert (Netlify baut nur `apps/web`).
-- Keine Entscheidung: E50–E54 bleiben `offen`, jede mit Standardannahme. Keine Änderung an
+- Keine Entscheidung: E50–E52 und E54 bleiben `offen`, jede mit Standardannahme; E53 trägt den Standard, der im Code
+  steht (Bestätigung durch den Umsetzer). Keine Änderung an
   `docs/design-prinzipien.md`, bevor E52 und E53 beantwortet sind.
 - Keine Takt-Specs für U1, U2, U4, U6–U9: die entstehen beim Bau (Plan 5.9).
 - Keine neuen Scheiben außer 089; keine Änderung an Terminen, Abhängigkeiten oder Aufwänden bestehender Scheiben.
@@ -117,7 +118,7 @@ Ladelauf und Namensprüfung vom Reviewer grün bestätigt. Befunde und Erledigun
 |---|---|---|---|
 | 1 | major | E53/Z20 beruhten auf falscher Annahme: die Bühne hat seit 005–007 einen Kontrastmodus je Gerät (`.stage-contrast`, Standard hell) | E53 als Frage nach dem Standardwert, Status `auf Standard gebaut am 03.09.2026 in 007`, Kosten Minuten; Z20, README, Plan-Zeilen 089 und 056 angepasst |
 | 2 | major | E52: Standard „Ja" war die Entscheidung selbst und widersprach Nicht-Ziel und Plan-Zeilen | Standard: Leertaste wie D7; Rückgängig-Fenster (058) in jedem Fall; Rückfalltrigger 13.11.2026 / 056; Quelle, 056 und 058 angeglichen; Bauordnung (Halten 056, Fenster 058) genannt |
-| 3 | major | Aufwand in S/M statt AStd; zugeschlagener Umfang in M4 verdeckt | Aufwand in AStd je Punkt, Summen je Scheibe in Quelle Abschnitt 4 (+3,75 AStd M4, 2,25 AStd Takt), Neuschätzung und Weg über Prüfpunkt 2 und Plan 6.5 |
+| 3 | major | Aufwand in S/M statt AStd; zugeschlagener Umfang in M4 verdeckt | Aufwand in AStd je Punkt, Summen je Scheibe in Quelle Abschnitt 4 (+3,25 AStd M4, +0,5 AStd M3, 2,25 AStd Takt; nach Runde 2 berichtigt), Neuschätzung und Weg über Prüfpunkt 2 und Plan 6.5 |
 | 4 | minor | U3 ungenau (Podium schließt sofort ab; R-TRANS-06 führt zum Antwortentwurf) | U3 neu formuliert |
 | 5 | minor | Z16 teils gebaut (Vorschau, „noch n" aus 020) | Status und Matrix-Stand ergänzt |
 | 6 | minor | Matrix-Stand ohne 020, 089 fehlt in Spalte Scheibe(n) | ergänzt |
@@ -137,4 +138,21 @@ Ladelauf und Namensprüfung vom Reviewer grün bestätigt. Befunde und Erledigun
 | 20 | nit | `innerHTML` auch für Entwürfe und Rückgängig | in „nicht übernehmen" ergänzt, Verweis auf 055 |
 | 21 | nit | Bauordnung E52 | in Register und Plan-Zeilen 056/058 |
 | 22 | nit | Server auf 8089 lief noch | beendet |
+
+### Runde 2 (Nachprüfung auf `ad43745`) — Urteil: annehmen nach Kleinbefunden
+
+Majors 1–3 behoben, Minors 4–15 und Nits 16–22 wie in der Tabelle erledigt; Tore, Umfang, Plan-Graph, Ladelauf,
+Semgrep und die Zählung der IDs vom Reviewer erneut grün bestätigt. Neue Kleinbefunde aus der Nacharbeit:
+
+| Nr. | Schwere | Befund | Erledigung |
+|---|---|---|---|
+| 1 | minor | 087 liegt in M3, nicht in M4 | Summen getrennt: M4 +3,25 AStd, M3 +0,5 AStd; Tabelle Runde 1 berichtigt |
+| 2 | minor | E52-Standard brachte über Klicker und Rückgängig-Taste doch neue Bühnentasten (D7, D10) | Standard: Rückgängig als Schaltfläche ohne eigene Taste; Klicker- und Rückgängig-Taste in die Frage E52; Z18, README, Plan 056/058 angeglichen |
+| 3 | minor | „Saallicht" ist der vorhandene Umschalter „Kontrast", als neuer Begriff geführt | Z19 und README-Zuordnung auf „Kontrast"; aus den neuen Begriffen gestrichen; Plan 056 |
+| 4 | minor | Nicht-Ziel „E50–E54 bleiben offen" widersprach E53 | Nicht-Ziel angepasst |
+| 5 | nit | Matrix verbarg den 058-Anteil von Z18/U3 | „Z18 [Fenster: 058]", „U3 [058]" (jede ID weiter genau einmal) |
+| 6 | nit | Abschnitt 4 nannte 059 in der Matrix | 059 gesondert genannt |
+| 7 | nit | zwei Zeilen 13.11.2026 in Register-Abschnitt 5 | zusammengeführt (E14, E52, E53) |
+| 8 | nit | E53-Status außerhalb der Pflegeregel gesetzt | Vermerk „nachgetragen mit 089, Bestätigung durch den Umsetzer an Prüfpunkt 1" |
+| 9 | nit | Bericht zeigte einen Auszug statt des Endes | Bericht mit dem wörtlichen Ende des Torlaufs auf dem Nacharbeits-Commit |
 
