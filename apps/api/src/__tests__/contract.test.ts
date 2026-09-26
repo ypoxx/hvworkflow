@@ -83,6 +83,9 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     expectValid('updateSpeaker', 200, updated);
     // Slice 080: the deprecated field is still accepted by the contract (0.3.x) but the core ignores it.
     expect(updated).not.toHaveProperty('requestedMinutes');
+    // takt-015 Ziel 1: no effective field is left after the cut, so no event is written and the
+    // version stays the one If-Match named.
+    expect(updated.version).toBe(speaker.version);
 
     const round = updated.round as number;
     const roundSpeakerIds = (speakers as { id: string; round: number }[])

@@ -365,4 +365,41 @@ describe('speaker state table (R-SPK, slice 080)', () => {
       expect(moved.status).toBe(status);
     }
   });
+
+  // takt-015 Ziel 1: an empty PATCH (or one whose only fields are gone from the domain type, e.g.
+  // the deprecated requestedMinutes) writes no event — no growth of the log for a write with no
+  // effect, and no version bump for a change nobody made.
+  it('an empty PATCH writes no event and leaves the version unchanged', async () => {
+    const { api, id, events } = await speakerIn('waiting');
+    const before = events().length;
+    const view = await api.getSpeaker(id);
+    const updated = await api.updateSpeaker(id, {});
+    expect(events().length).toBe(before);
+    expect(updated.version).toBe(view.version);
+  });
+
+  it('a PATCH with only the deprecated requestedMinutes writes no event and leaves the version unchanged', async () => {
+    const { api, id, events } = await speakerIn('waiting');
+    const before = events().length;
+    const view = await api.getSpeaker(id);
+    const updated = await api.updateSpeaker(id, { requestedMinutes: 7 } as never);
+    expect(events().length).toBe(before);
+    expect(updated.version).toBe(view.version);
+  });
+
+  it('a stale If-Match on a forbidden transition (finished → speaking) is 412, not 409 (order)', async () => {
+    const { api, id } = await speakerIn('finished');
+    const p = await problemOf(api.updateSpeaker(id, { status: 'speaking' }, { ifMatch: '"v99"' }));
+    expect(p.status).toBe(412);
+  });
+
+  it('R-SPK-01: repeating updateSpeaker with the same idempotency key replays the answer, writes no second event, and is not a 409', async () => {
+    const { api, id, events } = await speakerIn('waiting');
+    const opts = { idempotencyKey: 'takt-015-same-key' };
+    const first = await api.updateSpeaker(id, { status: 'speaking' }, opts);
+    const before = events().length;
+    const second = await api.updateSpeaker(id, { status: 'speaking' }, opts);
+    expect(second).toEqual(first);
+    expect(events().length).toBe(before);
+  });
 });
