@@ -72,7 +72,22 @@ Tests zuerst. Jeder Commit nennt „Scheibe 024“ und endet mit `[skip netlify]
 
 ## Bericht
 
-(folgt nach dem Gate-Lauf auf dem neu aufgebauten Commit)
+Slice: 024-ereignis-umschlag-v2
+Done: Der v2-Umschlag, die Hash-Kette, getrennte Zeiten, JSONL-Replay und der ausdrückliche Demo-Reset sind umgesetzt. Die drei Befunde des unabhängigen Reviews und beide P2-Fälle des PR-Reviews sind mit Regressionstests geschlossen. Die Branch-Historie enthält den von Gitleaks beanstandeten synthetischen Testwert nicht mehr.
+Evidence: `pnpm gates` auf sauberem Commit `2069ed5` grün (wörtlicher Schluss unten); volle lokale Chrome-E2E-Suite 123/123 grün, axe ohne serious/critical; `docs/evidence/024-reset-de.png` und `docs/evidence/024-reset-en.png`.
+Open: Erneute PR-CI auf der bereinigten Branch-Historie steht aus; kein Deploy. Der automatische Betriebsalarm für MF-04 folgt in 037.
+Touched: `packages/domain/src/{events,store,api,index,envelope,piiCodec}.ts`, `packages/domain/src/__tests__/envelope.test.ts`, `packages/domain/package.json`, `apps/api/src/{eventLog.ts,__tests__/eventLog024.test.ts}`, `apps/web/src/{api/index.ts,app/App.tsx,app/BootScreen.tsx,i18n/shell.de.ts,i18n/shell.en.ts,i18n/parity.test.ts}`, `apps/web/e2e/{020-rueckbau-passung,024-ereignis-umschlag}.spec.ts`, `docs/evidence/024-reset-{de,en}.png`, `docs/produktplan-beta.md`, diese Spec und `pnpm-lock.yaml`.
+
+Wörtlicher Schluss von `pnpm gates` (Node 24, Commit `2069ed5`):
+
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 393ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit 2069ed5, tree 493bec107c99…
+```
 
 ## Review findings
 
