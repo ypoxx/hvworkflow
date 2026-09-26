@@ -1,6 +1,6 @@
 # 080b — Korpus 28/230 als eine Quelle
 
-**Status:** in Arbeit (26.09.)
+**Status:** review bestanden (Sonnet, R1, 26.09.)
 **Risikoklasse:** mittel · 1 AStd · 08.10.2026 (W2, vorgezogen) · Lanes: core, e2e
 **Rolle:** Implementierer-Backend (Seed, Adapter, e2e-Konstanten); Review in frischem Kontext (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 11, 12
@@ -77,4 +77,20 @@ sichtbarer Zustand in der Oberfläche; `seed-fictitious-names.test.ts` bleibt un
 
 ## Bericht
 
-(folgt)
+```
+Slice: 080b-korpus-eine-quelle
+Done: CORPUS_DEMO ([8, 8, 7, 5] = 28 Wortmeldungen, 230 Fragen, Seed 2027) und CORPUS_LOAD ([40, 34, 28, 16], 800)
+      in seed.ts; seedEvents mit roundSizes? (Standard LOAD, Fingerabdruck bytegleich); seedDemo-Standard CORPUS_DEMO
+      (Web-Adapter, Dienst); elf e2e-Dateien lesen CORPUS_DEMO.questions. Rundengrößen gegenüber dem Vorschlag
+      [8, 7, 8, 5] verschoben: der ergab nur eine Frage auf der Bühne (7 Szenarien brauchen „weiter“); jetzt staged=6.
+Evidence: seed.test.ts CORPUS_DEMO-Fälle vor der Implementierung rot (6 failed), danach grün.
+      e2e voll: 117 passed (5.5m), axe 0 serious/critical, kein Szenario umgestellt, keine Zusicherung geändert.
+      pnpm gates auf e69421c grün, Schluss wörtlich:
+      ✓ built in 1.52s
+      mark-test-run: wrote /home/user/wt/s080b/.claude/state/last-test-run (clean tree) at commit e69421c, tree 86d7656d8099…
+Open: Speicherschlüssel hv-demo-events-v1 unverändert: ein Browser mit gespeichertem Alt-Korpus behält ihn bis
+      „Demo zurücksetzen“ (R1 minor → Folgeliste). Zitat „bei 800 Fragen im Bestand“ in abnahme.spec.ts:7 (R1 nit →
+      Folgeliste). MAX_STAGE_ROUNDS = 130 in abnahme.spec.ts bleibt als Obergrenze.
+Touched: packages/domain/src/{seed,api}.ts, __tests__/{seed,api}.test.ts; apps/web/src/api/index.ts;
+      apps/web/e2e/{001,002,003,010b,010c,010d,013,020,090,abnahme,takt-009}*.spec.ts
+```
