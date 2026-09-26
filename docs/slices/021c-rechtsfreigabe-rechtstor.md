@@ -51,6 +51,18 @@ Freigabe.
 8. **Wahrheitstabelle** (`packages/domain/policy-truth-table.md`) und `docs/legal-trace.md` nur über Snapshot-Tests neu; der
    Diff (legal verliert approve, gewinnt legal.clear; R-TRANS-13, R-GUARD-07) ist hiermit freigegeben.
 
+**Nachtrag des Architekten (26.09., nach Rückfrage des Implementierers):**
+(a) Zwei Zeilen statt einer: **R-TRANS-13** Rechtsfreigabe aus `in_review` (Guards R-GUARD-01, R-GUARD-06, bindet an die
+letzte Version) und **R-TRANS-14** Rechtsfreigabe aus `classified` nur auf dem Podiumspfad (Guard R-GUARD-02, ohne
+Version). Keine Strukturänderung am Tabellentyp. (b) Seed: wo `legal` selbst entworfen hat (Einheit `unit-legal`),
+gibt eine zweite Persona `SEED_ACTORS.legal2` (`u-legal-2`, „Legal Clearing 2“) rechtlich frei; sonst `legal`. Die
+Entwürfe bleiben unverändert (Bytegleichheit). (c) Ereignis-id der Rechtsfreigabe im Seed außerhalb des gemeinsamen
+Zählers (z. B. `ev-<frage>-lc`), Zeitstempel ohne `tick()` (Zeit des vorigen Ereignisses) — angenommen. (d) 0.3.1 →
+0.3.2 auch in `CHANGELOG.md:278` und in der Risikotabelle `docs/produktplan-beta.md` (Zeile „plus 0.3.1 in 028“).
+(e) Rückgabe nach `classified` hebt die Rechtsfreigabe auf wie die Freigabe — angenommen. (f) Die Historie darf die
+neue Ereignisart mit Version zeigen: `apps/web/src/features/history/eventSummary.ts` und `apps/web/src/i18n/history.{de,en}.ts`
+sind erlaubt.
+
 ## Ziel und Tests (zuerst, rot vor der Änderung)
 
 - stage ohne Rechtsfreigabe → 409 R-GUARD-07 für **jeden** der drei Pfade; mit Rechtsfreigabe der freigegebenen Version
@@ -75,10 +87,10 @@ Rechtsfreigabe-Sicht (059), Prüflistentiefe je Pfad (E37 bleibt Standard), Verw
 - `packages/contract/{openapi.yaml,CHANGELOG.md,package.json,allowlist.json}`, `packages/contract/src/types.ts` (generiert)
 - `packages/domain/src/**`, `packages/domain/policy-truth-table.md` (generiert)
 - `apps/api/src/app.ts`, `apps/api/src/__tests__/*.test.ts`, `apps/api/src/__tests__/helpers.ts`
-- `apps/web/src/features/answers/**`, `apps/web/src/i18n/{answers.de,answers.en,shell.de,shell.en,parity.test,labels}.ts`
+- `apps/web/src/features/answers/**`, `apps/web/src/i18n/{answers.de,answers.en,shell.de,shell.en,history.de,history.en,parity.test,labels}.ts`, `apps/web/src/features/history/eventSummary.ts`
 - `apps/web/e2e/*.spec.ts`, `apps/web/e2e/021c-rechtsfreigabe.spec.ts` (neu), `docs/evidence/021c-*.png`
 - `docs/legal-trace.md` (generiert), `docs/erste-version-und-offene-fragen.md` (nur Abnahmesatz)
-- `docs/produktplan-beta.md` (nur Einträge 023, 028 und 021c: 0.3.1 → 0.3.2), `docs/slices/021c-rechtsfreigabe-rechtstor.md`
+- `docs/produktplan-beta.md` (nur Einträge 023, 028, 021c und die Risikotabelle: 0.3.1 → 0.3.2), `docs/slices/021c-rechtsfreigabe-rechtstor.md`
 
 ## Akzeptanzkriterium
 
