@@ -77,17 +77,22 @@ Slice: takt-016-025-papiervertrag
 Done: Vertrag 0.3.2 mit drei optionalen Feldern und DebateClosed; kanonischer
       Erfassungs-Body trägt den Grund, Alias bleibt unverändert. 028 rückt auf
       0.3.3; Plan 025 nennt die synthetische Schluss-Fixture und den echten HTTP-Test.
+      Der Kompatibilitätssatz erlaubt additive Enum-Werte in 0.3.x-Patches bei
+      unveränderter Client-Regel für unbekannte Werte (ADR 0015, 0.2.1).
 Evidence: fokussierter Test vor der Vertragsänderung rot: 3 failed (Version 0.3.1,
-      leerer Grund akzeptiert, DebateClosed fehlt); danach 3 passed. Generierte
+      leerer Grund akzeptiert, DebateClosed fehlt); danach 3 passed. Neuer
+      Kompatibilitätstest vor der Satzkorrektur rot: 1 failed, 3 passed
+      (Minor-only-Satz); danach 4 passed. Generierte
       Typen aktualisiert und erneut generiert, SHA-256 unverändert
       a1310ceb45cfabc343b395363a32942acdb52dfae2a68bb4b59e04a97f6f49bd.
-      pnpm gates auf Commit 8e8fbab (Node 24, pnpm 10.33.0)
+      Auf Integrations-Commit 8121138 rebasiert; pnpm gates auf Commit 9d7d508
+      (Node 24, pnpm 10.33.0)
       Exit 0; Schluss wörtlich:
       - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-      ✓ built in 739ms
-      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 8e8fbab, tree 9a7b4056d8bd…
-      contract:lint 0 Fehler, fünf bestehende Warnungen; API 73/73,
-      domain 144/144, web 181/181; Operationen 66 = 30 ausgeübt + 36 Allowlist.
+      ✓ built in 427ms
+      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 9d7d508, tree 006ad334328e…
+      contract:lint 0 Fehler, fünf bestehende Warnungen; API 79/79,
+      domain 154/154, web 181/181; Operationen 66 = 30 ausgeübt + 36 Allowlist.
 Open: unabhängiges Review; 025 implementiert R-MTG-03 und die HTTP-Nachweise.
       E2E entfällt hier, da keine Oberfläche geändert wurde.
 Touched: docs/slices/takt-016-025-papiervertrag.md,
