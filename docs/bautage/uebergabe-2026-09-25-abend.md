@@ -67,3 +67,12 @@ einfach, 030, 035, 036), C (043, 040, 041, 044, 045, dann 048, 053, 054, 055, 05
 Leitfaden und Sandbox). E11 für die Beta: einfache Anmeldung (Keycloak-Testrealm), kein Konzern-SSO. 044 aufgenommen.
 Beginnen mit **021c**; vor jeder Spec die betroffenen Tests mit festen Zahlen, Fingerabdrücken und generierten Dateien
 lesen (`grep toMatchFileSnapshot`, Paritäts- und Seed-Tests).
+
+## Pause (26.09., Budget aus)
+
+- **021c angefangen, kein Code.** Branch `claude/slice-021c-rechtstor` (gepusht) enthält nur die Spec
+  `docs/slices/021c-rechtsfreigabe-rechtstor.md` samt Nachtrag (R-TRANS-13 aus in_review, R-TRANS-14 Podium;
+  Seed-Persona `legal2`; Vertrag 0.3.1, 028 rückt auf 0.3.2). Bau dort neu starten; die Spec ist vom Implementierer
+  am Code geprüft (fünf Rückfragen beantwortet). Vor dem Bau den Integrationsbranch einmergen.
+- Subagenten-Token 021c bis zur Pause: rund 132 000 (Lesen und Rückfragen).
+- Keine offenen Scheiben-PRs, keine laufenden Agenten, keine geplanten Check-ins.
