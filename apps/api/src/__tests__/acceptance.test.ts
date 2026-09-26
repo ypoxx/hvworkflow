@@ -9,6 +9,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
 import { ACTOR, req } from './helpers.ts';
+// Classify and assign belong to coordination since slice 021b (helpers.ts is outside that slice's
+// files, so the token lives here: `id:role` as in ACTOR).
+const COORDINATION = 'coord:coordination';
 import { expectValid } from '../contractSchema.ts';
 
 describe('acceptance sentence (HTTP)', () => {
@@ -78,12 +81,13 @@ describe('acceptance sentence (HTTP)', () => {
     const meetingAfterRes = await req(app, 'GET', '/v1/meeting', { actor: ACTOR.admin });
     expect((await meetingAfterRes.json()).counts.questions).toBe(807);
 
-    const q = questions[0];
+    const qRes = await req(app, 'GET', `/v1/questions/${questions[0].id}`, { actor: COORDINATION });
+    const q = await qRes.json();
     expect(q._actions).toContain('question.classify');
     expect(q._actions).not.toContain('answer.draft');
 
     const classifyRes = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'If-Match': `"v${q.version}"` },
       body: { track: 'expert_track', agendaItemId: 'top-2', stageAssignment: 'cfo' },
     });
@@ -94,7 +98,7 @@ describe('acceptance sentence (HTTP)', () => {
     expect(classified.status).toBe('classified');
 
     const assignRes = await req(app, 'POST', `/v1/questions/${q.id}/assignment`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'If-Match': `"v${classified.version}"` },
       body: { unitId: 'unit-fin' },
     });

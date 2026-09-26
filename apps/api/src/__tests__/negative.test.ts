@@ -10,6 +10,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
 import { ACTOR, req } from './helpers.ts';
+// Classify and assign belong to coordination since slice 021b (helpers.ts is outside that slice's
+// files, so the token lives here: `id:role` as in ACTOR).
+const COORDINATION = 'coord:coordination';
 import { expectValid, expectValidProblem } from '../contractSchema.ts';
 
 describe('negative cases and idempotency', () => {
@@ -112,7 +115,7 @@ describe('negative cases and idempotency', () => {
     const q = items[0];
 
     const res = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'If-Match': '"v999"' },
       body: { track: 'podium' },
     });
@@ -249,7 +252,7 @@ describe('negative cases and idempotency', () => {
 
     const key = `idem-${q.id}`;
     const first = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
@@ -257,7 +260,7 @@ describe('negative cases and idempotency', () => {
     const firstBody = await first.json();
 
     const second = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
@@ -279,13 +282,13 @@ describe('negative cases and idempotency', () => {
 
     const key = `cross-actor-${q.id}`;
     const byA = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
     expect(byA.status).toBe(200);
     const bodyA = await byA.json();
-    expect(bodyA._actions).not.toContain('question.approve'); // capture role: sanity on this actor's view
+    expect(bodyA._actions).not.toContain('question.approve'); // coordination role: sanity on this actor's view
 
     // The same key replayed by an actor without the permission must be a fresh, denied request —
     // never a cached 200 carrying the classifying actor's `_actions`. `q` is now `classified`
@@ -302,7 +305,7 @@ describe('negative cases and idempotency', () => {
 
     // The classifying actor replaying its own key still gets the original, unchanged result.
     const byAAgain = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+      actor: COORDINATION,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
@@ -341,16 +344,16 @@ describe('negative cases and idempotency', () => {
     const q = items[0];
 
     const key = `expert-replay-${q.id}`;
-    const byCapture = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.capture,
+    const byCoordination = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
+      actor: COORDINATION,
       headers: { 'Idempotency-Key': key },
       body: { track: 'podium' },
     });
-    expect(byCapture.status).toBe(200);
+    expect(byCoordination.status).toBe(200);
 
     // expert holds unrestricted question.read (so the now-`classified` question is not the 404 mask)
     // but not question.classify: the permission is re-checked fresh on this replay, not skipped
-    // because capture's key already produced a 200.
+    // because coordination's key already produced a 200.
     const byExpert = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: ACTOR.expert,
       headers: { 'Idempotency-Key': key },
