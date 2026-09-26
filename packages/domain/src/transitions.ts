@@ -5,7 +5,7 @@
  * Rule ids (R-TRANS-nn) are referenced by tests and by error responses so that a legal or process
  * reviewer can trace a decision back to this table.
  */
-import type { Permission, QuestionRecord, QuestionStatus, Track } from './types.js';
+import type { Permission, QuestionRecord, QuestionStatus, SpeakerRecord, SpeakerStatus, Track } from './types.js';
 import { TERMINAL_STATUSES } from './types.js';
 // Type-only: `rules.ts` imports the *value* `TRANSITIONS` from this file to build `ruleRegister()`,
 // so this direction must stay type-only (isolatedModules erases it) or the two files would import
@@ -552,4 +552,139 @@ export function resolveTransition(
     lastGuardFailure = { ruleId: failed.ruleId, reason: failed.description };
   }
   return { ok: false, ...lastGuardFailure! };
+}
+
+/* ---------- the state table of a Wortmeldung (speaker request), R-SPK (slice 080) ---------- */
+
+export interface SpeakerGuard {
+  ruleId: string;
+  description: string;
+  legalRef: LegalRef;
+  check: (s: SpeakerRecord, payload?: unknown) => boolean;
+}
+
+export interface SpeakerTransition {
+  ruleId: string;
+  from: SpeakerStatus;
+  to: SpeakerStatus;
+  guards?: readonly SpeakerGuard[];
+  description: string;
+  legalRef: LegalRef;
+}
+
+const isFollowUp: SpeakerGuard = {
+  ruleId: 'R-SPK-GUARD-01',
+  description: 'The reason is "follow_up" (Nachfrage): only a follow-up reopens a finished Wortmeldung.',
+  legalRef: {
+    source: 'Prozess',
+    citation:
+      'Ableitung: docs/anforderungen-recherche.md:70 ("[MUSS] Nachfrage-Threads über alle Antworten") und ' +
+      ':256 ("[MUSS] Nachfragen-Handling mit harter Verknüpfung zur Ursprungsantwort") fordern Nachfragen, ' +
+      'sagen aber nichts über den Stand der Wortmeldung. Nicht belegt: dass eine Nachfrage die beendete ' +
+      'Wortmeldung wieder auf "wartet" setzt; Festlegung des Architekten (docs/produktplan-beta.md, Eintrag 080).',
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (_s, payload) => (payload as { reason?: string } | undefined)?.reason === 'follow_up',
+};
+
+/** Deny by default: a pair not listed here, or the same status again, is R-SPK-00. */
+export const SPEAKER_TRANSITIONS: readonly SpeakerTransition[] = [
+  {
+    ruleId: 'R-SPK-01',
+    from: 'waiting',
+    to: 'speaking',
+    description: 'Call the speaker to the microphone (aufrufen).',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'docs/ist-analyse-und-schnittstellen.md:67 ("Redner aktivierbar („Start“)") und :34 ("`0` ' +
+        'Redebeitrag anmelden … → `1` Redebeitrag halten").',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-SPK-02',
+    from: 'speaking',
+    to: 'finished',
+    description: 'End the speech (Rede beenden).',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'docs/ist-analyse-und-schnittstellen.md:34 ("`1` Redebeitrag halten → `2` Fragenaufnahme"). ' +
+        'Ableitung: das Ende der Rede ist nicht eigens genannt, es folgt aus dem Schritt danach.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-SPK-03',
+    from: 'waiting',
+    to: 'withdrawn',
+    description: 'Withdraw a waiting Wortmeldung (zurückziehen).',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'Nicht belegt: weder docs/ist-analyse-und-schnittstellen.md noch docs/anforderungen-recherche.md ' +
+        'nennen das Zurückziehen einer Wortmeldung; Ableitung aus dem bestehenden Stand `withdrawn` ' +
+        '(types.ts `SpeakerStatus`) und der Wortmeldeliste (docs/ist-analyse-und-schnittstellen.md:65).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-SPK-04',
+    from: 'speaking',
+    to: 'withdrawn',
+    description: 'Withdraw a Wortmeldung while the speaker is at the microphone (Rede abgebrochen).',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'Nicht belegt: keine Fundstelle für einen Abbruch während der Rede; Ableitung wie R-SPK-03 ' +
+        '(docs/ist-analyse-und-schnittstellen.md:65-67).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-SPK-05',
+    from: 'finished',
+    to: 'waiting',
+    guards: [isFollowUp],
+    description: 'Put a finished speaker back in the queue, only for a follow-up (Nachfrage).',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'Ableitung: docs/anforderungen-recherche.md:70 und :256 fordern Nachfragen; der Weg zurück auf ' +
+        '"wartet" ist Festlegung des Architekten (docs/produktplan-beta.md, Eintrag 080), nicht belegt.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+];
+
+export type SpeakerTransitionResult =
+  | { ok: true; transition: SpeakerTransition }
+  | { ok: false; ruleId: string; reason: string };
+
+/** Find the row for `from → to` and evaluate its guards. R-SPK-00: no row, or the same status again. */
+export function resolveSpeakerTransition(
+  s: SpeakerRecord,
+  to: SpeakerStatus,
+  payload?: unknown,
+): SpeakerTransitionResult {
+  const row = SPEAKER_TRANSITIONS.find((t) => t.from === s.status && t.to === to);
+  if (!row) {
+    return { ok: false, ruleId: 'R-SPK-00', reason: `A Wortmeldung cannot go from "${s.status}" to "${to}".` };
+  }
+  const failed = (row.guards ?? []).find((g) => !g.check(s, payload));
+  if (failed) return { ok: false, ruleId: failed.ruleId, reason: failed.description };
+  return { ok: true, transition: row };
 }

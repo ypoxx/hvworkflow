@@ -772,7 +772,7 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
   // previous actor's record on purpose, so the failed reload is now caused by an ordinary event.
   await page.evaluate(async (url) => {
     const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
-    await api['registerSpeaker']!({ displayName: 'Testperson Runde 5', kind: 'shareholder' });
+    await api['registerSpeaker']!({ displayName: 'Testperson Runde 5' });
   }, API_MODULE);
   await expect(toasts(page)).toHaveCount(1);
   await expect(currentNumber).toBeVisible();

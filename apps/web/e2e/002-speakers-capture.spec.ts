@@ -107,11 +107,9 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   ).toHaveAttribute('data-number', called);
   await expect(round.locator('[data-testid="speaker-row"][data-status="speaking"]')).toHaveCount(1);
 
-  // Slice 006: the time-budget ring next to "Am Mikrofon"'s mm:ss timer, and the round's own
-  // finished/total progress next to its header.
-  const timerRing = page.getByTestId('speaker-timer-ring');
-  await expect(timerRing).toBeVisible();
-  await expect(timerRing).toHaveAttribute('aria-valuenow', /^\d+$/);
+  // Slice 080 removed the speaking-time ring (feedback #15); the round's own finished/total
+  // progress next to its header stays.
+  await expect(page.getByTestId('speaker-timer-ring')).toHaveCount(0);
   await expect(round.getByTestId('round-progress-3')).toBeVisible();
 
   // R6 (006 rework, architect finding 1): the identity column must win real width instead of

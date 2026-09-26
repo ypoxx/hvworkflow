@@ -15,7 +15,7 @@
  * never by silently dropping the honest half of the sentence).
  * `verified` is the literal `false`: only the legal review (E15, 076) changes that, never this slice.
  */
-import { TRANSITIONS } from './transitions.js';
+import { SPEAKER_TRANSITIONS, TRANSITIONS } from './transitions.js';
 
 /** Rule kinds (Festlegung 1): a transition-table row, a guard, a rights rule, or the idempotency
  * rule. German terms, because they are the vocabulary the register and its report use throughout. */
@@ -60,6 +60,24 @@ export interface RuleEntry {
  * every write (`packages/domain/src/api.ts`).
  */
 const OTHER_RULES: readonly RuleEntry[] = [
+  {
+    ruleId: 'R-SPK-00',
+    kind: 'Übergang',
+    description:
+      'resolveSpeakerTransition()\'s own rule id (transitions.ts, slice 080): a status change of a ' +
+      'Wortmeldung that is not a row of SPEAKER_TRANSITIONS, and the same status again, is a conflict; ' +
+      'updateSpeaker (api.ts) answers 409 with this rule id and writes no event.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/qualitaetsleitplanken-produktreife.md:175 (Checkliste 6.4: "409 … als Problem-Details mit ' +
+        'Regel-ID modelliert") stützt nur das Antwortformat. Deny by default für Sprecherstände: ' +
+        'Architekturentscheidung (docs/slices/080-sprecher-zustand-rueckbau.md), keine externe Vorgabe.',
+      docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
+      docHash: null,
+      verified: false,
+    },
+  },
   {
     ruleId: 'R-TRANS-00',
     kind: 'Übergang',
@@ -299,6 +317,15 @@ export function ruleRegister(): readonly RuleEntry[] {
   const seenGuardIds = new Set<string>();
   const fromGuards: RuleEntry[] = [];
   for (const t of TRANSITIONS) {
+    for (const g of t.guards ?? []) {
+      if (seenGuardIds.has(g.ruleId)) continue;
+      seenGuardIds.add(g.ruleId);
+      fromGuards.push({ ruleId: g.ruleId, kind: 'Guard', description: g.description, legalRef: g.legalRef });
+    }
+  }
+
+  for (const t of SPEAKER_TRANSITIONS) {
+    fromTransitions.push({ ruleId: t.ruleId, kind: 'Übergang', description: t.description, legalRef: t.legalRef });
     for (const g of t.guards ?? []) {
       if (seenGuardIds.has(g.ruleId)) continue;
       seenGuardIds.add(g.ruleId);

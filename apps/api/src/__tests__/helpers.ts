@@ -93,6 +93,9 @@ export const UNDOCUMENTED_STATUS_EXCEPTIONS: Readonly<Record<string, readonly nu
   // POST /v1/questions/{questionId}/withdrawal (withdrawQuestion) rejects a wrongly-typed `reason`
   // with 422, but the contract only documents 200/403/404/409/412 for this operation.
   withdrawQuestion: [401, 422],
+  // PATCH /v1/speakers/{speakerId} (updateSpeaker) answers 409 for a status change the speaker state
+  // table refuses: R-SPK seit 080, im Vertrag ab 0.4.0/043 (not additive in 0.3.x, ADR 0015).
+  updateSpeaker: [401, 409],
 };
 
 function isExceptedStatus(operationId: string, status: number): boolean {

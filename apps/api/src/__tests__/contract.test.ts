@@ -81,7 +81,8 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     expect(patchRes.status).toBe(200);
     const updated = await patchRes.json();
     expectValid('updateSpeaker', 200, updated);
-    expect(updated.requestedMinutes).toBe(7);
+    // Slice 080: the deprecated field is still accepted by the contract (0.3.x) but the core ignores it.
+    expect(updated).not.toHaveProperty('requestedMinutes');
 
     const round = updated.round as number;
     const roundSpeakerIds = (speakers as { id: string; round: number }[])
