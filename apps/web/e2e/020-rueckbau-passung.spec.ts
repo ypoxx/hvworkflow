@@ -1,10 +1,10 @@
 /**
  * Slice 020 — Rückbau und Passung. Walks the S-Punkte of the project lead's feedback
  * (docs/feedback/2026-09-quickview-projektleitung.md #3, #9, #10, #13, #17, #21, #23, #26, #28, #32)
- * against the seeded corpus of 800 questions, one behaviour per point, plus axe on the five changed
+ * against the seeded demo corpus (CORPUS_DEMO), one behaviour per point, plus axe on the five changed
  * views and the three empty states this slice is responsible for.
  */
-import { project, seedEvents } from '@hv/domain';
+import { CORPUS_DEMO, project, seedEvents } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { DomainEvent } from '@hv/domain';
@@ -14,7 +14,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 async function asRole(page: Page, role: string): Promise<void> {
   await page.getByTestId('role-switcher').click();
@@ -91,7 +90,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 /**
@@ -410,7 +409,7 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await expect(page.getByTestId('answers-detail')).toBeVisible();
   await expect(page.getByTestId('answers-readonly-hint')).toHaveCount(0);
 
-  // Leerer Zustand: a search text that matches nothing in an 800-question corpus.
+  // Leerer Zustand: a search text that matches nothing in the demo corpus.
   await page.getByTestId('answers-filter-status-all').click();
   await page.getByTestId('answers-search').fill('kein-treffer-020-rueckbau');
   await expect(page.getByText('Kein Treffer')).toBeVisible();
@@ -601,8 +600,8 @@ test('020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minuten
 /* ===============================================================================================
  * A second, small session with a freshly crafted, genuinely empty meeting (`seedEvents` with
  * `questions: 0` — same seeder the demo itself uses, just parameterised down to zero individual
- * questions; ~118 Wortmeldungen are registered, nothing is ever captured). No 800-question corpus
- * to wait on, no hundred already-staged questions to drain: this is the direct, honest way to reach
+ * questions; the load corpus' 118 Wortmeldungen are registered, nothing is ever captured). No
+ * seeded corpus to wait on, no already-staged questions to drain: this is the direct, honest way to reach
  * "Erfassung ohne Redebeitrag" and "Bühne ohne Warteschlange" without touching the shared corpus
  * (design-prinzipien.md #6, "gestalteter Leerzustand").
  * ============================================================================================= */
@@ -622,7 +621,7 @@ test('020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschl
     try {
       window.localStorage.setItem('hv-demo-events-v1', json);
     } catch {
-      /* the app then simply seeds its own 800-question corpus instead */
+      /* the app then simply seeds its own demo corpus instead */
     }
   }, EMPTY_MEETING_LOG);
   await page.goto('/');

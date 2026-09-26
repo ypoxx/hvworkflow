@@ -1,6 +1,6 @@
 /**
  * The Abnahmesatz of docs/erste-version-und-offene-fragen.md §1, walked end to end by the people who
- * actually do it, against the seeded corpus of 800 questions — not a demo of twelve:
+ * actually do it, against the seeded demo corpus (CORPUS_DEMO, packages/domain/src/seed.ts) — not a demo of twelve:
  *
  *   Eine Person, die das Werkzeug nie gesehen hat, erfasst aus einem Redebeitrag sieben Einzelfragen,
  *   klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet und gibt frei,
@@ -13,6 +13,7 @@
  * history, read by the Versammlungsbüro (under slice 010's Festlegung 4 moderation holds
  * `history.read`, podium does not), proves every one of those steps afterwards.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
@@ -21,7 +22,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 /** A synthetic speech with exactly seven questions of record (same corpus as slice 002). */
 const QUESTIONS = [
@@ -44,11 +44,11 @@ const ANSWER_TEXT =
   'Die Einzelheiten sind im Geschäftsbericht auf Seite 42 dargestellt.';
 
 /**
- * The corpus of 800 already carries roughly a hundred questions with status "staged" (the seed's
- * own statusFor() distribution). Staging assigns the next position of an append-only counter
- * (R-TRANS-07/08, packages/domain/src/api.ts), so a freshly staged question always lands behind all
- * of them in the podium queue — never within the first couple of dozen presses. The bound below is
- * sized for that reality, not for a demo of twelve.
+ * The demo corpus already carries a few questions with status "staged" (the seed's own statusFor()
+ * distribution; the load corpus of 800 carried roughly a hundred). Staging assigns the next position
+ * of an append-only counter (R-TRANS-07/08, packages/domain/src/api.ts), so a freshly staged
+ * question always lands behind all of them in the podium queue. The bound below was sized for the
+ * load corpus and is kept as a generous upper limit; the loop stops once the question is reached.
  */
 const MAX_STAGE_ROUNDS = 130;
 
@@ -73,7 +73,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 /** Search by number and open the one row it turns up — the same motion at every desk. */
@@ -170,7 +170,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await expect(page).toHaveURL(/\/answers$/);
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
 
-  // Timing (soft): how long the list takes to settle after a status filter click, at 800+ rows.
+  // Timing (soft): how long the list takes to settle after a status filter click, at the full corpus.
   const answersFilterStart = await page.evaluate(() => performance.now());
   await page.getByTestId('answers-filter-status-classified').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute(

@@ -11,6 +11,7 @@
  * switch goes to `moderation`, which also holds `speaker.read` — a visible change without tripping
  * over the read grant (Nachprüfung B, point 1).
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 
@@ -18,7 +19,6 @@ import { checkAxe } from './support/axe';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -35,7 +35,7 @@ test('shell: counters, role switch, language switch @screenshot', async ({ page 
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), {
       timeout: 90_000,
     })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 
   for (const testId of [
     'header-meeting-title',
@@ -99,7 +99,7 @@ test('header strip on the answers desk @screenshot', async ({ page }) => {
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), {
       timeout: 90_000,
     })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
   await expect(page.getByTestId('header-counter-staged')).toBeVisible();
 
   // Design review rework: the counters pill must never force the meeting title to truncate at

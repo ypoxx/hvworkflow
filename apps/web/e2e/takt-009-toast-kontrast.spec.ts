@@ -6,8 +6,8 @@
  * (`notMergingIntoSelf`, "A question cannot be merged into itself."). The guard itself evaluates
  * only the *payload* (`intoQuestionId === q.id`), never a read permission, so the refusal fires for
  * every role that may merge at all, on every run, independent of the seeded corpus' exact contents
- * — only that at least one `classified` question exists, which the 800-question corpus
- * (`packages/domain/src/seed.ts`) always provides. The interface reaches it without any test hook:
+ * — only that at least one `classified` question exists, which the demo corpus
+ * (`CORPUS_DEMO`, `packages/domain/src/seed.ts`) always provides. The interface reaches it without any test hook:
  * open a `classified` question's own "Zusammenführen" dialog and type that same question's own
  * number (read off its own row, `data-number`) as the merge target — `MergeDialog.onResolve`
  * (`ActionDialogs.tsx`) resolves a number to an id through `HvApi.listQuestions`, exactly the way a
@@ -39,6 +39,7 @@
  * `checkAxe` is the shared gate from slice 013 (`support/axe.ts`); no exception is added for the
  * toast — the whole point of this slice is that none is needed once the token is right.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
@@ -47,7 +48,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 async function asRole(page: Page, role: string): Promise<void> {
   await page.getByTestId('role-switcher').click();
@@ -60,7 +60,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 test.use({ viewport: { width: 1440, height: 900 } });
