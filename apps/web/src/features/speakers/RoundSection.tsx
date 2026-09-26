@@ -26,10 +26,7 @@ function HeadStrip() {
       <span />
       <span className="hv-label truncate text-right">{t('speakers.column.number')}</span>
       <span className="hv-label truncate">{t('speakers.column.name')}</span>
-      <span className="hv-label truncate">{t('speakers.column.kind')}</span>
-      <span className="hv-label truncate text-right">{t('speakers.column.minutes')}</span>
       <span className="hv-label truncate">{t('speakers.column.status')}</span>
-      <span className="hv-label truncate text-right">{t('speakers.column.elapsed')}</span>
       <span className="hv-label truncate text-right">{t('speakers.column.questions')}</span>
       <span className="hv-label truncate text-right">{t('speakers.column.actions')}</span>
     </div>

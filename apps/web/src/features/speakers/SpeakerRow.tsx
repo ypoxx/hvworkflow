@@ -11,11 +11,11 @@ import { Link } from 'react-router';
 import type { Speaker } from '@hv/domain';
 import { Badge, Button, cx } from '../../components';
 import { useT } from '../../i18n';
-import { KIND_ICON, STATE_TONE, speakerKindLabel, speakerStateLabel } from './labels';
-import { SpeakingTimer } from './SpeakingTimer';
+import { STATE_TONE, speakerStateLabel } from './labels';
 
-/** One grid for the head strip and every row, so the columns line up across all rounds. */
-export const ROW_COLUMNS = '26px 46px minmax(0,1fr) 104px 92px 104px 78px 62px 100px';
+/** One grid for the head strip and every row, so the columns line up across all rounds. Slice 080
+ * dropped kind (Art), requested and running speaking time (Redezeit, feedback #15). */
+export const ROW_COLUMNS = '26px 46px minmax(0,1fr) 104px 62px 100px';
 
 export interface SpeakerRowActions {
   onCall: (speaker: Speaker) => void;
@@ -70,7 +70,6 @@ export function SpeakerRow({
   const finished = speaker.status === 'finished';
   const withdrawn = speaker.status === 'withdrawn';
   const waiting = speaker.status === 'waiting';
-  const KindIcon = KIND_ICON[speaker.kind];
 
   return (
     <li
@@ -139,17 +138,6 @@ export function SpeakerRow({
         )}
       </span>
 
-      <span className="flex min-w-0 items-center gap-1 truncate text-2xs text-ink-600">
-        <KindIcon size={14} strokeWidth={1.75} className="shrink-0 text-ink-400" aria-hidden="true" />
-        <span className="truncate">{speakerKindLabel(t, speaker.kind)}</span>
-      </span>
-
-      <span className="text-right font-mono text-[13px] tabular-nums text-ink-600">
-        {speaker.requestedMinutes === undefined
-          ? '—'
-          : t('speakers.minutes', { minutes: speaker.requestedMinutes })}
-      </span>
-
       <span>
         {speaking ? (
           <Badge tone={STATE_TONE.speaking} dot>
@@ -173,17 +161,6 @@ export function SpeakerRow({
           />
         ) : (
           <span className="text-2xs text-ink-500">{speakerStateLabel(t, speaker.status)}</span>
-        )}
-      </span>
-
-      <span className="text-right">
-        {speaking ? (
-          <SpeakingTimer
-            startedAt={speaker.speakingStartedAt}
-            requestedMinutes={speaker.requestedMinutes}
-          />
-        ) : (
-          <span className="font-mono text-[13px] text-ink-300">—</span>
         )}
       </span>
 

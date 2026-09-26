@@ -282,7 +282,7 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
       let written: Promise<unknown>;
       try {
-        written = w.__original['registerSpeaker']!({ displayName, kind: 'shareholder' });
+        written = w.__original['registerSpeaker']!({ displayName });
       } finally {
         mod.setActor(before);
       }

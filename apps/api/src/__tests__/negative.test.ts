@@ -172,6 +172,24 @@ describe('negative cases and idempotency', () => {
     }
   });
 
+  it('409: finished → speaking is refused by the speaker state table with ruleId R-SPK-00 (slice 080)', async () => {
+    const created = await (
+      await req(app, 'POST', '/v1/speakers', { actor: ACTOR.moderation, body: { displayName: 'Zustandsprobe' } })
+    ).json();
+    for (const status of ['speaking', 'finished'] as const) {
+      const ok = await req(app, 'PATCH', `/v1/speakers/${created.id}`, { actor: ACTOR.moderation, body: { status } });
+      expect(ok.status).toBe(200);
+    }
+    const res = await req(app, 'PATCH', `/v1/speakers/${created.id}`, {
+      actor: ACTOR.moderation,
+      body: { status: 'speaking' },
+    });
+    expect(res.status).toBe(409);
+    const problem = await res.json();
+    expectValidProblem(problem);
+    expect(problem.ruleId).toBe('R-SPK-00');
+  });
+
   it('422: an out-of-enum kind or status is rejected, not silently written', async () => {
     const badKind = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,

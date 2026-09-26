@@ -107,19 +107,19 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
     case 'SpeakerRegistered': {
+      // Events written before slice 080 may still carry the kind (Art) and the speaking time; they stay in
+      // the log untouched (rule 7), the projection just no longer reads them.
       const p = e.payload;
       state.speakers.set(e.subjectId, {
         id: e.subjectId,
         number: p.number,
         displayName: p.displayName,
-        kind: p.kind,
         round: p.round,
         position: p.position,
         status: 'waiting',
         questionCount: 0,
         version: 1,
         ...(p.organisation !== undefined ? { organisation: p.organisation } : {}),
-        ...(p.requestedMinutes !== undefined ? { requestedMinutes: p.requestedMinutes } : {}),
       });
       break;
     }
@@ -144,7 +144,6 @@ export function reduce(state: State, e: DomainEvent): State {
         if (p.status === 'finished') s.speakingEndedAt = e.at;
       }
       if (p.round !== undefined) s.round = p.round;
-      if (p.requestedMinutes !== undefined) s.requestedMinutes = p.requestedMinutes;
       s.version += 1;
       break;
     }

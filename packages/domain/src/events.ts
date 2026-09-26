@@ -8,7 +8,7 @@ import type {
   AnswerVersion,
   Classification,
   QuestionStatus,
-  SpeakerKind,
+  SpeakerReopenReason,
   SpeakerStatus,
   TextSpan,
 } from './types.js';
@@ -39,16 +39,14 @@ export type SpeakerRegistered = Base<
     number: number;
     displayName: string;
     organisation?: string;
-    kind: SpeakerKind;
     round: number;
     position: number;
-    requestedMinutes?: number;
   }
 >;
 export type SpeakersReordered = Base<'SpeakersReordered', { round: number; speakerIds: string[] }>;
 export type SpeakerUpdated = Base<
   'SpeakerUpdated',
-  { status?: SpeakerStatus; round?: number; requestedMinutes?: number }
+  { status?: SpeakerStatus; round?: number; reason?: SpeakerReopenReason }
 >;
 export type ContributionCaptured = Base<
   'ContributionCaptured',

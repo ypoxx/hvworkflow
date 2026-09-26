@@ -6,10 +6,8 @@
 import { Mic, MicOff, PencilLine } from 'lucide-react';
 import { Link } from 'react-router';
 import type { Speaker } from '@hv/domain';
-import { Button, Panel, ProgressRing, cx } from '../../components';
+import { Button, Panel, cx } from '../../components';
 import { useT } from '../../i18n';
-import { speakerKindLabel } from './labels';
-import { SpeakingTimer, useElapsedSeconds } from './SpeakingTimer';
 
 function Identity({
   speaker,
@@ -35,14 +33,12 @@ function Identity({
         </span>
       </div>
       <div className="flex min-w-0 items-center gap-2 text-2xs whitespace-nowrap text-ink-500">
-        <span>{speakerKindLabel(t, speaker.kind)}</span>
         {speaker.organisation !== undefined && (
           <>
-            <span aria-hidden="true">·</span>
             <span className="truncate">{speaker.organisation}</span>
+            <span aria-hidden="true">·</span>
           </>
         )}
-        <span aria-hidden="true">·</span>
         <span className="shrink-0 font-mono">{t('header.round', { round: speaker.round })}</span>
       </div>
     </div>
@@ -63,9 +59,6 @@ export function NowSpeaking({
   onCall: (speaker: Speaker) => void;
 }) {
   const t = useT();
-  const elapsed = useElapsedSeconds(speaking?.speakingStartedAt);
-  const budgetSeconds =
-    speaking?.requestedMinutes !== undefined ? speaking.requestedMinutes * 60 : undefined;
 
   return (
     <div className="grid shrink-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
@@ -80,7 +73,7 @@ export function NowSpeaking({
              * R6 (006 rework): the name needs real priority, not leftover space — `min-w-[220px]`
              * keeps it from being squeezed by the fixed-width blocks that follow, which are grouped
              * into one `shrink-0` unit so they wrap as a whole rather than eating into the name one
-             * by one. The "angemeldet {n} min" badge is gone: the ring's max is that same figure.
+             * by one. Slice 080 removed the speaking time and its ring (feedback #15).
              */}
             <Identity
               speaker={speaking}
@@ -88,25 +81,6 @@ export function NowSpeaking({
               nameTestId="speaker-now-name"
             />
             <div className="flex shrink-0 items-center gap-4">
-              <div className="flex flex-col items-end">
-                <span className="hv-label">{t('speakers.now.elapsed')}</span>
-                <div className="flex items-center gap-2">
-                  {elapsed !== null && budgetSeconds !== undefined && (
-                    <ProgressRing
-                      value={elapsed}
-                      max={budgetSeconds}
-                      tone={elapsed >= budgetSeconds ? 'warn' : 'accent'}
-                      label={t('speakers.now.elapsed')}
-                      data-testid="speaker-timer-ring"
-                    />
-                  )}
-                  <SpeakingTimer
-                    startedAt={speaking.speakingStartedAt}
-                    requestedMinutes={speaking.requestedMinutes}
-                    size="lead"
-                  />
-                </div>
-              </div>
               <div className="flex flex-col items-end">
                 <span className="hv-label">{t('speakers.column.questions')}</span>
                 <span className="font-mono text-[13px] tabular-nums text-ink-800">
@@ -149,11 +123,6 @@ export function NowSpeaking({
         ) : (
           <div className="flex h-14 items-center gap-4">
             <Identity speaker={next} className="flex-1" />
-            {next.requestedMinutes !== undefined && (
-              <span className="font-mono text-2xs text-ink-500">
-                {t('speakers.now.requested', { minutes: next.requestedMinutes })}
-              </span>
-            )}
             {next._actions.includes('speaker.update') && (
               <Button
                 variant="primary"

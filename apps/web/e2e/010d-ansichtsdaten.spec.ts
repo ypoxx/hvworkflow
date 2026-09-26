@@ -292,7 +292,7 @@ async function switchActor(page: Page, role: string): Promise<void> {
  * page; the outcome is polled.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
-  await elsewhere(page, 'registerSpeaker', [{ displayName: name, kind: 'shareholder' }]);
+  await elsewhere(page, 'registerSpeaker', [{ displayName: name }]);
 }
 
 /**

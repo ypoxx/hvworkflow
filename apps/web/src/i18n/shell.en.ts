@@ -109,7 +109,7 @@ export const shellEn: typeof shellDe = {
   'placeholder.right': 'Individual questions',
   'page.speakers.title': 'Requests to speak',
   'page.speakers.description':
-    'Speakers list by round: order, speaking time, calling the next speaker.',
+    'Speakers list by round: order, calling the next speaker.',
   'page.capture.title': 'Capture',
   'page.capture.description':
     'Capture contributions and atomize them into individual questions, with remaining coverage.',
