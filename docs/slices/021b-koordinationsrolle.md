@@ -1,6 +1,6 @@
 # 021b — Koordinationsrolle
 
-**Status:** in Arbeit (26.09.)
+**Status:** review bestanden (R1, 26.09.)
 **Risikoklasse:** hoch (Rechte) · 1 AStd · 09.10.2026 (W2, vorgezogen) · Lanes: core, e2e
 **Rolle:** Implementierer-Backend (Rechte, Persona) und e2e-Personas in einem Bau; Review in frischem Kontext, Perspektive Security (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 4, 10, 12; Rechte als Daten (ROLE_PERMISSIONS), Wahrheitstabelle
@@ -74,4 +74,26 @@ e2e wechselt Rollen über `role-option-<rolle>`; klassifiziert wird heute als `c
 
 ## Bericht
 
-(folgt)
+```
+Slice: 021b-koordinationsrolle
+Done: Rolle coordination (classify, assign, question/contribution/speaker/history.read); capture ohne classify/assign;
+      Persona u-coord-1 „Koordination“ (DEMO_ACTORS, SEED_ACTORS; Seed-Ereignisse unverändert); i18n DE/EN; Wahrheits-
+      tabelle neu (coordination-Zeilen, capture verliert classify auf 4 und assign auf 2 Zeilen); Abnahmesatz „… die
+      Koordination klassifiziert sie …“. Nach Merge von 021a (f462ecc) beide Blöcke in api.test.ts erhalten.
+Evidence: rot vor der Änderung: „Tests 4 failed | 38 skipped (42)“ (coordination-Rechte, capture 403, coordination
+      klassifiziert/weist zu, coordination erfasst nicht). e2e voll nach dem Merge: 118 passed (5.5m), axe 0 serious/critical.
+      Szenarien mit Rollenwechsel für Klassifizieren/Zuweisen: e2e 002, 020 (#21/#23), abnahme; API acceptance, negative;
+      Domäne api.test (Abnahmedurchlauf, If-Match, Idempotenz, subscribe, 422). Keine Zusicherung geschwächt.
+      HTTP-Negativtests capture → 403 R-PERM-01 auf /classification und /assignment (Review R1, 23f167b).
+      pnpm gates auf 23f167b grün (domain 132, api 67, web 181, Skripte 206), Schluss wörtlich:
+      ✓ built in 1.40s
+      mark-test-run: wrote /home/user/wt/s021b/.claude/state/last-test-run (clean tree) at commit 23f167b, tree eb62fef38d6f…
+      docs/evidence/021b-koordination-{de,en}.png
+Open: Folgeliste: Erfassung zeigt der Koordination „In dieser Rolle nur lesen“ neben „Klassifizieren“ (capture/Page.tsx
+      leitet den Hinweis nur aus question.capture ab); alte Klassifizierungen im Demo-Korpus tragen die Erfassung als Akteur.
+      Review R1: 0/0/2 + 2 nit; minor 1 und nit 3 behoben, nit 4 in der Spec begründet, minor 2 → Folgeliste.
+Touched: packages/domain/src/{types,permissions,seed}.ts, __tests__/api.test.ts, policy-truth-table.md;
+      apps/api/src/__tests__/{acceptance,negative}.test.ts; apps/web/src/api/actor.ts, i18n/{labels,shell.de,shell.en,
+      parity.test}.ts; apps/web/e2e/{002,020,abnahme,021b-koordination}.spec.ts; scripts/role-literal-check.test.mjs
+      (Fixture-Name); docs/erste-version-und-offene-fragen.md; docs/evidence/021b-*.png
+```
