@@ -138,8 +138,8 @@ const approverIsNotCreator: Guard = {
       'ready_for_stage: Vier-Augen "Ersteller ≠ Freigeber") und :156 (Abschnitt 4: "Kein Recht und ' +
       'keine Rollenkombination kann das Vier-Augen-Prinzip abschalten"). Ableitung: verglichen wird ' +
       'die Akteur-id des Freigebenden mit `createdBy.id` der letzten Antwortversion (der ' +
-      'freizugebenden, R-GUARD-04), nie eine Rolle; kein Schalter und keine Rolle (auch `admin` ' +
-      'nicht) umgeht den Guard. Hat eine andere Person eine neuere Version angelegt, darf die ' +
+      'freizugebenden, R-GUARD-04), nie eine Rolle; kein Schalter und keine Rolle (auch keine mit ' +
+      'allen Rechten) umgeht den Guard. Hat eine andere Person eine neuere Version angelegt, darf die ' +
       'Erstellerin einer früheren Version freigeben. Personengenau nur mit Einzelidentitäten: ' +
       'Vertretung und geteilte Kennungen erkennt der Guard nicht (Demo: eine Identität je Persona).',
     docVersion: null,
