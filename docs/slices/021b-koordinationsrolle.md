@@ -25,10 +25,10 @@ e2e wechselt Rollen über `role-option-<rolle>`; klassifiziert wird heute als `c
 - Demo-Persona `{ id: 'u-coord-1', role: 'coordination', displayName: 'Koordination' }` in `DEMO_ACTORS` und
   `SEED_ACTORS` (nur als Akteur; **der Seed schreibt seine Ereignisse unverändert**, damit Korpus und Fingerabdruck
   gleich bleiben — historische Klassifizierungen im Demo-Korpus tragen weiter die Erfassung als Akteur; → Folgeliste).
-- i18n: `role.coordination` DE „Koordination“, EN „Coordination“ (Schlüsselzahl im Paritätstest +2).
+- i18n: `role.coordination` DE „Koordination“, EN „Coordination“ (ein Schlüssel je Sprache: Zahlen im Paritätstest `apps/web/src/i18n/parity.test.ts` 452 → 453).
 - Die Oberfläche rendert `_actions`: kein Rollenvergleich neu; die Erfassungsseite zeigt „Klassifizieren“ nur noch der
   Koordination.
-- Wahrheitstabelle `docs/policy-truth-table.md` neu erzeugt; der Diff (Zeilen für coordination, zwei Zeilen capture
+- Wahrheitstabelle `packages/domain/policy-truth-table.md` neu erzeugt; der Diff (Zeilen für coordination, zwei Zeilen capture
   verweigert) ist hiermit freigegeben.
 - e2e: Szenarien, die als `capture` klassifizieren oder zuweisen, wechseln für diesen Schritt zu `coordination`; das
   Prüfziel bleibt, keine Zusicherung wird geschwächt. Abnahmesatz in `docs/erste-version-und-offene-fragen.md`: „… die
@@ -52,7 +52,7 @@ e2e wechselt Rollen über `role-option-<rolle>`; klassifiziert wird heute als `c
 - `apps/api/src/__tests__/*.test.ts` (nur Stellen, die capture klassifizieren lassen)
 - `apps/web/src/api/actor.ts`, `apps/web/src/i18n/{labels,shell.de,shell.en,parity.test}.ts`
 - `apps/web/e2e/*.spec.ts`, `apps/web/e2e/021b-koordination.spec.ts` (neu)
-- `docs/policy-truth-table.md`, `docs/legal-trace.md` (nur generiert), `docs/evidence/021b-*.png`
+- `packages/domain/policy-truth-table.md`, `docs/legal-trace.md` (nur generiert), `docs/evidence/021b-*.png`
 - `docs/erste-version-und-offene-fragen.md` (nur der Abnahmesatz), `docs/slices/021b-koordinationsrolle.md`
 
 ## Akzeptanzkriterium
