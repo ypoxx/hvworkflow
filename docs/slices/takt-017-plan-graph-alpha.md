@@ -1,6 +1,6 @@
 # takt-017 — Buchstabensuffixe im Plan-Graphen erkennen
 
-**Status:** geplant · **Risikoklasse:** niedrig · **Lane:** infra
+**Status:** review · **Risikoklasse:** niedrig · **Lane:** infra
 **Regeln:** AGENTS.md R1, R2, R12; Plan §5.1 (Abhängigkeiten und Lanes)
 **Ausgangspunkt:** Der Produktplan enthält 021a–c, 029b und 080b/c. `plan-graph.mjs` liest bisher nur dreistellige IDs und übersieht dadurch echte Abhängigkeiten und Terminkollisionen.
 
@@ -27,4 +27,23 @@ Keine Änderung des Produktplans, keine Neudefinition von `--strict`, keine Unte
 
 ## Bericht
 
-(nach dem Test- und Gate-Lauf)
+```
+Slice: takt-017-plan-graph-alpha
+Done: Plan-Graph liest dreistellige IDs mit optionalem Kleinbuchstaben.
+      Echte Abhängigkeiten und 9 bestehende Lane-Kollisionen werden sichtbar;
+      der Produktplan wurde nicht umdatiert.
+Evidence: Tests zuerst: plan-graph.test.mjs 3 neu rot/11 grün; danach
+      14/14 grün. `node scripts/plan-graph.mjs` erkennt 88 Scheiben,
+      0 fehlende Abhängigkeiten, 0 Zyklen, 0 Reihenfolgeprobleme,
+      9 Lane-Warnungen. `pnpm gates` Exit 0 auf Commit e8546b5;
+      wörtlicher Schluss:
+      - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+      ✓ built in 420ms
+      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit e8546b5, tree 24f871542855…
+Open: Die 9 historischen Lane-Kollisionen und der 029/029b-Umfang
+      bleiben eine gesonderte Planentscheidung. Unabhängiges Review
+      und PR-CI stehen aus; keine Oberfläche geändert.
+Touched: docs/slices/takt-017-plan-graph-alpha.md,
+      scripts/plan-graph.mjs, scripts/plan-graph.test.mjs,
+      scripts/fixtures/plan-graph/alpha-splits.md.
+```
