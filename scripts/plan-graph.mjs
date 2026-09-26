@@ -212,6 +212,13 @@ function checkGraph(slices, byNumber) {
   }
 
   const warnings = [];
+  // Two slices that explicitly depend on one another can own the same lane in sequence on one
+  // documented day. Dependency-order validation above still rejects reversed same-day order.
+  function dependsOn(number, target, visited = new Set()) {
+    if (visited.has(number)) return false;
+    visited.add(number);
+    return (byNumber.get(number)?.deps ?? []).some((dep) => dep === target || dependsOn(dep, target, visited));
+  }
   const byDate = new Map();
   for (const s of slices) {
     if (!byDate.has(s.date)) byDate.set(s.date, []);
@@ -220,6 +227,7 @@ function checkGraph(slices, byNumber) {
   for (const [date, group] of byDate) {
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
+        if (dependsOn(group[i].number, group[j].number) || dependsOn(group[j].number, group[i].number)) continue;
         const shared = group[i].lanes.filter((l) => group[j].lanes.includes(l));
         if (shared.length > 0) {
           warnings.push(`${group[i].number} and ${group[j].number} both start ${date} and share lane(s): ${shared.join(', ')}.`);

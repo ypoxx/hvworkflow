@@ -1,0 +1,33 @@
+# takt-018 — Serielle Scheiben-Splits im Plan-Graphen
+
+**Status:** geplant · **Risikoklasse:** mittel · **Lanes:** infra, docs-plan
+**Regeln:** AGENTS.md R1, R2, R12; Produktplan §5.1 und §8.3
+**Ausgangspunkt:** Der Parser aus takt-017 erkennt jetzt 080b/c und 021a/b/c. Er meldet neun Lane-Kollisionen, obwohl 080→080b und 021a→021b→021c explizit serielle Arbeit am selben Tag sind. Der alte Sammelpunkt 021 wird fälschlich als zusätzliche Scheibe gezählt. 080c und 032 sind dagegen unabhängig und teilen am 27.10. die Lane web-speakers.
+
+## Ziel
+
+1. Zwei Scheiben am selben Kalendertag mit gemeinsamer Lane gelten nur dann als seriell, wenn eine im Abhängigkeitsgraphen unmittelbar oder mittelbar von der anderen abhängt. Der bestehende Reihenfolge-Check muss dafür weiterhin gelten. Unabhängige Scheiben mit gemeinsamer Lane bleiben unter `--strict` rot.
+2. Der historische Sammelpunkt 021 wird als historische Prosa bewahrt und nicht länger als eigenständige Scheibe gezählt. Seine echten Nachfolger sind 021a, 021b und 021c; 021c hängt explizit von 021b ab. Fachliche Abhängigkeiten, die noch den abgeschafften Sammelpunkt 021 nennen, zeigen auf den letzten Teil 021c.
+3. Die unabhängige 080c wird auf den 30.10.2026 (W5) gesetzt; dort ist die Lane web-speakers frei. Sonstige Plantermine bleiben unverändert.
+
+## Nicht-Ziele
+
+Keine Entscheidung zum widersprüchlichen Umfang oder Termin von 029/029b; keine Anpassung der Beta-Kriterien oder von 084; keine automatische Neuplanung; keine Umgehung des strengen Gates und kein Deployment. Die verbleibende 029/029b-Warnung wird ausdrücklich berichtet.
+
+## Files allowed
+
+- `docs/slices/takt-018-plan-serielle-splits.md`
+- `scripts/plan-graph.mjs`
+- `scripts/plan-graph.test.mjs`
+- `scripts/fixtures/plan-graph/serial-same-day.md`
+- `docs/produktplan-beta.md` (nur historischer 021-Block, die exakten 021-Abhängigkeitszeilen, die 021c-Abhängigkeit und das Datum von 080c)
+
+## Akzeptanz
+
+1. Test zuerst rot: Eine Fixture mit expliziter gleichdatiger Kette und gemeinsamer Lane scheitert heute an `--strict`; nach der Korrektur besteht sie. Die bestehende unabhängige Lane-Kollision bleibt unter `--strict` rot.
+2. Der echte Plan enthält keine eigenständige Scheibe 021 mehr, keine Abhängigkeit auf 021, aber die drei Teil-Scheiben. `node scripts/plan-graph.mjs` meldet 87 Scheiben, keine fehlende Abhängigkeit, keinen Zyklus und kein Reihenfolgeproblem; von den neun bisherigen Warnungen bleibt genau 029/029b. `--strict` gegen den echten Plan bleibt deshalb bewusst rot.
+3. `pnpm gates` besteht auf einem sauberen Commit. Der Bericht nennt dessen Commit und den wörtlichen Schluss. Unabhängiges Review prüft Spec und Diff.
+
+## Bericht
+
+(nach dem Test- und Gate-Lauf)

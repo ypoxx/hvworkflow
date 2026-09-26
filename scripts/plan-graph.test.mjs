@@ -11,6 +11,7 @@ const SCRIPT = join(SCRIPTS_DIR, 'plan-graph.mjs');
 const FIXTURES = join(SCRIPTS_DIR, 'fixtures', 'plan-graph');
 const REAL_PLAN = join(SCRIPTS_DIR, '..', 'docs', 'produktplan-beta.md');
 const ALPHA_PLAN = join(FIXTURES, 'alpha-splits.md');
+const SERIAL_PLAN = join(FIXTURES, 'serial-same-day.md');
 
 function run(args) {
   const r = spawnSync('node', [SCRIPT, ...args], { encoding: 'utf8' });
@@ -64,6 +65,13 @@ test('takt-017 P1 red: malformed suffixes fail loudly even without a dependent s
     assert.match(r.stderr, /starts like a slice bullet/);
     assert.match(r.stderr, new RegExp(malformed));
   }
+});
+
+test('takt-018 red: same-day lane ownership is serial along an explicit dependency path', () => {
+  const r = run(['--plan', SERIAL_PLAN, '--strict']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /6 slice\(s\) found/);
+  assert.match(r.stdout, /same-day lane-sharing warnings: 0/);
 });
 
 test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {

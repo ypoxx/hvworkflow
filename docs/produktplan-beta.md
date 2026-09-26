@@ -423,13 +423,13 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Backend (Seed) + Implementierer-Oberfläche (e2e-Konstanten); Review
   - *Nachweise:* seed.test.ts 28/230 und 800; `grep SEEDED_QUESTIONS apps/web/e2e` liefert nur den Import; pnpm gates + e2e
   - *Offene Entscheidung:* —
-- **080c · Umsortierung nach Runde 1 mit Begründung** — mittel · 0,5 AStd · Kalender 27.10.2026 (W5) · Lanes: core, web-speakers
+- **080c · Umsortierung nach Runde 1 mit Begründung** — mittel · 0,5 AStd · Kalender 30.10.2026 (W5) · Lanes: core, web-speakers
   - *Ziel:* SpeakerOrder erhält ein Begründungsfeld (Vertrag 0.4.0 aus 043), das Ereignis SpeakersReordered trägt es; Umsortierung ab Runde 2 nur mit Begründung, mit Regel-id und Test; Dialog in der Wortmeldeliste. Aus 080b abgetrennt (26.09.). Quellen: Feedback #14; Ist-Analyse Sprecherstatus.
   - *Abhängigkeiten:* 080b, 043
   - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review
   - *Nachweise:* Test je Regel, Screenshot Dialog DE/EN; pnpm gates + e2e
   - *Offene Entscheidung:* —
-- **021 · Koordinationsrolle, Vier-Augen-Guard R-GUARD-06, Rechtstor vor der Bühne R-GUARD-07** — hoch · 2 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
+**Historische Scheibe 021 (am 26.09.2026 in 021a–c geteilt): Koordinationsrolle, Vier-Augen-Guard R-GUARD-06, Rechtstor vor der Bühne R-GUARD-07.** Ursprüngliche Schätzung: hoch · 2 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e.
   - *Ziel:* Am 26.09. geteilt in 021a (Vier-Augen), 021b (Koordinationsrolle), 021c (Rechtstor); die Einträge dort gelten. Ursprünglich: Rolle `coordination` mit classify/assign/forward/round.assemble, capture verliert classify/assign; R-GUARD-06 „Ersteller der letzten Version ≠ Freigeber" auf R-TRANS-05 (personengenau nur mit Einzelidentitäten, siehe B18); legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared aus 019) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor" auf R-TRANS-07 und R-TRANS-08 mit Geltungsbereich aus der Datentabelle `LEGAL_GATE_BY_TRACK` in transitions.ts (Standard: alle drei Pfade); zur Laufzeit nicht abschaltbar, jede Tabellenänderung erzeugt einen Wahrheitstabellen-Diff; kein Eilpfad an der Freigabe vorbei; Wahrheitstabelle neu; e2e-Personas und Abnahmesatz umformuliert („… die Koordination klassifiziert …"); docs/erste-version-und-offene-fragen.md aktualisiert.
   - *Abhängigkeiten:* 010, 019, 080
   - *Rolle:* Implementierer-Backend (Kern) + Implementierer-Oberfläche (e2e-Personas); Review mit Perspektive Legal/Security
@@ -449,13 +449,13 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E1 Rollenname (Arbeitsname)
 - **021c · Rechtsfreigabe und Rechtstor vor der Bühne R-GUARD-07** — hoch · 1 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
   - *Ziel:* Teil 3 von 021: legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor“ auf R-TRANS-07 und R-TRANS-08 mit `LEGAL_GATE_BY_TRACK` (Standard: alle drei Pfade), zur Laufzeit nicht abschaltbar, kein Eilpfad; Seed mit QuestionLegalCleared; docs/erste-version-und-offene-fragen.md aktualisiert.
-  - *Abhängigkeiten:* 021a
+  - *Abhängigkeiten:* 021b
   - *Rolle:* Implementierer-Backend (Kern, Seed) + e2e; Review mit Perspektive Legal/Security
   - *Nachweise:* stage ohne Rechtsfreigabe → 409 R-GUARD-07 für jeden Pfad, Test „keine Konfiguration schaltet den Guard ab“; Wahrheitstabellen-Diff; pnpm gates + e2e
   - *Offene Entscheidung:* E25 Letztverantwortung (Standard approver), E37 Freigabetiefe je Pfad
 - **022 · Nachweise M1, Demo-Skript, Protokoll Feedback-Runde 2** — niedrig · 1 AStd · Kalender 12.10.2026 (W3) · Lanes: docs-feedback
   - *Ziel:* Screenshots aller fünf Ansichten neu, docs/demo-skript.md und README-Status aktualisiert, Protokoll der zweiten Feedback-Runde (09.10.: Antworten auf das Fragenpaket, Vorführung der S-Punkte aus 020) im Statustabellen-Format mit Antworten auf die Fragen 1–9 ins Register, Abnahmesatz-Freigabe der Projektleitung vermerkt, Vorführung von Koordination und Rechtstor für Prüfpunkt 2 vorbereitet, Messtabelle 009–021.
-  - *Abhängigkeiten:* 020, 021
+  - *Abhängigkeiten:* 020, 021c
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* docs/feedback/2026-10-runde-2.md, docs/evidence/022-*.png, Register-Diff
   - *Offene Entscheidung:* Antworten E1–E9 eingetragen oder „auf Standard gebaut"
@@ -654,13 +654,13 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* Zusatzkanal E-Mail oder Push (Nach-Beta)
 - **048 · Weiterleiten zwischen Fachbereichen, Auskunftsschuldner, Inhaltssprache** — mittel · 1,5 AStd · Kalender 05.11.2026 (W6) · Lanes: core
   - *Ziel:* R-TRANS-13 forward aus assigned | answer_drafted | in_review an andere Einheit (coordination, expert der aktuellen Einheit), Antwortversion bleibt, Ereignis QuestionForwarded mit Grund; Feld accountable (Auskunftsschuldner, genau eine Person oder Funktion, RACI-Accountable) getrennt vom Bühnenplatz (Sprecher), Standard = Bühnenplatz; Feld language (Standard de) reserviert ohne Kopplungslogik; der Dialog „Weiterleiten" mit Einheit und Grund entsteht in der Fokusansicht (054); eine Umbenennung von Ereignis oder Operation nur nach Antwort auf Frage 6 (E5).
-  - *Abhängigkeiten:* 021, 043, 040
+  - *Abhängigkeiten:* 021c, 043, 040
   - *Rolle:* Implementierer-Backend; Review
   - *Nachweise:* Test je Regelzeile; Wahrheitstabellen-Diff
   - *Offene Entscheidung:* E5 Bedeutung „Weiterleiten" (beides gebaut)
 - **044 · Verweigerungspfad A und B im Kern** — hoch · 2,5 AStd · Kalender 06.11.2026 (W6) · Lanes: core
   - *Ziel:* answerKind refusal_no_claim (Pfad A) und refusal_with_ground (Pfad B, Pflichtauswahl aus packages/domain/src/refusalGrounds.ts mit legalRef und verified:false, Begründung Pflicht) als Antwortart durch in_review → approved → staged → delivered; Guards R-GUARD-08 „Verweigerung nur mit Rechtsfreigabe-Ereignis" und Vier-Augen gelten; Rechte question.refuse.propose (legal, coordination) und question.refuse.approve (approver); Grundpflicht als Guard R-GUARD-09 (Pfad B ohne refusalGroundId oder Begründung → 409; `_actions` enthält die Verweigerung erst, wenn der Guard erfüllbar ist); Formulierungsbaustein für die Bühne aus dem Katalog; Export markiert Verweigerungen; Nachweise für ADR 0012 (liegt seit 011 bei Recht, sonst Vermerk „auf Standard gebaut"). Höchstes rechtliches Risiko: Implementierer-Backend baut, Review in frischem Kontext mit Perspektive Legal, Architekt prüft stichprobenartig; der Wahrheitstabellen-Diff steht vor der Implementierung im Spec.
-  - *Abhängigkeiten:* 021, 011, 043
+  - *Abhängigkeiten:* 021c, 011, 043
   - *Rolle:* Implementierer-Backend; Review in frischem Kontext + Stichprobe des Architekten in eigenem frischem Kontext mit Perspektive Legal
   - *Nachweise:* Test je neuer Regel-ID inkl. Vier-Augen-Negativtest; Wahrheitstabellen-Diff freigegeben; Katalog mit 0 verified sichtbar als „ungeprüft"; pnpm gates
   - *Offene Entscheidung:* E15 Rechtsprüfung des Grundkatalogs (Daten)
@@ -691,7 +691,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E19 Notarzugang (lesend über Export)
 - **049 · Vorgelesen als Entität mit Abweichungsvermerk (Soll-Ist)** — hoch · 2 AStd · Kalender 12.11.2026 (W7) · Lanes: core, web-stage
   - *Ziel:* Delivery {questionId, answerVersion, versionHash, seat, personId, deviceId, recordedAt, occurredAt mit Quelle, mode: as_approved | deviation, deviationNote, idempotencyKey}; „Vorgelesen" ist von If-Match auf der Frage ausgenommen und prüft den Versions-Hash; passt er nach Wiederverbindung nicht, entsteht ein Vermerk DeliveryConflict statt eines stillen Fehlers; Mehrfach-Delivery erlaubt (Nachfrage, Korrektur); Bühne fragt „Vorgelesen wie freigegeben" (Leertaste) oder „mit Abweichung" (A + Pflichttext); Historie zeigt Soll-Ist-Vermerk; Alarm (085) an Inhaber von question.legal.clear bei deviation.
-  - *Abhängigkeiten:* 021, 043, 085
+  - *Abhängigkeiten:* 021c, 043, 085
   - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review mit Perspektive Legal
   - *Nachweise:* Test Delivery referenziert exakt die freigegebene Version (Hash); Test Hash passt nicht → DeliveryConflict; Playwright Bühne: Abweichung erfordert Text; Screenshot
   - *Offene Entscheidung:* —
@@ -721,14 +721,14 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
 
 - **053 · Steuerungsansicht der Koordination** — mittel · 2,5 AStd · Kalender 13.11.2026 (W7) · Lanes: web-steering
   - *Ziel:* Route /steering (Recht question.classify): Klassifizierung (Antwortpfad, Bühnenplatz, Insider-Kennzeichen), Zuweisung, Weiterleiten, Verweigerung vorschlagen, Zurückstellen; Verteilung „wo liegt was" je Fachbereich und je Bühnenplatz als Matrix aus counts.byUnit und counts.bySeat (040) (Feedback #11, #25); Mehrfachauswahl mit Einzeltasten; Filter bleiben hier; Vertraulichkeits-Badge; die Route kommt als eine Zeile ins Feature-Register (082), sichtbar über das Recht question.classify, nie über einen Rollennamen.
-  - *Abhängigkeiten:* 021, 043, 036, 047, 040, 082
+  - *Abhängigkeiten:* 021c, 043, 036, 047, 040, 082
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots DE/EN; Playwright Matrix-Zahlen gegen counts; Zeitmessung Filterwechsel p90 < 150 ms bei 800 (Tor) mit Ausweis gegen D9 100 ms; axe grün
   - *Offene Entscheidung:* E1 Rollenname (nur i18n)
 - **054 · Fokusansicht der Beantworter** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-focus
   - *Ziel:* Route /my: nur eigene Zuweisungen (Einheit/Person), keine Filter, Doppelklick öffnet Vollbild-Schreibmodus, Enter/Escape-Pfad, Lesehinweis bei fehlendem Recht, TOP und Erfassungszeit ausgeblendet, Rückgabegrund prominent, „Weiterleiten" als primäre Aktion mit Dialog für Einheit und Grund (Übergang aus 048); Alt+6 über das Feature-Register (082).
   - *Zielbild (089):* Z1, Z5, Z7, Z8, Z9 (Weiterleiten nach E5 zum nächsten Schritt; die Übergabe an einen anderen Fachbereich bleibt die zweite Aktion im Dialog); Z2–Z4 und das Treffer-Kennzeichen erst nach E50 und E51. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
-  - *Abhängigkeiten:* 036, 021, 048, 082
+  - *Abhängigkeiten:* 036, 021c, 048, 082
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots inkl. Weiterleiten-Dialog; Playwright Doppelklick → Vollbild → speichern; axe grün
   - *Offene Entscheidung:* —
@@ -906,7 +906,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021, 082, 084, 023, 024, 025, 026, 027, 028, 029, 030, 031, 032, 033, 034, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029, 030, 031, 032, 033, 034, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —
