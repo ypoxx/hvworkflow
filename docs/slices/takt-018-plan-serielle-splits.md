@@ -30,4 +30,18 @@ Keine Entscheidung zum widersprüchlichen Umfang oder Termin von 029/029b; keine
 
 ## Bericht
 
-(nach dem Test- und Gate-Lauf)
+Slice: takt-018-plan-serielle-splits
+
+Done: Gleichdatige Scheiben mit expliziter Abhängigkeitskette gelten als serielle Lane-Nutzung. Der historische Sammelpunkt 021 bleibt lesbar, wird aber nicht mehr als aktive Scheibe gezählt; die Abhängigkeiten zeigen auf 021c. 080c liegt am 30.10.2026.
+
+Evidence: Test zuerst rot (vier Warnungen in der neuen Fixture), danach `node --test scripts/plan-graph.test.mjs` mit 16/16 grün; `node scripts/plan-graph.mjs` mit 87 Scheiben, 0 fehlenden Abhängigkeiten, 0 Zyklen, 0 Reihenfolgefehlern und genau einer Warnung; `node scripts/slice-scope.mjs --takt 018 --base 3311c00de17cb2543bee23d240d9d3950ca17e1c` bestätigt 5/5 Dateien. `pnpm gates` auf Commit `8cce56f` endete wörtlich:
+
+```text
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 434ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit 8cce56f, tree f20717b58f9e…
+```
+
+Open: `node scripts/plan-graph.mjs --strict` bleibt wegen der unabhängigen Lane-Kollision 029/029b rot. Deren Umfang und Termin werden erst nach der offenen Beta-Entscheidung festgelegt. Kein Deployment.
+
+Touched: `docs/slices/takt-018-plan-serielle-splits.md`, `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`, `scripts/fixtures/plan-graph/serial-same-day.md`, `docs/produktplan-beta.md`.
