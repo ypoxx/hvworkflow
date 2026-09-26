@@ -1,6 +1,6 @@
 # takt-016 — Vertragsbrücke für Scheibe 025 (Papier-Nacherfassung)
 
-**Status:** spec
+**Status:** review (Bau abgeschlossen; unabhängiges Review offen)
 **Risikoklasse:** mittel · Vertragsform vor der Kernarbeit · Lane: contract, docs-plan (nur Planzeilen 023/025/028 und Versionsverweis in der Risikotabelle), service (nur fokussierter Vertragstest)
 **Rolle:** Architekt; unabhängiges Review gegen ADR 0015 und die Nachweise aus 023
 **Rule ids:** AGENTS.md Regeln 1, 2, 6, 7, 12; R-MTG-03 wird erst in 025 implementiert
@@ -63,7 +63,29 @@ Rot/grün des fokussierten Tests, generierte Typen, CHANGELOG 0.3.2, `pnpm gates
 
 ## Bericht
 
-(folgt nach dem Bau)
+```
+Slice: takt-016-025-papiervertrag
+Done: Vertrag 0.3.2 mit drei optionalen Feldern und DebateClosed; kanonischer
+      Erfassungs-Body trägt den Grund, Alias bleibt unverändert. 028 rückt auf
+      0.3.3; Plan 025 nennt die synthetische Schluss-Fixture und den echten HTTP-Test.
+Evidence: fokussierter Test vor der Vertragsänderung rot: 3 failed (Version 0.3.1,
+      leerer Grund akzeptiert, DebateClosed fehlt); danach 3 passed. Generierte
+      Typen aktualisiert und erneut generiert, SHA-256 unverändert
+      a1310ceb45cfabc343b395363a32942acdb52dfae2a68bb4b59e04a97f6f49bd.
+      pnpm gates auf Commit 8e8fbab (Node 24, pnpm 10.33.0)
+      Exit 0; Schluss wörtlich:
+      - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+      ✓ built in 739ms
+      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 8e8fbab, tree 9a7b4056d8bd…
+      contract:lint 0 Fehler, fünf bestehende Warnungen; API 73/73,
+      domain 144/144, web 181/181; Operationen 66 = 30 ausgeübt + 36 Allowlist.
+Open: unabhängiges Review; 025 implementiert R-MTG-03 und die HTTP-Nachweise.
+      E2E entfällt hier, da keine Oberfläche geändert wurde.
+Touched: docs/slices/takt-016-025-papiervertrag.md,
+      apps/api/src/__tests__/takt-016-contract.test.ts,
+      packages/contract/{openapi.yaml,src/types.ts,CHANGELOG.md,package.json},
+      docs/produktplan-beta.md.
+```
 
 ## Review findings
 
