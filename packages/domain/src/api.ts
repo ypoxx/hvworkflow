@@ -425,6 +425,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return idempotent(`updateSpeaker:${id}`, opts, () => {
         requirePermission('speaker.update');
         const s = requireSpeaker(id);
+        // If-Match is checked before we know whether the PATCH has any effect: a stale precondition
+        // fails the same way (412) whatever the body says, so a parallel client racing a real change
+        // still sees the conflict instead of a silent no-op 200 (takt-015 Ziel 1/AK1).
         checkIfMatch(s.version, opts);
         // The reason is kept only when the resolved row has a guard that reads it (today R-SPK-05 with
         // R-SPK-GUARD-01); on any other row it is dropped, so no unchecked text reaches the log (review R1).
@@ -436,17 +439,18 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         }
         // Built field by field: fields the contract still accepts but the core ignores since 080
         // (Redezeit) never reach an event; the reason only travels with a status change.
-        append([
-          {
-            type: 'SpeakerUpdated',
-            subjectId: id,
-            payload: {
-              ...(input.status !== undefined ? { status: input.status } : {}),
-              ...(input.round !== undefined ? { round: input.round } : {}),
-              ...(keepReason && input.reason !== undefined ? { reason: input.reason } : {}),
-            },
-          },
-        ]);
+        const payload = {
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.round !== undefined ? { round: input.round } : {}),
+          ...(keepReason && input.reason !== undefined ? { reason: input.reason } : {}),
+        };
+        // takt-015 Ziel 1: nothing named survives the cut (empty body, or only fields the domain
+        // type no longer has, e.g. the deprecated requestedMinutes) — write no event. Regel 7 keeps
+        // the log append-only; that is a reason to never write one for no change, not a licence for
+        // one, and a version bump with nothing to show for it would confuse an optimistic-lock client.
+        if (Object.keys(payload).length > 0) {
+          append([{ type: 'SpeakerUpdated', subjectId: id, payload }]);
+        }
         return viewSpeaker(requireSpeaker(id));
       });
     },
