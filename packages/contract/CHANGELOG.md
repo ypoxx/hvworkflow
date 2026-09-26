@@ -10,6 +10,25 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.2] - 2026-09-26
+
+### Added
+
+- takt-016 for slice 025: optional `Meeting.debateClosedAt`, `Contribution.lateEntry`, and
+  `MeetingContributionCapture.lateEntryReason`; the latter is accepted only on the canonical
+  meeting capture operation and rejects an empty string. R-MTG-03 in 025 decides when the reason
+  is required and when `lateEntry` is true.
+- `DebateClosed` in `Event.type`, with the meeting as `subjectId`. Slice 025 can prove the rule with
+  a synthetic closed-debate event and the real HTTP capture route. A public closing operation waits
+  for the remainder-list guard in slice 087.
+
+### Changed
+
+- `Meeting.version` is projected from slice 025 so the already required ETag of `getMeetingById`
+  can be returned. It remains optional in the schema.
+- The mandatory fields and If-Match requirement planned for slice 028 move from 0.3.2 to 0.3.3;
+  this patch introduces no new required field or operation.
+
 ## [0.3.1] - 2026-09-26
 
 Slice 021c (Rechtsfreigabe und Rechtstor): additive legal clearance operation
