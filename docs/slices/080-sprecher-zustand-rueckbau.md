@@ -75,6 +75,7 @@ aus `_actions` ableiten). Keine Politur aus der Folgeliste.
 
 - `packages/domain/src/{transitions,rules,types,events,state,api,seed}.ts`
 - `packages/domain/src/__tests__/{transitions,rules,api,seed}.test.ts`
+- `packages/domain/src/__tests__/seed-fictitious-names.test.ts` (Nachtrag 26.09.: nur `maskNames` blendet `kind`/`requestedMinutes` aus, `PRE_CHANGE_FINGERPRINT` auf den so maskierten Altstand, Kommentar zu 080; der Implementierer hat gezeigt, dass der alte Seed ohne die beiden Felder bytegleich zum neuen ist)
 - `docs/legal-trace.md`, `docs/policy-truth-table.md` (nur generiert)
 - `apps/api/src/__tests__/{contract,acceptance,negative,rule-register}.test.ts`
 - `apps/web/src/features/speakers/**`, `apps/web/src/i18n/speakers.{de,en}.ts`
