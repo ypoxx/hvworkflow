@@ -600,3 +600,90 @@ describe('read rights (slice 010)', () => {
     }
   });
 });
+
+/**
+ * Slice 021a: R-GUARD-06 (Vier-Augen, "Ersteller ≠ Freigeber", docs/rollen-und-rechtekonzept.md:109,
+ * :156). The guard compares actor ids of the latest answer version and the approver, never roles.
+ */
+describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
+  /** An assigned question on a text track, ready for its first answer version. */
+  async function assignedTextQuestion(): Promise<Question> {
+    as(actors.admin!);
+    const { items } = await api.listQuestions({ status: ['assigned'], limit: 200 });
+    const q = items.find((x) => x.track !== undefined && x.track !== 'podium');
+    expect(q).toBeDefined();
+    return q!;
+  }
+
+  async function draftAs(a: Actor, id: string, text: string): Promise<Question> {
+    as(a);
+    return api.draftAnswer(id, { text });
+  }
+
+  async function submit(id: string): Promise<Question> {
+    as(actors.expert!);
+    return api.submitForReview(id);
+  }
+
+  it('legal drafts version 1 and tries to approve it: 409 R-GUARD-06, no event', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
+    await submit(q.id);
+    as(actors.legal!);
+    const before = store.all().length;
+    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    expect(store.all().length).toBe(before);
+    expect((await api.getQuestion(q.id)).status).toBe('in_review');
+  });
+
+  it('admin drafts and approves: 409 R-GUARD-06 — no role bypasses the guard', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.admin!, q.id, 'Entwurf von Admin.');
+    as(actors.admin!);
+    await api.submitForReview(q.id);
+    const before = store.all().length;
+    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    expect(store.all().length).toBe(before);
+  });
+
+  it('the same person under another role is still the creator (actor id, not role)', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
+    await submit(q.id);
+    as({ id: actors.legal!.id, role: 'approver' });
+    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+  });
+
+  it('expert drafts, approver approves: allowed', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.expert!, q.id, 'Entwurf vom Fachbereich.');
+    await submit(q.id);
+    as(actors.approver!);
+    const approved = await api.approveQuestion(q.id, 1);
+    expect(approved.status).toBe('approved');
+    expect(approved.approval?.answerVersion).toBe(1);
+  });
+
+  it('legal drafts v1, expert drafts v2, legal approves v2: allowed (the approved version counts)', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.legal!, q.id, 'Version 1 von Recht.');
+    await draftAs(actors.expert!, q.id, 'Version 2 vom Fachbereich.');
+    await submit(q.id);
+    as(actors.legal!);
+    const approved = await api.approveQuestion(q.id, 2);
+    expect(approved.status).toBe('approved');
+    expect(approved.approval?.answerVersion).toBe(2);
+  });
+
+  it('_actions: the creator is not offered question.approve, another person is', async () => {
+    const q = await assignedTextQuestion();
+    await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
+    await submit(q.id);
+    as(actors.legal!);
+    expect((await api.getQuestion(q.id))._actions).not.toContain('question.approve');
+    as({ id: 'leg-2', role: 'legal' });
+    expect((await api.getQuestion(q.id))._actions).toContain('question.approve');
+    as(actors.approver!);
+    expect((await api.getQuestion(q.id))._actions).toContain('question.approve');
+  });
+});
