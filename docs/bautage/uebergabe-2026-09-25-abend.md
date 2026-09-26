@@ -1,6 +1,6 @@
 # Übergabe an die nächste Orchestrator-Sitzung (25.09.2026, abends)
 
-**Integrationsbranch-Kopf bei Übergabe:** `cab1ebb` (090).
+**Integrationsbranch-Kopf bei Übergabe:** `cab1ebb` (090); nach der Fortschreibung vom 26.09. `252f3fe` (080).
 
 Fortschreibung von `docs/bautage/uebergabe-2026-09-25.md`. **Rolle, Grenzen und Auftrag gelten unverändert** (dort
 nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, jeder Commit (auch Squash) mit
@@ -46,7 +46,7 @@ bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
 
 ## Fortschreibung 26.09.2026
 
-- **080** gemergt (PR #39, `SQUASH`), geteilt: **080b** (Korpus 28/230, Umsortierung mit Begründung) steht im Plan und
+- **080** gemergt (PR #39, `252f3fe`), geteilt: **080b** (Korpus 28/230, Umsortierung mit Begründung) steht im Plan und
   ist die nächste Kernscheibe; 021 hängt an 080 und kann jetzt ebenfalls starten.
 - Budget dieser Sitzung aufgebraucht; neue Sitzung nötig. Bericht: `docs/bautage/2026-09-26.md`.
 - Lehre: **Vor der Spec auch die Tests lesen, die Zahlen festnageln** (i18n-Schlüsselzahl, Seed-Fingerabdruck,
