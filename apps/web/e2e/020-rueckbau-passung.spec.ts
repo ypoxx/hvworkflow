@@ -4,7 +4,7 @@
  * against the seeded demo corpus (CORPUS_DEMO), one behaviour per point, plus axe on the five changed
  * views and the three empty states this slice is responsible for.
  */
-import { CORPUS_DEMO, project, seedEvents } from '@hv/domain';
+import { CORPUS_DEMO, createInMemoryEventStore, project, seedEvents } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { DomainEvent } from '@hv/domain';
@@ -607,12 +607,12 @@ test('020: Uhr — keine Änderung innerhalb einer Minute, exakt eine am Minuten
  * (design-prinzipien.md #6, "gestalteter Leerzustand").
  * ============================================================================================= */
 const EMPTY_MEETING_LOG = JSON.stringify(
-  seedEvents({
+  createInMemoryEventStore().append(seedEvents({
     questions: 0,
     seed: 20,
     now: new Date('2026-09-23T12:00:00.000Z'),
     actor: { id: 'u-admin', role: 'admin' },
-  }).map((event, index) => ({ ...event, seq: index + 1 })),
+  })),
 );
 
 test('020: leere Zustände — Erfassung ohne Redebeitrag, Bühne ohne Warteschlange', async ({

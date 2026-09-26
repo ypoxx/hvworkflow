@@ -5,6 +5,8 @@ export * from './transitions.js';
 export * from './rules.js';
 export * from './coverage.js';
 export * from './store.js';
+export * from './envelope.js';
+export * from './piiCodec.js';
 export * from './state.js';
 export * from './api.js';
 export * from './seed.js';

@@ -218,6 +218,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   let state: State = emptyState();
   for (const e of store.all()) reduce(state, e);
   const idempotency = new Map<string, unknown>();
+  let activeIdempotencyKey: string | undefined;
 
   store.subscribe((events) => {
     for (const e of events) if (e.seq > state.lastSeq) reduce(state, e);
@@ -309,14 +310,23 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     const key = opts?.idempotencyKey;
     const scoped = key !== undefined ? `${actor().id}|${scope}|${key}` : undefined;
     if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
-    const result = run();
+    const priorKey = activeIdempotencyKey;
+    activeIdempotencyKey = key;
+    let result: T;
+    try {
+      result = run();
+    } finally {
+      activeIdempotencyKey = priorKey;
+    }
     if (scoped !== undefined) idempotency.set(scoped, result);
     return result;
   };
   const append = (events: Omit<NewEvent, 'id' | 'at' | 'actor'>[]): DomainEvent[] => {
     const a = actor();
     const at = now();
-    return store.append(events.map((e) => ({ ...e, id: newId(), at, actor: a }) as NewEvent));
+    return store.append(events.map((e) => ({ ...e, id: newId(), at, actor: a,
+      ...(activeIdempotencyKey !== undefined ? { idempotencyKey: activeIdempotencyKey } : {}),
+    }) as NewEvent));
   };
 
   /**

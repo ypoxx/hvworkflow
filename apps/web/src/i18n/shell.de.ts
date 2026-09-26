@@ -9,6 +9,9 @@ export const shellDe = {
   'boot.failed.title': 'Das Werkzeug konnte nicht starten',
   'boot.failed.hint': 'Der Demobestand ließ sich nicht aufbauen.',
   'boot.failed.retry': 'Erneut versuchen',
+  'boot.legacy.title': 'Altes Demoprotokoll',
+  'boot.legacy.hint': 'Das gespeicherte Demoprotokoll stammt aus einer älteren Version. Setzen Sie es ausdrücklich zurück, um den synthetischen Bestand neu aufzubauen.',
+  'boot.legacy.reset': 'Zurücksetzen und Demo neu aufbauen',
   'error.title': 'Diese Ansicht wurde angehalten',
   'error.hint':
     'Es ist ein unerwarteter Fehler aufgetreten. Die Vorgangshistorie bleibt unberührt — Sie können die Ansicht neu aufbauen.',

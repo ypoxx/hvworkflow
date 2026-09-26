@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router';
-import { seedIfEmpty } from '../api';
+import { LegacyDemoLogError, resetDemo, seedIfEmpty } from '../api';
 import { ToastProvider } from '../components';
 import { AppShell } from './AppShell';
 import { BootFailure, BootScreen } from './BootScreen';
@@ -48,6 +48,8 @@ function Boot() {
     return (
       <BootFailure
         error={phase.error}
+        legacy={phase.error instanceof LegacyDemoLogError}
+        onReset={resetDemo}
         onRetry={() => {
           setPhase({ kind: 'loading' });
           setAttempt((value) => value + 1);

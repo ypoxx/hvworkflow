@@ -4,7 +4,7 @@
  * removed — and is replayed once at start to rebuild the in-memory projection.
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-import type { DomainEvent, Persistence } from '@hv/domain';
+import { assertEventShape, upcastJsonlEvents, type DomainEvent, type Persistence } from '@hv/domain';
 
 export function createFileEventLog(path: string): Persistence {
   let persistedCount = 0;
@@ -12,13 +12,21 @@ export function createFileEventLog(path: string): Persistence {
   return {
     load(): DomainEvent[] | undefined {
       if (!existsSync(path)) return undefined;
-      const lines = readFileSync(path, 'utf8')
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-      const events = lines.map((l) => JSON.parse(l) as DomainEvent);
+      const lines = readFileSync(path, 'utf8').split('\n');
+      const events = lines.flatMap((raw, index) => {
+        const line = raw.trim();
+        if (line.length === 0) return [];
+        try {
+          const parsed: unknown = JSON.parse(line);
+          assertEventShape(parsed);
+          return [parsed];
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Invalid JSONL event at line ${index + 1}: ${reason}.`);
+        }
+      });
       persistedCount = events.length;
-      return events.length > 0 ? events : undefined;
+      return events.length > 0 ? upcastJsonlEvents(events) : undefined;
     },
     save(events: readonly DomainEvent[]): void {
       if (events.length <= persistedCount) return;
