@@ -53,6 +53,8 @@ e2e wechselt Rollen über `role-option-<rolle>`; klassifiziert wird heute als `c
 - `apps/web/src/api/actor.ts`, `apps/web/src/i18n/{labels,shell.de,shell.en,parity.test}.ts`
 - `apps/web/e2e/*.spec.ts`, `apps/web/e2e/021b-koordination.spec.ts` (neu)
 - `packages/domain/policy-truth-table.md`, `docs/legal-trace.md` (nur generiert), `docs/evidence/021b-*.png`
+- `scripts/role-literal-check.test.mjs` (Nachtrag 26.09.: nur der Fixture-Rollenname, der `coordination` als erfundene
+  Zusatzrolle nutzte; jetzt eine nicht vergebene Rolle)
 - `docs/erste-version-und-offene-fragen.md` (nur der Abnahmesatz), `docs/slices/021b-koordinationsrolle.md`
 
 ## Akzeptanzkriterium
