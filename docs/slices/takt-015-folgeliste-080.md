@@ -1,6 +1,6 @@
 # takt-015 — Folgeliste aus 080 gebündelt
 
-**Status:** in Arbeit (26.09.)
+**Status:** review bestanden (Sonnet, R1, 26.09.)
 **Klasse:** S (Kleinänderungsspur) · Risikoklasse niedrig · Lanes: core, web-speakers
 **Rolle:** Implementierer-Backend (Kern, Tests, eine Spaltenbreite); Review in frischem Kontext mit Sonnet (niedriges Risiko, AGENTS.md Regel 3)
 **Rule ids:** AGENTS.md Regeln 1, 2, 5, 7, 12; R-SPK-01, R-SPK-00
@@ -61,4 +61,22 @@ Keine weiteren Umbauten.
 
 ## Bericht
 
-(folgt)
+```
+Slice: takt-015-folgeliste-080
+Done: updateSpeaker schreibt bei wirkungslosem PATCH kein Ereignis (If-Match davor, 412 bleibt 412); vier Tests
+      (leer, nur requestedMinutes, 412 vor 409, Idempotenz-Wiederholung) plus Versionsprüfung im Vertragstest;
+      legalRef R-SPK-01 vollständig zitiert; Fragen-Spalte 62 → 84 px, EN „QUESTIONS“ ungekürzt.
+Evidence: rot vor Ziel 1 (pnpm --filter @hv/domain test -- --run transitions.test.ts):
+      FAIL … an empty PATCH writes no event and leaves the version unchanged — expected 2 to be 1
+      FAIL … a PATCH with only the deprecated requestedMinutes writes no event … — expected 2 to be 1
+      Tests  2 failed | 111 passed (113)
+      (412-vor-409 und Wiederholung waren schon grün: sie sichern bestehendes Verhalten.)
+      pnpm gates auf 73ba8ed grün, Schluss wörtlich:
+      ✓ built in 1.27s
+      mark-test-run: wrote /home/user/wt/t015/.claude/state/last-test-run (clean tree) at commit 73ba8ed, tree 9cf0a3eb4816…
+      e2e 080 + 002: 2 passed, axe 0 serious/critical. docs/evidence/080-wortmeldeliste-{de,en}.png
+Open: Ziel 5 (Folgeliste) erledigt der Orchestrator auf claude/bautag-2026-09-26 (8e5b124), weil der Abschnitt dort liegt.
+      Review (Sonnet) bestanden, ein minor (dieser Bericht fehlte) hiermit behoben.
+Touched: packages/domain/src/{api,transitions}.ts, __tests__/transitions.test.ts; apps/api/src/__tests__/contract.test.ts;
+      docs/legal-trace.md; apps/web/src/features/speakers/SpeakerRow.tsx; docs/evidence/080-wortmeldeliste-{de,en}.png
+```
