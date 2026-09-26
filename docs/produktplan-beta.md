@@ -532,8 +532,8 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Negativtests abgelaufene Sitzung 401, falsche Audience 401, X-Actor ohne Demo 401, Subject ohne Rolle 403, HV_DEMO=1 mit Issuer → Start verweigert; CI mit Keycloak grün; Wahrheitstabelle unverändert
   - *Offene Entscheidung:* —
 - **030 · HTTP-HvApi-Client aus dem Vertrag, Anmeldung im Web, zwei Betriebsarten** — hoch · 2,5 AStd · Kalender 22.10.2026 (W4) · Lanes: web-api, web-shell
-  - *Ziel:* generierter Client (openapi-typescript + fetch-Wrapper) implementiert HvApi mit ETag/If-Match/Idempotency-Key/Problem-Details/CSRF; AuthAdapter-Port (demoPersona | session) mit Anmeldeseite (Transparenzhinweis DE/EN, Link zur DSFA-Zusammenfassung), stillem Refresh, Abmelden, 401-Behandlung; Betriebsart per Build-Konfiguration; Rollenumschalter nur in Demo; `grep fetch(` außerhalb apps/web/src/api/http liefert nichts.
-  - *Abhängigkeiten:* 029b, 028
+  - *Ziel:* Für die Beta genügt die einfache Anmeldung aus 029b statt ganz 029 (Zielpfad Beta-2, Abschnitt 11). generierter Client (openapi-typescript + fetch-Wrapper) implementiert HvApi mit ETag/If-Match/Idempotency-Key/Problem-Details/CSRF; AuthAdapter-Port (demoPersona | session) mit Anmeldeseite (Transparenzhinweis DE/EN, Link zur DSFA-Zusammenfassung), stillem Refresh, Abmelden, 401-Behandlung; Betriebsart per Build-Konfiguration; Rollenumschalter nur in Demo; `grep fetch(` außerhalb apps/web/src/api/http liefert nichts.
+  - *Abhängigkeiten:* 029, 028
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* Screenshot Anmeldeseite und 401-Behandlung; Unit-Tests des Wrappers; pnpm gates
   - *Offene Entscheidung:* —
