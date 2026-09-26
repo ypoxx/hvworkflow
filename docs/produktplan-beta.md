@@ -1252,6 +1252,24 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 
 ## 11. Sofortige nächste Schritte
 
+**Zielpfad Beta-2 (Entscheidung des Eigentümers, 26.09.2026).** Weg vom Demo-Zustand zu einer betriebsfähigen Lösung.
+Der Product Owner soll in der zweiten Demo ein fast vollständiges Produkt sehen, die Transkript- und die KI-Mannschaft
+sollen in der Beta angebundene, dokumentierte Schnittstellen vorfinden. Reihenfolge in vier Etappen; Abhängigkeiten
+aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo möglich, statt Nachbarscheiben ganz mitzubauen
+(etwa 053 ohne 047, 059 ohne 047, 057 ohne 056):
+
+- **A Fundament:** 021c, 024, 025, 026, 027, 028, 033, 034.
+- **B Mehrbenutzer:** 029 in einfacher Form, 030, 035, 036.
+- **C Oberfläche vollständig:** 043, 040, 041, 044 (Verweigerung, auf Empfehlung aufgenommen), aus der Arbeitsfähigkeit
+  zuerst 053, 054, 059, 061, dann 048, 055, 057, 060, 046.
+- **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
+
+Zurückgestellt: 049 (hängt an 085), 045, 047, 056, 058 und der Rest von M4–M7 bis nach der zweiten Demo.
+**E11 für die Beta entschieden:** die Anmeldung bleibt einfach (Keycloak mit Testrealm und synthetischen Testpersonen);
+Anbindung an das Konzern-SSO wird in der Beta nicht nachgewiesen. Notfallkonten und Sperrliste aus 029 nur, soweit
+der einfache Weg sie ohne Mehraufwand mitbringt.
+
+
 1. **Woche 0, bis 25.09.2026 (Prüfpunkt 0).** Der Eigentümer gibt diesen Plan und die Standardannahmen frei und entscheidet E23 (Codex-Branch nach 009 löschen), E47 (Geld- und Nutzungsdeckel) und E48 (Merge-Befugnis beim Orchestrator). Er stellt die Anfragen mit Laufzeit bei Dritten: Konzern-IT für IdP-Client, Hosting/Postgres-Konto mit AVV, Endgeräte und Netz der Podiumsgeräte (E10, E11, E33); Start von Betriebsrat- und DSFA-Prozess (E13, E14); Beauftragung der Rechtsprüfung mit Anforderung von Satzung und Geschäftsordnung (E15); Beschaffung des Pentests (E32); Ansprechperson des Tool-Teams (E3a); Bestätigung von HV-Datum und Format (E20).
 2. **Ab 28.09. (W1).** Bautage beginnen mit 009, 017, 012, 014, 015, 016, 018, 019, 013, 020 in der berechneten Reihenfolge. Der Eigentümer setzt den Branch-Schutz nach der Checkliste aus 016. Das Fragenpaket geht am 02.10. an die Projektleitung. Ab dem ersten Bautag führt docs/messung.md den Durchsatz je Bautag.
 3. **Bis 09.10. (Prüfpunkt 1 mit Feedback-Runde 2).** M0 steht, die S-Punkte aus 020 sind auf der Demo sichtbar, der gemessene Durchsatz ist bekannt. Entscheidungen: ADR 0001 (E42), Ergänzung 0002, 0015, 0016; Durchsatzannahme bestätigt oder Kalender neu gerechnet; Antworten E1–E9 und E25 ins Register, sonst Vermerk „auf Standard gebaut".
