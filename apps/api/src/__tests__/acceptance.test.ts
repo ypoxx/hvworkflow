@@ -9,10 +9,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
 import { ACTOR, req } from './helpers.ts';
+import { expectValid } from '../contractSchema.ts';
+
 // Classify and assign belong to coordination since slice 021b (helpers.ts is outside that slice's
 // files, so the token lives here: `id:role` as in ACTOR).
 const COORDINATION = 'coord:coordination';
-import { expectValid } from '../contractSchema.ts';
 
 describe('acceptance sentence (HTTP)', () => {
   let app: App;
