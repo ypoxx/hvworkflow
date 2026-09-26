@@ -79,6 +79,10 @@ aus `_actions` ableiten). Keine Politur aus der Folgeliste.
 - `docs/legal-trace.md`, `docs/policy-truth-table.md` (nur generiert)
 - `apps/api/src/__tests__/{contract,acceptance,negative,rule-register}.test.ts`
 - `apps/web/src/features/speakers/**`, `apps/web/src/i18n/speakers.{de,en}.ts`
+- Nachtrag 26.09.: `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl 464 → 452); `apps/web/src/i18n/shell.{de,en}.ts`
+  (nur `page.speakers.description` ohne Redezeit); `apps/api/src/__tests__/helpers.ts` (nur
+  `UNDOCUMENTED_STATUS_EXCEPTIONS.updateSpeaker` um 409, Begründung „R-SPK seit 080, im Vertrag ab 0.4.0/043“ — der
+  Vertrag nennt 409 für `updateSpeaker` noch nicht; 043 dokumentiert ihn)
 - `apps/web/src/app/App.tsx`, `apps/web/src/features/answers/{Page,QuestionDetail}.tsx` (nur falls sie `kind` eines
   Sprechers lesen)
 - `apps/web/e2e/*.spec.ts` (nur Zeilen, die `kind`/`requestedMinutes` senden oder Spalten Art/Redezeit prüfen)
