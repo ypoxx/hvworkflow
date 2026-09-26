@@ -1,6 +1,6 @@
 # 021c — Rechtsfreigabe und Rechtstor vor der Bühne R-GUARD-07
 
-**Status:** in Arbeit (26.09.)
+**Status:** review (26.09.; unabhängiger Befund nachgearbeitet, PR-CI und Abnahme offen)
 **Risikoklasse:** hoch (Recht, Rechte, Vertrag) · 2 AStd · 09.10.2026 (W2, vorgezogen) · Lanes: contract, core, service, web-answers, e2e
 **Rolle:** Implementierer-Backend (Vertrag nach Festlegung, Kern, Dienst, Seed) und Oberfläche (eine Aktion) in einem Bau; Review in frischem Kontext, Perspektive Legal/Security (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 4, 5, 6, 7, 10, 12; R-TRANS-07, R-TRANS-08, R-TRANS-13 (neu), R-GUARD-06, R-GUARD-07 (neu)
@@ -110,4 +110,32 @@ Rechtsfreigabe-Sicht (059), Prüflistentiefe je Pfad (E37 bleibt Standard), Verw
 
 ## Bericht
 
-(folgt)
+```
+Slice: 021c-rechtsfreigabe-rechtstor
+Done: Rechtsfreigabe auf allen drei Pfaden und Rechtstor vor der Bühne umgesetzt; Version und Vier-Augen-Regeln mit
+      Domänen-, Dienst-, Web- und e2e-Tests belegt. Der unabhängige Review-Befund zum Versionskonflikt ist durch
+      einen gezielten Guard-Test ergänzt (Commit 3251e68; Draft-PR #45).
+Evidence: pnpm gates auf Commit 3251e68 grün (Schluss wörtlich unten); volle Chromium-E2E-Suite 119/119 grün,
+      axe ohne serious/critical. Screenshots: docs/evidence/021c-rechtsfreigabe-de.png und
+      docs/evidence/021c-rechtsfreigabe-en.png.
+Open: PR-CI auf dem letzten Commit und Abnahme durch den Eigentümer stehen aus. Kein Deploy.
+Touched: siehe Diff 1b2e402..3251e68; Nacharbeit nur packages/domain/src/__tests__/transitions.test.ts und diese Spec.
+```
+
+Wörtlicher Schluss von `pnpm gates` (Node 24, Commit `3251e68`):
+
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 401ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 3251e68, tree f0a2fb316ce9…
+```
+
+## Review findings
+
+- Unabhängiges Review 26.09.: Kein bestätigter Produktionsfehler. P3-Testlücke: Eine alte Rechtsfreigabe bei neuerer
+  freigegebener Antwort war nicht direkt gegen `R-GUARD-07` geprüft. Im Commit `3251e68` mit einem gezielten
+  Tabellen-Guard-Test geschlossen; der Test prüft `approval.answerVersion=2`, `legalClearance.answerVersion=1` und
+  `409`/`R-GUARD-07` am Übergang zur Bühne.
