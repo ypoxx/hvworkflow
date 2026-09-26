@@ -8,7 +8,9 @@
 **Depends on:** 021a
 **Perspektive:** Security (Rechteverteilung) · **Glossar: neue Begriffe:** nein (Koordination steht im Glossar-Plan 018)
 **Bedrohungs-IDs:** keine neue; Rechte werden enger (capture verliert zwei Rechte), keine Rolle gewinnt ein Schreibrecht, das
-nicht schon eine andere Rolle hält. Missbrauchsfall: keiner.
+nicht schon eine andere Rolle hält. Missbrauchsfall: keiner neu; MF-01 (Rechteerhöhung über die Rollenzuordnung)
+wird nicht berührt, weil die Zuordnung unverändert bleibt und nur eine Rolle mit engeren Rechten hinzukommt; T-G1-E-02/E-04
+bleiben durch `can()` abgedeckt (Negativtests in Domäne und über HTTP).
 **Offene Entscheidung:** E1 Rollenname — auf Standard gebaut: Arbeitsname `coordination`, Anzeige „Koordination“ / „Coordination“.
 
 ## Festlegung des Architekten
