@@ -417,11 +417,17 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Backend (Kern, Seed) + Implementierer-Oberfläche (Spalten, e2e-Konstanten); Review
   - *Nachweise:* transitions.test.ts eine Zeile je R-SPK, Negativtest finished→speaking 409; grep ohne requestedMinutes/SpeakerKind/SpeakingTimer; Screenshot Wortmeldeliste ohne Redezeit DE/EN; pnpm gates + e2e
   - *Offene Entscheidung:* —
-- **080b · Korpus 28/230 als eine Quelle, Umsortierung mit Begründung** — hoch · 1 AStd · Kalender 08.10.2026 (W2) · Lanes: core, e2e
-  - *Ziel:* Seed exportiert CORPUS_DEMO (28 Wortmeldungen, 230 Fragen, kurze Bühnen-Warteschlange) und CORPUS_LOAD (800); Web-Adapter, api-Default und alle e2e-Konstanten lesen daraus (die vier Alt-Spec-Dateien sind geteilte e2e-Dateien dieser Scheibe); Umsortierung nach Runde 1 mit Begründungsfeld im Ereignis. Aus 080 abgetrennt (25.09.). Quellen: Feedback #14; Ist-Analyse Sprecherstatus.
+- **080b · Korpus 28/230 als eine Quelle** — mittel · 1 AStd · Kalender 08.10.2026 (W2) · Lanes: core, e2e
+  - *Ziel:* Seed exportiert CORPUS_DEMO (28 Wortmeldungen, 230 Fragen, kurze Bühnen-Warteschlange) und CORPUS_LOAD (800, Fingerabdruck unverändert); seedDemo-Standard, Web-Adapter und alle e2e-Konstanten lesen daraus. Aus 080 abgetrennt (25.09.); die Umsortierung mit Begründung ging am 26.09. nach 080c (braucht Vertrag). Quellen: Feedback #14.
   - *Abhängigkeiten:* 080
   - *Rolle:* Implementierer-Backend (Seed) + Implementierer-Oberfläche (e2e-Konstanten); Review
   - *Nachweise:* seed.test.ts 28/230 und 800; `grep SEEDED_QUESTIONS apps/web/e2e` liefert nur den Import; pnpm gates + e2e
+  - *Offene Entscheidung:* —
+- **080c · Umsortierung nach Runde 1 mit Begründung** — mittel · 0,5 AStd · Kalender 27.10.2026 (W5) · Lanes: core, web-speakers
+  - *Ziel:* SpeakerOrder erhält ein Begründungsfeld (Vertrag 0.4.0 aus 043), das Ereignis SpeakersReordered trägt es; Umsortierung ab Runde 2 nur mit Begründung, mit Regel-id und Test; Dialog in der Wortmeldeliste. Aus 080b abgetrennt (26.09.). Quellen: Feedback #14; Ist-Analyse Sprecherstatus.
+  - *Abhängigkeiten:* 080b, 043
+  - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review
+  - *Nachweise:* Test je Regel, Screenshot Dialog DE/EN; pnpm gates + e2e
   - *Offene Entscheidung:* —
 - **021 · Koordinationsrolle, Vier-Augen-Guard R-GUARD-06, Rechtstor vor der Bühne R-GUARD-07** — hoch · 2 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
   - *Ziel:* Rolle `coordination` mit classify/assign/forward/round.assemble, capture verliert classify/assign; R-GUARD-06 „Ersteller der letzten Version ≠ Freigeber" auf R-TRANS-05 (personengenau nur mit Einzelidentitäten, siehe B18); legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared aus 019) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor" auf R-TRANS-07 und R-TRANS-08 mit Geltungsbereich aus der Datentabelle `LEGAL_GATE_BY_TRACK` in transitions.ts (Standard: alle drei Pfade); zur Laufzeit nicht abschaltbar, jede Tabellenänderung erzeugt einen Wahrheitstabellen-Diff; kein Eilpfad an der Freigabe vorbei; Wahrheitstabelle neu; e2e-Personas und Abnahmesatz umformuliert („… die Koordination klassifiziert …"); docs/erste-version-und-offene-fragen.md aktualisiert.
