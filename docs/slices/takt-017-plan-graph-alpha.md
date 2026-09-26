@@ -21,7 +21,7 @@ Keine Änderung des Produktplans, keine Neudefinition von `--strict`, keine Unte
 
 ## Akzeptanz
 
-1. Zuerst roter Test: Eine Fixture mit `080 → 080b → 084` wird vollständig gelesen; `080b` ist eine vorhandene Abhängigkeit. `--merged 080b` berücksichtigt den suffigierten Eintrag. Eine doppelte oder fehlende suffigierte ID wird wie jede andere ID beanstandet.
+1. Zuerst roter Test: Eine Fixture mit `080 → 080b → 084` wird vollständig gelesen; `080b` ist eine vorhandene Abhängigkeit. `--merged 080b` berücksichtigt den suffigierten Eintrag. Eine doppelte oder fehlende suffigierte ID wird wie jede andere ID beanstandet. Fehlerhafte Suffixe (`080B`, `080bb`) werden auch ohne abhängige Scheibe nicht still übersprungen.
 2. Danach grüner Test mit gezielter Parseränderung. Ein unabhängiger Lane-Konflikt bleibt unter `--strict` rot; die echten Kollisionen des Produktplans werden ausdrücklich als Warnungen berichtet.
 3. `pnpm gates` auf einem sauberen Commit grün. Der Bericht nennt den Commit und zitiert den wörtlichen Schluss. Ein unabhängiges Review sieht Spec und Diff.
 

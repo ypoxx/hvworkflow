@@ -31,7 +31,8 @@ process.chdir(ROOT);
 const DEFAULT_PLAN_PATH = 'docs/produktplan-beta.md';
 const HOURS_PER_CLASS_PATTERN = /^- \*\*(\d{3}[a-z]?) · ([^*]+)\*\* — (niedrig|mittel|hoch) · ([\d,]+) AStd · Kalender ([^·]+) · Lanes?: (.+)$/;
 const DEP_LINE_RE = /^\s*- \*Abhängigkeiten:\* (.+)$/;
-const NEXT_BULLET_RE = /^- \*\*\d{3}[a-z]? ·/;
+// Deliberately broader than the full format: malformed suffixes must reach the fail-loud branch.
+const NEXT_BULLET_RE = /^- \*\*\d{3}/;
 
 // Plan 8.3: "Äußere Termine setzen frühestmögliche Starts" — a small table, not derived from the
 // document (the prose names occasions, not slice numbers); kept here with its source sentence.
@@ -124,7 +125,7 @@ function parseSlices(planText) {
       // Round 1, m5: a line that starts like a slice bullet ("- **NNN ·") but does not fully match must
       // fail loudly — silently dropping it would understate the slice count without any signal.
       throw new Error(
-        `plan-graph: section 5, line ${fileLine(i)} starts like a slice bullet ("- **NNN[a-z]? ·") but does not match ` +
+        `plan-graph: section 5, line ${fileLine(i)} starts like a slice bullet ("- **NNN...") but does not match ` +
           `the expected "- **NNN[a-z]? · Title** — risk · X AStd · Kalender ... · Lanes: ..." format: "${line}"`,
       );
     }

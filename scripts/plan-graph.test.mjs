@@ -55,6 +55,17 @@ test('takt-017 red: duplicate and missing suffixed IDs fail', () => {
   assert.match(missing.stdout, /084 depends on 080c/);
 });
 
+test('takt-017 P1 red: malformed suffixes fail loudly even without a dependent slice', () => {
+  for (const malformed of ['080B', '080bb']) {
+    const r = runChangedAlphaPlan((plan) => plan
+      .replace('**080b ·', `**${malformed} ·`)
+      .replace('  - *Abhängigkeiten:* 080b', '  - *Abhängigkeiten:* 080'));
+    assert.equal(r.status, 1, `${malformed}: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /starts like a slice bullet/);
+    assert.match(r.stderr, new RegExp(malformed));
+  }
+});
+
 test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {
   // Round 1, m5: do not hard-code the current slice count here — the plan grows over the project's
   // life and a fixed number makes this test fail on every unrelated planning change. The slice count
