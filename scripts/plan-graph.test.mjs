@@ -3,16 +3,57 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(SCRIPTS_DIR, 'plan-graph.mjs');
 const FIXTURES = join(SCRIPTS_DIR, 'fixtures', 'plan-graph');
 const REAL_PLAN = join(SCRIPTS_DIR, '..', 'docs', 'produktplan-beta.md');
+const ALPHA_PLAN = join(FIXTURES, 'alpha-splits.md');
 
 function run(args) {
   const r = spawnSync('node', [SCRIPT, ...args], { encoding: 'utf8' });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
+
+function runChangedAlphaPlan(change) {
+  const dir = mkdtempSync(join(tmpdir(), 'hv-plan-alpha-'));
+  const plan = join(dir, 'plan.md');
+  try {
+    writeFileSync(plan, change(readFileSync(ALPHA_PLAN, 'utf8')));
+    return run(['--plan', plan]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('takt-017 red: suffixed slice is parsed and satisfies a dependency', () => {
+  const r = run(['--plan', ALPHA_PLAN]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 slice\(s\) found/);
+  assert.match(r.stdout, /missing dependencies: 0/);
+});
+
+test('takt-017 red: --merged recognizes a suffixed slice', () => {
+  const r = run(['--plan', ALPHA_PLAN, '--calendar', '--merged', '080b']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /2 slice\(s\) scheduled \(1 taken out as already merged\)/);
+});
+
+test('takt-017 red: duplicate and missing suffixed IDs fail', () => {
+  const original = readFileSync(ALPHA_PLAN, 'utf8');
+  const duplicate = runChangedAlphaPlan((plan) => plan.replace(
+    '- **084 · Zeitbudget**',
+    '- **080b · Duplikat** — mittel · 1 AStd · Kalender 10.10.2026 (W2) · Lanes: docs\n  - *Abhängigkeiten:* 080\n- **084 · Zeitbudget**',
+  ));
+  assert.equal(duplicate.status, 1, duplicate.stdout + duplicate.stderr);
+  assert.match(duplicate.stderr, /slice 080b appears twice/);
+
+  const missing = runChangedAlphaPlan(() => original.replace('  - *Abhängigkeiten:* 080b', '  - *Abhängigkeiten:* 080c'));
+  assert.equal(missing.status, 1, missing.stdout + missing.stderr);
+  assert.match(missing.stdout, /084 depends on 080c/);
+});
 
 test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {
   // Round 1, m5: do not hard-code the current slice count here — the plan grows over the project's
