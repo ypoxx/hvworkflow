@@ -42,8 +42,9 @@ info:
     scraper only and takes the `metricsBearer` token from the service configuration. `/healthz`,
     `/readyz`, `/metrics` and `/auth/*` live outside `/v1` (per-path `servers`).
 
-    Compatibility within a major version: enumerations grow in minor versions (0.3.0: `Action` +12,
-    `Event.type` +10, `Contribution.source` +`paper`, new `ReadinessCheckCode`) and optional fields
+    Compatibility within a major version: additive enum values within the 0.3.x cycle may appear
+    in patch releases (ADR 0015; precedent 0.2.1). The 0.3.0 package added `Action` +12,
+    `Event.type` +10, `Contribution.source` +`paper` and `ReadinessCheckCode`; optional fields
     are added. A client must ignore an unknown enum value in a response (skip the event, hide the
     action), ignore an unknown optional field and not fail on a documented status it has not seen
     before. A removal is deprecated one cycle ahead (ADR 0015). Request schemas of existing

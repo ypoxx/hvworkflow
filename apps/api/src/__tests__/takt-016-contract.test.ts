@@ -26,4 +26,11 @@ describe('takt-016: additive contract bridge for meeting capture', () => {
   it('recognizes DebateClosed as a typed event of the meeting', () => {
     expect(schemas.Event.properties.type.enum).toContain('DebateClosed');
   });
+
+  it('documents additive enum patch compatibility and safe unknown-value handling', () => {
+    const description = openapiDoc.info.description as string;
+    expect(description).not.toMatch(/enumerations grow in minor versions/i);
+    expect(description).toMatch(/additive enum values[\s\S]*patch releases/i);
+    expect(description).toMatch(/unknown enum value[\s\S]*skip the event, hide the\s+action/i);
+  });
 });

@@ -30,6 +30,13 @@ Vertrag 0.3.2 ergänzt genau die Form, die 025 für seinen unveränderten HTTP-N
    mit 0.3.3 verpflichtend. Alle Vorblicke in Vertrag und Plan werden angepasst.
 4. `info.version` und Paketversion werden 0.3.2; CHANGELOG und generierte Typen folgen. Keine
    neue Operation und kein neuer Allowlist-Eintrag.
+5. **Kompatibilitätsklarstellung innerhalb 0.3.x:** Der bisherige OpenAPI-Satz „enumerations grow
+   in minor versions“ widerspricht dem additiven Ereignistyp dieses Patch-Takts. Die Formulierung
+   erlaubt ausdrücklich additive Enum-Werte in Patch-Stufen desselben Vertragszyklus und behält
+   die bestehende Clientregel bei: unbekannte Werte überspringen beziehungsweise Aktionen
+   ausblenden. Das ist die Festlegung aus ADR 0015 für additive Einzeländerungen und der
+   0.2.1-Präzedenzfall aus 010. Nur `info.description` wird dafür geändert; keine weitere
+   Vertragssemantik, kein neuer Endpunkt und kein zusätzliches Pflichtfeld.
 
 ## Nicht-Ziele
 
@@ -51,6 +58,8 @@ Keine Implementierung von R-MTG-03, keine Status- oder Rechteänderung, kein Sch
 1. Der fokussierte Vertragstest ist vor der Vertragsänderung rot und danach grün: neue Felder
    sind ausdrücklich im Schema typisiert, leerer Grund wird abgewiesen, `DebateClosed` ist ein
    erlaubter Ereignistyp, der Alias-Body besitzt keinen Nachtragsgrund, Version ist 0.3.2.
+   Ein eigener zuerst roter Test beanstandet den bisherigen Minor-only-Satz und prüft danach
+   ausdrücklich Patch-Erweiterung und Umgang mit unbekannten Enum-Werten.
 2. `pnpm contract:types` erzeugt einen stabilen Typen-Diff; `pnpm contract:lint` und `pnpm gates`
    sind grün. Bericht nennt Commit und den wörtlichen Gates-Schluss.
 3. 025 kann danach unverändert die Nachweise `manual nach Schluss → 409 R-MTG-03` und `paper mit
