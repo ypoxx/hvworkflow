@@ -8,7 +8,10 @@
 /** Roles are only bundles of permissions. Nothing in the domain branches on a role name. */
 export type Role =
   | 'moderation' // Versammlungsleitung / Backoffice: Wortmeldeliste
-  | 'capture' // Erfassung: Redebeiträge, Atomisierung, Klassifizierung
+  | 'capture' // Erfassung: Redebeiträge, Atomisierung
+  // Koordination (slice 021b, working name of decision E1): classifies questions into tracks and
+  // assigns them to units — taken over from capture so that capturing and routing are separate hands.
+  | 'coordination'
   | 'expert' // Fachbereich: Antwortentwurf
   | 'legal' // Recht / Legal Clearing
   | 'approver' // Freigabe (Vorstandsbüro / Leitung)

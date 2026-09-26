@@ -52,6 +52,7 @@ export const shellDe = {
   'role.hint': 'Die Rechte richten sich nach der gewählten Rolle.',
   'role.moderation': 'Versammlungsbüro',
   'role.capture': 'Erfassung',
+  'role.coordination': 'Koordination',
   'role.expert': 'Fachbereich',
   'role.legal': 'Recht',
   'role.approver': 'Freigabe',

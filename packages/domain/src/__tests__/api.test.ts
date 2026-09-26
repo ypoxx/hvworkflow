@@ -16,6 +16,7 @@ const actors: Record<string, Actor> = {
   admin: { id: 'admin', role: 'admin' },
   moderation: { id: 'mod', role: 'moderation' },
   capture: { id: 'cap', role: 'capture' },
+  coordination: { id: 'coord', role: 'coordination' },
   expert: { id: 'exp', role: 'expert' },
   legal: { id: 'leg', role: 'legal' },
   approver: { id: 'app', role: 'approver' },
@@ -73,7 +74,9 @@ describe('acceptance sentence', () => {
     expect((await api.getContribution(contribution.id)).coverage.coveredRatio).toBeGreaterThan(0.95);
     expect((await api.getMeeting()).counts.questions).toBe(807);
 
-    const q = questions[0]!;
+    // Classify and assign are coordination's since slice 021b; capture hands over here.
+    as(actors.coordination!);
+    const q = await api.getQuestion(questions[0]!.id);
     expect(q._actions).toContain('question.classify');
     expect(q._actions).not.toContain('answer.draft');
 
@@ -135,20 +138,20 @@ describe('invariants', () => {
   }
 
   it('If-Match mismatch is a 412 and changes nothing', async () => {
-    as(actors.capture!);
+    as(actors.coordination!);
     const q = await firstIn('captured');
     await expect(api.classifyQuestion(q.id, { track: 'podium' }, { ifMatch: '"v999"' })).rejects.toMatchObject({ status: 412 });
     expect((await api.getQuestion(q.id)).status).toBe('captured');
   });
 
   it('Idempotency-Key replays the first result without a second event', async () => {
-    as(actors.capture!);
+    as(actors.coordination!);
     const q = await firstIn('captured');
-    // `listEvents` requires `event.read` since slice 010; capture does not hold it, so the counter
-    // reads happen under admin instead — the idempotent write itself still runs as capture.
+    // `listEvents` requires `event.read` since slice 010; coordination does not hold it, so the counter
+    // reads happen under admin instead — the idempotent write itself still runs as coordination.
     as(actors.admin!);
     const before = (await api.listEvents(0, 100000)).lastSeq;
-    as(actors.capture!);
+    as(actors.coordination!);
     const a = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
     const b = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
     expect(b).toEqual(a);
@@ -157,7 +160,7 @@ describe('invariants', () => {
   });
 
   it('R-IDEM-01: an idempotency key is scoped to actor and operation', async () => {
-    as(actors.capture!);
+    as(actors.coordination!);
     const { items } = await api.listQuestions({ status: ['captured'], limit: 2 });
     const [a, b] = items as [Question, Question];
     const first = await api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' });
@@ -167,7 +170,7 @@ describe('invariants', () => {
     as(actors.observer!);
     await expect(api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' })).rejects.toMatchObject({ status: 404 });
     // The same actor with the same key on another resource executes independently.
-    as(actors.capture!);
+    as(actors.coordination!);
     const other = await api.classifyQuestion(b.id, { track: 'fast_track' }, { idempotencyKey: 'shared' });
     expect(other.id).toBe(b.id);
     expect(other.track).toBe('fast_track');
@@ -232,7 +235,7 @@ describe('invariants', () => {
   });
 
   it('classification validates its inputs (422) before any transition', async () => {
-    as(actors.capture!);
+    as(actors.coordination!);
     const q = await firstIn('captured');
     await expect(api.classifyQuestion(q.id, { track: 'nope' as never })).rejects.toMatchObject({ status: 422 });
     await expect(api.classifyQuestion(q.id, { track: 'podium', agendaItemId: 'top-99' })).rejects.toMatchObject({ status: 422 });
@@ -441,7 +444,7 @@ describe('read rights (slice 010)', () => {
   });
 
   it('subscribe (Festlegung 5): delivers [] to an actor without event.read', async () => {
-    const writer = createInProcessApi({ store, actor: () => actors.capture! });
+    const writer = createInProcessApi({ store, actor: () => actors.coordination! });
     const received: DomainEvent[][] = [];
     as(actors.observer!);
     const unsubscribe = api.subscribe((events) => received.push(events));
@@ -453,7 +456,7 @@ describe('read rights (slice 010)', () => {
   });
 
   it('subscribe (Festlegung 5): checks the permission fresh on every delivery, so a role switch between two deliveries changes what arrives', async () => {
-    const writer = createInProcessApi({ store, actor: () => actors.capture! });
+    const writer = createInProcessApi({ store, actor: () => actors.coordination! });
     const received: DomainEvent[][] = [];
     as(actors.observer!);
     const unsubscribe = api.subscribe((events) => received.push(events));
@@ -598,6 +601,58 @@ describe('read rights (slice 010)', () => {
     } finally {
       delete mutableRolePermissions['auditor'];
     }
+  });
+});
+
+describe('coordination role (slice 021b): classify and assign move from capture to coordination', () => {
+  async function firstCaptured() {
+    as(actors.admin!);
+    const { items } = await api.listQuestions({ status: ['captured'], limit: 1 });
+    expect(items.length).toBeGreaterThan(0);
+    return items[0]!;
+  }
+
+  it('coordination holds exactly classify, assign and the four read grants of the spec', () => {
+    expect([...(ROLE_PERMISSIONS.coordination ?? [])].sort()).toEqual(
+      ['contribution.read', 'history.read', 'question.assign', 'question.classify', 'question.read', 'speaker.read'].sort(),
+    );
+  });
+
+  it('capture no longer classifies or assigns: 403 R-PERM-01, nothing changes', async () => {
+    const q = await firstCaptured();
+    as(actors.capture!);
+    expect((await api.getQuestion(q.id))._actions).not.toContain('question.classify');
+    await expect(api.classifyQuestion(q.id, { track: 'expert_track' })).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
+    as(actors.coordination!);
+    const classified = await api.classifyQuestion(q.id, { track: 'expert_track' });
+    as(actors.capture!);
+    expect((await api.getQuestion(q.id))._actions).not.toContain('question.assign');
+    await expect(api.assignQuestion(q.id, 'unit-fin')).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
+    expect((await api.getQuestion(q.id)).version).toBe(classified.version);
+  });
+
+  it('coordination classifies and assigns; _actions offers exactly that step', async () => {
+    const q = await firstCaptured();
+    as(actors.coordination!);
+    const seen = await api.getQuestion(q.id);
+    expect(seen._actions).toContain('question.classify');
+    expect(seen._actions).not.toContain('question.capture');
+    const classified = await api.classifyQuestion(q.id, { track: 'expert_track' }, { ifMatch: etagOf(seen.version) });
+    expect(classified.status).toBe('classified');
+    expect(classified._actions).toContain('question.assign');
+    const assigned = await api.assignQuestion(q.id, 'unit-fin', { ifMatch: etagOf(classified.version) });
+    expect(assigned.status).toBe('assigned');
+  });
+
+  it('coordination does not capture: question.capture and contribution.capture are 403', async () => {
+    as(actors.coordination!);
+    const contribution = (await api.listContributions())[0]!;
+    await expect(api.captureQuestions(contribution.id, [{ text: 'Frage?', span: { start: 0, end: 6 } }])).rejects.toMatchObject({
+      status: 403,
+      ruleId: 'R-PERM-01',
+    });
+    const speaker = (await api.listSpeakers())[0]!;
+    await expect(api.captureContribution({ speakerId: speaker.id, text: 'Text.' })).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
   });
 });
 

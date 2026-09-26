@@ -279,9 +279,10 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   /* =========================================================================================
    * Point #21/#23 — the capture card shows number, wording and status only; classification lives
    * behind the explicit "Klassifizieren" dialog, reachable only with the right, and the
-   * Tagesordnungspunkt is not asked anywhere in this desk any more.
+   * Tagesordnungspunkt is not asked anywhere in this desk any more. Slice 021b: the right to
+   * classify moved from capture to coordination, so coordination opens the dialog here.
    * ========================================================================================= */
-  await asRole(page, 'capture');
+  await asRole(page, 'coordination');
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
 

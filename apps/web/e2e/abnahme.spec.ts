@@ -3,12 +3,12 @@
  * actually do it, against the seeded demo corpus (CORPUS_DEMO, packages/domain/src/seed.ts) — not a demo of twelve:
  *
  *   Eine Person, die das Werkzeug nie gesehen hat, erfasst aus einem Redebeitrag sieben Einzelfragen,
- *   klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet und gibt frei,
+ *   die Koordination klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet und gibt frei,
  *   und der Vorstand liest sie am Podiumsgerät vor und schließt sie ab — bei 800 Fragen im Bestand.
  *
  * One Wortmeldung is registered and called to the microphone (Versammlungsbüro), its Redebeitrag is
- * captured and atomised into seven Einzelfragen and the first is classified (Erfassung), assigned to
- * an answering unit (Erfassung), answered and handed to Legal Clearing (Fachbereich), approved at
+ * captured and atomised into seven Einzelfragen (Erfassung), the first is classified and assigned to
+ * an answering unit (Koordination, slice 021b), answered and handed to Legal Clearing (Fachbereich), approved at
  * exactly version 1 (Legal Clearing), put on the podium and read out (Freigabe, Podium) — and the
  * history, read by the Versammlungsbüro (under slice 010's Festlegung 4 moderation holds
  * `history.read`, podium does not), proves every one of those steps afterwards.
@@ -147,6 +147,10 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   );
   expect(coverage).toBeGreaterThan(50);
 
+  /* ---------- Koordination: classify the first card (slice 021b: the right moved from capture) ---------- */
+  await asRole(page, 'coordination');
+  await expect(cards).toHaveCount(QUESTIONS.length);
+
   // Classify the first card via the explicit "Klassifizieren" action (point #21, slice 020):
   // Pfad C, Expert Track, one podium assignment. The Tagesordnungspunkt is not asked here.
   const card = cards.first();
@@ -165,7 +169,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('abnahme-02-erfassung.png') });
 
-  /* ---------- Erfassung, still: assign the question to an answering unit on /answers ---------- */
+  /* ---------- Koordination, still: assign the question to an answering unit on /answers ---------- */
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await expect(page.getByTestId('answers-row').first()).toBeVisible();

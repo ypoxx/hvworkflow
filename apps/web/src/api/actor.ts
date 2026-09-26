@@ -12,6 +12,7 @@ const STORAGE_KEY = 'hv-demo-actor-v1';
 export const DEMO_ACTORS: readonly Actor[] = [
   { id: 'u-mod-1', role: 'moderation', displayName: 'Versammlungsbüro' },
   { id: 'u-cap-1', role: 'capture', displayName: 'Erfassung 1' },
+  { id: 'u-coord-1', role: 'coordination', displayName: 'Koordination' },
   { id: 'u-exp-fin', role: 'expert', displayName: 'Fachbereich Finanzen' },
   { id: 'u-legal-1', role: 'legal', displayName: 'Legal Clearing' },
   { id: 'u-appr-1', role: 'approver', displayName: 'Freigabe Vorstandsbüro' },
