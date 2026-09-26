@@ -1,6 +1,6 @@
 # 021a — Vier-Augen-Guard R-GUARD-06 auf der Freigabe
 
-**Status:** in Arbeit (26.09.)
+**Status:** review bestanden (R1, 26.09.)
 **Risikoklasse:** hoch (Recht, Rechte) · 0,5 AStd · 09.10.2026 (W2, vorgezogen) · Lanes: core
 **Rolle:** Implementierer-Backend; Review in frischem Kontext, Perspektive Legal/Security (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 4, 5, 12; R-TRANS-05, R-GUARD-06 (neu)
@@ -46,7 +46,7 @@ Gelesen: `Guard.check(q, payload)` kennt den Akteur nicht; `can()` (api.ts) und 
    - expert entwirft, approver gibt frei → erlaubt; legal entwirft v1, expert v2, legal gibt v2 frei → erlaubt;
    - `_actions` der Erstellerin enthält `question.approve` nicht, die einer anderen Person schon;
    - über HTTP: 409 mit `ruleId` R-GUARD-06 (`apps/api` negative.test.ts).
-3. `docs/legal-trace.md` und `docs/policy-truth-table.md` nur über die Snapshot-Tests neu erzeugt; Diff prüfen.
+3. `docs/legal-trace.md` und `packages/domain/policy-truth-table.md` nur über die Snapshot-Tests neu erzeugt; Diff prüfen.
 4. `docs/produktplan-beta.md`: Eintrag 021 geteilt (021a, 021b, 021c), vom Architekten.
 
 ## Nicht-Ziele
@@ -59,7 +59,7 @@ Vertragsänderung (der Vertrag nennt 409 für die Freigabe bereits; falls nicht:
 - `packages/domain/src/{transitions,api,rules,permissions}.ts`
 - `packages/domain/src/__tests__/{transitions,api,rules}.test.ts`
 - `apps/api/src/__tests__/{negative,rule-register}.test.ts`
-- `docs/legal-trace.md`, `docs/policy-truth-table.md` (nur generiert)
+- `docs/legal-trace.md`, `packages/domain/policy-truth-table.md` (nur generiert)
 - `docs/produktplan-beta.md` (nur Eintrag 021 und die neuen 021a–c, vom Architekten), `docs/slices/021a-vier-augen-freigabe.md`
 
 ## Akzeptanzkriterium
@@ -77,4 +77,25 @@ Vertragsänderung (der Vertrag nennt 409 für die Freigabe bereits; falls nicht:
 
 ## Bericht
 
-(folgt)
+```
+Slice: 021a-vier-augen-freigabe
+Done: R-GUARD-06 an R-TRANS-05: Freigabe verweigert, wenn actor.id = createdBy.id der letzten Version; Akteur als
+      Pflichtkontext in resolveTransition/Guard.check (kein Aufrufer kann ihn weglassen), can() und Schreibweg reichen ihn
+      durch, _actions ohne Freigabe für die Erstellerin; keine Rolle, auch nicht die mit allen Rechten, umgeht ihn.
+      legalRefs R-TRANS-03/05 verweisen auf R-GUARD-06; policy-truth-table unverändert (rollen-, nicht personenabhängig).
+Evidence: rot vor der Änderung: domain „Tests 6 failed | 93 passed (99)“ (u. a. „legal drafts version 1 and tries to
+      approve it: 409 R-GUARD-06, no event“, „admin drafts and approves“, „the same person under another role“,
+      „_actions: the creator is not offered question.approve“); api „409: legal approving its own answer version …
+      expected 200 to be 409“. Danach grün. e2e voll auf 422af80: 117 passed (5.5m).
+      pnpm gates auf 9915fe8 grün (domain 128, web 181, api 65), Schluss wörtlich:
+      ✓ built in 1.31s
+      mark-test-run: wrote /home/user/wt/s021a/.claude/state/last-test-run (clean tree) at commit 9915fe8, tree 56ab1c9e7b6a…
+      MF-07: Nachweise transitions.test.ts, api.test.ts, apps/api negative.test.ts; Erkennung offen (verweigerter Versuch
+      erzeugt kein Ereignis; Protokoll mit 033), eingetragen in docs/sicherheit/bedrohungsmodell.md (d908538, PR #40).
+Open: Ein Test „keine Konfiguration schaltet den Guard ab“ entfällt: es gibt keine Konfigurationsstelle, der Guard steht
+      fest in der Tabelle. Die Erstellerin, die eine ältere fremde Version freigibt, bekommt R-GUARD-04 (fachlich richtig).
+      Review R1: 0/0/2 + 3 nit; minor 1 (MF-07) und minor 2 (legalRef nennt Demo-Adapter, 9915fe8) behoben, nit 3
+      (Pfad der Wahrheitstabelle) hier korrigiert.
+Touched: packages/domain/src/{transitions,api}.ts, __tests__/{transitions,api}.test.ts;
+      apps/api/src/__tests__/negative.test.ts; docs/legal-trace.md (generiert)
+```
