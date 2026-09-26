@@ -6,6 +6,7 @@
  * `createInProcessApi` with an HTTP client that implements the same `HvApi` — nothing else changes.
  */
 import {
+  CORPUS_DEMO,
   createInMemoryEventStore,
   createInProcessApi,
   seedEvents,
@@ -15,7 +16,6 @@ import {
 import { getActor, setActor, DEMO_ACTORS } from './actor';
 
 const STORAGE_KEY = 'hv-demo-events-v1';
-const SEED_QUESTIONS = 800;
 
 function loadLog(): DomainEvent[] | undefined {
   try {
@@ -62,7 +62,7 @@ export async function seedIfEmpty(): Promise<void> {
   const admin = DEMO_ACTORS.find((a) => a.id === 'u-admin')!;
   setActor(admin);
   try {
-    await api.seedDemo({ questions: SEED_QUESTIONS, seed: 2027 });
+    await api.seedDemo({ questions: CORPUS_DEMO.questions, roundSizes: CORPUS_DEMO.roundSizes, seed: CORPUS_DEMO.seed });
   } finally {
     setActor(before);
   }

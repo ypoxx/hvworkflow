@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore, type EventStore } from '../store.js';
 import { ROLE_PERMISSIONS } from '../permissions.js';
-import { seedEvents } from '../seed.js';
+import { CORPUS_DEMO, CORPUS_LOAD, seedEvents } from '../seed.js';
 import type { DomainEvent } from '../events.js';
 import type { Actor, Permission, Question, Role } from '../types.js';
 import { READ_PERMISSIONS } from '../types.js';
@@ -40,7 +40,8 @@ beforeEach(async () => {
     seeder: seedEvents,
   });
   as(actors.admin!);
-  await api.seedDemo({ questions: 800, seed: 7 });
+  // The load round sizes keep this store identical to before slice 080b (the default is now CORPUS_DEMO).
+  await api.seedDemo({ questions: 800, seed: 7, roundSizes: CORPUS_LOAD.roundSizes });
 });
 
 describe('acceptance sentence', () => {
@@ -242,6 +243,18 @@ describe('invariants', () => {
   it('seeding twice is refused: the log is never replaced', async () => {
     as(actors.admin!);
     await expect(api.seedDemo()).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('seeds CORPUS_DEMO when no options are given (slice 080b)', async () => {
+    const fresh = createInProcessApi({
+      store: createInMemoryEventStore(),
+      actor: () => actors.admin!,
+      clock: () => new Date('2027-04-20T13:30:00.000Z'),
+      seeder: seedEvents,
+    });
+    const meeting = await fresh.seedDemo();
+    expect(meeting.counts.questions).toBe(CORPUS_DEMO.questions);
+    expect(meeting.counts.speakers).toBe(CORPUS_DEMO.roundSizes.reduce((a, b) => a + b, 0));
   });
 });
 

@@ -32,6 +32,7 @@
  *     gestalteter Zustand for a role denied the Hauptabfrage outright, not just scoped like observer.
  * Every scenario also checks axe (slice 013's two-pass helper) and that no error toast appears.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
@@ -40,7 +41,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 async function asRole(page: Page, role: string): Promise<void> {
   await page.getByTestId('role-switcher').click();
@@ -53,7 +53,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 /**

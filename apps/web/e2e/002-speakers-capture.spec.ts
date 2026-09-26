@@ -5,6 +5,7 @@
  * Einzelfragen (selection, `Alt+Q`, batch by sentence), watch the Restabdeckung rise, and classify
  * one question into the Expert Track.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
@@ -13,7 +14,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 /** A synthetic speech with exactly seven questions of record. */
 const QUESTIONS = [
@@ -67,7 +67,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(counter).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await counter.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 
   // The meeting office is the desk that owns the Wortmeldeliste.
   await page.getByTestId('role-switcher').click();

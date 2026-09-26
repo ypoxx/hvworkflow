@@ -24,6 +24,7 @@
  * focus lands after an action and that it writes once — positions directly on a button whose own
  * reachability is already proven by the scene it is copied from.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Locator, Page } from '@playwright/test';
@@ -42,7 +43,6 @@ async function waitForToastsGone(page: Page): Promise<void> {
   });
 }
 
-const SEEDED_QUESTIONS = 800;
 
 async function asRole(page: Page, role: string): Promise<void> {
   await page.getByTestId('role-switcher').click();
@@ -55,7 +55,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 interface FocusSnapshot {
