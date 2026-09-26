@@ -141,7 +141,9 @@ const approverIsNotCreator: Guard = {
       'freizugebenden, R-GUARD-04), nie eine Rolle; kein Schalter und keine Rolle (auch keine mit ' +
       'allen Rechten) umgeht den Guard. Hat eine andere Person eine neuere Version angelegt, darf die ' +
       'Erstellerin einer früheren Version freigeben. Personengenau nur mit Einzelidentitäten: ' +
-      'Vertretung und geteilte Kennungen erkennt der Guard nicht (Demo: eine Identität je Persona).',
+      'Vertretung und geteilte Kennungen erkennt der Guard nicht. Im Demobetrieb ist die Akteur-id ' +
+      'eine Angabe des Clients (`X-Actor`, apps/api/src/actor.ts); personengenau wirkt der Guard ' +
+      'erst mit echter Anmeldung (029).',
     docVersion: null,
     docHash: null,
     verified: false,
