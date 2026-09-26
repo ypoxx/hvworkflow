@@ -28,6 +28,15 @@ Paar und derselbe Status noch einmal antworten 409 mit `R-SPK-00`, der eigenen K
 `OTHER_RULES` (wie `R-TRANS-00` bei Fragen). (c) Seed: der verworfene Wurf für die Redezeit fällt nach `tick()`, damit
 die Zufallsfolge gleich bleibt.
 
+**Nachtrag des Architekten (26.09., nach Review R1):** Bedrohungs-IDs: **T-G1-T-02** (unbekannte Felder im Log). 080
+schreibt `SpeakerUpdated` nur noch aus benannten Feldern (`status`, `round`, `reason`). `reason` kommt nur ins Ereignis,
+wenn die aufgelöste Zeile einen Guard hat, der den Wert prüft (heute nur R-SPK-05 mit GUARD-01); sonst wird es verworfen.
+Test: „`waiting → speaking` mit `reason: 'x'` schreibt keinen Grund“. Damit ist T-G1-T-02 für `updateSpeaker`
+geschlossen, für die übrigen Operationen bleibt es bei 023/024. Da `SpeakerUpdate` keine Zusatzfelder verbietet, ist
+R-SPK-05 mit `reason: 'follow_up'` **schon über HTTP erreichbar**. Das ist gewollt (geprüfter Wert), steht so im
+Bericht, und 043 nimmt das Feld in den Vertrag auf. Missbrauchsfall: keiner aus MF-01..08. Die Scheibe ändert weder
+Rechte noch Rollen, Bühne, Ingest oder Demo-Schalter.
+
 Befund beim Lesen: `updateSpeaker` (packages/domain/src/api.ts) prüft heute **keinen** Statusübergang; jeder Wechsel
 ist erlaubt, auch `finished → speaking`. Das ist die eigentliche Lücke, die R-SPK schließt.
 
@@ -40,8 +49,7 @@ ist erlaubt, auch `finished → speaking`. Das ist die eigentliche Lücke, die R
    - R-SPK-03 `waiting → withdrawn`
    - R-SPK-04 `speaking → withdrawn`
    - R-SPK-05 `finished → waiting` nur mit Grund „Nachfrage“: Guard R-SPK-GUARD-01, Feld `reason: 'follow_up'` im
-     Domänentyp `SpeakerUpdate` (nur Kern; über HTTP erst mit Vertrag 0.4.0 erreichbar, im CHANGELOG-Abschnitt nichts
-     ändern, sondern im Bericht vermerken). Der Grund steht im Ereignis `SpeakerUpdated`.
+     Domänentyp `SpeakerUpdate` (im Vertrag erst ab 0.4.0; siehe Nachtrag R1). Der Grund steht im Ereignis `SpeakerUpdated`.
    legalRef ehrlich wie in 011 (`source: 'Prozess'`, Zitat mit Datei:Zeile aus der Ist-Analyse bzw. Feedback,
    `verified: false`; was nicht belegt ist, heißt „Ableitung“ oder „Nicht belegt“).
 2. `updateSpeaker` prüft einen Statuswechsel gegen die Tabelle; nicht erlaubt → 409 mit `ruleId` (gleicher Weg wie bei
