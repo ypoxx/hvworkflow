@@ -33,16 +33,18 @@ Done: Plan-Graph liest dreistellige IDs mit optionalem Kleinbuchstaben.
       Echte Abhängigkeiten und 9 bestehende Lane-Kollisionen werden sichtbar;
       der Produktplan wurde nicht umdatiert.
 Evidence: Tests zuerst: plan-graph.test.mjs 3 neu rot/11 grün; danach
-      14/14 grün. `node scripts/plan-graph.mjs` erkennt 88 Scheiben,
+      14/14 grün. Codex-P1 zu ungültigen Suffixen: eigener Test zunächst
+      rot (14/15 grün), nach Korrektur 15/15 grün. `node scripts/plan-graph.mjs` erkennt 88 Scheiben,
       0 fehlende Abhängigkeiten, 0 Zyklen, 0 Reihenfolgeprobleme,
-      9 Lane-Warnungen. `pnpm gates` Exit 0 auf Commit e8546b5;
+      9 Lane-Warnungen. `pnpm gates` Exit 0 auf Commit eb057e1;
       wörtlicher Schluss:
       - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-      ✓ built in 420ms
-      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit e8546b5, tree 24f871542855…
+      ✓ built in 421ms
+      mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit eb057e1, tree 1b06ebd226e6…
 Open: Die 9 historischen Lane-Kollisionen und der 029/029b-Umfang
       bleiben eine gesonderte Planentscheidung. Unabhängiges Review
-      und PR-CI stehen aus; keine Oberfläche geändert.
+      war ohne wesentliche Findings; Codex-P1 wurde behoben, enger
+      Recheck und PR-CI stehen aus. Keine Oberfläche geändert.
 Touched: docs/slices/takt-017-plan-graph-alpha.md,
       scripts/plan-graph.mjs, scripts/plan-graph.test.mjs,
       scripts/fixtures/plan-graph/alpha-splits.md.
