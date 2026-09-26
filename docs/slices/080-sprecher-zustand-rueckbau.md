@@ -1,6 +1,6 @@
 # 080 — Redezeit und Art zurückbauen, Sprecher-Zustandstabelle R-SPK
 
-**Status:** in Arbeit (25.09.)
+**Status:** review bestanden (R1 nicht bestanden, Nachprüfung bestanden, 26.09.)
 **Risikoklasse:** hoch · 1,5 AStd · 08.10.2026 (W2, vorgezogen) · Lanes: core, web-speakers
 **Rolle:** Implementierer-Backend (Kern, Seed, Regeln) und Oberfläche (Wortmeldeliste) in einem Bau; Review in frischem Kontext (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** AGENTS.md Regeln 1, 2, 5, 7, 10, 12; R-SPK-01..05 (neu); Regelregister aus 011
@@ -116,4 +116,23 @@ aus `_actions` ableiten). Keine Politur aus der Folgeliste.
 
 ## Bericht
 
-(folgt)
+```
+Slice: 080-sprecher-zustand-rueckbau
+Done: SPEAKER_TRANSITIONS R-SPK-01..05 + GUARD-01, Konflikt R-SPK-00; updateSpeaker prüft gegen die Tabelle
+      (409 mit ruleId, auch über HTTP), Ereignis nur aus benannten Feldern, reason nur mit Guard (T-G1-T-02 für
+      updateSpeaker geschlossen). kind/requestedMinutes/SpeakingTimer aus Kern und Web; Seed bytegleich ohne die Felder.
+Evidence: pnpm gates auf 86cdf0d grün (Domäne 109, Web 181, API 64), Schluss wörtlich:
+      ✓ built in 1.65s
+      mark-test-run: wrote /home/user/wt/s080/.claude/state/last-test-run (clean tree) at commit 86cdf0d, tree e4848fd67911…
+      e2e voll auf c4e5d37: 117 passed (6.9m), axe 0 serious/critical; nach der Web-Nacharbeit 080 + 002: 2 passed.
+      docs/evidence/080-wortmeldeliste-{de,en}.png
+Open: R-SPK-05 mit reason 'follow_up' ist schon über HTTP erreichbar (SpeakerUpdate verbietet keine Zusatzfelder;
+      gewollt, Wert geprüft); 409 und reason kommen mit 0.4.0/043 in den Vertrag (bis dahin Ausnahme in helpers.ts).
+      Vertragsfelder kind/requestedMinutes löscht 043. Korpus und Umsortierung: 080b.
+      Folgeliste: leerer PATCH schreibt leeres SpeakerUpdated; legalRef R-SPK-01 soll die Redezeitmessung der
+      Ist-Analyse erwähnen; Tests 412-vor-409 und Idempotenz-Wiederholung; EN-Spaltenkopf „QUESTI…“; Knopfwahl in
+      SpeakerRow aus _actions; Guard „nur ein Mikrofon offen“.
+Touched: packages/domain/src/{transitions,rules,types,events,state,api,seed}.ts und Tests; apps/api/src/__tests__/
+      {contract,acceptance,negative,rule-register,helpers}.ts; apps/web/src/features/speakers/**, i18n speakers/shell,
+      parity.test.ts; e2e 002, 010b, 010c, 010d, 080 (neu); docs/legal-trace.md; docs/evidence/080-*.
+```
