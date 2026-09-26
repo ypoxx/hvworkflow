@@ -102,6 +102,20 @@ describe('transition table', () => {
     expect(resolveTransition(otherV2, 'question.approve', { answerVersion: 2 }, legal).ok).toBe(true);
   });
 
+  it('R-GUARD-07: an old legal clearance does not release a newer approved answer', () => {
+    const q = question({
+      status: 'approved',
+      track: 'expert_track',
+      answers: [
+        { version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+        { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+      ],
+      approval: { answerVersion: 2, approvedAt: '2027-04-20T09:20:00.000Z', approvedBy: OTHER.actor },
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
+    });
+    expect(resolveTransition(q, 'question.stage', undefined, OTHER)).toMatchObject({ ok: false, ruleId: 'R-GUARD-07' });
+  });
+
   it('R-TRANS-06: a returned podium question goes back to classified, a text question to answer_drafted', () => {
     const podium = resolveTransition(question({ status: 'staged', track: 'podium' }), 'question.return', { reason: 'x' }, OTHER);
     const expert = resolveTransition(question({ status: 'staged', track: 'expert_track' }), 'question.return', { reason: 'x' }, OTHER);
