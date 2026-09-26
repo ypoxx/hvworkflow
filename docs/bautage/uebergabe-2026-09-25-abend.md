@@ -49,6 +49,7 @@ bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
 - **080** gemergt (PR #39, `252f3fe`), geteilt: **080b** (Korpus 28/230, Umsortierung mit Begründung) steht im Plan und
   ist die nächste Kernscheibe; 021 hängt an 080 und kann jetzt ebenfalls starten.
 - Mit 20 USD Restbudget danach **takt-015** (Folgeliste aus 080) gemergt (PR #41, `eb9fe85`); Integrationsbranch-Kopf `eb9fe85`.
+- Danach **080b** (Korpus 28/230) gemergt (PR #42, `7efc5f4`); Umsortierung mit Begründung als **080c** im Plan (nach 043).
 - Budget dieser Sitzung aufgebraucht; neue Sitzung nötig. Bericht: `docs/bautage/2026-09-26.md`.
 - Lehre: **Vor der Spec auch die Tests lesen, die Zahlen festnageln** (i18n-Schlüsselzahl, Seed-Fingerabdruck,
   Regel-id-Muster, Statusausnahmen in `apps/api/src/__tests__/helpers.ts`), und sie gleich in Files allowed nehmen.

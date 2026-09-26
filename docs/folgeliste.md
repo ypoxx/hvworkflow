@@ -57,3 +57,7 @@ erledigt in takt-015.
   Oberfläche beendet die laufende Rede zuerst) · Guard mit Regel-id.
 - 080 → 043 · `packages/contract/openapi.yaml` · `SpeakerUpdate.reason` und 409 für `updateSpeaker` aufnehmen, Ausnahme
   in `apps/api/src/__tests__/helpers.ts` streichen, `kind`/`requestedMinutes` löschen.
+- 080b R1 minor · `apps/web/src/api/index.ts` (`STORAGE_KEY` `hv-demo-events-v1`) · ein Browser mit gespeichertem
+  Alt-Korpus (800) behält ihn bis „Demo zurücksetzen“ · Schlüssel versionieren (`-v2`).
+- 080b R1 nit · `apps/web/e2e/abnahme.spec.ts:7` · Zitat „bei 800 Fragen im Bestand“ neben CORPUS_DEMO verwirrt ·
+  als Zitat kennzeichnen oder Abnahmesatz in `docs/erste-version-und-offene-fragen.md` nachziehen.
