@@ -62,8 +62,8 @@ bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
 
 ## Zielpfad ab der nächsten Sitzung (Entscheidung des Eigentümers, 26.09.)
 
-Maßgeblich ist `docs/produktplan-beta.md` Abschnitt 11, „Zielpfad Beta-2“: Etappen A (021c, 024–028, 033, 034), B (029
-einfach, 030, 035, 036), C (043, 040, 041, 044, dann 053, 054, 059, 061, 048, 055, 057, 060, 046), D (064, 065, 066 mit
+Maßgeblich ist `docs/produktplan-beta.md` Abschnitt 11, „Zielpfad Beta-2“: Etappen A (021c, 024–028, 033, 034), B (029b
+einfach, 030, 035, 036), C (043, 040, 041, 044, 045, dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057), D (064, 065, 066 mit
 Leitfaden und Sandbox). E11 für die Beta: einfache Anmeldung (Keycloak-Testrealm), kein Konzern-SSO. 044 aufgenommen.
 Beginnen mit **021c**; vor jeder Spec die betroffenen Tests mit festen Zahlen, Fingerabdrücken und generierten Dateien
 lesen (`grep toMatchFileSnapshot`, Paritäts- und Seed-Tests).

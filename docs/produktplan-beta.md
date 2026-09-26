@@ -520,14 +520,20 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Test Neustart, gleicher Schlüssel → Replay statt Doppelanlage; Test paralleles captureQuestions → 412 für den Zweiten; Test abgelaufener Claim ist wieder frei; Web: StaleBanner auf der Erfassung
   - *Offene Entscheidung:* —
 - **029 · OIDC-BFF im Dienst hinter dem Actor-Port, Sitzung, Sperrliste, Notfallkonten, Demo-Verriegelung** — hoch · 3 AStd · Kalender 21.10.2026 (W4) · Lanes: service, infra
-  - *Ziel:* actor.ts wird Port mit drei Adaptern (demoHeader nur bei HV_DEMO=1 und ohne OIDC-Issuer, sonst Startabbruch; sessionCookie: Authorization Code serverseitig, JWKS, iss/aud/exp, Clock-Skew aus injizierter Uhr, HttpOnly/SameSite-Cookie, CSRF-Token für Schreibvorgänge; localBreakGlass: zwei versiegelte Notfallkonten mit langem Einmalgeheimnis, nur aktivierbar bei gemeldetem IdP-Ausfall, zeitlich befristet, jede Nutzung ein Alarmereignis); Rollen aus der Zuordnungstabelle (026), IdP-Gruppen nur als Vorschlag in /auth/me; Sitzung 14 h mit stillem Refresh, Leerlauf-Timeout konfigurierbar, /auth/logout; Kill-Switch (Recherche SOLL): Sperrliste von subject-IDs ohne Neustart; Keycloak-Container in CI mit Testrealm; Transparenzhinweis-Text (Art. 13 DSGVO) als Vertragsfeld für die Anmeldeseite; Nachweise für ADR 0004.
+  - *Ziel:* Nach der Beta (26.09.: der Beta-Teil ist 029b; hier bleiben Sperrliste, Notfallkonten und ihre Tests). Ursprünglich: actor.ts wird Port mit drei Adaptern (demoHeader nur bei HV_DEMO=1 und ohne OIDC-Issuer, sonst Startabbruch; sessionCookie: Authorization Code serverseitig, JWKS, iss/aud/exp, Clock-Skew aus injizierter Uhr, HttpOnly/SameSite-Cookie, CSRF-Token für Schreibvorgänge; localBreakGlass: zwei versiegelte Notfallkonten mit langem Einmalgeheimnis, nur aktivierbar bei gemeldetem IdP-Ausfall, zeitlich befristet, jede Nutzung ein Alarmereignis); Rollen aus der Zuordnungstabelle (026), IdP-Gruppen nur als Vorschlag in /auth/me; Sitzung 14 h mit stillem Refresh, Leerlauf-Timeout konfigurierbar, /auth/logout; Kill-Switch (Recherche SOLL): Sperrliste von subject-IDs ohne Neustart; Keycloak-Container in CI mit Testrealm; Transparenzhinweis-Text (Art. 13 DSGVO) als Vertragsfeld für die Anmeldeseite; Nachweise für ADR 0004.
   - *Abhängigkeiten:* 010, 023, 026
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Security; zusätzlich Sicherheits-Checkliste des Reviewers
   - *Nachweise:* Negativtests abgelaufene Sitzung 401, falsche Audience 401, X-Actor ohne Demo 401, Subject ohne Rolle 403, gesperrtes Subject 401, HV_DEMO=1 mit Issuer → Start verweigert, Notfallkonto bei laufendem IdP → 403, Nutzung erzeugt Alarm; CI mit Keycloak grün; Wahrheitstabelle unverändert
   - *Offene Entscheidung:* E11 IdP des Konzerns (Konfiguration)
+- **029b · Einfache Anmeldung für die Beta: OIDC gegen Keycloak-Testrealm, Sitzung** — hoch · 2 AStd · Kalender 21.10.2026 (W4) · Lanes: service, infra
+  - *Ziel:* Beta-Teil von 029 (Entscheidung des Eigentümers 26.09., E11 für die Beta): Adapter sessionCookie hinter dem Actor-Port aus 029a (Authorization Code serverseitig, JWKS, iss/aud/exp, Clock-Skew aus injizierter Uhr, HttpOnly/SameSite-Cookie, CSRF-Token für Schreibvorgänge) gegen einen Keycloak-Testrealm mit synthetischen Testpersonen; Rollen aus der Rollenzuordnung (026). Sperrliste und Notfallkonten bleiben in 029 nach der Beta.
+  - *Abhängigkeiten:* 010, 023, 026
+  - *Rolle:* Implementierer-Backend; Review mit Perspektive Security; zusätzlich Sicherheits-Checkliste des Reviewers
+  - *Nachweise:* Negativtests abgelaufene Sitzung 401, falsche Audience 401, X-Actor ohne Demo 401, Subject ohne Rolle 403, HV_DEMO=1 mit Issuer → Start verweigert; CI mit Keycloak grün; Wahrheitstabelle unverändert
+  - *Offene Entscheidung:* —
 - **030 · HTTP-HvApi-Client aus dem Vertrag, Anmeldung im Web, zwei Betriebsarten** — hoch · 2,5 AStd · Kalender 22.10.2026 (W4) · Lanes: web-api, web-shell
   - *Ziel:* generierter Client (openapi-typescript + fetch-Wrapper) implementiert HvApi mit ETag/If-Match/Idempotency-Key/Problem-Details/CSRF; AuthAdapter-Port (demoPersona | session) mit Anmeldeseite (Transparenzhinweis DE/EN, Link zur DSFA-Zusammenfassung), stillem Refresh, Abmelden, 401-Behandlung; Betriebsart per Build-Konfiguration; Rollenumschalter nur in Demo; `grep fetch(` außerhalb apps/web/src/api/http liefert nichts.
-  - *Abhängigkeiten:* 029, 028
+  - *Abhängigkeiten:* 029b, 028
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* Screenshot Anmeldeseite und 401-Behandlung; Unit-Tests des Wrappers; pnpm gates
   - *Offene Entscheidung:* —
@@ -1259,15 +1265,16 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 (etwa 053 ohne 047, 059 ohne 047, 057 ohne 056):
 
 - **A Fundament:** 021c, 024, 025, 026, 027, 028, 033, 034.
-- **B Mehrbenutzer:** 029 in einfacher Form, 030, 035, 036.
-- **C Oberfläche vollständig:** 043, 040, 041, 044 (Verweigerung, auf Empfehlung aufgenommen), aus der Arbeitsfähigkeit
-  zuerst 053, 054, 059, 061, dann 048, 055, 057, 060, 046.
+- **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
+- **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
+  aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
+  zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
-Zurückgestellt: 049 (hängt an 085), 045, 047, 056, 058 und der Rest von M4–M7 bis nach der zweiten Demo.
+Zurückgestellt: 049 (hängt an 085), 047, 056, 058, der Rest von 029 und der Rest von M4–M7 bis nach der zweiten Demo.
 **E11 für die Beta entschieden:** die Anmeldung bleibt einfach (Keycloak mit Testrealm und synthetischen Testpersonen);
-Anbindung an das Konzern-SSO wird in der Beta nicht nachgewiesen. Notfallkonten und Sperrliste aus 029 nur, soweit
-der einfache Weg sie ohne Mehraufwand mitbringt.
+Anbindung an das Konzern-SSO wird in der Beta nicht nachgewiesen. Dafür ist 029 geteilt: 029b (Beta) und 029 (Sperrliste,
+Notfallkonten, nach der Beta), jeweils mit eigenen Nachweisen.
 
 
 1. **Woche 0, bis 25.09.2026 (Prüfpunkt 0).** Der Eigentümer gibt diesen Plan und die Standardannahmen frei und entscheidet E23 (Codex-Branch nach 009 löschen), E47 (Geld- und Nutzungsdeckel) und E48 (Merge-Befugnis beim Orchestrator). Er stellt die Anfragen mit Laufzeit bei Dritten: Konzern-IT für IdP-Client, Hosting/Postgres-Konto mit AVV, Endgeräte und Netz der Podiumsgeräte (E10, E11, E33); Start von Betriebsrat- und DSFA-Prozess (E13, E14); Beauftragung der Rechtsprüfung mit Anforderung von Satzung und Geschäftsordnung (E15); Beschaffung des Pentests (E32); Ansprechperson des Tool-Teams (E3a); Bestätigung von HV-Datum und Format (E20).
