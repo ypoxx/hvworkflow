@@ -197,6 +197,11 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   // Classification (point #21, slice 020): reached only through the explicit "Klassifizieren"
   // action, in a dialog — the card itself carries no track, agenda or stage field any more.
+  // Slice 021b: classifying is the Koordination's right now, so the desk changes hands for this step.
+  await page.getByTestId('role-switcher').click();
+  await page.getByTestId('role-option-coordination').click();
+  await expect(page.getByTestId('role-option-coordination')).toBeHidden();
+  await expect(page.getByTestId('capture-question-card')).toHaveCount(8);
   const card = page.getByTestId('capture-question-card').first();
   await card.getByTestId('capture-classify-open').click();
   await page.getByTestId('classify-track-expert_track').click();

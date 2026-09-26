@@ -34,13 +34,21 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   capture: [
     'contribution.capture',
     'question.capture',
-    'question.classify',
-    'question.assign',
     'question.merge',
     'question.withdraw',
     'speaker.read',
     'contribution.read',
-    'question.read', // atomises and classifies questions (question.capture/classify)
+    'question.read', // atomises questions (question.capture); classify/assign moved to coordination (021b)
+    'history.read',
+  ],
+  // Koordination (slice 021b): routes what capture atomised — classify into a track, assign to a
+  // unit. Reads what it needs to judge a question in context; captures nothing itself.
+  coordination: [
+    'question.classify',
+    'question.assign',
+    'question.read',
+    'contribution.read',
+    'speaker.read',
     'history.read',
   ],
   expert: ['answer.draft', 'question.submit_review', 'question.read', 'history.read'],

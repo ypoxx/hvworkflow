@@ -51,6 +51,7 @@ export const SEED_ACTORS: Record<string, Actor> = {
   moderation: { id: 'u-mod-1', role: 'moderation', displayName: 'Versammlungsbüro' },
   capture1: { id: 'u-cap-1', role: 'capture', displayName: 'Erfassung 1' },
   capture2: { id: 'u-cap-2', role: 'capture', displayName: 'Erfassung 2' },
+  coordination: { id: 'u-coord-1', role: 'coordination', displayName: 'Koordination' },
   expertFin: { id: 'u-exp-fin', role: 'expert', displayName: 'Fachbereich Finanzen' },
   expertHr: { id: 'u-exp-hr', role: 'expert', displayName: 'Fachbereich Personal' },
   expertEsg: { id: 'u-exp-esg', role: 'expert', displayName: 'Fachbereich Nachhaltigkeit' },

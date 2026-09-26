@@ -149,13 +149,14 @@ describe('i18n parity checks', () => {
   // and there are no rows: a gestalteter Fehlerzustand instead of "Kein Treffer". Review round 1: +3,
   // `answers.toast.step` (the confirmation names the question) and `answers.toast.stale.title`/`.body`
   // (a 412 for a question no longer on screen, in the house's words, with its number).
-  it('(f) Total key count is 452 across all modules and matches de and en', () => {
+  // Slice 021b: +1, `role.coordination` — the Koordination role takes over classify/assign.
+  it('(f) Total key count is 453 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(452);
-    expect(deKeys).toBe(452);
-    expect(enKeys).toBe(452);
+    expect(totalKeys).toBe(453);
+    expect(deKeys).toBe(453);
+    expect(enKeys).toBe(453);
   });
 });

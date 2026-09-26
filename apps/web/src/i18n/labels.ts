@@ -80,6 +80,7 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
 const ROLE_KEYS: Readonly<Record<Role, TKey>> = {
   moderation: 'role.moderation',
   capture: 'role.capture',
+  coordination: 'role.coordination',
   expert: 'role.expert',
   legal: 'role.legal',
   approver: 'role.approver',

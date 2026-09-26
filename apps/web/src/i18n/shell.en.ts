@@ -54,6 +54,7 @@ export const shellEn: typeof shellDe = {
   'role.hint': 'Rights follow the selected role.',
   'role.moderation': 'Meeting office',
   'role.capture': 'Capture desk',
+  'role.coordination': 'Coordination',
   'role.expert': 'Expert',
   'role.legal': 'Legal',
   'role.approver': 'Approver',
