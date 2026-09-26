@@ -124,16 +124,25 @@ describe('acceptance sentence (HTTP)', () => {
     expect(submitted.status).toBe('in_review');
     expect(submitted._actions).not.toContain('question.approve');
 
-    const rejectApprovalRes = await req(app, 'POST', `/v1/questions/${q.id}/approvals`, {
+    const rejectClearanceRes = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, {
       actor: ACTOR.legal,
       body: { answerVersion: 99 },
     });
-    expect(rejectApprovalRes.status).toBe(409);
-    const rejectApprovalProblem = await rejectApprovalRes.json();
-    expect(rejectApprovalProblem.ruleId).toBe('R-GUARD-04');
+    expect(rejectClearanceRes.status).toBe(409);
+    const rejectClearanceProblem = await rejectClearanceRes.json();
+    expect(rejectClearanceProblem.ruleId).toBe('R-GUARD-04');
+
+    const clearanceRes = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, {
+      actor: ACTOR.legal,
+      body: { answerVersion: 1 },
+    });
+    expect(clearanceRes.status).toBe(200);
+    const cleared = await clearanceRes.json();
+    expectValid('clearQuestionLegally', 200, cleared);
+    expect(cleared.legalClearance?.answerVersion).toBe(1);
 
     const approveRes = await req(app, 'POST', `/v1/questions/${q.id}/approvals`, {
-      actor: ACTOR.legal,
+      actor: ACTOR.approver,
       body: { answerVersion: 1 },
     });
     expect(approveRes.status).toBe(200);
@@ -178,6 +187,7 @@ describe('acceptance sentence (HTTP)', () => {
       'QuestionAssigned',
       'AnswerDrafted',
       'QuestionSubmittedForReview',
+      'QuestionLegalCleared',
       'QuestionApproved',
       'QuestionStaged',
       'QuestionDelivered',

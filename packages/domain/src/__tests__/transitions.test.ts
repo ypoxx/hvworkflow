@@ -42,8 +42,12 @@ describe('transition table', () => {
       // A representative question that satisfies every guard of this row.
       const base = question({
         status: t.from[0]!,
-        track: t.ruleId === 'R-TRANS-08' ? 'podium' : 'expert_track',
-        answers: [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
+        track: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId) ? 'podium' : 'expert_track',
+        answers: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId)
+          ? []
+          : [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
+        approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+        legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
       });
       const payload = t.action === 'question.approve' ? { answerVersion: 1 } : t.action === 'question.merge' ? { intoQuestionId: 'q2' } : undefined;
       const r = resolveTransition(base, t.action, payload, OTHER);
@@ -161,6 +165,17 @@ const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?, Tr
       { answerVersion: 1 },
       { actor: { id: 'l', role: 'legal' } },
     ],
+  },
+  'R-GUARD-07': {
+    satisfies: [question({
+      track: 'expert_track',
+      approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
+    })],
+    violates: [question({
+      track: 'expert_track',
+      approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+    })],
   },
 };
 

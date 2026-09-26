@@ -88,6 +88,7 @@ async function findAndOpen(page: Page, number: string): Promise<void> {
 test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   await page.goto('/');
   await waitForCorpus(page);
 
@@ -204,8 +205,17 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await page.getByTestId('answer-submit-review').click();
   await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
 
-  /* ---------- Legal Clearing: approve exactly the latest version ---------- */
+  /* ---------- Legal Clearing: clear exactly the latest version ---------- */
   await asRole(page, 'legal');
+  await findAndOpen(page, questionNumber);
+
+  const clear = page.getByTestId('answer-legal-clear');
+  await expect(clear).toBeVisible();
+  await clear.click();
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+
+  /* ---------- Freigabe: approve the cleared version ---------- */
+  await asRole(page, 'approver');
   await findAndOpen(page, questionNumber);
 
   const approve = page.getByTestId('answer-approve');

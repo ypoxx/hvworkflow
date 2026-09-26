@@ -52,7 +52,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'history.read',
   ],
   expert: ['answer.draft', 'question.submit_review', 'question.read', 'history.read'],
-  legal: ['answer.draft', 'question.approve', 'question.return', 'question.read', 'history.read'],
+  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.read', 'history.read'],
   approver: [
     'question.assign',
     'question.approve',

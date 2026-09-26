@@ -93,8 +93,12 @@ describe('acceptance sentence', () => {
     expect(submitted._actions).not.toContain('question.approve');
 
     as(actors.legal!);
-    expect((await api.getQuestion(q.id))._actions).toContain('question.approve'); // capability without payload
-    await expect(api.approveQuestion(q.id, 99)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-04' });
+    expect((await api.getQuestion(q.id))._actions).toContain('question.legal.clear');
+    await expect(api.clearQuestionLegally(q.id, { answerVersion: 99 })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-04' });
+    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 1 });
+    expect(cleared.legalClearance?.answerVersion).toBe(1);
+
+    as(actors.approver!);
     const approved = await api.approveQuestion(q.id, 1);
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(1);
@@ -122,6 +126,7 @@ describe('acceptance sentence', () => {
       'QuestionAssigned',
       'AnswerDrafted',
       'QuestionSubmittedForReview',
+      'QuestionLegalCleared',
       'QuestionApproved',
       'QuestionStaged',
       'QuestionDelivered',
@@ -680,13 +685,13 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     return api.submitForReview(id);
   }
 
-  it('legal drafts version 1 and tries to approve it: 409 R-GUARD-06, no event', async () => {
+  it('legal drafts version 1 and tries to legally clear it: 409 R-GUARD-06, no event', async () => {
     const q = await assignedTextQuestion();
     await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
     await submit(q.id);
     as(actors.legal!);
     const before = store.all().length;
-    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(api.clearQuestionLegally(q.id, { answerVersion: 1 })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
     expect(store.all().length).toBe(before);
     expect((await api.getQuestion(q.id)).status).toBe('in_review');
   });
@@ -719,25 +724,29 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     expect(approved.approval?.answerVersion).toBe(1);
   });
 
-  it('legal drafts v1, expert drafts v2, legal approves v2: allowed (the approved version counts)', async () => {
+  it('legal drafts v1, expert drafts v2, legal clears v2 and approver approves: allowed', async () => {
     const q = await assignedTextQuestion();
     await draftAs(actors.legal!, q.id, 'Version 1 von Recht.');
     await draftAs(actors.expert!, q.id, 'Version 2 vom Fachbereich.');
     await submit(q.id);
     as(actors.legal!);
+    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 2 });
+    expect(cleared.legalClearance?.answerVersion).toBe(2);
+    as(actors.approver!);
     const approved = await api.approveQuestion(q.id, 2);
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(2);
   });
 
-  it('_actions: the creator is not offered question.approve, another person is', async () => {
+  it('_actions: the creator is not offered question.legal.clear, another legal person is', async () => {
     const q = await assignedTextQuestion();
     await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
     await submit(q.id);
     as(actors.legal!);
-    expect((await api.getQuestion(q.id))._actions).not.toContain('question.approve');
+    expect((await api.getQuestion(q.id))._actions).not.toContain('question.legal.clear');
     as({ id: 'leg-2', role: 'legal' });
-    expect((await api.getQuestion(q.id))._actions).toContain('question.approve');
+    expect((await api.getQuestion(q.id))._actions).toContain('question.legal.clear');
+    expect((await api.getQuestion(q.id))._actions).not.toContain('question.approve');
     as(actors.approver!);
     expect((await api.getQuestion(q.id))._actions).toContain('question.approve');
   });

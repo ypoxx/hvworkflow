@@ -10,13 +10,22 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.1] - 2026-09-26
+
+Slice 021c (Rechtsfreigabe und Rechtstor): additive legal clearance operation
+`POST /questions/{questionId}/legal-clearances` (`clearQuestionLegally`) with optional
+`answerVersion` and `note`, the `Question.legalClearance` projection, and an optional
+`QuestionLegalClearedPayload.answerVersion` for the podium track. The operation uses the
+same If-Match and Idempotency-Key conventions as `approveQuestion`. The mandatory fields
+and If-Match requirement planned for slice 028 move to 0.3.2.
+
 ## [0.3.0] - 2026-09-24
 
 Slice 023 (Architekt), contract only: the foundation package for M2 (Plan 5.4). Additive: nothing
 removed, nothing becomes required, all existing tests stay green. 29 → 65 operations; the 36 new ones
 are pre-declared in `allowlist.json` (expiry 2026-11-25 = end of M2 + 14 days) and implemented by
-025, 026, 028, 029, 033, 035 and 040. `If-Match` stays optional; 0.3.1 (slice 028) makes it and the
-fields marked "Pflicht ab 0.3.1" mandatory. Reworked before the merge after the Opus review and two
+025, 026, 028, 029, 033, 035 and 040. `If-Match` stays optional; 0.3.2 (slice 028) makes it and the
+fields marked "Pflicht ab 0.3.2" mandatory. Reworked before the merge after the Opus review and two
 Codex findings (24.09.2026): request schemas of existing operations are back to their 0.2.1 shape
 (see "Compatibility" under Changed), `X-CSRF-Token` declared, `ReadinessCheckCode` instead of free
 text, 404 on the alias operations with the current-meeting rule, 409 on `registerSpeaker` and
@@ -53,7 +62,7 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   aliases (shared through `components/parameters`, `SpeakerOrder`, `QuestionList`) — except
   `captureMeetingContribution`, whose body `MeetingContributionCapture` is the superset with the paper
   path and the sender's time statement (see the envelope entry below).
-- **`meetingId`** (optional, "Pflicht ab 0.3.1, Scheibe 028") on `Speaker`, `Contribution`, `Question`
+- **`meetingId`** (optional, "Pflicht ab 0.3.2, Scheibe 028") on `Speaker`, `Contribution`, `Question`
   and `Event`; `meetingId` query filter on `streamEvents` (on `listEvents` with 0.4.0, slice 043: the
   unchanged service would accept and ignore it today).
 - **Agenda progress** (025, permission `agenda.manage`): `openAgendaItem`, `openVoting`, `closeVoting`
@@ -72,13 +81,13 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
 - **Claim/release** (028, register E36): `claimContribution`, `releaseContribution`,
   `claimQuestion`, `releaseQuestion` (`POST …/claim`, `POST …/release`); `Claim` on `Contribution`
   and `Question`; events `ContributionClaimed`, `ContributionReleased`, `QuestionClaimed`,
-  `QuestionReleased`; `Contribution.version` ("Pflicht ab 0.3.1, Scheibe 028") and
+  `QuestionReleased`; `Contribution.version` ("Pflicht ab 0.3.2, Scheibe 028") and
   `Contribution._actions`; response `ContributionUpdated`.
 - **Event envelope v2** (024, ADR 0011), all optional on `Event`: `schemaVersion`, `idempotencyKey`,
   `causationId`, `prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`
   (`OccurredAtSource`: server | device | paper | transcript), `retentionClass` (`RetentionClass`:
   record | working | technical, E16), `legalHold`, `personId`; `payload.pii` (`PiiEnvelope` with
-  required `keyId`, ADR 0009). "Pflicht ab 0.3.1, Scheibe 028": `schemaVersion`, `meetingId`,
+  required `keyId`, ADR 0009). "Pflicht ab 0.3.2, Scheibe 028": `schemaVersion`, `meetingId`,
   `prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`.
   `Event.at` stays and equals `recordedAt`. Sender statements enter only through
   `MeetingContributionCapture.occurredAt`/`occurredAtSource` (device | paper | transcript; both or
@@ -127,7 +136,7 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
   assignments, the session). On `Event`: `dependentRequired` `occurredAt` ↔ `occurredAtSource`,
   `hash` ↔ `prevHash`, `schemaVersion` → the v2 envelope of slice 024 (`prevHash`, `hash`,
   `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` is left
-  out because the core carries it only from 025 and 0.3.1 requires it anyway), and
+  out because the core carries it only from 025 and 0.3.2 requires it anyway), and
   `dependentSchemas`: an event with `schemaVersion` carries no `actor.displayName`. Pairs on
   projections: `Contribution` `occurredAt` ↔ `occurredAtSource`; `Meeting` `configFrozenAt` ↔
   `configHash`; `AgendaItem` `votingOpenedAt` → `openedAt` (as `openVoting` states: `409` when the
@@ -275,7 +284,7 @@ columns (Plan 3). (c) The transparency notice is `GET /auth/transparency-notice`
 
 Slice 010 (Implementierer-Backend), contract only for this entry: additive within the 0.2 cycle. An
 additive enum value and the documentation of a new rule id are a patch release, not a minor one
-(compare 0.3.1 in slice 028); 0.3.0 is reserved for the next contract package (slice 023).
+(compare 0.3.2 in slice 028); 0.3.0 is reserved for the next contract package (slice 023).
 
 ### Added
 

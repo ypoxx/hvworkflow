@@ -368,6 +368,25 @@ async function selectFirstRowByKeyboard(page: Page, status: string): Promise<voi
   await expect(page.getByTestId('answers-detail')).toBeVisible();
 }
 
+async function selectClearableRowByKeyboard(page: Page): Promise<void> {
+  await selectFirstRowByKeyboard(page, 'in_review');
+  const rows = page.getByTestId('answers-row');
+  for (let i = 0; i < await rows.count(); i++) {
+    if (await page.getByTestId('answer-legal-clear').isVisible()) return;
+    await page.keyboard.press('ArrowDown');
+  }
+  throw new Error('No legal-clearable in-review question in the keyboard list');
+}
+
+async function clickClearableRow(page: Page): Promise<void> {
+  const rows = page.getByTestId('answers-row');
+  for (let i = 0; i < await rows.count(); i++) {
+    await rows.nth(i).click();
+    if (await page.getByTestId('answer-legal-clear').isVisible()) return;
+  }
+  throw new Error('No legal-clearable in-review question in the list');
+}
+
 test('013c: Antwort entwerfen und mit der Tastatur weiterleiten', async ({ page }) => {
   await page.goto('/');
   await waitForCorpus(page);
@@ -417,9 +436,14 @@ test('013d: Freigeben mit der Tastatur', async ({ page }) => {
   await page.keyboard.press('Alt+3');
   await expect(page).toHaveURL(/\/answers$/);
 
-  await selectFirstRowByKeyboard(page, 'in_review');
+  await selectClearableRowByKeyboard(page);
 
-  await tabToTestId(page, 'answer-approve', 15);
+  await tabToTestId(page, 'answer-legal-clear', 15);
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+  await asRole(page, 'approver');
+
+  await tabToTestId(page, 'answer-approve', 60);
   await assertFocusVisible(page, { testId: 'answer-approve' });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
@@ -577,7 +601,12 @@ test('013h: Fokus nach Aktion bleibt sichtbar am Bedienelement, nie auf BODY (ta
   await page.keyboard.press('Alt+3');
   await page.getByTestId('answers-filter-status-in_review').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
-  await page.getByTestId('answers-row').first().click();
+  await clickClearableRow(page);
+  await page.getByTestId('answer-legal-clear').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+  await assertFocusVisible(page, { testId: 'legal-clearance-block' });
+  await asRole(page, 'approver');
   await page.getByTestId('answer-approve').focus();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
@@ -704,6 +733,7 @@ async function clickTwiceInOneTask(locator: Locator): Promise<void> {
 test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein Ereignis (takt-008)', async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   await page.goto('/');
   await waitForCorpus(page);
 
@@ -823,7 +853,10 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await page.keyboard.press('Alt+3');
   await page.getByTestId('answers-filter-status-in_review').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'in_review');
-  await page.getByTestId('answers-row').first().click();
+  await clickClearableRow(page);
+  await page.getByTestId('answer-legal-clear').click();
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+  await asRole(page, 'approver');
   const approvedNumber = await page.getByTestId('answers-detail-number').innerText();
   before = await settledCount(page, 'QuestionApproved');
   await page.getByTestId('answer-approve').focus();
@@ -836,8 +869,12 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   // answer-approve — two activations in one task, on the next question in Legal Clearing.
   await waitForToastsGone(page);
   await expect(page.getByTestId('answers-row').first()).not.toContainText(approvedNumber);
-  await page.getByTestId('answers-row').first().click();
+  await asRole(page, 'legal');
+  await clickClearableRow(page);
   await expect(page.getByTestId('answers-detail-number')).not.toHaveText(approvedNumber);
+  await page.getByTestId('answer-legal-clear').click();
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+  await asRole(page, 'approver');
   before = await settledCount(page, 'QuestionApproved');
   await clickTwiceInOneTask(page.getByTestId('answer-approve'));
   await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');

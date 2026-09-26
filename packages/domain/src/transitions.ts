@@ -42,6 +42,13 @@ export interface Transition {
 
 const NON_PODIUM: readonly Track[] = ['fast_track', 'expert_track'];
 
+/** The legal gate is fixed for this release: no runtime setting or role can disable a track. */
+export const LEGAL_GATE_BY_TRACK: Readonly<Record<Track, boolean>> = Object.freeze({
+  podium: true,
+  fast_track: true,
+  expert_track: true,
+});
+
 const hasAnswer: Guard = {
   ruleId: 'R-GUARD-01',
   description: 'At least one answer version exists.',
@@ -130,7 +137,7 @@ const notMergingIntoSelf: Guard = {
 const approverIsNotCreator: Guard = {
   ruleId: 'R-GUARD-06',
   description:
-    'Four eyes (Vier-Augen): the creator of the latest answer version may not approve it.',
+    'Four eyes (Vier-Augen): the creator of the latest answer version may not approve or legally clear it.',
   legalRef: {
     source: 'Rechtekonzept',
     citation:
@@ -152,6 +159,28 @@ const approverIsNotCreator: Guard = {
     const latest = q.answers[q.answers.length - 1];
     if (latest === undefined) return false;
     return latest.createdBy.id !== ctx.actor.id;
+  },
+};
+
+const hasLegalClearance: Guard = {
+  ruleId: 'R-GUARD-07',
+  description: 'Legal clearance (Rechtsfreigabe) is required for the approved version or the podium question.',
+  legalRef: {
+    source: 'Leitplanken',
+    citation:
+      'docs/produktplan-beta.md:451 (Scheibe 021c: Rechtstor auf R-TRANS-07 und R-TRANS-08, ' +
+      'Geltungsbereich LEGAL_GATE_BY_TRACK standardmäßig alle drei Pfade, nicht abschaltbar). ' +
+      'Die Bindung an die freigegebene Version folgt docs/rollen-und-rechtekonzept.md:163 ' +
+      '(jede Textänderung setzt die Freigabe zurück); für Pfad A gilt die Rechtsfreigabe ohne Version.',
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q) => {
+    if (q.track === undefined) return false;
+    if (!LEGAL_GATE_BY_TRACK[q.track]) return true;
+    if (q.track === 'podium') return q.legalClearance !== undefined;
+    return q.approval !== undefined && q.legalClearance?.answerVersion === q.approval.answerVersion;
   },
 };
 
@@ -363,6 +392,7 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.stage',
     from: ['approved'],
     to: 'staged',
+    guards: [hasLegalClearance],
     description: 'Put an approved answer on the podium queue (Auf die Bühne).',
     legalRef: {
       source: 'Prozess',
@@ -384,7 +414,7 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.stage',
     from: ['classified'],
     to: 'staged',
-    guards: [isPodiumTrack],
+    guards: [isPodiumTrack, hasLegalClearance],
     description: 'Podium track: the question itself goes to the podium, the board answers freely.',
     legalRef: {
       source: 'Prozess',
@@ -539,6 +569,41 @@ export const TRANSITIONS: readonly Transition[] = [
         'ID. Die Existenz eines Ziels ist damit für jeden sichtbar, der `question.merge` hält; heute ' +
         'ohne Folge (beide Rollen mit `question.merge` lesen alle Fragen), wirksam, sobald ein ' +
         'Merge-Recht ohne volles Leserecht vergeben wird.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-TRANS-13',
+    action: 'question.legal.clear',
+    from: ['in_review'],
+    to: 'in_review',
+    guards: [hasAnswer, approverIsNotCreator],
+    description: 'Legally clear (Rechtsfreigabe) the latest answer version without changing status.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/produktplan-beta.md:451 (Scheibe 021c: legal erhält question.legal.clear statt approve; ' +
+        'QuestionLegalCleared und R-GUARD-07 vor der Bühne). Vier Augen gelten auch hier, ' +
+        'docs/rollen-und-rechtekonzept.md:156.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-TRANS-14',
+    action: 'question.legal.clear',
+    from: ['classified'],
+    to: 'classified',
+    guards: [isPodiumTrack],
+    description: 'Legally clear (Rechtsfreigabe) a podium question without an answer version.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/slices/021c-rechtsfreigabe-rechtstor.md (Nachtrag des Architekten a: ' +
+        'Podiumspfad aus classified ohne Antwortversion, R-GUARD-02).',
       docVersion: null,
       docHash: null,
       verified: false,

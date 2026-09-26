@@ -170,6 +170,7 @@ async function answersWith(page: Page, role: string, status: string): Promise<vo
 }
 
 async function selectFirst(page: Page, status: string): Promise<void> {
+  await page.getByTestId('answers-filter-status-all').click();
   await page.getByTestId(`answers-filter-status-${status}`).click();
   const row = page.getByTestId('answers-row').first();
   await expect(row).toHaveAttribute('data-status', status);
