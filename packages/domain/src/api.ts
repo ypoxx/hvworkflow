@@ -618,6 +618,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       }
       return transition(id, 'question.legal.clear', opts, input, (q) => {
         const latest = q.answers[q.answers.length - 1]?.version;
+        if (latest !== undefined && input.answerVersion === undefined) {
+          throw new ApiProblem(422, 'Unprocessable', 'answerVersion is required for a text-answer legal clearance.');
+        }
         if (input.answerVersion !== undefined && input.answerVersion !== latest) {
           throw new ApiProblem(409, 'Conflict', 'Legal clearance must name the latest answer version.', 'R-GUARD-04');
         }

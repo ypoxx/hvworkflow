@@ -43,6 +43,22 @@ describe('Scheibe 021c: legal clearance HTTP operation', () => {
     expect(cleared.legalClearance?.answerVersion).toBe(1);
   });
 
+  it('requires an explicit answer version for text clearance with or without If-Match', async () => {
+    const question = await firstQuestion(app, 'in_review');
+    for (const headers of [undefined, { 'If-Match': `"v${question.version}"` }]) {
+      const res = await req(app, 'POST', `/v1/questions/${question.id}/legal-clearances`, {
+        actor: ACTOR.legal,
+        ...(headers !== undefined ? { headers } : {}),
+        body: {},
+      });
+      expect(res.status).toBe(422);
+      expectValid('clearQuestionLegally', 422, await res.json(), 'application/problem+json');
+    }
+    const unchanged = await req(app, 'GET', `/v1/questions/${question.id}`, { actor: ACTOR.admin });
+    expect(unchanged.status).toBe(200);
+    expect(((await unchanged.json()) as QuestionLike).version).toBe(question.version);
+  });
+
   it('rejects expert with 403 and a stale version with 412', async () => {
     const question = await firstQuestion(app, 'in_review');
     const forbidden = await req(app, 'POST', `/v1/questions/${question.id}/legal-clearances`, {

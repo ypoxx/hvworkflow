@@ -123,6 +123,12 @@ describe('Scheibe 021c: legal clearance and stage gate', () => {
     expect((await api.getQuestion(question.id)).legalClearance).toBeUndefined();
     await api.submitForReview(question.id);
     as(ACTORS.legal);
+    const before = store.all().length;
+    const current = await api.getQuestion(question.id);
+    await expect(api.clearQuestionLegally(question.id, {})).rejects.toMatchObject({ status: 422 });
+    await expect(api.clearQuestionLegally(question.id, {}, { ifMatch: etagOf(current.version) })).rejects.toMatchObject({ status: 422 });
+    expect(store.all()).toHaveLength(before);
+    expect(await api.getQuestion(question.id)).toEqual(current);
     await expect(api.clearQuestionLegally(question.id, { answerVersion: 1 })).rejects.toMatchObject({ status: 409 });
     await api.clearQuestionLegally(question.id, { answerVersion: 2 });
     as(ACTORS.approver);

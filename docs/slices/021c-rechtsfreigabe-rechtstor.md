@@ -82,7 +82,7 @@ sind erlaubt.
 Rechtsfreigabe-Sicht (059), Prüflistentiefe je Pfad (E37 bleibt Standard), Verweigerung (044), Freigabevermerk, Versiegelung,
 Änderung der Bühnenansicht außer dem, was die Seed-Änderung ohnehin zeigt.
 
-## Files allowed
+## Files allowed (ursprüngliche Scheibe; historischer Umfang)
 
 - `packages/contract/{openapi.yaml,CHANGELOG.md,package.json,allowlist.json}`, `packages/contract/src/types.ts` (generiert)
 - `packages/domain/src/**`, `packages/domain/policy-truth-table.md` (generiert)
@@ -139,3 +139,56 @@ mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-w
   freigegebener Antwort war nicht direkt gegen `R-GUARD-07` geprüft. Im Commit `3251e68` mit einem gezielten
   Tabellen-Guard-Test geschlossen; der Test prüft `approval.answerVersion=2`, `legalClearance.answerVersion=1` und
   `409`/`R-GUARD-07` am Übergang zur Bühne.
+- P1-Hotfix-Review: Minor-Testlücke im HTTP-Regressionstest: Je 422-Anfrage wird die unveränderte Frageversion,
+  aber nicht zusätzlich `legalClearance` und Ereigniszahl geprüft. Der Domänentest deckt alle drei Invarianten ab.
+  Gemäß Lean Review (AGENTS.md Regel 3) wird die zusätzliche HTTP-Assertion als einzelner Folgepunkt in
+  `docs/folgeliste.md` erfasst; keine Code-Nacharbeit in diesem Hotfix.
+
+## P1-Hotfix nach Merge 2db7fcf
+
+Das automatische Codex-Review fand einen fehlenden Versionsbezug: `POST /questions/{id}/legal-clearances` mit `{}`
+gibt bei einer Textantwort in `in_review` still die neueste Antwortversion rechtlich frei. Für R-TRANS-13 muss der
+Aufruf `answerVersion` ausdrücklich benennen. Fehlt das Feld, antwortet die Domäne mit 422; es entsteht kein
+`QuestionLegalCleared`-Ereignis und weder Frageversion noch Rechtsfreigabe ändern sich. Das gilt auch bei vorhandenem
+gültigem `If-Match`; der Header ersetzt den fachlichen Versionsbezug nicht. Eine genannte veraltete Antwortversion
+behält den bestehenden 409/R-GUARD-04-Pfad. Für R-TRANS-14 (Podiumsfrage aus `classified`, ohne Antwort) bleibt `{}`
+zulässig und erzeugt weiterhin eine Rechtsfreigabe ohne `answerVersion`.
+
+Der Vertrag bleibt unverändert: `LegalClearanceRequest.answerVersion` ist für den Podiumspfad optional; die
+zustandsabhängige Pflicht für den Textpfad wird im Kern geprüft. Die Operation deklariert bereits 422. `If-Match`
+wird in diesem Hotfix nicht allgemein zur Pflicht gemacht (028).
+
+## Files allowed
+
+Nur für diesen P1-Hotfix, anstelle des historischen Umfangs oben:
+
+- `docs/slices/021c-rechtsfreigabe-rechtstor.md`
+- `packages/domain/src/api.ts`
+- `packages/domain/src/__tests__/legal-clearance.test.ts`
+- `apps/api/src/__tests__/legal-clearance.test.ts`
+- `docs/folgeliste.md` ausschließlich für einen Eintrag zur Minor-Testlücke des 021c-Hotfix-Reviews
+
+## Akzeptanzkriterium für den P1-Hotfix
+
+1. Domänen- und HTTP-Regressionstests prüfen für eine Textantwort in `in_review`: `{}` ohne `If-Match` und `{}` mit gültigem `If-Match` ergeben 422; Ereigniszahl, Frageversion und `legalClearance` bleiben unverändert.
+2. Der bestehende Podiumspfad aus `classified` nimmt `{}` weiterhin an und schreibt eine Rechtsfreigabe ohne `answerVersion`; ein Test hält dies fest.
+3. Die fokussierten Tests und `pnpm gates` laufen grün; der Hotfix-Bericht nennt den geprüften Commit und den wörtlichen Schluss des Gate-Laufs. Ein unabhängiges Review prüft den P1-Fall vor Merge.
+
+## Bericht zum P1-Hotfix
+
+Slice: 021c-rechtsfreigabe-rechtstor (P1-Hotfix)
+Done: Textantworten benötigen bei der Rechtsfreigabe eine ausdrücklich benannte Antwortversion; Podiumsfragen bleiben ohne Version freigebbar. Rote und danach grüne Domänen- und HTTP-Regressionstests belegen den Fall. Das unabhängige Review fand keinen schweren oder Sicherheitsbefund.
+Evidence: `pnpm gates` auf Commit `bda9314` grün (wörtlicher Schluss unten); vollständige lokale Chrome-E2E-Suite 119/119 grün, axe ohne serious/critical.
+Open: PR-CI und automatisches Codex-Review auf dem Hotfix-PR stehen noch aus; kein Deploy. Der Minor-Testhinweis steht in `docs/folgeliste.md`.
+Touched: `packages/domain/src/api.ts`, `packages/domain/src/__tests__/legal-clearance.test.ts`, `apps/api/src/__tests__/legal-clearance.test.ts`, diese Spec und `docs/folgeliste.md`.
+
+Wörtlicher Schluss von `pnpm gates` (Node 24, Commit `bda9314`):
+
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 703ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-021c-hotfix/.claude/state/last-test-run (clean tree) at commit bda9314, tree 406f9785b656…
+```
