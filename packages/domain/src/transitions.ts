@@ -599,8 +599,10 @@ export const SPEAKER_TRANSITIONS: readonly SpeakerTransition[] = [
     legalRef: {
       source: 'Prozess',
       citation:
-        'docs/ist-analyse-und-schnittstellen.md:67 ("Redner aktivierbar („Start“)") und :34 ("`0` ' +
-        'Redebeitrag anmelden … → `1` Redebeitrag halten").',
+        'docs/ist-analyse-und-schnittstellen.md:67 ("Redner aktivierbar („Start“) mit laufender ' +
+        'Redezeitmessung.") und :34 ("`0` Redebeitrag anmelden … → `1` Redebeitrag halten"). ' +
+        'Ableitung: 080 baut die Redezeitmessung nach Feedback #15 zurück (docs/produktplan-beta.md); ' +
+        'der Übergang selbst bleibt, nur ohne Messung.',
       docVersion: null,
       docHash: null,
       verified: false,

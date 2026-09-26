@@ -14,8 +14,9 @@ import { useT } from '../../i18n';
 import { STATE_TONE, speakerStateLabel } from './labels';
 
 /** One grid for the head strip and every row, so the columns line up across all rounds. Slice 080
- * dropped kind (Art), requested and running speaking time (Redezeit, feedback #15). */
-export const ROW_COLUMNS = '26px 46px minmax(0,1fr) 104px 62px 100px';
+ * dropped kind (Art), requested and running speaking time (Redezeit, feedback #15). The questions
+ * column is 84px (was 62px, takt-015 Ziel 4): 62px cut the EN header "QUESTIONS" to "QUESTI…". */
+export const ROW_COLUMNS = '26px 46px minmax(0,1fr) 104px 84px 100px';
 
 export interface SpeakerRowActions {
   onCall: (speaker: Speaker) => void;
