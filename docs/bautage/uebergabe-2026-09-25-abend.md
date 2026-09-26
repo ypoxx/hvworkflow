@@ -51,6 +51,9 @@ bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
 - Mit 20 USD Restbudget danach **takt-015** (Folgeliste aus 080) gemergt (PR #41, `eb9fe85`); Integrationsbranch-Kopf `eb9fe85`.
 - Danach **080b** (Korpus 28/230) gemergt (PR #42, `7efc5f4`); Umsortierung mit Begründung als **080c** im Plan (nach 043).
 - Danach **021a** Vier-Augen-Guard R-GUARD-06 gemergt (PR #43, `b4fb7d7`); 021 ist geteilt in 021a/021b/021c.
+- Danach **021b** Koordinationsrolle gemergt (PR #44, `80a918d`). Integrationsbranch-Kopf `80a918d`. Nächste Kernscheibe:
+  **021c** (Rechtsfreigabe `question.legal.clear`, Rechtstor R-GUARD-07 mit `LEGAL_GATE_BY_TRACK`, Seed mit
+  QuestionLegalCleared; erwartbar groß, vor der Spec Seed und e2e-Bühnenszenarien lesen).
 - Budget dieser Sitzung aufgebraucht; neue Sitzung nötig. Bericht: `docs/bautage/2026-09-26.md`.
 - Lehre: **Vor der Spec auch die Tests lesen, die Zahlen festnageln** (i18n-Schlüsselzahl, Seed-Fingerabdruck,
   Regel-id-Muster, Statusausnahmen in `apps/api/src/__tests__/helpers.ts`), und sie gleich in Files allowed nehmen.

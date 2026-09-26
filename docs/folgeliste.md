@@ -61,3 +61,14 @@ erledigt in takt-015.
   Alt-Korpus (800) behält ihn bis „Demo zurücksetzen“ · Schlüssel versionieren (`-v2`).
 - 080b R1 nit · `apps/web/e2e/abnahme.spec.ts:7` · Zitat „bei 800 Fragen im Bestand“ neben CORPUS_DEMO verwirrt ·
   als Zitat kennzeichnen oder Abnahmesatz in `docs/erste-version-und-offene-fragen.md` nachziehen.
+
+## Rollen (aus 021a/021b)
+
+- 021b R1 minor 2 · `apps/web/src/features/capture/Page.tsx` · Koordination sieht „In dieser Rolle nur lesen“ neben
+  „Klassifizieren“ (Hinweis nur aus `question.capture` abgeleitet) · Hinweis aus allen `_actions` der Seite ableiten.
+- 021b Spec · `packages/domain/src/seed.ts` · historische Klassifizierungen im Demo-Korpus tragen die Erfassung als
+  Akteur · mit dem nächsten Seed-Umbau auf die Koordination umstellen (Fingerabdruck neu begründen).
+- 021a Bau · `packages/domain/src/api.ts` (Schreibweg) · `actor()` wird für Rechteprüfung, Guard und `append` getrennt
+  gelesen · Akteur einmal je Aufruf binden.
+- 021a R1 nit · `packages/domain/src/transitions.ts` · Erstellerin, die eine ältere fremde Version freigibt, erhält
+  R-GUARD-04 statt R-GUARD-06 · nur zur Kenntnis.
