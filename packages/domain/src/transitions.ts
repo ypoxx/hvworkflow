@@ -5,12 +5,20 @@
  * Rule ids (R-TRANS-nn) are referenced by tests and by error responses so that a legal or process
  * reviewer can trace a decision back to this table.
  */
-import type { Permission, QuestionRecord, QuestionStatus, SpeakerRecord, SpeakerStatus, Track } from './types.js';
+import type { Actor, Permission, QuestionRecord, QuestionStatus, SpeakerRecord, SpeakerStatus, Track } from './types.js';
 import { TERMINAL_STATUSES } from './types.js';
 // Type-only: `rules.ts` imports the *value* `TRANSITIONS` from this file to build `ruleRegister()`,
 // so this direction must stay type-only (isolatedModules erases it) or the two files would import
 // each other's values and form a real load-time cycle.
 import type { LegalRef } from './rules.js';
+
+/**
+ * Who asks for the transition (slice 021a). Required, not optional: a guard that depends on the
+ * person (R-GUARD-06, Vier-Augen) must never be skipped because a caller forgot to pass the actor.
+ */
+export interface TransitionContext {
+  actor: Actor;
+}
 
 export interface Guard {
   ruleId: string;
@@ -18,7 +26,7 @@ export interface Guard {
   /** Legal/process trace for this guard (slice 011, Festlegung 2 of docs/slices/011-legal-trace-
    * regelregister.md) — `ruleRegister()` (rules.ts) reads this to build docs/legal-trace.md. */
   legalRef: LegalRef;
-  check: (q: QuestionRecord, payload?: unknown) => boolean;
+  check: (q: QuestionRecord, payload: unknown, ctx: TransitionContext) => boolean;
 }
 
 export interface Transition {
@@ -119,6 +127,34 @@ const notMergingIntoSelf: Guard = {
   check: (q, payload) => (payload as { intoQuestionId?: string } | undefined)?.intoQuestionId !== q.id,
 };
 
+const approverIsNotCreator: Guard = {
+  ruleId: 'R-GUARD-06',
+  description:
+    'Four eyes (Vier-Augen): the creator of the latest answer version may not approve it.',
+  legalRef: {
+    source: 'Rechtekonzept',
+    citation:
+      'docs/rollen-und-rechtekonzept.md:109 (Abschnitt 2.4, Übergang legal_clearing → ' +
+      'ready_for_stage: Vier-Augen "Ersteller ≠ Freigeber") und :156 (Abschnitt 4: "Kein Recht und ' +
+      'keine Rollenkombination kann das Vier-Augen-Prinzip abschalten"). Ableitung: verglichen wird ' +
+      'die Akteur-id des Freigebenden mit `createdBy.id` der letzten Antwortversion (der ' +
+      'freizugebenden, R-GUARD-04), nie eine Rolle; kein Schalter und keine Rolle (auch keine mit ' +
+      'allen Rechten) umgeht den Guard. Hat eine andere Person eine neuere Version angelegt, darf die ' +
+      'Erstellerin einer früheren Version freigeben. Personengenau nur mit Einzelidentitäten: ' +
+      'Vertretung und geteilte Kennungen erkennt der Guard nicht. Im Demobetrieb ist die Akteur-id ' +
+      'eine Angabe des Clients (`X-Actor`, apps/api/src/actor.ts); personengenau wirkt der Guard ' +
+      'erst mit echter Anmeldung (029).',
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q, _payload, ctx) => {
+    const latest = q.answers[q.answers.length - 1];
+    if (latest === undefined) return false;
+    return latest.createdBy.id !== ctx.actor.id;
+  },
+};
+
 const NON_TERMINAL = (['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved', 'staged', 'delivered'] as const) satisfies readonly QuestionStatus[];
 
 export const TRANSITIONS: readonly Transition[] = [
@@ -208,7 +244,7 @@ export const TRANSITIONS: readonly Transition[] = [
         'Wortlautversion"): Zeitpunkt aus der eingesetzten Uhr; serverseitig und NTP-synchronisiert ' +
         'nicht sichergestellt (Demo: Browser-Uhr, apps/web/src/api/index.ts:46). Den Ersteller ' +
         'setzt Rechtekonzept Abschnitt 4 "Ersteller ≠ Freigeber" (docs/rollen-und-' +
-        'rechtekonzept.md:156) voraus (Ableitung; der Guard dazu fehlt, siehe R-TRANS-05). Nicht ' +
+        'rechtekonzept.md:156) voraus (Ableitung; der Guard dazu ist R-GUARD-06 an R-TRANS-05). Nicht ' +
         'belegt: ein Entwurf schon aus `classified`, ohne Zuweisung an eine Einheit (R-TRANS-02). ' +
         'Ableitung: docs/rollen-und-rechtekonzept.md:107 sieht vor der fachlichen Beantwortung das ' +
         'Pflichtfeld "Segment" vor; für Fast Track nennt docs/ist-analyse-und-schnittstellen.md:51 ' +
@@ -250,19 +286,16 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.approve',
     from: ['in_review'],
     to: 'approved',
-    guards: [hasAnswer, approvalIsLatest],
+    guards: [hasAnswer, approvalIsLatest, approverIsNotCreator],
     description: 'Approve (Freigeben) exactly the latest answer version.',
     legalRef: {
       source: 'Rechtekonzept',
       citation:
         'docs/rollen-und-rechtekonzept.md:109 (Abschnitt 2.4, Übergang legal_clearing → ' +
         'ready_for_stage, Berechtigung answer.approve.legal, Pflichtfelder "Freigabevermerk" und ' +
-        'Vier-Augen "Ersteller ≠ Freigeber"). Nicht umgesetzt: ' +
-        '`approveQuestion` nimmt keinen Freigabevermerk entgegen, und es gibt keinen Guard ' +
-        '"Ersteller ≠ Freigeber" — die Rolle `legal` hält sowohl `answer.draft` als auch ' +
-        '`question.approve` (permissions.ts), obwohl Rechtekonzept §4 (docs/rollen-und-' +
-        'rechtekonzept.md:156) das Vier-Augen-Prinzip als nicht konfigurierbar bezeichnet ("Kein ' +
-        'Recht und keine Rollenkombination kann das Vier-Augen-Prinzip abschalten"). Für Fast Track nicht belegt: docs/ist-analyse-und-schnittstellen.md:51 sieht keinen ' +
+        'Vier-Augen "Ersteller ≠ Freigeber"). Das Vier-Augen-Prinzip setzt R-GUARD-06 um ' +
+        '(Rechtekonzept §4, docs/rollen-und-rechtekonzept.md:156: nicht abschaltbar). Nicht ' +
+        'umgesetzt: `approveQuestion` nimmt keinen Freigabevermerk entgegen. Für Fast Track nicht belegt: docs/ist-analyse-und-schnittstellen.md:51 sieht keinen ' +
         'eigenen Clearing-Schritt vor (Spalte "Rechtsprüfung vor der Bühne": "im Team enthalten"); ' +
         'hier durchläuft auch Pfad B `in_review`/`approved`. Die Freigabe hält Version, Zeitpunkt ' +
         'und Freigebenden fest (`approval.answerVersion`, `approvedAt`, `approvedBy`; state.ts ' +
@@ -529,7 +562,8 @@ export type TransitionResult =
 export function resolveTransition(
   q: QuestionRecord,
   action: Permission,
-  payload?: unknown,
+  payload: unknown,
+  ctx: TransitionContext,
 ): TransitionResult {
   if (TERMINAL_STATUSES.includes(q.status)) {
     return { ok: false, ruleId: 'R-TRANS-00', reason: `Status "${q.status}" is terminal.` };
@@ -544,7 +578,7 @@ export function resolveTransition(
   }
   let lastGuardFailure: { ruleId: string; reason: string } | undefined;
   for (const t of candidates) {
-    const failed = (t.guards ?? []).find((g) => !g.check(q, payload));
+    const failed = (t.guards ?? []).find((g) => !g.check(q, payload, ctx));
     if (!failed) {
       const to = typeof t.to === 'function' ? t.to(q) : t.to;
       return { ok: true, transition: t, to };

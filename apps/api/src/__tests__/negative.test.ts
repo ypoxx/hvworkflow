@@ -106,6 +106,29 @@ describe('negative cases and idempotency', () => {
     expect(problem.ruleId).toBe('R-TRANS-00');
   });
 
+  it('409: legal approving its own answer version is refused with ruleId R-GUARD-06 (Vier-Augen, slice 021a)', async () => {
+    const listRes = await req(app, 'GET', '/v1/questions?status=assigned&limit=200', { actor: ACTOR.admin });
+    const { items } = await listRes.json();
+    const q = items.find((x: { track?: string }) => x.track !== undefined && x.track !== 'podium');
+    expect(q).toBeDefined();
+
+    const draftRes = await req(app, 'POST', `/v1/questions/${q.id}/answers`, { actor: ACTOR.legal, body: { text: 'Entwurf von Recht.' } });
+    expect(draftRes.status).toBe(200);
+    const submitRes = await req(app, 'POST', `/v1/questions/${q.id}/review-submissions`, { actor: ACTOR.expert });
+    expect(submitRes.status).toBe(200);
+
+    const res = await req(app, 'POST', `/v1/questions/${q.id}/approvals`, { actor: ACTOR.legal, body: { answerVersion: 1 } });
+    expect(res.status).toBe(409);
+    const problem = await res.json();
+    expectValid('approveQuestion', 409, problem, 'application/problem+json');
+    expectValidProblem(problem);
+    expect(problem.ruleId).toBe('R-GUARD-06');
+
+    const after = await (await req(app, 'GET', `/v1/questions/${q.id}`, { actor: ACTOR.legal })).json();
+    expect(after.status).toBe('in_review');
+    expect(after._actions).not.toContain('question.approve');
+  });
+
   it('412: a stale If-Match is a precondition failure and changes nothing', async () => {
     const listRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
     const { items } = await listRes.json();
