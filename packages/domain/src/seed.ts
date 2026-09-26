@@ -1,7 +1,7 @@
 /**
  * Synthetic demo corpus. Deterministic (seeded RNG), German, no real persons, no real company data.
- * Produces the event log of a general meeting in progress: four rounds of speakers, ~800 questions
- * in all workflow statuses, a podium queue, and a realistic afternoon backlog.
+ * Produces the event log of a general meeting in progress: four rounds of speakers, questions
+ * (CORPUS_DEMO: 230, CORPUS_LOAD: 800) in all workflow statuses, a podium queue, and a realistic afternoon backlog.
  *
  * Nothing here is used outside the demo; production data enters through the API only.
  */
@@ -331,9 +331,32 @@ function fill(template: string, rnd: () => number, year: number): string {
     .replace(/\{N\}/g, () => String(intBetween(rnd, 1, 9)));
 }
 
+/** A named corpus: speaker requests (Wortmeldungen) per round, question count, RNG seed. */
+export interface Corpus {
+  readonly roundSizes: readonly number[];
+  readonly questions: number;
+  readonly seed: number;
+}
+
+/**
+ * The demo corpus: small enough to walk through in a presentation (28 speaker requests in four
+ * rounds, 230 questions). The single source for the web adapter, the service default and e2e.
+ * Round sizes [8, 8, 7, 5] instead of the proposed [8, 7, 8, 5]: with the unchanged `statusFor`,
+ * the proposal staged a single question; this split keeps a podium queue of six that the stage
+ * scenarios can advance through.
+ */
+export const CORPUS_DEMO: Corpus = { roundSizes: [8, 8, 7, 5], questions: 230, seed: 2027 };
+
+/**
+ * The load corpus: 118 speaker requests, 800 questions. Also the `seedEvents` default for round
+ * sizes, so that the load corpus (and its fingerprint test) stays byte-identical.
+ */
+export const CORPUS_LOAD: Corpus = { roundSizes: [40, 34, 28, 16], questions: 800, seed: 2027 };
+
 export interface SeedOptions {
   questions: number;
   seed: number;
+  roundSizes?: readonly number[];
   now: Date;
   actor: Actor;
 }
@@ -372,7 +395,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
   });
 
   /* ---- speakers: four rounds; the meeting is in round 3 ---- */
-  const roundSizes = [40, 34, 28, 16];
+  const roundSizes = o.roundSizes ?? CORPUS_LOAD.roundSizes;
   const speakers: { id: string; round: number; position: number; name: string; org?: string }[] = [];
   let speakerNumber = 0;
   const posCounters = [0, 0, 0, 0, 0];

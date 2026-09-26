@@ -7,6 +7,7 @@
  * that knows role names (AGENTS.md rule 4). Everything else it does is possible only because
  * `_actions` offered it.
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
@@ -15,7 +16,6 @@ import type { Page } from '@playwright/test';
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 
-const SEEDED_QUESTIONS = 800;
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -38,7 +38,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 test('backlog, approval, podium and history @screenshot', async ({ page }) => {
@@ -183,7 +183,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   // The search is debounced, so wait until the whole corpus is back in the list.
   await page.getByTestId('answers-search').fill('');
   await expect(page.getByTestId('answers-filter-status-all')).toContainText(
-    String(SEEDED_QUESTIONS),
+    String(CORPUS_DEMO.questions),
   );
   await clearToasts(page);
   await page.evaluate(() => document.fonts.ready);

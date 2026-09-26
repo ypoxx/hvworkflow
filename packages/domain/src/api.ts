@@ -14,6 +14,7 @@ import type { DomainEvent, NewEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, READ_SCOPES, type Decision } from './permissions.js';
 import { resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
+import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
 import type {
   Actor,
@@ -97,7 +98,8 @@ export interface HvApi {
 
   getStage(): Promise<StageView>;
   listEvents(after?: number, limit?: number): Promise<{ items: DomainEvent[]; lastSeq: number }>;
-  seedDemo(options?: { questions?: number; seed?: number }): Promise<Meeting>;
+  /** Defaults to CORPUS_DEMO. `roundSizes` is a domain-only option; the contract names `questions` and `seed`. */
+  seedDemo(options?: { questions?: number; seed?: number; roundSizes?: readonly number[] }): Promise<Meeting>;
 
   /** In-process realtime: called after every append. The HTTP adapter maps this to SSE/polling. */
   subscribe(listener: (events: DomainEvent[]) => void): () => void;
@@ -111,7 +113,7 @@ export interface InProcessApiOptions {
   clock?: () => Date;
   idGenerator?: () => string;
   /** Provided by seed.ts; injected to keep this module free of demo content. */
-  seeder?: (options: { questions: number; seed: number; now: Date; actor: Actor }) => NewEvent[];
+  seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
 }
 
 export function etagOf(version: number): string {
@@ -684,7 +686,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       if (store.lastSeq() > 0) {
         throw new ApiProblem(409, 'Conflict', 'The event log is not empty; seeding only into an empty store.');
       }
-      const events = options.seeder({ questions: o.questions ?? 800, seed: o.seed ?? 2027, now: clock(), actor: actor() });
+      const events = options.seeder({
+        questions: o.questions ?? CORPUS_DEMO.questions,
+        seed: o.seed ?? CORPUS_DEMO.seed,
+        roundSizes: o.roundSizes ?? CORPUS_DEMO.roundSizes,
+        now: clock(),
+        actor: actor(),
+      });
       store.append(events);
       return this.getMeeting();
     },

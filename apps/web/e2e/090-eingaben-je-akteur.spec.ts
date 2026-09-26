@@ -11,11 +11,11 @@
  * fields 010d already clears stay as regression guards; the cases for fields that leaked were run
  * red against the code before the change (the Bericht quotes them).
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { checkAxe } from './support/axe';
 
-const SEEDED_QUESTIONS = 800;
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -61,7 +61,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 }
 
 /** The value of a field if it is on screen, `null` if it is not — polled, never read once. */

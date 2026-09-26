@@ -12,11 +12,11 @@
  * The patches wrap one `HvApi` method in the running in-process API, as in `010c-lesezustand.spec.ts`
  * (dev server only, own port per worktree).
  */
+import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { checkAxe } from './support/axe';
 
-const SEEDED_QUESTIONS = 800;
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
 const evidence = (name: string): string =>
@@ -56,7 +56,7 @@ async function waitForCorpus(page: Page): Promise<void> {
   await expect(questions).toBeVisible({ timeout: 90_000 });
   await expect
     .poll(async () => Number((await questions.innerText()).replace(/\D/g, '')), { timeout: 90_000 })
-    .toBeGreaterThanOrEqual(SEEDED_QUESTIONS);
+    .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
   await installHarness(page);
 }
 
