@@ -5,8 +5,8 @@ Hauptversammlung so abbildet, wie sie ihn kennt — flüssig, in der Sprache des
 Volumen. Nicht: Funktionsvollständigkeit.
 
 **Aufbau:** Laptop mit Chrome, Adresse `https://hvtool.netlify.app`, Fenster 1440 × 900 oder größer.
-Vorher einmal „Demo zurücksetzen" im Kopf der Seite drücken, damit der Korpus frisch ist (800 Fragen,
-118 Wortmeldungen, vier Runden, Nachmittag der Generaldebatte).
+Vorher einmal „Demo zurücksetzen" im Kopf der Seite drücken, damit der Korpus frisch ist (230 Fragen,
+28 Wortmeldungen, vier Runden, Nachmittag der Generaldebatte).
 
 **Was vorab gesagt wird (30 Sekunden):** Alles, was zu sehen ist, sind synthetische Daten. Die
 Anwendung läuft in dieser Demo vollständig im Browser; der Anwendungskern ist derselbe, der später
@@ -17,12 +17,12 @@ je Vorgang mitgibt — deshalb ändert der Rollenschalter oben rechts sofort, wa
 
 | Min | Szene | Rolle | Was zu sehen ist | Satz dazu |
 |---|---|---|---|---|
-| 0–1 | Kopf und Zähler | Erfassung | 800 Fragen, 118 Wortmeldungen, offen / auf der Bühne, Uhr | „Das ist der Stand um halb drei am HV-Tag." |
+| 0–1 | Kopf und Zähler | Erfassung | 230 Fragen, 28 Wortmeldungen, offen / auf der Bühne, Uhr | „Das ist der Stand um halb drei am HV-Tag." |
 | 1–3 | Wortmeldeliste | Versammlungsbüro | Runde 3 aktiv, eine Person spricht mit laufender Redezeit, Liste per Drag-and-drop umsortieren, nächste Person aufrufen | „Die Liste ist das Werkzeug des Versammlungsbüros; Reihenfolge und Aufruf sind ein Handgriff." |
 | 3–6 | Erfassung und Atomisierung | Erfassung | Redebeitrag links, Text markieren, „Als Einzelfrage erfassen", Restabdeckung steigt, sieben Fragen rechts, Klassifizierung auf Pfad C | „Aus einem Redebeitrag werden Einzelfragen — mit Nachweis, welcher Teil des Beitrags abgedeckt ist." |
 | 6–8 | Beantwortung | Fachbereich → Recht | Arbeitsvorrat nach Status filtern, Antwortentwurf schreiben, zur Prüfung geben; Rolle wechseln: Legal Clearing gibt Version 1 frei | „Die Freigabe hängt an der Textversion. Eine spätere Änderung lässt sie erlöschen — das sieht man." |
 | 8–10 | Bühne | Freigabe → Podium | „Auf die Bühne“, dann Podiumsansicht: große Schrift, freigegebene Antwort, „Als Nächstes“ vorbereitet, Warteschlange mit Bühnenzuordnung, „Nur Bühne“ mit Kontrastmodus, „Vorgelesen, weiter“, „Zurückgeben“ | „Das ist das Gerät auf dem Podium. Zwei Tasten." |
-| 10–11 | Historie | Beobachtung | Vorgangshistorie der eben bearbeiteten Frage: jeder Schritt mit Zeit und Person; Suche über 800 Fragen | „Jeder Schritt ist ein unveränderliches Ereignis. Das ist die Nachweisführung für § 131." |
+| 10–11 | Historie | Beobachtung | Vorgangshistorie der eben bearbeiteten Frage: jeder Schritt mit Zeit und Person; Suche über 230 Fragen | „Jeder Schritt ist ein unveränderliches Ereignis. Das ist die Nachweisführung für § 131." |
 | 11–12 | Rechte | Beobachtung | Rolle „Beobachtung": alles sichtbar, nichts bedienbar; Rolle „Podium": nur die Bühne bedienbar | „Rechte sind Daten, nicht Code. Ein neues Jahr ist eine neue Tabelle, kein neuer Release." |
 
 ## Was bewusst nicht gezeigt wird

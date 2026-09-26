@@ -1,6 +1,6 @@
 # Übergabe an die nächste Orchestrator-Sitzung (25.09.2026, abends)
 
-**Integrationsbranch-Kopf bei Übergabe:** `cab1ebb` (090).
+**Integrationsbranch-Kopf bei Übergabe:** `cab1ebb` (090); nach der Fortschreibung vom 26.09. `252f3fe` (080).
 
 Fortschreibung von `docs/bautage/uebergabe-2026-09-25.md`. **Rolle, Grenzen und Auftrag gelten unverändert** (dort
 nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, jeder Commit (auch Squash) mit
@@ -43,3 +43,36 @@ nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, j
 
 Unverändert aus der vorigen Übergabe; zusätzlich: 029a macht den Dienst ohne `HV_DEMO=1` unbenutzbar (fail closed),
 bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
+
+## Fortschreibung 26.09.2026
+
+- **080** gemergt (PR #39, `252f3fe`), geteilt: **080b** (Korpus 28/230, Umsortierung mit Begründung) steht im Plan und
+  ist die nächste Kernscheibe; 021 hängt an 080 und kann jetzt ebenfalls starten.
+- Mit 20 USD Restbudget danach **takt-015** (Folgeliste aus 080) gemergt (PR #41, `eb9fe85`); Integrationsbranch-Kopf `eb9fe85`.
+- Danach **080b** (Korpus 28/230) gemergt (PR #42, `7efc5f4`); Umsortierung mit Begründung als **080c** im Plan (nach 043).
+- Danach **021a** Vier-Augen-Guard R-GUARD-06 gemergt (PR #43, `b4fb7d7`); 021 ist geteilt in 021a/021b/021c.
+- Danach **021b** Koordinationsrolle gemergt (PR #44, `80a918d`). Integrationsbranch-Kopf `80a918d`. Nächste Kernscheibe:
+  **021c** (Rechtsfreigabe `question.legal.clear`, Rechtstor R-GUARD-07 mit `LEGAL_GATE_BY_TRACK`, Seed mit
+  QuestionLegalCleared; erwartbar groß, vor der Spec Seed und e2e-Bühnenszenarien lesen).
+- Budget dieser Sitzung aufgebraucht; neue Sitzung nötig. Bericht: `docs/bautage/2026-09-26.md`.
+- Lehre: **Vor der Spec auch die Tests lesen, die Zahlen festnageln** (i18n-Schlüsselzahl, Seed-Fingerabdruck,
+  Regel-id-Muster, Statusausnahmen in `apps/api/src/__tests__/helpers.ts`), und sie gleich in Files allowed nehmen.
+  Das hätte drei Rückfragen gespart.
+- Für 043 vorgemerkt (Folgeliste): `SpeakerUpdate.reason`, 409 für `updateSpeaker`, Löschen von `kind`/`requestedMinutes`.
+
+## Zielpfad ab der nächsten Sitzung (Entscheidung des Eigentümers, 26.09.)
+
+Maßgeblich ist `docs/produktplan-beta.md` Abschnitt 11, „Zielpfad Beta-2“: Etappen A (021c, 024–028, 033, 034), B (029b
+einfach, 030, 035, 036), C (043, 040, 041, 044, 045, dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057), D (064, 065, 066 mit
+Leitfaden und Sandbox). E11 für die Beta: einfache Anmeldung (Keycloak-Testrealm), kein Konzern-SSO. 044 aufgenommen.
+Beginnen mit **021c**; vor jeder Spec die betroffenen Tests mit festen Zahlen, Fingerabdrücken und generierten Dateien
+lesen (`grep toMatchFileSnapshot`, Paritäts- und Seed-Tests).
+
+## Pause (26.09., Budget aus)
+
+- **021c angefangen, kein Code.** Branch `claude/slice-021c-rechtstor` (gepusht) enthält nur die Spec
+  `docs/slices/021c-rechtsfreigabe-rechtstor.md` samt Nachtrag (R-TRANS-13 aus in_review, R-TRANS-14 Podium;
+  Seed-Persona `legal2`; Vertrag 0.3.1, 028 rückt auf 0.3.2). Bau dort neu starten; die Spec ist vom Implementierer
+  am Code geprüft (fünf Rückfragen beantwortet). Vor dem Bau den Integrationsbranch einmergen.
+- Subagenten-Token 021c bis zur Pause: rund 132 000 (Lesen und Rückfragen).
+- Keine offenen Scheiben-PRs, keine laufenden Agenten, keine geplanten Check-ins.

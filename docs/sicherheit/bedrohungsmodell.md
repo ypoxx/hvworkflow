@@ -347,9 +347,13 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   zweite Rollenzuordnung als Vertretung.
 - *Verhindert durch:* T-G1-E-02, T-G1-E-04; R-GUARD-06 vergleicht Personen, nicht Rollen (021); Rechtekonzept
   Abschnitt 4: auch ein Rollenwechsel in derselben Sitzung hebt Vier-Augen nicht auf.
-- *Erkennung:* 409 mit R-GUARD-06 in der Historie sichtbar; im Rückfall gepoolter Stationsidentitäten nur auf
-  Stationsebene (B18).
-- *Nachweis:* geplant in Scheibe 021 („legal entwirft und versucht Freigabe → 409 R-GUARD-06").
+- *Erkennung:* **offen.** Ein verweigerter Übergang hängt kein Ereignis an; der Versuch erscheint daher nicht in der
+  Historie, nur als 409 mit R-GUARD-06 beim Aufrufer. Protokollierung verweigerter Schreibversuche kommt mit 033
+  (Protokollebenen). Im Rückfall gepoolter Stationsidentitäten wirkt der Guard nur auf Stationsebene (B18); im
+  Demobetrieb ist die Akteur-id eine Angabe des Clients (`X-Actor`), personengenau erst mit Anmeldung (029).
+- *Nachweis:* umgesetzt in 021a (26.09.2026): `packages/domain/src/__tests__/transitions.test.ts` und `api.test.ts`
+  (legal, admin und dieselbe id unter anderer Rolle → 409 R-GUARD-06, kein Ereignis; `_actions` ohne Freigabe),
+  `apps/api/src/__tests__/negative.test.ts` (409 über HTTP).
 
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.
