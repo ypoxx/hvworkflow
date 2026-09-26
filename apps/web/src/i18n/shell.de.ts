@@ -106,7 +106,7 @@ export const shellDe = {
   'placeholder.left': 'Redebeitrag',
   'placeholder.right': 'Einzelfragen',
   'page.speakers.title': 'Wortmeldungen',
-  'page.speakers.description': 'Wortmeldeliste nach Runden: Reihenfolge, Redezeit, Aufruf.',
+  'page.speakers.description': 'Wortmeldeliste nach Runden: Reihenfolge, Aufruf.',
   'page.capture.title': 'Erfassung',
   'page.capture.description':
     'Redebeiträge erfassen und in Einzelfragen zerlegen, mit Restabdeckung.',
