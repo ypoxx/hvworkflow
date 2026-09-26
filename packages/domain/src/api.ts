@@ -12,7 +12,7 @@
  */
 import type { DomainEvent, NewEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, READ_SCOPES, type Decision } from './permissions.js';
-import { resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
+import { resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
 import type { EventStore } from './store.js';
 import type {
@@ -401,11 +401,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             payload: {
               number: state.speakers.size + 1,
               displayName: input.displayName.trim(),
-              kind: input.kind,
               round,
               position: inRound.length + 1,
               ...(input.organisation !== undefined ? { organisation: input.organisation } : {}),
-              ...(input.requestedMinutes !== undefined ? { requestedMinutes: input.requestedMinutes } : {}),
             },
           },
         ]);
@@ -428,7 +426,23 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         requirePermission('speaker.update');
         const s = requireSpeaker(id);
         checkIfMatch(s.version, opts);
-        append([{ type: 'SpeakerUpdated', subjectId: id, payload: { ...input } }]);
+        if (input.status !== undefined) {
+          const t = resolveSpeakerTransition(s, input.status, input);
+          if (!t.ok) throw new ApiProblem(409, 'Conflict', t.reason, t.ruleId);
+        }
+        // Built field by field: fields the contract still accepts but the core ignores since 080
+        // (Redezeit) never reach an event; the reason only travels with a status change.
+        append([
+          {
+            type: 'SpeakerUpdated',
+            subjectId: id,
+            payload: {
+              ...(input.status !== undefined ? { status: input.status } : {}),
+              ...(input.round !== undefined ? { round: input.round } : {}),
+              ...(input.status !== undefined && input.reason !== undefined ? { reason: input.reason } : {}),
+            },
+          },
+        ]);
         return viewSpeaker(requireSpeaker(id));
       });
     },

@@ -33,11 +33,12 @@ describe('acceptance sentence (HTTP)', () => {
 
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
-      body: { displayName: 'Testaktionärin', kind: 'shareholder' },
+      body: { displayName: 'Testaktionärin' },
     });
     expect(speakerRes.status).toBe(201);
     const speaker = await speakerRes.json();
     expectValid('registerSpeaker', 201, speaker);
+    expect(speaker).not.toHaveProperty('kind'); // slice 080: the core no longer keeps the kind (Art)
     expect(speaker._actions).toContain('speaker.update');
 
     const text =

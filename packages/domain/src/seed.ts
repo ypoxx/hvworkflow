@@ -6,7 +6,7 @@
  * Nothing here is used outside the demo; production data enters through the API only.
  */
 import type { NewEvent } from './events.js';
-import type { Actor, QuestionStatus, SpeakerKind, StageAssignment, Track } from './types.js';
+import type { Actor, QuestionStatus, StageAssignment, Track } from './types.js';
 
 /* ---------- deterministic randomness ---------- */
 function mulberry32(seed: number): () => number {
@@ -373,34 +373,38 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
 
   /* ---- speakers: four rounds; the meeting is in round 3 ---- */
   const roundSizes = [40, 34, 28, 16];
-  const speakers: { id: string; round: number; position: number; kind: SpeakerKind; name: string; org?: string }[] = [];
+  const speakers: { id: string; round: number; position: number; name: string; org?: string }[] = [];
   let speakerNumber = 0;
   const posCounters = [0, 0, 0, 0, 0];
   roundSizes.forEach((size, ri) => {
     for (let i = 0; i < size; i++) {
       const round = ri + 1;
+      // Slice 080 removed the kind (Art) and the requested speaking time (Redezeit) of a Wortmeldung.
+      // Both rolls are still drawn, in the same order, so the random sequence — names, organisations
+      // and every count the seed and snapshot tests pin — stays exactly as before. The kind roll
+      // still decides whether an organisation is named; the requestedMinutes roll is discarded.
       const kindRoll = rnd();
-      const kind: SpeakerKind = kindRoll < 0.12 ? 'association' : kindRoll < 0.3 ? 'proxy' : 'shareholder';
+      const orgFrom = kindRoll < 0.12 ? ASSOCIATIONS : kindRoll < 0.3 ? INSTITUTIONS : undefined;
       const female = chance(rnd, 0.42);
       const name = `${pick(rnd, female ? FIRST_NAMES_F : FIRST_NAMES_M)} ${pick(rnd, LAST_NAMES)}`;
-      const org = kind === 'association' ? pick(rnd, ASSOCIATIONS) : kind === 'proxy' ? pick(rnd, INSTITUTIONS) : undefined;
+      const org = orgFrom !== undefined ? pick(rnd, orgFrom) : undefined;
       const sid = id('sp');
       speakerNumber += 1;
       posCounters[round] = (posCounters[round] ?? 0) + 1;
-      const sp = { id: sid, round, position: posCounters[round]!, kind, name, ...(org !== undefined ? { org } : {}) };
+      const sp = { id: sid, round, position: posCounters[round]!, name, ...(org !== undefined ? { org } : {}) };
       speakers.push(sp);
+      const at = tick(5_000, 40_000);
+      void (orgFrom === ASSOCIATIONS ? intBetween(rnd, 8, 15) : intBetween(rnd, 3, 8)); // discarded, see above
       push({
         type: 'SpeakerRegistered',
-        at: tick(5_000, 40_000),
+        at,
         actor: SEED_ACTORS.moderation!,
         subjectId: sid,
         payload: {
           number: speakerNumber,
           displayName: name,
-          kind,
           round,
           position: sp.position,
-          requestedMinutes: kind === 'association' ? intBetween(rnd, 8, 15) : intBetween(rnd, 3, 8),
           ...(org !== undefined ? { organisation: org } : {}),
         },
       });

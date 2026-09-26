@@ -102,7 +102,8 @@ export const STAGE_ASSIGNMENTS = ['supervisory_board_chair', 'ceo', 'cfo', 'boar
 export type StageAssignment = (typeof STAGE_ASSIGNMENTS)[number];
 
 export type SpeakerStatus = 'waiting' | 'speaking' | 'finished' | 'withdrawn';
-export type SpeakerKind = 'shareholder' | 'proxy' | 'association';
+/** Why a finished Wortmeldung goes back to waiting (R-SPK-05): only a follow-up (Nachfrage). */
+export type SpeakerReopenReason = 'follow_up';
 
 export interface TextSpan {
   start: number;
@@ -144,11 +145,9 @@ export interface SpeakerRecord {
   number: number;
   displayName: string;
   organisation?: string;
-  kind: SpeakerKind;
   round: number;
   position: number;
   status: SpeakerStatus;
-  requestedMinutes?: number;
   speakingStartedAt?: string;
   speakingEndedAt?: string;
   questionCount: number;
@@ -223,14 +222,13 @@ export interface StageView {
 export interface SpeakerRegistration {
   displayName: string;
   organisation?: string;
-  kind: SpeakerKind;
   round?: number;
-  requestedMinutes?: number;
 }
 export interface SpeakerUpdate {
   status?: SpeakerStatus;
   round?: number;
-  requestedMinutes?: number;
+  /** Domain only until contract 0.4.0 (slice 043): required by R-SPK-05 (finished → waiting). */
+  reason?: SpeakerReopenReason;
 }
 export interface ContributionCapture {
   speakerId: string;

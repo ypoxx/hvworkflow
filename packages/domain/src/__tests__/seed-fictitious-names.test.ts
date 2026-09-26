@@ -47,9 +47,13 @@ const FORBIDDEN_NAMES = [
 /** Masks the two fields this slice is allowed to change (`displayName`, `organisation`) so the
  *  fingerprint below proves everything else the seed produces — ids, timestamps, order, statuses,
  *  tracks, numbers, answer text — is byte-identical to the pre-change seed (review round 2, item 2).
+ *  Slice 080 removed the kind (Art) and requested speaking time (Redezeit) from the seed payload;
+ *  both are stripped here, so the fingerprint still proves the random sequence is unchanged.
  */
 function maskNames(json: string): string {
   return json
+    .replace(/"kind":"[a-z]+",/g, '')
+    .replace(/,"requestedMinutes":\d+/g, '')
     .replace(/"displayName":"[^"]*"/g, '"displayName":"<masked>"')
     .replace(/"organisation":"[^"]*"/g, '"organisation":"<masked>"');
 }
@@ -83,7 +87,10 @@ function fingerprintOf(events: readonly unknown[]): string {
 // this ever needs recomputing: check out c891616, run this same fingerprint function against
 // `seedEvents(OPTIONS)` there. A different value here would mean the RNG draw sequence changed, not
 // just a name.
-const PRE_CHANGE_FINGERPRINT = '14306754d3352f';
+// Slice 080: recomputed with the extended `maskNames` on the pre-080 seed (seed.ts before 080, which
+// still wrote `kind` and the speaking time); the post-080 seed gives the same value, so the random
+// draw sequence is unchanged. Before 080 the value was '14306754d3352f'.
+const PRE_CHANGE_FINGERPRINT = '1bac7aa18a9d88';
 
 describe('seed corpus: no real association, family or public-figure names (takt-004)', () => {
   const events = seedEvents(OPTIONS);

@@ -24,11 +24,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ruleRegister, TRANSITIONS } from '@hv/domain';
+import { ruleRegister, SPEAKER_TRANSITIONS, TRANSITIONS } from '@hv/domain';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-const RULE_ID_RE = /\bR-[A-Z]+-\d{2,}\b/g;
+const RULE_ID_RE = /\bR-[A-Z]+(?:-[A-Z]+)?-\d{2,}\b/g;
 
 /** Every `.ts` file under `root` (relative to the repo root), depth-first, optionally excluding any
  * path segment named `__tests__` and/or any of `excludePaths` (repository-relative). */
@@ -89,8 +89,10 @@ describe('rule register', () => {
   const registerIds = new Set(entries.map((e) => e.ruleId));
   const idsInProductionCode = ruleIdsIn(productionFiles);
   const idsInTests = ruleIdsIn(testFiles);
-  const transitionRowIds = new Set(TRANSITIONS.map((t) => t.ruleId));
-  const guardIds = new Set(TRANSITIONS.flatMap((t) => (t.guards ?? []).map((g) => g.ruleId)));
+  const transitionRowIds = new Set([...TRANSITIONS, ...SPEAKER_TRANSITIONS].map((t) => t.ruleId));
+  const guardIds = new Set(
+    [...TRANSITIONS, ...SPEAKER_TRANSITIONS].flatMap((t) => (t.guards ?? []).map((g) => g.ruleId)),
+  );
 
   it('every rule id used in production code has a register entry', () => {
     const missing = [...idsInProductionCode].filter((id) => !registerIds.has(id));

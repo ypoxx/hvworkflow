@@ -49,7 +49,7 @@ describe('acceptance sentence', () => {
     expect(meeting.counts.questions).toBe(800);
 
     as(actors.moderation!);
-    const speaker = await api.registerSpeaker({ displayName: 'Testaktionärin', kind: 'shareholder' });
+    const speaker = await api.registerSpeaker({ displayName: 'Testaktionärin' });
     expect(speaker._actions).toContain('speaker.update');
 
     as(actors.capture!);

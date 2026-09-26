@@ -3,9 +3,11 @@
  * Role × Status × Action, diffed against the committed file (docs gate "Policy-Wahrheitstabelle").
  */
 import { describe, expect, it } from 'vitest';
-import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, type Guard } from '../transitions.js';
-import { can } from '../api.js';
-import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Permission } from '../types.js';
+import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, SPEAKER_TRANSITIONS, resolveSpeakerTransition, type Guard } from '../transitions.js';
+import { ApiProblem, can, createInProcessApi, type HvApi } from '../api.js';
+import { createInMemoryEventStore } from '../store.js';
+import type { DomainEvent } from '../events.js';
+import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Permission, type SpeakerRecord, type SpeakerStatus } from '../types.js';
 import { ROLE_PERMISSIONS, READ_PERMISSION_LIST, READ_SCOPES } from '../permissions.js';
 
 const ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
@@ -247,6 +249,112 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       expect(can({ id: 'x', role: observer }, 'question.read', staged).allow).toBe(false); // observer holds no stage.read
     } finally {
       delete mutableReadScopes['stage.read'];
+    }
+  });
+});
+
+/* ---------- speaker state table R-SPK (slice 080) ---------- */
+
+const SPEAKER_STATUSES: readonly SpeakerStatus[] = ['waiting', 'speaking', 'finished', 'withdrawn'];
+
+function speakerRecord(status: SpeakerStatus): SpeakerRecord {
+  return { id: 's1', number: 1, displayName: 'Testperson', round: 1, position: 1, status, questionCount: 0, version: 1 };
+}
+
+/** An in-process API with one Wortmeldung brought into `status` along allowed rows only. */
+async function speakerIn(status: SpeakerStatus): Promise<{ api: HvApi; id: string; events: () => readonly DomainEvent[] }> {
+  const store = createInMemoryEventStore();
+  let t = Date.parse('2027-04-20T12:00:00.000Z');
+  const api = createInProcessApi({ store, actor: () => ({ id: 'mod', role: 'moderation' }), clock: () => new Date((t += 1000)) });
+  const s = await api.registerSpeaker({ displayName: 'Testperson' });
+  const path: Record<SpeakerStatus, SpeakerStatus[]> = {
+    waiting: [],
+    speaking: ['speaking'],
+    finished: ['speaking', 'finished'],
+    withdrawn: ['withdrawn'],
+  };
+  for (const next of path[status]) await api.updateSpeaker(s.id, { status: next });
+  return { api, id: s.id, events: () => store.all() };
+}
+
+async function problemOf(p: Promise<unknown>): Promise<ApiProblem> {
+  try {
+    await p;
+  } catch (e) {
+    if (e instanceof ApiProblem) return e;
+    throw e;
+  }
+  throw new Error('expected an ApiProblem');
+}
+
+describe('speaker state table (R-SPK, slice 080)', () => {
+  it('lists exactly R-SPK-01..05 with the guard R-SPK-GUARD-01 on R-SPK-05', () => {
+    expect(SPEAKER_TRANSITIONS.map((t) => t.ruleId)).toEqual(['R-SPK-01', 'R-SPK-02', 'R-SPK-03', 'R-SPK-04', 'R-SPK-05']);
+    const r05 = SPEAKER_TRANSITIONS.find((t) => t.ruleId === 'R-SPK-05')!;
+    expect(r05.guards?.map((g) => g.ruleId)).toEqual(['R-SPK-GUARD-01']);
+  });
+
+  for (const t of SPEAKER_TRANSITIONS) {
+    const payload = t.guards?.length ? { reason: 'follow_up' as const } : {};
+    it(`${t.ruleId}: ${t.from} → ${t.to} is allowed — ${t.description}`, async () => {
+      const r = resolveSpeakerTransition(speakerRecord(t.from), t.to, payload);
+      expect(r.ok && r.transition.ruleId).toBe(t.ruleId);
+      const { api, id } = await speakerIn(t.from);
+      const updated = await api.updateSpeaker(id, { status: t.to, ...payload });
+      expect(updated.status).toBe(t.to);
+    });
+  }
+
+  for (const from of SPEAKER_STATUSES) {
+    for (const to of SPEAKER_STATUSES) {
+      if (SPEAKER_TRANSITIONS.some((t) => t.from === from && t.to === to)) continue;
+      it(`R-SPK-00: ${from} → ${to} is not listed: 409 with the rule id`, async () => {
+        expect(resolveSpeakerTransition(speakerRecord(from), to, { reason: 'follow_up' })).toMatchObject({ ok: false, ruleId: 'R-SPK-00' });
+        const { api, id } = await speakerIn(from);
+        const p = await problemOf(api.updateSpeaker(id, { status: to, reason: 'follow_up' }));
+        expect(p.status).toBe(409);
+        expect(p.ruleId).toBe('R-SPK-00');
+      });
+    }
+  }
+
+  it('R-SPK-00: finished → speaking is a 409 with ruleId in the problem, and no event is written', async () => {
+    const { api, id, events } = await speakerIn('finished');
+    const before = events().length;
+    const p = await problemOf(api.updateSpeaker(id, { status: 'speaking' }));
+    expect(p.status).toBe(409);
+    expect(p.toProblem().ruleId).toBe('R-SPK-00');
+    expect(events().length).toBe(before);
+  });
+
+  it('R-SPK-05 without the reason "follow_up" is a 409 with R-SPK-GUARD-01', async () => {
+    const { api, id } = await speakerIn('finished');
+    const p = await problemOf(api.updateSpeaker(id, { status: 'waiting' }));
+    expect(p.status).toBe(409);
+    expect(p.ruleId).toBe('R-SPK-GUARD-01');
+  });
+
+  it('R-SPK-05 with the reason writes it into SpeakerUpdated', async () => {
+    const { api, id, events } = await speakerIn('finished');
+    await api.updateSpeaker(id, { status: 'waiting', reason: 'follow_up' });
+    const last = events().at(-1)!;
+    expect(last.type).toBe('SpeakerUpdated');
+    expect(last.payload).toEqual({ status: 'waiting', reason: 'follow_up' });
+  });
+
+  it('R-SPK-GUARD-01: guard — only the reason "follow_up" satisfies it', () => {
+    const guard = SPEAKER_TRANSITIONS.find((t) => t.ruleId === 'R-SPK-05')!.guards![0]!;
+    expect(guard.check(speakerRecord('finished'), { reason: 'follow_up' })).toBe(true);
+    expect(guard.check(speakerRecord('finished'), {})).toBe(false);
+    expect(guard.check(speakerRecord('finished'))).toBe(false);
+  });
+
+  it('a round change without status stays allowed from any status', async () => {
+    for (const status of SPEAKER_STATUSES) {
+      const { api, id } = await speakerIn(status);
+      const moved = await api.updateSpeaker(id, { round: 2 });
+      expect(moved.round).toBe(2);
+      expect(moved.status).toBe(status);
     }
   });
 });
