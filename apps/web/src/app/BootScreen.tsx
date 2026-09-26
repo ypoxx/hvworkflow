@@ -21,7 +21,9 @@ export function BootScreen() {
   );
 }
 
-export function BootFailure({ error, onRetry }: { error: Error; onRetry: () => void }) {
+export function BootFailure({ error, legacy, onRetry, onReset }: {
+  error: Error; legacy: boolean; onRetry: () => void; onReset: () => void;
+}) {
   const t = useT();
   return (
     <div className="flex h-screen items-center justify-center bg-canvas p-6">
@@ -29,13 +31,13 @@ export function BootFailure({ error, onRetry }: { error: Error; onRetry: () => v
         <span className="flex h-9 w-9 items-center justify-center rounded-md border border-tone-danger-bd bg-tone-danger-bg text-tone-danger-fg">
           <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" />
         </span>
-        <h1 className="mt-4 text-[15px] font-semibold text-ink-900">{t('boot.failed.title')}</h1>
-        <p className="mt-1 text-[13px] text-ink-600">{t('boot.failed.hint')}</p>
-        <pre className="mt-3 overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-2xs text-ink-600">
+        <h1 className="mt-4 text-[15px] font-semibold text-ink-900">{t(legacy ? 'boot.legacy.title' : 'boot.failed.title')}</h1>
+        <p className="mt-1 text-[13px] text-ink-600">{t(legacy ? 'boot.legacy.hint' : 'boot.failed.hint')}</p>
+        {!legacy && <pre className="mt-3 overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-2xs text-ink-600">
           {error.message}
-        </pre>
-        <Button variant="primary" className="mt-5" onClick={onRetry}>
-          {t('boot.failed.retry')}
+        </pre>}
+        <Button variant="primary" className="mt-5" onClick={legacy ? onReset : onRetry}>
+          {t(legacy ? 'boot.legacy.reset' : 'boot.failed.retry')}
         </Button>
       </div>
     </div>

@@ -21,6 +21,19 @@ interface Base<T extends string, P> {
   actor: Actor;
   subjectId: string;
   payload: P;
+  /** Envelope v2 fields are optional in contract 0.3.0 so legacy dev fixtures can still be read. */
+  schemaVersion?: 2;
+  meetingId?: string;
+  idempotencyKey?: string;
+  causationId?: string;
+  prevHash?: string;
+  hash?: string;
+  recordedAt?: string;
+  occurredAt?: string;
+  occurredAtSource?: 'server' | 'device' | 'paper' | 'transcript';
+  retentionClass?: 'record' | 'working' | 'technical';
+  legalHold?: boolean;
+  personId?: string;
 }
 
 export type MeetingCreated = Base<

@@ -489,7 +489,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Architekt; Review
   - *Nachweise:* contract:lint und Typen-Diff; CHANGELOG-Eintrag; Allowlist mit Ablauf je Operation; Validatoren regeneriert
   - *Offene Entscheidung:* —
-- **024 · Ereignis-Umschlag v2 mit Hash-Kette, zwei Zeiten, Aufbewahrungsklasse, PII-Codec** — hoch · 2,5 AStd · Kalender 14.10.2026 (W3) · Lanes: core, web-api
+- **024 · Ereignis-Umschlag v2 mit Hash-Kette, zwei Zeiten, Aufbewahrungsklasse, PII-Codec** — hoch · 2,5 AStd · Kalender 14.10.2026 (W3) · Lanes: core, service, web-api, web-shell, i18n, e2e
   - *Ziel:* Base-Ereignis erhält die Felder aus 023; SHA-256 über kanonisches JSON, Kette wird beim Laden verifiziert; recordedAt aus der Server-Uhr als maßgebliche Zeit, occurredAt als Angabe mit Quellenkennzeichen (server, device, paper, transcript); retentionClass, legalHold:false; payload.pii mit keyId je Jahrgang hinter Codec-Port (Beta: Identitäts-Codec); Upcaster v1→v2 nur für JSONL-Dev-Bestände; die Demo zeigt bei altem localStorage-Protokoll ein Reset-Banner (ADR 0002 bleibt, kein Upcaster); Nachweise für ADR 0011.
   - *Abhängigkeiten:* 015, 023, 080
   - *Rolle:* Architekt (Umschlag-Design im Spec) + Implementierer-Backend; Review mit Perspektive Security/Datenschutz

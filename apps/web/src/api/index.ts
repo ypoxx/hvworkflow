@@ -9,21 +9,29 @@ import {
   CORPUS_DEMO,
   createInMemoryEventStore,
   createInProcessApi,
+  isLegacyEventShape,
   seedEvents,
   type DomainEvent,
   type HvApi,
+  type EventStore,
 } from '@hv/domain';
 import { getActor, setActor, DEMO_ACTORS } from './actor';
 
 const STORAGE_KEY = 'hv-demo-events-v1';
 
+export class LegacyDemoLogError extends Error {
+  constructor() { super('Legacy demo event log requires an explicit reset.'); }
+}
+
 function loadLog(): DomainEvent[] | undefined {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as DomainEvent[]) : undefined;
-  } catch {
-    return undefined;
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw === null) return undefined;
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error('Demo event log is not an array.');
+  if (parsed.length > 0 && parsed.every(isLegacyEventShape)) {
+    throw new LegacyDemoLogError();
   }
+  return parsed as DomainEvent[];
 }
 let saveTimer: number | undefined;
 function saveLog(events: readonly DomainEvent[]): void {
@@ -38,7 +46,14 @@ function saveLog(events: readonly DomainEvent[]): void {
   }, 150);
 }
 
-const store = createInMemoryEventStore({ load: loadLog, save: saveLog });
+let startupError: Error | undefined;
+let store: EventStore;
+try {
+  store = createInMemoryEventStore({ load: loadLog, save: saveLog });
+} catch (error) {
+  startupError = error instanceof Error ? error : new Error(String(error));
+  store = createInMemoryEventStore();
+}
 
 export const api: HvApi = createInProcessApi({
   store,
@@ -57,6 +72,7 @@ export function isSeeded(): boolean {
  * holds; the current persona is restored afterwards so the demo starts in the chosen role.
  */
 export async function seedIfEmpty(): Promise<void> {
+  if (startupError) throw startupError;
   if (isSeeded()) return;
   const before = getActor();
   const admin = DEMO_ACTORS.find((a) => a.id === 'u-admin')!;
