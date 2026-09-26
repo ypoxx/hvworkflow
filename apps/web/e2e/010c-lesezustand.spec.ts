@@ -24,6 +24,22 @@ const evidence = (name: string): string =>
 const API_MODULE = '/src/api/index.ts';
 const ACTOR_MODULE = '/src/api/actor.ts';
 
+/** A legal author cannot clear their own seeded answer. */
+async function legalClearableRows(page: Page, count = 1): Promise<Locator[]> {
+  const rows = page.getByTestId('answers-row');
+  const found: Locator[] = [];
+  for (let i = 0; i < await rows.count() && found.length < count; i++) {
+    const row = rows.nth(i);
+    const number = await row.getAttribute('data-number');
+    await row.click();
+    if (await page.getByTestId('answer-legal-clear').isVisible()) {
+      found.push(page.locator(`[data-testid="answers-row"][data-number="${number}"]`));
+    }
+  }
+  expect(found).toHaveLength(count);
+  return found;
+}
+
 type Wrapped = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 /** The test's own handle on the patched API, kept on `window` between `evaluate` calls. */
@@ -943,16 +959,16 @@ test('010c Befund 3: Beantwortung — eine Einzelfrage, die noch für die vorige
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
-  await page.getByTestId('answers-row').first().click();
-  const approve = page.getByTestId('answer-approve');
+  await (await legalClearableRows(page))[0]!.click();
+  const approve = page.getByTestId('answer-legal-clear');
   await expect(approve).toBeVisible();
 
-  // expert's own `getQuestion` (no "Freigeben" among its `_actions`) is held ...
+  // expert's own `getQuestion` (no "Rechtlich freigeben" among its `_actions`) is held ...
   await holdCalls(page, 'getQuestion', true);
   await switchActor(page, 'expert');
   await expect.poll(() => callCount(page, 'getQuestion')).toBeGreaterThan(0);
   // ... and handed over as the actor becomes legal again.
-  await releaseInGap(page, 'getQuestion', 'legal', 'answer-approve', 'removed');
+  await releaseInGap(page, 'getQuestion', 'legal', 'answer-legal-clear', 'removed');
   expect(await sawIt(page)).toBe(false);
 
   await releaseAll(page, 'getQuestion');
@@ -994,7 +1010,7 @@ test('010c Befund 3: Beantwortung — eine Verlaufsverweigerung der vorigen Roll
 // Ziel 6: takt-008's N1–N3, the same class for write locks and focus markers.
 // ---------------------------------------------------------------------------------------------
 
-test('010c Ziel 6 (N1): Beantwortung — nach einem 412 auf "Freigeben" fällt der Fokus nicht auf BODY', async ({
+test('010c Ziel 6 (N1): Beantwortung — nach einem 412 auf "Rechtlich freigeben" fällt der Fokus nicht auf BODY', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1003,30 +1019,30 @@ test('010c Ziel 6 (N1): Beantwortung — nach einem 412 auf "Freigeben" fällt d
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
-  await page.getByTestId('answers-row').first().click();
-  await expect(page.getByTestId('answer-approve')).toBeVisible();
+  await (await legalClearableRows(page))[0]!.click();
+  await expect(page.getByTestId('answer-legal-clear')).toBeVisible();
 
-  // Somebody else approves first: the write reaches the record, and this page is told 412.
+  // Somebody else clears first: the write reaches the record, and this page is told 412.
   await installHarness(page);
   await page.evaluate(async (url) => {
     const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
-    api['approveQuestion'] = async (...args: unknown[]) => {
-      await w.__original['approveQuestion']!(...args);
-      api['approveQuestion'] = w.__original['approveQuestion']!;
+    api['clearQuestionLegally'] = async (...args: unknown[]) => {
+      await w.__original['clearQuestionLegally']!(...args);
+      api['clearQuestionLegally'] = w.__original['clearQuestionLegally']!;
       throw { status: 412, title: 'Testfehler', detail: '010c, absichtlich' };
     };
   }, API_MODULE);
 
   // The page reads the question back 300 ms late: the refusal is on screen before the record is.
   await delayCalls(page, 'getQuestion', 300);
-  await tabTo(page, 'answer-approve', 30);
+  await tabTo(page, 'answer-legal-clear', 30);
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('stale-banner')).toBeVisible();
-  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
-  await expect(page.getByTestId('answer-approve')).toHaveCount(0);
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+  await expect(page.getByTestId('answer-legal-clear')).toBeVisible();
   await settle(page);
-  expect(await focusedTestId(page)).toBe('approval-block');
+  expect(await focusedTestId(page)).toBe('legal-clearance-block');
 });
 
 test('010c Ziel 6 (N1): Bühne — nach einem 412 auf "Vorgelesen, weiter" fällt der Fokus nicht auf BODY', async ({
@@ -1068,33 +1084,33 @@ test('010c Ziel 6 (N2): Beantwortung — der Fehler eines älteren Schreibens gi
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
-  const rows = page.getByTestId('answers-row');
-  const approve = page.getByTestId('answer-approve');
+  const rows = await legalClearableRows(page, 2);
+  const approve = page.getByTestId('answer-legal-clear');
   const detailNumber = page.getByTestId('answers-detail-number');
 
-  await holdCalls(page, 'approveQuestion', false);
-  // A: "Freigeben" on the first question — held.
-  await rows.nth(0).click();
-  await expect(detailNumber).toHaveText((await rows.nth(0).getAttribute('data-number'))!);
+  await holdCalls(page, 'clearQuestionLegally', false);
+  // A: "Rechtlich freigeben" on the first question — held.
+  await rows[0]!.click();
+  await expect(detailNumber).toHaveText((await rows[0]!.getAttribute('data-number'))!);
   await approve.click();
   await expect(approve).toHaveAttribute('aria-disabled', 'true');
 
-  // Another question: its own lock, free — then B: "Freigeben" on it, held as well.
-  const second = (await rows.nth(1).getAttribute('data-number'))!;
-  await rows.nth(1).click();
+  // Another question: its own lock, free — then B: "Rechtlich freigeben" on it, held as well.
+  const second = (await rows[1]!.getAttribute('data-number'))!;
+  await rows[1]!.click();
   await expect(detailNumber).toHaveText(second);
   await expect(approve).toHaveAttribute('aria-disabled', 'false');
   await approve.click();
   await expect(approve).toHaveAttribute('aria-disabled', 'true');
-  expect(await callCount(page, 'approveQuestion')).toBe(2);
+  expect(await callCount(page, 'clearQuestionLegally')).toBe(2);
 
   // A fails. B is still on its way, so its lock must hold.
-  await refuseHeld(page, 'approveQuestion', 0, 500);
+  await refuseHeld(page, 'clearQuestionLegally', 0, 500);
   await expectOneToast(page);
   await expect(approve).toHaveAttribute('aria-disabled', 'true');
 
-  await runHeld(page, 'approveQuestion', 1);
-  await expect(page.getByTestId('approval-block')).toContainText('Freigegeben');
+  await runHeld(page, 'clearQuestionLegally', 1);
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
 });
 
 test('010c Ziel 6 (N2): Bühne — der Fehler eines älteren "Vorgelesen" gibt die Sperre eines neueren nicht frei', async ({

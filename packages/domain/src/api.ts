@@ -24,6 +24,7 @@ import type {
   Contribution,
   ContributionCapture,
   Meeting,
+  LegalClearanceRequest,
   Permission,
   Question,
   QuestionCapture,
@@ -89,6 +90,7 @@ export interface HvApi {
   draftAnswer(id: string, input: AnswerDraft, opts?: WriteOptions): Promise<Question>;
   submitForReview(id: string, opts?: WriteOptions): Promise<Question>;
   approveQuestion(id: string, answerVersion: number, opts?: WriteOptions): Promise<Question>;
+  clearQuestionLegally(id: string, input: LegalClearanceRequest, opts?: WriteOptions): Promise<Question>;
   returnQuestion(id: string, reason: string, opts?: WriteOptions): Promise<Question>;
   stageQuestion(id: string, opts?: WriteOptions): Promise<Question>;
   deliverQuestion(id: string, opts?: WriteOptions): Promise<Question>;
@@ -606,6 +608,29 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         subjectId: q.id,
         payload: { answerVersion },
       }));
+    },
+    async clearQuestionLegally(id, input, opts) {
+      if (input.answerVersion !== undefined && (!Number.isInteger(input.answerVersion) || input.answerVersion < 1)) {
+        throw new ApiProblem(422, 'Unprocessable', 'answerVersion must be a positive integer.');
+      }
+      if (input.note !== undefined && typeof input.note !== 'string') {
+        throw new ApiProblem(422, 'Unprocessable', 'note must be a string.');
+      }
+      return transition(id, 'question.legal.clear', opts, input, (q) => {
+        const latest = q.answers[q.answers.length - 1]?.version;
+        if (input.answerVersion !== undefined && input.answerVersion !== latest) {
+          throw new ApiProblem(409, 'Conflict', 'Legal clearance must name the latest answer version.', 'R-GUARD-04');
+        }
+        return {
+          type: 'QuestionLegalCleared',
+          subjectId: q.id,
+          payload: {
+            questionId: q.id,
+            ...(latest !== undefined ? { answerVersion: latest } : {}),
+            ...(input.note !== undefined ? { note: input.note } : {}),
+          },
+        };
+      });
     },
     async returnQuestion(id, reason, opts) {
       if (!reason?.trim()) throw new ApiProblem(422, 'Unprocessable', 'A reason is required.');

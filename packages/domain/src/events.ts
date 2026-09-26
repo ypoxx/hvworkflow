@@ -64,6 +64,7 @@ export type AnswerDrafted = Base<
 >;
 export type QuestionSubmittedForReview = Base<'QuestionSubmittedForReview', { answerVersion: number }>;
 export type QuestionApproved = Base<'QuestionApproved', { answerVersion: number }>;
+export type QuestionLegalCleared = Base<'QuestionLegalCleared', { questionId: string; answerVersion?: number; note?: string }>;
 export type QuestionReturned = Base<
   'QuestionReturned',
   { reason: string; fromStatus: QuestionStatus; toStatus: QuestionStatus }
@@ -86,6 +87,7 @@ export type DomainEvent =
   | AnswerDrafted
   | QuestionSubmittedForReview
   | QuestionApproved
+  | QuestionLegalCleared
   | QuestionReturned
   | QuestionStaged
   | QuestionDelivered

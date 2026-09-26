@@ -42,8 +42,12 @@ describe('transition table', () => {
       // A representative question that satisfies every guard of this row.
       const base = question({
         status: t.from[0]!,
-        track: t.ruleId === 'R-TRANS-08' ? 'podium' : 'expert_track',
-        answers: [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
+        track: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId) ? 'podium' : 'expert_track',
+        answers: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId)
+          ? []
+          : [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
+        approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+        legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
       });
       const payload = t.action === 'question.approve' ? { answerVersion: 1 } : t.action === 'question.merge' ? { intoQuestionId: 'q2' } : undefined;
       const r = resolveTransition(base, t.action, payload, OTHER);
@@ -96,6 +100,20 @@ describe('transition table', () => {
     // Somebody else wrote the latest version: the earlier author may approve it.
     const otherV2 = question({ status: 'in_review', track: 'expert_track', answers: answers('leg', 'exp') });
     expect(resolveTransition(otherV2, 'question.approve', { answerVersion: 2 }, legal).ok).toBe(true);
+  });
+
+  it('R-GUARD-07: an old legal clearance does not release a newer approved answer', () => {
+    const q = question({
+      status: 'approved',
+      track: 'expert_track',
+      answers: [
+        { version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+        { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'e', role: 'expert' } },
+      ],
+      approval: { answerVersion: 2, approvedAt: '2027-04-20T09:20:00.000Z', approvedBy: OTHER.actor },
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
+    });
+    expect(resolveTransition(q, 'question.stage', undefined, OTHER)).toMatchObject({ ok: false, ruleId: 'R-GUARD-07' });
   });
 
   it('R-TRANS-06: a returned podium question goes back to classified, a text question to answer_drafted', () => {
@@ -161,6 +179,17 @@ const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?, Tr
       { answerVersion: 1 },
       { actor: { id: 'l', role: 'legal' } },
     ],
+  },
+  'R-GUARD-07': {
+    satisfies: [question({
+      track: 'expert_track',
+      approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
+    })],
+    violates: [question({
+      track: 'expert_track',
+      approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
+    })],
   },
 };
 

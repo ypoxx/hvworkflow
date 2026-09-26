@@ -22,6 +22,7 @@ import {
   type Classification,
   type ContributionCapture,
   type HvApi,
+  type LegalClearanceRequest,
   type Persistence,
   type Question,
   type QuestionCapture,
@@ -271,6 +272,11 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/questions/:questionId/approvals', validateOperation('approveQuestion'), async (c) => {
     const body = getValidatedBody<{ answerVersion: number }>(c);
     const question = await domain.approveQuestion(requireParam(c, 'questionId'), body.answerVersion, writeOptions(c));
+    return questionResult(c, question);
+  });
+  app.post('/v1/questions/:questionId/legal-clearances', validateOperation('clearQuestionLegally'), async (c) => {
+    const body = getValidatedBody<LegalClearanceRequest>(c);
+    const question = await domain.clearQuestionLegally(requireParam(c, 'questionId'), body, writeOptions(c));
     return questionResult(c, question);
   });
   app.post('/v1/questions/:questionId/returns', validateOperation('returnQuestion'), async (c) => {

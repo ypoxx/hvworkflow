@@ -1,6 +1,6 @@
 /**
  * Slice 003 — the afternoon, walked from end to end by the people who actually do it: the answering
- * unit drafts and hands over, legal approves exactly one text version, the approver puts it on the
+ * unit drafts and hands over, legal clears exactly one text version, the approver approves and puts it on the
  * podium, the podium reads it out, and the history can prove every step afterwards.
  *
  * The test switches persona through the header's role switcher — the one place in the interface
@@ -101,8 +101,16 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   await page.getByTestId('answer-submit-review').click();
   await expect(page.getByTestId('approval-block')).toContainText('Legal Clearing');
 
-  /* ---------- Recht: approve exactly the latest version ---------- */
+  /* ---------- Recht: clear exactly the latest version ---------- */
   await asRole(page, 'legal');
+  const clear = page.getByTestId('answer-legal-clear');
+  await expect(clear).toBeVisible();
+  await expect(clear).toContainText('Version 1');
+  await clear.click();
+  await expect(page.getByTestId('legal-clearance-block')).toContainText('Rechtlich freigegeben');
+
+  /* ---------- Freigabe: approve the cleared version ---------- */
+  await asRole(page, 'approver');
   const approve = page.getByTestId('answer-approve');
   await expect(approve).toBeVisible();
   await expect(approve).toContainText('Version 1');
@@ -111,9 +119,10 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
   const approval = page.getByTestId('approval-block');
   await expect(approval).toContainText('Freigegeben');
   await expect(approval).toContainText('Version 1');
-  await checkAxe(page, 'answers (approved, Recht)');
+  await checkAxe(page, 'answers (approved, Freigabe)');
 
   // Still legal: another answer goes back for rework — a return is impossible without a reason.
+  await asRole(page, 'legal');
   await page.getByTestId('answers-filter-status-in_review').click();
   await page.getByTestId('answers-row').first().click();
   await page.getByTestId('answer-return').click();
@@ -140,6 +149,7 @@ test('backlog, approval, podium and history @screenshot', async ({ page }) => {
     .fill(
       'Ergänzte Fassung: die Zahl ist mit dem Konzernanhang abgeglichen und dort auf Seite 118 belegt.',
     );
+  await clearToasts(page);
   await page.getByTestId('answer-submit-draft').click();
 
   const lapsed = page.getByTestId('approval-lapsed');

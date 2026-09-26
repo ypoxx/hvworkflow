@@ -76,6 +76,7 @@ export type DetailAction =
   | { kind: 'draft'; text: string; sources: string }
   | { kind: 'submit_review' }
   | { kind: 'approve'; version: number }
+  | { kind: 'legal_clear'; version?: number }
   | { kind: 'stage' }
   | { kind: 'open-return' }
   | { kind: 'open-assign' }
@@ -234,7 +235,8 @@ export function QuestionDetail({
    * the lock fell dropped the focus to `<body>` right then.
    */
   const approvalBlock = useRef<HTMLDivElement>(null);
-  const stepTaken = useRef<Question | null>(null);
+  const legalClearanceBlock = useRef<HTMLDivElement>(null);
+  const stepTaken = useRef<{ question: Question; target: 'approval' | 'legal' } | null>(null);
 
   const unit = useMemo(
     () => units.find((candidate) => candidate.id === question.unitId),
@@ -245,6 +247,7 @@ export function QuestionDetail({
   const mayDraft = may.includes('answer.draft');
   const maySubmit = may.includes('question.submit_review');
   const mayApprove = may.includes('question.approve');
+  const mayLegalClear = may.includes('question.legal.clear');
   const mayStage = may.includes('question.stage');
   const mayReturn = may.includes('question.return');
   const mayAssign = may.includes('question.assign');
@@ -252,8 +255,13 @@ export function QuestionDetail({
   const mayWithdraw = may.includes('question.withdraw');
 
   useEffect(() => {
-    const takenOn = stepTaken.current;
-    if (busy || takenOn === null) return;
+    const taken = stepTaken.current;
+    if (busy || taken === null) return;
+    if (taken.target === 'legal' && question !== taken.question) {
+      stepTaken.current = null;
+      legalClearanceBlock.current?.focus();
+      return;
+    }
     const active = document.activeElement;
     if (active === null || active === document.body) {
       stepTaken.current = null;
@@ -261,15 +269,17 @@ export function QuestionDetail({
       return;
     }
     // The button kept its focus: the step is settled once a record read after it is shown.
-    if (question !== takenOn) stepTaken.current = null;
+    if (question !== taken.question) stepTaken.current = null;
   }, [busy, question]);
 
   const dirty = draft.trim() !== '';
   // Exactly one primary action (D2): the step that moves this question on — unless something is
   // written in the editor, then saving it is what the person is doing.
-  const primary: 'draft' | 'approve' | 'submit' | 'stage' | 'none' =
+  const primary: 'draft' | 'legal_clear' | 'approve' | 'submit' | 'stage' | 'none' =
     dirty && mayDraft
       ? 'draft'
+      : mayLegalClear
+        ? 'legal_clear'
       : mayApprove
         ? 'approve'
         : maySubmit
@@ -285,7 +295,7 @@ export function QuestionDetail({
   // A question that has come to rest (closed, withdrawn, merged) offers nothing; then the command
   // bar is not empty, it is gone.
   const hasSteps =
-    mayWithdraw || mayMerge || mayAssign || mayReturn || maySubmit || mayApprove || mayStage;
+    mayWithdraw || mayMerge || mayAssign || mayReturn || maySubmit || mayLegalClear || mayApprove || mayStage;
   /**
    * Point #26 (feedback, slice 020): "Wieso kann ich hier nicht rein?" — a role without any editing
    * action for this question used to leave an empty command bar with no explanation. `_actions`
@@ -374,11 +384,26 @@ export function QuestionDetail({
                 // takt-008: `aria-disabled` keeps focus while the step is written (Button.tsx).
                 aria-disabled={busy}
                 onClick={() => {
-                  stepTaken.current = question;
+                  stepTaken.current = { question, target: 'approval' };
                   onAction({ kind: 'submit_review' });
                 }}
               >
                 {actionLabel(t, 'question.submit_review')}
+              </Button>
+            )}
+            {mayLegalClear && (
+              <Button
+                data-testid="answer-legal-clear"
+                variant={primary === 'legal_clear' ? 'primary' : 'secondary'}
+                aria-disabled={busy}
+                onClick={() => {
+                  stepTaken.current = { question, target: 'legal' };
+                  onAction(latest === undefined ? { kind: 'legal_clear' } : { kind: 'legal_clear', version: latest });
+                }}
+              >
+                {latest === undefined
+                  ? t('answers.legalClear.podium')
+                  : t('answers.legalClear.label', { version: latest })}
               </Button>
             )}
             {mayApprove && latest !== undefined && (
@@ -387,7 +412,7 @@ export function QuestionDetail({
                 variant={primary === 'approve' ? 'primary' : 'secondary'}
                 aria-disabled={busy}
                 onClick={() => {
-                  stepTaken.current = question;
+                  stepTaken.current = { question, target: 'approval' };
                   onAction({ kind: 'approve', version: latest });
                 }}
               >
@@ -487,6 +512,24 @@ export function QuestionDetail({
               </>
             )}
           </div>
+
+          {question.legalClearance !== undefined && (
+            <div
+              ref={legalClearanceBlock}
+              data-testid="legal-clearance-block"
+              tabIndex={-1}
+              role="group"
+              aria-label={t('answers.legalClear.group')}
+              className="flex items-center gap-2 rounded-md border border-status-approved-bd bg-status-approved-bg px-3 py-2 text-[13px] font-medium text-status-approved-fg"
+            >
+              <ShieldCheck size={16} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
+              <span>
+                {question.legalClearance.answerVersion === undefined
+                  ? t('answers.legalClear.podiumSealed')
+                  : t('answers.legalClear.sealed', { version: question.legalClearance.answerVersion })}
+              </span>
+            </div>
+          )}
 
           {/* Major (review round 2): the Nebenabfrage `getQuestionHistory` failed for this one
            * question — put the refused state exactly where its finding (a lapsed approval) would

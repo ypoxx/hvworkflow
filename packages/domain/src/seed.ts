@@ -59,6 +59,7 @@ export const SEED_ACTORS: Record<string, Actor> = {
   expertOps: { id: 'u-exp-ops', role: 'expert', displayName: 'Fachbereich Operations' },
   fastTrack: { id: 'u-fast-1', role: 'expert', displayName: 'Fast-Track-Team' },
   legal: { id: 'u-legal-1', role: 'legal', displayName: 'Legal Clearing' },
+  legal2: { id: 'u-legal-2', role: 'legal', displayName: 'Legal Clearing 2' },
   approver: { id: 'u-appr-1', role: 'approver', displayName: 'Freigabe Vorstandsbüro' },
   podium: { id: 'u-podium', role: 'podium', displayName: 'Podium' },
 };
@@ -560,6 +561,11 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       if (track === 'podium') {
         // Podium track: classified -> staged -> delivered -> closed
         if (['staged', 'delivered', 'closed', 'approved', 'in_review', 'answer_drafted', 'assigned'].includes(targetStatus)) {
+          // A dedicated id and the preceding event's time preserve the old seed's id/RNG stream.
+          events.push({
+            id: `ev-${qid}-lc`, type: 'QuestionLegalCleared', at: events[events.length - 1]!.at,
+            actor: SEED_ACTORS.legal!, subjectId: qid, payload: { questionId: qid },
+          });
           stageCounter += 1;
           push({ type: 'QuestionStaged', at: tick(30_000, 120_000), actor: SEED_ACTORS.approver!, subjectId: qid, payload: { stagePosition: stageCounter } });
           if (['delivered', 'closed', 'approved', 'in_review', 'answer_drafted', 'assigned'].includes(targetStatus)) {
@@ -603,7 +609,12 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       }
       if (targetStatus === 'in_review') continue;
 
-      push({ type: 'QuestionApproved', at: tick(60_000, 600_000), actor: SEED_ACTORS.legal!, subjectId: qid, payload: { answerVersion: version } });
+      events.push({
+        id: `ev-${qid}-lc`, type: 'QuestionLegalCleared', at: events[events.length - 1]!.at,
+        actor: expert.id === SEED_ACTORS.legal!.id ? SEED_ACTORS.legal2! : SEED_ACTORS.legal!,
+        subjectId: qid, payload: { questionId: qid, answerVersion: version },
+      });
+      push({ type: 'QuestionApproved', at: tick(60_000, 600_000), actor: SEED_ACTORS.approver!, subjectId: qid, payload: { answerVersion: version } });
       if (targetStatus === 'approved') continue;
 
       stageCounter += 1;

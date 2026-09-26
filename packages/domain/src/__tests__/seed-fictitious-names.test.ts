@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { project } from '../state.js';
-import { seedEvents } from '../seed.js';
+import { SEED_ACTORS, seedEvents } from '../seed.js';
 import type { DomainEvent } from '../events.js';
 
 // Same options as the corpus test in `seed.test.ts`, so the counts below are the ones already
@@ -77,7 +77,15 @@ function cyrb53(str: string, seed = 0): string {
 }
 
 function fingerprintOf(events: readonly unknown[]): string {
-  return cyrb53(maskNames(JSON.stringify(events)));
+  // Scheibe 021c: remove only the inserted clearance facts and restore the former approving
+  // persona. Clearance ids and timestamps live outside the old counters, so equality with the
+  // pinned pre-021c fingerprint proves the original seed bytes and RNG sequence were preserved.
+  const before021c = (events as DomainEvent[])
+    .filter((event) => event.type !== 'QuestionLegalCleared')
+    .map((event) => event.type === 'QuestionApproved'
+      ? { ...event, actor: SEED_ACTORS.legal! }
+      : event);
+  return cyrb53(maskNames(JSON.stringify(before021c)));
 }
 
 // Computed once on commit c891616 (the last commit before this slice touched `seed.ts` at all — the

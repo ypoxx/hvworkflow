@@ -223,6 +223,11 @@ export function AnswersPage() {
             api.approveQuestion(id, action.version, options),
           );
           break;
+        case 'legal_clear':
+          void run('question.legal.clear', (options) =>
+            api.clearQuestionLegally(id, action.version === undefined ? {} : { answerVersion: action.version }, options),
+          );
+          break;
         case 'stage':
           void run('question.stage', (options) => api.stageQuestion(id, options));
           break;

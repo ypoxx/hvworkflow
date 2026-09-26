@@ -25,8 +25,7 @@ export interface Actor {
   displayName?: string;
 }
 
-/** Permission identifiers. Identical to the `Action` enum of the contract (`question.legal.clear` is
- * not in this list yet — its permission bundle arrives with slice 021). */
+/** Permission identifiers. Implemented entries from the contract's `Action` enum. */
 export const PERMISSIONS = [
   'speaker.register',
   'speaker.reorder',
@@ -40,6 +39,7 @@ export const PERMISSIONS = [
   'answer.draft',
   'question.submit_review',
   'question.approve',
+  'question.legal.clear',
   'question.return',
   'question.stage',
   'question.deliver',
@@ -184,6 +184,12 @@ export interface Approval {
   approvedBy: Actor;
 }
 
+export interface LegalClearance {
+  answerVersion?: number;
+  clearedAt: string;
+  clearedBy: Actor;
+}
+
 /** A question as stored in the projection, without the per-actor `_actions`. */
 export interface QuestionRecord {
   id: string;
@@ -200,6 +206,7 @@ export interface QuestionRecord {
   unitId?: string;
   answers: AnswerVersion[];
   approval?: Approval;
+  legalClearance?: LegalClearance;
   returnReason?: string;
   stagePosition?: number;
   deliveredAt?: string;
@@ -250,6 +257,10 @@ export interface Classification {
 export interface AnswerDraft {
   text: string;
   sources?: string[];
+}
+export interface LegalClearanceRequest {
+  answerVersion?: number;
+  note?: string;
 }
 export interface QuestionFilter {
   status?: QuestionStatus[];

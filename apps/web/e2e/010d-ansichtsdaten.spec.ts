@@ -338,7 +338,7 @@ async function expectAbsent(page: Page, testIds: readonly string[]): Promise<voi
   for (const id of testIds) await expect(page.getByTestId(id), id).toHaveCount(0);
 }
 
-/** The Beantwortung with legal, filtered to "in Prüfung": every row there offers "Freigeben". */
+/** The Beantwortung with legal, filtered to "in Prüfung". */
 async function answersInReviewAsLegal(page: Page): Promise<void> {
   await page.goto('/');
   await waitForCorpus(page);
@@ -347,6 +347,22 @@ async function answersInReviewAsLegal(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
+}
+
+/** Seeded legal authors cannot clear their own answers, so choose records with an offered step. */
+async function legalClearableRows(page: Page, count = 1): Promise<Locator[]> {
+  const rows = page.getByTestId('answers-row');
+  const found: Locator[] = [];
+  for (let i = 0; i < await rows.count() && found.length < count; i++) {
+    const row = rows.nth(i);
+    const number = await row.getAttribute('data-number');
+    await row.click();
+    if (await page.getByTestId('answer-legal-clear').isVisible()) {
+      found.push(page.locator(`[data-testid="answers-row"][data-number="${number}"]`));
+    }
+  }
+  expect(found).toHaveLength(count);
+  return found;
 }
 
 const SPEAKER_ACTIONS = [
@@ -376,6 +392,7 @@ const ANSWER_ACTIONS = [
   'answer-assign',
   'answer-return',
   'answer-submit-review',
+  'answer-legal-clear',
   'answer-approve',
   'answer-stage',
   'answer-editor',
@@ -480,12 +497,12 @@ test('010d Ziel 1: Erfassung — capture → moderation, Lesevorgänge zurückge
   await checkAxe(page, 'capture (010d, role switch)');
 });
 
-test('010d Ziel 1: Beantwortung — legal → expert, Liste und Einzelfrage zurückgehalten: kein "Freigeben", keine Zeile der vorigen Rolle', async ({
+test('010d Ziel 1: Beantwortung — legal → expert, Liste und Einzelfrage zurückgehalten: kein "Rechtlich freigeben", keine Zeile der vorigen Rolle', async ({
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  await page.getByTestId('answers-row').first().click();
-  await expect(page.getByTestId('answer-approve')).toBeVisible();
+  await (await legalClearableRows(page))[0]!.click();
+  await expect(page.getByTestId('answer-legal-clear')).toBeVisible();
 
   for (const method of ['listQuestions', 'getQuestion', 'getQuestionHistory']) {
     await holdCalls(page, method, true);
@@ -501,10 +518,10 @@ test('010d Ziel 1: Beantwortung — legal → expert, Liste und Einzelfrage zur�
   for (const method of ['listQuestions', 'getQuestion', 'getQuestionHistory']) {
     await releaseAll(page, method);
   }
-  // expert's own record: the question, but no "Freigeben".
+  // expert's own record: the question, but no "Rechtlich freigeben".
   await expect(page.getByTestId('answers-detail')).toBeVisible();
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
-  await expect(page.getByTestId('answer-approve')).toHaveCount(0);
+  await expect(page.getByTestId('answer-legal-clear')).toHaveCount(0);
   await expect(toasts(page)).toHaveCount(0);
   await checkAxe(page, 'answers (010d, role switch)');
 });
@@ -513,22 +530,22 @@ test('010d Ziel 1: Beantwortung — langsame Liste: die Einzelfrage der neuen Ro
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  const row = page.getByTestId('answers-row').first();
+  const row = (await legalClearableRows(page))[0]!;
   const number = (await row.getAttribute('data-number'))!;
   await row.click();
-  await expect(page.getByTestId('answer-approve')).toBeVisible();
+  await expect(page.getByTestId('answer-legal-clear')).toBeVisible();
 
   // Only the list is held; expert's own `getQuestion` answers first.
   await holdCalls(page, 'listQuestions', true);
   await switchActor(page, 'expert');
   await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
   await expect(page.getByTestId('answer-editor')).toBeVisible();
-  await expect(page.getByTestId('answer-approve')).toHaveCount(0);
+  await expect(page.getByTestId('answer-legal-clear')).toHaveCount(0);
   await expect(page.getByTestId('answers-row')).toHaveCount(0);
 
   await releaseAll(page, 'listQuestions');
   await expect(page.locator(`[data-testid="answers-row"][data-number="${number}"]`)).toBeVisible();
-  await expect(page.getByTestId('answer-approve')).toHaveCount(0);
+  await expect(page.getByTestId('answer-legal-clear')).toHaveCount(0);
 });
 
 test('010d Ziel 1: Beantwortung — ein Dialog der vorigen Rolle schließt mit dem Rollenwechsel', async ({
@@ -650,8 +667,8 @@ for (const [first, second] of [
     page,
   }) => {
     await answersInReviewAsLegal(page);
-    await page.getByTestId('answers-row').first().click();
-    await expect(page.getByTestId('answer-approve')).toBeVisible();
+    await (await legalClearableRows(page))[0]!.click();
+    await expect(page.getByTestId('answer-legal-clear')).toBeVisible();
 
     await failOnce(page, first, first === 'listQuestions' ? { limit: 2000 } : undefined, 100);
     await failOnce(page, second, second === 'listQuestions' ? { limit: 2000 } : undefined, 300);
@@ -687,7 +704,7 @@ test('010d Ziel 2 (Gegenprobe): Beantwortung — dieselbe Rolle, ein Abruf mit 5
 // ---------------------------------------------------------------------------------------------
 
 /**
- * A real 412: "Freigeben" on A is held before it reaches the API; somebody else then returns A and
+ * A real 412: "Rechtlich freigeben" on A is held before it reaches the API; somebody else then returns A and
  * submits it for review again — the same status and answer version, a newer record — so the held
  * write passes every transition guard and meets only its outgrown `ifMatch`. Returns A's number and
  * the locator of B, found by its number.
@@ -696,16 +713,16 @@ async function approveAThenChangeElsewhere(
   page: Page,
 ): Promise<{ first: string; second: string; rowB: Locator }> {
   await answersInReviewAsLegal(page);
-  const rows = page.getByTestId('answers-row');
-  const first = (await rows.nth(0).getAttribute('data-number'))!;
-  const firstId = (await rows.nth(0).getAttribute('id'))!.replace('answers-row-', '');
-  const second = (await rows.nth(1).getAttribute('data-number'))!;
+  const rows = await legalClearableRows(page, 2);
+  const first = (await rows[0]!.getAttribute('data-number'))!;
+  const firstId = (await rows[0]!.getAttribute('id'))!.replace('answers-row-', '');
+  const second = (await rows[1]!.getAttribute('data-number'))!;
   const rowB = page.locator(`[data-testid="answers-row"][data-number="${second}"]`);
-  await holdCalls(page, 'approveQuestion', false);
-  await rows.nth(0).click();
+  await holdCalls(page, 'clearQuestionLegally', false);
+  await rows[0]!.click();
   await expect(page.getByTestId('answers-detail-number')).toHaveText(first);
-  await page.getByTestId('answer-approve').click();
-  await expect.poll(() => callCount(page, 'approveQuestion')).toBe(1);
+  await page.getByTestId('answer-legal-clear').click();
+  await expect.poll(() => callCount(page, 'clearQuestionLegally')).toBe(1);
   await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.']);
   await elsewhere(page, 'submitForReview', [firstId]);
   return { first, second, rowB };
@@ -715,7 +732,7 @@ async function approveAThenChangeElsewhere(
 async function expectStaleToastFor(page: Page, number: string): Promise<void> {
   await expect(toasts(page)).toHaveCount(1);
   await expect(toasts(page)).toContainText('Nicht übernommen');
-  await expect(toasts(page)).toContainText(`„Freigeben“ für Einzelfrage ${number}`);
+  await expect(toasts(page)).toContainText(`„Rechtlich freigeben“ für Einzelfrage ${number}`);
   await expect(toasts(page)).not.toContainText('Precondition');
 }
 
@@ -727,7 +744,7 @@ test('010d Ziel 3: Beantwortung — echter 412 auf A nach dem Wechsel zu B: kein
   await rowB.click();
   await expect(detailNumber).toHaveText(second);
 
-  await runHeld(page, 'approveQuestion', 0);
+  await runHeld(page, 'clearQuestionLegally', 0);
   await page.waitForTimeout(300);
   await settle(page);
   await expect(page.getByTestId('stale-banner')).toHaveCount(0);
@@ -747,7 +764,7 @@ test('010d Runde 1 (Befund 1): Beantwortung — echter 412 auf A, während B noc
   await expect.poll(() => callCount(page, 'getQuestion')).toBeGreaterThan(0);
   await expect(detailNumber).toHaveText(first);
 
-  await runHeld(page, 'approveQuestion', 0);
+  await runHeld(page, 'clearQuestionLegally', 0);
   await page.waitForTimeout(300);
   await settle(page);
   await releaseAll(page, 'getQuestion');
@@ -762,20 +779,20 @@ test('010d Ziel 3: Beantwortung — Erfolg auf A nach dem Wechsel zu B: der Dial
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  const rows = page.getByTestId('answers-row');
-  const first = (await rows.nth(0).getAttribute('data-number'))!;
-  await holdCalls(page, 'approveQuestion', false);
+  const rows = await legalClearableRows(page, 2);
+  const first = (await rows[0]!.getAttribute('data-number'))!;
+  await holdCalls(page, 'clearQuestionLegally', false);
 
-  await rows.nth(0).click();
-  await page.getByTestId('answer-approve').click();
-  const second = (await rows.nth(1).getAttribute('data-number'))!;
-  await rows.nth(1).click();
+  await rows[0]!.click();
+  await page.getByTestId('answer-legal-clear').click();
+  const second = (await rows[1]!.getAttribute('data-number'))!;
+  await rows[1]!.click();
   await expect(page.getByTestId('answers-detail-number')).toHaveText(second);
   await page.getByTestId('answer-return').click();
   const reason = page.getByTestId('answer-return-reason');
   await reason.fill('Bitte die Quelle nachtragen.');
 
-  await runHeld(page, 'approveQuestion', 0);
+  await runHeld(page, 'clearQuestionLegally', 0);
   await expect(toasts(page)).toHaveCount(1);
   // Review round 1, finding 2: the confirmation names the question it was for.
   await expect(toasts(page)).toContainText(`Einzelfrage ${first}`);
@@ -814,15 +831,15 @@ test('010d Ziel 3: Beantwortung — 412 auf A nach einem Rollenwechsel, A bleibt
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  const row = page.getByTestId('answers-row').first();
+  const row = (await legalClearableRows(page))[0]!;
   const number = (await row.getAttribute('data-number'))!;
-  await holdCalls(page, 'approveQuestion', false);
+  await holdCalls(page, 'clearQuestionLegally', false);
   await row.click();
-  await page.getByTestId('answer-approve').click();
+  await page.getByTestId('answer-legal-clear').click();
 
   await switchActor(page, 'admin');
   await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
-  await refuseHeld(page, 'approveQuestion', 0, 412);
+  await refuseHeld(page, 'clearQuestionLegally', 0, 412);
   await page.waitForTimeout(300);
   await settle(page);
   await expect(page.getByTestId('stale-banner')).toHaveCount(0);
@@ -833,10 +850,10 @@ test('010d Ziel 3 (Gegenprobe): Beantwortung — 412 auf der gezeigten Frage: "S
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  await holdCalls(page, 'approveQuestion', false);
-  await page.getByTestId('answers-row').first().click();
-  await page.getByTestId('answer-approve').click();
-  await refuseHeld(page, 'approveQuestion', 0, 412);
+  await holdCalls(page, 'clearQuestionLegally', false);
+  await (await legalClearableRows(page))[0]!.click();
+  await page.getByTestId('answer-legal-clear').click();
+  await refuseHeld(page, 'clearQuestionLegally', 0, 412);
   await expect(page.getByTestId('stale-banner')).toBeVisible();
   await page.waitForTimeout(300);
   await settle(page);

@@ -20,7 +20,8 @@ Nicht Funktionsumfang. Drei Dinge:
 **Abnahmesatz, an dem sich die Version messen lässt:**
 
 > Eine Person, die das Werkzeug nie gesehen hat, erfasst aus einem Redebeitrag sieben Einzelfragen,
-> die Koordination klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet und gibt frei,
+> die Koordination klassifiziert sie, schickt sie in die Beantwortung, eine zweite Person beantwortet,
+> Recht gibt rechtlich frei und die Freigabe gibt die Antwort frei,
 > und der Vorstand liest sie am Podiumsgerät vor und schließt sie ab — bei 800 Fragen im Bestand,
 > ohne Anleitung, ohne dass jemand erklären muss, wo man klickt.
 

@@ -80,6 +80,11 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
     case 'QuestionApproved':
       parts.push(t('history.payload.version', { version: event.payload.answerVersion }));
       break;
+    case 'QuestionLegalCleared':
+      if (event.payload.answerVersion !== undefined) {
+        parts.push(t('history.payload.version', { version: event.payload.answerVersion }));
+      }
+      break;
     case 'QuestionReturned':
       parts.push(
         t('history.payload.status', {

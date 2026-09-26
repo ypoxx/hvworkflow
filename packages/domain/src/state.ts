@@ -212,6 +212,7 @@ export function reduce(state: State, e: DomainEvent): State {
       q.answers.push({ ...e.payload.answer });
       q.status = 'answer_drafted';
       delete q.approval; // R-GUARD-04: an approval is bound to a version; a new version voids it
+      delete q.legalClearance;
       delete q.returnReason;
       touch(q, e.at);
       break;
@@ -231,13 +232,27 @@ export function reduce(state: State, e: DomainEvent): State {
       touch(q, e.at);
       break;
     }
+    case 'QuestionLegalCleared': {
+      const q = state.questions.get(e.subjectId);
+      if (!q) break;
+      q.legalClearance = {
+        ...(e.payload.answerVersion !== undefined ? { answerVersion: e.payload.answerVersion } : {}),
+        clearedAt: e.at,
+        clearedBy: e.actor,
+      };
+      touch(q, e.at);
+      break;
+    }
     case 'QuestionReturned': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;
       q.status = e.payload.toStatus;
       q.returnReason = e.payload.reason;
       delete q.stagePosition;
-      if (e.payload.toStatus === 'classified') delete q.approval;
+      if (e.payload.toStatus === 'classified') {
+        delete q.approval;
+        delete q.legalClearance;
+      }
       touch(q, e.at);
       break;
     }
