@@ -430,11 +430,29 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Test je Regel, Screenshot Dialog DE/EN; pnpm gates + e2e
   - *Offene Entscheidung:* —
 - **021 · Koordinationsrolle, Vier-Augen-Guard R-GUARD-06, Rechtstor vor der Bühne R-GUARD-07** — hoch · 2 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
-  - *Ziel:* Rolle `coordination` mit classify/assign/forward/round.assemble, capture verliert classify/assign; R-GUARD-06 „Ersteller der letzten Version ≠ Freigeber" auf R-TRANS-05 (personengenau nur mit Einzelidentitäten, siehe B18); legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared aus 019) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor" auf R-TRANS-07 und R-TRANS-08 mit Geltungsbereich aus der Datentabelle `LEGAL_GATE_BY_TRACK` in transitions.ts (Standard: alle drei Pfade); zur Laufzeit nicht abschaltbar, jede Tabellenänderung erzeugt einen Wahrheitstabellen-Diff; kein Eilpfad an der Freigabe vorbei; Wahrheitstabelle neu; e2e-Personas und Abnahmesatz umformuliert („… die Koordination klassifiziert …"); docs/erste-version-und-offene-fragen.md aktualisiert.
+  - *Ziel:* Am 26.09. geteilt in 021a (Vier-Augen), 021b (Koordinationsrolle), 021c (Rechtstor); die Einträge dort gelten. Ursprünglich: Rolle `coordination` mit classify/assign/forward/round.assemble, capture verliert classify/assign; R-GUARD-06 „Ersteller der letzten Version ≠ Freigeber" auf R-TRANS-05 (personengenau nur mit Einzelidentitäten, siehe B18); legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared aus 019) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor" auf R-TRANS-07 und R-TRANS-08 mit Geltungsbereich aus der Datentabelle `LEGAL_GATE_BY_TRACK` in transitions.ts (Standard: alle drei Pfade); zur Laufzeit nicht abschaltbar, jede Tabellenänderung erzeugt einen Wahrheitstabellen-Diff; kein Eilpfad an der Freigabe vorbei; Wahrheitstabelle neu; e2e-Personas und Abnahmesatz umformuliert („… die Koordination klassifiziert …"); docs/erste-version-und-offene-fragen.md aktualisiert.
   - *Abhängigkeiten:* 010, 019, 080
   - *Rolle:* Implementierer-Backend (Kern) + Implementierer-Oberfläche (e2e-Personas); Review mit Perspektive Legal/Security
   - *Nachweise:* Wahrheitstabellen-Diff im Spec freigegeben; Tests: legal entwirft und versucht Freigabe → 409 R-GUARD-06, stage ohne Rechtsfreigabe → 409 R-GUARD-07 für jeden Pfad, Test „keine Konfiguration schaltet den Guard ab"; abnahme.spec.ts grün mit Koordinations-Persona
   - *Offene Entscheidung:* E1 Rollenname (Arbeitsname), E25 Letztverantwortung (Standard approver), E37 Freigabetiefe je Pfad
+- **021a · Vier-Augen-Guard R-GUARD-06 auf der Freigabe** — hoch · 0,5 AStd · Kalender 09.10.2026 (W2) · Lanes: core
+  - *Ziel:* Teil 1 von 021 (geteilt am 26.09.): Guard „Ersteller der letzten Version ≠ Freigeber“ auf R-TRANS-05, Akteur-id statt Rolle, nicht abschaltbar, auch nicht für admin; `_actions` bietet der Erstellerin keine Freigabe an.
+  - *Abhängigkeiten:* 010, 019, 080
+  - *Rolle:* Implementierer-Backend; Review mit Perspektive Legal/Security
+  - *Nachweise:* legal entwirft und versucht Freigabe → 409 R-GUARD-06 (auch über HTTP, auch als admin); pnpm gates + e2e
+  - *Offene Entscheidung:* —
+- **021b · Koordinationsrolle** — hoch · 1 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
+  - *Ziel:* Teil 2 von 021: Rolle `coordination` mit classify/assign/forward/round.assemble, capture verliert classify/assign; Demo-Persona, e2e-Personas und Abnahmesatz umformuliert („… die Koordination klassifiziert …“); Wahrheitstabellen-Diff.
+  - *Abhängigkeiten:* 021a
+  - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche (e2e-Personas); Review
+  - *Nachweise:* Wahrheitstabellen-Diff im Spec freigegeben; abnahme.spec.ts grün mit Koordinations-Persona; pnpm gates + e2e
+  - *Offene Entscheidung:* E1 Rollenname (Arbeitsname)
+- **021c · Rechtsfreigabe und Rechtstor vor der Bühne R-GUARD-07** — hoch · 1 AStd · Kalender 09.10.2026 (W2) · Lanes: core, e2e
+  - *Ziel:* Teil 3 von 021: legal erhält `question.legal.clear` (Ereignis QuestionLegalCleared) statt approve, approver behält approve; R-GUARD-07 „Rechtsfreigabe liegt vor“ auf R-TRANS-07 und R-TRANS-08 mit `LEGAL_GATE_BY_TRACK` (Standard: alle drei Pfade), zur Laufzeit nicht abschaltbar, kein Eilpfad; Seed mit QuestionLegalCleared; docs/erste-version-und-offene-fragen.md aktualisiert.
+  - *Abhängigkeiten:* 021a
+  - *Rolle:* Implementierer-Backend (Kern, Seed) + e2e; Review mit Perspektive Legal/Security
+  - *Nachweise:* stage ohne Rechtsfreigabe → 409 R-GUARD-07 für jeden Pfad, Test „keine Konfiguration schaltet den Guard ab“; Wahrheitstabellen-Diff; pnpm gates + e2e
+  - *Offene Entscheidung:* E25 Letztverantwortung (Standard approver), E37 Freigabetiefe je Pfad
 - **022 · Nachweise M1, Demo-Skript, Protokoll Feedback-Runde 2** — niedrig · 1 AStd · Kalender 12.10.2026 (W3) · Lanes: docs-feedback
   - *Ziel:* Screenshots aller fünf Ansichten neu, docs/demo-skript.md und README-Status aktualisiert, Protokoll der zweiten Feedback-Runde (09.10.: Antworten auf das Fragenpaket, Vorführung der S-Punkte aus 020) im Statustabellen-Format mit Antworten auf die Fragen 1–9 ins Register, Abnahmesatz-Freigabe der Projektleitung vermerkt, Vorführung von Koordination und Rechtstor für Prüfpunkt 2 vorbereitet, Messtabelle 009–021.
   - *Abhängigkeiten:* 020, 021

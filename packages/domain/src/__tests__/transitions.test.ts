@@ -3,7 +3,7 @@
  * Role × Status × Action, diffed against the committed file (docs gate "Policy-Wahrheitstabelle").
  */
 import { describe, expect, it } from 'vitest';
-import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, SPEAKER_TRANSITIONS, resolveSpeakerTransition, type Guard } from '../transitions.js';
+import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, SPEAKER_TRANSITIONS, resolveSpeakerTransition, type Guard, type TransitionContext } from '../transitions.js';
 import { ApiProblem, can, createInProcessApi, type HvApi } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import type { DomainEvent } from '../events.js';
@@ -11,6 +11,9 @@ import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Pe
 import { ROLE_PERMISSIONS, READ_PERMISSION_LIST, READ_SCOPES } from '../permissions.js';
 
 const ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
+
+/** A deciding actor who wrote none of the fixture answers (their creator is `{ id: 'e' }`). */
+const OTHER: TransitionContext = { actor: { id: 'a', role: 'approver' } };
 
 function question(overrides: Partial<QuestionRecord> = {}): QuestionRecord {
   return {
@@ -43,7 +46,7 @@ describe('transition table', () => {
         answers: [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
       });
       const payload = t.action === 'question.approve' ? { answerVersion: 1 } : t.action === 'question.merge' ? { intoQuestionId: 'q2' } : undefined;
-      const r = resolveTransition(base, t.action, payload);
+      const r = resolveTransition(base, t.action, payload, OTHER);
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.transition.ruleId).toBe(t.ruleId);
       // And it is forbidden from a status the row does not list.
@@ -51,7 +54,7 @@ describe('transition table', () => {
       if (other) {
         const otherRows = TRANSITIONS.filter((x) => x.action === t.action && x.from.includes(other));
         if (otherRows.length === 0) {
-          expect(resolveTransition(question({ ...base, status: other }), t.action, payload).ok).toBe(false);
+          expect(resolveTransition(question({ ...base, status: other }), t.action, payload, OTHER).ok).toBe(false);
         }
       }
     });
@@ -60,7 +63,7 @@ describe('transition table', () => {
   it('R-TRANS-00: terminal statuses accept no action', () => {
     for (const s of ['closed', 'withdrawn', 'merged'] as const) {
       for (const p of PERMISSIONS) {
-        expect(resolveTransition(question({ status: s }), p).ok).toBe(false);
+        expect(resolveTransition(question({ status: s }), p, undefined, OTHER).ok).toBe(false);
       }
     }
   });
@@ -74,13 +77,30 @@ describe('transition table', () => {
         { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'e', role: 'expert' } },
       ],
     });
-    expect(resolveTransition(q, 'question.approve', { answerVersion: 1 }).ok).toBe(false);
-    expect(resolveTransition(q, 'question.approve', { answerVersion: 2 }).ok).toBe(true);
+    expect(resolveTransition(q, 'question.approve', { answerVersion: 1 }, OTHER).ok).toBe(false);
+    expect(resolveTransition(q, 'question.approve', { answerVersion: 2 }, OTHER).ok).toBe(true);
+  });
+
+  it('R-GUARD-06: the creator of the latest version may not approve it, by actor id, whatever the role (slice 021a)', () => {
+    const answers = (...ids: string[]) =>
+      ids.map((id, i) => ({ version: i + 1, text: `v${i + 1}`, createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id, role: 'legal' as const } }));
+    const legal = { actor: { id: 'leg', role: 'legal' as const } };
+    const admin = { actor: { id: 'leg', role: 'admin' as const } };
+    const ownV1 = question({ status: 'in_review', track: 'expert_track', answers: answers('leg') });
+    const denied = resolveTransition(ownV1, 'question.approve', { answerVersion: 1 }, legal);
+    expect(denied).toMatchObject({ ok: false, ruleId: 'R-GUARD-06' });
+    // Same person under another role (demo role switcher, admin): still denied — ids, never roles.
+    expect(resolveTransition(ownV1, 'question.approve', { answerVersion: 1 }, admin)).toMatchObject({ ok: false, ruleId: 'R-GUARD-06' });
+    // Capability without payload (`_actions`) is denied too.
+    expect(resolveTransition(ownV1, 'question.approve', undefined, legal)).toMatchObject({ ok: false, ruleId: 'R-GUARD-06' });
+    // Somebody else wrote the latest version: the earlier author may approve it.
+    const otherV2 = question({ status: 'in_review', track: 'expert_track', answers: answers('leg', 'exp') });
+    expect(resolveTransition(otherV2, 'question.approve', { answerVersion: 2 }, legal).ok).toBe(true);
   });
 
   it('R-TRANS-06: a returned podium question goes back to classified, a text question to answer_drafted', () => {
-    const podium = resolveTransition(question({ status: 'staged', track: 'podium' }), 'question.return', { reason: 'x' });
-    const expert = resolveTransition(question({ status: 'staged', track: 'expert_track' }), 'question.return', { reason: 'x' });
+    const podium = resolveTransition(question({ status: 'staged', track: 'podium' }), 'question.return', { reason: 'x' }, OTHER);
+    const expert = resolveTransition(question({ status: 'staged', track: 'expert_track' }), 'question.return', { reason: 'x' }, OTHER);
     expect(podium.ok && podium.to).toBe('classified');
     expect(expert.ok && expert.to).toBe('answer_drafted');
   });
@@ -93,7 +113,7 @@ describe('transition table', () => {
  * needing to appear literally anywhere. A guard added later without an entry here fails loudly
  * instead of silently passing "untested".
  */
-const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?]; violates: [QuestionRecord, unknown?] }> = {
+const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?, TransitionContext?]; violates: [QuestionRecord, unknown?, TransitionContext?] }> = {
   'R-GUARD-01': {
     satisfies: [question({ answers: [{ version: 1, text: 'a', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }] })],
     violates: [question({ answers: [] })],
@@ -130,6 +150,18 @@ const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?]; v
     satisfies: [question({ id: 'q1' }), { intoQuestionId: 'q2' }],
     violates: [question({ id: 'q1' }), { intoQuestionId: 'q1' }],
   },
+  'R-GUARD-06': {
+    satisfies: [
+      question({ answers: [{ version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }] }),
+      { answerVersion: 1 },
+      { actor: { id: 'l', role: 'legal' } },
+    ],
+    violates: [
+      question({ answers: [{ version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'l', role: 'legal' } }] }),
+      { answerVersion: 1 },
+      { actor: { id: 'l', role: 'legal' } },
+    ],
+  },
 };
 
 describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {
@@ -150,8 +182,10 @@ describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {
     it(`${ruleId}: guard — ${guard.description}`, () => {
       const scenario = GUARD_SCENARIOS[ruleId];
       if (!scenario) return; // reported by the "every guard has a scenario" test above
-      expect(guard.check(...scenario.satisfies)).toBe(true);
-      expect(guard.check(...scenario.violates)).toBe(false);
+      const [sq, sp, sctx] = scenario.satisfies;
+      const [vq, vp, vctx] = scenario.violates;
+      expect(guard.check(sq, sp, sctx ?? OTHER)).toBe(true);
+      expect(guard.check(vq, vp, vctx ?? OTHER)).toBe(false);
     });
   }
 });

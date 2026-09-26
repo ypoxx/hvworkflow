@@ -166,7 +166,7 @@ export function can(
       }
     }
     if (question && TRANSITION_ACTIONS.includes(action)) {
-      const t = resolveTransition(question, action, payload);
+      const t = resolveTransition(question, action, payload, { actor });
       if (!t.ok) return deny(t.ruleId, t.reason);
     }
     return ALLOW;
@@ -332,7 +332,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       const q = requireQuestionFor(id, action);
       const perm = can(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
-      const t = resolveTransition(q, action, payload);
+      const t = resolveTransition(q, action, payload, { actor: actor() });
       if (!t.ok) {
         // Festlegung 8: a 409 to an actor who may not read the question names no status and no rule
         // id — the message is the generic "Transition not allowed" (Übergang nicht zulässig). Only an
