@@ -43,3 +43,13 @@ nachlesen, nicht wiederholt): Orchestrator und Architekt, kein Deploy ohne Go, j
 
 Unverändert aus der vorigen Übergabe; zusätzlich: 029a macht den Dienst ohne `HV_DEMO=1` unbenutzbar (fail closed),
 bis 029 den OIDC-Adapter bringt — nur zur Kenntnis.
+
+## Fortschreibung 26.09.2026
+
+- **080** gemergt (PR #39, `SQUASH`), geteilt: **080b** (Korpus 28/230, Umsortierung mit Begründung) steht im Plan und
+  ist die nächste Kernscheibe; 021 hängt an 080 und kann jetzt ebenfalls starten.
+- Budget dieser Sitzung aufgebraucht; neue Sitzung nötig. Bericht: `docs/bautage/2026-09-26.md`.
+- Lehre: **Vor der Spec auch die Tests lesen, die Zahlen festnageln** (i18n-Schlüsselzahl, Seed-Fingerabdruck,
+  Regel-id-Muster, Statusausnahmen in `apps/api/src/__tests__/helpers.ts`), und sie gleich in Files allowed nehmen.
+  Das hätte drei Rückfragen gespart.
+- Für 043 vorgemerkt (Folgeliste): `SpeakerUpdate.reason`, 409 für `updateSpeaker`, Löschen von `kind`/`requestedMinutes`.

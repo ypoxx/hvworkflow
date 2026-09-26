@@ -45,3 +45,21 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   `createApp` zu übernehmen · gewählten Adapternamen zurückgeben und loggen (spätestens mit 029).
 - 029a R1 nit 6 · `packages/contract/openapi.yaml` · 401 für `seedDemo`, `getMeeting`, `registerSpeaker` nicht
   dokumentiert (Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS`) · 043.
+
+## Sprecher und Zustandstabelle (aus 080)
+
+- 080 R1 minor 3 · `packages/domain/src/api.ts` (`updateSpeaker`) · PATCH ohne wirksames Feld (leer oder nur
+  `requestedMinutes`) schreibt ein leeres `SpeakerUpdated` und erhöht die Version (unnötige 412 bei parallelen
+  Clients) · kein Ereignis bei leerem Payload.
+- 080 R1 minor 4 · `packages/domain/src/transitions.ts` (legalRef R-SPK-01) · Zitat der Ist-Analyse endet vor „mit
+  laufender Redezeitmessung“ · vermerken, dass 080 die Messung nach Feedback #15 entfernt.
+- 080 R1 minor 5 · `packages/domain/src/__tests__/transitions.test.ts` · Tests fehlen für 412 vor 409 (veraltetes
+  If-Match bei verbotenem Übergang) und für die Idempotenz-Wiederholung nach R-SPK · ergänzen.
+- 080 R1 nit 6 · `apps/web/src/features/speakers/SpeakerRow.tsx` (`ROW_COLUMNS`) · EN-Spaltenkopf „QUESTI…“
+  abgeschnitten · Spalte breiter, Platz ist frei.
+- 080 Spec Nicht-Ziel · `apps/web/src/features/speakers/SpeakerRow.tsx` · Knopfwahl nach Status statt aus `_actions`
+  (Regel 4/5) · je Wortmeldung erlaubte Übergänge als Aktionen ausgeben.
+- 080 Spec Nicht-Ziel · `packages/domain/src/transitions.ts` · kein Guard „nur ein Mikrofon offen“ auf R-SPK-01 (die
+  Oberfläche beendet die laufende Rede zuerst) · Guard mit Regel-id.
+- 080 → 043 · `packages/contract/openapi.yaml` · `SpeakerUpdate.reason` und 409 für `updateSpeaker` aufnehmen, Ausnahme
+  in `apps/api/src/__tests__/helpers.ts` streichen, `kind`/`requestedMinutes` löschen.
