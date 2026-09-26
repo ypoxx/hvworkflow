@@ -426,9 +426,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         requirePermission('speaker.update');
         const s = requireSpeaker(id);
         checkIfMatch(s.version, opts);
+        // The reason is kept only when the resolved row has a guard that reads it (today R-SPK-05 with
+        // R-SPK-GUARD-01); on any other row it is dropped, so no unchecked text reaches the log (review R1).
+        let keepReason = false;
         if (input.status !== undefined) {
           const t = resolveSpeakerTransition(s, input.status, input);
           if (!t.ok) throw new ApiProblem(409, 'Conflict', t.reason, t.ruleId);
+          keepReason = (t.transition.guards?.length ?? 0) > 0;
         }
         // Built field by field: fields the contract still accepts but the core ignores since 080
         // (Redezeit) never reach an event; the reason only travels with a status change.
@@ -439,7 +443,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             payload: {
               ...(input.status !== undefined ? { status: input.status } : {}),
               ...(input.round !== undefined ? { round: input.round } : {}),
-              ...(input.status !== undefined && input.reason !== undefined ? { reason: input.reason } : {}),
+              ...(keepReason && input.reason !== undefined ? { reason: input.reason } : {}),
             },
           },
         ]);

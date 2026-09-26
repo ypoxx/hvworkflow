@@ -342,6 +342,14 @@ describe('speaker state table (R-SPK, slice 080)', () => {
     expect(last.payload).toEqual({ status: 'waiting', reason: 'follow_up' });
   });
 
+  it('waiting → speaking mit reason:\'x\' schreibt keinen Grund ins Ereignis (Review R1)', async () => {
+    const { api, id, events } = await speakerIn('waiting');
+    await api.updateSpeaker(id, { status: 'speaking', reason: 'x' as unknown as 'follow_up' });
+    const last = events().at(-1)!;
+    expect(last.type).toBe('SpeakerUpdated');
+    expect(last.payload).toEqual({ status: 'speaking' });
+  });
+
   it('R-SPK-GUARD-01: guard — only the reason "follow_up" satisfies it', () => {
     const guard = SPEAKER_TRANSITIONS.find((t) => t.ruleId === 'R-SPK-05')!.guards![0]!;
     expect(guard.check(speakerRecord('finished'), { reason: 'follow_up' })).toBe(true);
