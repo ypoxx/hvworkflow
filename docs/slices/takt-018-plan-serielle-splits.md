@@ -42,6 +42,6 @@ Evidence: Test zuerst rot (vier Warnungen in der neuen Fixture), danach `node --
 mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit 8cce56f, tree f20717b58f9e…
 ```
 
-Open: `node scripts/plan-graph.mjs --strict` bleibt wegen der unabhängigen Lane-Kollision 029/029b rot. Deren Umfang und Termin werden erst nach der offenen Beta-Entscheidung festgelegt. Kein Deployment.
+Open: `node scripts/plan-graph.mjs --strict` bleibt wegen der unabhängigen Lane-Kollision 029/029b rot. Deren Umfang und Termin werden erst nach der offenen Beta-Entscheidung festgelegt. Der automatische PR-Review meldete P2: `--calendar` legt serielle, gleichdatig dokumentierte Scheiben wegen seiner tagesweisen Neuplanung auf Folgetage. Das gehört nach AGENTS.md R3 in einen späteren gebündelten Folgelisten-Pass; `docs/folgeliste.md` liegt außerhalb von „Files allowed“ dieser Scheibe. Kein Deployment.
 
 Touched: `docs/slices/takt-018-plan-serielle-splits.md`, `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`, `scripts/fixtures/plan-graph/serial-same-day.md`, `docs/produktplan-beta.md`.
