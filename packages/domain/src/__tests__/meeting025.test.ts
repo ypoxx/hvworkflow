@@ -5,6 +5,7 @@ import type { NewEvent } from '../events.js';
 import type { Actor } from '../types.js';
 import { can } from '../api.js';
 import { ROLE_PERMISSIONS } from '../permissions.js';
+import { stampEvent } from '../envelope.js';
 
 const admin: Actor = { id: 'test-admin', role: 'admin' };
 const at = '2027-04-20T10:00:00.000Z';
@@ -42,6 +43,26 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     expect((await api.getMeeting()).debateClosedAt).toBe('2027-04-20T11:00:00.000Z');
     store.append([lifecycleEvent('MeetingClosed', 'hv-2027', '2027-04-20T12:00:00.000Z')]);
     expect((await api.getMeeting()).status).toBe('closed');
+  });
+
+  it('keeps pre-lifecycle logs usable without changing their event or chain', async () => {
+    const legacy = stampEvent(meetingEvent('hv-2026', '2026-04-20'), 1, '');
+    const persisted = [legacy];
+    const store = createInMemoryEventStore({ load: () => persisted, save: (events) => { persisted.splice(0, persisted.length, ...events); } });
+    const api = createInProcessApi({ store, actor: () => admin });
+    expect((await api.getMeeting()).status).toBe('running');
+    const speaker = await api.registerSpeaker({ displayName: 'Bestandsdatum' });
+    await expect(api.captureContribution({ speakerId: speaker.id, text: 'Weiter nutzbar' })).resolves.toMatchObject({ text: 'Weiter nutzbar' });
+    expect(store.all()[0]).toEqual(legacy);
+    expect(store.all().some((event) => event.type === 'MeetingStarted')).toBe(false);
+  });
+
+  it('marks new meeting creations for the explicit lifecycle', async () => {
+    const store = createInMemoryEventStore();
+    store.append([meetingEvent('hv-2027', '2027-04-20')]);
+    expect(store.all()[0]).toMatchObject({ type: 'MeetingCreated', payload: { lifecycleVersion: 2 } });
+    const api = createInProcessApi({ store, actor: () => admin });
+    expect((await api.getMeeting()).status).toBe('preparation');
   });
 
   it('rejects duplicate creation and invalid lifecycle edges with their rule ids', async () => {

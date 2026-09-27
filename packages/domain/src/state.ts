@@ -108,7 +108,9 @@ export function reduce(state: State, e: DomainEvent): State {
         id: e.subjectId,
         title: e.payload.title,
         date: e.payload.date,
-        status: 'preparation',
+        // A pre-025 MeetingCreated has no lifecycle marker: preserve the running projection
+        // without mutating its hashed event or synthesising a second event in the global log.
+        status: e.payload.lifecycleVersion === 2 ? 'preparation' : 'running',
         version: 1,
         currentRound: 1,
         counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0, byStatus: Object.fromEntries(QUESTION_STATUSES.map((st) => [st, 0])) as Record<QuestionStatus, number> },

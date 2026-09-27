@@ -391,6 +391,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       title: `Ordentliche Hauptversammlung ${o.now.getUTCFullYear()}`,
       legalEntity: 'Beispiel AG (synthetische Demodaten)',
       date: o.now.toISOString().slice(0, 10),
+      lifecycleVersion: 2,
       agendaItems: SEED_AGENDA.map((a) => ({ ...a })),
       units: SEED_UNITS.map((u) => ({ ...u })),
     },

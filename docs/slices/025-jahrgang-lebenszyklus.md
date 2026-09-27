@@ -13,7 +13,7 @@
 ## Ziel
 
 1. Zwei Jahrgänge bestehen im selben globalen, lückenlos nummerierten Ereignislog. Jedes neu geschriebene Ereignis trägt explizit die richtige `meetingId`; Rekonstruktion, Zähler, Fragennummern F-n, Listen und Schreiboperationen sind auf den angefragten Jahrgang begrenzt. Ein Fremd-ID-Verweis liefert 404 und verändert den anderen Jahrgang nicht. Der Demo-Alias ohne Jahrgang folgt gemäß Vertrag 0.3.3 dem laufenden Jahrgang mit jüngstem Datum; ohne laufenden dem jüngsten Datum, bei Gleichstand der letzten Anlage.
-2. `MeetingCreated` projiziert `preparation`, `MeetingStarted` `running`, `MeetingClosed` `closed`; `DebateClosed` setzt nur `debateClosedAt`. Diese vier Ereignisse werden mit synthetischen v2-Fixtures gegen dieselbe Projektion und die R-MTG-Tabelle geprüft. 025 führt keine öffentliche Start-, Debattenschluss- oder Jahrgangsschluss-Operation ein. Die Demo-Seeddaten tragen ein `MeetingStarted`, damit der bisherige Ablauf in `running` bleibt.
+2. Neu angehängtes `MeetingCreated` trägt `payload.lifecycleVersion: 2` und projiziert `preparation`; `MeetingStarted` projiziert `running`, `MeetingClosed` `closed`; `DebateClosed` setzt nur `debateClosedAt`. Historische `MeetingCreated` ohne den erst mit 025 eingeführten Marker bleiben als `running` projiziert, weil der frühere Kern genau das tat; weder Ereignis noch Hashkette werden nachträglich verändert. Diese vier Ereignisse und ein historisches v2-Log werden gegen dieselbe Projektion und die R-MTG-Tabelle geprüft. 025 führt keine öffentliche Start-, Debattenschluss- oder Jahrgangsschluss-Operation ein. Die neuen Demo-Seeddaten tragen ein `MeetingStarted`, damit der Ablauf in `running` bleibt.
 3. `AgendaItemOpened`, `VotingOpened`, `VotingClosed` folgen einer expliziten Tabelle mit R-MTG-IDs. Nur `agenda.manage` darf die drei vorhandenen kanonischen Operationen ausführen. Jede Antwort enthält den fortgeschriebenen Tagesordnungspunkt; `Meeting.version` ist der ETag der kanonischen Jahrgangsleseroute und der Agenda-Schreibpfade. `If-Match` bleibt nach dem Vertrag bis 028 optional; ein mitgesendeter falscher Wert wird als 412 abgelehnt.
 4. R-MTG-03: Nach `DebateClosed` wird eine neue Erfassung über Alias und kanonische Route als 409 verweigert. Nur `paper`/`transcript` mit zugehörigem `occurredAtSource`, `occurredAt <= debateClosedAt` und nicht leerem `lateEntryReason` sind zulässig; `occurredAt` in der Zukunft ist 422. Das Ereignis hält `lateEntry: true` und den Grund fest; die Projektion zeigt `Contribution.lateEntry`. `recordedAt` bleibt die Serverzeit. Der HTTP-Test injiziert `DebateClosed` als synthetisches v2-Ereignis in denselben Store und ruft danach die echte Route auf.
 5. Die 14 Vertragsoperationen aus der 025-Allowlist werden im Dienst gemountet, gegen den Vertrag validiert und aus `allowlist.json` entfernt. Die Web-Oberfläche wird in dieser Scheibe nicht umgebaut.
@@ -22,7 +22,7 @@
 
 | ID | Ereignis / Aktion | Voraussetzung | Ergebnis |
 |---|---|---|---|
-| R-MTG-01 | `MeetingCreated` | ID existiert noch nicht | `preparation`, Version 1 |
+| R-MTG-01 | Neues `MeetingCreated` (`lifecycleVersion: 2`) | ID existiert noch nicht | `preparation`, Version 1; historische Ereignisse ohne Marker bleiben `running` |
 | R-MTG-02 | `MeetingStarted`, `MeetingClosed` | Start nur aus `preparation`, Schluss nur aus `running`; `DebateClosed` schließt den Jahrgang nicht | `running` bzw. `closed`, Version steigt |
 | R-MTG-03 | `ContributionCaptured` nach Debattenschluss | Nur Papier/Transkript mit Absenderzeit bis Debattenschluss und Pflichtgrund | `lateEntry: true`; sonst 409, ungültige Zeit 422 |
 | R-MTG-04 | `AgendaItemOpened` | Jahrgang `running`, Punkt vorhanden und noch nicht geöffnet | `openedAt` aus Serverzeit, Version steigt |
@@ -52,7 +52,7 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 - `packages/domain/policy-truth-table.md` (nur generierter Role-×-Agenda-Diff)
 - `packages/domain/src/__tests__/api.test.ts` (nur alte Einjahrgangserwartungen)
 - `packages/domain/src/__tests__/seed.test.ts` (nur alte Einjahrgangserwartungen)
-- `packages/domain/src/__tests__/seed-fictitious-names.test.ts` (nur Abzug des neuen Lebenszyklus-Ereignisses und der expliziten `meetingId` vom historischen RNG-Fingerabdruck)
+- `packages/domain/src/__tests__/seed-fictitious-names.test.ts` (nur Abzug des neuen Lebenszyklus-Ereignisses, Markers und der expliziten `meetingId` vom historischen RNG-Fingerabdruck)
 - `packages/domain/src/__tests__/envelope.test.ts` (nur Ereignistyp-/Jahrgangs-Fixtures)
 - `packages/domain/src/__tests__/rules.test.ts` (nur falls der Register-Snapshot angepasst werden muss)
 - `apps/api/src/app.ts`
@@ -71,7 +71,7 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 
 ## Tests zuerst und Abnahme
 
-1. Neue fokussierte Tests werden vor der Implementierung rot ausgeführt: zwei Jahrgänge, globale `seq`, getrennte F-Nummern/Listen und 404 bei Fremd-ID; synthetischer v2-Lebenszyklus und Debattenschluss; R-MTG-03 mit spätem Papier/Transkript; R-MTG-04..06 und fehlendes `agenda.manage`; alle 14 kanonischen HTTP-Operationen einschließlich ETag und Vertragsschema.
+1. Neue fokussierte Tests werden vor der Implementierung rot ausgeführt: zwei Jahrgänge, globale `seq`, getrennte F-Nummern/Listen und 404 bei Fremd-ID; synthetischer v2-Lebenszyklus, historisches v2-Log ohne `MeetingStarted` und Debattenschluss; R-MTG-03 mit spätem Papier/Transkript; R-MTG-04..06 und fehlendes `agenda.manage`; alle 14 kanonischen HTTP-Operationen einschließlich ETag und Vertragsschema.
 2. Nach Implementierung sind die fokussierten Tests und `pnpm gates` auf sauberem Commit grün. Browser verfügbar: vollständige E2E-Suite lokal oder in CI; Demo-Ablauf bleibt grün. Unabhängiges Review in frischem Kontext; Blocker/Major sowie Security/Legal/Privacy vor Merge beheben.
 3. Bericht im AGENTS.md-Format mit wörtlichem Schluss des Gate-Laufs, Commit, offener Grenze und berührten Dateien. Jeder Commit nennt „Scheibe 025“ und endet mit `[skip netlify]`.
 

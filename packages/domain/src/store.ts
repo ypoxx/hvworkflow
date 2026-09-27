@@ -46,7 +46,11 @@ export function createInMemoryEventStore(persistence?: Persistence, codec: PiiCo
         }
       }
       for (const e of events) {
-        const withSeq = stampEvent(e, log.length + appended.length + 1, appended.at(-1)?.hash ?? log.at(-1)?.hash ?? '', meetingId, codec);
+        // Older MeetingCreated facts had no lifecycle marker and projected directly to running.
+        // Mark only newly appended creations; loading and rehashing a historical fact is forbidden.
+        const input: NewEvent = e.type === 'MeetingCreated'
+          ? { ...e, payload: { ...e.payload, lifecycleVersion: 2 as const } } as NewEvent : e;
+        const withSeq = stampEvent(input, log.length + appended.length + 1, appended.at(-1)?.hash ?? log.at(-1)?.hash ?? '', meetingId, codec);
         appended.push(withSeq);
         if (withSeq.type === 'MeetingCreated') meetingId = withSeq.subjectId;
       }

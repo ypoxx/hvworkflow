@@ -42,6 +42,8 @@ export type MeetingCreated = Base<
     title: string;
     legalEntity?: string;
     date: string;
+    /** Written on new creations since 025; absent on older logs that were already running. */
+    lifecycleVersion?: 2;
     agendaItems: { id: string; number: number; title: string }[];
     units: { id: string; name: string; shortName?: string }[];
   }
