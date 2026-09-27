@@ -227,17 +227,22 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
-  for (const e of store.all()) {
-    if (options.meetingId === undefined || e.meetingId === options.meetingId) reduce(state, e);
+  const aliasStates = new Map<string, State>();
+  if (options.meetingId !== undefined) {
+    for (const e of store.all()) if (e.meetingId === options.meetingId) reduce(state, e);
+  } else {
+    for (const e of store.all()) {
+      if (!e.meetingId) continue;
+      let scoped = aliasStates.get(e.meetingId);
+      if (!scoped) {
+        scoped = emptyState();
+        aliasStates.set(e.meetingId, scoped);
+      }
+      reduce(scoped, e);
+    }
   }
   const idempotency = new Map<string, unknown>();
   let activeIdempotencyKey: string | undefined;
-
-  store.subscribe((events) => {
-    for (const e of events) {
-      if (e.seq > state.lastSeq && (options.meetingId === undefined || e.meetingId === options.meetingId)) reduce(state, e);
-    }
-  });
 
   const stateForMeeting = (meetingId: string): State => {
     const projected = emptyState();
@@ -245,6 +250,33 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     if (!projected.meeting) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
     return projected;
   };
+  const refreshAliasState = (): void => {
+    const meetings = [...aliasStates.values()].filter((candidate) => candidate.meeting !== null);
+    // Contract 0.3.3: latest running date wins; otherwise latest date. Equal dates keep the
+    // later MeetingCreated, which is later in the append-only global log.
+    const candidates = meetings.some((candidate) => candidate.meeting?.status === 'running')
+      ? meetings.filter((candidate) => candidate.meeting?.status === 'running') : meetings;
+    state = candidates.reduce<State | undefined>((latest, candidate) =>
+      !latest || candidate.meeting!.date >= latest.meeting!.date ? candidate : latest, undefined) ?? emptyState();
+    state.lastSeq = store.lastSeq();
+  };
+  if (options.meetingId === undefined) refreshAliasState();
+  store.subscribe((events) => {
+    if (options.meetingId === undefined) {
+      for (const e of events) {
+        if (!e.meetingId) continue;
+        let scoped = aliasStates.get(e.meetingId);
+        if (!scoped) {
+          scoped = emptyState();
+          aliasStates.set(e.meetingId, scoped);
+        }
+        reduce(scoped, e);
+      }
+      refreshAliasState();
+    } else {
+      for (const e of events) if (e.seq > state.lastSeq && e.meetingId === options.meetingId) reduce(state, e);
+    }
+  });
   const viewMeeting = (meeting: Meeting): Meeting => ({
     ...meeting,
     counts: { ...meeting.counts, byStatus: { ...meeting.counts.byStatus } },
@@ -557,6 +589,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
 
     async listContributions(filter = {}) {
       requireReadPermission('listContributions');
+      if (options.meetingId !== undefined && filter.speakerId !== undefined) requireSpeaker(filter.speakerId);
       return [...state.contributions.values()]
         .filter((c) => filter.speakerId === undefined || c.speakerId === filter.speakerId)
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
@@ -609,6 +642,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
 
     async listQuestions(filter = {}) {
       requireReadPermission('listQuestions');
+      if (options.meetingId !== undefined) {
+        if (filter.speakerId !== undefined) requireSpeaker(filter.speakerId);
+        if (filter.contributionId !== undefined) requireContribution(filter.contributionId);
+        if (filter.unitId !== undefined && !state.units.some((unit) => unit.id === filter.unitId)) {
+          throw new ApiProblem(404, 'Not found', `Unit ${filter.unitId} does not exist.`);
+        }
+        if (filter.agendaItemId !== undefined && !state.agendaItems.some((item) => item.id === filter.agendaItemId)) {
+          throw new ApiProblem(404, 'Not found', `Agenda item ${filter.agendaItemId} does not exist.`);
+        }
+      }
       // Festlegung 2: a status filter naming a status outside the actor's own read scope is R-PERM-03
       // — checked through `can()` itself (a `questionShell` per candidate status), never a second,
       // hand-rolled walk of `READ_SCOPES` (rework round, point 3). `requireReadPermission` above
@@ -646,7 +689,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
       }
       requireReadPermission('getQuestionHistory'); // 403 R-PERM-02 if history.read itself is missing
-      return store.all().filter((e) => e.subjectId === q.id);
+      return store.all().filter((e) => e.subjectId === q.id && e.meetingId === state.meeting?.id);
     },
     async classifyQuestion(id, input, opts) {
       if (!TRACKS.includes(input.track)) throw new ApiProblem(422, 'Unprocessable', 'track must be podium, fast_track or expert_track.');

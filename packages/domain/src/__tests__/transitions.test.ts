@@ -266,6 +266,13 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       lines.push(`| ${role} | ${cells.join(' | ')} |`);
     }
 
+    lines.push('', '# Policy truth table — Role × Agenda', '',
+      'Scheibe 025: explicit agenda.manage grant; other roles are denied by default.', '',
+      '| Role | agenda.manage |', '|---|---|');
+    for (const role of ROLES) {
+      lines.push(`| ${role} | ${can({ id: 'x', role }, 'agenda.manage').allow ? '✓' : '·'} |`);
+    }
+
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');
   });
 

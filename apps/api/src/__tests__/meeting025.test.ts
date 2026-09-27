@@ -50,6 +50,10 @@ describe('Scheibe 025: kanonische Jahrgangsrouten', () => {
     expect(await alias.json()).toMatchObject({ id: 'hv-2027', counts: { speakers: 1 } });
     const foreign = await req(app, 'GET', '/v1/meetings/missing/speakers', { actor: ACTOR.admin });
     expect(foreign.status).toBe(404);
+    const foreignContributionFilter = await req(app, 'GET', '/v1/meetings/hv-2027/contributions?speakerId=old-speaker', { actor: ACTOR.admin });
+    expect(foreignContributionFilter.status).toBe(404);
+    const foreignQuestionFilter = await req(app, 'GET', '/v1/meetings/hv-2027/questions?speakerId=old-speaker', { actor: ACTOR.admin });
+    expect(foreignQuestionFilter.status).toBe(404);
   });
 
   it('exercises all canonical readers, speaker writes and agenda transitions against the contract', async () => {

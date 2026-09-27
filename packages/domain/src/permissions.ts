@@ -63,7 +63,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'history.read',
   ],
   podium: ['question.deliver', 'question.return', 'question.close', 'stage.read'],
-  admin: [...PERMISSIONS],
+  // Scheibe 025: the agenda grant is explicit. All other bundles deny it by default.
+  admin: [...PERMISSIONS.filter((permission) => permission !== 'agenda.manage'), 'agenda.manage'],
   observer: ['question.read.delivered'],
 };
 

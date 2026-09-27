@@ -3,6 +3,8 @@ import { createInProcessApi } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import type { NewEvent } from '../events.js';
 import type { Actor } from '../types.js';
+import { can } from '../api.js';
+import { ROLE_PERMISSIONS } from '../permissions.js';
 
 const admin: Actor = { id: 'test-admin', role: 'admin' };
 const at = '2027-04-20T10:00:00.000Z';
@@ -68,6 +70,45 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     expect((await api.getMeetingById('hv-2026')).status).toBe('preparation');
     expect((await api.listMeetingAgendaItems('hv-2026')).map((item) => item.id)).toEqual(['top-hv-2026']);
     await expect(api.getMeetingById('missing')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('uses the latest running date for the alias, regardless of creation order', async () => {
+    const store = createInMemoryEventStore();
+    store.append([meetingEvent('hv-2027', '2027-04-20'), meetingEvent('hv-2026', '2026-04-20'),
+      lifecycleEvent('MeetingStarted', 'hv-2026', at)]);
+    const api = createInProcessApi({ store, actor: () => admin });
+    expect((await api.getMeeting()).id).toBe('hv-2026');
+    store.append([lifecycleEvent('MeetingStarted', 'hv-2027', at)]);
+    expect((await api.getMeeting()).id).toBe('hv-2027');
+  });
+
+  it('does not persist an agenda transition for an unknown or foreign point', () => {
+    const store = createInMemoryEventStore();
+    store.append([meetingEvent('hv-2026', '2026-04-20'), lifecycleEvent('MeetingStarted', 'hv-2026', at),
+      meetingEvent('hv-2027', '2027-04-20'), lifecycleEvent('MeetingStarted', 'hv-2027', at)]);
+    const before = store.lastSeq();
+    expect(() => store.append([{ id: 'bad-agenda', type: 'AgendaItemOpened', at, actor: admin,
+      subjectId: 'hv-2027', meetingId: 'hv-2027', payload: { agendaItemId: 'top-hv-2026', number: 1 } }]))
+      .toThrow(/R-MTG-04/);
+    expect(store.lastSeq()).toBe(before);
+  });
+
+  it('grants agenda.manage explicitly only to the designated role', () => {
+    for (const role of Object.keys(ROLE_PERMISSIONS) as Actor['role'][]) {
+      expect(can({ id: 'actor', role }, 'agenda.manage').allow, role).toBe(role === 'admin');
+    }
+  });
+
+  it('keeps question history within the requested meeting when subject IDs collide', async () => {
+    const store = createInMemoryEventStore();
+    store.append([meetingEvent('hv-2026', '2026-04-20'), lifecycleEvent('MeetingStarted', 'hv-2026', at),
+      { id: 'old-question', type: 'QuestionCaptured', at, actor: admin, subjectId: 'same-question', meetingId: 'hv-2026',
+        payload: { number: 'F-0001', contributionId: 'old-contribution', speakerId: 'old-speaker', text: 'Alt' } },
+      meetingEvent('hv-2027', '2027-04-20'), lifecycleEvent('MeetingStarted', 'hv-2027', at),
+      { id: 'new-question', type: 'QuestionCaptured', at, actor: admin, subjectId: 'same-question', meetingId: 'hv-2027',
+        payload: { number: 'F-0001', contributionId: 'new-contribution', speakerId: 'new-speaker', text: 'Neu' } }]);
+    const api = createInProcessApi({ store, actor: () => admin, meetingId: 'hv-2027' });
+    expect((await api.getQuestionHistory('same-question')).map((event) => event.id)).toEqual(['new-question']);
   });
 
   it('isolates writes, F-n counters and the latest demo alias when meetings interleave', async () => {

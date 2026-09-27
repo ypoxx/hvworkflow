@@ -119,21 +119,19 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
     case 'MeetingStarted': {
-      if (state.meeting?.id === e.subjectId) {
-        const transition = resolveMeetingLifecycle(state.meeting, e.type);
-        if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
-        state.meeting.status = transition.to;
-        state.meeting.version = (state.meeting.version ?? 1) + 1;
-      }
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-02: meeting does not exist here.');
+      const transition = resolveMeetingLifecycle(state.meeting, e.type);
+      if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
+      state.meeting.status = transition.to;
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
       break;
     }
     case 'MeetingClosed': {
-      if (state.meeting?.id === e.subjectId) {
-        const transition = resolveMeetingLifecycle(state.meeting, e.type);
-        if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
-        state.meeting.status = transition.to;
-        state.meeting.version = (state.meeting.version ?? 1) + 1;
-      }
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-02: meeting does not exist here.');
+      const transition = resolveMeetingLifecycle(state.meeting, e.type);
+      if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
+      state.meeting.status = transition.to;
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
       break;
     }
     case 'DebateClosed': {
@@ -146,9 +144,9 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'AgendaItemOpened':
     case 'VotingOpened':
     case 'VotingClosed': {
-      if (state.meeting?.id !== e.subjectId) break;
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-04: meeting does not exist here.');
       const item = state.agendaItems.find((a) => a.id === e.payload.agendaItemId);
-      if (!item) break;
+      if (!item) throw new Error('R-MTG-04: agenda item does not exist here.');
       const transition = resolveAgendaProgress(state.meeting, item, e.type);
       if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
       const at = e.recordedAt ?? e.at;
