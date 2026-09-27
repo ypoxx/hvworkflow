@@ -60,18 +60,18 @@ Weitere Dateien oder eine abweichende Auth-Architektur sind Scope-Befunde: zuers
 
 Slice: 029b-anmeldung-beta
 Done: OIDC-BFF mit browsergebundenem Rückruf, Postgres-Sitzungen, aktuellem Rollenentzug und CSRF-Tor gebaut. Fünf Auth-Operationen aus der Vertrags-Allowlist entfernt; DE/EN-Hinweis ist Login-Voraussetzung. Unabhängiges Review und enger Re-Check schlossen die drei gemeldeten Auth-, DB-Rechte- und Datenschutzbefunde auf Codeebene.
-Evidence: Baucommit `d93bab4` · `pnpm gates` auf sauberem Arbeitsbaum: Exit 0. Vollständige Chromium-E2E-Suite: 127/127 bestanden. API-Suite: 150 bestanden, 29 lokale Postgres-Tests ohne Datenbank übersprungen. Der wörtliche Schluss von `pnpm gates` auf `d93bab4`:
+Evidence: Baucommit `6de0c53` · `pnpm gates` auf sauberem Arbeitsbaum mit Node 24: Exit 0. Vollständige Chromium-E2E-Suite: 127/127 bestanden. API-Suite: 150 bestanden, 29 lokale Postgres-Tests ohne Datenbank übersprungen. Der wörtliche Schluss von `pnpm gates` auf `6de0c53`:
 
 ```text
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 400ms
-mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit d93bab4, tree 16a406fc463a…
+✓ built in 705ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit 6de0c53, tree 745355125c18…
 ```
 
-Open: Echter Postgres-Migrations-/Grant-Test und Keycloak-Browserlauf sind mangels lokalem Docker bis zur PR-CI offen; deren grünes Ergebnis auf dem letzten PR-Commit ist Merge-Bedingung. 030/031 liefern Anmeldeseite und vollständige HTTP-Web-Betriebsart; 035 muss offene SSE-Ströme beim Entzug prüfen; 040 muss Jahrgang/Erst-Admin auditierbar bootstrappen. Vor einer Beta mit echten Personen sind E11/E14/E15, eine Aufbewahrungsfrist und ein getesteter Löschweg für abgelaufene pseudonyme Auth-Datensätze zu klären; 088 ergänzt Realm/TOTP und einen unveränderlichen Container-Digest. Notfallkonten (029) bleiben bis nach der Fortführungsentscheidung zurückgestellt. Kein Deploy.
+Open: Echter Postgres-Migrations-/Grant-Test ist in der PR-CI grün; der Keycloak-Browserlauf bleibt bis zum vollständigen CI-Ergebnis offen. Grünes CI-Ergebnis auf dem letzten PR-Commit ist Merge-Bedingung. 030/031 liefern Anmeldeseite und vollständige HTTP-Web-Betriebsart; 035 muss offene SSE-Ströme beim Entzug prüfen; 040 muss Jahrgang/Erst-Admin auditierbar bootstrappen. Vor einer Beta mit echten Personen sind E11/E14/E15, eine Aufbewahrungsfrist und ein getesteter Löschweg für abgelaufene pseudonyme Auth-Datensätze zu klären; 088 ergänzt Realm/TOTP und einen unveränderlichen Container-Digest. Notfallkonten (029) bleiben bis nach der Fortführungsentscheidung zurückgestellt. Kein Deploy.
 Touched: `.github/workflows/gates.yml`; `apps/api/migrations/{0002_auth.up.sql,0002_auth.down.sql}`; `apps/api/package.json`; `apps/api/src/__tests__/{auth-029b.test.ts,contract.test.ts,helpers.ts,postgres-auth-029b.test.ts,takt-019-contract.test.ts}`; `apps/api/src/{actor.ts,app.ts,server.ts}`; `apps/api/src/auth/{oidc.ts,sessions.ts,store.ts,subject-block-cli.ts}`; `apps/api/src/persistence/{migrations.ts,postgres.ts}`; `docs/adr/0004-identitaet-oidc-bff.md`; `docs/legal-trace.md`; `docs/sicherheit/bedrohungsmodell.md`; `docs/slices/029b-anmeldung-beta.md`; `packages/contract/{CHANGELOG.md,allowlist.json,openapi.yaml,package.json}`; `packages/contract/src/types.ts`; `packages/domain/src/{api.ts,rules.ts}`; `packages/domain/src/__tests__/person-roles026.test.ts`; `pnpm-lock.yaml`; `scripts/keycloak-ci-029b.mjs`.
 
 ## Review findings
