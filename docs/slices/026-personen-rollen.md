@@ -1,7 +1,11 @@
 # Scheibe 026 — Personentabelle und Rollenereignisse
 
 **Status:** geplant · **Risikoklasse:** hoch · **Lanes:** core, service
-**Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/026; ADR 0004, 0009, 0011, 0013; Vertrag 0.3.3. Scheibe 025 ist mit PR #53 (`7bd0e30`) integriert. E8 baut auf der Standardannahme: die Zuordnungstabelle im Tool ist die Wahrheit, IdP-Gruppen sind später nur Vorschläge.
+**Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/026; ADR 0004, 0009, 0011, 0013, 0015; Vertrag 0.3.3. Scheibe 025 ist mit PR #53 (`7bd0e30`) integriert. E8 baut auf der Standardannahme: die Zuordnungstabelle im Tool ist die Wahrheit, IdP-Gruppen sind später nur Vorschläge.
+
+**Nachtrag nach Stopp und Freigabe durch den Eigentümer am 27.09.2026:** Der erste Baucommit `6ee35c6` und `pnpm gates` zeigten, dass die bisherige Dateiliste Web-Übersetzungen und die Historienanzeige ausschloss. Das unabhängige Review fand zudem einen Widerspruch zwischen PII-Maskierung und dem Hash eines unveränderten Ereignisses. Der Eigentümer hat die Erweiterung dieser Scheibe und des Vertrags freigegeben. Die folgenden Festlegungen gelten vor der Nacharbeit; der erste Bau wird nicht rückwirkend als vollständig oder gate-grün ausgegeben.
+
+**Vertragsentscheidung für die Lesedarstellung:** Das gespeicherte `Event` und seine Hash-Kette bleiben unverändert und nur auf dem vollständigen Original verifizierbar. `listEvents`, `getQuestionHistory` und SSE liefern künftig ein eigenständiges `EventRead`: dieselbe globale `seq` und die für die Anzeige nötigen fachlichen Felder, aber ohne `personId`, `payload.pii`, historische Klarname-Felder oder `hash`/`prevHash`. `sourceHash` bezeichnet nur den Hash des gespeicherten Originals; er ist kein Hash über `EventRead` und aus dessen JSON nicht nachrechenbar. Die Vertragsantworten und Typen werden entsprechend geändert. Der Vertrag steigt auf 0.3.4; die geplanten 028-Pflichtfelder rücken auf 0.3.5. Die bewusste Vorab-Kompatibilitätsgrenze wird im Changelog mit ADR 0009/0013/0015 begründet. Kein neuer Endpunkt.
 
 ## Ziel und Grenzen
 
@@ -20,7 +24,7 @@ Der Role-×-Action-Diff wird vor den Codeänderungen in der Spec festgelegt: `qu
 
 ## Nicht-Ziele
 
-Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufender Session-Entzug (029b), keine physische Postgres-Tabelle (027), keine Vertraulichkeitsstufen oder `event.read.personal` (047), kein protokolliertes Aufdecken per Lookup (067), keine Oberfläche zur Rollenverwaltung (040), keine neue Vertragsoperation oder Vertragsversion, kein Deploy.
+Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufender Session-Entzug (029b), keine physische Postgres-Tabelle (027), keine Vertraulichkeitsstufen oder `event.read.personal` (047), kein protokolliertes Aufdecken per Lookup (067), keine Oberfläche zur Rollenverwaltung (040), keine neue Vertragsoperation, kein Deploy.
 
 ## Files allowed
 
@@ -47,6 +51,16 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 - `apps/api/src/__tests__/person-roles026.test.ts`
 - `apps/api/src/__tests__/helpers.ts` (nur 026-Operation-Coverage)
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "026"`)
+- `packages/contract/openapi.yaml` (nur `EventRead`, drei Leseantworten/SSE und Versionsverweise 028)
+- `packages/contract/package.json` (nur Versionsnummer)
+- `packages/contract/CHANGELOG.md` (nur 0.3.4 und Verschiebung 028)
+- `packages/contract/src/types.ts` (nur generiert)
+- `apps/web/src/i18n/labels.ts` (nur vier neue Labels)
+- `apps/web/src/i18n/shell.de.ts` (nur vier neue Labels)
+- `apps/web/src/i18n/shell.en.ts` (nur vier neue Labels)
+- `apps/web/src/i18n/parity.test.ts` (nur Zähler/Parität)
+- `apps/web/src/features/history/eventSummary.ts` (nur maskierte Sprecherhistorie und neue Ereignisse)
+- `apps/web/src/features/history/eventSummary.test.ts`
 - `docs/rollen-und-rechtekonzept.md` (nur Gewährung und zeitliche Grenze)
 - `docs/legal-trace.md` (nur generierte Regelzeilen, falls neue Regeln)
 - `docs/evidence/026-personen-rollen.jpg` (Browser-Nachweis der pseudonymen Ansicht)
@@ -54,6 +68,7 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 ## Tests zuerst und Abnahme
 
 1. Fokussierte Tests laufen vor der Implementierung rot: zwei Personen in getrennten Jahrgängen; neuer Sprecher schreibt keinen Namen außerhalb `pii` und trägt `personId`/`keyId`; fünf Reveal-Rollen sehen Namen, alle anderen Pseudonym; Frage und Bühne verraten bei fehlendem Recht keinen Namen; `expert` ohne Einheit 403; Zuordnung/Entzug/Ablauf/Jahrgangsende; fremde ID 404; alle drei HTTP-Operationen vertragsvalidiert; alte v2-Logs bleiben lesbar.
+   Nachtrag: Ein Test beweist, dass `EventRead` ohne PII und ohne `hash`/`prevHash` ausgegeben wird und `sourceHash` dem unveränderten, separat verifizierten Original entspricht. Historische `AnswerDrafted.createdBy.displayName`-Felder bleiben in Ansichten und Historie unsichtbar. Eine fremde oder unbekannte `personId` bei `assignRole` ergibt 404. Web-Historie und DE/EN-Labels erhalten fokussierte Tests. Die E2E-Suite startet mit frischem Browserprofil; ein vorhandener lokaler Altbestand wird separat diagnostiziert, nicht still umgeschrieben.
 2. Fokussierte Tests und `pnpm gates` laufen auf sauberem Commit grün. Browser verfügbar: volle E2E-Suite und Screenshot; unabhängiges Review in frischem Kontext, Blocker/Major sowie Security/Legal/Privacy vor Merge beheben. PR-CI auf letztem Commit grün. Jeder Commit nennt „Scheibe 026“ und endet `[skip netlify]`.
 3. Bericht nach AGENTS.md mit wörtlichem Schluss von `pnpm gates`, Commit, offenen Grenzen, Bedrohungs-ID→Test und berührten Dateien. Kein Deploy.
 
