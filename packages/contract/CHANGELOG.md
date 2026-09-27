@@ -10,6 +10,19 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.4] - 2026-09-27
+
+### Changed
+
+- Slice 026 (ADR 0009, 0013 and 0015): `getQuestionHistory`, `listEvents` and SSE now return
+  `EventRead`, a redacted projection of the unchanged stored `Event`. It retains the global `seq`
+  but omits `personId`, `payload.pii`, historical clear-name fields, `hash` and `prevHash`.
+  `sourceHash` identifies the complete stored original and cannot be recomputed from the redacted
+  JSON. This is an intentional response compatibility boundary before beta: clients that consumed
+  personal data or recomputed the hash from the HTTP event must adapt to `EventRead`.
+- Slice 028's planned mandatory fields and `If-Match` requirement move from 0.3.4 to 0.3.5.
+  No slice 028 field becomes mandatory in this patch.
+
 ## [0.3.3] - 2026-09-27
 
 ### Added

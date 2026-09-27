@@ -11,6 +11,7 @@ import type {
   SpeakerReopenReason,
   SpeakerStatus,
   TextSpan,
+  Role,
 } from './types.js';
 
 interface Base<T extends string, P> {
@@ -58,12 +59,18 @@ export type SpeakerRegistered = Base<
   'SpeakerRegistered',
   {
     number: number;
-    displayName: string;
+    /** Historical events only; new writes place the name in `pii`. */
+    displayName?: string;
     organisation?: string;
+    pii?: { keyId: string; displayName: string; organisation?: string };
     round: number;
     position: number;
   }
 >;
+export type RoleAssigned = Base<'RoleAssigned', {
+  assignmentId: string; subjectId: string; role: Role; unitId?: string; expiresAt?: string; deputyForSubjectId?: string;
+}>;
+export type RoleRevoked = Base<'RoleRevoked', { assignmentId: string; subjectId: string; role: Role; reason?: string }>;
 export type SpeakersReordered = Base<'SpeakersReordered', { round: number; speakerIds: string[] }>;
 export type SpeakerUpdated = Base<
   'SpeakerUpdated',
@@ -105,6 +112,8 @@ export type DomainEvent =
   | VotingOpened
   | VotingClosed
   | SpeakerRegistered
+  | RoleAssigned
+  | RoleRevoked
   | SpeakersReordered
   | SpeakerUpdated
   | ContributionCaptured
@@ -123,6 +132,11 @@ export type DomainEvent =
   | QuestionMerged;
 
 export type EventType = DomainEvent['type'];
+
+/** Standard read projection. sourceHash identifies the immutable original, not this redacted JSON. */
+export type ReadEvent = DomainEvent extends infer E
+  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId'> & { redacted: true; sourceHash: string } : never
+  : never;
 
 /** An event before it is appended: the store assigns `seq`. */
 export type NewEvent = Omit<DomainEvent, 'seq'>;

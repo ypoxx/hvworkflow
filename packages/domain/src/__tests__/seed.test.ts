@@ -12,6 +12,26 @@ describe('synthetic corpus (CORPUS_LOAD)', () => {
     expect(CORPUS_LOAD.questions).toBe(800);
     expect(state.questions.size).toBe(CORPUS_LOAD.questions);
   });
+  it('keeps speaker identity in a keyed PII envelope for this meeting', () => {
+    const speakers = events.filter((event) => event.type === 'SpeakerRegistered') as Extract<DomainEvent, { type: 'SpeakerRegistered' }>[];
+    expect(speakers).toHaveLength(118);
+    for (const event of speakers) {
+      expect(event.personId).toBeTruthy();
+      expect(event.payload).not.toHaveProperty('displayName');
+      expect(event.payload).not.toHaveProperty('organisation');
+      expect(event.payload.pii).toEqual({
+        keyId: event.meetingId,
+        displayName: expect.any(String),
+        ...(event.payload.pii?.organisation !== undefined ? { organisation: expect.any(String) } : {}),
+      });
+    }
+  });
+  it('does not reuse synthetic person IDs across meeting years', () => {
+    const nextYear = seedEvents({ ...CORPUS_LOAD, now: new Date('2028-04-20T13:30:00.000Z'), actor: { id: 'sys', role: 'admin' } });
+    const currentIds = new Set(events.filter((event) => event.type === 'SpeakerRegistered').map((event) => event.personId));
+    const nextIds = nextYear.filter((event) => event.type === 'SpeakerRegistered').map((event) => event.personId);
+    expect(nextIds.every((personId) => personId !== undefined && !currentIds.has(personId))).toBe(true);
+  });
   it('is deterministic', () => {
     const again = seedEvents({ ...CORPUS_LOAD, now: new Date('2027-04-20T13:30:00.000Z'), actor: { id: 'sys', role: 'admin' } });
     expect(again.map((e) => e.type + e.subjectId)).toEqual(events.map((e) => e.type + e.subjectId));

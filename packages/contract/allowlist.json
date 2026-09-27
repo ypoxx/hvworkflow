@@ -1,7 +1,4 @@
 [
-  {"operationId":"listRoleAssignments","reason":"Vertrag 0.3.0 (Scheibe 023): Rollenzuordnungstabelle als Ereignisse RoleAssigned/RoleRevoked (ADR 0004); Kern in 026; Lane service seit takt-011; wird mit Scheibe 026 ausgeübt und entfernt","slice":"026","expires":"2026-11-25"},
-  {"operationId":"assignRole","reason":"Vertrag 0.3.0 (Scheibe 023): RoleAssigned mit admin.roles.manage, optionale unitId; Kern in 026; Lane service seit takt-011; wird mit Scheibe 026 ausgeübt und entfernt","slice":"026","expires":"2026-11-25"},
-  {"operationId":"revokeRole","reason":"Vertrag 0.3.0 (Scheibe 023): RoleRevoked mit admin.roles.manage; Kern in 026; Lane service seit takt-011; wird mit Scheibe 026 ausgeübt und entfernt","slice":"026","expires":"2026-11-25"},
   {"operationId":"claimContribution","reason":"Vertrag 0.3.0 (Scheibe 023): Übernahme-Sperre ContributionClaimed mit TTL (E36); Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
   {"operationId":"releaseContribution","reason":"Vertrag 0.3.0 (Scheibe 023): ContributionReleased; Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
   {"operationId":"claimQuestion","reason":"Vertrag 0.3.0 (Scheibe 023): Übernahme-Sperre QuestionClaimed mit TTL (E36); Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},

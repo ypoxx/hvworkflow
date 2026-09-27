@@ -29,6 +29,8 @@ import {
   type QuestionCapture,
   type QuestionFilter,
   type QuestionStatus,
+  type Role,
+  type RoleAssignmentCreate,
   type Speaker,
   type SpeakerRegistration,
   type SpeakerUpdate,
@@ -223,6 +225,26 @@ export function createApp(options: CreateAppOptions = {}): App {
     (c) => agendaResult(c, 'openVoting'));
   app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/closure', validateOperation('closeVoting'),
     (c) => agendaResult(c, 'closeVoting'));
+
+  app.get('/v1/meetings/:meetingId/role-assignments', validateOperation('listRoleAssignments'), async (c) => {
+    const query = getValidatedQuery(c);
+    return c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).listRoleAssignments({
+      ...(query['subjectId'] !== undefined ? { subjectId: query['subjectId'] as string } : {}),
+      ...(query['role'] !== undefined ? { role: query['role'] as Role } : {}),
+    }));
+  });
+  app.post('/v1/meetings/:meetingId/role-assignments', validateOperation('assignRole'), async (c) => {
+    const assignment = await (await meetingDomain(requireParam(c, 'meetingId')))
+      .assignRole(getValidatedBody<RoleAssignmentCreate>(c), writeOptions(c));
+    return c.json(assignment, 201);
+  });
+  app.post('/v1/meetings/:meetingId/role-assignments/:assignmentId/revocation',
+    validateOperation('revokeRole'), async (c) => {
+      const body = getValidatedBody<{ reason?: string } | undefined>(c);
+      const assignment = await (await meetingDomain(requireParam(c, 'meetingId')))
+        .revokeRole(requireParam(c, 'assignmentId'), body?.reason, writeOptions(c));
+      return c.json(assignment);
+    });
 
   app.get('/v1/meetings/:meetingId/speakers', validateOperation('listMeetingSpeakers'), async (c) => {
     const query = getValidatedQuery(c);

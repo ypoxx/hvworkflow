@@ -430,12 +430,12 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
         at,
         actor: SEED_ACTORS.moderation!,
         subjectId: sid,
+        personId: `person-${meetingId}-${sid}`,
         payload: {
           number: speakerNumber,
-          displayName: name,
           round,
           position: sp.position,
-          ...(org !== undefined ? { organisation: org } : {}),
+          pii: { keyId: meetingId, displayName: name, ...(org !== undefined ? { organisation: org } : {}) },
         },
       });
     }
@@ -594,7 +594,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
         at: tick(120_000, 900_000),
         actor: expert,
         subjectId: qid,
-        payload: { answer: { version, text: answerText, createdAt: new Date(clock).toISOString(), createdBy: expert, sources: [track === 'fast_track' ? 'Geschäftsbericht ' + year : 'Q&A-Katalog ' + part.topic.id] } },
+        payload: { answer: { version, text: answerText, createdAt: new Date(clock).toISOString(), createdBy: { id: expert.id, role: expert.role }, sources: [track === 'fast_track' ? 'Geschäftsbericht ' + year : 'Q&A-Katalog ' + part.topic.id] } },
       });
       if (targetStatus === 'answer_drafted') continue;
 
@@ -608,7 +608,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
           at: tick(120_000, 600_000),
           actor: expert,
           subjectId: qid,
-          payload: { answer: { version, text: answerText + ' Quelle: Geschäftsbericht ' + year + ', Konzernanhang.', createdAt: new Date(clock).toISOString(), createdBy: expert, sources: ['Geschäftsbericht ' + year] } },
+          payload: { answer: { version, text: answerText + ' Quelle: Geschäftsbericht ' + year + ', Konzernanhang.', createdAt: new Date(clock).toISOString(), createdBy: { id: expert.id, role: expert.role }, sources: ['Geschäftsbericht ' + year] } },
         });
         push({ type: 'QuestionSubmittedForReview', at: tick(30_000, 200_000), actor: expert, subjectId: qid, payload: { answerVersion: version } });
       }

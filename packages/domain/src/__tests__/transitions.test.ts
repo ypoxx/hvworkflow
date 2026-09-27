@@ -220,7 +220,7 @@ describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {
 });
 
 describe('policy truth table (Role × Status × Action, Role × Leserecht)', () => {
-  const actions = PERMISSIONS.filter((p) => p.startsWith('question.') || p === 'answer.draft') as Permission[];
+  const actions = PERMISSIONS.filter((p) => (p.startsWith('question.') && p !== 'question.identity.reveal') || p === 'answer.draft') as Permission[];
   it('matches the committed table — any change must be reviewed', async () => {
     const lines: string[] = [
       '# Policy truth table — Role × Status × Action',
@@ -271,6 +271,14 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       '| Role | agenda.manage |', '|---|---|');
     for (const role of ROLES) {
       lines.push(`| ${role} | ${can({ id: 'x', role }, 'agenda.manage').allow ? '✓' : '·'} |`);
+    }
+
+    lines.push('', '# Policy truth table — Role × Identität und Rollenverwaltung', '',
+      'Scheibe 026: identity reveal is limited to the five operational roles selected before build;',
+      'role management is limited to administration. Both are independent of question status.', '',
+      '| Role | question.identity.reveal | admin.roles.manage |', '|---|---|---|');
+    for (const role of ROLES) {
+      lines.push(`| ${role} | ${can({ id: 'x', role }, 'question.identity.reveal').allow ? '✓' : '·'} | ${can({ id: 'x', role }, 'admin.roles.manage').allow ? '✓' : '·'} |`);
     }
 
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');
