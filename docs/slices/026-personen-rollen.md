@@ -8,6 +8,8 @@
 
 **Vertragsentscheidung für die Lesedarstellung:** Das gespeicherte `Event` und seine Hash-Kette bleiben unverändert und nur auf dem vollständigen Original verifizierbar. `listEvents`, `getQuestionHistory` und SSE liefern künftig ein eigenständiges `EventRead`: dieselbe globale `seq` und die für die Anzeige nötigen fachlichen Felder, aber ohne `personId`, `payload.pii`, historische Klarname-Felder oder `hash`/`prevHash`. `sourceHash` bezeichnet nur den Hash des gespeicherten Originals; er ist kein Hash über `EventRead` und aus dessen JSON nicht nachrechenbar. Die Vertragsantworten und Typen werden entsprechend geändert. Der Vertrag steigt auf 0.3.4; die geplanten 028-Pflichtfelder rücken auf 0.3.5. Die bewusste Vorab-Kompatibilitätsgrenze wird im Changelog mit ADR 0009/0013/0015 begründet. Kein neuer Endpunkt.
 
+**Nachtrag nach unabhängigem Review, vom Eigentümer am 27.09.2026 freigegeben:** Die bestehende Beschreibung von `Speaker.displayName` im OpenAPI-Vertrag widerspricht der oben festgelegten Leseregel. Sie darf präzise korrigiert werden: Rollen mit `question.identity.reveal` erhalten den Klarnamen aus der Personentabelle; alle anderen erhalten `Redner <Nummer>`. Das ändert weder Feldtyp noch Rechteentscheidung.
+
 ## Ziel und Grenzen
 
 1. Der Kern führt `Person {personId, displayName, organisation?}` als eigene, je Jahrgang rekonstruierbare Entität. Neue Sprecherereignisse tragen eine pseudonyme `subjectId`, `personId` im Umschlag und personenbezogene Felder nur in `payload.pii` mit `keyId`; `SpeakerRegistered.payload` enthält keinen Klarnamen. Die Identitäts-Codec-Grenze aus 024 bleibt erhalten. Historische Ereignisse bleiben unverändert lesbar; sie werden nie umgeschrieben. Die physische Postgres-Personentabelle folgt in 027.
@@ -53,7 +55,7 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur bisherige feste Version und EventRead-Fixture an 0.3.4 anpassen)
 - `apps/api/src/__tests__/helpers.ts` (nur 026-Operation-Coverage)
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "026"`)
-- `packages/contract/openapi.yaml` (nur `EventRead`, drei Leseantworten/SSE und Versionsverweise 028)
+- `packages/contract/openapi.yaml` (nur `EventRead`, drei Leseantworten/SSE, Versionsverweise 028 und die Beschreibung von `Speaker.displayName` gemäß freigegebenem Review-Nachtrag)
 - `packages/contract/package.json` (nur Versionsnummer)
 - `packages/contract/CHANGELOG.md` (nur 0.3.4 und Verschiebung 028)
 - `packages/contract/src/types.ts` (nur generiert)

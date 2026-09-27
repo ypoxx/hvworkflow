@@ -2014,7 +2014,7 @@ components:
         id: { type: string }
         meetingId: { type: string, description: 'Since 0.3.0 (slice 025): the meeting this request to speak belongs to. Pflicht ab 0.3.5, Scheibe 028.' }
         number: { type: integer, description: Running number of the request to speak }
-        displayName: { type: string, description: Pseudonym in the demo; real name only via the register interface }
+        displayName: { type: string, description: 'Since 0.3.4 (slice 026): clear name from the person table for actors with `question.identity.reveal`; otherwise `Redner <number>`.' }
         personId: { type: string, description: 'Since 0.3.0 (slice 026, ADR 0009): key into the person table; the clear name is resolved on read for holders of `question.identity.reveal`' }
         organisation: { type: string }
         kind:

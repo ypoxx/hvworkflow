@@ -1537,7 +1537,7 @@ export interface components {
             meetingId?: string;
             /** @description Running number of the request to speak */
             number: number;
-            /** @description Pseudonym in the demo; real name only via the register interface */
+            /** @description Since 0.3.4 (slice 026): clear name from the person table for actors with `question.identity.reveal`; otherwise `Redner <number>`. */
             displayName: string;
             /** @description Since 0.3.0 (slice 026, ADR 0009): key into the person table; the clear name is resolved on read for holders of `question.identity.reveal` */
             personId?: string;
