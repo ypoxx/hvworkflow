@@ -1,6 +1,7 @@
 # Scheibe 026 — Personentabelle und Rollenereignisse
 
-**Status:** geplant · **Risikoklasse:** hoch · **Lanes:** core, service
+**Status:** geplant · **Lanes:** core, service
+**Risikoklasse:** hoch
 **Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/026; ADR 0004, 0009, 0011, 0013, 0015; Vertrag 0.3.3. Scheibe 025 ist mit PR #53 (`7bd0e30`) integriert. E8 baut auf der Standardannahme: die Zuordnungstabelle im Tool ist die Wahrheit, IdP-Gruppen sind später nur Vorschläge.
 
 **Nachtrag nach Stopp und Freigabe durch den Eigentümer am 27.09.2026:** Der erste Baucommit `6ee35c6` und `pnpm gates` zeigten, dass die bisherige Dateiliste Web-Übersetzungen und die Historienanzeige ausschloss. Das unabhängige Review fand zudem einen Widerspruch zwischen PII-Maskierung und dem Hash eines unveränderten Ereignisses. Der Eigentümer hat die Erweiterung dieser Scheibe und des Vertrags freigegeben. Die folgenden Festlegungen gelten vor der Nacharbeit; der erste Bau wird nicht rückwirkend als vollständig oder gate-grün ausgegeben.

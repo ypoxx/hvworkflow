@@ -47,8 +47,8 @@ describe('Scheibe 026: vertragsvalidierte Rollenzuordnung', () => {
     const read = await req(app, 'GET', '/v1/events', { actor: ACTOR.admin });
     expect(read.status).toBe(200);
     const body = await read.json() as { items: Array<Record<string, unknown>> };
-    const speaker = body.items.findLast((item) => item['type'] === 'SpeakerRegistered');
-    const source = events().findLast((item) => item.type === 'SpeakerRegistered');
+    const speaker = [...body.items].reverse().find((item) => item['type'] === 'SpeakerRegistered');
+    const source = [...events()].reverse().find((item) => item.type === 'SpeakerRegistered');
     expect(speaker).toMatchObject({ redacted: true, sourceHash: source?.hash });
     expect(speaker).not.toHaveProperty('hash');
     expect(speaker).not.toHaveProperty('personId');
