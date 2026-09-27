@@ -40,7 +40,7 @@ Keine Notfallkonten (029 nach Fortführungsentscheidung), keine Web-Anmeldeseite
 - `apps/api/src/persistence/{migrations.ts,postgres.ts}`, `apps/api/migrations/{0002_auth.up.sql,0002_auth.down.sql}` (nur neue Auth-Tabellen, Grants und deren Prüfung)
 - `apps/api/src/__tests__/{auth-029b.test.ts,postgres-auth-029b.test.ts,demo-lock.test.ts,contract.test.ts,helpers.ts}` (Bestandstests nur für Auth-Grenze/Vertragsprüfung)
 - `packages/domain/src/api.ts`, `packages/domain/src/__tests__/person-roles026.test.ts` (nur Pflicht für `assignmentScoped`-Sitzungsakteure und Negativtest; keine Änderung an `ROLE_PERMISSIONS`)
-- `packages/contract/{openapi.yaml,CHANGELOG.md,allowlist.json}`, `packages/contract/src/types.ts` (nur bei nötiger Auth-Präzisierung aus OpenAPI generiert; Allowlist nur die fünf Auth-Operationen)
+- `packages/contract/{openapi.yaml,CHANGELOG.md,allowlist.json,package.json}`, `packages/contract/src/types.ts` (nur bei nötiger Auth-Präzisierung; `package.json` ausschließlich für den nach ADR 0015 und Vertragscheck vorgeschriebenen Versionssprung, Typen aus OpenAPI generiert; Allowlist nur die fünf Auth-Operationen)
 - `apps/api/package.json`, `pnpm-lock.yaml` (nur die geprüfte OIDC-Abhängigkeit)
 - `.github/workflows/gates.yml`, `scripts/keycloak-ci-029b.mjs` (nur synthetischer Keycloak-Integrationstest mit zur Laufzeit erzeugten Geheimnissen und gepinntem Image)
 - `docs/sicherheit/bedrohungsmodell.md` (nur 029b-Status und konkrete Nachweise), `docs/adr/0004-identitaet-oidc-bff.md` (nur Beta-Teil/Nachweise), `docs/folgeliste.md` (nur unabhängige nicht blockierende 029b-Reviewbefunde)
@@ -65,4 +65,4 @@ Touched: _Tatsächlich geänderte Dateien vollständig auflisten._
 
 ## Review findings
 
-Erster unabhängiger Lesebefund: Blocker bei asynchroner Rollenauflösung und aktueller Fachprojektion; Major bei browsergebundenem Login-State, issuergebundener Actor-ID und falscher Zuordnung von T-G3-S-03. Enger Re-Check bestätigt deren Auflösung. Ein verbliebener Major zur nicht vorhandenen `createMeeting`-Domainmethode wurde durch ausdrückliche Trennung von Test-Fixture und späterem 040-Bootstrap behoben. Unabhängiges Diff-Review nach Bau eintragen.
+Erster unabhängiger Lesebefund: Blocker bei asynchroner Rollenauflösung und aktueller Fachprojektion; Major bei browsergebundenem Login-State, issuergebundener Actor-ID und falscher Zuordnung von T-G3-S-03. Enger Re-Check bestätigt deren Auflösung. Ein verbliebener Major zur nicht vorhandenen `createMeeting`-Domainmethode wurde durch ausdrückliche Trennung von Test-Fixture und späterem 040-Bootstrap behoben. Vor dem Bau nach Nutzerfreigabe ergänzt: `packages/contract/package.json` für den zwingenden gleichlaufenden Versionssprung des Vertragschecks (`check.mjs` Bedingung a/c). Unabhängiges Diff-Review nach Bau eintragen.
