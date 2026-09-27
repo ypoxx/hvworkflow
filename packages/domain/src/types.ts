@@ -27,6 +27,7 @@ export interface Actor {
 
 /** Permission identifiers. Implemented entries from the contract's `Action` enum. */
 export const PERMISSIONS = [
+  'agenda.manage',
   'speaker.register',
   'speaker.reorder',
   'speaker.update',
@@ -119,6 +120,8 @@ export interface Meeting {
   legalEntity?: string;
   date: string; // ISO date
   status: 'preparation' | 'running' | 'closed';
+  version?: number;
+  debateClosedAt?: string;
   currentRound: number;
   counts: {
     speakers: number;
@@ -135,6 +138,9 @@ export interface AgendaItem {
   id: string;
   number: number;
   title: string;
+  openedAt?: string;
+  votingOpenedAt?: string;
+  votingClosedAt?: string;
 }
 
 export interface Unit {
@@ -145,6 +151,7 @@ export interface Unit {
 
 export interface SpeakerRecord {
   id: string;
+  meetingId?: string;
   number: number;
   displayName: string;
   organisation?: string;
@@ -162,10 +169,14 @@ export interface Speaker extends SpeakerRecord {
 
 export interface Contribution {
   id: string;
+  meetingId?: string;
   speakerId: string;
   text: string;
   capturedAt: string;
-  source: 'manual' | 'transcript';
+  source: 'manual' | 'transcript' | 'paper';
+  occurredAt?: string;
+  occurredAtSource?: 'device' | 'paper' | 'transcript';
+  lateEntry?: boolean;
   questionIds: string[];
   coverage: { coveredRatio: number; uncovered: TextSpan[] };
 }
@@ -193,6 +204,7 @@ export interface LegalClearance {
 /** A question as stored in the projection, without the per-actor `_actions`. */
 export interface QuestionRecord {
   id: string;
+  meetingId?: string;
   number: string;
   contributionId: string;
   speakerId: string;
@@ -244,6 +256,15 @@ export interface ContributionCapture {
   speakerId: string;
   text: string;
   source?: 'manual' | 'transcript';
+}
+/** Canonical year-scoped capture; the legacy alias keeps its narrower request body. */
+export interface MeetingContributionCapture {
+  speakerId: string;
+  text: string;
+  source?: 'manual' | 'transcript' | 'paper';
+  occurredAt?: string;
+  occurredAtSource?: 'device' | 'paper' | 'transcript';
+  lateEntryReason?: string;
 }
 export interface QuestionCapture {
   text: string;

@@ -23,6 +23,7 @@ import {
   type ContributionCapture,
   type HvApi,
   type LegalClearanceRequest,
+  type MeetingContributionCapture,
   type Persistence,
   type Question,
   type QuestionCapture,
@@ -111,6 +112,28 @@ export function createApp(options: CreateAppOptions = {}): App {
     seeder: seedEvents,
   });
 
+  // A scoped projection is shared across requests for the same meeting. It follows the global
+  // event log but applies only that meeting's events; the actor still comes from this request.
+  const scopedDomains = new Map<string, HvApi>();
+  const meetingDomain = async (meetingId: string): Promise<HvApi> => {
+    let scoped = scopedDomains.get(meetingId);
+    if (!scoped) {
+      await domain.getMeetingById(meetingId);
+      scoped = createInProcessApi({
+        store, meetingId,
+        actor: () => {
+          const actor = actorStorage.getStore();
+          if (!actor) throw new ApiProblem(401, 'Unauthorized', 'The X-Actor header is required.');
+          return actor;
+        },
+        ...(options.clock !== undefined ? { clock: options.clock } : {}),
+        ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
+      });
+      scopedDomains.set(meetingId, scoped);
+    }
+    return scoped;
+  };
+
   if (options.seedOnStart && demoEnabled && store.lastSeq() === 0) {
     // `seedDemo` (packages/domain) does no real async I/O (AGENTS.md: "no framework, no I/O"), so the
     // store is already populated by the time this synchronous function returns even though the
@@ -161,8 +184,80 @@ export function createApp(options: CreateAppOptions = {}): App {
   const etag = (c: Context, resource: { version: number }): void => {
     c.header('ETag', etagOf(resource.version));
   };
+  const questionFilter = (query: Record<string, unknown>): QuestionFilter => ({
+    ...((query['status'] as QuestionStatus[] | undefined)?.length ? { status: query['status'] as QuestionStatus[] } : {}),
+    ...(query['track'] !== undefined ? { track: query['track'] as Track } : {}),
+    ...(query['unitId'] !== undefined ? { unitId: query['unitId'] as string } : {}),
+    ...(query['speakerId'] !== undefined ? { speakerId: query['speakerId'] as string } : {}),
+    ...(query['contributionId'] !== undefined ? { contributionId: query['contributionId'] as string } : {}),
+    ...(query['agendaItemId'] !== undefined ? { agendaItemId: query['agendaItemId'] as string } : {}),
+    ...(query['q'] !== undefined ? { q: query['q'] as string } : {}),
+    ...(query['limit'] !== undefined ? { limit: query['limit'] as number } : {}),
+    ...(query['offset'] !== undefined ? { offset: query['offset'] as number } : {}),
+  });
 
   // ---- meeting ----------------------------------------------------------------------------------
+  app.get('/v1/meetings', validateOperation('listMeetings'), async (c) => {
+    const status = getValidatedQuery(c)['status'] as Awaited<ReturnType<HvApi['getMeeting']>>['status'] | undefined;
+    return c.json(await domain.listMeetings(status));
+  });
+  app.get('/v1/meetings/:meetingId', validateOperation('getMeetingById'), async (c) => {
+    const meeting = await domain.getMeetingById(requireParam(c, 'meetingId'));
+    etag(c, { version: meeting.version ?? 1 });
+    return c.json(meeting);
+  });
+  app.get('/v1/meetings/:meetingId/agenda-items', validateOperation('listMeetingAgendaItems'), async (c) =>
+    c.json(await domain.listMeetingAgendaItems(requireParam(c, 'meetingId'))));
+  app.get('/v1/meetings/:meetingId/units', validateOperation('listMeetingUnits'), async (c) =>
+    c.json(await domain.listMeetingUnits(requireParam(c, 'meetingId'))));
+  const agendaResult = async (c: Context, action: 'openAgendaItem' | 'openVoting' | 'closeVoting'): Promise<Response> => {
+    const scoped = await meetingDomain(requireParam(c, 'meetingId'));
+    const item = await scoped[action](requireParam(c, 'agendaItemId'), writeOptions(c));
+    const meeting = await scoped.getMeeting();
+    etag(c, { version: meeting.version ?? 1 });
+    return c.json(item);
+  };
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/opening', validateOperation('openAgendaItem'),
+    (c) => agendaResult(c, 'openAgendaItem'));
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/opening', validateOperation('openVoting'),
+    (c) => agendaResult(c, 'openVoting'));
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/closure', validateOperation('closeVoting'),
+    (c) => agendaResult(c, 'closeVoting'));
+
+  app.get('/v1/meetings/:meetingId/speakers', validateOperation('listMeetingSpeakers'), async (c) => {
+    const query = getValidatedQuery(c);
+    return c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).listSpeakers({
+      ...(query['round'] !== undefined ? { round: query['round'] as number } : {}),
+      ...(query['status'] !== undefined ? { status: query['status'] as Speaker['status'] } : {}),
+    }));
+  });
+  app.post('/v1/meetings/:meetingId/speakers', validateOperation('registerMeetingSpeaker'), async (c) => {
+    const speaker = await (await meetingDomain(requireParam(c, 'meetingId')))
+      .registerSpeaker(getValidatedBody<SpeakerRegistration>(c), writeOptions(c));
+    return c.json(speaker, 201);
+  });
+  app.put('/v1/meetings/:meetingId/speakers/order', validateOperation('reorderMeetingSpeakers'), async (c) => {
+    const body = getValidatedBody<{ round: number; speakerIds: string[] }>(c);
+    return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
+      .reorderSpeakers(body.round, body.speakerIds, writeOptions(c)));
+  });
+  app.get('/v1/meetings/:meetingId/contributions', validateOperation('listMeetingContributions'), async (c) => {
+    const speakerId = getValidatedQuery(c)['speakerId'] as string | undefined;
+    return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
+      .listContributions(speakerId !== undefined ? { speakerId } : {}));
+  });
+  app.post('/v1/meetings/:meetingId/contributions', validateOperation('captureMeetingContribution'), async (c) => {
+    const contribution = await (await meetingDomain(requireParam(c, 'meetingId')))
+      .captureMeetingContribution(getValidatedBody<MeetingContributionCapture>(c), writeOptions(c));
+    return c.json(contribution, 201);
+  });
+  app.get('/v1/meetings/:meetingId/questions', validateOperation('listMeetingQuestions'), async (c) => {
+    return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
+      .listQuestions(questionFilter(getValidatedQuery(c))));
+  });
+  app.get('/v1/meetings/:meetingId/stage', validateOperation('getMeetingStage'), async (c) =>
+    c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).getStage()));
+
   app.get('/v1/meeting', async (c) => c.json(await domain.getMeeting()));
   app.get('/v1/agenda-items', async (c) => c.json(await domain.listAgendaItems()));
   app.get('/v1/units', async (c) => c.json(await domain.listUnits()));
@@ -222,19 +317,7 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   // ---- questions ----------------------------------------------------------------------------------
   app.get('/v1/questions', validateOperation('listQuestions'), async (c) => {
-    const query = getValidatedQuery(c);
-    const filter: QuestionFilter = {
-      ...((query['status'] as QuestionStatus[] | undefined)?.length ? { status: query['status'] as QuestionStatus[] } : {}),
-      ...(query['track'] !== undefined ? { track: query['track'] as Track } : {}),
-      ...(query['unitId'] !== undefined ? { unitId: query['unitId'] as string } : {}),
-      ...(query['speakerId'] !== undefined ? { speakerId: query['speakerId'] as string } : {}),
-      ...(query['contributionId'] !== undefined ? { contributionId: query['contributionId'] as string } : {}),
-      ...(query['agendaItemId'] !== undefined ? { agendaItemId: query['agendaItemId'] as string } : {}),
-      ...(query['q'] !== undefined ? { q: query['q'] as string } : {}),
-      ...(query['limit'] !== undefined ? { limit: query['limit'] as number } : {}),
-      ...(query['offset'] !== undefined ? { offset: query['offset'] as number } : {}),
-    };
-    return c.json(await domain.listQuestions(filter));
+    return c.json(await domain.listQuestions(questionFilter(getValidatedQuery(c))));
   });
   app.get('/v1/questions/:questionId', validateOperation('getQuestion'), async (c) => {
     const question = await domain.getQuestion(requireParam(c, 'questionId'));

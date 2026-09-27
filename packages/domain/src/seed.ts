@@ -368,6 +368,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
   const rnd = mulberry32(o.seed);
   const year = o.now.getUTCFullYear() - 1;
   const events: NewEvent[] = [];
+  const meetingId = 'hv-' + o.now.getUTCFullYear();
   let idCounter = 0;
   const id = (prefix: string): string => `${prefix}-${(++idCounter).toString(36).padStart(5, '0')}`;
   // The meeting clock: it opened this morning; we replay events up to "now".
@@ -378,10 +379,9 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
     return new Date(Math.min(clock, o.now.getTime())).toISOString();
   };
   const push = (e: Omit<NewEvent, 'id'>): void => {
-    events.push({ ...e, id: id('ev') } as NewEvent);
+    events.push({ ...e, meetingId, id: id('ev') } as NewEvent);
   };
 
-  const meetingId = 'hv-' + o.now.getUTCFullYear();
   push({
     type: 'MeetingCreated',
     at: start.toISOString(),
@@ -395,6 +395,10 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       units: SEED_UNITS.map((u) => ({ ...u })),
     },
   });
+  // Keep the demo in its familiar running state now that MeetingCreated projects preparation.
+  // This fixed id avoids shifting the synthetic corpus's stable speaker/question ids.
+  events.push({ id: `meeting-start-${meetingId}`, type: 'MeetingStarted', at: start.toISOString(),
+    actor: SEED_ACTORS.system!, subjectId: meetingId, meetingId, payload: {} });
 
   /* ---- speakers: four rounds; the meeting is in round 3 ---- */
   const roundSizes = o.roundSizes ?? CORPUS_LOAD.roundSizes;

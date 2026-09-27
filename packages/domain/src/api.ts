@@ -12,7 +12,7 @@
  */
 import type { DomainEvent, NewEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, READ_SCOPES, type Decision } from './permissions.js';
-import { resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
+import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
 import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
@@ -23,6 +23,7 @@ import type {
   Classification,
   Contribution,
   ContributionCapture,
+  MeetingContributionCapture,
   Meeting,
   LegalClearanceRequest,
   Permission,
@@ -68,6 +69,13 @@ export class ApiProblem extends Error {
 
 export interface HvApi {
   getMeeting(): Promise<Meeting>;
+  listMeetings(status?: Meeting['status']): Promise<Meeting[]>;
+  getMeetingById(meetingId: string): Promise<Meeting>;
+  listMeetingAgendaItems(meetingId: string): Promise<AgendaItem[]>;
+  listMeetingUnits(meetingId: string): Promise<Unit[]>;
+  openAgendaItem(agendaItemId: string, opts?: WriteOptions): Promise<AgendaItem>;
+  openVoting(agendaItemId: string, opts?: WriteOptions): Promise<AgendaItem>;
+  closeVoting(agendaItemId: string, opts?: WriteOptions): Promise<AgendaItem>;
   listAgendaItems(): Promise<AgendaItem[]>;
   listUnits(): Promise<Unit[]>;
 
@@ -80,6 +88,7 @@ export interface HvApi {
   listContributions(filter?: { speakerId?: string }): Promise<Contribution[]>;
   getContribution(id: string): Promise<Contribution>;
   captureContribution(input: ContributionCapture, opts?: WriteOptions): Promise<Contribution>;
+  captureMeetingContribution(input: MeetingContributionCapture, opts?: WriteOptions): Promise<Contribution>;
   captureQuestions(contributionId: string, questions: QuestionCapture[], opts?: WriteOptions): Promise<Question[]>;
 
   listQuestions(filter?: QuestionFilter): Promise<{ items: Question[]; total: number }>;
@@ -109,6 +118,8 @@ export interface HvApi {
 
 export interface InProcessApiOptions {
   store: EventStore;
+  /** Canonical /meetings/{meetingId} handlers use a per-meeting projection; legacy aliases omit it. */
+  meetingId?: string;
   /** The calling actor. A function so that the demo role switcher can change it at runtime. */
   actor: () => Actor;
   /** Single source of time (docs: R-TIME). Defaults to the system clock. */
@@ -216,12 +227,27 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
-  for (const e of store.all()) reduce(state, e);
+  for (const e of store.all()) {
+    if (options.meetingId === undefined || e.meetingId === options.meetingId) reduce(state, e);
+  }
   const idempotency = new Map<string, unknown>();
   let activeIdempotencyKey: string | undefined;
 
   store.subscribe((events) => {
-    for (const e of events) if (e.seq > state.lastSeq) reduce(state, e);
+    for (const e of events) {
+      if (e.seq > state.lastSeq && (options.meetingId === undefined || e.meetingId === options.meetingId)) reduce(state, e);
+    }
+  });
+
+  const stateForMeeting = (meetingId: string): State => {
+    const projected = emptyState();
+    for (const e of store.all()) if (e.meetingId === meetingId) reduce(projected, e);
+    if (!projected.meeting) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
+    return projected;
+  };
+  const viewMeeting = (meeting: Meeting): Meeting => ({
+    ...meeting,
+    counts: { ...meeting.counts, byStatus: { ...meeting.counts.byStatus } },
   });
 
   const now = (): string => clock().toISOString();
@@ -324,10 +350,52 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const append = (events: Omit<NewEvent, 'id' | 'at' | 'actor'>[]): DomainEvent[] => {
     const a = actor();
     const at = now();
+    for (const event of events) {
+      if (event.type === 'MeetingCreated') continue;
+      if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+      if (event.meetingId !== undefined && event.meetingId !== state.meeting.id) {
+        throw new ApiProblem(404, 'Not found', `Meeting ${event.meetingId} does not exist here.`);
+      }
+    }
     return store.append(events.map((e) => ({ ...e, id: newId(), at, actor: a,
+      ...(e.type !== 'MeetingCreated' ? { meetingId: state.meeting!.id } : { meetingId: e.subjectId }),
       ...(activeIdempotencyKey !== undefined ? { idempotencyKey: activeIdempotencyKey } : {}),
     }) as NewEvent));
   };
+
+  const agendaProgress = (event: 'AgendaItemOpened' | 'VotingOpened' | 'VotingClosed', agendaItemId: string, opts?: WriteOptions): AgendaItem =>
+    idempotent(`${event}:${state.meeting?.id ?? 'none'}:${agendaItemId}`, opts, () => {
+      requirePermission('agenda.manage');
+      const meeting = state.meeting;
+      if (!meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+      const item = state.agendaItems.find((candidate) => candidate.id === agendaItemId);
+      if (!item) throw new ApiProblem(404, 'Not found', `Agenda item ${agendaItemId} does not exist.`);
+      const decision = resolveAgendaProgress(meeting, item, event);
+      if (!decision.ok) throw new ApiProblem(409, 'Conflict', decision.reason, decision.ruleId);
+      checkIfMatch(meeting.version ?? 1, opts);
+      append([{ type: event, subjectId: meeting.id, payload: { agendaItemId, number: item.number } }]);
+      return { ...state.agendaItems.find((candidate) => candidate.id === agendaItemId)! };
+    });
+
+  const captureInMeeting = (input: MeetingContributionCapture, opts?: WriteOptions): Contribution =>
+    idempotent(`captureMeetingContribution:${state.meeting?.id ?? 'none'}`, opts, () => {
+      requirePermission('contribution.capture');
+      const meeting = state.meeting;
+      if (!meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+      requireSpeaker(input.speakerId);
+      if (!input.text?.trim()) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
+      const at = now();
+      const decision = resolveMeetingCapture(meeting, input, at);
+      if (!decision.ok) throw new ApiProblem(decision.status, decision.status === 422 ? 'Unprocessable' : 'Conflict', decision.reason, decision.ruleId);
+      const id = newId();
+      append([{ type: 'ContributionCaptured', subjectId: id,
+        ...(input.occurredAt !== undefined ? { occurredAt: input.occurredAt, occurredAtSource: input.occurredAtSource } : {}),
+        payload: { speakerId: input.speakerId, text: input.text, source: input.source ?? 'manual',
+          ...(decision.lateEntry ? { lateEntry: true, lateEntryReason: input.lateEntryReason!.trim() } : {}) },
+      }]);
+      const contribution = state.contributions.get(id)!;
+      return { ...contribution, questionIds: [...contribution.questionIds], coverage: { ...contribution.coverage, uncovered: [...contribution.coverage.uncovered] } };
+    });
 
   /**
    * Generic question transition: permission + transition table + guards, If-Match, one event.
@@ -381,8 +449,26 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   return {
     async getMeeting() {
       if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
-      return { ...state.meeting, counts: { ...state.meeting.counts, byStatus: { ...state.meeting.counts.byStatus } } };
+      return viewMeeting(state.meeting);
     },
+    async listMeetings(status) {
+      const ids = [...new Set(store.all().filter((e) => e.type === 'MeetingCreated').map((e) => e.subjectId))];
+      return ids.map((id) => viewMeeting(stateForMeeting(id).meeting!))
+        .filter((meeting) => status === undefined || meeting.status === status)
+        .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+    },
+    async getMeetingById(meetingId) {
+      return viewMeeting(stateForMeeting(meetingId).meeting!);
+    },
+    async listMeetingAgendaItems(meetingId) {
+      return stateForMeeting(meetingId).agendaItems.map((item) => ({ ...item }));
+    },
+    async listMeetingUnits(meetingId) {
+      return stateForMeeting(meetingId).units.map((unit) => ({ ...unit }));
+    },
+    async openAgendaItem(agendaItemId, opts) { return agendaProgress('AgendaItemOpened', agendaItemId, opts); },
+    async openVoting(agendaItemId, opts) { return agendaProgress('VotingOpened', agendaItemId, opts); },
+    async closeVoting(agendaItemId, opts) { return agendaProgress('VotingClosed', agendaItemId, opts); },
     async listAgendaItems() {
       return state.agendaItems.map((a) => ({ ...a }));
     },
@@ -482,14 +568,10 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return { ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } };
     },
     async captureContribution(input, opts) {
-      return idempotent('captureContribution', opts, () => {
-        requirePermission('contribution.capture');
-        requireSpeaker(input.speakerId);
-        if (!input.text?.trim()) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
-        const id = newId();
-        append([{ type: 'ContributionCaptured', subjectId: id, payload: { speakerId: input.speakerId, text: input.text, source: input.source ?? 'manual' } }]);
-        return this.getContribution(id);
-      });
+      return captureInMeeting(input, opts);
+    },
+    async captureMeetingContribution(input, opts) {
+      return captureInMeeting(input, opts);
     },
     async captureQuestions(contributionId, questions, opts) {
       return idempotent(`captureQuestions:${contributionId}`, opts, () => {

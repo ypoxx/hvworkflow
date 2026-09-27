@@ -5,7 +5,7 @@
  * Rule ids (R-TRANS-nn) are referenced by tests and by error responses so that a legal or process
  * reviewer can trace a decision back to this table.
  */
-import type { Actor, Permission, QuestionRecord, QuestionStatus, SpeakerRecord, SpeakerStatus, Track } from './types.js';
+import type { Actor, AgendaItem, Meeting, MeetingContributionCapture, Permission, QuestionRecord, QuestionStatus, SpeakerRecord, SpeakerStatus, Track } from './types.js';
 import { TERMINAL_STATUSES } from './types.js';
 // Type-only: `rules.ts` imports the *value* `TRANSITIONS` from this file to build `ruleRegister()`,
 // so this direction must stay type-only (isolatedModules erases it) or the two files would import
@@ -788,4 +788,49 @@ export function resolveSpeakerTransition(
   const failed = (row.guards ?? []).find((g) => !g.check(s, payload));
   if (failed) return { ok: false, ruleId: failed.ruleId, reason: failed.description };
   return { ok: true, transition: row };
+}
+
+/** Year and agenda progress are status transitions too (AGENTS.md R5). Public start/close
+ * operations arrive later; their synthetic v2 events use these rows in slice 025. */
+export const MEETING_TRANSITIONS = [
+  { ruleId: 'R-MTG-02', event: 'MeetingStarted', from: 'preparation', to: 'running' },
+  { ruleId: 'R-MTG-02', event: 'MeetingClosed', from: 'running', to: 'closed' },
+] as const;
+
+export const AGENDA_TRANSITIONS = [
+  { ruleId: 'R-MTG-04', event: 'AgendaItemOpened',
+    allowed: (meeting: Meeting, item: AgendaItem) => meeting.status === 'running' && item.openedAt === undefined },
+  { ruleId: 'R-MTG-05', event: 'VotingOpened',
+    allowed: (meeting: Meeting, item: AgendaItem) => meeting.status === 'running' && item.openedAt !== undefined && item.votingOpenedAt === undefined },
+  { ruleId: 'R-MTG-06', event: 'VotingClosed',
+    allowed: (meeting: Meeting, item: AgendaItem) => meeting.status === 'running' && item.votingOpenedAt !== undefined && item.votingClosedAt === undefined },
+] as const;
+
+export function resolveMeetingLifecycle(meeting: Meeting, event: 'MeetingStarted' | 'MeetingClosed'):
+  { ok: true; to: Meeting['status'] } | { ok: false; ruleId: 'R-MTG-02'; reason: string } {
+  const row = MEETING_TRANSITIONS.find((r) => r.event === event && r.from === meeting.status);
+  return row ? { ok: true, to: row.to } : { ok: false, ruleId: 'R-MTG-02', reason: `Cannot apply ${event} while meeting is ${meeting.status}.` };
+}
+
+export function resolveAgendaProgress(meeting: Meeting, item: AgendaItem, event: 'AgendaItemOpened' | 'VotingOpened' | 'VotingClosed'):
+  { ok: true } | { ok: false; ruleId: 'R-MTG-04' | 'R-MTG-05' | 'R-MTG-06'; reason: string } {
+  const row = AGENDA_TRANSITIONS.find((r) => r.event === event)!;
+  return row.allowed(meeting, item) ? { ok: true } : { ok: false, ruleId: row.ruleId, reason: `${event} is not allowed at this agenda progress.` };
+}
+
+/** R-MTG-03: late evidence may describe an earlier speech; it never changes server time. */
+export function resolveMeetingCapture(meeting: Meeting, input: MeetingContributionCapture, serverAt: string):
+  { ok: true; lateEntry: boolean } | { ok: false; status: 409 | 422; ruleId: 'R-MTG-03'; reason: string } {
+  const claimedAt = input.occurredAt;
+  if ((claimedAt === undefined) !== (input.occurredAtSource === undefined) ||
+      (claimedAt !== undefined && (!Number.isFinite(Date.parse(claimedAt)) || Date.parse(claimedAt) > Date.parse(serverAt)))) {
+    return { ok: false, status: 422, ruleId: 'R-MTG-03', reason: 'Invalid or future occurrence time.' };
+  }
+  if (meeting.debateClosedAt === undefined && meeting.status === 'running') return { ok: true, lateEntry: false };
+  if (meeting.debateClosedAt !== undefined && (input.source === 'paper' || input.source === 'transcript') &&
+      input.occurredAtSource === input.source && claimedAt !== undefined &&
+      Date.parse(claimedAt) <= Date.parse(meeting.debateClosedAt) && input.lateEntryReason?.trim()) {
+    return { ok: true, lateEntry: true };
+  }
+  return { ok: false, status: 409, ruleId: 'R-MTG-03', reason: 'Capture is closed; only grounded late paper or transcript is allowed.' };
 }

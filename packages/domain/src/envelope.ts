@@ -3,7 +3,9 @@ import type { DomainEvent, EventType, NewEvent } from './events.js';
 import { identityPiiCodec, type PiiCodec, type PiiEnvelope } from './piiCodec.js';
 
 const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
-  'MeetingCreated', 'SpeakerRegistered', 'SpeakersReordered', 'SpeakerUpdated',
+  'MeetingCreated', 'MeetingStarted', 'MeetingClosed', 'DebateClosed',
+  'AgendaItemOpened', 'VotingOpened', 'VotingClosed',
+  'SpeakerRegistered', 'SpeakersReordered', 'SpeakerUpdated',
   'ContributionCaptured', 'QuestionCaptured', 'QuestionClassified', 'QuestionAssigned',
   'AnswerDrafted', 'QuestionSubmittedForReview', 'QuestionApproved', 'QuestionLegalCleared',
   'QuestionReturned', 'QuestionStaged', 'QuestionDelivered', 'QuestionClosed',
