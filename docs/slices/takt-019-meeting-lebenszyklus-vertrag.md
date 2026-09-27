@@ -33,4 +33,22 @@ Keine Kern-Projektion oder Status-Transition in diesem Takt, keine neue Route, k
 
 ## Bericht
 
-(nach Test, Gate und Review)
+Slice: takt-019-meeting-lebenszyklus-vertrag
+
+Done: Vertrag 0.3.3 enthält `MeetingStarted` und `MeetingClosed` mit `subjectId` und leerem Payload. `DebateClosed` bleibt vom Jahrgangsschluss getrennt. Der Plan setzt 028 auf 0.3.4; keine Operation kam hinzu.
+
+Evidence: Der neue Vertragstest war zuerst 3/3 rot (Version und zwei Ereignisse), danach zusammen mit dem älteren Brückentest 7/7 grün. `pnpm contract:types` regenerierte die Typen; `pnpm contract:lint` bestand mit fünf bestehenden Warnungen. `node scripts/slice-scope.mjs --takt 019 --base 60d8081d6d69a3c5635252db22d8664780a54bd1` bestätigte 8/8 erlaubte Dateien. `pnpm gates` auf sauberem Commit `cd7fccc` bestand; Schluss wörtlich:
+
+```text
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 721ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit cd7fccc, tree b1048d5c10db…
+```
+
+Open: 025 implementiert Projektion und R-MTG. Eine öffentliche Jahrgangs-Schlussaktion braucht später eine eigene Spec und Vertragsänderung. Die Planzeile 040 nennt bisher allgemein „Lebenszyklus-Aktionen“; das unabhängige Review hat diese Unschärfe als nicht blockierenden Folgebefund notiert, außerhalb dieses Dateiumfangs. Kein Deployment.
+
+Touched: `docs/slices/takt-019-meeting-lebenszyklus-vertrag.md`, `packages/contract/openapi.yaml`, `packages/contract/src/types.ts`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `apps/api/src/__tests__/takt-019-contract.test.ts`, `apps/api/src/__tests__/takt-016-contract.test.ts`, `docs/produktplan-beta.md`.
+
+## Review findings
+
+Unabhängiger frischer Review von `60d8081…cd7fccc`: keine Blocker/Major- oder Security-/Legal-/Privacy-Befunde; die Unschärfe der späteren 040-Planzeile ist unter „Open“ vermerkt.
