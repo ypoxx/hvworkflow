@@ -237,3 +237,20 @@ Scheibe 025: explicit agenda.manage grant; other roles are denied by default.
 | podium | · |
 | admin | ✓ |
 | observer | · |
+
+# Policy truth table — Role × Identität und Rollenverwaltung
+
+Scheibe 026: identity reveal is limited to the five operational roles selected before build;
+role management is limited to administration. Both are independent of question status.
+
+| Role | question.identity.reveal | admin.roles.manage |
+|---|---|---|
+| moderation | ✓ | · |
+| capture | · | · |
+| coordination | ✓ | · |
+| expert | · | · |
+| legal | ✓ | · |
+| approver | ✓ | · |
+| podium | ✓ | · |
+| admin | · | ✓ |
+| observer | · | · |

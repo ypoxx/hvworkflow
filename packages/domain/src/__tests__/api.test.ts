@@ -619,7 +619,7 @@ describe('coordination role (slice 021b): classify and assign move from capture 
 
   it('coordination holds exactly classify, assign and the four read grants of the spec', () => {
     expect([...(ROLE_PERMISSIONS.coordination ?? [])].sort()).toEqual(
-      ['contribution.read', 'history.read', 'question.assign', 'question.classify', 'question.read', 'speaker.read'].sort(),
+      ['contribution.read', 'history.read', 'question.assign', 'question.classify', 'question.identity.reveal', 'question.read', 'speaker.read'].sort(),
     );
   });
 

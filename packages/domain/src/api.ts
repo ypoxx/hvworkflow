@@ -11,7 +11,7 @@
  *   4. appends one event and returns the projected resource with `_actions`.
  */
 import type { DomainEvent, NewEvent } from './events.js';
-import { ALLOW, deny, extendingScopesFor, hasPermission, READ_SCOPES, type Decision } from './permissions.js';
+import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
 import { CORPUS_DEMO } from './seed.js';
@@ -27,6 +27,9 @@ import type {
   Meeting,
   LegalClearanceRequest,
   Permission,
+  Role,
+  RoleAssignment,
+  RoleAssignmentCreate,
   Question,
   QuestionCapture,
   QuestionFilter,
@@ -78,6 +81,9 @@ export interface HvApi {
   closeVoting(agendaItemId: string, opts?: WriteOptions): Promise<AgendaItem>;
   listAgendaItems(): Promise<AgendaItem[]>;
   listUnits(): Promise<Unit[]>;
+  listRoleAssignments(filter?: { subjectId?: string; role?: Role }): Promise<RoleAssignment[]>;
+  assignRole(input: RoleAssignmentCreate, opts?: WriteOptions): Promise<RoleAssignment>;
+  revokeRole(id: string, reason?: string, opts?: WriteOptions): Promise<RoleAssignment>;
 
   listSpeakers(filter?: { round?: number; status?: Speaker['status'] }): Promise<Speaker[]>;
   getSpeaker(id: string): Promise<Speaker>;
@@ -173,6 +179,9 @@ export function can(
   const perm = hasPermission(actor, action);
   if (perm.allow) {
     if (question) {
+      if (actor.assignmentScoped && hasUnitBoundRead(actor) && question.unitId !== actor.unitId) {
+        return deny('R-PERM-03', 'Question is outside the assigned unit.');
+      }
       const scope = READ_SCOPES[action];
       if (scope && !scope.statuses.includes(question.status)) {
         return deny('R-PERM-03', `Permission "${action}" only covers status ${scope.statuses.join('/')} (Leseumfang).`);
@@ -216,7 +225,7 @@ function questionShell(status: QuestionStatus): QuestionRecord {
 
 /** Actions the actor may take on this question right now — the server-provided `_actions`. */
 export function actionsFor(actor: Actor, q: QuestionRecord): Permission[] {
-  return PERMISSIONS.filter((p) => p !== 'demo.seed' && p.startsWith('question.') || p === 'answer.draft')
+  return PERMISSIONS.filter((p) => p !== 'question.identity.reveal' && (p.startsWith('question.') || p === 'answer.draft'))
     .filter((p) => can(actor, p, q).allow);
 }
 
@@ -283,14 +292,50 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   });
 
   const now = (): string => clock().toISOString();
-  const actor = (): Actor => options.actor();
+  const actor = (): Actor => {
+    const current = options.actor();
+    const history = [...state.roleAssignments.values()].filter((assignment) => assignment.subjectId === current.id);
+    if (history.length === 0) return current; // synthetic demo identity until the session adapter in 029b
+    const assignment = history.find((item) => item.role === current.role && !item.revokedAt &&
+      (item.expiresAt === undefined || Date.parse(item.expiresAt) > clock().getTime()) && state.meeting?.status !== 'closed');
+    if (!assignment) throw new ApiProblem(403, 'Forbidden', 'Role assignment is no longer active.', 'R-PERM-01');
+    return { id: current.id, role: current.role, assignmentScoped: true,
+      ...(assignment.personId !== undefined ? { personId: assignment.personId } : {}),
+      ...(assignment.unitId !== undefined ? { unitId: assignment.unitId } : {}) };
+  };
+
+  const viewRoleAssignment = (assignment: RoleAssignment): RoleAssignment => ({ ...assignment,
+    assignedBy: { id: assignment.assignedBy.id, role: assignment.assignedBy.role },
+    ...(assignment.revokedBy !== undefined ? { revokedBy: { id: assignment.revokedBy.id, role: assignment.revokedBy.role } } : {}),
+  });
+  const maskEvent = (event: DomainEvent): DomainEvent => {
+    const { personId: _personId, ...visible } = event;
+    const { pii: _pii, displayName: _displayName, organisation: _organisation, ...payload } =
+      event.payload as Record<string, unknown>;
+    const answer = payload['answer'];
+    if (answer !== null && typeof answer === 'object' && !Array.isArray(answer)) {
+      const copy = { ...answer as Record<string, unknown> };
+      const by = copy['createdBy'];
+      if (by !== null && typeof by === 'object' && !Array.isArray(by)) {
+        const { displayName: _name, ...actorWithoutName } = by as Record<string, unknown>;
+        copy['createdBy'] = actorWithoutName;
+      }
+      payload['answer'] = copy;
+    }
+    return { ...visible, payload } as DomainEvent;
+  };
 
   const viewSpeaker = (s: SpeakerRecord): Speaker => ({
     ...s,
+    ...(can(actor(), 'question.identity.reveal').allow && s.personId !== undefined && state.persons.has(s.personId)
+      ? { displayName: state.persons.get(s.personId)!.displayName,
+          ...(state.persons.get(s.personId)!.organisation !== undefined ? { organisation: state.persons.get(s.personId)!.organisation } : {}) }
+      : { displayName: `Redner ${s.number}` }),
     _actions: SPEAKER_ACTIONS.filter((p) => can(actor(), p).allow),
   });
   const viewQuestion = (q: QuestionRecord): Question => ({
     ...q,
+    ...(state.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(state.speakers.get(q.speakerId)!).displayName } : {}),
     answers: q.answers.map((a) => ({ ...a })),
     _actions: actionsFor(actor(), q),
   });
@@ -442,6 +487,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   ): Question =>
     idempotent(`${action}:${id}`, opts, () => {
       const q = requireQuestionFor(id, action);
+      if (actor().assignmentScoped && hasUnitBoundRead(actor()) && !can(actor(), 'question.read', q).allow) {
+        throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+      }
       const perm = can(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
       const t = resolveTransition(q, action, payload, { actor: actor() });
@@ -470,7 +518,10 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     if (f.agendaItemId && q.agendaItemId !== f.agendaItemId) return false;
     if (f.q) {
       const needle = f.q.toLowerCase();
-      const hay = [q.number, q.text, q.speakerDisplayName ?? '', ...q.answers.map((a) => a.text)]
+      const speaker = state.speakers.get(q.speakerId);
+      const name = speaker && can(actor(), 'question.identity.reveal').allow && speaker.personId
+        ? state.persons.get(speaker.personId)?.displayName ?? '' : '';
+      const hay = [q.number, q.text, q.speakerDisplayName ?? '', name, ...q.answers.map((a) => a.text)]
         .join(' ')
         .toLowerCase();
       if (!hay.includes(needle)) return false;
@@ -479,6 +530,53 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   };
 
   return {
+    async listRoleAssignments(filter = {}) {
+      requirePermission('admin.roles.manage');
+      if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+      return [...state.roleAssignments.values()].filter((item) =>
+        (filter.subjectId === undefined || item.subjectId === filter.subjectId) &&
+        (filter.role === undefined || item.role === filter.role)).map(viewRoleAssignment);
+    },
+    async assignRole(input, opts) {
+      return idempotent(`assignRole:${state.meeting?.id ?? 'none'}`, opts, () => {
+        requirePermission('admin.roles.manage');
+        if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+        if (!input.subjectId?.trim() || input.subjectId.includes('@') || /\s/.test(input.subjectId))
+          throw new ApiProblem(422, 'Unprocessable', 'A pseudonymous subjectId is required.');
+        if (!input.role || !Object.hasOwn(ROLE_PERMISSIONS, input.role))
+          throw new ApiProblem(422, 'Unprocessable', 'A valid role is required.');
+        if (input.unitId !== undefined && !state.units.some((unit) => unit.id === input.unitId))
+          throw new ApiProblem(404, 'Not found', 'Unit does not exist here.');
+        if (input.expiresAt !== undefined && (!Number.isFinite(Date.parse(input.expiresAt)) || Date.parse(input.expiresAt) <= clock().getTime()))
+          throw new ApiProblem(422, 'Unprocessable', 'expiresAt must be in the future.');
+        const duplicate = [...state.roleAssignments.values()].some((item) => item.subjectId === input.subjectId &&
+          item.role === input.role && !item.revokedAt && (item.expiresAt === undefined || Date.parse(item.expiresAt) > clock().getTime()));
+        if (duplicate) throw new ApiProblem(409, 'Conflict', 'An active assignment already exists.');
+        const id = newId();
+        append([{ type: 'RoleAssigned', subjectId: id,
+          ...(input.personId !== undefined ? { personId: input.personId } : {}),
+          payload: { assignmentId: id, subjectId: input.subjectId, role: input.role,
+            ...(input.unitId !== undefined ? { unitId: input.unitId } : {}),
+            ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+            ...(input.deputyForSubjectId !== undefined ? { deputyForSubjectId: input.deputyForSubjectId } : {}),
+          } }]);
+        return viewRoleAssignment(state.roleAssignments.get(id)!);
+      });
+    },
+    async revokeRole(id, reason, opts) {
+      return idempotent(`revokeRole:${id}`, opts, () => {
+        requirePermission('admin.roles.manage');
+        const assignment = state.roleAssignments.get(id);
+        if (!assignment) throw new ApiProblem(404, 'Not found', 'Role assignment does not exist here.');
+        if (assignment.revokedAt) throw new ApiProblem(409, 'Conflict', 'Role assignment already revoked.');
+        if (reason !== undefined && !reason.trim()) throw new ApiProblem(422, 'Unprocessable', 'reason must not be empty.');
+        append([{ type: 'RoleRevoked', subjectId: id, payload: {
+          assignmentId: id, subjectId: assignment.subjectId, role: assignment.role,
+          ...(reason !== undefined ? { reason: reason.trim() } : {}),
+        } }]);
+        return viewRoleAssignment(state.roleAssignments.get(id)!);
+      });
+    },
     async getMeeting() {
       if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
       return viewMeeting(state.meeting);
@@ -530,12 +628,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           {
             type: 'SpeakerRegistered',
             subjectId: id,
+            personId: newId(),
             payload: {
               number: state.speakers.size + 1,
-              displayName: input.displayName.trim(),
+              pii: { keyId: state.meeting?.id ?? '', displayName: input.displayName.trim(),
+                ...(input.organisation !== undefined ? { organisation: input.organisation } : {}) },
               round,
               position: inRound.length + 1,
-              ...(input.organisation !== undefined ? { organisation: input.organisation } : {}),
             },
           },
         ]);
@@ -689,7 +788,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
       }
       requireReadPermission('getQuestionHistory'); // 403 R-PERM-02 if history.read itself is missing
-      return store.all().filter((e) => e.subjectId === q.id && e.meetingId === state.meeting?.id);
+      return store.all().filter((e) => e.subjectId === q.id && e.meetingId === state.meeting?.id).map(maskEvent);
     },
     async classifyQuestion(id, input, opts) {
       if (!TRACKS.includes(input.track)) throw new ApiProblem(422, 'Unprocessable', 'track must be podium, fast_track or expert_track.');
@@ -723,7 +822,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             version: q.answers.length + 1,
             text: input.text.trim(),
             createdAt: now(),
-            createdBy: actor(),
+            createdBy: { id: actor().id, role: actor().role },
             ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
           },
           ...(q.approval ? { invalidatedApprovalOfVersion: q.approval.answerVersion } : {}),
@@ -841,7 +940,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     },
     async listEvents(after = 0, limit = 1000) {
       requireReadPermission('listEvents');
-      return { items: store.readAfter(after, limit), lastSeq: store.lastSeq() };
+      return { items: store.readAfter(after, limit).map(maskEvent), lastSeq: store.lastSeq() };
     },
     async seedDemo(o = {}) {
       requirePermission('demo.seed');
@@ -866,7 +965,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // `actor()` at runtime — a subscription started under one role must not keep leaking events
       // once the demo user switches to a role without `event.read`.
       return store.subscribe((events) => {
-        listener(can(actor(), 'event.read').allow ? events : []);
+        listener(can(actor(), 'event.read').allow ? events.map(maskEvent) : []);
       });
     },
   };

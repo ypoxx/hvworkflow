@@ -2,6 +2,10 @@
 
 **Scheibe 025, vorläufige Agenda-Gewährung:** `agenda.manage` erlaubt die drei kanonischen Öffnen-/Schließen-Aktionen am Tagesordnungspunkt. Bis die Jahrgangsrollen in 026/040 verwaltet werden, erhält nur `admin` dieses Recht ausdrücklich; alle anderen Rollen sind abgewiesen. Die generierte Role-×-Agenda-Tabelle in `packages/domain/policy-truth-table.md` und die positive/negative Rollenmatrix in `meeting025.test.ts` machen die Änderung prüfbar. Die Inhalts- und Override-Rechte der Administration werden erst in 040 neu geordnet.
 
+**Scheibe 026, Identität und Rollenzuordnung:** `question.identity.reveal` erhalten nur `coordination`, `moderation`, `legal`, `approver` und `podium`. `admin`, `capture`, `expert` und `observer` sehen in Sprecher-, Frage- und Bühnenansichten „Redner <Nummer>“. Neue Sprecherereignisse führen eine pseudonyme Subject-ID und eine Personen-ID; Klarnamen und Organisation stehen ausschließlich im `pii`-Umschlag mit `keyId`. `admin.roles.manage` erhält nur `admin`. Beide Rechte sind in der generierten Role-×-Recht-Tabelle festgehalten.
+
+Rollen werden je Jahrgang durch `RoleAssigned` und `RoleRevoked` nachvollziehbar zugeordnet. Ein zugeordneter Eintrag gilt nur bis zu seiner Ablaufzeit, seinem Entzug oder dem Jahrgangsende; bei der Fachbeantwortung begrenzt die zugeordnete Einheit das Leserecht. Bis zum Sitzungsadapter aus 029b bleibt allein die bestehende synthetische Demo-Identität ohne Zuordnung als Kompatibilitätspfad nutzbar. Die physische Personentabelle folgt in 027, der Entzug bereits laufender Sitzungen in 029b, die Oberfläche zur Rollenverwaltung in 040 und ein protokolliertes Aufdecken von Identitäten in 067. Notfallkonten sind für die erste interne Beta zurückgestellt.
+
 **Frage, die dieses Dokument beantwortet:** Wie wird das Berechtigungsmodell flexibel genug, um von Jahr
 zu Jahr angepasst zu werden — ohne dass jede Anpassung ein Umbau ist und Fehler produziert?
 

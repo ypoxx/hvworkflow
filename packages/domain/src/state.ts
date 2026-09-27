@@ -8,9 +8,11 @@ import type {
   AgendaItem,
   Contribution,
   Meeting,
+  Person,
   QuestionRecord,
   QuestionStatus,
   SpeakerRecord,
+  RoleAssignment,
   Unit,
 } from './types.js';
 import { QUESTION_STATUSES } from './types.js';
@@ -22,6 +24,8 @@ export interface State {
   agendaItems: AgendaItem[];
   units: Unit[];
   speakers: Map<string, SpeakerRecord>;
+  persons: Map<string, Person>;
+  roleAssignments: Map<string, RoleAssignment>;
   contributions: Map<string, Contribution>;
   questions: Map<string, QuestionRecord>;
   /** Highest stage position handed out so far; the queue is ordered by it. */
@@ -35,6 +39,8 @@ export function emptyState(): State {
     agendaItems: [],
     units: [],
     speakers: new Map(),
+    persons: new Map(),
+    roleAssignments: new Map(),
     contributions: new Map(),
     questions: new Map(),
     stageCounter: 0,
@@ -101,6 +107,8 @@ export function reduce(state: State, e: DomainEvent): State {
       // The unscoped demo alias follows the newest meeting; canonical readers project one
       // meeting at a time from the same global event log.
       state.speakers = new Map();
+      state.persons = new Map();
+      state.roleAssignments = new Map();
       state.contributions = new Map();
       state.questions = new Map();
       state.stageCounter = 0;
@@ -113,6 +121,7 @@ export function reduce(state: State, e: DomainEvent): State {
         status: e.payload.lifecycleVersion === 2 ? 'preparation' : 'running',
         version: 1,
         currentRound: 1,
+        pseudonymiseForUnits: true,
         counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0, byStatus: Object.fromEntries(QUESTION_STATUSES.map((st) => [st, 0])) as Record<QuestionStatus, number> },
         ...(e.payload.legalEntity !== undefined ? { legalEntity: e.payload.legalEntity } : {}),
       };
@@ -162,18 +171,48 @@ export function reduce(state: State, e: DomainEvent): State {
       // Events written before slice 080 may still carry the kind (Art) and the speaking time; they stay in
       // the log untouched (rule 7), the projection just no longer reads them.
       const p = e.payload;
+      const personId = e.personId ?? e.subjectId;
+      const displayName = p.pii?.displayName ?? p.displayName;
+      if (displayName) state.persons.set(personId, {
+        personId, displayName,
+        ...(p.pii?.organisation !== undefined ? { organisation: p.pii.organisation }
+          : p.organisation !== undefined ? { organisation: p.organisation } : {}),
+      });
       state.speakers.set(e.subjectId, {
         id: e.subjectId,
         ...(e.meetingId !== undefined ? { meetingId: e.meetingId } : {}),
         number: p.number,
-        displayName: p.displayName,
+        personId,
+        displayName: `Redner ${p.number}`,
         round: p.round,
         position: p.position,
         status: 'waiting',
         questionCount: 0,
         version: 1,
-        ...(p.organisation !== undefined ? { organisation: p.organisation } : {}),
       });
+      break;
+    }
+    case 'RoleAssigned': {
+      state.roleAssignments.set(e.subjectId, {
+        id: e.subjectId,
+        meetingId: e.meetingId ?? state.meeting?.id ?? '',
+        subjectId: e.payload.subjectId,
+        ...(e.personId !== undefined ? { personId: e.personId } : {}),
+        role: e.payload.role,
+        ...(e.payload.unitId !== undefined ? { unitId: e.payload.unitId } : {}),
+        ...(e.payload.expiresAt !== undefined ? { expiresAt: e.payload.expiresAt } : {}),
+        ...(e.payload.deputyForSubjectId !== undefined ? { deputyForSubjectId: e.payload.deputyForSubjectId } : {}),
+        assignedAt: e.recordedAt ?? e.at,
+        assignedBy: { id: e.actor.id, role: e.actor.role },
+      });
+      break;
+    }
+    case 'RoleRevoked': {
+      const assignment = state.roleAssignments.get(e.subjectId);
+      if (assignment) {
+        assignment.revokedAt = e.recordedAt ?? e.at;
+        assignment.revokedBy = { id: e.actor.id, role: e.actor.role };
+      }
       break;
     }
     case 'SpeakersReordered': {

@@ -16,7 +16,10 @@ import { PERMISSIONS, READ_PERMISSIONS } from './types.js';
  * and `observer` lost `question.read` for the scoped `question.read.delivered` (it sees counters and
  * what has been read out, R-PERM-03 below).
  */
-export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
+type RoleBundle = readonly Permission[] & { readonly unitBoundRead?: true };
+const unitBound = (permissions: readonly Permission[]): RoleBundle =>
+  Object.assign([...permissions], { unitBoundRead: true as const });
+export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
   moderation: [
     'speaker.register',
     'speaker.reorder',
@@ -30,6 +33,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'question.read',
     'stage.read', // holds question.stage, must see what is on the podium
     'history.read', // may read a question, may trace how it came to be (Plan 3)
+    'question.identity.reveal',
   ],
   capture: [
     'contribution.capture',
@@ -50,9 +54,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'contribution.read',
     'speaker.read',
     'history.read',
+    'question.identity.reveal',
   ],
-  expert: ['answer.draft', 'question.submit_review', 'question.read', 'history.read'],
-  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.read', 'history.read'],
+  expert: unitBound(['answer.draft', 'question.submit_review', 'question.read', 'history.read']),
+  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.read', 'history.read', 'question.identity.reveal'],
   approver: [
     'question.assign',
     'question.approve',
@@ -61,12 +66,16 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'question.read',
     'stage.read', // holds question.stage
     'history.read',
+    'question.identity.reveal',
   ],
-  podium: ['question.deliver', 'question.return', 'question.close', 'stage.read'],
+  podium: ['question.deliver', 'question.return', 'question.close', 'stage.read', 'question.identity.reveal'],
   // Scheibe 025: the agenda grant is explicit. All other bundles deny it by default.
-  admin: [...PERMISSIONS.filter((permission) => permission !== 'agenda.manage'), 'agenda.manage'],
+  admin: [...PERMISSIONS.filter((permission) => !['agenda.manage', 'admin.roles.manage', 'question.identity.reveal'].includes(permission)),
+    'agenda.manage', 'admin.roles.manage'],
   observer: ['question.read.delivered'],
 };
+
+export const hasUnitBoundRead = (actor: Actor): boolean => ROLE_PERMISSIONS[actor.role]?.unitBoundRead === true;
 
 /**
  * R-PERM-03 (Leseumfang): a permission that only unlocks a question in specific statuses. `can()`
@@ -119,6 +128,9 @@ export const deny = (ruleId: string, reason: string): Decision => ({ allow: fals
  * (a write permission) is R-PERM-01. */
 export function hasPermission(actor: Actor, permission: Permission): Decision {
   const bundle = ROLE_PERMISSIONS[actor.role];
+  if (bundle?.unitBoundRead && actor.assignmentScoped && permission === 'question.read' && !actor.unitId) {
+    return deny('R-PERM-03', 'This assignment needs a unit to read questions.');
+  }
   if (!bundle || !bundle.includes(permission)) {
     const ruleId = READ_PERMISSION_SET.has(permission) ? 'R-PERM-02' : 'R-PERM-01';
     return deny(ruleId, `Role "${actor.role}" lacks permission "${permission}".`);

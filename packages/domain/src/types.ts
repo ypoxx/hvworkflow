@@ -23,11 +23,17 @@ export interface Actor {
   id: string;
   role: Role;
   displayName?: string;
+  personId?: string;
+  /** Internal assignment context, never accepted from a request body. */
+  unitId?: string;
+  assignmentScoped?: boolean;
 }
 
 /** Permission identifiers. Implemented entries from the contract's `Action` enum. */
 export const PERMISSIONS = [
+  'admin.roles.manage',
   'agenda.manage',
+  'question.identity.reveal',
   'speaker.register',
   'speaker.reorder',
   'speaker.update',
@@ -122,6 +128,7 @@ export interface Meeting {
   status: 'preparation' | 'running' | 'closed';
   version?: number;
   debateClosedAt?: string;
+  pseudonymiseForUnits?: boolean;
   currentRound: number;
   counts: {
     speakers: number;
@@ -152,6 +159,7 @@ export interface Unit {
 export interface SpeakerRecord {
   id: string;
   meetingId?: string;
+  personId?: string;
   number: number;
   displayName: string;
   organisation?: string;
@@ -162,6 +170,37 @@ export interface SpeakerRecord {
   speakingEndedAt?: string;
   questionCount: number;
   version: number;
+}
+
+/** Clear identity stays in the person projection, separate from workflow records. */
+export interface Person {
+  personId: string;
+  displayName: string;
+  organisation?: string;
+}
+
+/** One append-only role grant and its optional later revocation. */
+export interface RoleAssignment {
+  id: string;
+  meetingId: string;
+  subjectId: string;
+  personId?: string;
+  role: Role;
+  unitId?: string;
+  expiresAt?: string;
+  deputyForSubjectId?: string;
+  assignedAt: string;
+  assignedBy: Actor;
+  revokedAt?: string;
+  revokedBy?: Actor;
+}
+export interface RoleAssignmentCreate {
+  subjectId: string;
+  personId?: string;
+  role: Role;
+  unitId?: string;
+  expiresAt?: string;
+  deputyForSubjectId?: string;
 }
 export interface Speaker extends SpeakerRecord {
   _actions: Permission[];
