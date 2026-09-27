@@ -32,14 +32,14 @@ Keine Auth-Implementierung in diesem Takt, kein produktiver Konzern-IdP, kein No
 ## Bericht
 
 Slice: takt-020-interne-beta-ohne-notfallkonten
-Done: Die Eigentümerentscheidung vom 27.09. ist in B1, B14, E11 und im Beta-Pfad erfasst. 029b enthält sichere Anmeldung und die Subject-Sperre für verlorene Geräte; 029 enthält erst nach der Fortführungsentscheidung die zwei Notfallkonten mit Alarm. Vor-Beta-Abhängigkeiten auf 029 sind beseitigt. Der strikte Plan-Graph hat 87 Scheiben, 0 fehlende Abhängigkeiten, 0 Zyklen, 0 Reihenfolgefehler und 0 Lane-Warnungen.
-Evidence: Fokussierter Test zuerst rot wegen 029/029b, danach 17/17 Skripttests grün. Unabhängiges Review: zwei Planhinweise zu B15 und Files allowed wurden behoben und eng nachgeprüft; keine P0/P1-, Security-, Legal- oder Privacy-Befunde. `pnpm gates` auf sauberem Commit `04a7e18` (Node 24, pnpm 10.33.0) endete wörtlich:
+Done: Die Eigentümerentscheidung vom 27.09. ist in B1, B14, E11, ADR 0004 und im Beta-Pfad erfasst. 029b enthält sichere Anmeldung und die Subject-Sperre für verlorene Geräte; 029 enthält erst nach der Fortführungsentscheidung die zwei Notfallkonten mit Alarm. Vor-Beta-Abhängigkeiten auf 029 sind beseitigt, der berechnete Start ist frühestens 15.03.2027, und W4 nennt 029b. Der strikte Plan-Graph hat 87 Scheiben, 0 fehlende Abhängigkeiten, 0 Zyklen, 0 Reihenfolgefehler und 0 Lane-Warnungen.
+Evidence: Fokussierter Test zuerst rot wegen 029/029b; Kalendertest danach rot wegen 09.03., jetzt 18/18 Skripttests grün. Unabhängiges Review: B15 und Files allowed behoben; zwei P1-Funde des GitHub-Reviews zu Kalender und ADR behoben und eng unabhängig nachgeprüft, kein direkter Blocker. `pnpm gates` auf sauberem Commit `85473ad` (Node 24, pnpm 10.33.0) endete wörtlich:
 
 ```text
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 726ms
-mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 04a7e18, tree 74c2e84e0fa8…
+✓ built in 417ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 85473ad, tree 4a6d130a6051…
 ```
 
 Open: Die Anmeldung, Subject-Sperre, das Runbook und die Chaos-Probe sind hier geplant, noch nicht implementiert. Notfallkonten und Ausfall-Alarm folgen in 029 nach der Fortführungsentscheidung. Kein Deployment.
-Touched: `docs/slices/takt-020-interne-beta-ohne-notfallkonten.md`, `docs/produktplan-beta.md`, `docs/entscheidungsregister.md`, `scripts/plan-graph.test.mjs`.
+Touched: `docs/slices/takt-020-interne-beta-ohne-notfallkonten.md`, `docs/produktplan-beta.md`, `docs/entscheidungsregister.md`, `docs/adr/0004-identitaet-oidc-bff.md`, `scripts/plan-graph.mjs`, `scripts/plan-graph.test.mjs`.
