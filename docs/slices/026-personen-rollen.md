@@ -49,6 +49,7 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 - `packages/domain/policy-truth-table.md` (nur generierter Diff für zwei neue Rechte)
 - `apps/api/src/app.ts`
 - `apps/api/src/__tests__/person-roles026.test.ts`
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur bisherige feste Version und EventRead-Fixture an 0.3.4 anpassen)
 - `apps/api/src/__tests__/helpers.ts` (nur 026-Operation-Coverage)
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "026"`)
 - `packages/contract/openapi.yaml` (nur `EventRead`, drei Leseantworten/SSE und Versionsverweise 028)
