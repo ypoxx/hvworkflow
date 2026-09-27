@@ -60,6 +60,7 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "025"`)
 - `docs/rollen-und-rechtekonzept.md` (nur `agenda.manage`-Gewährung)
 - `docs/legal-trace.md` (nur generierte R-MTG-01..06-Zeilen)
+- `docs/evidence/025-capture.jpg` (Browser-Nachweis der bestehenden Erfassungsansicht mit Quellenanzeige)
 
 ## Tests zuerst und Abnahme
 
