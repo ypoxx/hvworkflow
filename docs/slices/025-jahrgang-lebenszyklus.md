@@ -8,7 +8,7 @@
 
 **Missbrauchsfall MF-04 (Ereignis manipuliert):** Ein veränderter oder hinzugefügter Jahrgangs-/Agenda-Eintrag verändert den sichtbaren Stand. `verifyEventChain` erkennt eine gebrochene globale Hashkette beim Laden; die Wiederherstellung wird gestoppt. Signal ist der Integritätsfehler ohne Frageinhalt oder Kennzahl je Person, Empfänger ist der technische Betrieb; die Alarmweiterleitung folgt in 085. Nachweis: `envelope.test.ts` für Kette und `meeting025.test.ts` für abgewiesene Agenda-Ereignisse. Ein formal gültig, aber unberechtigt geschriebenes Ereignis ist damit nicht erkannt; die Autorisierung neuer HTTP-Schreibwege bleibt zusätzlich über `can()` geprüft.
 
-**Rechteentscheidung vor Bau (SC-02):** Die Wahrheitstabelle erhält eine eigene Spalte `agenda.manage`. Nur `admin` bekommt in Scheibe 025 einen ausdrücklichen Grant, damit die drei kanonischen Agenda-Aktionen bedienbar sind; alle übrigen Rollen sind `deny`. Das ist eine vorläufige Demo-Rollenentscheidung bis 026/040 und kein Freibrief für `admin.override`. Positive und negative Rollenmatrix stehen in `meeting025.test.ts`; der generierte Diff in `policy-truth-table.md` ist Review-Gegenstand.
+**Rechteentscheidung im Review (SC-02):** Die Wahrheitstabelle erhält eine eigene Spalte `agenda.manage`. Nur `admin` bekommt in Scheibe 025 einen ausdrücklichen Grant, damit die drei kanonischen Agenda-Aktionen bedienbar sind; alle übrigen Rollen sind `deny`. Das ist eine vorläufige Demo-Rollenentscheidung bis 026/040 und kein Freibrief für `admin.override`. Positive und negative Rollenmatrix stehen in `meeting025.test.ts`; der generierte Diff in `policy-truth-table.md` ist Review-Gegenstand. Diese Festlegung wurde erst nach dem Baucommit `d400e28` mit `cb497cd` nachgetragen und erfüllt die zeitliche Vorgabe „vor Bau“ nicht; die nachträgliche Prozessabweichung benötigt die ausdrückliche Entscheidung des Eigentümers vor dem Merge.
 
 ## Ziel
 
@@ -77,4 +77,20 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 
 ## Bericht
 
-(nach Bau, Test, Gate und Review)
+Slice: 025-jahrgang-lebenszyklus
+
+Done: Zwei Jahrgänge sind im globalen Ereignislog getrennt; der Demo-Alias folgt der Vertragsregel. R-MTG-01..06, spät begründete Papier-/Transkripterfassung und 14 kanonische Operationen sind implementiert. Das unabhängige Review und der enge Recheck haben die technischen und dokumentarischen Befunde 2–4 und 6–8 als behoben bestätigt (Commit `cb497cd`).
+
+Evidence: `pnpm gates` auf sauberem Commit `cb497cd` (Exit 0), wörtlicher Schluss:
+
+```text
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 416ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit cb497cd, tree 607d516708dc…
+```
+
+Browser-Nachweis: `docs/evidence/025-capture.jpg` (Erfassungsansicht, Quellenanzeige; kein Konsolenfehler). Die volle E2E-Suite läuft in der PR-CI mit installiertem Chromium; Ergebnis steht vor dem Merge noch aus.
+
+Open: Die ausdrückliche `agenda.manage`-Gewährung und der Wahrheitstabellen-Diff wurden erst im Review nach dem ursprünglichen Baucommit ergänzt. Diese Abweichung von SC-02 „vor Bau“ benötigt vor dem Merge die nachträgliche Entscheidung des Eigentümers. T-G1-D-01 bleibt für Scheibe 034 offen: Body-/Text-/Rate-/Timeout-Grenzen und 413/429/408 erfordern eine versionierte Vertragsänderung nach ADR 0015. Scheibe 025 ist damit noch keine intern betriebsfähige Beta; kein Deploy.
+
+Touched: `apps/api/src/app.ts`, `apps/api/src/__tests__/meeting025.test.ts`; `apps/web/src/components/SourceIcon.tsx`, `apps/web/src/i18n/{labels.ts,parity.test.ts,shell.de.ts,shell.en.ts}`; `docs/evidence/025-capture.jpg`, `docs/legal-trace.md`, `docs/rollen-und-rechtekonzept.md`, diese Spec; `packages/contract/allowlist.json`; `packages/domain/policy-truth-table.md`, `packages/domain/src/{api.ts,envelope.ts,events.ts,permissions.ts,rules.ts,seed.ts,state.ts,store.ts,transitions.ts,types.ts}`, `packages/domain/src/__tests__/{meeting025.test.ts,seed-fictitious-names.test.ts,transitions.test.ts}`.
