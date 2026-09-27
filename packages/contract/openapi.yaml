@@ -2441,7 +2441,16 @@ components:
       allOf:
         - if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
           then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
-        - { $ref: '#/components/schemas/Event/else' }
+        - if: { required: [type], properties: { type: { enum: [AgendaItemOpened, VotingOpened, VotingClosed] } } }
+          then: { required: [subjectId], properties: { payload: { $ref: '#/components/schemas/AgendaItemEventPayload' } } }
+        - if: { required: [type], properties: { type: { enum: [MeetingStarted, MeetingClosed, DebateClosed] } } }
+          then: { required: [subjectId] }
+        - if: { required: [type], properties: { type: { enum: [MeetingStarted, MeetingClosed] } } }
+          then: { properties: { payload: { type: object, maxProperties: 0 } } }
+        - if: { required: [type], properties: { type: { const: RoleAssigned } } }
+          then: { required: [subjectId], properties: { payload: { $ref: '#/components/schemas/RoleAssignedPayload' } } }
+        - if: { required: [type], properties: { type: { const: RoleRevoked } } }
+          then: { required: [subjectId], properties: { payload: { $ref: '#/components/schemas/RoleRevokedPayload' } } }
     Event:
       type: object
       description: >
