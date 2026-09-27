@@ -17,14 +17,16 @@ Keine Auth-Implementierung in diesem Takt, kein produktiver Konzern-IdP, kein No
 ## Files allowed
 
 - `docs/slices/takt-020-interne-beta-ohne-notfallkonten.md`
-- `docs/produktplan-beta.md` (nur B1/B14; Architektur-/ADR-/M2-/M5-/B-Listen-/Risikotext zu Identität und Notfallkonten; 026, 029, 029b, 030, 064, 065, 070, 072, 074, 077, 079, 085, 088 und deren exakte Abhängigkeiten; Abschnitt 11 Beta-Pfad)
+- `docs/produktplan-beta.md` (nur B1/B14; Architektur-/ADR-/M2-/M5-/B-Listen-/Risikotext und Wochenübersicht zu Identität und Notfallkonten; 026, 029, 029b, 030, 064, 065, 070, 072, 074, 077, 079, 085, 088 und deren exakte Abhängigkeiten; Abschnitt 11 Beta-Pfad)
 - `docs/entscheidungsregister.md` (nur E11 und seine direkten Referenzen)
-- `scripts/plan-graph.test.mjs` (nur fokussierter Test des echten Plans unter `--strict`)
+- `docs/adr/0004-identitaet-oidc-bff.md` (nur Beta-Grenze, Adapter-Zeitpunkt und getrennte Nachweise gemäß E11)
+- `scripts/plan-graph.mjs` (nur frühester Start für 029 nach der Fortführungsentscheidung)
+- `scripts/plan-graph.test.mjs` (nur fokussierter Test des echten Plans unter `--strict` und 029-Kalendergrenze)
 
 ## Tests zuerst und Akzeptanz
 
-1. Zuerst ein fokussierter Plan-Graph-Test, der `--strict` auf dem echten Plan ausführt und wegen 029/029b rot ist. Nach der Planentscheidung besteht er: keine fehlende Abhängigkeit, kein Zyklus, kein Reihenfolgefehler und keine Lane-Warnung.
-2. B1 ist intern ohne Notfallkonto erfüllbar und nennt den IdP-Ausfall als Einschränkung. Die Subject-Sperre aus 029b deckt den verlorenen Podiumsrechner in B15 und 078 ab. 029 ist ausdrücklich nach der Beta-Entscheidung und bleibt mit Eigentümer, Datum, Test und reservierten Attributen erhalten. Keine vor der Beta liegende Scheibe hängt noch von 029 ab. E11 und B14 widersprechen dieser Grenze nicht.
+1. Zuerst ein fokussierter Plan-Graph-Test, der `--strict` auf dem echten Plan ausführt und wegen 029/029b rot ist. Nach der Planentscheidung besteht er: keine fehlende Abhängigkeit, kein Zyklus, kein Reihenfolgefehler und keine Lane-Warnung. Ein zweiter roter Kalendertest verlangt für 029 einen berechneten Start frühestens am 15.03.2027; die Wochenübersicht W4 nennt 029b statt 029.
+2. B1 ist intern ohne Notfallkonto erfüllbar und nennt den IdP-Ausfall als Einschränkung. Die Subject-Sperre aus 029b deckt den verlorenen Podiumsrechner in B15 und 078 ab. 029 ist ausdrücklich nach der Beta-Entscheidung und bleibt mit Eigentümer, Datum, Scheduler-Grenze, Test und reservierten Attributen erhalten. Keine vor der Beta liegende Scheibe hängt noch von 029 ab. E11, B14 und ADR 0004 widersprechen dieser Grenze nicht.
 3. `pnpm gates` besteht auf sauberem Commit. Bericht nennt den Commit und den wörtlichen Schluss. Unabhängiges Review prüft Plan, Entscheidung und Diff. Kein Deploy.
 
 ## Bericht

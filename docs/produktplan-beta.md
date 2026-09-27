@@ -1135,7 +1135,7 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 1 | 28.09.–02.10. | Bau | **009**, **017**, **012**, **014**, **015**, **016**, **018**, **019**, **013**, **020** | Fragenpaket an die Projektleitung (02.10.); HV-Datum und Format bestätigt (02.10., E20) |
 | 2 | 05.10.–09.10. | Bau | **039**, **082**, **010**, **011**, **080**, **021** | **Prüfpunkt 1** mit Feedback-Runde 2 (09.10.); Satzung und Geschäftsordnung bis 09.10. |
 | 3 | 12.10.–16.10. | Bau | **022**, **084**, **023**, **024**, **025**, **026** | **Prüfpunkt 2** (16.10.); Entscheidungsstunde; Ansprechperson Tool-Team (E3a) bis 16.10. |
-| 4 | 19.10.–23.10. | Bau | **027**, **028**, **029**, **030**, **031**, **043** | Vertrag 0.4.0 (043) |
+| 4 | 19.10.–23.10. | Bau | **027**, **028**, **029b**, **030**, **031**, **043** | Vertrag 0.4.0 (043); 029 erst nach Fortführungsentscheidung |
 | 5 | 26.10.–30.10. | Bau | **033**, **032**, **034**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
 | 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **048**, **088**, **044** | Restore-Drill auf Staging (038) |
 | 7 | 09.11.–13.11. | Bau | **045**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |

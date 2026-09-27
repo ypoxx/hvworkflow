@@ -83,6 +83,14 @@ test('takt-020 red: deferred emergency accounts no longer collide with beta sign
   assert.match(r.stdout, /same-day lane-sharing warnings: 0/);
 });
 
+test('takt-020 review red: calendar cannot start emergency accounts before the continuation decision', () => {
+  const r = run(['--plan', REAL_PLAN, '--calendar']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const start = r.stdout.match(/^\s+029\s+start\s+(\d{4}-\d{2}-\d{2})\s+/m)?.[1];
+  assert.ok(start, 'calendar must include 029');
+  assert.ok(start >= '2027-03-15', `029 starts too early: ${start}`);
+});
+
 test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {
   // Round 1, m5: do not hard-code the current slice count here — the plan grows over the project's
   // life and a fixed number makes this test fail on every unrelated planning change. The slice count
