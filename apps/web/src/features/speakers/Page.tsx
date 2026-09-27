@@ -27,7 +27,7 @@ import { NowSpeaking } from './NowSpeaking';
 import { RoundSection } from './RoundSection';
 import { ROW_COLUMNS } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
-import { useSpeakers } from './useSpeakers';
+import { moveSpeakerToRound, useSpeakers } from './useSpeakers';
 import { RegisterDialog } from './RegisterDialog';
 
 /** The failed-write message: title from the problem, fallback from the dictionary. */
@@ -216,20 +216,7 @@ export function SpeakersPage() {
 
   const move = useCallback(
     async (speaker: Speaker, round: number): Promise<boolean> =>
-      run(speaker.id, async () => {
-        await api.updateSpeaker(speaker.id, { round }, { ifMatch: etagOf(speaker.version) });
-        // The dialog promises the end of the round, so the positions of the target round are
-        // written once more with this Wortmeldung appended.
-        if (speaker._actions.includes('speaker.reorder')) {
-          const target = viewRef.current
-            .filter((s) => s.round === round && s.id !== speaker.id)
-            .map((s) => s.id);
-          const currentList = await api.getMeeting();
-          await api.reorderSpeakers(round, [...target, speaker.id], {
-            ifMatch: etagOf(currentList.speakerListVersion),
-          });
-        }
-      }),
+      run(speaker.id, () => moveSpeakerToRound(api, speaker, round)),
     [run],
   );
 

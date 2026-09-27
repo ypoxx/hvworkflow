@@ -4,7 +4,8 @@
  * (`useApiVersion`), and on demand after a refused write.
  */
 import { useCallback, useEffect, useState } from 'react';
-import type { Speaker } from '@hv/domain';
+import { etagOf } from '@hv/domain';
+import type { HvApi, Speaker } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -45,6 +46,29 @@ export function isReadForbidden(error: unknown): boolean {
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 
+/** Pair rows with the list version by bracketing the read with two monotone version reads. */
+export async function readStableSpeakerList(
+  client: Pick<HvApi, 'getMeeting' | 'listSpeakers'>,
+): Promise<{ speakers: readonly Speaker[]; version: number }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const before = (await client.getMeeting()).speakerListVersion;
+    const speakers = await client.listSpeakers();
+    const after = (await client.getMeeting()).speakerListVersion;
+    if (before === after) return { speakers, version: after };
+  }
+  throw new Error(translate(getLang(), 'speakers.list.changed'));
+}
+
+/** Re-read the target round after the move; a fresh tag must never validate an old order. */
+export async function moveSpeakerToRound(client: HvApi, speaker: Speaker, round: number): Promise<void> {
+  await client.updateSpeaker(speaker.id, { round }, { ifMatch: etagOf(speaker.version) });
+  if (!speaker._actions.includes('speaker.reorder')) return;
+  const { speakers, version } = await readStableSpeakerList(client);
+  const target = speakers.filter((item) => item.round === round && item.id !== speaker.id)
+    .map((item) => item.id);
+  await client.reorderSpeakers(round, [...target, speaker.id], { ifMatch: etagOf(version) });
+}
+
 export function useSpeakers(): SpeakersState {
   const version = useApiVersion();
   const [token, setToken] = useState(0);
@@ -75,10 +99,10 @@ export function useSpeakers(): SpeakersState {
     let cancelled = false;
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
-    Promise.all([api.listSpeakers(), api.getMeeting()])
-      .then(([next, meeting]) => {
+    readStableSpeakerList(api)
+      .then(({ speakers: next, version: listVersion }) => {
         if (!isCurrentLoad(requested, current())) return;
-        setList({ key: requested, speakers: next, version: meeting.speakerListVersion });
+        setList({ key: requested, speakers: next, version: listVersion });
         setRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
