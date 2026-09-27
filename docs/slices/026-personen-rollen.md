@@ -1,6 +1,6 @@
 # Scheibe 026 — Personentabelle und Rollenereignisse
 
-**Status:** geplant · **Lanes:** core, service
+**Status:** im Review · **Lanes:** core, service
 **Risikoklasse:** hoch
 **Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/026; ADR 0004, 0009, 0011, 0013, 0015; Vertrag 0.3.3. Scheibe 025 ist mit PR #53 (`7bd0e30`) integriert. E8 baut auf der Standardannahme: die Zuordnungstabelle im Tool ist die Wahrheit, IdP-Gruppen sind später nur Vorschläge.
 
@@ -79,4 +79,22 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 
 ## Bericht
 
-(nach Bau, Test, Gate und Review)
+Slice: 026-personen-rollen
+
+Done: Die je Jahrgang rekonstruierbare Personentabelle, die pseudonymisierte Sprecheransicht und die beiden neuen Rechte sind umgesetzt. `RoleAssigned`/`RoleRevoked` werden append-only projiziert; die drei kanonischen HTTP-Operationen sind gemountet. `EventRead` liefert maskierte Ereignisse ohne Änderung der gespeicherten Hash-Kette; Web-Historie und OpenAPI-Beschreibung folgen derselben Leseregel. Das unabhängige Review und die engen Rechecks haben den Statusfilter-Befund und die Vertragsbeschreibung geklärt.
+
+Evidence: `pnpm gates` auf sauberem Commit `a81a320` (Exit 0), wörtlicher Schluss:
+
+```text
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 415ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit a81a320, tree 83ac28117f96…
+```
+
+Die vollständige lokale Chromium-E2E-Suite bestand mit 123/123 Tests; `docs/evidence/026-personen-rollen.jpg` zeigt die pseudonyme `capture`-Ansicht. Der Abnahmetest wurde nach einem roten Volllauf (122 bestanden, 1 fehlgeschlagen) an das freigegebene Pseudonymrecht angepasst. Der Fachbereichs-Statusfiltertest war vor der Korrektur rot (403) und danach grün. Der explizite Scope-Check meldete 31 geänderte Dateien innerhalb der Allowlist. PR #54 muss vor dem Merge auf seinem letzten Commit grüne CI haben.
+
+Bedrohungs-ID → Test und Grenze: T-G1-I-03 → `person-roles026.test.ts` (Pseudonym, Frage und historische Namen), `eventSummary.test.ts` (Historie); protokolliertes Aufdecken folgt in 067. T-G1-E-04 → Rollenmatrix in `person-roles026.test.ts`; die Selbstzuordnung des `admin` bleibt bis 040/085 als MF-01 zu überwachen. T-G2-I-01 → PII-/`EventRead`- und unveränderter Original-Hash in Domain- und API-`person-roles026.test.ts`; physische Speicherung und spätere persönliche Leserechte folgen in 027/047. T-G3-E-03 → Zuordnungs-, Fremd-ID-, Einheits-, Ablauf- und Statusfiltertests in `person-roles026.test.ts`; laufender Sitzungsentzug folgt in 029b. T-G1-S-01 → HTTP-Negativtests für das Verwaltungsrecht in API-`person-roles026.test.ts`; echte OIDC-Sitzungen folgen in 029b. T-G1-D-01 → durch 026 nicht geschlossen; Body-, Rate- und Timeout-Grenzen mit 413/429/408 folgen in 034.
+
+Open: 026 allein macht die Beta noch nicht intern betriebsfähig: Postgres (027), verpflichtender Umschlag und Idempotenz (028), OIDC und Sitzungsentzug (029b) sowie die übrigen Beta-Nachweise bleiben erforderlich. Beim Anlegen von PR #54 hat Netlify automatisch einen Deploy-Preview erstellt, obwohl die Commits `[skip netlify]` trugen; der PR-Titel trägt nun ebenfalls `[skip netlify]`, um weitere PR-Previews zu überspringen. Es gab keinen manuellen oder Produktions-Deploy.
+
+Touched: `apps/api/src/{app.ts,__tests__/person-roles026.test.ts,__tests__/takt-019-contract.test.ts}`; `apps/web/e2e/abnahme.spec.ts`, `apps/web/src/features/history/{eventSummary.ts,eventSummary.test.ts}`, `apps/web/src/i18n/{labels.ts,parity.test.ts,shell.de.ts,shell.en.ts}`; `docs/evidence/026-personen-rollen.jpg`, `docs/rollen-und-rechtekonzept.md`, diese Spec; `packages/contract/{CHANGELOG.md,allowlist.json,openapi.yaml,package.json,src/types.ts}`; `packages/domain/policy-truth-table.md`, `packages/domain/src/{api.ts,envelope.ts,events.ts,permissions.ts,seed.ts,state.ts,types.ts}`, `packages/domain/src/__tests__/{api.test.ts,person-roles026.test.ts,seed-fictitious-names.test.ts,seed.test.ts,transitions.test.ts}`.
