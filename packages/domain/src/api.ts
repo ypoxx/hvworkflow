@@ -317,11 +317,12 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const actor = (): Actor => {
     const current = options.actor();
     const history = [...state.roleAssignments.values()].filter((assignment) => assignment.subjectId === current.id);
-    if (history.length === 0) return current; // synthetic demo identity until the session adapter in 029b
-    const assignment = history.find((item) => item.role === current.role && !item.revokedAt &&
+    if (history.length === 0 && current.assignmentScoped !== true) return current; // synthetic demo identity
+    // The projection retains event order; a session uses the oldest active grant in this meeting.
+    const assignment = history.find((item) => (current.assignmentScoped === true || item.role === current.role) && !item.revokedAt &&
       (item.expiresAt === undefined || Date.parse(item.expiresAt) > clock().getTime()) && state.meeting?.status !== 'closed');
     if (!assignment) throw new ApiProblem(403, 'Forbidden', 'Role assignment is no longer active.', 'R-PERM-01');
-    return { id: current.id, role: current.role, assignmentScoped: true,
+    return { id: current.id, role: assignment.role, assignmentScoped: true,
       ...(assignment.personId !== undefined ? { personId: assignment.personId } : {}),
       ...(assignment.unitId !== undefined ? { unitId: assignment.unitId } : {}) };
   };

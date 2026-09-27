@@ -203,6 +203,18 @@ const OTHER_RULES: readonly RuleEntry[] = [
     },
   },
   {
+    ruleId: 'R-AUTH-01',
+    kind: 'Guard',
+    description: 'A session-cookie write requires its non-empty, matching CSRF token before any workflow event is appended.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation: 'docs/slices/029b-anmeldung-beta.md:19 (interne Sicherheitsentscheidung für die Beta; keine extern bestätigte Rechtsnorm).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
     ruleId: 'R-IDEM-01',
     kind: 'Idempotenz',
     description:

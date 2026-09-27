@@ -91,11 +91,15 @@ export async function assertRuntimePrivileges(pool: Pool, requireTables = true):
        FROM pg_catalog.pg_class c
        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
        JOIN pg_catalog.pg_roles r ON r.rolname = current_user
-       WHERE n.nspname = current_schema() AND c.relname IN ('events', 'persons', 'schema_migrations')`);
-    if (requireTables && privileges.rows.length !== 3) throw new PostgresPersistenceError();
+       WHERE n.nspname = current_schema() AND c.relname IN
+         ('events', 'persons', 'schema_migrations', 'auth_login_states', 'auth_sessions',
+          'auth_logout_ids', 'auth_subject_blocks')`);
+    if (requireTables && privileges.rows.length !== 7) throw new PostgresPersistenceError();
     for (const row of privileges.rows) {
+      const expectedSelect = row.relname !== 'auth_logout_ids';
       const expectedInsert = row.relname !== 'schema_migrations';
-      if (!row.can_select || row.can_insert !== expectedInsert || row.can_update || row.can_delete ||
+      const expectedUpdate = row.relname === 'auth_login_states' || row.relname === 'auth_sessions';
+      if (row.can_select !== expectedSelect || row.can_insert !== expectedInsert || row.can_update !== expectedUpdate || row.can_delete ||
           row.can_truncate || row.can_references || row.can_trigger || row.owner_member) {
         throw new PostgresPersistenceError();
       }

@@ -4,6 +4,7 @@ Generiert aus packages/domain; kein Eintrag ist durch Recht geprüft (E15).
 
 | Regel-ID | Art | Beschreibung | Quelle | Fundstelle | Stand | geprüft |
 |---|---|---|---|---|---|---|
+| R-AUTH-01 | Guard | A session-cookie write requires its non-empty, matching CSRF token before any workflow event is appended. | Leitplanken | docs/slices/029b-anmeldung-beta.md:19 (interne Sicherheitsentscheidung für die Beta; keine extern bestätigte Rechtsnorm). | – | nein |
 | R-CLAIM-01 | Guard | An active soft claim may be renewed by its holder; another actor must wait until release or expiry. | Leitplanken | docs/slices/028-idempotenz-konflikte.md:36 (interne Beta-Entscheidung E36: weiche Übernahme mit zehn Minuten Ablauf; keine extern geprüfte Rechtsnorm). | – | nein |
 | R-CLAIM-02 | Guard | Only the current holder may release an unexpired soft claim. | Leitplanken | docs/slices/028-idempotenz-konflikte.md:36 (interne Beta-Entscheidung E36: Release nur durch Inhaber; keine extern geprüfte Rechtsnorm). | – | nein |
 | R-GUARD-01 | Guard | At least one answer version exists. | Prozess | docs/ist-analyse-und-schnittstellen.md:52 (Antwortpfad C "Expert Track": erst "6 fachliche Beantwortung", dann "7 Legal Clearing"). Ableitung: das Legal Clearing setzt eine vorliegende Antwort voraus. | – | nein |

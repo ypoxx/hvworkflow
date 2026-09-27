@@ -8,6 +8,7 @@
  * wrongly-typed or contract-violating request never reaches the domain (rework review blockers 1/2).
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { randomBytes } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -23,6 +24,7 @@ import {
   systemClock,
   SYSTEM_ACTOR,
   type Actor,
+  type DomainEvent,
   type AnswerDraft,
   type Classification,
   type ContributionCapture,
@@ -41,7 +43,9 @@ import {
   type SpeakerUpdate,
   type Track,
 } from '@hv/domain';
-import { parseActorHeader, selectAuthAdapter } from './actor.ts';
+import { parseActorHeader, selectAuthAdapter, sessionActorFromEvents, sessionTokenFromCookie } from './actor.ts';
+import { actorIdForIdentity, createOidcFlow, safeReturnTo, type OidcFlow } from './auth/oidc.ts';
+import { createAuthStore, type AuthStore } from './auth/store.ts';
 import { createFileEventLog } from './eventLog.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { problemResponse } from './problem.ts';
@@ -57,6 +61,17 @@ export interface CreateAppOptions {
    * throws: the demo header must never be accepted where real sign-ins exist (ADR 0004).
    */
   oidcIssuer?: string;
+  /** Synthetic test provider; production uses a discovered openid-client configuration. */
+  oidcFlow?: OidcFlow;
+  oidcClientId?: string;
+  oidcClientSecret?: string;
+  oidcRedirectUri?: string;
+  /** 32-byte AES-GCM key. Required whenever the production OIDC adapter is enabled. */
+  authKey?: Buffer;
+  /** Test-only store/event ports; the running service uses Postgres. */
+  authStore?: AuthStore;
+  authEvents?: () => Promise<readonly DomainEvent[]>;
+  transparencyNotice?: { version: string; text: { de: string; en: string }; dataProtectionSummaryUrl?: string };
   /** Defaults to `process.env.HV_EVENT_LOG`. Append-only JSON-lines file (AGENTS.md rule 7). */
   eventLogPath?: string;
   /** Overrides `eventLogPath` — lets tests inject an in-memory `Persistence` without touching disk. */
@@ -116,11 +131,56 @@ function parseSeedActorEnv(raw: string): Actor {
   }
 }
 
+function browserCorrelation(header: string | undefined): string | null {
+  const values = header?.split(';').map((part) => part.trim())
+    .filter((part) => part.startsWith('hv_auth_state=')) ?? [];
+  if (values.length !== 1) return null;
+  const value = values[0]!.slice('hv_auth_state='.length);
+  return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
+}
+
 export function createApp(options: CreateAppOptions = {}): App {
   const demoEnabled = options.demoEnabled ?? process.env['HV_DEMO'] === '1';
+  const oidcIssuer = options.oidcIssuer ?? process.env['HV_OIDC_ISSUER'];
+  const authKeyRaw = process.env['HV_AUTH_ENCRYPTION_KEY'];
+  const authKey = options.authKey ?? (authKeyRaw ? Buffer.from(authKeyRaw, 'base64url') : undefined);
+  const clock = options.clock ?? systemClock;
+  const authStore = options.authStore ?? (options.postgres && authKey
+    ? createAuthStore(options.postgres, authKey) : undefined);
+  const clientId = options.oidcClientId ?? process.env['HV_OIDC_CLIENT_ID'];
+  const clientSecret = options.oidcClientSecret ?? process.env['HV_OIDC_CLIENT_SECRET'];
+  const redirectUri = options.oidcRedirectUri ?? process.env['HV_OIDC_REDIRECT_URI'];
+  if (!demoEnabled && oidcIssuer?.trim() && clientId && clientSecret && redirectUri && authKey &&
+      !options.postgres && !options.authStore) {
+    throw new Error('OIDC sign-in requires Postgres persistence.');
+  }
+  const oidcFlow = options.oidcFlow ?? (oidcIssuer?.trim() && clientId && clientSecret && redirectUri
+    ? createOidcFlow({ issuer: oidcIssuer, clientId, clientSecret, redirectUri, clock }) : undefined);
+  const authEvents = options.authEvents ?? (options.postgres ? async (): Promise<readonly DomainEvent[]> => {
+    const client = await options.postgres!.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const snapshot = await loadPostgresSnapshot(client);
+      await client.query('COMMIT');
+      return snapshot.events;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch { /* Connection is discarded by the pool. */ }
+      throw error;
+    } finally {
+      client.release();
+    }
+  } : undefined);
+  const sessionReady = !demoEnabled && authStore !== undefined && oidcFlow !== undefined && authEvents !== undefined;
   const authenticate = selectAuthAdapter({
     demoEnabled,
-    oidcIssuer: options.oidcIssuer ?? process.env['HV_OIDC_ISSUER'],
+    oidcIssuer,
+    ...(sessionReady ? { sessionCookie: async (readHeader) => {
+      const token = sessionTokenFromCookie(readHeader('Cookie'));
+      if (!token) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+      const session = await authStore.readSession(token, clock(), false);
+      if (!session) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+      return sessionActorFromEvents(await authEvents(), session.actorId, clock()).actor;
+    } } : {}),
   });
   const eventLogPath = options.eventLogPath ?? process.env['HV_EVENT_LOG'];
   const persistence = options.persistence ?? (eventLogPath !== undefined ? createFileEventLog(eventLogPath) : undefined);
@@ -221,12 +281,31 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
-    if (c.req.path === '/readyz') {
+    if (c.req.path === '/readyz' || c.req.path === '/auth/login' ||
+        c.req.path === '/auth/callback' || c.req.path === '/auth/transparency-notice') {
       await next();
       return;
     }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
-    const actor = authenticate((name) => c.req.header(name));
+    const actor = await authenticate((name) => c.req.header(name));
+    if (sessionReady) {
+      const token = sessionTokenFromCookie(c.req.header('Cookie'))!;
+      const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
+      const csrfRequired = (mutation && c.req.path.startsWith('/v1/')) || c.req.path === '/auth/logout';
+      if (csrfRequired) {
+        const csrf = c.req.header('X-CSRF-Token');
+        if (c.req.path === '/auth/logout' && !csrf) {
+          throw new ApiProblem(422, 'Unprocessable', 'X-CSRF-Token is required.', 'R-AUTH-01');
+        }
+        if (!csrf || !await authStore!.verifyCsrf(token, csrf, clock())) {
+          throw new ApiProblem(403, 'Forbidden', 'CSRF token is invalid.', 'R-AUTH-01');
+        }
+      }
+      // Re-read only after CSRF validation; a rejected write cannot extend its idle window.
+      if (!await authStore!.readSession(token, clock())) {
+        throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+      }
+    }
     await actorStorage.run(actor, () => next());
   });
   app.use('/v1/*', async (c, next) => {
@@ -288,7 +367,18 @@ export function createApp(options: CreateAppOptions = {}): App {
       client?.release();
     }
   });
-  app.onError((err, _c) => problemResponse(err));
+  app.onError((err, c) => {
+    const response = problemResponse(err);
+    if (c.req.path.startsWith('/auth/')) {
+      response.headers.set('X-Server-Time', clock().toISOString());
+      response.headers.set('Cache-Control', 'no-store');
+      if (c.req.path === '/auth/callback') {
+        response.headers.append('Set-Cookie',
+          'hv_auth_state=; Max-Age=0; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax');
+      }
+    }
+    return response;
+  });
   app.notFound(() => problemResponse(new ApiProblem(404, 'Not found', 'No such route.')));
 
   app.get('/readyz', async (c) => {
@@ -348,6 +438,115 @@ export function createApp(options: CreateAppOptions = {}): App {
     const ready = Object.values(checks).every((check) => check.status === 'ok');
     c.header('X-Server-Time', serverTime);
     return c.json({ status: ready ? 'ready' : 'not_ready', checks, serverTime }, ready ? 200 : 503);
+  });
+
+  // ---- browser sign-in -----------------------------------------------------------------------
+  const authResponseHeaders = (c: Context): void => {
+    c.header('Cache-Control', 'no-store');
+    c.header('X-Server-Time', clock().toISOString());
+  };
+  app.get('/auth/login', validateOperation('login'), async (c) => {
+    if (!sessionReady) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
+    const returnTo = safeReturnTo(c.req.query('returnTo'));
+    const state = randomBytes(32).toString('base64url');
+    const nonce = randomBytes(32).toString('base64url');
+    const pkceVerifier = randomBytes(32).toString('base64url');
+    const correlation = randomBytes(32).toString('base64url');
+    let location: string;
+    try {
+      location = await oidcFlow!.authorizationUrl({ state, nonce, pkceVerifier });
+      await authStore!.createLoginState({ state, browserCorrelation: correlation, nonce, pkceVerifier,
+        returnTo, now: clock() });
+    } catch {
+      throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
+    }
+    authResponseHeaders(c);
+    const response = c.redirect(location, 302);
+    response.headers.append('Set-Cookie',
+      `hv_auth_state=${correlation}; Max-Age=300; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax`);
+    return response;
+  });
+
+  app.get('/auth/callback', validateOperation('completeLogin'), async (c) => {
+    if (!sessionReady) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
+    const params = new URL(c.req.url).searchParams;
+    const codes = params.getAll('code');
+    const states = params.getAll('state');
+    const correlation = browserCorrelation(c.req.header('Cookie'));
+    if (codes.length !== 1 || states.length !== 1 || !codes[0] || codes[0].length > 2048 ||
+        !states[0] || !/^[A-Za-z0-9_-]{43}$/.test(states[0]) || !correlation || params.has('error')) {
+      throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
+    }
+    const pending = await authStore!.consumeLoginState({ state: states[0],
+      browserCorrelation: correlation, now: clock() });
+    if (!pending) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
+    let identity: Awaited<ReturnType<OidcFlow['complete']>>;
+    try {
+      identity = await oidcFlow!.complete({ search: params.toString(), state: states[0],
+        nonce: pending.nonce, pkceVerifier: pending.pkceVerifier });
+    } catch {
+      throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
+    }
+    if (identity.issuer !== oidcIssuer) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
+    const actorId = actorIdForIdentity(identity.issuer, identity.subject);
+    if (await authStore!.isSubjectBlocked(actorId)) {
+      throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
+    }
+    sessionActorFromEvents(await authEvents!(), actorId, clock());
+    let session: Awaited<ReturnType<AuthStore['createSession']>>;
+    try {
+      session = await authStore!.createSession({ actorId, now: clock(),
+        ...(identity.refreshToken !== undefined ? { refreshToken: identity.refreshToken } : {}) });
+    } catch {
+      throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
+    }
+    authResponseHeaders(c);
+    const response = c.redirect(pending.returnTo, 302);
+    response.headers.append('Set-Cookie',
+      `hv_session=${session.token}; Max-Age=50400; Path=/; HttpOnly; Secure; SameSite=Lax`);
+    response.headers.append('Set-Cookie',
+      'hv_auth_state=; Max-Age=0; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax');
+    return response;
+  });
+
+  app.get('/auth/me', validateOperation('getSession'), async (c) => {
+    authResponseHeaders(c);
+    const actor = currentActor();
+    if (demoEnabled) return c.json({ scheme: 'demoActor', actor: { id: actor.id, role: actor.role },
+      subjectId: actor.id, roles: [actor.role] });
+    const token = sessionTokenFromCookie(c.req.header('Cookie'));
+    const session = token && await authStore!.readSession(token, clock(), false);
+    if (!session) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+    const resolved = sessionActorFromEvents(await authEvents!(), session.actorId, clock());
+    return c.json({ scheme: 'session', actor: { id: resolved.actor.id, role: resolved.actor.role },
+      subjectId: session.actorId, roles: resolved.roles,
+      ...(resolved.actor.personId !== undefined ? { personId: resolved.actor.personId } : {}),
+      expiresAt: session.expiresAt.toISOString(), csrfToken: session.csrfToken });
+  });
+
+  app.post('/auth/logout', validateOperation('logout'), async (c) => {
+    if (!sessionReady) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+    const token = sessionTokenFromCookie(c.req.header('Cookie'));
+    if (!token || !await authStore!.revokeSession(token)) {
+      throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+    }
+    authResponseHeaders(c);
+    const response = c.body(null, 204);
+    response.headers.append('Set-Cookie', 'hv_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax');
+    return response;
+  });
+
+  app.get('/auth/transparency-notice', validateOperation('getTransparencyNotice'), async (c) => {
+    const version = process.env['HV_TRANSPARENCY_NOTICE_VERSION'];
+    const de = process.env['HV_TRANSPARENCY_NOTICE_DE'];
+    const en = process.env['HV_TRANSPARENCY_NOTICE_EN'];
+    const configured = options.transparencyNotice ?? (version && de && en
+      ? { version, text: { de, en },
+        ...(process.env['HV_DSFA_SUMMARY_URL'] ? { dataProtectionSummaryUrl: process.env['HV_DSFA_SUMMARY_URL'] } : {}) }
+      : undefined);
+    if (!configured) throw new ApiProblem(404, 'Not found', 'Transparency notice is unavailable.');
+    c.header('X-Server-Time', clock().toISOString());
+    return c.json(configured);
   });
 
   const etag = (c: Context, resource: { version: number }): void => {

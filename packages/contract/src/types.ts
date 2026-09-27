@@ -1043,7 +1043,7 @@ export interface paths {
         };
         /**
          * Start the sign-in (Anmeldung) — redirects the browser to the identity provider
-         * @description Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a confidential client; the browser is redirected to the identity provider and never sees a token. No credential needed (`security: []`). `503` when no identity provider is configured (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than 512 characters. A `2xx` response does not exist for this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
+         * @description Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a confidential client; the browser is redirected to the identity provider and never sees a token. Since 0.3.7 (slice 029b), the redirect also sets a host-only `hv_auth_state` browser correlation cookie for the callback; it is distinct from the server-side OIDC state and expires within five minutes. No credential needed (`security: []`). `503` when no identity provider is configured (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than 512 characters. A `2xx` response does not exist for this operation by design (lint warning accepted, see CHANGELOG 0.3.0).
          */
         get: operations["login"];
         put?: never;
@@ -1063,7 +1063,7 @@ export interface paths {
         };
         /**
          * Complete the sign-in — exchanges the code, sets the session cookie, redirects into the application
-         * @description Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer, audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice 026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie. `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any open meeting; `503` when no identity provider is configured. No `2xx` by design. The call carries no credential yet, so no problem `detail` names the subject, its e-mail address or the identity provider's error text (ADR 0009; prose, Codex round 5).
+         * @description Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer, audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice 026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie. Since 0.3.7 (slice 029b), the callback also requires the browser-bound `hv_auth_state` correlation cookie set by login, consumes its server-side state atomically and clears the correlation cookie in a separate `Set-Cookie` header line. `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any open meeting; `503` when no identity provider is configured. No `2xx` by design. The call carries no credential yet, so no problem `detail` names the subject, its e-mail address or the identity provider's error text (ADR 0009; prose, Codex round 5).
          */
         get: operations["completeLogin"];
         put?: never;
@@ -1215,6 +1215,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description One login correlation cookie line. The Base64url value is at least 43 characters; `Max-Age` is 1–300 seconds. The canonical attribute order also rejects Domain, Expires and duplicates. */
+        AuthStateCookieLine: string;
+        /** @description One callback clearing cookie line with the same host-only path and attributes as login. */
+        ClearedAuthStateCookieLine: string;
+        /** @description One live host-only session cookie line; never a deleting cookie. */
+        SessionCookieLine: string;
         /** @description Since 0.3.0 (Codex on 50cc738, SECURITY): a path inside the application, same origin — the open-redirect rule shared by `login` (`returnTo`) and the `Location` of `completeLogin`. */
         SameOriginPath: string;
         /** @description Since 0.3.0 (Codex on 50cc738): a SHA-256 digest as 64 lower-case hex digits */
@@ -3952,6 +3958,8 @@ export interface operations {
             302: {
                 headers: {
                     Location: string;
+                    /** @description Exactly one `Set-Cookie` header line for the short-lived browser correlation value. It is host-only, HttpOnly, Secure, SameSite=Lax and scoped to `/auth/callback`; no session is established by login. Validate each line through `Headers.getSetCookie()`. */
+                    "Set-Cookie": components["schemas"]["AuthStateCookieLine"];
                     "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
@@ -3979,17 +3987,18 @@ export interface operations {
                 headers: {
                     /** @description `returnTo` of `login` when it matched `SameOriginPath`, else `/` */
                     Location: components["schemas"]["SameOriginPath"];
-                    /** @description Sets the `hv_session` cookie of the `session` scheme (ADR 0004); the only way a session comes into being. Codex on 50cc738 (SECURITY): the value is at least 32 cookie octets (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Codex on f611116: `Path=/` is required and no other `Path` may follow (set from `/auth/callback`, a cookie without it would be scoped to `/auth` and never reach `/v1`); `Domain` is forbidden (host-only cookie: no sibling or parent host receives the session); a second `SameSite` other than `Lax`/`Strict` is forbidden (the browser keeps the last one). Required attributes in the canonical case the service writes (a lower-case variant is rejected, never admitted); forbidden attributes in any case (RFC 6265 names are case-insensitive, so `domain=` cannot slip through). Codex on 929d0d7 (SECURITY): exactly one session cookie per response — one `Set-Cookie` header line named `hv_session`, never a second one that the browser could apply last. The schema describes one header line; a client or test must validate every `Set-Cookie` line on its own (`Headers.getSetCookie()`), never the comma-joined `Headers.get()`. As a safety net the value contains no comma and no second `hv_session=`, which is possible because `Expires` is forbidden and lifetime is expressed only by `Max-Age` (RFC 6265 gives `Max-Age` precedence; `Expires` is the only attribute whose value contains a comma). Prose only: the randomness of the value. */
-                    "Set-Cookie": string;
+                    /** @description Exactly two separate `Set-Cookie` header lines: one live `hv_session` cookie of the `session` scheme (ADR 0004), and one clearing `hv_auth_state` cookie with the same host-only `/auth/callback` scope used by login. Validate each line independently and require exactly one of each name through `Headers.getSetCookie()`; never parse the comma-joined `Headers.get()` value. The session value is at least 32 cookie octets (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Codex on f611116: `Path=/` is required and no other `Path` may follow (set from `/auth/callback`, a cookie without it would be scoped to `/auth` and never reach `/v1`); `Domain` is forbidden (host-only cookie: no sibling or parent host receives the session); a second `SameSite` other than `Lax`/`Strict` is forbidden (the browser keeps the last one). Required attributes in the canonical case the service writes (a lower-case variant is rejected, never admitted); forbidden attributes in any case (RFC 6265 names are case-insensitive, so `domain=` cannot slip through). Codex on 929d0d7 (SECURITY): exactly one session cookie per response, never a second one that the browser could apply last. Each schema branch describes one header line. As a safety net the value contains no comma and no second `hv_session=`, which is possible because `Expires` is forbidden and lifetime is expressed only by `Max-Age` (RFC 6265 gives `Max-Age` precedence; `Expires` is the only attribute whose value contains a comma). Prose only: the randomness of the value. */
+                    "Set-Cookie": components["schemas"]["SessionCookieLine"] | components["schemas"]["ClearedAuthStateCookieLine"];
                     "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Invalid or replayed authorization response */
+            /** @description Invalid or replayed authorization response; clears browser correlation */
             400: {
                 headers: {
+                    "Set-Cookie": components["schemas"]["ClearedAuthStateCookieLine"];
                     "X-Server-Time": components["headers"]["X-Server-Time"];
                     [name: string]: unknown;
                 };
@@ -4000,8 +4009,34 @@ export interface operations {
                     };
                 };
             };
-            403: components["responses"]["Forbidden"];
-            503: components["responses"]["ServiceUnavailable"];
+            /** @description No active role or blocked subject; clears browser correlation */
+            403: {
+                headers: {
+                    "Set-Cookie": components["schemas"]["ClearedAuthStateCookieLine"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 403;
+                    };
+                };
+            };
+            /** @description Sign-in unavailable; clears browser correlation */
+            503: {
+                headers: {
+                    "Set-Cookie": components["schemas"]["ClearedAuthStateCookieLine"];
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 503;
+                    };
+                };
+            };
         };
     };
     logout: {
@@ -4053,6 +4088,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getTransparencyNotice: {

@@ -29,11 +29,12 @@ const app = createApp({ seedOnStart: postgres === undefined,
 serve({ fetch: app.fetch, port }, (info) => {
   // eslint-disable-next-line no-console
   console.log(`HV-Tool API listening on http://localhost:${info.port}`);
-  if (process.env['HV_DEMO'] !== '1') {
-    // Slice 029a (BF-01): without demo mode there is no sign-in path yet, so every /v1 call is a 401.
+  if (process.env['HV_DEMO'] !== '1' && !(postgres && process.env['HV_OIDC_ISSUER'] &&
+      process.env['HV_OIDC_CLIENT_ID'] && process.env['HV_OIDC_CLIENT_SECRET'] &&
+      process.env['HV_OIDC_REDIRECT_URI'] && process.env['HV_AUTH_ENCRYPTION_KEY'])) {
     // eslint-disable-next-line no-console
     console.warn(
-      'HV-Tool API: demo mode is off (HV_DEMO is not 1) and no other sign-in is set up — every /v1 request is answered with 401; X-Actor is ignored.',
+      'HV-Tool API: no complete sign-in configuration is present — protected requests are answered with 401; X-Actor is ignored.',
     );
   }
 });
