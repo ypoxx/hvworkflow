@@ -154,6 +154,9 @@ function startApi(runtimeUrl, identity, encryptionKey) {
     HV_OIDC_CLIENT_SECRET: identity.clientSecret,
     HV_OIDC_REDIRECT_URI: callback,
     HV_AUTH_ENCRYPTION_KEY: encryptionKey,
+    HV_TRANSPARENCY_NOTICE_VERSION: 'ci-synthetic-1',
+    HV_TRANSPARENCY_NOTICE_DE: 'Unbestätigter synthetischer CI-Hinweis.',
+    HV_TRANSPARENCY_NOTICE_EN: 'Unreviewed synthetic CI notice.',
   };
   delete env.HV_DEMO;
   delete env.HV_EVENT_LOG;
@@ -164,6 +167,10 @@ function startApi(runtimeUrl, identity, encryptionKey) {
 }
 
 async function checkBrowserFlow(identity, expectedActorId, meetingId) {
+  const noticeResponse = await fetch(`${apiOrigin}/auth/transparency-notice`);
+  assert.equal(noticeResponse.status, 200, 'The DE/EN notice must be readable before login.');
+  const notice = await noticeResponse.json();
+  assert(notice.text.de && notice.text.en);
   const { chromium } = webRequire('@playwright/test');
   const browser = await chromium.launch({ headless: true });
   try {

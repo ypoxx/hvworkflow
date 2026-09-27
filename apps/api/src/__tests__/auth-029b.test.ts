@@ -67,7 +67,7 @@ describe('Scheibe 029b: OIDC configuration boundary', () => {
 
 const at = new Date('2027-04-20T10:00:00.000Z');
 
-async function authFixture() {
+async function authFixture(withNotice = true, providerRefreshToken?: string) {
   const actorId = actorIdForIdentity('https://idp.example.invalid/realms/hv', 'synthetic-user');
   const events = createInMemoryEventStore();
   const meeting: NewEvent[] = [{ id: 'm1', type: 'MeetingCreated', at: at.toISOString(), actor: SYSTEM_ACTOR,
@@ -78,6 +78,7 @@ async function authFixture() {
   await domain.assignRole({ subjectId: actorId, role: 'moderation' });
   const logins = new Map<string, { browserCorrelation: string; nonce: string; pkceVerifier: string; returnTo: string }>();
   const sessions = new Map<string, { actorId: string; csrfToken: string }>();
+  let retainedRefreshToken: string | undefined;
   const authStore: AuthStore = {
     async createLoginState(input) { logins.set(input.state, input); },
     async consumeLoginState({ state, browserCorrelation }) {
@@ -87,6 +88,7 @@ async function authFixture() {
       return found;
     },
     async createSession(input) {
+      retainedRefreshToken = input.refreshToken;
       const token = 's'.repeat(43);
       const csrfToken = 'c'.repeat(43);
       sessions.set(token, { actorId: input.actorId, csrfToken });
@@ -105,13 +107,15 @@ async function authFixture() {
   };
   const oidcFlow: OidcFlow = {
     async authorizationUrl({ state }) { return `https://idp.example.invalid/authorize?state=${state}`; },
-    async complete() { return { issuer: 'https://idp.example.invalid/realms/hv', subject: 'synthetic-user' }; },
+    async complete() { return { issuer: 'https://idp.example.invalid/realms/hv', subject: 'synthetic-user',
+      ...(providerRefreshToken === undefined ? {} : { refreshToken: providerRefreshToken }) }; },
   };
   const app = createApp({ demoEnabled: false, oidcIssuer: 'https://idp.example.invalid/realms/hv',
     oidcFlow, authStore, authEvents: async () => events.all(), clock: () => at,
     persistence: { load: () => [...events.all()], save: () => {} },
-    transparencyNotice: { version: 'synthetic-1', text: { de: 'Ungeprüfter Testhinweis.', en: 'Unreviewed test notice.' } } });
-  return { app, events, actorId, domain };
+    ...(withNotice ? { transparencyNotice: { version: 'synthetic-1',
+      text: { de: 'Ungeprüfter Testhinweis.', en: 'Unreviewed test notice.' } } } : {}) });
+  return { app, events, actorId, domain, retainedRefreshToken: () => retainedRefreshToken };
 }
 
 async function signIn(app: ReturnType<typeof createApp>): Promise<string> {
@@ -124,6 +128,18 @@ async function signIn(app: ReturnType<typeof createApp>): Promise<string> {
 }
 
 describe('Scheibe 029b: browser-bound sign-in', () => {
+  it('discards an unused IdP refresh token instead of retaining a credential after logout', async () => {
+    const { app, retainedRefreshToken } = await authFixture(true, 'synthetic-secret-refresh');
+    await signIn(app);
+    expect(retainedRefreshToken()).toBeUndefined();
+  });
+
+  it('does not start sign-in before a readable DE/EN transparency notice is configured', async () => {
+    const { app } = await authFixture(false);
+    expect((await req(app, 'GET', '/auth/transparency-notice')).status).toBe(404);
+    expect((await req(app, 'GET', '/auth/login')).status).toBe(503);
+  });
+
   it('rejects a callback from another browser and allows the initiating browser only once', async () => {
     const { app } = await authFixture();
     const incomplete = await req(app, 'GET', '/auth/callback');

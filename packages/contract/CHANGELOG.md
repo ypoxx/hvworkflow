@@ -24,6 +24,8 @@ Each entry names the slice that implements it in core, seed, web or e2e.
 - The five auth operations are now covered by HTTP tests and removed from the pre-declared allowlist.
 - `/auth/me` now documents 403 when a valid session has lost every active role assignment; the
   signed-in subject remains known, while the current grant is absent.
+- Sign-in and callback return 503 until a versioned DE/EN transparency notice is configured and
+  readable before login.
 
 ## [0.3.6] - 2026-09-27
 

@@ -1149,7 +1149,7 @@ paths:
         confidential client; the browser is redirected to the identity provider and never sees a
         token. Since 0.3.7 (slice 029b), the redirect also sets a host-only `hv_auth_state` browser
         correlation cookie for the callback; it is distinct from the server-side OIDC state and
-        expires within five minutes. No credential needed (`security: []`). `503` when no identity provider is configured
+        expires within five minutes. No credential needed (`security: []`). `503` when no identity provider or no readable DE/EN transparency notice is configured
         (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than
         512 characters. A `2xx` response does not exist for this operation by design (lint warning
         accepted, see CHANGELOG 0.3.0).
@@ -1198,7 +1198,7 @@ paths:
         correlation cookie set by login, consumes its server-side state atomically and clears the
         correlation cookie in a separate `Set-Cookie` header line.
         `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any
-        open meeting; `503` when no identity provider is configured. No `2xx` by design. The call
+        open meeting; `503` when no identity provider or no readable DE/EN transparency notice is configured. No `2xx` by design. The call
         carries no credential yet, so no problem `detail` names the subject, its e-mail address or
         the identity provider's error text (ADR 0009; prose, Codex round 5).
       security: []

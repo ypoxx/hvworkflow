@@ -133,6 +133,12 @@ describe.skipIf(ownerUrl === undefined || runtimeUrl === undefined)('Scheibe 029
     await expect(firstPool.query(`DELETE FROM persons`)).rejects.toMatchObject({ code: '42501' });
     await expect(firstPool.query(`DELETE FROM auth_sessions`)).rejects.toMatchObject({ code: '42501' });
     await expect(firstPool.query(`SELECT * FROM auth_logout_ids`)).rejects.toMatchObject({ code: '42501' });
+    await expect(firstPool.query(`UPDATE auth_sessions SET actor_id = 'oidc_another'`))
+      .rejects.toMatchObject({ code: '42501' });
+    await expect(firstPool.query(`UPDATE auth_sessions SET expires_at = CURRENT_TIMESTAMP`))
+      .rejects.toMatchObject({ code: '42501' });
+    await expect(firstPool.query(`UPDATE auth_login_states SET return_to = '/elsewhere'`))
+      .rejects.toMatchObject({ code: '42501' });
     await expect(firstPool.query(`CREATE TABLE forbidden_by_runtime (id integer)`)).rejects.toMatchObject({ code: '42501' });
   });
 });

@@ -20,7 +20,7 @@ export function safeReturnTo(value: string | undefined): string {
 export interface OidcFlow {
   authorizationUrl(input: { state: string; nonce: string; pkceVerifier: string }): Promise<string>;
   complete(input: { search: string; state: string; nonce: string; pkceVerifier: string }): Promise<{
-    issuer: string; subject: string; refreshToken?: string;
+    issuer: string; subject: string;
   }>;
 }
 
@@ -98,8 +98,7 @@ export function createOidcFlow(options: OidcFlowOptions): OidcFlow {
           typeof claims.exp !== 'number') {
         throw new Error('OIDC ID token validation failed.');
       }
-      return { issuer: claims.iss, subject: claims.sub,
-        ...(tokens.refresh_token !== undefined ? { refreshToken: tokens.refresh_token } : {}) };
+      return { issuer: claims.iss, subject: claims.sub };
     },
   };
 }

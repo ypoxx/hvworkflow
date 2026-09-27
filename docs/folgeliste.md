@@ -40,6 +40,13 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 
 ## Dienst: Anmeldung (vor oder mit 029)
 
+- 029b Review P2 · `apps/api/src/auth/store.ts`, `apps/api/migrations/0002_auth.up.sql` · verbrauchte
+  Login-Zustände und abgelaufene pseudonyme Sitzungseinträge bleiben ohne Aufräumjob bestehen.
+  Vor dem produktiven Betrieb eine dokumentierte Aufbewahrungsfrist und einen getesteten
+  Löschweg festlegen; der 029b-Laufzeitpfad verwirft ungenutzte IdP-Refresh-Tokens sofort.
+- 029b Review P2 · `scripts/keycloak-ci-029b.mjs` · der offizielle Keycloak-Container hat eine
+  feste Versionsmarke, aber noch keinen unveränderlichen Digest · mit der Realm-Arbeit in 088
+  den geprüften Digest festhalten.
 - 029a R1 minor 3 · `apps/api/src/actor.ts:1-5` · Dateikopf nennt die Datei noch „demo authentication adapter“, sie
   enthält jetzt Port und Adapterwahl · Kommentar anpassen.
 - 029a R1 minor 4 · `apps/api/src/server.ts:17` · Log-Hinweis wertet `HV_DEMO` selbst aus statt die Wahl aus

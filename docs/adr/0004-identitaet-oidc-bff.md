@@ -75,7 +75,9 @@ Rückfall 15.01.2027, E11); bis dahin läuft alles gegen Keycloak.
 Scheibe 029b implementiert den BFF-Port mit `openid-client`, browsergebundenem Login-State,
 Postgres-Sitzung und aktueller Zuordnung je Jahrgang. Der synthetische Provider-Test unter
 `apps/api/src/__tests__/auth-029b.test.ts` prüft Signatur, Issuer, Audience, Ablauf, Nonce,
-State, PKCE, Replay, Rollenentzug und CSRF. Der echte Keycloak-Container und Postgres-
+State, PKCE, Replay, Rollenentzug und CSRF. Login und Callback bleiben gesperrt, bis der
+versionierte DE/EN-Transparenzhinweis lesbar ist; ein für die Beta ungenutztes IdP-Refresh-Token
+wird verworfen. Der echte Keycloak-Container und Postgres-
 Laufzeitgrants werden in `.github/workflows/gates.yml` geprüft; ein grüner CI-Lauf auf dem letzten
 PR-Commit ist noch Bedingung für Prüfpunkt 3. Vor der realen Beta braucht 040 zusätzlich einen
 auditierbaren Bootstrap des ersten Jahrgangs und Erst-Admins. Das Web-Anmeldeformular folgt in

@@ -130,9 +130,11 @@ async function grantRuntimeAccess(
   );
   await client.query(`GRANT SELECT ON TABLE ${schema.quoted}.schema_migrations TO ${quotedRole}`);
   await client.query(
-    `GRANT SELECT, INSERT, UPDATE ON TABLE ${schema.quoted}.auth_login_states,
+    `GRANT SELECT, INSERT ON TABLE ${schema.quoted}.auth_login_states,
        ${schema.quoted}.auth_sessions TO ${quotedRole}`,
   );
+  await client.query(`GRANT UPDATE (consumed_at) ON TABLE ${schema.quoted}.auth_login_states TO ${quotedRole}`);
+  await client.query(`GRANT UPDATE (idle_expires_at, revoked_at) ON TABLE ${schema.quoted}.auth_sessions TO ${quotedRole}`);
   await client.query(
     `GRANT INSERT ON TABLE ${schema.quoted}.auth_logout_ids TO ${quotedRole}`,
   );

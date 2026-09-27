@@ -156,6 +156,15 @@ export function createApp(options: CreateAppOptions = {}): App {
   }
   const oidcFlow = options.oidcFlow ?? (oidcIssuer?.trim() && clientId && clientSecret && redirectUri
     ? createOidcFlow({ issuer: oidcIssuer, clientId, clientSecret, redirectUri, clock }) : undefined);
+  const noticeVersion = process.env['HV_TRANSPARENCY_NOTICE_VERSION'];
+  const noticeDe = process.env['HV_TRANSPARENCY_NOTICE_DE'];
+  const noticeEn = process.env['HV_TRANSPARENCY_NOTICE_EN'];
+  const noticeCandidate = options.transparencyNotice ?? (noticeVersion && noticeDe && noticeEn
+    ? { version: noticeVersion, text: { de: noticeDe, en: noticeEn },
+      ...(process.env['HV_DSFA_SUMMARY_URL'] ? { dataProtectionSummaryUrl: process.env['HV_DSFA_SUMMARY_URL'] } : {}) }
+    : undefined);
+  const transparencyNotice = noticeCandidate?.version.trim() && noticeCandidate.text.de.trim() &&
+    noticeCandidate.text.en.trim() ? noticeCandidate : undefined;
   const authEvents = options.authEvents ?? (options.postgres ? async (): Promise<readonly DomainEvent[]> => {
     const client = await options.postgres!.connect();
     try {
@@ -446,7 +455,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     c.header('X-Server-Time', clock().toISOString());
   };
   app.get('/auth/login', validateOperation('login'), async (c) => {
-    if (!sessionReady) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
+    if (!sessionReady || !transparencyNotice) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
     const returnTo = safeReturnTo(c.req.query('returnTo'));
     const state = randomBytes(32).toString('base64url');
     const nonce = randomBytes(32).toString('base64url');
@@ -468,7 +477,7 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
 
   app.get('/auth/callback', validateOperation('completeLogin'), async (c) => {
-    if (!sessionReady) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
+    if (!sessionReady || !transparencyNotice) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
     const params = new URL(c.req.url).searchParams;
     const codes = params.getAll('code');
     const states = params.getAll('state');
@@ -495,8 +504,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     sessionActorFromEvents(await authEvents!(), actorId, clock());
     let session: Awaited<ReturnType<AuthStore['createSession']>>;
     try {
-      session = await authStore!.createSession({ actorId, now: clock(),
-        ...(identity.refreshToken !== undefined ? { refreshToken: identity.refreshToken } : {}) });
+      session = await authStore!.createSession({ actorId, now: clock() });
     } catch {
       throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
     }
@@ -537,16 +545,9 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
 
   app.get('/auth/transparency-notice', validateOperation('getTransparencyNotice'), async (c) => {
-    const version = process.env['HV_TRANSPARENCY_NOTICE_VERSION'];
-    const de = process.env['HV_TRANSPARENCY_NOTICE_DE'];
-    const en = process.env['HV_TRANSPARENCY_NOTICE_EN'];
-    const configured = options.transparencyNotice ?? (version && de && en
-      ? { version, text: { de, en },
-        ...(process.env['HV_DSFA_SUMMARY_URL'] ? { dataProtectionSummaryUrl: process.env['HV_DSFA_SUMMARY_URL'] } : {}) }
-      : undefined);
-    if (!configured) throw new ApiProblem(404, 'Not found', 'Transparency notice is unavailable.');
+    if (!transparencyNotice) throw new ApiProblem(404, 'Not found', 'Transparency notice is unavailable.');
     c.header('X-Server-Time', clock().toISOString());
-    return c.json(configured);
+    return c.json(transparencyNotice);
   });
 
   const etag = (c: Context, resource: { version: number }): void => {
