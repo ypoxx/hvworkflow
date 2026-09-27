@@ -12,8 +12,8 @@ if (!databaseUrl || !actorId || !/^oidc_[A-Za-z0-9_-]{43}$/.test(actorId)) {
     ...(process.env['HV_DB_TLS'] === '1' ? { ssl: { rejectUnauthorized: true } } : {}) });
   try {
     await assertRuntimePrivileges(pool);
-    await pool.query('INSERT INTO auth_subject_blocks (actor_id, blocked_at) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [actorId, new Date()]);
+    await pool.query('INSERT INTO auth_subject_blocks (actor_id, blocked_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
+      [actorId]);
     console.log('Auth subject blocked.');
   } catch {
     // Neither database diagnostics nor the actor id belong in operational output.

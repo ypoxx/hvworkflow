@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { ApiProblem } from '@hv/domain';
+import { ApiProblem, systemClock } from '@hv/domain';
 import * as client from 'openid-client';
 
 const SAME_ORIGIN_PATH = /^\/(?![/\\])[^\\\x00-\x20\x7f]*$/;
@@ -59,7 +59,7 @@ export function createOidcFlow(options: OidcFlowOptions): OidcFlow {
   let discovery: Promise<client.Configuration> | undefined;
   const configuration = (): Promise<client.Configuration> => {
     const skewSeconds = options.clock === undefined ? 0 :
-      Math.round((options.clock().getTime() - new Date().getTime()) / 1000);
+      Math.round((options.clock().getTime() - systemClock().getTime()) / 1000);
     discovery ??= client.discovery(issuer, options.clientId,
       { client_secret: options.clientSecret, id_token_signed_response_alg: 'RS256',
         [client.clockSkew]: skewSeconds, [client.clockTolerance]: 30 },
