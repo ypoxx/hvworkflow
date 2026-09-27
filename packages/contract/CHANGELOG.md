@@ -10,6 +10,30 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.6] - 2026-09-27
+
+### Changed
+
+- Scheibe 028 makes `If-Match` mandatory for speaker, contribution and question writes except
+  `deliverQuestion`: missing yields 428 and stale yields 412. The list ETag covers the entire
+  meeting's speaker list; capture uses the speaker version, and atomisation uses the contribution
+  version. `Meeting.version`, `Meeting.speakerListVersion`, `Contribution.version`, the resource
+  `meetingId` fields and the nine persisted event envelope fields documented in the 028 spec are
+  now required.
+- This is an intentional **beta contract break within 0.3.x**, not an additive patch. The product
+  plan schedules it for 0.3.6 and `docs/slices/028-idempotenz-konflikte.md` defines the migration
+  window before external partner use. ADR 0015's Semver rule would otherwise require a major
+  version; any proven 0.3.5 partner must receive a separate compatibility decision.
+- A confirmed idempotent replay survives restart and returns the original business result only
+  after checking current rights. Identity masking and `_actions` reflect the current actor.
+
+### Added
+
+- Claim/release for contributions and questions, stored as append-only events, with a ten-minute
+  soft expiry. `IdempotencyRecorded` receipts make successful no-op commands durable. Optional
+  `Event.commandId`, `commandOperation` and `commandResource` bind events of one command without
+  storing request bodies or personal content.
+
 ## [0.3.5] - 2026-09-27
 
 ### Changed
