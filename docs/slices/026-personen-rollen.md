@@ -62,6 +62,7 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 - `apps/web/src/i18n/parity.test.ts` (nur Zähler/Parität)
 - `apps/web/src/features/history/eventSummary.ts` (nur maskierte Sprecherhistorie und neue Ereignisse)
 - `apps/web/src/features/history/eventSummary.test.ts`
+- `apps/web/e2e/abnahme.spec.ts` (nur die Sprechererwartung für `capture` an das Pseudonymrecht anpassen)
 - `docs/rollen-und-rechtekonzept.md` (nur Gewährung und zeitliche Grenze)
 - `docs/legal-trace.md` (nur generierte Regelzeilen, falls neue Regeln)
 - `docs/evidence/026-personen-rollen.jpg` (Browser-Nachweis der pseudonymen Ansicht)
@@ -69,7 +70,7 @@ Keine echte Anmeldung, kein IdP-Gruppen-Sync, keine Notfallkonten, kein laufende
 ## Tests zuerst und Abnahme
 
 1. Fokussierte Tests laufen vor der Implementierung rot: zwei Personen in getrennten Jahrgängen; neuer Sprecher schreibt keinen Namen außerhalb `pii` und trägt `personId`/`keyId`; fünf Reveal-Rollen sehen Namen, alle anderen Pseudonym; Frage und Bühne verraten bei fehlendem Recht keinen Namen; `expert` ohne Einheit 403; Zuordnung/Entzug/Ablauf/Jahrgangsende; fremde ID 404; alle drei HTTP-Operationen vertragsvalidiert; alte v2-Logs bleiben lesbar.
-   Nachtrag: Ein Test beweist, dass `EventRead` ohne PII und ohne `hash`/`prevHash` ausgegeben wird und `sourceHash` dem unveränderten, separat verifizierten Original entspricht. Historische `AnswerDrafted.createdBy.displayName`-Felder bleiben in Ansichten und Historie unsichtbar. Eine fremde oder unbekannte `personId` bei `assignRole` ergibt 404. Web-Historie und DE/EN-Labels erhalten fokussierte Tests. Die E2E-Suite startet mit frischem Browserprofil; ein vorhandener lokaler Altbestand wird separat diagnostiziert, nicht still umgeschrieben.
+   Nachtrag: Ein Test beweist, dass `EventRead` ohne PII und ohne `hash`/`prevHash` ausgegeben wird und `sourceHash` dem unveränderten, separat verifizierten Original entspricht. Historische `AnswerDrafted.createdBy.displayName`-Felder bleiben in Ansichten und Historie unsichtbar. Eine fremde oder unbekannte `personId` bei `assignRole` ergibt 404. Web-Historie und DE/EN-Labels erhalten fokussierte Tests. Die E2E-Suite startet mit frischem Browserprofil; ein vorhandener lokaler Altbestand wird separat diagnostiziert, nicht still umgeschrieben. Der bisherige Abnahmetest erwartet bei `capture` noch einen Klarnamen; nach dem roten Volllauf (122 bestanden, 1 fehlgeschlagen) darf ausschließlich diese Erwartung auf `Redner <Nummer>` und die Abwesenheit des Klarnamens angepasst werden.
 2. Fokussierte Tests und `pnpm gates` laufen auf sauberem Commit grün. Browser verfügbar: volle E2E-Suite und Screenshot; unabhängiges Review in frischem Kontext, Blocker/Major sowie Security/Legal/Privacy vor Merge beheben. PR-CI auf letztem Commit grün. Jeder Commit nennt „Scheibe 026“ und endet `[skip netlify]`.
 3. Bericht nach AGENTS.md mit wörtlichem Schluss von `pnpm gates`, Commit, offenen Grenzen, Bedrohungs-ID→Test und berührten Dateien. Kein Deploy.
 

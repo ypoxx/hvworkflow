@@ -16,6 +16,9 @@ function fixture(): { persistence: Persistence; events: () => readonly NewEvent[
     { id: 'create-2027', type: 'MeetingCreated', at, actor, subjectId: 'hv-2027', meetingId: 'hv-2027',
       payload: { title: 'HV 2027', date: '2027-04-20', agendaItems: [], units: [{ id: 'unit-fin', name: 'Finanzen' }] } },
     { id: 'start-2027', type: 'MeetingStarted', at, actor, subjectId: 'hv-2027', meetingId: 'hv-2027', payload: {} },
+    { id: 'speaker-2027', type: 'SpeakerRegistered', at, actor, subjectId: 'speaker-2027', meetingId: 'hv-2027',
+      personId: 'person-1', payload: { number: 1, round: 1, position: 1,
+        pii: { keyId: 'hv-2027', displayName: 'Bestehende Testperson' } } },
   ]);
   let events = [...source.all()];
   return {
@@ -35,6 +38,22 @@ function appWithFixture() {
 }
 
 describe('Scheibe 026: vertragsvalidierte Rollenzuordnung', () => {
+  it('serves a contract-valid redacted EventRead while preserving the stored source hash', async () => {
+    const { app, events } = appWithFixture();
+    const created = await req(app, 'POST', '/v1/meetings/hv-2027/speakers', {
+      actor: ACTOR.moderation, body: { displayName: 'Synthetische Testperson' },
+    });
+    expect(created.status).toBe(201);
+    const read = await req(app, 'GET', '/v1/events', { actor: ACTOR.admin });
+    expect(read.status).toBe(200);
+    const body = await read.json() as { items: Array<Record<string, unknown>> };
+    const speaker = body.items.findLast((item) => item['type'] === 'SpeakerRegistered');
+    const source = events().findLast((item) => item.type === 'SpeakerRegistered');
+    expect(speaker).toMatchObject({ redacted: true, sourceHash: source?.hash });
+    expect(speaker).not.toHaveProperty('hash');
+    expect(speaker).not.toHaveProperty('personId');
+    expect(JSON.stringify(speaker)).not.toContain('Synthetische Testperson');
+  });
   it('mounts all three canonical operations and filters the administered table', async () => {
     const { app, events } = appWithFixture();
     const empty = await req(app, 'GET', base, { actor: ACTOR.admin });

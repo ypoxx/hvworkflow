@@ -119,12 +119,13 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
 
-  // Whoever is at the microphone is preselected.
+  // Whoever is at the microphone is preselected without revealing their name to capture.
   const selectedOption = await page.getByTestId('capture-speaker-select').evaluate((node) => {
     const select = node as HTMLSelectElement;
     return select.options[select.selectedIndex]?.text ?? '';
   });
-  expect(selectedOption).toContain(speakerName);
+  expect(selectedOption).toContain(`Redner ${speakerNumber}`);
+  expect(selectedOption).not.toContain(speakerName);
 
   await page.getByTestId('capture-text').fill(SPEECH);
   await page.getByTestId('capture-submit').click();

@@ -7,7 +7,7 @@
  * rather than silently show an empty row.
  */
 import type { DomainEvent } from '@hv/domain';
-import { stageAssignmentLabel, statusLabel, trackLabel } from '../../i18n';
+import { roleLabel, stageAssignmentLabel, statusLabel, trackLabel } from '../../i18n';
 import type { Translate } from '../../i18n';
 import { excerpt } from './lib';
 
@@ -32,8 +32,16 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
       parts.push(event.payload.title);
       break;
     case 'SpeakerRegistered':
-      parts.push(t('history.payload.speaker', { name: event.payload.displayName }));
+      // The log can contain both historical cleartext and new PII. The current actor's speaker
+      // projection is the only source allowed to supply a name to this view.
+      if (context.speakerNames.has(event.subjectId)) {
+        parts.push(t('history.payload.speaker', { name: context.speakerNames.get(event.subjectId)! }));
+      }
       parts.push(t('history.payload.round', { round: event.payload.round }));
+      break;
+    case 'RoleAssigned':
+    case 'RoleRevoked':
+      parts.push(roleLabel(t, event.payload.role));
       break;
     case 'SpeakersReordered':
       parts.push(t('history.payload.round', { round: event.payload.round }));

@@ -4,6 +4,7 @@ import { createInMemoryEventStore } from '../store.js';
 import type { Actor, Permission } from '../types.js';
 import type { NewEvent } from '../events.js';
 import { can } from '../api.js';
+import { verifyEventChain } from '../envelope.js';
 
 const at = '2027-04-20T10:00:00.000Z';
 const admin: Actor = { id: 'demo-admin', role: 'admin' };
@@ -95,9 +96,11 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
     await api.assignRole({ subjectId: 'expert-b', role: 'expert', unitId: 'unit-b' });
     actor({ id: 'expert-a', role: 'expert' });
     expect((await api.listQuestions()).total).toBe(1);
+    expect((await api.listQuestions({ status: ['assigned'] })).total).toBe(1);
     await expect(api.listQuestions({ unitId: 'unit-missing' })).rejects.toMatchObject({ status: 404 });
     actor({ id: 'expert-b', role: 'expert' });
     expect((await api.listQuestions()).total).toBe(0);
+    expect((await api.listQuestions({ status: ['assigned'] })).total).toBe(0);
     await expect(api.getQuestion(question!.id)).rejects.toMatchObject({ status: 404 });
     actor(admin);
     const grant = await api.assignRole({ subjectId: 'expert-c', role: 'expert', unitId: 'unit-a', expiresAt: '2027-04-20T10:06:00.000Z' });
@@ -110,7 +113,7 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
   });
 
   it('masks marked PII and personId in the standard event read path', async () => {
-    const { api, actor } = fixture();
+    const { api, actor, store } = fixture();
     await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
     actor(admin);
     const result = await api.listEvents();
@@ -118,6 +121,32 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
     expect(speakerEvent).toBeTruthy();
     expect(JSON.stringify(speakerEvent)).not.toContain('Synthetische Testperson');
     expect(speakerEvent).not.toHaveProperty('personId');
+    expect(speakerEvent).not.toHaveProperty('hash');
+    expect(speakerEvent).not.toHaveProperty('prevHash');
+    expect(speakerEvent).toHaveProperty('sourceHash', store.all().at(-1)?.hash);
+    expect(() => verifyEventChain(store.all())).not.toThrow();
+  });
+
+  it('hides clear actor names from historical answer projections and event history', async () => {
+    const { api, actor, store } = fixture();
+    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
+    actor({ id: 'demo-capture', role: 'capture' });
+    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Frage.' });
+    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }]);
+    store.append([{ id: 'old-answer', type: 'AnswerDrafted', at, actor: { id: 'old-expert', role: 'expert' },
+      subjectId: question!.id, meetingId: 'hv-2027', payload: { answer: { version: 1, text: 'Antwort.',
+        createdAt: at, createdBy: { id: 'old-expert', role: 'expert', displayName: 'Historischer Klarname', personId: 'person-old' } } } }] as NewEvent[]);
+    const read = await api.getQuestion(question!.id);
+    expect(JSON.stringify(read)).not.toContain('Historischer Klarname');
+    expect(JSON.stringify(read)).not.toContain('person-old');
+    expect(JSON.stringify(await api.getQuestionHistory(question!.id))).not.toContain('Historischer Klarname');
+  });
+
+  it('rejects an unknown or another meeting’s personId on a role grant', async () => {
+    const { api, actor } = fixture();
+    actor(admin);
+    await expect(api.assignRole({ subjectId: 'expert-a', role: 'expert', personId: 'person-from-2026' }))
+      .rejects.toMatchObject({ status: 404 });
   });
 
   it('expires assigned roles at their instant and when the meeting closes', async () => {

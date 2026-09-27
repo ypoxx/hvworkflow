@@ -10,7 +10,7 @@
  *   3. replays an earlier result if the `Idempotency-Key` was seen,
  *   4. appends one event and returns the projected resource with `_actions`.
  */
-import type { DomainEvent, NewEvent } from './events.js';
+import type { DomainEvent, NewEvent, ReadEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, reduce, type State } from './state.js';
@@ -99,7 +99,7 @@ export interface HvApi {
 
   listQuestions(filter?: QuestionFilter): Promise<{ items: Question[]; total: number }>;
   getQuestion(id: string): Promise<Question>;
-  getQuestionHistory(id: string): Promise<DomainEvent[]>;
+  getQuestionHistory(id: string): Promise<ReadEvent[]>;
   classifyQuestion(id: string, input: Classification, opts?: WriteOptions): Promise<Question>;
   assignQuestion(id: string, unitId: string, opts?: WriteOptions): Promise<Question>;
   draftAnswer(id: string, input: AnswerDraft, opts?: WriteOptions): Promise<Question>;
@@ -114,12 +114,12 @@ export interface HvApi {
   mergeQuestion(id: string, intoQuestionId: string, opts?: WriteOptions): Promise<Question>;
 
   getStage(): Promise<StageView>;
-  listEvents(after?: number, limit?: number): Promise<{ items: DomainEvent[]; lastSeq: number }>;
+  listEvents(after?: number, limit?: number): Promise<{ items: ReadEvent[]; lastSeq: number }>;
   /** Defaults to CORPUS_DEMO. `roundSizes` is a domain-only option; the contract names `questions` and `seed`. */
   seedDemo(options?: { questions?: number; seed?: number; roundSizes?: readonly number[] }): Promise<Meeting>;
 
   /** In-process realtime: called after every append. The HTTP adapter maps this to SSE/polling. */
-  subscribe(listener: (events: DomainEvent[]) => void): () => void;
+  subscribe(listener: (events: ReadEvent[]) => void): () => void;
 }
 
 export interface InProcessApiOptions {
@@ -204,11 +204,11 @@ export function can(
   return perm;
 }
 
-/** A question shell for a status-only check (rework round, point 3): only `status` matters to
- * `READ_SCOPES`/`can()`, so every other field is a harmless placeholder a caller never sees. Used to
+/** A question shell for a status-only check (rework round, point 3): `status` and the actor's unit
+ * matter to `READ_SCOPES`/`can()`; every other field is a harmless placeholder a caller never sees. Used to
  * validate a `listQuestions` status filter against the actor's own read scope through `can()` itself
  * — never a second, hand-rolled walk of `READ_SCOPES` outside it. */
-function questionShell(status: QuestionStatus): QuestionRecord {
+function questionShell(status: QuestionStatus, unitId?: string): QuestionRecord {
   return {
     id: '',
     number: '',
@@ -216,6 +216,7 @@ function questionShell(status: QuestionStatus): QuestionRecord {
     speakerId: '',
     text: '',
     status,
+    ...(unitId !== undefined ? { unitId } : {}),
     answers: [],
     version: 0,
     createdAt: '',
@@ -308,21 +309,24 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     assignedBy: { id: assignment.assignedBy.id, role: assignment.assignedBy.role },
     ...(assignment.revokedBy !== undefined ? { revokedBy: { id: assignment.revokedBy.id, role: assignment.revokedBy.role } } : {}),
   });
-  const maskEvent = (event: DomainEvent): DomainEvent => {
-    const { personId: _personId, ...visible } = event;
-    const { pii: _pii, displayName: _displayName, organisation: _organisation, ...payload } =
+  const viewActor = (source: Actor): Actor => ({ id: source.id, role: source.role });
+  const maskEvent = (event: DomainEvent): ReadEvent => {
+    if (!event.hash) throw new Error(`Event seq ${event.seq}: source hash missing.`);
+    const { personId: _personId, hash: sourceHash, prevHash: _prevHash, ...visible } = event;
+    const { displayName: _actorName, personId: _actorPerson, ...eventActor } = event.actor;
+    const { pii: _pii, personId: _payloadPerson, displayName: _displayName, organisation: _organisation, ...payload } =
       event.payload as Record<string, unknown>;
     const answer = payload['answer'];
     if (answer !== null && typeof answer === 'object' && !Array.isArray(answer)) {
       const copy = { ...answer as Record<string, unknown> };
       const by = copy['createdBy'];
       if (by !== null && typeof by === 'object' && !Array.isArray(by)) {
-        const { displayName: _name, ...actorWithoutName } = by as Record<string, unknown>;
+        const { displayName: _name, personId: _person, ...actorWithoutName } = by as Record<string, unknown>;
         copy['createdBy'] = actorWithoutName;
       }
       payload['answer'] = copy;
     }
-    return { ...visible, payload } as DomainEvent;
+    return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
   };
 
   const viewSpeaker = (s: SpeakerRecord): Speaker => ({
@@ -336,7 +340,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const viewQuestion = (q: QuestionRecord): Question => ({
     ...q,
     ...(state.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(state.speakers.get(q.speakerId)!).displayName } : {}),
-    answers: q.answers.map((a) => ({ ...a })),
+    answers: q.answers.map((a) => ({ ...a, createdBy: viewActor(a.createdBy) })),
+    ...(q.approval !== undefined ? { approval: { ...q.approval, approvedBy: viewActor(q.approval.approvedBy) } } : {}),
+    ...(q.legalClearance !== undefined ? { legalClearance: { ...q.legalClearance, clearedBy: viewActor(q.legalClearance.clearedBy) } } : {}),
     _actions: actionsFor(actor(), q),
   });
 
@@ -547,6 +553,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           throw new ApiProblem(422, 'Unprocessable', 'A valid role is required.');
         if (input.unitId !== undefined && !state.units.some((unit) => unit.id === input.unitId))
           throw new ApiProblem(404, 'Not found', 'Unit does not exist here.');
+        if (input.personId !== undefined && !state.persons.has(input.personId))
+          throw new ApiProblem(404, 'Not found', 'Person does not exist in this meeting.');
         if (input.expiresAt !== undefined && (!Number.isFinite(Date.parse(input.expiresAt)) || Date.parse(input.expiresAt) <= clock().getTime()))
           throw new ApiProblem(422, 'Unprocessable', 'expiresAt must be in the future.');
         const duplicate = [...state.roleAssignments.values()].some((item) => item.subjectId === input.subjectId &&
@@ -757,7 +765,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // already guarantees the actor holds at least one qualifying permission, so any status this
       // rejects is specifically a scope overrun, not a missing permission — R-PERM-03, not R-PERM-02.
       if (filter.status) {
-        const outOfScope = filter.status.find((s) => !can(actor(), 'question.read', questionShell(s)).allow);
+        const currentActor = actor();
+        const outOfScope = filter.status.find((s) => !can(currentActor, 'question.read', questionShell(s, currentActor.unitId)).allow);
         if (outOfScope !== undefined) {
           throw new ApiProblem(403, 'Forbidden', `Status "${outOfScope}" is outside the read scope (Leseumfang).`, 'R-PERM-03');
         }

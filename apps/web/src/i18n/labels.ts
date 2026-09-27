@@ -50,7 +50,9 @@ const STAGE_KEYS: Readonly<Record<StageAssignment, TKey>> = {
 };
 
 const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
+  'admin.roles.manage': 'action.admin.roles.manage',
   'agenda.manage': 'action.agenda.manage',
+  'question.identity.reveal': 'action.question.identity.reveal',
   'speaker.register': 'action.speaker.register',
   'speaker.reorder': 'action.speaker.reorder',
   'speaker.update': 'action.speaker.update',
@@ -100,6 +102,8 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   VotingOpened: 'event.VotingOpened',
   VotingClosed: 'event.VotingClosed',
   SpeakerRegistered: 'event.SpeakerRegistered',
+  RoleAssigned: 'event.RoleAssigned',
+  RoleRevoked: 'event.RoleRevoked',
   SpeakersReordered: 'event.SpeakersReordered',
   SpeakerUpdated: 'event.SpeakerUpdated',
   ContributionCaptured: 'event.ContributionCaptured',

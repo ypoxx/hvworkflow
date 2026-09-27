@@ -133,5 +133,10 @@ export type DomainEvent =
 
 export type EventType = DomainEvent['type'];
 
+/** Standard read projection. sourceHash identifies the immutable original, not this redacted JSON. */
+export type ReadEvent = DomainEvent extends infer E
+  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId'> & { redacted: true; sourceHash: string } : never
+  : never;
+
 /** An event before it is appended: the store assigns `seq`. */
 export type NewEvent = Omit<DomainEvent, 'seq'>;
