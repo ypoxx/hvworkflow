@@ -434,7 +434,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
     const meetingScope = options.meetingId ?? state.meeting?.id ?? 'none';
-    const scoped = key !== undefined ? `${meetingScope}|${actor().id}|${scope}|${key}` : undefined;
+    const scoped = key !== undefined ? JSON.stringify([meetingScope, actor().id, scope, key]) : undefined;
     if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
     const priorKey = activeIdempotencyKey;
     activeIdempotencyKey = key;
