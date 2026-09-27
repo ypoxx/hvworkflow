@@ -20,6 +20,7 @@ import {
   createInProcessApi,
   etagOf,
   seedEvents,
+  systemClock,
   SYSTEM_ACTOR,
   type Actor,
   type AnswerDraft,
@@ -293,7 +294,7 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.notFound(() => problemResponse(new ApiProblem(404, 'Not found', 'No such route.')));
 
   app.get('/readyz', async (c) => {
-    const serverTime = (options.clock ?? (() => new Date()))().toISOString(); // now-ok: injected API clock
+    const serverTime = (options.clock ?? systemClock)().toISOString();
     const defaultChecks = {
       clock: async (): Promise<ReadinessCheck> => ({ status: 'fail', code: 'not_configured' }),
       db: async (): Promise<ReadinessCheck> => {

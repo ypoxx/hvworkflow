@@ -237,9 +237,11 @@ export function actionsFor(actor: Actor, q: QuestionRecord): Permission[] {
 
 const SPEAKER_ACTIONS: readonly Permission[] = ['speaker.update', 'speaker.reorder'];
 
+export function systemClock(): Date { return new Date(); } // now-ok: default clock injection point for domain and server
+
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
-  const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
+  const clock = options.clock ?? systemClock;
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
   const aliasStates = new Map<string, State>();

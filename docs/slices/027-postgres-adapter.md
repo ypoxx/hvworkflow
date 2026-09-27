@@ -50,7 +50,7 @@ Keine echte Anmeldung (029b), kein persistentes Idempotenzregister oder Pflicht-
 - `pnpm-lock.yaml` (nur aus dem vorgenannten Manifest generiert)
 - `package.json` (nur ein dediziertes Postgres-CI-Skript, falls benötigt)
 - `.github/workflows/gates.yml` (nur Postgres-Service, Migration/Grant-/Integrationsgate für 027)
-- `packages/domain/src/api.ts` (nur injizierbarer, bis Commit isolierter In-Process-Idempotenzcache und Personen-Snapshot-Port, falls für den anfragelokalen Dienst nötig)
+- `packages/domain/src/api.ts` (nur injizierbarer, bis Commit isolierter In-Process-Idempotenzcache, Personen-Snapshot-Port und Export der bestehenden Default-Clock-Injektionsstelle für `/readyz`)
 - `packages/domain/src/__tests__/person-roles026.test.ts` (nur Regression der Namensauflösung mit Personen-Snapshot, falls nötig)
 - `packages/domain/src/__tests__/api.test.ts` (nur Regression der Idempotenzcache-Injektion, falls nötig)
 - `packages/contract/allowlist.json` (nur `getReadiness` von 033 auf 027 vorziehen und nach Implementierung entfernen)
