@@ -120,6 +120,7 @@ export function reduce(state: State, e: DomainEvent): State {
         // without mutating its hashed event or synthesising a second event in the global log.
         status: e.payload.lifecycleVersion === 2 ? 'preparation' : 'running',
         version: 1,
+        speakerListVersion: 1,
         currentRound: 1,
         pseudonymiseForUnits: true,
         counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0, byStatus: Object.fromEntries(QUESTION_STATUSES.map((st) => [st, 0])) as Record<QuestionStatus, number> },
@@ -168,6 +169,7 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
     case 'SpeakerRegistered': {
+      if (state.meeting) state.meeting.speakerListVersion += 1;
       // Events written before slice 080 may still carry the kind (Art) and the speaking time; they stay in
       // the log untouched (rule 7), the projection just no longer reads them.
       const p = e.payload;
@@ -216,6 +218,7 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
     case 'SpeakersReordered': {
+      if (state.meeting) state.meeting.speakerListVersion += 1;
       e.payload.speakerIds.forEach((id, i) => {
         const s = state.speakers.get(id);
         if (s) {
@@ -229,6 +232,7 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'SpeakerUpdated': {
       const s = state.speakers.get(e.subjectId);
       if (!s) break;
+      if (state.meeting) state.meeting.speakerListVersion += 1;
       const p = e.payload;
       if (p.status !== undefined) {
         s.status = p.status;
@@ -240,8 +244,14 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
     case 'ContributionCaptured': {
+      const speaker = state.speakers.get(e.payload.speakerId);
+      if (speaker) {
+        speaker.version += 1;
+        if (state.meeting) state.meeting.speakerListVersion += 1;
+      }
       state.contributions.set(e.subjectId, {
         id: e.subjectId,
+        version: 1,
         ...(e.meetingId !== undefined ? { meetingId: e.meetingId } : {}),
         speakerId: e.payload.speakerId,
         text: e.payload.text,
@@ -275,13 +285,46 @@ export function reduce(state: State, e: DomainEvent): State {
       const c = state.contributions.get(p.contributionId);
       if (c) {
         c.questionIds.push(e.subjectId);
+        c.version += 1;
         recomputeCoverage(state, c.id);
       }
       if (speaker) {
         speaker.questionCount += 1;
+        speaker.version += 1;
+        if (state.meeting) state.meeting.speakerListVersion += 1;
       }
       break;
     }
+    case 'ContributionClaimed': {
+      const c = state.contributions.get(e.subjectId);
+      if (!c) break;
+      c.claim = { ...e.payload };
+      c.version += 1;
+      break;
+    }
+    case 'ContributionReleased': {
+      const c = state.contributions.get(e.subjectId);
+      if (!c) break;
+      delete c.claim;
+      c.version += 1;
+      break;
+    }
+    case 'QuestionClaimed': {
+      const q = state.questions.get(e.subjectId);
+      if (!q) break;
+      q.claim = { ...e.payload };
+      touch(q, e.at);
+      break;
+    }
+    case 'QuestionReleased': {
+      const q = state.questions.get(e.subjectId);
+      if (!q) break;
+      delete q.claim;
+      touch(q, e.at);
+      break;
+    }
+    case 'IdempotencyRecorded':
+      break;
     case 'QuestionClassified': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;

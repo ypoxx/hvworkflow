@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Eye, Lock } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
+import { etagOf } from '@hv/domain';
 import { api } from '../../api';
 import { useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -15,7 +16,7 @@ import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
-import { NO_VERDICT, readVerdict, useAsync, useHoveredQuestion } from './useCapture';
+import { isVersionConflict, NO_VERDICT, readVerdict, useAsync, useHoveredQuestion } from './useCapture';
 import type { ReadVerdict } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
@@ -162,6 +163,7 @@ export function CapturePage() {
   const knowsCaptureRight = deskActions.length > 0;
 
   const [writing, setWriting] = useState(false);
+  const [staleFor, setStaleFor] = useState<string | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   /**
    * Slice 010d, Ziel 1: the proposal dialog belongs to the actor who opened it. On an actor change
@@ -178,21 +180,26 @@ export function CapturePage() {
   const writeContribution = useCallback(
     async (text: string): Promise<boolean> => {
       if (speakerId === null) return false;
+      const speaker = speakers.data.find((item) => item.id === speakerId);
+      if (speaker === undefined) return false;
       setWriting(true);
       try {
-        // A new Redebeitrag has no version yet, so there is nothing to match against.
-        const created = await api.captureContribution({ speakerId, text, source: 'manual' });
+        const created = await api.captureContribution(
+          { speakerId, text, source: 'manual' },
+          { ifMatch: etagOf(speaker.version) },
+        );
         setChosenContribution(created.id);
+        setStaleFor(null);
         return true;
       } catch (error: unknown) {
-        showProblem(error, problemTitle());
-        contributions.reload();
+        if (isVersionConflict(error)) setStaleFor(speakerId);
+        else showProblem(error, problemTitle());
         return false;
       } finally {
         setWriting(false);
       }
     },
-    [speakerId, contributions],
+    [speakerId, speakers.data],
   );
 
   const captureQuestions = useCallback(
@@ -200,12 +207,12 @@ export function CapturePage() {
       if (contribution === undefined || items.length === 0) return false;
       try {
         // No toast: the new cards and the rising Restabdeckung are the answer (design principle 8).
-        await api.captureQuestions(contribution.id, items);
+        await api.captureQuestions(contribution.id, items, { ifMatch: etagOf(contribution.version) });
+        setStaleFor(null);
         return true;
       } catch (error: unknown) {
-        showProblem(error, problemTitle());
-        questions.reload();
-        contributions.reload();
+        if (isVersionConflict(error)) setStaleFor(contribution.id);
+        else showProblem(error, problemTitle());
         return false;
       }
     },
@@ -216,6 +223,12 @@ export function CapturePage() {
     questions.reload();
     contributions.reload();
   }, [questions, contributions]);
+
+  const reloadStale = useCallback(() => {
+    setStaleFor(null);
+    speakers.reload();
+    refetch();
+  }, [speakers, refetch]);
 
   const { hoveredQuestionId, onHoverQuestion } = useHoveredQuestion();
 
@@ -271,10 +284,12 @@ export function CapturePage() {
               loading={contributions.status === 'loading'}
               failed={contributions.status === 'error'}
               onRetry={contributions.reload}
+              stale={staleFor !== null && (staleFor === contribution?.id || staleFor === speakerId)}
+              onReloadStale={reloadStale}
               canCapture={canCapture}
               writing={writing}
               onWrite={writeContribution}
-              onCaptureQuestions={(items) => void captureQuestions(items)}
+              onCaptureQuestions={captureQuestions}
               onOpenSuggest={() => setSuggestOpen(true)}
               questions={questions.data.items}
               hoveredQuestionId={hoveredQuestionId}

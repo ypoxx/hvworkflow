@@ -99,7 +99,6 @@ interface PostgresRequest {
   domain: HvApi;
   scoped: Map<string, HvApi>;
   persons: ReadonlyMap<string, readonly { personId: string; displayName: string; organisation?: string }[]>;
-  idempotency: Map<string, unknown>;
 }
 
 /**
@@ -129,7 +128,6 @@ export function createApp(options: CreateAppOptions = {}): App {
   const store = createInMemoryEventStore(persistence);
   const actorStorage = new AsyncLocalStorage<Actor>();
   const requestStorage = new AsyncLocalStorage<PostgresRequest>();
-  let committedIdempotency = new Map<string, unknown>();
 
   const currentActor = (): Actor => {
     const actor = actorStorage.getStore();
@@ -162,7 +160,6 @@ export function createApp(options: CreateAppOptions = {}): App {
         scoped = createInProcessApi({
           store: request.store, meetingId, actor: currentActor,
           personSnapshots: request.persons,
-          idempotencyCache: request.idempotency,
           ...(options.clock !== undefined ? { clock: options.clock } : {}),
           ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
         });
@@ -263,20 +260,18 @@ export function createApp(options: CreateAppOptions = {}): App {
           ...(row.organisation !== undefined ? { organisation: row.organisation } : {}) });
         persons.set(row.meetingId, list);
       }
-      const idempotency = new Map(committedIdempotency);
       const activeDomain = createInProcessApi({
-        store: requestStore, actor: currentActor, personSnapshots: persons, idempotencyCache: idempotency,
+        store: requestStore, actor: currentActor, personSnapshots: persons,
         ...(options.clock !== undefined ? { clock: options.clock } : {}),
         ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
         seeder: seedEvents,
       });
-      await requestStorage.run({ store: requestStore, domain: activeDomain, scoped: new Map(), persons, idempotency }, () => next());
+      await requestStorage.run({ store: requestStore, domain: activeDomain, scoped: new Map(), persons }, () => next());
       if (c.res.status >= 400) {
         await client.query('ROLLBACK');
       } else {
         if (pendingEvents.length > 0) await insertPostgresEvents(client, pendingEvents);
         await client.query('COMMIT');
-        if (write) committedIdempotency = idempotency;
       }
       started = false;
     } catch (error) {
@@ -358,6 +353,16 @@ export function createApp(options: CreateAppOptions = {}): App {
   const etag = (c: Context, resource: { version: number }): void => {
     c.header('ETag', etagOf(resource.version));
   };
+  // A replay returns the original commit's list tag; a GET uses today's projected list tag.
+  const speakerListEtag = async (c: Context, scoped: HvApi, afterWrite = false): Promise<void> => {
+    const committedTag = afterWrite ? scoped.lastWriteEtag() : undefined;
+    if (committedTag !== undefined) {
+      c.header('ETag', committedTag);
+      return;
+    }
+    const meeting = await scoped.getMeeting();
+    etag(c, { version: meeting.speakerListVersion });
+  };
   const questionFilter = (query: Record<string, unknown>): QuestionFilter => ({
     ...((query['status'] as QuestionStatus[] | undefined)?.length ? { status: query['status'] as QuestionStatus[] } : {}),
     ...(query['track'] !== undefined ? { track: query['track'] as Track } : {}),
@@ -420,20 +425,26 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   app.get('/v1/meetings/:meetingId/speakers', validateOperation('listMeetingSpeakers'), async (c) => {
     const query = getValidatedQuery(c);
-    return c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).listSpeakers({
+    const scoped = await meetingDomain(requireParam(c, 'meetingId'));
+    const speakers = await scoped.listSpeakers({
       ...(query['round'] !== undefined ? { round: query['round'] as number } : {}),
       ...(query['status'] !== undefined ? { status: query['status'] as Speaker['status'] } : {}),
-    }));
+    });
+    await speakerListEtag(c, scoped);
+    return c.json(speakers);
   });
   app.post('/v1/meetings/:meetingId/speakers', validateOperation('registerMeetingSpeaker'), async (c) => {
-    const speaker = await (await meetingDomain(requireParam(c, 'meetingId')))
-      .registerSpeaker(getValidatedBody<SpeakerRegistration>(c), writeOptions(c));
+    const scoped = await meetingDomain(requireParam(c, 'meetingId'));
+    const speaker = await scoped.registerSpeaker(getValidatedBody<SpeakerRegistration>(c), writeOptions(c));
+    await speakerListEtag(c, scoped, true);
     return c.json(speaker, 201);
   });
   app.put('/v1/meetings/:meetingId/speakers/order', validateOperation('reorderMeetingSpeakers'), async (c) => {
     const body = getValidatedBody<{ round: number; speakerIds: string[] }>(c);
-    return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
-      .reorderSpeakers(body.round, body.speakerIds, writeOptions(c)));
+    const scoped = await meetingDomain(requireParam(c, 'meetingId'));
+    const speakers = await scoped.reorderSpeakers(body.round, body.speakerIds, writeOptions(c));
+    await speakerListEtag(c, scoped, true);
+    return c.json(speakers);
   });
   app.get('/v1/meetings/:meetingId/contributions', validateOperation('listMeetingContributions'), async (c) => {
     const speakerId = getValidatedQuery(c)['speakerId'] as string | undefined;
@@ -443,6 +454,7 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/meetings/:meetingId/contributions', validateOperation('captureMeetingContribution'), async (c) => {
     const contribution = await (await meetingDomain(requireParam(c, 'meetingId')))
       .captureMeetingContribution(getValidatedBody<MeetingContributionCapture>(c), writeOptions(c));
+    etag(c, contribution);
     return c.json(contribution, 201);
   });
   app.get('/v1/meetings/:meetingId/questions', validateOperation('listMeetingQuestions'), async (c) => {
@@ -465,17 +477,20 @@ export function createApp(options: CreateAppOptions = {}): App {
       ...(round !== undefined ? { round } : {}),
       ...(status !== undefined ? { status } : {}),
     };
-    return c.json(await domain.listSpeakers(filter));
+    const speakers = await domain.listSpeakers(filter);
+    await speakerListEtag(c, domain);
+    return c.json(speakers);
   });
   app.post('/v1/speakers', validateOperation('registerSpeaker'), async (c) => {
     const body = getValidatedBody<SpeakerRegistration>(c);
     const speaker = await domain.registerSpeaker(body, writeOptions(c));
-    etag(c, speaker);
+    await speakerListEtag(c, domain, true);
     return c.json(speaker, 201);
   });
   app.put('/v1/speakers/order', validateOperation('reorderSpeakers'), async (c) => {
     const body = getValidatedBody<{ round: number; speakerIds: string[] }>(c);
     const speakers = await domain.reorderSpeakers(body.round, body.speakerIds, writeOptions(c));
+    await speakerListEtag(c, domain, true);
     return c.json(speakers);
   });
   app.get('/v1/speakers/:speakerId', validateOperation('getSpeaker'), async (c) => {
@@ -498,15 +513,30 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/contributions', validateOperation('captureContribution'), async (c) => {
     const body = getValidatedBody<ContributionCapture>(c);
     const contribution = await domain.captureContribution(body, writeOptions(c));
+    etag(c, contribution);
     return c.json(contribution, 201);
   });
   app.get('/v1/contributions/:contributionId', validateOperation('getContribution'), async (c) => {
-    return c.json(await domain.getContribution(requireParam(c, 'contributionId')));
+    const contribution = await domain.getContribution(requireParam(c, 'contributionId'));
+    etag(c, contribution);
+    return c.json(contribution);
   });
   app.post('/v1/contributions/:contributionId/questions', validateOperation('captureQuestions'), async (c) => {
     const body = getValidatedBody<{ questions: QuestionCapture[] }>(c);
-    const questions = await domain.captureQuestions(requireParam(c, 'contributionId'), body.questions, writeOptions(c));
+    const contributionId = requireParam(c, 'contributionId');
+    const questions = await domain.captureQuestions(contributionId, body.questions, writeOptions(c));
+    c.header('ETag', domain.lastWriteEtag() ?? etagOf((await domain.getContribution(contributionId)).version));
     return c.json(questions, 201);
+  });
+  app.post('/v1/contributions/:contributionId/claim', validateOperation('claimContribution'), async (c) => {
+    const contribution = await domain.claimContribution(requireParam(c, 'contributionId'), writeOptions(c));
+    etag(c, contribution);
+    return c.json(contribution);
+  });
+  app.post('/v1/contributions/:contributionId/release', validateOperation('releaseContribution'), async (c) => {
+    const contribution = await domain.releaseContribution(requireParam(c, 'contributionId'), writeOptions(c));
+    etag(c, contribution);
+    return c.json(contribution);
   });
 
   // ---- questions ----------------------------------------------------------------------------------
@@ -581,6 +611,14 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/questions/:questionId/merge', validateOperation('mergeQuestion'), async (c) => {
     const body = getValidatedBody<{ intoQuestionId: string }>(c);
     const question = await domain.mergeQuestion(requireParam(c, 'questionId'), body.intoQuestionId, writeOptions(c));
+    return questionResult(c, question);
+  });
+  app.post('/v1/questions/:questionId/claim', validateOperation('claimQuestion'), async (c) => {
+    const question = await domain.claimQuestion(requireParam(c, 'questionId'), writeOptions(c));
+    return questionResult(c, question);
+  });
+  app.post('/v1/questions/:questionId/release', validateOperation('releaseQuestion'), async (c) => {
+    const question = await domain.releaseQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
 

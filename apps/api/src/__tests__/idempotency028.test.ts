@@ -208,6 +208,7 @@ describe('Scheibe 028: replay from the confirmed log', () => {
       { displayName: 'Changed retry body' }, { 'If-Match': listTag, 'Idempotency-Key': key });
     expect(replay.status).toBe(201);
     expect(await replay.json()).toMatchObject({ id: original.id, version: original.version });
+    expect(replay.headers.get('ETag')).toBe(created.headers.get('ETag'));
     expect(readFileSync(eventLogPath, 'utf8').trim().split('\n')).toHaveLength(committedLines);
     const denied = await request(restarted, 'POST', `${base}/speakers`, 'mod:observer',
       { displayName: 'Changed retry body' }, { 'If-Match': listTag, 'Idempotency-Key': key });
@@ -234,6 +235,7 @@ describe('Scheibe 028: replay from the confirmed log', () => {
     const replay = await request(restarted, 'POST', '/v1/contributions/contribution/questions', ACTOR.capture,
       { questions: [{ text: 'Changed body' }] }, headers);
     expect(replay.status).toBe(201);
+    expect(replay.headers.get('ETag')).toBe(first.headers.get('ETag'));
     expect((await replay.json() as { id: string; version: number }[]).map(({ id, version }) => ({ id, version })))
       .toEqual(original.map(({ id, version }) => ({ id, version })));
     expect(events()).toHaveLength(after);

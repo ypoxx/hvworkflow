@@ -37,6 +37,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
   ],
   capture: [
     'contribution.capture',
+    'contribution.claim',
     'question.capture',
     'question.merge',
     'question.withdraw',
@@ -56,8 +57,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'history.read',
     'question.identity.reveal',
   ],
-  expert: unitBound(['answer.draft', 'question.submit_review', 'question.read', 'history.read']),
-  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.read', 'history.read', 'question.identity.reveal'],
+  expert: unitBound(['answer.draft', 'question.submit_review', 'question.claim', 'question.read', 'history.read']),
+  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.claim', 'question.read', 'history.read', 'question.identity.reveal'],
   approver: [
     'question.assign',
     'question.approve',
@@ -70,7 +71,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
   ],
   podium: ['question.deliver', 'question.return', 'question.close', 'stage.read', 'question.identity.reveal'],
   // Scheibe 025: the agenda grant is explicit. All other bundles deny it by default.
-  admin: [...PERMISSIONS.filter((permission) => !['agenda.manage', 'admin.roles.manage', 'question.identity.reveal'].includes(permission)),
+  admin: [...PERMISSIONS.filter((permission) => !['agenda.manage', 'admin.roles.manage', 'question.identity.reveal', 'contribution.claim', 'question.claim'].includes(permission)),
     'agenda.manage', 'admin.roles.manage'],
   observer: ['question.read.delivered'],
 };

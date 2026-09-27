@@ -16,6 +16,7 @@ export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden';
 export interface SpeakersState {
   status: LoadStatus;
   speakers: readonly Speaker[];
+  listVersion: number | null;
   reload: () => void;
 }
 
@@ -55,7 +56,7 @@ export function useSpeakers(): SpeakersState {
    * until the new role has answered; the page shows its skeleton instead. A newer `version` of the
    * same actor keeps the rows on screen while it loads (nothing jumps, design principle 8).
    */
-  const [list, setList] = useState<{ key: string; speakers: readonly Speaker[] } | null>(null);
+  const [list, setList] = useState<{ key: string; speakers: readonly Speaker[]; version: number } | null>(null);
 
   /**
    * Slice 010c, Ziel 4: every answer used to be set as it came — ready, refused and failed alike —
@@ -74,11 +75,10 @@ export function useSpeakers(): SpeakersState {
     let cancelled = false;
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
-    api
-      .listSpeakers()
-      .then((next) => {
+    Promise.all([api.listSpeakers(), api.getMeeting()])
+      .then(([next, meeting]) => {
         if (!isCurrentLoad(requested, current())) return;
-        setList({ key: requested, speakers: next });
+        setList({ key: requested, speakers: next, version: meeting.speakerListVersion });
         setRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
@@ -86,7 +86,7 @@ export function useSpeakers(): SpeakersState {
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — the Wortmeldeliste
           // is simply not readable in this role.
-          setList({ key: requested, speakers: NO_SPEAKERS });
+          setList({ key: requested, speakers: NO_SPEAKERS, version: 0 });
           setRead({ key: requested, status: 'forbidden' });
           return;
         }
@@ -109,7 +109,8 @@ export function useSpeakers(): SpeakersState {
       ? 'loading'
       : read.status;
   const speakers = list !== null && keyBelongsTo(list.key, actorId) ? list.speakers : NO_SPEAKERS;
-  return { status, speakers, reload };
+  const listVersion = list !== null && keyBelongsTo(list.key, actorId) && status === 'ready' ? list.version : null;
+  return { status, speakers, listVersion, reload };
 }
 
 /**

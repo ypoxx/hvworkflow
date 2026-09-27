@@ -42,6 +42,7 @@ export const captureEn: typeof captureDe = {
   'capture.key.alt': 'Alt',
   'capture.key.q': 'Q',
   'capture.readonly.hint': 'Read only in this role',
+  'capture.stale.banner': 'This record changed meanwhile. Reload the contribution and questions; your unsent entry will be kept.',
   // Slice 010b: the state a 403 R-PERM-02/03 on `listContributions` renders instead of a toast
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
   'capture.forbidden.title': 'This role has no read permission for this view',

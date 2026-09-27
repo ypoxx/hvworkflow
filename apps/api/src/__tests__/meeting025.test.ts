@@ -68,17 +68,23 @@ describe('Scheibe 025: kanonische Jahrgangsrouten', () => {
       const response = await req(app, 'GET', `${base}${path}`, { actor: ACTOR.admin });
       expect(response.status, path).toBe(200);
     }
+    const listTag = (await req(app, 'GET', `${base}/speakers`, { actor: ACTOR.admin })).headers.get('ETag')!;
     const registered = await req(app, 'POST', `${base}/speakers`, {
-      actor: ACTOR.admin, body: { displayName: 'Zweite Testperson', round: 1 },
+      actor: ACTOR.admin, headers: { 'If-Match': listTag },
+      body: { displayName: 'Zweite Testperson', round: 1 },
     });
     expect(registered.status).toBe(201);
-    const speakerId = (await registered.json() as { id: string }).id;
+    const speaker = await registered.json() as { id: string; version: number };
+    const speakerId = speaker.id;
     const reordered = await req(app, 'PUT', `${base}/speakers/order`, {
-      actor: ACTOR.admin, body: { round: 1, speakerIds: [speakerId, 'speaker-1'] },
+      actor: ACTOR.admin, headers: { 'If-Match': registered.headers.get('ETag')! },
+      body: { round: 1, speakerIds: [speakerId, 'speaker-1'] },
     });
     expect(reordered.status).toBe(200);
+    const currentSpeaker = await req(app, 'GET', `/v1/speakers/${speakerId}`, { actor: ACTOR.admin });
     const captured = await req(app, 'POST', `${base}/contributions`, {
-      actor: ACTOR.admin, body: { speakerId, text: 'Redeinhalt', source: 'manual' },
+      actor: ACTOR.admin, headers: { 'If-Match': currentSpeaker.headers.get('ETag')! },
+      body: { speakerId, text: 'Redeinhalt', source: 'manual' },
     });
     expect(captured.status).toBe(201);
     for (const [suffix, expectedField] of [
@@ -112,13 +118,16 @@ describe('Scheibe 025: kanonische Jahrgangsrouten', () => {
     expect(events()).toHaveLength(4);
     const app = createApp({ demoEnabled: true, persistence,
       clock: () => new Date('2027-04-20T11:05:00.000Z') });
+    const speakerTag = (await req(app, 'GET', '/v1/speakers/speaker-1', { actor: ACTOR.capture })).headers.get('ETag')!;
     const manual = await req(app, 'POST', '/v1/meetings/hv-2027/contributions', {
-      actor: ACTOR.capture, body: { speakerId: 'speaker-1', text: 'Später Text', source: 'manual' },
+      actor: ACTOR.capture, headers: { 'If-Match': speakerTag },
+      body: { speakerId: 'speaker-1', text: 'Später Text', source: 'manual' },
     });
     expect(manual.status).toBe(409);
     expect(await manual.json()).toMatchObject({ ruleId: 'R-MTG-03' });
     const paper = await req(app, 'POST', '/v1/meetings/hv-2027/contributions', {
       actor: ACTOR.capture,
+      headers: { 'If-Match': speakerTag },
       body: { speakerId: 'speaker-1', text: 'Papiertext', source: 'paper',
         occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'paper', lateEntryReason: 'Papierbogen nachgetragen' },
     });

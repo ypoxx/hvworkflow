@@ -34,7 +34,7 @@ test('Erfassung zeigt 412 sichtbar und behält eine nicht bestätigte Einzelfrag
   await free.press('Enter');
   await expect(page.getByTestId('capture-stale-banner')).toBeVisible();
   await expect(free).toHaveValue(draft);
-  await expect(page.getByTestId('capture-stale-banner')).toContainText('aktualis');
+  await expect(page.getByTestId('capture-stale-banner')).toContainText('Laden Sie Redebeitrag und Einzelfragen neu');
   await page.screenshot({ path: evidence });
   await page.getByTestId('capture-stale-banner').getByRole('button').click();
   await expect(free).toHaveValue(draft);
@@ -57,7 +57,7 @@ test('Wortmeldung sendet die angezeigte Listen-Version bei Registrierung', async
     const original = api.registerSpeaker.bind(api);
     (window as typeof window & { registrationIfMatch: string | undefined }).registrationIfMatch = undefined;
     api.registerSpeaker = async (input, opts) => {
-      (window as typeof window & { registrationIfMatch?: string }).registrationIfMatch = opts?.ifMatch;
+      (window as typeof window & { registrationIfMatch: string | undefined }).registrationIfMatch = opts?.ifMatch;
       return original(input, opts);
     };
     return `"v${meeting.speakerListVersion}"`;

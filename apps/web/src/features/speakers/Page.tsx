@@ -63,7 +63,7 @@ function SkeletonRows() {
 export function SpeakersPage() {
   const t = useT();
   const meeting = useMeeting();
-  const { status, speakers, reload } = useSpeakers();
+  const { status, speakers, listVersion, reload } = useSpeakers();
 
   // While a reorder is in flight the list shows the new order; the refetch then confirms it.
   const [override, setOverride] = useState<readonly Speaker[] | null>(null);
@@ -210,8 +210,8 @@ export function SpeakersPage() {
 
   const register = useCallback(
     async (input: SpeakerRegistration): Promise<boolean> =>
-      run('new', () => api.registerSpeaker(input)),
-    [run],
+      listVersion === null ? false : run('new', () => api.registerSpeaker(input, { ifMatch: etagOf(listVersion) })),
+    [run, listVersion],
   );
 
   const move = useCallback(
@@ -224,7 +224,10 @@ export function SpeakersPage() {
           const target = viewRef.current
             .filter((s) => s.round === round && s.id !== speaker.id)
             .map((s) => s.id);
-          await api.reorderSpeakers(round, [...target, speaker.id]);
+          const currentList = await api.getMeeting();
+          await api.reorderSpeakers(round, [...target, speaker.id], {
+            ifMatch: etagOf(currentList.speakerListVersion),
+          });
         }
       }),
     [run],
@@ -292,12 +295,16 @@ export function SpeakersPage() {
 
       let cursor = 0;
       setOverride(list.map((s) => (s.round === moved.round ? reordered[cursor++]! : s)));
-      // No `ifMatch`: the order is a property of the round, not of one Wortmeldung, and the
-      // contract's reorder takes the whole sequence of ids.
+      // The order is a property of the entire meeting's speaker list, including other rounds.
+      if (listVersion === null) {
+        setOverride(null);
+        return;
+      }
       api
         .reorderSpeakers(
           moved.round,
           reordered.map((s) => s.id),
+          { ifMatch: etagOf(listVersion) },
         )
         .catch((error: unknown) => {
           showProblem(error, problemTitle());
@@ -305,7 +312,7 @@ export function SpeakersPage() {
           reload();
         });
     },
-    [reload],
+    [reload, listVersion],
   );
 
   const registerButton = mayRegister ? (

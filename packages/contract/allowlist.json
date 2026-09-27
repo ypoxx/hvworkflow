@@ -1,8 +1,4 @@
 [
-  {"operationId":"claimContribution","reason":"Vertrag 0.3.0 (Scheibe 023): Übernahme-Sperre ContributionClaimed mit TTL (E36); Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
-  {"operationId":"releaseContribution","reason":"Vertrag 0.3.0 (Scheibe 023): ContributionReleased; Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
-  {"operationId":"claimQuestion","reason":"Vertrag 0.3.0 (Scheibe 023): Übernahme-Sperre QuestionClaimed mit TTL (E36); Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
-  {"operationId":"releaseQuestion","reason":"Vertrag 0.3.0 (Scheibe 023): QuestionReleased; Kern in 028; Lane service seit takt-011; wird mit Scheibe 028 ausgeübt und entfernt","slice":"028","expires":"2026-11-25"},
   {"operationId":"login","reason":"Vertrag 0.3.0 (Scheibe 023): OIDC-BFF, Authorization Code serverseitig (ADR 0004); Dienst in 029","slice":"029","expires":"2026-11-25"},
   {"operationId":"completeLogin","reason":"Vertrag 0.3.0 (Scheibe 023): Callback setzt das Sitzungscookie (ADR 0004); Dienst in 029","slice":"029","expires":"2026-11-25"},
   {"operationId":"logout","reason":"Vertrag 0.3.0 (Scheibe 023): Abmelden, Sperrliste (ADR 0004); Dienst in 029","slice":"029","expires":"2026-11-25"},

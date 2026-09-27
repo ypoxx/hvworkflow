@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { TRANSITIONS, resolveTransition, TRANSITION_ACTIONS, SPEAKER_TRANSITIONS, resolveSpeakerTransition, type Guard, type TransitionContext } from '../transitions.js';
-import { ApiProblem, can, createInProcessApi, type HvApi } from '../api.js';
+import { ApiProblem, can, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import type { DomainEvent } from '../events.js';
 import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Permission, type SpeakerRecord, type SpeakerStatus } from '../types.js';
@@ -348,14 +348,14 @@ async function speakerIn(status: SpeakerStatus): Promise<{ api: HvApi; id: strin
     payload: { title: 'Sprecher-Testjahrgang', date: '2027-04-20', agendaItems: [], units: [] } }]);
   let t = Date.parse('2027-04-20T12:00:00.000Z');
   const api = createInProcessApi({ store, actor: () => ({ id: 'mod', role: 'moderation' }), clock: () => new Date((t += 1000)) });
-  const s = await api.registerSpeaker({ displayName: 'Testperson' });
+  const s = await api.registerSpeaker({ displayName: 'Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
   const path: Record<SpeakerStatus, SpeakerStatus[]> = {
     waiting: [],
     speaking: ['speaking'],
     finished: ['speaking', 'finished'],
     withdrawn: ['withdrawn'],
   };
-  for (const next of path[status]) await api.updateSpeaker(s.id, { status: next });
+  for (const next of path[status]) await api.updateSpeaker(s.id, { status: next }, { ifMatch: etagOf((await api.getSpeaker(s.id)).version) });
   return { api, id: s.id, events: () => store.all() };
 }
 
@@ -382,7 +382,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
       const r = resolveSpeakerTransition(speakerRecord(t.from), t.to, payload);
       expect(r.ok && r.transition.ruleId).toBe(t.ruleId);
       const { api, id } = await speakerIn(t.from);
-      const updated = await api.updateSpeaker(id, { status: t.to, ...payload });
+      const updated = await api.updateSpeaker(id, { status: t.to, ...payload }, { ifMatch: etagOf((await api.getSpeaker(id)).version) });
       expect(updated.status).toBe(t.to);
     });
   }
@@ -393,7 +393,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
       it(`R-SPK-00: ${from} → ${to} is not listed: 409 with the rule id`, async () => {
         expect(resolveSpeakerTransition(speakerRecord(from), to, { reason: 'follow_up' })).toMatchObject({ ok: false, ruleId: 'R-SPK-00' });
         const { api, id } = await speakerIn(from);
-        const p = await problemOf(api.updateSpeaker(id, { status: to, reason: 'follow_up' }));
+        const p = await problemOf(api.updateSpeaker(id, { status: to, reason: 'follow_up' }, { ifMatch: etagOf((await api.getSpeaker(id)).version) }));
         expect(p.status).toBe(409);
         expect(p.ruleId).toBe('R-SPK-00');
       });
@@ -403,7 +403,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
   it('R-SPK-00: finished → speaking is a 409 with ruleId in the problem, and no event is written', async () => {
     const { api, id, events } = await speakerIn('finished');
     const before = events().length;
-    const p = await problemOf(api.updateSpeaker(id, { status: 'speaking' }));
+    const p = await problemOf(api.updateSpeaker(id, { status: 'speaking' }, { ifMatch: etagOf((await api.getSpeaker(id)).version) }));
     expect(p.status).toBe(409);
     expect(p.toProblem().ruleId).toBe('R-SPK-00');
     expect(events().length).toBe(before);
@@ -411,14 +411,14 @@ describe('speaker state table (R-SPK, slice 080)', () => {
 
   it('R-SPK-05 without the reason "follow_up" is a 409 with R-SPK-GUARD-01', async () => {
     const { api, id } = await speakerIn('finished');
-    const p = await problemOf(api.updateSpeaker(id, { status: 'waiting' }));
+    const p = await problemOf(api.updateSpeaker(id, { status: 'waiting' }, { ifMatch: etagOf((await api.getSpeaker(id)).version) }));
     expect(p.status).toBe(409);
     expect(p.ruleId).toBe('R-SPK-GUARD-01');
   });
 
   it('R-SPK-05 with the reason writes it into SpeakerUpdated', async () => {
     const { api, id, events } = await speakerIn('finished');
-    await api.updateSpeaker(id, { status: 'waiting', reason: 'follow_up' });
+    await api.updateSpeaker(id, { status: 'waiting', reason: 'follow_up' }, { ifMatch: etagOf((await api.getSpeaker(id)).version) });
     const last = events().at(-1)!;
     expect(last.type).toBe('SpeakerUpdated');
     expect(last.payload).toEqual({ status: 'waiting', reason: 'follow_up' });
@@ -426,7 +426,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
 
   it('waiting → speaking mit reason:\'x\' schreibt keinen Grund ins Ereignis (Review R1)', async () => {
     const { api, id, events } = await speakerIn('waiting');
-    await api.updateSpeaker(id, { status: 'speaking', reason: 'x' as unknown as 'follow_up' });
+    await api.updateSpeaker(id, { status: 'speaking', reason: 'x' as unknown as 'follow_up' }, { ifMatch: etagOf((await api.getSpeaker(id)).version) });
     const last = events().at(-1)!;
     expect(last.type).toBe('SpeakerUpdated');
     expect(last.payload).toEqual({ status: 'speaking' });
@@ -442,7 +442,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
   it('a round change without status stays allowed from any status', async () => {
     for (const status of SPEAKER_STATUSES) {
       const { api, id } = await speakerIn(status);
-      const moved = await api.updateSpeaker(id, { round: 2 });
+      const moved = await api.updateSpeaker(id, { round: 2 }, { ifMatch: etagOf((await api.getSpeaker(id)).version) });
       expect(moved.round).toBe(2);
       expect(moved.status).toBe(status);
     }
@@ -455,7 +455,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
     const { api, id, events } = await speakerIn('waiting');
     const before = events().length;
     const view = await api.getSpeaker(id);
-    const updated = await api.updateSpeaker(id, {});
+    const updated = await api.updateSpeaker(id, {}, { ifMatch: etagOf(view.version) });
     expect(events().length).toBe(before);
     expect(updated.version).toBe(view.version);
   });
@@ -464,7 +464,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
     const { api, id, events } = await speakerIn('waiting');
     const before = events().length;
     const view = await api.getSpeaker(id);
-    const updated = await api.updateSpeaker(id, { requestedMinutes: 7 } as never);
+    const updated = await api.updateSpeaker(id, { requestedMinutes: 7 } as never, { ifMatch: etagOf(view.version) });
     expect(events().length).toBe(before);
     expect(updated.version).toBe(view.version);
   });
@@ -477,7 +477,7 @@ describe('speaker state table (R-SPK, slice 080)', () => {
 
   it('R-SPK-01: repeating updateSpeaker with the same idempotency key replays the answer, writes no second event, and is not a 409', async () => {
     const { api, id, events } = await speakerIn('waiting');
-    const opts = { idempotencyKey: 'takt-015-same-key' };
+    const opts = { idempotencyKey: 'takt-015-same-key', ifMatch: etagOf((await api.getSpeaker(id)).version) };
     const first = await api.updateSpeaker(id, { status: 'speaking' }, opts);
     const before = events().length;
     const second = await api.updateSpeaker(id, { status: 'speaking' }, opts);

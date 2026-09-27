@@ -111,9 +111,10 @@ describe('Scheibe 028: contribution and question claims over HTTP', () => {
     for (const actorHeader of [ACTOR.moderation, ACTOR.admin, ACTOR.observer, ACTOR.expert]) {
       expect((await req(app, 'POST', `${contribution}/claim`, { actor: actorHeader })).status, actorHeader).toBe(403);
     }
-    for (const actorHeader of [ACTOR.moderation, ACTOR.admin, ACTOR.observer, ACTOR.capture]) {
+    for (const actorHeader of [ACTOR.moderation, ACTOR.admin, ACTOR.capture]) {
       expect((await req(app, 'POST', `${question}/claim`, { actor: actorHeader })).status, actorHeader).toBe(403);
     }
+    expect((await req(app, 'POST', `${question}/claim`, { actor: ACTOR.observer })).status).toBe(404);
     expect((await req(app, 'POST', `${contribution}/claim`, {
       actor: ACTOR.capture, headers: { 'If-Match': '"v999"' },
     })).status).toBe(412);

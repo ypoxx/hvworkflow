@@ -48,7 +48,7 @@ export function ContributionText({
 }: {
   contribution: Contribution;
   canCapture: boolean;
-  onCapture: (questions: QuestionCapture[]) => void;
+  onCapture: (questions: QuestionCapture[]) => Promise<boolean>;
   /** In card order: a marker's number is this Einzelfrage's 1-based position in that list. */
   questions: readonly Question[];
   hoveredQuestionId: string | null;
@@ -78,10 +78,12 @@ export function ContributionText({
   );
 
   const capture = useCallback(
-    (selection: PendingSelection) => {
-      onCapture([{ text: selection.text, span: { start: selection.start, end: selection.end } }]);
-      window.getSelection()?.removeAllRanges();
-      setPending(null);
+    async (selection: PendingSelection) => {
+      const confirmed = await onCapture([{ text: selection.text, span: { start: selection.start, end: selection.end } }]);
+      if (confirmed) {
+        window.getSelection()?.removeAllRanges();
+        setPending(null);
+      }
     },
     [onCapture],
   );
@@ -145,7 +147,7 @@ export function ContributionText({
       const selection = pendingRef.current;
       if (selection === null) return;
       event.preventDefault();
-      capture(selection);
+      void capture(selection);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -216,7 +218,7 @@ export function ContributionText({
             data-testid="capture-add-selection"
             // Keep the marked passage alive: a plain mousedown would collapse the selection.
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => capture(pending)}
+            onClick={() => void capture(pending)}
             icon={<Highlighter size={14} strokeWidth={1.75} aria-hidden="true" />}
           >
             {t('capture.selection.add')}

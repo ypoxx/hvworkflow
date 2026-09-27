@@ -18,7 +18,7 @@ function fixture() {
   const store = createInMemoryEventStore();
   store.append([
     { id: 'meeting', type: 'MeetingCreated', at, actor: admin, subjectId: 'hv-2027', meetingId: 'hv-2027',
-      payload: { title: 'HV 2027', date: '2027-04-20', agendaItems: [], units: [] } },
+      payload: { title: 'HV 2027', date: '2027-04-20', agendaItems: [], units: [{ id: 'unit-a', name: 'Unit A' }] } },
     { id: 'start', type: 'MeetingStarted', at, actor: admin, subjectId: 'hv-2027', meetingId: 'hv-2027', payload: {} },
   ]);
   let current = moderation;
@@ -34,6 +34,17 @@ async function register(api: VersionedApi, name = 'Testperson', opts?: WriteOpti
 }
 
 describe('Scheibe 028: durable idempotency and resource versions', () => {
+  it('projects mandatory year ids on all newly persisted workflow resources', async () => {
+    const f = fixture();
+    const speaker = await register(f.api());
+    f.as(capture);
+    const contribution = await f.api().captureContribution({ speakerId: speaker.id, text: 'Question text' },
+      { ifMatch: etagOf(speaker.version) });
+    const [question] = await f.api().captureQuestions(contribution.id, [{ text: 'What?' }],
+      { ifMatch: etagOf(contribution.version) });
+    expect([speaker.meetingId, contribution.meetingId, question?.meetingId]).toEqual(['hv-2027', 'hv-2027', 'hv-2027']);
+    expect(f.store.all().every((event) => event.schemaVersion === 2 && event.meetingId === 'hv-2027')).toBe(true);
+  });
   it('reconstructs a register replay from the log after a new API instance, including the original version', async () => {
     const f = fixture();
     const first = await register(f.api(), 'Erste Person', { idempotencyKey: 'register-1' });
@@ -93,6 +104,25 @@ describe('Scheibe 028: durable idempotency and resource versions', () => {
     await expect(f.api().registerSpeaker({ displayName: 'Granted person' },
       { idempotencyKey: 'granted-register', ifMatch: etagOf(1) })).rejects.toMatchObject({ status: 403 });
     expect(f.store.lastSeq()).toBe(before);
+  });
+
+  it('replays historical question fields with actions from the current state', async () => {
+    const f = fixture();
+    const speaker = await register(f.api());
+    f.as(capture);
+    const contribution = await f.api().captureContribution({ speakerId: speaker.id, text: 'Question text' },
+      { ifMatch: etagOf(speaker.version) });
+    const [question] = await f.api().captureQuestions(contribution.id, [{ text: 'What?' }],
+      { ifMatch: etagOf(contribution.version) });
+    f.as({ id: 'coordinator', role: 'coordination' });
+    const first = await f.api().classifyQuestion(question!.id, { track: 'expert_track' },
+      { ifMatch: etagOf(question!.version), idempotencyKey: 'classify-once' });
+    await f.api().assignQuestion(question!.id, 'unit-a', { ifMatch: etagOf(first.version) });
+    const replay = await f.api().classifyQuestion(question!.id, { track: 'podium' },
+      { ifMatch: etagOf(question!.version), idempotencyKey: 'classify-once' });
+    expect(replay).toMatchObject({ id: first.id, status: first.status, track: first.track, version: first.version });
+    expect(replay._actions).toEqual((await f.api().getQuestion(question!.id))._actions);
+    expect(replay._actions).not.toEqual(first._actions);
   });
 
   it('requires the list version for registration and rejects a stale version without appending', async () => {

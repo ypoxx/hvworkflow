@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createInProcessApi } from '../api.js';
+import { createInProcessApi, etagOf } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import type { NewEvent } from '../events.js';
 import type { Actor } from '../types.js';
@@ -51,8 +51,8 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     const store = createInMemoryEventStore({ load: () => persisted, save: (events) => { persisted.splice(0, persisted.length, ...events); } });
     const api = createInProcessApi({ store, actor: () => admin });
     expect((await api.getMeeting()).status).toBe('running');
-    const speaker = await api.registerSpeaker({ displayName: 'Bestandsdatum' });
-    await expect(api.captureContribution({ speakerId: speaker.id, text: 'Weiter nutzbar' })).resolves.toMatchObject({ text: 'Weiter nutzbar' });
+    const speaker = await api.registerSpeaker({ displayName: 'Bestandsdatum' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
+    await expect(api.captureContribution({ speakerId: speaker.id, text: 'Weiter nutzbar' }, { ifMatch: etagOf(speaker.version) })).resolves.toMatchObject({ text: 'Weiter nutzbar' });
     expect(store.all()[0]).toEqual(legacy);
     expect(store.all().some((event) => event.type === 'MeetingStarted')).toBe(false);
   });
@@ -143,17 +143,17 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     const current = createInProcessApi({ store, actor: () => admin, meetingId: 'hv-2027',
       clock: () => new Date('2027-04-20T10:30:00.000Z') });
     const alias = createInProcessApi({ store, actor: () => admin });
-    const oldSpeaker = await old.registerSpeaker({ displayName: 'Alt' });
-    const newSpeaker = await current.registerSpeaker({ displayName: 'Neu' });
+    const oldSpeaker = await old.registerSpeaker({ displayName: 'Alt' }, { ifMatch: etagOf((await old.getMeeting()).speakerListVersion) });
+    const newSpeaker = await current.registerSpeaker({ displayName: 'Neu' }, { ifMatch: etagOf((await current.getMeeting()).speakerListVersion) });
     expect((await alias.getMeeting()).id).toBe('hv-2027');
     expect((await alias.listSpeakers()).map((s) => s.id)).toEqual([newSpeaker.id]);
     await expect(current.getSpeaker(oldSpeaker.id)).rejects.toMatchObject({ status: 404 });
     await expect(current.captureContribution({ speakerId: oldSpeaker.id, text: 'Fremd' }))
       .rejects.toMatchObject({ status: 404 });
-    const oldContribution = await old.captureContribution({ speakerId: oldSpeaker.id, text: 'Alttext' });
-    const newContribution = await current.captureContribution({ speakerId: newSpeaker.id, text: 'Neutext' });
-    const oldQuestion = await old.captureQuestions(oldContribution.id, [{ text: 'Alte Frage' }]);
-    const newQuestion = await current.captureQuestions(newContribution.id, [{ text: 'Neue Frage' }]);
+    const oldContribution = await old.captureContribution({ speakerId: oldSpeaker.id, text: 'Alttext' }, { ifMatch: etagOf(oldSpeaker.version) });
+    const newContribution = await current.captureContribution({ speakerId: newSpeaker.id, text: 'Neutext' }, { ifMatch: etagOf(newSpeaker.version) });
+    const oldQuestion = await old.captureQuestions(oldContribution.id, [{ text: 'Alte Frage' }], { ifMatch: etagOf(oldContribution.version) });
+    const newQuestion = await current.captureQuestions(newContribution.id, [{ text: 'Neue Frage' }], { ifMatch: etagOf(newContribution.version) });
     expect(oldQuestion[0]?.number).toBe('F-0001');
     expect(newQuestion[0]?.number).toBe('F-0001');
     expect((await old.listQuestions()).total).toBe(1);
@@ -196,26 +196,26 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     ]);
     const api = createInProcessApi({ store, actor: () => ({ id: 'capture', role: 'capture' }), meetingId: 'hv-2027',
       clock: () => new Date('2027-04-20T11:05:00.000Z') });
-    await expect(api.captureContribution({ speakerId: 'sp-1', text: 'Später Text' }))
+    await expect(api.captureContribution({ speakerId: 'sp-1', text: 'Später Text' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) }))
       .rejects.toMatchObject({ status: 409, ruleId: 'R-MTG-03' });
     await expect(api.captureMeetingContribution({ speakerId: 'sp-1', text: 'Papiertext', source: 'paper',
-      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'paper' }))
+      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'paper' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) }))
       .rejects.toMatchObject({ status: 409, ruleId: 'R-MTG-03' });
     await expect(api.captureMeetingContribution({ speakerId: 'sp-1', text: 'Falsche Quelle', source: 'paper',
-      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'device', lateEntryReason: 'Papierbogen' }))
+      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'device', lateEntryReason: 'Papierbogen' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) }))
       .rejects.toMatchObject({ status: 409, ruleId: 'R-MTG-03' });
     await expect(api.captureMeetingContribution({ speakerId: 'sp-1', text: 'Papiertext', source: 'paper',
-      occurredAt: '2027-04-20T11:06:00.000Z', occurredAtSource: 'paper', lateEntryReason: 'Papierbogen' }))
+      occurredAt: '2027-04-20T11:06:00.000Z', occurredAtSource: 'paper', lateEntryReason: 'Papierbogen' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) }))
       .rejects.toMatchObject({ status: 422 });
     const paper = await api.captureMeetingContribution({ speakerId: 'sp-1', text: 'Papiertext', source: 'paper',
-      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'paper', lateEntryReason: 'Papierbogen' });
+      occurredAt: '2027-04-20T10:30:00.000Z', occurredAtSource: 'paper', lateEntryReason: 'Papierbogen' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) });
     expect(paper).toMatchObject({ meetingId: 'hv-2027', source: 'paper', lateEntry: true,
       occurredAt: '2027-04-20T10:30:00.000Z' });
     expect(store.all().at(-1)).toMatchObject({ type: 'ContributionCaptured', meetingId: 'hv-2027',
       payload: { lateEntry: true, lateEntryReason: 'Papierbogen' }, occurredAtSource: 'paper',
       occurredAt: '2027-04-20T10:30:00.000Z', recordedAt: '2027-04-20T11:05:00.000Z' });
     const transcript = await api.captureMeetingContribution({ speakerId: 'sp-1', text: 'Transkripttext', source: 'transcript',
-      occurredAt: '2027-04-20T10:35:00.000Z', occurredAtSource: 'transcript', lateEntryReason: 'Transkript nachgetragen' });
+      occurredAt: '2027-04-20T10:35:00.000Z', occurredAtSource: 'transcript', lateEntryReason: 'Transkript nachgetragen' }, { ifMatch: etagOf((await api.getSpeaker('sp-1')).version) });
     expect(transcript.lateEntry).toBe(true);
   });
 });

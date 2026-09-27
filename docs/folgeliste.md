@@ -74,6 +74,6 @@ erledigt in takt-015.
 - 021a R1 nit · `packages/domain/src/transitions.ts` · Erstellerin, die eine ältere fremde Version freigibt, erhält
   R-GUARD-04 statt R-GUARD-06 · nur zur Kenntnis.
 
-## Idempotenz nach Rollenablauf (für 028)
+## Idempotenz nach Rollenablauf (in 028 erledigt)
 
-- 026 Codex-PR-Review P2 · `packages/domain/src/api.ts:419` · ein Retry mit demselben Idempotenzschlüssel erhält nach Ablauf oder Entzug der Rolle 403 statt des früheren Ergebnisses; der Vertrag verspricht bisher allgemein das frühere Ergebnis · in 028 Vertragsversprechen und Autorisierungsreihenfolge ausdrücklich festlegen und testen; die 026-Regel „Rolle für folgende Anfragen entzogen“ bleibt bis zu einem eigenen Rechteentscheid maßgeblich.
+- 026 Codex-PR-Review P2 · Scheibe 028 legt im Vertrag und in R-IDEM-01 fest und testet: Ein Retry mit demselben Idempotenzschlüssel erhält nach Ablauf oder Entzug der Rolle 403. Die heutige Berechtigung wird vor dem historischen Ergebnis geprüft; eine alte Antwort und alte `_actions` werden nicht ausgeliefert.

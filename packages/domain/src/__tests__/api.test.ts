@@ -51,7 +51,7 @@ describe('acceptance sentence', () => {
     expect(meeting.counts.questions).toBe(800);
 
     as(actors.moderation!);
-    const speaker = await api.registerSpeaker({ displayName: 'Testaktionärin' });
+    const speaker = await api.registerSpeaker({ displayName: 'Testaktionärin' }, { ifMatch: etagOf(meeting.speakerListVersion) });
     expect(speaker._actions).toContain('speaker.update');
 
     as(actors.capture!);
@@ -59,7 +59,7 @@ describe('acceptance sentence', () => {
       'Meine erste Frage: Wie hoch war die Ausschüttungsquote? Zweitens: Wie viele Stellen wurden abgebaut? ' +
       'Drittens: Welche Rückstellungen bestehen? Viertens: Wann ist der Prüferwechsel? Fünftens: Wie hoch sind die IT-Ausgaben? ' +
       'Sechstens: Welche Zölle belasten das Ergebnis? Siebtens: Wie hoch ist die Fluktuation?';
-    const contribution = await api.captureContribution({ speakerId: speaker.id, text });
+    const contribution = await api.captureContribution({ speakerId: speaker.id, text }, { ifMatch: etagOf(speaker.version) });
     expect(contribution.coverage.coveredRatio).toBe(0);
 
     const sentences = text.split(/(?<=\?)\s*/).filter(Boolean);
@@ -69,7 +69,7 @@ describe('acceptance sentence', () => {
       cursor = start + s.length;
       return { text: s.replace(/^[A-Za-zäöü]+:\s*/, ''), span: { start, end: start + s.length } };
     });
-    const questions = await api.captureQuestions(contribution.id, captures);
+    const questions = await api.captureQuestions(contribution.id, captures, { ifMatch: etagOf(contribution.version) });
     expect(questions).toHaveLength(7);
     expect((await api.getContribution(contribution.id)).coverage.coveredRatio).toBeGreaterThan(0.95);
     expect((await api.getMeeting()).counts.questions).toBe(807);
@@ -86,25 +86,25 @@ describe('acceptance sentence', () => {
     expect(assigned.status).toBe('assigned');
 
     as(actors.expert!);
-    const drafted = await api.draftAnswer(q.id, { text: 'Die Quote lag bei 45 Prozent.', sources: ['Geschäftsbericht'] });
+    const drafted = await api.draftAnswer(q.id, { text: 'Die Quote lag bei 45 Prozent.', sources: ['Geschäftsbericht'] }, { ifMatch: etagOf(assigned.version) });
     expect(drafted.answers).toHaveLength(1);
-    const submitted = await api.submitForReview(q.id);
+    const submitted = await api.submitForReview(q.id, { ifMatch: etagOf(drafted.version) });
     expect(submitted.status).toBe('in_review');
     expect(submitted._actions).not.toContain('question.approve');
 
     as(actors.legal!);
     expect((await api.getQuestion(q.id))._actions).toContain('question.legal.clear');
-    await expect(api.clearQuestionLegally(q.id, { answerVersion: 99 })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-04' });
-    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 1 });
+    await expect(api.clearQuestionLegally(q.id, { answerVersion: 99 }, { ifMatch: etagOf(submitted.version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-04' });
+    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 1 }, { ifMatch: etagOf(submitted.version) });
     expect(cleared.legalClearance?.answerVersion).toBe(1);
 
     as(actors.approver!);
-    const approved = await api.approveQuestion(q.id, 1);
+    const approved = await api.approveQuestion(q.id, 1, { ifMatch: etagOf(cleared.version) });
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(1);
 
     as(actors.approver!);
-    const staged = await api.stageQuestion(q.id);
+    const staged = await api.stageQuestion(q.id, { ifMatch: etagOf(approved.version) });
     expect(staged.status).toBe('staged');
     const stage = await api.getStage();
     expect(stage.queue.map((x) => x.id).concat(stage.current?.id ?? [])).toContain(q.id);
@@ -112,7 +112,7 @@ describe('acceptance sentence', () => {
     as(actors.podium!);
     const delivered = await api.deliverQuestion(q.id);
     expect(delivered.status).toBe('delivered');
-    const closed = await api.closeQuestion(q.id);
+    const closed = await api.closeQuestion(q.id, { ifMatch: etagOf(delivered.version) });
     expect(closed.status).toBe('closed');
     // Terminal: podium holds neither `question.read` nor `question.read.delivered` since slice 010
     // (Festlegung 4) — it works the stage, not the question archive — so no action is left at all.
@@ -157,8 +157,8 @@ describe('invariants', () => {
     as(actors.admin!);
     const before = (await api.listEvents(0, 100000)).lastSeq;
     as(actors.coordination!);
-    const a = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
-    const b = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1' });
+    const a = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1', ifMatch: etagOf(q.version) });
+    const b = await api.classifyQuestion(q.id, { track: 'podium' }, { idempotencyKey: 'k-1', ifMatch: etagOf(q.version) });
     expect(b).toEqual(a);
     as(actors.admin!);
     expect((await api.listEvents(0, 100000)).lastSeq).toBe(before + 1);
@@ -168,7 +168,7 @@ describe('invariants', () => {
     as(actors.coordination!);
     const { items } = await api.listQuestions({ status: ['captured'], limit: 2 });
     const [a, b] = items as [Question, Question];
-    const first = await api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' });
+    const first = await api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared', ifMatch: etagOf(a.version) });
     // Another actor replaying the same key is a new request: no leak of _actions. `a` is now
     // `classified`, outside observer's `question.read.delivered` scope, and observer holds no
     // `question.classify` either — 404, not 403 (Festlegung 3, "keine ableitbare ID", slice 010).
@@ -176,13 +176,13 @@ describe('invariants', () => {
     await expect(api.classifyQuestion(a.id, { track: 'podium' }, { idempotencyKey: 'shared' })).rejects.toMatchObject({ status: 404 });
     // The same actor with the same key on another resource executes independently.
     as(actors.coordination!);
-    const other = await api.classifyQuestion(b.id, { track: 'fast_track' }, { idempotencyKey: 'shared' });
+    const other = await api.classifyQuestion(b.id, { track: 'fast_track' }, { idempotencyKey: 'shared', ifMatch: etagOf(b.version) });
     expect(other.id).toBe(b.id);
     expect(other.track).toBe('fast_track');
     expect(await api.classifyQuestion(a.id, { track: 'expert_track' }, { idempotencyKey: 'shared' })).toEqual(first);
   });
 
-  it('R-IDEM-01: a shared cache keeps the same actor key separate across meetings', async () => {
+  it('R-IDEM-01: the same actor key stays separate across meetings in the event log', async () => {
     const sharedStore = createInMemoryEventStore();
     const at = '2027-04-20T10:00:00.000Z';
     sharedStore.append(['hv-a', 'hv-b'].map((meetingId) => ({
@@ -190,20 +190,21 @@ describe('invariants', () => {
       actor: actors.admin!, subjectId: meetingId, meetingId,
       payload: { title: meetingId, date: '2027-04-20', agendaItems: [], units: [] },
     })) as NewEvent[]);
-    const cache = new Map<string, unknown>();
     let nextId = 0;
     const scoped = (meetingId: string) => createInProcessApi({
-      store: sharedStore, meetingId, actor: () => actors.admin!, idempotencyCache: cache,
+      store: sharedStore, meetingId, actor: () => actors.admin!,
       clock: () => new Date(at), idGenerator: () => `speaker-${++nextId}`,
     });
-    const first = await scoped('hv-a').registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'same-key' });
-    const second = await scoped('hv-b').registerSpeaker({ displayName: 'Person B' }, { idempotencyKey: 'same-key' });
+    const firstApi = scoped('hv-a');
+    const secondApi = scoped('hv-b');
+    const first = await firstApi.registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'same-key', ifMatch: etagOf((await firstApi.getMeeting()).speakerListVersion) });
+    const second = await secondApi.registerSpeaker({ displayName: 'Person B' }, { idempotencyKey: 'same-key', ifMatch: etagOf((await secondApi.getMeeting()).speakerListVersion) });
     expect(second.id).not.toBe(first.id);
     expect(sharedStore.all().filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
       .toEqual(['hv-a', 'hv-b']);
   });
 
-  it('R-IDEM-01: meeting and key delimiters cannot alias another cache entry', async () => {
+  it('R-IDEM-01: meeting and key delimiters cannot alias another log scope', async () => {
     const meetingA = 'hv|admin|registerSpeaker|x';
     const meetingB = 'hv';
     const sharedStore = createInMemoryEventStore();
@@ -212,15 +213,16 @@ describe('invariants', () => {
       actor: actors.admin!, subjectId: meetingId, meetingId,
       payload: { title: `Test ${index}`, date: '2027-04-20', agendaItems: [], units: [] },
     })) as NewEvent[]);
-    const cache = new Map<string, unknown>();
     let nextId = 0;
     const scoped = (meetingId: string) => createInProcessApi({
-      store: sharedStore, meetingId, actor: () => actors.admin!, idempotencyCache: cache,
+      store: sharedStore, meetingId, actor: () => actors.admin!,
       clock: () => new Date('2027-04-20T10:15:00.000Z'), idGenerator: () => `speaker-${++nextId}`,
     });
-    const first = await scoped(meetingA).registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'y' });
-    const second = await scoped(meetingB).registerSpeaker({ displayName: 'Person B' },
-      { idempotencyKey: 'x|admin|registerSpeaker|y' });
+    const firstApi = scoped(meetingA);
+    const secondApi = scoped(meetingB);
+    const first = await firstApi.registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'y', ifMatch: etagOf((await firstApi.getMeeting()).speakerListVersion) });
+    const second = await secondApi.registerSpeaker({ displayName: 'Person B' },
+      { idempotencyKey: 'x|admin|registerSpeaker|y', ifMatch: etagOf((await secondApi.getMeeting()).speakerListVersion) });
     expect(second.id).not.toBe(first.id);
     expect(sharedStore.all().filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
       .toEqual([meetingA, meetingB]);
@@ -229,7 +231,7 @@ describe('invariants', () => {
   it('a new answer version after approval voids the approval (bound to the text)', async () => {
     as(actors.expert!);
     const q = await firstIn('approved');
-    const redrafted = await api.draftAnswer(q.id, { text: 'Korrigierte Antwort.' });
+    const redrafted = await api.draftAnswer(q.id, { text: 'Korrigierte Antwort.' }, { ifMatch: etagOf(q.version) });
     expect(redrafted.status).toBe('answer_drafted');
     expect(redrafted.approval).toBeUndefined();
     expect(redrafted.answers.length).toBe(q.answers.length + 1);
@@ -498,7 +500,7 @@ describe('read rights (slice 010)', () => {
     as(actors.observer!);
     const unsubscribe = api.subscribe((events) => received.push(events));
     const q = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
-    await writer.classifyQuestion(q.id, { track: 'podium' });
+    await writer.classifyQuestion(q.id, { track: 'podium' }, { ifMatch: etagOf(q.version) });
     expect(received).toHaveLength(1);
     expect(received[0]).toEqual([]);
     unsubscribe();
@@ -511,12 +513,12 @@ describe('read rights (slice 010)', () => {
     const unsubscribe = api.subscribe((events) => received.push(events));
 
     const first = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
-    await writer.classifyQuestion(first.id, { track: 'podium' });
+    await writer.classifyQuestion(first.id, { track: 'podium' }, { ifMatch: etagOf(first.version) });
     expect(received[0]).toEqual([]); // observer: no event.read
 
     as(actors.admin!); // the demo role switcher changes the actor at runtime, same subscription
     const second = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
-    await writer.classifyQuestion(second.id, { track: 'fast_track' });
+    await writer.classifyQuestion(second.id, { track: 'fast_track' }, { ifMatch: etagOf(second.version) });
     expect(received).toHaveLength(2);
     expect(received[1]!.length).toBeGreaterThan(0); // admin: holds event.read
 
@@ -524,7 +526,7 @@ describe('read rights (slice 010)', () => {
     // this is not a one-way "gets enabled once" effect, the check really runs fresh every time.
     as(actors.observer!);
     const third = (await writer.listQuestions({ status: ['captured'], limit: 1 })).items[0]!;
-    await writer.classifyQuestion(third.id, { track: 'expert_track' });
+    await writer.classifyQuestion(third.id, { track: 'expert_track' }, { ifMatch: etagOf(third.version) });
     expect(received).toHaveLength(3);
     expect(received[2]).toEqual([]); // observer again: no event.read
 
@@ -673,7 +675,7 @@ describe('coordination role (slice 021b): classify and assign move from capture 
     expect((await api.getQuestion(q.id))._actions).not.toContain('question.classify');
     await expect(api.classifyQuestion(q.id, { track: 'expert_track' })).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
     as(actors.coordination!);
-    const classified = await api.classifyQuestion(q.id, { track: 'expert_track' });
+    const classified = await api.classifyQuestion(q.id, { track: 'expert_track' }, { ifMatch: etagOf(q.version) });
     as(actors.capture!);
     expect((await api.getQuestion(q.id))._actions).not.toContain('question.assign');
     await expect(api.assignQuestion(q.id, 'unit-fin')).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
@@ -721,12 +723,12 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
 
   async function draftAs(a: Actor, id: string, text: string): Promise<Question> {
     as(a);
-    return api.draftAnswer(id, { text });
+    return api.draftAnswer(id, { text }, { ifMatch: etagOf((await api.getQuestion(id)).version) });
   }
 
   async function submit(id: string): Promise<Question> {
     as(actors.expert!);
-    return api.submitForReview(id);
+    return api.submitForReview(id, { ifMatch: etagOf((await api.getQuestion(id)).version) });
   }
 
   it('legal drafts version 1 and tries to legally clear it: 409 R-GUARD-06, no event', async () => {
@@ -735,7 +737,7 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     await submit(q.id);
     as(actors.legal!);
     const before = store.all().length;
-    await expect(api.clearQuestionLegally(q.id, { answerVersion: 1 })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(api.clearQuestionLegally(q.id, { answerVersion: 1 }, { ifMatch: etagOf((await api.getQuestion(q.id)).version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
     expect(store.all().length).toBe(before);
     expect((await api.getQuestion(q.id)).status).toBe('in_review');
   });
@@ -744,9 +746,9 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     const q = await assignedTextQuestion();
     await draftAs(actors.admin!, q.id, 'Entwurf von Admin.');
     as(actors.admin!);
-    await api.submitForReview(q.id);
+    await api.submitForReview(q.id, { ifMatch: etagOf((await api.getQuestion(q.id)).version) });
     const before = store.all().length;
-    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(api.approveQuestion(q.id, 1, { ifMatch: etagOf((await api.getQuestion(q.id)).version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
     expect(store.all().length).toBe(before);
   });
 
@@ -755,7 +757,7 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     await draftAs(actors.legal!, q.id, 'Entwurf von Recht.');
     await submit(q.id);
     as({ id: actors.legal!.id, role: 'approver' });
-    await expect(api.approveQuestion(q.id, 1)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(api.approveQuestion(q.id, 1, { ifMatch: etagOf((await api.getQuestion(q.id)).version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
   });
 
   it('expert drafts, approver approves: allowed', async () => {
@@ -763,7 +765,7 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     await draftAs(actors.expert!, q.id, 'Entwurf vom Fachbereich.');
     await submit(q.id);
     as(actors.approver!);
-    const approved = await api.approveQuestion(q.id, 1);
+    const approved = await api.approveQuestion(q.id, 1, { ifMatch: etagOf((await api.getQuestion(q.id)).version) });
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(1);
   });
@@ -774,10 +776,10 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     await draftAs(actors.expert!, q.id, 'Version 2 vom Fachbereich.');
     await submit(q.id);
     as(actors.legal!);
-    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 2 });
+    const cleared = await api.clearQuestionLegally(q.id, { answerVersion: 2 }, { ifMatch: etagOf((await api.getQuestion(q.id)).version) });
     expect(cleared.legalClearance?.answerVersion).toBe(2);
     as(actors.approver!);
-    const approved = await api.approveQuestion(q.id, 2);
+    const approved = await api.approveQuestion(q.id, 2, { ifMatch: etagOf(cleared.version) });
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(2);
   });

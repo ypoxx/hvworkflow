@@ -6,6 +6,8 @@
 
 Rollen werden je Jahrgang durch `RoleAssigned` und `RoleRevoked` nachvollziehbar zugeordnet. Ein zugeordneter Eintrag gilt nur bis zu seiner Ablaufzeit, seinem Entzug oder dem Jahrgangsende; bei der Fachbeantwortung begrenzt die zugeordnete Einheit das Leserecht. Bis zum Sitzungsadapter aus 029b bleibt allein die bestehende synthetische Demo-Identität ohne Zuordnung als Kompatibilitätspfad nutzbar. Die physische Personentabelle folgt in 027, der Entzug bereits laufender Sitzungen in 029b, die Oberfläche zur Rollenverwaltung in 040 und ein protokolliertes Aufdecken von Identitäten in 067. Notfallkonten sind für die erste interne Beta zurückgestellt.
 
+**Scheibe 028, Übernahme-Anzeige:** `contribution.claim` erhält nur `capture`; `question.claim` erhalten nur `expert` und `legal`. Auch `admin` erhält diese beiden Rechte nicht über seine allgemeine Berechtigungsableitung. Eine Übernahme gilt zehn Minuten, kann vom Inhaber verlängert oder freigegeben werden und blockiert keine fachlich erlaubte Änderung. Sie ersetzt weder die Einheitszuordnung noch den Versionsvergleich per `If-Match`. Der generierte Rechte-Diff in `packages/domain/policy-truth-table.md` und die Positiv-/Negativtests belegen genau diese Gewährung.
+
 **Frage, die dieses Dokument beantwortet:** Wie wird das Berechtigungsmodell flexibel genug, um von Jahr
 zu Jahr angepasst zu werden — ohne dass jede Anpassung ein Umbau ist und Fehler produziert?
 

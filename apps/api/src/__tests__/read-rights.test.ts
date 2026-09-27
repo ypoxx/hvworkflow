@@ -133,16 +133,21 @@ describe('read rights over HTTP (slice 010)', () => {
     const q = (await capturedRes.json()).items[0];
     const classifyRes = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: ACTOR.admin,
+      headers: { 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     const classified = await classifyRes.json();
     expect(classified.status).toBe('classified');
     const clearanceRes = await req(app, 'POST', `/v1/questions/${classified.id}/legal-clearances`, {
       actor: ACTOR.legal,
+      headers: { 'If-Match': `"v${classified.version}"` },
       body: {},
     });
     expect(clearanceRes.status).toBe(200);
-    const stageRes = await req(app, 'POST', `/v1/questions/${classified.id}/staging`, { actor: ACTOR.admin });
+    const cleared = await clearanceRes.json();
+    const stageRes = await req(app, 'POST', `/v1/questions/${classified.id}/staging`, {
+      actor: ACTOR.admin, headers: { 'If-Match': `"v${cleared.version}"` },
+    });
     const staged = await stageRes.json();
     expect(staged.status).toBe('staged');
 

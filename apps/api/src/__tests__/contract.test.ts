@@ -132,6 +132,7 @@ describe('contract: the operations the acceptance sentence does not reach', () =
       .map((s) => s.id);
     const reorderRes = await req(app, 'PUT', '/v1/speakers/order', {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': listRes.headers.get('ETag')! },
       body: { round, speakerIds: [...roundSpeakerIds].reverse() },
     });
     expect(reorderRes.status).toBe(200);
@@ -192,6 +193,7 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     const q = await firstQuestion(app, 'captured');
     const res = await req(app, 'POST', `/v1/questions/${q.id}/withdrawal`, {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': `"v${q.version}"` },
       body: { reason: 'Aktionärin hat die Frage zurückgezogen.' },
     });
     expect(res.status).toBe(200);
@@ -207,6 +209,7 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     const [into, duplicate] = items as [QuestionLike, QuestionLike];
     const res = await req(app, 'POST', `/v1/questions/${duplicate.id}/merge`, {
       actor: ACTOR.capture,
+      headers: { 'If-Match': `"v${duplicate.version}"` },
       body: { intoQuestionId: into.id },
     });
     expect(res.status).toBe(200);

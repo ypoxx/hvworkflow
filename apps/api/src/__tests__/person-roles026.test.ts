@@ -40,8 +40,12 @@ function appWithFixture() {
 describe('Scheibe 026: vertragsvalidierte Rollenzuordnung', () => {
   it('serves a contract-valid redacted EventRead while preserving the stored source hash', async () => {
     const { app, events } = appWithFixture();
+    const listTag = (await req(app, 'GET', '/v1/meetings/hv-2027/speakers', {
+      actor: ACTOR.moderation,
+    })).headers.get('ETag')!;
     const created = await req(app, 'POST', '/v1/meetings/hv-2027/speakers', {
-      actor: ACTOR.moderation, body: { displayName: 'Synthetische Testperson' },
+      actor: ACTOR.moderation, headers: { 'If-Match': listTag },
+      body: { displayName: 'Synthetische Testperson' },
     });
     expect(created.status).toBe(201);
     const read = await req(app, 'GET', '/v1/events', { actor: ACTOR.admin });

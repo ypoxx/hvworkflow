@@ -43,16 +43,19 @@ describe('Scheibe 021c: legal clearance HTTP operation', () => {
     expect(cleared.legalClearance?.answerVersion).toBe(1);
   });
 
-  it('requires an explicit answer version for text clearance with or without If-Match', async () => {
+  it('requires If-Match before applying the answer-version guard', async () => {
     const question = await firstQuestion(app, 'in_review');
-    for (const headers of [undefined, { 'If-Match': `"v${question.version}"` }]) {
+    for (const [headers, status] of [
+      [undefined, 428],
+      [{ 'If-Match': `"v${question.version}"` }, 422],
+    ] as const) {
       const res = await req(app, 'POST', `/v1/questions/${question.id}/legal-clearances`, {
         actor: ACTOR.legal,
         ...(headers !== undefined ? { headers } : {}),
         body: {},
       });
-      expect(res.status).toBe(422);
-      expectValid('clearQuestionLegally', 422, await res.json(), 'application/problem+json');
+      expect(res.status).toBe(status);
+      expectValid('clearQuestionLegally', status, await res.json(), 'application/problem+json');
     }
     const unchanged = await req(app, 'GET', `/v1/questions/${question.id}`, { actor: ACTOR.admin });
     expect(unchanged.status).toBe(200);
@@ -84,11 +87,13 @@ describe('Scheibe 021c: legal clearance HTTP operation', () => {
     expect(question).toBeDefined();
     const approved = await req(app, 'POST', `/v1/questions/${question!.id}/approvals`, {
       actor: ACTOR.approver,
+      headers: { 'If-Match': `"v${question!.version}"` },
       body: { answerVersion: 1 },
     });
     expect(approved.status).toBe(200);
     const res = await req(app, 'POST', `/v1/questions/${question!.id}/staging`, {
       actor: ACTOR.approver,
+      headers: { 'If-Match': approved.headers.get('ETag')! },
     });
     expect(res.status).toBe(409);
     const problem = await res.json();

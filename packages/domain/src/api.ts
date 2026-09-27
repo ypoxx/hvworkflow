@@ -97,6 +97,12 @@ export interface HvApi {
   captureContribution(input: ContributionCapture, opts?: WriteOptions): Promise<Contribution>;
   captureMeetingContribution(input: MeetingContributionCapture, opts?: WriteOptions): Promise<Contribution>;
   captureQuestions(contributionId: string, questions: QuestionCapture[], opts?: WriteOptions): Promise<Question[]>;
+  claimContribution(id: string, opts?: WriteOptions): Promise<Contribution>;
+  releaseContribution(id: string, opts?: WriteOptions): Promise<Contribution>;
+  claimQuestion(id: string, opts?: WriteOptions): Promise<Question>;
+  releaseQuestion(id: string, opts?: WriteOptions): Promise<Question>;
+  /** ETag of the resource written by the last command on this request-local API instance. */
+  lastWriteEtag(): string | undefined;
 
   listQuestions(filter?: QuestionFilter): Promise<{ items: Question[]; total: number }>;
   getQuestion(id: string): Promise<Question>;
@@ -136,8 +142,6 @@ export interface InProcessApiOptions {
   seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
   /** A committed person-table projection, keyed by meeting, for the Postgres request boundary. */
   personSnapshots?: ReadonlyMap<string, readonly Person[]>;
-  /** A request-local copy in Postgres mode; published to the process cache only after commit. */
-  idempotencyCache?: Map<string, unknown>;
 }
 
 export function etagOf(version: number): string {
@@ -267,8 +271,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       }
     }
   }
-  const idempotency = options.idempotencyCache ?? new Map<string, unknown>();
   let activeIdempotencyKey: string | undefined;
+  let activeCommand: { id: string; operation: string; resource: string } | undefined;
+  let lastWriteVersion: number | undefined;
 
   const stateForMeeting = (meetingId: string): State => {
     const projected = emptyState();
@@ -328,7 +333,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const viewActor = (source: Actor): Actor => ({ id: source.id, role: source.role });
   const maskEvent = (event: DomainEvent): ReadEvent => {
     if (!event.hash) throw new Error(`Event seq ${event.seq}: source hash missing.`);
-    const { personId: _personId, hash: sourceHash, prevHash: _prevHash, ...visible } = event;
+    const { personId: _personId, hash: sourceHash, prevHash: _prevHash,
+      commandId: _commandId, commandOperation: _commandOperation, commandResource: _commandResource,
+      ...visible } = event;
     const { displayName: _actorName, personId: _actorPerson, ...eventActor } = event.actor;
     const { pii: _pii, personId: _payloadPerson, displayName: _displayName, organisation: _organisation, ...payload } =
       event.payload as Record<string, unknown>;
@@ -342,25 +349,37 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       }
       payload['answer'] = copy;
     }
+    if (event.type === 'IdempotencyRecorded') delete visible.idempotencyKey;
     return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
   };
 
-  const viewSpeaker = (s: SpeakerRecord): Speaker => ({
+  const viewSpeaker = (s: SpeakerRecord, source: State = state): Speaker => ({
     ...s,
-    ...(can(actor(), 'question.identity.reveal').allow && s.personId !== undefined && state.persons.has(s.personId)
-      ? { displayName: state.persons.get(s.personId)!.displayName,
-          ...(state.persons.get(s.personId)!.organisation !== undefined ? { organisation: state.persons.get(s.personId)!.organisation } : {}) }
+    ...(can(actor(), 'question.identity.reveal').allow && s.personId !== undefined && source.persons.has(s.personId)
+      ? { displayName: source.persons.get(s.personId)!.displayName,
+          ...(source.persons.get(s.personId)!.organisation !== undefined ? { organisation: source.persons.get(s.personId)!.organisation } : {}) }
       : { displayName: `Redner ${s.number}` }),
     _actions: SPEAKER_ACTIONS.filter((p) => can(actor(), p).allow),
   });
-  const viewQuestion = (q: QuestionRecord): Question => ({
-    ...q,
-    ...(state.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(state.speakers.get(q.speakerId)!).displayName } : {}),
+  const viewQuestion = (q: QuestionRecord, source: State = state): Question => {
+    const { claim, ...record } = q;
+    return {
+    ...record,
+    ...(claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime() ? { claim: { ...claim } } : {}),
+    ...(source.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(source.speakers.get(q.speakerId)!, source).displayName } : {}),
     answers: q.answers.map((a) => ({ ...a, createdBy: viewActor(a.createdBy) })),
     ...(q.approval !== undefined ? { approval: { ...q.approval, approvedBy: viewActor(q.approval.approvedBy) } } : {}),
     ...(q.legalClearance !== undefined ? { legalClearance: { ...q.legalClearance, clearedBy: viewActor(q.legalClearance.clearedBy) } } : {}),
     _actions: actionsFor(actor(), q),
-  });
+  };
+  };
+  const viewContribution = (c: Contribution): Contribution => {
+    const { claim, ...rest } = c;
+    return { ...rest,
+      ...(claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime() ? { claim: { ...claim } } : {}),
+      questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] },
+    };
+  };
 
   const requireQuestion = (id: string): QuestionRecord => {
     const q = state.questions.get(id);
@@ -417,7 +436,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     }
     return q;
   };
-  const checkIfMatch = (version: number, opts?: WriteOptions): void => {
+  const checkIfMatch = (version: number, opts?: WriteOptions, required = false): void => {
+    if (opts?.ifMatch === undefined && required) {
+      throw new ApiProblem(428, 'Precondition required', 'If-Match is required for this write.');
+    }
+    if (required && opts?.ifMatch !== undefined && !/^"v[1-9][0-9]*"$/.test(opts.ifMatch)) {
+      throw new ApiProblem(422, 'Unprocessable', 'If-Match must contain one version tag.');
+    }
     if (opts?.ifMatch !== undefined && opts.ifMatch !== etagOf(version)) {
       throw new ApiProblem(
         412,
@@ -426,25 +451,147 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       );
     }
   };
-  /**
-   * Wrap a write so that an idempotency key replays the first result instead of re-executing.
-   * The key is scoped to the meeting, calling actor and operation (R-IDEM-01): a replay by another
-   * actor or against another resource is a new request and goes through the permission check again.
-   */
+  const operationPermission: Partial<Record<string, Permission>> = {
+    registerSpeaker: 'speaker.register', reorderSpeakers: 'speaker.reorder', updateSpeaker: 'speaker.update',
+    captureMeetingContribution: 'contribution.capture', captureQuestions: 'question.capture',
+    claimContribution: 'contribution.claim', releaseContribution: 'contribution.claim',
+    claimQuestion: 'question.claim', releaseQuestion: 'question.claim',
+    assignRole: 'admin.roles.manage', revokeRole: 'admin.roles.manage',
+    AgendaItemOpened: 'agenda.manage', VotingOpened: 'agenda.manage', VotingClosed: 'agenda.manage',
+  };
+  const legacyEventType: Partial<Record<string, DomainEvent['type']>> = {
+    registerSpeaker: 'SpeakerRegistered', reorderSpeakers: 'SpeakersReordered', updateSpeaker: 'SpeakerUpdated',
+    captureMeetingContribution: 'ContributionCaptured', captureQuestions: 'QuestionCaptured',
+    assignRole: 'RoleAssigned', revokeRole: 'RoleRevoked',
+    AgendaItemOpened: 'AgendaItemOpened', VotingOpened: 'VotingOpened', VotingClosed: 'VotingClosed',
+    'question.classify': 'QuestionClassified', 'question.assign': 'QuestionAssigned',
+    'answer.draft': 'AnswerDrafted', 'question.submit_review': 'QuestionSubmittedForReview',
+    'question.approve': 'QuestionApproved', 'question.legal.clear': 'QuestionLegalCleared',
+    'question.return': 'QuestionReturned', 'question.stage': 'QuestionStaged',
+    'question.deliver': 'QuestionDelivered', 'question.close': 'QuestionClosed',
+    'question.withdraw': 'QuestionWithdrawn', 'question.merge': 'QuestionMerged',
+  };
+  const authorizeReplay = (operation: string, resource: string): void => {
+    // Current grants, meeting lifecycle and scoped reads govern every historical replay.
+    actor();
+    if (state.meeting?.status === 'closed') throw new ApiProblem(403, 'Forbidden', 'Meeting is closed.', 'R-PERM-01');
+    const permission = operationPermission[operation] ?? (PERMISSIONS.includes(operation as Permission) ? operation as Permission : undefined);
+    if (!permission) throw new ApiProblem(409, 'Conflict', 'Historical command scope is unsupported.', 'R-IDEM-01');
+    if (operation.startsWith('question.') || operation === 'answer.draft' || operation === 'claimQuestion' || operation === 'releaseQuestion') {
+      const q = requireQuestionFor(resource, permission);
+      if (actor().assignmentScoped && hasUnitBoundRead(actor()) && !can(actor(), 'question.read', q).allow) {
+        throw new ApiProblem(404, 'Not found', `Question ${resource} does not exist.`);
+      }
+    } else requirePermission(permission);
+    if (operation === 'updateSpeaker') requireSpeaker(resource);
+    else if (operation === 'captureQuestions' || operation === 'claimContribution' || operation === 'releaseContribution') requireContribution(resource);
+    else if (operation === 'captureMeetingContribution') requireSpeaker(resource.split(':').at(-1)!);
+    if (operation.startsWith('question.') || operation === 'answer.draft' || operation === 'claimQuestion' || operation === 'releaseQuestion') requirePermission(permission);
+  };
+  const legacyMatch = (event: DomainEvent, operation: string, resource: string): boolean => {
+    if (event.commandId !== undefined || event.type !== legacyEventType[operation]) return false;
+    if (operation === 'captureMeetingContribution') return event.type === 'ContributionCaptured' && event.payload.speakerId === resource.split(':').at(-1);
+    if (operation === 'captureQuestions') return event.type === 'QuestionCaptured' && event.payload.contributionId === resource;
+    if (operation === 'reorderSpeakers') return event.type === 'SpeakersReordered' && String(event.payload.round) === resource;
+    if (operation === 'registerSpeaker' || operation === 'assignRole') return true;
+    if (operation === 'AgendaItemOpened' || operation === 'VotingOpened' || operation === 'VotingClosed') {
+      return 'agendaItemId' in event.payload && event.payload.agendaItemId === resource.split(':').at(-1);
+    }
+    return event.subjectId === resource;
+  };
+  const replayValue = (operation: string, resource: string, events: DomainEvent[], meetingId: string): unknown => {
+    const last = events.at(-1)!;
+    const historical = emptyState();
+    for (const event of store.all()) if (event.meetingId === meetingId && event.seq <= last.seq) reduce(historical, event);
+    // Clear identity is supplied by the current person projection; it is never taken from stale read results.
+    historical.persons = state.persons;
+    if (operation === 'registerSpeaker' || operation === 'updateSpeaker') {
+      lastWriteVersion = historical.meeting?.speakerListVersion;
+      const speaker = historical.speakers.get(operation === 'registerSpeaker' ? events[0]!.subjectId : resource);
+      if (!speaker) throw new ApiProblem(409, 'Conflict', 'Historical speaker result is missing.', 'R-IDEM-01');
+      if (operation === 'updateSpeaker') lastWriteVersion = speaker.version;
+      return viewSpeaker(speaker, historical);
+    }
+    if (operation === 'reorderSpeakers') {
+      lastWriteVersion = historical.meeting?.speakerListVersion;
+      return [...historical.speakers.values()].filter((speaker) => speaker.round === Number(resource))
+        .sort((a, b) => a.position - b.position).map((speaker) => viewSpeaker(speaker, historical));
+    }
+    if (operation === 'captureMeetingContribution' || operation === 'claimContribution' || operation === 'releaseContribution') {
+      const contribution = historical.contributions.get(operation === 'captureMeetingContribution' ? events[0]!.subjectId : resource);
+      if (!contribution) throw new ApiProblem(409, 'Conflict', 'Historical contribution result is missing.', 'R-IDEM-01');
+      lastWriteVersion = contribution.version;
+      return viewContribution(contribution);
+    }
+    if (operation === 'captureQuestions') {
+      lastWriteVersion = historical.contributions.get(resource)?.version;
+      return events.filter((event) => event.type === 'QuestionCaptured').map((event) => {
+        const question = historical.questions.get(event.subjectId);
+        if (!question) throw new ApiProblem(409, 'Conflict', 'Historical question result is missing.', 'R-IDEM-01');
+        return { ...viewQuestion(question, historical), _actions: actionsFor(actor(), state.questions.get(event.subjectId) ?? question) };
+      });
+    }
+    if (operation.startsWith('question.') || operation === 'answer.draft' || operation === 'claimQuestion' || operation === 'releaseQuestion') {
+      const question = historical.questions.get(resource);
+      if (!question) throw new ApiProblem(409, 'Conflict', 'Historical question result is missing.', 'R-IDEM-01');
+      lastWriteVersion = question.version;
+      return { ...viewQuestion(question, historical), _actions: actionsFor(actor(), state.questions.get(resource) ?? question) };
+    }
+    if (operation === 'assignRole' || operation === 'revokeRole') {
+      const assignment = historical.roleAssignments.get(operation === 'assignRole' ? events[0]!.subjectId : resource);
+      if (!assignment) throw new ApiProblem(409, 'Conflict', 'Historical assignment result is missing.', 'R-IDEM-01');
+      return viewRoleAssignment(assignment);
+    }
+    if (operation === 'AgendaItemOpened' || operation === 'VotingOpened' || operation === 'VotingClosed') {
+      lastWriteVersion = historical.meeting?.version;
+      const item = historical.agendaItems.find((candidate) => candidate.id === resource.split(':').at(-1));
+      if (!item) throw new ApiProblem(409, 'Conflict', 'Historical agenda result is missing.', 'R-IDEM-01');
+      return { ...item };
+    }
+    throw new ApiProblem(409, 'Conflict', 'Historical command result is unsupported.', 'R-IDEM-01');
+  };
   const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
-    const meetingScope = options.meetingId ?? state.meeting?.id ?? 'none';
-    const scoped = key !== undefined ? JSON.stringify([meetingScope, actor().id, scope, key]) : undefined;
-    if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
-    const priorKey = activeIdempotencyKey;
+    if (key !== undefined && (key.length === 0 || key.length > 128)) {
+      throw new ApiProblem(422, 'Unprocessable', 'Idempotency-Key must contain 1 to 128 characters.');
+    }
+    const split = scope.indexOf(':');
+    const operation = split < 0 ? scope : scope.slice(0, split);
+    const resource = split < 0 ? '' : scope.slice(split + 1);
+    const meetingId = options.meetingId ?? state.meeting?.id ?? 'none';
+    const currentActor = actor();
+    if (key !== undefined) {
+      const candidates = store.all().filter((event) => event.meetingId === meetingId && event.actor.id === currentActor.id &&
+        event.idempotencyKey === key && ((event.commandOperation === operation && event.commandResource === resource) ||
+        (event.commandId === undefined && legacyMatch(event, operation, resource))));
+      if (candidates.length > 0) {
+        authorizeReplay(operation, resource);
+        const ids = new Set(candidates.map((event) => event.commandId ?? 'legacy'));
+        if (ids.size > 1 || (ids.has('legacy') && candidates.some((event, i) => i > 0 && event.seq !== candidates[i - 1]!.seq + 1))) {
+          throw new ApiProblem(409, 'Conflict', 'Historical idempotency command is ambiguous.', 'R-IDEM-01');
+        }
+        return replayValue(operation, resource, candidates, meetingId) as T;
+      }
+    }
+    const before = store.lastSeq();
+    const previousKey = activeIdempotencyKey;
+    const previousCommand = activeCommand;
     activeIdempotencyKey = key;
+    activeCommand = { id: defaultId(), operation, resource };
     let result: T;
     try {
       result = run();
+      if (key !== undefined && store.lastSeq() === before) {
+        append([{ type: 'IdempotencyRecorded', subjectId: resource || meetingId, payload: {} }]);
+      }
     } finally {
-      activeIdempotencyKey = priorKey;
+      activeIdempotencyKey = previousKey;
+      activeCommand = previousCommand;
     }
-    if (scoped !== undefined) idempotency.set(scoped, result);
+    if (operation === 'registerSpeaker' || operation === 'reorderSpeakers') lastWriteVersion = state.meeting?.speakerListVersion;
+    else if (operation === 'captureQuestions') lastWriteVersion = state.contributions.get(resource)?.version;
+    else if (typeof result === 'object' && result !== null && 'version' in result && typeof result.version === 'number') lastWriteVersion = result.version;
+    else lastWriteVersion = undefined;
     return result;
   };
   const append = (events: Omit<NewEvent, 'id' | 'at' | 'actor'>[]): DomainEvent[] => {
@@ -460,6 +607,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     return store.append(events.map((e) => ({ ...e, id: newId(), at, actor: a,
       ...(e.type !== 'MeetingCreated' ? { meetingId: state.meeting!.id } : { meetingId: e.subjectId }),
       ...(activeIdempotencyKey !== undefined ? { idempotencyKey: activeIdempotencyKey } : {}),
+      ...(e.type === 'IdempotencyRecorded' ? { retentionClass: 'technical' as const } : {}),
+      ...(activeCommand !== undefined ? { commandId: activeCommand.id,
+        commandOperation: activeCommand.operation, commandResource: activeCommand.resource } : {}),
     }) as NewEvent));
   };
 
@@ -478,12 +628,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     });
 
   const captureInMeeting = (input: MeetingContributionCapture, opts?: WriteOptions): Contribution =>
-    idempotent(`captureMeetingContribution:${state.meeting?.id ?? 'none'}`, opts, () => {
+    idempotent(`captureMeetingContribution:${state.meeting?.id ?? 'none'}:${input.speakerId}`, opts, () => {
       requirePermission('contribution.capture');
       const meeting = state.meeting;
       if (!meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
-      requireSpeaker(input.speakerId);
+      const speaker = requireSpeaker(input.speakerId);
       if (!input.text?.trim()) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
+      checkIfMatch(speaker.version, opts, true);
       const at = now();
       const decision = resolveMeetingCapture(meeting, input, at);
       if (!decision.ok) throw new ApiProblem(decision.status, decision.status === 422 ? 'Unprocessable' : 'Conflict', decision.reason, decision.ruleId);
@@ -494,7 +645,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           ...(decision.lateEntry ? { lateEntry: true, lateEntryReason: input.lateEntryReason!.trim() } : {}) },
       }]);
       const contribution = state.contributions.get(id)!;
-      return { ...contribution, questionIds: [...contribution.questionIds], coverage: { ...contribution.coverage, uncovered: [...contribution.coverage.uncovered] } };
+      return viewContribution(contribution);
     });
 
   /**
@@ -515,6 +666,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       }
       const perm = can(actor(), action);
       if (!perm.allow) throw new ApiProblem(403, 'Forbidden', perm.reason, perm.ruleId);
+      checkIfMatch(q.version, opts, action !== 'question.deliver');
       const t = resolveTransition(q, action, payload, { actor: actor() });
       if (!t.ok) {
         // Festlegung 8: a 409 to an actor who may not read the question names no status and no rule
@@ -527,7 +679,6 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           ? new ApiProblem(409, 'Conflict', t.reason, t.ruleId)
           : new ApiProblem(409, 'Conflict', 'Transition not allowed.');
       }
-      checkIfMatch(q.version, opts);
       append([build(q, t.to)]);
       return viewQuestion(requireQuestion(id));
     });
@@ -636,7 +787,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return [...state.speakers.values()]
         .filter((s) => (filter.round === undefined || s.round === filter.round) && (filter.status === undefined || s.status === filter.status))
         .sort((a, b) => a.round - b.round || a.position - b.position)
-        .map(viewSpeaker);
+        .map((speaker) => viewSpeaker(speaker));
     },
     async getSpeaker(id) {
       requireReadPermission('getSpeaker');
@@ -646,6 +797,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return idempotent('registerSpeaker', opts, () => {
         requirePermission('speaker.register');
         if (!input.displayName?.trim()) throw new ApiProblem(422, 'Unprocessable', 'displayName is required.');
+        if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+        checkIfMatch(state.meeting.speakerListVersion, opts, true);
         const round = input.round ?? state.meeting?.currentRound ?? 1;
         const inRound = [...state.speakers.values()].filter((s) => s.round === round);
         const id = newId();
@@ -670,11 +823,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return idempotent(`reorderSpeakers:${round}`, opts, () => {
         requirePermission('speaker.reorder');
         for (const id of speakerIds) requireSpeaker(id);
+        if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+        checkIfMatch(state.meeting.speakerListVersion, opts, true);
         append([{ type: 'SpeakersReordered', subjectId: state.meeting?.id ?? 'meeting', payload: { round, speakerIds } }]);
         return [...state.speakers.values()]
           .filter((s) => s.round === round)
           .sort((a, b) => a.position - b.position)
-          .map(viewSpeaker);
+          .map((speaker) => viewSpeaker(speaker));
       });
     },
     async updateSpeaker(id, input, opts) {
@@ -684,7 +839,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         // If-Match is checked before we know whether the PATCH has any effect: a stale precondition
         // fails the same way (412) whatever the body says, so a parallel client racing a real change
         // still sees the conflict instead of a silent no-op 200 (takt-015 Ziel 1/AK1).
-        checkIfMatch(s.version, opts);
+        checkIfMatch(s.version, opts, true);
         // The reason is kept only when the resolved row has a guard that reads it (today R-SPK-05 with
         // R-SPK-GUARD-01); on any other row it is dropped, so no unchecked text reaches the log (review R1).
         let keepReason = false;
@@ -717,12 +872,12 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return [...state.contributions.values()]
         .filter((c) => filter.speakerId === undefined || c.speakerId === filter.speakerId)
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
-        .map((c) => ({ ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } }));
+        .map((c) => viewContribution(c));
     },
     async getContribution(id) {
       requireReadPermission('getContribution');
       const c = requireContribution(id);
-      return { ...c, questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] } };
+      return viewContribution(c);
     },
     async captureContribution(input, opts) {
       return captureInMeeting(input, opts);
@@ -741,6 +896,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             throw new ApiProblem(422, 'Unprocessable', 'Span is outside the contribution text.');
           }
         }
+        checkIfMatch(c.version, opts, true);
         const ids: string[] = [];
         const base = state.questions.size;
         append(
@@ -763,6 +919,72 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         return ids.map((id) => viewQuestion(requireQuestion(id)));
       });
     },
+    async claimContribution(id, opts) {
+      return idempotent(`claimContribution:${id}`, opts, () => {
+        requirePermission('contribution.claim');
+        const contribution = requireContribution(id);
+        checkIfMatch(contribution.version, opts, true);
+        const active = viewContribution(contribution).claim;
+        if (active && active.actorId !== actor().id) {
+          throw new ApiProblem(409, 'Conflict', 'Contribution is claimed by another actor.', 'R-CLAIM-01');
+        }
+        const claimedAt = now();
+        append([{ type: 'ContributionClaimed', subjectId: id, payload: {
+          actorId: actor().id, ...(actor().personId !== undefined ? { personId: actor().personId } : {}),
+          claimedAt, expiresAt: new Date(Date.parse(claimedAt) + 600_000).toISOString(),
+        } }]);
+        return viewContribution(requireContribution(id));
+      });
+    },
+    async releaseContribution(id, opts) {
+      return idempotent(`releaseContribution:${id}`, opts, () => {
+        requirePermission('contribution.claim');
+        const contribution = requireContribution(id);
+        checkIfMatch(contribution.version, opts, true);
+        if (viewContribution(contribution).claim?.actorId !== actor().id) {
+          throw new ApiProblem(409, 'Conflict', 'Only the current claim holder may release.', 'R-CLAIM-02');
+        }
+        append([{ type: 'ContributionReleased', subjectId: id, payload: {} }]);
+        return viewContribution(requireContribution(id));
+      });
+    },
+    async claimQuestion(id, opts) {
+      return idempotent(`claimQuestion:${id}`, opts, () => {
+        const question = requireQuestionFor(id, 'question.claim');
+        if (actor().assignmentScoped && hasUnitBoundRead(actor()) && !can(actor(), 'question.read', question).allow) {
+          throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+        }
+        requirePermission('question.claim');
+        checkIfMatch(question.version, opts, true);
+        const active = question.claim && Date.parse(question.claim.expiresAt) > clock().getTime() ? question.claim : undefined;
+        if (active && active.actorId !== actor().id) {
+          throw new ApiProblem(409, 'Conflict', 'Question is claimed by another actor.', 'R-CLAIM-01');
+        }
+        const claimedAt = now();
+        append([{ type: 'QuestionClaimed', subjectId: id, payload: {
+          actorId: actor().id, ...(actor().personId !== undefined ? { personId: actor().personId } : {}),
+          claimedAt, expiresAt: new Date(Date.parse(claimedAt) + 600_000).toISOString(),
+        } }]);
+        return viewQuestion(requireQuestion(id));
+      });
+    },
+    async releaseQuestion(id, opts) {
+      return idempotent(`releaseQuestion:${id}`, opts, () => {
+        const question = requireQuestionFor(id, 'question.claim');
+        if (actor().assignmentScoped && hasUnitBoundRead(actor()) && !can(actor(), 'question.read', question).allow) {
+          throw new ApiProblem(404, 'Not found', `Question ${id} does not exist.`);
+        }
+        requirePermission('question.claim');
+        checkIfMatch(question.version, opts, true);
+        const active = question.claim && Date.parse(question.claim.expiresAt) > clock().getTime() ? question.claim : undefined;
+        if (active?.actorId !== actor().id) {
+          throw new ApiProblem(409, 'Conflict', 'Only the current claim holder may release.', 'R-CLAIM-02');
+        }
+        append([{ type: 'QuestionReleased', subjectId: id, payload: {} }]);
+        return viewQuestion(requireQuestion(id));
+      });
+    },
+    lastWriteEtag() { return lastWriteVersion === undefined ? undefined : etagOf(lastWriteVersion); },
 
     async listQuestions(filter = {}) {
       requireReadPermission('listQuestions');
@@ -791,7 +1013,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       const all = [...state.questions.values()].filter((q) => questionMatches(q, filter) && can(actor(), 'question.read', q).allow);
       const offset = filter.offset ?? 0;
       const limit = filter.limit ?? 500;
-      return { items: all.slice(offset, offset + limit).map(viewQuestion), total: all.length };
+      return { items: all.slice(offset, offset + limit).map((question) => viewQuestion(question)), total: all.length };
     },
     async getQuestion(id) {
       const q = state.questions.get(id);
@@ -954,7 +1176,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       const staged = [...state.questions.values()]
         .filter((q) => q.status === 'staged')
         .sort((a, b) => (a.stagePosition ?? 0) - (b.stagePosition ?? 0))
-        .map(viewQuestion);
+        .map((question) => viewQuestion(question));
       const [current, ...queue] = staged;
       const counts = state.meeting?.counts;
       return {

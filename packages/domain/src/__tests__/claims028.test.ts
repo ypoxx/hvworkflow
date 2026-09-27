@@ -71,7 +71,7 @@ describe('Scheibe 028: visible soft claims', () => {
     f.as(capturerB);
     const before = f.store.lastSeq();
     await expect(f.api.claimContribution(captured.id, { ifMatch: etagOf(first.version) }))
-      .rejects.toMatchObject({ status: 409, ruleId: expect.any(String) });
+      .rejects.toMatchObject({ status: 409, ruleId: 'R-CLAIM-01' });
     expect(f.store.lastSeq()).toBe(before);
     f.as(capturerA);
     f.time('2027-04-20T10:05:00.000Z');
@@ -101,7 +101,7 @@ describe('Scheibe 028: visible soft claims', () => {
     const claimed = await f.api.claimContribution(captured.id, { ifMatch: etagOf(captured.version) });
     f.as(capturerB);
     await expect(f.api.releaseContribution(captured.id, { ifMatch: etagOf(claimed.version) }))
-      .rejects.toMatchObject({ status: 409 });
+      .rejects.toMatchObject({ status: 409, ruleId: 'R-CLAIM-02' });
     const [question] = await f.api.captureQuestions(captured.id, [{ text: 'What?' }],
       { ifMatch: etagOf(claimed.version) });
     expect(question?.id).toBeTruthy();

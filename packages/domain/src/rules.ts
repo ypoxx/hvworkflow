@@ -206,9 +206,10 @@ const OTHER_RULES: readonly RuleEntry[] = [
     ruleId: 'R-IDEM-01',
     kind: 'Idempotenz',
     description:
-      'An idempotency key is scoped to the calling actor and the operation; a replay of the same key ' +
-      'returns the first successful result instead of re-executing (createInProcessApi, api.ts). A ' +
-      'first call that fails (403, 409, 422 …) is not cached; a retry runs again.',
+      'An idempotency key is scoped to meeting, calling actor, operation and resource. A replay ' +
+      'reconstructs the first committed result from the append-only event log after current authorization ' +
+      '(createInProcessApi, api.ts). A first call that fails (403, 409, 412, 428, 422 …) writes no ' +
+      'receipt; a retry runs again.',
     legalRef: {
       source: 'Leitplanken',
       citation:
@@ -216,10 +217,35 @@ const OTHER_RULES: readonly RuleEntry[] = [
         'Dokument führt keine Regel, kein Tor, keine Rolle und keine Freigabe ein"): ' +
         'docs/qualitaetsleitplanken-produktreife.md:167 (Checkliste 6.3: "Wiederholungen sind ' +
         'idempotent je Akteur und Operation"). Teilweise: gibt das erste erfolgreiche Ergebnis ' +
-        'zurück; fehlgeschlagene Erstaufrufe werden nicht zwischengespeichert (api.ts `idempotent`), ' +
-        'eine Wiederholung läuft erneut durch und kann anders ausgehen. Ableitung: ein ' +
-        'fehlgeschlagener Aufruf hängt kein Ereignis an, eine doppelte Wirkung entsteht so nicht.',
+        'zurück; fehlgeschlagene Erstaufrufe erhalten keinen Ereignisbeleg (api.ts `idempotent`), ' +
+        'eine Wiederholung läuft erneut durch und kann anders ausgehen. ' +
+        'docs/slices/028-idempotenz-konflikte.md:27-34 bestimmt den dauerhaften Log-Replay. ' +
+        'Ableitung: ein fehlgeschlagener Aufruf hängt kein Ereignis an, eine doppelte Wirkung entsteht so nicht.',
       docVersion: '23. September 2026 (Scheibe 009, konsolidiert aus Scheibe 008)',
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-CLAIM-01',
+    kind: 'Guard',
+    description: 'An active soft claim may be renewed by its holder; another actor must wait until release or expiry.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation: 'docs/slices/028-idempotenz-konflikte.md:36 (interne Beta-Entscheidung E36: weiche Übernahme mit zehn Minuten Ablauf; keine extern geprüfte Rechtsnorm).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-CLAIM-02',
+    kind: 'Guard',
+    description: 'Only the current holder may release an unexpired soft claim.',
+    legalRef: {
+      source: 'Leitplanken',
+      citation: 'docs/slices/028-idempotenz-konflikte.md:36 (interne Beta-Entscheidung E36: Release nur durch Inhaber; keine extern geprüfte Rechtsnorm).',
+      docVersion: null,
       docHash: null,
       verified: false,
     },

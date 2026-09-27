@@ -57,6 +57,7 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'speaker.reorder': 'action.speaker.reorder',
   'speaker.update': 'action.speaker.update',
   'contribution.capture': 'action.contribution.capture',
+  'contribution.claim': 'action.contribution.claim',
   'question.capture': 'action.question.capture',
   'question.classify': 'action.question.classify',
   'question.assign': 'action.question.assign',
@@ -70,6 +71,7 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'question.close': 'action.question.close',
   'question.withdraw': 'action.question.withdraw',
   'question.merge': 'action.question.merge',
+  'question.claim': 'action.question.claim',
   'question.read': 'action.question.read',
   // Read permissions (slice 010): the read methods now check them through `can()` too.
   'speaker.read': 'action.speaker.read',
@@ -107,6 +109,8 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   SpeakersReordered: 'event.SpeakersReordered',
   SpeakerUpdated: 'event.SpeakerUpdated',
   ContributionCaptured: 'event.ContributionCaptured',
+  ContributionClaimed: 'event.ContributionClaimed',
+  ContributionReleased: 'event.ContributionReleased',
   QuestionCaptured: 'event.QuestionCaptured',
   QuestionClassified: 'event.QuestionClassified',
   QuestionAssigned: 'event.QuestionAssigned',
@@ -120,6 +124,9 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   QuestionClosed: 'event.QuestionClosed',
   QuestionWithdrawn: 'event.QuestionWithdrawn',
   QuestionMerged: 'event.QuestionMerged',
+  QuestionClaimed: 'event.QuestionClaimed',
+  QuestionReleased: 'event.QuestionReleased',
+  IdempotencyRecorded: 'event.IdempotencyRecorded',
 };
 
 export function statusLabel(t: Translate, status: QuestionStatus): string {

@@ -11,10 +11,12 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   'AnswerDrafted', 'QuestionSubmittedForReview', 'QuestionApproved', 'QuestionLegalCleared',
   'QuestionReturned', 'QuestionStaged', 'QuestionDelivered', 'QuestionClosed',
   'QuestionWithdrawn', 'QuestionMerged',
+  'ContributionClaimed', 'ContributionReleased', 'QuestionClaimed', 'QuestionReleased', 'IdempotencyRecorded',
 ]);
 const V2_ONLY_FIELDS = [
   'meetingId', 'idempotencyKey', 'causationId', 'prevHash', 'hash', 'recordedAt',
   'occurredAt', 'occurredAtSource', 'retentionClass', 'legalHold', 'personId',
+  'commandId', 'commandOperation', 'commandResource',
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -114,7 +116,9 @@ export function stampEvent(
   if (!['record', 'working', 'technical'].includes(String(retentionClass))) {
     throw new Error(`Event seq ${seq}: invalid retention class.`);
   }
-  const effectiveMeetingId = explicitMeetingId ?? meetingId ?? (event.type === 'MeetingCreated' ? event.subjectId : undefined);
+  // Pre-024 JSONL prefixes may consist solely of standalone facts. Give those a deterministic
+  // synthetic scope during upcast; new API writes always supply their real year id.
+  const effectiveMeetingId = explicitMeetingId ?? meetingId ?? (event.type === 'MeetingCreated' ? event.subjectId : 'legacy-unscoped');
   const { hash: _hash, prevHash: _prevHash, schemaVersion: _schemaVersion, ...rest } = input;
   const envelope = {
     ...rest,
@@ -142,6 +146,14 @@ export function verifyEventChain(events: readonly DomainEvent[]): void {
     try {
       assertEventShape(event);
       if (event.seq !== seq || event.schemaVersion !== 2 || event.prevHash !== previousHash) throw new Error('sequence or predecessor');
+      if (!nonemptyString(event.meetingId) || !nonemptyString(event.recordedAt) ||
+          !nonemptyString(event.occurredAt) || !nonemptyString(event.hash) ||
+          typeof event.legalHold !== 'boolean' || !nonemptyString(event.retentionClass) ||
+          !nonemptyString(event.occurredAtSource)) throw new Error('required v2 envelope fields');
+      if ([event.commandId, event.commandOperation, event.commandResource].some((field) => field !== undefined) &&
+          (!nonemptyString(event.commandId) || !nonemptyString(event.commandOperation) || typeof event.commandResource !== 'string')) {
+        throw new Error('incomplete command envelope');
+      }
       if (Object.hasOwn(event.actor, 'displayName')) throw new Error('actor.displayName forbidden in v2');
       if (event.at !== event.recordedAt || event.legalHold !== false ||
           !['record', 'working', 'technical'].includes(String(event.retentionClass)) ||

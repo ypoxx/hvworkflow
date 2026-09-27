@@ -34,9 +34,11 @@ describe('acceptance sentence (HTTP)', () => {
     const meeting = await meetingRes.json();
     expectValid('getMeeting', 200, meeting);
     expect(meeting.counts.questions).toBe(800);
+    const speakerListTag = (await req(app, 'GET', '/v1/speakers', { actor: ACTOR.moderation })).headers.get('ETag')!;
 
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': speakerListTag },
       body: { displayName: 'Testaktionärin' },
     });
     expect(speakerRes.status).toBe(201);
@@ -51,6 +53,7 @@ describe('acceptance sentence (HTTP)', () => {
       'Sechstens: Welche Zölle belasten das Ergebnis? Siebtens: Wie hoch ist die Fluktuation?';
     const contribRes = await req(app, 'POST', '/v1/contributions', {
       actor: ACTOR.capture,
+      headers: { 'If-Match': `"v${speaker.version}"` },
       body: { speakerId: speaker.id, text },
     });
     expect(contribRes.status).toBe(201);
@@ -67,6 +70,7 @@ describe('acceptance sentence (HTTP)', () => {
     });
     const questionsRes = await req(app, 'POST', `/v1/contributions/${contribution.id}/questions`, {
       actor: ACTOR.capture,
+      headers: { 'If-Match': `"v${contribution.version}"` },
       body: { questions: captures },
     });
     expect(questionsRes.status).toBe(201);
@@ -110,6 +114,7 @@ describe('acceptance sentence (HTTP)', () => {
 
     const draftRes = await req(app, 'POST', `/v1/questions/${q.id}/answers`, {
       actor: ACTOR.expert,
+      headers: { 'If-Match': `"v${assigned.version}"` },
       body: { text: 'Die Quote lag bei 45 Prozent.', sources: ['Geschäftsbericht'] },
     });
     expect(draftRes.status).toBe(200);
@@ -117,7 +122,9 @@ describe('acceptance sentence (HTTP)', () => {
     expectValid('draftAnswer', 200, drafted);
     expect(drafted.answers).toHaveLength(1);
 
-    const submitRes = await req(app, 'POST', `/v1/questions/${q.id}/review-submissions`, { actor: ACTOR.expert });
+    const submitRes = await req(app, 'POST', `/v1/questions/${q.id}/review-submissions`, {
+      actor: ACTOR.expert, headers: { 'If-Match': `"v${drafted.version}"` },
+    });
     expect(submitRes.status).toBe(200);
     const submitted = await submitRes.json();
     expectValid('submitForReview', 200, submitted);
@@ -126,6 +133,7 @@ describe('acceptance sentence (HTTP)', () => {
 
     const rejectClearanceRes = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, {
       actor: ACTOR.legal,
+      headers: { 'If-Match': `"v${submitted.version}"` },
       body: { answerVersion: 99 },
     });
     expect(rejectClearanceRes.status).toBe(409);
@@ -134,6 +142,7 @@ describe('acceptance sentence (HTTP)', () => {
 
     const clearanceRes = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, {
       actor: ACTOR.legal,
+      headers: { 'If-Match': `"v${submitted.version}"` },
       body: { answerVersion: 1 },
     });
     expect(clearanceRes.status).toBe(200);
@@ -143,6 +152,7 @@ describe('acceptance sentence (HTTP)', () => {
 
     const approveRes = await req(app, 'POST', `/v1/questions/${q.id}/approvals`, {
       actor: ACTOR.approver,
+      headers: { 'If-Match': `"v${cleared.version}"` },
       body: { answerVersion: 1 },
     });
     expect(approveRes.status).toBe(200);
@@ -151,7 +161,9 @@ describe('acceptance sentence (HTTP)', () => {
     expect(approved.status).toBe('approved');
     expect(approved.approval?.answerVersion).toBe(1);
 
-    const stageRes = await req(app, 'POST', `/v1/questions/${q.id}/staging`, { actor: ACTOR.approver });
+    const stageRes = await req(app, 'POST', `/v1/questions/${q.id}/staging`, {
+      actor: ACTOR.approver, headers: { 'If-Match': `"v${approved.version}"` },
+    });
     expect(stageRes.status).toBe(200);
     const staged = await stageRes.json();
     expectValid('stageQuestion', 200, staged);
@@ -168,7 +180,9 @@ describe('acceptance sentence (HTTP)', () => {
     expectValid('deliverQuestion', 200, delivered);
     expect(delivered.status).toBe('delivered');
 
-    const closeRes = await req(app, 'POST', `/v1/questions/${q.id}/closure`, { actor: ACTOR.podium });
+    const closeRes = await req(app, 'POST', `/v1/questions/${q.id}/closure`, {
+      actor: ACTOR.podium, headers: { 'If-Match': `"v${delivered.version}"` },
+    });
     expect(closeRes.status).toBe(200);
     const closed = await closeRes.json();
     expectValid('closeQuestion', 200, closed);
