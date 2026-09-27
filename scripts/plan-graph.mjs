@@ -37,6 +37,7 @@ const NEXT_BULLET_RE = /^- \*\*\d{3}/;
 // Plan 8.3: "Äußere Termine setzen frühestmögliche Starts" — a small table, not derived from the
 // document (the prose names occasions, not slice numbers); kept here with its source sentence.
 const EXTERNAL_EARLIEST_START = {
+  '029': { date: '2027-03-15', why: 'Notfallkonten erst nach beta-1 und der Fortführungsentscheidung des Eigentümers (E11)' },
   '043': { date: '2026-10-12', why: 'Vertrag 0.4.0 nach Feedback-Runde 2 (ab 12.10.)' },
   '064': { date: '2026-10-19', why: 'Ingest nach der Ansprechperson des Tool-Teams (ab 19.10.)' },
   '038': { date: '2026-11-02', why: 'Restore-Drill erst mit Staging-Host (ab 02.11.)' },

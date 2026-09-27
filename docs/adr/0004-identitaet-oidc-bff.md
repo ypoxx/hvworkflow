@@ -1,13 +1,15 @@
 # ADR 0004 — Identität: OIDC über einen BFF im Dienst
 
-**Status:** vorgeschlagen · **Datum:** 23.09.2026 · **Entscheider:** Konzern-IT (Identity Provider und Client-Typ, E11); Konzern-IT und Projektleitung (Rollenzuweisungspfad, E8); Eigentümer und Konzern-Security (MFA im Rückfall, E38) · **Annahme:** Prüfpunkt 3 (Plan 4)
+**Status:** vorgeschlagen · **Datum:** 23.09.2026; Beta-Grenze durch den Eigentümer am 27.09.2026 entschieden · **Entscheider:** Eigentümer (Beta-Grenze, E11); Konzern-IT (Identity Provider und Client-Typ, E11); Konzern-IT und Projektleitung (Rollenzuweisungspfad, E8); Eigentümer und Konzern-Security (MFA im Rückfall, E38) · **Annahme:** Prüfpunkt 3 für den Beta-Teil; Notfallkonten erst nach der Fortführungsentscheidung
 
 ## Kontext
 
 Heute stellt der Dienst Identität aus dem `X-Actor`-Header her (`HV_DEMO=1`), die Demo aus dem
 Rollenumschalter. `apps/api/src/actor.ts` ist der einzige Ort, der Identität herstellt. B1 verlangt
-eine echte Anmeldung jeder Person über OIDC, Notfallkonten nur für den IdP-Ausfall und das Ende
-des Header-Pfads außerhalb der Demo. Rechte bleiben Daten (Regel 4): `can()` ändert sich durch
+für den internen Betabereich eine echte Anmeldung jeder Testperson über OIDC und das Ende des
+Header-Pfads außerhalb der Demo. Bei IdP-Ausfall ist keine neue Anmeldung möglich; die begrenzte
+Verfügbarkeit ist im Runbook und im Chaos-Test sichtbar. Der Eigentümer hat zwei Notfallkonten für
+die erste Beta am 27.09.2026 zurückgestellt, weil sie der Fortführungsentscheidung dient. Rechte bleiben Daten (Regel 4): `can()` ändert sich durch
 diesen ADR nicht; er regelt nur, wie das Actor-Objekt entsteht.
 
 ## Entscheidung
@@ -18,12 +20,14 @@ Plan 4 (Zeile 0004):
 - **OIDC über einen BFF im Dienst.** Authorization Code läuft serverseitig, vertraulicher Client,
   HttpOnly-Sitzungscookie, JWKS-Prüfung; Issuer und Audience sind Konfiguration. Das Web hält nie ein
   Token.
-- **`actor.ts` wird ein Port mit drei Adaptern:** `demoHeader` (nur bei `HV_DEMO=1` und ohne
-  OIDC-Issuer; sind beide Schalter gesetzt, bricht der Start ab), `sessionCookie` (der OIDC-Pfad) und
-  `localBreakGlass` (zwei versiegelte Notfallkonten mit langem Einmalgeheimnis, nur bei gemeldetem
-  IdP-Ausfall aktivierbar, zeitlich befristet, jede Nutzung ein Alarmereignis).
-- **Sitzungsrichtlinie:** 14 h mit stillem Refresh, Leerlauf-Timeout, Abmelden, Sperrliste von
-  Subject-IDs ohne Neustart (Kill-Switch, Recherche SOLL).
+- **`actor.ts` ist ein Port:** `demoHeader` (nur bei `HV_DEMO=1` und ohne OIDC-Issuer; sind beide
+  Schalter gesetzt, bricht der Start ab) und `sessionCookie` (OIDC-Pfad in 029b) sind für die Beta.
+  Der dritte Adapter `localBreakGlass` folgt in 029 nach der Fortführungsentscheidung: zwei
+  versiegelte Notfallkonten mit langem Einmalgeheimnis, nur bei gemeldetem IdP-Ausfall aktivierbar,
+  zeitlich befristet, jede Nutzung ein Alarmereignis. Port, Rollenereignisse und Alarm-Port werden
+  vorher angelegt; es gibt keine vorgetäuschte Notfallkonto-Anmeldung in der Beta.
+- **Sitzungsrichtlinie für die Beta:** 14 h mit stillem Refresh, Leerlauf-Timeout, Abmelden,
+  Sperrliste von Subject-IDs ohne Neustart bei Geräteverlust (Kill-Switch in 029b).
 - **Rollenzuordnung als Ereignisdaten:** eine administrierte Zuordnungstabelle im Tool (Subject →
   Rollen je Jahrgang, optional `unitId` je Zuordnung) als Ereignisse `RoleAssigned`/`RoleRevoked` mit
   Ablauf am Jahrgangsende. IdP-Gruppen werden als Vorschlag gelesen, nie automatisch zur Rolle.
@@ -39,7 +43,7 @@ Konfiguration plus Claim-Mapping. Die Wahrheitstabelle bleibt unverändert, weil
 berührt wird. Personengenaues Vier-Augen (B6) wird mit Einzelidentitäten erst möglich.
 
 **Negativ.** Ein Sitzungscookie verlangt CSRF-Schutz für Schreibvorgänge und eine Uhr mit
-Clock-Skew aus dem injizierten Clock-Port (029). Die CI braucht einen Keycloak-Container. Die
+Clock-Skew aus dem injizierten Clock-Port (029b). Die CI braucht einen Keycloak-Container. Die
 Anmeldeseite trägt einen Transparenzhinweis (Art. 13 DSGVO — ungeprüft (E15)) als Vertragsfeld.
 Im Rückfall gepoolter Stationsidentitäten gelten B1, B6, B9 und B15 nur mit Einschränkung (B18).
 
@@ -68,11 +72,13 @@ Rückfall 15.01.2027, E11); bis dahin läuft alles gegen Keycloak.
 
 ## Nachweis
 
-Scheibe **029** (Plan 4): Negativtests abgelaufene Sitzung → 401, falsche Audience → 401,
-`X-Actor` ohne Demo → 401, Subject ohne Rolle → 403, gesperrtes Subject → 401, `HV_DEMO=1` mit
-Issuer → Start verweigert, Notfallkonto bei laufendem IdP → 403, Nutzung erzeugt Alarm; CI mit
-Keycloak grün; Wahrheitstabelle unverändert. Aus B1 zusätzlich der Screenshot der Anmeldeseite.
-Die Zuordnungstabelle kommt aus Scheibe 026 (E8).
+Scheibe **029b** (Beta-Teil von Plan 4): Negativtests abgelaufene Sitzung → 401, falsche Audience
+→ 401, `X-Actor` ohne Demo → 401, Subject ohne Rolle → 403, gesperrtes Subject → 401,
+`HV_DEMO=1` mit Issuer → Start verweigert, IdP-Ausfall → keine neue Anmeldung; CI mit Keycloak
+grün; Wahrheitstabelle unverändert. Aus B1 zusätzlich der Screenshot der Anmeldeseite. Die
+Zuordnungstabelle kommt aus Scheibe 026 (E8). Scheibe **029** nach der Fortführungsentscheidung:
+Notfallkonto bei laufendem IdP → 403, Nutzung bei gemeldetem Ausfall erzeugt Alarm und läuft ab;
+Runbook-Übung erst nach Implementierung.
 
 ## Offene Registerzeilen
 
