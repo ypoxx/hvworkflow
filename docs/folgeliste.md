@@ -77,3 +77,7 @@ erledigt in takt-015.
 ## Idempotenz nach Rollenablauf (in 028 erledigt)
 
 - 026 Codex-PR-Review P2 · Scheibe 028 legt im Vertrag und in R-IDEM-01 fest und testet: Ein Retry mit demselben Idempotenzschlüssel erhält nach Ablauf oder Entzug der Rolle 403. Die heutige Berechtigung wird vor dem historischen Ergebnis geprüft; eine alte Antwort und alte `_actions` werden nicht ausgeliefert.
+
+## Antwort-ETag bei gleichzeitigen Demo-Anfragen
+
+- 028 unabhängiges Review P2 · `packages/domain/src/api.ts:987`, `apps/api/src/app.ts:358` · `lastWriteEtag()` liegt beim In-Memory-/JSONL-Dienst auf der gemeinsam genutzten Domain-Instanz; bei gleichzeitig abgewickelten HTTP-Anfragen kann die Antwort den ETag eines anderen Schreibens tragen · den Schreibstand als Teil des jeweiligen Aufrufergebnisses zurückgeben und einen gezielten Konkurrenztest ergänzen.

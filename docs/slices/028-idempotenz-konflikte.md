@@ -1,6 +1,6 @@
 # Scheibe 028 — dauerhafte Idempotenz, Versionskonflikte und Übernahme
 
-**Status:** spezifiziert, noch nicht gebaut · **Lanes:** core, contract, web-capture, service  
+**Status:** gebaut, unabhängig geprüft · **Lanes:** core, contract, web-capture, service
 **Risikoklasse:** hoch · **Rolle:** Implementierer-Backend; unabhängiges Review in frischem Kontext mit Perspektive Konsistenz, Rechte und Datenschutz  
 **Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/028; Vertrag 0.3.5 aus 027; ADR 0001, 0002, 0003, 0009, 0011, 0013, 0015; R-IDEM-01; Register E36 auf seiner Standardannahme. 023, 024, 026 und 027 sind integriert. Die Notfallkonten aus 029 liegen ausdrücklich nach der internen Beta.
 
@@ -78,7 +78,7 @@ Keine echte Anmeldung oder Session-Sperrliste (029b), keine Notfallkonten (029 n
 - `apps/api/src/{app.ts,http.ts,validate.ts,contractSchema.ts}` (nur Header/ETag, neue Routen, 428 und Replay-Grenze), `apps/api/src/__tests__/{idempotency028.test.ts,claims028.test.ts,postgres028.test.ts,contract.test.ts,helpers.ts,negative.test.ts,acceptance.test.ts,legal-clearance.test.ts,meeting025.test.ts,person-roles026.test.ts,postgres027.test.ts,read-rights.test.ts,takt-019-contract.test.ts}` (Bestandstests nur für die 0.3.6-Grenze und die feste Versionsassertion anpassen)
 - `apps/web/src/features/capture/{Page.tsx,useCapture.ts,useCapture.test.ts,ContributionPane.tsx,ContributionText.tsx,SuggestDialog.tsx}` (nur Vergleichsversion, 412/428-Aktualisierung, StaleBanner-/Refetch-Zustand und Erhalt nicht bestätigter Eingaben), `apps/web/src/features/speakers/{Page.tsx,useSpeakers.ts}` (nur Listenstand und Konfliktaktualisierung)
 - `apps/web/src/features/history/{eventSummary.ts,eventSummary.test.ts}` (nur neue Eventtypen ohne Anzeige technischer Schlüssel oder personenbezogener Daten), `apps/web/src/i18n/{capture.de.ts,capture.en.ts,speakers.de.ts,speakers.en.ts,shell.de.ts,shell.en.ts,labels.ts,parity.test.ts}` (nur neue Meldungen/Ereignisse; diese Modulnamen existieren), `apps/web/e2e/{028-konflikte.spec.ts,010b-lesepfade.spec.ts,010c-lesezustand.spec.ts,010d-ansichtsdaten.spec.ts}` (bestehende direkte In-Process-Schreib-Fixtures nur für explizite aktuelle Vergleichsversionen), `docs/evidence/028-capture-stale.png`
-- `docs/rollen-und-rechtekonzept.md` (nur Claim-Rechte und weiche Sperre), `docs/legal-trace.md` (nur generierte neue Regelzeilen), `docs/folgeliste.md` (nur Erledigung des 026-P2 zu Replay nach Rollenablauf), `docs/produktplan-beta.md` (nur eine nötige Klarstellung der 028-ETag-/Vertragsausnahme; kein neuer Scheibenschnitt)
+- `docs/rollen-und-rechtekonzept.md` (nur Claim-Rechte und weiche Sperre), `docs/legal-trace.md` (nur generierte neue Regelzeilen), `docs/folgeliste.md` (Erledigung des 026-P2 zu Replay nach Rollenablauf und nicht blockierende Befunde aus dem unabhängigen 028-Review), `docs/produktplan-beta.md` (nur eine nötige Klarstellung der 028-ETag-/Vertragsausnahme; kein neuer Scheibenschnitt)
 
 Weitere Dateien sind ein Scope-Befund und benötigen vor Änderung eine Spec-Ergänzung. Das `rg`-Inventar der direkten Schreibaufrufe umfasst gerade die oben einzeln genannten bestehenden Domänen-, HTTP- und E2E-Dateien; `demo-lock.test.ts` prüft die vorgelagerte Anmeldung, `takt-016-contract.test.ts` nur ein Body-Schema und braucht dafür keine pauschale 028-Freigabe. Insbesondere bleiben 027-Persistenzmigrationen und Readiness-Code unangetastet; der Postgres-Test aus 028 verwendet den bestehenden Adapter. Die betroffenen Bestands-Fixtures lesen ihren **aktuellen** Listen-, Sprecher-, Redebeitrags- oder Fragenstand und übergeben dessen `ifMatch`/`If-Match` ausdrücklich am jeweiligen Aufruf. `apps/api/src/__tests__/helpers.ts` bleibt Vertrags- und Coverage-Helper; er ergänzt weder implizit einen Header noch errät er eine Version. Tests für 428 lassen den Header absichtlich weg. Auch E2E-Injektionen über `__original`/`elsewhere` senden selbst eine gelesene Version, statt `HvApi` global zu patchen.
 
@@ -93,7 +93,82 @@ Weitere Dateien sind ein Scope-Befund und benötigen vor Änderung eine Spec-Erg
 ## Bericht (nach Bau ausfüllen)
 
 Slice: 028-idempotenz-konflikte  
-Done: _Implementierte Vertrags-, Kern-, Dienst- und Oberflächenänderungen sowie unabhängiges Review eintragen._  
-Evidence: _Commit des sauberen `pnpm gates`-Laufs und dessen echten wörtlichen Schluss einmal einfügen; Postgres-Zwei-Schreiber-Test, E2E-Ergebnis, generierter Rechte-Diff und `docs/evidence/028-capture-stale.png` nennen._  
-Open: _Verbleibende Grenzen, insbesondere 049, 054 und 029b, mit Grund eintragen._  
-Touched: _Tatsächlich geänderte Dateien vollständig auflisten._
+Done: Vertrag 0.3.6, erforderliche Vergleichsversionen, dauerhafte Idempotenz und weiche Übernahme sind umgesetzt.
+Die Erfassung und Wortmeldeliste behandeln 412/428 sichtbar; die unabhängigen P1-Befunde zum Listenstand sind behoben und eng nachgeprüft.
+Tests zuerst: rote Vertrags-, Kern-, Dienst- und Oberflächentests vor den Baucommits; Postgres-Testdaten nach rotem CI-Lauf korrigiert.
+Evidence: `pnpm gates` auf sauberem Baucommit `e988372` (Exit 0), wörtlicher Schluss:
+
+```text
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 429ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit e988372, tree 21cd3b2f9eba…
+```
+
+Vollständige lokale Browser-E2E-Suite: 127/127 grün (Chromium, 3,2 min). GitHub-CI-Lauf 36345608665: Postgres-Migrationen, Grants und Transaktionsintegration sowie allgemeine Gates und Sicherheitschecks grün; die vollständige CI-E2E läuft auf dem PR. Generierter Claim-Rechte-Diff: `packages/domain/policy-truth-table.md`; Screenshot: `docs/evidence/028-capture-stale.png`.
+Open: Der P2-Reviewbefund zum gemeinsam gespeicherten Antwort-ETag im In-Memory-/JSONL-HTTP-Pfad steht für einen gebündelten Folgedurchgang in `docs/folgeliste.md`; er hält nach AGENTS.md Regel 3 den Merge nicht auf. 049 ergänzt den maßgeblichen Antwortversions-Hash für „Vorgelesen“, 054 die Offline-/Merge-Ansicht, 029b die echte Beta-Anmeldung; diese Funktionen liegen außerhalb von 028. Kein Deploy.
+Touched:
+- `apps/api/src/__tests__/acceptance.test.ts`
+- `apps/api/src/__tests__/claims028.test.ts`
+- `apps/api/src/__tests__/contract.test.ts`
+- `apps/api/src/__tests__/idempotency028.test.ts`
+- `apps/api/src/__tests__/legal-clearance.test.ts`
+- `apps/api/src/__tests__/meeting025.test.ts`
+- `apps/api/src/__tests__/negative.test.ts`
+- `apps/api/src/__tests__/person-roles026.test.ts`
+- `apps/api/src/__tests__/postgres027.test.ts`
+- `apps/api/src/__tests__/postgres028.test.ts`
+- `apps/api/src/__tests__/read-rights.test.ts`
+- `apps/api/src/__tests__/takt-019-contract.test.ts`
+- `apps/api/src/app.ts`
+- `apps/api/src/validate.ts`
+- `apps/web/e2e/010b-lesepfade.spec.ts`
+- `apps/web/e2e/010c-lesezustand.spec.ts`
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts`
+- `apps/web/e2e/028-konflikte.spec.ts`
+- `apps/web/src/features/capture/ContributionPane.tsx`
+- `apps/web/src/features/capture/ContributionText.tsx`
+- `apps/web/src/features/capture/Page.tsx`
+- `apps/web/src/features/capture/useCapture.test.ts`
+- `apps/web/src/features/capture/useCapture.ts`
+- `apps/web/src/features/history/eventSummary.test.ts`
+- `apps/web/src/features/history/eventSummary.ts`
+- `apps/web/src/features/speakers/Page.tsx`
+- `apps/web/src/features/speakers/useSpeakers.ts`
+- `apps/web/src/i18n/capture.de.ts`
+- `apps/web/src/i18n/capture.en.ts`
+- `apps/web/src/i18n/labels.ts`
+- `apps/web/src/i18n/parity.test.ts`
+- `apps/web/src/i18n/shell.de.ts`
+- `apps/web/src/i18n/shell.en.ts`
+- `apps/web/src/i18n/speakers.de.ts`
+- `apps/web/src/i18n/speakers.en.ts`
+- `docs/evidence/028-capture-stale.png`
+- `docs/folgeliste.md`
+- `docs/legal-trace.md`
+- `docs/produktplan-beta.md`
+- `docs/rollen-und-rechtekonzept.md`
+- `docs/slices/028-idempotenz-konflikte.md`
+- `packages/contract/CHANGELOG.md`
+- `packages/contract/allowlist.json`
+- `packages/contract/openapi.yaml`
+- `packages/contract/package.json`
+- `packages/contract/src/types.ts`
+- `packages/domain/policy-truth-table.md`
+- `packages/domain/src/__tests__/api.test.ts`
+- `packages/domain/src/__tests__/claims028.test.ts`
+- `packages/domain/src/__tests__/envelope.test.ts`
+- `packages/domain/src/__tests__/idempotency028.test.ts`
+- `packages/domain/src/__tests__/legal-clearance.test.ts`
+- `packages/domain/src/__tests__/meeting025.test.ts`
+- `packages/domain/src/__tests__/person-roles026.test.ts`
+- `packages/domain/src/__tests__/transitions.test.ts`
+- `packages/domain/src/api.ts`
+- `packages/domain/src/envelope.ts`
+- `packages/domain/src/events.ts`
+- `packages/domain/src/permissions.ts`
+- `packages/domain/src/rules.ts`
+- `packages/domain/src/state.ts`
+- `packages/domain/src/types.ts`
