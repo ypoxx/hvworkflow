@@ -24,7 +24,7 @@
 
 ## Nicht-Ziele
 
-Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Start- oder Schlussaktion (040 bzw. eigener späterer Vertrag), keine Debattenschluss-Operation oder Restantenbestätigung (087), keine Rollenereignisse (026), keine persistierte Mehrschreiber-Idempotenz (028), keine Oberflächenänderung, kein Deploy. Der interne Betabereich bekommt die Mehrjahrgangsgrundlage, aber 025 allein ist noch keine betriebsfähige Beta.
+Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Start- oder Schlussaktion (040 bzw. eigener späterer Vertrag), keine Debattenschluss-Operation oder Restantenbestätigung (087), keine Rollenereignisse (026), keine persistierte Mehrschreiber-Idempotenz (028), keine neue Oberflächenstrecke für die kanonischen Routen, kein Deploy. Die bestehenden Ansichten erhalten nur Bezeichnungen für neue Ereignisse und die Papierquelle. Der interne Betabereich bekommt die Mehrjahrgangsgrundlage, aber 025 allein ist noch keine betriebsfähige Beta.
 
 ## Files allowed
 
@@ -51,6 +51,10 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 - `apps/api/src/__tests__/meeting025.test.ts`
 - `apps/api/src/__tests__/contract.test.ts` (nur kanonische Operationen und Altalias-Abgleich)
 - `apps/api/src/__tests__/helpers.ts` (nur Operation-Coverage der 025-Routen)
+- `apps/web/src/components/SourceIcon.tsx` (nur Papierquelle der kanonischen Erfassung anzeigen)
+- `apps/web/src/i18n/labels.ts` (nur neue R-MTG-Ereignisse und `agenda.manage`)
+- `apps/web/src/i18n/shell.de.ts` (nur die dazugehörigen deutschen Bezeichnungen)
+- `apps/web/src/i18n/shell.en.ts` (nur die dazugehörigen englischen Bezeichnungen)
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "025"`)
 - `docs/rollen-und-rechtekonzept.md` (nur `agenda.manage`-Gewährung)
 - `docs/legal-trace.md` (nur generierte R-MTG-01..06-Zeilen)

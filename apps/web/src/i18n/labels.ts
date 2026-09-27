@@ -50,6 +50,7 @@ const STAGE_KEYS: Readonly<Record<StageAssignment, TKey>> = {
 };
 
 const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
+  'agenda.manage': 'action.agenda.manage',
   'speaker.register': 'action.speaker.register',
   'speaker.reorder': 'action.speaker.reorder',
   'speaker.update': 'action.speaker.update',
@@ -92,6 +93,12 @@ const ROLE_KEYS: Readonly<Record<Role, TKey>> = {
 
 const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   MeetingCreated: 'event.MeetingCreated',
+  MeetingStarted: 'event.MeetingStarted',
+  MeetingClosed: 'event.MeetingClosed',
+  DebateClosed: 'event.DebateClosed',
+  AgendaItemOpened: 'event.AgendaItemOpened',
+  VotingOpened: 'event.VotingOpened',
+  VotingClosed: 'event.VotingClosed',
   SpeakerRegistered: 'event.SpeakerRegistered',
   SpeakersReordered: 'event.SpeakersReordered',
   SpeakerUpdated: 'event.SpeakerUpdated',
