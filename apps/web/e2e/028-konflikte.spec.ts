@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { HvApi } from '@hv/domain';
 
 test('Erfassung zeigt 412 sichtbar und behält eine nicht bestätigte Einzelfrage', async ({ page }) => {
   const evidence = `${test.info().project.testDir}/../../../docs/evidence/028-capture-stale.png`;
@@ -15,7 +16,8 @@ test('Erfassung zeigt 412 sichtbar und behält eine nicht bestätigte Einzelfrag
   await expect(free).toBeVisible();
 
   await page.evaluate(async () => {
-    const { api } = await import('/src/api/index.ts');
+    const url = '/src/api/index.ts';
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: HvApi };
     const original = api.captureQuestions.bind(api);
     let first = true;
     api.captureQuestions = async (...args) => {
@@ -38,4 +40,32 @@ test('Erfassung zeigt 412 sichtbar und behält eine nicht bestätigte Einzelfrag
   await expect(free).toHaveValue(draft);
   await expect(page.getByTestId('capture-stale-banner')).toHaveCount(0);
   await expect(free).toBeFocused();
+});
+
+test('Wortmeldung sendet die angezeigte Listen-Version bei Registrierung', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('header-counter-questions')).toBeVisible({ timeout: 90_000 });
+  await page.getByTestId('role-switcher').click();
+  await page.getByTestId('role-option-moderation').click();
+  await page.getByTestId('nav-speakers').click();
+  await expect(page.getByTestId('speaker-register')).toBeVisible();
+
+  const expected = await page.evaluate(async () => {
+    const url = '/src/api/index.ts';
+    const { api } = (await import(/* @vite-ignore */ url)) as { api: HvApi };
+    const meeting = await api.getMeeting();
+    const original = api.registerSpeaker.bind(api);
+    (window as typeof window & { registrationIfMatch: string | undefined }).registrationIfMatch = undefined;
+    api.registerSpeaker = async (input, opts) => {
+      (window as typeof window & { registrationIfMatch?: string }).registrationIfMatch = opts?.ifMatch;
+      return original(input, opts);
+    };
+    return `"v${meeting.speakerListVersion}"`;
+  });
+
+  await page.getByTestId('speaker-register').click();
+  await page.getByTestId('speaker-register-name').fill('Konflikt Testperson');
+  await page.getByTestId('speaker-register-submit').click();
+  await expect(page.getByText('Konflikt Testperson')).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { registrationIfMatch?: string }).registrationIfMatch)).toBe(expected);
 });
