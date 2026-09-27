@@ -266,6 +266,13 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       lines.push(`| ${role} | ${cells.join(' | ')} |`);
     }
 
+    lines.push('', '# Policy truth table — Role × Agenda', '',
+      'Scheibe 025: explicit agenda.manage grant; other roles are denied by default.', '',
+      '| Role | agenda.manage |', '|---|---|');
+    for (const role of ROLES) {
+      lines.push(`| ${role} | ${can({ id: 'x', role }, 'agenda.manage').allow ? '✓' : '·'} |`);
+    }
+
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');
   });
 
@@ -327,6 +334,10 @@ function speakerRecord(status: SpeakerStatus): SpeakerRecord {
 /** An in-process API with one Wortmeldung brought into `status` along allowed rows only. */
 async function speakerIn(status: SpeakerStatus): Promise<{ api: HvApi; id: string; events: () => readonly DomainEvent[] }> {
   const store = createInMemoryEventStore();
+  const actor = { id: 'fixture', role: 'admin' as const };
+  store.append([{ id: 'meeting-speaker-fixture', type: 'MeetingCreated', at: '2027-04-20T10:00:00.000Z',
+    actor, subjectId: 'hv-speaker-fixture', meetingId: 'hv-speaker-fixture',
+    payload: { title: 'Sprecher-Testjahrgang', date: '2027-04-20', agendaItems: [], units: [] } }]);
   let t = Date.parse('2027-04-20T12:00:00.000Z');
   const api = createInProcessApi({ store, actor: () => ({ id: 'mod', role: 'moderation' }), clock: () => new Date((t += 1000)) });
   const s = await api.registerSpeaker({ displayName: 'Testperson' });

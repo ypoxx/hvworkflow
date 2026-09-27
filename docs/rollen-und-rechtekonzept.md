@@ -1,5 +1,7 @@
 # Rollen- und Rechtekonzept
 
+**Scheibe 025, vorläufige Agenda-Gewährung:** `agenda.manage` erlaubt die drei kanonischen Öffnen-/Schließen-Aktionen am Tagesordnungspunkt. Bis die Jahrgangsrollen in 026/040 verwaltet werden, erhält nur `admin` dieses Recht ausdrücklich; alle anderen Rollen sind abgewiesen. Die generierte Role-×-Agenda-Tabelle in `packages/domain/policy-truth-table.md` und die positive/negative Rollenmatrix in `meeting025.test.ts` machen die Änderung prüfbar. Die Inhalts- und Override-Rechte der Administration werden erst in 040 neu geordnet.
+
 **Frage, die dieses Dokument beantwortet:** Wie wird das Berechtigungsmodell flexibel genug, um von Jahr
 zu Jahr angepasst zu werden — ohne dass jede Anpassung ein Umbau ist und Fehler produziert?
 

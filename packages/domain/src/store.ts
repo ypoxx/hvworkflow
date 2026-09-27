@@ -6,6 +6,7 @@
 import type { DomainEvent, NewEvent } from './events.js';
 import { stampEvent, verifyEventChain } from './envelope.js';
 import { identityPiiCodec, type PiiCodec } from './piiCodec.js';
+import { project } from './state.js';
 
 export interface EventStore {
   append(events: NewEvent[]): DomainEvent[];
@@ -28,6 +29,14 @@ export function createInMemoryEventStore(persistence?: Persistence, codec: PiiCo
 
   return {
     append(events) {
+      // Reject a duplicate meeting before persistence or listener notification. The projection
+      // checks R-MTG-01 too, but a listener exception after append would leave a poisoned log.
+      const knownMeetings = new Set(log.filter((e) => e.type === 'MeetingCreated').map((e) => e.subjectId));
+      for (const event of events) {
+        if (event.type !== 'MeetingCreated') continue;
+        if (knownMeetings.has(event.subjectId)) throw new Error('R-MTG-01: meeting already exists.');
+        knownMeetings.add(event.subjectId);
+      }
       const appended: DomainEvent[] = [];
       let meetingId: string | undefined;
       for (let index = log.length - 1; index >= 0; index--) {
@@ -37,9 +46,21 @@ export function createInMemoryEventStore(persistence?: Persistence, codec: PiiCo
         }
       }
       for (const e of events) {
-        const withSeq = stampEvent(e, log.length + appended.length + 1, appended.at(-1)?.hash ?? log.at(-1)?.hash ?? '', meetingId, codec);
+        // Older MeetingCreated facts had no lifecycle marker and projected directly to running.
+        // Mark only newly appended creations; loading and rehashing a historical fact is forbidden.
+        const input: NewEvent = e.type === 'MeetingCreated'
+          ? { ...e, payload: { ...e.payload, lifecycleVersion: 2 as const } } as NewEvent : e;
+        const withSeq = stampEvent(input, log.length + appended.length + 1, appended.at(-1)?.hash ?? log.at(-1)?.hash ?? '', meetingId, codec);
         appended.push(withSeq);
         if (withSeq.type === 'MeetingCreated') meetingId = withSeq.subjectId;
+      }
+      // Validate lifecycle and agenda facts before saving. A projection listener may reject a
+      // transition, but by then the append would already have persisted a bad event.
+      const progressTypes = new Set(['MeetingStarted', 'MeetingClosed', 'AgendaItemOpened', 'VotingOpened', 'VotingClosed']);
+      const changedMeetings = new Set(appended.filter((e) => progressTypes.has(e.type)).map((e) => e.meetingId));
+      for (const id of changedMeetings) {
+        if (!id) throw new Error('R-MTG-02: lifecycle event requires a meeting.');
+        project([...log, ...appended].filter((e) => e.meetingId === id));
       }
       persistence?.save([...log, ...appended]);
       log.push(...appended);

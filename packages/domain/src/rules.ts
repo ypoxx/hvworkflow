@@ -53,6 +53,25 @@ export interface RuleEntry {
   readonly legalRef: LegalRef;
 }
 
+/** Internal meeting lifecycle decisions from slice 025, not externally verified legal rules. */
+const MEETING_RULES: readonly RuleEntry[] = ([
+  ['R-MTG-01', 'Übergang', 'A meeting id may be created only once; creation starts preparation at version 1.', 18],
+  ['R-MTG-02', 'Übergang', 'A meeting starts from preparation and closes from running; debate end is separate.', 19],
+  ['R-MTG-03', 'Guard', 'After debate close, only grounded earlier paper or transcript with a reason can be captured.', 20],
+  ['R-MTG-04', 'Übergang', 'A running meeting may open an agenda item once.', 21],
+  ['R-MTG-05', 'Übergang', 'Voting may open only after its agenda item opens, and only once.', 22],
+  ['R-MTG-06', 'Übergang', 'Voting may close only after it opens, and only once.', 23],
+] as const).map(([ruleId, kind, description, line]) => ({
+  ruleId, kind, description,
+  legalRef: {
+    source: 'Leitplanken',
+    citation: `docs/slices/025-jahrgang-lebenszyklus.md:${line} (R-MTG-Tabelle; interne Ablaufentscheidung, keine extern bestätigte Rechtsnorm).`,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+}));
+
 /**
  * Rule ids that are neither a `TRANSITIONS` row nor a `Guard` (Festlegung 1): the transition
  * resolver's own conflict rule, the three permission rules `hasPermission`/`can()` use
@@ -333,5 +352,5 @@ export function ruleRegister(): readonly RuleEntry[] {
     }
   }
 
-  return [...fromTransitions, ...fromGuards, ...OTHER_RULES].sort((a, b) => a.ruleId.localeCompare(b.ruleId));
+  return [...fromTransitions, ...fromGuards, ...OTHER_RULES, ...MEETING_RULES].sort((a, b) => a.ruleId.localeCompare(b.ruleId));
 }

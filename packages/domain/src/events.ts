@@ -42,10 +42,18 @@ export type MeetingCreated = Base<
     title: string;
     legalEntity?: string;
     date: string;
+    /** Written on new creations since 025; absent on older logs that were already running. */
+    lifecycleVersion?: 2;
     agendaItems: { id: string; number: number; title: string }[];
     units: { id: string; name: string; shortName?: string }[];
   }
 >;
+export type MeetingStarted = Base<'MeetingStarted', Record<string, never>>;
+export type MeetingClosed = Base<'MeetingClosed', Record<string, never>>;
+export type DebateClosed = Base<'DebateClosed', Record<string, never>>;
+export type AgendaItemOpened = Base<'AgendaItemOpened', { agendaItemId: string; number: number }>;
+export type VotingOpened = Base<'VotingOpened', { agendaItemId: string; number: number }>;
+export type VotingClosed = Base<'VotingClosed', { agendaItemId: string; number: number }>;
 export type SpeakerRegistered = Base<
   'SpeakerRegistered',
   {
@@ -63,7 +71,7 @@ export type SpeakerUpdated = Base<
 >;
 export type ContributionCaptured = Base<
   'ContributionCaptured',
-  { speakerId: string; text: string; source: 'manual' | 'transcript' }
+  { speakerId: string; text: string; source: 'manual' | 'transcript' | 'paper'; lateEntry?: boolean; lateEntryReason?: string }
 >;
 export type QuestionCaptured = Base<
   'QuestionCaptured',
@@ -90,6 +98,12 @@ export type QuestionMerged = Base<'QuestionMerged', { intoQuestionId: string }>;
 
 export type DomainEvent =
   | MeetingCreated
+  | MeetingStarted
+  | MeetingClosed
+  | DebateClosed
+  | AgendaItemOpened
+  | VotingOpened
+  | VotingClosed
   | SpeakerRegistered
   | SpeakersReordered
   | SpeakerUpdated

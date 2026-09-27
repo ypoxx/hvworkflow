@@ -15,6 +15,7 @@ import type {
 } from './types.js';
 import { QUESTION_STATUSES } from './types.js';
 import { computeCoverage } from './coverage.js';
+import { resolveAgendaProgress, resolveMeetingLifecycle } from './transitions.js';
 
 export interface State {
   meeting: Meeting | null;
@@ -91,13 +92,26 @@ function touch(q: QuestionRecord, at: string): void {
 /** Apply one event. Mutates `state` in place for speed; callers treat the result as the new state. */
 export function reduce(state: State, e: DomainEvent): State {
   state.lastSeq = e.seq;
+  // The unscoped demo alias follows the latest meeting even when an older meeting receives
+  // another event later in the same global log. Scoped projections already filter by meetingId.
+  if (e.type !== 'MeetingCreated' && state.meeting && e.meetingId !== state.meeting.id) return state;
   switch (e.type) {
     case 'MeetingCreated': {
+      if (state.meeting?.id === e.subjectId) throw new Error('R-MTG-01: meeting already exists.');
+      // The unscoped demo alias follows the newest meeting; canonical readers project one
+      // meeting at a time from the same global event log.
+      state.speakers = new Map();
+      state.contributions = new Map();
+      state.questions = new Map();
+      state.stageCounter = 0;
       state.meeting = {
         id: e.subjectId,
         title: e.payload.title,
         date: e.payload.date,
-        status: 'running',
+        // A pre-025 MeetingCreated has no lifecycle marker: preserve the running projection
+        // without mutating its hashed event or synthesising a second event in the global log.
+        status: e.payload.lifecycleVersion === 2 ? 'preparation' : 'running',
+        version: 1,
         currentRound: 1,
         counts: { speakers: 0, questions: 0, open: 0, staged: 0, delivered: 0, byStatus: Object.fromEntries(QUESTION_STATUSES.map((st) => [st, 0])) as Record<QuestionStatus, number> },
         ...(e.payload.legalEntity !== undefined ? { legalEntity: e.payload.legalEntity } : {}),
@@ -106,12 +120,51 @@ export function reduce(state: State, e: DomainEvent): State {
       state.units = e.payload.units.map((u) => ({ ...u }));
       break;
     }
+    case 'MeetingStarted': {
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-02: meeting does not exist here.');
+      const transition = resolveMeetingLifecycle(state.meeting, e.type);
+      if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
+      state.meeting.status = transition.to;
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
+      break;
+    }
+    case 'MeetingClosed': {
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-02: meeting does not exist here.');
+      const transition = resolveMeetingLifecycle(state.meeting, e.type);
+      if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
+      state.meeting.status = transition.to;
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
+      break;
+    }
+    case 'DebateClosed': {
+      if (state.meeting?.id === e.subjectId) {
+        state.meeting.debateClosedAt = e.recordedAt ?? e.at;
+        state.meeting.version = (state.meeting.version ?? 1) + 1;
+      }
+      break;
+    }
+    case 'AgendaItemOpened':
+    case 'VotingOpened':
+    case 'VotingClosed': {
+      if (state.meeting?.id !== e.subjectId) throw new Error('R-MTG-04: meeting does not exist here.');
+      const item = state.agendaItems.find((a) => a.id === e.payload.agendaItemId);
+      if (!item) throw new Error('R-MTG-04: agenda item does not exist here.');
+      const transition = resolveAgendaProgress(state.meeting, item, e.type);
+      if (!transition.ok) throw new Error(`${transition.ruleId}: ${transition.reason}`);
+      const at = e.recordedAt ?? e.at;
+      if (e.type === 'AgendaItemOpened') item.openedAt = at;
+      else if (e.type === 'VotingOpened') item.votingOpenedAt = at;
+      else item.votingClosedAt = at;
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
+      break;
+    }
     case 'SpeakerRegistered': {
       // Events written before slice 080 may still carry the kind (Art) and the speaking time; they stay in
       // the log untouched (rule 7), the projection just no longer reads them.
       const p = e.payload;
       state.speakers.set(e.subjectId, {
         id: e.subjectId,
+        ...(e.meetingId !== undefined ? { meetingId: e.meetingId } : {}),
         number: p.number,
         displayName: p.displayName,
         round: p.round,
@@ -150,10 +203,13 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'ContributionCaptured': {
       state.contributions.set(e.subjectId, {
         id: e.subjectId,
+        ...(e.meetingId !== undefined ? { meetingId: e.meetingId } : {}),
         speakerId: e.payload.speakerId,
         text: e.payload.text,
         capturedAt: e.at,
         source: e.payload.source,
+        ...(e.occurredAtSource !== undefined && e.occurredAtSource !== 'server' ? { occurredAt: e.occurredAt, occurredAtSource: e.occurredAtSource } : {}),
+        ...(e.payload.lateEntry === true ? { lateEntry: true } : {}),
         questionIds: [],
         coverage: computeCoverage(e.payload.text.length, []),
       });
@@ -164,6 +220,7 @@ export function reduce(state: State, e: DomainEvent): State {
       const speaker = state.speakers.get(p.speakerId);
       state.questions.set(e.subjectId, {
         id: e.subjectId,
+        ...(e.meetingId !== undefined ? { meetingId: e.meetingId } : {}),
         number: p.number,
         contributionId: p.contributionId,
         speakerId: p.speakerId,

@@ -77,14 +77,21 @@ function cyrb53(str: string, seed = 0): string {
 }
 
 function fingerprintOf(events: readonly unknown[]): string {
-  // Scheibe 021c: remove only the inserted clearance facts and restore the former approving
-  // persona. Clearance ids and timestamps live outside the old counters, so equality with the
-  // pinned pre-021c fingerprint proves the original seed bytes and RNG sequence were preserved.
+  // Scheibe 021c: remove inserted clearance facts and restore the former approving persona.
+  // Scheibe 025: remove the lifecycle fact, marker and explicit meetingId, all absent
+  // from the historical fixture. The pinned fingerprint still proves the RNG sequence.
   const before021c = (events as DomainEvent[])
-    .filter((event) => event.type !== 'QuestionLegalCleared')
-    .map((event) => event.type === 'QuestionApproved'
-      ? { ...event, actor: SEED_ACTORS.legal! }
-      : event);
+    .filter((event) => event.type !== 'QuestionLegalCleared' && event.type !== 'MeetingStarted')
+    .map((event) => {
+      const { meetingId: _meetingId, ...historical } = event;
+      if (event.type === 'MeetingCreated') {
+        const { lifecycleVersion: _lifecycleVersion, ...payload } = event.payload;
+        return { ...historical, payload };
+      }
+      return event.type === 'QuestionApproved'
+        ? { ...historical, actor: SEED_ACTORS.legal! }
+        : historical;
+    });
   return cyrb53(maskNames(JSON.stringify(before021c)));
 }
 
