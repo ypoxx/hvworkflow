@@ -1,6 +1,7 @@
 # Scheibe 025 — Jahrgang, Lebenszyklus und Tagesordnung
 
-**Status:** im Bau · **Risiko:** hoch · **Lanes:** core, service
+**Status:** im Bau · **Lanes:** core, service
+**Risikoklasse:** hoch
 **Grundlage:** AGENTS.md R1–R8, R11–R12; ADR 0011; Vertrag 0.3.3 aus takt-019; `docs/produktplan-beta.md` Abschnitt 5, 025; R-MTG-01..06.
 
 ## Ziel
