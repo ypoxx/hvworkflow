@@ -152,6 +152,35 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     expect(allowed.status).toBe(200);
   });
 
+  it('keeps a committed idempotency key separate for two meetings in the same service', async () => {
+    const secondMeetingId = 'hv-2028';
+    const secondMeeting = createInMemoryEventStore({ load: () => [...fixtureEvents()], save: () => undefined }).append([{
+      id: 'create-2028', type: 'MeetingCreated', at, actor,
+      subjectId: secondMeetingId, meetingId: secondMeetingId,
+      payload: { title: 'Zweite synthetische HV', date: '2028-04-20', agendaItems: [], units: [] },
+    } as NewEvent]);
+    await insertEvents(secondMeeting);
+
+    const instance = app(poolA, 'two-meetings');
+    const request = (id: string, name: string) => instance.request(`/v1/meetings/${id}/speakers`, {
+      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
+        'Idempotency-Key': 'same-key' },
+      body: JSON.stringify({ displayName: name, round: 1 }),
+    });
+    const first = await request(meetingId, 'Person A');
+    const second = await request(secondMeetingId, 'Person B');
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const firstBody = await first.json() as { id: string };
+    const secondBody = await second.json() as { id: string };
+    expect(secondBody.id).not.toBe(firstBody.id);
+    expect((await events()).filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
+      .toEqual([meetingId, secondMeetingId]);
+    const replay = await request(meetingId, 'Ignored retry');
+    expect((await replay.json() as { id: string }).id).toBe(firstBody.id);
+    expect((await events()).filter((event) => event.type === 'SpeakerRegistered')).toHaveLength(2);
+  });
+
   it('rolls back a failed insert and does not publish a projection or an idempotency result', async () => {
     const secret = 'postgres-driver-secret-027';
     await owner.query(`CREATE FUNCTION fail_event_insert() RETURNS trigger LANGUAGE plpgsql AS $$

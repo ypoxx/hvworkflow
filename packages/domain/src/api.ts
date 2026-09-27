@@ -428,12 +428,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   };
   /**
    * Wrap a write so that an idempotency key replays the first result instead of re-executing.
-   * The key is scoped to the calling actor and the operation (R-IDEM-01): a replay by another actor
-   * or against another resource is a new request and goes through the permission check again.
+   * The key is scoped to the meeting, calling actor and operation (R-IDEM-01): a replay by another
+   * actor or against another resource is a new request and goes through the permission check again.
    */
   const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
-    const scoped = key !== undefined ? `${actor().id}|${scope}|${key}` : undefined;
+    const meetingScope = options.meetingId ?? state.meeting?.id ?? 'none';
+    const scoped = key !== undefined ? `${meetingScope}|${actor().id}|${scope}|${key}` : undefined;
     if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
     const priorKey = activeIdempotencyKey;
     activeIdempotencyKey = key;
