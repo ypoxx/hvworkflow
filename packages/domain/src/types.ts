@@ -39,8 +39,10 @@ export const PERMISSIONS = [
   'speaker.update',
   'speaker.read',
   'contribution.capture',
+  'contribution.claim',
   'contribution.read',
   'question.capture',
+  'question.claim',
   'question.classify',
   'question.assign',
   'answer.draft',
@@ -126,7 +128,8 @@ export interface Meeting {
   legalEntity?: string;
   date: string; // ISO date
   status: 'preparation' | 'running' | 'closed';
-  version?: number;
+  version: number;
+  speakerListVersion: number;
   debateClosedAt?: string;
   pseudonymiseForUnits?: boolean;
   currentRound: number;
@@ -208,6 +211,7 @@ export interface Speaker extends SpeakerRecord {
 
 export interface Contribution {
   id: string;
+  version: number;
   meetingId?: string;
   speakerId: string;
   text: string;
@@ -218,6 +222,14 @@ export interface Contribution {
   lateEntry?: boolean;
   questionIds: string[];
   coverage: { coveredRatio: number; uncovered: TextSpan[] };
+  claim?: Claim;
+}
+
+export interface Claim {
+  actorId: string;
+  personId?: string;
+  claimedAt: string;
+  expiresAt: string;
 }
 
 export interface AnswerVersion {
@@ -265,6 +277,7 @@ export interface QuestionRecord {
   version: number;
   createdAt: string;
   updatedAt: string;
+  claim?: Claim;
 }
 /** A question as returned by the API: record plus the actions the calling actor may take now. */
 export interface Question extends QuestionRecord {

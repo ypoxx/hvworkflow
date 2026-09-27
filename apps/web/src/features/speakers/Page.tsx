@@ -27,7 +27,7 @@ import { NowSpeaking } from './NowSpeaking';
 import { RoundSection } from './RoundSection';
 import { ROW_COLUMNS } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
-import { useSpeakers } from './useSpeakers';
+import { moveSpeakerToRound, useSpeakers } from './useSpeakers';
 import { RegisterDialog } from './RegisterDialog';
 
 /** The failed-write message: title from the problem, fallback from the dictionary. */
@@ -63,7 +63,7 @@ function SkeletonRows() {
 export function SpeakersPage() {
   const t = useT();
   const meeting = useMeeting();
-  const { status, speakers, reload } = useSpeakers();
+  const { status, speakers, listVersion, reload } = useSpeakers();
 
   // While a reorder is in flight the list shows the new order; the refetch then confirms it.
   const [override, setOverride] = useState<readonly Speaker[] | null>(null);
@@ -210,23 +210,13 @@ export function SpeakersPage() {
 
   const register = useCallback(
     async (input: SpeakerRegistration): Promise<boolean> =>
-      run('new', () => api.registerSpeaker(input)),
-    [run],
+      listVersion === null ? false : run('new', () => api.registerSpeaker(input, { ifMatch: etagOf(listVersion) })),
+    [run, listVersion],
   );
 
   const move = useCallback(
     async (speaker: Speaker, round: number): Promise<boolean> =>
-      run(speaker.id, async () => {
-        await api.updateSpeaker(speaker.id, { round }, { ifMatch: etagOf(speaker.version) });
-        // The dialog promises the end of the round, so the positions of the target round are
-        // written once more with this Wortmeldung appended.
-        if (speaker._actions.includes('speaker.reorder')) {
-          const target = viewRef.current
-            .filter((s) => s.round === round && s.id !== speaker.id)
-            .map((s) => s.id);
-          await api.reorderSpeakers(round, [...target, speaker.id]);
-        }
-      }),
+      run(speaker.id, () => moveSpeakerToRound(api, speaker, round)),
     [run],
   );
 
@@ -292,12 +282,16 @@ export function SpeakersPage() {
 
       let cursor = 0;
       setOverride(list.map((s) => (s.round === moved.round ? reordered[cursor++]! : s)));
-      // No `ifMatch`: the order is a property of the round, not of one Wortmeldung, and the
-      // contract's reorder takes the whole sequence of ids.
+      // The order is a property of the entire meeting's speaker list, including other rounds.
+      if (listVersion === null) {
+        setOverride(null);
+        return;
+      }
       api
         .reorderSpeakers(
           moved.round,
           reordered.map((s) => s.id),
+          { ifMatch: etagOf(listVersion) },
         )
         .catch((error: unknown) => {
           showProblem(error, problemTitle());
@@ -305,7 +299,7 @@ export function SpeakersPage() {
           reload();
         });
     },
-    [reload],
+    [reload, listVersion],
   );
 
   const registerButton = mayRegister ? (

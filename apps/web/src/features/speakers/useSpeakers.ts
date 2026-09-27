@@ -4,7 +4,8 @@
  * (`useApiVersion`), and on demand after a refused write.
  */
 import { useCallback, useEffect, useState } from 'react';
-import type { Speaker } from '@hv/domain';
+import { etagOf } from '@hv/domain';
+import type { HvApi, Speaker } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -16,6 +17,7 @@ export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden';
 export interface SpeakersState {
   status: LoadStatus;
   speakers: readonly Speaker[];
+  listVersion: number | null;
   reload: () => void;
 }
 
@@ -44,6 +46,29 @@ export function isReadForbidden(error: unknown): boolean {
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 
+/** Pair rows with the list version by bracketing the read with two monotone version reads. */
+export async function readStableSpeakerList(
+  client: Pick<HvApi, 'getMeeting' | 'listSpeakers'>,
+): Promise<{ speakers: readonly Speaker[]; version: number }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const before = (await client.getMeeting()).speakerListVersion;
+    const speakers = await client.listSpeakers();
+    const after = (await client.getMeeting()).speakerListVersion;
+    if (before === after) return { speakers, version: after };
+  }
+  throw new Error(translate(getLang(), 'speakers.list.changed'));
+}
+
+/** Re-read the target round after the move; a fresh tag must never validate an old order. */
+export async function moveSpeakerToRound(client: HvApi, speaker: Speaker, round: number): Promise<void> {
+  await client.updateSpeaker(speaker.id, { round }, { ifMatch: etagOf(speaker.version) });
+  if (!speaker._actions.includes('speaker.reorder')) return;
+  const { speakers, version } = await readStableSpeakerList(client);
+  const target = speakers.filter((item) => item.round === round && item.id !== speaker.id)
+    .map((item) => item.id);
+  await client.reorderSpeakers(round, [...target, speaker.id], { ifMatch: etagOf(version) });
+}
+
 export function useSpeakers(): SpeakersState {
   const version = useApiVersion();
   const [token, setToken] = useState(0);
@@ -55,7 +80,7 @@ export function useSpeakers(): SpeakersState {
    * until the new role has answered; the page shows its skeleton instead. A newer `version` of the
    * same actor keeps the rows on screen while it loads (nothing jumps, design principle 8).
    */
-  const [list, setList] = useState<{ key: string; speakers: readonly Speaker[] } | null>(null);
+  const [list, setList] = useState<{ key: string; speakers: readonly Speaker[]; version: number } | null>(null);
 
   /**
    * Slice 010c, Ziel 4: every answer used to be set as it came — ready, refused and failed alike —
@@ -74,11 +99,10 @@ export function useSpeakers(): SpeakersState {
     let cancelled = false;
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
-    api
-      .listSpeakers()
-      .then((next) => {
+    readStableSpeakerList(api)
+      .then(({ speakers: next, version: listVersion }) => {
         if (!isCurrentLoad(requested, current())) return;
-        setList({ key: requested, speakers: next });
+        setList({ key: requested, speakers: next, version: listVersion });
         setRead({ key: requested, status: 'ready' });
       })
       .catch((error: unknown) => {
@@ -86,7 +110,7 @@ export function useSpeakers(): SpeakersState {
         if (isReadForbidden(error)) {
           // Ziel 1 (slice 010b): a gestalteter Zustand, not an error toast — the Wortmeldeliste
           // is simply not readable in this role.
-          setList({ key: requested, speakers: NO_SPEAKERS });
+          setList({ key: requested, speakers: NO_SPEAKERS, version: 0 });
           setRead({ key: requested, status: 'forbidden' });
           return;
         }
@@ -109,7 +133,8 @@ export function useSpeakers(): SpeakersState {
       ? 'loading'
       : read.status;
   const speakers = list !== null && keyBelongsTo(list.key, actorId) ? list.speakers : NO_SPEAKERS;
-  return { status, speakers, reload };
+  const listVersion = list !== null && keyBelongsTo(list.key, actorId) && status === 'ready' ? list.version : null;
+  return { status, speakers, listVersion, reload };
 }
 
 /**

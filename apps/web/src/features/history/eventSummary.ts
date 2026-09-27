@@ -124,6 +124,13 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
         }),
       );
       break;
+    case 'ContributionClaimed':
+    case 'ContributionReleased':
+    case 'QuestionClaimed':
+    case 'QuestionReleased':
+    case 'IdempotencyRecorded':
+      // The event label is enough; command keys and claim actors are not repeated in the summary.
+      break;
   }
 
   return parts.join(' · ');

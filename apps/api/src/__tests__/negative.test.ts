@@ -15,6 +15,9 @@ import { expectValid, expectValidProblem } from '../contractSchema.ts';
 // Classify and assign belong to coordination since slice 021b (helpers.ts is outside that slice's
 // files, so the token lives here: `id:role` as in ACTOR).
 const COORDINATION = 'coord:coordination';
+async function speakerListTag(app: App): Promise<string> {
+  return (await req(app, 'GET', '/v1/speakers', { actor: ACTOR.moderation })).headers.get('ETag')!;
+}
 
 describe('negative cases and idempotency', () => {
   let app: App;
@@ -101,6 +104,7 @@ describe('negative cases and idempotency', () => {
 
     const res = await req(app, 'POST', `/v1/questions/${q.id}/approvals`, {
       actor: ACTOR.approver,
+      headers: { 'If-Match': `"v${q.version}"` },
       body: { answerVersion: 1 },
     });
     expect(res.status).toBe(409);
@@ -116,12 +120,20 @@ describe('negative cases and idempotency', () => {
     const q = items.find((x: { track?: string }) => x.track !== undefined && x.track !== 'podium');
     expect(q).toBeDefined();
 
-    const draftRes = await req(app, 'POST', `/v1/questions/${q.id}/answers`, { actor: ACTOR.legal, body: { text: 'Entwurf von Recht.' } });
+    const draftRes = await req(app, 'POST', `/v1/questions/${q.id}/answers`, {
+      actor: ACTOR.legal, headers: { 'If-Match': `"v${q.version}"` }, body: { text: 'Entwurf von Recht.' },
+    });
     expect(draftRes.status).toBe(200);
-    const submitRes = await req(app, 'POST', `/v1/questions/${q.id}/review-submissions`, { actor: ACTOR.expert });
+    const drafted = await draftRes.json();
+    const submitRes = await req(app, 'POST', `/v1/questions/${q.id}/review-submissions`, {
+      actor: ACTOR.expert, headers: { 'If-Match': `"v${drafted.version}"` },
+    });
     expect(submitRes.status).toBe(200);
 
-    const res = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, { actor: ACTOR.legal, body: { answerVersion: 1 } });
+    const submitted = await submitRes.json();
+    const res = await req(app, 'POST', `/v1/questions/${q.id}/legal-clearances`, {
+      actor: ACTOR.legal, headers: { 'If-Match': `"v${submitted.version}"` }, body: { answerVersion: 1 },
+    });
     expect(res.status).toBe(409);
     const problem = await res.json();
     expectValid('clearQuestionLegally', 409, problem, 'application/problem+json');
@@ -156,11 +168,13 @@ describe('negative cases and idempotency', () => {
   it('422: capturing a contribution with blank text is rejected', async () => {
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': await speakerListTag(app) },
       body: { displayName: 'Leerprobe', kind: 'shareholder' },
     });
     const speaker = await speakerRes.json();
     const res = await req(app, 'POST', '/v1/contributions', {
       actor: ACTOR.capture,
+      headers: { 'If-Match': `"v${speaker.version}"` },
       body: { speakerId: speaker.id, text: '   ' },
     });
     expect(res.status).toBe(422);
@@ -202,14 +216,19 @@ describe('negative cases and idempotency', () => {
 
   it('409: finished → speaking is refused by the speaker state table with ruleId R-SPK-00 (slice 080)', async () => {
     const created = await (
-      await req(app, 'POST', '/v1/speakers', { actor: ACTOR.moderation, body: { displayName: 'Zustandsprobe' } })
+      await req(app, 'POST', '/v1/speakers', { actor: ACTOR.moderation,
+        headers: { 'If-Match': await speakerListTag(app) }, body: { displayName: 'Zustandsprobe' } })
     ).json();
+    let speakerVersion = created.version as number;
     for (const status of ['speaking', 'finished'] as const) {
-      const ok = await req(app, 'PATCH', `/v1/speakers/${created.id}`, { actor: ACTOR.moderation, body: { status } });
+      const ok = await req(app, 'PATCH', `/v1/speakers/${created.id}`, { actor: ACTOR.moderation,
+        headers: { 'If-Match': `"v${speakerVersion}"` }, body: { status } });
       expect(ok.status).toBe(200);
+      speakerVersion = (await ok.json()).version as number;
     }
     const res = await req(app, 'PATCH', `/v1/speakers/${created.id}`, {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': `"v${speakerVersion}"` },
       body: { status: 'speaking' },
     });
     expect(res.status).toBe(409);
@@ -231,6 +250,7 @@ describe('negative cases and idempotency', () => {
 
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
+      headers: { 'If-Match': await speakerListTag(app) },
       body: { displayName: 'Fine', kind: 'shareholder' },
     });
     const speaker = await speakerRes.json();
@@ -278,7 +298,7 @@ describe('negative cases and idempotency', () => {
     const key = `idem-${q.id}`;
     const first = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: COORDINATION,
-      headers: { 'Idempotency-Key': key },
+      headers: { 'Idempotency-Key': key, 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     expect(first.status).toBe(200);
@@ -286,7 +306,7 @@ describe('negative cases and idempotency', () => {
 
     const second = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: COORDINATION,
-      headers: { 'Idempotency-Key': key },
+      headers: { 'Idempotency-Key': key, 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     expect(second.status).toBe(200);
@@ -308,7 +328,7 @@ describe('negative cases and idempotency', () => {
     const key = `cross-actor-${q.id}`;
     const byA = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: COORDINATION,
-      headers: { 'Idempotency-Key': key },
+      headers: { 'Idempotency-Key': key, 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     expect(byA.status).toBe(200);
@@ -331,7 +351,7 @@ describe('negative cases and idempotency', () => {
     // The classifying actor replaying its own key still gets the original, unchanged result.
     const byAAgain = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: COORDINATION,
-      headers: { 'Idempotency-Key': key },
+      headers: { 'Idempotency-Key': key, 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     expect(byAAgain.status).toBe(200);
@@ -419,7 +439,7 @@ describe('negative cases and idempotency', () => {
     const key = `expert-replay-${q.id}`;
     const byCoordination = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
       actor: COORDINATION,
-      headers: { 'Idempotency-Key': key },
+      headers: { 'Idempotency-Key': key, 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
     expect(byCoordination.status).toBe(200);

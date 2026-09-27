@@ -292,7 +292,37 @@ async function switchActor(page: Page, role: string): Promise<void> {
  * page; the outcome is polled.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
-  await elsewhere(page, 'registerSpeaker', [{ displayName: name }]);
+  const version = await currentVersionAsAdmin(page, 'getMeeting', 'speakerListVersion');
+  await elsewhere(page, 'registerSpeaker', [{ displayName: name }, { ifMatch: `"v${version}"` }]);
+}
+
+/** Read the exact resource version before an out-of-view write; restore the actor before awaiting. */
+async function currentVersionAsAdmin(
+  page: Page,
+  method: 'getMeeting' | 'getQuestion',
+  field: 'speakerListVersion' | 'version',
+  id?: string,
+): Promise<number> {
+  return page.evaluate(
+    ([actorUrl, name, key, resourceId]) => {
+      const w = window as unknown as Harness;
+      const mod = w.__modules[actorUrl] as {
+        DEMO_ACTORS: readonly { id: string }[];
+        getActor: () => unknown;
+        setActor: (actor: unknown) => void;
+      };
+      const before = mod.getActor();
+      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
+      let read: Promise<unknown>;
+      try {
+        read = w.__original[name]!(...(resourceId === undefined ? [] : [resourceId]));
+      } finally {
+        mod.setActor(before);
+      }
+      return read.then((resource) => (resource as Record<string, number>)[key]!);
+    },
+    [ACTOR_MODULE, method, field, id] as const,
+  );
 }
 
 /**
@@ -723,8 +753,10 @@ async function approveAThenChangeElsewhere(
   await expect(page.getByTestId('answers-detail-number')).toHaveText(first);
   await page.getByTestId('answer-legal-clear').click();
   await expect.poll(() => callCount(page, 'clearQuestionLegally')).toBe(1);
-  await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.']);
-  await elsewhere(page, 'submitForReview', [firstId]);
+  const beforeReturn = await currentVersionAsAdmin(page, 'getQuestion', 'version', firstId);
+  await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.', { ifMatch: `"v${beforeReturn}"` }]);
+  const beforeReview = await currentVersionAsAdmin(page, 'getQuestion', 'version', firstId);
+  await elsewhere(page, 'submitForReview', [firstId, { ifMatch: `"v${beforeReview}"` }]);
   return { first, second, rowB };
 }
 

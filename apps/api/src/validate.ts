@@ -32,6 +32,8 @@ export function validateOperation(operationId: string) {
     for (const spec of paramsFor(operationId)) {
       if (spec.in !== 'query' && spec.in !== 'header') continue;
       const raw = spec.in === 'query' ? c.req.query(spec.name) : c.req.header(spec.name);
+      // The domain checks an absent required If-Match after rights, 404 masking and replay.
+      // A present malformed header is still rejected here as 422 before the handler.
       if (raw === undefined) continue;
       const { value, errors } = validateParam(spec, raw);
       if (errors) {

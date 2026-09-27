@@ -52,6 +52,7 @@ export const speakersEn: typeof speakersDe = {
   'speakers.loading': 'Loading the speakers list',
   'speakers.error.title': 'The speakers list could not be loaded',
   'speakers.error.body': 'The corpus cannot be reached at the moment.',
+  'speakers.list.changed': 'The speakers list changed while loading. Please reload.',
   'speakers.readonly.hint': 'Read only in this role',
   // Slice 010b (read paths in the interface): the state a 403 R-PERM-02/03 on `listSpeakers`
   // renders instead of a toast (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).

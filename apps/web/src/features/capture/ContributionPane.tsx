@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert } from 'lucide-react';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
-import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, cx } from '../../components';
+import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, StaleBanner, cx } from '../../components';
 import { useActor } from '../../api/actor';
 import { actionLabel, useLang, useT } from '../../i18n';
 import { ContributionText } from './ContributionText';
@@ -49,10 +49,12 @@ export interface ContributionPaneProps {
   loading: boolean;
   failed: boolean;
   onRetry: () => void;
+  stale: boolean;
+  onReloadStale: () => void;
   canCapture: boolean;
   writing: boolean;
   onWrite: (text: string) => Promise<boolean>;
-  onCaptureQuestions: (questions: QuestionCapture[]) => void;
+  onCaptureQuestions: (questions: QuestionCapture[]) => Promise<boolean>;
   onOpenSuggest: () => void;
   /** The Einzelfragen of this Redebeitrag, in card order — `ContributionText` numbers its markers by it. */
   questions: readonly Question[];
@@ -70,6 +72,8 @@ export function ContributionPane({
   loading,
   failed,
   onRetry,
+  stale,
+  onReloadStale,
   canCapture,
   writing,
   onWrite,
@@ -116,6 +120,7 @@ export function ContributionPane({
   // A second activation before React has re-rendered `writing` (e.g. two clicks in one task) must
   // not write the same Redebeitrag twice.
   const submitting = useRef(false);
+  const submittingFree = useRef(false);
 
   const speaker = speakers.find((s) => s.id === speakerId);
   // Without a Redebeitrag there is nothing to read, so the desk starts writing straight away.
@@ -154,13 +159,16 @@ export function ContributionPane({
     }
   };
 
-  const addFree = (): void => {
-    if (free.trim() === '') return;
-    onCaptureQuestions([{ text: free.trim() }]);
-    setFree('');
-    // takt-008: emptying the field disables "Hinzufügen" — had it held focus, focus would fall to
-    // `<body>`. It goes back to the field, where the next Einzelfrage is typed.
-    freeInput.current?.focus();
+  const addFree = async (): Promise<void> => {
+    if (free.trim() === '' || submittingFree.current) return;
+    submittingFree.current = true;
+    try {
+      if (await onCaptureQuestions([{ text: free.trim() }])) setFree('');
+      // The draft remains in the field on 412/428 so the operator can compare it after reload.
+      freeInput.current?.focus();
+    } finally {
+      submittingFree.current = false;
+    }
   };
 
   return (
@@ -198,7 +206,7 @@ export function ContributionPane({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
-                    addFree();
+                    void addFree();
                   }
                 }}
               />
@@ -208,7 +216,7 @@ export function ContributionPane({
               variant="secondary"
               data-testid="capture-free-add"
               disabled={free.trim() === ''}
-              onClick={addFree}
+              onClick={() => void addFree()}
               className="h-8"
             >
               {t('capture.free.add')}
@@ -227,6 +235,16 @@ export function ContributionPane({
         ) : undefined
       }
     >
+      {stale && (
+        <StaleBanner
+          testId="capture-stale-banner"
+          message={t('capture.stale.banner')}
+          onReload={() => {
+            onReloadStale();
+            freeInput.current?.focus();
+          }}
+        />
+      )}
       <div className="shrink-0 border-b border-line px-4 py-3">
         <div className="flex items-end gap-3">
           <Field label={t('capture.speaker.label')} htmlFor={`${ids}-speaker`} className="flex-1">

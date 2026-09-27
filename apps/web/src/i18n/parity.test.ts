@@ -153,13 +153,14 @@ describe('i18n parity checks', () => {
   // Scheibe 021c: +7 keys (five answer labels, one action and one event).
   // Scheibe 024: +3 boot.legacy keys for the explicit demo-log reset in both languages.
   // Scheibe 026: +4 action/event keys for identity reveal and role assignments.
-  it('(f) Total key count is 475 across all modules and matches de and en', () => {
+  // Scheibe 028: +9 conflict, claim and receipt labels across capture, speakers and shell.
+  it('(f) Total key count is 484 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(475);
-    expect(deKeys).toBe(475);
-    expect(enKeys).toBe(475);
+    expect(totalKeys).toBe(484);
+    expect(deKeys).toBe(484);
+    expect(enKeys).toBe(484);
   });
 });

@@ -26,6 +26,9 @@ interface Base<T extends string, P> {
   schemaVersion?: 2;
   meetingId?: string;
   idempotencyKey?: string;
+  commandId?: string;
+  commandOperation?: string;
+  commandResource?: string;
   causationId?: string;
   prevHash?: string;
   hash?: string;
@@ -102,6 +105,11 @@ export type QuestionDelivered = Base<'QuestionDelivered', { answerVersion?: numb
 export type QuestionClosed = Base<'QuestionClosed', Record<string, never>>;
 export type QuestionWithdrawn = Base<'QuestionWithdrawn', { reason: string }>;
 export type QuestionMerged = Base<'QuestionMerged', { intoQuestionId: string }>;
+export type ContributionClaimed = Base<'ContributionClaimed', { actorId: string; personId?: string; claimedAt: string; expiresAt: string }>;
+export type ContributionReleased = Base<'ContributionReleased', Record<string, never>>;
+export type QuestionClaimed = Base<'QuestionClaimed', { actorId: string; personId?: string; claimedAt: string; expiresAt: string }>;
+export type QuestionReleased = Base<'QuestionReleased', Record<string, never>>;
+export type IdempotencyRecorded = Base<'IdempotencyRecorded', Record<string, never>>;
 
 export type DomainEvent =
   | MeetingCreated
@@ -129,13 +137,18 @@ export type DomainEvent =
   | QuestionDelivered
   | QuestionClosed
   | QuestionWithdrawn
-  | QuestionMerged;
+  | QuestionMerged
+  | ContributionClaimed
+  | ContributionReleased
+  | QuestionClaimed
+  | QuestionReleased
+  | IdempotencyRecorded;
 
 export type EventType = DomainEvent['type'];
 
 /** Standard read projection. sourceHash identifies the immutable original, not this redacted JSON. */
 export type ReadEvent = DomainEvent extends infer E
-  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId'> & { redacted: true; sourceHash: string } : never
+  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string } : never
   : never;
 
 /** An event before it is appended: the store assigns `seq`. */

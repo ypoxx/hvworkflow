@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
-import { translate } from '../../i18n';
+import { eventTypeLabel, translate } from '../../i18n';
 import { eventSubject, eventSummary, type SummaryContext } from './eventSummary';
 
 const t = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
@@ -65,5 +65,21 @@ describe('history speaker summary', () => {
 
     expect(eventSummary(t, assigned, empty)).toBe('Freigabe');
     expect(eventSummary(t, revoked, empty)).toBe('Freigabe');
+  });
+});
+
+describe('Scheibe 028: neutrale technische Historie', () => {
+  it('names a durable no-op receipt without exposing its key or command scope', () => {
+    expect(eventTypeLabel(t, 'IdempotencyRecorded')).toBe('Schreibvorgang bestätigt');
+    const receipt = {
+      ...speakerEvent,
+      type: 'IdempotencyRecorded' as const,
+      subjectId: 'speaker-1',
+      idempotencyKey: 'private-client-key',
+      commandOperation: 'updateSpeaker',
+      commandResource: 'speaker-1',
+      payload: {},
+    };
+    expect(eventSummary(t, receipt, context(new Map()))).toBe('');
   });
 });

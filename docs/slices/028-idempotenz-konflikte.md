@@ -1,0 +1,174 @@
+# Scheibe 028 — dauerhafte Idempotenz, Versionskonflikte und Übernahme
+
+**Status:** gebaut, unabhängig geprüft · **Lanes:** core, contract, web-capture, service
+**Risikoklasse:** hoch · **Rolle:** Implementierer-Backend; unabhängiges Review in frischem Kontext mit Perspektive Konsistenz, Rechte und Datenschutz  
+**Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/028; Vertrag 0.3.5 aus 027; ADR 0001, 0002, 0003, 0009, 0011, 0013, 0015; R-IDEM-01; Register E36 auf seiner Standardannahme. 023, 024, 026 und 027 sind integriert. Die Notfallkonten aus 029 liegen ausdrücklich nach der internen Beta.
+
+## Architekturentscheidungen vor Bau
+
+### Versionsquelle und `If-Match`
+
+Eine Änderung vergleicht genau die Ressource, deren Stand sie als Eingabe benutzt. Der ETag ist weiterhin `"v<version>"`; ein fehlender erforderlicher Header ergibt 428, ein vorhandener unpassender 412, jeweils **ohne Ereignis**. Ein syntaktisch ungültiger Header bleibt 422. Rechte und die 404-Maskierung fremder bzw. unlesbarer IDs werden vor der Versionsauskunft geprüft; ein 428/412 verrät keinen fremden Bestand. Nach erfolgreicher Autorisierung wird eine Idempotenzwiederholung vor dem Versionsvergleich erkannt, damit ein alter `If-Match` den Replay nicht verhindert. Bei einem neuen gültigen Aufruf folgt die Versionsprüfung **vor** Zustands-/Claim-Guards: ein fehlender Header darf nicht als 409 eines fachlich ungültigen Übergangs versteckt werden. Die Vertragsprüfung eines fehlerhaften Bodys darf vorher 422 liefern. Im Postgres-Pfad geschieht das nach dem transaktionsgebundenen Advisory-Lock und dem frischen Snapshot aus 027.
+
+| Schreibvorgang, Alias und kanonischer Pfad gleichermaßen | Vergleichsstand vor dem Schreiben | Lesepfad/Antwort für den nächsten Wert |
+|---|---|---|
+| `registerSpeaker`, `registerMeetingSpeaker`, `reorderSpeakers`, `reorderMeetingSpeakers` | Version der **gesamten Wortmeldeliste dieses Jahrgangs**, nicht einer einzelnen Wortmeldung | `GET /speakers` und `GET /meetings/{id}/speakers` behalten die Array-Antwort und liefern den Listen-ETag; `Meeting.speakerListVersion` macht denselben projizierten Zähler über `getMeeting`/`getMeetingById` für den In-Process-`HvApi` zugänglich. Schreibantworten liefern den neuen Listen-ETag. |
+| `updateSpeaker` | `Speaker.version` | `getSpeaker` und die Sprecherzeile; Antwort mit neuem Sprecher-ETag. |
+| `captureContribution`, `captureMeetingContribution` | `Speaker.version` des referenzierten Redners, da ein noch nicht angelegter Redebeitrag keine eigene Version besitzt | `getSpeaker` bzw. Sprecherzeile; die Erfassung erhöht dessen Version und antwortet mit `Contribution.version`/ETag für die folgende Atomisierung. |
+| `captureQuestions` | `Contribution.version` | `getContribution` mit ETag; jede angehängte `QuestionCaptured` erhöht die Redebeitragsversion. Die HTTP-Antwort enthält zusätzlich den neuen Redebeitrags-ETag, ohne die bestehende Fragen-Arrayform zu ändern. |
+| `claimContribution`, `releaseContribution` | `Contribution.version` | `getContribution`, Claim-/Release-Antwort mit neuem ETag. |
+| Frageübergänge einschließlich `claimQuestion`, `releaseQuestion` | `Question.version` | `getQuestion`, Antwort mit neuem ETag. **Ausnahme:** `deliverQuestion` behält den bestehenden optionalen `If-Match`-Check; 049 führt den laut Plan maßgeblichen Antwortversions-Hash ein. 028 behauptet für einen Aufruf ohne Header noch keine gleichwertige Konfliktsicherung. |
+
+Agenda- und Rollenzuordnungsaktionen sind keine Vorgangs-, Redebeitrags- oder Wortmeldungsoperationen dieser Scheibe. Ihr bisheriger optionaler `If-Match` und `Meeting.version` aus 025 bleiben erhalten; die für 040 vorab deklarierten Administrationsaktionen werden nicht vorgezogen.
+
+`speakerListVersion` beginnt je Jahrgang bei 1 und wird ausschließlich aus gespeicherten Ereignissen projiziert. Sie steigt, wenn sich die ausgegebene Wortmeldeliste ändert: `SpeakerRegistered`, `SpeakerUpdated`, `SpeakersReordered`, `ContributionCaptured` (Sprecherversion) und `QuestionCaptured` (questionCount/Sprecherversion). Ein Mehrereignis-Aufruf darf die Version pro Ereignis erhöhen; maßgeblich ist der nach dem ganzen Aufruf zurückgegebene Stand. `Speaker.version` steigt entsprechend auch bei Redebeitrags- und Frageerfassung, `Contribution.version` beginnt bei 1 und steigt bei jeder Frage sowie Claim/Release. Ein Claim-Ablauf ohne Ereignis ändert **keinen** Versionszähler. Historische Logs werden durch dieselbe Projektion gelesen, nie umgeschrieben. Ein `GET` mit ETag und der zugehörige In-Process-Wert müssen denselben Zähler liefern. Der Listen-ETag ist jahrgangsweit, nicht rundenweise; ein Schreiber in einer anderen Runde erhält bei inzwischen geänderter Liste ebenfalls 412.
+
+### Dauerhafte Wiederholung aus dem Ereignislog
+
+Die Quelle der Wahrheit für einen erfolgreich abgeschlossenen Idempotenzschlüssel ist das append-only Log, nicht `committedIdempotency` aus 027. R-IDEM-01 wird als `(meetingId, actor.id, fachliche Operation, Ressourcen-Scope, Idempotency-Key)` definiert. Alias und kanonischer Pfad derselben Fachoperation teilen den Scope; ein gleicher Schlüssel bei anderem Akteur, Jahrgang, Vorgang oder anderer Fachoperation wiederholt **nicht** dessen Ergebnis. Ein Schlüssel mit geändertem Body im gleichen Scope liefert das zuerst bestätigte fachliche Ergebnis gemäß bestehender Vertragszusage; weder ein zweites Ereignis noch eine zweite Anlage entsteht. Schlüssel bleiben optional und auf 128 Zeichen begrenzt.
+
+Neue Ereignisse eines Aufrufs tragen außer `idempotencyKey` eine nicht personenbezogene Befehlskennung und einen stabilen fachlichen Operations-/Ressourcen-Scope im Umschlag. Alle `QuestionCaptured` eines Atomisierungsaufrufs teilen diese Kennung und werden als **eine** bestätigte Antwort rekonstruiert. Der letzte `seq` des zusammenhängenden Befehls begrenzt die historische Projektion des ursprünglichen Ergebnisses; spätere Änderungen dürfen einen Replay weder in eine neue Anlage noch in den inzwischen veränderten Fachstand verwandeln. Ein erfolgreiches No-op **mit Idempotency-Key**, etwa ein akzeptierter leerer `updateSpeaker`, erhält ein eigenes technisches, append-only Idempotenzbeleg-Ereignis ohne Fach- oder Versionsänderung; sonst wäre dieser Erfolg nach Neustart nicht aus dem Log rekonstruierbar. Ohne Schlüssel bleibt ein No-op ereignislos. Der neue Ereignistyp und die optionalen Befehlsfelder stehen im Vertrag, im Changelog und in den generierten Typen; sie enthalten weder Body noch Frage-/Antworttext noch Klarnamen. Die interne Befehlskennung und der Scope werden in `EventRead` maskiert (dessen Schema verbietet ohnehin zusätzliche Felder); der technische Ereignistyp erhält nur eine neutrale Ereignisbezeichnung und keine Schlüsseldarstellung in der Historie. Ältere v2-Ereignisse mit Schlüssel, aber ohne Befehlskennung, werden anhand von Akteur, Jahrgang, Ereignistyp, Subject und zusammenhängenden `seq` deterministisch gelesen; ist ein historischer Mehrdeutigkeitsfall nicht beweisbar, stoppt der Replay mit einem festen Konflikt statt erneut zu schreiben. Bereits gespeicherte Hashes werden nie verändert.
+
+Die Prüfung der **heutigen** Rolle und Rechte geht jedem Replay voraus. Nach `RoleRevoked`, Ablauf oder Jahrgangsschluss bleibt die 026-Regel maßgeblich: derselbe Schlüssel liefert 403, niemals eine alte Antwort oder alte `_actions`. Bei weiter gültigem Recht werden fachliche IDs, Versionsstand und Status des ursprünglichen Commit wiedergegeben; aktorabhängige Namen und `_actions` werden für den aktuellen berechtigten Akteur maskiert bzw. neu berechnet. Diese Einschränkung der bisherigen pauschalen Formulierung „original result“ wird ausdrücklich im 0.3.6-Vertrag dokumentiert. Ein fehlgeschlagener Aufruf, 412, 428 oder zurückgerollter Postgres-Commit reserviert keinen Schlüssel. Der Dienst darf einen optionalen, begrenzten Beschleunigungscache benutzen; ein Prozessneustart oder zweiter Prozess muss ausschließlich aus dem bestätigten Log korrekt antworten. Für JSONL gilt dieselbe Rekonstruktion beim Start, für die Demo nach dem Laden ihres gültigen v2-Logs.
+
+### Übernahme als sichtbare, weiche Sperre
+
+`ContributionClaimed`/`ContributionReleased` und `QuestionClaimed`/`QuestionReleased` sind neue, append-only Ereignisse. Claim und Release sind die vier bereits in 0.3.0 deklarierten Operationen aus der 028-Allowlist. Ein Claim hält `actorId`, gegebenenfalls `personId`, `claimedAt` und `expiresAt = claimedAt + 10 Minuten`, ausschließlich aus der injizierten Serveruhr. `expiresAt` wird aus dem Ereignis projiziert; sobald `now >= expiresAt`, erscheint kein aktiver Claim mehr, ohne Lösch- oder Ablaufereignis. Derselbe Inhaber darf mit neuem `If-Match` verlängern (neues Claim-Ereignis); ein anderer erhält während der Laufzeit 409 mit Regel-ID. Release ist nur durch den aktuellen Inhaber vor Ablauf möglich, sonst 409; ein späteres Claim nach Ablauf gelingt mit der unveränderten, zuletzt **geschriebenen** Version. Fachliche Schreibrechte und die Frage-Zustandstabelle bleiben maßgeblich: der Claim blockiert **keinen** erlaubten Fachschreibvorgang und ersetzt weder Rechte noch 412. Der Claim ist eine Präsenzanzeige, keine automatische Personenzuweisung; die Einheit bleibt wie in E36 der Verantwortungsanker. Rollennamen erscheinen im Code nur in `ROLE_PERMISSIONS` und im Demo-Umschalter.
+
+**Role-×-Action-Diff vor Bau:**
+
+| Rolle | `contribution.claim` | `question.claim` |
+|---|:---:|:---:|
+| `moderation` | nein | nein |
+| `capture` | ja | nein |
+| `coordination` | nein | nein |
+| `expert` | nein | ja |
+| `legal` | nein | ja |
+| `approver` | nein | nein |
+| `podium` | nein | nein |
+| `admin` | nein | nein |
+| `observer` | nein | nein |
+
+Für `admin` muss die heutige allgemeine `PERMISSIONS`-Ableitung diese beiden neuen Rechte ausdrücklich ausschließen. Alle sonstigen Rechtezellen bleiben unverändert. Der generierte Diff und Positiv-/Negativtests sind Review-Gegenstand. Damit baut 028 bezüglich E36 erkennbar auf der Register-Standardannahme statt auf einer behaupteten Mitbestimmungsentscheidung.
+
+### Vertragsgrenze 0.3.6
+
+`openapi.yaml` bleibt die Wahrheit. 0.3.6 führt erforderliche `If-Match`-Parameter **je betroffener Operation** und die 428-Problemantwort ein; der gemeinsame Parameter wird nicht global auf `required: true` gesetzt, weil `deliverQuestion`, andere Operationen und vorab deklarierte 040-Aktionen eine andere Grenze haben. 412/428 werden für Alias und kanonischen Pfad dokumentiert. `Contribution.version`, `Meeting.version`, `Meeting.speakerListVersion` und die seit 0.3.0 ausdrücklich für 028 als künftig verpflichtend markierten `meetingId`-Felder auf Speaker, Contribution und Question werden Pflicht. Für das **gespeicherte `Event`** sind alle neun mit „Pflicht ab 0.3.6“ bezeichneten Felder erforderlich: `schemaVersion`, `meetingId`, `prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`. `stampEvent` liefert sie bereits; die Schema-`required`-Liste und die Prüfungen für neue und hochgezogene Ereignisse werden darauf angeglichen. Bedingt sinnvolle Felder (`claim`, `personId`, `occurredAt` auf einem Redebeitrag, `lateEntry`, `configFrozenAt`, `causationId`, `idempotencyKey`) werden **nicht** pauschal Pflicht. Alte gespeicherte JSONL-v1-Ereignisse werden beim Laden wie in 024 hochgezogen; das HTTP-`EventRead` bleibt die maskierte Projektion aus 026 und darf gerade `hash`/`prevHash` nicht enthalten. Es ist ein eigenes Leseschema und erhält keine der neun `Event`-Pflichten bloß durch deren neuen Status.
+
+Die Pflichtfelder und Pflichtheader ändern das bisherige 0.3.5-Verhalten. Das ist eine **geplante Beta-Vertragsausnahme** innerhalb 0.3.x, die der Produktplan ausdrücklich auf 0.3.6 legt. ADR 0015 fordert Semver und für Brüche einen ADR-Verweis: der 0.3.6-Changelog nennt diese Abweichung mit Verweis auf ADR 0015, den Plan und diese Spec samt betroffenem Migrationsfenster; sie wird weder als rein additive Patchänderung noch als bereits partnerkompatibel ausgegeben. Der Benutzer- und Partnerbetrieb hat noch nicht begonnen. Falls vor dem Bau ein realer 0.3.5-Partner nachgewiesen wird, ist die Vertragsfreigabe erneut zu entscheiden; 028 wird dann nicht still unter anderer Semver-Regel implementiert. Vertrags-Typen werden mit `pnpm contract:types` erzeugt. Nur die vier `slice: "028"`-Allowlist-Einträge entfallen nach gemounteten, getesteten Routen.
+
+## Bedrohungsfälle und Nachweis
+
+- **T-G1-T-03 / B9, verlorene Änderung:** Zwei Personen lesen denselben Redebeitrag bzw. dieselbe Wortmeldeliste. Im echten Zwei-Schreiber-Test schreibt eine; die zweite bekommt nach frischem Snapshot 412, ohne zweites Fachereignis oder stillen Überschreibeffekt. Fehlender Header ergibt 428. Ein Claim ändert daran nichts.
+- **T-G1-I-07, Replay als Datenleck; R-IDEM-01:** Ein fremder Akteur bzw. Jahrgang sendet denselben Schlüssel und erhält keinen ursprünglichen Inhalt. Ein inzwischen widerrufener Inhaber erhält 403. Die Antwort maskiert Namen und `_actions` nach den heutigen Rechten.
+- **T-G1-D-02, ungebundener Cache:** Der Replay-Index ist aus dem Log ableitbar; kein zusätzlich unbegrenzt wachsender Ergebnis-Cache ist nötig. Das 128-Zeichen-Limit bleibt. Die allgemeine HTTP-Rate-Grenze folgt in 034.
+- **T-G2-T-02/T-03 und T-G2-R-01, Teilcommit und Neustart:** Der Beleg und alle Fachereignisse eines Befehls werden in derselben 027-Transaktion bestätigt. Rollback verwirft beides. Zwei Dienstprozesse lesen nach dem Lock denselben bestätigten Stand; `seq` und Hash-Kette bleiben lückenlos und werden beim Neustart verifiziert.
+- **Missbrauchsfall MF-05, Claim als scheinbare Sperre:** Ein Inhaber lässt eine Übernahme offen oder versucht, durch Gerätezeit die Frist zu verlängern. Nur die Serveruhr zählt; nach zehn Minuten sieht die Projektion keinen aktiven Claim und ein anderer darf übernehmen. Der Fachschreibpfad bleibt unabhängig. Signal sind die Claim-/Release-Ereignisse mit Subject und Zeit ohne Klarnamen oder Text; Betriebsauswertung/Alarm folgen 033/085.
+
+## Nicht-Ziele
+
+Keine echte Anmeldung oder Session-Sperrliste (029b), keine Notfallkonten (029 nach Fortführungsentscheidung), keine harte Bearbeitungssperre, keine automatische Zuweisung einer Person, keine Offline-Entwürfe oder Merge-Ansicht (054), kein Antwortversions-Hash für „Vorgelesen“ (049), keine Vertragsoperationen aus 040, keine Realtime-/SSE-Implementierung (035), keine Readiness-Timeout-Nacharbeit aus dem 027-Review, kein Deploy und keine realen Personendaten.
+
+## Files allowed
+
+- `docs/slices/028-idempotenz-konflikte.md`
+- `packages/contract/openapi.yaml`, `packages/contract/package.json`, `packages/contract/CHANGELOG.md`, `packages/contract/src/types.ts` (nur aus OpenAPI generiert), `packages/contract/allowlist.json` (nur 028-Einträge)
+- `packages/domain/src/{api.ts,events.ts,state.ts,types.ts,permissions.ts,rules.ts,index.ts}` (nur Versionen, Replay, Claims, Rechte und Exporte), `packages/domain/src/store.ts` und `packages/domain/src/envelope.ts` (nur Befehlsbeleg, validierte Umschlagfelder und Kettenprüfung)
+- `packages/domain/src/__tests__/{idempotency028.test.ts,claims028.test.ts,api.test.ts,envelope.test.ts,rules.test.ts,transitions.test.ts,legal-clearance.test.ts,meeting025.test.ts,person-roles026.test.ts}` (Bestandstests nur für explizite aktuelle Vergleichsversionen und neue Pflichtfelder/Regeln anpassen), `packages/domain/policy-truth-table.md` (nur generierter Diff der Claim-Rechte)
+- `apps/api/src/{app.ts,http.ts,validate.ts,contractSchema.ts}` (nur Header/ETag, neue Routen, 428 und Replay-Grenze), `apps/api/src/__tests__/{idempotency028.test.ts,claims028.test.ts,postgres028.test.ts,contract.test.ts,helpers.ts,negative.test.ts,acceptance.test.ts,legal-clearance.test.ts,meeting025.test.ts,person-roles026.test.ts,postgres027.test.ts,read-rights.test.ts,takt-019-contract.test.ts}` (Bestandstests nur für die 0.3.6-Grenze und die feste Versionsassertion anpassen)
+- `apps/web/src/features/capture/{Page.tsx,useCapture.ts,useCapture.test.ts,ContributionPane.tsx,ContributionText.tsx,SuggestDialog.tsx}` (nur Vergleichsversion, 412/428-Aktualisierung, StaleBanner-/Refetch-Zustand und Erhalt nicht bestätigter Eingaben), `apps/web/src/features/speakers/{Page.tsx,useSpeakers.ts}` (nur Listenstand und Konfliktaktualisierung)
+- `apps/web/src/features/history/{eventSummary.ts,eventSummary.test.ts}` (nur neue Eventtypen ohne Anzeige technischer Schlüssel oder personenbezogener Daten), `apps/web/src/i18n/{capture.de.ts,capture.en.ts,speakers.de.ts,speakers.en.ts,shell.de.ts,shell.en.ts,labels.ts,parity.test.ts}` (nur neue Meldungen/Ereignisse; diese Modulnamen existieren), `apps/web/e2e/{028-konflikte.spec.ts,010b-lesepfade.spec.ts,010c-lesezustand.spec.ts,010d-ansichtsdaten.spec.ts}` (bestehende direkte In-Process-Schreib-Fixtures nur für explizite aktuelle Vergleichsversionen), `docs/evidence/028-capture-stale.png`
+- `docs/rollen-und-rechtekonzept.md` (nur Claim-Rechte und weiche Sperre), `docs/legal-trace.md` (nur generierte neue Regelzeilen), `docs/folgeliste.md` (Erledigung des 026-P2 zu Replay nach Rollenablauf und nicht blockierende Befunde aus dem unabhängigen 028-Review), `docs/produktplan-beta.md` (nur eine nötige Klarstellung der 028-ETag-/Vertragsausnahme; kein neuer Scheibenschnitt)
+
+Weitere Dateien sind ein Scope-Befund und benötigen vor Änderung eine Spec-Ergänzung. Das `rg`-Inventar der direkten Schreibaufrufe umfasst gerade die oben einzeln genannten bestehenden Domänen-, HTTP- und E2E-Dateien; `demo-lock.test.ts` prüft die vorgelagerte Anmeldung, `takt-016-contract.test.ts` nur ein Body-Schema und braucht dafür keine pauschale 028-Freigabe. Insbesondere bleiben 027-Persistenzmigrationen und Readiness-Code unangetastet; der Postgres-Test aus 028 verwendet den bestehenden Adapter. Die betroffenen Bestands-Fixtures lesen ihren **aktuellen** Listen-, Sprecher-, Redebeitrags- oder Fragenstand und übergeben dessen `ifMatch`/`If-Match` ausdrücklich am jeweiligen Aufruf. `apps/api/src/__tests__/helpers.ts` bleibt Vertrags- und Coverage-Helper; er ergänzt weder implizit einen Header noch errät er eine Version. Tests für 428 lassen den Header absichtlich weg. Auch E2E-Injektionen über `__original`/`elsewhere` senden selbst eine gelesene Version, statt `HvApi` global zu patchen.
+
+## Tests zuerst und Abnahme
+
+1. **Rot vor Bau:** Vertrags- und Domänentests für jede Zeile der ETag-Tabelle: fehlend 428, falsch 412, passend Erfolg mit neuem ETag; kein Ereignis bei 428/412; 404/403 vor Versionsauskunft; Alias und kanonischer Pfad gleich. Projektion von zwei Jahrgängen und historischen v2-/JSONL-v1-Fällen. Kontrakttests beweisen die ausdrücklich erforderlichen Felder, 428-Antworten, die `deliverQuestion`-Ausnahme und die unveränderten Arrayantworten.
+2. **Rot vor Bau:** Ein und derselbe Schlüssel über Neustart und zwei Prozesse liefert dieselben angelegten IDs sowie den ursprünglichen fachlichen Stand bei null zusätzlichen Ereignissen; `captureQuestions` mit mehreren Ereignissen wiederholt als ein Ergebnis. Ein zurückgerollter Commit oder 412 reserviert nichts. Anderer Akteur, Jahrgang, Ressource und Operation wiederholen nicht. Rollenentzug/Ablauf vor Retry ergibt 403. Akzeptierter No-op ist nach Neustart belegbar. Ein unbeweisbar mehrdeutiger historischer Schlüssel führt zu festem Fehler ohne Neubau.
+3. **Rot vor Bau:** Zwei echte Postgres-Schreiber mit gleichem Redebeitrags- bzw. Listen-ETag: genau ein `captureQuestions`/`reorderSpeakers` bestätigt, der andere 412; nach Neustart lückenlose `seq`/Hash-Kette und korrekte Versionen. Claims: Erstübernahme, zweiter Akteur 409, Verlängerung, Inhaber-Release, Fremd-Release 409, Ablaufgrenze mit injizierter Uhr, erneute Übernahme; Fachschreiben bleibt trotz fremdem Claim nach Rechten/ETag möglich. Positiver und negativer Role-×-Action-Test plus generierter Wahrheitstabellen-Diff.
+4. **Web:** Erfassung sendet den angezeigten `Contribution.version` bei `captureQuestions`. Auf 412 zeigt sie `StaleBanner`, bewahrt den noch nicht bestätigten Eingabetext und bietet Neuladen der Redebeitrags-/Fragenstände; kein stilles Zweitschreiben und keine Toast-Duplikate. Wortmeldeliste verwendet ihren gemeinsamen Versionstag für Registrierung/Sortierung, aktualisiert ihn nach Erfolg und lädt bei 412 neu. DE/EN-Parität, Tastatur-/Fokusverhalten und ein Screenshot der Erfassungswarnung werden geprüft.
+5. **Abschluss:** Alle vier 028-Operationen werden im HTTP-Test ausgeübt und aus der Allowlist entfernt; Vertrag 0.3.6, Changelog und generierte Typen stimmen. `pnpm gates` läuft auf sauberem Baucommit, vollständige E2E-Suite und echte Postgres-Integration sind grün. Unabhängiges Review in frischem Kontext; Blocker/Major und jede Security-/Legal-/Privacy-Frage vor Merge klären, übrige Funde nach AGENTS.md in die Folgeliste. PR-CI auf letztem Commit grün. Jeder Baucommit nennt „Scheibe 028“ und endet `[skip netlify]`. Kein Deploy.
+
+## Bericht (nach Bau ausfüllen)
+
+Slice: 028-idempotenz-konflikte  
+Done: Vertrag 0.3.6, erforderliche Vergleichsversionen, dauerhafte Idempotenz und weiche Übernahme sind umgesetzt.
+Die Erfassung und Wortmeldeliste behandeln 412/428 sichtbar; die unabhängigen P1-Befunde zum Listenstand sind behoben und eng nachgeprüft.
+Tests zuerst: rote Vertrags-, Kern-, Dienst- und Oberflächentests vor den Baucommits; Postgres-Testdaten nach rotem CI-Lauf korrigiert.
+Evidence: `pnpm gates` auf sauberem Baucommit `e988372` (Exit 0), wörtlicher Schluss:
+
+```text
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 429ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit e988372, tree 21cd3b2f9eba…
+```
+
+Vollständige lokale Browser-E2E-Suite: 127/127 grün (Chromium, 3,2 min). GitHub-CI-Lauf 36345608665: Postgres-Migrationen, Grants und Transaktionsintegration sowie allgemeine Gates und Sicherheitschecks grün; die CI-E2E wurde beim nachfolgenden Bericht-Commit abgelöst. Ein vollständig grüner CI-Lauf auf dem letzten PR-Commit bleibt Merge-Bedingung. Generierter Claim-Rechte-Diff: `packages/domain/policy-truth-table.md`; Screenshot: `docs/evidence/028-capture-stale.png`.
+Open: Der P2-Reviewbefund zum gemeinsam gespeicherten Antwort-ETag im In-Memory-/JSONL-HTTP-Pfad steht für einen gebündelten Folgedurchgang in `docs/folgeliste.md`; er hält nach AGENTS.md Regel 3 den Merge nicht auf. 049 ergänzt den maßgeblichen Antwortversions-Hash für „Vorgelesen“, 054 die Offline-/Merge-Ansicht, 029b die echte Beta-Anmeldung; diese Funktionen liegen außerhalb von 028. Kein Deploy.
+Touched:
+- `apps/api/src/__tests__/acceptance.test.ts`
+- `apps/api/src/__tests__/claims028.test.ts`
+- `apps/api/src/__tests__/contract.test.ts`
+- `apps/api/src/__tests__/idempotency028.test.ts`
+- `apps/api/src/__tests__/legal-clearance.test.ts`
+- `apps/api/src/__tests__/meeting025.test.ts`
+- `apps/api/src/__tests__/negative.test.ts`
+- `apps/api/src/__tests__/person-roles026.test.ts`
+- `apps/api/src/__tests__/postgres027.test.ts`
+- `apps/api/src/__tests__/postgres028.test.ts`
+- `apps/api/src/__tests__/read-rights.test.ts`
+- `apps/api/src/__tests__/takt-019-contract.test.ts`
+- `apps/api/src/app.ts`
+- `apps/api/src/validate.ts`
+- `apps/web/e2e/010b-lesepfade.spec.ts`
+- `apps/web/e2e/010c-lesezustand.spec.ts`
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts`
+- `apps/web/e2e/028-konflikte.spec.ts`
+- `apps/web/src/features/capture/ContributionPane.tsx`
+- `apps/web/src/features/capture/ContributionText.tsx`
+- `apps/web/src/features/capture/Page.tsx`
+- `apps/web/src/features/capture/useCapture.test.ts`
+- `apps/web/src/features/capture/useCapture.ts`
+- `apps/web/src/features/history/eventSummary.test.ts`
+- `apps/web/src/features/history/eventSummary.ts`
+- `apps/web/src/features/speakers/Page.tsx`
+- `apps/web/src/features/speakers/useSpeakers.ts`
+- `apps/web/src/i18n/capture.de.ts`
+- `apps/web/src/i18n/capture.en.ts`
+- `apps/web/src/i18n/labels.ts`
+- `apps/web/src/i18n/parity.test.ts`
+- `apps/web/src/i18n/shell.de.ts`
+- `apps/web/src/i18n/shell.en.ts`
+- `apps/web/src/i18n/speakers.de.ts`
+- `apps/web/src/i18n/speakers.en.ts`
+- `docs/evidence/028-capture-stale.png`
+- `docs/folgeliste.md`
+- `docs/legal-trace.md`
+- `docs/produktplan-beta.md`
+- `docs/rollen-und-rechtekonzept.md`
+- `docs/slices/028-idempotenz-konflikte.md`
+- `packages/contract/CHANGELOG.md`
+- `packages/contract/allowlist.json`
+- `packages/contract/openapi.yaml`
+- `packages/contract/package.json`
+- `packages/contract/src/types.ts`
+- `packages/domain/policy-truth-table.md`
+- `packages/domain/src/__tests__/api.test.ts`
+- `packages/domain/src/__tests__/claims028.test.ts`
+- `packages/domain/src/__tests__/envelope.test.ts`
+- `packages/domain/src/__tests__/idempotency028.test.ts`
+- `packages/domain/src/__tests__/legal-clearance.test.ts`
+- `packages/domain/src/__tests__/meeting025.test.ts`
+- `packages/domain/src/__tests__/person-roles026.test.ts`
+- `packages/domain/src/__tests__/transitions.test.ts`
+- `packages/domain/src/api.ts`
+- `packages/domain/src/envelope.ts`
+- `packages/domain/src/events.ts`
+- `packages/domain/src/permissions.ts`
+- `packages/domain/src/rules.ts`
+- `packages/domain/src/state.ts`
+- `packages/domain/src/types.ts`

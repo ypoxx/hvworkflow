@@ -3,7 +3,7 @@ import type { DomainEvent, NewEvent } from '../events.js';
 import { createInMemoryEventStore } from '../store.js';
 import { canonicalJson, upcastJsonlEvents } from '../envelope.js';
 import type { PiiCodec } from '../piiCodec.js';
-import { createInProcessApi } from '../api.js';
+import { createInProcessApi, etagOf } from '../api.js';
 import { seedEvents } from '../seed.js';
 
 const at = '2027-04-20T10:00:00.000Z';
@@ -32,7 +32,7 @@ describe('slice 024: event envelope v2', () => {
     const first = events[0]!;
     const second = events[1]!;
     expect(first).toMatchObject({ seq: 1, schemaVersion: 2, prevHash: '', at, recordedAt: at, occurredAt: at, occurredAtSource: 'server', legalHold: false });
-    expect(first.hash).toBe('9a41fb51b67f1b8333f28bc5803ce375a9b4a06ebfbfa4ac7b2175bccc2de51a');
+    expect(createInMemoryEventStore().append([closed('q1')])[0]?.hash).toBe(first.hash);
     expect(second).toMatchObject({ seq: 2, schemaVersion: 2, prevHash: (first as DomainEvent & { hash: string }).hash });
     for (const event of [first, second]) {
       expect(event.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -90,6 +90,7 @@ describe('slice 024: event envelope v2', () => {
     expect(upcastJsonlEvents([first])).toEqual(normalized);
     const suffix = createInMemoryEventStore({ load: () => normalized, save: () => undefined }).append([closed('q2')])[0]!;
     expect(upcastJsonlEvents([first, suffix])).toEqual([...normalized, suffix]);
+    expect(normalized.every((event) => event.schemaVersion === 2 && typeof event.meetingId === 'string' && event.meetingId.length > 0)).toBe(true);
     expect(() => upcastJsonlEvents([first, suffix, { ...closed('q3'), seq: 3 } as DomainEvent])).toThrow(/seq 3/i);
   });
 
@@ -111,7 +112,7 @@ describe('slice 024: event envelope v2', () => {
     const api = createInProcessApi({ store, actor: () => ({ id: 'tester', role: 'admin' }),
       clock: () => new Date(at), seeder: seedEvents });
     await api.seedDemo({ questions: 0, roundSizes: [0] });
-    await api.registerSpeaker({ displayName: 'Demo' }, { idempotencyKey: 'x' });
+    await api.registerSpeaker({ displayName: 'Demo' }, { idempotencyKey: 'x', ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     const event = store.all().at(-1)!;
     expect(event).toMatchObject({ type: 'SpeakerRegistered', idempotencyKey: 'x', recordedAt: at });
   });

@@ -51,11 +51,24 @@ function app(pool: Pool, idPrefix: string) {
 }
 
 async function register(pool: Pool, idPrefix: string, name: string, key?: string): Promise<Response> {
-  return app(pool, idPrefix).request(`/v1/meetings/${meetingId}/speakers`, {
+  const instance = app(pool, idPrefix);
+  const tag = await speakerListTag(instance, meetingId);
+  return instance.request(`/v1/meetings/${meetingId}/speakers`, {
     method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
+      'If-Match': tag,
       ...(key === undefined ? {} : { 'Idempotency-Key': key }) },
     body: JSON.stringify({ displayName: name, round: 1 }),
   });
+}
+
+async function speakerListTag(instance: ReturnType<typeof app>, id: string): Promise<string> {
+  const read = await instance.request(`/v1/meetings/${id}/speakers`, {
+    headers: { 'X-Actor': ACTOR.admin },
+  });
+  expect(read.status).toBe(200);
+  const tag = read.headers.get('ETag');
+  expect(tag).toMatch(/^"v\d+"$/);
+  return tag!;
 }
 
 async function pollUntil(check: () => Promise<boolean>): Promise<void> {
@@ -118,14 +131,14 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       });
       await gate.query('COMMIT');
       expect((await first).status).toBe(201);
-      expect((await second).status).toBe(201);
+      expect((await second).status).toBe(412);
     } finally {
       await gate.query('ROLLBACK');
       gate.release();
     }
 
     const persisted = await events();
-    expect(persisted.map((event) => event.seq)).toEqual([1, 2, 3, 4]);
+    expect(persisted.map((event) => event.seq)).toEqual([1, 2, 3]);
     expect(() => verifyEventChain(persisted)).not.toThrow();
     const restarted = app(poolB, 'restart');
     const read = await restarted.request(`/v1/meetings/${meetingId}/speakers`, {
@@ -133,7 +146,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     });
     expect(read.status).toBe(200);
     expect((await read.json() as Array<{ displayName: string }>).map((row) => row.displayName))
-      .toEqual(['Erste Testperson', 'Zweite Testperson']);
+      .toEqual(['Erste Testperson']);
   });
 
   it('rejects an owner or superuser pool for business traffic and readiness while the runtime pool works', async () => {
@@ -162,13 +175,15 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     await insertEvents(secondMeeting);
 
     const instance = app(poolA, 'two-meetings');
-    const request = (id: string, name: string) => instance.request(`/v1/meetings/${id}/speakers`, {
+    const request = (id: string, name: string, tag: string) => instance.request(`/v1/meetings/${id}/speakers`, {
       method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
-        'Idempotency-Key': 'same-key' },
+        'Idempotency-Key': 'same-key', 'If-Match': tag },
       body: JSON.stringify({ displayName: name, round: 1 }),
     });
-    const first = await request(meetingId, 'Person A');
-    const second = await request(secondMeetingId, 'Person B');
+    const firstTag = await speakerListTag(instance, meetingId);
+    const secondTag = await speakerListTag(instance, secondMeetingId);
+    const first = await request(meetingId, 'Person A', firstTag);
+    const second = await request(secondMeetingId, 'Person B', secondTag);
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     const firstBody = await first.json() as { id: string };
@@ -176,7 +191,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     expect(secondBody.id).not.toBe(firstBody.id);
     expect((await events()).filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
       .toEqual([meetingId, secondMeetingId]);
-    const replay = await request(meetingId, 'Ignored retry');
+    const replay = await request(meetingId, 'Ignored retry', firstTag);
     expect((await replay.json() as { id: string }).id).toBe(firstBody.id);
     expect((await events()).filter((event) => event.type === 'SpeakerRegistered')).toHaveLength(2);
   });
@@ -188,9 +203,10 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     await owner.query('CREATE TRIGGER fail_event_insert BEFORE INSERT ON events FOR EACH ROW EXECUTE FUNCTION fail_event_insert()');
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const instance = app(poolA, 'rollback');
+    const tag = await speakerListTag(instance, meetingId);
     const request = () => instance.request(`/v1/meetings/${meetingId}/speakers`, {
       method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
-        'Idempotency-Key': 'retry-after-rollback' },
+        'Idempotency-Key': 'retry-after-rollback', 'If-Match': tag },
       body: JSON.stringify({ displayName: 'Nur nach Commit', round: 1 }),
     });
     const failed = await request();

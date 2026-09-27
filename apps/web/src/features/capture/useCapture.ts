@@ -63,6 +63,12 @@ export function isReadForbidden(error: unknown): boolean {
   return status === 403 && (ruleId === 'R-PERM-02' || ruleId === 'R-PERM-03');
 }
 
+/** A lost optimistic-lock race or a missing required version needs an explicit reload. */
+export function isVersionConflict(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('status' in error)) return false;
+  return error.status === 412 || error.status === 428;
+}
+
 /**
  * One loader with the house's failure behaviour: the data on screen stays while the next answer is
  * fetched (nothing jumps, design principle 8) and a refused call becomes a toast — except a denied

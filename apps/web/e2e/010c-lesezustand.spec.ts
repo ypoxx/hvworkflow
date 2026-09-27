@@ -285,9 +285,26 @@ async function callCount(page: Page, method: string): Promise<number> {
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
   await installHarness(page);
+  const speakerListVersion = await page.evaluate((actorUrl) => {
+    const w = window as unknown as Harness;
+    const mod = w.__modules[actorUrl] as {
+      DEMO_ACTORS: readonly { id: string }[];
+      getActor: () => unknown;
+      setActor: (actor: unknown) => void;
+    };
+    const before = mod.getActor();
+    mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
+    let read: Promise<unknown>;
+    try {
+      read = w.__original['getMeeting']!();
+    } finally {
+      mod.setActor(before);
+    }
+    return read.then((meeting) => (meeting as { speakerListVersion: number }).speakerListVersion);
+  }, ACTOR_MODULE);
   // Synchronous on purpose: the evaluate awaits nothing in the page, the outcome is polled below.
   const index = await page.evaluate(
-    ([actorUrl, displayName]) => {
+    ([actorUrl, displayName, version]) => {
       const w = window as unknown as Harness;
       const mod = w.__modules[actorUrl!] as {
         DEMO_ACTORS: readonly { id: string }[];
@@ -298,7 +315,7 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
       let written: Promise<unknown>;
       try {
-        written = w.__original['registerSpeaker']!({ displayName });
+        written = w.__original['registerSpeaker']!({ displayName }, { ifMatch: `"v${version}"` });
       } finally {
         mod.setActor(before);
       }
@@ -311,7 +328,7 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
       );
       return at;
     },
-    [ACTOR_MODULE, name],
+    [ACTOR_MODULE, name, speakerListVersion] as const,
   );
   await expect
     .poll(() => page.evaluate((at) => (window as unknown as Harness).__writes[at], index))

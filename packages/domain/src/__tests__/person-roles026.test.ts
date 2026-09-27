@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createInProcessApi, type HvApi } from '../api.js';
+import { createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore } from '../store.js';
 import type { Actor, Permission } from '../types.js';
 import type { NewEvent } from '../events.js';
@@ -32,7 +32,7 @@ type RoleOps = HvApi & {
 describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
   it('keeps clear speaker names in marked PII and reveals them only through the new right', async () => {
     const { store, api, actor } = fixture();
-    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson', organisation: 'Testverein' });
+    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson', organisation: 'Testverein' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     const event = store.all().find((candidate) => candidate.type === 'SpeakerRegistered');
     expect(event?.personId).toBeTruthy();
     expect(event?.payload).not.toHaveProperty('displayName');
@@ -48,10 +48,10 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
 
   it('does not copy the clear name into a question visible without reveal', async () => {
     const { api, actor } = fixture();
-    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
+    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     actor({ id: 'demo-capture', role: 'capture' });
-    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Eine Frage.' });
-    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }]);
+    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Eine Frage.' }, { ifMatch: etagOf(speaker.version) });
+    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }], { ifMatch: etagOf(contribution.version) });
     expect(question?.speakerDisplayName).toBe('Redner 1');
     actor({ id: 'demo-mod', role: 'moderation' });
     expect((await api.getQuestion(question!.id)).speakerDisplayName).toBe('Synthetische Testperson');
@@ -84,13 +84,13 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
 
   it('bounds an assigned expert to their unit and expiry', async () => {
     const { api, actor } = fixture();
-    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
+    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     actor({ id: 'demo-capture', role: 'capture' });
-    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Frage an Fachbereich B.' });
-    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }]);
+    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Frage an Fachbereich B.' }, { ifMatch: etagOf(speaker.version) });
+    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }], { ifMatch: etagOf(contribution.version) });
     actor({ id: 'demo-coordination', role: 'coordination' });
-    await api.classifyQuestion(question!.id, { track: 'expert_track' });
-    await api.assignQuestion(question!.id, 'unit-a');
+    await api.classifyQuestion(question!.id, { track: 'expert_track' }, { ifMatch: etagOf(question!.version) });
+    await api.assignQuestion(question!.id, 'unit-a', { ifMatch: etagOf((await api.getQuestion(question!.id)).version) });
     actor(admin);
     await api.assignRole({ subjectId: 'expert-a', role: 'expert', unitId: 'unit-a' });
     await api.assignRole({ subjectId: 'expert-b', role: 'expert', unitId: 'unit-b' });
@@ -114,7 +114,7 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
 
   it('masks marked PII and personId in the standard event read path', async () => {
     const { api, actor, store } = fixture();
-    await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
+    await api.registerSpeaker({ displayName: 'Synthetische Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     actor(admin);
     const result = await api.listEvents();
     const speakerEvent = result.items.find((item) => item.type === 'SpeakerRegistered');
@@ -129,10 +129,10 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
 
   it('hides clear actor names from historical answer projections and event history', async () => {
     const { api, actor, store } = fixture();
-    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' });
+    const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     actor({ id: 'demo-capture', role: 'capture' });
-    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Frage.' });
-    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }]);
+    const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Frage.' }, { ifMatch: etagOf(speaker.version) });
+    const [question] = await api.captureQuestions(contribution.id, [{ text: 'Wie?' }], { ifMatch: etagOf(contribution.version) });
     store.append([{ id: 'old-answer', type: 'AnswerDrafted', at, actor: { id: 'old-expert', role: 'expert' },
       subjectId: question!.id, meetingId: 'hv-2027', payload: { answer: { version: 1, text: 'Antwort.',
         createdAt: at, createdBy: { id: 'old-expert', role: 'expert', displayName: 'Historischer Klarname', personId: 'person-old' } } } }] as NewEvent[]);

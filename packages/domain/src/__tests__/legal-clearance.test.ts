@@ -36,22 +36,22 @@ beforeEach(async () => {
 
 async function classified(track: Track): Promise<Question> {
   as(ACTORS.moderation);
-  const speaker = await api.registerSpeaker({ displayName: 'Testperson' });
+  const speaker = await api.registerSpeaker({ displayName: 'Testperson' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
   as(ACTORS.capture);
-  const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Warum?' });
+  const contribution = await api.captureContribution({ speakerId: speaker.id, text: 'Warum?' }, { ifMatch: etagOf(speaker.version) });
   const [question] = await api.captureQuestions(contribution.id, [
     { text: 'Warum?', span: { start: 0, end: 6 } },
-  ]);
+  ], { ifMatch: etagOf(contribution.version) });
   as(ACTORS.coordination);
-  return api.classifyQuestion(question!.id, { track });
+  return api.classifyQuestion(question!.id, { track }, { ifMatch: etagOf(question!.version) });
 }
 
 async function inReview(track: 'fast_track' | 'expert_track', drafter: Actor = ACTORS.expert): Promise<Question> {
   const question = await classified(track);
   as(drafter);
-  await api.draftAnswer(question.id, { text: 'Belastbare Antwort.' });
+  const drafted = await api.draftAnswer(question.id, { text: 'Belastbare Antwort.' }, { ifMatch: etagOf(question.version) });
   as(ACTORS.expert);
-  return api.submitForReview(question.id);
+  return api.submitForReview(question.id, { ifMatch: etagOf(drafted.version) });
 }
 
 describe('Scheibe 021c: legal clearance and stage gate', () => {
@@ -64,8 +64,8 @@ describe('Scheibe 021c: legal clearance and stage gate', () => {
     it(`${track}: staging requires legal clearance of the approved version`, async () => {
       const question = await inReview(track);
       as(ACTORS.approver);
-      await api.approveQuestion(question.id, 1);
-      await expect(api.stageQuestion(question.id)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
+      const approved = await api.approveQuestion(question.id, 1, { ifMatch: etagOf(question.version) });
+      await expect(api.stageQuestion(question.id, { ifMatch: etagOf(approved.version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
 
       const clearedQuestion = await inReview(track);
       as(ACTORS.legal);
@@ -73,21 +73,21 @@ describe('Scheibe 021c: legal clearance and stage gate', () => {
       expect(cleared.legalClearance).toMatchObject({ answerVersion: 1, clearedBy: ACTORS.legal });
       expect(cleared.status).toBe('in_review');
       as(ACTORS.approver);
-      await api.approveQuestion(clearedQuestion.id, 1);
-      expect((await api.stageQuestion(clearedQuestion.id)).status).toBe('staged');
+      const approvedAgain = await api.approveQuestion(clearedQuestion.id, 1, { ifMatch: etagOf(cleared.version) });
+      expect((await api.stageQuestion(clearedQuestion.id, { ifMatch: etagOf(approvedAgain.version) })).status).toBe('staged');
     });
   }
 
   it('podium: staging requires a clearance without an answer version', async () => {
     const question = await classified('podium');
     as(ACTORS.approver);
-    await expect(api.stageQuestion(question.id)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
+    await expect(api.stageQuestion(question.id, { ifMatch: etagOf(question.version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
     as(ACTORS.legal);
-    const cleared = await api.clearQuestionLegally(question.id, {});
+    const cleared = await api.clearQuestionLegally(question.id, {}, { ifMatch: etagOf(question.version) });
     expect(cleared.legalClearance).toMatchObject({ clearedBy: ACTORS.legal });
     expect(cleared.legalClearance).not.toHaveProperty('answerVersion');
     as(ACTORS.approver);
-    expect((await api.stageQuestion(question.id)).status).toBe('staged');
+    expect((await api.stageQuestion(question.id, { ifMatch: etagOf(cleared.version) })).status).toBe('staged');
   });
 
   it('uses the same four-eyes guard for legal clearance and offers a second legal actor the action', async () => {
@@ -95,11 +95,11 @@ describe('Scheibe 021c: legal clearance and stage gate', () => {
     as(ACTORS.legal);
     expect((await api.getQuestion(question.id))._actions).not.toContain('question.legal.clear');
     const before = store.all().length;
-    await expect(api.clearQuestionLegally(question.id, { answerVersion: 1 })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(api.clearQuestionLegally(question.id, { answerVersion: 1 }, { ifMatch: etagOf(question.version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
     expect(store.all()).toHaveLength(before);
     as(ACTORS.legal2);
     expect((await api.getQuestion(question.id))._actions).toContain('question.legal.clear');
-    expect((await api.clearQuestionLegally(question.id, { answerVersion: 1 })).legalClearance?.answerVersion).toBe(1);
+    expect((await api.clearQuestionLegally(question.id, { answerVersion: 1 }, { ifMatch: etagOf(question.version) })).legalClearance?.answerVersion).toBe(1);
   });
 
   it('legal cannot approve; approver can approve and cannot legally clear', async () => {
@@ -111,39 +111,39 @@ describe('Scheibe 021c: legal clearance and stage gate', () => {
     await expect(api.approveQuestion(question.id, 1)).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
     as(ACTORS.approver);
     expect((await api.getQuestion(question.id))._actions).not.toContain('question.legal.clear');
-    expect((await api.approveQuestion(question.id, 1)).approval?.answerVersion).toBe(1);
+    expect((await api.approveQuestion(question.id, 1, { ifMatch: etagOf(question.version) })).approval?.answerVersion).toBe(1);
   });
 
   it('a new answer version voids legal clearance and the old version cannot open the gate', async () => {
     const question = await inReview('expert_track');
     as(ACTORS.legal);
-    await api.clearQuestionLegally(question.id, { answerVersion: 1 });
+    await api.clearQuestionLegally(question.id, { answerVersion: 1 }, { ifMatch: etagOf(question.version) });
     as(ACTORS.expert);
-    await api.draftAnswer(question.id, { text: 'Neue Version.' });
+    await api.draftAnswer(question.id, { text: 'Neue Version.' }, { ifMatch: etagOf((await api.getQuestion(question.id)).version) });
     expect((await api.getQuestion(question.id)).legalClearance).toBeUndefined();
-    await api.submitForReview(question.id);
+    await api.submitForReview(question.id, { ifMatch: etagOf((await api.getQuestion(question.id)).version) });
     as(ACTORS.legal);
     const before = store.all().length;
     const current = await api.getQuestion(question.id);
-    await expect(api.clearQuestionLegally(question.id, {})).rejects.toMatchObject({ status: 422 });
+    await expect(api.clearQuestionLegally(question.id, {}, { ifMatch: etagOf(current.version) })).rejects.toMatchObject({ status: 422 });
     await expect(api.clearQuestionLegally(question.id, {}, { ifMatch: etagOf(current.version) })).rejects.toMatchObject({ status: 422 });
     expect(store.all()).toHaveLength(before);
     expect(await api.getQuestion(question.id)).toEqual(current);
-    await expect(api.clearQuestionLegally(question.id, { answerVersion: 1 })).rejects.toMatchObject({ status: 409 });
-    await api.clearQuestionLegally(question.id, { answerVersion: 2 });
+    await expect(api.clearQuestionLegally(question.id, { answerVersion: 1 }, { ifMatch: etagOf(current.version) })).rejects.toMatchObject({ status: 409 });
+    await api.clearQuestionLegally(question.id, { answerVersion: 2 }, { ifMatch: etagOf(current.version) });
     as(ACTORS.approver);
-    await api.approveQuestion(question.id, 2);
-    expect((await api.stageQuestion(question.id)).status).toBe('staged');
+    await api.approveQuestion(question.id, 2, { ifMatch: etagOf((await api.getQuestion(question.id)).version) });
+    expect((await api.stageQuestion(question.id, { ifMatch: etagOf((await api.getQuestion(question.id)).version) })).status).toBe('staged');
   });
 
   it('returning a podium question to classified voids its clearance', async () => {
     const question = await classified('podium');
     as(ACTORS.legal);
-    await api.clearQuestionLegally(question.id, {});
+    await api.clearQuestionLegally(question.id, {}, { ifMatch: etagOf(question.version) });
     as(ACTORS.approver);
-    await api.stageQuestion(question.id);
-    await api.returnQuestion(question.id, 'Überarbeiten.');
+    await api.stageQuestion(question.id, { ifMatch: etagOf((await api.getQuestion(question.id)).version) });
+    await api.returnQuestion(question.id, 'Überarbeiten.', { ifMatch: etagOf((await api.getQuestion(question.id)).version) });
     expect((await api.getQuestion(question.id)).legalClearance).toBeUndefined();
-    await expect(api.stageQuestion(question.id)).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
+    await expect(api.stageQuestion(question.id, { ifMatch: etagOf((await api.getQuestion(question.id)).version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-07' });
   });
 });

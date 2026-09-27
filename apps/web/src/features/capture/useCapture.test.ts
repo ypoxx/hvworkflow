@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isCurrentLoad,
   isReadForbidden,
+  isVersionConflict,
   keyBelongsTo,
   loadKey,
   NO_VERDICT,
@@ -34,6 +35,15 @@ describe('isReadForbidden', () => {
 
   it('500 (a real fault, not a rule): false — still becomes an error toast', () => {
     expect(isReadForbidden({ status: 500 })).toBe(false);
+  });
+});
+
+describe('Scheibe 028: conflict classification', () => {
+  it('shows stale recovery for 412 and 428, not for rights or validation errors', () => {
+    expect(isVersionConflict({ status: 412 })).toBe(true);
+    expect(isVersionConflict({ status: 428 })).toBe(true);
+    expect(isVersionConflict({ status: 403, ruleId: 'R-PERM-01' })).toBe(false);
+    expect(isVersionConflict({ status: 422 })).toBe(false);
   });
 });
 
