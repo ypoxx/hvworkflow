@@ -152,13 +152,13 @@ describe('i18n parity checks', () => {
   // Slice 021b: +1, `role.coordination` — the Koordination role takes over classify/assign.
   // Scheibe 021c: +7 keys (five answer labels, one action and one event).
   // Scheibe 024: +3 boot.legacy keys for the explicit demo-log reset in both languages.
-  it('(f) Total key count is 463 across all modules and matches de and en', () => {
+  it('(f) Total key count is 471 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(463);
-    expect(deKeys).toBe(463);
-    expect(enKeys).toBe(463);
+    expect(totalKeys).toBe(471);
+    expect(deKeys).toBe(471);
+    expect(enKeys).toBe(471);
   });
 });

@@ -55,6 +55,7 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 - `apps/web/src/i18n/labels.ts` (nur neue R-MTG-Ereignisse und `agenda.manage`)
 - `apps/web/src/i18n/shell.de.ts` (nur die dazugehörigen deutschen Bezeichnungen)
 - `apps/web/src/i18n/shell.en.ts` (nur die dazugehörigen englischen Bezeichnungen)
+- `apps/web/src/i18n/parity.test.ts` (nur die Anzahl beider Wörterbücher nach acht neuen Schlüsseln)
 - `packages/contract/allowlist.json` (nur Einträge mit `slice: "025"`)
 - `docs/rollen-und-rechtekonzept.md` (nur `agenda.manage`-Gewährung)
 - `docs/legal-trace.md` (nur generierte R-MTG-01..06-Zeilen)
