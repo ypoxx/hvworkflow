@@ -67,6 +67,13 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     for (const event of fixtureEvents()) {
       await owner.query('INSERT INTO events (seq, id, meeting_id, hash, prev_hash, envelope) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
         [event.seq, event.id, event.meetingId, event.hash, event.prevHash, JSON.stringify(event)]);
+      if (event.type === 'SpeakerRegistered') {
+        await owner.query(
+          'INSERT INTO persons (meeting_id, person_id, display_name, organisation, key_id, source_seq) VALUES ($1, $2, $3, $4, $5, $6)',
+          [event.meetingId, event.personId, event.payload.pii?.displayName,
+            event.payload.pii?.organisation ?? null, event.payload.pii?.keyId, event.seq],
+        );
+      }
     }
   });
 
