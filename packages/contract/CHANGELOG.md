@@ -10,6 +10,21 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.3] - 2026-09-27
+
+### Added
+
+- takt-019 for slice 025: additive `MeetingStarted` and `MeetingClosed` event types. Each names the
+  meeting in `subjectId` and has an empty payload. Starting with slice 025, `MeetingCreated`
+  projects `preparation`, `MeetingStarted` projects `running`, and `MeetingClosed` projects `closed`.
+  `DebateClosed` remains a separate fact about the general debate and does not close the meeting.
+  No public operation is added by this contract-only bridge.
+
+### Changed
+
+- The mandatory fields and If-Match requirement of slice 028 move from 0.3.3 to 0.3.4. Existing
+  request and response fields remain optional in this patch.
+
 ## [0.3.2] - 2026-09-26
 
 ### Added
