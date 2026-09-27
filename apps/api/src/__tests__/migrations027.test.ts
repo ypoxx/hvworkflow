@@ -92,7 +92,7 @@ describe.skipIf(databaseUrl === undefined)('Scheibe 027: migrations and grants',
         'INSERT INTO events (seq, id, meeting_id, hash, prev_hash, envelope) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
         [event.seq, event.id, event.meetingId, event.hash, event.prevHash, JSON.stringify(event)],
       );
-      expect((await runtime.query('SELECT seq FROM events')).rows).toEqual([{ seq: 1 }]);
+      expect((await runtime.query('SELECT seq FROM events')).rows).toEqual([{ seq: '1' }]);
       expect((await runtime.query('SELECT * FROM persons')).rows).toEqual([]);
       expect((await runtime.query('SELECT * FROM schema_migrations')).rows.length).toBeGreaterThan(0);
       for (const sql of [

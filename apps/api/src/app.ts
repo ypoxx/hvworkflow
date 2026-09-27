@@ -285,7 +285,10 @@ export function createApp(options: CreateAppOptions = {}): App {
       }
       const detail = error instanceof PostgresIntegrityError
         ? `Event seq ${error.seq}: integrity check failed.` : 'Persistence is unavailable.';
-      return problemResponse(new ApiProblem(500, 'Internal Server Error', detail));
+      // A handler may already have finalized a success response before persistence failed.
+      // Hono ignores a returned middleware response at that point, so replace it explicitly.
+      c.res = problemResponse(new ApiProblem(500, 'Internal Server Error', detail));
+      return;
     } finally {
       client?.release();
     }
