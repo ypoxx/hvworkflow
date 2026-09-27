@@ -74,6 +74,15 @@ test('takt-018 red: same-day lane ownership is serial along an explicit dependen
   assert.match(r.stdout, /same-day lane-sharing warnings: 0/);
 });
 
+test('takt-020 red: deferred emergency accounts no longer collide with beta sign-in', () => {
+  const r = run(['--plan', REAL_PLAN, '--strict']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /missing dependencies: 0/);
+  assert.match(r.stdout, /cycles: 0/);
+  assert.match(r.stdout, /dependency-order problems: 0/);
+  assert.match(r.stdout, /same-day lane-sharing warnings: 0/);
+});
+
 test('green: the real product plan parses, no missing deps, no cycles, no order problems', () => {
   // Round 1, m5: do not hard-code the current slice count here — the plan grows over the project's
   // life and a fixed number makes this test fail on every unrelated planning change. The slice count
