@@ -89,6 +89,21 @@ async function waitForHttp(url, expectedStatus, timeoutMs, child) {
   throw new Error(`Timed out waiting for ${new URL(url).pathname}.`);
 }
 
+async function waitForApi(child) {
+  // Clock/NTP readiness is introduced in 033. In 029b, /readyz is 503 even when
+  // Postgres and its migrations are healthy; the public notice proves the HTTP server is up.
+  await waitForHttp(`${apiOrigin}/auth/transparency-notice`, 200, 30_000, child);
+  const response = await fetch(`${apiOrigin}/readyz`);
+  const body = await response.json();
+  assert.equal(body.checks.db.status, 'ok', 'The API runtime login must reach Postgres.');
+  assert.equal(body.checks.migrations.status, 'ok', 'The API must see the applied migrations.');
+  if (response.status === 503) {
+    assert.equal(body.checks.clock.code, 'not_configured', 'Only the future clock probe may hold readiness.');
+  } else {
+    assert.equal(response.status, 200);
+  }
+}
+
 async function stopApi(child) {
   if (!child || child.exitCode !== null) return;
   child.kill('SIGTERM');
@@ -267,7 +282,7 @@ async function main() {
     const { actorId, meetingId } = await bootstrapMeeting(ownerUrl, identity.userId);
     stage = 'service startup';
     api = startApi(runtimeUrl, identity, encryptionKey);
-    await waitForHttp(`${apiOrigin}/readyz`, 200, 30_000, api);
+    await waitForApi(api);
     stage = 'browser login and role flow';
     await checkBrowserFlow(identity, actorId, meetingId);
     const sessionsBeforeOutage = await sessionCount(ownerUrl);
@@ -277,7 +292,7 @@ async function main() {
     await execFile('docker', ['rm', '-f', container], { timeout: 10_000 });
     containerStarted = false;
     api = startApi(runtimeUrl, identity, encryptionKey);
-    await waitForHttp(`${apiOrigin}/readyz`, 200, 30_000, api);
+    await waitForApi(api);
     const unavailable = await fetch(`${apiOrigin}/auth/login`, { redirect: 'manual' });
     assert.equal(unavailable.status, 503, 'A fresh login must fail closed while Keycloak is unavailable.');
     assert.equal(await sessionCount(ownerUrl), sessionsBeforeOutage, 'An IdP outage must not create a session.');
