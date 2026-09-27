@@ -79,14 +79,14 @@ Kein `createMeeting`/Klonen oder Stammdatenersatz (040), keine öffentliche Star
 
 Slice: 025-jahrgang-lebenszyklus
 
-Done: Zwei Jahrgänge sind im globalen Ereignislog getrennt; der Demo-Alias folgt der Vertragsregel. R-MTG-01..06, spät begründete Papier-/Transkripterfassung und 14 kanonische Operationen sind implementiert. Das unabhängige Review und der enge Recheck haben die technischen und dokumentarischen Befunde 2–4 und 6–8 als behoben bestätigt (Commit `cb497cd`).
+Done: Zwei Jahrgänge sind im globalen Ereignislog getrennt; der Demo-Alias folgt der Vertragsregel. R-MTG-01..06, spät begründete Papier-/Transkripterfassung und 14 kanonische Operationen sind implementiert. Das unabhängige Review und der enge Recheck haben ihre Befunde abgearbeitet; der P1-Befund des anschließenden Codex-PR-Reviews zur Weiterverwendung historischer Logs wurde mit `lifecycleVersion` und Rückwärtskompatibilitätstest auf `506ba91` behoben.
 
-Evidence: `pnpm gates` auf sauberem Commit `cb497cd` (Exit 0), wörtlicher Schluss:
+Evidence: `pnpm gates` auf sauberem Commit `506ba91` (Exit 0), wörtlicher Schluss:
 
 ```text
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 416ms
-mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit cb497cd, tree 607d516708dc…
+✓ built in 402ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit 506ba91, tree 24dabd781c72…
 ```
 
 Browser-Nachweis: `docs/evidence/025-capture.jpg` (Erfassungsansicht, Quellenanzeige; kein Konsolenfehler). Die volle E2E-Suite läuft in der PR-CI mit installiertem Chromium; Ergebnis steht vor dem Merge noch aus.
