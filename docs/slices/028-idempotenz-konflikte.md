@@ -107,7 +107,7 @@ Evidence: `pnpm gates` auf sauberem Baucommit `e988372` (Exit 0), wörtlicher Sc
 mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow-024/.claude/state/last-test-run (clean tree) at commit e988372, tree 21cd3b2f9eba…
 ```
 
-Vollständige lokale Browser-E2E-Suite: 127/127 grün (Chromium, 3,2 min). GitHub-CI-Lauf 36345608665: Postgres-Migrationen, Grants und Transaktionsintegration sowie allgemeine Gates und Sicherheitschecks grün; die vollständige CI-E2E läuft auf dem PR. Generierter Claim-Rechte-Diff: `packages/domain/policy-truth-table.md`; Screenshot: `docs/evidence/028-capture-stale.png`.
+Vollständige lokale Browser-E2E-Suite: 127/127 grün (Chromium, 3,2 min). GitHub-CI-Lauf 36345608665: Postgres-Migrationen, Grants und Transaktionsintegration sowie allgemeine Gates und Sicherheitschecks grün; die CI-E2E wurde beim nachfolgenden Bericht-Commit abgelöst. Ein vollständig grüner CI-Lauf auf dem letzten PR-Commit bleibt Merge-Bedingung. Generierter Claim-Rechte-Diff: `packages/domain/policy-truth-table.md`; Screenshot: `docs/evidence/028-capture-stale.png`.
 Open: Der P2-Reviewbefund zum gemeinsam gespeicherten Antwort-ETag im In-Memory-/JSONL-HTTP-Pfad steht für einen gebündelten Folgedurchgang in `docs/folgeliste.md`; er hält nach AGENTS.md Regel 3 den Merge nicht auf. 049 ergänzt den maßgeblichen Antwortversions-Hash für „Vorgelesen“, 054 die Offline-/Merge-Ansicht, 029b die echte Beta-Anmeldung; diese Funktionen liegen außerhalb von 028. Kein Deploy.
 Touched:
 - `apps/api/src/__tests__/acceptance.test.ts`
