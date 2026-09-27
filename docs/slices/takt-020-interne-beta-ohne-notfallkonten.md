@@ -29,4 +29,15 @@ Keine Auth-Implementierung in diesem Takt, kein produktiver Konzern-IdP, kein No
 
 ## Bericht
 
-(nach Test, Gate und Review)
+Slice: takt-020-interne-beta-ohne-notfallkonten
+Done: Die Eigentümerentscheidung vom 27.09. ist in B1, B14, E11 und im Beta-Pfad erfasst. 029b enthält sichere Anmeldung und die Subject-Sperre für verlorene Geräte; 029 enthält erst nach der Fortführungsentscheidung die zwei Notfallkonten mit Alarm. Vor-Beta-Abhängigkeiten auf 029 sind beseitigt. Der strikte Plan-Graph hat 87 Scheiben, 0 fehlende Abhängigkeiten, 0 Zyklen, 0 Reihenfolgefehler und 0 Lane-Warnungen.
+Evidence: Fokussierter Test zuerst rot wegen 029/029b, danach 17/17 Skripttests grün. Unabhängiges Review: zwei Planhinweise zu B15 und Files allowed wurden behoben und eng nachgeprüft; keine P0/P1-, Security-, Legal- oder Privacy-Befunde. `pnpm gates` auf sauberem Commit `04a7e18` (Node 24, pnpm 10.33.0) endete wörtlich:
+
+```text
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 726ms
+mark-test-run: wrote /Users/alex/Documents/Codex/2026-09-26/prior-conversation-with-codex-conversation-role/work/hvworkflow/.claude/state/last-test-run (clean tree) at commit 04a7e18, tree 74c2e84e0fa8…
+```
+
+Open: Die Anmeldung, Subject-Sperre, das Runbook und die Chaos-Probe sind hier geplant, noch nicht implementiert. Notfallkonten und Ausfall-Alarm folgen in 029 nach der Fortführungsentscheidung. Kein Deployment.
+Touched: `docs/slices/takt-020-interne-beta-ohne-notfallkonten.md`, `docs/produktplan-beta.md`, `docs/entscheidungsregister.md`, `scripts/plan-graph.test.mjs`.
