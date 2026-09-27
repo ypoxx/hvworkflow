@@ -17,6 +17,22 @@ concurrency:
 jobs:
   gates:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hv_owner
+          POSTGRES_PASSWORD: hv_owner_test
+          POSTGRES_DB: hv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U hv_owner -d hv_test"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      TEST_DATABASE_URL: postgres://hv_owner:hv_owner_test@localhost:5432/hv_test
+      TEST_RUNTIME_DATABASE_URL: postgres://hv_runtime:hv_runtime_test@localhost:5432/hv_test
+      HV_DB_RUNTIME_ROLE: hv_runtime
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +46,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - name: Create separate Postgres runtime login for grant tests
+        env:
+          PGPASSWORD: hv_owner_test
+        run: psql -h localhost -U hv_owner -d hv_test -c "CREATE ROLE hv_runtime LOGIN PASSWORD 'hv_runtime_test'"
+      - name: Run operational migration command
+        run: HV_MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @hv/api db:migrate up
+      - name: Postgres migrations, grants and transaction integration
+        run: pnpm --filter @hv/api exec vitest run src/__tests__/migrations027.test.ts src/__tests__/postgres027.test.ts
       # Slice 012 point 8: a doc-only commit (`docs/**`, `*.md`) skips the Chromium install and
       # Playwright below — nothing else. No `paths-ignore` at the workflow level: the job always
       # triggers and reports, so a later required status check never simply goes missing.

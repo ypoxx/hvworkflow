@@ -44,6 +44,7 @@ Keine echte Anmeldung (029b), kein persistentes Idempotenzregister oder Pflicht-
 - `apps/api/src/__tests__/postgres027.test.ts`
 - `apps/api/src/__tests__/migrations027.test.ts`
 - `apps/api/src/__tests__/readiness027.test.ts`
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur bisherige Versionsassertion von 0.3.4 auf 0.3.5 nach dem bewusst gebumpten Vertrag)
 - `apps/api/src/__tests__/helpers.ts` (nur Operation-Coverage für `getReadiness`)
 - `apps/api/package.json` (nur Treiber und Test-/Migrationsskripte)
 - `pnpm-lock.yaml` (nur aus dem vorgenannten Manifest generiert)

@@ -31,6 +31,13 @@ Standardannahme aus Plan 3 („Persistenzform des Ereignislogs") und Plan 4 (Zei
   10 000 Ereignissen in unter fünf Minuten ist eine Pflicht der Generalprobe, kein Komfortziel.
 - **Hash-Kette über alle Ereignisse**, Kettenprüfung beim Laden und nach jedem Neustart.
 - **JSONL bleibt Dev-Adapter.** Die Personentabelle liegt getrennt vom Ereignislog (ADR 0009).
+- **Die asynchrone DB-Grenze liegt im HTTP-Dienst.** Der synchrone Domänen-Port bleibt für die
+  Browser-Demo erhalten. Eine Postgres-Schreibanfrage beginnt mit `READ COMMITTED`, nimmt vor dem
+  Laden des globalen Tails einen transaktionsgebundenen Advisory-Lock, verifiziert die Kette,
+  projiziert anfragelokal und fügt neue Ereignisse samt Personenprojektion in derselben Transaktion
+  ein. Erst nach `COMMIT` erhält der Aufrufer Erfolg; Rollback verwirft auch den anfragelokalen
+  Idempotenzstand. Reads laden einen konsistenten frischen Snapshot. Die Personentabelle wird aus
+  den bestätigten `SpeakerRegistered`-Ereignissen abgeglichen; Abweichungen blockieren Fachzugriff.
 - **Eine Datenhaltung mit PITR, keine zweite Zone in der Beta** (E27). Backup und Restore werden
   einmal als Drill protokolliert (B3).
 - **Bestände werden nie durch die Dienstrolle gelöscht.** Der Übungsbestand verschwindet, indem der

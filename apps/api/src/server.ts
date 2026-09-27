@@ -6,10 +6,25 @@
  * production is unaffected because `HV_DEMO` stays unset there).
  */
 import { serve } from '@hono/node-server';
+import { Pool } from 'pg';
 import { createApp } from './app.ts';
 
 const port = Number.parseInt(process.env['PORT'] ?? '8787', 10);
-const app = createApp({ seedOnStart: true });
+const databaseUrl = process.env['HV_DATABASE_URL'];
+if (databaseUrl && process.env['HV_EVENT_LOG']) {
+  throw new Error('Configure either Postgres or the JSONL development log.');
+}
+const postgres = databaseUrl
+  ? new Pool({ connectionString: databaseUrl,
+    connectionTimeoutMillis: 2_000,
+    ...(process.env['HV_DB_TLS'] === '1' ? { ssl: { rejectUnauthorized: true } } : {}) })
+  : undefined;
+postgres?.on('error', () => {
+  // Driver error objects can contain connection details; the pool can reconnect on a later request.
+  console.error('HV-Tool API: Postgres pool connection failed.');
+});
+const app = createApp({ seedOnStart: postgres === undefined,
+  ...(postgres !== undefined ? { postgres } : {}) });
 
 serve({ fetch: app.fetch, port }, (info) => {
   // eslint-disable-next-line no-console

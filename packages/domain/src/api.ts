@@ -25,6 +25,7 @@ import type {
   ContributionCapture,
   MeetingContributionCapture,
   Meeting,
+  Person,
   LegalClearanceRequest,
   Permission,
   Role,
@@ -133,6 +134,10 @@ export interface InProcessApiOptions {
   idGenerator?: () => string;
   /** Provided by seed.ts; injected to keep this module free of demo content. */
   seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
+  /** A committed person-table projection, keyed by meeting, for the Postgres request boundary. */
+  personSnapshots?: ReadonlyMap<string, readonly Person[]>;
+  /** A request-local copy in Postgres mode; published to the process cache only after commit. */
+  idempotencyCache?: Map<string, unknown>;
 }
 
 export function etagOf(version: number): string {
@@ -251,7 +256,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       reduce(scoped, e);
     }
   }
-  const idempotency = new Map<string, unknown>();
+  if (options.personSnapshots !== undefined) {
+    if (options.meetingId !== undefined) {
+      state.persons = new Map((options.personSnapshots.get(options.meetingId) ?? []).map((person) => [person.personId, person]));
+    } else {
+      for (const [meetingId, scoped] of aliasStates) {
+        scoped.persons = new Map((options.personSnapshots.get(meetingId) ?? []).map((person) => [person.personId, person]));
+      }
+    }
+  }
+  const idempotency = options.idempotencyCache ?? new Map<string, unknown>();
   let activeIdempotencyKey: string | undefined;
 
   const stateForMeeting = (meetingId: string): State => {
