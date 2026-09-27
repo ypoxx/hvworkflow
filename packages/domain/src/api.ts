@@ -25,6 +25,7 @@ import type {
   ContributionCapture,
   MeetingContributionCapture,
   Meeting,
+  Person,
   LegalClearanceRequest,
   Permission,
   Role,
@@ -133,6 +134,10 @@ export interface InProcessApiOptions {
   idGenerator?: () => string;
   /** Provided by seed.ts; injected to keep this module free of demo content. */
   seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
+  /** A committed person-table projection, keyed by meeting, for the Postgres request boundary. */
+  personSnapshots?: ReadonlyMap<string, readonly Person[]>;
+  /** A request-local copy in Postgres mode; published to the process cache only after commit. */
+  idempotencyCache?: Map<string, unknown>;
 }
 
 export function etagOf(version: number): string {
@@ -232,9 +237,11 @@ export function actionsFor(actor: Actor, q: QuestionRecord): Permission[] {
 
 const SPEAKER_ACTIONS: readonly Permission[] = ['speaker.update', 'speaker.reorder'];
 
+export function systemClock(): Date { return new Date(); } // now-ok: default clock injection point for domain and server
+
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
-  const clock = options.clock ?? (() => new Date()); // now-ok: the default clock — this *is* the injection point (AGENTS.md rule 8)
+  const clock = options.clock ?? systemClock;
   const newId = options.idGenerator ?? defaultId;
   let state: State = emptyState();
   const aliasStates = new Map<string, State>();
@@ -251,7 +258,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       reduce(scoped, e);
     }
   }
-  const idempotency = new Map<string, unknown>();
+  if (options.personSnapshots !== undefined) {
+    if (options.meetingId !== undefined) {
+      state.persons = new Map((options.personSnapshots.get(options.meetingId) ?? []).map((person) => [person.personId, person]));
+    } else {
+      for (const [meetingId, scoped] of aliasStates) {
+        scoped.persons = new Map((options.personSnapshots.get(meetingId) ?? []).map((person) => [person.personId, person]));
+      }
+    }
+  }
+  const idempotency = options.idempotencyCache ?? new Map<string, unknown>();
   let activeIdempotencyKey: string | undefined;
 
   const stateForMeeting = (meetingId: string): State => {
@@ -412,12 +428,13 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   };
   /**
    * Wrap a write so that an idempotency key replays the first result instead of re-executing.
-   * The key is scoped to the calling actor and the operation (R-IDEM-01): a replay by another actor
-   * or against another resource is a new request and goes through the permission check again.
+   * The key is scoped to the meeting, calling actor and operation (R-IDEM-01): a replay by another
+   * actor or against another resource is a new request and goes through the permission check again.
    */
   const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
-    const scoped = key !== undefined ? `${actor().id}|${scope}|${key}` : undefined;
+    const meetingScope = options.meetingId ?? state.meeting?.id ?? 'none';
+    const scoped = key !== undefined ? JSON.stringify([meetingScope, actor().id, scope, key]) : undefined;
     if (scoped !== undefined && idempotency.has(scoped)) return idempotency.get(scoped) as T;
     const priorKey = activeIdempotencyKey;
     activeIdempotencyKey = key;

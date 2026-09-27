@@ -8,6 +8,10 @@
  * wrongly-typed or contract-violating request never reaches the domain (rework review blockers 1/2).
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { constants } from 'node:fs';
+import { access } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import type { Pool, PoolClient } from 'pg';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -16,6 +20,7 @@ import {
   createInProcessApi,
   etagOf,
   seedEvents,
+  systemClock,
   SYSTEM_ACTOR,
   type Actor,
   type AnswerDraft,
@@ -40,6 +45,8 @@ import { parseActorHeader, selectAuthAdapter } from './actor.ts';
 import { createFileEventLog } from './eventLog.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { problemResponse } from './problem.ts';
+import { getMigrationStatus } from './persistence/migrations.ts';
+import { assertRuntimePrivileges, insertPostgresEvents, loadPostgresSnapshot, PostgresIntegrityError } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
 
 export interface CreateAppOptions {
@@ -70,10 +77,30 @@ export interface CreateAppOptions {
    * (AGENTS.md rule 4; `scripts/role-literal-check.mjs`, slice 012).
    */
   seedActor?: Actor;
+  /** Transactional Postgres source of truth for the service; JSONL remains the dev adapter. */
+  postgres?: Pool;
+  /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
+  readiness?: {
+    clock: () => Promise<ReadinessCheck>;
+    db: () => Promise<ReadinessCheck>;
+    migrations: () => Promise<ReadinessCheck>;
+  };
 }
+
+type ReadinessCheck =
+  | { status: 'ok' }
+  | { status: 'fail'; code: 'not_configured' | 'unreachable' | 'timeout' | 'migrations_pending' | 'clock_unsynced' | 'clock_drift' };
 
 /** The concrete app type (with its `Variables`), so tests can type `let app: App` without repeating it. */
 export type App = Hono<{ Variables: Variables }>;
+
+interface PostgresRequest {
+  store: ReturnType<typeof createInMemoryEventStore>;
+  domain: HvApi;
+  scoped: Map<string, HvApi>;
+  persons: ReadonlyMap<string, readonly { personId: string; displayName: string; organisation?: string }[]>;
+  idempotency: Map<string, unknown>;
+}
 
 /**
  * `HV_SEED_ACTOR` shares `parseActorHeader`'s `"<id>:<role>"` format, but its errors must say so —
@@ -98,36 +125,57 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
   const eventLogPath = options.eventLogPath ?? process.env['HV_EVENT_LOG'];
   const persistence = options.persistence ?? (eventLogPath !== undefined ? createFileEventLog(eventLogPath) : undefined);
+  if (options.postgres && persistence) throw new Error('Configure only one service persistence source.');
   const store = createInMemoryEventStore(persistence);
   const actorStorage = new AsyncLocalStorage<Actor>();
+  const requestStorage = new AsyncLocalStorage<PostgresRequest>();
+  let committedIdempotency = new Map<string, unknown>();
 
-  const domain: HvApi = createInProcessApi({
+  const currentActor = (): Actor => {
+    const actor = actorStorage.getStore();
+    if (!actor) throw new ApiProblem(401, 'Unauthorized', 'The X-Actor header is required.');
+    return actor;
+  };
+
+  const memoryDomain: HvApi = createInProcessApi({
     store,
-    actor: () => {
-      const actor = actorStorage.getStore();
-      // The global middleware below always sets this before a handler runs; this is a safety net.
-      if (!actor) throw new ApiProblem(401, 'Unauthorized', 'The X-Actor header is required.');
-      return actor;
-    },
+    actor: currentActor,
     ...(options.clock !== undefined ? { clock: options.clock } : {}),
     ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
     seeder: seedEvents,
+  });
+  const domain: HvApi = new Proxy(memoryDomain, {
+    get(target, property, receiver) {
+      return Reflect.get(requestStorage.getStore()?.domain ?? target, property, receiver);
+    },
   });
 
   // A scoped projection is shared across requests for the same meeting. It follows the global
   // event log but applies only that meeting's events; the actor still comes from this request.
   const scopedDomains = new Map<string, HvApi>();
   const meetingDomain = async (meetingId: string): Promise<HvApi> => {
+    const request = requestStorage.getStore();
+    if (request) {
+      let scoped = request.scoped.get(meetingId);
+      if (!scoped) {
+        await request.domain.getMeetingById(meetingId);
+        scoped = createInProcessApi({
+          store: request.store, meetingId, actor: currentActor,
+          personSnapshots: request.persons,
+          idempotencyCache: request.idempotency,
+          ...(options.clock !== undefined ? { clock: options.clock } : {}),
+          ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
+        });
+        request.scoped.set(meetingId, scoped);
+      }
+      return scoped;
+    }
     let scoped = scopedDomains.get(meetingId);
     if (!scoped) {
       await domain.getMeetingById(meetingId);
       scoped = createInProcessApi({
         store, meetingId,
-        actor: () => {
-          const actor = actorStorage.getStore();
-          if (!actor) throw new ApiProblem(401, 'Unauthorized', 'The X-Actor header is required.');
-          return actor;
-        },
+        actor: currentActor,
         ...(options.clock !== undefined ? { clock: options.clock } : {}),
         ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
       });
@@ -136,7 +184,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     return scoped;
   };
 
-  if (options.seedOnStart && demoEnabled && store.lastSeq() === 0) {
+  if (options.seedOnStart && demoEnabled && options.postgres === undefined && store.lastSeq() === 0) {
     // `seedDemo` (packages/domain) does no real async I/O (AGENTS.md: "no framework, no I/O"), so the
     // store is already populated by the time this synchronous function returns even though the
     // promise below is not awaited here; `actorStorage.run` supplies the actor `seedDemo` needs
@@ -176,12 +224,136 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
+    if (c.req.path === '/readyz') {
+      await next();
+      return;
+    }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
     const actor = authenticate((name) => c.req.header(name));
     await actorStorage.run(actor, () => next());
   });
+  app.use('/v1/*', async (c, next) => {
+    const pool = options.postgres;
+    if (!pool) {
+      await next();
+      return;
+    }
+    const write = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
+    let client: PoolClient | undefined;
+    let started = false;
+    try {
+      if ((await getMigrationStatus(pool)).pending) {
+        return problemResponse(new ApiProblem(503, 'Service Unavailable', 'Migrations are pending.'));
+      }
+      await assertRuntimePrivileges(pool);
+      client = await pool.connect();
+      await client.query(write ? 'BEGIN ISOLATION LEVEL READ COMMITTED' : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      started = true;
+      if (write) await client.query('SELECT pg_advisory_xact_lock($1, $2)', [27027, 1]);
+      const snapshot = await loadPostgresSnapshot(client);
+      let pendingEvents = snapshot.events.slice(snapshot.events.length);
+      const requestStore = createInMemoryEventStore({
+        load: () => snapshot.events,
+        save: (all) => { pendingEvents = all.slice(snapshot.events.length); },
+      });
+      const persons = new Map<string, { personId: string; displayName: string; organisation?: string }[]>();
+      for (const row of snapshot.persons) {
+        const list = persons.get(row.meetingId) ?? [];
+        list.push({ personId: row.personId, displayName: row.displayName,
+          ...(row.organisation !== undefined ? { organisation: row.organisation } : {}) });
+        persons.set(row.meetingId, list);
+      }
+      const idempotency = new Map(committedIdempotency);
+      const activeDomain = createInProcessApi({
+        store: requestStore, actor: currentActor, personSnapshots: persons, idempotencyCache: idempotency,
+        ...(options.clock !== undefined ? { clock: options.clock } : {}),
+        ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
+        seeder: seedEvents,
+      });
+      await requestStorage.run({ store: requestStore, domain: activeDomain, scoped: new Map(), persons, idempotency }, () => next());
+      if (c.res.status >= 400) {
+        await client.query('ROLLBACK');
+      } else {
+        if (pendingEvents.length > 0) await insertPostgresEvents(client, pendingEvents);
+        await client.query('COMMIT');
+        if (write) committedIdempotency = idempotency;
+      }
+      started = false;
+    } catch (error) {
+      if (started && client) {
+        try { await client.query('ROLLBACK'); } catch { /* Failed transaction is discarded with the connection. */ }
+      }
+      const detail = error instanceof PostgresIntegrityError
+        ? `Event seq ${error.seq}: integrity check failed.` : 'Persistence is unavailable.';
+      // A handler may already have finalized a success response before persistence failed.
+      // Hono ignores a returned middleware response at that point, so replace it explicitly.
+      c.res = problemResponse(new ApiProblem(500, 'Internal Server Error', detail));
+      return;
+    } finally {
+      client?.release();
+    }
+  });
   app.onError((err, _c) => problemResponse(err));
   app.notFound(() => problemResponse(new ApiProblem(404, 'Not found', 'No such route.')));
+
+  app.get('/readyz', async (c) => {
+    const serverTime = (options.clock ?? systemClock)().toISOString();
+    const defaultChecks = {
+      clock: async (): Promise<ReadinessCheck> => ({ status: 'fail', code: 'not_configured' }),
+      db: async (): Promise<ReadinessCheck> => {
+        if (options.postgres) {
+          await assertRuntimePrivileges(options.postgres, false);
+          await options.postgres.query('SELECT 1');
+          return { status: 'ok' };
+        }
+        if (eventLogPath) {
+          try {
+            await access(eventLogPath, constants.R_OK | constants.W_OK);
+          } catch (error) {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+              await access(dirname(eventLogPath), constants.R_OK | constants.W_OK);
+            } else {
+              throw error;
+            }
+          }
+          return { status: 'ok' };
+        }
+        return persistence ? { status: 'ok' } : { status: 'fail', code: 'not_configured' };
+      },
+      migrations: async (): Promise<ReadinessCheck> => {
+        if (options.postgres) {
+          return (await getMigrationStatus(options.postgres)).pending
+            ? { status: 'fail', code: 'migrations_pending' } : { status: 'ok' };
+        }
+        return persistence ? { status: 'ok' } : { status: 'fail', code: 'not_configured' };
+      },
+    };
+    const probes = options.readiness ?? defaultChecks;
+    const safeCheck = async (run: () => Promise<ReadinessCheck>, failureCode: 'timeout' | 'unreachable'): Promise<ReadinessCheck> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          run(),
+          new Promise<ReadinessCheck>((resolve) => {
+            timer = setTimeout(() => resolve({ status: 'fail', code: 'timeout' }), 2_000);
+          }),
+        ]);
+      } catch {
+        // Driver failures may contain credentials, SQL and host names. Do not pass the error on.
+        return { status: 'fail', code: failureCode };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+    const checks = {
+      clock: await safeCheck(probes.clock, 'timeout'),
+      db: await safeCheck(probes.db, 'unreachable'),
+      migrations: await safeCheck(probes.migrations, 'unreachable'),
+    };
+    const ready = Object.values(checks).every((check) => check.status === 'ok');
+    c.header('X-Server-Time', serverTime);
+    return c.json({ status: ready ? 'ready' : 'not_ready', checks, serverTime }, ready ? 200 : 503);
+  });
 
   const etag = (c: Context, resource: { version: number }): void => {
     c.header('ETag', etagOf(resource.version));

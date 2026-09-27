@@ -8,7 +8,7 @@ import { ApiProblem, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { createInMemoryEventStore, type EventStore } from '../store.js';
 import { ROLE_PERMISSIONS } from '../permissions.js';
 import { CORPUS_DEMO, CORPUS_LOAD, seedEvents } from '../seed.js';
-import type { DomainEvent } from '../events.js';
+import type { DomainEvent, NewEvent } from '../events.js';
 import type { Actor, Permission, Question, Role } from '../types.js';
 import { READ_PERMISSIONS } from '../types.js';
 
@@ -180,6 +180,50 @@ describe('invariants', () => {
     expect(other.id).toBe(b.id);
     expect(other.track).toBe('fast_track');
     expect(await api.classifyQuestion(a.id, { track: 'expert_track' }, { idempotencyKey: 'shared' })).toEqual(first);
+  });
+
+  it('R-IDEM-01: a shared cache keeps the same actor key separate across meetings', async () => {
+    const sharedStore = createInMemoryEventStore();
+    const at = '2027-04-20T10:00:00.000Z';
+    sharedStore.append(['hv-a', 'hv-b'].map((meetingId) => ({
+      id: `created-${meetingId}`, type: 'MeetingCreated' as const, at,
+      actor: actors.admin!, subjectId: meetingId, meetingId,
+      payload: { title: meetingId, date: '2027-04-20', agendaItems: [], units: [] },
+    })) as NewEvent[]);
+    const cache = new Map<string, unknown>();
+    let nextId = 0;
+    const scoped = (meetingId: string) => createInProcessApi({
+      store: sharedStore, meetingId, actor: () => actors.admin!, idempotencyCache: cache,
+      clock: () => new Date(at), idGenerator: () => `speaker-${++nextId}`,
+    });
+    const first = await scoped('hv-a').registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'same-key' });
+    const second = await scoped('hv-b').registerSpeaker({ displayName: 'Person B' }, { idempotencyKey: 'same-key' });
+    expect(second.id).not.toBe(first.id);
+    expect(sharedStore.all().filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
+      .toEqual(['hv-a', 'hv-b']);
+  });
+
+  it('R-IDEM-01: meeting and key delimiters cannot alias another cache entry', async () => {
+    const meetingA = 'hv|admin|registerSpeaker|x';
+    const meetingB = 'hv';
+    const sharedStore = createInMemoryEventStore();
+    sharedStore.append([meetingA, meetingB].map((meetingId, index) => ({
+      id: `created-${index}`, type: 'MeetingCreated' as const, at: '2027-04-20T10:00:00.000Z',
+      actor: actors.admin!, subjectId: meetingId, meetingId,
+      payload: { title: `Test ${index}`, date: '2027-04-20', agendaItems: [], units: [] },
+    })) as NewEvent[]);
+    const cache = new Map<string, unknown>();
+    let nextId = 0;
+    const scoped = (meetingId: string) => createInProcessApi({
+      store: sharedStore, meetingId, actor: () => actors.admin!, idempotencyCache: cache,
+      clock: () => new Date('2027-04-20T10:15:00.000Z'), idGenerator: () => `speaker-${++nextId}`,
+    });
+    const first = await scoped(meetingA).registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'y' });
+    const second = await scoped(meetingB).registerSpeaker({ displayName: 'Person B' },
+      { idempotencyKey: 'x|admin|registerSpeaker|y' });
+    expect(second.id).not.toBe(first.id);
+    expect(sharedStore.all().filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
+      .toEqual([meetingA, meetingB]);
   });
 
   it('a new answer version after approval voids the approval (bound to the text)', async () => {

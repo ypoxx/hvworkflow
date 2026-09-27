@@ -10,6 +10,16 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.5] - 2026-09-27
+
+### Changed
+
+- Slice 027 implements the pre-declared `getReadiness` operation. The `clock` check may now
+  return `not_configured` while its NTP adapter is pending in slice 033. The code was already
+  defined for other checks; the response remains limited to status and allowed codes.
+- Slice 028's planned mandatory fields and `If-Match` requirement move to 0.3.6. No slice 028
+  field becomes mandatory in this patch.
+
 ## [0.3.4] - 2026-09-27
 
 ### Changed

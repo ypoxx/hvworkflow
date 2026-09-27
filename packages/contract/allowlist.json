@@ -9,7 +9,6 @@
   {"operationId":"getSession","reason":"Vertrag 0.3.0 (Scheibe 023): /auth/me mit Rollen aus der Zuordnungstabelle, IdP-Gruppen nur als Vorschlag; Dienst in 029","slice":"029","expires":"2026-11-25"},
   {"operationId":"getTransparencyNotice","reason":"Vertrag 0.3.0 (Scheibe 023): Transparenzhinweis (Art. 13 DSGVO, ungeprüft E15) ohne Anmeldung lesbar; Text als Konfiguration in 029, Anzeige in 030","slice":"029","expires":"2026-11-25"},
   {"operationId":"getHealth","reason":"Vertrag 0.3.0 (Scheibe 023): /healthz ohne Anmeldung; Dienst in 033","slice":"033","expires":"2026-11-25"},
-  {"operationId":"getReadiness","reason":"Vertrag 0.3.0 (Scheibe 023): /readyz mit NTP-Status (033), DB und Migrationsstand (027); Dienst in 033","slice":"033","expires":"2026-11-25"},
   {"operationId":"getMetrics","reason":"Vertrag 0.3.0 (Scheibe 023): /metrics mit fünf fachlichen Kennzahlen hinter metricsBearer (ADR 0013); Dienst in 033","slice":"033","expires":"2026-11-25"},
   {"operationId":"streamEvents","reason":"Vertrag 0.3.0 (Scheibe 023): SSE /v1/stream mit Last-Event-ID und Jahrgangsfilter (ADR 0014); Dienst in 035","slice":"035","expires":"2026-11-25"},
   {"operationId":"createMeeting","reason":"Vertrag 0.3.0 (Scheibe 023): Jahrgang anlegen/klonen mit admin.meetings.manage; Kern in 040; Lane service seit takt-011; wird mit Scheibe 040 ausgeübt und entfernt","slice":"040","expires":"2026-11-25"},
