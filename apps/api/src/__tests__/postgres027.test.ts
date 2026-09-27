@@ -173,7 +173,10 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const retried = await request();
     expect(retried.status).toBe(201);
     expect((await events()).map((event) => event.seq)).toEqual([1, 2, 3]);
-    expect((await retried.json() as { displayName: string }).displayName).toBe('Nur nach Commit');
+    // Admin may register a speaker but has no right to reveal the clear name in the response.
+    expect((await retried.json() as { displayName: string }).displayName).toBe('Redner 1');
+    expect((await owner.query<{ display_name: string }>('SELECT display_name FROM persons')).rows)
+      .toEqual([{ display_name: 'Nur nach Commit' }]);
   });
 
   it.each([
