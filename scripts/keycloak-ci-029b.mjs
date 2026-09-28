@@ -55,6 +55,9 @@ function realmFixture() {
     users: [{
       id: identity.userId,
       username: identity.username,
+      email: `${identity.username}@example.test`,
+      firstName: 'Synthetic',
+      lastName: 'Testperson',
       enabled: true,
       emailVerified: true,
       credentials: [{ type: 'password', value: identity.userPassword, temporary: false }],
@@ -68,6 +71,8 @@ function checkFixture() {
   const { identity, realm } = realmFixture();
   assert.equal(realm.clients[0].secret, identity.clientSecret);
   assert.equal(realm.users[0].id, identity.userId);
+  assert.match(realm.users[0].email, /@example\.test$/);
+  assert(realm.users[0].firstName && realm.users[0].lastName);
   assert.equal(realm.clients[0].redirectUris[0], callback);
   assert.equal(realm.users[0].credentials[0].value, identity.userPassword);
   assert.notEqual(identity.clientSecret, identity.userPassword);
@@ -209,7 +214,14 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     const callbackResponse = page.waitForResponse((response) => response.url().startsWith(`${apiOrigin}/auth/callback?`));
     await page.locator('#kc-login').click();
     stage = 'OIDC callback';
-    const completed = await callbackResponse;
+    const completed = await callbackResponse.catch(async (error) => {
+      const current = new URL(page.url());
+      const area = current.origin === `http://localhost:${keycloakPort}` ? 'Keycloak'
+        : current.origin === apiOrigin ? 'API' : 'other origin';
+      const profileForm = await page.locator('#email').isVisible().catch(() => false);
+      stage = `OIDC callback absent at ${area}${profileForm ? ' profile form' : ''}`;
+      throw error;
+    });
     stage = `OIDC callback HTTP ${completed.status()}`;
     assert.equal(completed.status(), 302, 'OIDC callback was not accepted.');
     stage = 'OIDC callback cookies';
