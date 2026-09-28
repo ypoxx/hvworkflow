@@ -30,6 +30,77 @@ type RoleOps = HvApi & {
 };
 
 describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
+  it('requires a current grant for a session actor, while preserving the synthetic demo actor', async () => {
+    const { api, actor } = fixture();
+    actor({ id: 'unassigned', role: 'admin', assignmentScoped: true });
+    await expect(api.listSpeakers()).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
+    actor({ id: 'demo-mod', role: 'moderation' });
+    expect(await api.listSpeakers()).toEqual([]);
+  });
+
+  it('uses the oldest active grant for the current meeting, not the session role', async () => {
+    const { api, actor } = fixture();
+    actor(admin);
+    const oldest = await api.assignRole({ subjectId: 'session-subject', role: 'capture' });
+    await api.assignRole({ subjectId: 'session-subject', role: 'admin' });
+    actor({ id: 'session-subject', role: 'admin', assignmentScoped: true });
+    await expect(api.assignRole({ subjectId: 'other', role: 'capture' })).rejects.toMatchObject({ status: 403 });
+    actor(admin);
+    await api.revokeRole(oldest.id);
+    actor({ id: 'session-subject', role: 'observer', assignmentScoped: true });
+    expect((await api.assignRole({ subjectId: 'other', role: 'capture' })).subjectId).toBe('other');
+  });
+
+  it('rejects a revoked, expired or closed grant for a session actor', async () => {
+    const { api, actor, time, store } = fixture();
+    actor(admin);
+    const revoked = await api.assignRole({ subjectId: 'revoked-session', role: 'moderation' });
+    const expired = await api.assignRole({ subjectId: 'expired-session', role: 'moderation', expiresAt: '2027-04-20T10:06:00.000Z' });
+    await api.assignRole({ subjectId: 'closed-session', role: 'moderation' });
+    await api.revokeRole(revoked.id);
+    actor({ id: 'revoked-session', role: 'moderation', assignmentScoped: true });
+    await expect(api.listSpeakers()).rejects.toMatchObject({ status: 403 });
+    actor({ id: 'expired-session', role: 'moderation', assignmentScoped: true });
+    expect(await api.listSpeakers()).toEqual([]);
+    time(expired.expiresAt!);
+    await expect(api.listSpeakers()).rejects.toMatchObject({ status: 403 });
+    store.append([{ id: 'session-close', type: 'MeetingClosed', at: expired.expiresAt!, actor: admin,
+      subjectId: 'hv-2027', meetingId: 'hv-2027', payload: {} }] as NewEvent[]);
+    actor({ id: 'closed-session', role: 'moderation', assignmentScoped: true });
+    await expect(api.listSpeakers()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('does not carry a session grant into another meeting', async () => {
+    const { api, actor, store } = fixture();
+    actor(admin);
+    await api.assignRole({ subjectId: 'switching-subject', role: 'moderation' });
+    store.append([
+      { id: 'meeting-next', type: 'MeetingCreated', at, actor: admin, subjectId: 'hv-2028', meetingId: 'hv-2028',
+        payload: { title: 'HV 2028', date: '2028-04-20', agendaItems: [], units: [] } },
+      { id: 'start-next', type: 'MeetingStarted', at, actor: admin, subjectId: 'hv-2028', meetingId: 'hv-2028', payload: {} },
+    ] as NewEvent[]);
+    const next = createInProcessApi({ store, actor: () => ({ id: 'switching-subject', role: 'moderation', assignmentScoped: true }),
+      meetingId: 'hv-2028', clock: () => new Date('2027-04-20T10:05:00.000Z') });
+    await expect(next.listSpeakers()).rejects.toMatchObject({ status: 403 });
+    actor({ id: 'switching-subject', role: 'moderation', assignmentScoped: true });
+    expect(await api.listSpeakers()).toEqual([]);
+  });
+
+  it('denies an idempotent replay after revocation without appending an event', async () => {
+    const { api, actor, store } = fixture();
+    actor(admin);
+    const grant = await api.assignRole({ subjectId: 'replay-session', role: 'moderation' });
+    actor({ id: 'replay-session', role: 'moderation', assignmentScoped: true });
+    const options = { ifMatch: etagOf((await api.getMeeting()).speakerListVersion), idempotencyKey: 'session-replay' };
+    await api.registerSpeaker({ displayName: 'Synthetische Testperson' }, options);
+    actor(admin);
+    await api.revokeRole(grant.id);
+    const before = store.lastSeq();
+    actor({ id: 'replay-session', role: 'moderation', assignmentScoped: true });
+    await expect(api.registerSpeaker({ displayName: 'Synthetische Testperson' }, options)).rejects.toMatchObject({ status: 403 });
+    expect(store.lastSeq()).toBe(before);
+  });
+
   it('keeps clear speaker names in marked PII and reveals them only through the new right', async () => {
     const { store, api, actor } = fixture();
     const speaker = await api.registerSpeaker({ displayName: 'Synthetische Testperson', organisation: 'Testverein' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });

@@ -10,6 +10,23 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.7] - 2026-09-28
+
+### Changed
+
+- Scheibe 029b binds the OIDC callback to the browser that started login. The `/auth/login` 302
+  now declares one short-lived, host-only `hv_auth_state` correlation cookie. The successful
+  `/auth/callback` 302 declares two separate `Set-Cookie` lines: exactly one live `hv_session`
+  and one clearing `hv_auth_state` scoped to `/auth/callback`. The per-line schemas and
+  `x-required-cookie-lines` metadata make the required names and multiplicity testable.
+- Failed `/auth/callback` responses (400, 403 and 503) also clear `hv_auth_state` on a separate
+  cookie line, so a failed sign-in leaves no browser correlation value behind.
+- The five auth operations are now covered by HTTP tests and removed from the pre-declared allowlist.
+- `/auth/me` now documents 403 when a valid session has lost every active role assignment; the
+  signed-in subject remains known, while the current grant is absent.
+- Sign-in and callback return 503 until a versioned DE/EN transparency notice is configured and
+  readable before login.
+
 ## [0.3.6] - 2026-09-27
 
 ### Changed

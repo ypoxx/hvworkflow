@@ -123,6 +123,27 @@ nach ADR 0002 hingenommen, weil die Demo nur den synthetischen Korpus hält (T-G
   E Rechteerhöhung. In v1 hat jeder Buchstabe jeder Grenze mindestens eine Bedrohung; die Form „nicht
   anwendbar, weil …" wird deshalb nicht gebraucht.
 
+## Stand Scheibe 029b (interne Beta-Anmeldung)
+
+Die untenstehenden STRIDE-Zeilen beschreiben zum Teil noch den ursprünglichen Demo-Stand. Für
+T-G1-S-01 gilt seit 029a der Startabbruch bei Demo plus Issuer und 401 ohne Demo-Anmeldung; 029b
+ergänzt den OIDC-Sitzungsadapter. T-G1-S-02, T-G1-I-08 und T-G1-T-05 erhalten mit 029b
+browsergebundenen Login-State, ein zufälliges HttpOnly-Sitzungscookie, 14 Stunden absolute und
+30 Minuten Leerlaufgrenze, Abmelden, Subject-Sperre und CSRF-Pflicht vor jedem `/v1`-Schreiben.
+Offene SSE-Ströme und der UI-Client folgen in 035 beziehungsweise 030; der Geräteverlustfall ist
+damit noch nicht vollständig geschlossen. T-G3-S-02 wird mit `openid-client` gegen JWKS,
+Issuer, Audience, Ablauf, Nonce, State und PKCE geprüft; die Negativfälle stehen in
+`apps/api/src/__tests__/auth-029b.test.ts`. T-G3-E-03 erhält die aktuelle Rollenzuordnung aus
+`RoleAssigned`/`RoleRevoked`, ohne automatische IdP-Gruppenrechte; der Entzug wird beim nächsten
+Aufruf geprüft. T-G3-D-01 bleibt für Register und Transkription offen; ein ausgefallener IdP
+verhindert neue Anmeldungen. Notfallkonten bleiben bis nach der Fortführungsentscheidung zurückgestellt.
+
+Der Datenbanknachweis in `apps/api/src/__tests__/postgres-auth-029b.test.ts` prüft zwei Prozesse,
+Logout, Sperre und Laufzeitrechte. Der echte Keycloak- und Browser-Nachweis steht im
+CI-Schritt `scripts/keycloak-ci-029b.mjs`; sein grünes CI-Ergebnis ist vor Merge erforderlich.
+Die Test-Fixierung verwendet ausschließlich synthetische Subjects. Die Tabellenzeilen unten
+sind die Bedrohungsbeschreibung; dieser Nachtrag ist der aktuelle 029b-Status der genannten IDs.
+
 ## 5. STRIDE je Grenze
 
 ### 5.1 G1 — Oberfläche ↔ Dienst

@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 
 const migrations = [
   { version: 1, name: '0001_event_log' },
+  { version: 2, name: '0002_auth' },
 ] as const;
 
 const latestVersion = migrations.at(-1)!.version;
@@ -78,6 +79,11 @@ async function assertSchemaConsistent(
   if (versions.includes(1) !== (events && persons) || events !== persons) {
     throw new Error('Migration schema and history disagree.');
   }
+  const authTables = await Promise.all(['auth_login_states', 'auth_sessions', 'auth_logout_ids',
+    'auth_subject_blocks'].map((table) => tableExists(client, schema.name, table)));
+  if (authTables.some((present) => present !== versions.includes(2))) {
+    throw new Error('Auth migration schema and history disagree.');
+  }
 }
 
 async function readMigration(name: string, direction: 'up' | 'down', schema: string): Promise<string> {
@@ -114,7 +120,8 @@ async function grantRuntimeAccess(
 
   await client.query(`REVOKE CREATE ON SCHEMA ${schema.quoted} FROM PUBLIC`);
   await client.query(`GRANT USAGE ON SCHEMA ${schema.quoted} TO ${quotedRole}`);
-  for (const table of ['events', 'persons', 'schema_migrations']) {
+  for (const table of ['events', 'persons', 'schema_migrations', 'auth_login_states',
+    'auth_sessions', 'auth_logout_ids', 'auth_subject_blocks']) {
     await client.query(`REVOKE ALL ON TABLE ${schema.quoted}.${table} FROM PUBLIC`);
     await client.query(`REVOKE ALL ON TABLE ${schema.quoted}.${table} FROM ${quotedRole}`);
   }
@@ -122,6 +129,16 @@ async function grantRuntimeAccess(
     `GRANT SELECT, INSERT ON TABLE ${schema.quoted}.events, ${schema.quoted}.persons TO ${quotedRole}`,
   );
   await client.query(`GRANT SELECT ON TABLE ${schema.quoted}.schema_migrations TO ${quotedRole}`);
+  await client.query(
+    `GRANT SELECT, INSERT ON TABLE ${schema.quoted}.auth_login_states,
+       ${schema.quoted}.auth_sessions TO ${quotedRole}`,
+  );
+  await client.query(`GRANT UPDATE (consumed_at) ON TABLE ${schema.quoted}.auth_login_states TO ${quotedRole}`);
+  await client.query(`GRANT UPDATE (idle_expires_at, revoked_at) ON TABLE ${schema.quoted}.auth_sessions TO ${quotedRole}`);
+  await client.query(
+    `GRANT INSERT ON TABLE ${schema.quoted}.auth_logout_ids TO ${quotedRole}`,
+  );
+  await client.query(`GRANT SELECT, INSERT ON TABLE ${schema.quoted}.auth_subject_blocks TO ${quotedRole}`);
 
   const privileges = await client.query<{
     can_create: boolean; can_update_events: boolean; can_delete_events: boolean;
@@ -200,15 +217,15 @@ export async function runMigrations(pool: Pool, options: MigrationOptions): Prom
       for (const migration of [...migrations].reverse()) {
         if (!versions.includes(migration.version)) continue;
         // Lock before checking: another writer cannot insert between the emptiness check and DROP.
-        await client.query(
-          `LOCK TABLE ${schema.quoted}.events, ${schema.quoted}.persons IN ACCESS EXCLUSIVE MODE`,
-        );
+        const tables = migration.version === 2
+          ? ['auth_login_states', 'auth_sessions', 'auth_logout_ids', 'auth_subject_blocks']
+          : ['events', 'persons'];
+        await client.query(`LOCK TABLE ${tables.map((table) => `${schema.quoted}.${table}`).join(', ')} IN ACCESS EXCLUSIVE MODE`);
         const contents = await client.query<{ populated: boolean }>(
-          `SELECT EXISTS (SELECT 1 FROM ${schema.quoted}.events)
-               OR EXISTS (SELECT 1 FROM ${schema.quoted}.persons) AS populated`,
+          `SELECT ${tables.map((table) => `EXISTS (SELECT 1 FROM ${schema.quoted}.${table})`).join(' OR ')} AS populated`,
         );
         if (contents.rows[0]?.populated) {
-          throw new Error('Refusing destructive down migration while the event log is populated.');
+          throw new Error('Refusing destructive down migration while data is populated.');
         }
         await client.query(await readMigration(migration.name, 'down', schema.quoted));
         await client.query(

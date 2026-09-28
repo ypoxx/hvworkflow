@@ -1,6 +1,6 @@
 # ADR 0004 — Identität: OIDC über einen BFF im Dienst
 
-**Status:** vorgeschlagen · **Datum:** 23.09.2026; Beta-Grenze durch den Eigentümer am 27.09.2026 entschieden · **Entscheider:** Eigentümer (Beta-Grenze, E11); Konzern-IT (Identity Provider und Client-Typ, E11); Konzern-IT und Projektleitung (Rollenzuweisungspfad, E8); Eigentümer und Konzern-Security (MFA im Rückfall, E38) · **Annahme:** Prüfpunkt 3 für den Beta-Teil; Notfallkonten erst nach der Fortführungsentscheidung
+**Status:** Beta-Teil in Scheibe 029b umgesetzt, Prüfpunkt 3/CI und reale Inbetriebnahme noch offen · **Datum:** 23.09.2026; Beta-Grenze durch den Eigentümer am 27.09.2026 entschieden · **Entscheider:** Eigentümer (Beta-Grenze, E11); Konzern-IT (Identity Provider und Client-Typ, E11); Konzern-IT und Projektleitung (Rollenzuweisungspfad, E8); Eigentümer und Konzern-Security (MFA im Rückfall, E38) · **Annahme:** Prüfpunkt 3 für den Beta-Teil; Notfallkonten erst nach der Fortführungsentscheidung
 
 ## Kontext
 
@@ -71,6 +71,17 @@ Rückfall 15.01.2027, E11); bis dahin läuft alles gegen Keycloak.
   Lesezugang (E24).
 
 ## Nachweis
+
+Scheibe 029b implementiert den BFF-Port mit `openid-client`, browsergebundenem Login-State,
+Postgres-Sitzung und aktueller Zuordnung je Jahrgang. Der synthetische Provider-Test unter
+`apps/api/src/__tests__/auth-029b.test.ts` prüft Signatur, Issuer, Audience, Ablauf, Nonce,
+State, PKCE, Replay, Rollenentzug und CSRF. Login und Callback bleiben gesperrt, bis der
+versionierte DE/EN-Transparenzhinweis lesbar ist; ein für die Beta ungenutztes IdP-Refresh-Token
+wird verworfen. Der echte Keycloak-Container und Postgres-
+Laufzeitgrants werden in `.github/workflows/gates.yml` geprüft; ein grüner CI-Lauf auf dem letzten
+PR-Commit ist noch Bedingung für Prüfpunkt 3. Vor der realen Beta braucht 040 zusätzlich einen
+auditierbaren Bootstrap des ersten Jahrgangs und Erst-Admins. Das Web-Anmeldeformular folgt in
+030, der durchgängige Browserbetrieb in 031. Der Transparenzhinweis bleibt bis E15 ungeprüft.
 
 Scheibe **029b** (Beta-Teil von Plan 4): Negativtests abgelaufene Sitzung → 401, falsche Audience
 → 401, `X-Actor` ohne Demo → 401, Subject ohne Rolle → 403, gesperrtes Subject → 401,

@@ -91,12 +91,32 @@ export async function assertRuntimePrivileges(pool: Pool, requireTables = true):
        FROM pg_catalog.pg_class c
        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
        JOIN pg_catalog.pg_roles r ON r.rolname = current_user
-       WHERE n.nspname = current_schema() AND c.relname IN ('events', 'persons', 'schema_migrations')`);
-    if (requireTables && privileges.rows.length !== 3) throw new PostgresPersistenceError();
+       WHERE n.nspname = current_schema() AND c.relname IN
+         ('events', 'persons', 'schema_migrations', 'auth_login_states', 'auth_sessions',
+          'auth_logout_ids', 'auth_subject_blocks')`);
+    if (requireTables && privileges.rows.length !== 7) throw new PostgresPersistenceError();
     for (const row of privileges.rows) {
+      const expectedSelect = row.relname !== 'auth_logout_ids';
       const expectedInsert = row.relname !== 'schema_migrations';
-      if (!row.can_select || row.can_insert !== expectedInsert || row.can_update || row.can_delete ||
+      const expectedUpdate = false;
+      if (row.can_select !== expectedSelect || row.can_insert !== expectedInsert || row.can_update !== expectedUpdate || row.can_delete ||
           row.can_truncate || row.can_references || row.can_trigger || row.owner_member) {
+        throw new PostgresPersistenceError();
+      }
+    }
+    const columns = await client.query<{ relname: string; attname: string; can_update: boolean }>(
+      `SELECT c.relname, a.attname,
+         has_column_privilege(current_user, c.oid, a.attname, 'UPDATE') AS can_update
+       FROM pg_catalog.pg_class c
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+       WHERE n.nspname = current_schema() AND c.relname IN ('auth_login_states', 'auth_sessions')`,
+    );
+    if (requireTables && columns.rows.length === 0) throw new PostgresPersistenceError();
+    const writable = new Set(['auth_login_states.consumed_at', 'auth_sessions.idle_expires_at',
+      'auth_sessions.revoked_at']);
+    for (const row of columns.rows) {
+      if (row.can_update !== writable.has(`${row.relname}.${row.attname}`)) {
         throw new PostgresPersistenceError();
       }
     }

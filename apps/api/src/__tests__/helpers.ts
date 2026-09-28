@@ -203,7 +203,7 @@ function assertResponseHeaders(operationId: string, method: string, pathname: st
   }
   for (const [name, raw] of Object.entries(headers ?? {})) {
     const pointer = '$ref' in raw ? (raw['$ref'] as string) : `${base}/headers/${escapePointer(name)}`;
-    const header = resolvePointer(pointer) as { required?: boolean };
+    const header = resolvePointer(pointer) as { required?: boolean; 'x-required-cookie-lines'?: string[] };
     const isSetCookie = name.toLowerCase() === 'set-cookie';
     const joined = res.headers.get(name);
     const values = isSetCookie ? setCookies : joined === null ? [] : [joined];
@@ -212,6 +212,13 @@ function assertResponseHeaders(operationId: string, method: string, pathname: st
         throw new Error(`${where} without the response header "${name}", which the contract marks as required for this status.`);
       }
       continue;
+    }
+    if (isSetCookie && header['x-required-cookie-lines']) {
+      const required = header['x-required-cookie-lines'];
+      const names = setCookies.map((line) => line.split('=', 1)[0]?.trim());
+      if (names.length !== required.length || required.some((expected) => names.filter((name) => name === expected).length !== 1)) {
+        throw new Error(`${where} has cookie lines ${names.join(', ')}; required exactly ${required.join(', ')}.`);
+      }
     }
     const validate = headerValidator(`${pointer}/schema`);
     for (const value of values) {

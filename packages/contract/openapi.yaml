@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.3.6
+  version: 0.3.7
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -1147,7 +1147,9 @@ paths:
       description: >-
         Since 0.3.0 (slice 029, ADR 0004). Authorization Code flow runs server-side with a
         confidential client; the browser is redirected to the identity provider and never sees a
-        token. No credential needed (`security: []`). `503` when no identity provider is configured
+        token. Since 0.3.7 (slice 029b), the redirect also sets a host-only `hv_auth_state` browser
+        correlation cookie for the callback; it is distinct from the server-side OIDC state and
+        expires within five minutes. No credential needed (`security: []`). `503` when no identity provider or no readable DE/EN transparency notice is configured
         (demo, `HV_DEMO=1`: the header `X-Actor` is the sign-in); `422` when `returnTo` is longer than
         512 characters. A `2xx` response does not exist for this operation by design (lint warning
         accepted, see CHANGELOG 0.3.0).
@@ -1170,6 +1172,14 @@ paths:
             # The identity provider's authorization URL from the configuration (slice 029). Not bound to
             # `https:` because the local and e2e Keycloak (031) runs on plain http on localhost.
             Location: { required: true, schema: { type: string, format: uri } }
+            Set-Cookie:
+              required: true
+              x-required-cookie-lines: [hv_auth_state]
+              description: >-
+                Exactly one `Set-Cookie` header line for the short-lived browser correlation value.
+                It is host-only, HttpOnly, Secure, SameSite=Lax and scoped to `/auth/callback`;
+                no session is established by login. Validate each line through `Headers.getSetCookie()`.
+              schema: { $ref: '#/components/schemas/AuthStateCookieLine' }
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '422': { $ref: '#/components/responses/Unprocessable' }
@@ -1184,8 +1194,11 @@ paths:
         Since 0.3.0 (slice 029). Validates `state`, exchanges `code` server-side, checks issuer,
         audience, expiry and signature (JWKS), resolves the roles from the assignment table (slice
         026; identity-provider groups are a suggestion only) and sets the HttpOnly `session` cookie.
+        Since 0.3.7 (slice 029b), the callback also requires the browser-bound `hv_auth_state`
+        correlation cookie set by login, consumes its server-side state atomically and clears the
+        correlation cookie in a separate `Set-Cookie` header line.
         `400` on an invalid or replayed `state`/`code`; `403` when the subject has no role in any
-        open meeting; `503` when no identity provider is configured. No `2xx` by design. The call
+        open meeting; `503` when no identity provider or no readable DE/EN transparency notice is configured. No `2xx` by design. The call
         carries no credential yet, so no problem `detail` names the subject, its e-mail address or
         the identity provider's error text (ADR 0009; prose, Codex round 5).
       security: []
@@ -1205,9 +1218,13 @@ paths:
             # Codex on 8ef3ad2: a 302 without the cookie would be a sign-in that signed no one in.
             Set-Cookie:
               required: true
+              x-required-cookie-lines: [hv_session, hv_auth_state]
               description: >-
-                Sets the `hv_session` cookie of the `session` scheme (ADR 0004); the only way a session
-                comes into being. Codex on 50cc738 (SECURITY): the value is at least 32 cookie octets
+                Exactly two separate `Set-Cookie` header lines: one live `hv_session` cookie of the
+                `session` scheme (ADR 0004), and one clearing `hv_auth_state` cookie with the same
+                host-only `/auth/callback` scope used by login. Validate each line independently and
+                require exactly one of each name through `Headers.getSetCookie()`; never parse the
+                comma-joined `Headers.get()` value. The session value is at least 32 cookie octets
                 (an unguessable session id, never empty), and the attributes `HttpOnly`, `Secure` and
                 `SameSite=Lax` or `SameSite=Strict` are all present in any order (lookaheads); a
                 `Max-Age=0` or negative `Max-Age` (a deleting cookie) is rejected. Codex on f611116:
@@ -1218,22 +1235,36 @@ paths:
                 attributes in the canonical case the service writes (a lower-case variant is rejected,
                 never admitted); forbidden attributes in any case (RFC 6265 names are case-insensitive,
                 so `domain=` cannot slip through). Codex on 929d0d7 (SECURITY): exactly one session
-                cookie per response — one `Set-Cookie` header line named `hv_session`, never a second
-                one that the browser could apply last. The schema describes one header line; a client
-                or test must validate every `Set-Cookie` line on its own (`Headers.getSetCookie()`),
-                never the comma-joined `Headers.get()`. As a safety net the value contains no comma
+                cookie per response, never a second one that the browser could apply last. Each
+                schema branch describes one header line. As a safety net the value contains no comma
                 and no second `hv_session=`, which is possible because `Expires` is forbidden and
                 lifetime is expressed only by `Max-Age` (RFC 6265 gives `Max-Age` precedence; `Expires`
                 is the only attribute whose value contains a comma). Prose only: the randomness of the
                 value.
               schema:
-                type: string
-                pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?!.*,)(?!.*hv_session=)(?!.*;\s*[Ee][Xx][Pp][Ii][Rr][Ee][Ss]=)(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*[Ss][Aa][Mm][Ee][Ss][Ii][Tt][Ee]=(?!(?:Lax|Strict)\s*(?:;|$)))(?!.*;\s*[Mm][Aa][Xx]-[Aa][Gg][Ee]=\s*(?:0|-))'
+                oneOf:
+                  - { $ref: '#/components/schemas/SessionCookieLine' }
+                  - { $ref: '#/components/schemas/ClearedAuthStateCookieLine' }
             Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
-        '400': { description: Invalid or replayed authorization response, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } } }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '400':
+          description: Invalid or replayed authorization response; clears browser correlation
+          headers:
+            Set-Cookie: { required: true, x-required-cookie-lines: [hv_auth_state], schema: { $ref: '#/components/schemas/ClearedAuthStateCookieLine' } }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 400 } } } ] } } }
+        '403':
+          description: No active role or blocked subject; clears browser correlation
+          headers:
+            Set-Cookie: { required: true, x-required-cookie-lines: [hv_auth_state], schema: { $ref: '#/components/schemas/ClearedAuthStateCookieLine' } }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 403 } } } ] } } }
+        '503':
+          description: Sign-in unavailable; clears browser correlation
+          headers:
+            Set-Cookie: { required: true, x-required-cookie-lines: [hv_auth_state], schema: { $ref: '#/components/schemas/ClearedAuthStateCookieLine' } }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
   /auth/logout:
     servers: [ { url: /, description: 'Outside /v1' } ]
     post:
@@ -1281,6 +1312,7 @@ paths:
       responses:
         '200': { description: 'OK — carries the CSRF token, so never stored by a cache', headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /auth/transparency-notice:
     servers: [ { url: /, description: 'Outside /v1: read before sign-in' } ]
     get:
@@ -1608,6 +1640,21 @@ components:
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
   schemas:
+    AuthStateCookieLine:
+      type: string
+      description: >-
+        One login correlation cookie line. The Base64url value is at least 43 characters; `Max-Age`
+        is 1–300 seconds. The canonical attribute order also rejects Domain, Expires and duplicates.
+      pattern: '^hv_auth_state=[A-Za-z0-9_-]{43,}; Max-Age=(?:[1-9]|[1-9][0-9]|[12][0-9]{2}|300); Path=/auth/callback; HttpOnly; Secure; SameSite=Lax$'
+    ClearedAuthStateCookieLine:
+      type: string
+      description: >-
+        One callback clearing cookie line with the same host-only path and attributes as login.
+      pattern: '^hv_auth_state=; Max-Age=0; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax$'
+    SessionCookieLine:
+      type: string
+      description: One live host-only session cookie line; never a deleting cookie.
+      pattern: '^hv_session=[!#-+\--:<-\[\]-~]{32,}(?!.*,)(?!.*hv_session=)(?!.*;\s*[Ee][Xx][Pp][Ii][Rr][Ee][Ss]=)(?=.*;\s*Path=/\s*(?:;|$))(?!.*;\s*[Pp][Aa][Tt][Hh]=(?!/\s*(?:;|$)))(?!.*;\s*[Dd][Oo][Mm][Aa][Ii][Nn]=)(?=.*;\s*HttpOnly\s*(?:;|$))(?=.*;\s*Secure\s*(?:;|$))(?=.*;\s*SameSite=(?:Lax|Strict)\s*(?:;|$))(?!.*;\s*[Ss][Aa][Mm][Ee][Ss][Ii][Tt][Ee]=(?!(?:Lax|Strict)\s*(?:;|$)))(?!.*;\s*[Mm][Aa][Xx]-[Aa][Gg][Ee]=\s*(?:0|-))'
     SameOriginPath:
       type: string
       maxLength: 512

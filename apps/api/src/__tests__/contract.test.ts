@@ -25,9 +25,68 @@ interface QuestionLike {
   status: string;
 }
 
+interface CookieSchema {
+  $ref?: string;
+  pattern?: string;
+  oneOf?: CookieSchema[];
+}
+
+function matchesCookieLine(schema: CookieSchema, line: string): boolean {
+  if (schema.$ref) return matchesCookieLine(resolvePointer(schema.$ref) as CookieSchema, line);
+  if (schema.oneOf) return schema.oneOf.filter((branch) => matchesCookieLine(branch, line)).length === 1;
+  return schema.pattern !== undefined && new RegExp(schema.pattern).test(line);
+}
+
+function matchesCookieResponse(header: { schema: CookieSchema; 'x-required-cookie-lines': string[] },
+  lines: readonly string[]): boolean {
+  const names = header['x-required-cookie-lines'];
+  return lines.length === names.length &&
+    lines.every((line) => matchesCookieLine(header.schema, line)) &&
+    names.every((name) => lines.filter((line) => line.startsWith(`${name}=`)).length === 1);
+}
+
+describe('Scheibe 029b: browser-bound OIDC correlation cookies', () => {
+  const loginHeaders = openapiDoc.paths['/auth/login'].get.responses['302'].headers;
+  const callbackHeaders = openapiDoc.paths['/auth/callback'].get.responses['302'].headers;
+  const stateValue = 'A'.repeat(43);
+  const sessionValue = 'B'.repeat(43);
+  const stateLine = `hv_auth_state=${stateValue}; Max-Age=300; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax`;
+  const clearStateLine = 'hv_auth_state=; Max-Age=0; Path=/auth/callback; HttpOnly; Secure; SameSite=Lax';
+  const sessionLine = `hv_session=${sessionValue}; Max-Age=50400; Path=/; HttpOnly; Secure; SameSite=Lax`;
+
+  it('declares exactly one short-lived host-bound correlation cookie on login', () => {
+    const cookie = loginHeaders['Set-Cookie'];
+    expect(cookie?.required).toBe(true);
+    expect(cookie?.['x-required-cookie-lines']).toEqual(['hv_auth_state']);
+    expect(matchesCookieResponse(cookie, [stateLine])).toBe(true);
+    expect(matchesCookieResponse(cookie, [stateLine, stateLine])).toBe(false);
+    for (const invalid of [
+      sessionLine,
+      stateLine.replace('Secure; ', ''),
+      stateLine.replace('Path=/auth/callback', 'Path=/'),
+      `${stateLine}; Domain=example.test`,
+      stateLine.replace('Max-Age=300', 'Max-Age=301'),
+    ]) expect(matchesCookieLine(cookie.schema as CookieSchema, invalid), invalid).toBe(false);
+  });
+
+  it('declares separate callback Set-Cookie lines for one live session and clearing the correlation cookie', () => {
+    const cookie = callbackHeaders['Set-Cookie'];
+    expect(cookie?.required).toBe(true);
+    expect(cookie?.['x-required-cookie-lines']).toEqual(['hv_session', 'hv_auth_state']);
+    expect(matchesCookieResponse(cookie, [sessionLine, clearStateLine])).toBe(true);
+    expect(matchesCookieResponse(cookie, [sessionLine])).toBe(false);
+    expect(matchesCookieResponse(cookie, [sessionLine, sessionLine])).toBe(false);
+    expect(matchesCookieResponse(cookie, [sessionLine, stateLine])).toBe(false);
+    expect(matchesCookieLine(cookie.schema as CookieSchema, stateLine)).toBe(false);
+    expect(matchesCookieLine(cookie.schema as CookieSchema,
+      clearStateLine.replace('Path=/auth/callback', 'Path=/'))).toBe(false);
+    expect(new Set(cookie['x-required-cookie-lines']).size).toBe(2);
+  });
+});
+
 describe('Scheibe 028: mandatory version contract', () => {
   it('requires the 0.3.6 fields and per-operation If-Match without changing array responses', () => {
-    expect(openapiDoc.info.version).toBe('0.3.6');
+    expect(openapiDoc.info.version).toBe('0.3.7');
     const schemas = openapiDoc.components.schemas;
     expect(schemas.Meeting.required).toEqual(expect.arrayContaining(['version', 'speakerListVersion']));
     expect(schemas.Speaker.required).toContain('meetingId');
