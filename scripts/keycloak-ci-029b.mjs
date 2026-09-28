@@ -182,15 +182,18 @@ function startApi(runtimeUrl, identity, encryptionKey) {
 }
 
 async function checkBrowserFlow(identity, expectedActorId, meetingId) {
+  stage = 'pre-login notice';
   const noticeResponse = await fetch(`${apiOrigin}/auth/transparency-notice`);
   assert.equal(noticeResponse.status, 200, 'The DE/EN notice must be readable before login.');
   const notice = await noticeResponse.json();
   assert(notice.text.de && notice.text.en);
   const { chromium } = webRequire('@playwright/test');
+  stage = 'browser launch';
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
+    stage = 'Keycloak login form';
     const loginResponse = await page.goto(`${apiOrigin}/auth/login?returnTo=%2Fv1%2Fmeeting`);
     assert.equal(loginResponse?.status(), 200, 'Keycloak login form did not load.');
     const authorization = new URL(page.url());
@@ -200,10 +203,12 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     assert(authorization.searchParams.get('code_challenge'));
     assert(authorization.searchParams.get('state'));
     assert(authorization.searchParams.get('nonce'));
+    stage = 'Keycloak credential form';
     await page.locator('#username').fill(identity.username);
     await page.locator('#password').fill(identity.userPassword);
     const callbackResponse = page.waitForResponse((response) => response.url().startsWith(`${apiOrigin}/auth/callback?`));
     await page.locator('#kc-login').click();
+    stage = 'OIDC callback';
     const completed = await callbackResponse;
     assert.equal(completed.status(), 302, 'OIDC callback was not accepted.');
     const cookies = (await completed.headersArray())
@@ -211,8 +216,10 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     assert.equal(cookies.length, 2, 'Callback must send two separate Set-Cookie fields.');
     assert.equal(cookies.filter((line) => line.startsWith('hv_session=')).length, 1);
     assert.equal(cookies.filter((line) => line.startsWith('hv_auth_state=') && line.includes('Max-Age=0')).length, 1);
+    stage = 'post-login navigation';
     await page.waitForURL(`${apiOrigin}/v1/meeting`);
 
+    stage = 'session verification';
     const me = await page.evaluate(async () => {
       const response = await fetch('/auth/me', { headers: { 'X-Actor': 'attacker:admin' } });
       return { status: response.status, cache: response.headers.get('Cache-Control'), body: await response.json() };
@@ -225,6 +232,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     assert.deepEqual(me.body.roles, ['moderation']);
     assert.match(me.body.csrfToken, /^[A-Za-z0-9_-]{43}$/);
 
+    stage = 'CSRF mutation';
     const mutation = await page.evaluate(async ({ meetingId: id, csrfToken }) => {
       const route = `/v1/meetings/${id}/speakers`;
       const before = await fetch(route);
@@ -242,6 +250,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     assert.equal(mutation.rejected, 403, 'Missing CSRF token must reject a mutation.');
     assert.equal(mutation.accepted, 201, 'Signed-in moderation actor must be able to register a speaker.');
 
+    stage = 'logout';
     const logout = await page.evaluate(async (csrfToken) => {
       const response = await fetch('/auth/logout', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
       return { status: response.status, after: (await fetch('/auth/me')).status };
