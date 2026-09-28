@@ -210,7 +210,9 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     await page.locator('#kc-login').click();
     stage = 'OIDC callback';
     const completed = await callbackResponse;
+    stage = `OIDC callback HTTP ${completed.status()}`;
     assert.equal(completed.status(), 302, 'OIDC callback was not accepted.');
+    stage = 'OIDC callback cookies';
     const cookies = (await completed.headersArray())
       .filter((header) => header.name.toLowerCase() === 'set-cookie').map((header) => header.value);
     assert.equal(cookies.length, 2, 'Callback must send two separate Set-Cookie fields.');
