@@ -65,6 +65,29 @@ describe('Scheibe 029b: OIDC configuration boundary', () => {
   });
 });
 
+describe('Scheibe 029b: optional DSFA notice link', () => {
+  const notice = { version: 'synthetic-1', text: { de: 'Testhinweis.', en: 'Test notice.' } };
+
+  it.each(['not a URI', '/relative', 'javascript:alert(1)'])(
+    'omits an unsafe or malformed optional link: %s', async (dataProtectionSummaryUrl) => {
+      const app = createApp({ demoEnabled: false,
+        transparencyNotice: { ...notice, dataProtectionSummaryUrl } });
+      const response = await req(app, 'GET', '/auth/transparency-notice');
+      expect(response.status).toBe(200);
+      expect(await response.json()).not.toHaveProperty('dataProtectionSummaryUrl');
+    },
+  );
+
+  it('retains a valid HTTPS summary link', async () => {
+    const dataProtectionSummaryUrl = 'https://example.test/dsfa-summary';
+    const app = createApp({ demoEnabled: false,
+      transparencyNotice: { ...notice, dataProtectionSummaryUrl } });
+    const response = await req(app, 'GET', '/auth/transparency-notice');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty('dataProtectionSummaryUrl', dataProtectionSummaryUrl);
+  });
+});
+
 const at = new Date('2027-04-20T10:00:00.000Z');
 
 async function authFixture(withNotice = true, providerRefreshToken?: string) {

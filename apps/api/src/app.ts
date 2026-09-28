@@ -163,8 +163,18 @@ export function createApp(options: CreateAppOptions = {}): App {
     ? { version: noticeVersion, text: { de: noticeDe, en: noticeEn },
       ...(process.env['HV_DSFA_SUMMARY_URL'] ? { dataProtectionSummaryUrl: process.env['HV_DSFA_SUMMARY_URL'] } : {}) }
     : undefined);
+  let summaryUrl: string | undefined;
+  if (noticeCandidate?.dataProtectionSummaryUrl) {
+    try {
+      const parsed = new URL(noticeCandidate.dataProtectionSummaryUrl);
+      if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) {
+        summaryUrl = parsed.href;
+      }
+    } catch { /* An optional, invalid link must not enter the contract response. */ }
+  }
   const transparencyNotice = noticeCandidate?.version.trim() && noticeCandidate.text.de.trim() &&
-    noticeCandidate.text.en.trim() ? noticeCandidate : undefined;
+    noticeCandidate.text.en.trim() ? { version: noticeCandidate.version, text: noticeCandidate.text,
+      ...(summaryUrl ? { dataProtectionSummaryUrl: summaryUrl } : {}) } : undefined;
   const authEvents = options.authEvents ?? (options.postgres ? async (): Promise<readonly DomainEvent[]> => {
     const client = await options.postgres!.connect();
     try {
