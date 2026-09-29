@@ -39,8 +39,10 @@ Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe")
   (auch ein bloßer `seq`-Abgleich), ist eine personenbezogene Auswertung und nur zu zweit zulässig —
   zwei benannte Personen, dokumentierter Zweck, Frist, Eintrag im Runbook; bis 047 organisatorisch,
   ab 047 technisch (Zugriff auf Log-Senke und `event.read.personal` nur mit zweiter Freigabe).
-  Betrieb und Support lesen Log-Zeilen ohne Historie (Status, Latenz, Operation), das ist keine
-  personenbezogene Auswertung. Missbrauchsfall MF-09 (Bedrohungsmodell).
+  Betrieb und Support dürfen einzelne Log-Zeilen zur Störungsanalyse lesen (Status, Latenz,
+  Operation, Korrelations-ID). Jedes Gruppieren, Filtern oder Zählen nach `subjectHash` ist dagegen
+  eine personenbezogene Auswertung (Latenzen je Hash ergeben schon allein ein Leistungsprofil) und nur
+  zu zweit zulässig. Missbrauchsfall MF-09 (Bedrohungsmodell).
 - **Keine Kennzahl je Person.** Keine personenbezogene Leistungsauswertung (Plan 4, Zeile 0013). Es gibt fünf
   fachliche Kennzahlen (Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf je 5 min, Fragen in
   Rechtsfreigabe > 10 min, Ereignisse je Minute), eine technische Zählung ohne Labels (Anfragen, die wegen
