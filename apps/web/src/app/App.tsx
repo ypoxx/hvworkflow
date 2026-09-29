@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router';
 import { DEMO_MODE, LegacyDemoLogError, resetDemo, seedIfEmpty, sessionAuth } from '../api';
 import { getTransparencyNotice, type TransparencyNotice } from '../api/http';
-import { ToastProvider } from '../components';
+import { Button, ToastProvider } from '../components';
+import { useT } from '../i18n';
 import { AppShell } from './AppShell';
 import { BootFailure, BootScreen } from './BootScreen';
 import { ErrorBoundary } from './ErrorBoundary';
 import { LoginPage } from './LoginPage';
+import { LanguageToggle } from './LanguageToggle';
 
 /** One demo seed per page load, including React development's second effect pass. */
 let demoBootPromise: Promise<void> | undefined;
@@ -73,6 +75,28 @@ function HttpLogin({ authError }: { authError: boolean }) {
   return <LoginPage notice={notice} returnTo={returnTo} onLogin={() => undefined} authError={authError} />;
 }
 
+/** A valid session without an active role: sign-out only, no sign-in button (that would loop). */
+function NoRolePage({ onLogout }: { onLogout: () => Promise<void> }) {
+  const t = useT();
+  const [failed, setFailed] = useState(false);
+  return (
+    <main className="min-h-screen bg-canvas px-4 py-10 text-ink-900 sm:px-8" id="main">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <span className="font-semibold">{t('app.name')}</span>
+          <LanguageToggle />
+        </div>
+        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm sm:p-10">
+          <h1 className="mb-3 text-2xl font-semibold">{t('noRole.title')}</h1>
+          <p className="mb-6 text-ink-600">{t('noRole.body')}</p>
+          {failed && <p role="alert" className="mb-5 rounded-md bg-red-50 p-3 text-red-800">{t('session.logoutFailed')}</p>}
+          <Button onClick={() => { setFailed(false); void onLogout().catch(() => setFailed(true)); }}>{t('session.logout')}</Button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function HttpBoot() {
   const adapter = auth!;
   const [state, setState] = useState(adapter.getState);
@@ -98,6 +122,7 @@ function HttpBoot() {
   }, [adapter, state.kind]);
 
   if (state.kind === 'checking') return <BootScreen />;
+  if (state.kind === 'noRole') return <NoRolePage onLogout={adapter.logout} />;
   if (state.kind !== 'signedIn') return <HttpLogin authError={state.kind === 'error'} />;
   return <BrowserRouter><AppShell /></BrowserRouter>;
 }
