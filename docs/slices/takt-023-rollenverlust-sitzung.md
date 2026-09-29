@@ -1,6 +1,6 @@
 # takt-023 — Rollenverlust in laufender Sitzung: Web zeigt ihn, Abmelden bleibt möglich
 
-**Status:** Bau · **Risikoklasse:** hoch (Anmeldung, Sitzung) · **Lanes:** web-api, web-shell, service (nur Auth-Middleware)
+**Status:** review · **Risikoklasse:** hoch (Anmeldung, Sitzung) · **Lanes:** web-api, web-shell, service (nur Auth-Middleware)
 **Regeln:** AGENTS.md R1–R12; Sicherheits-Checkliste SP-3, SP-6, SP-7, SC-01, SC-06
 **Ausgangspunkt:** Nachprüfung der Codex-Scheiben vom 29.09.2026 (`docs/bautage/2026-09-27-29.md`).
 - **030, major 1:** `/auth/me` antwortet laut Vertrag 0.3.7 mit **403**, wenn eine gültige Sitzung keine aktive
@@ -88,4 +88,16 @@ ab, melde es, statt die Spec auszulegen.
 
 ## Review findings
 
-folgt
+Rückfrage des Implementierers vor dem Bau (berechtigt): beim Start-403 kennt das Web keinen CSRF-Token, Abmelden wäre
+unmöglich → Ziel 0 (Vertrag 0.3.8, `csrfToken` im 403 von `/auth/me`) vom Orchestrator ergänzt.
+
+Review in frischem Kontext (reviewer, Opus, 29.09.2026): **freigabefähig**, 0 blocker, 0 major. Ausnahme greift nur
+bei Sitzungsbetrieb und genau `/auth/me`/`/auth/logout`; Token nur nach gültigem `readSession`, `no-store`; kein
+CORS im Sitzungsbetrieb; `types.ts` reproduzierbar; Einzeltests api 40/40, web 61/61.
+
+1. minor → Folgeliste: 403-Body nicht gegen `NoActiveRole` validiert, `X-Server-Time` nicht geprüft.
+2. minor → Folgeliste: Test 1(d) (403 aus Fachaufruf ändert Zustand nicht) prüft faktisch nichts.
+3. minor → Folgeliste: Missbrauchsfall in Spec 030 ohne Erkennung/Signal/Empfänger bzw. MF-Bezug (SC-06).
+4. minor → Folgeliste: `GET /auth/me` einer Sitzung ohne Rolle schiebt das Leerlauffenster (`slideIdle`) weiter.
+5. nit: `logout`-Beschreibung im Vertrag nennt „keine Rolle nötig“ nicht.
+6. nit: `noRole` fragt die Sitzung nicht neu ab; neue Rolle erst nach Ab- und Anmelden (bewusste Grenze).
