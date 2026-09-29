@@ -16,6 +16,8 @@ export const shellDe = {
   'login.noticeUnavailableDe': 'Die Anmeldung ist vorübergehend nicht verfügbar: Der Transparenzhinweis fehlt oder ist unvollständig.',
   'login.noticeUnavailableEn': 'Sign-in is temporarily unavailable: the privacy notice is missing or incomplete.',
   'login.sessionError': 'Die Sitzung konnte nicht geprüft werden. Bitte versuchen Sie es erneut.',
+  'noRole.title': 'Keine aktive Rolle',
+  'noRole.body': 'Für Ihr Konto ist derzeit keine Rolle aktiv. Wenden Sie sich an die Administration.',
   'session.logout': 'Abmelden',
   'session.logoutFailed': 'Abmelden ist fehlgeschlagen. Ihre Sitzung bleibt aktiv.',
   'http.errorTitle': 'Anfrage fehlgeschlagen',

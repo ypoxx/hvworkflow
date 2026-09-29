@@ -7,6 +7,7 @@ export type AuthState =
   | { kind: 'checking' }
   | { kind: 'signedOut' }
   | { kind: 'signedIn'; actor: Actor }
+  | { kind: 'noRole' }
   | { kind: 'error' };
 
 export interface SessionTransport {
@@ -22,10 +23,19 @@ function hasConfirmedActor(value: unknown): value is Actor {
     typeof actor['role'] === 'string' && actor['role'].trim() !== '';
 }
 
+/** Contract 0.3.8: the 403 of `/auth/me` carries the CSRF token that only sign-out may use. */
+function noRoleToken(error: unknown): string | undefined {
+  if (!(error instanceof ApiProblem) || error.status !== 403) return undefined;
+  const token = (error as { csrfToken?: unknown }).csrfToken;
+  return typeof token === 'string' && /^[A-Za-z0-9_-]{32,}$/.test(token) ? token : undefined;
+}
+
 /** The browser retains only the active actor and CSRF token, never a provider credential. */
 export function createSessionAuth(transport: SessionTransport) {
   let state: AuthState = { kind: 'checking' };
   let csrfToken: string | undefined;
+  /** Held in `noRole` only: usable for sign-out, invisible to business calls (`getCsrfToken`). */
+  let logoutOnlyToken: string | undefined;
   let sessionRevision = 0;
   const listeners = new Set<() => void>();
 
@@ -38,6 +48,7 @@ export function createSessionAuth(transport: SessionTransport) {
     sessionRevision += 1;
     if (state.kind === 'signedOut') return;
     csrfToken = undefined;
+    logoutOnlyToken = undefined;
     transport.onActorChange?.(undefined);
     publish({ kind: 'signedOut' });
   }
@@ -53,6 +64,7 @@ export function createSessionAuth(transport: SessionTransport) {
         throw new Error('Invalid HTTP session response.');
       }
       csrfToken = session.csrfToken;
+      logoutOnlyToken = undefined;
       transport.onActorChange?.(session.actor);
       publish({ kind: 'signedIn', actor: session.actor });
     } catch (error) {
@@ -61,15 +73,26 @@ export function createSessionAuth(transport: SessionTransport) {
         onUnauthorized();
         return;
       }
-      if (state.kind !== 'signedIn') publish({ kind: 'error' });
+      const noRoleCsrf = noRoleToken(error);
+      if (noRoleCsrf !== undefined) {
+        // No actor any more; the token stays only so that `logout()` can send it.
+        sessionRevision += 1;
+        csrfToken = undefined;
+        logoutOnlyToken = noRoleCsrf;
+        transport.onActorChange?.(undefined);
+        publish({ kind: 'noRole' });
+        return;
+      }
+      if (state.kind !== 'signedIn' && state.kind !== 'noRole') publish({ kind: 'error' });
       throw error;
     }
   }
 
   async function logout(): Promise<void> {
-    if (state.kind !== 'signedIn' || !csrfToken) return;
+    const token = state.kind === 'signedIn' ? csrfToken : state.kind === 'noRole' ? logoutOnlyToken : undefined;
+    if (!token) return;
     try {
-      await transport.signOut(csrfToken);
+      await transport.signOut(token);
     } catch (error) {
       if (error instanceof ApiProblem && error.status === 401) onUnauthorized();
       throw error;
