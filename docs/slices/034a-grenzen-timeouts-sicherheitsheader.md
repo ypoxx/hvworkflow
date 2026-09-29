@@ -44,7 +44,8 @@ Konfiguration (034b) oder eine Folgescheibe, keine stille Änderung im Bau.
 | Node-HTTP-Server | `headersTimeout` 10 000 ms, `requestTimeout` 30 000 ms | nein |
 | Postgres `lock_timeout` | 3 000 ms | ja |
 | Postgres `statement_timeout` | 5 000 ms | ja |
-| `pg`-Client `query_timeout` | 6 000 ms (Netzausfall ohne Serverantwort) | ja |
+| Abfrage-Timer des Dienstes (eigener Timer je Abfrage, `QueryTimeoutError`; `pg`-eigenes `query_timeout` nicht gesetzt) | 6 000 ms (Netzausfall ohne Serverantwort) | ja |
+| OIDC-Abruf (Discovery, Token-Austausch) | 5 000 ms je Aufruf | nein |
 | Postgres `idle_in_transaction_session_timeout` | 15 000 ms | ja |
 | Schreibvorgänge je Subject | 60 je Fenster | ja |
 | Lesevorgänge je Subject | 1 200 je Fenster | ja |
@@ -59,7 +60,7 @@ Konfiguration (034b) oder eine Folgescheibe, keine stille Änderung im Bau.
 | `Retry-After` bei 503 (Schreibwarteschlange, Statement-Abbruch) | 2 | nein |
 | Aufräumen Login-Zustände | höchstens 500 Zeilen je Aufruf | nein |
 
-Reihenfolge der Zeitgrenzen, als Test festgehalten: `lock_timeout` (3 s) < `statement_timeout` (5 s) < `query_timeout`
+Reihenfolge der Zeitgrenzen, als Test festgehalten: `lock_timeout` (3 s) < `statement_timeout` (5 s) < Abfrage-Timer
 (6 s) < Request-Timeout (10 s) < `idle_in_transaction_session_timeout` (15 s). `/readyz` bleibt mit 3 × 2 000 ms
 (`safeCheck`) unter dem Request-Timeout.
 
@@ -166,38 +167,61 @@ Lasttest (071), danach Standard anpassen.
 7. **Request-Timeout (408) ohne Festschreiben.** Eigene Middleware (nicht `hono/timeout`, weil diese den Handler nur
    überholt): ein Zeitgeber je Anfrage; läuft er ab, setzt die Middleware im Anfragekontext (033a,
    `observability/context.ts`) die Phase `timedOut` und antwortet mit Problem 408, **außer** die Phase ist bereits
-   `committing` — dann wartet sie auf das Ende des COMMIT (durch `statement_timeout` und `query_timeout` begrenzt) und
+   `committing` — dann wartet sie auf das Ende des COMMIT (durch `statement_timeout` und den Abfrage-Timer begrenzt) und
    gibt dessen Ergebnis zurück. Wettlauf ausgeschlossen: `postgresBoundary` prüft `timedOut` und setzt `committing`
    **synchron im selben Schritt ohne `await` dazwischen**, unmittelbar bevor sie `INSERT … ; COMMIT` absetzt; der
    Zeitgeber-Rückruf läuft auf derselben Ereignisschleife und sieht entweder `committing` oder setzt `timedOut` vorher.
    Zusätzlich prüft die Grenze `timedOut` direkt nach dem Erhalt der Schreibsperre und nach dem Laden des Snapshots und
    bricht dann früh mit `ROLLBACK` ab. Zusage: **ein 408 bedeutet „nichts festgeschrieben“** im Postgres-Pfad (läuft während des
-   Wartens auf das COMMIT der `query_timeout` ab, gilt Punkt 8: 500 „Ergebnis unbekannt“, nie 408); ein
+   Wartens auf das COMMIT der Abfrage-Timer ab, gilt Punkt 8: 500 „Ergebnis unbekannt“, nie 408); ein
    erneuter Versuch mit demselben `Idempotency-Key` führt genau einmal aus. Im JSONL-Entwicklungsadapter und im
    In-Memory-Pfad gilt diese Zusage nicht, ebenso wenig „408 verbraucht keinen Schlüssel“ (dort kann ein Handler nach
    dem 408 fertig werden und anhängen; im Bericht nennen). Das Zugriffslog schreibt genau eine Zeile mit Status 408;
-   ein später fertig werdender Handler ändert weder Antwort noch Log-Zeile. Eine Ausnahmeliste für Pfade ohne Timeout
-   ist vorbereitet und leer (035 trägt `/v1/stream` ein). Der Node-Server erhält in `server.ts` `headersTimeout` und
-   `requestTimeout` (Tabelle) gegen langsam tröpfelnde Header und Bodies. 408 statt 503/504: der Planeintrag und SP-2
+   ein später fertig werdender Handler ändert weder Antwort noch Log-Zeile. **Ausnahmeliste der 408-Stufe:** `/auth/login`,
+   `/auth/callback` und `/auth/logout` (Codex P2 auf #71). Sie schreiben über `AuthStore` ohne phasenbewusste
+   `postgresBoundary`; ein 408 könnte sonst die Cookie-Antwort verwerfen, während der Callback die Sitzung danach noch
+   anlegt (verwaiste Sitzung) oder das Abmelden serverseitig gelingt, ohne dass der Browser das Löschen des Cookies
+   erhält. Statt des 408-Timers haben diese Routen feste eigene Obergrenzen: jeder OIDC-Abruf (Discovery,
+   `authorizationUrl`, Token-Austausch in `complete`) mit eigenem Timeout von 5 000 ms (Abbruch über `AbortSignal`
+   bzw. die Fetch-Option von `openid-client`), Ablauf → 503 „Sign-in is unavailable.“ **bevor** eine Sitzung angelegt
+   ist; jede Store-Abfrage läuft über dieselben Postgres-Timeouts und den Abfrage-Timer (Punkt 8), Ablauf → 503.
+   Eine einmal begonnene Sitzungsanlage läuft zu Ende und liefert ihr Cookie. Die Obergrenze einer Anmeldeanfrage ist
+   damit etwa OIDC 2 × 5 s plus wenige Abfragen à höchstens 6 s. 035 ergänzt `/v1/stream`. Der Node-Server erhält in `server.ts` `headersTimeout` und
+   `requestTimeout` (Tabelle) gegen langsam tröpfelnde Header und Bodies. **Benannte Ausnahme** (Codex P2 auf #71):
+   diese beiden Grenzen antwortet Node selbst mit einem leeren `408` und `Connection: close`, bevor die Anfrage Hono
+   erreicht; diese Antwort trägt keine Sicherheitsheader und erzeugt keine Zugriffslog-Zeile. Gewählt wird die
+   Eingrenzung statt eines `clientError`-Handlers, weil sie einfacher ist und nichts verliert: die Antwort hat keinen
+   Inhalt, den ein Browser darstellen oder einbetten könnte (Header wie CSP, `nosniff`, Frame-Schutz wirken nur auf
+   Inhalt), und für eine nie vollständig empfangene Anfrage gäbe es weder Methode noch `operationId` noch Akteur für
+   eine sinnvolle Log-Zeile; ein eigener Handler bräuchte zudem einen Test über einen echten Socket. Restrisiko: eine
+   Slowloris-Flut ist im Zugriffslog unsichtbar → Sichtbarkeit und Grenze am Proxy (037). Die Zusagen „jede Antwort
+   trägt die Sicherheitsheader“ (Punkt 9) und „jede Anfrage erzeugt eine Log-Zeile“ (Punkt 11) gelten für Antworten
+   der Anwendung (Hono). 408 statt 503/504: der Planeintrag und SP-2
    nennen 408, RFC 9110 erlaubt dem Client die Wiederholung, und 503 bleibt der überlasteten Persistenz vorbehalten
    (Punkt 8); der CHANGELOG nennt diese Begründung.
 8. **Postgres-Pool-Timeouts und 503.** Die Pool-Optionen entstehen in einer testbaren Funktion unter
    `apps/api/src/limits/` (Werte aus der Tabelle, `connectionTimeoutMillis` 2 000 und TLS wie heute); `server.ts` nutzt
    sie. `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout` werden als Verbindungsparameter
-   gesetzt, `query_timeout` als Client-Option. Der Pool der Migrations-CLI bleibt unverändert (DDL darf länger laufen).
+   gesetzt. Den clientseitigen Abfrage-Timeout setzt der Dienst **selbst** (Codex P1 auf #71): mit `pg@8.23.0`
+   (`apps/api/package.json` `^8.23.0`, Lockfile `pg@8.23.0`) meldet sich das `pg`-eigene `query_timeout` als schlichter
+   `Error("Query read timeout")` ohne Code und ohne eigene Klasse, und Meldungstexte werden nicht verglichen. Ein
+   Wrapper in `postgres.ts` (von der Postgres-Grenze, `loadPostgresSnapshot`, `insertPostgresEvents`, der Readiness und
+   den `AuthStore`-Abfragen genutzt) legt je Abfrage einen Timer über 6 000 ms und wirft bei Ablauf einen eigenen,
+   getaggten `QueryTimeoutError`; das `pg`-eigene `query_timeout` wird nicht gesetzt. Der Pool der Migrations-CLI bleibt unverändert (DDL darf länger laufen).
    `lock_timeout` trifft auch das Warten auf `pg_advisory_xact_lock` (`app.ts:397`): wartet ein Schreibvorgang länger
    als 3 s auf die globale Schreibsperre, bricht Postgres mit SQLSTATE `55P03` ab. Dieser Fall und der
-   Statement-Abbruch `57014` sowie der client-seitige `query_timeout` **vor** der Phase `committing` werden auf **503** mit
+   Statement-Abbruch `57014` sowie der `QueryTimeoutError` **vor** der Phase `committing` werden auf **503** mit
    `Retry-After: 2` und dem festen Text „Persistence is busy.“ abgebildet (Rollback, kein Ereignis, kein Treibertext;
    T-G2-I-02). Damit die Kennung nicht verloren geht: `loadPostgresSnapshot` (`postgres.ts:174-176`) und
    `insertPostgresEvents` (`postgres.ts:231-233`, `:243-244`) fangen Treiberfehler heute ab und werfen
    `PostgresPersistenceError`; dieser trägt künftig ein Kennzeichen `busy` (gesetzt bei `55P03`, `57014` und
-   `query_timeout`, aus `code` bzw. dem Fehlertyp, nie aus dem Meldungstext), ohne Treibertext (N2).
-   **`query_timeout` während `committing`** (N3): der Zeitgeber ist clientseitig, der Server kann das COMMIT trotzdem
+   `QueryTimeoutError`, aus `code` bzw. `instanceof`, nie aus dem Meldungstext), ohne Treibertext (N2).
+   **`QueryTimeoutError` während `committing`** (N3): der Zeitgeber ist clientseitig, der Server kann das COMMIT trotzdem
    ausgeführt haben, und das Web vergibt je Aufruf einen neuen Idempotenzschlüssel (`apps/web/src/api/http.ts:74`);
    ein 503 mit der Zusage „kein Ereignis“ könnte also zu doppelten Ereignissen führen. Deshalb: 500 mit dem festen Text
    „Persistence outcome is unknown.“, **ohne** `Retry-After` und ohne Zusage; kein `noteSeq`. Nach jedem
-   `query_timeout` wird die Verbindung mit `client.release(error)` verworfen, nie in den Pool zurückgegeben. Ein
+   `QueryTimeoutError` wird die Verbindung mit `client.release(error)` verworfen, nie in den Pool zurückgegeben (die
+   hängende Abfrage stirbt mit der Verbindung; ohne empfangenes COMMIT rollt Postgres zurück). Ein
    `57014` während `committing` kann nicht auftreten, ohne dass Postgres das COMMIT abgelehnt hat, bleibt also 503.
    Das bestehende 503 „Migrations are pending.“ (`app.ts:391`) erhält `Retry-After: 30` und dieselbe Vertragsantwort
    (N4). Alle übrigen Persistenzfehler bleiben 500 „Persistence is unavailable.“. 3 s sind gewählt, weil ein Schreibvorgang die Sperre nur
@@ -313,16 +337,16 @@ web-api).
 | **T-G1-D-05 (neu)** | schließen (Rest: Innentäter hinter NAT, MF-10) | 121. `/auth/login` derselben Quelle → 429, auch mit gefälschtem, syntaktisch gültigem `hv_session` und mit `X-Actor`, `createLoginState` nicht aufgerufen (Test-Store zählt); 601. gesamt über viele Quellen → 429 (`limits034a.test.ts`); verbrauchte und abgelaufene Zeilen werden beim nächsten Anmeldestart entfernt, gültige bleiben, höchstens 500 je Aufruf; Laufzeitrolle: `DELETE FROM auth_login_states` → Rechtefehler, `EXECUTE` der Funktion erlaubt; Katalog: `prosecdef`, `proconfig`, `proowner`, keine PUBLIC-ACL auch ohne gesetzte Laufzeitrolle; `assertRuntimePrivileges` schlägt fehl, wenn EXECUTE fehlt oder DELETE vorhanden ist; `/readyz` vor Migration 3 → `migrations_pending`; Aufräumfehler blockiert die Anmeldung nicht (`postgres-limits034a.test.ts`); neue Zeile im Bedrohungsmodell |
 | T-G2-D-04 | berührt (Anteil 034a: Quellschicht, Protokollausnahme Punkt 11) | 601. nicht angemeldete Anfrage derselben Quelle → 429; 602.–700. erzeugen **keine** weitere Log-Zeile, genau eine stderr-Zeile je Minute mit der Summe 99; Flut mit gefälschtem Cookie: bis Nr. 600 401, ab Nr. 601 429 mit `Retry-After`, danach keine weiteren Log-Zeilen; Anfrage mit gültiger Sitzung aus derselben Quelle → 200 mit Log-Zeile; 601 × `/healthz` erschöpft nicht das Kontingent für nicht angemeldete Anfragen und umgekehrt; Preflight-Flut erschöpft nur den Preflight-Zähler; keine Log- oder stderr-Zeile enthält die Quelladresse (Marker-Adresse über `sourceOf`) (`limits034a.test.ts`) |
 | T-G3-D-02 | berührt | Subject-Grenzen greifen für jeden Akteur unabhängig von der Rolle (zwei Akteure mit verschiedenen Rollen, je eigener Zähler; kein Rollenname im Code, R4) (`limits034a.test.ts`) |
-| T-G3-D-01 | berührt | hängende Prüfung (`readiness`-Injektion mit 200 ms, Timeout-Option 50 ms) → 408 statt Warten (`limits034a.test.ts`) |
+| T-G3-D-01 | berührt | hängende Prüfung (`readiness`-Injektion mit 200 ms, Timeout-Option 50 ms) → 408 statt Warten; langsamer OIDC-Austausch im Callback (Test-IdP verzögert über den Request-Timeout, aber unter dem OIDC-Timeout) → 302 mit Sitzungscookie, **kein** 408, genau eine Sitzung; OIDC-Austausch über dem OIDC-Timeout → 503, **keine** Sitzung angelegt; `/auth/logout` mit langsamem Store → 204, kein 408 (`limits034a.test.ts`) |
 | T-G1-T-06 | berührt (CSP am Dienst; Web 037) | CSP-Wert in der Header-Probe (`contract.test.ts`); Zeile im Bedrohungsmodell nennt 037 für den e2e-Report |
-| T-G2-I-02 | berührt | Abbruch durch `statement_timeout` (`pg_sleep` über injizierten Testweg) → 503 mit festem Text und `Retry-After: 2`, kein Treibertext in Antwort und Log; `statement_timeout` **während `loadPostgresSnapshot`** → 503 (N2); `query_timeout` vor COMMIT → 503 und Verbindung verworfen; `query_timeout` während `committing` (verzögertes COMMIT über injizierten Client) → 500 „Persistence outcome is unknown.“ ohne `Retry-After`, Verbindung mit Fehler freigegeben (N3); Migrationen ausstehend → 503 mit `Retry-After: 30` (N4) (`postgres-limits034a.test.ts`) |
+| T-G2-I-02 | berührt | Abbruch durch `statement_timeout` (`pg_sleep` über injizierten Testweg) → 503 mit festem Text und `Retry-After: 2`, kein Treibertext in Antwort und Log; `statement_timeout` **während `loadPostgresSnapshot`** → 503 (N2); künstlich hängende Abfrage (`pg_sleep` über dem Abfrage-Timer, Test-Option Abfrage-Timer 200 ms, `statement_timeout` darüber) vor COMMIT → 503 `QueryTimeoutError`, Verbindung verworfen, kein Ereignis; hängendes COMMIT per Test-Hook (Option nur für Tests, die vor `COMMIT` `pg_sleep` einschiebt) → 500 „Persistence outcome is unknown.“ ohne `Retry-After`, Verbindung mit Fehler freigegeben (N3); Migrationen ausstehend → 503 mit `Retry-After: 30` (N4) (`postgres-limits034a.test.ts`) |
 | T-G2-D-01 | berührt (Schreibwarteschlange) | Testverbindung hält `pg_advisory_xact_lock(27027, 1)` 4 s, paralleler Schreibvorgang → 503 nach ≤ 3 s + Toleranz, kein Ereignis; nach Freigabe gelingt die Wiederholung mit gleichem `Idempotency-Key` genau einmal (`postgres-limits034a.test.ts`) |
 | T-G1-D-03 | berührt (Anteil Rate-Limit; Ströme 035) | durch die Tests zu T-G1-D-01 abgedeckt |
 
 Zähler und Speicher: 10 000 verschiedene Quellen in einem Fenster, die 10 001. teilt den Überlaufschlüssel, feste
 stderr-Zeile „key table full“ einmal; nach Fensterwechsel ist die Tabelle leer (`limits034a.test.ts`, reine Funktion
 mit injizierter Uhr). Pool-Parameter: `SHOW statement_timeout` = `5s`, `SHOW lock_timeout` = `3s`,
-`SHOW idle_in_transaction_session_timeout` = `15s` über den Pool aus der Fabrik, `query_timeout` in der Client-Option
+`SHOW idle_in_transaction_session_timeout` = `15s` über den Pool aus der Fabrik, kein `pg`-`query_timeout` in der Client-Konfiguration
 (`postgres-limits034a.test.ts`). Grenzen der nicht bedienten Operationen über den Ajv-Validator des Anfrageschemas
 (`limits034a.test.ts`).
 
@@ -359,10 +383,11 @@ eine Zuordnung zur Person nur über das Verfahren „Auswertung nur zu zweit“ 
 - `apps/api/src/observability/requestLog.ts` (nur die Protokollausnahme aus Punkt 11)
 - `apps/api/src/problem.ts` (nur zusätzliche Antwortheader wie Retry-After und 413 ohne Fehlerlog)
 - `apps/api/src/contractSchema.ts` (nur Export eines Validators für Anfrageschemas zu Testzwecken)
-- `apps/api/src/auth/store.ts` (nur Aufruf der Aufräumfunktion in createLoginState mit stderr-Zeile)
+- `apps/api/src/auth/store.ts` (nur Aufruf der Aufräumfunktion in createLoginState mit stderr-Zeile und Abfragen über den Abfrage-Timer)
+- `apps/api/src/auth/oidc.ts` (nur Timeout von 5 000 ms je OIDC-Abruf)
 - `apps/api/migrations/0003_auth_login_purge.up.sql`, `apps/api/migrations/0003_auth_login_purge.down.sql` (neu)
 - `apps/api/src/persistence/migrations.ts` (Migrationsliste, Down-Zweig und Konsistenz- und Katalogprüfung für Version 3, GRANT EXECUTE in grantRuntimeAccess)
-- `apps/api/src/persistence/postgres.ts` (nur die EXECUTE-Prüfung in assertRuntimePrivileges mit requireTables und das Kennzeichen busy an PostgresPersistenceError in loadPostgresSnapshot und insertPostgresEvents, ohne Treibertext)
+- `apps/api/src/persistence/postgres.ts` (nur die EXECUTE-Prüfung in assertRuntimePrivileges mit requireTables, das Kennzeichen busy an PostgresPersistenceError in loadPostgresSnapshot und insertPostgresEvents ohne Treibertext, und der Abfrage-Wrapper mit QueryTimeoutError)
 - `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts` (generiert)
 - `apps/api/src/__tests__/contract.test.ts` (Versionsaussage, generierte Status um 408/413/429/503 erweitert, Header-Probe)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die feste Versionsaussage)
@@ -407,7 +432,8 @@ Bedrohungsmodell und unter „Open“ benannt.
    feste Bedingung, gesetzter `search_path` und die Katalogprüfung begrenzen das. Im Bericht nennen; die Trennung der
    Owner-Rolle vom Superuser ist 037/038.
 9. SQLSTATE-Abbildung: `pg` liefert `code` `55P03` (lock_timeout) und `57014` (statement_timeout); der
-   client-seitige `query_timeout` wirft einen eigenen Fehler — alle drei gezielt abbilden, keinen Meldungstext parsen.
+   eigene Abfrage-Timer wirft `QueryTimeoutError` — alle drei gezielt über `code` bzw. `instanceof` abbilden, keinen
+   Meldungstext parsen; `pg`-Version im Lockfile prüfen (heute 8.23.0).
 10. `node scripts/slice-scope.mjs` auf dem Baubranch `claude/slice-034a-…` grün.
 
 ## Tests zuerst und Abnahme
@@ -421,8 +447,8 @@ Bedrohungsmodell und unter „Open“ benannt.
    `contract.test.ts`, erweiterte generierte Status (408/429 an jeder Operation, 413 an jeder schreibenden, 503 an jeder
    unter `/v1`).
 2. Postgres in CI: `postgres-limits034a.test.ts` belegt Pool-Parameter, 408 ohne COMMIT, verzögertes COMMIT → 201,
-   `statement_timeout`-Abbruch → 503 ohne Treibertext (auch während `loadPostgresSnapshot`), `query_timeout` vor und
-   während `committing` (503 bzw. 500 „Ergebnis unbekannt“, Verbindung verworfen), Migrationen ausstehend → 503 mit
+   `statement_timeout`-Abbruch → 503 ohne Treibertext (auch während `loadPostgresSnapshot`), hängende Abfrage vor und
+   hängendes COMMIT während `committing` (503 bzw. 500 „Ergebnis unbekannt“, Verbindung verworfen), Migrationen ausstehend → 503 mit
    `Retry-After: 30`, parallele Schreiber an der gehaltenen Schreibsperre → 503 nach
    ≤ 3 s + Toleranz, Migration 0003 auf/ab/auf, Funktion löscht nur verbrauchte und abgelaufene Zeilen (höchstens 500),
    Katalogprüfung, Laufzeitrolle ohne DELETE, mit EXECUTE, keine PUBLIC-ACL, `assertRuntimePrivileges`-Negativfälle,
@@ -455,7 +481,7 @@ Slice: 034a-grenzen-timeouts-sicherheitsheader
 Done: <drei Zeilen>
 Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Postgres- und Keycloak-CI-Lauf; curl-Proben
 Bedrohungs-ID → Test: <je Zeile der Tabelle oben>
-Open (Restrisiken mit Ziel): Sitzungslesung je gefälschtem Cookie und ungezählte CSRF-403 bekannter Subjects → Proxy-Grenze 037; Innentäter hinter NAT erschöpft das Anmeldekontingent des Hauses (MF-10) → Messung 071/078, Konfiguration 034b; verteilte Quellen unter der Schwelle füllen das Log → Alarm 037; mehrere Prozesse vervielfachen die Grenzen → 037; 408-Zusage und „408 verbraucht keinen Schlüssel“ nur im Postgres-Pfad; Demo: wechselnde X-Actor-Kennungen erzeugen neue Zähler; Alarm auf die festen stderr-Zeilen 037 (Ausnahme bis 30.10.2026); CSP des Web-Dokuments und e2e-Report 037; Kernprüfung der Vertragsgrenzen (Folgeliste, fachlich); E55 Patch-Stufe (Eigentümer)
+Open (Restrisiken mit Ziel): Node-eigene 408 aus headersTimeout/requestTimeout ohne Sicherheitsheader und ohne Log-Zeile (Slowloris im Log unsichtbar) → Proxy 037; Sitzungslesung je gefälschtem Cookie und ungezählte CSRF-403 bekannter Subjects → Proxy-Grenze 037; Innentäter hinter NAT erschöpft das Anmeldekontingent des Hauses (MF-10) → Messung 071/078, Konfiguration 034b; verteilte Quellen unter der Schwelle füllen das Log → Alarm 037; mehrere Prozesse vervielfachen die Grenzen → 037; 408-Zusage und „408 verbraucht keinen Schlüssel“ nur im Postgres-Pfad; Demo: wechselnde X-Actor-Kennungen erzeugen neue Zähler; Alarm auf die festen stderr-Zeilen 037 (Ausnahme bis 30.10.2026); CSP des Web-Dokuments und e2e-Report 037; Kernprüfung der Vertragsgrenzen (Folgeliste, fachlich); E55 Patch-Stufe (Eigentümer)
 Touched: <Dateiliste>
 ```
 
@@ -479,6 +505,12 @@ Enge Nachprüfung (Opus, 29.09.2026): M1, M2, M4, M5, M7, M8 gelöst; nachgebess
 auch mit Cookie (N1, Punkt 3); Kennzeichen `busy` an `PostgresPersistenceError`, damit 57014/`query_timeout` aus
 Snapshot und Insert 503 werden (N2, Punkt 8); `query_timeout` während `committing` → 500 „Ergebnis unbekannt“,
 Verbindung verworfen (N3, Punkte 7, 8, Vertrag); „Migrations are pending.“ mit `Retry-After: 30` (N4).
+
+Codex auf #71: eigener Abfrage-Timer mit `QueryTimeoutError` statt `pg`-`query_timeout`, weil `pg@8.23.0` dort nur
+`Error("Query read timeout")` ohne Code wirft (P1, Punkt 8); `/auth/login`, `/auth/callback`, `/auth/logout` von der
+408-Stufe ausgenommen, mit OIDC-Timeout 5 000 ms und Postgres-Timeouts als eigenen Obergrenzen (P2, Punkt 7);
+Node-eigene 408 aus `headersTimeout`/`requestTimeout` als benannte Ausnahme ohne Header und Log-Zeile, Restrisiko 037
+(P2, Punkt 7).
 
 ## Review findings
 
