@@ -274,6 +274,23 @@ Lesebefund (Opus, frischer Kontext): nachbessern, 3 major / 6 minor / 1 nit → 
 vom Architekten. Schmale Nachprüfung (Opus): die drei Major gelöst; drei neue Major (ADR-Satz zu Betrieb/Support zu
 weit, Planzeile 033b mit altem Tor-Wortlaut, Files allowed ohne Zähler-Hochzählen) vom Architekten behoben.
 
+### Nachweis nach Codex (#73)
+
+Codex P2 „Zukunftsereignisse in Zeitfenstern“ in der Scheibe behoben (`withinWindow`: Alter ≥ 0 und ≤ Fenster; Test
+zuerst rot, dann grün). `pnpm gates` mit Postgres-Variablen auf `a9444d5` (sauberer Baum, Exit 0):
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/api test:       Tests  289 passed (289)
+...
+✓ built in 2.37s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit a9444d5, tree a2f9ba078fd2…
+```
+
+Codex P2 „`unassigned` kollidiert mit einer konfigurierten Fachbereichs-ID“: nicht in dieser Scheibe lösbar (die
+Prüfung der Fachbereichs-IDs liegt in `api.ts`, außerhalb von Files allowed; `replaceMeetingUnits` wird noch nicht
+bedient). Folgeliste: `unassigned` als reservierte ID in der Fachbereichsprüfung (Scheibe 040).
+
 ## Review findings
 
 Review (Opus, frischer Kontext, Perspektive Datenschutz/Betrieb): freigabefähig, kein Blocker, kein Major.
