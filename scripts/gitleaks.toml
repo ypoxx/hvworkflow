@@ -1,6 +1,6 @@
 #
 # gitleaks config (slice 012, AGENTS.md rule 11: no credentials, no real data). Extends gitleaks'
-# own default ruleset. No custom allowlist yet: an earlier version of this file added two
+# own default ruleset. One allowlist entry (takt-021, at the end); an earlier version of this file added two
 # speculative entries (a "secret"-target regex for the demo `X-Actor` header, which gitleaks never
 # matches against by default since `regexTarget` defaults to the finding's secret, not the whole
 # line — a no-op; and a whole-file allowlist for `packages/domain/src/seed.ts` and its test that was
@@ -17,3 +17,17 @@ title = "HV-Tool gitleaks config"
 
 [extend]
 useDefault = true
+
+# takt-021: the nightly full-history scan failed from its first run on two `generic-api-key` false
+# positives, browser-storage key names: the constants COLLAPSE_KEY (apps/web/src/app/AppShell.tsx)
+# and STAGE_CONTRAST_KEY (apps/web/src/features/stage/Page.tsx), each bound to an `hv-<name>-v1`
+# literal. Not quoted verbatim here on purpose: a quoted line in a comment or in Markdown trips the
+# same rule (takt-021 review blocker). The rule keys on the `_KEY =` name plus the entropy of the
+# literal. This allowlist matches the whole line (`regexTarget = "line"`) and only that exact shape:
+# an upper-case constant ending in `_KEY` bound to a lower-case `hv-…-vN` literal. A credential does
+# not look like that, so the rule stays live for everything else. Checked locally with gitleaks
+# 8.24.3 over the full history: 2 findings before, 0 after.
+[allowlist]
+description = "Browser-storage key names (hv-...-vN), not credentials"
+regexTarget = "line"
+regexes = ['''^\s*(export\s+)?const [A-Z][A-Z0-9_]*_KEY = 'hv-[a-z0-9-]*-v[0-9]+';\s*$''']
