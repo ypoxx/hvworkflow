@@ -135,4 +135,39 @@ describe('Scheibe 028: visible soft claims', () => {
     expect(released.claim).toBeUndefined();
     expect(released.version).toBe(claimed.version + 1);
   });
+  // takt-027 (privacy, Codex P1 on #66): the event log keeps personId inside the claim, but no read view
+  // shows it; presence needs only actorId (event reads already mask personId, slice 026).
+  it('never shows the claimant personId in contribution or question views', async () => {
+    const f = fixture();
+    const withPerson = (actor: Actor): Actor => ({ ...actor, personId: `person-of-${actor.id}` });
+    const listVersion = (await f.api.getMeeting()).speakerListVersion;
+    const speaker = await f.api.registerSpeaker({ displayName: 'Testperson' }, { ifMatch: etagOf(listVersion) });
+    f.as(withPerson(capturerA));
+    const captured = await f.api.captureContribution({ speakerId: speaker.id, text: 'A question' },
+      { ifMatch: etagOf(speaker.version) });
+    const claimedContribution = await f.api.claimContribution(captured.id, { ifMatch: etagOf(captured.version) });
+    expect(claimedContribution.claim?.actorId).toBe('capture-a');
+    expect(claimedContribution.claim).not.toHaveProperty('personId');
+    expect(f.store.all().some((e) => e.type === 'ContributionClaimed' &&
+      (e.payload as { personId?: string }).personId === 'person-of-capture-a')).toBe(true);
+    f.as(moderation);
+    const readByOther = await f.api.getContribution(captured.id);
+    expect(readByOther.claim?.actorId).toBe('capture-a');
+    expect(readByOther.claim).not.toHaveProperty('personId');
+
+    f.as(withPerson(capturerA));
+    const [question] = await f.api.captureQuestions(captured.id, [{ text: 'What?' }],
+      { ifMatch: etagOf(claimedContribution.version) });
+    f.as({ id: 'coordinator', role: 'coordination' });
+    const classified = await f.api.classifyQuestion(question!.id, { track: 'expert_track' },
+      { ifMatch: etagOf(question!.version) });
+    const assigned = await f.api.assignQuestion(question!.id, 'unit-a', { ifMatch: etagOf(classified.version) });
+    f.as(withPerson({ id: 'expert-a', role: 'expert' }));
+    const claimedQuestion = await f.api.claimQuestion(question!.id, { ifMatch: etagOf(assigned.version) });
+    expect(claimedQuestion.claim?.actorId).toBe('expert-a');
+    expect(claimedQuestion.claim).not.toHaveProperty('personId');
+    f.as(moderation);
+    const questionReadByOther = await f.api.getQuestion(question!.id);
+    expect(questionReadByOther.claim).not.toHaveProperty('personId');
+  });
 });
