@@ -1,6 +1,6 @@
 # takt-024 — Postgres: Schreibsperre erst nach Routentreffer und Vertragsprüfung
 
-**Status:** Bau · **Risikoklasse:** hoch (Betrieb, Verfügbarkeit) · **Lanes:** service
+**Status:** review · **Risikoklasse:** hoch (Betrieb, Verfügbarkeit) · **Lanes:** service
 **Regeln:** AGENTS.md R1–R12; Bedrohungsmodell T-G1-D-01 (Verfügbarkeit); Sicherheits-Checkliste SP-2, SC-08
 **Ausgangspunkt:** Nachprüfung 027 (29.09.2026), major 1. Die Middleware `app.use('/v1/*', …)` in
 `apps/api/src/app.ts` öffnet bei Postgres für **jede** schreibende Methode unter `/v1` eine Transaktion, nimmt den
@@ -59,4 +59,14 @@ melde es, statt auszulegen.
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer, Opus, 29.09.2026): **freigabefähig**, 0 blocker, 0 major. Alle 55 `/v1`-Routen
+hängen an `guarded(...)`, auch die vier Aliasrouten; der `domain`-Proxy wirft bei Postgres ohne Request-Store;
+Rollback/Commit-Semantik aus 027 unverändert; Test echt (Wartezustand über `pg_stat_activity`, 2-s-Schranke).
+Postgres-Dateien lokal 5/30 grün.
+
+1. minor → Folgeliste: zweiter Test prüft nur eine lesende Aliasroute; statischer Check „jede `/v1`-Route beginnt mit
+   `guarded(`“ fehlt.
+2. minor → Folgeliste: Proxy-Guard wirft einfachen `Error` (unspezifische 500, kein Betriebssignal).
+3. minor (mitgenommen, Orchestrator): `postgres028.test.ts` fehlte im CI-Postgres-Schritt, jetzt aufgenommen.
+4. nit → Folgeliste: `ROLLBACK` im `finally` nach `COMMIT` im Test.
+5. nit: 422 aus Query-Parameter nicht eigens geprüft (gleicher Codepfad).
