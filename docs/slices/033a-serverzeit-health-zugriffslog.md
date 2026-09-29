@@ -137,4 +137,16 @@ Touched: <Dateiliste>
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer, Opus, Perspektiven Datenschutz/Betrieb/Security, 29.09.2026): **freigabefähig**,
+0 blocker, 0 major. Tests 73/73 und Postgres 20/20 vom Reviewer selbst gelaufen; Zuordnung aller Vertragsoperationen über
+`matchServedOperationId` per Wegwerfprobe geprüft; Schlüsselmenge, `seq` nach COMMIT, `O_NOFOLLOW`, X-Server-Time auf
+allen Statuscodes bestätigt.
+
+1. minor (Sicherheit, behoben in `9cc419d`): Pakete mit falschem Absender/Port oder Originate beendeten die NTP-Teilfrist
+   sofort → ein Angreifer hätte `/readyz` auf 503 zwingen können. Jetzt still verworfen (RFC 5905), Test „gefälschtes,
+   dann echtes Paket → ok“.
+2. minor (behoben in `9cc419d`): `/auth/logout` mit falschem CSRF-Token loggte `subjectHash: null`; jetzt Hash aus einer
+   Sitzungslesung ohne Verlängerung, Reihenfolge der Prüfungen unverändert, Test ergänzt.
+3. minor → **037**: synchrones Schreiben des Zugriffslogs blockiert bei hängendem Datenträger die Event-Loop.
+4. minor (behoben): e2e-Suite nachgetragen (127 passed, 4 skipped); Keycloak- und Postgres-Nachweis im PR-CI-Lauf.
+5. nit → Folgeliste: Rechte des Log-Verzeichnisses nicht geprüft.
