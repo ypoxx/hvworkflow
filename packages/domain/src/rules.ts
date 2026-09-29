@@ -55,12 +55,12 @@ export interface RuleEntry {
 
 /** Internal meeting lifecycle decisions from slice 025, not externally verified legal rules. */
 const MEETING_RULES: readonly RuleEntry[] = ([
-  ['R-MTG-01', 'Übergang', 'A meeting id may be created only once; creation starts preparation at version 1.', 18],
-  ['R-MTG-02', 'Übergang', 'A meeting starts from preparation and closes from running; debate end is separate.', 19],
-  ['R-MTG-03', 'Guard', 'After debate close, only grounded earlier paper or transcript with a reason can be captured.', 20],
-  ['R-MTG-04', 'Übergang', 'A running meeting may open an agenda item once.', 21],
-  ['R-MTG-05', 'Übergang', 'Voting may open only after its agenda item opens, and only once.', 22],
-  ['R-MTG-06', 'Übergang', 'Voting may close only after it opens, and only once.', 23],
+  ['R-MTG-01', 'Übergang', 'A meeting id may be created only once; creation starts preparation at version 1.', 25],
+  ['R-MTG-02', 'Übergang', 'A meeting starts from preparation and closes from running; debate end is separate.', 26],
+  ['R-MTG-03', 'Guard', 'After debate close, only grounded earlier paper or transcript with a reason can be captured.', 27],
+  ['R-MTG-04', 'Übergang', 'A running meeting may open an agenda item once.', 28],
+  ['R-MTG-05', 'Übergang', 'Voting may open only after its agenda item opens, and only once.', 29],
+  ['R-MTG-06', 'Übergang', 'Voting may close only after it opens, and only once.', 30],
 ] as const).map(([ruleId, kind, description, line]) => ({
   ruleId, kind, description,
   legalRef: {

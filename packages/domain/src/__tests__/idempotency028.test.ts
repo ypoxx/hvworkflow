@@ -223,4 +223,69 @@ describe('Scheibe 028: durable idempotency and resource versions', () => {
       .rejects.toMatchObject({ status: 404 });
     expect(f.store.lastSeq()).toBe(before);
   });
+
+  describe('historical v2 events with an idempotency key but without a commandId', () => {
+    // Hand-built rows as an earlier writer left them: the store stamps seq and hash chain,
+    // but no commandId, commandOperation or commandResource is present.
+    const registered = (id: string, name: string, actor: Actor, extra: Record<string, unknown> = {}, position = 1) => ({
+      id: `evt-${id}`, type: 'SpeakerRegistered' as const, at, actor, subjectId: id, meetingId: 'hv-2027',
+      personId: `person-${id}`,
+      payload: { number: position, round: 1, position, pii: { keyId: 'hv-2027', displayName: name } }, ...extra,
+    });
+    const legacyKey = (key: string) => ({ idempotencyKey: key });
+
+    it('replays contiguous same-actor candidates with the original ids and appends nothing', async () => {
+      const f = fixture();
+      f.store.append([
+        registered('legacy-a', 'Alt A', moderation, legacyKey('legacy-1')),
+        registered('legacy-b', 'Alt B', moderation, legacyKey('legacy-1'), 2),
+      ]);
+      expect(f.store.all().some((event) => event.commandId !== undefined)).toBe(false);
+      const before = f.store.lastSeq();
+      const replay = await f.api().registerSpeaker({ displayName: 'Changed retry body' },
+        { idempotencyKey: 'legacy-1', ifMatch: etagOf(1) });
+      expect(replay).toMatchObject({ id: 'legacy-a', displayName: 'Alt A' });
+      expect(f.store.lastSeq()).toBe(before);
+    });
+
+    it('rejects candidates with a seq gap as ambiguous without appending', async () => {
+      const f = fixture();
+      f.store.append([
+        registered('gap-a', 'Alt A', moderation, legacyKey('gap-1')),
+        registered('gap-foreign', 'Fremd', capture, {}, 2),
+        registered('gap-b', 'Alt B', moderation, legacyKey('gap-1'), 3),
+      ]);
+      const before = f.store.lastSeq();
+      await expect(f.api().registerSpeaker({ displayName: 'Retry' }, { idempotencyKey: 'gap-1', ifMatch: etagOf(1) }))
+        .rejects.toMatchObject({ status: 409, ruleId: 'R-IDEM-01', detail: 'Historical idempotency command is ambiguous.' });
+      expect(f.store.lastSeq()).toBe(before);
+    });
+
+    it('rejects two candidates with different commandIds as ambiguous without appending', async () => {
+      const f = fixture();
+      const command = (id: string) => ({ ...legacyKey('two-commands'), commandId: id,
+        commandOperation: 'registerSpeaker', commandResource: '' });
+      f.store.append([
+        registered('cmd-a', 'Alt A', moderation, command('command-1')),
+        registered('cmd-b', 'Alt B', moderation, command('command-2'), 2),
+      ]);
+      const before = f.store.lastSeq();
+      await expect(f.api().registerSpeaker({ displayName: 'Retry' }, { idempotencyKey: 'two-commands', ifMatch: etagOf(1) }))
+        .rejects.toMatchObject({ status: 409, ruleId: 'R-IDEM-01', detail: 'Historical idempotency command is ambiguous.' });
+      expect(f.store.lastSeq()).toBe(before);
+    });
+
+    it('never replays another actor\'s result for the same key', async () => {
+      const f = fixture();
+      f.store.append([registered('other-a', 'Fremdes Ergebnis', { id: 'moderator-2', role: 'moderation' }, legacyKey('shared-key'))]);
+      const before = f.store.lastSeq();
+      const version = (await f.api().getMeeting()).speakerListVersion;
+      const result = await f.api().registerSpeaker({ displayName: 'Eigene Person' },
+        { idempotencyKey: 'shared-key', ifMatch: etagOf(version) });
+      expect(result).toMatchObject({ displayName: 'Eigene Person' });
+      expect(result.id).not.toBe('other-a');
+      expect(JSON.stringify(result)).not.toContain('Fremdes Ergebnis');
+      expect(f.store.lastSeq()).toBeGreaterThan(before);
+    });
+  });
 });
