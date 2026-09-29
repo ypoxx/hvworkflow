@@ -3,10 +3,13 @@
  * it is in the hall, who is looking, in which language. Everything else on screen may change; these
  * five facts must be readable at a glance from two metres away.
  */
+import { useState } from 'react';
 import { Keyboard } from 'lucide-react';
 import type { Meeting } from '@hv/domain';
+import { DEMO_MODE, sessionAuth } from '../api';
+import { useActor } from '../api/actor';
 import { Badge, Button } from '../components';
-import { useT } from '../i18n';
+import { roleLabel, useT } from '../i18n';
 import type { TKey } from '../i18n';
 import { Clock } from './Clock';
 import { DemoControls } from './DemoControls';
@@ -28,6 +31,12 @@ export function Header({
   onOpenShortcuts: () => void;
 }) {
   const t = useT();
+  const actor = useActor();
+  const [logoutError, setLogoutError] = useState(false);
+  const logout = () => {
+    setLogoutError(false);
+    void sessionAuth?.logout().catch(() => setLogoutError(true));
+  };
   return (
     <header
       role="banner"
@@ -75,7 +84,12 @@ export function Header({
       <span aria-hidden="true" className="h-7 w-px bg-line" />
 
       <div className="flex items-center gap-2">
-        <RoleSwitcher />
+        {DEMO_MODE ? <RoleSwitcher /> : (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-ink-700" data-testid="session-role">{roleLabel(t, actor.role)}</span>
+            <Button variant="ghost" size="sm" onClick={logout}>{t('session.logout')}</Button>
+          </div>
+        )}
         <LanguageToggle />
         <Button
           variant="ghost"
@@ -86,8 +100,9 @@ export function Header({
           onClick={onOpenShortcuts}
           icon={<Keyboard size={16} strokeWidth={1.75} aria-hidden="true" />}
         />
-        <DemoControls />
+        {DEMO_MODE && <DemoControls />}
       </div>
+      {logoutError && <span role="alert" className="text-sm text-red-700">{t('session.logoutFailed')}</span>}
     </header>
   );
 }

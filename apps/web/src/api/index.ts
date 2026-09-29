@@ -1,9 +1,8 @@
 /**
  * The interface's only door to the application core. `api` implements the contract (`HvApi`).
  *
- * Demo mode (ADR 0002): the domain runs in-process in the browser, the event log lives in
- * localStorage of this device. Switching to the HTTP server later means replacing this file's
- * `createInProcessApi` with an HTTP client that implements the same `HvApi` — nothing else changes.
+ * Demo mode (ADR 0002) runs the domain in-process. HTTP mode supplies the same port from the
+ * session-bound server, without loading the demo store or a demo actor.
  */
 import {
   CORPUS_DEMO,
@@ -15,7 +14,11 @@ import {
   type HvApi,
   type EventStore,
 } from '@hv/domain';
-import { getActor, setActor, DEMO_ACTORS } from './actor';
+import { getActor, setActor, setSessionActor, DEMO_ACTORS } from './actor';
+import { createSessionAuth } from './auth';
+import { createHttpApi, getHttpSession, logoutHttpSession } from './http';
+import { DEMO_MODE } from './mode';
+import { getLang } from '../i18n';
 
 const STORAGE_KEY = 'hv-demo-events-v1';
 
@@ -47,24 +50,33 @@ function saveLog(events: readonly DomainEvent[]): void {
 }
 
 let startupError: Error | undefined;
-let store: EventStore;
-try {
-  store = createInMemoryEventStore({ load: loadLog, save: saveLog });
-} catch (error) {
-  startupError = error instanceof Error ? error : new Error(String(error));
-  store = createInMemoryEventStore();
+let store: EventStore | undefined;
+if (DEMO_MODE) {
+  try {
+    store = createInMemoryEventStore({ load: loadLog, save: saveLog });
+  } catch (error) {
+    startupError = error instanceof Error ? error : new Error(String(error));
+    store = createInMemoryEventStore();
+  }
 }
 
-export const api: HvApi = createInProcessApi({
-  store,
-  actor: getActor,
-  clock: () => new Date(),
-  seeder: seedEvents,
+export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
+  readSession: getHttpSession,
+  signOut: logoutHttpSession,
+  onActorChange: setSessionActor,
 });
+
+export const api: HvApi = DEMO_MODE
+  ? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents })
+  : createHttpApi({
+    getCsrfToken: () => sessionAuth?.getCsrfToken(),
+    onUnauthorized: () => sessionAuth?.onUnauthorized(),
+    locale: getLang,
+  });
 
 /** Whether the demo corpus is loaded. The shell seeds on first start. */
 export function isSeeded(): boolean {
-  return store.lastSeq() > 0;
+  return store?.lastSeq() !== undefined && store.lastSeq() > 0;
 }
 
 /**
@@ -72,6 +84,7 @@ export function isSeeded(): boolean {
  * holds; the current persona is restored afterwards so the demo starts in the chosen role.
  */
 export async function seedIfEmpty(): Promise<void> {
+  if (!DEMO_MODE) return;
   if (startupError) throw startupError;
   if (isSeeded()) return;
   const before = getActor();
@@ -86,6 +99,7 @@ export async function seedIfEmpty(): Promise<void> {
 
 /** Wipe this device's demo data and reload with a fresh corpus. */
 export function resetDemo(): void {
+  if (!DEMO_MODE) return;
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
@@ -99,4 +113,4 @@ export function subscribeToChanges(listener: (events: DomainEvent[]) => void): (
   return api.subscribe(listener);
 }
 
-export const DEMO_MODE = true;
+export { DEMO_MODE } from './mode';
