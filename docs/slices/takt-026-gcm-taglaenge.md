@@ -1,6 +1,6 @@
 # takt-026 — AES-GCM der Anmeldewerte mit fester Tag-Länge
 
-**Status:** review · **Risikoklasse:** mittel (Sicherheit, eng) · **Lane:** service (nur `apps/api/src/auth/sessions.ts`)
+**Status:** review · **Risikoklasse:** hoch (Sitzung/Secrets, Leitplanken §4; zunächst als mittel geführt, vom Orchestrator korrigiert; Review lief bereits mit Opus, Perspektive Security) · **Lane:** service (nur `apps/api/src/auth/sessions.ts`)
 **Regeln:** AGENTS.md R1, R2, R12; Sicherheits-Checkliste SP-3, SC-10
 **Ausgangspunkt:** Der erste Nightly-Lauf nach takt-021 (gitleaks grün, Lauf 7 per `workflow_dispatch`, 29.09.2026)
 erreicht erstmals Semgrep `p/typescript` und meldet einen blockierenden Fund aus 029b:
