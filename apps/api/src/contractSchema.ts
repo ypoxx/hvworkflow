@@ -93,6 +93,34 @@ export function matchOperationId(method: string, pathname: string): string | und
   return undefined;
 }
 
+/** Every operation with the full path it is served under: the path item's own `servers` entry, else the default. */
+const servedOperations = Object.entries(operations).map(([operationId, op]) => {
+  const pathItem = (openapiDoc.paths as Record<string, { servers?: { url: string }[] }>)[op.path];
+  const servers = pathItem?.servers ?? (openapiDoc as { servers?: { url: string }[] }).servers;
+  const base = (servers?.[0]?.url ?? '').replace(/\/$/, '');
+  return { operationId, method: op.method, fullPath: `${base}${op.path}` };
+});
+
+/**
+ * Runtime mapping request -> `operationId` for the access log (slice 033a, T-G1-I-05). Unlike
+ * `matchOperationId` it honours each path's `servers` entry: `/healthz`, `/readyz`, `/metrics`
+ * and `/auth/*` only without a prefix, everything else only under `/v1`. A path segment that is a
+ * template parameter must be non-empty, as in the router. Unknown routes give `undefined`.
+ */
+export function matchServedOperationId(method: string, pathname: string): string | undefined {
+  const wanted = method.toLowerCase();
+  const actual = pathname.split('/');
+  for (const served of servedOperations) {
+    if (served.method !== wanted) continue;
+    const template = served.fullPath.split('/');
+    if (template.length !== actual.length) continue;
+    if (template.every((segment, i) => segment.startsWith('{') ? actual[i] !== '' : segment === actual[i])) {
+      return served.operationId;
+    }
+  }
+  return undefined;
+}
+
 /** `/questions/{questionId}/history` matches `/questions/abc/history`; segment counts must agree. */
 function pathTemplateMatches(template: string, actual: string): boolean {
   const t = template.split('/');

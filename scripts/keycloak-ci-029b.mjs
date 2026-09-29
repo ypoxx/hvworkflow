@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn, execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -95,8 +95,9 @@ async function waitForHttp(url, expectedStatus, timeoutMs, child) {
 }
 
 async function waitForApi(child) {
-  // Clock/NTP readiness is introduced in 033. In 029b, /readyz is 503 even when
-  // Postgres and its migrations are healthy; the public notice proves the HTTP server is up.
+  // Clock/NTP readiness exists since 033a, but this run configures no HV_NTP_SERVERS (no outbound
+  // network in CI), so /readyz stays 503 with `not_configured` even when Postgres and its migrations
+  // are healthy; the public notice proves the HTTP server is up.
   await waitForHttp(`${apiOrigin}/auth/transparency-notice`, 200, 30_000, child);
   const response = await fetch(`${apiOrigin}/readyz`);
   const body = await response.json();
@@ -164,7 +165,9 @@ async function sessionCount(ownerUrl) {
   }
 }
 
-function startApi(runtimeUrl, identity, encryptionKey) {
+// Scheibe 033a: the access log is mandatory outside demo mode. Directory and HMAC key exist only
+// for this run; afterwards the files are checked for anything that must never reach the log.
+function startApi(runtimeUrl, identity, encryptionKey, accessLog) {
   const env = {
     ...process.env,
     PORT: String(apiPort),
@@ -174,6 +177,8 @@ function startApi(runtimeUrl, identity, encryptionKey) {
     HV_OIDC_CLIENT_SECRET: identity.clientSecret,
     HV_OIDC_REDIRECT_URI: callback,
     HV_AUTH_ENCRYPTION_KEY: encryptionKey,
+    HV_ACCESS_LOG_DIR: accessLog.dir,
+    HV_ACCESS_LOG_HASH_KEY: accessLog.key,
     HV_TRANSPARENCY_NOTICE_VERSION: 'ci-synthetic-1',
     HV_TRANSPARENCY_NOTICE_DE: 'Unbestätigter synthetischer CI-Hinweis.',
     HV_TRANSPARENCY_NOTICE_EN: 'Unreviewed synthetic CI notice.',
@@ -184,6 +189,23 @@ function startApi(runtimeUrl, identity, encryptionKey) {
     ['--import', join(root, 'apps/api/node_modules/tsx/dist/loader.mjs'), join(root, 'apps/api/src/server.ts')],
     { cwd: root, env, stdio: 'ignore' });
   return child;
+}
+
+async function checkAccessLog(dir, forbidden) {
+  const files = (await readdir(dir)).filter((name) => /^access-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name));
+  assert(files.length > 0, 'The access log must contain at least one daily file.');
+  const keys = ['latencyMs', 'operationId', 'requestId', 'seq', 'status', 'subjectHash', 'ts', 'v'];
+  let lines = 0;
+  for (const name of files) {
+    const text = await readFile(join(dir, name), 'utf8');
+    for (const value of forbidden) assert(!text.includes(value), 'The access log holds a secret, token, cookie or actor id.');
+    for (const line of text.split('\n').filter(Boolean)) {
+      assert.deepEqual(Object.keys(JSON.parse(line)).sort(), keys, 'Every access log line has exactly the eight keys.');
+      lines += 1;
+    }
+  }
+  assert(lines > 0, 'The browser run must have produced access log lines.');
+  console.log('033a access log holds no secret, token, cookie or actor id: PASS');
 }
 
 async function checkBrowserFlow(identity, expectedActorId, meetingId) {
@@ -229,6 +251,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
       .filter((header) => header.name.toLowerCase() === 'set-cookie').map((header) => header.value);
     assert.equal(cookies.length, 2, 'Callback must send two separate Set-Cookie fields.');
     assert.equal(cookies.filter((line) => line.startsWith('hv_session=')).length, 1);
+    const sessionCookie = cookies.find((line) => line.startsWith('hv_session='))?.split(';')[0]?.slice('hv_session='.length);
     assert.equal(cookies.filter((line) => line.startsWith('hv_auth_state=') && line.includes('Max-Age=0')).length, 1);
     stage = 'post-login navigation';
     await page.waitForURL(`${apiOrigin}/v1/meeting`);
@@ -272,6 +295,8 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     assert.equal(logout.status, 204);
     assert.equal(logout.after, 401);
     console.log('029b Keycloak browser login, role, CSRF, write and logout: PASS');
+    return [identity.clientSecret, identity.userPassword, sessionCookie, me.body.csrfToken, expectedActorId,
+      expectedActorId.replace(/^oidc_/, ''), identity.userId, identity.username].filter(Boolean);
   } finally {
     await browser.close();
   }
@@ -304,17 +329,22 @@ async function main() {
     stage = 'synthetic Postgres bootstrap';
     const { actorId, meetingId } = await bootstrapMeeting(ownerUrl, identity.userId);
     stage = 'service startup';
-    api = startApi(runtimeUrl, identity, encryptionKey);
+    const logDir = join(temp, 'access-log');
+    await mkdir(logDir, { mode: 0o700 });
+    const accessLog = { dir: logDir, key: randomBytes(32).toString('base64') };
+    api = startApi(runtimeUrl, identity, encryptionKey, accessLog);
     await waitForApi(api);
     stage = 'browser login and role flow';
-    await checkBrowserFlow(identity, actorId, meetingId);
+    const secrets = await checkBrowserFlow(identity, actorId, meetingId);
     const sessionsBeforeOutage = await sessionCount(ownerUrl);
     await stopApi(api);
     api = undefined;
+    stage = 'access log check';
+    await checkAccessLog(logDir, secrets);
     stage = 'IdP outage';
     await execFile('docker', ['rm', '-f', container], { timeout: 10_000 });
     containerStarted = false;
-    api = startApi(runtimeUrl, identity, encryptionKey);
+    api = startApi(runtimeUrl, identity, encryptionKey, accessLog);
     await waitForApi(api);
     const unavailable = await fetch(`${apiOrigin}/auth/login`, { redirect: 'manual' });
     assert.equal(unavailable.status, 503, 'A fresh login must fail closed while Keycloak is unavailable.');

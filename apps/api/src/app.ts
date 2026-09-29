@@ -48,7 +48,11 @@ import { actorIdForIdentity, createOidcFlow, safeReturnTo, type OidcFlow } from 
 import { createAuthStore, type AuthStore } from './auth/store.ts';
 import { createFileEventLog } from './eventLog.ts';
 import { requireParam, writeOptions } from './http.ts';
-import { problemResponse } from './problem.ts';
+import { discardSink, type AccessLogSink } from './observability/accessLog.ts';
+import { currentRequest, noteSeq } from './observability/context.ts';
+import { createRequestLog } from './observability/requestLog.ts';
+import { createSubjectHasher } from './observability/subjectHash.ts';
+import { problemBody, problemResponse } from './problem.ts';
 import { getMigrationStatus } from './persistence/migrations.ts';
 import { assertRuntimePrivileges, insertPostgresEvents, loadPostgresSnapshot, PostgresIntegrityError } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
@@ -77,6 +81,15 @@ export interface CreateAppOptions {
   /** Overrides `eventLogPath` — lets tests inject an in-memory `Persistence` without touching disk. */
   persistence?: Persistence;
   clock?: () => Date;
+  /** Monotonic milliseconds for the access log latency (wired in server.ts); default: clock differences. */
+  monotonic?: () => number;
+  /**
+   * Slice 033a access log: sink and HMAC key. Default for `createApp` (a library for tests): a discarding
+   * sink and a random key per call, whatever the mode. The process start (`server.ts`) enforces the real one.
+   */
+  accessLog?: { sink: AccessLogSink; hashKey: Buffer };
+  /** Slice 033a: SNTP status for `/readyz`; `server.ts` builds it from `HV_NTP_SERVERS`. */
+  clockHealth?: () => Promise<ReadinessCheck>;
   idGenerator?: () => string;
   /**
    * Seed the synthetic demo corpus once at startup when demo mode is on and the store is still
@@ -145,6 +158,12 @@ export function createApp(options: CreateAppOptions = {}): App {
   const authKeyRaw = process.env['HV_AUTH_ENCRYPTION_KEY'];
   const authKey = options.authKey ?? (authKeyRaw ? Buffer.from(authKeyRaw, 'base64url') : undefined);
   const clock = options.clock ?? systemClock;
+  const accessLog = options.accessLog ?? { sink: discardSink, hashKey: randomBytes(32) };
+  const subjectHashOf = createSubjectHasher(accessLog.hashKey);
+  const noteSubject = (actorId: string): void => {
+    const context = currentRequest();
+    if (context !== undefined) context.subjectHash = subjectHashOf(actorId);
+  };
   const authStore = options.authStore ?? (options.postgres && authKey
     ? createAuthStore(options.postgres, authKey) : undefined);
   const clientId = options.oidcClientId ?? process.env['HV_OIDC_CLIENT_ID'];
@@ -205,6 +224,9 @@ export function createApp(options: CreateAppOptions = {}): App {
   const persistence = options.persistence ?? (eventLogPath !== undefined ? createFileEventLog(eventLogPath) : undefined);
   if (options.postgres && persistence) throw new Error('Configure only one service persistence source.');
   const store = createInMemoryEventStore(persistence);
+  // In-memory and JSONL paths: the highest seq appended while a request runs (Postgres notes its
+  // seq after COMMIT in `postgresBoundary`). The listener runs synchronously inside the request.
+  store.subscribe((appended) => { for (const event of appended) noteSeq(event.seq); });
   const actorStorage = new AsyncLocalStorage<Actor>();
   const requestStorage = new AsyncLocalStorage<PostgresRequest>();
 
@@ -288,6 +310,10 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   const app = new Hono<{ Variables: Variables }>();
 
+  // ---- outermost: correlation id, X-Server-Time, access log (slice 033a) ------------------------
+  app.use('*', createRequestLog({ clock, sink: accessLog.sink,
+    ...(options.monotonic !== undefined ? { monotonic: options.monotonic } : {}) }));
+
   // ---- CORS (dev only) -------------------------------------------------------------------------
   // The contract is same-origin (openapi.yaml: `servers: /v1`); this exists only so the Vite dev
   // server (apps/web, default port 5173) can reach a demo-mode server across origins.
@@ -297,14 +323,14 @@ export function createApp(options: CreateAppOptions = {}): App {
       cors({
         origin: 'http://localhost:5173',
         allowHeaders: ['X-Actor', 'If-Match', 'Idempotency-Key', 'Content-Type'],
-        exposeHeaders: ['ETag'],
+        exposeHeaders: ['ETag', 'X-Server-Time'],
       }),
     );
   }
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
-    if (c.req.path === '/readyz' || c.req.path === '/auth/login' ||
+    if (c.req.path === '/healthz' || c.req.path === '/readyz' || c.req.path === '/auth/login' ||
         c.req.path === '/auth/callback' || c.req.path === '/auth/transparency-notice') {
       await next();
       return;
@@ -318,9 +344,23 @@ export function createApp(options: CreateAppOptions = {}): App {
     }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
     const actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
+    // The session was used from here on, whatever CSRF or the re-read decide next: log who (hashed).
+    if (actor !== undefined) noteSubject(actor.id);
     if (sessionReady) {
       const token = sessionTokenFromCookie(c.req.header('Cookie'))!;
       const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
+      // Without an adapter actor (`/auth/me`, `/auth/logout`) the session still identifies who acted,
+      // also when CSRF fails below: peek without extending the idle window (order of checks unchanged).
+      if (actor === undefined) {
+        const peek = await authStore!.readSession(token, clock(), false);
+        if (peek) noteSubject(peek.actorId);
+        // takt-029: `/auth/me` extends the idle window only once the handler knows the session has a role.
+        if (c.req.path === '/auth/me') {
+          if (!peek) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+          await next();
+          return;
+        }
+      }
       const csrfRequired = (mutation && c.req.path.startsWith('/v1/')) || c.req.path === '/auth/logout';
       if (csrfRequired) {
         const csrf = c.req.header('X-CSRF-Token');
@@ -332,9 +372,9 @@ export function createApp(options: CreateAppOptions = {}): App {
         }
       }
       // Re-read only after CSRF validation; a rejected write cannot extend its idle window.
-      if (!await authStore!.readSession(token, clock())) {
-        throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
-      }
+      const current = await authStore!.readSession(token, clock());
+      if (!current) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+      if (actor === undefined) noteSubject(current.actorId);
     }
     if (actor === undefined) await next();
     else await actorStorage.run(actor, () => next());
@@ -386,6 +426,8 @@ export function createApp(options: CreateAppOptions = {}): App {
       } else {
         if (pendingEvents.length > 0) await insertPostgresEvents(client, pendingEvents);
         await client.query('COMMIT');
+        // Only what is committed counts: a rollback or a failed COMMIT leaves `seq` null.
+        if (pendingEvents.length > 0) noteSeq(Math.max(...pendingEvents.map((event) => event.seq)));
       }
       started = false;
     } catch (error) {
@@ -417,7 +459,6 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.onError((err, c) => {
     const response = problemResponse(err);
     if (c.req.path.startsWith('/auth/')) {
-      response.headers.set('X-Server-Time', clock().toISOString());
       response.headers.set('Cache-Control', 'no-store');
       if (c.req.path === '/auth/callback') {
         response.headers.append('Set-Cookie',
@@ -428,10 +469,13 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
   app.notFound(() => problemResponse(new ApiProblem(404, 'Not found', 'No such route.')));
 
+  // Liveness: the process answers. No credential, no database, no NTP; exact path (see the auth exemption).
+  app.get('/healthz', (c) => c.json({ status: 'ok' }));
+
   app.get('/readyz', async (c) => {
     const serverTime = (options.clock ?? systemClock)().toISOString();
     const defaultChecks = {
-      clock: async (): Promise<ReadinessCheck> => ({ status: 'fail', code: 'not_configured' }),
+      clock: options.clockHealth ?? (async (): Promise<ReadinessCheck> => ({ status: 'fail', code: 'not_configured' })),
       db: async (): Promise<ReadinessCheck> => {
         if (options.postgres) {
           await assertRuntimePrivileges(options.postgres, false);
@@ -490,7 +534,6 @@ export function createApp(options: CreateAppOptions = {}): App {
   // ---- browser sign-in -----------------------------------------------------------------------
   const authResponseHeaders = (c: Context): void => {
     c.header('Cache-Control', 'no-store');
-    c.header('X-Server-Time', clock().toISOString());
   };
   app.get('/auth/login', validateOperation('login'), async (c) => {
     if (!sessionReady || !transparencyNotice) throw new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
@@ -524,8 +567,10 @@ export function createApp(options: CreateAppOptions = {}): App {
         !states[0] || !/^[A-Za-z0-9_-]{43}$/.test(states[0]) || !correlation || params.has('error')) {
       throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     }
+    // takt-029: a database fault is "unavailable" (503, contract `completeLogin`), never a bare 500.
+    const unavailable = () => new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
     const pending = await authStore!.consumeLoginState({ state: states[0],
-      browserCorrelation: correlation, now: clock() });
+      browserCorrelation: correlation, now: clock() }).catch(() => { throw unavailable(); });
     if (!pending) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     let identity: Awaited<ReturnType<OidcFlow['complete']>>;
     try {
@@ -536,15 +581,17 @@ export function createApp(options: CreateAppOptions = {}): App {
     }
     if (identity.issuer !== oidcIssuer) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     const actorId = actorIdForIdentity(identity.issuer, identity.subject);
-    if (await authStore!.isSubjectBlocked(actorId)) {
+    if (await authStore!.isSubjectBlocked(actorId).catch(() => { throw unavailable(); })) {
       throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
     }
-    sessionActorFromEvents(await authEvents!(), actorId, clock());
+    sessionActorFromEvents(await authEvents!().catch(() => { throw unavailable(); }), actorId, clock());
     let session: Awaited<ReturnType<AuthStore['createSession']>>;
     try {
       session = await authStore!.createSession({ actorId, now: clock() });
     } catch {
-      throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
+      // Blocked between the check and the insert stays 403; any other fault is a persistence fault.
+      const blocked = await authStore!.isSubjectBlocked(actorId).catch(() => false);
+      throw blocked ? new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.') : unavailable();
     }
     authResponseHeaders(c);
     const response = c.redirect(pending.returnTo, 302);
@@ -571,12 +618,14 @@ export function createApp(options: CreateAppOptions = {}): App {
     } catch (error) {
       if (!(error instanceof ApiProblem) || error.status !== 403) throw error;
       // Contract 0.3.8 `NoActiveRole`: the token lets the client sign out; /v1 writes still fail.
-      const response = new Response(JSON.stringify({ ...error.toProblem(), csrfToken: session.csrfToken }),
+      const response = new Response(JSON.stringify({ ...problemBody(error), csrfToken: session.csrfToken }),
         { status: 403, headers: { 'Content-Type': 'application/problem+json' } });
-      response.headers.set('X-Server-Time', clock().toISOString());
       response.headers.set('Cache-Control', 'no-store');
       return response;
     }
+    // A session with an active role keeps its idle window alive (the sliding read); one without does not.
+    const extended = await authStore!.readSession(token, clock());
+    if (!extended) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
     return c.json({ scheme: 'session', actor: { id: resolved.actor.id, role: resolved.actor.role },
       subjectId: session.actorId, roles: resolved.roles,
       ...(resolved.actor.personId !== undefined ? { personId: resolved.actor.personId } : {}),
@@ -597,7 +646,6 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   app.get('/auth/transparency-notice', validateOperation('getTransparencyNotice'), async (c) => {
     if (!transparencyNotice) throw new ApiProblem(404, 'Not found', 'Transparency notice is unavailable.');
-    c.header('X-Server-Time', clock().toISOString());
     return c.json(transparencyNotice);
   });
 
