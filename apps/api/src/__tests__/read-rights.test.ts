@@ -222,7 +222,8 @@ describe('read rights over HTTP (slice 010)', () => {
     const unknownProblem = await unknownRes.json();
     expectValid('mergeQuestion', 403, hiddenProblem, 'application/problem+json');
     expect(hiddenProblem.ruleId).toBe('R-PERM-01');
-    expect(unknownProblem).toEqual(hiddenProblem);
+    // `instance` is the per-request correlation id (slice 033a) and differs by design.
+    expect({ ...unknownProblem, instance: undefined }).toEqual({ ...hiddenProblem, instance: undefined });
   });
 
   it('404 precedence: an unknown id and "exists but not readable" produce equivalent bodies over HTTP — no ruleId, no ETag (rework round, point 8)', async () => {
@@ -245,7 +246,7 @@ describe('read rights over HTTP (slice 010)', () => {
     // Same shape apart from the id embedded in `detail` — replace the two different ids with a
     // placeholder before comparing so the bodies are otherwise identical.
     const normalize = (problem: Record<string, unknown>, id: string): unknown =>
-      JSON.parse(JSON.stringify(problem).split(id).join('<id>'));
+      JSON.parse(JSON.stringify({ ...problem, instance: undefined }).split(id).join('<id>'));
     expect(normalize(hiddenProblem, hidden.id)).toEqual(normalize(unknownProblem, 'does-not-exist-xyz'));
   });
 });

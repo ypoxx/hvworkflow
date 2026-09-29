@@ -7,7 +7,22 @@
  */
 import { serve } from '@hono/node-server';
 import { Pool } from 'pg';
+import { systemClock } from '@hv/domain';
 import { createApp } from './app.ts';
+import { createNtpClockCheck, parseNtpEnv } from './clock/ntp.ts';
+import { createFileSink, discardSink } from './observability/accessLog.ts';
+import { readObservabilityConfig } from './observability/config.ts';
+
+// Slice 033a: the access log cannot be switched off outside demo mode. Fixed sentences, no values.
+let observability: ReturnType<typeof readObservabilityConfig>;
+let ntp: ReturnType<typeof parseNtpEnv>;
+try {
+  observability = readObservabilityConfig(process.env);
+  ntp = parseNtpEnv(process.env);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : 'HV-Tool API: refusing to start: invalid configuration.');
+  process.exit(1);
+}
 
 const port = Number.parseInt(process.env['PORT'] ?? '8787', 10);
 const databaseUrl = process.env['HV_DATABASE_URL'];
@@ -24,6 +39,11 @@ postgres?.on('error', () => {
   console.error('HV-Tool API: Postgres pool connection failed.');
 });
 const app = createApp({ seedOnStart: postgres === undefined,
+  monotonic: () => performance.now(), // now-ok: latency needs a monotonic source that a wall-clock step cannot bend
+  accessLog: { sink: observability.dir === undefined ? discardSink
+    : createFileSink({ dir: observability.dir, retentionDays: observability.retentionDays, clock: systemClock }),
+  hashKey: observability.hashKey },
+  ...(ntp !== undefined ? { clockHealth: createNtpClockCheck({ ...ntp, clock: systemClock }) } : {}),
   ...(postgres !== undefined ? { postgres } : {}) });
 
 serve({ fetch: app.fetch, port }, (info) => {
