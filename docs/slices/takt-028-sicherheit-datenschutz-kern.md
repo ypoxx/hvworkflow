@@ -41,6 +41,7 @@ Migration bestehender Ereignisse (R7: nichts wird umgeschrieben), keine Grenzen 
 - `packages/domain/src/__tests__/**` (neue und betroffene Tests; feste Fingerabdrücke nur ändern, wenn nachweislich unverändert gültig)
 - `apps/api/src/eventLog.ts`, `apps/api/src/__tests__/eventLog024.test.ts`
 - `apps/web/src/api/index.ts`, `apps/web/src/app/BootScreen.tsx` (nur Fehlertext), `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts`, `apps/web/src/i18n/parity.test.ts`, `apps/web/src/api/*.test.ts`
+- `docs/evidence/takt-028-*.png` (Nachtrag nach Codex P1 auf #69: Bildnachweis des geänderten Startfehlers)
 
 ## Abnahme
 
