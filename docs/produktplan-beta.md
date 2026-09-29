@@ -247,7 +247,7 @@ Drei Umgebungen: Demo (Netlify, In-Process, Taktfläche), Staging-synthetisch (A
 | 0010 Pilotmodus und Übungsbetrieb | HV_MODE training\|shadow\|live, Beta ist Schattenbetrieb, Übungsmandant mit Banner und ohne Podium-Push, Seed nur in training, Löschung durch Entfernen der getrennten Datenbank mit Protokoll | 042 | Prüfpunkt 3 |
 | 0011 Ereignis-Umschlag v2 | schemaVersion, idempotencyKey, causationId, prevHash/hash (SHA-256 kanonisch), recordedAt maßgeblich, occurredAt mit Quellenkennzeichen, retentionClass, legalHold, meetingId, personId statt Klarname; kein Upcaster für Demo-Protokolle (Reset-Banner); Kettenprüfung beim Laden | 024 | Prüfpunkt 3 |
 | 0012 Zustandsmodell | 11 Zustände bleiben; Verweigerung als Antwortart durch die bestehende Kette; Nebenaspekte als Kennzeichen (deferred, correctionOpen, followUp), jedes als Guard oder Tabellenzeile mit Regel-ID; fünf Anzeigegruppen; Alternative zwei Hauptzustände mit Kosten; Reform erst nach der Beta; geht vor 044 an Recht | 044 | Prüfpunkt 4, Umsetzer und Recht |
-| 0013 Zwei Protokollebenen | Fachliche Vorgangshistorie (unbegrenzt, nicht abschaltbar) und technisches Zugriffslog (ohne Nutzdaten, Korrelations-ID, 30 Tage, getrennte Senke); Auswertung personenbezogener Felder nur zu zweit; Rate-Limit-Zähler flüchtig; keine personenbezogene Leistungsauswertung; Kennzahlen-Allowlist | 033, 047 | Prüfpunkt 4 |
+| 0013 Zwei Protokollebenen | Fachliche Vorgangshistorie (unbegrenzt, nicht abschaltbar) und technisches Zugriffslog (ohne Nutzdaten, Korrelations-ID, 30 Tage, getrennte Senke); Auswertung personenbezogener Felder nur zu zweit; Rate-Limit-Zähler flüchtig; keine personenbezogene Leistungsauswertung; Kennzahlen-Allowlist | 033a, 033b, 047 | Prüfpunkt 4 |
 | 0014 Realtime | SSE mit after=seq und Last-Event-ID, Polling als Fallback, kein Broker, Client wendet Ereignisse auf gepufferte Listen an | 035, 036 | Prüfpunkt 3 |
 | 0015 Vertragsversionierung | Semver, CHANGELOG-Tor, brechende Änderung nur mit ADR-Verweis, neue Pflichtfelder erst optional mit Ablaufdatum und dann in einem Folgezyklus Pflicht, vorab deklarierte Operationen in einer Allowlist mit Ablaufdatum (damit das Tor „jede operationId wird ausgeübt" bestehen bleibt), Vertragsfreeze vor der Generalprobe, /v1-Kompatibilität für Partner über zwei Zyklen | 019 | Prüfpunkt 1 |
 | 0016 Agenten-Arbeitsmodell | Lanes mit exklusivem Dateibesitz, berechneter Kalender statt Handplanung, Scheibenumfang-Tor, Plan-Graph-Prüfung, i18n je Feature-Modul, Feature-Register für Routen, e2e-Dateien je Scheibe plus geteilte Altdateien, Review-Paarung nach Regel 3, Merge durch den Orchestrator nach grünen Toren und Review (E48), Herabstufung nur mit menschlicher Unterschrift, Token-Regelkreis | 016 | Prüfpunkt 1 |
@@ -270,9 +270,9 @@ Jede Zeile löst sich in eine Scheibe, einen Nach-Beta-Eintrag (B-Liste, 5.10, m
 | Ist-Delta mittel 9–14 | Versionierung (erfüllt) · zwei Datenbereiche · Auskunftsschuldner · Drehbuch-Kopplung · Vorabfragen · Taxonomie | — · 046 (Notiz getrennt) · 048 · 025 (R-MTG, Tagesordnung, Nachtragsregel) · 068 (light) · B-Liste |
 | Ist-Analyse offene Fragen 1–9 | Fragenpaket Woche 1; Frage 5 (Rechtsrollen) eigene Zeile | 014 → Register E31, E40 |
 | Leitplanken-Register (20 Zeilen) | Persistenz, IdP/Gast/Notfallkonten, Rollenzuschnitt/Vertretungen, DB-Topologie/HA, Betreiber, Legitimation, Veröffentlichung, Letztfreigabe/Rechtstor, ADR 0001, BR, Rechtsprüfung u. a. | 009 (konsolidiert), Register E10–E29, E42 |
-| Recherche MUSS Betrieb/Sicherheit (tragend für die Generalprobe) | Z.263 Offline-Podium · Z.295/296 Hash-Kette, Rebuild · Z.299/205 Referenzuhr · Z.312 IAM · Z.330/344 Bedrohungsmodell, SBOM · Z.340 Rate-Limit · Z.362 Lasttest · Z.365 Entwurfsspeicherung · Z.367 Generalprobe · Z.370/371 Monitoring, Kanarienfrage · Z.373/374 Papier, Katalogkopie · Z.378 Login-Check | 058 · 024/027/038 · 032/033 · 029 · 039/074 · 034 · 071 · 060 · 078 · 037/086 · 068/070 · 062/078 |
+| Recherche MUSS Betrieb/Sicherheit (tragend für die Generalprobe) | Z.263 Offline-Podium · Z.295/296 Hash-Kette, Rebuild · Z.299/205 Referenzuhr · Z.312 IAM · Z.330/344 Bedrohungsmodell, SBOM · Z.340 Rate-Limit · Z.362 Lasttest · Z.365 Entwurfsspeicherung · Z.367 Generalprobe · Z.370/371 Monitoring, Kanarienfrage · Z.373/374 Papier, Katalogkopie · Z.378 Login-Check | 058 · 024/027/038 · 032/033a · 029 · 039/074 · 034 · 071 · 060 · 078 · 037/086 · 068/070 · 062/078 |
 | Recherche SOLL, bewusst mitgenommen | Z.351 Kill-Switch (Sperrliste, billig mit 029) | 029 |
-| Recherche MUSS Recht (tragend) | Z.63/64 Verweigerung · Z.70 Nachfragen · Z.74/259 Verfahrensereignisse · Z.78 Restanten-Feststellung · Z.80 Korrektur · Z.91/422 Rechtstor · Z.103 Soll-Ist · Z.104/126 Legal Hold · Z.116 Pseudonymisierung · Z.129/130 zwei Protokollebenen mit Auswertung zu zweit · Z.231 Vier-Augen · Z.277 Delivery-Entität · Z.449 Auskunftsschuldner, Aufsichtsrat | 044 · 046 · 050 · 087 · 046 · 021 · 049 · 024 · 026 (Standard an)/067 · 033/047 · 021 · 049 · 048, 040/047 |
+| Recherche MUSS Recht (tragend) | Z.63/64 Verweigerung · Z.70 Nachfragen · Z.74/259 Verfahrensereignisse · Z.78 Restanten-Feststellung · Z.80 Korrektur · Z.91/422 Rechtstor · Z.103 Soll-Ist · Z.104/126 Legal Hold · Z.116 Pseudonymisierung · Z.129/130 zwei Protokollebenen mit Auswertung zu zweit · Z.231 Vier-Augen · Z.277 Delivery-Entität · Z.449 Auskunftsschuldner, Aufsichtsrat | 044 · 046 · 050 · 087 · 046 · 021 · 049 · 024 · 026 (Standard an)/067 · 033a/033b/047 · 021 · 049 · 048, 040/047 |
 | Kritik der Gegenlese (fünf Linsen) | Blocker und Hauptbefunde zu Kalender, Rechtstor, Papierpfad, Vertrag zuerst, Kapazität, Token, Governance | 080–088 neu; Änderungen in 019, 021, 023, 025, 051, 058, 076 u. a.; Abschnitte 3, 4, 6, 8, 10 |
 | Zielbild Oberfläche (`docs/feedback/2026-09-zielbild-oberflaeche.md`, Prototyp `docs/zielbild/`) | Befunde U1–U11 · Zielbild Z1–Z26 | 089 (Übernahme) · 054 (Z1, Z5, Z7–Z9), 055 (Z6), 061 (Z10–Z13), 087 (Z14), 050/085 (Z15), 056/057 (Z16, Z17, Z19, Z22), 062 (Z26), 026 (U10), 080 (U11), 021/053 (U5) · Takt-Spur (U1, U2, U4, U6–U9) · Register E50–E54 (Z2–Z4, Z18 [Fenster: 058], Z20, Z21, U3 [058]) · bewusst nein: Z24, Z25 · gebaut: Z23 (020) |
 | Recherche MUSS übrig (§7, §8 Aktionärskanal, MAR-Ampel, PDF/A, Publikation, KI-Anbieter, Nebenstränge, Ethical Wall, Suche, SAML …) | — | B-Liste 5.10 |
@@ -556,21 +556,29 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* e2e-Lauf beider Projekte grün mit Laufzeiten; ADR-0002-Ergänzung mit Nachweis
   - *Offene Entscheidung:* —
-- **033 · Zwei Protokollebenen, Health, NTP-Status, Kennzahlen, Serverzeit-Header** — hoch · 2 AStd · Kalender 26.10.2026 (W5) · Lanes: service
-  - *Ziel:* strukturiertes Zugriffslog (JSON: requestId, subjectHash, operationId, status, latency, seq; nie Fragetext) in eigene Senke mit konfigurierbarer Aufbewahrung (Standard 30 Tage); Korrelations-ID; /healthz, NTP-Status für das seit 027 implementierte /readyz; /metrics mit fünf fachlichen Kennzahlen (Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, Ereignisse/min); Kennzahlen-Allowlist-Tor (keine Kennzahl je subject ohne Spec-Eintrag); X-Server-Time; generierter Auswertungskatalog (welche Kennzahlen existieren, keine je Person) als CI-Artefakt, Erstfassung; Verfahren „Auswertung des Zugriffslogs nur zu zweit" in ADR 0013, technische Sperre mit 047; Rate-Limit-Zähler aus 034 sind flüchtig und aus dem Katalog ausgeschlossen; Aufbewahrung von subjectHash im DSFA-Entwurf; Nachweise für ADR 0013.
-  - *Abhängigkeiten:* 023
+**Historische Scheibe 033 (am 29.09.2026 in 033a–b geteilt): Zwei Protokollebenen, Health, NTP-Status, Kennzahlen, Serverzeit-Header.** Ursprüngliche Schätzung: hoch · 2 AStd · Kalender 26.10.2026 (W5) · Lanes: service.
+  - *Ziel:* Am 29.09. geteilt in 033a (Serverzeit-Header, /healthz, NTP-Status, Korrelations-ID, Zugriffslog, Verfahren „nur zu zweit“) und 033b (/metrics, Kennzahlen-Allowlist-Tor, Auswertungskatalog); die Einträge dort gelten. Grund: zwei getrennt prüfbare Datenschutzflächen (Protokoll je Anfrage gegen Aggregat ohne Personenbezug) und ein Umfang über einer Agentenschicht. Ursprüngliches Ziel und Nachweise stehen vollständig in 033a und 033b.
+- **033a · Serverzeit-Header, Health, NTP-Status, Korrelations-ID und Zugriffslog** — hoch · 1,25 AStd · Kalender 26.10.2026 (W5) · Lanes: service, infra, docs-adr, docs-datenschutz, docs-sicherheit
+  - *Ziel:* Teil 1 von 033 (geteilt am 29.09.): `X-Server-Time` aus der injizierten Uhr auf jeder Antwort; /healthz; NTP-Status für das seit 027 implementierte /readyz (SNTP-Port mit Zwischenspeicher, damit die öffentliche Probe keine ungebremsten Abfragen auslöst); serverseitige Korrelations-ID; strukturiertes Zugriffslog (JSON: requestId, subjectHash, operationId, status, latency, seq; nie Fragetext) in eigener Senke mit konfigurierbarer Aufbewahrung (Standard 30 Tage), `subjectHash` als HMAC mit Schlüssel aus der Plattform; Fehlerlog ohne Nutzdaten; Verfahren „Auswertung des Zugriffslogs nur zu zweit“ in ADR 0013 (technische Sperre mit 047); Aufbewahrung von subjectHash im DSFA-Vorentwurf.
+  - *Abhängigkeiten:* 023, 027, 029b
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Datenschutz/Betrieb
-  - *Nachweise:* Test Log-Zeile ohne Fragetext trotz Body; `curl /healthz` 200, `/readyz` meldet NTP-Status; Katalog als CI-Artefakt; Allowlist-Tor rot bei absichtlicher Kennzahl je Person
-  - *Offene Entscheidung:* —
+  - *Nachweise:* Test Log-Zeile ohne Fragetext trotz Body; `curl /healthz` 200, `/readyz` meldet NTP-Status (gefälschter lokaler NTP-Server); X-Server-Time auf 2xx/4xx/5xx; Aufbewahrungstest mit injizierter Uhr
+  - *Offene Entscheidung:* E16 (Aufbewahrung, Standard 30 Tage), E13 (Mindest-Aggregationsschwelle)
+- **033b · Kennzahlen, Kennzahlen-Allowlist-Tor und Auswertungskatalog** — hoch · 1 AStd · Kalender 27.10.2026 (W5) · Lanes: service, core, infra
+  - *Ziel:* Teil 2 von 033 (geteilt am 29.09.): /metrics hinter `metricsBearer` mit fünf fachlichen Kennzahlen (Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, Ereignisse/min) aus einer reinen Kernfunktion; Kennzahlen-Allowlist-Tor (keine Kennzahl je subject ohne Spec-Eintrag, Personenlabel immer rot); generierter Auswertungskatalog (welche Kennzahlen existieren, keine je Person) als CI-Artefakt, Erstfassung; Rate-Limit-Zähler aus 034 sind flüchtig und aus dem Katalog ausgeschlossen; Nachweise für ADR 0013.
+  - *Abhängigkeiten:* 033a
+  - *Rolle:* Implementierer-Backend; Review mit Perspektive Datenschutz/Betrieb
+  - *Nachweise:* Katalog als CI-Artefakt; Allowlist-Tor rot bei absichtlicher Kennzahl je Person; /metrics 401 ohne oder mit falschem Token; Ausgabe ohne Akteur-, Personen-ID und Fragetext
+  - *Offene Entscheidung:* E13 (Mindest-Aggregationsschwelle für Einpersonen-Fachbereiche)
 - **032 · Serverzeit als Referenz im Web, Drift-Hinweis, now()-Tor auf web** — mittel · 1 AStd · Kalender 27.10.2026 (W5) · Lanes: web-shell, web-answers, web-capture, web-history, web-stage, web-speakers
   - *Ziel:* Client berechnet Offset aus X-Server-Time und nutzt eine `clock()`-Quelle für Alter, Fristen, Uhr; Drift > 30 s zeigt Hinweis; statischer Check erweitert auf apps/web (nur time.ts). Die Ersetzungen in den Feature-Ordnern (answers, capture, history, stage, speakers) gehören zu dieser Scheibe und sind in deren Lanes angemeldet.
-  - *Abhängigkeiten:* 030, 033
+  - *Abhängigkeiten:* 030, 033a
   - *Rolle:* Implementierer-Oberfläche + Mechaniker (Ersetzungen); Review
   - *Nachweise:* `grep Date.now|new Date(` in apps/web/src ohne Treffer außerhalb time.ts; Test gefälschte Client-Uhr, Alter stimmt
   - *Offene Entscheidung:* —
 - **034 · Limits, Sicherheitsheader, Konfigurationsschema des Dienstes** — mittel · 1 AStd · Kalender 27.10.2026 (W5) · Lanes: service
   - *Ziel:* Rate-Limit je Subject (Standard 60 Schreibvorgänge/min), Body-Limit 256 kB, Request-Timeout, Sicherheitsheader und CSP am Dienst (netlify.toml folgt in 037), typisiertes Konfigurationsschema (zod) mit .env.example, CORS-Allowlist aus Konfiguration, Doppelklickschutz-Header-Konvention.
-  - *Abhängigkeiten:* 033
+  - *Abhängigkeiten:* 033b
   - *Rolle:* Implementierer-Backend; Review
   - *Nachweise:* Negativtests 429, 413, 408; Test fehlende Pflichtkonfiguration → Start verweigert; Header-Probe in contract.test.ts; CSP-Report ohne Verstoß in e2e
   - *Offene Entscheidung:* —
@@ -588,7 +596,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **037 · Container, Pipeline, drei Umgebungen, Betriebsauswertung, Freeze-Regel** — hoch · 2,5 AStd · Kalender 30.10.2026 (W5) · Lanes: infra
   - *Ziel:* Dockerfile für apps/api (distroless, non-root), Prüfung des Konfigurationsschemas aus 034 beim Start im Image, Secrets nur aus der Plattform, CSP und Sicherheitsheader in netlify.toml, Betriebsauswertung je Umgebung (plattformnativ oder Prometheus/Grafana im Container-Stack) mit Alarmversand an die benannte Beobachterin, Härtungs-Checkliste des gemieteten Hosts (SSH-Schlüssel, Updates, Firewall, verschlüsselte Backups), CI-Job build+push Image mit Digest, Deploy nach Staging-synthetisch nur über Approval-Environment (Eigentümer-Go), Health-Smoke nach Deploy (/readyz 200 sonst Rollback), Freeze-Kalender als Pipeline-Regel, Umgebungsdefinitionen demo / staging-synthetic / rehearsal (Übungsmandant mit eigener DB); Eigentümer-Checkliste Secrets (< 2 h) in docs/betrieb/; Nachweise für ADR 0007. Staging-synthetisch mit Anmeldung, sobald der Host steht (Rückfalltrigger 30.10.).
-  - *Abhängigkeiten:* 033
+  - *Abhängigkeiten:* 033b
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Betrieb/Security; Eigentümer führt Secrets-Checkliste aus
   - *Nachweise:* Image-Digest und Staging-URL im Bericht; Testalarm kommt bei der Beobachterin an; Pipeline-Protokoll mit Approval-Schritt; Deploy im Freeze-Fenster → abgelehnt (Test)
   - *Offene Entscheidung:* E10 Hosting — Container und Pipeline sind neutral; Rückfall gemieteter Host ab 30.10.
@@ -623,8 +631,8 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Trockenlauf Import → Anmeldung → Sperre → Löschung auf Staging mit Protokoll; Test TOTP-Pflicht
   - *Offene Entscheidung:* E11, E13, E38
 - **083 · Zulieferungen an Betriebsrat und DSB** — niedrig · 2 AStd · Kalender 11.11.2026 (W7) · Lanes: docs-datenschutz
-  - *Ziel:* docs/datenschutz/: Schutzmaßnahmenkatalog (zwei Protokollebenen, Auswertung nur zu zweit, keine Kennzahl je Person, 30 Tage Zugriffslog, Pseudonymisierung gegenüber Fachbereichen), Beschreibung der Testidentitäten und der gepoolten Stationsidentitäten als geplanter Weg (Anlage, Nutzung, Sperre, Löschung), DSFA-Endfassung aus dem Vorentwurf von 014 mit Stand der gebauten Scheiben, Auswertungskatalog aus 033 als Anlage; Übergabe durch den Eigentümer spätestens 18.12.2026. Eine Interimsvereinbarung ist eine Chance, kein Planpfad.
-  - *Abhängigkeiten:* 014, 033, 039, 026, 047
+  - *Ziel:* docs/datenschutz/: Schutzmaßnahmenkatalog (zwei Protokollebenen, Auswertung nur zu zweit, keine Kennzahl je Person, 30 Tage Zugriffslog, Pseudonymisierung gegenüber Fachbereichen), Beschreibung der Testidentitäten und der gepoolten Stationsidentitäten als geplanter Weg (Anlage, Nutzung, Sperre, Löschung), DSFA-Endfassung aus dem Vorentwurf von 014 mit Stand der gebauten Scheiben, Auswertungskatalog aus 033b als Anlage; Übergabe durch den Eigentümer spätestens 18.12.2026. Eine Interimsvereinbarung ist eine Chance, kein Planpfad.
+  - *Abhängigkeiten:* 014, 033b, 039, 026, 047
   - *Rolle:* Architekt; Review mit Perspektive Datenschutz
   - *Nachweise:* drei Dokumente eingecheckt; Übergabevermerk mit Datum im Register (E13, E14)
   - *Offene Entscheidung:* E13, E14
@@ -741,7 +749,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
 - **061 · Leitstand mit fachlichen Kennzahlen** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-cockpit
   - *Ziel:* Route /cockpit (Recht cockpit.read, Standard coordination, moderation, admin; eine Zeile im Feature-Register 082): Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, „Fragen ohne Endstatus" vor Debattenschluss; Drill-down auf Liste; Platz für den Kanarienfrage-Status (gefüllt durch 086); Werte aus /metrics oder Projektion; keine personenbezogenen Kennzahlen (Negativtest, Allowlist).
   - *Zielbild (089):* Z10–Z13. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
-  - *Abhängigkeiten:* 033, 043, 082, 040
+  - *Abhängigkeiten:* 033b, 043, 082, 040
   - *Rolle:* Implementierer-Oberfläche; Review mit Perspektive Datenschutz
   - *Nachweise:* Test keine Kennzahl je subject; Screenshot; axe grün
   - *Offene Entscheidung:* —
@@ -887,8 +895,8 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Protokoll je Szenario (erwartet/beobachtet); seq-Lücken-/Duplikatprüfung nach Kill
   - *Offene Entscheidung:* —
 - **073 · Datenschutz-Paket für Beta und Betriebsrat** — hoch · 2,5 AStd · Kalender 04.12.2026 (W10) · Lanes: docs-datenschutz
-  - *Ziel:* Rechtsgrundlagen-Matrix feldgenau aus den Typen generiert (mit retentionClass), Auswertungskatalog aus 033 vervollständigt und mit Diff-Tor versehen, Dokumentation „Auswertung nur zu zweit", Aufbewahrung des Zugriffslogs als Konfiguration (30 Tage), Löschkonzept-Entscheidungsvorlage (Klassen, Fristen, Krypto-Shredding als Nach-Beta-Blocker vor Produktion) mit benanntem Schlüsselverwahrer, Löschprotokoll-Vorlage für Generalprobe-Bestände, Betroffenenauskunft-Skript, Fortschreibung der Zulieferungen aus 083 auf den Endstand, Datenpannen-Playbook aus 070 als Zulieferung an den DSB, AVV-Kette in der Hosting-Anfrage.
-  - *Abhängigkeiten:* 033, 061, 067, 083
+  - *Ziel:* Rechtsgrundlagen-Matrix feldgenau aus den Typen generiert (mit retentionClass), Auswertungskatalog aus 033b vervollständigt und mit Diff-Tor versehen, Dokumentation „Auswertung nur zu zweit", Aufbewahrung des Zugriffslogs als Konfiguration (30 Tage), Löschkonzept-Entscheidungsvorlage (Klassen, Fristen, Krypto-Shredding als Nach-Beta-Blocker vor Produktion) mit benanntem Schlüsselverwahrer, Löschprotokoll-Vorlage für Generalprobe-Bestände, Betroffenenauskunft-Skript, Fortschreibung der Zulieferungen aus 083 auf den Endstand, Datenpannen-Playbook aus 070 als Zulieferung an den DSB, AVV-Kette in der Hosting-Anfrage.
+  - *Abhängigkeiten:* 033b, 061, 067, 083
   - *Rolle:* Architekt + Implementierer-Backend (Generatoren); Review mit Perspektive Datenschutz
   - *Nachweise:* generierte Matrix und Katalog eingecheckt; Tor-Lauf grün; Übergabeliste für DSB und Betriebsrat mit Datum
   - *Offene Entscheidung:* E13, E14, E16 (Dokumente sind Zulieferung)
@@ -912,7 +920,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031, 032, 033, 034, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031, 032, 033a, 033b, 034, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —
@@ -1009,7 +1017,7 @@ Ein Bautag ist eine Orchestrierungssitzung, die der Umsetzer mit einem Satz star
 - Identitäts-Negativtests mit Keycloak-Container und Demo-Verriegelung (029b); Subject-Sperrlisten-Test in 029b; Notfallkonto-Tests erst nach der Fortführungsentscheidung (029).
 - Dual-Mode-e2e-Matrix (031).
 - now()-Check web (032).
-- Zugriffslog-Tor ohne Nutzdaten, Kennzahlen-Allowlist, Auswertungskatalog als Artefakt (033).
+- Zugriffslog-Tor ohne Nutzdaten (033a); Kennzahlen-Allowlist, Auswertungskatalog als Artefakt (033b).
 - Header- und Limit-Proben, Konfigurationsschema (034).
 - Health-Smoke nach Deploy, Freeze-Regel, Approval-Environment, Testalarm (037).
 - nightly Restore-Test (038).
@@ -1136,7 +1144,7 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 2 | 05.10.–09.10. | Bau | **039**, **082**, **010**, **011**, **080**, **021** | **Prüfpunkt 1** mit Feedback-Runde 2 (09.10.); Satzung und Geschäftsordnung bis 09.10. |
 | 3 | 12.10.–16.10. | Bau | **022**, **084**, **023**, **024**, **025**, **026** | **Prüfpunkt 2** (16.10.); Entscheidungsstunde; Ansprechperson Tool-Team (E3a) bis 16.10. |
 | 4 | 19.10.–23.10. | Bau | **027**, **028**, **029b**, **030**, **031**, **043** | Vertrag 0.4.0 (043); 029 erst nach Fortführungsentscheidung |
-| 5 | 26.10.–30.10. | Bau | **033**, **032**, **034**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
+| 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
 | 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **048**, **088**, **044** | Restore-Drill auf Staging (038) |
 | 7 | 09.11.–13.11. | Bau | **045**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
 | 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **060**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
@@ -1277,7 +1285,7 @@ sollen in der Beta angebundene, dokumentierte Schnittstellen vorfinden. Reihenfo
 aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo möglich, statt Nachbarscheiben ganz mitzubauen
 (etwa 053 ohne 047, 059 ohne 047, 057 ohne 056):
 
-- **A Fundament:** 021c, 024, 025, 026, 027, 028, 033, 034.
+- **A Fundament:** 021c, 024, 025, 026, 027, 028, 033a, 033b, 034.
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
