@@ -44,7 +44,7 @@ Keine Änderung an `nightly.yml` oder `gates.yml`, keine Umbenennung der Schlüs
 - `pnpm gates` Exit 0 auf Commit `54bb779` (Kopf dieses PRs). Wörtlicher Schluss:
 
 ```
-✓ built in 7.81s
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 mark-test-run: wrote /home/user/wt/takt-021/.claude/state/last-test-run (clean tree) at commit 54bb779, tree e7f4d9bc7648…
 EXIT 0
 ```
