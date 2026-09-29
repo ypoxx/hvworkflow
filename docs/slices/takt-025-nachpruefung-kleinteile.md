@@ -46,6 +46,17 @@ Keine Verhaltensänderung in `api.ts`, `transitions.ts` oder `state.ts`; keine w
    Diff von `legal-trace.md` nur sechs Zeilen.
 2. `pnpm gates` grün auf sauberem Commit; Bericht mit wörtlichem Schluss.
 
+## Nachweis
+
+`vitest run src/__tests__/idempotency028.test.ts src/__tests__/rules.test.ts`: 2 Dateien, 22 Tests grün.
+`pnpm gates` Exit 0 auf Commit `9d460e8` (Code-Stand dieses PRs). Wörtlicher Schluss:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.55s
+mark-test-run: wrote /home/user/wt/takt-025/.claude/state/last-test-run (clean tree) at commit 9d460e8, tree b6294c69d212…
+```
+
 ## Review findings
 
 Review in frischem Kontext (reviewer-sonnet, 29.09.2026): **freigegeben**, 0 blocker, 0 major. Fundstellen 25–30
