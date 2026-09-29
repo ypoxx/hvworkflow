@@ -144,6 +144,22 @@ CI-Schritt `scripts/keycloak-ci-029b.mjs`; sein grünes CI-Ergebnis ist vor Merg
 Die Test-Fixierung verwendet ausschließlich synthetische Subjects. Die Tabellenzeilen unten
 sind die Bedrohungsbeschreibung; dieser Nachtrag ist der aktuelle 029b-Status der genannten IDs.
 
+## Stand Scheibe 034b (Konfigurationsschema, CORS-Allowlist, Proxy-Quelle)
+
+Gilt für die genannten IDs vor den Tabellenzeilen unten, die die ursprüngliche Bedrohung beschreiben. Nachweis-Commit:
+`4976877` (`pnpm gates` grün).
+
+| ID | Stand nach 034b | Nachweis |
+|---|---|---|
+| T-Q-T-04 | teilweise (Rest: Seed nur in `training`, 042): typisiertes zod-Schema, Start verweigert mit festem Satz je Regel und ohne Wert bei fehlender Pflichtkonfiguration (Zugriffslog, Schlüssel), unvollständiger Anmeldung, `HV_DEMO` ungleich `1`, `HV_DEMO=1` mit Issuer, ungültigen Zahlen und falscher Reihenfolge der Zeitgrenzen | `apps/api/src/__tests__/config034b.test.ts` |
+| T-G2-E-02 | geschlossen für den Dienst (Rest: Container ohne Root, 037): `HV_EVENT_LOG` nur mit `HV_DEMO=1`, absolut, Elternverzeichnis beschreibbar, nicht im Log-Verzeichnis; Rechte des Log-Verzeichnisses (lstat, kein Symlink, `(mode & 0o027) === 0`). **Restrisiko (Ziel 037):** die Rechte werden nur beim Start geprüft; `O_NOFOLLOW` der Senke schützt nur die letzte Pfadkomponente, ein austauschbares Elternverzeichnis bleibt eine TOCTOU-Lücke; Gegenmaßnahme im Betrieb: Elternverzeichnis gehört root oder dem Dienst, Wurzeldateisystem nur lesbar; ACLs erfasst `mode & 0o027` nicht | `config034b.test.ts` › „paths and directory rights" |
+| T-G1-T-05 | CORS-Teil geschlossen (CSRF bleibt 029b): Allowlist aus `HV_CORS_ORIGINS`, exakter Vergleich, außerhalb der Demo nur `https:`, höchstens 10, ohne Platzhalter und `null`; fremde Herkunft ohne jeden `Access-Control-*`-Header, auch im Preflight; ohne Variable außerhalb der Demo kein CORS | `apps/api/src/__tests__/cors034b.test.ts` |
+| T-G2-S-01 | berührt (Secrets aus der Plattform: 037): kein Geheimnis und kein Pfad in Startzeile, Fehlersätzen und der Meldung unbekannter Variablen | `config034b.test.ts` › „start line and secrets" |
+| T-G1-D-01 (Proxy-Teil) | Quelle hinter Proxy geschlossen: `X-Forwarded-For` nur von Gegenstellen in `HV_TRUSTED_PROXY_CIDRS` (höchstens 16 Blöcke ohne Host-Bits, IPv4 ab /8, IPv6 ab /32, also nie `/0`; IPv4-abgebildete IPv6-Blöcke gelten als IPv4-Block, ein IPv6-Block, der `::ffff:0:0/96` enthält, wird abgelehnt), rechtester nicht vertrauenswürdiger Eintrag; direkte Verbindung mit gefälschtem Header zählt unter der Verbindungsadresse; Grenzen und Timeouts konfigurierbar, Standardwerte unverändert. Restrisiko: falsch eingetragener, aber gültiger Block (etwa ein zu weites Firmennetz); Proxy-Grenze 037 | `config034b.test.ts` › „trusted proxy list", „configured limits take effect" |
+
+Neue Laufzeitabhängigkeit (SC-10): `zod` 4.6.5, exakt gepinnt, Lizenz MIT, keine transitiven Laufzeitabhängigkeiten,
+im Lockfile; Nutzen: Planvorgabe „typisiertes Konfigurationsschema (zod)".
+
 ## 5. STRIDE je Grenze
 
 ### 5.1 G1 — Oberfläche ↔ Dienst
@@ -387,10 +403,23 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Verhindert durch:* T-Q-T-04, T-G1-S-01; Startabbruch bei `HV_DEMO=1` mit Issuer (gebaut in 029a, Test
   `apps/api/src/__tests__/demo-lock.test.ts`; ohne `HV_DEMO=1` wird `X-Actor` nicht gelesen), Konfigurationsschema
   (034), Seed nur in `training` (042).
-- *Erkennung:* Health-Smoke nach dem Deploy prüft die Betriebsart (Zielvorschlag für 037); Banner je Modus
-  (042).
+- *Erkennung:* seit 034b nennt die Startzeile die Betriebsart (`mode demo` oder `mode service`); der Health-Smoke nach
+  dem Deploy vergleicht sie mit der erwarteten (Zielvorschlag für 037); Banner je Modus (042).
 - *Nachweis:* geplant in Scheibe 029 („HV_DEMO=1 mit Issuer → Start verweigert"), 042 („seed im Modus live →
-  403").
+  403"); seit 034b `config034b.test.ts` (Startzeile, Demo mit Issuer, `HV_EVENT_LOG` nur in der Demo, Anmeldung alles oder nichts).
+- *Ausnahme (Erkennung):* der automatische Vergleich der Startzeile fehlt bis 037; Eigentümer technischer Betrieb, Ablauf mit
+  Merge von 037, spätestens 30.10.2026.
+
+**MF-11 Fremde Herkunft in der CORS-Allowlist** (034b)
+- *Ablauf:* jemand trägt beim Deploy eine fremde oder zu weite Herkunft in `HV_CORS_ORIGINS` ein, damit eine fremde
+  Seite im Browser einer angemeldeten Person Antworten lesen kann.
+- *Verhindert durch:* keine Platzhalter, kein `null`, außerhalb der Demo nur `https:`, höchstens 10 exakte Herkünfte,
+  `SameSite=Lax`-Cookie und CSRF-Token (029b).
+- *Erkennung:* die Startzeile listet die erlaubten Herkünfte; der Betrieb prüft sie beim Deploy gegen die
+  Eigentümer-Checkliste (037). Signal und Empfänger: Startzeile im Plattformprotokoll, technischer Betrieb; bis 037 manuell beim
+  Tagesstart. Ausnahme: fehlender automatischer Vergleich, Eigentümer technischer Betrieb, Ablauf mit Merge von 037,
+  spätestens 30.10.2026.
+- *Nachweis:* `apps/api/src/__tests__/cors034b.test.ts`, Startzeilen-Test in `config034b.test.ts`.
 
 **MF-09 Leistungsauswertung über das Zugriffslog** (033a; verwandt MF-02, dort ist das Zugriffslog nur Erkennungsweg)
 - *Ablauf:* eine Person im technischen Betrieb, die zugleich im Tool `event.read` hat, will die

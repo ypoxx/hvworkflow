@@ -88,6 +88,11 @@ heute wirkt `HV_DEMO=0` wie „aus“, künftig ist es ein Fehler, im Bericht ne
    die Verbindung nicht von einem vertrauenswürdigen Proxy, wird der Header ignoriert und die Verbindungsadresse gilt
    (ein Client kann seine Quelle nicht selbst wählen). Standard leer: immer die Verbindungsadresse. Die Quelle bleibt
    außerhalb jedes Logs (034a Punkt 3). `HV_TRUST_PROXY_HOPS` aus der ersten Fassung entfällt zugunsten der CIDR-Liste.
+   *Nachtrag nach dem Review (29.09.2026):* Blöcke ohne Host-Bits (`10.0.0.1/8` wird abgelehnt), Mindestpräfix IPv4 /8,
+   IPv6 /32 (schließt `/0`, `0.0.0.0/1` mit `128.0.0.0/1` und `::/8`). Ein IPv6-Block innerhalb von `::ffff:0:0/96`
+   (Präfix ab 96) gilt als sein IPv4-Äquivalent (Präfix minus 96) mit den IPv4-Regeln (`::ffff:10.0.0.0/104` ist `10.0.0.0/8`,
+   `::ffff:0:0/97` ist IPv4 /1 und wird abgelehnt); ein IPv6-Block mit Präfix unter 96, der `::ffff:0:0/96` enthält, wird
+   abgelehnt, weil `BlockList` IPv4-Gegenstellen dagegen prüft.
 9. **Startzeile als Erkennung.** Nach erfolgreichem Start schreibt `server.ts` eine feste Zeile mit Betriebsart
    (`demo` oder `service`), Persistenz (`postgres`, `jsonl`, `none`), Anmeldung (`oidc` oder `none`), den erlaubten
    CORS-Herkünften und den vertrauenswürdigen Proxy-Blöcken (Konfiguration, kein Geheimnis); keine anderen Werte.
@@ -182,8 +187,126 @@ Lizenz, Keycloak-CI-Schritt grün.
 
 ## Nachweis
 
-(nach dem Bau: **Gates-Commit** `<sha>` auf sauberem Baum, Umgebung, Anzahl Testdateien/Tests, `slice-scope`-Ergebnis,
-und der wörtliche Schluss der Ausgabe von `pnpm gates` in einem Codeblock; eigener Doku-Commit, kein Amend danach)
+**Gates-Commit:** `4976877` (Baucommit "Scheibe 034b: Konfigurationsschema (zod), .env.example, CORS-Allowlist, Proxy-Quelle"),
+`CONTRACT_GATE_STRICT=1 pnpm gates` auf sauberem Baum, Exit 0. Umgebung: lokale Postgres-DB `hv_s034b`
+(`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE=hv_runtime`), Node 22.22.2, pnpm 10.33.0.
+Testdateien/Tests: domain 14/231, web 13/254, api 34/477 (davon neu `config034b.test.ts` und `cors034b.test.ts`), Skripte 234.
+`slice-scope`: 18 geänderte Dateien, alle innerhalb von „Files allowed" (15 Muster). zod 4.6.5 exakt gepinnt, Lizenz MIT, keine
+Laufzeitabhängigkeiten.
+
+Wörtlicher Schluss der Ausgabe von `pnpm gates`:
+
+```
+# todo 0
+# duration_ms 13070.980578
+> @hv/web@0.0.0 build /home/user/wt/s034bb/apps/web
+> tsc -b && vite build
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1725 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 kB │ map: 2,559.49 kB
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.12s
+mark-test-run: wrote /home/user/wt/s034bb/.claude/state/last-test-run (clean tree) at commit 4976877, tree 3dca399a7df2…
+```
+
+E2E (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium E2E_PORT=4420 pnpm --filter @hv/web e2e -- --timeout=240000`), Schluss:
+
+```
+  ✓  129 [chromium] › e2e/abnahme.spec.ts:88:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (1.0m)
+  4 skipped
+  127 passed (8.2m)
+```
+
+Die Konfiguration berührt den Web-Demo-Start nicht (E2E startet nur Vite mit dem Demo im Browser); der Lauf ist die
+Sammelprobe ohne Oberflächenänderung. Die dabei neu erzeugten Screenshots wurden verworfen, nicht committet.
+Der Keycloak-CI-Lauf konnte hier nicht laufen (kein Docker-Daemon); `scripts/keycloak-ci-029b.mjs` bleibt unverändert: mit
+denselben Variablen wie das Skript besteht das Schema (Anmeldung `oidc`, Persistenz `postgres`, Loopback-HTTP für Issuer und
+Redirect, `mkdir` mit 0700), geprüft per `readServiceConfig` in einem Wegwerfaufruf.
+
+Startproben (Ausgaben wörtlich): ohne Demo und ohne Zugriffslog Exit 1 mit den beiden 033a-Sätzen; Verzeichnis 0755 Exit 1 mit
+`HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must not be writable by group or accessible by others.`; nur
+`HV_OIDC_ISSUER` gesetzt Exit 1 mit je einem Satz für die fehlenden Anmelde-, Datenbank- und Hinweisvariablen; `HV_DEMO=1` Startzeile
+`HV-Tool API: start mode=demo persistence=none auth=none cors=http://localhost:5173 trusted-proxies=none`.
+
+Verhaltensänderungen (im Bericht zu nennen):
+
+- `HV_DEMO`: nur `1` oder fehlend; `0` und jeder andere Wert verweigert den Start (vorher wirkte `0` wie „aus").
+- Ein ungültiger `HV_DSFA_SUMMARY_URL` (kein http/https, mit Zugangsdaten) verweigert den Start (vorher stilles Verwerfen).
+- Ein leerer Wert zählt als nicht gesetzt, außer bei `HV_ACCESS_LOG_DIR`, `HV_ACCESS_LOG_HASH_KEY`,
+  `HV_ACCESS_LOG_RETENTION_DAYS`, `HV_CLOCK_MAX_DRIFT_MS`, `HV_EVENT_LOG` und `HV_SEED_ACTOR` (dort ist leer ein Fehler).
+- `HV_TRUSTED_PROXY_CIDRS`: strenger als die erste Fassung: nie `/0`, IPv4 ab /8, IPv6 ab /32, keine Host-Bits, IPv4-abgebildete
+  IPv6-Blöcke als IPv4 gelesen (siehe Nachtrag zu Entscheidung 8).
+- `PORT` wird streng geprüft (ganze Zahl 1 bis 65535); vorher `parseInt`, `8080abc` ging.
+- `HV_DATABASE_URL` muss mit `postgres://` oder `postgresql://` beginnen.
+- Eine unvollständige Anmeldekonfiguration verweigert den Start (vorher Warnung und 401 auf geschützten Anfragen).
+- `HV_OIDC_CLIENT_ID` und `HV_OIDC_CLIENT_SECRET` aus reinen Leerzeichen verweigern den Start.
+- Der Rechtesatz für das Log-Verzeichnis gilt auch im Demo-Modus, wenn dort ein Verzeichnis gesetzt ist.
+
+Offen (aus der Folgeliste hierher verschoben, kein Reviewbefund):
+
+- Kein Eigentümervergleich des Log-Verzeichnisses und keine Prüfung im Container-Image: 037.
+- Die `process.env`-Rückfälle in `app.ts` bleiben als Bibliotheksstandard, beim Prozessstart nie erreicht.
+- Der Keycloak-CI-Lauf gegen das neue Schema war im Bau nicht möglich (kein Docker); nur ein Wegwerfaufruf von `readServiceConfig`
+  mit den Variablen des Skripts. Die PR-CI ist der Nachweis.
+- Die Rechte des Log-Verzeichnisses werden nur beim Start geprüft (TOCTOU über das Elternverzeichnis, Restrisiko im
+  Bedrohungsmodell, Ziel 037). Die Senke (`observability/accessLog.ts`) steht nicht in „Files allowed"; ein `lstat` vor jeder neuen
+  Tagesdatei wäre dort nachzuziehen.
+
+Bedrohungs-ID → Test:
+
+| ID | Test (Datei, Block) |
+|---|---|
+| T-Q-T-04 | `config034b.test.ts`: „defaults and shape", „numeric ranges and time order", „rules across variables", „process start" (Exit 1, feste Sätze ohne Marker-Wert) |
+| T-G2-E-02 | `config034b.test.ts`: „paths and directory rights" (`HV_EVENT_LOG` ohne Demo, relativ, im Log-Verzeichnis; 0700/0750 angenommen; 0770/0755/0777/Symlink verweigert) |
+| T-G1-T-05 | `cors034b.test.ts`: alle Blöcke (gelistete Herkunft, fremde Herkunft/`null`/Pfad ohne Header auch im Preflight, Demo-Standard, `X-Actor` nur in der Demo, `Retry-After` exponiert, Preflight-Zähler) |
+| T-G2-S-01 | `config034b.test.ts`: „start line and secrets" (Marker für Client-Secret, Schlüssel, Hash-Schlüssel, Metrics-Token, DB-Passwort) |
+| T-G1-D-01 | `config034b.test.ts`: „configured limits take effect" (`HV_RATE_LIMIT_WRITES_PER_MIN=2` gibt 429 beim dritten Schreibvorgang), „trusted proxy list" (vertrauenswürdiger Proxy mit gefälschtem Eintrag, direkte Verbindung mit `X-Forwarded-For` zählt unter der Verbindungsadresse, `0.0.0.0/0`, `::/0`, `::ffff:0:0/96`, `::/8`, `0.0.0.0/1`, `10.0.0.0/7` und Host-Bits verweigert), `HV_REQUEST_TIMEOUT_MS=6000` verweigert |
+| `.env.example`-Drift | `config034b.test.ts`: „.env.example (drift)" und „reads every variable it lists" |
+
+## Nachweis nach dem Review
+
+**Gates-Commit:** `e816b64` (Code in `2cbbc07`, Doku in `e816b64`), `CONTRACT_GATE_STRICT=1 pnpm gates` mit den Postgres-Variablen auf
+sauberem Baum, Exit 0. Testdateien/Tests: domain 14/231, web 13/254, api 34/480 (3 neue Fälle gegenüber dem ersten Lauf: Proxy-Blöcke,
+gemapptes IPv4, leeres Client-Secret und CORS auf 408/503 sind teils in bestehende Blöcke eingerechnet); `slice-scope`: 21 Dateien,
+alle in „Files allowed". Keine e2e neu (keine Änderung an Oberfläche oder Web-Start).
+
+Wörtlicher Schluss:
+
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.06s
+mark-test-run: wrote /home/user/wt/s034bb/.claude/state/last-test-run (clean tree) at commit e816b64, tree 3d71c2e52006…
+```
+
+Befunde des Opus-Reviews je Zeile:
+
+| Befund | Behandlung | Nachweis |
+|---|---|---|
+| Major Sicherheit: `/0` in anderer Schreibweise (`::ffff:0:0/96`, `::/8`, `0.0.0.0/1` mit `128.0.0.0/1`) | behoben: IPv4 ab /8, IPv6 ab /32, gemappte Blöcke als IPv4 (Präfix minus 96), IPv6-Blöcke mit `::ffff:0:0/96` abgelehnt, Nachtrag zu Entscheidung 8 | `config034b.test.ts` › „trusted proxy list" (erst rot, dann grün) |
+| Minor Sicherheit: TOCTOU der Verzeichnisrechte | als Restrisiko mit Ziel 037 im Bedrohungsmodell; `lstat` je Tagesdatei nicht gebaut (`accessLog.ts` nicht in „Files allowed") | Bedrohungsmodell T-G2-E-02, Spec „Offen" |
+| Minor Tests: CORS auf 408 und 503 | Tests ergänzt (408 auf `/v1` mit langsamem Sitzungsspeicher, 503 auf `/auth/login`) | `cors034b.test.ts` |
+| Minor Doku: Verhaltensänderungen `PORT`, `HV_DATABASE_URL`, unvollständige Anmeldung | ergänzt | Spec, Abschnitt „Nachweis" |
+| Minor: Folgeliste-Einträge „034b Bau" | in „Offen" der Spec verschoben; Folgeliste hält den 033a-Vermerk und zwei Review-Nits (Nit 8, ACLs) | `docs/folgeliste.md` |
+| Nit: Client-Secret aus Leerzeichen | behoben, auch `HV_OIDC_CLIENT_ID` | `config034b.test.ts` |
+| Nit: Host-Bits (`10.0.0.1/8`) | abgelehnt mit festem Satz ohne Wert | `config034b.test.ts` |
+| Nit: Testtitel Preflight | korrigiert (11. Preflight) | `cors034b.test.ts` |
 
 ## Bericht (nach Bau ausfüllen)
 

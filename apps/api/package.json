@@ -22,7 +22,8 @@
     "hono": "^4.13.5",
     "openid-client": "6.8.8",
     "pg": "^8.23.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

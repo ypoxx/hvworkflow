@@ -17,7 +17,8 @@
 import { createSocket, type RemoteInfo, type Socket } from 'node:dgram';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { randomBytes } from 'node:crypto';
-import { isIP } from 'node:net';
+import { createReader } from '../config/reader.ts';
+import { readNtp } from '../config/groups.ts';
 
 export type ClockCheck =
   | { status: 'ok' }
@@ -131,32 +132,10 @@ export function createNtpClockCheck(options: NtpClockOptions): () => Promise<Clo
   };
 }
 
-const REFUSE = 'HV-Tool API: refusing to start:';
-
-/** `HV_NTP_SERVERS` (up to three `host[:port]`, `[v6]:port`) and `HV_CLOCK_MAX_DRIFT_MS` (50..60000, default 1000). */
+/** `HV_NTP_SERVERS` and `HV_CLOCK_MAX_DRIFT_MS`: a thin wrapper over the configuration schema (slice 034b). */
 export function parseNtpEnv(env: NodeJS.ProcessEnv): { servers: NtpServer[]; maxDriftMs: number } | undefined {
-  const raw = env['HV_NTP_SERVERS'];
-  const driftRaw = env['HV_CLOCK_MAX_DRIFT_MS'];
-  let maxDriftMs = 1000;
-  if (driftRaw !== undefined) {
-    if (!/^\d{1,5}$/.test(driftRaw) || Number(driftRaw) < 50 || Number(driftRaw) > 60_000) {
-      throw new Error(`${REFUSE} HV_CLOCK_MAX_DRIFT_MS must be an integer from 50 to 60000.`);
-    }
-    maxDriftMs = Number(driftRaw);
-  }
-  if (raw === undefined || raw.trim() === '') return undefined;
-  const entries = raw.split(',').map((part) => part.trim());
-  const fail = (): never => { throw new Error(`${REFUSE} HV_NTP_SERVERS must list one to three host[:port] entries.`); };
-  if (entries.length > 3) fail();
-  const servers = entries.map((entry): NtpServer => {
-    const bracket = /^\[([0-9A-Fa-f:.]+)\](?::(\d{1,5}))?$/.exec(entry);
-    const plain = /^([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)(?::(\d{1,5}))?$/.exec(entry);
-    const host = bracket?.[1] ?? plain?.[1];
-    const portText = bracket !== null ? bracket[2] : plain?.[3];
-    if (host === undefined || (bracket !== null && isIP(host) !== 6)) return fail();
-    const port = portText === undefined ? 123 : Number(portText);
-    if (port < 1 || port > 65_535) return fail();
-    return { host, port };
-  });
-  return { servers, maxDriftMs };
+  const reader = createReader(env);
+  const ntp = readNtp(reader);
+  if (reader.errors.length > 0) throw new Error(reader.errors[0]);
+  return ntp;
 }

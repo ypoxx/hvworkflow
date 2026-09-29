@@ -166,7 +166,11 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   Idempotenz-Wiederholung, Listen und Bühne nicht eigens auf fehlende `personId` getestet.
 
 - 033a R1 nit · `apps/api/src/observability/config.ts` · Rechte des Log-Verzeichnisses nicht geprüft (Dateien 0600) ·
-  mit 034/037.
+  **erledigt mit 034b** (`config/groups.ts`: lstat, kein Symlink, `(mode & 0o027) === 0`; Eigentümer bleibt 037).
+- 034b Review nit · `apps/api/src/config/schema.ts` · die letzte Komponente von `HV_EVENT_LOG` wird nicht aufgelöst (nur
+  Demo) · `realpath` der Datei, wenn sie existiert.
+- 034b Review nit · `apps/api/src/config/groups.ts` · `mode & 0o027` erfasst ACLs nicht · im Betrieb (037) ACLs auf dem
+  Log-Verzeichnis ausschließen oder prüfen.
 
 - takt-028 Nachprüfung minor · `apps/web/src/api/index.ts`, `BootScreen.tsx` · älterer Text „Demo event log is not an
   array.“ erscheint unübersetzt über `error.message` (R10) · wie `DemoLogParseError` über das Wörterbuch.
