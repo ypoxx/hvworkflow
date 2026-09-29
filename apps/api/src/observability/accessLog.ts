@@ -7,7 +7,7 @@
  * full period); only regular files that match the name exactly are ever touched (`lstat`, so a
  * symlink or a foreign file with a similar name stays).
  */
-import { closeSync, constants, lstatSync, openSync, readdirSync, unlinkSync, writeSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, openSync, readdirSync, unlinkSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface AccessLogSink {
@@ -65,6 +65,8 @@ export function createFileSink(options: FileSinkOptions): AccessLogSink {
       // O_NOFOLLOW: a symlink planted under today's name must not redirect the write.
       const fd = openSync(file, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
       try {
+        // The creation mode only applies to a new file; an existing one (restored, pre-created) is narrowed first.
+        if ((fstatSync(fd).mode & 0o777) !== 0o600) fchmodSync(fd, 0o600);
         writeSync(fd, `${line}\n`);
       } finally {
         closeSync(fd);

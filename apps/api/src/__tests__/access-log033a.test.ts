@@ -3,7 +3,7 @@
  * T-G1-R-01, T-G3-I-04, T-G1-I-05, T-G2-I-02, T-G2-D-04, retention (E16), correlation id, `instance`.
  */
 import { createHmac } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -331,6 +331,18 @@ describe('Scheibe 033a: file sink and retention (E16)', () => {
     expect(readdirSync(dir).sort()).toEqual([name('2031-05-06'), name('2031-05-07')]);
     expect(readFileSync(join(dir, name('2031-05-06')), 'utf8')).toBe('{"a":1}\n{"a":2}\n');
     expect(statSync(join(dir, name('2031-05-06'))).mode & 0o777).toBe(0o600);
+  });
+
+  // Codex P2 on #68 (privacy): the creation mode is ignored for an existing file, so a day file restored or
+  // pre-created with broader rights must be narrowed before a pseudonymous line is appended.
+  it('narrows a pre-existing day file to mode 0600 before appending', () => {
+    const now = new Date('2031-05-06T12:00:00.000Z');
+    writeFileSync(join(dir, name('2031-05-06')), '', { mode: 0o644 });
+    chmodSync(join(dir, name('2031-05-06')), 0o644);
+    const sink = createFileSink({ dir, retentionDays: 30, clock: () => now });
+    sink.write('{"a":1}', now);
+    expect(statSync(join(dir, name('2031-05-06'))).mode & 0o777).toBe(0o600);
+    expect(readFileSync(join(dir, name('2031-05-06')), 'utf8')).toBe('{"a":1}\n');
   });
 
   it('keeps day D at D+30, deletes it at D+31, leaves foreign files and symlinks alone', () => {
