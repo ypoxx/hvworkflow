@@ -11,13 +11,13 @@ Bau bevorzugt mit Sonnet, Reviews von Hochrisiko-Scheiben mit Opus.
   `docs/bautage/2026-09-27-29.md`. Vertrag jetzt **0.3.8** (takt-023).
 - Gemergt in dieser Sitzung: takt-021 (#60), takt-022 (#59), takt-023 (#64), takt-025 (#61), takt-026 (#63),
   Spec 033a/033b (#65). **Nightly grün** seit Lauf 8.
-- Offen: **takt-024 (#62)** — Postgres-Schreibsperre erst nach Routentreffer und Vertragsprüfung; Integrationsbranch
-  eingemergt, Gates grün auf `60b69db`, CI auf `e55aecd` stand bei Übergabe aus. Danach mergen.
+- takt-024 (#62, `bc60ab8`) Postgres-Schreibsperre erst nach Routentreffer und Vertragsprüfung ebenfalls gemergt;
+  alle sechs Reparatur-Takte sind drin. Integrationsbranch-Kopf nach #62: `bc60ab8`.
 - Doku-PR für Tagesbericht, Folgeliste, diese Übergabe und den Zielpfad-Stand: Branch `claude/bautag-2026-09-27-29`.
 
 ## Nächste Schritte
 
-1. #62 mergen, dann **033a** bauen (Spec `docs/slices/033a-serverzeit-health-zugriffslog.md`; Branch
+1. **033a** bauen (Bau am 29.09. abends gestartet, siehe offene PRs) (Spec `docs/slices/033a-serverzeit-health-zugriffslog.md`; Branch
    `claude/slice-033a-…`; ADR-Absätze sind schon geschrieben). Danach **033b** (Vertrag 0.3.9 zuerst), dann **034**
    mit der harten Vorbedingung aus 029b: `/auth/login` braucht Obergrenze/Rate-Limit und ein Aufräumen abgelaufener
    Login-Zustände (Folgeliste, Befund 029b major).
