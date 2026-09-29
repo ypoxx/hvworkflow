@@ -1,11 +1,12 @@
 /**
  * The source of a request (slice 034a, decision 3): the peer of the TCP connection, normalised, then a
  * keyed hash. The address itself never leaves this module: not into the access log, the error log,
- * stderr, `/metrics` or a file (ADR 0013). Behind a trusted proxy slice 034b supplies the evaluated
- * `X-Forwarded-For`; until then the connection address counts.
+ * stderr, `/metrics` or a file (ADR 0013). Behind a trusted proxy (slice 034b) the source is the evaluated
+ * `X-Forwarded-For`; without one the connection address counts.
  */
 import { createHmac } from 'node:crypto';
-import { isIPv4, isIPv6 } from 'node:net';
+import { isIP, isIPv4, isIPv6 } from 'node:net';
+import { createTrustMatcher } from '../config/cidr.ts';
 
 const UNKNOWN = 'unbekannt';
 
@@ -38,4 +39,26 @@ export function normalizeSource(address: string | undefined): string {
 /** A keyer with a random-per-process secret: the same source gives the same key inside one process only. */
 export function createSourceKeyer(secret: Buffer): (address: string | undefined) => string {
   return (address) => createHmac('sha256', secret).update(normalizeSource(address)).digest('base64url');
+}
+
+/**
+ * Slice 034b, decision 8: `X-Forwarded-For` is read only when the TCP peer lies in a trusted block; the source is then
+ * the rightmost entry that is NOT in a trusted block (entries from right to left, trusted proxies skipped). An empty,
+ * malformed or all-trusted header, and every request from a peer outside the blocks, count under the connection
+ * address: a client cannot choose its own source. Without any block the header never counts.
+ */
+export function createForwardedResolver(cidrs: readonly string[]):
+  (peer: string | undefined, forwarded: string | undefined) => string | undefined {
+  if (cidrs.length === 0) return (peer) => peer;
+  const trusted = createTrustMatcher(cidrs);
+  return (peer, forwarded) => {
+    if (peer === undefined || forwarded === undefined || !trusted(peer)) return peer;
+    const entries = forwarded.split(',').map((entry) => entry.trim());
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index]!;
+      if (isIP(entry) === 0) return peer; // empty or not an address: the header is not evidence
+      if (!trusted(entry)) return entry;
+    }
+    return peer;
+  };
 }

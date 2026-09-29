@@ -14,7 +14,7 @@ import { access } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Pool, PoolClient } from 'pg';
 import { getConnInfo } from '@hono/node-server/conninfo';
-import { Hono, type Context, type Next } from 'hono';
+import { Hono, type Context, type MiddlewareHandler, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import {
   ApiProblem,
@@ -60,7 +60,8 @@ import { DeadlineError, withDeadline } from './limits/deadline.ts';
 import { createBodyLimit, createPreflightGuard, createRequestTimeout, createSecurityHeaders, createSourceLayer,
   createSubjectLimits } from './limits/middleware.ts';
 import { outcomeUnknown, persistenceBusy } from './limits/responses.ts';
-import { createSourceKeyer } from './limits/source.ts';
+import { createForwardedResolver, createSourceKeyer } from './limits/source.ts';
+import { normalizeOrigin } from './config/origins.ts';
 import { createNotices } from './limits/stderr.ts';
 import { currentRequest, noteSeq } from './observability/context.ts';
 import { createRequestLog } from './observability/requestLog.ts';
@@ -133,11 +134,21 @@ export interface CreateAppOptions {
    */
   limits?: Partial<LimitsConfig>;
   /**
-   * Slice 034a: the source (peer of the TCP connection) of a request, as a plain address string. Default: the
-   * connection address of the Node server (`getConnInfo`); `app.request()` in tests has none, so tests set this.
-   * Without an address the key is "unbekannt". Behind a trusted proxy slice 034b evaluates `X-Forwarded-For`.
+   * Slice 034a: the peer of the TCP connection of a request, as a plain address string. Default: the connection
+   * address of the Node server (`getConnInfo`); `app.request()` in tests has none, so tests set this.
+   * Without an address the key is "unbekannt". `trustedProxyCidrs` (034b) then decides whether `X-Forwarded-For` counts.
    */
   sourceOf?: (c: Context) => string | undefined;
+  /**
+   * Slice 034b: CIDR blocks of the trusted proxies (`HV_TRUSTED_PROXY_CIDRS`, at most 16, never /0). Only a peer in
+   * one of them may name the source through `X-Forwarded-For`. Default: none, the connection address always counts.
+   */
+  trustedProxyCidrs?: readonly string[];
+  /**
+   * Slice 034b: allowed CORS origins (`HV_CORS_ORIGINS`, exact, `scheme://host[:port]`). Default: in demo mode
+   * `http://localhost:5173` (the Vite dev server), otherwise none, and then no CORS middleware at all (same origin).
+   */
+  corsOrigins?: readonly string[];
   /** Tests only: run a statement on the request's transaction connection at a named point of a write's Postgres boundary. */
   testHooks?: { at?: (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>) => Promise<void> };
   /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
@@ -367,26 +378,45 @@ export function createApp(options: CreateAppOptions = {}): App {
   // timeout -> (5) source layer -> (6) body limit -> (7) actor and errors -> (8) subject limits -> routes. A refused
   // request costs neither a session read nor a database connection nor the global write lock.
   const sourceKeyOf = createSourceKeyer(randomBytes(32));
-  const peerAddress = (c: Context): string | undefined => {
+  const forwardedSource = createForwardedResolver(options.trustedProxyCidrs ?? []);
+  const connectionAddress = (c: Context): string | undefined => {
     if (options.sourceOf) return options.sourceOf(c);
     try { return getConnInfo(c).remote.address; } catch { return undefined; } // no socket under `app.request()`
   };
+  const peerAddress = (c: Context): string | undefined => forwardedSource(connectionAddress(c), c.req.header('X-Forwarded-For'));
   const sourceOf = (c: Context): string => sourceKeyOf(peerAddress(c));
   const rate = { clock, limits, notices };
   app.use('*', createSecurityHeaders());
 
-  // CORS (dev only): the contract is same-origin (openapi.yaml: `servers: /v1`); this exists only so the Vite dev
-  // server (apps/web, default port 5173) can reach a demo-mode server across origins. It sets the headers of an
-  // allowed origin on every response, also on 408, 413, 429 and 503; `Retry-After` is readable for the browser.
-  if (demoEnabled) {
-    app.use(
-      '/v1/*',
-      createPreflightGuard(rate, sourceOf, cors({
-        origin: 'http://localhost:5173',
-        allowHeaders: ['X-Actor', 'If-Match', 'Idempotency-Key', 'Content-Type'],
-        exposeHeaders: ['ETag', 'X-Server-Time', 'Retry-After'],
-      })),
-    );
+  // CORS (slice 034b): the contract is same-origin (openapi.yaml: `servers: /v1`). An allowlist of exact origins comes
+  // from configuration; in demo mode without one it is the Vite dev server (apps/web, port 5173). Without any origin
+  // there is no CORS middleware. An origin outside the list gets no `Access-Control-*` header, also on a preflight. An
+  // allowed origin gets its headers on every response, also on 408, 413, 429 and 503; `Retry-After` is readable.
+  const corsAllowed = new Set((options.corsOrigins ?? (demoEnabled ? ['http://localhost:5173'] : [])).map((origin) => {
+    const normalised = normalizeOrigin(origin);
+    if (normalised === undefined) throw new Error('Invalid CORS origin option.');
+    return normalised;
+  }));
+  if (corsAllowed.size > 0) {
+    const allowedCors = cors({
+      origin: (origin) => (corsAllowed.has(normalizeOrigin(origin) ?? '') ? origin : null),
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'If-Match', 'Idempotency-Key', 'X-CSRF-Token', ...(demoEnabled ? ['X-Actor'] : [])],
+      exposeHeaders: ['ETag', 'X-Server-Time', 'Retry-After'],
+      maxAge: 600,
+      credentials: !demoEnabled,
+    });
+    const corsPolicy: MiddlewareHandler = async (c, next) => {
+      const origin = c.req.header('Origin');
+      if (origin !== undefined && corsAllowed.has(normalizeOrigin(origin) ?? '')) return allowedCors(c, next);
+      if (c.req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { Vary: 'Origin' } });
+      await next();
+      c.header('Vary', 'Origin', { append: true });
+      return undefined;
+    };
+    const guard = createPreflightGuard(rate, sourceOf, corsPolicy);
+    app.use('/v1/*', guard);
+    app.use('/auth/*', guard);
   }
   app.use('*', createRequestTimeout(limits.requestTimeoutMs));
   // Sign-in material: the well-formed session cookie, in demo mode the `X-Actor` header (what the adapter reads).
