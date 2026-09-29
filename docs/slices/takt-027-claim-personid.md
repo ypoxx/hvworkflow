@@ -36,8 +36,23 @@ rekursive Maske).
 
 ## Nachweis
 
-(folgt nach dem Gates-Lauf)
+- Test vor der Änderung rot: `AssertionError: expected { actorId: 'capture-a', …(3) } to not have property "personId"`;
+  danach Domäne `claims028.test.ts` 6/6, API `claims028` + `idempotency028` 30/30 grün.
+- `pnpm gates` Exit 0 auf Commit `58fceae` (Code- und Teststand dieses PRs). Wörtlicher Schluss:
+
+```
+✓ built in 3.04s
+mark-test-run: wrote /home/user/wt/takt-027/.claude/state/last-test-run (clean tree) at commit 58fceae, tree 17a18687e0ad…
+EXIT 0
+```
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer, Opus, Perspektive Datenschutz, 29.09.2026): **freigabefähig**. Alle Lesewege für
+Fragen und Redebeiträge laufen über `viewClaim` (Idempotenz-Wiederholung, `listQuestions`, Arbeitslisten, Bühne,
+Rückgaben von Übernahme und Freigabe); Ereignisse über `maskEvent`; kein weiterer Weg gefunden. Test ohne Fix rot.
+
+1. minor → takt-028: `Claim.personId` im Vertrag ohne Beschreibung („in Antworten nie befüllt, nur im Ereignis“).
+2. nit (behoben, `58fceae`): Assertion `actorId` bei der fremden Lesung der Frage ergänzt.
+3. nit → Folgeliste: Parametertyp von `viewClaim` von Hand statt `Claim` aus `types.ts`.
+4. nit → Folgeliste: Wiederholung, Listen und Bühne nicht eigens getestet (laufen über dieselbe Ansicht).
