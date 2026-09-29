@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "notice": "Einzige Quelle für Dienst, Kennzahlen-Allowlist-Tor und Auswertungskatalog (Scheibe 033b, ADR 0013). Es gibt keine Kennzahl je Person.",
+  "definitions": "Betrachtet werden Jahrgänge im Status running; ohne laufenden Jahrgang erscheinen für die Kennzahlen 1 bis 4 nur HELP und TYPE. Offen heißt: Status nicht in delivered, closed, withdrawn, merged. Ereigniszeit ist die Serverzeit (recordedAt), nie die Zeit eines Geräts oder Papiers.",
+  "metrics": [
+    {
+      "name": "hv_open_question_oldest_age_seconds",
+      "type": "gauge",
+      "help": "Sekunden seit Erfassung der ältesten offenen Einzelfrage des laufenden Jahrgangs; 0 ohne offene Einzelfrage.",
+      "labels": ["meeting_id"],
+      "purpose": "Stau in der Bearbeitung früh erkennen (Betrieb der HV).",
+      "source": "QuestionCaptured und der Status der Einzelfrage aus den Ereignissen",
+      "aggregation": "Minimum der Erfassungszeit über alle offenen Einzelfragen eines Jahrgangs",
+      "personalReference": "keiner: eine Zahl je Jahrgang, ohne Frage-ID und ohne Text",
+      "spec": "033b"
+    },
+    {
+      "name": "hv_open_questions",
+      "type": "gauge",
+      "help": "Offene Einzelfragen je zugewiesenem Fachbereich des laufenden Jahrgangs; ohne Zuweisung unit_id=unassigned.",
+      "labels": ["meeting_id", "unit_id"],
+      "purpose": "Rückstau je Fachbereich sichtbar machen, damit Kapazität verschoben werden kann.",
+      "source": "QuestionAssigned und der Status der Einzelfrage aus den Ereignissen",
+      "aggregation": "Anzahl offener Einzelfragen je Jahrgang und Fachbereich",
+      "personalReference": "kein Personenbezug je Frage; bei einem Fachbereich mit genau einer Person würde die Zahl faktisch eine Kennzahl je Person: die Mindest-Aggregationsschwelle regelt die Betriebsvereinbarung (E13), keine Unterdrückung im Code",
+      "spec": "033b"
+    },
+    {
+      "name": "hv_questions_captured_last_5m",
+      "type": "gauge",
+      "help": "Einzelfragen des laufenden Jahrgangs, die in den letzten 300 Sekunden erfasst wurden.",
+      "labels": ["meeting_id"],
+      "purpose": "Zulauf erkennen, um die Erfassung rechtzeitig zu verstärken.",
+      "source": "QuestionCaptured (Serverzeit)",
+      "aggregation": "Anzahl der Einzelfragen mit Erfassungszeit in den letzten 300 Sekunden",
+      "personalReference": "keiner: eine Zahl je Jahrgang",
+      "spec": "033b"
+    },
+    {
+      "name": "hv_questions_in_legal_review_over_10m",
+      "type": "gauge",
+      "help": "Einzelfragen im Status in_review ohne Rechtsfreigabe der aktuellen Fassung, deren Eintritt in in_review länger als 600 Sekunden zurückliegt.",
+      "labels": ["meeting_id"],
+      "purpose": "Engpass in der rechtlichen Prüfung erkennen.",
+      "source": "QuestionSubmittedForReview, QuestionLegalCleared, AnswerDrafted (Serverzeit)",
+      "aggregation": "Anzahl der Einzelfragen je Jahrgang",
+      "personalReference": "keiner: eine Zahl je Jahrgang, ohne Bezug auf die prüfende Person",
+      "spec": "033b"
+    },
+    {
+      "name": "hv_events_last_1m",
+      "type": "gauge",
+      "help": "Ereignisse mit Serverzeit in den letzten 60 Sekunden über alle Jahrgänge.",
+      "labels": [],
+      "purpose": "Grundlast und Aktivität des Dienstes erkennen.",
+      "source": "alle Ereignisse (Serverzeit)",
+      "aggregation": "Anzahl aller Ereignisse der letzten 60 Sekunden",
+      "personalReference": "keiner: eine Zahl ohne Label",
+      "spec": "033b"
+    },
+    {
+      "name": "hv_auth_no_active_role_total",
+      "type": "counter",
+      "help": "Antworten 403 NoActiveRole auf GET /auth/me und 403 auf /v1 für eine Sitzung ohne aktive Rolle seit dem Prozessstart.",
+      "labels": [],
+      "purpose": "Erkennung Missbrauchsfall Rollenverlust (Spec 030).",
+      "source": "prozesslokaler Zähler im Dienst, nicht aus Ereignissen, nicht persistiert",
+      "aggregation": "Summe seit Prozessstart (setzt bei Neustart auf 0 zurück)",
+      "personalReference": "keiner",
+      "spec": "033b"
+    }
+  ]
+}
