@@ -15,12 +15,14 @@ Bau bevorzugt mit Sonnet, Reviews von Hochrisiko-Scheiben mit Opus.
   alle sechs Reparatur-Takte sind drin. Integrationsbranch-Kopf nach #62: `bc60ab8`.
 - Später am Abend gemergt: 033a (#68), takt-027 (#67), takt-028 (#69, `f357693`), takt-029 (#70, `ebf0ae2`).
   Spec 034a/034b als PR #71 (baureif nach drei Lesebefund-Runden). 033b gebaut, Review läuft.
+- In der Nacht gemergt: 033b (#73, `115c28b`), Spec 034a (#71), Spec 034b (#74), 034a (#75, `3534213`). Vertrag
+  jetzt **0.3.10**. 034b im Bau (Branch `claude/slice-034b-konfiguration`).
 - Doku-PR für Tagesbericht, Folgeliste, diese Übergabe und den Zielpfad-Stand: Branch `claude/bautag-2026-09-27-29`.
 
 ## Nächste Schritte
 
-0. **Jetzt:** 033b nach Review/PR mergen; Spec-PR #71 mergen; dann 034a bauen (Opus-Review, Risikoklasse hoch),
-   danach 034b. E55 (Patch-Stufe für engere Anfrageschemas) beim Eigentümer, Standard Patch.
+0. **Jetzt:** 034b fertig bauen, Opus-Review, PR, CI (inklusive Keycloak-Schritt), Codex, Merge. Damit ist Etappe A
+   abgeschlossen. E55 (Patch-Stufe für engere Anfrageschemas) beim Eigentümer; 034a hat mit Standard Patch gebaut.
 1. Regel für alle Scheiben: Sicherheits-, Rechts- und Datenschutzbefunde nie auf die Folgeliste. 034a trägt die harte
    Vorbedingung aus 029b (`/auth/login` mit Obergrenze und Aufräumen abgelaufener Login-Zustände).
 2. Etappe B: 031 (e2e gegen Hono/Postgres/Keycloak; dabei den HTTP-Modus der e2e-Suite in CI verdrahten, Folgeliste 030),
@@ -32,6 +34,9 @@ Bau bevorzugt mit Sonnet, Reviews von Hochrisiko-Scheiben mit Opus.
   `initdb` als Nutzer `postgres`, Rollen `hv_owner`/`hv_runtime` wie in `gates.yml`). Je Scheibe eine eigene Datenbank.
 - gitleaks 8.24.3 lässt sich in die Sandbox laden (GitHub-Release); Semgrep-Registry (`p/typescript`) und Netlify-Doku
   sind gesperrt.
+- Kein Docker in der Sandbox: der Keycloak-Schritt der CI lässt sich lokal nicht fahren; Änderungen an
+  `scripts/keycloak-ci-029b.mjs` besonders sorgfältig lesen.
+- Nach e2e nur gezielt stagen (Screenshots werden neu erzeugt).
 - e2e lokal: `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`, eigener `E2E_PORT`; `003-answers-stage` braucht unter Last
   `--timeout=240000`.
 
