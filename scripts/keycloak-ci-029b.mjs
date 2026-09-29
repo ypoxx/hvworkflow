@@ -262,6 +262,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     // cookie from the callback is sent as one explicit `Cookie` header (never two `hv_session` cookies, and no doubt
     // about `Secure` cookies over http://localhost). Same assertions as before; cookie and token are never printed.
     const api = await webRequire('@playwright/test').request.newContext({ baseURL: apiOrigin });
+    let csrfToken = '';
     try {
       const cookie = { Cookie: `hv_session=${sessionCookie}` };
 
@@ -275,6 +276,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
       assert.equal(me.body.actor.role, 'moderation');
       assert.deepEqual(me.body.roles, ['moderation']);
       assert.match(me.body.csrfToken, /^[A-Za-z0-9_-]{43}$/);
+      csrfToken = me.body.csrfToken;
 
       stage = 'CSRF mutation';
       const route = `/v1/meetings/${meetingId}/speakers`;
@@ -298,7 +300,7 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
       await api.dispose();
     }
     console.log('029b Keycloak browser login, role, CSRF, write and logout: PASS');
-    return [identity.clientSecret, identity.userPassword, sessionCookie, me.body.csrfToken, expectedActorId,
+    return [identity.clientSecret, identity.userPassword, sessionCookie, csrfToken, expectedActorId,
       expectedActorId.replace(/^oidc_/, ''), identity.userId, identity.username].filter(Boolean);
   } finally {
     await browser.close();
