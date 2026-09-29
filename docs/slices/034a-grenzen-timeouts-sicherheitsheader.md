@@ -245,7 +245,7 @@ Lasttest (071), danach Standard anpassen.
    - `Cache-Control: no-store` (Entwürfe und Rechtstexte dürfen in keinem Cache liegen; die bestehenden `no-store`
      der Anmeldepfade bleiben unverändert, kein doppelter Header)
 
-   Die CSP gilt den Antworten des Dienstes (JSON, Problem-Details, Weiterleitungen); der Dienst liefert kein HTML. Die
+   Die CSP gilt den Antworten des Dienstes (JSON, Problem-Details, Weiterleitungen); der Dienst liefert kein HTML. Die CSP des Dienstes verbietet `fetch` aus Dokumenten des Dienstes selbst (`connect-src` fällt auf `'none'`); das ist beabsichtigt, Prüfskripte rufen den Dienst deshalb nicht aus einer Seite des Dienstes auf. Die
    CSP für das Dokument der Weboberfläche und der CSP-Report im e2e-Lauf gehören zu 037 (Produktions-Build; der
    Vite-Entwicklungsserver der e2e-Suite braucht Inline-Skripte). Keine neue Abhängigkeit; `hono/secure-headers` nur
    mit ausdrücklich gesetzten Werten, sonst eigene Middleware.
@@ -401,6 +401,7 @@ eine Zuordnung zur Person nur über das Verfahren „Auswertung nur zu zweit“ 
 - `apps/api/src/__tests__/postgres-auth-029b.test.ts` (nur falls die Rechteprüfung der Laufzeitrolle die neue EXECUTE-Ausnahme ausdrücklich erwartet; keine Abschwächung)
 - `apps/api/src/__tests__/acceptance.test.ts`, `apps/api/src/__tests__/negative.test.ts`, `apps/api/src/__tests__/idempotency028.test.ts`, `apps/api/src/__tests__/claims028.test.ts`, `apps/api/src/__tests__/person-roles026.test.ts`, `apps/api/src/__tests__/access-log033a.test.ts` (nur eine ausdrückliche Grenzen-Option im createApp-Aufruf, falls ein Test mehr als die Standardgrenze je Akteur in einem Fenster der injizierten Uhr ausführt; Grund im Bericht; jede andere Testdatei ist ein Scope-Befund)
 - `.github/workflows/gates.yml` (nur `postgres-limits034a.test.ts` in den Postgres-Schritt aufnehmen)
+- `scripts/keycloak-ci-029b.mjs` (nur Umstellung der Prüfungen nach der Anmeldung von In-Page-`fetch` auf `page.context().request` wegen der CSP des Dienstes; umgesetzt als Anfragekontext ohne Cookie-Speicher mit einem ausdrücklichen `Cookie`-Header, damit nie zwei `hv_session`-Cookies gesendet werden)
 - `docs/sicherheit/bedrohungsmodell.md` (nur Status, Nachweise und Restrisiken der oben genannten IDs, neue Zeile T-G1-D-05, neuer Missbrauchsfall MF-10, SC-08-Ausnahme EXECUTE, BF-05 und BF-06 (Anteil Dienst), Abschnitt-6-Zeile 034 auf 034a/034b, T-G1-T-06 „e2e-Report 037“)
 - `docs/folgeliste.md` (nur: 021c/takt-016 maxLength und 027 Pool-Timeouts als erledigt markieren; nicht blockierende Reviewbefunde ohne Sicherheits- oder Verfügbarkeitsbezug; Punkt „Kernprüfung der Vertragsgrenzen“)
 - `docs/entscheidungsregister.md` (nur Status von E55 nach dem Bau)
