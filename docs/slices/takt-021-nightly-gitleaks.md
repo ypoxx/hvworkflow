@@ -67,11 +67,11 @@ Keine Änderung an `nightly.yml` oder `gates.yml`, keine Umbenennung der Schlüs
   Grundlinie ohne Allowlist: jede dieser Zeilen meldet 1 Fund. Gegenprobe zur Pfadbindung: mit `[[allowlists]]` wurde
   auch die erlaubte Zeile gemeldet (Block ignoriert); mit `condition = "AND"` im `[allowlist]` wurden fremde Datei und
   fremde Konstante unterdrückt (ODER) — beides verworfen.
-- `pnpm gates` Exit 0 auf Commit `54bb779` (Kopf dieses PRs). Wörtlicher Schluss:
+- `pnpm gates` Exit 0 auf Commit `ebebcaf` (Stand nach Codex-P1-Fix und Security-Review). Wörtlicher Schluss:
 
 ```
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-mark-test-run: wrote /home/user/wt/takt-021/.claude/state/last-test-run (clean tree) at commit 54bb779, tree e7f4d9bc7648…
+✓ built in 1.61s
+mark-test-run: wrote /home/user/wt/takt-021/.claude/state/last-test-run (clean tree) at commit ebebcaf, tree 4d3457d0c1b9…
 EXIT 0
 ```
 
