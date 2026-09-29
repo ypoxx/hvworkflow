@@ -121,7 +121,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   `HV_REQUIRE_POSTGRES_TESTS=1`, der Überspringen zum Fehler macht; Laufzeitrolle explizit übergeben.
 - 027 · `app.ts` Readiness · unbekannter Migrationsstand → `unreachable`/500 statt `migrations_pending`/503.
 - 027 nit · `postgres:16` per Digest pinnen; TLS standardmäßig aus (037); kein Owner-Trigger gegen UPDATE (038).
-- ~~028 · `claim.personId` an alle Leser~~ → behoben in **takt-027** (Datenschutz hält den Merge, AGENTS.md R3; Codex P1 auf #66).
+- ~~028 · `claim.personId` an alle Leser~~ → behoben in **takt-027** (#67, `4daa317`; Datenschutz hält den Merge, AGENTS.md R3; Codex P1 auf #66).
 - 028 · `envelope.ts` · Ersatzkennung `legacy-unscoped` auch bei neuen Schreibvorgängen ohne `meetingId` · nur im
   Hochzieh-Pfad, sonst Fehler.
 - 028 · Tests · anderer Jahrgang, Rollenablauf, Postgres-Rollback nach angehängtem Ereignis, gleicher Schlüssel über
