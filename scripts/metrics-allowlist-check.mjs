@@ -10,6 +10,7 @@
  *       wording of ADR 0013 ("no metric per subject without a spec entry") on purpose: "no metric per
  *       person" and the rights concept (section 6) win. Loosening it takes an ADR change, not a switch;
  *   (d) a name containing `rate_limit` (ephemeral, ADR 0013, never in the catalog);
+ *   (f) `metrics` missing or not an array; a label twice within one metric; a `type` outside {gauge, counter}.
  *   (e) a `spec` that does not name a file `docs/slices/<spec>-*.md` whose section
  *       "## Kennzahlen-Allowlist" contains the name in backticks.
  * Run as `pnpm metrics-allowlist` (part of `pnpm gates`). `--catalog <file>` and `--specs-dir <dir>`
@@ -64,12 +65,16 @@ function specNames(specsDir, spec) {
 export function checkCatalog(catalog, specsDir) {
   const failures = [];
   const seen = new Set();
-  for (const metric of catalog.metrics ?? []) {
+  // A catalog without a metrics array must not pass as an empty, therefore clean, catalog.
+  if (!Array.isArray(catalog?.metrics)) return ['catalog: (f) "metrics" is missing or not an array'];
+  for (const metric of catalog.metrics) {
     const name = String(metric.name);
     const labels = Array.isArray(metric.labels) ? metric.labels.map(String) : [];
     if (!NAME_RE.test(name)) failures.push(`${name}: (a) name must match ^hv_[a-z0-9_]+$`);
     if (seen.has(name)) failures.push(`${name}: (a) duplicate name`);
     seen.add(name);
+    if (!['gauge', 'counter'].includes(metric.type)) failures.push(`${name}: (f) type "${metric.type}" is not gauge or counter`);
+    if (new Set(labels).size !== labels.length) failures.push(`${name}: (f) a label appears twice`);
     for (const label of labels) {
       if (!ALLOWED_LABELS.has(label)) failures.push(`${name}: (b) label "${label}" is outside {meeting_id, unit_id}`);
     }

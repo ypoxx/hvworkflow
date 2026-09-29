@@ -31,6 +31,9 @@ Warum geteilt: siehe Abschnitt „Warum geteilt“ in `docs/slices/033a-serverze
    Sitzung oder Pfad. Katalogeintrag mit `personalReference: "keiner"`, Zweck „Erkennung Missbrauchsfall
    Rollenverlust (Spec 030)“. Test: zwei 403 einer rollenlosen Sitzung → Zähler 2; die Ausgabe enthält keine
    Actor-ID. Damit endet die befristete Ausnahme in Spec 030.
+   Gezählt wird nur auf `/auth/me` und auf Pfaden, die mit `/v1/` beginnen. Mittelbarer Personenbezug (Review
+   Datenschutz): bei einer einzigen rollenlosen Sitzung zeigt der Zeitverlauf des Zählers deren Aktivität; Zuordnung nur
+   über das Zugriffslog im Verfahren zu zweit (E13), im Katalog wörtlich unter `personalReference`.
 9. **Vertrag zuerst (Codex P1 auf #65, R6).** `getMetrics` verspricht heute „the five aggregate indicators“
    (`openapi.yaml`, Summary von `/metrics`). Vor dem Code: Summary und Beschreibung auf „fünf fachliche Kennzahlen und
    eine technische Zählung ohne Labels (`hv_auth_no_active_role_total`), keine je Person“ ändern; additive Patch-Stufe
@@ -80,7 +83,7 @@ Grenzfälle der Kernfunktion mit fester Uhr (`indicators033b.test.ts`): genau 30
 - `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts`, `apps/api/src/__tests__/contract.test.ts`, `apps/api/src/__tests__/takt-019-contract.test.ts` (Ziel 9: Beschreibung `getMetrics`, Patch-Stufe, Typen, CHANGELOG, Versions-Assertions)
 - `scripts/metrics-allowlist-check.mjs`, `scripts/metrics-allowlist-check.test.mjs`, `scripts/auswertungskatalog.mjs`, `scripts/auswertungskatalog.test.mjs`, `scripts/fixtures/metrics-allowlist/**`
 - `package.json` (nur Skript `metrics-allowlist` und dessen Aufnahme in `gates`)
-- `.github/workflows/gates.yml` (nur Katalog-Schritt mit gepinntem Artefakt-Upload, `postgres-metrics033b.test.ts` im Postgres-Schritt, Schrittname der gates-Zeile)
+- `.github/workflows/gates.yml` (nur Katalog-Schritt mit gepinntem Artefakt-Upload, `postgres-metrics033b.test.ts` im Postgres-Schritt; der Schrittname der gates-Zeile bleibt, weil `plan-honesty` ihn wörtlich prüft)
 - `AGENTS.md` (nur die Gate-Liste im Kommentar zu `pnpm gates`)
 - `docs/adr/0013-zwei-protokollebenen.md` (nur Zeile „Keine Kennzahl je Person“ auf die strengere Lesart des Tors und Nachweis-Abschnitt: Tor, Artefakt, Definitionen; **geschrieben vom Architekten**, nicht vom Implementierer; steht hier, damit dessen Commit auf dem Baubranch das Scheibenumfang-Tor passiert)
 - `docs/sicherheit/bedrohungsmodell.md` (nur Status und Nachweise der oben genannten IDs, neue Zeile T-G1-I-10)

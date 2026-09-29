@@ -5,7 +5,7 @@
  * without `TEST_DATABASE_URL`. Synthetic data and a synthetic token only.
  */
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { createInMemoryEventStore, type DomainEvent, type NewEvent } from '@hv/domain';
 import { createApp } from '../app.ts';
@@ -72,6 +72,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await runtime?.end();
     await owner?.end();
     const admin = new Pool({ connectionString: databaseUrl });
@@ -116,9 +117,16 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     ['index hash', `UPDATE events SET hash = repeat('0', 64) WHERE seq = 2`],
   ])('answers a corrupt stored %s with a bare 500 and no indicator', async (_label, sql) => {
     await owner.query(sql);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
     const app = createApp({ demoEnabled: true, postgres: runtime, clock: () => fixed, metricsToken: TOKEN });
     const response = await call(app);
     expect(response.status).toBe(500);
+    // Exactly one fixed error line with the error class; no seq, no driver text (problem.ts format).
+    expect(errorLog.mock.calls).toHaveLength(1);
+    const line = JSON.parse(String(errorLog.mock.calls[0]![0])) as Record<string, unknown>;
+    expect(Object.keys(line).sort()).toEqual(['errorClass', 'log', 'requestId', 'ts']);
+    expect(line['errorClass']).toBe('PostgresIntegrityError');
+    expect(JSON.stringify(line)).not.toMatch(/seq|tampered|MARKER/i);
     const body = await response.text();
     expect(body).not.toContain('hv_');
     expect(body).not.toMatch(/seq \d/i);

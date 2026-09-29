@@ -118,6 +118,26 @@ describe('Scheibe 033b: T-G1-I-10 no metrics without the token', () => {
   });
 });
 
+describe('Scheibe 033b: a failed scan is not cached (cache.ts)', () => {
+  it('answers 500 when connect throws once, and reconnects on the next call with an unchanged clock', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { pool: healthy, calls } = fakePool();
+    let failures = 1;
+    const pool = { ...(healthy as unknown as Record<string, unknown>),
+      connect: async () => {
+        if (failures-- > 0) throw new Error('connection terminated: host=db.internal password=hunter2');
+        return (healthy as unknown as { connect: () => Promise<unknown> }).connect();
+      } } as unknown as Pool;
+    const app = createApp({ demoEnabled: true, postgres: pool, clock: () => fixed, metricsToken: TOKEN });
+    const first = await app.request('/metrics', { headers: bearer(TOKEN) });
+    expect(first.status).toBe(500);
+    expect(await first.text()).not.toContain('hunter2');
+    const second = await app.request('/metrics', { headers: bearer(TOKEN) });
+    expect(second.status).toBe(200);
+    expect(calls.connect).toBe(1);
+  });
+});
+
 describe('Scheibe 033b: HV_METRICS_TOKEN at start', () => {
   it('is optional, but refuses a set value shorter than 32 characters with a fixed sentence', () => {
     expect(readMetricsToken({})).toBeUndefined();
@@ -264,6 +284,16 @@ describe('Scheibe 033b: hv_auth_no_active_role_total (Spec 030, Ziel 8)', () => 
     expect(body).not.toContain(actorId);
     expect(body).not.toContain('synthetic-user');
     expect(body).not.toMatch(/^hv_auth_no_active_role_total\{/m);
+  });
+
+  it('counts only /auth/me and /v1/ paths: a role-less session on /foo leaves the counter unchanged', async () => {
+    const { app, domain, cookie } = await sessionFixture();
+    await domain.revokeRole('assignment-1');
+    expect((await app.request('/foo', { headers: { Cookie: cookie } })).status).toBe(403);
+    expect((await app.request('/v1x', { headers: { Cookie: cookie } })).status).toBe(403);
+    expect(await counter(app)).toBe(0);
+    expect((await app.request('/v1/meeting', { headers: { Cookie: cookie } })).status).toBe(403);
+    expect(await counter(app)).toBe(1);
   });
 
   it('does not count an unauthenticated 401 or a plain 200', async () => {

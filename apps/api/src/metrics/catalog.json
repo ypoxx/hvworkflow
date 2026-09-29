@@ -55,7 +55,7 @@
       "purpose": "Grundlast und Aktivität des Dienstes erkennen.",
       "source": "alle Ereignisse (Serverzeit)",
       "aggregation": "Anzahl aller Ereignisse der letzten 60 Sekunden",
-      "personalReference": "keiner: eine Zahl ohne Label",
+      "personalReference": "mittelbar: bei einer einzigen rollenlosen Sitzung bzw. einem einzigen aktiven Nutzer zeigt der Zeitverlauf dessen Aktivität; Zuordnung nur über das Zugriffslog im Verfahren zu zweit (E13)",
       "spec": "033b"
     },
     {
@@ -66,7 +66,7 @@
       "purpose": "Erkennung Missbrauchsfall Rollenverlust (Spec 030).",
       "source": "prozesslokaler Zähler im Dienst, nicht aus Ereignissen, nicht persistiert",
       "aggregation": "Summe seit Prozessstart (setzt bei Neustart auf 0 zurück)",
-      "personalReference": "keiner",
+      "personalReference": "mittelbar: bei einer einzigen rollenlosen Sitzung bzw. einem einzigen aktiven Nutzer zeigt der Zeitverlauf dessen Aktivität; Zuordnung nur über das Zugriffslog im Verfahren zu zweit (E13)",
       "spec": "033b"
     }
   ]

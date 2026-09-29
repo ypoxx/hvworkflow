@@ -232,13 +232,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       if (!token) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
       const session = await authStore.readSession(token, clock(), false);
       if (!session) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
-      try {
-        return sessionActorFromEvents(await authEvents(), session.actorId, clock()).actor;
-      } catch (error) {
-        // The only 403 this call throws is the missing active role (takt-023 signal, slice 033b).
-        if (error instanceof ApiProblem && error.status === 403) noteNoActiveRole();
-        throw error;
-      }
+      return sessionActorFromEvents(await authEvents(), session.actorId, clock()).actor;
     } } : {}),
   });
   const eventLogPath = options.eventLogPath ?? process.env['HV_EVENT_LOG'];
@@ -365,7 +359,15 @@ export function createApp(options: CreateAppOptions = {}): App {
       throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
     }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
-    const actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
+    let actor: Actor | undefined;
+    try {
+      actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
+    } catch (error) {
+      // Slice 033b, Ziel 8: only `/v1/*` counts here (`/auth/me` counts in its handler); the only 403 the
+      // session adapter throws is the missing active role (takt-023).
+      if (error instanceof ApiProblem && error.status === 403 && c.req.path.startsWith('/v1/')) noteNoActiveRole();
+      throw error;
+    }
     // The session was used from here on, whatever CSRF or the re-read decide next: log who (hashed).
     if (actor !== undefined) noteSubject(actor.id);
     if (sessionReady) {
@@ -579,13 +581,10 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (!metricsBearer(c.req.header('Authorization'))) {
       throw new ApiProblem(401, 'Unauthorized', 'A valid metrics token is required.');
     }
-    let indicators: Indicators;
-    try {
-      indicators = await cachedIndicators(async () => computeIndicators(await readEventsForMetrics(), clock()));
-    } catch {
-      // No diagnostic data (no sequence number, no driver text) for a caller that only holds a token.
-      throw new ApiProblem(500, 'Internal Server Error', 'Persistence is unavailable.');
-    }
+    // A failure is not caught here: `onError` answers a bare 500 and writes the one fixed error line
+    // with `errorClass` only (problem.ts); no sequence number, no driver text, nothing in the response.
+    const indicators: Indicators = await cachedIndicators(
+      async () => computeIndicators(await readEventsForMetrics(), clock()));
     return new Response(renderMetrics(indicators, noActiveRoleTotal), { status: 200,
       headers: { 'Content-Type': METRICS_CONTENT_TYPE, 'Cache-Control': 'no-store' } });
   });

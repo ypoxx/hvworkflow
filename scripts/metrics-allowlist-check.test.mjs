@@ -27,7 +27,7 @@ test('green: a fixture with meeting_id, unit_id and a spec entry passes', () => 
 
 // Every red fixture below is listed in the fixture spec: the rule under test must fire on its own.
 const RED = [
-  ['subject-label.json', /\(c\).*subject_hash|\(c\)/, 'a label subject_hash is a metric per person'],
+  ['subject-label.json', /\(c\) "subject_hash"/, 'a label subject_hash is a metric per person'],
   ['actor-name.json', /hv_answers_per_actor: \(c\)/, 'a name with "actor" (answers per person)'],
   ['user-with-unit-label.json', /hv_user_open_questions: \(c\)/, 'unit_id plus "user" in the name'],
   ['rate-limit.json', /\(d\)/, 'rate_limit is never part of the catalog'],
@@ -37,6 +37,10 @@ const RED = [
   ['ip-label.json', /\(c\).*"ip"/, 'a name that has the word ip'],
   ['not-in-spec-section.json', /\(e\)/, 'a name that stands outside the "## Kennzahlen-Allowlist" section'],
   ['unknown-spec.json', /\(e\).*777/, 'a spec without a file'],
+  ['no-metrics.json', /\(f\).*"metrics"/, 'a catalog without a metrics array'],
+  ['metrics-not-array.json', /\(f\).*"metrics"/, 'metrics that is not an array'],
+  ['duplicate-label.json', /\(f\).*label appears twice/, 'a label twice within one metric'],
+  ['bad-type.json', /\(f\).*type "histogram"/, 'a type outside gauge and counter'],
 ];
 for (const [file, pattern, why] of RED) {
   test(`red: ${file} (${why})`, () => {
