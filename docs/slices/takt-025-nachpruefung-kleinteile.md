@@ -48,4 +48,10 @@ Keine Verhaltensänderung in `api.ts`, `transitions.ts` oder `state.ts`; keine w
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer-sonnet, 29.09.2026): **freigegeben**, 0 blocker, 0 major. Fundstellen 25–30
+geprüft, `legal-trace.md` nur sechs Zeilennummern. Mutationsprobe: Lückenprüfung, `ids.size > 1`, Akteursfilter und
+`legacyMatch` einzeln entschärft → jeweils der zugehörige Test rot.
+
+1. minor → Folgeliste: Test (c) läuft über den `commandOperation`-Pfad, nicht über `legacyMatch` (Titel ungenau).
+2. minor → Folgeliste: Test (a) prüft nur `registerSpeaker` (pauschales `return true`); die operationsspezifischen
+   Zweige von `legacyMatch` (etwa `captureQuestions`, Agenda) sind ungetestet.
