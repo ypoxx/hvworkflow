@@ -37,8 +37,15 @@ Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe")
   Akteur trägt. `seq` bleibt im Log, weil es die einzige inhaltsfreie Brücke von einer Störung zum
   betroffenen Vorgang ist. Deshalb gilt: Jede Auswertung, die Zugriffslog und Historie zusammenführt
   (auch ein bloßer `seq`-Abgleich), ist eine personenbezogene Auswertung und nur zu zweit zulässig —
-  zwei benannte Personen, dokumentierter Zweck, Frist, Eintrag im Runbook; bis 047 organisatorisch,
-  ab 047 technisch (Zugriff auf Log-Senke und `event.read.personal` nur mit zweiter Freigabe).
+  zwei benannte Personen, dokumentierter Zweck, Frist, Eintrag im Runbook. Für die Historie wird das
+  ab 047 technisch (`event.read.personal` nur mit zweiter Freigabe in `can()`). **Für die Log-Senke
+  selbst bleibt der Schutz organisatorisch** (Codex P1 auf #65): 033a legt die Senke als Datei ohne
+  Anwendungsroute ab; wer technischen Zugriff auf den Datenträger hat, kann sie allein lesen. Der
+  Zugriff auf die Senke ist daher auf benannte Betriebspersonen beschränkt und über die Plattform zu
+  protokollieren (037). Eine technische Zwei-Personen-Kontrolle der Senke (z. B. verschlüsselte Senke
+  mit geteiltem Schlüssel oder plattformseitige Freigabe) ist offen und als Restrisiko im Plan (037)
+  geführt; bis dahin gilt der Satz „technisch deaktiviert, nicht organisatorisch untersagt“ aus dem
+  Rechtekonzept Abschnitt 6 für die Senke **nicht**, nur für Kennzahlen und Historie.
   Betrieb und Support dürfen einzelne Log-Zeilen zur Störungsanalyse lesen (Status, Latenz,
   Operation, Korrelations-ID). Jedes Gruppieren, Filtern oder Zählen nach `subjectHash` ist dagegen
   eine personenbezogene Auswertung (Latenzen je Hash ergeben schon allein ein Leistungsprofil) und nur

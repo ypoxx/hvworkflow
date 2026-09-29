@@ -31,6 +31,11 @@ Warum geteilt: siehe Abschnitt „Warum geteilt“ in `docs/slices/033a-serverze
    Sitzung oder Pfad. Katalogeintrag mit `personalReference: "keiner"`, Zweck „Erkennung Missbrauchsfall
    Rollenverlust (Spec 030)“. Test: zwei 403 einer rollenlosen Sitzung → Zähler 2; die Ausgabe enthält keine
    Actor-ID. Damit endet die befristete Ausnahme in Spec 030.
+9. **Vertrag zuerst (Codex P1 auf #65, R6).** `getMetrics` verspricht heute „the five aggregate indicators“
+   (`openapi.yaml`, Summary von `/metrics`). Vor dem Code: Summary und Beschreibung auf „fünf fachliche Kennzahlen und
+   eine technische Zählung ohne Labels (`hv_auth_no_active_role_total`), keine je Person“ ändern; additive Patch-Stufe
+   (aktueller Stand +1, nach takt-023 also 0.3.9), `packages/contract/package.json`, `pnpm contract:types`, CHANGELOG,
+   exakte Versions-Assertions in `contract.test.ts` und `takt-019-contract.test.ts`.
 7. **Personenbezug über kleine Fachbereiche (offen, E13):** Hat ein Fachbereich genau eine Person, wird `hv_open_questions{unit_id}` faktisch eine Kennzahl je Person. Die Mindest-Aggregationsschwelle ist Sache der Betriebsvereinbarung (E13). Standard in 033b: Katalogfeld `personalReference` nennt diese Grenze wörtlich; keine Unterdrückung im Code. Der Bericht führt das unter „Open“.
 
 ## Kennzahlen-Allowlist
@@ -46,7 +51,7 @@ Die Einträge, auf die `catalog.json` mit `"spec": "033b"` verweist:
 
 ## Nicht-Ziele
 
-Keine Kennzahl je Person, je Subject, je Sitzung oder je Bühnenplatz. Kein Leitstand, keine Oberfläche (061). Keine Alarmierung, kein Prometheus/Grafana-Stack (037). Kein Diff-Tor des Katalogs, keine Rechtsgrundlagen-Matrix (073). Kein Rate-Limit und keine Rate-Limit-Kennzahl (034). Keine neue Berechtigung, kein `can()`-Pfad für den Scraper. Keine Änderung an Zugriffslog, NTP oder `X-Server-Time` (033a). Keine Vertragsänderung (Ausnahme nur nach „Vor dem Bau prüfen“, Punkt 2).
+Keine Kennzahl je Person, je Subject, je Sitzung oder je Bühnenplatz. Kein Leitstand, keine Oberfläche (061). Keine Alarmierung, kein Prometheus/Grafana-Stack (037). Kein Diff-Tor des Katalogs, keine Rechtsgrundlagen-Matrix (073). Kein Rate-Limit und keine Rate-Limit-Kennzahl (034). Keine neue Berechtigung, kein `can()`-Pfad für den Scraper. Keine Änderung an Zugriffslog, NTP oder `X-Server-Time` (033a). Keine Vertragsänderung außer der Beschreibung von `getMetrics` (Ziel 9).
 
 ## Bedrohungen, Missbrauchsfall und Test je ID
 
@@ -72,7 +77,7 @@ Grenzfälle der Kernfunktion mit fester Uhr (`indicators033b.test.ts`): genau 30
 - `apps/api/src/observability/config.ts` (nur Prüfung von `HV_METRICS_TOKEN`, falls die Konfiguration dort liegt)
 - `apps/api/src/__tests__/metrics033b.test.ts`, `apps/api/src/__tests__/postgres-metrics033b.test.ts`
 - `packages/contract/allowlist.json` (nur Eintrag `getMetrics` entfernen)
-- `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts`, `apps/api/src/__tests__/contract.test.ts`, `apps/api/src/__tests__/takt-019-contract.test.ts` (nur im Ausnahmefall aus „Vor dem Bau prüfen“, Punkt 2)
+- `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts`, `apps/api/src/__tests__/contract.test.ts`, `apps/api/src/__tests__/takt-019-contract.test.ts` (Ziel 9: Beschreibung `getMetrics`, Patch-Stufe, Typen, CHANGELOG, Versions-Assertions)
 - `scripts/metrics-allowlist-check.mjs`, `scripts/metrics-allowlist-check.test.mjs`, `scripts/auswertungskatalog.mjs`, `scripts/auswertungskatalog.test.mjs`, `scripts/fixtures/metrics-allowlist/**`
 - `package.json` (nur Skript `metrics-allowlist` und dessen Aufnahme in `gates`)
 - `.github/workflows/gates.yml` (nur Katalog-Schritt mit gepinntem Artefakt-Upload, `postgres-metrics033b.test.ts` im Postgres-Schritt, Schrittname der gates-Zeile)
