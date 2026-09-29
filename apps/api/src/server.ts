@@ -49,7 +49,13 @@ const app = createApp({ seedOnStart: postgres === undefined,
   ...(ntp !== undefined ? { clockHealth: createNtpClockCheck({ ...ntp, clock: systemClock }) } : {}),
   ...(postgres !== undefined ? { postgres } : {}) });
 
-const server = serve({ fetch: app.fetch, port }, (info) => {
+// Slice 034a: against slowly trickling headers and bodies. Node checks these limits only every
+// `connectionsCheckingInterval` (default 30 s), so `headersTimeout` alone acts between 10 s and 40 s; the interval
+// is lowered to 5 s (10 to 15 s). Node answers a breach itself with an empty 408 and `Connection: close`, before a
+// request reaches the application: that answer has no security headers and no access log line (named exception,
+// spec decision 7; visibility and limit at the proxy, slice 037).
+serve({ fetch: app.fetch, port,
+  serverOptions: { headersTimeout: 10_000, requestTimeout: 30_000, connectionsCheckingInterval: 5_000 } }, (info) => {
   // eslint-disable-next-line no-console
   console.log(`HV-Tool API listening on http://localhost:${info.port}`);
   if (process.env['HV_DEMO'] !== '1' && !(postgres && process.env['HV_OIDC_ISSUER'] &&
@@ -62,9 +68,3 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   }
 });
 
-// Slice 034a: against slowly trickling headers and bodies. Node answers these two limits itself with an empty
-// 408 and `Connection: close`, before a request reaches the application: that answer has no security headers
-// and no access log line (named exception, spec decision 7; visibility and limit at the proxy, slice 037).
-const nodeServer = server as unknown as { headersTimeout: number; requestTimeout: number };
-nodeServer.headersTimeout = 10_000;
-nodeServer.requestTimeout = 30_000;

@@ -68,7 +68,7 @@ import { createSubjectHasher } from './observability/subjectHash.ts';
 import { problemBody, problemResponse } from './problem.ts';
 import { getMigrationStatus } from './persistence/migrations.ts';
 import { assertRuntimePrivileges, insertPostgresEvents, isPersistenceBusy, loadPostgresSnapshot, mustDiscardConnection,
-  pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimer } from './persistence/postgres.ts';
+  pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimers } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
 
 export interface CreateAppOptions {
@@ -471,6 +471,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     const phaseIs = (phase: 'committing' | 'timedOut'): boolean => context?.phase === phase;
     const write = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
     const queryMs = limits.queryTimeoutMs;
+    const timedPool = withQueryTimers(pool, queryMs);
     let client: PoolClient | undefined;
     let started = false;
     let discard: Error | undefined;
@@ -485,13 +486,16 @@ export function createApp(options: CreateAppOptions = {}): App {
       started = false;
     };
     try {
-      if ((await withQueryTimer(getMigrationStatus(pool), queryMs)).pending) {
+      if ((await getMigrationStatus(timedPool)).pending) {
         return persistenceBusy('Migrations are pending.');
       }
-      await withQueryTimer(assertRuntimePrivileges(pool), queryMs);
+      await assertRuntimePrivileges(timedPool);
+      // A request that ran out of time in the checks above must not take a connection or queue for the lock.
+      if (phaseIs('timedOut')) return;
       client = await pool.connect();
       await query(write ? 'BEGIN ISOLATION LEVEL READ COMMITTED' : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
       started = true;
+      if (phaseIs('timedOut')) return await rollback();
       if (write) await query('SELECT pg_advisory_xact_lock($1, $2)', [27027, 1]);
       if (write) await options.testHooks?.at?.('afterLock', async (sql) => { await query(sql); });
       // A request that waited for the lock beyond its time budget was answered 408 already: leave early.
@@ -593,7 +597,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       clock: options.clockHealth ?? (async (): Promise<ReadinessCheck> => ({ status: 'fail', code: 'not_configured' })),
       db: async (): Promise<ReadinessCheck> => {
         if (options.postgres) {
-          await assertRuntimePrivileges(options.postgres, false);
+          await assertRuntimePrivileges(withQueryTimers(options.postgres, limits.queryTimeoutMs), false);
           await pooledQuery(options.postgres, limits.queryTimeoutMs, 'SELECT 1');
           return { status: 'ok' };
         }
@@ -613,7 +617,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       },
       migrations: async (): Promise<ReadinessCheck> => {
         if (options.postgres) {
-          return (await getMigrationStatus(options.postgres)).pending
+          return (await getMigrationStatus(withQueryTimers(options.postgres, limits.queryTimeoutMs))).pending
             ? { status: 'fail', code: 'migrations_pending' } : { status: 'ok' };
         }
         return persistence ? { status: 'ok' } : { status: 'fail', code: 'not_configured' };

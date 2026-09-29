@@ -13,6 +13,9 @@ import { expectValidProblem, requestBodyValidator } from '../contractSchema.ts';
 import { DEFAULT_LIMITS, READINESS_CHECK_TIMEOUT_MS } from '../limits/config.ts';
 import { createWindowCounter } from '../limits/counters.ts';
 import { createSourceKeyer, normalizeSource } from '../limits/source.ts';
+import { getMigrationStatus } from '../persistence/migrations.ts';
+import { QueryTimeoutError, withQueryTimers } from '../persistence/postgres.ts';
+import { postgresPoolOptions } from '../limits/poolOptions.ts';
 import { createMemorySink } from '../observability/accessLog.ts';
 import { ACTOR, req } from './helpers.ts';
 
@@ -653,5 +656,98 @@ describe('Scheibe 034a: sign-in paths keep their own upper bounds (T-G3-D-01)', 
     const out = await req(f.app, 'POST', '/auth/logout', { headers: { Cookie: cookie, 'X-CSRF-Token': me.csrfToken } });
     expect(out.status).toBe(204);
     expect(out.headers.getSetCookie()).toHaveLength(1);
+  });
+});
+
+describe('Scheibe 034a (Nachbesserung): every answer to forged session material counts against the source', () => {
+  const stateCookie = `hv_auth_state=${'A'.repeat(43)}`;
+  const csrf = 'wrong-token';
+
+  it('logout without CSRF (422) and with a wrong CSRF (403): counted, and 429 from request 6 on', async () => {
+    for (const headers of [{ Cookie: forged }, { Cookie: forged, 'X-CSRF-Token': csrf }]) {
+      const f = sessionFixture({ limits: { anonymousPerSource: 5 } });
+      await f.ready;
+      const call = () => f.app.request('/auth/logout', { method: 'POST', headers });
+      const expected = 'X-CSRF-Token' in headers ? 403 : 422;
+      for (let i = 0; i < 5; i += 1) expect((await call()).status).toBe(expected);
+      const limited = await req(f.app, 'POST', '/auth/logout', { headers });
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get('Retry-After')).toBe('45');
+    }
+  });
+
+  it('callback with a correlation cookie and a forged session cookie (400): counted, 429 from request 6 on', async () => {
+    const f = sessionFixture({ limits: { anonymousPerSource: 5 } });
+    await f.ready;
+    const call = () => f.app.request('/auth/callback', { headers: { Cookie: `${stateCookie}; ${forged}` } });
+    for (let i = 0; i < 5; i += 1) expect((await call()).status).toBe(400);
+    expect((await call()).status).toBe(429);
+  });
+
+  it('a 200 to the transparency notice is never replaced, but it is counted', async () => {
+    const f = sessionFixture({ limits: { anonymousPerSource: 5 } });
+    await f.ready;
+    const call = () => f.app.request('/auth/transparency-notice', { headers: { Cookie: forged } });
+    for (let i = 0; i < 8; i += 1) expect((await call()).status).toBe(200); // exhausted after 5, status unchanged
+    // the eight answers used the shared counter: the next failing request of the source is refused at once
+    expect((await f.app.request('/v1/meeting', { headers: { Cookie: forged } })).status).toBe(429);
+  });
+
+  it('a successful callback (302 with the session cookie) is never replaced by 429 when the source is exhausted', async () => {
+    const f = sessionFixture({ limits: { anonymousPerSource: 2 } });
+    await f.ready;
+    const login = await f.app.request('/auth/login');
+    const state = new URL(login.headers.get('Location')!).searchParams.get('state');
+    const correlation = login.headers.getSetCookie().find((line) => line.startsWith('hv_auth_state='))!.split(';')[0]!;
+    for (let i = 0; i < 4; i += 1) await f.app.request('/v1/meeting', { headers: { Cookie: forged } });
+    expect((await f.app.request('/v1/meeting', { headers: { Cookie: forged } })).status).toBe(429);
+    const callback = await f.app.request(`/auth/callback?code=synthetic-code&state=${state}`,
+      { headers: { Cookie: `${correlation}; ${forged}` } });
+    expect(callback.status).toBe(302);
+    expect(callback.headers.getSetCookie().some((line) => line.startsWith('hv_session='))).toBe(true);
+    expect(f.counts.sessions).toBe(1);
+  });
+});
+
+describe('Scheibe 034a (Nachbesserung): the total sign-in counter counts only calls the source may make', () => {
+  it('700 calls of source A do not block source B', async () => {
+    let source = 'source-a';
+    const f = sessionFixture({ sourceOf: () => source });
+    await f.ready;
+    for (let i = 0; i < 700; i += 1) await f.app.request('/auth/login');
+    expect((await f.app.request('/auth/login')).status).toBe(429);
+    source = 'source-b';
+    expect((await f.app.request('/auth/login')).status).toBe(302);
+  });
+});
+
+describe('Scheibe 034a (Nachbesserung): timers on the pre-checks, pool options, preflight CORS, early exit', () => {
+  it('a hanging pre-check query ends in QueryTimeoutError and destroys its connection', async () => {
+    const released: unknown[] = [];
+    const client = { query: () => new Promise(() => undefined), release: (error?: unknown) => { released.push(error); } };
+    const pool = { connect: async () => client } as never;
+    await expect(getMigrationStatus(withQueryTimers(pool, 50))).rejects.toBeInstanceOf(QueryTimeoutError);
+    expect(released).toHaveLength(1);
+    expect(released[0]).toBeInstanceOf(QueryTimeoutError);
+  });
+
+  it('the pool options set TCP keep-alive and the connection check interval, and keep a test search_path', () => {
+    const options = postgresPoolOptions({ connectionString: 'postgres://u:p@localhost/db' });
+    expect(options.keepAlive).toBe(true);
+    expect(options.options).toBe('-c client_connection_check_interval=1000');
+    expect(postgresPoolOptions({ connectionString: 'x', extra: { options: '-c search_path=s' } }).options)
+      .toBe('-c client_connection_check_interval=1000 -c search_path=s');
+  });
+
+  it('a refused CORS preflight carries the CORS headers of the allowed origin', async () => {
+    const { app } = await harness({ limits: { preflightPerSource: 1 } });
+    const preflight = () => app.request('/v1/meetings', { method: 'OPTIONS',
+      headers: { Origin: 'http://localhost:5173', 'Access-Control-Request-Method': 'GET' } });
+    expect((await preflight()).status).toBe(204);
+    const limited = await preflight();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
+    expect(limited.headers.get('Access-Control-Expose-Headers')).toContain('Retry-After');
+    expect(limited.headers.get('Retry-After')).toBe('45');
   });
 });

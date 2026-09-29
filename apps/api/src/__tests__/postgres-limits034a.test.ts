@@ -334,6 +334,8 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
     expect(await shown('statement_timeout')).toBe('5s');
     expect(await shown('lock_timeout')).toBe('3s');
     expect(await shown('idle_in_transaction_session_timeout')).toBe('15s');
+    expect(await shown('client_connection_check_interval')).toBe('1s'); // and the test's search_path still applies
+    expect((await pool.query<{ s: string }>('SELECT current_schema() AS s')).rows[0]!.s).toBe(schema);
   });
 
   it('408 in the Postgres path: a request that waited past its budget for the write lock commits nothing and stops early; the retry runs exactly once', async () => {
@@ -371,6 +373,29 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
     expect(again.status).toBe(201);
     expect((await again.json() as { id: string }).id).toBe((await first.json() as { id: string }).id);
     expect(await eventCount()).toBe(3);
+  });
+
+  it('a request that ran out of time in the pre-checks takes no lock and no transaction', async () => {
+    const pool = runtimePool();
+    const sql: string[] = [];
+    pool.on('connect', (client) => {
+      const original = client.query.bind(client) as (...args: unknown[]) => unknown;
+      (client as unknown as { query: unknown }).query = (...args: unknown[]) => {
+        const first = args[0];
+        sql.push(typeof first === 'string' ? first : String((first as { text?: string }).text));
+        return original(...args);
+      };
+    });
+    const { app } = build(pool, { limits: { requestTimeoutMs: 1 } });
+    const res = await app.request(`/v1/meetings/${meetingId}/speakers`, { method: 'POST',
+      headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': '"v1"' },
+      body: JSON.stringify({ displayName: 'Zu spät', round: 1 }) });
+    expect(res.status).toBe(408);
+    await sleep(500);
+    expect(sql.length).toBeGreaterThan(0); // the pre-checks ran
+    expect(sql.some((text) => /pg_advisory_xact_lock/.test(text))).toBe(false);
+    expect(sql.some((text) => /^BEGIN/.test(text))).toBe(false);
+    expect(await eventCount()).toBe(2);
   });
 
   it('a COMMIT that is already on its way wins over the timer: 201, not 408', async () => {

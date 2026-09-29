@@ -51,7 +51,7 @@ Konfiguration (034b) oder eine Folgescheibe, keine stille Änderung im Bau.
 | Lesevorgänge je Subject | 1 200 je Fenster | ja |
 | Nicht angemeldete Anfragen je Quelle | 600 je Fenster | ja |
 | `GET /auth/login` je Quelle (jeder Aufruf) | 120 je Fenster | ja |
-| `GET /auth/login` gesamt (jeder Aufruf) | 600 je Fenster | ja |
+| `GET /auth/login` gesamt (jeder je Quelle zugelassene Aufruf) | 600 je Fenster | ja |
 | Proben `/healthz`, `/readyz` je Quelle (eigener Zähler) | 600 je Fenster | ja |
 | CORS-Preflights je Quelle (eigener Zähler) | 1 200 je Fenster | ja |
 | Fenster | 60 s, feste Fenster nach der injizierten Uhr (`floor(ms / 60 000)`) | nein |
@@ -106,16 +106,17 @@ Lasttest (071), danach Standard anpassen.
    Verbindungsadresse. Drei getrennte Zähler je Quelle, jeweils vor der Auth-Stufe:
    - **Proben:** exakt `/healthz` und `/readyz` zählen nur auf den Probenzähler (Überwachung bleibt unabhängig von
      einer Flut auf anderen Pfaden).
-   - **Anmeldestart:** jeder `GET /auth/login` zählt auf den Anmeldestartzähler je Quelle **und** gesamt, unabhängig
+   - **Anmeldestart:** jeder `GET /auth/login` zählt auf den Anmeldestartzähler je Quelle, jeder je Quelle zugelassene Aufruf zusätzlich gesamt (eine schon abgewiesene Quelle verbraucht das Gesamtkontingent der anderen nicht), unabhängig
      von Cookies oder `X-Actor` (die Auth-Stufe überspringt diesen Pfad, `app.ts:333`). Ist einer erschöpft, antwortet
      der Dienst 429, bevor `authorizationUrl` oder `createLoginState` laufen (kein Datenbankzugriff, keine
      IdP-Anfrage).
    - **Nicht angemeldet:** alle übrigen Anfragen. Ohne Anmeldematerial (kein syntaktisch gültiges `hv_session`-Cookie
      laut `sessionTokenFromCookie`, im Demo-Modus kein `X-Actor`) werden sie vor der Auth-Stufe gezählt und bei
      erschöpftem Kontingent mit 429 abgewiesen. **Mit** Anmeldematerial laufen sie in die Auth-Stufe (Arbeitsplätze
-     hinter derselben NAT-Adresse bleiben arbeitsfähig); steht danach kein Akteur fest (`subjectHash` null), zählt die
-     Anfrage nachträglich gegen die Quelle, und **ist das Kontingent der Quelle bereits erschöpft, wird statt 401 ein
-     429 mit `Retry-After` geantwortet** und die Anfrage fällt unter die Protokollausnahme (Punkt 11). Ein gefälschtes,
+     hinter derselben NAT-Adresse bleiben arbeitsfähig); steht danach kein Akteur fest (`subjectHash` null), zählt **jede**
+     Antwort (auch 2xx/3xx, 403, 422, 400) nachträglich gegen die Quelle, und **ist das Kontingent der Quelle bereits erschöpft, wird jede Antwort mit
+     `status >= 400` (statt 401, 403, 422, 400) durch 429 mit `Retry-After` ersetzt; 2xx und 3xx werden nie überschrieben**
+     (der 302 des Callbacks trägt das Sitzungscookie, sonst entstünde eine verwaiste Sitzung) und die Anfrage fällt unter die Protokollausnahme (Punkt 11). Ein gefälschtes,
      syntaktisch gültiges Cookie (`actor.ts:82` nimmt jedes `^[A-Za-z0-9_-]{43,}$`) umgeht die Grenze also nicht mehr;
      es kostet je Anfrage weiter eine Sitzungslesung (Restrisiko, Proxy-Grenze 037). Jede Antwort 413 zählt ebenso gegen die
      Quelle: vor dem Body-Limit (6) steht nie ein Akteur fest, auch nicht bei gefälschtem oder echtem Cookie. **Ist das
@@ -163,7 +164,10 @@ Lasttest (071), danach Standard anpassen.
    und eigener Fehlerantwort (Problem 413). Mit `Content-Length` > Grenze sofort 413, ohne den Body zu lesen; ohne
    `Content-Length` (chunked) bricht das Lesen beim ersten Byte über der Grenze ab. Der dabei aus `readJson`
    (`http.ts:12`) geworfene `BodyLimitError` wird auf 413 abgebildet, **ohne** Fehlerlog-Zeile (heute würde er über
-   `problem.ts` ein 500 mit Fehlerlog). Genau 262 144 Byte werden angenommen.
+   `problem.ts` ein 500 mit Fehlerlog). **Stand nach dem Bau:** `hono@4.13.5` kennt keine `BodyLimitError`-Klasse; sein
+   `bodyLimit` liest den Body vorab und ruft `onError` (413-Problem) beim ersten Byte über der Grenze oder bei zu großem
+   `Content-Length` selbst auf. Die Abbildung in `http.ts` entfällt; geprüft sind 413 mit und ohne `Content-Length`, ohne
+   Fehlerlog-Zeile, und 262 144 Byte werden angenommen. Genau 262 144 Byte werden angenommen.
 7. **Request-Timeout (408) ohne Festschreiben.** Eigene Middleware (nicht `hono/timeout`, weil diese den Handler nur
    überholt): ein Zeitgeber je Anfrage; läuft er ab, setzt die Middleware im Anfragekontext (033a,
    `observability/context.ts`) die Phase `timedOut` und antwortet mit Problem 408, **außer** die Phase ist bereits

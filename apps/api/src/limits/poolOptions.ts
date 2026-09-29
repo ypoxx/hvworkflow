@@ -16,13 +16,19 @@ export function postgresPoolOptions(input: {
   extra?: Partial<PoolConfig>;
 }): PoolConfig {
   const limits = { ...DEFAULT_LIMITS, ...input.limits };
+  // `client_connection_check_interval` (PostgreSQL 14 and later; CI uses 16): the server notices a vanished client
+  // during a running statement, so a destroyed connection does not hold the global write lock until its statement
+  // ends. TCP keep-alive covers the rest (a dead network ends at the idle-in-transaction timeout at the latest).
+  const options = ['-c client_connection_check_interval=1000', input.extra?.options].filter(Boolean).join(' ');
   return {
     connectionString: input.connectionString,
     connectionTimeoutMillis: 2_000,
     statement_timeout: limits.statementTimeoutMs,
     lock_timeout: limits.lockTimeoutMs,
     idle_in_transaction_session_timeout: limits.idleInTransactionTimeoutMs,
+    keepAlive: true,
     ...(input.tls === true ? { ssl: { rejectUnauthorized: true } } : {}),
     ...input.extra,
+    options,
   };
 }

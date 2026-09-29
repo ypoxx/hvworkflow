@@ -107,6 +107,37 @@ export async function pooledQuery<R extends QueryResultRow = QueryResultRow>(
   return result;
 }
 
+/**
+ * A view of the pool for helpers that open a connection and query it themselves (`getMigrationStatus`,
+ * `assertRuntimePrivileges`): every query on it runs under the service's timer, and a connection on which the
+ * timer fired is destroyed on `release()` instead of returned to the pool.
+ */
+export function withQueryTimers(pool: Pool, timeoutMs: number): Pool {
+  return {
+    connect: async () => {
+      const client = await pool.connect();
+      let expired: Error | undefined;
+      return new Proxy(client, {
+        get(target, property) {
+          if (property === 'query') {
+            return async (...args: unknown[]) => {
+              try {
+                return await timedQuery(target, timeoutMs, args[0] as string, args[1] as unknown[] | undefined);
+              } catch (error) {
+                if (mustDiscardConnection(error)) expired = error as Error;
+                throw error;
+              }
+            };
+          }
+          if (property === 'release') return (error?: Error | boolean) => target.release(error ?? expired);
+          const value = Reflect.get(target, property) as unknown;
+          return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+        },
+      });
+    },
+  } as unknown as Pool;
+}
+
 /** Runs any promise against the per-query timer (for helpers that open their own connection). */
 export async function withQueryTimer<T>(run: Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;

@@ -126,7 +126,17 @@ export function createPreflightGuard(deps: RateLimitDeps, sourceOf: (c: Context)
     if (c.req.method === 'OPTIONS') {
       deps.notices.tick();
       const result = counter.hit(sourceOf(c));
-      if (!result.allowed) return refuse(currentRequest(), deps, 'preflight', result);
+      if (!result.allowed) {
+        const refused = refuse(currentRequest(), deps, 'preflight', result);
+        // Let `cors` decide the headers of the allowed origin, then carry them on the 429.
+        const answered = await cors(c, async () => undefined);
+        if (answered instanceof Response) {
+          for (const [name, value] of answered.headers) {
+            if (name.startsWith('access-control-') || name === 'vary') refused.headers.set(name, value);
+          }
+        }
+        return refused;
+      }
     }
     return cors(c, next);
   };
@@ -139,9 +149,9 @@ export function createPreflightGuard(deps: RateLimitDeps, sourceOf: (c: Context)
  *  - sign-in start: every `GET /auth/login`, per source and over all sources, whatever cookie or `X-Actor` it
  *    carries;
  *  - anonymous: every other request without sign-in material counts before authentication. A request WITH
- *    material passes on (workplaces behind one address keep working); when it ends without a subject (401) or
- *    as a 413, it counts afterwards, and an exhausted source gets 429 instead, so a forged but well-formed
- *    cookie does not get around the limit.
+ *    material passes on (workplaces behind one address keep working); when it ends without a subject, whatever
+ *    the answer, it counts afterwards, and an exhausted source gets 429 instead of an error answer, so a forged but
+ *    well-formed cookie does not get around the limit.
  */
 export function createSourceLayer(deps: RateLimitDeps, sourceOf: (c: Context) => string,
   hasSignInMaterial: (c: Context) => boolean): MiddlewareHandler {
@@ -163,13 +173,15 @@ export function createSourceLayer(deps: RateLimitDeps, sourceOf: (c: Context) =>
       const result = probes.hit(source);
       if (!result.allowed) return refuse(context, deps, 'probe', result);
     } else if (path === '/auth/login' && (c.req.method === 'GET' || c.req.method === 'HEAD')) {
+      // The total counts only calls the source may make: a source that is already refused must not use up the
+      // total of everybody else (one source with 700 calls would lock out all others).
       const bySource = loginPerSource.hit(source);
-      const overall = loginTotal.hit('all');
-      if (!bySource.allowed || !overall.allowed) {
+      const overall = bySource.allowed ? loginTotal.hit('all') : undefined;
+      if (!bySource.allowed || (overall !== undefined && !overall.allowed)) {
         notices.once('HV-Tool API: sign-in start limit reached.');
         return refuse(context, deps, 'sign-in start', {
-          firstRejection: (!bySource.allowed && bySource.firstRejection) || (!overall.allowed && overall.firstRejection),
-          retryAfterSeconds: Math.max(bySource.retryAfterSeconds, overall.retryAfterSeconds),
+          firstRejection: (!bySource.allowed && bySource.firstRejection) || (overall !== undefined && !overall.allowed && overall.firstRejection),
+          retryAfterSeconds: Math.max(bySource.retryAfterSeconds, overall?.retryAfterSeconds ?? 1),
         });
       }
     } else if (hasSignInMaterial(c)) {
@@ -179,9 +191,13 @@ export function createSourceLayer(deps: RateLimitDeps, sourceOf: (c: Context) =>
       if (!result.allowed) return refuse(context, deps, 'anonymous', result);
     }
     await next();
-    if (countLater && context?.subjectHash === null && (c.res.status === 401 || c.res.status === 413)) {
+    // Every answer to a request with sign-in material but without a subject counts (401, 403, 422, 400, 413, and
+    // also 2xx/3xx: the well-formed forged cookie must not buy free requests). An exhausted source gets 429 instead
+    // of an error answer (status >= 400); a 2xx or 3xx is never replaced (the callback's 302 carries the session
+    // cookie: replacing it would leave an orphaned session).
+    if (countLater && context?.subjectHash === null) {
       const result = anonymous.hit(source);
-      if (!result.allowed) c.res = refuse(context, deps, 'anonymous', result);
+      if (!result.allowed && c.res.status >= 400) c.res = refuse(context, deps, 'anonymous', result);
     }
   };
 }
