@@ -70,6 +70,15 @@ mark-test-run: wrote /home/user/wt/takt-024/.claude/state/last-test-run (clean t
 exit 0
 ```
 
+- Nach Einmergen des Integrationsbranchs (takt-023 ändert ebenfalls `apps/api/src/app.ts`, konfliktfrei): Merge-Commit
+  `60b69db`, Postgres-Dateien 5 / 31 Tests grün, `pnpm gates` mit Postgres-Variablen Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 2.16s
+mark-test-run: wrote /home/user/wt/takt-024/.claude/state/last-test-run (clean tree) at commit 60b69db, tree a3c2b42b15de…
+EXIT 0
+```
+
 ## Review findings
 
 Review in frischem Kontext (reviewer, Opus, 29.09.2026): **freigabefähig**, 0 blocker, 0 major. Alle 55 `/v1`-Routen
