@@ -39,11 +39,14 @@ export function problemBody(err: unknown): Problem {
   };
 }
 
-/** Build the raw problem+json `Response`. A plain `Response` is a valid Hono handler return value. */
-export function problemResponse(err: unknown): Response {
+/**
+ * Build the raw problem+json `Response`. A plain `Response` is a valid Hono handler return value.
+ * `headers` adds response headers of the boundary (`Retry-After`, slice 034a) next to the content type.
+ */
+export function problemResponse(err: unknown, headers: Record<string, string> = {}): Response {
   const problem = problemBody(err);
   return new Response(JSON.stringify(problem), {
     status: problem.status,
-    headers: { 'Content-Type': 'application/problem+json' },
+    headers: { 'Content-Type': 'application/problem+json', ...headers },
   });
 }

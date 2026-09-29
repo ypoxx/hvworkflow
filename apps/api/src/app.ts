@@ -13,6 +13,7 @@ import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Pool, PoolClient } from 'pg';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -54,12 +55,20 @@ import { createSingleFlightCache } from './metrics/cache.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './metrics/prometheus.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { discardSink, type AccessLogSink } from './observability/accessLog.ts';
+import { READINESS_CHECK_TIMEOUT_MS, resolveLimits, type LimitsConfig } from './limits/config.ts';
+import { DeadlineError, withDeadline } from './limits/deadline.ts';
+import { createBodyLimit, createPreflightGuard, createRequestTimeout, createSecurityHeaders, createSourceLayer,
+  createSubjectLimits } from './limits/middleware.ts';
+import { outcomeUnknown, persistenceBusy } from './limits/responses.ts';
+import { createSourceKeyer } from './limits/source.ts';
+import { createNotices } from './limits/stderr.ts';
 import { currentRequest, noteSeq } from './observability/context.ts';
 import { createRequestLog } from './observability/requestLog.ts';
 import { createSubjectHasher } from './observability/subjectHash.ts';
 import { problemBody, problemResponse } from './problem.ts';
 import { getMigrationStatus } from './persistence/migrations.ts';
-import { assertRuntimePrivileges, insertPostgresEvents, loadPostgresSnapshot, PostgresIntegrityError } from './persistence/postgres.ts';
+import { assertRuntimePrivileges, insertPostgresEvents, isPersistenceBusy, loadPostgresSnapshot, mustDiscardConnection,
+  pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimer } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
 
 export interface CreateAppOptions {
@@ -118,6 +127,19 @@ export interface CreateAppOptions {
   seedActor?: Actor;
   /** Transactional Postgres source of truth for the service; JSONL remains the dev adapter. */
   postgres?: Pool;
+  /**
+   * Slice 034a: limits and timeouts. The defaults are the fixed values of the spec (`DEFAULT_LIMITS`); a test may
+   * lower one. The process start passes nothing (slice 034b reads the configurable ones from the environment).
+   */
+  limits?: Partial<LimitsConfig>;
+  /**
+   * Slice 034a: the source (peer of the TCP connection) of a request, as a plain address string. Default: the
+   * connection address of the Node server (`getConnInfo`); `app.request()` in tests has none, so tests set this.
+   * Without an address the key is "unbekannt". Behind a trusted proxy slice 034b evaluates `X-Forwarded-For`.
+   */
+  sourceOf?: (c: Context) => string | undefined;
+  /** Tests only: run a statement on the request's transaction connection at a named point of a write's Postgres boundary. */
+  testHooks?: { at?: (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>) => Promise<void> };
   /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
   readiness?: {
     clock: () => Promise<ReadinessCheck>;
@@ -169,6 +191,8 @@ export function createApp(options: CreateAppOptions = {}): App {
   const authKeyRaw = process.env['HV_AUTH_ENCRYPTION_KEY'];
   const authKey = options.authKey ?? (authKeyRaw ? Buffer.from(authKeyRaw, 'base64url') : undefined);
   const clock = options.clock ?? systemClock;
+  const limits = resolveLimits(options.limits);
+  const notices = createNotices(clock);
   const accessLog = options.accessLog ?? { sink: discardSink, hashKey: randomBytes(32) };
   const subjectHashOf = createSubjectHasher(accessLog.hashKey);
   // Slice 033b, `hv_auth_no_active_role_total`: process-local detection signal for the loss of every role
@@ -180,7 +204,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (context !== undefined) context.subjectHash = subjectHashOf(actorId);
   };
   const authStore = options.authStore ?? (options.postgres && authKey
-    ? createAuthStore(options.postgres, authKey) : undefined);
+    ? createAuthStore(options.postgres, authKey, { queryTimeoutMs: limits.queryTimeoutMs }) : undefined);
   const clientId = options.oidcClientId ?? process.env['HV_OIDC_CLIENT_ID'];
   const clientSecret = options.oidcClientSecret ?? process.env['HV_OIDC_CLIENT_SECRET'];
   const redirectUri = options.oidcRedirectUri ?? process.env['HV_OIDC_REDIRECT_URI'];
@@ -189,7 +213,8 @@ export function createApp(options: CreateAppOptions = {}): App {
     throw new Error('OIDC sign-in requires Postgres persistence.');
   }
   const oidcFlow = options.oidcFlow ?? (oidcIssuer?.trim() && clientId && clientSecret && redirectUri
-    ? createOidcFlow({ issuer: oidcIssuer, clientId, clientSecret, redirectUri, clock }) : undefined);
+    ? createOidcFlow({ issuer: oidcIssuer, clientId, clientSecret, redirectUri, clock,
+      timeoutSeconds: Math.ceil(limits.oidcTimeoutMs / 1_000) }) : undefined);
   const noticeVersion = process.env['HV_TRANSPARENCY_NOTICE_VERSION'];
   const noticeDe = process.env['HV_TRANSPARENCY_NOTICE_DE'];
   const noticeEn = process.env['HV_TRANSPARENCY_NOTICE_EN'];
@@ -209,20 +234,27 @@ export function createApp(options: CreateAppOptions = {}): App {
   const transparencyNotice = noticeCandidate?.version.trim() && noticeCandidate.text.de.trim() &&
     noticeCandidate.text.en.trim() ? { version: noticeCandidate.version, text: noticeCandidate.text,
       ...(summaryUrl ? { dataProtectionSummaryUrl: summaryUrl } : {}) } : undefined;
-  const authEvents = options.authEvents ?? (options.postgres ? async (): Promise<readonly DomainEvent[]> => {
+  // One read-only snapshot on a connection of its own (sign-in role lookup, metrics). A connection whose own query
+  // timer fired is destroyed, never returned to the pool (slice 034a).
+  const readSnapshotEvents = async (): Promise<readonly DomainEvent[]> => {
     const client = await options.postgres!.connect();
+    let discard: Error | undefined;
     try {
-      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-      const snapshot = await loadPostgresSnapshot(client);
-      await client.query('COMMIT');
+      await timedQuery(client, limits.queryTimeoutMs, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const snapshot = await loadPostgresSnapshot(client, limits.queryTimeoutMs);
+      await timedQuery(client, limits.queryTimeoutMs, 'COMMIT');
       return snapshot.events;
     } catch (error) {
-      try { await client.query('ROLLBACK'); } catch { /* Connection is discarded by the pool. */ }
+      if (mustDiscardConnection(error)) discard = error as Error;
+      else await timedQuery(client, limits.queryTimeoutMs, 'ROLLBACK').catch((rollbackError: unknown) => {
+        if (mustDiscardConnection(rollbackError)) discard = rollbackError as Error;
+      });
       throw error;
     } finally {
-      client.release();
+      client.release(discard);
     }
-  } : undefined);
+  };
+  const authEvents = options.authEvents ?? (options.postgres ? readSnapshotEvents : undefined);
   const sessionReady = !demoEnabled && authStore !== undefined && oidcFlow !== undefined && authEvents !== undefined;
   const authenticate = selectAuthAdapter({
     demoEnabled,
@@ -329,19 +361,39 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.use('*', createRequestLog({ clock, sink: accessLog.sink,
     ...(options.monotonic !== undefined ? { monotonic: options.monotonic } : {}) }));
 
-  // ---- CORS (dev only) -------------------------------------------------------------------------
-  // The contract is same-origin (openapi.yaml: `servers: /v1`); this exists only so the Vite dev
-  // server (apps/web, default port 5173) can reach a demo-mode server across origins.
+  // ---- request boundary in front of the actor stage (slice 034a) --------------------------------------
+  // Order: (1) access log (above) -> (2) security headers -> (3) CORS with the preflight counter -> (4) request
+  // timeout -> (5) source layer -> (6) body limit -> (7) actor and errors -> (8) subject limits -> routes. A refused
+  // request costs neither a session read nor a database connection nor the global write lock.
+  const sourceKeyOf = createSourceKeyer(randomBytes(32));
+  const peerAddress = (c: Context): string | undefined => {
+    if (options.sourceOf) return options.sourceOf(c);
+    try { return getConnInfo(c).remote.address; } catch { return undefined; } // no socket under `app.request()`
+  };
+  const sourceOf = (c: Context): string => sourceKeyOf(peerAddress(c));
+  const rate = { clock, limits, notices };
+  app.use('*', createSecurityHeaders());
+
+  // CORS (dev only): the contract is same-origin (openapi.yaml: `servers: /v1`); this exists only so the Vite dev
+  // server (apps/web, default port 5173) can reach a demo-mode server across origins. It sets the headers of an
+  // allowed origin on every response, also on 408, 413, 429 and 503; `Retry-After` is readable for the browser.
   if (demoEnabled) {
     app.use(
       '/v1/*',
-      cors({
+      createPreflightGuard(rate, sourceOf, cors({
         origin: 'http://localhost:5173',
         allowHeaders: ['X-Actor', 'If-Match', 'Idempotency-Key', 'Content-Type'],
-        exposeHeaders: ['ETag', 'X-Server-Time'],
-      }),
+        exposeHeaders: ['ETag', 'X-Server-Time', 'Retry-After'],
+      })),
     );
   }
+  app.use('*', createRequestTimeout(limits.requestTimeoutMs));
+  // Sign-in material: the well-formed session cookie, in demo mode the `X-Actor` header (what the adapter reads).
+  const hasSignInMaterial = (c: Context): boolean => demoEnabled
+    ? (c.req.header('X-Actor') ?? '').trim() !== ''
+    : sessionTokenFromCookie(c.req.header('Cookie')) !== null;
+  app.use('*', createSourceLayer(rate, sourceOf, hasSignInMaterial));
+  app.use('*', createBodyLimit());
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
@@ -403,6 +455,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (actor === undefined) await next();
     else await actorStorage.run(actor, () => next());
   });
+  app.use('*', createSubjectLimits(rate));
   // Slice takt-024: the Postgres boundary (migration status, runtime rights, transaction, write lock,
   // snapshot, commit/rollback) is NOT a blanket `/v1/*` middleware any more. It is chained onto each
   // route behind `validateOperation` (see `guarded` below), so an unknown path (404) or a contract
@@ -413,19 +466,38 @@ export function createApp(options: CreateAppOptions = {}): App {
       await next();
       return;
     }
+    const context = currentRequest();
+    // A function, not a property read: the timer may change the phase during any `await` (no narrowing).
+    const phaseIs = (phase: 'committing' | 'timedOut'): boolean => context?.phase === phase;
     const write = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
+    const queryMs = limits.queryTimeoutMs;
     let client: PoolClient | undefined;
     let started = false;
-    try {
-      if ((await getMigrationStatus(pool)).pending) {
-        return problemResponse(new ApiProblem(503, 'Service Unavailable', 'Migrations are pending.'));
+    let discard: Error | undefined;
+    const query = (text: string, values?: unknown[]) => timedQuery(client!, queryMs, text, values);
+    const rollback = async (): Promise<void> => {
+      try {
+        await query('ROLLBACK');
+      } catch (rollbackError) {
+        // A ROLLBACK that itself hangs is not waited for: the connection dies and Postgres rolls back.
+        if (mustDiscardConnection(rollbackError)) discard = rollbackError as Error;
       }
-      await assertRuntimePrivileges(pool);
+      started = false;
+    };
+    try {
+      if ((await withQueryTimer(getMigrationStatus(pool), queryMs)).pending) {
+        return persistenceBusy('Migrations are pending.');
+      }
+      await withQueryTimer(assertRuntimePrivileges(pool), queryMs);
       client = await pool.connect();
-      await client.query(write ? 'BEGIN ISOLATION LEVEL READ COMMITTED' : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      await query(write ? 'BEGIN ISOLATION LEVEL READ COMMITTED' : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
       started = true;
-      if (write) await client.query('SELECT pg_advisory_xact_lock($1, $2)', [27027, 1]);
-      const snapshot = await loadPostgresSnapshot(client);
+      if (write) await query('SELECT pg_advisory_xact_lock($1, $2)', [27027, 1]);
+      if (write) await options.testHooks?.at?.('afterLock', async (sql) => { await query(sql); });
+      // A request that waited for the lock beyond its time budget was answered 408 already: leave early.
+      if (phaseIs('timedOut')) return await rollback();
+      const snapshot = await loadPostgresSnapshot(client, queryMs);
+      if (phaseIs('timedOut')) return await rollback();
       let pendingEvents = snapshot.events.slice(snapshot.events.length);
       const requestStore = createInMemoryEventStore({
         load: () => snapshot.events,
@@ -446,26 +518,45 @@ export function createApp(options: CreateAppOptions = {}): App {
       });
       await requestStorage.run({ store: requestStore, domain: activeDomain, scoped: new Map(), persons }, () => next());
       if (c.res.status >= 400) {
-        await client.query('ROLLBACK');
+        await rollback();
+      } else if (phaseIs('timedOut')) {
+        // The 408 is on its way: a 408 means "nothing was committed", so this request must not commit.
+        await rollback();
       } else {
-        if (pendingEvents.length > 0) await insertPostgresEvents(client, pendingEvents);
-        await client.query('COMMIT');
+        // Check and mark are one synchronous step (no `await` between them): the timer of the request timeout
+        // runs on this event loop and sees either `committing` or sets `timedOut` before this line.
+        if (pendingEvents.length > 0 && context !== undefined) context.phase = 'committing';
+        if (write) await options.testHooks?.at?.('beforeCommit', async (sql) => { await query(sql); });
+        if (pendingEvents.length > 0) await insertPostgresEvents(client, pendingEvents, queryMs);
+        await query('COMMIT');
         // Only what is committed counts: a rollback or a failed COMMIT leaves `seq` null.
         if (pendingEvents.length > 0) noteSeq(Math.max(...pendingEvents.map((event) => event.seq)));
+        started = false;
       }
-      started = false;
     } catch (error) {
-      if (started && client) {
-        try { await client.query('ROLLBACK'); } catch { /* Failed transaction is discarded with the connection. */ }
+      if (mustDiscardConnection(error)) {
+        // The hanging statement dies with the connection; a queued ROLLBACK would only wait behind it.
+        discard = error as Error;
+      } else if (started && client) {
+        await rollback();
       }
-      const detail = error instanceof PostgresIntegrityError
-        ? `Event seq ${error.seq}: integrity check failed.` : 'Persistence is unavailable.';
       // A handler may already have finalized a success response before persistence failed.
       // Hono ignores a returned middleware response at that point, so replace it explicitly.
-      c.res = problemResponse(new ApiProblem(500, 'Internal Server Error', detail));
+      if (error instanceof PostgresIntegrityError) {
+        c.res = problemResponse(new ApiProblem(500, 'Internal Server Error', `Event seq ${error.seq}: integrity check failed.`));
+      } else if (mustDiscardConnection(error) && phaseIs('committing')) {
+        // The service's own timer fired while events or COMMIT were on the wire: the server may have committed.
+        // 500 without `Retry-After` and without a promise (the client reads before it writes again).
+        c.res = outcomeUnknown();
+      } else if (isPersistenceBusy(error)) {
+        notices.once('HV-Tool API: persistence busy.');
+        c.res = persistenceBusy('Persistence is busy.');
+      } else {
+        c.res = problemResponse(new ApiProblem(500, 'Internal Server Error', 'Persistence is unavailable.'));
+      }
       return;
     } finally {
-      client?.release();
+      client?.release(discard);
     }
   };
   // One handler per route: contract check first, Postgres boundary only for an accepted request.
@@ -503,7 +594,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       db: async (): Promise<ReadinessCheck> => {
         if (options.postgres) {
           await assertRuntimePrivileges(options.postgres, false);
-          await options.postgres.query('SELECT 1');
+          await pooledQuery(options.postgres, limits.queryTimeoutMs, 'SELECT 1');
           return { status: 'ok' };
         }
         if (eventLogPath) {
@@ -535,7 +626,7 @@ export function createApp(options: CreateAppOptions = {}): App {
         return await Promise.race([
           run(),
           new Promise<ReadinessCheck>((resolve) => {
-            timer = setTimeout(() => resolve({ status: 'fail', code: 'timeout' }), 2_000);
+            timer = setTimeout(() => resolve({ status: 'fail', code: 'timeout' }), READINESS_CHECK_TIMEOUT_MS);
           }),
         ]);
       } catch {
@@ -562,20 +653,8 @@ export function createApp(options: CreateAppOptions = {}): App {
   const metricsBearer = createBearerCheck(options.metricsToken);
   const cachedIndicators = createSingleFlightCache<Indicators>(10_000, clock);
   const readEventsForMetrics = async (): Promise<readonly DomainEvent[]> => {
-    const pool = options.postgres;
-    if (!pool) return store.all();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-      const snapshot = await loadPostgresSnapshot(client);
-      await client.query('COMMIT');
-      return snapshot.events;
-    } catch (error) {
-      try { await client.query('ROLLBACK'); } catch { /* The connection is discarded by the pool. */ }
-      throw error;
-    } finally {
-      client.release();
-    }
+    if (!options.postgres) return store.all();
+    return readSnapshotEvents();
   };
   app.get('/metrics', async (c) => {
     if (!metricsBearer(c.req.header('Authorization'))) {
@@ -602,7 +681,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     const correlation = randomBytes(32).toString('base64url');
     let location: string;
     try {
-      location = await oidcFlow!.authorizationUrl({ state, nonce, pkceVerifier });
+      location = await withDeadline(oidcFlow!.authorizationUrl({ state, nonce, pkceVerifier }), limits.oidcTimeoutMs);
       await authStore!.createLoginState({ state, browserCorrelation: correlation, nonce, pkceVerifier,
         returnTo, now: clock() });
     } catch {
@@ -632,10 +711,11 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (!pending) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     let identity: Awaited<ReturnType<OidcFlow['complete']>>;
     try {
-      identity = await oidcFlow!.complete({ search: params.toString(), state: states[0],
-        nonce: pending.nonce, pkceVerifier: pending.pkceVerifier });
-    } catch {
-      throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
+      identity = await withDeadline(oidcFlow!.complete({ search: params.toString(), state: states[0],
+        nonce: pending.nonce, pkceVerifier: pending.pkceVerifier }), limits.oidcTimeoutMs);
+    } catch (error) {
+      // A provider that does not answer in time is "unavailable" (no session is created), not a bad response.
+      throw error instanceof DeadlineError ? unavailable() : new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     }
     if (identity.issuer !== oidcIssuer) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     const actorId = actorIdForIdentity(identity.issuer, identity.subject);

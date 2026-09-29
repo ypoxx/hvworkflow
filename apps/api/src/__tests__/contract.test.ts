@@ -5,9 +5,10 @@
  * response is checked against its schema in `packages/contract/openapi.yaml` with `expectValid`,
  * so together with `acceptance.test.ts` and `negative.test.ts` every operationId has a test.
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app.ts';
 import { createApp } from '../app.ts';
+import { createInMemoryEventStore } from '@hv/domain';
 import { ACTOR, OPERATIONS_0_2, UNDOCUMENTED_STATUS_EXCEPTIONS, req } from './helpers.ts';
 import {
   allOperationIds,
@@ -362,5 +363,119 @@ describe('contract: every status the generic layer can produce is documented or 
       else for (const s of statuses) if (documentedStatuses(operationId).includes(String(s))) stale.push(`${operationId}: ${s} is documented now`);
     }
     expect(stale).toEqual([]);
+  });
+});
+
+// ---- Scheibe 034a: security headers on every response (T-G1-I-06, T-G1-T-06) -------------------------------------
+
+describe('034a security headers', () => {
+  const EXPECTED: Record<string, string> = {
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Strict-Transport-Security': 'max-age=31536000',
+    'Cache-Control': 'no-store',
+  };
+  const expectHeaders = (res: Response, label: string): void => {
+    for (const [name, value] of Object.entries(EXPECTED)) {
+      // `Headers.get` joins duplicates with ", ": an exact match also proves the header is set once.
+      expect(res.headers.get(name), `${label}: ${name}`).toBe(value);
+    }
+  };
+  const idp = 'https://idp.example.invalid/realms/hv';
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('carries all eight headers with their exact values on 200, 201, 401, 404, 422, 408, 413, 429 and 503', async () => {
+    let now = Date.parse('2027-04-20T10:00:15.000Z');
+    const slow = async () => { await sleep(150); return { status: 'ok' as const }; };
+    const ok = async () => ({ status: 'ok' as const });
+    const app = createApp({ demoEnabled: true, clock: () => new Date(now), sourceOf: () => 'probe-source',
+      limits: { requestTimeoutMs: 60, readPerSubject: 3 }, readiness: { clock: slow, db: ok, migrations: ok } });
+    const seed = await app.request('/v1/demo/seed', { method: 'POST',
+      headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json' }, body: JSON.stringify({ questions: 3, seed: 1 }) });
+    expectHeaders(seed, '200 seed');
+    now += 60_000;
+    const tag = (await app.request('/v1/speakers', { headers: { 'X-Actor': ACTOR.moderation } })).headers.get('ETag')!;
+    expectHeaders(await app.request('/healthz'), '200 /healthz');
+    const created = await app.request('/v1/speakers', { method: 'POST', body: JSON.stringify({ displayName: 'Testperson' }),
+      headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag } });
+    expect(created.status).toBe(201);
+    expectHeaders(created, '201');
+    const unauthorized = await app.request('/v1/speakers');
+    expect(unauthorized.status).toBe(401);
+    expectHeaders(unauthorized, '401');
+    const missing = await app.request('/v1/nothing-here', { headers: { 'X-Actor': ACTOR.moderation } });
+    expect(missing.status).toBe(404);
+    expectHeaders(missing, '404 notFound');
+    const invalid = await app.request('/v1/speakers', { method: 'POST', body: JSON.stringify({}),
+      headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag } });
+    expect(invalid.status).toBe(422);
+    expectHeaders(invalid, '422');
+    const timeout = await app.request('/readyz');
+    expect(timeout.status).toBe(408);
+    expectHeaders(timeout, '408');
+    const large = await app.request('/v1/contributions', { method: 'POST', body: 'x',
+      headers: { 'X-Actor': ACTOR.capture, 'Content-Type': 'application/json', 'Content-Length': '262145' } });
+    expect(large.status).toBe(413);
+    expectHeaders(large, '413');
+    // the reads above: 3 allowed (limit 3), the next one of the same subject is refused
+    await app.request('/v1/meeting', { headers: { 'X-Actor': ACTOR.moderation } });
+    const limited = await app.request('/v1/meeting', { headers: { 'X-Actor': ACTOR.moderation } });
+    expect(limited.status).toBe(429);
+    expectHeaders(limited, '429');
+    await sleep(200); // the slow readiness check of the 408 above ends; nothing more to see
+    const notReady = createApp({ demoEnabled: true, readiness: { clock: ok, db: async () => ({ status: 'fail', code: 'unreachable' }), migrations: ok } });
+    const unavailable = await notReady.request('/readyz');
+    expect(unavailable.status).toBe(503);
+    expectHeaders(unavailable, '503 /readyz');
+    expectHeaders(await app.request('/healthz'), '200 /healthz (again)');
+  });
+
+  it('carries them on 500 (onError), on `/readyz` 200, and on a redirect with exactly one no-store on the sign-in path (302)', async () => {
+    const failing = createApp({ demoEnabled: true, persistence: { load: () => undefined, save: () => { throw new Error('disk full'); } } });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await failing.request('/v1/demo/seed', { method: 'POST',
+      headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json' }, body: '{}' });
+    expect(res.status).toBe(500);
+    expectHeaders(res, '500');
+    const ok = async () => ({ status: 'ok' as const });
+    const ready = createApp({ demoEnabled: true, readiness: { clock: ok, db: ok, migrations: ok } });
+    const readyz = await ready.request('/readyz');
+    expect(readyz.status).toBe(200);
+    expectHeaders(readyz, '200 /readyz');
+
+    const events = createInMemoryEventStore();
+    const login = createApp({ demoEnabled: false, oidcIssuer: idp,
+      oidcFlow: { authorizationUrl: async ({ state }) => `${idp}/authorize?state=${state}`, complete: async () => ({ issuer: idp, subject: 's' }) },
+      authStore: { createLoginState: async () => undefined, consumeLoginState: async () => null,
+        createSession: async () => { throw new Error('unused'); }, readSession: async () => null, verifyCsrf: async () => false,
+        revokeSession: async () => false, blockSubject: async () => undefined, isSubjectBlocked: async () => false },
+      authEvents: async () => events.all(), persistence: { load: () => [], save: () => undefined },
+      transparencyNotice: { version: 'v1', text: { de: 'Hinweis', en: 'Notice' } } });
+    const redirect = await login.request('/auth/login');
+    expect(redirect.status).toBe(302);
+    expectHeaders(redirect, '302 /auth/login');
+    expect(redirect.headers.get('Cache-Control')).toBe('no-store'); // once, not "no-store, no-store"
+    const failed = await login.request('/auth/callback');
+    expect(failed.status).toBe(400);
+    expectHeaders(failed, '400 /auth/callback');
+    const metrics = await login.request('/metrics');
+    expect(metrics.status).toBe(401);
+    expectHeaders(metrics, '401 /metrics');
+  });
+
+  it('an allowed origin also gets its CORS headers on 429, and Retry-After is listed as exposed', async () => {
+    const app = createApp({ demoEnabled: true, sourceOf: () => 's', limits: { anonymousPerSource: 1 } });
+    const headers = { Origin: 'http://localhost:5173' };
+    await app.request('/v1/meeting', { headers });
+    const limited = await app.request('/v1/meeting', { headers });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
+    expect(limited.headers.get('Access-Control-Expose-Headers')).toContain('Retry-After');
+    expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1);
+    expectHeaders(limited, '429 with CORS');
   });
 });

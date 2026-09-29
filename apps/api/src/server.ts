@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { systemClock } from '@hv/domain';
 import { createApp } from './app.ts';
 import { createNtpClockCheck, parseNtpEnv } from './clock/ntp.ts';
+import { postgresPoolOptions } from './limits/poolOptions.ts';
 import { createFileSink, discardSink } from './observability/accessLog.ts';
 import { readMetricsToken, readObservabilityConfig } from './observability/config.ts';
 
@@ -31,10 +32,9 @@ const databaseUrl = process.env['HV_DATABASE_URL'];
 if (databaseUrl && process.env['HV_EVENT_LOG']) {
   throw new Error('Configure either Postgres or the JSONL development log.');
 }
+// Slice 034a: statement, lock and idle-in-transaction timeouts as connection parameters (one testable function).
 const postgres = databaseUrl
-  ? new Pool({ connectionString: databaseUrl,
-    connectionTimeoutMillis: 2_000,
-    ...(process.env['HV_DB_TLS'] === '1' ? { ssl: { rejectUnauthorized: true } } : {}) })
+  ? new Pool(postgresPoolOptions({ connectionString: databaseUrl, tls: process.env['HV_DB_TLS'] === '1' }))
   : undefined;
 postgres?.on('error', () => {
   // Driver error objects can contain connection details; the pool can reconnect on a later request.
@@ -49,7 +49,7 @@ const app = createApp({ seedOnStart: postgres === undefined,
   ...(ntp !== undefined ? { clockHealth: createNtpClockCheck({ ...ntp, clock: systemClock }) } : {}),
   ...(postgres !== undefined ? { postgres } : {}) });
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   // eslint-disable-next-line no-console
   console.log(`HV-Tool API listening on http://localhost:${info.port}`);
   if (process.env['HV_DEMO'] !== '1' && !(postgres && process.env['HV_OIDC_ISSUER'] &&
@@ -61,3 +61,10 @@ serve({ fetch: app.fetch, port }, (info) => {
     );
   }
 });
+
+// Slice 034a: against slowly trickling headers and bodies. Node answers these two limits itself with an empty
+// 408 and `Connection: close`, before a request reaches the application: that answer has no security headers
+// and no access log line (named exception, spec decision 7; visibility and limit at the proxy, slice 037).
+const nodeServer = server as unknown as { headersTimeout: number; requestTimeout: number };
+nodeServer.headersTimeout = 10_000;
+nodeServer.requestTimeout = 30_000;
