@@ -142,6 +142,11 @@ export interface InProcessApiOptions {
   seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
   /** A committed person-table projection, keyed by meeting, for the Postgres request boundary. */
   personSnapshots?: ReadonlyMap<string, readonly Person[]>;
+  /**
+   * Called with a fixed-text error (naming the seq) when `subscribe` had to skip an event whose
+   * source hash is missing. The interface can surface it; the delivery loop is never aborted.
+   */
+  onIntegrityError?: (error: Error) => void;
 }
 
 export function etagOf(version: number): string {
@@ -332,24 +337,24 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     ...(assignment.revokedBy !== undefined ? { revokedBy: { id: assignment.revokedBy.id, role: assignment.revokedBy.role } } : {}),
   });
   const viewActor = (source: Actor): Actor => ({ id: source.id, role: source.role });
+  // Nested actors and person blocks may sit anywhere in a payload (approval, clearance, answer
+  // versions), so the strip is recursive; `id` and `role` of a nested actor stay visible.
+  const MASKED_KEYS: ReadonlySet<string> = new Set(['displayName', 'organisation', 'pii', 'personId']);
+  const maskValue = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(maskValue);
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !MASKED_KEYS.has(key)).map(([key, item]) => [key, maskValue(item)]));
+    }
+    return value;
+  };
   const maskEvent = (event: DomainEvent): ReadEvent => {
-    if (!event.hash) throw new Error(`Event seq ${event.seq}: source hash missing.`);
+    if (!event.hash) throw new Error(`Event seq ${event.seq}: integrity check failed (source hash missing).`);
     const { personId: _personId, hash: sourceHash, prevHash: _prevHash,
       commandId: _commandId, commandOperation: _commandOperation, commandResource: _commandResource,
       ...visible } = event;
     const { displayName: _actorName, personId: _actorPerson, ...eventActor } = event.actor;
-    const { pii: _pii, personId: _payloadPerson, displayName: _displayName, organisation: _organisation, ...payload } =
-      event.payload as Record<string, unknown>;
-    const answer = payload['answer'];
-    if (answer !== null && typeof answer === 'object' && !Array.isArray(answer)) {
-      const copy = { ...answer as Record<string, unknown> };
-      const by = copy['createdBy'];
-      if (by !== null && typeof by === 'object' && !Array.isArray(by)) {
-        const { displayName: _name, personId: _person, ...actorWithoutName } = by as Record<string, unknown>;
-        copy['createdBy'] = actorWithoutName;
-      }
-      payload['answer'] = copy;
-    }
+    const payload = maskValue(event.payload) as Record<string, unknown>;
     if (event.type === 'IdempotencyRecorded') delete visible.idempotencyKey;
     return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
   };
@@ -722,8 +727,11 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return idempotent(`assignRole:${state.meeting?.id ?? 'none'}`, opts, () => {
         requirePermission('admin.roles.manage');
         if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
-        if (!input.subjectId?.trim() || input.subjectId.includes('@') || /\s/.test(input.subjectId))
+        if (!input.subjectId?.trim() || input.subjectId.length > 128 || input.subjectId.includes('@') || /\s/.test(input.subjectId))
           throw new ApiProblem(422, 'Unprocessable', 'A pseudonymous subjectId is required.');
+        if (input.deputyForSubjectId !== undefined && (!input.deputyForSubjectId.trim() || input.deputyForSubjectId.length > 128 ||
+            input.deputyForSubjectId.includes('@') || /\s/.test(input.deputyForSubjectId)))
+          throw new ApiProblem(422, 'Unprocessable', 'A pseudonymous deputyForSubjectId is required.');
         if (!input.role || !Object.hasOwn(ROLE_PERMISSIONS, input.role))
           throw new ApiProblem(422, 'Unprocessable', 'A valid role is required.');
         if (input.unitId !== undefined && !state.units.some((unit) => unit.id === input.unitId))
@@ -753,6 +761,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         if (!assignment) throw new ApiProblem(404, 'Not found', 'Role assignment does not exist here.');
         if (assignment.revokedAt) throw new ApiProblem(409, 'Conflict', 'Role assignment already revoked.');
         if (reason !== undefined && !reason.trim()) throw new ApiProblem(422, 'Unprocessable', 'reason must not be empty.');
+        if (reason !== undefined && reason.trim().length > 500) throw new ApiProblem(422, 'Unprocessable', 'reason must not exceed 500 characters.');
         append([{ type: 'RoleRevoked', subjectId: id, payload: {
           assignmentId: id, subjectId: assignment.subjectId, role: assignment.role,
           ...(reason !== undefined ? { reason: reason.trim() } : {}),
@@ -1056,7 +1065,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return transition(id, 'question.classify', opts, input, (q) => ({
         type: 'QuestionClassified',
         subjectId: q.id,
-        payload: { ...input },
+        payload: { track: input.track,
+          ...(input.agendaItemId !== undefined ? { agendaItemId: input.agendaItemId } : {}),
+          ...(input.stageAssignment !== undefined ? { stageAssignment: input.stageAssignment } : {}) },
       }));
     },
     async assignQuestion(id, unitId, opts) {
@@ -1220,7 +1231,18 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // `actor()` at runtime — a subscription started under one role must not keep leaking events
       // once the demo user switches to a role without `event.read`.
       return store.subscribe((events) => {
-        listener(can(actor(), 'event.read').allow ? events.map(maskEvent) : []);
+        if (!can(actor(), 'event.read').allow) { listener([]); return; }
+        // A broken event must not abort the store's notification loop (other subscribers, the
+        // append that already persisted). It is skipped here; `listEvents` reports it by seq.
+        const visible: ReadEvent[] = [];
+        for (const event of events) {
+          try {
+            visible.push(maskEvent(event));
+          } catch (error) {
+            try { options.onIntegrityError?.(error instanceof Error ? error : new Error('Event integrity check failed.')); } catch { /* a faulty callback must not break delivery */ }
+          }
+        }
+        listener(visible);
       });
     },
   };

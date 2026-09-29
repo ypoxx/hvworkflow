@@ -146,7 +146,10 @@ export type DomainEvent =
 
 export type EventType = DomainEvent['type'];
 
-/** Standard read projection. sourceHash identifies the immutable original, not this redacted JSON. */
+/**
+ * Standard read projection. `maskEvent` (api.ts) strips `displayName`, `organisation`, `pii` and
+ * `personId` recursively from every payload; a new payload field that holds clear-text person data
+ * must be added to that block list. sourceHash identifies the immutable original, not this redacted JSON. */
 export type ReadEvent = DomainEvent extends infer E
   ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string } : never
   : never;

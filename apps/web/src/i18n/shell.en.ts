@@ -31,6 +31,7 @@ export const shellEn: typeof shellDe = {
   'boot.hint': 'The synthetic demo corpus is being built once on this device.',
   'boot.failed.title': 'The tool could not start',
   'boot.failed.hint': 'The demo corpus could not be built.',
+  'boot.failed.invalidJson': 'The stored demo event log is not valid JSON.',
   'boot.failed.retry': 'Try again',
   'boot.legacy.title': 'Old demo log',
   'boot.legacy.hint': 'The saved demo log comes from an older version. Explicitly reset it to rebuild the synthetic corpus.',

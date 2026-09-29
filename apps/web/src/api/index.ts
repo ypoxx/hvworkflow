@@ -26,15 +26,28 @@ export class LegacyDemoLogError extends Error {
   constructor() { super('Legacy demo event log requires an explicit reset.'); }
 }
 
-function loadLog(): DomainEvent[] | undefined {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw === null) return undefined;
-  const parsed: unknown = JSON.parse(raw);
+/** The stored demo log is not JSON; the boot screen shows a translated fixed text (R10). */
+export class DemoLogParseError extends Error {
+  constructor() { super('Demo event log is not valid JSON.'); }
+}
+
+/** Parse the stored demo log; a syntax error never repeats the raw text (SC-11). */
+export function parseDemoLog(raw: string): DomainEvent[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new DemoLogParseError();
+  }
   if (!Array.isArray(parsed)) throw new Error('Demo event log is not an array.');
   if (parsed.length > 0 && parsed.every(isLegacyEventShape)) {
     throw new LegacyDemoLogError();
   }
   return parsed as DomainEvent[];
+}
+function loadLog(): DomainEvent[] | undefined {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw === null ? undefined : parseDemoLog(raw);
 }
 let saveTimer: number | undefined;
 function saveLog(events: readonly DomainEvent[]): void {
