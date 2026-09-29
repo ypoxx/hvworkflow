@@ -26,6 +26,7 @@ function hasConfirmedActor(value: unknown): value is Actor {
 export function createSessionAuth(transport: SessionTransport) {
   let state: AuthState = { kind: 'checking' };
   let csrfToken: string | undefined;
+  let sessionRevision = 0;
   const listeners = new Set<() => void>();
 
   function publish(next: AuthState): void {
@@ -34,6 +35,7 @@ export function createSessionAuth(transport: SessionTransport) {
   }
 
   function onUnauthorized(): void {
+    sessionRevision += 1;
     if (state.kind === 'signedOut') return;
     csrfToken = undefined;
     transport.onActorChange?.(undefined);
@@ -41,8 +43,10 @@ export function createSessionAuth(transport: SessionTransport) {
   }
 
   async function refresh(): Promise<void> {
+    const requestRevision = sessionRevision;
     try {
       const session = await transport.readSession();
+      if (requestRevision !== sessionRevision) return;
       if (session.scheme !== 'session' || !/^[A-Za-z0-9_-]{32,}$/.test(session.csrfToken) ||
         !hasConfirmedActor(session.actor) || !Array.isArray(session.roles) ||
         !session.roles.includes(session.actor.role)) {
@@ -52,6 +56,7 @@ export function createSessionAuth(transport: SessionTransport) {
       transport.onActorChange?.(session.actor);
       publish({ kind: 'signedIn', actor: session.actor });
     } catch (error) {
+      if (requestRevision !== sessionRevision) return;
       if (error instanceof ApiProblem && error.status === 401) {
         onUnauthorized();
         return;

@@ -53,6 +53,27 @@ describe('HTTP session auth', () => {
     expect(auth.getCsrfToken()).toBeUndefined();
   });
 
+  it('does not restore a signed-out session from a refresh started before logout', async () => {
+    let releaseRefresh: ((value: SignedInSession) => void) | undefined;
+    const readSession = vi.fn()
+      .mockResolvedValueOnce(session)
+      .mockImplementationOnce(() => new Promise<SignedInSession>(resolve => { releaseRefresh = resolve; }));
+    const onActorChange = vi.fn();
+    const auth = createSessionAuth({ readSession, signOut: vi.fn(async () => undefined), onActorChange });
+    await auth.start();
+
+    const pendingRefresh = auth.refresh();
+    await auth.logout();
+    expect(auth.getState().kind).toBe('signedOut');
+    expect(auth.getCsrfToken()).toBeUndefined();
+
+    releaseRefresh?.(session);
+    await pendingRefresh;
+    expect(auth.getState().kind).toBe('signedOut');
+    expect(auth.getCsrfToken()).toBeUndefined();
+    expect(onActorChange).toHaveBeenLastCalledWith(undefined);
+  });
+
   it('rejects a demo-header identity and malformed CSRF data in HTTP mode', async () => {
     for (const payload of [
       { scheme: 'demoActor', actor: session.actor },

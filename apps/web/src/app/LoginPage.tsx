@@ -32,7 +32,11 @@ export function LoginPage({
   authError?: boolean;
 }) {
   const t = useT();
-  const complete = Boolean(notice?.version.trim() && notice.text.de.trim() && notice.text.en.trim());
+  const complete = Boolean(
+    typeof notice?.version === 'string' && notice.version.trim() &&
+    typeof notice?.text?.de === 'string' && notice.text.de.trim() &&
+    typeof notice?.text?.en === 'string' && notice.text.en.trim(),
+  );
   const summaryUrl = safeSummaryUrl(notice?.dataProtectionSummaryUrl);
   const loginUrl = `/auth/login?returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`;
 

@@ -22,6 +22,19 @@ describe('login page', () => {
     expect(html).not.toContain('/auth/login?');
   });
 
+  it('shows the bilingual fallback for malformed and incomplete notice responses', () => {
+    for (const payload of [
+      { version: 'v1', text: { de: 'Hinweis' } },
+      { version: 'v1' },
+      { text: { de: 'Hinweis', en: 'Notice' } },
+    ]) {
+      const html = renderToStaticMarkup(<LoginPage notice={payload as unknown as typeof notice} returnTo="/" onLogin={() => undefined} />);
+      expect(html).toContain('Der Transparenzhinweis fehlt oder ist unvollständig.');
+      expect(html).toContain('the privacy notice is missing or incomplete.');
+      expect(html).not.toContain('/auth/login?');
+    }
+  });
+
   it('accepts only local return paths and safe summary links', () => {
     expect(safeReturnTo('/speakers?round=2')).toBe('/speakers?round=2');
     expect(safeReturnTo('//evil.example/path')).toBe('/');

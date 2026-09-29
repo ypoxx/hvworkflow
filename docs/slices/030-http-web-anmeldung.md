@@ -28,7 +28,7 @@ Das Web startet aus einer **Build-Konfiguration** in genau einer Betriebsart: `d
 - `docs/slices/030-http-web-anmeldung.md`, `docs/evidence/030-*.png`, `docs/folgeliste.md` (letztere nur für nicht blockierende unabhängige Reviewbefunde)
 - `apps/web/src/api/**` (nur Moduswahl, Auth-Port, Vertragsadapter und zugehörige Tests)
 - `apps/web/src/app/{App.tsx,AppShell.tsx,Header.tsx,RoleSwitcher.tsx,DemoControls.tsx,LoginPage.tsx,LoginPage.test.tsx}` (nur Start-/Anmelde-/Headerfluss; neue Dateien nur für diese Funktionen)
-- `apps/web/src/i18n/{de.ts,en.ts,shell.de.ts,shell.en.ts,types.ts}` (nur Anmelde-, Sitzungs- und Fehlermeldungen in DE/EN)
+- `apps/web/src/i18n/{de.ts,en.ts,shell.de.ts,shell.en.ts,types.ts,parity.test.ts}` (nur Anmelde-, Sitzungs- und Fehlermeldungen in DE/EN sowie deren Sollzahl im Paritätstest; die 19 neuen Schlüssel erhöhen sie von 484 auf 503)
 - `apps/web/src/styles/index.css` (nur Anmeldeseite, Fokus- und responsive Darstellung)
 - `apps/web/vite.config.ts`, `apps/web/src/vite-env.d.ts` (nur Build-Modus und lokale Same-Origin-Proxy-Konfiguration)
 - `apps/web/e2e/030-anmeldung.spec.ts` (nur 030-Browsernachweise mit synthetischen Antworten; der echte Dual-Mode-Lauf folgt in 031)
