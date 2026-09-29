@@ -36,12 +36,15 @@ const EVENTS_WINDOW_MS = 60_000;
 
 const eventTime = (event: DomainEvent): number => Date.parse(event.recordedAt ?? event.at);
 
+/** An age inside a rolling window: never negative, so an event after `now` (clock set back) counts nowhere. */
+const withinWindow = (ageMs: number, windowMs: number): boolean => ageMs >= 0 && ageMs <= windowMs;
+
 export function computeIndicators(events: readonly DomainEvent[], now: Date): Indicators {
   const nowMs = now.getTime();
   const byMeeting = new Map<string, DomainEvent[]>();
   let eventsLast1m = 0;
   for (const event of events) {
-    if (nowMs - eventTime(event) <= EVENTS_WINDOW_MS) eventsLast1m += 1;
+    if (withinWindow(nowMs - eventTime(event), EVENTS_WINDOW_MS)) eventsLast1m += 1;
     if (event.meetingId === undefined) continue;
     const group = byMeeting.get(event.meetingId);
     if (group) group.push(event);
@@ -71,7 +74,7 @@ export function computeIndicators(events: readonly DomainEvent[], now: Date): In
     let legalOver = 0;
     for (const q of state.questions.values()) {
       const at = capturedAt.get(q.id);
-      if (at !== undefined && nowMs - at <= CAPTURED_WINDOW_MS) captured += 1;
+      if (at !== undefined && withinWindow(nowMs - at, CAPTURED_WINDOW_MS)) captured += 1;
       if (!['delivered', 'closed', 'withdrawn', 'merged'].includes(q.status)) {
         const unit = q.unitId ?? UNASSIGNED_UNIT;
         openByUnit[unit] = (openByUnit[unit] ?? 0) + 1;

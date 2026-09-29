@@ -54,6 +54,12 @@ describe('Scheibe 033b: indicators (core, pure)', () => {
     expect(only([...meeting(), capture('q1', ago(301))]).questionsCapturedLast5m).toBe(0);
   });
 
+  it('an event with a server time after `now` counts in no rolling window (clock set back, Codex P2 on #73)', () => {
+    const result = computeIndicators([...meeting(), capture('q1', ago(-5))], NOW);
+    expect(result.eventsLast1m).toBe(0);
+    expect(result.meetings[0]!.questionsCapturedLast5m).toBe(0);
+  });
+
   it('events window: 60 s counts, 61 s does not, over all meetings', () => {
     const other = ev('MeetingCreated', 'hv-other', { title: 'Andere', date: '2031-05-06', lifecycleVersion: 2, agendaItems: [], units: [] }, ago(60), { meetingId: 'hv-other' });
     const result = computeIndicators([...meeting(), other, capture('q1', ago(61)), capture('q2', ago(60))], NOW);
