@@ -48,7 +48,7 @@ heute wirkt `HV_DEMO=0` wie „aus“, künftig ist es ein Fehler, im Bericht ne
    `HV_OIDC_*` oder `HV_AUTH_ENCRYPTION_KEY` gesetzt, müssen alle fünf gültig gesetzt sein, dazu `HV_DATABASE_URL` und
    der vollständige Transparenzhinweis; sonst Start verweigert (fängt Tippfehler, statt still mit 401 zu laufen). Keine
    davon gesetzt und kein Demo-Modus → Start wie heute mit der festen Warnung „no complete sign-in configuration“.
-   Issuer und Redirect-URI: `https:`, ausgenommen Loopback-Hosts (`localhost`, `127.0.0.1`, `[::1]`) für
+   Issuer und Redirect-URI: `https:`, ausgenommen Loopback-Hosts (`localhost`, `127.0.0.1`; genau die, die `createOidcFlow` in `apps/api/src/auth/oidc.ts` heute zulässt, kein `[::1]`) für
    Keycloak-CI und Entwicklung; kein Benutzer/Passwort in der URL. Zeitgrenzen:
    `HV_DB_LOCK_TIMEOUT_MS` < `HV_DB_STATEMENT_TIMEOUT_MS` < `HV_DB_QUERY_TIMEOUT_MS` < `HV_REQUEST_TIMEOUT_MS` <
    `HV_DB_IDLE_TX_TIMEOUT_MS` (wie 034a).
