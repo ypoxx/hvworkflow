@@ -362,11 +362,17 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       : { displayName: `Redner ${s.number}` }),
     _actions: SPEAKER_ACTIONS.filter((p) => can(actor(), p).allow),
   });
+  // takt-027 (privacy): presence needs only actorId; the claimant's personId stays in the event log and
+  // never reaches a read view (event reads mask it too, slice 026).
+  const viewClaim = (claim: { actorId: string; personId?: string; claimedAt: string; expiresAt: string } | undefined) =>
+    claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime()
+      ? { claim: { actorId: claim.actorId, claimedAt: claim.claimedAt, expiresAt: claim.expiresAt } }
+      : {};
   const viewQuestion = (q: QuestionRecord, source: State = state): Question => {
     const { claim, ...record } = q;
     return {
     ...record,
-    ...(claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime() ? { claim: { ...claim } } : {}),
+    ...viewClaim(claim),
     ...(source.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(source.speakers.get(q.speakerId)!, source).displayName } : {}),
     answers: q.answers.map((a) => ({ ...a, createdBy: viewActor(a.createdBy) })),
     ...(q.approval !== undefined ? { approval: { ...q.approval, approvedBy: viewActor(q.approval.approvedBy) } } : {}),
@@ -377,7 +383,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const viewContribution = (c: Contribution): Contribution => {
     const { claim, ...rest } = c;
     return { ...rest,
-      ...(claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime() ? { claim: { ...claim } } : {}),
+      ...viewClaim(claim),
       questionIds: [...c.questionIds], coverage: { ...c.coverage, uncovered: [...c.coverage.uncovered] },
     };
   };
