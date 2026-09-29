@@ -666,6 +666,25 @@ mark-test-run: wrote /home/user/wt/s034a/.claude/state/last-test-run (clean tree
 
 Nachweis für den Keycloak-Schritt bleibt die PR-CI (lokal kein Docker).
 
+### Nachweis nach Codex (#75)
+
+Codex P1: Der ROLLBACK nach einem fehlgeschlagenen `revokeSession` lief ohne Zeitgrenze, und `/auth/logout` ist von
+der 408-Stufe ausgenommen. Ein hängender ROLLBACK hätte Anfrage und Pool-Platz festgehalten. Behoben in `68e0d03`:
+ROLLBACK über `timedQuery`, jeder fehlgeschlagene oder hängende ROLLBACK verwirft die Verbindung
+(`client.release(error)`). Derselbe Grundsatz gilt jetzt auch für die ROLLBACKs in `app.ts`. Drei Tests in
+`limits034a.test.ts` (hängend, fehlschlagend, erfolgreich) waren zuerst rot (Test-Timeout bzw. Verbindung nicht
+verworfen), dann grün. `pnpm gates` mit Postgres-Variablen und `CONTRACT_GATE_STRICT=1` auf `68e0d03`, Exit 0:
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/api test:       Tests  398 passed (398)
+apps/web test:       Tests  254 passed (254)
+slice-scope: 34 changed file(s), all within "docs/slices/034a-grenzen-timeouts-sicherheitsheader.md"'s "Files allowed" list (42 pattern(s)).
+...
+✓ built in 2.48s
+mark-test-run: wrote /home/user/wt/s034a/.claude/state/last-test-run (clean tree) at commit 68e0d03, tree b78476253cf9…
+```
+
 ## Review findings
 
 folgt
