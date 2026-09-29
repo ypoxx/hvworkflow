@@ -1,6 +1,7 @@
 /** What the tool shows while the synthetic corpus is being built, and if that ever fails. */
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '../components';
+import { DemoLogParseError } from '../api';
 import { useT } from '../i18n';
 
 export function BootScreen() {
@@ -34,7 +35,7 @@ export function BootFailure({ error, legacy, onRetry, onReset }: {
         <h1 className="mt-4 text-[15px] font-semibold text-ink-900">{t(legacy ? 'boot.legacy.title' : 'boot.failed.title')}</h1>
         <p className="mt-1 text-[13px] text-ink-600">{t(legacy ? 'boot.legacy.hint' : 'boot.failed.hint')}</p>
         {!legacy && <pre className="mt-3 overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-2xs text-ink-600">
-          {error.message}
+          {error instanceof DemoLogParseError ? t('boot.failed.invalidJson') : error.message}
         </pre>}
         <Button variant="primary" className="mt-5" onClick={legacy ? onReset : onRetry}>
           {t(legacy ? 'boot.legacy.reset' : 'boot.failed.retry')}

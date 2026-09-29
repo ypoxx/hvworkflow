@@ -19,6 +19,21 @@ const V2_ONLY_FIELDS = [
   'commandId', 'commandOperation', 'commandResource',
 ] as const;
 
+/**
+ * Fields a caller may hand to `stampEvent` (SC-07). Anything else is a programming error and is
+ * rejected instead of silently entering the hash chain; `hash`, `prevHash`, `schemaVersion`,
+ * `recordedAt` and `legalHold` are accepted only to be overwritten by the store.
+ */
+const INPUT_FIELDS: ReadonlySet<string> = new Set([
+  'seq', 'id', 'type', 'at', 'actor', 'subjectId', 'payload',
+  'schemaVersion', 'hash', 'prevHash', 'recordedAt', 'legalHold',
+  'meetingId', 'idempotencyKey', 'causationId', 'personId',
+  'commandId', 'commandOperation', 'commandResource',
+  'occurredAt', 'occurredAtSource', 'retentionClass',
+]);
+const OPTIONAL_TEXT_FIELDS = ['personId', 'causationId', 'idempotencyKey', 'commandId', 'commandOperation', 'commandResource'] as const;
+const MAX_ENVELOPE_TEXT = 128;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -97,6 +112,21 @@ export function stampEvent(
   codec: PiiCodec = identityPiiCodec,
 ): DomainEvent {
   const input = event as NewEvent & Record<string, unknown>;
+  if (Object.keys(input).some((key) => !INPUT_FIELDS.has(key))) throw new Error(`Event seq ${seq}: unknown envelope field.`);
+  for (const field of OPTIONAL_TEXT_FIELDS) {
+    const value = input[field];
+    // commandResource may be the empty string (a command without a resource id); the others may not.
+    if (value !== undefined && (typeof value !== 'string' || value.length > MAX_ENVELOPE_TEXT ||
+        (value.length === 0 && field !== 'commandResource'))) {
+      throw new Error(`Event seq ${seq}: invalid optional envelope field.`);
+    }
+  }
+  for (const field of ['id', 'subjectId'] as const) {
+    const value = input[field];
+    if (typeof value !== 'string' || value.length === 0 || value.length > MAX_ENVELOPE_TEXT) {
+      throw new Error(`Event seq ${seq}: invalid optional envelope field.`);
+    }
+  }
   const recordedAt = event.at;
   const recordedMs = Date.parse(recordedAt);
   const source = input['occurredAtSource'] ?? 'server';
@@ -111,7 +141,8 @@ export function stampEvent(
     throw new Error(`Event seq ${seq}: invalid occurrence source/time pair.`);
   }
   const explicitMeetingId = input['meetingId'];
-  if (explicitMeetingId !== undefined && typeof explicitMeetingId !== 'string') throw new Error(`Event seq ${seq}: invalid meetingId.`);
+  if (explicitMeetingId !== undefined && (typeof explicitMeetingId !== 'string' || explicitMeetingId.length === 0 ||
+      explicitMeetingId.length > MAX_ENVELOPE_TEXT)) throw new Error(`Event seq ${seq}: invalid meetingId.`);
   const retentionClass = input['retentionClass'] ?? 'working';
   if (!['record', 'working', 'technical'].includes(String(retentionClass))) {
     throw new Error(`Event seq ${seq}: invalid retention class.`);
@@ -119,9 +150,12 @@ export function stampEvent(
   // Pre-024 JSONL prefixes may consist solely of standalone facts. Give those a deterministic
   // synthetic scope during upcast; new API writes always supply their real year id.
   const effectiveMeetingId = explicitMeetingId ?? meetingId ?? (event.type === 'MeetingCreated' ? event.subjectId : 'legacy-unscoped');
-  const { hash: _hash, prevHash: _prevHash, schemaVersion: _schemaVersion, ...rest } = input;
+  const named: Record<string, unknown> = {};
+  for (const key of ['id', 'type', 'at', 'subjectId', ...OPTIONAL_TEXT_FIELDS] as const) {
+    if (input[key] !== undefined) named[key] = input[key];
+  }
   const envelope = {
-    ...rest,
+    ...named,
     seq,
     actor: { id: event.actor.id, role: event.actor.role },
     payload: piiPayload(event.payload, effectiveMeetingId, codec),
