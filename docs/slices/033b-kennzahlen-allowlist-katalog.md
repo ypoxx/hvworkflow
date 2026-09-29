@@ -209,7 +209,7 @@ $ curl -s -o /dev/null -w "%{http_code}\n" localhost:8787/metrics
 Artefakt `auswertungskatalog`: entsteht erst im PR-CI-Lauf (Schritte „Generate the evaluation catalogue“ und „Upload the
 evaluation catalogue“ in `.github/workflows/gates.yml`); `actions/upload-artifact` gepinnt auf
 `ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2, per `git ls-remote https://github.com/actions/upload-artifact 'refs/tags/v4*'`).
-Lauf-ID und Link folgen mit dem PR.
+PR-CI #73, Lauf `36626722716` auf `3917204` (https://github.com/ypoxx/hvworkflow/actions/runs/36626722716), Artefakt `auswertungskatalog` (ID `11060053045`, 3 478 Byte, `sha256:b13f7f21c41767e0392945eddccc628dd6b892f251c4d3b0f0d81d9dab909e36`).
 
 ## Nachweis nach dem Review (Nachbesserung)
 
@@ -244,7 +244,7 @@ Done: Kennzahlen im Kern (`indicators.ts`), `/metrics` mit Bearer-Prüfung vor j
   in `pnpm gates`; Auswertungskatalog-Skript mit CI-Artefakt; Vertrag 0.3.9. Review-Befunde 1 bis 5 behoben.
 Evidence: Baucommit e8b8314 und nach dem Review Gates-Commit 1c9be19 (`pnpm gates` Exit 0, Schluss oben unter
   „Nachweis“ und „Nachweis nach dem Review“); roter Torlauf und curl /metrics oben; Artefakt `auswertungskatalog`
-  folgt aus PR-CI (Lauf-ID trägt der Koordinator nach).
+  aus PR-CI, Lauf `36626722716` (Artefakt-ID `11060053045`).
 Bedrohungs-ID → Test:
   T-G3-I-03: scripts/metrics-allowlist-check.test.mjs (Fixtures subject_hash, hv_answers_per_actor, unit_id plus user,
     rate_limit, ip, Duplikat, Typ, fehlendes metrics); metrics033b.test.ts › contains no actor id, personId, subject id,
