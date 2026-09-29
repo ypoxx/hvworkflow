@@ -45,6 +45,16 @@ branch-deploy -> exit 0
 production -> exit 1
 ```
 
+`pnpm gates` Exit 0 auf Commit `41e0f62` (Code- und Spec-Stand dieses PRs; der zuerst genannte `1f09128` wurde durch
+einen Doku-Amend ersetzt und ist nicht mehr erreichbar — Codex P1). Wörtlicher Schluss:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.15s
+mark-test-run: wrote /home/user/wt/takt-022/.claude/state/last-test-run (clean tree) at commit 41e0f62, tree ca17624eb199…
+EXIT 0
+```
+
 ## Review findings
 
 Review in frischem Kontext (reviewer-sonnet, 29.09.2026), Urteil „reparieren (klein)“, alles behoben:
@@ -54,3 +64,6 @@ Review in frischem Kontext (reviewer-sonnet, 29.09.2026), Urteil „reparieren (
    Hinweis auf den `ignore`-Befehl.
 3. **nit:** `ignore` korrekt und fail-safe (leeres `CONTEXT` → übersprungen; Quoting als TOML-Literal-String hält
    `"$CONTEXT"` für die Shell); vollständige Sperre bleibt die Netlify-Einstellung des Eigentümers.
+
+Codex (ein Lauf beim Ready-Setzen): 1 × P1 — Gates-Nachweis nannte einen nicht erreichbaren Commit und keinen
+wörtlichen Schluss → Gates auf `41e0f62` erneut gelaufen, Schluss oben eingetragen.
