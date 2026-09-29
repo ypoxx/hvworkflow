@@ -168,6 +168,12 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 033a R1 nit · `apps/api/src/observability/config.ts` · Rechte des Log-Verzeichnisses nicht geprüft (Dateien 0600) ·
   mit 034/037.
 
+- takt-028 Nachprüfung minor · `apps/web/src/api/index.ts`, `BootScreen.tsx` · älterer Text „Demo event log is not an
+  array.“ erscheint unübersetzt über `error.message` (R10) · wie `DemoLogParseError` über das Wörterbuch.
+
+- takt-029 R1 nit · `apps/api/src/app.ts` (`/auth/me`) · DB-Fehler beim Laden der Rollen liefert 500 statt 503
+  (Verfügbarkeit, keine Sitzung entsteht) · wie im Callback in 503 „unavailable“ umwandeln, mit Test.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
