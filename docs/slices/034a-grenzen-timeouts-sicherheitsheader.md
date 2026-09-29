@@ -589,6 +589,30 @@ exit 0
 | Nit: Entscheidung 6 (`bodyLimit` statt `BodyLimitError`) | erledigt: in Entscheidung 6 festgehalten |
 | Nit: `headersTimeout` und Prüfintervall | erledigt: `connectionsCheckingInterval` 5 s über `serverOptions` (wirksam 10 bis 15 s), im Slowloris-Restrisiko (037) benannt |
 
+## Nachweis nach der Nachprüfung
+
+**Gates-Commit:** `cdc3d91` (sauberer Baum), `CONTRACT_GATE_STRICT=1 pnpm gates` mit den Postgres-Variablen, Exit 0.
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/web test:       Tests  254 passed (254)
+apps/api test:  Test Files  32 passed (32)
+apps/api test:       Tests  395 passed (395)
+slice-scope: 33 changed file(s), all within "docs/slices/034a-grenzen-timeouts-sicherheitsheader.md"'s "Files allowed" list (37 pattern(s)).
+# pass 234
+# fail 0
+mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit cdc3d91
+exit 0
+```
+
+| Befund | Stand |
+|---|---|
+| N1 Blocker: 56 fremde Screenshots in `docs/evidence/` | erledigt: `docs/evidence/` auf 951a905 zurückgesetzt, `slice-scope` grün; künftig nach e2e nur gezielt gestaged |
+| N2 Major: `/auth/transparency-notice` mit gefälschtem Cookie blieb bei erschöpfter Quelle 200 | erledigt: `/auth/transparency-notice` und `/metrics` (Pfade ohne Sitzungslesung) zählen cookieunabhängig vorab; nur `/auth/callback` behält „nachzählen, 2xx/3xx nie ersetzen“; Test (rot, dann grün): 429 ab Nr. 6, keine weitere Einzelzeile; Metrics-Tests (033b) grün; Bedrohungsmodell T-G2-D-04 und MF-10 nachgezogen |
+| N3 Minor: PostgreSQL ≥ 14 | erledigt: Betriebsvoraussetzung in Entscheidung 8, unter „Open“ und im Bedrohungsmodell (T-G2-D-01), Prüfung 037/038 |
+| Optional: `assertRuntimePrivileges` verlor die Ursache | erledigt: `busy`/`queryTimeout` bleiben erhalten (503 statt 500); Test |
+| e2e | nicht erneut gelaufen: keine Oberflächenwirkung |
+
 ## Lesebefund vor dem Bau
 
 Lesebefund in frischem Kontext (Opus, 29.09.2026): kein Blocker, 8 major, 15 minor, einige nits; alle in dieser Fassung
