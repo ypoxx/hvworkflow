@@ -60,13 +60,11 @@ skip: context unset
 unset -> exit 0
 ```
 
-`pnpm gates` Exit 0 auf Commit `41e0f62` (Code- und Spec-Stand dieses PRs; der zuerst genannte `1f09128` wurde durch
-einen Doku-Amend ersetzt und ist nicht mehr erreichbar — Codex P1). Wörtlicher Schluss:
+`pnpm gates` Exit 0 auf Commit `a756dbd` (Stand nach Review und `CONTEXT`-Härtung). Wörtlicher Schluss:
 
 ```
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 2.15s
-mark-test-run: wrote /home/user/wt/takt-022/.claude/state/last-test-run (clean tree) at commit 41e0f62, tree ca17624eb199…
+✓ built in 2.14s
+mark-test-run: wrote /home/user/wt/takt-022/.claude/state/last-test-run (clean tree) at commit a756dbd, tree ca17624eb199…
 EXIT 0
 ```
 
