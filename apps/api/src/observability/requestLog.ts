@@ -37,7 +37,8 @@ export function createRequestLog(options: RequestLogOptions) {
   };
 
   return async (c: Context, next: Next): Promise<void> => {
-    const context: RequestContext = { requestId: randomUUID(), clock, subjectHash: null, seq: null };
+    const context: RequestContext = { requestId: randomUUID(), clock, subjectHash: null, seq: null,
+      phase: 'running', suppressLog: false };
     const operationId = matchServedOperationId(c.req.method, c.req.path) ?? null;
     const started = elapsedSource();
     try {
@@ -54,20 +55,24 @@ export function createRequestLog(options: RequestLogOptions) {
           c.res.headers.set('X-Server-Time', iso);
         }
       }
-      const line = JSON.stringify({
-        v: 1,
-        ts: iso,
-        requestId: context.requestId,
-        subjectHash: context.subjectHash,
-        operationId,
-        status: c.res.status,
-        latencyMs: Math.max(0, Math.round(elapsedSource() - started)),
-        seq: context.seq,
-      });
-      try {
-        sink.write(line, now);
-      } catch {
-        reportSinkFailure(now);
+      // Protocol exception (slice 034a, decision 11): repeated refusals of one exhausted source key are
+      // counted in a fixed stderr summary instead of one line each; the header above is still set.
+      if (!context.suppressLog) {
+        const line = JSON.stringify({
+          v: 1,
+          ts: iso,
+          requestId: context.requestId,
+          subjectHash: context.subjectHash,
+          operationId,
+          status: c.res.status,
+          latencyMs: Math.max(0, Math.round(elapsedSource() - started)),
+          seq: context.seq,
+        });
+        try {
+          sink.write(line, now);
+        } catch {
+          reportSinkFailure(now);
+        }
       }
     }
   };

@@ -94,8 +94,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 021c · R-TRANS-05/13 · `approver` kann vor Recht freigeben, danach ist R-TRANS-13 unerreichbar (Bedienfalle) · E25
   entscheiden: R-TRANS-13 auch aus `approved` oder Freigabe setzt Rechtsfreigabe voraus.
 - 021c · `apps/api/src/__tests__/legal-clearance.test.ts` · kein 404-Test auf der neuen Route · ergänzen.
-- 024 · `apps/api/src/http.ts` · leerer `Idempotency-Key:` besteht die Header-Prüfung (Domäne lehnt `""` inzwischen mit
-  422 ab, 028) · Header-Schema `minLength: 1` bzw. Test.
+- ~~024 · `apps/api/src/http.ts` · leerer `Idempotency-Key:` besteht die Header-Prüfung (Domäne lehnt `""` inzwischen mit
+  422 ab, 028) · Header-Schema `minLength: 1` bzw. Test.~~ → erledigt in **034a** (`IdempotencyKey` mit `minLength: 1`, Vertrag 0.3.10).
 - 024 · `apps/web/src/api/index.ts` · „Erneut versuchen“ bei korruptem Demo-Log wirkungslos · Hinweis oder bestätigter
   Reset (Produktentscheid).
 - 024 nit · `EVENT_TYPES` mit `satisfies Record<EventType, true>`; Downgrade des ganzen Logs bei RR-01 vermerken;
@@ -194,8 +194,8 @@ Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz
 #66). Sie sind eingeplant: **takt-028** (gebündelter Sicherheits- und Datenschutz-Takt, vor 033b) bzw. **034** (Grenzen
 und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** behoben.
 
-- 021c/takt-016 · `openapi.yaml` `LegalClearanceRequest.note`, `lateEntryReason` · kein `maxLength` (SP-2) · mit 034.
-  → **034**
+- ~~021c/takt-016 · `openapi.yaml` `LegalClearanceRequest.note`, `lateEntryReason` · kein `maxLength` (SP-2) · mit 034.~~
+  → erledigt in **034a** (Vertrag 0.3.10: `maxLength` und `maxItems` für alle Freitext- und Listenfelder der Anfrageschemas)
 - 024 · `packages/domain/src/envelope.ts` (`stampEvent`) · `...rest` ungefiltert in Umschlag und Hash (SC-07) ·
   Umschlag per Whitelist, optionale Felder auf Typ/Länge prüfen.
   → **takt-028**
@@ -207,9 +207,9 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 026 · `api.ts` (`maskEvent`) · nicht rekursiv (verschachtelte Akteure in Payloads); wirft bei fehlendem `hash`
   (SSE-Listener, 035) · rekursive Maske mit Test, definierter Fehler.
   → **takt-028**
-- 027 · `apps/api/src/server.ts` · kein `statement_timeout`/`lock_timeout`/`idle_in_transaction_session_timeout` ·
-  Pool-Timeouts setzen (vor Generalprobe).
-  → **034**
+- ~~027 · `apps/api/src/server.ts` · kein `statement_timeout`/`lock_timeout`/`idle_in_transaction_session_timeout` ·
+  Pool-Timeouts setzen (vor Generalprobe).~~
+  → erledigt in **034a** (`apps/api/src/limits/poolOptions.ts`, Werte 5 s, 3 s, 15 s)
 - 029b · `auth-029b.test.ts` · Negativtests `alg: none`/HS256, HTTP-Callback eines gesperrten Subjects → 403, ohne
   Zuordnung → 403, gleiches `sub` unter zwei Issuern ohne übertragene Rolle.
   → **takt-028**
@@ -224,3 +224,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 033a R1 minor (Verfügbarkeit) · `apps/api/src/observability/accessLog.ts` · synchrones Schreiben je Anfrage; ein
   hängender Datenträger blockiert die Event-Loop · lokaler Datenträger als Betriebsvorgabe oder gepufferter Strom.
   → **037**
+- 034a · Vertragsgrenzen (`maxLength`, `maxItems` der Anfrageschemas) · der Demo-Pfad im Browser validiert nicht gegen den
+  Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
+  derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
+  → **043**

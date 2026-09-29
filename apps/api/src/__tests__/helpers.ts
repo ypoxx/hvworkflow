@@ -221,7 +221,11 @@ function assertResponseHeaders(operationId: string, method: string, pathname: st
       }
     }
     const validate = headerValidator(`${pointer}/schema`);
-    for (const value of values) {
+    // A header is a string on the wire; an integer schema (`Retry-After`, slice 034a) is checked against
+    // the number only when the value is a plain decimal integer, so "45.5", "1e1" or "Wed, ..." still fail.
+    const integerHeader = (resolvePointer(`${pointer}/schema`) as { type?: string } | undefined)?.type === 'integer';
+    for (const raw of values) {
+      const value: unknown = integerHeader && /^(?:0|[1-9][0-9]{0,9})$/.test(raw) ? Number(raw) : raw;
       if (!validate(value)) {
         throw new Error(
           `${where} with response header "${name}: ${value}", which does not match its contract schema:\n` +

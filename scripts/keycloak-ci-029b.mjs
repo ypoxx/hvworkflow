@@ -256,46 +256,51 @@ async function checkBrowserFlow(identity, expectedActorId, meetingId) {
     stage = 'post-login navigation';
     await page.waitForURL(`${apiOrigin}/v1/meeting`);
 
-    stage = 'session verification';
-    const me = await page.evaluate(async () => {
-      const response = await fetch('/auth/me', { headers: { 'X-Actor': 'attacker:admin' } });
-      return { status: response.status, cache: response.headers.get('Cache-Control'), body: await response.json() };
-    });
-    assert.equal(me.status, 200);
-    assert.equal(me.cache, 'no-store');
-    assert.equal(me.body.scheme, 'session');
-    assert.equal(me.body.subjectId, expectedActorId);
-    assert.equal(me.body.actor.role, 'moderation');
-    assert.deepEqual(me.body.roles, ['moderation']);
-    assert.match(me.body.csrfToken, /^[A-Za-z0-9_-]{43}$/);
+    // Slice 034a: the service answers with `Content-Security-Policy: default-src 'none'`, so a script on one of its
+    // own JSON pages may not call `fetch` (connect-src falls back to 'none'); that is intended. The checks after the
+    // sign-in therefore run through a request context outside the page. It has no cookie jar of its own; the session
+    // cookie from the callback is sent as one explicit `Cookie` header (never two `hv_session` cookies, and no doubt
+    // about `Secure` cookies over http://localhost). Same assertions as before; cookie and token are never printed.
+    const api = await webRequire('@playwright/test').request.newContext({ baseURL: apiOrigin });
+    let csrfToken = '';
+    try {
+      const cookie = { Cookie: `hv_session=${sessionCookie}` };
 
-    stage = 'CSRF mutation';
-    const mutation = await page.evaluate(async ({ meetingId: id, csrfToken }) => {
-      const route = `/v1/meetings/${id}/speakers`;
-      const before = await fetch(route);
-      const tag = before.headers.get('ETag');
-      const body = JSON.stringify({ displayName: 'Synthetic CI speaker', round: 1 });
-      const rejected = await fetch(route, { method: 'POST', headers: { 'Content-Type': 'application/json', 'If-Match': tag }, body });
-      const accepted = await fetch(route, { method: 'POST', headers: {
-        'Content-Type': 'application/json', 'If-Match': tag, 'X-CSRF-Token': csrfToken,
-        'X-Actor': 'attacker:admin',
-      }, body });
-      return { read: before.status, tag, rejected: rejected.status, accepted: accepted.status };
-    }, { meetingId, csrfToken: me.body.csrfToken });
-    assert.equal(mutation.read, 200);
-    assert.match(mutation.tag, /^"v\d+"$/);
-    assert.equal(mutation.rejected, 403, 'Missing CSRF token must reject a mutation.');
-    assert.equal(mutation.accepted, 201, 'Signed-in moderation actor must be able to register a speaker.');
+      stage = 'session verification';
+      const meResponse = await api.get('/auth/me', { headers: { ...cookie, 'X-Actor': 'attacker:admin' } });
+      const me = { status: meResponse.status(), cache: meResponse.headers()['cache-control'], body: await meResponse.json() };
+      assert.equal(me.status, 200);
+      assert.equal(me.cache, 'no-store');
+      assert.equal(me.body.scheme, 'session');
+      assert.equal(me.body.subjectId, expectedActorId);
+      assert.equal(me.body.actor.role, 'moderation');
+      assert.deepEqual(me.body.roles, ['moderation']);
+      assert.match(me.body.csrfToken, /^[A-Za-z0-9_-]{43}$/);
+      csrfToken = me.body.csrfToken;
 
-    stage = 'logout';
-    const logout = await page.evaluate(async (csrfToken) => {
-      const response = await fetch('/auth/logout', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-      return { status: response.status, after: (await fetch('/auth/me')).status };
-    }, me.body.csrfToken);
-    assert.equal(logout.status, 204);
-    assert.equal(logout.after, 401);
+      stage = 'CSRF mutation';
+      const route = `/v1/meetings/${meetingId}/speakers`;
+      const before = await api.get(route, { headers: cookie });
+      const tag = before.headers().etag;
+      const data = JSON.stringify({ displayName: 'Synthetic CI speaker', round: 1 });
+      const rejected = await api.post(route, { headers: { ...cookie, 'Content-Type': 'application/json', 'If-Match': tag }, data });
+      const accepted = await api.post(route, { headers: { ...cookie, 'Content-Type': 'application/json', 'If-Match': tag,
+        'X-CSRF-Token': me.body.csrfToken, 'X-Actor': 'attacker:admin' }, data });
+      assert.equal(before.status(), 200);
+      assert.match(tag, /^"v\d+"$/);
+      assert.equal(rejected.status(), 403, 'Missing CSRF token must reject a mutation.');
+      assert.equal(accepted.status(), 201, 'Signed-in moderation actor must be able to register a speaker.');
+
+      stage = 'logout';
+      const logout = await api.post('/auth/logout', { headers: { ...cookie, 'X-CSRF-Token': me.body.csrfToken } });
+      const after = await api.get('/auth/me', { headers: cookie });
+      assert.equal(logout.status(), 204);
+      assert.equal(after.status(), 401);
+    } finally {
+      await api.dispose();
+    }
     console.log('029b Keycloak browser login, role, CSRF, write and logout: PASS');
-    return [identity.clientSecret, identity.userPassword, sessionCookie, me.body.csrfToken, expectedActorId,
+    return [identity.clientSecret, identity.userPassword, sessionCookie, csrfToken, expectedActorId,
       expectedActorId.replace(/^oidc_/, ''), identity.userId, identity.username].filter(Boolean);
   } finally {
     await browser.close();

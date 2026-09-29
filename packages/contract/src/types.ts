@@ -2106,6 +2106,60 @@ export interface components {
                 };
             };
         };
+        /** @description Since 0.3.10 (slice 034a): the request took longer than the service's time budget. With the Postgres persistence a `408` means nothing was committed, and a retry with the same `Idempotency-Key` executes exactly once. `detail` is a fixed sentence, never the limit. Not sent by `GET /auth/login`, `GET /auth/callback` and `POST /auth/logout`, which have their own upper bounds. */
+        RequestTimeout: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 408;
+                };
+            };
+        };
+        /** @description Since 0.3.10 (slice 034a): the request body exceeds 262 144 bytes (256 KiB). The limit applies to every body, also where this document declares no `requestBody`. When the caller's source has already used up its quota, `429` is sent instead. `detail` is a fixed sentence. */
+        PayloadTooLarge: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 413;
+                };
+            };
+        };
+        /** @description Since 0.3.10 (slice 034a): a quota of the service is used up for the current window (per subject for writes and reads, per source for requests without a session, sign-in starts, probes and CORS preflights). No event is written and no `Idempotency-Key` is consumed. `Retry-After` names the seconds to the end of the window. `detail` is a fixed sentence, never the limit or the source. */
+        TooManyRequests: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 429;
+                };
+            };
+        };
+        /** @description Since 0.3.10 (slice 034a): the persistence cannot serve now: the write queue waited longer than the lock limit, a statement was aborted, or migrations are pending. `detail` is "Persistence is busy." or "Migrations are pending."; `Retry-After` is 2 or 30. Nothing was written, no `Idempotency-Key` is consumed, and no database text is included. (A `500` with the detail "Persistence outcome is unknown." is different: see `info.description`.) */
+        PersistenceBusy: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 503;
+                };
+            };
+        };
         /** @description The service cannot serve this now (e.g. no identity provider configured). Used only on operations without credential (`login`, `completeLogin`, `getHealth`), so `detail` is a fixed sentence per cause, never a host name, a driver or identity-provider error text (review 023, Codex round 5; prose — a schema cannot inspect free text; `/readyz` uses codes instead). */
         ServiceUnavailable: {
             headers: {
@@ -2165,6 +2219,8 @@ export interface components {
         ETagRequired: string;
         /** @description Since 0.3.0 (security sweep after Codex on 50cc738): `no-store` on every response of the sign-in path (`login`, `completeLogin`, `logout`, `getSession`) — they carry a `state`, a session cookie or the CSRF token, and no shared or browser cache may keep them. Other directives may accompany it (`private, no-store`). */
         CacheControlNoStore: string;
+        /** @description Since 0.3.10 (slice 034a): whole seconds after which the client may try again, 1 to 60. On `429` the time to the end of the current counting window; on `503` `PersistenceBusy` 2 (write queue or statement abort) or 30 (migrations pending). Sent as a plain integer, never as an HTTP date. */
+        RetryAfter: number;
         /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header; optional (no `required: true`) because the unchanged 0.3.0 service does not send it yet. */
         "X-Server-Time": string;
     };
@@ -2193,6 +2249,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listAgendaItems: {
@@ -2216,6 +2275,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listUnits: {
@@ -2239,6 +2301,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listSpeakers: {
@@ -2266,7 +2331,10 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     registerSpeaker: {
@@ -2302,10 +2370,14 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     reorderSpeakers: {
@@ -2341,9 +2413,13 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getSpeaker: {
@@ -2370,6 +2446,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     updateSpeaker: {
@@ -2407,9 +2486,13 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listContributions: {
@@ -2435,6 +2518,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     captureContribution: {
@@ -2470,10 +2556,14 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getContribution: {
@@ -2500,6 +2590,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     captureQuestions: {
@@ -2539,9 +2632,13 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     claimContribution: {
@@ -2566,10 +2663,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     releaseContribution: {
@@ -2594,10 +2695,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listQuestions: {
@@ -2623,6 +2728,9 @@ export interface operations {
             200: components["responses"]["QuestionList"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getQuestion: {
@@ -2649,6 +2757,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getQuestionHistory: {
@@ -2674,6 +2785,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     classifyQuestion: {
@@ -2701,10 +2815,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     assignQuestion: {
@@ -2734,10 +2852,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     draftAnswer: {
@@ -2765,10 +2887,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     submitForReview: {
@@ -2792,10 +2918,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     approveQuestion: {
@@ -2825,10 +2955,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     clearQuestionLegally: {
@@ -2857,10 +2991,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     returnQuestion: {
@@ -2890,9 +3028,13 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     stageQuestion: {
@@ -2916,10 +3058,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     deliverQuestion: {
@@ -2943,9 +3089,13 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     closeQuestion: {
@@ -2969,10 +3119,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     withdrawQuestion: {
@@ -3002,9 +3156,13 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     mergeQuestion: {
@@ -3034,10 +3192,14 @@ export interface operations {
             200: components["responses"]["QuestionUpdated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     claimQuestion: {
@@ -3062,10 +3224,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     releaseQuestion: {
@@ -3090,10 +3256,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getStage: {
@@ -3117,6 +3287,9 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listEvents: {
@@ -3146,7 +3319,10 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     streamEvents: {
@@ -3178,7 +3354,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetings: {
@@ -3204,7 +3383,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     createMeeting: {
@@ -3239,7 +3421,11 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getMeetingById: {
@@ -3268,6 +3454,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingAgendaItems: {
@@ -3295,6 +3484,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     replaceMeetingAgendaItems: {
@@ -3334,9 +3526,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     openAgendaItem: {
@@ -3363,9 +3559,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     openVoting: {
@@ -3392,9 +3592,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     closeVoting: {
@@ -3421,9 +3625,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingUnits: {
@@ -3451,6 +3659,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     replaceMeetingUnits: {
@@ -3490,9 +3701,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingStageSeats: {
@@ -3520,6 +3735,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     replaceMeetingStageSeats: {
@@ -3559,9 +3777,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listRoleAssignments: {
@@ -3592,7 +3814,10 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     assignRole: {
@@ -3629,8 +3854,12 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     revokeRole: {
@@ -3670,8 +3899,12 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     freezeMeetingConfig: {
@@ -3707,9 +3940,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingSpeakers: {
@@ -3741,7 +3978,10 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     registerMeetingSpeaker: {
@@ -3781,10 +4021,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     reorderMeetingSpeakers: {
@@ -3824,9 +4068,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingContributions: {
@@ -3856,6 +4104,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     captureMeetingContribution: {
@@ -3895,10 +4146,14 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     listMeetingQuestions: {
@@ -3928,7 +4183,10 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     getMeetingStage: {
@@ -3956,6 +4214,9 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
     login: {
@@ -3982,7 +4243,9 @@ export interface operations {
                 };
                 content?: never;
             };
+            408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -4039,6 +4302,8 @@ export interface operations {
                     };
                 };
             };
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
             /** @description Sign-in unavailable; clears browser correlation */
             503: {
                 headers: {
@@ -4080,7 +4345,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getSession: {
@@ -4105,6 +4373,8 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["NoActiveRole"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getTransparencyNotice: {
@@ -4127,6 +4397,8 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getHealth: {
@@ -4148,6 +4420,8 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -4179,6 +4453,8 @@ export interface operations {
                     };
                 };
             };
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
             /** @description Not ready — at least one check is `fail` */
             503: {
                 headers: {
@@ -4230,6 +4506,8 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     seedDemo: {
@@ -4261,7 +4539,11 @@ export interface operations {
                 };
             };
             403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
+            413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["PersistenceBusy"];
         };
     };
 }

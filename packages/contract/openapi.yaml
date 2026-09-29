@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.3.9
+  version: 0.3.10
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -64,6 +64,23 @@ info:
       (`recordedAt`, ADR 0011); every response carries `X-Server-Time` (from slice 033) so clients
       can compute their offset (slice 032).
     - Vocabulary follows the house glossary (docs/glossar.md). German terms in parentheses.
+
+    Limits (since 0.3.10, slice 034a): a request body is limited to 262 144 bytes (`413`); a request
+    that exceeds the service's time budget is answered `408` (with Postgres: nothing was committed;
+    not for the sign-in paths, which have their own bounds). Quotas per subject (writes, reads) and
+    per source (requests without a session, sign-in starts, probes, CORS preflights) answer `429` with
+    `Retry-After` (whole seconds, 1 to 60); the values are configurable, the defaults live in the
+    service. `503` `PersistenceBusy` (`Retry-After` 2 or 30) means the persistence is busy or
+    migrations are pending; nothing was written. `500` "Persistence outcome is unknown." means a
+    write may have been committed: the client reads the state again before it writes anew, or repeats
+    only with the same `Idempotency-Key`. Every response of the service carries the security headers
+    `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+    `Cross-Origin-Resource-Policy`, `Cross-Origin-Opener-Policy`, `Strict-Transport-Security` and
+    `Cache-Control: no-store`. Double-click protection: a client creates exactly one
+    `Idempotency-Key` per user intention (key press), reuses it when it repeats after `408`, `429`,
+    `503`, `5xx` or a network error, and never uses it for a second intention; `429` and `503` consume
+    no key, and neither does `408` in the service with Postgres. Length and list limits of request
+    schemas were added in this release (see the CHANGELOG).
   x-legal-notice: >
     This contract cites no statute. Legal references live only in the domain: from slice 011 on,
     every rule of the domain rule tables (transitions and guards in `packages/domain`) carries a
@@ -111,6 +128,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /agenda-items:
     get:
       tags: [meeting]
@@ -124,6 +144,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /units:
     get:
       tags: [meeting]
@@ -137,6 +160,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /speakers:
     get:
       tags: [speakers]
@@ -154,6 +180,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [speakers]
       operationId: registerSpeaker
@@ -174,6 +203,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /speakers/order:
     put:
       tags: [speakers]
@@ -194,6 +227,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- items with a global id: canonical as they are --------------------------------------------
   /speakers/{speakerId}:
     parameters: [ { $ref: '#/components/parameters/SpeakerId' } ]
@@ -205,6 +242,9 @@ paths:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     patch:
       tags: [speakers]
       operationId: updateSpeaker
@@ -220,6 +260,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions:
     get:
       tags: [contributions]
@@ -235,6 +279,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [contributions]
       operationId: captureContribution
@@ -257,6 +304,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
     get:
@@ -267,6 +318,9 @@ paths:
         '200': { description: 'OK — `ETag` is `Contribution.version`, the value `claimContribution`/`releaseContribution` send back as `If-Match` (required since 0.3.6)', headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/questions:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
     post:
@@ -285,6 +339,7 @@ paths:
                 questions:
                   type: array
                   minItems: 1
+                  maxItems: 200
                   items: { $ref: '#/components/schemas/QuestionCapture' }
       responses:
         '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Question' } } } } }
@@ -293,6 +348,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/claim:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
     post:
@@ -315,6 +374,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/release:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
     post:
@@ -335,6 +398,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions:
     get:
       tags: [questions]
@@ -358,6 +425,9 @@ paths:
         '200': { $ref: '#/components/responses/QuestionList' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     get:
@@ -368,6 +438,9 @@ paths:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/history:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     get:
@@ -378,6 +451,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EventRead' } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/classification:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -396,6 +472,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/assignment:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -411,7 +491,7 @@ paths:
               type: object
               required: [unitId]
               properties:
-                unitId: { type: string }
+                unitId: { type: string, maxLength: 128 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -420,6 +500,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/answers:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -441,6 +525,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/review-submissions:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -456,6 +544,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/approvals:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -480,6 +572,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/legal-clearances:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -501,6 +597,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/returns:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -516,7 +616,7 @@ paths:
               type: object
               required: [reason]
               properties:
-                reason: { type: string, minLength: 1 }
+                reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -524,6 +624,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/staging:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -539,6 +643,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/delivery:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -553,6 +661,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/closure:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -568,6 +680,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/withdrawal:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -583,7 +699,7 @@ paths:
               type: object
               required: [reason]
               properties:
-                reason: { type: string, minLength: 1 }
+                reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -591,6 +707,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/merge:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -606,7 +726,7 @@ paths:
               type: object
               required: [intoQuestionId]
               properties:
-                intoQuestionId: { type: string }
+                intoQuestionId: { type: string, maxLength: 128 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -615,6 +735,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/claim:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -636,6 +760,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/release:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
     post:
@@ -655,6 +783,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /stage:
     get:
       tags: [stage]
@@ -668,6 +800,9 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- global feeds: sequence numbers are global, the meeting is a filter --------------------------
   /events:
     get:
@@ -696,6 +831,9 @@ paths:
                   lastSeq: { type: integer }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /stream:
     get:
       tags: [events]
@@ -724,6 +862,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- meetings (Jahrgang) — canonical since 0.3.0 --------------------------------------------------
   /meetings:
     get:
@@ -741,6 +882,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [meeting, admin]
       operationId: createMeeting
@@ -760,6 +904,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -772,6 +920,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -784,6 +935,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, meeting]
       operationId: replaceMeetingAgendaItems
@@ -795,7 +949,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItemInput' } } } }
+        content: { application/json: { schema: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/AgendaItemInput' } } } }
       responses:
         '200': { description: OK — the agenda after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -804,6 +958,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/opening:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
     post:
@@ -822,6 +980,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/opening:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
     post:
@@ -838,6 +1000,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/closure:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
     post:
@@ -854,6 +1020,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/units:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -866,6 +1036,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, meeting]
       operationId: replaceMeetingUnits
@@ -877,7 +1050,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UnitInput' } } } }
+        content: { application/json: { schema: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/UnitInput' } } } }
       responses:
         '200': { description: OK — the units after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -886,6 +1059,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/stage-seats:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -901,6 +1078,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, stage]
       operationId: replaceMeetingStageSeats
@@ -912,7 +1092,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeatInput' } } } }
+        content: { application/json: { schema: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/StageSeatInput' } } } }
       responses:
         '200': { description: OK — the seats after the change; `ETag` is the meeting's new version, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StageSeat' } } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -921,6 +1101,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/role-assignments:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -940,6 +1124,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [admin]
       operationId: assignRole
@@ -960,6 +1147,10 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/role-assignments/{assignmentId}/revocation:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AssignmentId' } ]
     post:
@@ -978,7 +1169,7 @@ paths:
             schema:
               type: object
               properties:
-                reason: { type: string, minLength: 1 }
+                reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
         '200': { description: OK — the assignment with `revokedAt` set, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/RoleAssignment' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -986,6 +1177,10 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/config-freeze:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     post:
@@ -1007,6 +1202,10 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/speakers:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -1023,6 +1222,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [speakers]
       operationId: registerMeetingSpeaker
@@ -1041,6 +1243,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/speakers/order:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     put:
@@ -1060,6 +1266,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/contributions:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -1074,6 +1284,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [contributions]
       operationId: captureMeetingContribution
@@ -1097,6 +1310,10 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/questions:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -1122,6 +1339,9 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/stage:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
     get:
@@ -1137,6 +1357,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- sign-in through the BFF (ADR 0004) — outside /v1 ---------------------------------------------
   /auth/login:
     servers: [ { url: /, description: 'Outside /v1: browser navigation, not an API call' } ]
@@ -1184,6 +1407,8 @@ paths:
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/callback:
     servers: [ { url: /, description: 'Outside /v1: the identity provider redirects the browser here' } ]
     get:
@@ -1265,6 +1490,8 @@ paths:
             Set-Cookie: { required: true, x-required-cookie-lines: [hv_auth_state], schema: { $ref: '#/components/schemas/ClearedAuthStateCookieLine' } }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
           content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/logout:
     servers: [ { url: /, description: 'Outside /v1' } ]
     post:
@@ -1298,6 +1525,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/me:
     servers: [ { url: /, description: 'Outside /v1' } ]
     get:
@@ -1313,6 +1543,8 @@ paths:
         '200': { description: 'OK — carries the CSRF token, so never stored by a cache', headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/NoActiveRole' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/transparency-notice:
     servers: [ { url: /, description: 'Outside /v1: read before sign-in' } ]
     get:
@@ -1328,6 +1560,8 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/TransparencyNotice' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   # ---- platform (ADR 0013) — outside /v1 --------------------------------------------------------
   /healthz:
     servers: [ { url: /, description: 'Outside /v1: platform probe' } ]
@@ -1340,6 +1574,8 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Health' } } } }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /readyz:
     servers: [ { url: /, description: 'Outside /v1: platform probe' } ]
     get:
@@ -1382,6 +1618,8 @@ paths:
                           - { required: [clock], properties: { clock: { type: object, properties: { status: { const: fail } } } } }
                           - { required: [db], properties: { db: { type: object, properties: { status: { const: fail } } } } }
                           - { required: [migrations], properties: { migrations: { type: object, properties: { status: { const: fail } } } } }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /metrics:
     servers: [ { url: /, description: 'Outside /v1: scraped by the monitoring stack' } ]
     get:
@@ -1401,6 +1639,8 @@ paths:
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { text/plain: { schema: { type: string, description: 'Prometheus text exposition format 0.0.4' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   # ---- demo -----------------------------------------------------------------------------------------
   /demo/seed:
     post:
@@ -1420,6 +1660,10 @@ paths:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
 components:
   securitySchemes:
     demoActor:
@@ -1461,7 +1705,7 @@ components:
       name: Idempotency-Key
       in: header
       required: false
-      schema: { type: string, maxLength: 128 }
+      schema: { type: string, minLength: 1, maxLength: 128 }
       description: >-
         Client-generated key. A confirmed replay with the same key returns its original business result after
         current authorization, with current masking and actions. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`).
@@ -1528,7 +1772,7 @@ components:
     UnitIdFilter: { name: unitId, in: query, schema: { type: string } }
     ContributionIdFilter: { name: contributionId, in: query, schema: { type: string } }
     AgendaItemIdFilter: { name: agendaItemId, in: query, schema: { type: string } }
-    FullTextFilter: { name: q, in: query, description: Full-text search over question and answer text, schema: { type: string } }
+    FullTextFilter: { name: q, in: query, description: Full-text search over question and answer text, schema: { type: string, maxLength: 200 } }
     QuestionLimit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 2000, default: 500 } }
     QuestionOffset: { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
   headers:
@@ -1556,6 +1800,13 @@ components:
         path (`login`, `completeLogin`, `logout`, `getSession`) — they carry a `state`, a session cookie
         or the CSRF token, and no shared or browser cache may keep them. Other directives may accompany
         it (`private, no-store`).
+    RetryAfter:
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 60 }
+      description: >-
+        Since 0.3.10 (slice 034a): whole seconds after which the client may try again, 1 to 60. On `429`
+        the time to the end of the current counting window; on `503` `PersistenceBusy` 2 (write queue
+        or statement abort) or 30 (migrations pending). Sent as a plain integer, never as an HTTP date.
     X-Server-Time:
       schema: { type: string, format: date-time }
       description: >-
@@ -1653,6 +1904,43 @@ components:
         (review 012 point 18, slice 043).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 422 } } } ] } } }
+    RequestTimeout:
+      description: >-
+        Since 0.3.10 (slice 034a): the request took longer than the service's time budget. With the
+        Postgres persistence a `408` means nothing was committed, and a retry with the same
+        `Idempotency-Key` executes exactly once. `detail` is a fixed sentence, never the limit.
+        Not sent by `GET /auth/login`, `GET /auth/callback` and `POST /auth/logout`, which have
+        their own upper bounds.
+      headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 408 } } } ] } } }
+    PayloadTooLarge:
+      description: >-
+        Since 0.3.10 (slice 034a): the request body exceeds 262 144 bytes (256 KiB). The limit applies
+        to every body, also where this document declares no `requestBody`. When the caller's source has
+        already used up its quota, `429` is sent instead. `detail` is a fixed sentence.
+      headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 413 } } } ] } } }
+    TooManyRequests:
+      description: >-
+        Since 0.3.10 (slice 034a): a quota of the service is used up for the current window (per subject
+        for writes and reads, per source for requests without a session, sign-in starts, probes and
+        CORS preflights). No event is written and no `Idempotency-Key` is consumed. `Retry-After` names
+        the seconds to the end of the window. `detail` is a fixed sentence, never the limit or the source.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 429 } } } ] } } }
+    PersistenceBusy:
+      description: >-
+        Since 0.3.10 (slice 034a): the persistence cannot serve now: the write queue waited longer than
+        the lock limit, a statement was aborted, or migrations are pending. `detail` is
+        "Persistence is busy." or "Migrations are pending."; `Retry-After` is 2 or 30. Nothing was
+        written, no `Idempotency-Key` is consumed, and no database text is included. (A `500` with the
+        detail "Persistence outcome is unknown." is different: see `info.description`.)
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
     ServiceUnavailable:
       description: >-
         The service cannot serve this now (e.g. no identity provider configured). Used only on
@@ -1886,11 +2174,11 @@ components:
       description: 'Since 0.3.0 (slice 040): body of `createMeeting`'
       required: [title, date]
       properties:
-        title: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1, maxLength: 200 }
         date: { type: string, format: date }
-        legalEntity: { type: string }
+        legalEntity: { type: string, maxLength: 200 }
         format: { $ref: '#/components/schemas/MeetingFormat' }
-        cloneFromMeetingId: { type: string, description: 'Copy agenda items, units and podium seats from this meeting (Jahrgang klonen)' }
+        cloneFromMeetingId: { type: string, maxLength: 128, description: 'Copy agenda items, units and podium seats from this meeting (Jahrgang klonen)' }
     AgendaItem:
       type: object
       required: [id, number, title]
@@ -1911,9 +2199,9 @@ components:
       description: 'Since 0.3.0 (slice 040): one item of `replaceMeetingAgendaItems`; without `id` the server assigns one'
       required: [number, title]
       properties:
-        id: { type: string }
+        id: { type: string, maxLength: 128 }
         number: { type: integer, minimum: 1 }
-        title: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1, maxLength: 500 }
     Unit:
       type: object
       required: [id, name]
@@ -1926,9 +2214,9 @@ components:
       description: 'Since 0.3.0 (slice 040): one item of `replaceMeetingUnits`; without `id` the server assigns one'
       required: [name]
       properties:
-        id: { type: string }
-        name: { type: string, minLength: 1 }
-        shortName: { type: string }
+        id: { type: string, maxLength: 128 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        shortName: { type: string, maxLength: 32 }
     StageSeat:
       type: object
       description: >-
@@ -1948,10 +2236,10 @@ components:
       description: 'Since 0.3.0 (slice 040): one item of `replaceMeetingStageSeats`; without `id` the server assigns one'
       required: [label]
       properties:
-        id: { type: string }
-        label: { type: string, minLength: 1 }
-        personId: { type: string }
-        deviceId: { type: string }
+        id: { type: string, maxLength: 128 }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        personId: { type: string, maxLength: 128 }
+        deviceId: { type: string, maxLength: 128 }
         position: { type: integer, minimum: 1 }
     RoleAssignment:
       type: object
@@ -1979,9 +2267,9 @@ components:
       required: [subjectId, role]
       properties:
         subjectId: { $ref: '#/components/schemas/SubjectId' }
-        personId: { type: string }
+        personId: { type: string, maxLength: 128 }
         role: { $ref: '#/components/schemas/Role' }
-        unitId: { type: string }
+        unitId: { type: string, maxLength: 128 }
         expiresAt: { type: string, format: date-time }
         deputyForSubjectId: { $ref: '#/components/schemas/SubjectId' }
     ConfigFreeze:
@@ -2155,8 +2443,8 @@ components:
       type: object
       required: [displayName]
       properties:
-        displayName: { type: string, minLength: 1 }
-        organisation: { type: string }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        organisation: { type: string, maxLength: 200 }
         kind:
           type: string
           enum: [shareholder, proxy, association]
@@ -2188,7 +2476,7 @@ components:
       required: [round, speakerIds]
       properties:
         round: { type: integer, minimum: 1 }
-        speakerIds: { type: array, items: { type: string } }
+        speakerIds: { type: array, maxItems: 2000, items: { type: string, maxLength: 128 } }
     TextSpan:
       type: object
       description: Character offsets into the contribution text, half-open interval
@@ -2267,8 +2555,8 @@ components:
         them (review 023).
       required: [speakerId, text]
       properties:
-        speakerId: { type: string }
-        text: { type: string, minLength: 1 }
+        speakerId: { type: string, maxLength: 128 }
+        text: { type: string, minLength: 1, maxLength: 60000 }
         source: { type: string, enum: [manual, transcript] }
     MeetingContributionCapture:
       type: object
@@ -2280,10 +2568,10 @@ components:
         enforced by the service's Ajv validator; the generated TypeScript types cannot express it).
       required: [speakerId, text]
       properties:
-        speakerId: { type: string }
-        text: { type: string, minLength: 1 }
+        speakerId: { type: string, maxLength: 128 }
+        text: { type: string, minLength: 1, maxLength: 60000 }
         source: { type: string, enum: [manual, transcript, paper], description: '`paper` = paper path (Papierpfad, slice 025)' }
-        lateEntryReason: { type: string, minLength: 1, description: 'Since 0.3.2 (takt-016): reason for a paper or transcript entry after the debate closed. Optional in the schema; R-MTG-03 requires non-blank text in that state.' }
+        lateEntryReason: { type: string, minLength: 1, maxLength: 500, description: 'Since 0.3.2 (takt-016): reason for a paper or transcript entry after the debate closed. Optional in the schema; R-MTG-03 requires non-blank text in that state.' }
         occurredAt: { type: string, format: date-time, description: 'The sender''s statement of when the speech happened' }
         occurredAtSource:
           type: string
@@ -2349,7 +2637,7 @@ components:
       type: object
       properties:
         answerVersion: { type: integer, minimum: 1 }
-        note: { type: string }
+        note: { type: string, maxLength: 500 }
     LegalClearance:
       type: object
       required: [clearedAt, clearedBy]
@@ -2407,14 +2695,14 @@ components:
       type: object
       required: [text]
       properties:
-        text: { type: string, minLength: 1 }
+        text: { type: string, minLength: 1, maxLength: 4000 }
         span: { $ref: '#/components/schemas/TextSpan' }
     Classification:
       type: object
       required: [track]
       properties:
         track: { $ref: '#/components/schemas/Track' }
-        agendaItemId: { type: string }
+        agendaItemId: { type: string, maxLength: 128 }
         stageAssignment:
           deprecated: true
           description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives with 0.4.0 (slice 043, ahead of 040): not in 0.3.0, because the unchanged service would accept and silently drop it today (review 023). `Question.seatId` is already declared on the response.'
@@ -2423,8 +2711,8 @@ components:
       type: object
       required: [text]
       properties:
-        text: { type: string, minLength: 1 }
-        sources: { type: array, items: { type: string } }
+        text: { type: string, minLength: 1, maxLength: 20000 }
+        sources: { type: array, maxItems: 50, items: { type: string, maxLength: 2000 } }
     StageView:
       type: object
       required: [current, queue, deliveredCount, openCount]

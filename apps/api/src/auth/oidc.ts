@@ -31,6 +31,12 @@ export interface OidcFlowOptions {
   redirectUri: string;
   serviceOrigin?: string;
   clock?: () => Date;
+  /**
+   * Deadline of each call to the identity provider in whole seconds (slice 034a: 5 s). `openid-client` applies
+   * it as an `AbortSignal` to the discovery request and, through the configuration, to every later call
+   * (the token exchange), so a stalled provider ends in an error and not in a hanging request.
+   */
+  timeoutSeconds?: number;
 }
 
 /** One configured issuer and one registered callback; caller controls state persistence. */
@@ -66,7 +72,7 @@ export function createOidcFlow(options: OidcFlowOptions): OidcFlow {
       client.ClientSecretPost(options.clientSecret),
       { execute: issuer.protocol === 'http:'
         ? [client.allowInsecureRequests, client.enableNonRepudiationChecks]
-        : [client.enableNonRepudiationChecks], timeout: 3 }).then((result) => {
+        : [client.enableNonRepudiationChecks], timeout: options.timeoutSeconds ?? 5 }).then((result) => {
       if (result.serverMetadata().issuer !== options.issuer) throw new Error('OIDC issuer mismatch.');
       return result;
     }).catch((error: unknown) => {

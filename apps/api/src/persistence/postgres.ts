@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { assertEventShape, verifyEventChain, type DomainEvent } from '@hv/domain';
 
 /** The per-meeting identity projection stored beside, and reconstructed from, the event log. */
@@ -16,11 +16,139 @@ export interface PostgresSnapshot {
   persons: PersonRow[];
 }
 
-/** Messages crossing the HTTP boundary must never include a DB diagnostic or an event payload. */
-export class PostgresPersistenceError extends Error {
+/** Default of the per-query timer (slice 034a): above `statement_timeout` (5 s), below the request timeout. */
+export const DEFAULT_QUERY_TIMEOUT_MS = 6_000;
+
+/**
+ * Raised by the service's own per-query timer (slice 034a). `pg@8.23.0` reports its `query_timeout` as a
+ * plain `Error("Query read timeout")` without code or class, and message texts are never compared, so the
+ * driver's option stays unset and this class is the tag.
+ */
+export class QueryTimeoutError extends Error {
   constructor() {
+    super('Postgres query timed out.');
+    this.name = 'QueryTimeoutError';
+  }
+}
+
+/** SQLSTATE of `lock_timeout` (55P03) and `statement_timeout` (57014): the persistence is busy. */
+function isBusyCode(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+  return code === '55P03' || code === '57014';
+}
+
+/**
+ * Messages crossing the HTTP boundary must never include a DB diagnostic or an event payload. `busy` is
+ * set from the SQLSTATE or from `QueryTimeoutError` (`instanceof`), never from a message text;
+ * `queryTimeout` says the service's own timer fired, so the connection has to be discarded.
+ */
+export class PostgresPersistenceError extends Error {
+  readonly busy: boolean;
+  readonly queryTimeout: boolean;
+
+  constructor(cause?: unknown) {
     super('Postgres persistence is unavailable.');
     this.name = 'PostgresPersistenceError';
+    this.queryTimeout = cause instanceof QueryTimeoutError;
+    this.busy = this.queryTimeout || isBusyCode(cause);
+  }
+}
+
+/** Whether the connection that ran into this error must not go back to the pool. */
+export function mustDiscardConnection(error: unknown): boolean {
+  return error instanceof QueryTimeoutError || (error instanceof PostgresPersistenceError && error.queryTimeout);
+}
+
+/** Whether the error means "persistence busy" (503) rather than "unavailable" (500). */
+export function isPersistenceBusy(error: unknown): boolean {
+  return error instanceof QueryTimeoutError || isBusyCode(error) ||
+    (error instanceof PostgresPersistenceError && error.busy);
+}
+
+type Queryable = Pick<Pool | PoolClient, 'query'>;
+
+/**
+ * One query with its own timer. The pending driver promise is swallowed after the timer won, so a late
+ * rejection is not an unhandled one; the caller discards the connection (`client.release(error)`).
+ */
+export async function timedQuery<R extends QueryResultRow = QueryResultRow>(
+  target: Queryable, timeoutMs: number, text: string, values?: unknown[],
+): Promise<QueryResult<R>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pending = (target.query as (t: string, v?: unknown[]) => Promise<QueryResult<R>>)
+    .call(target, text, values);
+  pending.catch(() => undefined);
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new QueryTimeoutError()), timeoutMs); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
+ * A query on a pooled connection of its own, with the timer; after a timer expiry the connection is
+ * destroyed instead of returned (the hanging statement dies with it).
+ */
+export async function pooledQuery<R extends QueryResultRow = QueryResultRow>(
+  pool: Pool, timeoutMs: number, text: string, values?: unknown[],
+): Promise<QueryResult<R>> {
+  const client = await pool.connect();
+  let result: QueryResult<R>;
+  try {
+    result = await timedQuery<R>(client, timeoutMs, text, values);
+  } catch (error) {
+    client.release(mustDiscardConnection(error) ? (error as Error) : undefined);
+    throw error;
+  }
+  client.release();
+  return result;
+}
+
+/**
+ * A view of the pool for helpers that open a connection and query it themselves (`getMigrationStatus`,
+ * `assertRuntimePrivileges`): every query on it runs under the service's timer, and a connection on which the
+ * timer fired is destroyed on `release()` instead of returned to the pool.
+ */
+export function withQueryTimers(pool: Pool, timeoutMs: number): Pool {
+  return {
+    connect: async () => {
+      const client = await pool.connect();
+      let expired: Error | undefined;
+      return new Proxy(client, {
+        get(target, property) {
+          if (property === 'query') {
+            return async (...args: unknown[]) => {
+              try {
+                return await timedQuery(target, timeoutMs, args[0] as string, args[1] as unknown[] | undefined);
+              } catch (error) {
+                if (mustDiscardConnection(error)) expired = error as Error;
+                throw error;
+              }
+            };
+          }
+          if (property === 'release') return (error?: Error | boolean) => target.release(error ?? expired);
+          const value = Reflect.get(target, property) as unknown;
+          return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+        },
+      });
+    },
+  } as unknown as Pool;
+}
+
+/** Runs any promise against the per-query timer (for helpers that open their own connection). */
+export async function withQueryTimer<T>(run: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  run.catch(() => undefined);
+  try {
+    return await Promise.race([
+      run,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new QueryTimeoutError()), timeoutMs); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -120,8 +248,21 @@ export async function assertRuntimePrivileges(pool: Pool, requireTables = true):
         throw new PostgresPersistenceError();
       }
     }
-  } catch {
-    throw new PostgresPersistenceError();
+    // Slice 034a (SC-08): the one named exception to "no DELETE" is EXECUTE on the bounded purge function.
+    // Without `requireTables` (readiness before the migration) an absent function is not an error.
+    const purge = await client.query<{ can_execute: boolean }>(
+      `SELECT has_function_privilege(current_user, p.oid, 'EXECUTE') AS can_execute
+       FROM pg_catalog.pg_proc p
+       JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = current_schema() AND p.proname = 'auth_purge_login_states'`,
+    );
+    if (purge.rows.length > 1 || (requireTables && purge.rows.length !== 1) ||
+        purge.rows.some((row) => !row.can_execute)) {
+      throw new PostgresPersistenceError();
+    }
+  } catch (error) {
+    // Keep the cause class only (`busy`, `queryTimeout`), never its text: a timer or lock timeout is a 503.
+    throw error instanceof PostgresPersistenceError ? error : new PostgresPersistenceError(error);
   } finally {
     client?.release();
   }
@@ -159,20 +300,22 @@ function expectedPersons(events: readonly DomainEvent[]): Map<string, PersonRow>
  * Load a fresh snapshot on the caller's transaction-bound client. The caller chooses the read
  * transaction isolation level; it must keep both SELECTs on one consistent snapshot.
  */
-export async function loadPostgresSnapshot(client: PoolClient): Promise<PostgresSnapshot> {
+export async function loadPostgresSnapshot(
+  client: PoolClient, queryTimeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
+): Promise<PostgresSnapshot> {
   let eventRows: EventDbRow[];
   let personRows: PersonDbRow[];
   try {
-    const eventResult = await client.query<EventDbRow>(
+    const eventResult = await timedQuery<EventDbRow>(client, queryTimeoutMs,
       'SELECT seq, id, meeting_id, hash, prev_hash, envelope FROM events ORDER BY seq',
     );
-    const personResult = await client.query<PersonDbRow>(
+    const personResult = await timedQuery<PersonDbRow>(client, queryTimeoutMs,
       'SELECT meeting_id, person_id, display_name, organisation, key_id, source_seq FROM persons ORDER BY meeting_id, person_id',
     );
     eventRows = eventResult.rows;
     personRows = personResult.rows;
-  } catch {
-    throw new PostgresPersistenceError();
+  } catch (error) {
+    throw new PostgresPersistenceError(error);
   }
 
   const events: DomainEvent[] = [];
@@ -220,28 +363,30 @@ export async function loadPostgresSnapshot(client: PoolClient): Promise<Postgres
 }
 
 /** Insert only the already stamped suffix; the caller commits or rolls back its transaction. */
-export async function insertPostgresEvents(client: PoolClient, events: readonly DomainEvent[]): Promise<void> {
+export async function insertPostgresEvents(
+  client: PoolClient, events: readonly DomainEvent[], queryTimeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
+): Promise<void> {
   for (const event of events) {
     try {
       assertEventShape(event);
-      await client.query(
+      await timedQuery(client, queryTimeoutMs,
         'INSERT INTO events (seq, id, meeting_id, hash, prev_hash, envelope) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
         [event.seq, event.id, event.meetingId ?? null, event.hash, event.prevHash, JSON.stringify(event)],
       );
     } catch (error) {
       if (error instanceof PostgresIntegrityError) throw error;
-      throw new PostgresPersistenceError();
+      throw new PostgresPersistenceError(error);
     }
     const person = personFromEvent(event);
     if (person) {
       try {
-        await client.query(
+        await timedQuery(client, queryTimeoutMs,
           'INSERT INTO persons (meeting_id, person_id, display_name, organisation, key_id, source_seq) VALUES ($1, $2, $3, $4, $5, $6)',
           [person.meetingId, person.personId, person.displayName, person.organisation ?? null,
             person.keyId, person.sourceSeq],
         );
-      } catch {
-        throw new PostgresPersistenceError();
+      } catch (error) {
+        throw new PostgresPersistenceError(error);
       }
     }
   }

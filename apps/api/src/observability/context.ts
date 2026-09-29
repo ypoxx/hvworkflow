@@ -13,6 +13,14 @@ export interface RequestContext {
   readonly clock: () => Date;
   subjectHash: string | null;
   seq: number | null;
+  /**
+   * Where the request stands for the request timeout (slice 034a): `committing` from the moment the
+   * Postgres boundary sends the events and COMMIT, `timedOut` once the 408 was answered. A late boundary
+   * that sees `timedOut` rolls back instead of committing.
+   */
+  phase: 'running' | 'committing' | 'timedOut';
+  /** The access log line of this request is not written (protocol exception for repeated refusals). */
+  suppressLog: boolean;
 }
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();
