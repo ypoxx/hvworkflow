@@ -97,7 +97,10 @@ CORS im Sitzungsbetrieb; `types.ts` reproduzierbar; Einzeltests api 40/40, web 6
 
 1. minor → Folgeliste: 403-Body nicht gegen `NoActiveRole` validiert, `X-Server-Time` nicht geprüft.
 2. minor → Folgeliste: Test 1(d) (403 aus Fachaufruf ändert Zustand nicht) prüft faktisch nichts.
-3. minor → Folgeliste: Missbrauchsfall in Spec 030 ohne Erkennung/Signal/Empfänger bzw. MF-Bezug (SC-06).
+3. minor (behoben nach Codex P1): Missbrauchsfall in Spec 030 ohne Erkennung/Signal/Empfänger (SC-06) → Signal, Empfänger und befristete Ausnahme bis 033b ergänzt.
 4. minor → Folgeliste: `GET /auth/me` einer Sitzung ohne Rolle schiebt das Leerlauffenster (`slideIdle`) weiter.
 5. nit: `logout`-Beschreibung im Vertrag nennt „keine Rolle nötig“ nicht.
 6. nit: `noRole` fragt die Sitzung nicht neu ab; neue Rolle erst nach Ab- und Anmelden (bewusste Grenze).
+
+Codex (ein Lauf beim Ready-Setzen, auf `1916029`): 1 × P1 — Missbrauchsfall ohne Erkennungssignal und Empfänger
+(SC-06) → in Spec 030 ergänzt (aggregierte 403-Zahl, Empfänger, Ausnahme mit Eigentümer und Ablauf bis 033b).
