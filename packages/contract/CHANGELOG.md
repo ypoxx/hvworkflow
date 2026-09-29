@@ -10,6 +10,15 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.9] - 2026-09-29
+
+### Changed
+
+- Scheibe 033b (additive, description only): `getMetrics` now says what the endpoint really serves: five
+  business indicators and one technical count without labels (`hv_auth_no_active_role_total`), none per
+  person; without a configured token every call is answered 401. No schema, status or parameter changes.
+  The `getMetrics` entry leaves `allowlist.json`, because the operation is now served.
+
 ## [0.3.8] - 2026-09-29
 
 ### Changed
