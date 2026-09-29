@@ -17,7 +17,8 @@ interface Options {
   subject?: string;
   grantFor?: string[]; // actor ids that receive a moderation role
   blocked?: boolean;
-  faults?: { events?: boolean; createSession?: boolean };
+  blockedAfterCheck?: boolean; // blocked between the first check and the session insert
+  faults?: { events?: boolean; createSession?: boolean; consumeLoginState?: boolean; isSubjectBlocked?: boolean };
 }
 
 async function fixture(options: Options = {}) {
@@ -36,9 +37,11 @@ async function fixture(options: Options = {}) {
   const logins = new Map<string, { browserCorrelation: string; nonce: string; pkceVerifier: string; returnTo: string }>();
   const sessions = new Map<string, { actorId: string; csrfToken: string; idle: Date }>();
   const created: string[] = [];
+  let blockChecks = 0;
   const authStore: AuthStore = {
     async createLoginState(input) { logins.set(input.state, input); },
     async consumeLoginState({ state, browserCorrelation }) {
+      if (options.faults?.consumeLoginState) throw new Error('connection terminated');
       const found = logins.get(state);
       if (!found || found.browserCorrelation !== browserCorrelation) return null;
       logins.delete(state);
@@ -46,7 +49,7 @@ async function fixture(options: Options = {}) {
     },
     async createSession(input) {
       if (options.faults?.createSession) throw new Error('connection terminated');
-      if (options.blocked) throw new Error('Auth subject is blocked.');
+      if (options.blocked || options.blockedAfterCheck) throw new Error('Auth subject is blocked.');
       const token = 's'.repeat(43);
       const csrfToken = 'c'.repeat(43);
       sessions.set(token, { actorId: input.actorId, csrfToken, idle: new Date(input.now.getTime() + 30 * min) });
@@ -64,7 +67,11 @@ async function fixture(options: Options = {}) {
     async verifyCsrf(token, submitted) { return sessions.get(token)?.csrfToken === submitted; },
     async revokeSession(token) { return sessions.delete(token); },
     async blockSubject() {},
-    async isSubjectBlocked() { return options.blocked === true; },
+    async isSubjectBlocked() {
+      if (options.faults?.isSubjectBlocked) throw new Error('connection terminated');
+      blockChecks += 1;
+      return options.blocked === true || (options.blockedAfterCheck === true && blockChecks > 1);
+    },
   };
   const oidcFlow: OidcFlow = {
     async authorizationUrl({ state }) { return `${issuer}/authorize?state=${state}`; },
@@ -128,7 +135,8 @@ describe('takt-029 goal 1: sign-in refusals over HTTP', () => {
 });
 
 describe('takt-029 goal 2: persistence faults in the callback answer 503', () => {
-  it.each([['loading the auth events', { events: true }], ['writing the session', { createSession: true }]] as const)(
+  it.each([['loading the auth events', { events: true }], ['writing the session', { createSession: true }],
+    ['consuming the login state', { consumeLoginState: true }], ['checking the subject block', { isSubjectBlocked: true }]] as const)(
     'answers 503 without session when %s fails', async (_name, faults) => {
       const { app, created } = await fixture({ faults });
       const response = await callback(app);
@@ -138,6 +146,16 @@ describe('takt-029 goal 2: persistence faults in the callback answer 503', () =>
       expect(created).toHaveLength(0);
       expect(await response.json()).toMatchObject({ detail: 'Sign-in is unavailable.' });
     });
+});
+
+describe('takt-029 review finding 2: blocked between the check and the insert', () => {
+  it('answers 403, not 503, and creates no session', async () => {
+    const { app, created } = await fixture({ blockedAfterCheck: true });
+    const response = await callback(app);
+    expect(response.status).toBe(403);
+    expect(sessionCookie(response)).toBeUndefined();
+    expect(created).toHaveLength(0);
+  });
 });
 
 describe('takt-029 goal 3: a session without a role does not extend its idle window', () => {

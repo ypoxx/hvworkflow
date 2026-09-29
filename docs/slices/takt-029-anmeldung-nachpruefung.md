@@ -73,4 +73,16 @@ Ziel 2 und 3: Tests vor der Änderung rot (500 bzw. 403 statt 503 bei beiden Feh
 
 ## Review findings
 
-folgt
+Review (Opus, frischer Kontext, nur Spec und Diff): freigabefähig, kein blocker, kein major. Einzeltests vom
+Reviewer ausgeführt: `auth-029b` und `auth-takt029` 36/36, `postgres-auth-029b` gegen `hv_t029` 7/7.
+
+1. minor, `apps/api/src/app.ts` (Callback, `consumeLoginState` und erste `isSubjectBlocked`-Prüfung): die
+   503-Umwandlung war ungetestet. **In der Scheibe behoben** (sicherheitsnaher Fehlerpfad, daher nicht Folgeliste):
+   die Tabelle in `auth-takt029.test.ts` prüft beide Fehlerarten auf 503, kein Cookie, keine Sitzung.
+2. minor, `apps/api/src/app.ts` (Callback, Sperre zwischen Prüfung und Einfügen): 403 statt 503 war ungetestet.
+   **In der Scheibe behoben**: eigener Test, die Sperre greift erst bei der zweiten Prüfung → 403, keine Sitzung.
+3. nit, Ziel 3 nur gegen den Test-Store belegt: **schon abgedeckt**. `postgres-auth-029b.test.ts` prüft in
+   „enforces 30-minute idle …“, dass `readSession(…, false)` `idle_expires_at` unverändert lässt.
+4. nit, `apps/api/src/app.ts` (`/auth/me`): ein DB-Fehler beim Laden der Rollen liefert weiter 500. Das liegt
+   außerhalb der Scheibe und betrifft die Verfügbarkeit, nicht Sicherheit, Recht oder Datenschutz. Es geht auf
+   `docs/folgeliste.md`.
