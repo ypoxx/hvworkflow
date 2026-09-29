@@ -13,7 +13,7 @@ import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Pool, PoolClient } from 'pg';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import {
   ApiProblem,
@@ -223,7 +223,11 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
   const domain: HvApi = new Proxy(memoryDomain, {
     get(target, property, receiver) {
-      return Reflect.get(requestStorage.getStore()?.domain ?? target, property, receiver);
+      const active = requestStorage.getStore()?.domain;
+      // With Postgres configured the in-memory store is never a valid source of truth: a handler
+      // reached without the request boundary must fail loudly, not read or write a stale store.
+      if (!active && options.postgres) throw new Error('Postgres request boundary missing for this route.');
+      return Reflect.get(active ?? target, property, receiver);
     },
   });
 
@@ -335,7 +339,11 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (actor === undefined) await next();
     else await actorStorage.run(actor, () => next());
   });
-  app.use('/v1/*', async (c, next) => {
+  // Slice takt-024: the Postgres boundary (migration status, runtime rights, transaction, write lock,
+  // snapshot, commit/rollback) is NOT a blanket `/v1/*` middleware any more. It is chained onto each
+  // route behind `validateOperation` (see `guarded` below), so an unknown path (404) or a contract
+  // violation (422) never takes a connection or the global lock.
+  const postgresBoundary = async (c: Context<{ Variables: Variables }>, next: Next): Promise<Response | void> => {
     const pool = options.postgres;
     if (!pool) {
       await next();
@@ -393,7 +401,19 @@ export function createApp(options: CreateAppOptions = {}): App {
     } finally {
       client?.release();
     }
-  });
+  };
+  // One handler per route: contract check first, Postgres boundary only for an accepted request.
+  // Reaching a domain call without the boundary is impossible with Postgres configured: the `domain`
+  // proxy refuses to fall back to the in-memory store then (guard above).
+  const guarded = (operationId: string | undefined) => {
+    const validate = operationId === undefined ? undefined : validateOperation(operationId);
+    return async (c: Context<{ Variables: Variables }>, next: Next): Promise<Response | void> => {
+      if (validate === undefined) return postgresBoundary(c, next);
+      let boundaryResult: Response | void = undefined;
+      await validate(c, async () => { boundaryResult = await postgresBoundary(c, next); });
+      return boundaryResult;
+    };
+  };
   app.onError((err, c) => {
     const response = problemResponse(err);
     if (c.req.path.startsWith('/auth/')) {
@@ -607,18 +627,18 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
 
   // ---- meeting ----------------------------------------------------------------------------------
-  app.get('/v1/meetings', validateOperation('listMeetings'), async (c) => {
+  app.get('/v1/meetings', guarded('listMeetings'), async (c) => {
     const status = getValidatedQuery(c)['status'] as Awaited<ReturnType<HvApi['getMeeting']>>['status'] | undefined;
     return c.json(await domain.listMeetings(status));
   });
-  app.get('/v1/meetings/:meetingId', validateOperation('getMeetingById'), async (c) => {
+  app.get('/v1/meetings/:meetingId', guarded('getMeetingById'), async (c) => {
     const meeting = await domain.getMeetingById(requireParam(c, 'meetingId'));
     etag(c, { version: meeting.version ?? 1 });
     return c.json(meeting);
   });
-  app.get('/v1/meetings/:meetingId/agenda-items', validateOperation('listMeetingAgendaItems'), async (c) =>
+  app.get('/v1/meetings/:meetingId/agenda-items', guarded('listMeetingAgendaItems'), async (c) =>
     c.json(await domain.listMeetingAgendaItems(requireParam(c, 'meetingId'))));
-  app.get('/v1/meetings/:meetingId/units', validateOperation('listMeetingUnits'), async (c) =>
+  app.get('/v1/meetings/:meetingId/units', guarded('listMeetingUnits'), async (c) =>
     c.json(await domain.listMeetingUnits(requireParam(c, 'meetingId'))));
   const agendaResult = async (c: Context, action: 'openAgendaItem' | 'openVoting' | 'closeVoting'): Promise<Response> => {
     const scoped = await meetingDomain(requireParam(c, 'meetingId'));
@@ -627,34 +647,34 @@ export function createApp(options: CreateAppOptions = {}): App {
     etag(c, { version: meeting.version ?? 1 });
     return c.json(item);
   };
-  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/opening', validateOperation('openAgendaItem'),
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/opening', guarded('openAgendaItem'),
     (c) => agendaResult(c, 'openAgendaItem'));
-  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/opening', validateOperation('openVoting'),
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/opening', guarded('openVoting'),
     (c) => agendaResult(c, 'openVoting'));
-  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/closure', validateOperation('closeVoting'),
+  app.post('/v1/meetings/:meetingId/agenda-items/:agendaItemId/voting/closure', guarded('closeVoting'),
     (c) => agendaResult(c, 'closeVoting'));
 
-  app.get('/v1/meetings/:meetingId/role-assignments', validateOperation('listRoleAssignments'), async (c) => {
+  app.get('/v1/meetings/:meetingId/role-assignments', guarded('listRoleAssignments'), async (c) => {
     const query = getValidatedQuery(c);
     return c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).listRoleAssignments({
       ...(query['subjectId'] !== undefined ? { subjectId: query['subjectId'] as string } : {}),
       ...(query['role'] !== undefined ? { role: query['role'] as Role } : {}),
     }));
   });
-  app.post('/v1/meetings/:meetingId/role-assignments', validateOperation('assignRole'), async (c) => {
+  app.post('/v1/meetings/:meetingId/role-assignments', guarded('assignRole'), async (c) => {
     const assignment = await (await meetingDomain(requireParam(c, 'meetingId')))
       .assignRole(getValidatedBody<RoleAssignmentCreate>(c), writeOptions(c));
     return c.json(assignment, 201);
   });
   app.post('/v1/meetings/:meetingId/role-assignments/:assignmentId/revocation',
-    validateOperation('revokeRole'), async (c) => {
+    guarded('revokeRole'), async (c) => {
       const body = getValidatedBody<{ reason?: string } | undefined>(c);
       const assignment = await (await meetingDomain(requireParam(c, 'meetingId')))
         .revokeRole(requireParam(c, 'assignmentId'), body?.reason, writeOptions(c));
       return c.json(assignment);
     });
 
-  app.get('/v1/meetings/:meetingId/speakers', validateOperation('listMeetingSpeakers'), async (c) => {
+  app.get('/v1/meetings/:meetingId/speakers', guarded('listMeetingSpeakers'), async (c) => {
     const query = getValidatedQuery(c);
     const scoped = await meetingDomain(requireParam(c, 'meetingId'));
     const speakers = await scoped.listSpeakers({
@@ -664,43 +684,43 @@ export function createApp(options: CreateAppOptions = {}): App {
     await speakerListEtag(c, scoped);
     return c.json(speakers);
   });
-  app.post('/v1/meetings/:meetingId/speakers', validateOperation('registerMeetingSpeaker'), async (c) => {
+  app.post('/v1/meetings/:meetingId/speakers', guarded('registerMeetingSpeaker'), async (c) => {
     const scoped = await meetingDomain(requireParam(c, 'meetingId'));
     const speaker = await scoped.registerSpeaker(getValidatedBody<SpeakerRegistration>(c), writeOptions(c));
     await speakerListEtag(c, scoped, true);
     return c.json(speaker, 201);
   });
-  app.put('/v1/meetings/:meetingId/speakers/order', validateOperation('reorderMeetingSpeakers'), async (c) => {
+  app.put('/v1/meetings/:meetingId/speakers/order', guarded('reorderMeetingSpeakers'), async (c) => {
     const body = getValidatedBody<{ round: number; speakerIds: string[] }>(c);
     const scoped = await meetingDomain(requireParam(c, 'meetingId'));
     const speakers = await scoped.reorderSpeakers(body.round, body.speakerIds, writeOptions(c));
     await speakerListEtag(c, scoped, true);
     return c.json(speakers);
   });
-  app.get('/v1/meetings/:meetingId/contributions', validateOperation('listMeetingContributions'), async (c) => {
+  app.get('/v1/meetings/:meetingId/contributions', guarded('listMeetingContributions'), async (c) => {
     const speakerId = getValidatedQuery(c)['speakerId'] as string | undefined;
     return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
       .listContributions(speakerId !== undefined ? { speakerId } : {}));
   });
-  app.post('/v1/meetings/:meetingId/contributions', validateOperation('captureMeetingContribution'), async (c) => {
+  app.post('/v1/meetings/:meetingId/contributions', guarded('captureMeetingContribution'), async (c) => {
     const contribution = await (await meetingDomain(requireParam(c, 'meetingId')))
       .captureMeetingContribution(getValidatedBody<MeetingContributionCapture>(c), writeOptions(c));
     etag(c, contribution);
     return c.json(contribution, 201);
   });
-  app.get('/v1/meetings/:meetingId/questions', validateOperation('listMeetingQuestions'), async (c) => {
+  app.get('/v1/meetings/:meetingId/questions', guarded('listMeetingQuestions'), async (c) => {
     return c.json(await (await meetingDomain(requireParam(c, 'meetingId')))
       .listQuestions(questionFilter(getValidatedQuery(c))));
   });
-  app.get('/v1/meetings/:meetingId/stage', validateOperation('getMeetingStage'), async (c) =>
+  app.get('/v1/meetings/:meetingId/stage', guarded('getMeetingStage'), async (c) =>
     c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).getStage()));
 
-  app.get('/v1/meeting', async (c) => c.json(await domain.getMeeting()));
-  app.get('/v1/agenda-items', async (c) => c.json(await domain.listAgendaItems()));
-  app.get('/v1/units', async (c) => c.json(await domain.listUnits()));
+  app.get('/v1/meeting', guarded(undefined), async (c) => c.json(await domain.getMeeting()));
+  app.get('/v1/agenda-items', guarded(undefined), async (c) => c.json(await domain.listAgendaItems()));
+  app.get('/v1/units', guarded(undefined), async (c) => c.json(await domain.listUnits()));
 
   // ---- speakers -----------------------------------------------------------------------------------
-  app.get('/v1/speakers', validateOperation('listSpeakers'), async (c) => {
+  app.get('/v1/speakers', guarded('listSpeakers'), async (c) => {
     const query = getValidatedQuery(c);
     const round = query['round'] as number | undefined;
     const status = query['status'] as Speaker['status'] | undefined;
@@ -712,24 +732,24 @@ export function createApp(options: CreateAppOptions = {}): App {
     await speakerListEtag(c, domain);
     return c.json(speakers);
   });
-  app.post('/v1/speakers', validateOperation('registerSpeaker'), async (c) => {
+  app.post('/v1/speakers', guarded('registerSpeaker'), async (c) => {
     const body = getValidatedBody<SpeakerRegistration>(c);
     const speaker = await domain.registerSpeaker(body, writeOptions(c));
     await speakerListEtag(c, domain, true);
     return c.json(speaker, 201);
   });
-  app.put('/v1/speakers/order', validateOperation('reorderSpeakers'), async (c) => {
+  app.put('/v1/speakers/order', guarded('reorderSpeakers'), async (c) => {
     const body = getValidatedBody<{ round: number; speakerIds: string[] }>(c);
     const speakers = await domain.reorderSpeakers(body.round, body.speakerIds, writeOptions(c));
     await speakerListEtag(c, domain, true);
     return c.json(speakers);
   });
-  app.get('/v1/speakers/:speakerId', validateOperation('getSpeaker'), async (c) => {
+  app.get('/v1/speakers/:speakerId', guarded('getSpeaker'), async (c) => {
     const speaker = await domain.getSpeaker(requireParam(c, 'speakerId'));
     etag(c, speaker);
     return c.json(speaker);
   });
-  app.patch('/v1/speakers/:speakerId', validateOperation('updateSpeaker'), async (c) => {
+  app.patch('/v1/speakers/:speakerId', guarded('updateSpeaker'), async (c) => {
     const body = getValidatedBody<SpeakerUpdate>(c);
     const speaker = await domain.updateSpeaker(requireParam(c, 'speakerId'), body, writeOptions(c));
     etag(c, speaker);
@@ -737,49 +757,49 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
 
   // ---- contributions --------------------------------------------------------------------------
-  app.get('/v1/contributions', validateOperation('listContributions'), async (c) => {
+  app.get('/v1/contributions', guarded('listContributions'), async (c) => {
     const speakerId = getValidatedQuery(c)['speakerId'] as string | undefined;
     return c.json(await domain.listContributions(speakerId !== undefined ? { speakerId } : {}));
   });
-  app.post('/v1/contributions', validateOperation('captureContribution'), async (c) => {
+  app.post('/v1/contributions', guarded('captureContribution'), async (c) => {
     const body = getValidatedBody<ContributionCapture>(c);
     const contribution = await domain.captureContribution(body, writeOptions(c));
     etag(c, contribution);
     return c.json(contribution, 201);
   });
-  app.get('/v1/contributions/:contributionId', validateOperation('getContribution'), async (c) => {
+  app.get('/v1/contributions/:contributionId', guarded('getContribution'), async (c) => {
     const contribution = await domain.getContribution(requireParam(c, 'contributionId'));
     etag(c, contribution);
     return c.json(contribution);
   });
-  app.post('/v1/contributions/:contributionId/questions', validateOperation('captureQuestions'), async (c) => {
+  app.post('/v1/contributions/:contributionId/questions', guarded('captureQuestions'), async (c) => {
     const body = getValidatedBody<{ questions: QuestionCapture[] }>(c);
     const contributionId = requireParam(c, 'contributionId');
     const questions = await domain.captureQuestions(contributionId, body.questions, writeOptions(c));
     c.header('ETag', domain.lastWriteEtag() ?? etagOf((await domain.getContribution(contributionId)).version));
     return c.json(questions, 201);
   });
-  app.post('/v1/contributions/:contributionId/claim', validateOperation('claimContribution'), async (c) => {
+  app.post('/v1/contributions/:contributionId/claim', guarded('claimContribution'), async (c) => {
     const contribution = await domain.claimContribution(requireParam(c, 'contributionId'), writeOptions(c));
     etag(c, contribution);
     return c.json(contribution);
   });
-  app.post('/v1/contributions/:contributionId/release', validateOperation('releaseContribution'), async (c) => {
+  app.post('/v1/contributions/:contributionId/release', guarded('releaseContribution'), async (c) => {
     const contribution = await domain.releaseContribution(requireParam(c, 'contributionId'), writeOptions(c));
     etag(c, contribution);
     return c.json(contribution);
   });
 
   // ---- questions ----------------------------------------------------------------------------------
-  app.get('/v1/questions', validateOperation('listQuestions'), async (c) => {
+  app.get('/v1/questions', guarded('listQuestions'), async (c) => {
     return c.json(await domain.listQuestions(questionFilter(getValidatedQuery(c))));
   });
-  app.get('/v1/questions/:questionId', validateOperation('getQuestion'), async (c) => {
+  app.get('/v1/questions/:questionId', guarded('getQuestion'), async (c) => {
     const question = await domain.getQuestion(requireParam(c, 'questionId'));
     etag(c, question);
     return c.json(question);
   });
-  app.get('/v1/questions/:questionId/history', validateOperation('getQuestionHistory'), async (c) => {
+  app.get('/v1/questions/:questionId/history', guarded('getQuestionHistory'), async (c) => {
     return c.json(await domain.getQuestionHistory(requireParam(c, 'questionId')));
   });
 
@@ -788,78 +808,78 @@ export function createApp(options: CreateAppOptions = {}): App {
     return c.json(question);
   };
 
-  app.post('/v1/questions/:questionId/classification', validateOperation('classifyQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/classification', guarded('classifyQuestion'), async (c) => {
     const body = getValidatedBody<Classification>(c);
     const question = await domain.classifyQuestion(requireParam(c, 'questionId'), body, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/assignment', validateOperation('assignQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/assignment', guarded('assignQuestion'), async (c) => {
     const body = getValidatedBody<{ unitId: string }>(c);
     const question = await domain.assignQuestion(requireParam(c, 'questionId'), body.unitId, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/answers', validateOperation('draftAnswer'), async (c) => {
+  app.post('/v1/questions/:questionId/answers', guarded('draftAnswer'), async (c) => {
     const body = getValidatedBody<AnswerDraft>(c);
     const question = await domain.draftAnswer(requireParam(c, 'questionId'), body, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/review-submissions', validateOperation('submitForReview'), async (c) => {
+  app.post('/v1/questions/:questionId/review-submissions', guarded('submitForReview'), async (c) => {
     const question = await domain.submitForReview(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/approvals', validateOperation('approveQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/approvals', guarded('approveQuestion'), async (c) => {
     const body = getValidatedBody<{ answerVersion: number }>(c);
     const question = await domain.approveQuestion(requireParam(c, 'questionId'), body.answerVersion, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/legal-clearances', validateOperation('clearQuestionLegally'), async (c) => {
+  app.post('/v1/questions/:questionId/legal-clearances', guarded('clearQuestionLegally'), async (c) => {
     const body = getValidatedBody<LegalClearanceRequest>(c);
     const question = await domain.clearQuestionLegally(requireParam(c, 'questionId'), body, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/returns', validateOperation('returnQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/returns', guarded('returnQuestion'), async (c) => {
     const body = getValidatedBody<{ reason: string }>(c);
     const question = await domain.returnQuestion(requireParam(c, 'questionId'), body.reason, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/staging', validateOperation('stageQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/staging', guarded('stageQuestion'), async (c) => {
     const question = await domain.stageQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/delivery', validateOperation('deliverQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/delivery', guarded('deliverQuestion'), async (c) => {
     const question = await domain.deliverQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/closure', validateOperation('closeQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/closure', guarded('closeQuestion'), async (c) => {
     const question = await domain.closeQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/withdrawal', validateOperation('withdrawQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/withdrawal', guarded('withdrawQuestion'), async (c) => {
     const body = getValidatedBody<{ reason: string }>(c);
     const question = await domain.withdrawQuestion(requireParam(c, 'questionId'), body.reason, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/merge', validateOperation('mergeQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/merge', guarded('mergeQuestion'), async (c) => {
     const body = getValidatedBody<{ intoQuestionId: string }>(c);
     const question = await domain.mergeQuestion(requireParam(c, 'questionId'), body.intoQuestionId, writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/claim', validateOperation('claimQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/claim', guarded('claimQuestion'), async (c) => {
     const question = await domain.claimQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
-  app.post('/v1/questions/:questionId/release', validateOperation('releaseQuestion'), async (c) => {
+  app.post('/v1/questions/:questionId/release', guarded('releaseQuestion'), async (c) => {
     const question = await domain.releaseQuestion(requireParam(c, 'questionId'), writeOptions(c));
     return questionResult(c, question);
   });
 
   // ---- stage / events / demo -----------------------------------------------------------------
-  app.get('/v1/stage', async (c) => c.json(await domain.getStage()));
-  app.get('/v1/events', validateOperation('listEvents'), async (c) => {
+  app.get('/v1/stage', guarded(undefined), async (c) => c.json(await domain.getStage()));
+  app.get('/v1/events', guarded('listEvents'), async (c) => {
     const query = getValidatedQuery(c);
     return c.json(await domain.listEvents(query['after'] as number | undefined, query['limit'] as number | undefined));
   });
-  app.post('/v1/demo/seed', validateOperation('seedDemo'), async (c) => {
+  app.post('/v1/demo/seed', guarded('seedDemo'), async (c) => {
     if (!demoEnabled) {
       throw new ApiProblem(403, 'Forbidden', 'Demo endpoints are disabled. Set HV_DEMO=1 to enable them.');
     }
