@@ -247,7 +247,8 @@ export function createApp(options: CreateAppOptions = {}): App {
     } catch (error) {
       if (mustDiscardConnection(error)) discard = error as Error;
       else await timedQuery(client, limits.queryTimeoutMs, 'ROLLBACK').catch((rollbackError: unknown) => {
-        if (mustDiscardConnection(rollbackError)) discard = rollbackError as Error;
+        // Any failed ROLLBACK leaves the connection in an unknown state: discard it.
+        discard = rollbackError instanceof Error ? rollbackError : new Error('ROLLBACK failed.');
       });
       throw error;
     } finally {
@@ -480,8 +481,8 @@ export function createApp(options: CreateAppOptions = {}): App {
       try {
         await query('ROLLBACK');
       } catch (rollbackError) {
-        // A ROLLBACK that itself hangs is not waited for: the connection dies and Postgres rolls back.
-        if (mustDiscardConnection(rollbackError)) discard = rollbackError as Error;
+        // A ROLLBACK that hangs or fails is not trusted: the connection dies and Postgres rolls back.
+        discard = rollbackError instanceof Error ? rollbackError : new Error('ROLLBACK failed.');
       }
       started = false;
     };

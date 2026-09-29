@@ -149,8 +149,14 @@ export function createAuthStore(pool: Pool, encryptionKey: Buffer, options: Auth
         return result.rowCount === 1;
       } catch (error) {
         // A hung connection must not queue a ROLLBACK behind the hanging statement: it dies with the connection.
+        // `/auth/logout` is exempt from the request timeout, so the ROLLBACK itself runs under the query timer and a
+        // failed or hanging ROLLBACK discards the connection (Codex P1 on #75).
         if (mustDiscardConnection(error)) discard = error as Error;
-        else await client.query('ROLLBACK').catch(() => undefined);
+        else {
+          await timedQuery(client, timeoutMs, 'ROLLBACK').catch((rollbackError: unknown) => {
+            discard = rollbackError instanceof Error ? rollbackError : new Error('ROLLBACK failed.');
+          });
+        }
         throw error;
       } finally {
         client.release(discard);

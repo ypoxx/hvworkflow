@@ -18,6 +18,8 @@ import { assertRuntimePrivileges, PostgresPersistenceError, QueryTimeoutError, w
 import { postgresPoolOptions } from '../limits/poolOptions.ts';
 import { createMemorySink } from '../observability/accessLog.ts';
 import { ACTOR, req } from './helpers.ts';
+import { createAuthStore } from '../auth/store.ts';
+import type { Pool } from 'pg';
 
 const KEY = Buffer.alloc(32, 3);
 const T0 = Date.parse('2027-04-20T10:00:15.000Z'); // 15 s into a counting window
@@ -762,5 +764,53 @@ describe('Scheibe 034a (Nachbesserung): timers on the pre-checks, pool options, 
     expect(limited.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
     expect(limited.headers.get('Access-Control-Expose-Headers')).toContain('Retry-After');
     expect(limited.headers.get('Retry-After')).toBe('45');
+  });
+});
+
+// Slice 034a, Codex P1 on #75: `/auth/logout` is exempt from the request timeout, so a ROLLBACK after a
+// failed revoke must run under the query timer and the connection must be discarded when it fails.
+function fakePool(rollback: 'hangs' | 'fails' | 'ok') {
+  const released: Array<Error | undefined> = [];
+  const client = {
+    query(text: string) {
+      if (text === 'BEGIN') return Promise.resolve({ rows: [], rowCount: 0 });
+      if (text === 'ROLLBACK') {
+        if (rollback === 'hangs') return new Promise(() => undefined);
+        if (rollback === 'fails') return Promise.reject(new Error('rollback failed'));
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }
+      return Promise.reject(Object.assign(new Error('synthetic write failure'), { code: '23505' }));
+    },
+    release(error?: Error) { released.push(error); },
+  };
+  const pool = { connect: async () => client } as unknown as Pool;
+  return { pool, released };
+}
+
+describe('Scheibe 034a: revokeSession rollback is bounded (Codex P1 on #75)', () => {
+  const key = Buffer.alloc(32, 7);
+
+  it('a hanging ROLLBACK ends within the query timeout and discards the connection', async () => {
+    const { pool, released } = fakePool('hangs');
+    const store = createAuthStore(pool, key, { queryTimeoutMs: 50 });
+    const started = Date.now();
+    await expect(store.revokeSession('s'.repeat(43))).rejects.toThrow('synthetic write failure');
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(released).toHaveLength(1);
+    expect(released[0]).toBeInstanceOf(Error);
+  });
+
+  it('a failing ROLLBACK discards the connection', async () => {
+    const { pool, released } = fakePool('fails');
+    const store = createAuthStore(pool, key, { queryTimeoutMs: 50 });
+    await expect(store.revokeSession('s'.repeat(43))).rejects.toThrow('synthetic write failure');
+    expect(released[0]).toBeInstanceOf(Error);
+  });
+
+  it('a successful ROLLBACK returns the connection to the pool', async () => {
+    const { pool, released } = fakePool('ok');
+    const store = createAuthStore(pool, key, { queryTimeoutMs: 50 });
+    await expect(store.revokeSession('s'.repeat(43))).rejects.toThrow('synthetic write failure');
+    expect(released).toEqual([undefined]);
   });
 });
