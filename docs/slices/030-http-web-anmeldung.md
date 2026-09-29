@@ -1,6 +1,7 @@
 # Scheibe 030 — HTTP-Client und Web-Anmeldung für den internen Betabereich
 
-**Status:** Spec vor Bau · **Risikoklasse:** hoch · **Lanes:** web-api, web-shell  
+**Status:** Bau · **Lanes:** web-api, web-shell
+**Risikoklasse:** hoch
 **Rolle:** Implementierer-Oberfläche; unabhängiges Review in frischem Kontext zu Vertrag, Anmeldung, CSRF, Rollengrenze, Datenschutz und Demo-Kontinuität.  
 **Grundlage:** AGENTS.md R1–R12; `docs/produktplan-beta.md` §5.4/030; ADR 0001, 0002 und 0004; OpenAPI 0.3.7 und `HvApi` nach 029b; 028 für ETag/If-Match/Idempotency-Key. Der Integrationsstand ist Merge-Commit `ccc8725` (029b). Kein weiterer Branch wird eingemischt.
 
