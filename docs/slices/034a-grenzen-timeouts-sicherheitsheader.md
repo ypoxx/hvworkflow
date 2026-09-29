@@ -614,6 +614,12 @@ exit 0
 | Optional: `assertRuntimePrivileges` verlor die Ursache | erledigt: `busy`/`queryTimeout` bleiben erhalten (503 statt 500); Test |
 | e2e | nicht erneut gelaufen: keine Oberflächenwirkung |
 
+## Nachtrag zum Nachweis: Keycloak-CI
+
+Die PR-CI auf a9d7a0d war nur im Schritt „Keycloak browser login against migrated Postgres“ rot („029b Keycloak integration failed during session verification.“). **Ursache:** die neue CSP des Dienstes (`default-src 'none'`) wirkt auf die JSON-Seite `/v1/meeting`, auf der das Skript nach der Anmeldung stand; sein In-Page-`fetch` wurde vom Browser blockiert. Die CSP ist beabsichtigt und bleibt. **Behebung:** `scripts/keycloak-ci-029b.mjs` ruft den Dienst nach der Anmeldung über einen Playwright-Anfragekontext ohne Cookie-Speicher auf, mit einem ausdrücklichen `Cookie: hv_session=…`-Header (so werden nie zwei `hv_session`-Cookies gesendet, und `Secure` über http://localhost ist ohne Belang); die Zusicherungen sind unverändert (`X-Actor` ignoriert; `/auth/me` 200, `no-store`, `scheme` session, `subjectId`, Rolle, `csrfToken`; Mutation ohne CSRF 403, mit CSRF 201; Logout 204, danach 401). Die Quellgrenzen (600 anonym, 120 Anmeldestart) werden mit einer Handvoll Aufrufen nicht berührt. Die Fehlermeldung nennt weiterhin nur den `stage`-Namen, nie Cookie, Token oder Secret.
+Lokal lief Keycloak nicht (kein Docker-Daemon); geprüft sind `node --check`, `--check` der Fixture-Struktur und der Aufruf des Anfragekontexts gegen einen lokalen Dienst. **Nachweis ist die PR-CI.**
+**Gates-Commit:** `5f33d84` (sauberer Baum), `CONTRACT_GATE_STRICT=1 pnpm gates` mit Postgres-Variablen, Exit 0 (domain 231, web 254, api 395 Tests, Skripttests 234/234; `slice-scope` grün, mit dem erwarteten Hinweis, dass „Files allowed“ gegenüber dem Merge-Base um die Zeile des Skripts erweitert ist).
+
 ## Lesebefund vor dem Bau
 
 Lesebefund in frischem Kontext (Opus, 29.09.2026): kein Blocker, 8 major, 15 minor, einige nits; alle in dieser Fassung
