@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp, type App } from '../app.ts';
+import type { AuthStore } from '../auth/store.ts';
+import type { OidcFlow } from '../auth/oidc.ts';
 import { appOptionsOf } from '../config/appOptions.ts';
 import { normalizeOrigin } from '../config/origins.ts';
 import { readServiceConfig } from '../config/schema.ts';
@@ -148,7 +150,7 @@ describe('Scheibe 034b: CORS in demo mode (T-G1-T-05)', () => {
 });
 
 describe('Scheibe 034b: preflight counter and limit answers (034a point 1)', () => {
-  it('counts preflights on their own counter: the anonymous limit stays untouched, the 3rd preflight is 429 with CORS headers', async () => {
+  it('counts preflights on their own counter: the anonymous limit stays untouched, the 11th preflight is 429 with CORS headers', async () => {
     const app = service({ HV_RATE_LIMIT_PREFLIGHT_PER_MIN: '10', HV_RATE_LIMIT_ANON_PER_MIN: '10' });
     const preflight = () => app.request('/v1/speakers', { method: 'OPTIONS',
       headers: { Origin: ORIGIN, 'Access-Control-Request-Method': 'POST' } });
@@ -173,5 +175,33 @@ describe('Scheibe 034b: preflight counter and limit answers (034a point 1)', () 
     expect(tooLarge.status).toBe(413);
     expect(tooLarge.headers.get(ACAO)).toBe(ORIGIN);
     expect(accessControl(await post('https://evil.example'))).toEqual([]);
+  });
+
+  /** A sign-in that stalls: the provider answers late. Sign-in start is on `/auth/*`, inside the CORS scope. */
+  function stalledSignIn(limits: { requestTimeoutMs: number; oidcTimeoutMs: number }): App {
+    // The provider stalls on sign-in start (503 above the OIDC limit); the session store stalls on a read (408 on /v1;
+    // the sign-in routes themselves are exempt from the request timeout, 034a).
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const flow: OidcFlow = { authorizationUrl: async () => { await sleep(400); return 'https://idp.example/authorize'; },
+      complete: async () => ({ issuer: 'https://idp.example', subject: 'x' }) };
+    const authStore = { createLoginState: async () => undefined,
+      readSession: async () => { await sleep(400); return null; } } as unknown as AuthStore;
+    return createApp({ demoEnabled: false, corsOrigins: [ORIGIN], clock: () => new Date(T0), sourceOf: () => 'source-a',
+      oidcFlow: flow, authStore, authEvents: async () => [], limits,
+      transparencyNotice: { version: 'v1', text: { de: 'Hinweis', en: 'Notice' } } });
+  }
+
+  it('carries the CORS headers of a listed origin on a 408 and on a 503, and none for a foreign origin', async () => {
+    const timedOut = await stalledSignIn({ requestTimeoutMs: 50, oidcTimeoutMs: 2_000 })
+      .request('/v1/meeting', { headers: { Origin: ORIGIN, Cookie: `hv_session=${'x'.repeat(43)}` } });
+    expect(timedOut.status).toBe(408);
+    expect(timedOut.headers.get(ACAO)).toBe(ORIGIN);
+    expect(timedOut.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    const unavailable = await stalledSignIn({ requestTimeoutMs: 10_000, oidcTimeoutMs: 100 })
+      .request('/auth/login', { headers: { Origin: ORIGIN } });
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get(ACAO)).toBe(ORIGIN);
+    expect(accessControl(await stalledSignIn({ requestTimeoutMs: 10_000, oidcTimeoutMs: 100 })
+      .request('/auth/login', { headers: { Origin: 'https://evil.example' } }))).toEqual([]);
   });
 });

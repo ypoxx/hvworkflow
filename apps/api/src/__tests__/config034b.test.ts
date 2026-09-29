@@ -208,6 +208,12 @@ describe('Scheibe 034b: rules across variables (T-Q-T-04)', () => {
     expect(sentences(signIn({ HV_OIDC_ISSUER: 'https://user:MARKER-pw@idp.example/realms/hv' })).join('\n')).not.toContain('MARKER');
   });
 
+  it('treats a blank client secret or client id (spaces only) as an error, without echoing it', () => {
+    for (const name of ['HV_OIDC_CLIENT_SECRET', 'HV_OIDC_CLIENT_ID']) {
+      expect(only(signIn({ [name]: '   ' }), name), name).toEqual([`${REFUSE} ${name} must not be blank.`]);
+    }
+  });
+
   it('requires the encryption key to be base64url of exactly 32 bytes', () => {
     for (const bad of ['short', Buffer.alloc(31, 1).toString('base64url'), Buffer.alloc(33, 1).toString('base64url'),
       `${authKey}=`, `${authKey.slice(0, 42)}+`]) {
@@ -309,16 +315,32 @@ describe('Scheibe 034b: unknown HV_ variables', () => {
 });
 
 describe('Scheibe 034b: trusted proxy list (T-G1-D-01)', () => {
-  it('refuses 0.0.0.0/0, ::/0, any /0, more than 16 blocks, and malformed blocks', () => {
+  const blocksRule = `${REFUSE} HV_TRUSTED_PROXY_CIDRS must list at most 16 CIDR blocks without host bits, IPv4 from /8 and IPv6 from /32.`;
+  it('refuses /0, blocks that cover (nearly) all of IPv4 or IPv6 in any spelling, more than 16 blocks, host bits and malformed blocks', () => {
     const list = (n: number): string => Array.from({ length: n }, (_, i) => `10.${i}.0.0/16`).join(',');
     for (const bad of ['0.0.0.0/0', '::/0', '10.0.0.0/0', '10.0.0.0/33', '::1/129', '10.0.0.1', '10.0.0.0/x', 'a.b.c.d/8',
-      '10.0.0.0/08x', '10.0.0.0/8,', ',10.0.0.0/8', list(17), '10.0.0.0/8, 0.0.0.0/0']) {
+      '10.0.0.0/08x', '10.0.0.0/8,', ',10.0.0.0/8', list(17), '10.0.0.0/8, 0.0.0.0/0',
+      // review 034b: the IPv4-mapped range and short blocks
+      '::ffff:0:0/96', '::ffff:0.0.0.0/96', '::FFFF:0.0.0.0/96', '::ffff:0:0/97', '::/8', '::/32', '0.0.0.0/1', '128.0.0.0/1',
+      '10.0.0.0/7', '::ffff:0:0/100', '::ffff:0:0/103', '8000::/1', '2001::/16',
+      // host bits set
+      '10.0.0.1/8', '2001:db8::1/32', '::ffff:10.0.0.1/104']) {
       const found = only(service({ HV_TRUSTED_PROXY_CIDRS: bad }), 'HV_TRUSTED_PROXY_CIDRS');
-      expect(found, bad).toEqual([`${REFUSE} HV_TRUSTED_PROXY_CIDRS must list at most 16 IPv4 or IPv6 CIDR blocks, none of them /0.`]);
+      expect(found, bad).toEqual([blocksRule]);
     }
     expect(readServiceConfig(service({ HV_TRUSTED_PROXY_CIDRS: list(16) })).trustedProxyCidrs).toHaveLength(16);
     expect(readServiceConfig(service({ HV_TRUSTED_PROXY_CIDRS: '10.0.0.0/8, 2001:db8::/32' })).trustedProxyCidrs)
       .toEqual(['10.0.0.0/8', '2001:db8::/32']);
+  });
+
+  it('reads an IPv4-mapped IPv6 block as its IPv4 equivalent (prefix minus 96) and applies the IPv4 minimum', () => {
+    expect(readServiceConfig(service({ HV_TRUSTED_PROXY_CIDRS: '::ffff:10.0.0.0/104' })).trustedProxyCidrs).toEqual(['10.0.0.0/8']);
+    expect(readServiceConfig(service({ HV_TRUSTED_PROXY_CIDRS: '::FFFF:0a00:0000/104' })).trustedProxyCidrs).toEqual(['10.0.0.0/8']);
+    const r = createForwardedResolver(['::ffff:10.0.0.0/104']);
+    expect(r('10.0.0.1', '198.51.100.7')).toBe('198.51.100.7');
+    expect(r('11.0.0.1', '198.51.100.7')).toBe('11.0.0.1');
+    // a valid IPv6 block still works; a block just outside the mapped range is fine
+    expect(sentences(service({ HV_TRUSTED_PROXY_CIDRS: '2001:db8::/32, fd00::/32' }))).toEqual([]);
   });
 
   const resolve = (cidrs: string[]) => createForwardedResolver(cidrs);

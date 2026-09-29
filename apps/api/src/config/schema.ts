@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { Actor } from '@hv/domain';
 import { parseActorHeader } from '../actor.ts';
 import { DEFAULT_LIMITS } from '../limits/config.ts';
-import { validCidrList } from './cidr.ts';
+import { canonicalCidrList } from './cidr.ts';
 import { readAccessLog, readMetricsTokenValue, readNtp, type AccessLogConfig } from './groups.ts';
 import { normalizeOrigin } from './origins.ts';
 import { createReader, type Env, type Reader } from './reader.ts';
@@ -150,11 +150,12 @@ function readProxies(reader: Reader): string[] {
   const raw = reader.raw('HV_TRUSTED_PROXY_CIDRS');
   if (raw === undefined || raw.trim() === '') return [];
   const entries = raw.split(',').map((entry) => entry.trim());
-  if (!validCidrList(entries)) {
-    reader.fail('HV_TRUSTED_PROXY_CIDRS', 'must list at most 16 IPv4 or IPv6 CIDR blocks, none of them /0');
+  const blocks = canonicalCidrList(entries);
+  if (blocks === undefined) {
+    reader.fail('HV_TRUSTED_PROXY_CIDRS', 'must list at most 16 CIDR blocks without host bits, IPv4 from /8 and IPv6 from /32');
     return [];
   }
-  return entries;
+  return blocks;
 }
 
 const freeze = <T extends object>(value: T): T => Object.freeze(value);
@@ -174,12 +175,12 @@ export function readServiceConfig(env: Env): ServiceConfig {
     'must be an absolute path in an existing writable directory', { emptyIsError: true });
 
   const issuer = reader.read('HV_OIDC_ISSUER', z.string().refine(httpsOrLoopback), HTTPS_OR_LOOPBACK);
-  const clientId = reader.read('HV_OIDC_CLIENT_ID', z.string(), 'must be a string');
-  const clientSecret = reader.read('HV_OIDC_CLIENT_SECRET', z.string(), 'must be a string');
+  const notBlank = z.string().refine((value) => value.trim() !== '');
+  const clientId = reader.read('HV_OIDC_CLIENT_ID', notBlank, 'must not be blank');
+  const clientSecret = reader.read('HV_OIDC_CLIENT_SECRET', notBlank, 'must not be blank');
   const redirectUri = reader.read('HV_OIDC_REDIRECT_URI', z.string().refine(httpsOrLoopback), HTTPS_OR_LOOPBACK);
   const authKey = reader.read('HV_AUTH_ENCRYPTION_KEY',
     z.string().refine(base64urlKey).transform((raw) => Buffer.from(raw, 'base64url')), 'must be base64url of exactly 32 bytes');
-  const notBlank = z.string().refine((value) => value.trim() !== '');
   const noticeVersion = reader.read('HV_TRANSPARENCY_NOTICE_VERSION', notBlank, 'must not be blank');
   const noticeDe = reader.read('HV_TRANSPARENCY_NOTICE_DE', notBlank, 'must not be blank');
   const noticeEn = reader.read('HV_TRANSPARENCY_NOTICE_EN', notBlank, 'must not be blank');
