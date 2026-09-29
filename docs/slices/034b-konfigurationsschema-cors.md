@@ -88,6 +88,11 @@ heute wirkt `HV_DEMO=0` wie „aus“, künftig ist es ein Fehler, im Bericht ne
    die Verbindung nicht von einem vertrauenswürdigen Proxy, wird der Header ignoriert und die Verbindungsadresse gilt
    (ein Client kann seine Quelle nicht selbst wählen). Standard leer: immer die Verbindungsadresse. Die Quelle bleibt
    außerhalb jedes Logs (034a Punkt 3). `HV_TRUST_PROXY_HOPS` aus der ersten Fassung entfällt zugunsten der CIDR-Liste.
+   *Nachtrag nach dem Review (29.09.2026):* Blöcke ohne Host-Bits (`10.0.0.1/8` wird abgelehnt), Mindestpräfix IPv4 /8,
+   IPv6 /32 (schließt `/0`, `0.0.0.0/1` mit `128.0.0.0/1` und `::/8`). Ein IPv6-Block innerhalb von `::ffff:0:0/96`
+   (Präfix ab 96) gilt als sein IPv4-Äquivalent (Präfix minus 96) mit den IPv4-Regeln (`::ffff:10.0.0.0/104` ist `10.0.0.0/8`,
+   `::ffff:0:0/97` ist IPv4 /1 und wird abgelehnt); ein IPv6-Block mit Präfix unter 96, der `::ffff:0:0/96` enthält, wird
+   abgelehnt, weil `BlockList` IPv4-Gegenstellen dagegen prüft.
 9. **Startzeile als Erkennung.** Nach erfolgreichem Start schreibt `server.ts` eine feste Zeile mit Betriebsart
    (`demo` oder `service`), Persistenz (`postgres`, `jsonl`, `none`), Anmeldung (`oidc` oder `none`), den erlaubten
    CORS-Herkünften und den vertrauenswürdigen Proxy-Blöcken (Konfiguration, kein Geheimnis); keine anderen Werte.
@@ -243,8 +248,23 @@ Verhaltensänderungen (im Bericht zu nennen):
 - Ein ungültiger `HV_DSFA_SUMMARY_URL` (kein http/https, mit Zugangsdaten) verweigert den Start (vorher stilles Verwerfen).
 - Ein leerer Wert zählt als nicht gesetzt, außer bei `HV_ACCESS_LOG_DIR`, `HV_ACCESS_LOG_HASH_KEY`,
   `HV_ACCESS_LOG_RETENTION_DAYS`, `HV_CLOCK_MAX_DRIFT_MS`, `HV_EVENT_LOG` und `HV_SEED_ACTOR` (dort ist leer ein Fehler).
-- `HV_TRUSTED_PROXY_CIDRS`: `/0` ist für jede Adresse verboten, nicht nur `0.0.0.0/0` und `::/0`.
+- `HV_TRUSTED_PROXY_CIDRS`: strenger als die erste Fassung: nie `/0`, IPv4 ab /8, IPv6 ab /32, keine Host-Bits, IPv4-abgebildete
+  IPv6-Blöcke als IPv4 gelesen (siehe Nachtrag zu Entscheidung 8).
+- `PORT` wird streng geprüft (ganze Zahl 1 bis 65535); vorher `parseInt`, `8080abc` ging.
+- `HV_DATABASE_URL` muss mit `postgres://` oder `postgresql://` beginnen.
+- Eine unvollständige Anmeldekonfiguration verweigert den Start (vorher Warnung und 401 auf geschützten Anfragen).
+- `HV_OIDC_CLIENT_ID` und `HV_OIDC_CLIENT_SECRET` aus reinen Leerzeichen verweigern den Start.
 - Der Rechtesatz für das Log-Verzeichnis gilt auch im Demo-Modus, wenn dort ein Verzeichnis gesetzt ist.
+
+Offen (aus der Folgeliste hierher verschoben, kein Reviewbefund):
+
+- Kein Eigentümervergleich des Log-Verzeichnisses und keine Prüfung im Container-Image: 037.
+- Die `process.env`-Rückfälle in `app.ts` bleiben als Bibliotheksstandard, beim Prozessstart nie erreicht.
+- Der Keycloak-CI-Lauf gegen das neue Schema war im Bau nicht möglich (kein Docker); nur ein Wegwerfaufruf von `readServiceConfig`
+  mit den Variablen des Skripts. Die PR-CI ist der Nachweis.
+- Die Rechte des Log-Verzeichnisses werden nur beim Start geprüft (TOCTOU über das Elternverzeichnis, Restrisiko im
+  Bedrohungsmodell, Ziel 037). Die Senke (`observability/accessLog.ts`) steht nicht in „Files allowed"; ein `lstat` vor jeder neuen
+  Tagesdatei wäre dort nachzuziehen.
 
 Bedrohungs-ID → Test:
 
@@ -254,7 +274,7 @@ Bedrohungs-ID → Test:
 | T-G2-E-02 | `config034b.test.ts`: „paths and directory rights" (`HV_EVENT_LOG` ohne Demo, relativ, im Log-Verzeichnis; 0700/0750 angenommen; 0770/0755/0777/Symlink verweigert) |
 | T-G1-T-05 | `cors034b.test.ts`: alle Blöcke (gelistete Herkunft, fremde Herkunft/`null`/Pfad ohne Header auch im Preflight, Demo-Standard, `X-Actor` nur in der Demo, `Retry-After` exponiert, Preflight-Zähler) |
 | T-G2-S-01 | `config034b.test.ts`: „start line and secrets" (Marker für Client-Secret, Schlüssel, Hash-Schlüssel, Metrics-Token, DB-Passwort) |
-| T-G1-D-01 | `config034b.test.ts`: „configured limits take effect" (`HV_RATE_LIMIT_WRITES_PER_MIN=2` gibt 429 beim dritten Schreibvorgang), „trusted proxy list" (vertrauenswürdiger Proxy mit gefälschtem Eintrag, direkte Verbindung mit `X-Forwarded-For` zählt unter der Verbindungsadresse, `0.0.0.0/0` und `::/0` verweigert), `HV_REQUEST_TIMEOUT_MS=6000` verweigert |
+| T-G1-D-01 | `config034b.test.ts`: „configured limits take effect" (`HV_RATE_LIMIT_WRITES_PER_MIN=2` gibt 429 beim dritten Schreibvorgang), „trusted proxy list" (vertrauenswürdiger Proxy mit gefälschtem Eintrag, direkte Verbindung mit `X-Forwarded-For` zählt unter der Verbindungsadresse, `0.0.0.0/0`, `::/0`, `::ffff:0:0/96`, `::/8`, `0.0.0.0/1`, `10.0.0.0/7` und Host-Bits verweigert), `HV_REQUEST_TIMEOUT_MS=6000` verweigert |
 | `.env.example`-Drift | `config034b.test.ts`: „.env.example (drift)" und „reads every variable it lists" |
 
 ## Bericht (nach Bau ausfüllen)
