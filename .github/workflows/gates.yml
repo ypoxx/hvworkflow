@@ -93,7 +93,7 @@ jobs:
               - added|modified|renamed: '**/*.cjs'
       - name: Contract types are up to date
         run: pnpm contract:types && git diff --exit-code -- packages/contract/src/types.ts
-      - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, metrics-allowlist, build
+      - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build
         env:
           # Slice 016: a full checkout (fetch-depth 0, since slice 012) always has the integration
           # branch reachable in CI, so check (c)'s "not available" skip would hide a real problem here
