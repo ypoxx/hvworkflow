@@ -237,6 +237,15 @@ Startproben (Ausgaben wörtlich): ohne Demo und ohne Zugriffslog Exit 1 mit den 
 `HV_OIDC_ISSUER` gesetzt Exit 1 mit je einem Satz für die fehlenden Anmelde-, Datenbank- und Hinweisvariablen; `HV_DEMO=1` Startzeile
 `HV-Tool API: start mode=demo persistence=none auth=none cors=http://localhost:5173 trusted-proxies=none`.
 
+Verhaltensänderungen (im Bericht zu nennen):
+
+- `HV_DEMO`: nur `1` oder fehlend; `0` und jeder andere Wert verweigert den Start (vorher wirkte `0` wie „aus").
+- Ein ungültiger `HV_DSFA_SUMMARY_URL` (kein http/https, mit Zugangsdaten) verweigert den Start (vorher stilles Verwerfen).
+- Ein leerer Wert zählt als nicht gesetzt, außer bei `HV_ACCESS_LOG_DIR`, `HV_ACCESS_LOG_HASH_KEY`,
+  `HV_ACCESS_LOG_RETENTION_DAYS`, `HV_CLOCK_MAX_DRIFT_MS`, `HV_EVENT_LOG` und `HV_SEED_ACTOR` (dort ist leer ein Fehler).
+- `HV_TRUSTED_PROXY_CIDRS`: `/0` ist für jede Adresse verboten, nicht nur `0.0.0.0/0` und `::/0`.
+- Der Rechtesatz für das Log-Verzeichnis gilt auch im Demo-Modus, wenn dort ein Verzeichnis gesetzt ist.
+
 Bedrohungs-ID → Test:
 
 | ID | Test (Datei, Block) |

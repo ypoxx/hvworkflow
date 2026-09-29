@@ -166,7 +166,13 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   Idempotenz-Wiederholung, Listen und Bühne nicht eigens auf fehlende `personId` getestet.
 
 - 033a R1 nit · `apps/api/src/observability/config.ts` · Rechte des Log-Verzeichnisses nicht geprüft (Dateien 0600) ·
-  mit 034/037.
+  **erledigt mit 034b** (`config/groups.ts`: lstat, kein Symlink, `(mode & 0o027) === 0`; Eigentümer bleibt 037).
+- 034b Bau · `apps/api/src/config/schema.ts` · keine Prüfung des Eigentümers des Log-Verzeichnisses und keine Schlüssel-
+  oder Pfadprüfung im Container-Image · mit 037.
+- 034b Bau · `apps/api/src/app.ts` · `process.env`-Rückfälle bleiben als Bibliotheksstandard, beim Prozessstart nie erreicht ·
+  Entfernen, wenn die Tests ohnehin angefasst werden.
+- 034b Bau · `scripts/keycloak-ci-029b.mjs` · Lauf gegen das neue Schema nur per Wegwerfaufruf geprüft (kein Docker im
+  Bau) · CI-Lauf der PR abwarten.
 
 - takt-028 Nachprüfung minor · `apps/web/src/api/index.ts`, `BootScreen.tsx` · älterer Text „Demo event log is not an
   array.“ erscheint unübersetzt über `error.message` (R10) · wie `DemoLogParseError` über das Wörterbuch.
