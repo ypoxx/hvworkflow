@@ -49,12 +49,12 @@ Keine Verhaltensänderung in `api.ts`, `transitions.ts` oder `state.ts`; keine w
 ## Nachweis
 
 `vitest run src/__tests__/idempotency028.test.ts src/__tests__/rules.test.ts`: 2 Dateien, 22 Tests grün.
-`pnpm gates` Exit 0 auf Commit `9d460e8` (Code-Stand dieses PRs). Wörtlicher Schluss:
+`pnpm gates` Exit 0 auf Commit `2cc657a` (Code-Stand dieses PRs nach der Umstellung von Test (a) auf `captureQuestions`; davor `9d460e8`). Wörtlicher Schluss:
 
 ```
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 4.55s
-mark-test-run: wrote /home/user/wt/takt-025/.claude/state/last-test-run (clean tree) at commit 9d460e8, tree b6294c69d212…
+✓ built in 3.35s
+mark-test-run: wrote /home/user/wt/takt-025/.claude/state/last-test-run (clean tree) at commit 2cc657a, tree 7026bb5bbb6a…
 ```
 
 ## Review findings
