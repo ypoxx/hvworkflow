@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "hv_answers_per_actor", "type": "gauge", "help": "Synthetic.", "labels": ["meeting_id"], "purpose": "x", "source": "x", "aggregation": "x", "personalReference": "x", "spec": "033b" } ] }

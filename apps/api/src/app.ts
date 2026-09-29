@@ -17,6 +17,7 @@ import { Hono, type Context, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import {
   ApiProblem,
+  computeIndicators,
   createInMemoryEventStore,
   createInProcessApi,
   etagOf,
@@ -25,6 +26,7 @@ import {
   SYSTEM_ACTOR,
   type Actor,
   type DomainEvent,
+  type Indicators,
   type AnswerDraft,
   type Classification,
   type ContributionCapture,
@@ -47,6 +49,9 @@ import { parseActorHeader, selectAuthAdapter, sessionActorFromEvents, sessionTok
 import { actorIdForIdentity, createOidcFlow, safeReturnTo, type OidcFlow } from './auth/oidc.ts';
 import { createAuthStore, type AuthStore } from './auth/store.ts';
 import { createFileEventLog } from './eventLog.ts';
+import { createBearerCheck } from './metrics/bearer.ts';
+import { createSingleFlightCache } from './metrics/cache.ts';
+import { METRICS_CONTENT_TYPE, renderMetrics } from './metrics/prometheus.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { discardSink, type AccessLogSink } from './observability/accessLog.ts';
 import { currentRequest, noteSeq } from './observability/context.ts';
@@ -90,6 +95,12 @@ export interface CreateAppOptions {
   accessLog?: { sink: AccessLogSink; hashKey: Buffer };
   /** Slice 033a: SNTP status for `/readyz`; `server.ts` builds it from `HV_NTP_SERVERS`. */
   clockHealth?: () => Promise<ReadinessCheck>;
+  /**
+   * Slice 033b: bearer token of `GET /metrics` (`server.ts` passes `HV_METRICS_TOKEN`; never read from the
+   * environment here, so a test cannot pick up a developer's token). Absent or shorter than 32 characters:
+   * every call is answered 401.
+   */
+  metricsToken?: string;
   idGenerator?: () => string;
   /**
    * Seed the synthetic demo corpus once at startup when demo mode is on and the store is still
@@ -160,6 +171,10 @@ export function createApp(options: CreateAppOptions = {}): App {
   const clock = options.clock ?? systemClock;
   const accessLog = options.accessLog ?? { sink: discardSink, hashKey: randomBytes(32) };
   const subjectHashOf = createSubjectHasher(accessLog.hashKey);
+  // Slice 033b, `hv_auth_no_active_role_total`: process-local detection signal for the loss of every role
+  // (Spec 030). Not persisted, not derived from events, no subject, session or path attached.
+  let noActiveRoleTotal = 0;
+  const noteNoActiveRole = (): void => { noActiveRoleTotal += 1; };
   const noteSubject = (actorId: string): void => {
     const context = currentRequest();
     if (context !== undefined) context.subjectHash = subjectHashOf(actorId);
@@ -330,7 +345,8 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   // ---- actor + errors -------------------------------------------------------------------------
   app.use('*', async (c, next) => {
-    if (c.req.path === '/healthz' || c.req.path === '/readyz' || c.req.path === '/auth/login' ||
+    // Slice 033b: `/metrics` (exact path) brings its own bearer check; it is the scraper, not an actor.
+    if (c.req.path === '/healthz' || c.req.path === '/readyz' || c.req.path === '/metrics' || c.req.path === '/auth/login' ||
         c.req.path === '/auth/callback' || c.req.path === '/auth/transparency-notice') {
       await next();
       return;
@@ -343,7 +359,15 @@ export function createApp(options: CreateAppOptions = {}): App {
       throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
     }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
-    const actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
+    let actor: Actor | undefined;
+    try {
+      actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
+    } catch (error) {
+      // Slice 033b, Ziel 8: only `/v1/*` counts here (`/auth/me` counts in its handler); the only 403 the
+      // session adapter throws is the missing active role (takt-023).
+      if (error instanceof ApiProblem && error.status === 403 && c.req.path.startsWith('/v1/')) noteNoActiveRole();
+      throw error;
+    }
     // The session was used from here on, whatever CSRF or the re-read decide next: log who (hashed).
     if (actor !== undefined) noteSubject(actor.id);
     if (sessionReady) {
@@ -531,6 +555,40 @@ export function createApp(options: CreateAppOptions = {}): App {
     return c.json({ status: ready ? 'ready' : 'not_ready', checks, serverTime }, ready ? 200 : 503);
   });
 
+  // ---- metrics (slice 033b) -----------------------------------------------------------------------
+  // The bearer check comes first, before any store access. The indicators are computed from an own
+  // read-only snapshot, never from the global in-memory projection (takt-024: it throws with Postgres),
+  // and cached for 10 s with one computation in flight (T-G2-D-03; the scan cost is measured in 071).
+  const metricsBearer = createBearerCheck(options.metricsToken);
+  const cachedIndicators = createSingleFlightCache<Indicators>(10_000, clock);
+  const readEventsForMetrics = async (): Promise<readonly DomainEvent[]> => {
+    const pool = options.postgres;
+    if (!pool) return store.all();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const snapshot = await loadPostgresSnapshot(client);
+      await client.query('COMMIT');
+      return snapshot.events;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch { /* The connection is discarded by the pool. */ }
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+  app.get('/metrics', async (c) => {
+    if (!metricsBearer(c.req.header('Authorization'))) {
+      throw new ApiProblem(401, 'Unauthorized', 'A valid metrics token is required.');
+    }
+    // A failure is not caught here: `onError` answers a bare 500 and writes the one fixed error line
+    // with `errorClass` only (problem.ts); no sequence number, no driver text, nothing in the response.
+    const indicators: Indicators = await cachedIndicators(
+      async () => computeIndicators(await readEventsForMetrics(), clock()));
+    return new Response(renderMetrics(indicators, noActiveRoleTotal), { status: 200,
+      headers: { 'Content-Type': METRICS_CONTENT_TYPE, 'Cache-Control': 'no-store' } });
+  });
+
   // ---- browser sign-in -----------------------------------------------------------------------
   const authResponseHeaders = (c: Context): void => {
     c.header('Cache-Control', 'no-store');
@@ -618,6 +676,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     } catch (error) {
       if (!(error instanceof ApiProblem) || error.status !== 403) throw error;
       // Contract 0.3.8 `NoActiveRole`: the token lets the client sign out; /v1 writes still fail.
+      noteNoActiveRole();
       const response = new Response(JSON.stringify({ ...problemBody(error), csrfToken: session.csrfToken }),
         { status: 403, headers: { 'Content-Type': 'application/problem+json' } });
       response.headers.set('Cache-Control', 'no-store');

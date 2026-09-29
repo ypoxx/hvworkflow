@@ -31,6 +31,9 @@ Warum geteilt: siehe Abschnitt „Warum geteilt“ in `docs/slices/033a-serverze
    Sitzung oder Pfad. Katalogeintrag mit `personalReference: "keiner"`, Zweck „Erkennung Missbrauchsfall
    Rollenverlust (Spec 030)“. Test: zwei 403 einer rollenlosen Sitzung → Zähler 2; die Ausgabe enthält keine
    Actor-ID. Damit endet die befristete Ausnahme in Spec 030.
+   Gezählt wird nur auf `/auth/me` und auf Pfaden, die mit `/v1/` beginnen. Mittelbarer Personenbezug (Review
+   Datenschutz): bei einer einzigen rollenlosen Sitzung zeigt der Zeitverlauf des Zählers deren Aktivität; Zuordnung nur
+   über das Zugriffslog im Verfahren zu zweit (E13), im Katalog wörtlich unter `personalReference`.
 9. **Vertrag zuerst (Codex P1 auf #65, R6).** `getMetrics` verspricht heute „the five aggregate indicators“
    (`openapi.yaml`, Summary von `/metrics`). Vor dem Code: Summary und Beschreibung auf „fünf fachliche Kennzahlen und
    eine technische Zählung ohne Labels (`hv_auth_no_active_role_total`), keine je Person“ ändern; additive Patch-Stufe
@@ -80,7 +83,7 @@ Grenzfälle der Kernfunktion mit fester Uhr (`indicators033b.test.ts`): genau 30
 - `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts`, `apps/api/src/__tests__/contract.test.ts`, `apps/api/src/__tests__/takt-019-contract.test.ts` (Ziel 9: Beschreibung `getMetrics`, Patch-Stufe, Typen, CHANGELOG, Versions-Assertions)
 - `scripts/metrics-allowlist-check.mjs`, `scripts/metrics-allowlist-check.test.mjs`, `scripts/auswertungskatalog.mjs`, `scripts/auswertungskatalog.test.mjs`, `scripts/fixtures/metrics-allowlist/**`
 - `package.json` (nur Skript `metrics-allowlist` und dessen Aufnahme in `gates`)
-- `.github/workflows/gates.yml` (nur Katalog-Schritt mit gepinntem Artefakt-Upload, `postgres-metrics033b.test.ts` im Postgres-Schritt, Schrittname der gates-Zeile)
+- `.github/workflows/gates.yml` (nur Katalog-Schritt mit gepinntem Artefakt-Upload, `postgres-metrics033b.test.ts` im Postgres-Schritt; der Schrittname der gates-Zeile bleibt, weil `plan-honesty` ihn wörtlich prüft)
 - `AGENTS.md` (nur die Gate-Liste im Kommentar zu `pnpm gates`)
 - `docs/adr/0013-zwei-protokollebenen.md` (nur Zeile „Keine Kennzahl je Person“ auf die strengere Lesart des Tors und Nachweis-Abschnitt: Tor, Artefakt, Definitionen; **geschrieben vom Architekten**, nicht vom Implementierer; steht hier, damit dessen Commit auf dem Baubranch das Scheibenumfang-Tor passiert)
 - `docs/sicherheit/bedrohungsmodell.md` (nur Status und Nachweise der oben genannten IDs, neue Zeile T-G1-I-10)
@@ -108,15 +111,161 @@ Grenzfälle der Kernfunktion mit fester Uhr (`indicators033b.test.ts`): genau 30
 
 `pnpm gates`-Schluss, roter Torlauf mit Fixture, Katalog-Artefakt aus CI, `curl /metrics`-Ausgabe mit synthetischem Korpus, Testnamen je Bedrohungs-ID.
 
-## Bericht (nach Bau ausfüllen)
+## Nachweis
+
+Gates-Lauf auf Commit `e8b8314` (sauberer Baum, `git status` leer vorher und nachher), mit
+`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` gegen die lokale, migrierte Postgres-Datenbank
+(30 Testdateien, 0 übersprungen, darunter `postgres-metrics033b.test.ts`; Operation-Coverage sieht `getMetrics`).
+Ein erster Lauf auf `90be82f` war rot (plan-honesty prüft den Namen des CI-Schritts der gates-Zeile wörtlich gegen
+`docs/agentische-entwicklung-plan.md`, außerhalb von „Files allowed“); der Schrittname blieb deshalb unverändert
+(Commit `e8b8314`).
+
+Auszug aus dem Lauf:
+
+```
+apps/api test:  Test Files  30 passed (30)
+apps/api test:       Tests  286 passed (286)
+slice-scope: 39 changed file(s), all within "docs/slices/033b-kennzahlen-allowlist-katalog.md"'s "Files allowed" list (44 pattern(s)).
+metrics-allowlist: 6 metrics, all within the allowlist.
+```
+
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (Exit 0):
+
+```
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-DgFD5jiT.js                        618.14 kB │ gzip: 181.11 kB │ map: 2,553.72 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.21s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit e8b8314, tree c8468dd9e1ba…
+EXIT 0
+```
+
+Roter Torlauf gegen Fixtures mit einer Kennzahl je Person (wörtlich):
+
+```
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/subject-label.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_by_subject: (b) label "subject_hash" is outside {meeting_id, unit_id}
+FAIL  hv_by_subject: (c) "hv_by_subject" points at a person ("subject"); no metric per person, with or without a spec entry
+FAIL  hv_by_subject: (c) "subject_hash" points at a person ("subject"); no metric per person, with or without a spec entry
+metrics-allowlist: 3 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/actor-name.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_answers_per_actor: (c) "hv_answers_per_actor" points at a person ("actor"); no metric per person, with or without a spec entry
+metrics-allowlist: 1 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/user-with-unit-label.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_user_open_questions: (c) "hv_user_open_questions" points at a person ("user"); no metric per person, with or without a spec entry
+metrics-allowlist: 1 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/rate-limit.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_rate_limit_rejections: (d) rate-limit counters are ephemeral and never part of the catalog
+metrics-allowlist: 1 finding(s).
+exit 1
+```
+
+`/metrics` gegen den lokalen Demo-Dienst (`HV_DEMO=1`, `HV_METRICS_TOKEN` synthetisch, 40 Zeichen, Port 8787;
+Korpus: `seedDemo` des Kerns; der Token ist eine ausgedachte Zeichenfolge):
+
+```
+$ curl -s -H "Authorization: Bearer <synthetischer Token>" localhost:8787/metrics
+# HELP hv_open_question_oldest_age_seconds Sekunden seit Erfassung der ältesten offenen Einzelfrage des laufenden Jahrgangs; 0 ohne offene Einzelfrage.
+# TYPE hv_open_question_oldest_age_seconds gauge
+hv_open_question_oldest_age_seconds{meeting_id="hv-2026"} 20478
+# HELP hv_open_questions Offene Einzelfragen je zugewiesenem Fachbereich des laufenden Jahrgangs; ohne Zuweisung unit_id=unassigned.
+# TYPE hv_open_questions gauge
+hv_open_questions{meeting_id="hv-2026",unit_id="unassigned"} 14
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-esg"} 4
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-fast"} 19
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-fin"} 20
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-hr"} 10
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-ir"} 6
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-legal"} 6
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-ops"} 15
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-strat"} 6
+# HELP hv_questions_captured_last_5m Einzelfragen des laufenden Jahrgangs, die in den letzten 300 Sekunden erfasst wurden.
+# TYPE hv_questions_captured_last_5m gauge
+hv_questions_captured_last_5m{meeting_id="hv-2026"} 215
+# HELP hv_questions_in_legal_review_over_10m Einzelfragen im Status in_review ohne Rechtsfreigabe der aktuellen Fassung, deren Eintritt in in_review länger als 600 Sekunden zurückliegt.
+# TYPE hv_questions_in_legal_review_over_10m gauge
+hv_questions_in_legal_review_over_10m{meeting_id="hv-2026"} 0
+# HELP hv_events_last_1m Ereignisse mit Serverzeit in den letzten 60 Sekunden über alle Jahrgänge.
+# TYPE hv_events_last_1m gauge
+hv_events_last_1m 1566
+# HELP hv_auth_no_active_role_total Antworten 403 NoActiveRole auf GET /auth/me und 403 auf /v1 für eine Sitzung ohne aktive Rolle seit dem Prozessstart.
+# TYPE hv_auth_no_active_role_total counter
+hv_auth_no_active_role_total 0
+$ curl -s -o /dev/null -w "%{http_code}\n" localhost:8787/metrics
+401
+```
+
+Artefakt `auswertungskatalog`: entsteht erst im PR-CI-Lauf (Schritte „Generate the evaluation catalogue“ und „Upload the
+evaluation catalogue“ in `.github/workflows/gates.yml`); `actions/upload-artifact` gepinnt auf
+`ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2, per `git ls-remote https://github.com/actions/upload-artifact 'refs/tags/v4*'`).
+PR-CI #73, Lauf `36626722716` auf `3917204` (https://github.com/ypoxx/hvworkflow/actions/runs/36626722716), Artefakt `auswertungskatalog` (ID `11060053045`, 3 478 Byte, `sha256:b13f7f21c41767e0392945eddccc628dd6b892f251c4d3b0f0d81d9dab909e36`).
+
+## Nachweis nach dem Review (Nachbesserung)
+
+Basis vorher eingemergt (takt-028, ohne Konflikt). Gates-Lauf auf Commit `1c9be19` (sauberer Baum davor und danach), mit
+den Postgres-Variablen: apps/api 30 Testdateien, 289 Tests, 0 übersprungen. Ein Hinweis von `slice-scope`
+(„Files allowed“ weicht vom Merge-Base ab) ist erwartet: die Streichung des Schrittnamen-Passus (Befund 6).
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (Exit 0):
+
+```
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 kB │ map: 2,559.49 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.38s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit 1c9be19, tree fe7dc25efcf3…
+EXIT 0
+```
+
+## Bericht
 
 ```
 Slice: 033b-kennzahlen-allowlist-katalog
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; roter Torlauf; Artefakt `auswertungskatalog` im CI-Lauf <id>; curl /metrics
-Bedrohungs-ID → Test: <je Zeile der Tabelle oben>
-Open: E13 Mindest-Aggregationsschwelle (Einpersonen-Fachbereich); Diff-Tor 073; Alarmweg 037; Scan-Kosten 071
-Touched: <Dateiliste>
+Done: Kennzahlen im Kern (`indicators.ts`), `/metrics` mit Bearer-Prüfung vor jedem Speicherzugriff, eigenem Snapshot,
+  10-s-Zwischenspeicher und Zähler `hv_auth_no_active_role_total`; Kennzahlen-Allowlist-Tor `pnpm metrics-allowlist`
+  in `pnpm gates`; Auswertungskatalog-Skript mit CI-Artefakt; Vertrag 0.3.9. Review-Befunde 1 bis 5 behoben.
+Evidence: Baucommit e8b8314 und nach dem Review Gates-Commit 1c9be19 (`pnpm gates` Exit 0, Schluss oben unter
+  „Nachweis“ und „Nachweis nach dem Review“); roter Torlauf und curl /metrics oben; Artefakt `auswertungskatalog`
+  aus PR-CI, Lauf `36626722716` (Artefakt-ID `11060053045`).
+Bedrohungs-ID → Test:
+  T-G3-I-03: scripts/metrics-allowlist-check.test.mjs (Fixtures subject_hash, hv_answers_per_actor, unit_id plus user,
+    rate_limit, ip, Duplikat, Typ, fehlendes metrics); metrics033b.test.ts › contains no actor id, personId, subject id,
+    display name or question text
+  T-G3-I-04: metrics033b.test.ts › serves text/plain 0.0.4 with the catalog families in order and labels within the catalog
+  T-G1-I-10: metrics033b.test.ts (401-Fälle, kein Speicherzugriff vor der Prüfung, Token in keiner Logzeile, subjectHash null)
+  T-G2-D-03: metrics033b.test.ts › answers 20 queries within 10 s from one scan of the store, › a failed scan is not cached;
+    postgres-metrics033b.test.ts (Snapshot ohne Advisory-Lock, beschädigte Kette: 500, eine Fehlerzeile mit errorClass)
+  T-G1-I-01/SC-03: indicators033b.test.ts › withdrawn and merged questions only change counters
+  Ziel 8: metrics033b.test.ts › counts each 403 …, › counts only /auth/me and /v1/ paths …
+Open: E13 Mindest-Aggregationsschwelle (Einpersonen-Fachbereich) und mittelbarer Personenbezug der Zähler
+  `hv_auth_no_active_role_total` und `hv_events_last_1m` (bei einer einzigen rollenlosen Sitzung bzw. einem einzigen
+  aktiven Nutzer zeigt der Zeitverlauf dessen Aktivität; Zuordnung nur über das Zugriffslog im Verfahren zu zweit);
+  Diff-Tor 073; Alarmweg 037; Scan-Kosten 071; Katalog-Artefakt-Link aus PR-CI.
+  Schrittname der gates-Zeile bleibt unverändert, weil plan-honesty ihn wörtlich gegen den Plan prüft.
+Touched: docs/slices/033b-kennzahlen-allowlist-katalog.md; packages/domain/src/indicators.ts, index.ts,
+  __tests__/indicators033b.test.ts; apps/api/src/app.ts, server.ts, observability/config.ts, metrics/**,
+  __tests__/metrics033b.test.ts, postgres-metrics033b.test.ts, contract.test.ts, takt-019-contract.test.ts;
+  packages/contract/{openapi.yaml,CHANGELOG.md,package.json,src/types.ts,allowlist.json};
+  scripts/metrics-allowlist-check.mjs(+test), auswertungskatalog.mjs(+test), fixtures/metrics-allowlist/**;
+  package.json; AGENTS.md (Gate-Liste); .github/workflows/gates.yml; docs/sicherheit/bedrohungsmodell.md
 ```
 
 ## Lesebefund vor dem Bau (29.09.2026)
@@ -125,6 +274,39 @@ Lesebefund (Opus, frischer Kontext): nachbessern, 3 major / 6 minor / 1 nit → 
 vom Architekten. Schmale Nachprüfung (Opus): die drei Major gelöst; drei neue Major (ADR-Satz zu Betrieb/Support zu
 weit, Planzeile 033b mit altem Tor-Wortlaut, Files allowed ohne Zähler-Hochzählen) vom Architekten behoben.
 
+### Nachweis nach Codex (#73)
+
+Codex P2 „Zukunftsereignisse in Zeitfenstern“ in der Scheibe behoben (`withinWindow`: Alter ≥ 0 und ≤ Fenster; Test
+zuerst rot, dann grün). `pnpm gates` mit Postgres-Variablen auf `a9444d5` (sauberer Baum, Exit 0):
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/api test:       Tests  289 passed (289)
+...
+✓ built in 2.37s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit a9444d5, tree a2f9ba078fd2…
+```
+
+Codex P2 „`unassigned` kollidiert mit einer konfigurierten Fachbereichs-ID“: nicht in dieser Scheibe lösbar (die
+Prüfung der Fachbereichs-IDs liegt in `api.ts`, außerhalb von Files allowed; `replaceMeetingUnits` wird noch nicht
+bedient). Folgeliste: `unassigned` als reservierte ID in der Fachbereichsprüfung (Scheibe 040).
+
 ## Review findings
 
-folgt
+Review (Opus, frischer Kontext, Perspektive Datenschutz/Betrieb): freigabefähig, kein Blocker, kein Major.
+
+Behoben in der Scheibe:
+
+1. Datenschutz: `personalReference` von `hv_auth_no_active_role_total` und `hv_events_last_1m` nennt den mittelbaren Personenbezug (E13); Ziel 8 und „Open“ ergänzt.
+2. Der Zähler zählt nur `/auth/me` und Pfade unter `/v1/`; Test mit `/foo`.
+3. Ein Integritätsbruch bei `/metrics` schreibt eine feste Fehlerzeile mit `errorClass`, die Antwort bleibt nackt; Test in `postgres-metrics033b.test.ts`.
+4. Test: ein Pool, dessen `connect` einmal wirft, liefert 500; der nächste Aufruf verbindet neu und liefert 200.
+5. Das Tor ist rot bei fehlendem oder nicht-Array `metrics`, doppeltem Label und `type` außerhalb {gauge, counter}; je eine Fixture mit Test, Muster für `subject_hash` geschärft.
+
+Auf die Folgeliste (`docs/folgeliste.md`, nicht in dieser Scheibe):
+
+- Nit 6: `readEventsForMetrics` dupliziert den Snapshot-Helfer bei `app.ts:210-225`.
+- Nit 7: `persons` wird für eine reine Zählung mitgeladen, nötig für die Kettenprüfung.
+- Nit 9: Die Personenbezugs-Begriffe im Tor sind nur englisch.
+- Nit 11: `catalogJson as never` ohne Laufzeitprüfung.
+- Nit 12: Das zweite `upload-artifact@v4` (Beweis-Upload) ist ungepinnt.

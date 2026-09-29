@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "hv_user_open_questions", "type": "gauge", "help": "Synthetic.", "labels": ["meeting_id","unit_id"], "purpose": "x", "source": "x", "aggregation": "x", "personalReference": "x", "spec": "033b" } ] }

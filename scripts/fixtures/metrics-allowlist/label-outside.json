@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "hv_by_track", "type": "gauge", "help": "Synthetic.", "labels": ["track"], "purpose": "x", "source": "x", "aggregation": "x", "personalReference": "x", "spec": "033b" } ] }

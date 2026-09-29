@@ -11,14 +11,16 @@ import { systemClock } from '@hv/domain';
 import { createApp } from './app.ts';
 import { createNtpClockCheck, parseNtpEnv } from './clock/ntp.ts';
 import { createFileSink, discardSink } from './observability/accessLog.ts';
-import { readObservabilityConfig } from './observability/config.ts';
+import { readMetricsToken, readObservabilityConfig } from './observability/config.ts';
 
 // Slice 033a: the access log cannot be switched off outside demo mode. Fixed sentences, no values.
 let observability: ReturnType<typeof readObservabilityConfig>;
 let ntp: ReturnType<typeof parseNtpEnv>;
+let metricsToken: string | undefined;
 try {
   observability = readObservabilityConfig(process.env);
   ntp = parseNtpEnv(process.env);
+  metricsToken = readMetricsToken(process.env);
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'HV-Tool API: refusing to start: invalid configuration.');
   process.exit(1);
@@ -43,6 +45,7 @@ const app = createApp({ seedOnStart: postgres === undefined,
   accessLog: { sink: observability.dir === undefined ? discardSink
     : createFileSink({ dir: observability.dir, retentionDays: observability.retentionDays, clock: systemClock }),
   hashKey: observability.hashKey },
+  ...(metricsToken !== undefined ? { metricsToken } : {}),
   ...(ntp !== undefined ? { clockHealth: createNtpClockCheck({ ...ntp, clock: systemClock }) } : {}),
   ...(postgres !== undefined ? { postgres } : {}) });
 

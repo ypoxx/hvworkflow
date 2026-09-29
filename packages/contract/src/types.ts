@@ -1182,8 +1182,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Metrics in Prometheus text exposition format — the five aggregate indicators, none per person
-         * @description Since 0.3.0 (slice 033, ADR 0013). Exactly the indicators of the generated evaluation catalogue (age of the oldest open question, backlog per unit, inflow per 5 min, questions in legal clearing > 10 min, events per minute); no indicator per subject, ever (allowlist gate of slice 033). Protected by the `metricsBearer` token from the service configuration: the consumer is the scraper, not an actor, so no `can()` decision and no `_actions` apply.
+         * Metrics in Prometheus text exposition format — five business indicators and one technical count without labels, none per person
+         * @description Since 0.3.0 (slice 033, ADR 0013). Exactly the indicators of the generated evaluation catalogue: five business indicators (age of the oldest open question, backlog per unit, inflow per 5 min, questions in legal clearing > 10 min, events per minute) and one technical count without labels (`hv_auth_no_active_role_total`, since 0.3.9: responses 403 for a session without an active role, process-local, detection signal of slice 030); no indicator per person, ever (allowlist gate of slice 033b). Without a configured token every call is answered 401. Protected by the `metricsBearer` token from the service configuration: the consumer is the scraper, not an actor, so no `can()` decision and no `_actions` apply.
          */
         get: operations["getMetrics"];
         put?: never;

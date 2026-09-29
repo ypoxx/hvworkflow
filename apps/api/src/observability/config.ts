@@ -19,6 +19,19 @@ export const REFUSE_DIR = `${REFUSE} HV_ACCESS_LOG_DIR must name a writable dire
 export const REFUSE_KEY = `${REFUSE} HV_ACCESS_LOG_HASH_KEY must be base64 and at least 32 bytes.`;
 export const REFUSE_RETENTION = `${REFUSE} HV_ACCESS_LOG_RETENTION_DAYS must be an integer from 1 to 365.`;
 
+export const REFUSE_METRICS_TOKEN = `${REFUSE} HV_METRICS_TOKEN must be at least 32 characters when set.`;
+
+/**
+ * Slice 033b: unset (or empty) means `/metrics` answers 401 to everybody; a token that is set but too
+ * short is a configuration error and stops the start, rather than silently closing the endpoint.
+ */
+export function readMetricsToken(env: NodeJS.ProcessEnv): string | undefined {
+  const token = env['HV_METRICS_TOKEN'];
+  if (token === undefined || token === '') return undefined;
+  if (token.length < 32) throw new Error(REFUSE_METRICS_TOKEN);
+  return token;
+}
+
 function writableDirectory(path: string): boolean {
   try {
     if (!statSync(path).isDirectory()) return false;

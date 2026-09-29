@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "hv_ok_but_listed_only_here", "type": "gauge", "labels": ["meeting_id", "unit_id"], "spec": "033b" } ] }
