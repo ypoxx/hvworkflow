@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "hv_rate_limit_rejections", "type": "gauge", "help": "Synthetic.", "labels": [], "purpose": "x", "source": "x", "aggregation": "x", "personalReference": "x", "spec": "033b" } ] }

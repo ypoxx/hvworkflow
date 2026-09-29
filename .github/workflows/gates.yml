@@ -53,7 +53,7 @@ jobs:
       - name: Run operational migration command
         run: HV_MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @hv/api db:migrate up
       - name: Postgres migrations, grants and transaction integration
-        run: pnpm --filter @hv/api exec vitest run src/__tests__/migrations027.test.ts src/__tests__/postgres027.test.ts src/__tests__/postgres-auth-029b.test.ts src/__tests__/postgres028.test.ts src/__tests__/postgres-takt024.test.ts src/__tests__/postgres-access-log033a.test.ts
+        run: pnpm --filter @hv/api exec vitest run src/__tests__/migrations027.test.ts src/__tests__/postgres027.test.ts src/__tests__/postgres-auth-029b.test.ts src/__tests__/postgres028.test.ts src/__tests__/postgres-takt024.test.ts src/__tests__/postgres-access-log033a.test.ts src/__tests__/postgres-metrics033b.test.ts
       # Slice 012 point 8: a doc-only commit (`docs/**`, `*.md`) skips the Chromium install and
       # Playwright below — nothing else. No `paths-ignore` at the workflow level: the job always
       # triggers and reports, so a later required status check never simply goes missing.
@@ -93,7 +93,7 @@ jobs:
               - added|modified|renamed: '**/*.cjs'
       - name: Contract types are up to date
         run: pnpm contract:types && git diff --exit-code -- packages/contract/src/types.ts
-      - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build
+      - name: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, metrics-allowlist, build
         env:
           # Slice 016: a full checkout (fetch-depth 0, since slice 012) always has the integration
           # branch reachable in CI, so check (c)'s "not available" skip would hide a real problem here
@@ -101,6 +101,18 @@ jobs:
           # failure instead (packages/contract/scripts/check.mjs).
           CONTRACT_GATE_STRICT: '1'
         run: pnpm gates
+      # Slice 033b: the generated evaluation catalogue (Auswertungskatalog, first version) of every run,
+      # deterministic, no personal data. The upload action is pinned to a full commit hash (SC-10):
+      # `git ls-remote https://github.com/actions/upload-artifact 'refs/tags/v4*'`, v4.6.2. The job's
+      # permissions stay `contents: read`; uploading an artifact needs no more.
+      - name: Generate the evaluation catalogue
+        run: node scripts/auswertungskatalog.mjs
+      - name: Upload the evaluation catalogue
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: auswertungskatalog
+          path: dist/auswertungskatalog/
+          if-no-files-found: error
       - name: Policy truth table is committed
         run: git diff --exit-code -- packages/domain/policy-truth-table.md
       # Scheibenumfang-Tor (016): only on a PR against the integration branch, and only for a

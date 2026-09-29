@@ -1,0 +1,3 @@
+{ "metrics": [
+  { "name": "hv_twice", "type": "gauge", "labels": [], "spec": "033b" },
+  { "name": "hv_twice", "type": "gauge", "labels": [], "spec": "033b" } ] }

@@ -1,0 +1,1 @@
+{ "metrics": [ { "name": "Hv-Bad", "type": "gauge", "help": "Synthetic.", "labels": [], "purpose": "x", "source": "x", "aggregation": "x", "personalReference": "x", "spec": "033b" } ] }
