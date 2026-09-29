@@ -1,6 +1,6 @@
 # takt-022 — Netlify baut keine Deploy-Previews mehr
 
-**Status:** review · **Risikoklasse:** niedrig · **Lane:** infra
+**Status:** review · **Risikoklasse:** hoch (Deployment, Leitplanken §4; zunächst falsch als niedrig geführt, vom Orchestrator nach Codex-P1 auf #60 korrigiert) · **Lane:** infra · **Perspektive:** Security, Betrieb
 **Regeln:** AGENTS.md R11 (Deployment nur nach Go), R12; Bedrohungsmodell T-Q-R-01, BF-20
 **Ausgangspunkt:** Laut PR-Texten #54 und #57 hat Netlify beim Anlegen der PRs Deploy-Previews gebaut, bevor
 `[skip netlify]` im Titel stand. `netlify.toml` hat keinen `ignore`-Befehl; Netlify baut daher jeden Kontext
@@ -10,8 +10,19 @@
 
 `netlify.toml` bekommt im `[build]`-Block einen `ignore`-Befehl: außerhalb des Kontexts `production`
 (Netlify-Build-Variable `CONTEXT`) endet der Build sofort mit Exit 0 (Netlify: „überspringen“). Deploy-Previews und
-Branch-Deploys veröffentlichen damit nichts mehr, egal was in Titel oder Commit steht. Der Kontext `production`
-verhält sich wie bisher; `[skip netlify]` im Commit bleibt dort die Sperre.
+Branch-Deploys veröffentlichen damit nichts mehr, egal was in Titel oder Commit steht. Für `production` entfällt
+Netlifys Standard-Diff-Prüfung (`git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF`); weil jeder echte Commit an der
+Repo-Wurzel etwas ändert, ist der Unterschied praktisch null (nur ein Neubau ohne Änderung baute bisher nicht). Die
+Sperre bleibt `[skip netlify]` im Commit, die Netlify vor dem `ignore`-Befehl prüft.
+
+## Bedrohungen und Missbrauchsfall
+
+- **T-Q-R-01 / BF-20** (Auslieferung ohne nachvollziehbares Go): Previews und Branch-Deploys sind aus dem Repo heraus
+  gesperrt; der Produktions-Build bleibt offen bis 037 (Approval-Environment).
+- **Missbrauchsfall (neu, kein MF-01..08 passt):** ungewollte Veröffentlichung über eine Deploy-Preview (etwa ein PR,
+  dessen erster Commit oder Titel die Überspring-Marke nicht trägt). Erkennung: Netlify-Deploy-Protokoll zeigt einen
+  veröffentlichten Preview-Deploy statt „skipped“; Signal ist dieser Protokolleintrag, Empfänger der Eigentümer (einzige
+  Person mit Netlify-Zugang). Vollständige Sperre nur über die Projekteinstellung (siehe Akzeptanz 3).
 
 ## Nicht-Ziele
 
@@ -35,14 +46,18 @@ Headern oder CSP (037), kein Deployment.
 
 ## Nachweis (Orchestrator, 29.09.2026)
 
-Befehl aus `netlify.toml` (per `tomllib` gelesen) je Kontext ausgeführt:
+Befehl aus `netlify.toml` (per `tomllib` gelesen) je Kontext unter `bash -u` ausgeführt (Stand nach Review):
 
 ```
 skip: context deploy-preview
-deploy-preview -> exit 0
+'deploy-preview' -> exit 0
 skip: context branch-deploy
-branch-deploy -> exit 0
-production -> exit 1
+'branch-deploy' -> exit 0
+skip: context unset
+'' -> exit 0
+'production' -> exit 1
+skip: context unset
+unset -> exit 0
 ```
 
 `pnpm gates` Exit 0 auf Commit `41e0f62` (Code- und Spec-Stand dieses PRs; der zuerst genannte `1f09128` wurde durch
@@ -67,3 +82,10 @@ Review in frischem Kontext (reviewer-sonnet, 29.09.2026), Urteil „reparieren (
 
 Codex (ein Lauf beim Ready-Setzen): 1 × P1 — Gates-Nachweis nannte einen nicht erreichbaren Commit und keinen
 wörtlichen Schluss → Gates auf `41e0f62` erneut gelaufen, Schluss oben eingetragen.
+
+Review in frischem Kontext (reviewer, Opus, Perspektive Security/Betrieb, 29.09.2026, nach Höherstufung auf „hoch“):
+Befehl korrekt und fail-safe (lokal: `production` → 1; `deploy-preview`, `branch-deploy`, `dev`, leer, ungesetzt,
+`Production`, `"production "`, `"x;exit 1"` → 0; kein Injektionsweg).
+1. major (behoben): Missbrauchsfall fehlte (SC-06) → Abschnitt „Bedrohungen und Missbrauchsfall“.
+2. minor (behoben): „production verhält sich wie bisher“ ungenau → präzisiert (Standard-Diff-Prüfung entfällt).
+3. nit (behoben): `"${CONTEXT:-}"` statt `"$CONTEXT"` (robust auch unter `bash -u`).
