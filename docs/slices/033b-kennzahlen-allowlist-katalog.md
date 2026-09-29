@@ -211,15 +211,61 @@ evaluation catalogue“ in `.github/workflows/gates.yml`); `actions/upload-artif
 `ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2, per `git ls-remote https://github.com/actions/upload-artifact 'refs/tags/v4*'`).
 Lauf-ID und Link folgen mit dem PR.
 
-## Bericht (nach Bau ausfüllen)
+## Nachweis nach dem Review (Nachbesserung)
+
+Basis vorher eingemergt (takt-028, ohne Konflikt). Gates-Lauf auf Commit `1c9be19` (sauberer Baum davor und danach), mit
+den Postgres-Variablen: apps/api 30 Testdateien, 289 Tests, 0 übersprungen. Ein Hinweis von `slice-scope`
+(„Files allowed“ weicht vom Merge-Base ab) ist erwartet: die Streichung des Schrittnamen-Passus (Befund 6).
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (Exit 0):
+
+```
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 kB │ map: 2,559.49 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.38s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit 1c9be19, tree fe7dc25efcf3…
+EXIT 0
+```
+
+## Bericht
 
 ```
 Slice: 033b-kennzahlen-allowlist-katalog
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; roter Torlauf; Artefakt `auswertungskatalog` im CI-Lauf <id>; curl /metrics
-Bedrohungs-ID → Test: <je Zeile der Tabelle oben>
-Open: E13 Mindest-Aggregationsschwelle (Einpersonen-Fachbereich); Diff-Tor 073; Alarmweg 037; Scan-Kosten 071
-Touched: <Dateiliste>
+Done: Kennzahlen im Kern (`indicators.ts`), `/metrics` mit Bearer-Prüfung vor jedem Speicherzugriff, eigenem Snapshot,
+  10-s-Zwischenspeicher und Zähler `hv_auth_no_active_role_total`; Kennzahlen-Allowlist-Tor `pnpm metrics-allowlist`
+  in `pnpm gates`; Auswertungskatalog-Skript mit CI-Artefakt; Vertrag 0.3.9. Review-Befunde 1 bis 5 behoben.
+Evidence: Baucommit e8b8314 und nach dem Review Gates-Commit 1c9be19 (`pnpm gates` Exit 0, Schluss oben unter
+  „Nachweis“ und „Nachweis nach dem Review“); roter Torlauf und curl /metrics oben; Artefakt `auswertungskatalog`
+  folgt aus PR-CI (Lauf-ID trägt der Koordinator nach).
+Bedrohungs-ID → Test:
+  T-G3-I-03: scripts/metrics-allowlist-check.test.mjs (Fixtures subject_hash, hv_answers_per_actor, unit_id plus user,
+    rate_limit, ip, Duplikat, Typ, fehlendes metrics); metrics033b.test.ts › contains no actor id, personId, subject id,
+    display name or question text
+  T-G3-I-04: metrics033b.test.ts › serves text/plain 0.0.4 with the catalog families in order and labels within the catalog
+  T-G1-I-10: metrics033b.test.ts (401-Fälle, kein Speicherzugriff vor der Prüfung, Token in keiner Logzeile, subjectHash null)
+  T-G2-D-03: metrics033b.test.ts › answers 20 queries within 10 s from one scan of the store, › a failed scan is not cached;
+    postgres-metrics033b.test.ts (Snapshot ohne Advisory-Lock, beschädigte Kette: 500, eine Fehlerzeile mit errorClass)
+  T-G1-I-01/SC-03: indicators033b.test.ts › withdrawn and merged questions only change counters
+  Ziel 8: metrics033b.test.ts › counts each 403 …, › counts only /auth/me and /v1/ paths …
+Open: E13 Mindest-Aggregationsschwelle (Einpersonen-Fachbereich) und mittelbarer Personenbezug der Zähler
+  `hv_auth_no_active_role_total` und `hv_events_last_1m` (bei einer einzigen rollenlosen Sitzung bzw. einem einzigen
+  aktiven Nutzer zeigt der Zeitverlauf dessen Aktivität; Zuordnung nur über das Zugriffslog im Verfahren zu zweit);
+  Diff-Tor 073; Alarmweg 037; Scan-Kosten 071; Katalog-Artefakt-Link aus PR-CI.
+  Schrittname der gates-Zeile bleibt unverändert, weil plan-honesty ihn wörtlich gegen den Plan prüft.
+Touched: docs/slices/033b-kennzahlen-allowlist-katalog.md; packages/domain/src/indicators.ts, index.ts,
+  __tests__/indicators033b.test.ts; apps/api/src/app.ts, server.ts, observability/config.ts, metrics/**,
+  __tests__/metrics033b.test.ts, postgres-metrics033b.test.ts, contract.test.ts, takt-019-contract.test.ts;
+  packages/contract/{openapi.yaml,CHANGELOG.md,package.json,src/types.ts,allowlist.json};
+  scripts/metrics-allowlist-check.mjs(+test), auswertungskatalog.mjs(+test), fixtures/metrics-allowlist/**;
+  package.json; AGENTS.md (Gate-Liste); .github/workflows/gates.yml; docs/sicherheit/bedrohungsmodell.md
 ```
 
 ## Lesebefund vor dem Bau (29.09.2026)
@@ -230,4 +276,20 @@ weit, Planzeile 033b mit altem Tor-Wortlaut, Files allowed ohne Zähler-Hochzäh
 
 ## Review findings
 
-folgt
+Review (Opus, frischer Kontext, Perspektive Datenschutz/Betrieb): freigabefähig, kein Blocker, kein Major.
+
+Behoben in der Scheibe:
+
+1. Datenschutz: `personalReference` von `hv_auth_no_active_role_total` und `hv_events_last_1m` nennt den mittelbaren Personenbezug (E13); Ziel 8 und „Open“ ergänzt.
+2. Der Zähler zählt nur `/auth/me` und Pfade unter `/v1/`; Test mit `/foo`.
+3. Ein Integritätsbruch bei `/metrics` schreibt eine feste Fehlerzeile mit `errorClass`, die Antwort bleibt nackt; Test in `postgres-metrics033b.test.ts`.
+4. Test: ein Pool, dessen `connect` einmal wirft, liefert 500; der nächste Aufruf verbindet neu und liefert 200.
+5. Das Tor ist rot bei fehlendem oder nicht-Array `metrics`, doppeltem Label und `type` außerhalb {gauge, counter}; je eine Fixture mit Test, Muster für `subject_hash` geschärft.
+
+Auf die Folgeliste (`docs/folgeliste.md`, nicht in dieser Scheibe):
+
+- Nit 6: `readEventsForMetrics` dupliziert den Snapshot-Helfer bei `app.ts:210-225`.
+- Nit 7: `persons` wird für eine reine Zählung mitgeladen, nötig für die Kettenprüfung.
+- Nit 9: Die Personenbezugs-Begriffe im Tor sind nur englisch.
+- Nit 11: `catalogJson as never` ohne Laufzeitprüfung.
+- Nit 12: Das zweite `upload-artifact@v4` (Beweis-Upload) ist ungepinnt.
