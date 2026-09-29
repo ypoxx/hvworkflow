@@ -116,8 +116,11 @@ Lasttest (071), danach Standard anpassen.
      Anfrage nachträglich gegen die Quelle, und **ist das Kontingent der Quelle bereits erschöpft, wird statt 401 ein
      429 mit `Retry-After` geantwortet** und die Anfrage fällt unter die Protokollausnahme (Punkt 11). Ein gefälschtes,
      syntaktisch gültiges Cookie (`actor.ts:82` nimmt jedes `^[A-Za-z0-9_-]{43,}$`) umgeht die Grenze also nicht mehr;
-     es kostet je Anfrage weiter eine Sitzungslesung (Restrisiko, Proxy-Grenze 037). Jede Antwort 413, bei der kein
-     Akteur feststand, zählt ebenso nachträglich gegen die Quelle.
+     es kostet je Anfrage weiter eine Sitzungslesung (Restrisiko, Proxy-Grenze 037). Jede Antwort 413 zählt ebenso gegen die
+     Quelle: vor dem Body-Limit (6) steht nie ein Akteur fest, auch nicht bei gefälschtem oder echtem Cookie. **Ist das
+     Kontingent der Quelle bereits erschöpft, wird statt 413 ein 429 mit `Retry-After` geantwortet** und die Anfrage fällt
+     unter die Protokollausnahme (Punkt 11); das gilt unabhängig vom Anmeldematerial (N1). Ein legitimer Arbeitsplatz
+     mit zu großem Body bekommt bei erschöpfter Quelle also 429 statt 413 — beides ohne Wirkung.
 
    **Datenschutz:** Die Zählerschlüssel sind HMAC-SHA-256 der Quelle mit einem je Prozess zufälligen Schlüssel; die
    Quelle steht nie im Zugriffslog, im Fehlerlog, auf stderr, in `/metrics` oder auf der Platte (ADR 0013: Zähler
@@ -168,7 +171,8 @@ Lasttest (071), danach Standard anpassen.
    **synchron im selben Schritt ohne `await` dazwischen**, unmittelbar bevor sie `INSERT … ; COMMIT` absetzt; der
    Zeitgeber-Rückruf läuft auf derselben Ereignisschleife und sieht entweder `committing` oder setzt `timedOut` vorher.
    Zusätzlich prüft die Grenze `timedOut` direkt nach dem Erhalt der Schreibsperre und nach dem Laden des Snapshots und
-   bricht dann früh mit `ROLLBACK` ab. Zusage: **ein 408 bedeutet „nichts festgeschrieben“** im Postgres-Pfad; ein
+   bricht dann früh mit `ROLLBACK` ab. Zusage: **ein 408 bedeutet „nichts festgeschrieben“** im Postgres-Pfad (läuft während des
+   Wartens auf das COMMIT der `query_timeout` ab, gilt Punkt 8: 500 „Ergebnis unbekannt“, nie 408); ein
    erneuter Versuch mit demselben `Idempotency-Key` führt genau einmal aus. Im JSONL-Entwicklungsadapter und im
    In-Memory-Pfad gilt diese Zusage nicht, ebenso wenig „408 verbraucht keinen Schlüssel“ (dort kann ein Handler nach
    dem 408 fertig werden und anhängen; im Bericht nennen). Das Zugriffslog schreibt genau eine Zeile mit Status 408;
@@ -183,9 +187,20 @@ Lasttest (071), danach Standard anpassen.
    gesetzt, `query_timeout` als Client-Option. Der Pool der Migrations-CLI bleibt unverändert (DDL darf länger laufen).
    `lock_timeout` trifft auch das Warten auf `pg_advisory_xact_lock` (`app.ts:397`): wartet ein Schreibvorgang länger
    als 3 s auf die globale Schreibsperre, bricht Postgres mit SQLSTATE `55P03` ab. Dieser Fall und der
-   Statement-Abbruch `57014` (sowie der client-seitige `query_timeout`) werden auf **503** mit `Retry-After: 2` und dem
-   festen Text „Persistence is busy.“ abgebildet (Rollback, kein Ereignis, kein Treibertext; T-G2-I-02); alle übrigen
-   Persistenzfehler bleiben 500 „Persistence is unavailable.“. 3 s sind gewählt, weil ein Schreibvorgang die Sperre nur
+   Statement-Abbruch `57014` sowie der client-seitige `query_timeout` **vor** der Phase `committing` werden auf **503** mit
+   `Retry-After: 2` und dem festen Text „Persistence is busy.“ abgebildet (Rollback, kein Ereignis, kein Treibertext;
+   T-G2-I-02). Damit die Kennung nicht verloren geht: `loadPostgresSnapshot` (`postgres.ts:174-176`) und
+   `insertPostgresEvents` (`postgres.ts:231-233`, `:243-244`) fangen Treiberfehler heute ab und werfen
+   `PostgresPersistenceError`; dieser trägt künftig ein Kennzeichen `busy` (gesetzt bei `55P03`, `57014` und
+   `query_timeout`, aus `code` bzw. dem Fehlertyp, nie aus dem Meldungstext), ohne Treibertext (N2).
+   **`query_timeout` während `committing`** (N3): der Zeitgeber ist clientseitig, der Server kann das COMMIT trotzdem
+   ausgeführt haben, und das Web vergibt je Aufruf einen neuen Idempotenzschlüssel (`apps/web/src/api/http.ts:74`);
+   ein 503 mit der Zusage „kein Ereignis“ könnte also zu doppelten Ereignissen führen. Deshalb: 500 mit dem festen Text
+   „Persistence outcome is unknown.“, **ohne** `Retry-After` und ohne Zusage; kein `noteSeq`. Nach jedem
+   `query_timeout` wird die Verbindung mit `client.release(error)` verworfen, nie in den Pool zurückgegeben. Ein
+   `57014` während `committing` kann nicht auftreten, ohne dass Postgres das COMMIT abgelehnt hat, bleibt also 503.
+   Das bestehende 503 „Migrations are pending.“ (`app.ts:391`) erhält `Retry-After: 30` und dieselbe Vertragsantwort
+   (N4). Alle übrigen Persistenzfehler bleiben 500 „Persistence is unavailable.“. 3 s sind gewählt, weil ein Schreibvorgang die Sperre nur
    Millisekunden hält; eine Warteschlange über 3 s ist Überlast, die der Client mit Wiederholung (gleicher
    `Idempotency-Key`) übersteht. Messung im Lasttest (071).
 9. **Sicherheitsheader auf jeder Antwort.** Eine Middleware setzt nach `await next()` auf **jede** Antwort (2xx, 3xx,
@@ -230,7 +245,12 @@ Lasttest (071), danach Standard anpassen.
     Auswertungskatalog (ADR 0013). Mehrere Prozesse vervielfachen die Grenzen (Beta: ein Prozess, 037).
 13. **Vertrag (Patch-Stufe, aktueller Stand + 1 zum Bauzeitpunkt; E55).** Heute 0.3.8; plant 033b eine
     Ausnahmeänderung (0.3.9), wird 034a entsprechend 0.3.10. Inhalt:
-    - Header `Retry-After` als `{ type: integer, minimum: 1, maximum: 60 }`, Pflicht an 429 und 503;
+    - Header `Retry-After` als `{ type: integer, minimum: 1, maximum: 60 }`, Pflicht an 429 und an `PersistenceBusy`
+      (503; deckt „Persistence is busy.“ und „Migrations are pending.“ ab); die bestehende `ServiceUnavailable`-Antwort
+      der Operationen ohne Anmeldung bleibt ohne Pflicht-`Retry-After`;
+    - Beschreibung der 500-Antwort bzw. `info.description`: „Persistence outcome is unknown.“ bedeutet, dass ein
+      Schreibvorgang festgeschrieben sein kann; der Client liest den Stand neu, bevor er erneut schreibt, oder
+      wiederholt nur mit demselben `Idempotency-Key`;
     - neue gemeinsame Antworten `TooManyRequests` (429), `RequestTimeout` (408), `PayloadTooLarge` (413) und
       `PersistenceBusy` (503), je mit `X-Server-Time` und Problem-Schema mit `status`-`const`; 408 und 429 an **jeder**
       Operation, 413 an jeder `POST`/`PUT`/`PATCH`-Operation (das Body-Limit gilt jedem Body, auch wo der Vertrag
@@ -288,14 +308,14 @@ web-api).
 
 | ID | Rolle in 034a | Test (Datei) |
 |---|---|---|
-| T-G1-D-01 | schließen (Rest: Sitzungslesung je gefälschtem Cookie, CSRF-403 bekannter Subjects ungezählt, mehrere Prozesse; Proxy-Grenze 037) | 61. Schreibvorgang desselben Subjects im Fenster → 429 mit `Retry-After` = Rest bis Fensterende (injizierte Uhr, 15 s im Fenster → 45), kein neues Ereignis, kein Idempotenz-Eintrag, nächstes Fenster wieder 201; anderes Subject unberührt; `/auth/logout` nie 429; 1 201. Lesevorgang → 429; 262 145 Byte → 413 mit und ohne `Content-Length`, ohne Fehlerlog-Zeile, 262 144 Byte → kein 413; Text mit 60 001 Zeichen → 422; langsamer Handler → 408; 700 × 413 aus einer Quelle ohne Anmeldung → ab Nr. 601 429 und keine weiteren Log-Zeilen (`limits034a.test.ts`); 408 im Postgres-Pfad ohne festgeschriebenes Ereignis, verzögertes COMMIT → 201 statt 408, Abbruch nach Sperrerhalt bei `timedOut` (`postgres-limits034a.test.ts`) |
+| T-G1-D-01 | schließen (Rest: Sitzungslesung je gefälschtem Cookie, CSRF-403 bekannter Subjects ungezählt, mehrere Prozesse; Proxy-Grenze 037) | 61. Schreibvorgang desselben Subjects im Fenster → 429 mit `Retry-After` = Rest bis Fensterende (injizierte Uhr, 15 s im Fenster → 45), kein neues Ereignis, kein Idempotenz-Eintrag, nächstes Fenster wieder 201; anderes Subject unberührt; `/auth/logout` nie 429; 1 201. Lesevorgang → 429; 262 145 Byte → 413 mit und ohne `Content-Length`, ohne Fehlerlog-Zeile, 262 144 Byte → kein 413; Text mit 60 001 Zeichen → 422; langsamer Handler → 408; 700 × 413 aus einer Quelle ohne Anmeldung und ebenso mit gefälschtem Cookie → ab Nr. 601 429 und keine weiteren Log-Zeilen (`limits034a.test.ts`); 408 im Postgres-Pfad ohne festgeschriebenes Ereignis, verzögertes COMMIT → 201 statt 408, Abbruch nach Sperrerhalt bei `timedOut` (`postgres-limits034a.test.ts`) |
 | T-G1-I-06 | schließen (Anteil Dienst; Web-Dokument 037) | Header-Probe: alle acht Header mit exakten Werten auf 200, 201, 302 (`/auth/login` mit Test-IdP), 401, 404 (`notFound`), 408, 413, 422, 429, 500 (`onError`), 503, `/healthz`, `/readyz`; `Cache-Control` der Anmeldepfade genau einmal `no-store`; 429 einer erlaubten Herkunft trägt `Access-Control-Allow-Origin` und `Retry-After` in `Access-Control-Expose-Headers` (`contract.test.ts`, Block „034a security headers“) |
 | **T-G1-D-05 (neu)** | schließen (Rest: Innentäter hinter NAT, MF-10) | 121. `/auth/login` derselben Quelle → 429, auch mit gefälschtem, syntaktisch gültigem `hv_session` und mit `X-Actor`, `createLoginState` nicht aufgerufen (Test-Store zählt); 601. gesamt über viele Quellen → 429 (`limits034a.test.ts`); verbrauchte und abgelaufene Zeilen werden beim nächsten Anmeldestart entfernt, gültige bleiben, höchstens 500 je Aufruf; Laufzeitrolle: `DELETE FROM auth_login_states` → Rechtefehler, `EXECUTE` der Funktion erlaubt; Katalog: `prosecdef`, `proconfig`, `proowner`, keine PUBLIC-ACL auch ohne gesetzte Laufzeitrolle; `assertRuntimePrivileges` schlägt fehl, wenn EXECUTE fehlt oder DELETE vorhanden ist; `/readyz` vor Migration 3 → `migrations_pending`; Aufräumfehler blockiert die Anmeldung nicht (`postgres-limits034a.test.ts`); neue Zeile im Bedrohungsmodell |
 | T-G2-D-04 | berührt (Anteil 034a: Quellschicht, Protokollausnahme Punkt 11) | 601. nicht angemeldete Anfrage derselben Quelle → 429; 602.–700. erzeugen **keine** weitere Log-Zeile, genau eine stderr-Zeile je Minute mit der Summe 99; Flut mit gefälschtem Cookie: bis Nr. 600 401, ab Nr. 601 429 mit `Retry-After`, danach keine weiteren Log-Zeilen; Anfrage mit gültiger Sitzung aus derselben Quelle → 200 mit Log-Zeile; 601 × `/healthz` erschöpft nicht das Kontingent für nicht angemeldete Anfragen und umgekehrt; Preflight-Flut erschöpft nur den Preflight-Zähler; keine Log- oder stderr-Zeile enthält die Quelladresse (Marker-Adresse über `sourceOf`) (`limits034a.test.ts`) |
 | T-G3-D-02 | berührt | Subject-Grenzen greifen für jeden Akteur unabhängig von der Rolle (zwei Akteure mit verschiedenen Rollen, je eigener Zähler; kein Rollenname im Code, R4) (`limits034a.test.ts`) |
 | T-G3-D-01 | berührt | hängende Prüfung (`readiness`-Injektion mit 200 ms, Timeout-Option 50 ms) → 408 statt Warten (`limits034a.test.ts`) |
 | T-G1-T-06 | berührt (CSP am Dienst; Web 037) | CSP-Wert in der Header-Probe (`contract.test.ts`); Zeile im Bedrohungsmodell nennt 037 für den e2e-Report |
-| T-G2-I-02 | berührt | Abbruch durch `statement_timeout` (`pg_sleep` über injizierten Testweg) → 503 mit festem Text und `Retry-After: 2`, kein Treibertext in Antwort und Log (`postgres-limits034a.test.ts`) |
+| T-G2-I-02 | berührt | Abbruch durch `statement_timeout` (`pg_sleep` über injizierten Testweg) → 503 mit festem Text und `Retry-After: 2`, kein Treibertext in Antwort und Log; `statement_timeout` **während `loadPostgresSnapshot`** → 503 (N2); `query_timeout` vor COMMIT → 503 und Verbindung verworfen; `query_timeout` während `committing` (verzögertes COMMIT über injizierten Client) → 500 „Persistence outcome is unknown.“ ohne `Retry-After`, Verbindung mit Fehler freigegeben (N3); Migrationen ausstehend → 503 mit `Retry-After: 30` (N4) (`postgres-limits034a.test.ts`) |
 | T-G2-D-01 | berührt (Schreibwarteschlange) | Testverbindung hält `pg_advisory_xact_lock(27027, 1)` 4 s, paralleler Schreibvorgang → 503 nach ≤ 3 s + Toleranz, kein Ereignis; nach Freigabe gelingt die Wiederholung mit gleichem `Idempotency-Key` genau einmal (`postgres-limits034a.test.ts`) |
 | T-G1-D-03 | berührt (Anteil Rate-Limit; Ströme 035) | durch die Tests zu T-G1-D-01 abgedeckt |
 
@@ -342,7 +362,7 @@ eine Zuordnung zur Person nur über das Verfahren „Auswertung nur zu zweit“ 
 - `apps/api/src/auth/store.ts` (nur Aufruf der Aufräumfunktion in createLoginState mit stderr-Zeile)
 - `apps/api/migrations/0003_auth_login_purge.up.sql`, `apps/api/migrations/0003_auth_login_purge.down.sql` (neu)
 - `apps/api/src/persistence/migrations.ts` (Migrationsliste, Down-Zweig und Konsistenz- und Katalogprüfung für Version 3, GRANT EXECUTE in grantRuntimeAccess)
-- `apps/api/src/persistence/postgres.ts` (nur die EXECUTE-Prüfung in assertRuntimePrivileges mit requireTables)
+- `apps/api/src/persistence/postgres.ts` (nur die EXECUTE-Prüfung in assertRuntimePrivileges mit requireTables und das Kennzeichen busy an PostgresPersistenceError in loadPostgresSnapshot und insertPostgresEvents, ohne Treibertext)
 - `packages/contract/openapi.yaml`, `packages/contract/CHANGELOG.md`, `packages/contract/package.json`, `packages/contract/src/types.ts` (generiert)
 - `apps/api/src/__tests__/contract.test.ts` (Versionsaussage, generierte Status um 408/413/429/503 erweitert, Header-Probe)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die feste Versionsaussage)
@@ -393,14 +413,17 @@ Bedrohungsmodell und unter „Open“ benannt.
 ## Tests zuerst und Abnahme
 
 1. Vor der Implementierung rot: `limits034a.test.ts` (Subject-Grenzen Schreiben und Lesen, Quellschicht mit und ohne
-   Anmeldematerial, 429 statt 401 bei erschöpfter Quelle, Anmeldestart je Quelle und gesamt mit gefälschtem Cookie,
+   Anmeldematerial, 429 statt 401 bei erschöpfter Quelle, 700 × 413 mit gefälschtem Cookie → ab Nr. 601 429 ohne
+   weitere Log-Zeilen (N1), Anmeldestart je Quelle und gesamt mit gefälschtem Cookie,
    Proben- und Preflight-Zähler getrennt, 413-Zählung, Protokollausnahme mit Summenzeile, keine Quelle in Log und
    stderr, Überlaufschlüssel, 413 mit und ohne `Content-Length` ohne Fehlerlog, 422 für jede Grenze der Tabelle an
    mindestens einem Feld je Zeile, 408, feste stderr-Zeilen höchstens einmal je Minute), Header-Probe in
    `contract.test.ts`, erweiterte generierte Status (408/429 an jeder Operation, 413 an jeder schreibenden, 503 an jeder
    unter `/v1`).
 2. Postgres in CI: `postgres-limits034a.test.ts` belegt Pool-Parameter, 408 ohne COMMIT, verzögertes COMMIT → 201,
-   `statement_timeout`-Abbruch → 503 ohne Treibertext, parallele Schreiber an der gehaltenen Schreibsperre → 503 nach
+   `statement_timeout`-Abbruch → 503 ohne Treibertext (auch während `loadPostgresSnapshot`), `query_timeout` vor und
+   während `committing` (503 bzw. 500 „Ergebnis unbekannt“, Verbindung verworfen), Migrationen ausstehend → 503 mit
+   `Retry-After: 30`, parallele Schreiber an der gehaltenen Schreibsperre → 503 nach
    ≤ 3 s + Toleranz, Migration 0003 auf/ab/auf, Funktion löscht nur verbrauchte und abgelaufene Zeilen (höchstens 500),
    Katalogprüfung, Laufzeitrolle ohne DELETE, mit EXECUTE, keine PUBLIC-ACL, `assertRuntimePrivileges`-Negativfälle,
    `/readyz` vor Migration 3. Keycloak-Lauf in CI bleibt grün.
@@ -451,6 +474,11 @@ bediente Operationen (m5), Summenzeile (m6), Checkliste SC-01/SC-08/SC-11 (m7), 
 Testdateien einzeln (m9), eigener Probenzähler (m10), Lesegrenze 1 200 (m11), `query_timeout` (m12), Timeout-Minimum
 7 000 (m13, 034b), Startzeile und `HV_DEMO=0` (m14, 034b), CSRF-403 als Restrisiko (m15). Nits: `FOR UPDATE SKIP
 LOCKED`, Begründung 408, Schlüsselzusage nur im Postgres-Pfad, Demo-`X-Actor`-Rotation, Schätzung auf 2 AStd.
+
+Enge Nachprüfung (Opus, 29.09.2026): M1, M2, M4, M5, M7, M8 gelöst; nachgebessert: 413 bei erschöpfter Quelle → 429
+auch mit Cookie (N1, Punkt 3); Kennzeichen `busy` an `PostgresPersistenceError`, damit 57014/`query_timeout` aus
+Snapshot und Insert 503 werden (N2, Punkt 8); `query_timeout` während `committing` → 500 „Ergebnis unbekannt“,
+Verbindung verworfen (N3, Punkte 7, 8, Vertrag); „Migrations are pending.“ mit `Retry-After: 30` (N4).
 
 ## Review findings
 
