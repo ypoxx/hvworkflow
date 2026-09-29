@@ -57,6 +57,19 @@ Migrationen: `HV_MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @hv/a
 `/auth/*`-Pfade, die ebenfalls Postgres nutzen), `validate.ts`, die Postgres-Tests. Weicht der Code von der Spec ab,
 melde es, statt auszulegen.
 
+## Nachweis
+
+- Postgres-Dateien lokal gegen Postgres 16 (eigene DB), alle fünf zusammen wie in CI: vor dem Testfix 6 von 12 Läufen
+  rot, danach 20 von 20 grün (je 31 Tests).
+- `pnpm gates` mit gesetzten Postgres-Variablen, Exit 0 auf Commit `df70ac1` (Kopf dieses PRs). Wörtlicher Schluss:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.45s
+mark-test-run: wrote /home/user/wt/takt-024/.claude/state/last-test-run (clean tree) at commit df70ac1, tree 0a7b37f06ef2…
+exit 0
+```
+
 ## Review findings
 
 Review in frischem Kontext (reviewer, Opus, 29.09.2026): **freigabefähig**, 0 blocker, 0 major. Alle 55 `/v1`-Routen
@@ -70,3 +83,12 @@ Postgres-Dateien lokal 5/30 grün.
 3. minor (mitgenommen, Orchestrator): `postgres028.test.ts` fehlte im CI-Postgres-Schritt, jetzt aufgenommen.
 4. nit → Folgeliste: `ROLLBACK` im `finally` nach `COMMIT` im Test.
 5. nit: 422 aus Query-Parameter nicht eigens geprüft (gleicher Codepfad).
+
+CI-Befund auf `43e8c9b` (nach Aufnahme von `postgres028` in den CI-Postgres-Schritt): `postgres027` „waits for the
+global lock …“ erwartete 412, erhielt 201. Ursache: kein verlorenes Update, sondern die Wartezustand-Abfrage der Tests
+(`pg_stat_activity`, datenbankweit) sah Wartende paralleler Testdateien. Fix in `df70ac1`: Filter auf den
+`application_name` der eigenen Pools; neuer Invariantentest „gleicher `If-Match` → genau `[201, 412]`, fünf Runden mit
+wechselnder Reihenfolge“. Assertion 201/412 unverändert.
+
+Codex (ein Lauf beim Ready-Setzen, auf `df70ac1`): 1 × P1 — Gates-Commit und wörtlicher Schluss fehlten in der Spec →
+Abschnitt „Nachweis“ ergänzt.
