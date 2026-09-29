@@ -547,6 +547,48 @@ Abweichung von der Spec: `hono@4.13.5` kennt keine `BodyLimitError`-Klasse; sein
 Touched: siehe `git diff --stat 115c28b..HEAD`; keine Datei außerhalb „Files allowed“ (slice-scope grün); `http.ts`, `contractSchema.ts`, `migrations027.test.ts`, `postgres-auth-029b.test.ts` und die Testdateien mit möglicher Grenzen-Option blieben unverändert.
 ```
 
+## Nachweis nach dem Review
+
+**Gates-Commit:** `ab4098a` (sauberer Baum), `CONTRACT_GATE_STRICT=1 pnpm gates` mit den Postgres-Variablen, Exit 0.
+Summen: `packages/domain` 231 Tests, `apps/web` 254 Tests, `apps/api` 32 Dateien / 394 Tests, Skripttests 234 / 234,
+`slice-scope` 33 Dateien in „Files allowed“.
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/web test:       Tests  254 passed (254)
+apps/api test:  Test Files  32 passed (32)
+apps/api test:       Tests  394 passed (394)
+slice-scope: 33 changed file(s), all within "docs/slices/034a-grenzen-timeouts-sicherheitsheader.md"'s "Files allowed" list (37 pattern(s)).
+# pass 234
+# fail 0
+✓ built in 2.03s
+mark-test-run: wrote /home/user/wt/s034a/.claude/state/last-test-run (clean tree) at commit ab4098a
+exit 0
+```
+
+**e2e** (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium E2E_PORT=4410 pnpm --filter @hv/web e2e -- --timeout=240000`, Exit 0):
+
+```
+  ✓  129 [chromium] › e2e/abnahme.spec.ts:88:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (1.0m)
+  4 skipped
+  127 passed (8.5m)
+exit 0
+```
+
+**Review-Befunde:**
+
+| Befund | Stand |
+|---|---|
+| Blocker: Nachzählen nur bei 401/413 | erledigt: jede Antwort ohne Subject zählt, ab erschöpfter Quelle ersetzt 429 jede Antwort ab Status 400, 2xx/3xx nie; Tests für Logout 422/403, Callback 400, Transparenzhinweis 200, Callback-302 (`limits034a.test.ts`, vorher rot); Bedrohungsmodell T-G2-D-04, MF-10 korrigiert |
+| Major: Gesamtzähler zählt abgewiesene Aufrufe | erledigt: nur je Quelle zugelassene Aufrufe zählen gesamt; Test Quelle A 700 Aufrufe, Quelle B 302 (vorher rot); Spec-Wortlaut angepasst |
+| Minor: Vorprüfungen/Readiness verwerfen Anschluss nicht | erledigt: `withQueryTimers` (Zeitgeber je Abfrage, `release(error)`), `keepAlive: true`; Test mit hängendem Client |
+| Minor: zerstörter Anschluss hält die Schreibsperre | Restrisiko in T-G2-D-01 (Ziel 071/037) und `client_connection_check_interval=1000` gesetzt, im Pool-Test geprüft |
+| Minor: abgelaufene Anfrage vor Anschluss und Sperre | erledigt: Frühabbruch vor `pool.connect()` und vor der Sperre; Test (kein `pg_advisory_xact_lock`, kein `BEGIN` im SQL-Mitschnitt; per Mutation geprüft) |
+| Minor: Preflight-429 ohne CORS-Header | erledigt: Header der erlaubten Herkunft über `cors`; Test |
+| Nachweis e2e | erledigt (oben); PR-CI trägt der Koordinator nach |
+| Nit: Entscheidung 6 (`bodyLimit` statt `BodyLimitError`) | erledigt: in Entscheidung 6 festgehalten |
+| Nit: `headersTimeout` und Prüfintervall | erledigt: `connectionsCheckingInterval` 5 s über `serverOptions` (wirksam 10 bis 15 s), im Slowloris-Restrisiko (037) benannt |
+
 ## Lesebefund vor dem Bau
 
 Lesebefund in frischem Kontext (Opus, 29.09.2026): kein Blocker, 8 major, 15 minor, einige nits; alle in dieser Fassung
