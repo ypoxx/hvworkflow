@@ -93,6 +93,17 @@ apps/web test:       Tests  254 passed (254)
 mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 58b81d3, tree 61928ad16475…
 ```
 
+Nach dem Einmergen von takt-029 (#70) erneut: `pnpm gates` auf `430616d` (sauberer Baum, Postgres-Variablen, Exit 0):
+
+```
+packages/domain test:       Tests  220 passed (220)
+apps/api test:       Tests  267 passed (267)
+apps/web test:       Tests  254 passed (254)
+...
+✓ built in 1.88s
+mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 430616d, tree 390d3305c21d…
+```
+
 Bildnachweis des geänderten Startfehlers (unlesbares Demoprotokoll mit Marker in der Zeile; der Marker erscheint nicht):
 `docs/evidence/takt-028-startfehler-de.png`, `docs/evidence/takt-028-startfehler-en.png`.
 
