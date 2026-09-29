@@ -2,6 +2,9 @@
 [build]
   command = "pnpm install --frozen-lockfile && pnpm --filter @hv/domain typecheck && pnpm --filter @hv/web build"
   publish = "apps/web/dist"
+  # takt-022: build only the production context. Deploy previews and branch deploys stop here
+  # (exit 0 = skip), so opening a PR never publishes a preview (AGENTS.md R11: no deploy without Go).
+  ignore = 'if [ "$CONTEXT" != "production" ]; then echo "skip: context $CONTEXT"; exit 0; fi; exit 1'
 
 [build.environment]
   NODE_VERSION = "22"
