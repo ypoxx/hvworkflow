@@ -86,7 +86,7 @@ describe('Scheibe 029b: browser-bound OIDC correlation cookies', () => {
 
 describe('Scheibe 028: mandatory version contract', () => {
   it('requires the 0.3.6 fields and per-operation If-Match without changing array responses', () => {
-    expect(openapiDoc.info.version).toBe('0.3.9');
+    expect(openapiDoc.info.version).toBe('0.3.10');
     const schemas = openapiDoc.components.schemas;
     expect(schemas.Meeting.required).toEqual(expect.arrayContaining(['version', 'speakerListVersion']));
     expect(schemas.Speaker.required).toContain('meetingId');
@@ -318,13 +318,20 @@ function canReject(node: unknown): boolean {
  *       JSON in `http.ts`);
  * 401 — a non-empty `security` (`actor.ts`, `app.ts`; the session and bearer schemes from 029/033);
  * 404 — a path parameter (domain lookups, `NotFound`);
- * 412 — an `If-Match` parameter (optimistic locking in `packages/domain/src/api.ts`).
+ * 412 — an `If-Match` parameter (optimistic locking in `packages/domain/src/api.ts`);
+ * 408, 429 — every operation (request timeout and quotas, slice 034a; the time budget is exempt on the
+ *       sign-in paths, but the contract documents it uniformly);
+ * 413 — every operation that takes a body (`POST`, `PUT`, `PATCH`; the body limit needs no `requestBody`);
+ * 503 — every operation under `/v1` (`PersistenceBusy`, slice 034a).
  */
 function generatedStatuses(operationId: string): number[] {
   const op = operations[operationId]!;
   const node = openapiDoc.paths[op.path][op.method] as { security?: Record<string, unknown>[]; requestBody?: unknown };
   const params = paramsFor(operationId);
-  const statuses: number[] = [];
+  const statuses: number[] = [408, 429];
+  if (['post', 'put', 'patch'].includes(op.method)) statuses.push(413);
+  const pathItem = openapiDoc.paths[op.path] as { servers?: unknown };
+  if (pathItem.servers === undefined) statuses.push(503);
   const rejectable = params.some(
     (p) => (p.in === 'query' || p.in === 'header') && canReject(resolvePointer(p.schemaPointer.slice('openapi'.length))),
   );
@@ -337,7 +344,7 @@ function generatedStatuses(operationId: string): number[] {
 }
 
 describe('contract: every status the generic layer can produce is documented or a reasoned exception', () => {
-  it('no operation lacks a generated status (422/401/404/412)', () => {
+  it('no operation lacks a generated status (422/401/404/412/408/413/429/503)', () => {
     const gaps: string[] = [];
     for (const operationId of allOperationIds) {
       const documented = documentedStatuses(operationId);

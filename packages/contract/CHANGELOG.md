@@ -10,6 +10,38 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.10] - 2026-09-29
+
+### Added
+
+- Scheibe 034a: the shared responses `RequestTimeout` (408), `PayloadTooLarge` (413), `TooManyRequests`
+  (429) and `PersistenceBusy` (503), and the header `RetryAfter` (integer, 1 to 60, required on 429 and
+  on `PersistenceBusy`). `408` and `429` are documented on every operation, `413` on every `POST`, `PUT`
+  and `PATCH` operation (the body limit of 262 144 bytes applies to any body, also where no
+  `requestBody` is declared), `503` `PersistenceBusy` on every operation under `/v1`. The existing
+  `ServiceUnavailable` of the operations without credential is unchanged.
+- `info.description`: the paragraph "Limits (since 0.3.10, slice 034a)" with the limits, the security
+  headers on every response, the meaning of `500` "Persistence outcome is unknown." and the
+  double-click convention: one `Idempotency-Key` per user intention, reused on repeat after 408, 429,
+  503, 5xx or network error, never for a second intention.
+- Why `408` (and not `503`/`504`) for a request that exceeds the time budget: the product plan and the
+  security checklist name 408, RFC 9110 lets the client repeat it, and `503` stays reserved for an
+  overloaded persistence.
+
+### Changed
+
+- **Narrower request schemas (not additive).** Length and list limits were added to request schemas:
+  `maxLength` 500 for `note`, `lateEntryReason` and the `reason` of `revokeRole`, `returnQuestion` and
+  `withdrawQuestion`; 60000 for contribution `text`; 4000 for question `text` (`maxItems` 200 in
+  `captureQuestions`); 20000 for answer draft `text` (`sources` `maxItems` 50, each 2000); 200 for
+  names, titles of a meeting and the search `q`; 500 for agenda item titles; 100 for seat labels; 32 for
+  `UnitInput.shortName`; 128 for identifiers; `maxItems` 2000 for `SpeakerOrder.speakerIds` and 200
+  (seats 50) for the `replaceMeeting*` lists. `Idempotency-Key` gets `minLength: 1`. A request over a
+  limit is a 422 now, where the service accepted it before. Every limit lies far above real input.
+  Whether narrowing a request schema is a patch step under ADR 0015 (vorgeschlagen) is the open owner
+  question E55 (same question as 0.3.4 and 0.3.6); the default applied here is a patch, as a security
+  correction (Scheibe 034a, SP-2).
+
 ## [0.3.9] - 2026-09-29
 
 ### Changed
