@@ -223,6 +223,33 @@ describe('Scheibe 029b: browser-bound sign-in', () => {
     await domain.revokeRole('assignment-1');
     expect((await req(app, 'GET', '/auth/me', { headers: { Cookie: otherCookie } })).status).toBe(403);
   });
+
+  it('lets a session without any active role learn of it and log out, while everything else stays refused (takt-023)', async () => {
+    const { app, domain } = await authFixture();
+    const cookie = await signIn(app);
+    await domain.revokeRole('assignment-1');
+    const me = await req(app, 'GET', '/auth/me', { headers: { Cookie: cookie } });
+    expect(me.status).toBe(403);
+    expect(me.headers.get('Cache-Control')).toBe('no-store');
+    expect(me.headers.get('Content-Type')).toContain('application/problem+json');
+    const csrfToken = (await me.json() as { csrfToken: string }).csrfToken;
+    expect(csrfToken).toMatch(/^[A-Za-z0-9_-]{32,}$/);
+    // The role resolution still refuses every business call of this session.
+    expect((await req(app, 'GET', '/v1/meeting', { headers: { Cookie: cookie } })).status).toBe(403);
+    expect((await req(app, 'POST', '/v1/speakers',
+      { headers: { Cookie: cookie, 'X-CSRF-Token': csrfToken }, body: { displayName: 'Nur synthetisch' } })).status).toBe(403);
+    expect((await req(app, 'POST', '/auth/logout', { headers: { Cookie: cookie } })).status).toBe(422);
+    expect((await req(app, 'POST', '/auth/logout', { headers: { Cookie: cookie, 'X-CSRF-Token': 'wrong' } })).status).toBe(403);
+    expect((await req(app, 'POST', '/auth/logout', { headers: { Cookie: cookie, 'X-CSRF-Token': csrfToken } })).status).toBe(204);
+    expect((await req(app, 'GET', '/auth/me', { headers: { Cookie: cookie } })).status).toBe(401);
+  });
+
+  it('gives /auth/me and /auth/logout no exemption without a valid session (takt-023)', async () => {
+    const { app } = await authFixture();
+    expect((await req(app, 'GET', '/auth/me')).status).toBe(401);
+    expect((await req(app, 'POST', '/auth/logout', { headers: { 'X-CSRF-Token': 'c'.repeat(43) } })).status).toBe(401);
+    expect((await req(app, 'GET', '/auth/me', { headers: { Cookie: `hv_session=${'x'.repeat(43)}` } })).status).toBe(401);
+  });
 });
 
 type TokenFault = 'none' | 'signature' | 'issuer' | 'audience' | 'expired' | 'nonce';

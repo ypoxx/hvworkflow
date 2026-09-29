@@ -18,6 +18,8 @@ export const shellEn: typeof shellDe = {
   'login.noticeUnavailableDe': 'Die Anmeldung ist vorübergehend nicht verfügbar: Der Transparenzhinweis fehlt oder ist unvollständig.',
   'login.noticeUnavailableEn': 'Sign-in is temporarily unavailable: the privacy notice is missing or incomplete.',
   'login.sessionError': 'The session could not be checked. Please try again.',
+  'noRole.title': 'No active role',
+  'noRole.body': 'No role is currently active for your account. Please contact the administration.',
   'session.logout': 'Sign out',
   'session.logoutFailed': 'Sign-out failed. Your session is still active.',
   'http.errorTitle': 'Request failed',

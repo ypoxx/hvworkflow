@@ -10,6 +10,15 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.8] - 2026-09-29
+
+### Changed
+
+- Scheibe takt-023 (additive): the 403 of `GET /auth/me` (valid session, no active role) gets its own
+  response `NoActiveRole`: problem+json with the required `csrfToken`, `Cache-Control: no-store` and
+  `X-Server-Time`, so a client that learns of the role loss at startup can still sign out.
+  `POST /auth/logout` no longer resolves roles; it checks session and CSRF only. No other operation changes.
+
 ## [0.3.7] - 2026-09-28
 
 ### Changed

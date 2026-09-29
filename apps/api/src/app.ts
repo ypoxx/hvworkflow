@@ -309,8 +309,15 @@ export function createApp(options: CreateAppOptions = {}): App {
       await next();
       return;
     }
+    // takt-023: a session that lost every role must still learn of it (`/auth/me`, 403 with the
+    // CSRF token) and sign out. Exactly these two paths skip the role resolution; they check the
+    // session cookie, CSRF (logout) and `readSession` below, nothing else is exempted.
+    const sessionOnly = sessionReady && (c.req.path === '/auth/me' || c.req.path === '/auth/logout');
+    if (sessionOnly && !sessionTokenFromCookie(c.req.header('Cookie'))) {
+      throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+    }
     // The adapter decides whether any header is read at all (slice 029a: without demo, none is).
-    const actor = await authenticate((name) => c.req.header(name));
+    const actor = sessionOnly ? undefined : await authenticate((name) => c.req.header(name));
     if (sessionReady) {
       const token = sessionTokenFromCookie(c.req.header('Cookie'))!;
       const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
@@ -329,7 +336,8 @@ export function createApp(options: CreateAppOptions = {}): App {
         throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
       }
     }
-    await actorStorage.run(actor, () => next());
+    if (actor === undefined) await next();
+    else await actorStorage.run(actor, () => next());
   });
   // Slice takt-024: the Postgres boundary (migration status, runtime rights, transaction, write lock,
   // snapshot, commit/rollback) is NOT a blanket `/v1/*` middleware any more. It is chained onto each
@@ -549,13 +557,26 @@ export function createApp(options: CreateAppOptions = {}): App {
 
   app.get('/auth/me', validateOperation('getSession'), async (c) => {
     authResponseHeaders(c);
-    const actor = currentActor();
-    if (demoEnabled) return c.json({ scheme: 'demoActor', actor: { id: actor.id, role: actor.role },
-      subjectId: actor.id, roles: [actor.role] });
+    if (demoEnabled) {
+      const actor = currentActor();
+      return c.json({ scheme: 'demoActor', actor: { id: actor.id, role: actor.role },
+        subjectId: actor.id, roles: [actor.role] });
+    }
     const token = sessionTokenFromCookie(c.req.header('Cookie'));
     const session = token && await authStore!.readSession(token, clock(), false);
     if (!session) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
-    const resolved = sessionActorFromEvents(await authEvents!(), session.actorId, clock());
+    let resolved: ReturnType<typeof sessionActorFromEvents>;
+    try {
+      resolved = sessionActorFromEvents(await authEvents!(), session.actorId, clock());
+    } catch (error) {
+      if (!(error instanceof ApiProblem) || error.status !== 403) throw error;
+      // Contract 0.3.8 `NoActiveRole`: the token lets the client sign out; /v1 writes still fail.
+      const response = new Response(JSON.stringify({ ...error.toProblem(), csrfToken: session.csrfToken }),
+        { status: 403, headers: { 'Content-Type': 'application/problem+json' } });
+      response.headers.set('X-Server-Time', clock().toISOString());
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
+    }
     return c.json({ scheme: 'session', actor: { id: resolved.actor.id, role: resolved.actor.role },
       subjectId: session.actorId, roles: resolved.roles,
       ...(resolved.actor.personId !== undefined ? { personId: resolved.actor.personId } : {}),

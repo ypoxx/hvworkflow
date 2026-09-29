@@ -94,8 +94,13 @@ async function perform<T>(
         if (body && typeof body === 'object') {
           const problem = body as Record<string, unknown>;
           if (problem.status === response.status && typeof problem.title === 'string' && typeof problem.detail === 'string') {
-            return Promise.reject(new ApiProblem(response.status, problem.title, problem.detail,
-              typeof problem.ruleId === 'string' ? problem.ruleId : undefined));
+            const rejected = new ApiProblem(response.status, problem.title, problem.detail,
+              typeof problem.ruleId === 'string' ? problem.ruleId : undefined);
+            // Contract 0.3.8 `NoActiveRole`: only this one response carries a token, for sign-out.
+            if (details.authPath === '/auth/me' && response.status === 403 && typeof problem.csrfToken === 'string') {
+              return Promise.reject(Object.assign(rejected, { csrfToken: problem.csrfToken }));
+            }
+            return Promise.reject(rejected);
           }
         }
       } catch { /* malformed provider/server data must not be reflected */ }

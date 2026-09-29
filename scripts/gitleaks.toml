@@ -1,19 +1,30 @@
 #
 # gitleaks config (slice 012, AGENTS.md rule 11: no credentials, no real data). Extends gitleaks'
-# own default ruleset. No custom allowlist yet: an earlier version of this file added two
-# speculative entries (a "secret"-target regex for the demo `X-Actor` header, which gitleaks never
-# matches against by default since `regexTarget` defaults to the finding's secret, not the whole
-# line — a no-op; and a whole-file allowlist for `packages/domain/src/seed.ts` and its test that was
-# never run against the real binary). Review rework round 1, minor 12: removed both rather than ship
-# unproven config — a reasoned, `regexTarget`-correct entry belongs here once a real CI run shows an
-# actual false positive to allowlist, not before.
-#
-# Runs only in CI (official `gitleaks/gitleaks-action`): a GitHub release download is blocked from
-# this development sandbox, so this file could not be exercised against the real binary in this
-# slice — the first real run is the CI job itself. Scope in `gates.yml` is the PR diff / push range;
-# the nightly workflow scans the whole repository.
+# own default ruleset with one global allowlist (takt-021, at the end). Runs in CI via the pinned
+# `gitleaks/gitleaks-action` (`gates.yml`: PR diff / push range; `nightly.yml`: whole history); the
+# same binary version (8.24.3) was exercised locally for takt-021.
 #
 title = "HV-Tool gitleaks config"
 
 [extend]
 useDefault = true
+
+# takt-021: the nightly full-history scan failed from its first run on two `generic-api-key` false
+# positives, browser-storage key names: the constants COLLAPSE_KEY (apps/web/src/app/AppShell.tsx)
+# and STAGE_CONTRAST_KEY (apps/web/src/features/stage/Page.tsx), each bound to an `hv-<name>-v1`
+# literal. Not quoted verbatim here on purpose: a quoted line in a comment or in Markdown trips the
+# same rule (takt-021 review blocker). The rule keys on the `_KEY =` name plus the entropy of the
+# literal. Codex P1 on #60: the allowlist matches exactly these two lines, constant name and literal
+# value spelled out, so no other constant and no other value (including a secret in `hv-…-vN` shape)
+# is exempt. Tested against gitleaks 8.24.3: a global `[[allowlists]]` table is ignored by this
+# version and `condition = "AND"` has no effect in the global `[allowlist]` (it ORs paths and regexes),
+# so a path restriction cannot be combined here; the exact-line regex needs none. The allowlist is
+# global (all rules, all paths); that is harmless because only these two fixed lines can match. Full history: 2
+# findings before, 0 after; negative controls in the spec.
+[allowlist]
+description = "Two known browser-storage key names, exact lines, not credentials"
+regexTarget = "line"
+regexes = [
+  '''^\s*const COLLAPSE_KEY = 'hv-nav-collapsed-v1';\s*$''',
+  '''^\s*const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';\s*$''',
+]

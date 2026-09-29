@@ -98,3 +98,32 @@ test('HTTP session shows the server role and confirms logout with CSRF', async (
   expect(logoutHeader).toBe(csrfToken);
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('hv-demo')))).toEqual([]);
 });
+
+test('HTTP session without an active role offers sign-out only and returns to sign-in @screenshot', async ({ page }) => {
+  const csrfToken = 'c'.repeat(43);
+  let signedOut = false;
+  let logoutHeader: string | null = null;
+  await page.route('**/auth/me', (route) => route.fulfill(signedOut
+    ? { status: 401, contentType: 'application/problem+json', body: JSON.stringify({ status: 401, title: 'Unauthorized', detail: 'Session required' }) }
+    : { status: 403, contentType: 'application/problem+json',
+      body: JSON.stringify({ type: 'urn:hv:problem:403', status: 403, title: 'Forbidden', detail: 'No active role assignment.', csrfToken }) }));
+  await page.route('**/auth/transparency-notice', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(notice) }));
+  await page.route('**/auth/logout', (route) => {
+    logoutHeader = route.request().headers()['x-csrf-token'] ?? null;
+    signedOut = true;
+    return route.fulfill({ status: 204 });
+  });
+
+  await page.goto('/speakers');
+  await expect(page.getByRole('heading', { name: 'Keine aktive Rolle' })).toBeVisible();
+  await expect(page.getByText('Für Ihr Konto ist derzeit keine Rolle aktiv.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Anmelden' })).toHaveCount(0);
+  await expect(page.getByTestId('role-switcher')).toHaveCount(0);
+  await checkAxe(page, 'HTTP no active role (German)');
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: evidence('takt-023-rollenverlust.png'), fullPage: true });
+
+  await page.getByRole('button', { name: 'Abmelden' }).click();
+  await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
+  expect(logoutHeader).toBe(csrfToken);
+});

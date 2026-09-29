@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.3.7
+  version: 0.3.8
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -1312,7 +1312,7 @@ paths:
       responses:
         '200': { description: 'OK — carries the CSRF token, so never stored by a cache', headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403': { $ref: '#/components/responses/NoActiveRole' }
   /auth/transparency-notice:
     servers: [ { url: /, description: 'Outside /v1: read before sign-in' } ]
     get:
@@ -1606,6 +1606,25 @@ components:
         scope.
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 403 } } } ] } } }
+    NoActiveRole:
+      description: >-
+        Since 0.3.8 (takt-023): a valid session that has no active role assignment any more (revoked,
+        expired, meeting closed). Carries the session's `csrfToken`, so the client can still call
+        `POST /auth/logout`; every `/v1` write of this session keeps failing at the role resolution,
+        so the token is usable for sign-out only. Never stored by a cache.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/Problem' }
+              - type: object
+                required: [csrfToken]
+                properties:
+                  status: { const: 403 }
+                  csrfToken: { type: string, pattern: '^[A-Za-z0-9_-]{32,}$', description: 'Same token as `SignedInSession.csrfToken`; send it as `X-CSRF-Token` on `POST /auth/logout`' }
     NotFound:
       description: Not found
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }

@@ -155,13 +155,14 @@ describe('i18n parity checks', () => {
   // Scheibe 026: +4 action/event keys for identity reveal and role assignments.
   // Scheibe 028: +9 conflict, claim and receipt labels across capture, speakers and shell.
   // Scheibe 030: +19 login, session and HTTP error labels in the shell module.
-  it('(f) Total key count is 503 across all modules and matches de and en', () => {
+  // Scheibe takt-023: +2 `noRole.title`/`noRole.body` for the lost-role page.
+  it('(f) Total key count is 505 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(503);
-    expect(deKeys).toBe(503);
-    expect(enKeys).toBe(503);
+    expect(totalKeys).toBe(505);
+    expect(deKeys).toBe(505);
+    expect(enKeys).toBe(505);
   });
 });

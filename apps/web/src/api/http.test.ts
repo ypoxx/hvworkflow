@@ -113,6 +113,14 @@ describe('HTTP HvApi adapter', () => {
     expect(new Headers(calls[2]?.init.headers).get('X-CSRF-Token')).toBe('csrf');
   });
 
+  it('carries the CSRF token of a 403 from /auth/me on the problem (takt-023)', async () => {
+    vi.stubGlobal('fetch', request);
+    replies.push(new Response(JSON.stringify({ type: 'urn:hv:problem:403', title: 'Forbidden', status: 403,
+      detail: 'No active role assignment.', csrfToken: 'c'.repeat(43) }),
+    { status: 403, headers: { 'Content-Type': 'application/problem+json' } }));
+    await expect(getHttpSession()).rejects.toMatchObject({ status: 403, csrfToken: 'c'.repeat(43) });
+  });
+
   const endpointCases: [keyof HvApi, unknown[], string, string, unknown?][] = [
     ['listMeetings', ['running'], 'GET', '/v1/meetings?status=running'],
     ['getMeetingById', ['m /1'], 'GET', '/v1/meetings/m%20%2F1'],

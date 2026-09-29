@@ -2025,6 +2025,22 @@ export interface components {
                 };
             };
         };
+        /** @description Since 0.3.8 (takt-023): a valid session that has no active role assignment any more (revoked, expired, meeting closed). Carries the session's `csrfToken`, so the client can still call `POST /auth/logout`; every `/v1` write of this session keeps failing at the role resolution, so the token is usable for sign-out only. Never stored by a cache. */
+        NoActiveRole: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControlNoStore"];
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 403;
+                    /** @description Same token as `SignedInSession.csrfToken`; send it as `X-CSRF-Token` on `POST /auth/logout` */
+                    csrfToken: string;
+                };
+            };
+        };
         /** @description Not found */
         NotFound: {
             headers: {
@@ -4088,7 +4104,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            403: components["responses"]["NoActiveRole"];
         };
     };
     getTransparencyNotice: {
