@@ -184,6 +184,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   Laden.
 - 033b R1 nit (vorbestehend, SC-10) · `.github/workflows/gates.yml` · zweites `actions/upload-artifact@v4` (evidence)
   ungepinnt · mit der nächsten Infra-Scheibe auf vollen Hash pinnen.
+- 033b Codex P2 · `packages/domain/src/indicators.ts` / Fachbereichsprüfung in `api.ts` · ein konfigurierter Fachbereich
+  mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
+  reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
