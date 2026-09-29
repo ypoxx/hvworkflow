@@ -647,6 +647,25 @@ Codex auf #71: eigener Abfrage-Timer mit `QueryTimeoutError` statt `pg`-`query_t
 Node-eigene 408 aus `headersTimeout`/`requestTimeout` als benannte Ausnahme ohne Header und Log-Zeile, Restrisiko 037
 (P2, Punkt 7).
 
+### Nachtrag 2 zum Nachweis: Keycloak-CI
+
+Die PR-CI auf `11de5ab` bestand den Anmeldeablauf („… write and logout: PASS“), scheiterte danach aber mit „failed
+during logout“: `me` war nach der Umstellung im `try`-Block deklariert, das `return` danach las `me.body.csrfToken`
+(ReferenceError). Behoben in `158b2b4` (Token in einer äußeren Variablen). `pnpm gates` mit Postgres-Variablen und
+`CONTRACT_GATE_STRICT=1` auf `158b2b4`, Exit 0:
+
+```
+packages/domain test:       Tests  231 passed (231)
+apps/api test:       Tests  395 passed (395)
+apps/web test:       Tests  254 passed (254)
+slice-scope: 34 changed file(s), all within "docs/slices/034a-grenzen-timeouts-sicherheitsheader.md"'s "Files allowed" list (42 pattern(s)).
+...
+✓ built in 2.00s
+mark-test-run: wrote /home/user/wt/s034a/.claude/state/last-test-run (clean tree) at commit 158b2b4, tree edeace99ebb8…
+```
+
+Nachweis für den Keycloak-Schritt bleibt die PR-CI (lokal kein Docker).
+
 ## Review findings
 
 folgt
