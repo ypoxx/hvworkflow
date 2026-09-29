@@ -260,4 +260,12 @@ describe('takt-028: role fields without plaintext PII', () => {
     expect(store.lastSeq()).toBe(before);
     await expect((api as unknown as RoleOps).revokeRole(granted.id, 'x'.repeat(500))).resolves.toBeDefined();
   });
+
+  it('rejects a subjectId longer than 128 characters', async () => {
+    const { api, actor, store } = fixture();
+    actor(admin);
+    const before = store.lastSeq();
+    await expect((api as unknown as RoleOps).assignRole({ subjectId: 's'.repeat(129), role: 'capture' })).rejects.toMatchObject({ status: 422 });
+    expect(store.lastSeq()).toBe(before);
+  });
 });

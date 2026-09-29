@@ -121,6 +121,12 @@ export function stampEvent(
       throw new Error(`Event seq ${seq}: invalid optional envelope field.`);
     }
   }
+  for (const field of ['id', 'subjectId'] as const) {
+    const value = input[field];
+    if (typeof value !== 'string' || value.length === 0 || value.length > MAX_ENVELOPE_TEXT) {
+      throw new Error(`Event seq ${seq}: invalid optional envelope field.`);
+    }
+  }
   const recordedAt = event.at;
   const recordedMs = Date.parse(recordedAt);
   const source = input['occurredAtSource'] ?? 'server';
@@ -135,7 +141,8 @@ export function stampEvent(
     throw new Error(`Event seq ${seq}: invalid occurrence source/time pair.`);
   }
   const explicitMeetingId = input['meetingId'];
-  if (explicitMeetingId !== undefined && typeof explicitMeetingId !== 'string') throw new Error(`Event seq ${seq}: invalid meetingId.`);
+  if (explicitMeetingId !== undefined && (typeof explicitMeetingId !== 'string' || explicitMeetingId.length === 0 ||
+      explicitMeetingId.length > MAX_ENVELOPE_TEXT)) throw new Error(`Event seq ${seq}: invalid meetingId.`);
   const retentionClass = input['retentionClass'] ?? 'working';
   if (!['record', 'working', 'technical'].includes(String(retentionClass))) {
     throw new Error(`Event seq ${seq}: invalid retention class.`);

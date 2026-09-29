@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInProcessApi } from '../api.js';
+import { stampEvent } from '../envelope.js';
 import { createInMemoryEventStore, type EventStore } from '../store.js';
 import type { Actor } from '../types.js';
 import type { DomainEvent, NewEvent } from '../events.js';
@@ -30,6 +31,27 @@ describe('takt-028: envelope built from named fields (SC-07)', () => {
     expect(store.lastSeq()).toBe(0);
     expect(store.append([closed('q1', { personId: 'p'.repeat(128), idempotencyKey: 'k'.repeat(128) })])).toHaveLength(1);
   });
+
+  it('limits id, subjectId and an explicit meetingId to 128 characters', () => {
+    const store = createInMemoryEventStore();
+    for (const extras of [{ id: 'i'.repeat(129) }, { subjectId: 's'.repeat(129) }, { meetingId: 'm'.repeat(129) }, { meetingId: '' }]) {
+      expect(() => store.append([closed('q1', extras)])).toThrow(/seq 1: invalid/);
+    }
+    expect(store.lastSeq()).toBe(0);
+  });
+
+  it('allows an empty commandResource (command without a resource id)', () => {
+    const store = createInMemoryEventStore();
+    const [stored] = store.append([closed('q1', { commandId: 'c', commandOperation: 'op', commandResource: '' })]);
+    expect(stored).toMatchObject({ commandResource: '' });
+  });
+
+  it('keeps a fixed hash test vector, equal to the pre-takt-028 stampEvent', () => {
+    const input = { id: 'e1', type: 'QuestionClosed', at, actor: { id: 'a', role: 'admin' }, subjectId: 's1', payload: { x: 1 },
+      personId: 'p1', causationId: 'c1', idempotencyKey: 'k1', commandId: 'cmd', commandOperation: 'op', commandResource: '' } as NewEvent;
+    // Value computed with the stampEvent of commit 3eee673 (before this slice) and re-checked against the new one.
+    expect(stampEvent(input, 3, 'prev', 'm1').hash).toBe('675ca1fa2f6968905b90ce835ed69d4ca5fdc8a77f0979c19bb0cae4a30359c8');
+  });
 });
 
 /** A store stub that serves hand-made events, so nested historical shapes can be read back. */
@@ -51,8 +73,9 @@ function raw(seq: number, type: string, payload: object): DomainEvent {
     schemaVersion: 2, meetingId: 'm', prevHash: '', hash: 'a'.repeat(64), recordedAt: at, occurredAt: at,
     occurredAtSource: 'server', retentionClass: 'working', legalHold: false } as unknown as DomainEvent;
 }
-function apiOver(store: EventStore) {
-  return createInProcessApi({ store, actor: () => admin, clock: () => new Date(at) });
+function apiOver(store: EventStore, onIntegrityError?: (error: Error) => void) {
+  return createInProcessApi({ store, actor: () => admin, clock: () => new Date(at),
+    ...(onIntegrityError ? { onIntegrityError } : {}) });
 }
 
 describe('takt-028: recursive masking (026)', () => {
@@ -69,6 +92,7 @@ describe('takt-028: recursive masking (026)', () => {
       expect(text).not.toContain(NAME);
       expect(text).not.toContain('person-marker');
       expect(text).toContain('"redacted":true');
+      if (type !== 'SpeakerRegistered') expect(text).toContain('"id":"u1","role":"legal"');
     });
   }
 
@@ -84,12 +108,14 @@ describe('takt-028: recursive masking (026)', () => {
   it('turns a missing source hash into a defined integrity error; subscribers keep running', async () => {
     const { hash: _hash, ...noHash } = raw(7, 'QuestionClosed', {});
     const store = stubStore([noHash as DomainEvent]);
-    const api = apiOver(store);
+    const signals: string[] = [];
+    const api = apiOver(store, (error) => signals.push(error.message));
     await expect(api.listEvents()).rejects.toThrow(/^Event seq 7: integrity check failed \(source hash missing\)\.$/);
     const batches: number[] = [];
     api.subscribe((events) => batches.push(events.length));
     expect(() => store.emit([noHash as DomainEvent, raw(8, 'QuestionClosed', {})])).not.toThrow();
     expect(() => store.emit([raw(9, 'QuestionClosed', {})])).not.toThrow();
     expect(batches).toEqual([1, 1]);
+    expect(signals).toEqual(['Event seq 7: integrity check failed (source hash missing).']);
   });
 });

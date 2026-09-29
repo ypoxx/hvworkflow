@@ -142,6 +142,11 @@ export interface InProcessApiOptions {
   seeder?: (options: { questions: number; seed: number; roundSizes: readonly number[]; now: Date; actor: Actor }) => NewEvent[];
   /** A committed person-table projection, keyed by meeting, for the Postgres request boundary. */
   personSnapshots?: ReadonlyMap<string, readonly Person[]>;
+  /**
+   * Called with a fixed-text error (naming the seq) when `subscribe` had to skip an event whose
+   * source hash is missing. The interface can surface it; the delivery loop is never aborted.
+   */
+  onIntegrityError?: (error: Error) => void;
 }
 
 export function etagOf(version: number): string {
@@ -722,7 +727,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return idempotent(`assignRole:${state.meeting?.id ?? 'none'}`, opts, () => {
         requirePermission('admin.roles.manage');
         if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
-        if (!input.subjectId?.trim() || input.subjectId.includes('@') || /\s/.test(input.subjectId))
+        if (!input.subjectId?.trim() || input.subjectId.length > 128 || input.subjectId.includes('@') || /\s/.test(input.subjectId))
           throw new ApiProblem(422, 'Unprocessable', 'A pseudonymous subjectId is required.');
         if (input.deputyForSubjectId !== undefined && (!input.deputyForSubjectId.trim() || input.deputyForSubjectId.length > 128 ||
             input.deputyForSubjectId.includes('@') || /\s/.test(input.deputyForSubjectId)))
@@ -1060,7 +1065,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return transition(id, 'question.classify', opts, input, (q) => ({
         type: 'QuestionClassified',
         subjectId: q.id,
-        payload: { ...input },
+        payload: { track: input.track,
+          ...(input.agendaItemId !== undefined ? { agendaItemId: input.agendaItemId } : {}),
+          ...(input.stageAssignment !== undefined ? { stageAssignment: input.stageAssignment } : {}) },
       }));
     },
     async assignQuestion(id, unitId, opts) {
@@ -1229,7 +1236,11 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         // append that already persisted). It is skipped here; `listEvents` reports it by seq.
         const visible: ReadEvent[] = [];
         for (const event of events) {
-          try { visible.push(maskEvent(event)); } catch { /* integrity error, surfaced by listEvents */ }
+          try {
+            visible.push(maskEvent(event));
+          } catch (error) {
+            try { options.onIntegrityError?.(error instanceof Error ? error : new Error('Event integrity check failed.')); } catch { /* a faulty callback must not break delivery */ }
+          }
         }
         listener(visible);
       });

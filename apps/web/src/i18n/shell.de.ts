@@ -29,6 +29,7 @@ export const shellDe = {
   'boot.hint': 'Der synthetische Demobestand wird einmalig auf diesem Gerät aufgebaut.',
   'boot.failed.title': 'Das Werkzeug konnte nicht starten',
   'boot.failed.hint': 'Der Demobestand ließ sich nicht aufbauen.',
+  'boot.failed.invalidJson': 'Das gespeicherte Demoprotokoll ist kein gültiges JSON.',
   'boot.failed.retry': 'Erneut versuchen',
   'boot.legacy.title': 'Altes Demoprotokoll',
   'boot.legacy.hint': 'Das gespeicherte Demoprotokoll stammt aus einer älteren Version. Setzen Sie es ausdrücklich zurück, um den synthetischen Bestand neu aufzubauen.',

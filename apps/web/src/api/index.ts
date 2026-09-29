@@ -26,13 +26,18 @@ export class LegacyDemoLogError extends Error {
   constructor() { super('Legacy demo event log requires an explicit reset.'); }
 }
 
+/** The stored demo log is not JSON; the boot screen shows a translated fixed text (R10). */
+export class DemoLogParseError extends Error {
+  constructor() { super('Demo event log is not valid JSON.'); }
+}
+
 /** Parse the stored demo log; a syntax error never repeats the raw text (SC-11). */
 export function parseDemoLog(raw: string): DomainEvent[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error('Demo event log is not valid JSON.');
+    throw new DemoLogParseError();
   }
   if (!Array.isArray(parsed)) throw new Error('Demo event log is not an array.');
   if (parsed.length > 0 && parsed.every(isLegacyEventShape)) {
