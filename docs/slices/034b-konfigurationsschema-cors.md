@@ -182,8 +182,71 @@ Lizenz, Keycloak-CI-Schritt grün.
 
 ## Nachweis
 
-(nach dem Bau: **Gates-Commit** `<sha>` auf sauberem Baum, Umgebung, Anzahl Testdateien/Tests, `slice-scope`-Ergebnis,
-und der wörtliche Schluss der Ausgabe von `pnpm gates` in einem Codeblock; eigener Doku-Commit, kein Amend danach)
+**Gates-Commit:** `4976877` (Baucommit "Scheibe 034b: Konfigurationsschema (zod), .env.example, CORS-Allowlist, Proxy-Quelle"),
+`CONTRACT_GATE_STRICT=1 pnpm gates` auf sauberem Baum, Exit 0. Umgebung: lokale Postgres-DB `hv_s034b`
+(`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE=hv_runtime`), Node 22.22.2, pnpm 10.33.0.
+Testdateien/Tests: domain 14/231, web 13/254, api 34/477 (davon neu `config034b.test.ts` und `cors034b.test.ts`), Skripte 234.
+`slice-scope`: 18 geänderte Dateien, alle innerhalb von „Files allowed" (15 Muster). zod 4.6.5 exakt gepinnt, Lizenz MIT, keine
+Laufzeitabhängigkeiten.
+
+Wörtlicher Schluss der Ausgabe von `pnpm gates`:
+
+```
+# todo 0
+# duration_ms 13070.980578
+> @hv/web@0.0.0 build /home/user/wt/s034bb/apps/web
+> tsc -b && vite build
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1725 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 kB │ map: 2,559.49 kB
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.12s
+mark-test-run: wrote /home/user/wt/s034bb/.claude/state/last-test-run (clean tree) at commit 4976877, tree 3dca399a7df2…
+```
+
+E2E (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium E2E_PORT=4420 pnpm --filter @hv/web e2e -- --timeout=240000`), Schluss:
+
+```
+  ✓  129 [chromium] › e2e/abnahme.spec.ts:88:1 › @abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vorgelesen (1.0m)
+  4 skipped
+  127 passed (8.2m)
+```
+
+Die Konfiguration berührt den Web-Demo-Start nicht (E2E startet nur Vite mit dem Demo im Browser); der Lauf ist die
+Sammelprobe ohne Oberflächenänderung. Die dabei neu erzeugten Screenshots wurden verworfen, nicht committet.
+Der Keycloak-CI-Lauf konnte hier nicht laufen (kein Docker-Daemon); `scripts/keycloak-ci-029b.mjs` bleibt unverändert: mit
+denselben Variablen wie das Skript besteht das Schema (Anmeldung `oidc`, Persistenz `postgres`, Loopback-HTTP für Issuer und
+Redirect, `mkdir` mit 0700), geprüft per `readServiceConfig` in einem Wegwerfaufruf.
+
+Startproben (Ausgaben wörtlich): ohne Demo und ohne Zugriffslog Exit 1 mit den beiden 033a-Sätzen; Verzeichnis 0755 Exit 1 mit
+`HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must not be writable by group or accessible by others.`; nur
+`HV_OIDC_ISSUER` gesetzt Exit 1 mit je einem Satz für die fehlenden Anmelde-, Datenbank- und Hinweisvariablen; `HV_DEMO=1` Startzeile
+`HV-Tool API: start mode=demo persistence=none auth=none cors=http://localhost:5173 trusted-proxies=none`.
+
+Bedrohungs-ID → Test:
+
+| ID | Test (Datei, Block) |
+|---|---|
+| T-Q-T-04 | `config034b.test.ts`: „defaults and shape", „numeric ranges and time order", „rules across variables", „process start" (Exit 1, feste Sätze ohne Marker-Wert) |
+| T-G2-E-02 | `config034b.test.ts`: „paths and directory rights" (`HV_EVENT_LOG` ohne Demo, relativ, im Log-Verzeichnis; 0700/0750 angenommen; 0770/0755/0777/Symlink verweigert) |
+| T-G1-T-05 | `cors034b.test.ts`: alle Blöcke (gelistete Herkunft, fremde Herkunft/`null`/Pfad ohne Header auch im Preflight, Demo-Standard, `X-Actor` nur in der Demo, `Retry-After` exponiert, Preflight-Zähler) |
+| T-G2-S-01 | `config034b.test.ts`: „start line and secrets" (Marker für Client-Secret, Schlüssel, Hash-Schlüssel, Metrics-Token, DB-Passwort) |
+| T-G1-D-01 | `config034b.test.ts`: „configured limits take effect" (`HV_RATE_LIMIT_WRITES_PER_MIN=2` gibt 429 beim dritten Schreibvorgang), „trusted proxy list" (vertrauenswürdiger Proxy mit gefälschtem Eintrag, direkte Verbindung mit `X-Forwarded-For` zählt unter der Verbindungsadresse, `0.0.0.0/0` und `::/0` verweigert), `HV_REQUEST_TIMEOUT_MS=6000` verweigert |
+| `.env.example`-Drift | `config034b.test.ts`: „.env.example (drift)" und „reads every variable it lists" |
 
 ## Bericht (nach Bau ausfüllen)
 
