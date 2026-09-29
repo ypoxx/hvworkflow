@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { createHash, createHmac, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -252,7 +252,7 @@ describe('Scheibe 029b: browser-bound sign-in', () => {
   });
 });
 
-type TokenFault = 'none' | 'signature' | 'issuer' | 'audience' | 'expired' | 'nonce';
+type TokenFault = 'none' | 'signature' | 'issuer' | 'audience' | 'expired' | 'nonce' | 'alg-none' | 'alg-hs256';
 
 /** A local synthetic provider exercises discovery, JWKS and the actual code/PKCE exchange. */
 async function startSyntheticProvider() {
@@ -314,11 +314,15 @@ async function startSyntheticProvider() {
           aud: issued.fault === 'audience' ? 'another-client' : clientId, sub: subject,
           iat: now, exp: issued.fault === 'expired' ? now - 60 : now + 300,
           nonce: issued.fault === 'nonce' ? 'another-nonce' : issued.nonce };
-        const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'runtime-key' })).toString('base64url');
+        const alg = issued.fault === 'alg-none' ? 'none' : issued.fault === 'alg-hs256' ? 'HS256' : 'RS256';
+        const header = Buffer.from(JSON.stringify({ alg, typ: 'JWT', kid: 'runtime-key' })).toString('base64url');
         const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
         const signed = `${header}.${body}`;
-        const signature = sign('RSA-SHA256', Buffer.from(signed),
-          issued.fault === 'signature' ? rogue.privateKey : signing.privateKey).toString('base64url');
+        // takt-029: `none` carries no signature; HS256 is keyed with the client secret (algorithm confusion).
+        const signature = alg === 'none' ? '' : alg === 'HS256'
+          ? createHmac('sha256', secret).update(signed).digest('base64url')
+          : sign('RSA-SHA256', Buffer.from(signed),
+            issued.fault === 'signature' ? rogue.privateKey : signing.privateKey).toString('base64url');
         json(response, 200, { access_token: randomBytes(24).toString('base64url'), token_type: 'Bearer',
           expires_in: 300, id_token: `${signed}.${signature}` });
         return;
@@ -368,7 +372,7 @@ describe('Scheibe 029b: real OIDC code flow against a synthetic local provider',
     await expect(current.complete({ search: callback.search, ...values })).rejects.toThrow();
   });
 
-  it.each(['signature', 'issuer', 'audience', 'expired', 'nonce'] as const)(
+  it.each(['signature', 'issuer', 'audience', 'expired', 'nonce', 'alg-none', 'alg-hs256'] as const)(
     'rejects an ID token with invalid %s', async (fault) => {
       provider.setFault(fault);
       const current = flow();

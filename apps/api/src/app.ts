@@ -354,6 +354,12 @@ export function createApp(options: CreateAppOptions = {}): App {
       if (actor === undefined) {
         const peek = await authStore!.readSession(token, clock(), false);
         if (peek) noteSubject(peek.actorId);
+        // takt-029: `/auth/me` extends the idle window only once the handler knows the session has a role.
+        if (c.req.path === '/auth/me') {
+          if (!peek) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
+          await next();
+          return;
+        }
       }
       const csrfRequired = (mutation && c.req.path.startsWith('/v1/')) || c.req.path === '/auth/logout';
       if (csrfRequired) {
@@ -561,8 +567,10 @@ export function createApp(options: CreateAppOptions = {}): App {
         !states[0] || !/^[A-Za-z0-9_-]{43}$/.test(states[0]) || !correlation || params.has('error')) {
       throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     }
+    // takt-029: a database fault is "unavailable" (503, contract `completeLogin`), never a bare 500.
+    const unavailable = () => new ApiProblem(503, 'Service Unavailable', 'Sign-in is unavailable.');
     const pending = await authStore!.consumeLoginState({ state: states[0],
-      browserCorrelation: correlation, now: clock() });
+      browserCorrelation: correlation, now: clock() }).catch(() => { throw unavailable(); });
     if (!pending) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     let identity: Awaited<ReturnType<OidcFlow['complete']>>;
     try {
@@ -573,15 +581,17 @@ export function createApp(options: CreateAppOptions = {}): App {
     }
     if (identity.issuer !== oidcIssuer) throw new ApiProblem(400, 'Bad Request', 'Invalid sign-in response.');
     const actorId = actorIdForIdentity(identity.issuer, identity.subject);
-    if (await authStore!.isSubjectBlocked(actorId)) {
+    if (await authStore!.isSubjectBlocked(actorId).catch(() => { throw unavailable(); })) {
       throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
     }
-    sessionActorFromEvents(await authEvents!(), actorId, clock());
+    sessionActorFromEvents(await authEvents!().catch(() => { throw unavailable(); }), actorId, clock());
     let session: Awaited<ReturnType<AuthStore['createSession']>>;
     try {
       session = await authStore!.createSession({ actorId, now: clock() });
     } catch {
-      throw new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.');
+      // Blocked between the check and the insert stays 403; any other fault is a persistence fault.
+      const blocked = await authStore!.isSubjectBlocked(actorId).catch(() => false);
+      throw blocked ? new ApiProblem(403, 'Forbidden', 'Sign-in is unavailable for this subject.') : unavailable();
     }
     authResponseHeaders(c);
     const response = c.redirect(pending.returnTo, 302);
@@ -613,6 +623,9 @@ export function createApp(options: CreateAppOptions = {}): App {
       response.headers.set('Cache-Control', 'no-store');
       return response;
     }
+    // A session with an active role keeps its idle window alive (the sliding read); one without does not.
+    const extended = await authStore!.readSession(token, clock());
+    if (!extended) throw new ApiProblem(401, 'Unauthorized', 'A valid session is required.');
     return c.json({ scheme: 'session', actor: { id: resolved.actor.id, role: resolved.actor.role },
       subjectId: session.actorId, roles: resolved.roles,
       ...(resolved.actor.personId !== undefined ? { personId: resolved.actor.personId } : {}),
