@@ -174,6 +174,17 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-029 R1 nit · `apps/api/src/app.ts` (`/auth/me`) · DB-Fehler beim Laden der Rollen liefert 500 statt 503
   (Verfügbarkeit, keine Sitzung entsteht) · wie im Callback in 503 „unavailable“ umwandeln, mit Test.
 
+- 033b R1 nit · `apps/api/src/app.ts` (`readEventsForMetrics`) · dupliziert den Snapshot-Helfer der Fachlesung · einen
+  gemeinsamen Helfer herausziehen.
+- 033b R1 nit · `apps/api/src/persistence/postgres.ts` · der Kennzahlen-Snapshot lädt `persons` mit, obwohl nur gezählt
+  wird (für die volle Kettenprüfung nötig) · Begründung als Kommentar oder Kettenprüfung ohne Personenfelder.
+- 033b R1 nit · `scripts/metrics-allowlist-check.mjs` · Personenbezugsbegriffe nur englisch (`bearbeiter`, `nutzer`,
+  `mitarbeiter`, `redner` fehlen); Schutz wirkt über die Label-Whitelist · Liste per Spec-Änderung erweitern.
+- 033b R1 nit · `apps/api/src/metrics/prometheus.ts` · `catalogJson as never` ohne Laufzeitprüfung · kleine Prüfung beim
+  Laden.
+- 033b R1 nit (vorbestehend, SC-10) · `.github/workflows/gates.yml` · zweites `actions/upload-artifact@v4` (evidence)
+  ungepinnt · mit der nächsten Infra-Scheibe auf vollen Hash pinnen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
