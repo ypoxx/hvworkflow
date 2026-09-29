@@ -168,6 +168,7 @@ describe('Scheibe 028: visible soft claims', () => {
     expect(claimedQuestion.claim).not.toHaveProperty('personId');
     f.as(moderation);
     const questionReadByOther = await f.api.getQuestion(question!.id);
+    expect(questionReadByOther.claim?.actorId).toBe('expert-a');
     expect(questionReadByOther.claim).not.toHaveProperty('personId');
   });
 });
