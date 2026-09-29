@@ -1286,7 +1286,9 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 (etwa 053 ohne 047, 059 ohne 047, 057 ohne 056):
 
 - **A Fundament:** 021c, 024, 025, 026, 027, 028, 033a, 033b, 034.
+  *Stand 29.09.2026:* erledigt 021c, 024, 025, 026, 027, 028 (Codex, 27.–29.09., nachgeprüft; Reparaturen takt-021..026); Spec 033a/033b gemergt; offen 033a, 033b, 034.
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
+  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031, 035, 036.
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
