@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg';
 const migrations = [
   { version: 1, name: '0001_event_log' },
   { version: 2, name: '0002_auth' },
+  { version: 3, name: '0003_auth_login_purge' },
 ] as const;
 
 const latestVersion = migrations.at(-1)!.version;
@@ -84,6 +85,53 @@ async function assertSchemaConsistent(
   if (authTables.some((present) => present !== versions.includes(2))) {
     throw new Error('Auth migration schema and history disagree.');
   }
+  await assertPurgeFunction(client, schema, versions.includes(3));
+}
+
+/**
+ * Version 3 (slice 034a): the purge function must exist exactly when the history says so, and must be
+ * the narrow thing the spec describes. `has_function_privilege` cannot tell PUBLIC from a role, so the
+ * ACL is read through `aclexplode` (grantee 0 is PUBLIC); a NULL ACL is the default, which is PUBLIC.
+ */
+async function assertPurgeFunction(
+  client: PoolClient,
+  schema: { name: string; quoted: string },
+  expected: boolean,
+): Promise<void> {
+  const result = await client.query<{
+    prosecdef: boolean; proconfig: string[] | null; owner_matches: boolean; public_free: boolean;
+    index_present: boolean;
+  }>(
+    `SELECT p.prosecdef, p.proconfig,
+       p.proowner = t.relowner AS owner_matches,
+       (p.proacl IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM aclexplode(p.proacl) AS a WHERE a.grantee = 0)) AS public_free,
+       EXISTS (SELECT 1 FROM pg_catalog.pg_index AS i
+         JOIN pg_catalog.pg_class AS ic ON ic.oid = i.indexrelid
+         WHERE i.indrelid = t.oid AND ic.relname = 'auth_login_states_expires_idx') AS index_present
+     FROM pg_catalog.pg_proc AS p
+     JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
+     JOIN pg_catalog.pg_class AS t ON t.relnamespace = n.oid AND t.relname = 'auth_login_states'
+     WHERE n.nspname = $1 AND p.proname = 'auth_purge_login_states'`,
+    [schema.name],
+  );
+  const rows = result.rows;
+  if (!expected) {
+    // Before version 3 (and while the auth tables are absent) there must be no such function.
+    const anyFunction = await client.query(
+      `SELECT 1 FROM pg_catalog.pg_proc AS p JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
+       WHERE n.nspname = $1 AND p.proname = 'auth_purge_login_states'`,
+      [schema.name],
+    );
+    if (anyFunction.rowCount !== 0) throw new Error('Auth purge migration schema and history disagree.');
+    return;
+  }
+  const row = rows[0];
+  if (rows.length !== 1 || !row || !row.prosecdef || row.proconfig?.length !== 1 ||
+      row.proconfig[0] !== 'search_path=pg_catalog, pg_temp' || !row.owner_matches || !row.public_free ||
+      !row.index_present) {
+    throw new Error('Auth purge function does not match its migration.');
+  }
 }
 
 async function readMigration(name: string, direction: 'up' | 'down', schema: string): Promise<string> {
@@ -139,6 +187,11 @@ async function grantRuntimeAccess(
     `GRANT INSERT ON TABLE ${schema.quoted}.auth_logout_ids TO ${quotedRole}`,
   );
   await client.query(`GRANT SELECT, INSERT ON TABLE ${schema.quoted}.auth_subject_blocks TO ${quotedRole}`);
+  // The one named exception to "SELECT/INSERT and three column UPDATEs only" (slice 034a, SC-08): a
+  // bounded purge function instead of a DELETE right on the table.
+  await client.query(`REVOKE ALL ON FUNCTION ${schema.quoted}.auth_purge_login_states(timestamptz) FROM PUBLIC`);
+  await client.query(`REVOKE ALL ON FUNCTION ${schema.quoted}.auth_purge_login_states(timestamptz) FROM ${quotedRole}`);
+  await client.query(`GRANT EXECUTE ON FUNCTION ${schema.quoted}.auth_purge_login_states(timestamptz) TO ${quotedRole}`);
 
   const privileges = await client.query<{
     can_create: boolean; can_update_events: boolean; can_delete_events: boolean;
@@ -217,15 +270,18 @@ export async function runMigrations(pool: Pool, options: MigrationOptions): Prom
       for (const migration of [...migrations].reverse()) {
         if (!versions.includes(migration.version)) continue;
         // Lock before checking: another writer cannot insert between the emptiness check and DROP.
-        const tables = migration.version === 2
+        // Version 3 only adds a function and an index: no table content is lost, so no data check.
+        const tables = migration.version === 3 ? [] : migration.version === 2
           ? ['auth_login_states', 'auth_sessions', 'auth_logout_ids', 'auth_subject_blocks']
           : ['events', 'persons'];
-        await client.query(`LOCK TABLE ${tables.map((table) => `${schema.quoted}.${table}`).join(', ')} IN ACCESS EXCLUSIVE MODE`);
-        const contents = await client.query<{ populated: boolean }>(
-          `SELECT ${tables.map((table) => `EXISTS (SELECT 1 FROM ${schema.quoted}.${table})`).join(' OR ')} AS populated`,
-        );
-        if (contents.rows[0]?.populated) {
-          throw new Error('Refusing destructive down migration while data is populated.');
+        if (tables.length > 0) {
+          await client.query(`LOCK TABLE ${tables.map((table) => `${schema.quoted}.${table}`).join(', ')} IN ACCESS EXCLUSIVE MODE`);
+          const contents = await client.query<{ populated: boolean }>(
+            `SELECT ${tables.map((table) => `EXISTS (SELECT 1 FROM ${schema.quoted}.${table})`).join(' OR ')} AS populated`,
+          );
+          if (contents.rows[0]?.populated) {
+            throw new Error('Refusing destructive down migration while data is populated.');
+          }
         }
         await client.query(await readMigration(migration.name, 'down', schema.quoted));
         await client.query(
