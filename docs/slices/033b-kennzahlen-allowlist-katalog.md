@@ -108,6 +108,106 @@ Grenzfälle der Kernfunktion mit fester Uhr (`indicators033b.test.ts`): genau 30
 
 `pnpm gates`-Schluss, roter Torlauf mit Fixture, Katalog-Artefakt aus CI, `curl /metrics`-Ausgabe mit synthetischem Korpus, Testnamen je Bedrohungs-ID.
 
+## Nachweis
+
+Gates-Lauf auf Commit `e8b8314` (sauberer Baum, `git status` leer vorher und nachher), mit
+`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` gegen die lokale, migrierte Postgres-Datenbank
+(30 Testdateien, 0 übersprungen, darunter `postgres-metrics033b.test.ts`; Operation-Coverage sieht `getMetrics`).
+Ein erster Lauf auf `90be82f` war rot (plan-honesty prüft den Namen des CI-Schritts der gates-Zeile wörtlich gegen
+`docs/agentische-entwicklung-plan.md`, außerhalb von „Files allowed“); der Schrittname blieb deshalb unverändert
+(Commit `e8b8314`).
+
+Auszug aus dem Lauf:
+
+```
+apps/api test:  Test Files  30 passed (30)
+apps/api test:       Tests  286 passed (286)
+slice-scope: 39 changed file(s), all within "docs/slices/033b-kennzahlen-allowlist-katalog.md"'s "Files allowed" list (44 pattern(s)).
+metrics-allowlist: 6 metrics, all within the allowlist.
+```
+
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (Exit 0):
+
+```
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
+dist/assets/index-DgFD5jiT.js                        618.14 kB │ gzip: 181.11 kB │ map: 2,553.72 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.21s
+mark-test-run: wrote /home/user/wt/s033b/.claude/state/last-test-run (clean tree) at commit e8b8314, tree c8468dd9e1ba…
+EXIT 0
+```
+
+Roter Torlauf gegen Fixtures mit einer Kennzahl je Person (wörtlich):
+
+```
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/subject-label.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_by_subject: (b) label "subject_hash" is outside {meeting_id, unit_id}
+FAIL  hv_by_subject: (c) "hv_by_subject" points at a person ("subject"); no metric per person, with or without a spec entry
+FAIL  hv_by_subject: (c) "subject_hash" points at a person ("subject"); no metric per person, with or without a spec entry
+metrics-allowlist: 3 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/actor-name.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_answers_per_actor: (c) "hv_answers_per_actor" points at a person ("actor"); no metric per person, with or without a spec entry
+metrics-allowlist: 1 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/user-with-unit-label.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_user_open_questions: (c) "hv_user_open_questions" points at a person ("user"); no metric per person, with or without a spec entry
+metrics-allowlist: 1 finding(s).
+exit 1
+$ node scripts/metrics-allowlist-check.mjs --catalog scripts/fixtures/metrics-allowlist/rate-limit.json --specs-dir scripts/fixtures/metrics-allowlist/slices
+FAIL  hv_rate_limit_rejections: (d) rate-limit counters are ephemeral and never part of the catalog
+metrics-allowlist: 1 finding(s).
+exit 1
+```
+
+`/metrics` gegen den lokalen Demo-Dienst (`HV_DEMO=1`, `HV_METRICS_TOKEN` synthetisch, 40 Zeichen, Port 8787;
+Korpus: `seedDemo` des Kerns; der Token ist eine ausgedachte Zeichenfolge):
+
+```
+$ curl -s -H "Authorization: Bearer <synthetischer Token>" localhost:8787/metrics
+# HELP hv_open_question_oldest_age_seconds Sekunden seit Erfassung der ältesten offenen Einzelfrage des laufenden Jahrgangs; 0 ohne offene Einzelfrage.
+# TYPE hv_open_question_oldest_age_seconds gauge
+hv_open_question_oldest_age_seconds{meeting_id="hv-2026"} 20478
+# HELP hv_open_questions Offene Einzelfragen je zugewiesenem Fachbereich des laufenden Jahrgangs; ohne Zuweisung unit_id=unassigned.
+# TYPE hv_open_questions gauge
+hv_open_questions{meeting_id="hv-2026",unit_id="unassigned"} 14
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-esg"} 4
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-fast"} 19
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-fin"} 20
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-hr"} 10
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-ir"} 6
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-legal"} 6
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-ops"} 15
+hv_open_questions{meeting_id="hv-2026",unit_id="unit-strat"} 6
+# HELP hv_questions_captured_last_5m Einzelfragen des laufenden Jahrgangs, die in den letzten 300 Sekunden erfasst wurden.
+# TYPE hv_questions_captured_last_5m gauge
+hv_questions_captured_last_5m{meeting_id="hv-2026"} 215
+# HELP hv_questions_in_legal_review_over_10m Einzelfragen im Status in_review ohne Rechtsfreigabe der aktuellen Fassung, deren Eintritt in in_review länger als 600 Sekunden zurückliegt.
+# TYPE hv_questions_in_legal_review_over_10m gauge
+hv_questions_in_legal_review_over_10m{meeting_id="hv-2026"} 0
+# HELP hv_events_last_1m Ereignisse mit Serverzeit in den letzten 60 Sekunden über alle Jahrgänge.
+# TYPE hv_events_last_1m gauge
+hv_events_last_1m 1566
+# HELP hv_auth_no_active_role_total Antworten 403 NoActiveRole auf GET /auth/me und 403 auf /v1 für eine Sitzung ohne aktive Rolle seit dem Prozessstart.
+# TYPE hv_auth_no_active_role_total counter
+hv_auth_no_active_role_total 0
+$ curl -s -o /dev/null -w "%{http_code}\n" localhost:8787/metrics
+401
+```
+
+Artefakt `auswertungskatalog`: entsteht erst im PR-CI-Lauf (Schritte „Generate the evaluation catalogue“ und „Upload the
+evaluation catalogue“ in `.github/workflows/gates.yml`); `actions/upload-artifact` gepinnt auf
+`ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2, per `git ls-remote https://github.com/actions/upload-artifact 'refs/tags/v4*'`).
+Lauf-ID und Link folgen mit dem PR.
+
 ## Bericht (nach Bau ausfüllen)
 
 ```
