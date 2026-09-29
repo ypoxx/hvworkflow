@@ -17,7 +17,10 @@ Bau bevorzugt mit Sonnet, Reviews von Hochrisiko-Scheiben mit Opus.
 
 ## Nächste Schritte
 
-1. **033a** bauen (Bau am 29.09. abends gestartet, siehe offene PRs) (Spec `docs/slices/033a-serverzeit-health-zugriffslog.md`; Branch
+1. **takt-027** (Datenschutz: `claim.personId` aus den Leseansichten; am 29.09. abends gebaut, PR offen) mergen.
+   **033a** bauen (Bau am 29.09. abends gestartet). Vor 033b **takt-028**: gebündelte Sicherheits- und
+   Datenschutzbefunde aus der Nachprüfung (Liste am Ende von `docs/folgeliste.md`); Grenzen und Timeouts gehen in 034.
+   Regel: Sicherheits-, Rechts- und Datenschutzbefunde nie auf die Folgeliste. (Spec `docs/slices/033a-serverzeit-health-zugriffslog.md`; Branch
    `claude/slice-033a-…`; ADR-Absätze sind schon geschrieben). Danach **033b** (Vertrag 0.3.9 zuerst), dann **034**
    mit der harten Vorbedingung aus 029b: `/auth/login` braucht Obergrenze/Rate-Limit und ein Aufräumen abgelaufener
    Login-Zustände (Folgeliste, Befund 029b major).

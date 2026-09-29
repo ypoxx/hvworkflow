@@ -93,14 +93,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   Wiederholbarkeit sogar zu · Architektenfrage, sonst Guard.
 - 021c · R-TRANS-05/13 · `approver` kann vor Recht freigeben, danach ist R-TRANS-13 unerreichbar (Bedienfalle) · E25
   entscheiden: R-TRANS-13 auch aus `approved` oder Freigabe setzt Rechtsfreigabe voraus.
-- 021c/takt-016 · `openapi.yaml` `LegalClearanceRequest.note`, `lateEntryReason` · kein `maxLength` (SP-2) · mit 034.
 - 021c · `apps/api/src/__tests__/legal-clearance.test.ts` · kein 404-Test auf der neuen Route · ergänzen.
-- 024 · `packages/domain/src/envelope.ts` (`stampEvent`) · `...rest` ungefiltert in Umschlag und Hash (SC-07) ·
-  Umschlag per Whitelist, optionale Felder auf Typ/Länge prüfen.
 - 024 · `apps/api/src/http.ts` · leerer `Idempotency-Key:` besteht die Header-Prüfung (Domäne lehnt `""` inzwischen mit
   422 ab, 028) · Header-Schema `minLength: 1` bzw. Test.
-- 024 · `apps/api/src/eventLog.ts`, `apps/web/src/api/index.ts`, `BootScreen.tsx` · `JSON.parse`-Fehlertext kann
-  Auszug der Rohzeile zeigen (SC-11) · festen Text abbilden.
 - 024 · `apps/web/src/api/index.ts` · „Erneut versuchen“ bei korruptem Demo-Log wirkungslos · Hinweis oder bestätigter
   Reset (Produktentscheid).
 - 024 nit · `EVENT_TYPES` mit `satisfies Record<EventType, true>`; Downgrade des ganzen Logs bei RR-01 vermerken;
@@ -118,21 +113,15 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 025 · `state.ts` (`DebateClosed`) · zweites Ereignis verschiebt `debateClosedAt` · vor 087: nur das erste gilt.
 - 025 · `store.ts`, `api.ts` · O(N)-Duplikatprüfung und Voll-Replay je Aufruf · mit 071.
 - 025 nit · `listMeetings` wirft TypeError statt definiertem Fehler bei Log ohne Projektion.
-- 026 · `api.ts` (`assignRole`) · `deputyForSubjectId` ohne Pseudonym-Prüfung, `revokeRole.reason` ohne Länge (PII im Log).
 - 026 · `api.ts` · Admin kann eigene letzte Admin-Zuordnung entziehen (Aussperrung), kein Test; `assignRole` bei
   geschlossenem Jahrgang erlaubt, ohne Spec-Aussage.
-- 026 · `api.ts` (`maskEvent`) · nicht rekursiv (verschachtelte Akteure in Payloads); wirft bei fehlendem `hash`
-  (SSE-Listener, 035) · rekursive Maske mit Test, definierter Fehler.
 - 026 · `api.ts` (`actor()`) · Demo-Rückfall „ohne Zuordnung = behauptete Rolle“ · mit 029b außerhalb Demo geschlossen;
   prüfen und Test, dass der Pfad nur im Demo-Modus existiert.
-- 027 · `apps/api/src/server.ts` · kein `statement_timeout`/`lock_timeout`/`idle_in_transaction_session_timeout` ·
-  Pool-Timeouts setzen (vor Generalprobe).
 - 027 · `postgres027.test.ts`, `migrations027.test.ts` · `describe.skipIf` ohne DB still grün · CI-Schalter
   `HV_REQUIRE_POSTGRES_TESTS=1`, der Überspringen zum Fehler macht; Laufzeitrolle explizit übergeben.
 - 027 · `app.ts` Readiness · unbekannter Migrationsstand → `unreachable`/500 statt `migrations_pending`/503.
 - 027 nit · `postgres:16` per Digest pinnen; TLS standardmäßig aus (037); kein Owner-Trigger gegen UPDATE (038).
-- 028 · `api.ts` (`viewQuestion`/`viewContribution`) · `claim.personId` an jeden Leser, obwohl `maskEvent` es entfernt
-  (Datenschutz, inkonsistent) · `personId` aus dem Claim entfernen oder an Recht binden. **Datenschutz → vor 040.**
+- ~~028 · `claim.personId` an alle Leser~~ → behoben in **takt-027** (Datenschutz hält den Merge, AGENTS.md R3; Codex P1 auf #66).
 - 028 · `envelope.ts` · Ersatzkennung `legacy-unscoped` auch bei neuen Schreibvorgängen ohne `meetingId` · nur im
   Hochzieh-Pfad, sonst Fehler.
 - 028 · Tests · anderer Jahrgang, Rollenablauf, Postgres-Rollback nach angehängtem Ereignis, gleicher Schlüssel über
@@ -142,10 +131,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   Claim ruft `touch()` (setzt `updatedAt`); keine Claim-Anzeige in der Oberfläche.
 - 029b · `apps/api/src/actor.ts` vs. `packages/domain/src/api.ts` · Regeln „aktive Zuordnung“ doppelt · gemeinsamer
   Domain-Helfer.
-- 029b · `auth-029b.test.ts` · Negativtests `alg: none`/HS256, HTTP-Callback eines gesperrten Subjects → 403, ohne
-  Zuordnung → 403, gleiches `sub` unter zwei Issuern ohne übertragene Rolle.
 - 029b · MF-08 (Zähler verworfener `X-Actor`-Versuche) fehlt · in 033.
-- 029b · `app.ts` Callback · DB-Fehler → 500 statt vertraglich 503.
 - 029b nit · `CURRENT_TIMESTAMP` statt injizierter Uhr in `auth/store.ts`/`0002_auth.up.sql`; Keycloak-Image per Tag;
   `subject-block-cli.ts` ohne Rechenhilfe aus Issuer+`sub`.
 - 030 · `apps/web/e2e/030-anmeldung.spec.ts` · überspringt sich ohne `HV_WEB_MODE=http`; kein HTTP-Build in CI ·
@@ -165,8 +151,6 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-023 R1 · `apps/api/src/__tests__/auth-029b.test.ts` · 403-Body nicht gegen `NoActiveRole` validiert,
   `X-Server-Time` ungeprüft; `apps/web/src/api/auth.test.ts` Test 1(d) prüft faktisch nichts (Fachaufruf-403 fehlt).
 - takt-023 R1 · `docs/slices/030-http-web-anmeldung.md` · Missbrauchsfall ohne Erkennung/Signal/Empfänger (SC-06).
-- takt-023 R1 · `apps/api/src/app.ts` `/auth/me` · Sitzung ohne Rolle schiebt mit jedem Abruf das Leerlauffenster
-  (`slideIdle`) · für diesen Fall `slideIdle=false`.
 - takt-023 nit · `logout`-Beschreibung im Vertrag ohne „keine Rolle nötig“; `noRole` fragt nicht neu ab (bewusst).
 - takt-021 Codex P1 · `scripts/downgrade-check.mjs` · prüft nur nummerierte Specs, keine `takt-*`-Specs; eine falsch
   niedrig eingestufte Takt-Spec (Secrets, Deployment) fällt nicht auf · Takt-Specs einbeziehen.
@@ -177,3 +161,34 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-023 Codex P1 (Ausnahme) · 033a/033b · Erkennungssignal für den Rollenverlust-Missbrauchsfall (aggregierte
   `403 NoActiveRole` auf `/auth/me` und `403` auf `/v1`) muss mit 033a/033b entstehen; Ausnahme läuft mit Merge von
   033b ab, spätestens 27.10.2026 · in Spec 033b als Kennzahl aufnehmen.
+
+## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
+
+Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
+#66). Sie sind eingeplant: **takt-028** (gebündelter Sicherheits- und Datenschutz-Takt, vor 033b) bzw. **034** (Grenzen
+und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** behoben.
+
+- 021c/takt-016 · `openapi.yaml` `LegalClearanceRequest.note`, `lateEntryReason` · kein `maxLength` (SP-2) · mit 034.
+  → **034**
+- 024 · `packages/domain/src/envelope.ts` (`stampEvent`) · `...rest` ungefiltert in Umschlag und Hash (SC-07) ·
+  Umschlag per Whitelist, optionale Felder auf Typ/Länge prüfen.
+  → **takt-028**
+- 024 · `apps/api/src/eventLog.ts`, `apps/web/src/api/index.ts`, `BootScreen.tsx` · `JSON.parse`-Fehlertext kann
+  Auszug der Rohzeile zeigen (SC-11) · festen Text abbilden.
+  → **takt-028**
+- 026 · `api.ts` (`assignRole`) · `deputyForSubjectId` ohne Pseudonym-Prüfung, `revokeRole.reason` ohne Länge (PII im Log).
+  → **takt-028**
+- 026 · `api.ts` (`maskEvent`) · nicht rekursiv (verschachtelte Akteure in Payloads); wirft bei fehlendem `hash`
+  (SSE-Listener, 035) · rekursive Maske mit Test, definierter Fehler.
+  → **takt-028**
+- 027 · `apps/api/src/server.ts` · kein `statement_timeout`/`lock_timeout`/`idle_in_transaction_session_timeout` ·
+  Pool-Timeouts setzen (vor Generalprobe).
+  → **034**
+- 029b · `auth-029b.test.ts` · Negativtests `alg: none`/HS256, HTTP-Callback eines gesperrten Subjects → 403, ohne
+  Zuordnung → 403, gleiches `sub` unter zwei Issuern ohne übertragene Rolle.
+  → **takt-028**
+- 029b · `app.ts` Callback · DB-Fehler → 500 statt vertraglich 503.
+  → **takt-028**
+- takt-023 R1 · `apps/api/src/app.ts` `/auth/me` · Sitzung ohne Rolle schiebt mit jedem Abruf das Leerlauffenster
+  (`slideIdle`) · für diesen Fall `slideIdle=false`.
+  → **takt-028**
