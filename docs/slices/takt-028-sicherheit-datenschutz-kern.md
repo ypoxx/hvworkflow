@@ -80,6 +80,22 @@ dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 
 mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 9392eed, tree 178819317ec5…
 ```
 
+Nachtrag nach Codex P1 auf #69 (Lauf lag vor dem Einmergen von 033a): `pnpm gates` erneut auf dem integrierten Stand,
+Commit `58b81d3` (enthält den Merge `c29aa4e` mit 033a und den Bildnachweis; sauberer Baum, Postgres-Variablen, Exit 0).
+Schluss, wörtlich (Auszug der Testsummen und die letzten Zeilen):
+
+```
+packages/domain test:       Tests  220 passed (220)
+apps/api test:       Tests  255 passed (255)
+apps/web test:       Tests  254 passed (254)
+...
+✓ built in 1.96s
+mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 58b81d3, tree 61928ad16475…
+```
+
+Bildnachweis des geänderten Startfehlers (unlesbares Demoprotokoll mit Marker in der Zeile; der Marker erscheint nicht):
+`docs/evidence/takt-028-startfehler-de.png`, `docs/evidence/takt-028-startfehler-en.png`.
+
 ## Review findings
 
 Review in frischem Kontext (reviewer, Opus, Datenschutz/Security, 29.09.2026): Kern trägt (Hash-Kette des Seeds mit
