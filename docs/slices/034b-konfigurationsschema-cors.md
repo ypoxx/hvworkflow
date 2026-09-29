@@ -277,6 +277,37 @@ Bedrohungs-ID → Test:
 | T-G1-D-01 | `config034b.test.ts`: „configured limits take effect" (`HV_RATE_LIMIT_WRITES_PER_MIN=2` gibt 429 beim dritten Schreibvorgang), „trusted proxy list" (vertrauenswürdiger Proxy mit gefälschtem Eintrag, direkte Verbindung mit `X-Forwarded-For` zählt unter der Verbindungsadresse, `0.0.0.0/0`, `::/0`, `::ffff:0:0/96`, `::/8`, `0.0.0.0/1`, `10.0.0.0/7` und Host-Bits verweigert), `HV_REQUEST_TIMEOUT_MS=6000` verweigert |
 | `.env.example`-Drift | `config034b.test.ts`: „.env.example (drift)" und „reads every variable it lists" |
 
+## Nachweis nach dem Review
+
+**Gates-Commit:** `e816b64` (Code in `2cbbc07`, Doku in `e816b64`), `CONTRACT_GATE_STRICT=1 pnpm gates` mit den Postgres-Variablen auf
+sauberem Baum, Exit 0. Testdateien/Tests: domain 14/231, web 13/254, api 34/480 (3 neue Fälle gegenüber dem ersten Lauf: Proxy-Blöcke,
+gemapptes IPv4, leeres Client-Secret und CORS auf 408/503 sind teils in bestehende Blöcke eingerechnet); `slice-scope`: 21 Dateien,
+alle in „Files allowed". Keine e2e neu (keine Änderung an Oberfläche oder Web-Start).
+
+Wörtlicher Schluss:
+
+```
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.06s
+mark-test-run: wrote /home/user/wt/s034bb/.claude/state/last-test-run (clean tree) at commit e816b64, tree 3d71c2e52006…
+```
+
+Befunde des Opus-Reviews je Zeile:
+
+| Befund | Behandlung | Nachweis |
+|---|---|---|
+| Major Sicherheit: `/0` in anderer Schreibweise (`::ffff:0:0/96`, `::/8`, `0.0.0.0/1` mit `128.0.0.0/1`) | behoben: IPv4 ab /8, IPv6 ab /32, gemappte Blöcke als IPv4 (Präfix minus 96), IPv6-Blöcke mit `::ffff:0:0/96` abgelehnt, Nachtrag zu Entscheidung 8 | `config034b.test.ts` › „trusted proxy list" (erst rot, dann grün) |
+| Minor Sicherheit: TOCTOU der Verzeichnisrechte | als Restrisiko mit Ziel 037 im Bedrohungsmodell; `lstat` je Tagesdatei nicht gebaut (`accessLog.ts` nicht in „Files allowed") | Bedrohungsmodell T-G2-E-02, Spec „Offen" |
+| Minor Tests: CORS auf 408 und 503 | Tests ergänzt (408 auf `/v1` mit langsamem Sitzungsspeicher, 503 auf `/auth/login`) | `cors034b.test.ts` |
+| Minor Doku: Verhaltensänderungen `PORT`, `HV_DATABASE_URL`, unvollständige Anmeldung | ergänzt | Spec, Abschnitt „Nachweis" |
+| Minor: Folgeliste-Einträge „034b Bau" | in „Offen" der Spec verschoben; Folgeliste hält den 033a-Vermerk und zwei Review-Nits (Nit 8, ACLs) | `docs/folgeliste.md` |
+| Nit: Client-Secret aus Leerzeichen | behoben, auch `HV_OIDC_CLIENT_ID` | `config034b.test.ts` |
+| Nit: Host-Bits (`10.0.0.1/8`) | abgelehnt mit festem Satz ohne Wert | `config034b.test.ts` |
+| Nit: Testtitel Preflight | korrigiert (11. Preflight) | `cors034b.test.ts` |
+
 ## Bericht (nach Bau ausfüllen)
 
 ```
