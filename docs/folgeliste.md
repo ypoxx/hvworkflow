@@ -162,6 +162,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   `403 NoActiveRole` auf `/auth/me` und `403` auf `/v1`) muss mit 033a/033b entstehen; Ausnahme läuft mit Merge von
   033b ab, spätestens 27.10.2026 · in Spec 033b als Kennzahl aufnehmen.
 
+- takt-027 R1 nit · `packages/domain/src/api.ts` `viewClaim` · Parametertyp von Hand statt `Claim` aus `types.ts`;
+  Idempotenz-Wiederholung, Listen und Bühne nicht eigens auf fehlende `personId` getestet.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -191,4 +194,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   → **takt-028**
 - takt-023 R1 · `apps/api/src/app.ts` `/auth/me` · Sitzung ohne Rolle schiebt mit jedem Abruf das Leerlauffenster
   (`slideIdle`) · für diesen Fall `slideIdle=false`.
+  → **takt-028**
+- takt-027 R1 minor · `packages/contract/openapi.yaml` `Claim.personId` · ohne Beschreibung („in Antworten nie befüllt,
+  nur im Ereignis“)
   → **takt-028**
