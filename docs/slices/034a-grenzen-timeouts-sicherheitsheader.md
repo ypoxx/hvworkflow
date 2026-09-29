@@ -470,19 +470,77 @@ Bedrohungsmodell und unter „Open“ benannt.
 
 ## Nachweis
 
-(nach dem Bau: **Gates-Commit** `<sha>` auf sauberem Baum, Umgebung (Postgres-Variablen), Anzahl Testdateien/Tests,
-`slice-scope`-Ergebnis, und der wörtliche Schluss der Ausgabe von `pnpm gates` in einem Codeblock; eigener
-Doku-Commit, kein Amend danach)
+**Gates-Commit:** `ce9d50e4aee22a85eb707ce43069a7d044a189b5` (sauberer Baum, `git status` leer). Aufruf:
+`CONTRACT_GATE_STRICT=1 pnpm gates` mit `TEST_DATABASE_URL=postgres://hv_owner:…@localhost:5432/hv_s034a`,
+`TEST_RUNTIME_DATABASE_URL=postgres://hv_runtime:…@localhost:5432/hv_s034a`, `HV_DB_RUNTIME_ROLE=hv_runtime`
+(lokales Postgres 16, Owner-Rolle ist Superuser, Migration 0003 lokal angewendet), Exit 0.
+Testsummen: `packages/domain` 14 Dateien / 231 Tests; `apps/web` 13 Dateien / 254 Tests; `apps/api` 32 Dateien /
+385 Tests (alle Postgres-Dateien laufen, keine übersprungen; Operation-Coverage: 66 Operationen, 59 geprüft, 7 im
+Allowlist); Skripttests 234 / 234; `slice-scope`: 32 geänderte Dateien, alle in „Files allowed“ (37 Muster).
 
-## Bericht (nach Bau ausfüllen)
+Wörtlicher Schluss der Ausgabe (gekürzt um die Vite-Dateiliste):
+
+```
+packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.3.10, 66 operations)
+packages/contract test:   ok    (a) info.version 0.3.10 = package.json version
+packages/contract test:   ok    (b) CHANGELOG.md has a section for 0.3.10
+packages/contract test:   ok    (c) openapi.yaml changed against merge base 115c28b; version 0.3.9 -> 0.3.10
+packages/contract test:   ok    (d) allowlist.json well-formed, 7 pre-declared operation(s), none expired (today 2026-09-29)
+packages/contract test: contract gate: ok
+packages/domain test:  Test Files  14 passed (14)
+packages/domain test:       Tests  231 passed (231)
+apps/web test:  Test Files  13 passed (13)
+apps/web test:       Tests  254 passed (254)
+apps/api test:  Test Files  32 passed (32)
+apps/api test:       Tests  385 passed (385)
+apps/api test: operation-coverage: 66 operations in the contract, 59 exercised by tests, 7 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+slice-scope: 32 changed file(s), all within "docs/slices/034a-grenzen-timeouts-sicherheitsheader.md"'s "Files allowed" list (37 pattern(s)).
+metrics-allowlist: 6 metrics, all within the allowlist.
+plan-graph: ok.
+# tests 234
+# pass 234
+# fail 0
+✓ built in 2.35s
+mark-test-run: wrote /home/user/wt/s034a/.claude/state/last-test-run (clean tree) at commit ce9d50e, tree a770d572a6e2…
+exit 0
+```
+
+**Bedrohungs-ID → Test** (alle Dateien unter `apps/api/src/__tests__/`):
+
+| ID | Test |
+|---|---|
+| T-G1-D-01 | `limits034a.test.ts › limits per subject` (61. Schreibvorgang → 429, `Retry-After` 45, kein Ereignis, Schlüssel nicht verbraucht, nächstes Fenster 201; 1 201. Lesevorgang), `› body limit 256 KiB` (262 145 Byte mit und ohne `Content-Length`, ohne Fehlerlog; 262 144 kein 413; 60 001 Zeichen → 422), `› request timeout (408)`, `› sources without a session … › counts a request 413 …` (700 × 413 ohne Anmeldung) und `› sign-in start and requests with forged session material › a 413 with a forged cookie`, `› length and list limits …` (eine Zeile der Tabelle je Grenze); `postgres-limits034a.test.ts › 408 in the Postgres path`, `› a COMMIT that is already on its way wins over the timer` |
+| T-G1-I-06 | `contract.test.ts › 034a security headers` (acht Header mit Werten auf 200, 201, 302, 400, 401, 404, 408, 413, 422, 429, 500, 503; `no-store` einmal; CORS und `Retry-After` in `exposeHeaders` auf 429) |
+| T-G1-D-05 | `limits034a.test.ts › sign-in start and requests with forged session material › answers the 121st /auth/login …`, `› … 601st sign-in start over many sources`; `postgres-limits034a.test.ts › migration 0003 and the purge of login states` (Aufräumfunktion, Katalog, Laufzeitrolle, `assertRuntimePrivileges`, `/readyz` vor Migration 3, Aufräumfehler) |
+| T-G2-D-04 | `limits034a.test.ts › sources without a session … › answers request 601 …` (Summenzeile 99), `› a flood with a forged cookie`, `› a request with a valid session stays possible …`, `› keeps a source separate for probes …`, `› … CORS preflight …`, `› never writes the source into a log line …` |
+| T-G3-D-02 | `limits034a.test.ts › limits per subject › counts per subject, independent of the role` |
+| T-G3-D-01 | `limits034a.test.ts › request timeout (408)` (hängende Prüfung → 408), `› sign-in paths keep their own upper bounds` (302 statt 408, 503 ohne Sitzung, Logout 204) |
+| T-G1-T-06 | CSP-Wert in `contract.test.ts › 034a security headers` |
+| T-G2-I-02 | `postgres-limits034a.test.ts › statement_timeout answers 503 …`, `› … while the snapshot is loaded …`, `› a query that hangs past the service timer before the COMMIT …`, `› a COMMIT phase that hangs … outcome unknown`, `› migrations pending …`, `› the sign-in store runs under the query timer` |
+| T-G2-D-01 | `postgres-limits034a.test.ts › a write that waits longer than lock_timeout … (T-G2-D-01)` |
+| T-G1-D-03 | durch die Tests zu T-G1-D-01 abgedeckt |
+| Zähler, Pool | `limits034a.test.ts › window counters`, `› source of a request`, `› fixed values and the order of the time limits`; `postgres-limits034a.test.ts › the pool from the factory carries …` |
+
+**Manuelle Probe** gegen `HV_DEMO=1 tsx src/server.ts` (echte TCP-Quelle, gekürzt): `curl -si /healthz` → `200`
+mit `cache-control: no-store`, `content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
+`cross-origin-opener-policy`, `cross-origin-resource-policy`, `referrer-policy: no-referrer`,
+`strict-transport-security: max-age=31536000`, `x-content-type-options: nosniff`, `x-frame-options: DENY`;
+`POST /v1/contributions` mit 262 145 Byte → `HTTP/1.1 413 Payload Too Large` (alle Header), mit 262 144 Byte → 422;
+600 × `GET /v1/meeting` ohne Anmeldung, dann der nächste → `HTTP/1.1 429 Too Many Requests` mit `retry-after: 50`.
+
+## Bericht
 
 ```
 Slice: 034a-grenzen-timeouts-sicherheitsheader
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Postgres- und Keycloak-CI-Lauf; curl-Proben
-Bedrohungs-ID → Test: <je Zeile der Tabelle oben>
-Open (Restrisiken mit Ziel): Node-eigene 408 aus headersTimeout/requestTimeout ohne Sicherheitsheader und ohne Log-Zeile (Slowloris im Log unsichtbar) → Proxy 037; Sitzungslesung je gefälschtem Cookie und ungezählte CSRF-403 bekannter Subjects → Proxy-Grenze 037; Innentäter hinter NAT erschöpft das Anmeldekontingent des Hauses (MF-10) → Messung 071/078, Konfiguration 034b; verteilte Quellen unter der Schwelle füllen das Log → Alarm 037; mehrere Prozesse vervielfachen die Grenzen → 037; 408-Zusage und „408 verbraucht keinen Schlüssel“ nur im Postgres-Pfad; Demo: wechselnde X-Actor-Kennungen erzeugen neue Zähler; Alarm auf die festen stderr-Zeilen 037 (Ausnahme bis 30.10.2026); CSP des Web-Dokuments und e2e-Report 037; Kernprüfung der Vertragsgrenzen (Folgeliste, fachlich); E55 Patch-Stufe (Eigentümer)
-Touched: <Dateiliste>
+Done: Vertrag 0.3.10 (408/413/429/503 und `Retry-After`, Längengrenzen der Anfrageschemas, E55 Standard Patch); Migration 0003
+      (`auth_purge_login_states`, Katalog- und EXECUTE-Prüfung); Grenzschicht in `apps/api/src/limits/` (Zähler mit injizierter
+      Uhr, Subject- und Quellgrenzen, Protokollausnahme, Body-Limit, Request-Timeout, Sicherheitsheader, Pool-Optionen,
+      Abfrage-Timer, 503/500-Abbildung, OIDC-Frist); Bedrohungsmodell mit T-G1-D-05 und MF-10.
+Evidence: Gates-Commit ce9d50e (siehe „Nachweis“); Postgres-Schritt in `gates.yml` um `postgres-limits034a.test.ts` erweitert
+Open (Restrisiken mit Ziel): Node-eigene 408 aus headersTimeout/requestTimeout ohne Sicherheitsheader und ohne Log-Zeile (Slowloris im Log unsichtbar) → Proxy 037; Sitzungslesung je gefälschtem Cookie und ungezählte CSRF-403 bekannter Subjects → Proxy-Grenze 037; Innentäter hinter NAT erschöpft das Anmeldekontingent des Hauses (MF-10) → Messung 071/078, Konfiguration 034b; verteilte Quellen unter der Schwelle füllen das Log → Alarm 037; mehrere Prozesse vervielfachen die Grenzen → 037; 408-Zusage und „408 verbraucht keinen Schlüssel“ nur im Postgres-Pfad; Demo: wechselnde X-Actor-Kennungen erzeugen neue Zähler; Alarm auf die festen stderr-Zeilen 037 (Ausnahme bis 30.10.2026); CSP des Web-Dokuments und e2e-Report 037; Kernprüfung der Vertragsgrenzen (Folgeliste 043); E55 Patch-Stufe (Eigentümer); Owner-Rolle in der lokalen und CI-Umgebung ist Superuser (die SECURITY-DEFINER-Funktion läuft mit deren Rechten, Trennung 037/038); ein durch den Abfrage-Timer zerstörter Anschluss kann die globale Schreibsperre bis zum Ende seiner Anweisung halten (höchstens `statement_timeout`, 5 s) und lässt in dieser Zeit weitere Schreibvorgänge mit 503 antworten; die Vorprüfungen (`getMigrationStatus`, `assertRuntimePrivileges`) laufen unter dem Zeitgeber, ohne dass ihr Anschluss verworfen wird.
+Abweichung von der Spec: `hono@4.13.5` kennt keine `BodyLimitError`-Klasse; sein `bodyLimit` liest den Body vorab und ruft `onError` beim ersten Byte über der Grenze auf. Die Abbildung in `http.ts` entfällt deshalb (Datei unverändert); das Verhalten (413 mit und ohne `Content-Length`, ohne Fehlerlog, 262 144 Byte angenommen) ist getestet.
+Touched: siehe `git diff --stat 115c28b..HEAD`; keine Datei außerhalb „Files allowed“ (slice-scope grün); `http.ts`, `contractSchema.ts`, `migrations027.test.ts`, `postgres-auth-029b.test.ts` und die Testdateien mit möglicher Grenzen-Option blieben unverändert.
 ```
 
 ## Lesebefund vor dem Bau
