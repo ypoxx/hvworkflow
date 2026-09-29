@@ -260,8 +260,9 @@ export async function assertRuntimePrivileges(pool: Pool, requireTables = true):
         purge.rows.some((row) => !row.can_execute)) {
       throw new PostgresPersistenceError();
     }
-  } catch {
-    throw new PostgresPersistenceError();
+  } catch (error) {
+    // Keep the cause class only (`busy`, `queryTimeout`), never its text: a timer or lock timeout is a 503.
+    throw error instanceof PostgresPersistenceError ? error : new PostgresPersistenceError(error);
   } finally {
     client?.release();
   }

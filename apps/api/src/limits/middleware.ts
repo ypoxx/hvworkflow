@@ -98,6 +98,13 @@ export interface RateLimitDeps {
   notices: Notices;
 }
 
+/**
+ * Paths the actor stage lets through without reading the session (`app.ts`): a cookie on them proves nothing and
+ * buys no exemption, so they count in advance like a request without sign-in material. `/auth/callback` is not
+ * here: it keeps "count afterwards, never replace a 2xx/3xx" (its 302 carries the session cookie).
+ */
+const SESSION_BLIND_PATHS = new Set(['/auth/transparency-notice', '/metrics']);
+
 type SourceKind = 'anonymous' | 'sign-in start' | 'probe' | 'preflight';
 
 /**
@@ -184,7 +191,7 @@ export function createSourceLayer(deps: RateLimitDeps, sourceOf: (c: Context) =>
           retryAfterSeconds: Math.max(bySource.retryAfterSeconds, overall?.retryAfterSeconds ?? 1),
         });
       }
-    } else if (hasSignInMaterial(c)) {
+    } else if (hasSignInMaterial(c) && !SESSION_BLIND_PATHS.has(path)) {
       countLater = true;
     } else {
       const result = anonymous.hit(source);

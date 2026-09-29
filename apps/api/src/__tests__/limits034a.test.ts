@@ -14,7 +14,7 @@ import { DEFAULT_LIMITS, READINESS_CHECK_TIMEOUT_MS } from '../limits/config.ts'
 import { createWindowCounter } from '../limits/counters.ts';
 import { createSourceKeyer, normalizeSource } from '../limits/source.ts';
 import { getMigrationStatus } from '../persistence/migrations.ts';
-import { QueryTimeoutError, withQueryTimers } from '../persistence/postgres.ts';
+import { assertRuntimePrivileges, PostgresPersistenceError, QueryTimeoutError, withQueryTimers } from '../persistence/postgres.ts';
 import { postgresPoolOptions } from '../limits/poolOptions.ts';
 import { createMemorySink } from '../observability/accessLog.ts';
 import { ACTOR, req } from './helpers.ts';
@@ -684,13 +684,18 @@ describe('Scheibe 034a (Nachbesserung): every answer to forged session material 
     expect((await call()).status).toBe(429);
   });
 
-  it('a 200 to the transparency notice is never replaced, but it is counted', async () => {
-    const f = sessionFixture({ limits: { anonymousPerSource: 5 } });
-    await f.ready;
-    const call = () => f.app.request('/auth/transparency-notice', { headers: { Cookie: forged } });
-    for (let i = 0; i < 8; i += 1) expect((await call()).status).toBe(200); // exhausted after 5, status unchanged
-    // the eight answers used the shared counter: the next failing request of the source is refused at once
-    expect((await f.app.request('/v1/meeting', { headers: { Cookie: forged } })).status).toBe(429);
+  it('paths that never read the session (transparency notice, metrics) count in advance whatever cookie they carry: 429 from request 6, no further log line', async () => {
+    for (const path of ['/auth/transparency-notice', '/metrics']) {
+      const f = sessionFixture({ limits: { anonymousPerSource: 5 } });
+      await f.ready;
+      const call = () => f.app.request(path, { headers: { Cookie: forged } });
+      for (let i = 0; i < 5; i += 1) await call();
+      const before = f.lines().length;
+      expect((await call()).status).toBe(429); // first refusal: logged
+      expect(f.lines().length).toBe(before + 1);
+      for (let i = 0; i < 4; i += 1) expect((await call()).status).toBe(429);
+      expect(f.lines().length).toBe(before + 1); // repeats are not logged one by one
+    }
   });
 
   it('a successful callback (302 with the session cookie) is never replaced by 429 when the source is exhausted', async () => {
@@ -729,6 +734,14 @@ describe('Scheibe 034a (Nachbesserung): timers on the pre-checks, pool options, 
     await expect(getMigrationStatus(withQueryTimers(pool, 50))).rejects.toBeInstanceOf(QueryTimeoutError);
     expect(released).toHaveLength(1);
     expect(released[0]).toBeInstanceOf(QueryTimeoutError);
+  });
+
+  it('a runtime-rights check that runs into the timer keeps its cause: busy (503), not unavailable (500)', async () => {
+    const client = { query: () => new Promise(() => undefined), release: () => undefined };
+    const pool = { connect: async () => client } as never;
+    const error = await assertRuntimePrivileges(withQueryTimers(pool, 30)).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PostgresPersistenceError);
+    expect(error).toMatchObject({ busy: true, queryTimeout: true });
   });
 
   it('the pool options set TCP keep-alive and the connection check interval, and keep a test search_path', () => {
