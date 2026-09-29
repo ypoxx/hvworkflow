@@ -71,6 +71,16 @@ Ziel 1, Ergebnis je Fall mit dem unveränderten Code: alle grün, kein Befund.
 
 Ziel 2 und 3: Tests vor der Änderung rot (500 bzw. 403 statt 503 bei beiden Fehlern; `/auth/me` bei t+35 min noch 403 statt 401), danach grün.
 
+Nachprüfung nach den Review-Tests: Gates-Commit `b1e6a7a` (sauberer Baum, Postgres-Variablen, DB `hv_t029`, Exit 0).
+
+```
+apps/api test:  Test Files  28 passed (28)
+apps/api test:       Tests  266 passed (266)
+...
+✓ built in 2.26s
+mark-test-run: wrote /home/user/wt/takt-029/.claude/state/last-test-run (clean tree) at commit b1e6a7a, tree 4fa3ff5d3411…
+```
+
 ## Review findings
 
 Review (Opus, frischer Kontext, nur Spec und Diff): freigabefähig, kein blocker, kein major. Einzeltests vom
