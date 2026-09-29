@@ -24,6 +24,13 @@ Warum geteilt: siehe Abschnitt „Warum geteilt“ in `docs/slices/033a-serverze
 4. **Katalogquelle:** `apps/api/src/metrics/catalog.json` ist die einzige Quelle für Dienst, Tor und Katalog: je Kennzahl `name`, `type`, `help`, `labels`, `purpose`, `source` (Ereignisse), `aggregation`, `personalReference`, `spec`. JSON statt TypeScript, weil Node-22-Skripte in CI es ohne Übersetzer lesen.
 5. **Kennzahlen-Allowlist-Tor** `scripts/metrics-allowlist-check.mjs` als `pnpm metrics-allowlist`, aufgenommen in `pnpm gates` (Root-`package.json`) und in die Gate-Liste von AGENTS.md. Rot, wenn (a) ein Name nicht `^hv_[a-z0-9_]+$` entspricht oder doppelt ist; (b) ein Label außerhalb {`meeting_id`, `unit_id`} liegt; (c) ein Name oder Label auf Personenbezug deutet (`subject`, `actor`, `person`, `user`, `employee`, `assignee`, `claim`, `session`, `login`, `email`, `ip`), und zwar **immer**, auch mit Spec-Eintrag. **Entscheidung (strenger als der Wortlaut von ADR 0013, Zeile 35 „keine Kennzahl je Subject ohne Spec-Eintrag“):** der Wortlaut ließe eine Kennzahl je Subject mit Spec-Eintrag zu; das widerspricht dem Satz „Keine Kennzahl je Person“ derselben ADR und dem Rechtekonzept Abschnitt 6 („technisch deaktiviert“). Das Tor folgt der strengeren Lesart; der Architekt gleicht Zeile 35 der ADR an (vor dem Bau oder im Review-Nachtrag). Eine Lockerung braucht eine ADR-Änderung, keinen Tor-Schalter; (d) ein Name `rate_limit` enthält (flüchtig, ADR 0013, nie im Katalog); (e) das Feld `spec` keine Datei `docs/slices/<spec>-*.md` nennt, deren Abschnitt „## Kennzahlen-Allowlist“ den Namen in Backticks enthält. Ein Laufzeittest (unten) sichert, dass `/metrics` keine Familie und kein Label außerhalb des Katalogs ausgibt; Tor und Test zusammen schließen die Lücke „Code gibt eine Kennzahl aus, die nicht im Katalog steht“.
 6. **Generierter Auswertungskatalog (Erstfassung)** `scripts/auswertungskatalog.mjs` schreibt deterministisch (keine Zeitstempel; Commit nur aus `GITHUB_SHA`, sonst `lokal`) `dist/auswertungskatalog/auswertungskatalog.md` und `.json` (Verzeichnis ist über `dist/` bereits ignoriert). Inhalt: die fünf Kennzahlen mit Definition, Zweck, Labels, Aggregation, Personenbezug; der ausdrückliche Satz „Es gibt keine Kennzahl je Person.“; Abschnitt „Nicht im Katalog“: Rate-Limit-Zähler (034, flüchtig, nicht auswertbar), Zugriffslog (033a, nur im Verfahren zu zweit, keine Kennzahl), Vorgangshistorie (Ebene 1). Neuer CI-Schritt in `.github/workflows/gates.yml` erzeugt ihn bei jedem Lauf und lädt ihn als Artefakt `auswertungskatalog` hoch; `actions/upload-artifact` auf einen vollen Commit-Hash gepinnt (SC-10), minimal berechtigt. Diff-Tor und Vervollständigung folgen in 073.
+8. **Erkennungssignal Rollenverlust (Nachtrag Architekt, 29.09.2026, aus takt-023/Codex P1 zu Spec 030).** Zähler
+   `hv_auth_no_active_role_total` (Counter, keine Labels) in `apps/api/src/app.ts`: +1 bei jeder Antwort `403
+   NoActiveRole` auf `GET /auth/me` und bei jeder `403`, die eine Sitzung ohne aktive Rolle auf `/v1` erhält.
+   Prozesslokal, nicht persistiert, nicht aus Ereignissen (Kernfunktion bleibt rein), kein Bezug auf Subject,
+   Sitzung oder Pfad. Katalogeintrag mit `personalReference: "keiner"`, Zweck „Erkennung Missbrauchsfall
+   Rollenverlust (Spec 030)“. Test: zwei 403 einer rollenlosen Sitzung → Zähler 2; die Ausgabe enthält keine
+   Actor-ID. Damit endet die befristete Ausnahme in Spec 030.
 7. **Personenbezug über kleine Fachbereiche (offen, E13):** Hat ein Fachbereich genau eine Person, wird `hv_open_questions{unit_id}` faktisch eine Kennzahl je Person. Die Mindest-Aggregationsschwelle ist Sache der Betriebsvereinbarung (E13). Standard in 033b: Katalogfeld `personalReference` nennt diese Grenze wörtlich; keine Unterdrückung im Code. Der Bericht führt das unter „Open“.
 
 ## Kennzahlen-Allowlist
@@ -35,6 +42,7 @@ Die Einträge, auf die `catalog.json` mit `"spec": "033b"` verweist:
 - `hv_questions_captured_last_5m` — Labels `meeting_id`
 - `hv_questions_in_legal_review_over_10m` — Labels `meeting_id`
 - `hv_events_last_1m` — keine Labels
+- `hv_auth_no_active_role_total` — keine Labels (technische Zählung, prozesslokal, nicht aus Ereignissen)
 
 ## Nicht-Ziele
 

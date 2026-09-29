@@ -28,12 +28,26 @@ Standardannahme aus Plan 3 („Betriebsrat und DSFA", „Vertraulichkeitsstufe")
   Aufbewahrung als Konfiguration mit Standard 30 Tage.
 - **Auswertung nur zu zweit.** Das Zugriffslog und die personenbezogenen Felder der Historie
   (`event.read.personal`) sind nur im Vier-Augen-Verfahren auswertbar: Ereignis
-  `AuditAccessGranted` mit Zweck und Frist; das Verfahren ist dokumentiert (033), die technische
+  `AuditAccessGranted` mit Zweck und Frist; das Verfahren ist dokumentiert (033a), die technische
   Sperre liegt in `can()` (047): `personId`-Auswertung ohne zweite Freigabe → 403.
+- **Verfahren „nur zu zweit“ (Ergänzung 29.09.2026, Architekt, zu 033a).** Der `subjectHash` im
+  Zugriffslog ist ein HMAC mit Schlüssel aus der Plattform; er ist pseudonym, nicht anonym. Es gibt
+  zwei Rückführungswege auf eine Person: (1) mit dem HMAC-Schlüssel, (2) **ohne Schlüssel** über den
+  Abgleich der `seq` einer Log-Zeile mit dem Ereignis gleicher `seq` in der Vorgangshistorie, das den
+  Akteur trägt. `seq` bleibt im Log, weil es die einzige inhaltsfreie Brücke von einer Störung zum
+  betroffenen Vorgang ist. Deshalb gilt: Jede Auswertung, die Zugriffslog und Historie zusammenführt
+  (auch ein bloßer `seq`-Abgleich), ist eine personenbezogene Auswertung und nur zu zweit zulässig —
+  zwei benannte Personen, dokumentierter Zweck, Frist, Eintrag im Runbook; bis 047 organisatorisch,
+  ab 047 technisch (Zugriff auf Log-Senke und `event.read.personal` nur mit zweiter Freigabe).
+  Betrieb und Support lesen Log-Zeilen ohne Historie (Status, Latenz, Operation), das ist keine
+  personenbezogene Auswertung. Missbrauchsfall MF-09 (Bedrohungsmodell).
 - **Keine Kennzahl je Person.** Keine personenbezogene Leistungsauswertung (Plan 4, Zeile 0013). Es gibt fünf
   fachliche Kennzahlen (Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf je 5 min, Fragen in
-  Rechtsfreigabe > 10 min, Ereignisse je Minute) und ein Kennzahlen-Allowlist-Tor: keine Kennzahl je Subject
-  ohne Spec-Eintrag.
+  Rechtsfreigabe > 10 min, Ereignisse je Minute), eine technische Zählung ohne Labels (Anfragen, die wegen
+  fehlender aktiver Rolle mit 403 enden; Erkennungssignal zum Rollenverlust aus takt-023, 033b) und ein
+  Kennzahlen-Allowlist-Tor: **keine Kennzahl je Subject, auch nicht mit Spec-Eintrag** (Präzisierung
+  29.09.2026, Architekt: der frühere Wortlaut „ohne Spec-Eintrag“ widersprach „technisch deaktiviert“ aus dem
+  Rechtekonzept Abschnitt 6; eine Lockerung braucht eine Änderung dieser ADR, keinen Tor-Schalter).
 - **Rate-Limit-Zähler sind flüchtig** und nicht auswertbar; sie stehen nicht im Katalog.
 - **Der Auswertungskatalog wird generiert**, nicht gepflegt: welche Kennzahlen existieren, keine je
   Person; als CI-Artefakt mit Diff-Tor (033, vervollständigt in 073).
@@ -76,9 +90,11 @@ Allowlist-Tor ein Tor und der Katalog ein Diff, nicht eine Zusage.
 
 ## Nachweis
 
-Scheiben **033** und **047** (Plan 4): Test Log-Zeile ohne Fragetext trotz Body; Katalog als
-CI-Artefakt; Allowlist-Tor rot bei absichtlicher Kennzahl je Person; Test `personId`-Auswertung ohne
-zweite Freigabe → 403. Katalog vervollständigt und Dokumentation „Auswertung nur zu zweit" in 073;
+Scheiben **033a**, **033b** (Teilung der Scheibe 033 am 29.09.2026) und **047** (Plan 4):
+033a — Test Log-Zeile ohne Fragetext trotz Body, feste Schlüsselmenge der Log-Zeile, `subjectHash` als HMAC,
+Aufbewahrung als Konfiguration; 033b — reine Kernfunktion für die fünf Kennzahlen, Katalog als CI-Artefakt,
+Allowlist-Tor rot bei absichtlicher Kennzahl je Person (auch mit Spec-Eintrag), `/metrics` ohne Personen-IDs;
+047 — Test `personId`-Auswertung ohne zweite Freigabe → 403. Katalog vervollständigt und Dokumentation „Auswertung nur zu zweit" in 073;
 Zulieferungen an Betriebsrat und DSB in 083. Aus B5: Zugriffslog-Tor, Kennzahlen-Allowlist-Tor.
 
 ## Offene Registerzeilen
