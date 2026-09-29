@@ -150,3 +150,14 @@ allen Statuscodes bestätigt.
 3. minor → **037**: synchrones Schreiben des Zugriffslogs blockiert bei hängendem Datenträger die Event-Loop.
 4. minor (behoben): e2e-Suite nachgetragen (127 passed, 4 skipped); Keycloak- und Postgres-Nachweis im PR-CI-Lauf.
 5. nit → Folgeliste: Rechte des Log-Verzeichnisses nicht geprüft.
+
+Codex (ein Lauf beim Ready-Setzen, auf `eba63ef`): 1 × P2 mit Datenschutzbezug — eine bereits vorhandene Tagesdatei
+behielt weitere Rechte (Modus beim Anlegen gilt nur für neue Dateien) → vor dem Schreiben per `fchmod` auf 0600
+eingeschränkt, Test zuerst rot (0644 blieb), dann grün. `pnpm gates` mit Postgres-Variablen Exit 0 auf `ff296c0`.
+Wörtlicher Schluss:
+
+```
+✓ built in 2.31s
+mark-test-run: wrote /home/user/wt/s033a/.claude/state/last-test-run (clean tree) at commit ff296c0, tree 502a8423faa0…
+EXIT 0
+```
