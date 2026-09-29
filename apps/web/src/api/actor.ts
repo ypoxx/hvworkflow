@@ -5,6 +5,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { Actor, Role } from '@hv/domain';
+import { DEMO_MODE } from './mode';
 
 const STORAGE_KEY = 'hv-demo-actor-v1';
 
@@ -35,13 +36,15 @@ function load(): Actor {
   return DEMO_ACTORS[1]!; // the capture desk is the natural starting point of the demo
 }
 
-let current: Actor = load();
+let current: Actor | undefined = DEMO_MODE ? load() : undefined;
 const listeners = new Set<() => void>();
 
 export function getActor(): Actor {
+  if (!current) throw new Error('No confirmed session actor.');
   return current;
 }
 export function setActor(actor: Actor): void {
+  if (!DEMO_MODE) throw new Error('Demo persona switching is unavailable in HTTP mode.');
   current = actor;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: actor.role }));
@@ -49,6 +52,12 @@ export function setActor(actor: Actor): void {
     /* ignore */
   }
   for (const l of listeners) l();
+}
+/** Session actors come only from /auth/me and are never persisted. */
+export function setSessionActor(actor: Actor | undefined): void {
+  if (DEMO_MODE) return;
+  current = actor;
+  for (const listener of listeners) listener();
 }
 export function useActor(): Actor {
   return useSyncExternalStore(
