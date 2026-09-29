@@ -292,19 +292,23 @@ describe('Scheibe 033a: session actors in the line (T-G3-I-04)', () => {
     expect(noCsrf.status).toBe(403);
     const me = await app.request('/auth/me', { headers: { Cookie: cookie } });
     expect(me.status).toBe(200);
+    const logoutBadCsrf = await app.request('/auth/logout', { method: 'POST',
+      headers: { Cookie: cookie, 'X-CSRF-Token': 'wrong' } });
+    expect(logoutBadCsrf.status).toBe(403);
     sessions.delete(token);
     const expired = await app.request('/v1/meeting', { headers: { Cookie: cookie } });
     expect(expired.status).toBe(401);
     void csrf;
 
     const lines = parse(sink.lines);
-    expect(lines).toHaveLength(5);
+    expect(lines).toHaveLength(6);
     const expected = hashOf(KEY, actorId);
     expect(lines[0]!.subjectHash).toBe(expected);
     expect(lines[1]).toMatchObject({ status: 403, subjectHash: expected, operationId: 'registerSpeaker' });
     expect(lines[2]).toMatchObject({ status: 403, subjectHash: expected });
     expect(lines[3]).toMatchObject({ operationId: 'getSession', status: 200, subjectHash: expected });
-    expect(lines[4]).toMatchObject({ status: 401, subjectHash: null });
+    expect(lines[4]).toMatchObject({ operationId: 'logout', status: 403, subjectHash: expected });
+    expect(lines[5]).toMatchObject({ status: 401, subjectHash: null });
     const all = sink.lines.join('\n');
     for (const forbidden of ['oidc_', SUBJECT, actorId, 'example', token]) expect(all).not.toContain(forbidden);
     expect(expected).not.toBe(actorId);

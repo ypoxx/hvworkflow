@@ -349,6 +349,12 @@ export function createApp(options: CreateAppOptions = {}): App {
     if (sessionReady) {
       const token = sessionTokenFromCookie(c.req.header('Cookie'))!;
       const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method);
+      // Without an adapter actor (`/auth/me`, `/auth/logout`) the session still identifies who acted,
+      // also when CSRF fails below: peek without extending the idle window (order of checks unchanged).
+      if (actor === undefined) {
+        const peek = await authStore!.readSession(token, clock(), false);
+        if (peek) noteSubject(peek.actorId);
+      }
       const csrfRequired = (mutation && c.req.path.startsWith('/v1/')) || c.req.path === '/auth/logout';
       if (csrfRequired) {
         const csrf = c.req.header('X-CSRF-Token');

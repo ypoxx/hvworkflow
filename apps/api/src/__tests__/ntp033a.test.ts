@@ -26,6 +26,8 @@ interface Behaviour {
   mode?: number;
   wrongOriginate?: boolean;
   fromOtherPort?: boolean;
+  /** Send one forged packet (wrong originate) before the real answer. */
+  forgedFirst?: boolean;
   silent?: boolean;
   delayMs?: number;
 }
@@ -53,6 +55,11 @@ async function fakeServer(behaviour: Behaviour = {}, clockMs: () => number = () 
     const t = clockMs() + (b.delta ?? 0);
     ntpTimestamp(t).copy(reply, 32);
     ntpTimestamp(t).copy(reply, 40);
+    if (b.forgedFirst) {
+      const forged = Buffer.from(reply);
+      Buffer.alloc(8, 9).copy(forged, 24);
+      socket.send(forged, rinfo.port, rinfo.address);
+    }
     const send = (): void => { (b.fromOtherPort ? other : socket).send(reply, rinfo.port, rinfo.address); };
     if (b.delayMs) setTimeout(send, b.delayMs); else send();
   });
@@ -81,11 +88,22 @@ describe('Scheibe 033a: SNTP client (T-G2-D-01)', () => {
     ['stratum 0', { stratum: 0 }],
     ['stratum 16', { stratum: 16 }],
     ['mode 3 instead of 4', { mode: 3 }],
-    ['a wrong originate field', { wrongOriginate: true }],
-    ['a foreign sender port', { fromOtherPort: true }],
   ])('reports clock_unsynced for %s', async (_label, behaviour) => {
     const server = await fakeServer(behaviour);
     expect(await check([server])()).toEqual({ status: 'fail', code: 'clock_unsynced' });
+  });
+
+  it.each<[string, Behaviour]>([
+    ['a wrong originate field', { wrongOriginate: true }],
+    ['a foreign sender port', { fromOtherPort: true }],
+  ])('drops a packet with %s silently: timeout, not clock_unsynced', async (_label, behaviour) => {
+    const server = await fakeServer(behaviour);
+    expect(await check([server])()).toEqual({ status: 'fail', code: 'timeout' });
+  });
+
+  it('keeps listening after a forged packet: the genuine answer in the same slot gives ok', async () => {
+    const server = await fakeServer({ forgedFirst: true });
+    expect(await check([server])()).toEqual({ status: 'ok' });
   });
 
   it('reports clock_unsynced for a DNS failure and never leaks the host', async () => {

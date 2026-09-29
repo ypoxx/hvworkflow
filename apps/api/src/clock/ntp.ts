@@ -63,13 +63,15 @@ async function ask(server: NtpServer, clock: () => Date, slot: Promise<'slot'>,
       open.on('error', () => resolve({ kind: 'invalid' }));
       open.on('message', (message: Buffer, from: RemoteInfo) => {
         const t4 = clock().getTime();
-        if (from.address !== target.address || from.port !== server.port) { resolve({ kind: 'invalid' }); return; }
-        if (message.length < 48) { resolve({ kind: 'invalid' }); return; }
+        // RFC 5905: a packet from the wrong sender or with the wrong originate field is not an answer
+        // to this request. Drop it silently and keep listening until the slot ends, so an off-path
+        // sender who hits the short-lived port cannot end the slot (and force `clock_unsynced`).
+        if (from.address !== target.address || from.port !== server.port || message.length < 48 ||
+            !message.subarray(24, 32).equals(nonce)) return;
         const leap = message[0]! >> 6;
         const mode = message[0]! & 7;
         const stratum = message[1]!;
-        if (mode !== 4 || leap === 3 || stratum < 1 || stratum > 15 ||
-            !message.subarray(24, 32).equals(nonce) || message.readUInt32BE(40) === 0) {
+        if (mode !== 4 || leap === 3 || stratum < 1 || stratum > 15 || message.readUInt32BE(40) === 0) {
           resolve({ kind: 'invalid' });
           return;
         }
