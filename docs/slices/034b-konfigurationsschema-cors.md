@@ -1,17 +1,18 @@
 # Scheibe 034b — Konfigurationsschema, .env.example und CORS-Allowlist
 
-**Status:** spec
+**Status:** spec (nach Lesebefund 29.09.2026 nachgebessert)
 **Risikoklasse:** hoch · 1 AStd · 28.10.2026 (W5) · Lanes: service, manifests, infra, docs-sicherheit
-**Rolle:** Implementierer-Backend; unabhängiges Review in frischem Kontext mit Perspektive Security/Betrieb, zusätzlich Sicherheits-Checkliste des Reviewers (SC-05, SC-06, SC-10, SP-3, SP-5, SP-6) (Modell nur in `.claude/agents/`, takt-012)
+**Rolle:** Implementierer-Backend; unabhängiges Review in frischem Kontext mit Perspektive Security/Betrieb, zusätzlich Sicherheits-Checkliste des Reviewers (SC-01, SC-05, SC-06, SC-10, SC-11, SP-3, SP-5, SP-6) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel, keine Änderung an `ROLE_PERMISSIONS` oder der Übergangstabelle; AGENTS.md R4 (Rechte), R8 (Zeit aus der injizierten Uhr), R11 (keine Zugangsdaten, keine echten Daten)
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/034b (Teil 2 der am 29.09.2026 geteilten Scheibe 034); Befund 033a R1 nit (`docs/folgeliste.md`: Rechte des Log-Verzeichnisses); Bedrohungsmodell Abschnitt 6 Zeile 034 (T-Q-T-04, T-G2-E-02, T-G1-T-05), MF-08; ADR 0004 (Demo-Verriegelung), ADR 0013; Leitplanken §4, 6.8, 6.12
-**Depends on:** 034a (gemergt)
+**Depends on:** 034a (muss vor Baubeginn gemergt sein)
 **Perspektive:** Security/Betrieb · **Glossar: neue Begriffe:** nein
 
 ## Warum geteilt
 
 Siehe `docs/slices/034a-grenzen-timeouts-sicherheitsheader.md`, Abschnitt „Warum geteilt“. 034b prüft den
-Prozessstart: jede Variable des Dienstes läuft durch ein Schema, bevor ein Socket geöffnet wird. Die Grenzen und
+Prozessstart: jede Variable des Dienstes läuft durch ein Schema, bevor ein Socket geöffnet wird. Dazu gehört, welchen
+Proxys der Dienst die Quelladresse glaubt (Punkt 8). Die Grenzen und
 Timeouts aus 034a werden hier konfigurierbar, ihre Standardwerte ändern sich nicht.
 
 ## Ziel und Entscheidungen vor Bau
@@ -26,16 +27,21 @@ Offene Punkte sind auf Standard gebaut und als solche markiert.
    `HV-Tool API: refusing to start: <VARIABLE> <Regel>.` und nennt **nie** einen Wert (auch nicht gekürzt). Die drei
    Sätze aus 033a (`REFUSE_DIR`, `REFUSE_KEY`, `REFUSE_RETENTION`) bleiben wörtlich gleich.
 2. **Erfasste Variablen** (alle, die `apps/api/src` außerhalb der Migrations-CLI liest, plus die neuen):
-   `PORT` (1–65535, Standard 8787); `HV_DEMO` (`1` oder fehlend); `HV_DATABASE_URL`; `HV_EVENT_LOG`; `HV_DB_TLS`
+   `PORT` (1–65535, Standard 8787); `HV_DEMO` (`1` oder fehlend; jeder andere Wert, auch `0`, verweigert den Start —
+heute wirkt `HV_DEMO=0` wie „aus“, künftig ist es ein Fehler, im Bericht nennen); `HV_DATABASE_URL`; `HV_EVENT_LOG`; `HV_DB_TLS`
    (`0`/`1`); `HV_OIDC_ISSUER`, `HV_OIDC_CLIENT_ID`, `HV_OIDC_CLIENT_SECRET`, `HV_OIDC_REDIRECT_URI`,
    `HV_AUTH_ENCRYPTION_KEY` (base64url, genau 32 Byte); `HV_TRANSPARENCY_NOTICE_VERSION`/`_DE`/`_EN`,
    `HV_DSFA_SUMMARY_URL`; `HV_SEED_ACTOR`; `HV_ACCESS_LOG_DIR`, `HV_ACCESS_LOG_HASH_KEY`,
    `HV_ACCESS_LOG_RETENTION_DAYS` (033a); `HV_NTP_SERVERS`, `HV_CLOCK_MAX_DRIFT_MS` (033a); `HV_METRICS_TOKEN` (033b);
-   neu: `HV_CORS_ORIGINS`, `HV_TRUST_PROXY_HOPS` (0–3, Standard 0), `HV_REQUEST_TIMEOUT_MS` (1 000–60 000, Standard
-   10 000), `HV_RATE_LIMIT_WRITES_PER_MIN` (1–10 000, Standard 60), `HV_RATE_LIMIT_ANON_PER_MIN` (10–100 000, Standard
-   300), `HV_RATE_LIMIT_LOGIN_PER_MIN` (1–10 000, Standard 60), `HV_RATE_LIMIT_LOGIN_GLOBAL_PER_MIN` (10–100 000,
-   Standard 600), `HV_DB_STATEMENT_TIMEOUT_MS` (500–60 000, Standard 5 000), `HV_DB_LOCK_TIMEOUT_MS` (100–60 000,
-   Standard 3 000), `HV_DB_IDLE_TX_TIMEOUT_MS` (1 000–600 000, Standard 15 000). Das Body-Limit (256 KiB) bleibt fest.
+   neu: `HV_CORS_ORIGINS`, `HV_TRUSTED_PROXY_CIDRS` (Standard leer), `HV_REQUEST_TIMEOUT_MS` (7 000–60 000, Standard
+   10 000; Minimum über dem `/readyz`-Budget von 3 × 2 000 ms), `HV_RATE_LIMIT_WRITES_PER_MIN` (1–10 000, Standard 60),
+   `HV_RATE_LIMIT_READS_PER_MIN` (60–100 000, Standard 1 200), `HV_RATE_LIMIT_ANON_PER_MIN` (10–100 000, Standard 600),
+   `HV_RATE_LIMIT_LOGIN_PER_MIN` (1–10 000, Standard 120), `HV_RATE_LIMIT_LOGIN_GLOBAL_PER_MIN` (10–100 000, Standard
+   600), `HV_RATE_LIMIT_PROBES_PER_MIN` (10–100 000, Standard 600), `HV_RATE_LIMIT_PREFLIGHT_PER_MIN` (10–100 000,
+   Standard 1 200), `HV_DB_STATEMENT_TIMEOUT_MS` (500–60 000, Standard 5 000), `HV_DB_LOCK_TIMEOUT_MS` (100–60 000,
+   Standard 3 000), `HV_DB_QUERY_TIMEOUT_MS` (1 000–60 000, Standard 6 000), `HV_DB_IDLE_TX_TIMEOUT_MS`
+   (1 000–600 000, Standard 15 000). Das Body-Limit (256 KiB) bleibt fest. Die Standardwerte sind die aus 034a
+   (dort begründet, Verfügbarkeitsabwägung).
 3. **Regeln über mehrere Variablen.** `HV_DATABASE_URL` und `HV_EVENT_LOG` schließen sich aus (heute ein `throw` in
    `server.ts`). `HV_DEMO=1` mit `HV_OIDC_ISSUER` → Start verweigert (ADR 0004; die Prüfung in `createApp` bleibt als
    Bibliotheksschutz, `demo-lock.test.ts` unverändert). Anmeldung ist **alles oder nichts**: ist eine der Variablen
@@ -44,7 +50,8 @@ Offene Punkte sind auf Standard gebaut und als solche markiert.
    davon gesetzt und kein Demo-Modus → Start wie heute mit der festen Warnung „no complete sign-in configuration“.
    Issuer und Redirect-URI: `https:`, ausgenommen Loopback-Hosts (`localhost`, `127.0.0.1`, `[::1]`) für
    Keycloak-CI und Entwicklung; kein Benutzer/Passwort in der URL. Zeitgrenzen:
-   `HV_DB_LOCK_TIMEOUT_MS` < `HV_DB_STATEMENT_TIMEOUT_MS` < `HV_REQUEST_TIMEOUT_MS` < `HV_DB_IDLE_TX_TIMEOUT_MS` (wie 034a).
+   `HV_DB_LOCK_TIMEOUT_MS` < `HV_DB_STATEMENT_TIMEOUT_MS` < `HV_DB_QUERY_TIMEOUT_MS` < `HV_REQUEST_TIMEOUT_MS` <
+   `HV_DB_IDLE_TX_TIMEOUT_MS` (wie 034a).
 4. **Pfade (T-G2-E-02).** `HV_EVENT_LOG` nur mit `HV_DEMO=1` (JSONL ist Entwicklungsadapter, 027; Standard, vom
    Eigentümer als Konfigurationsfrage änderbar), absoluter Pfad, Elternverzeichnis vorhanden und beschreibbar, nicht
    innerhalb von `HV_ACCESS_LOG_DIR`. `HV_ACCESS_LOG_DIR` (033a-Regeln unverändert) und neu die **Rechte des
@@ -70,14 +77,20 @@ Offene Punkte sind auf Standard gebaut und als solche markiert.
    `ETag`, `X-Server-Time`, `Retry-After`; Methoden `GET`, `POST`, `PUT`, `PATCH`, `OPTIONS`; `maxAge` 600;
    `credentials: true` nur außerhalb der Demo. Eine nicht gelistete Herkunft erhält keinen
    `Access-Control-Allow-Origin` (auch nicht bei Preflight); Vergleich exakt nach Normalisierung (Kleinschreibung von
-   Schema und Host, Standardport entfernt). Preflights zählen weiter gegen die Quellgrenze aus 034a.
-8. **Quelle hinter einem Proxy.** `HV_TRUST_PROXY_HOPS` = n > 0: die Quelle für die Grenzen aus 034a ist der n-te
-   Eintrag von rechts in `X-Forwarded-For`; fehlt der Header oder hat er weniger als n Einträge oder einen ungültigen
-   Eintrag, gilt der gemeinsame Schlüssel „unbekannt“ (angemeldete Anfragen bleiben unberührt). Standard 0: die
-   Verbindungsadresse. Die Quelle bleibt außerhalb jedes Logs (034a Punkt 3).
+   Schema und Host, Standardport entfernt). Preflights zählen auf den eigenen Preflight-Zähler aus 034a,
+   nicht auf die Grenze für nicht angemeldete Anfragen; Antworten 408, 413, 429 und 503 an eine erlaubte Herkunft tragen
+   die CORS-Header (034a Punkt 1).
+8. **Quelle hinter einem vertrauenswürdigen Proxy.** `HV_TRUSTED_PROXY_CIDRS`: kommagetrennte IPv4-/IPv6-CIDR-Blöcke
+   (höchstens 16, keine `0.0.0.0/0` und `::/0`). `X-Forwarded-For` wird **nur** ausgewertet, wenn die TCP-Gegenstelle
+   in einem dieser Blöcke liegt; dann ist die Quelle der am weitesten rechts stehende Eintrag, der **nicht** in einem
+   vertrauenswürdigen Block liegt (Einträge von rechts nach links, vertrauenswürdige Proxys übersprungen). Ist der
+   Header dann leer, fehlerhaft oder besteht nur aus vertrauenswürdigen Adressen, gilt die Verbindungsadresse. Kommt
+   die Verbindung nicht von einem vertrauenswürdigen Proxy, wird der Header ignoriert und die Verbindungsadresse gilt
+   (ein Client kann seine Quelle nicht selbst wählen). Standard leer: immer die Verbindungsadresse. Die Quelle bleibt
+   außerhalb jedes Logs (034a Punkt 3). `HV_TRUST_PROXY_HOPS` aus der ersten Fassung entfällt zugunsten der CIDR-Liste.
 9. **Startzeile als Erkennung.** Nach erfolgreichem Start schreibt `server.ts` eine feste Zeile mit Betriebsart
-   (`demo` oder `service`), Persistenz (`postgres`, `jsonl`, `none`), Anmeldung (`oidc` oder `none`) und den erlaubten
-   CORS-Herkünften (Konfiguration, kein Geheimnis); keine anderen Werte.
+   (`demo` oder `service`), Persistenz (`postgres`, `jsonl`, `none`), Anmeldung (`oidc` oder `none`), den erlaubten
+   CORS-Herkünften und den vertrauenswürdigen Proxy-Blöcken (Konfiguration, kein Geheimnis); keine anderen Werte.
 10. **`.env.example`** unter `apps/api/.env.example`: jede Variable des Schemas genau einmal, mit Kommentar (Zweck,
     Standard, erlaubter Bereich, „aus der Plattform“ bei Geheimnissen) und Platzhalter ohne echten oder
     echt aussehenden Wert (Geheimnisse leer). Ein Drift-Test vergleicht die Schlüsselmenge der Datei mit der des
@@ -98,7 +111,7 @@ Migrations-CLI. Kein Entfernen der `process.env`-Rückfälle in `app.ts`. Keine 
 | T-G2-E-02 | schließen (Rest: Container ohne Root 037) | `HV_EVENT_LOG` ohne Demo, relativ, innerhalb des Log-Verzeichnisses → verweigert; Log-Verzeichnis 0700 und 0750 angenommen, 0770, 0755, 0777 und Symlink auf ein Verzeichnis verweigert (`config034b.test.ts`, temporäre Verzeichnisse) |
 | T-G1-T-05 | berührt (CSRF bleibt 029b) | gelistete Herkunft → `Access-Control-Allow-Origin` gleich der Herkunft und `Access-Control-Allow-Credentials: true` (ohne Demo); fremde Herkunft, `null`, Herkunft mit Pfad → kein Allow-Header, auch nicht im Preflight; Demo ohne Variable → nur `http://localhost:5173`; `X-Actor` nur im Demo-Modus in `Access-Control-Allow-Headers`; `Retry-After` in `Access-Control-Expose-Headers` (`cors034b.test.ts`) |
 | T-G2-S-01 | berührt (Secrets aus der Plattform 037) | kein Geheimnis in Startzeile, Fehlersätzen und stderr (Marker-Werte für Client-Secret, Verschlüsselungsschlüssel, Hash-Schlüssel, Metrics-Token) (`config034b.test.ts`) |
-| T-G1-D-01 | berührt (Konfiguration der Grenzen) | gesetzte Grenzen aus dem Schema wirken (z. B. `HV_RATE_LIMIT_WRITES_PER_MIN=2` → 3. Schreibvorgang 429); Quelle aus `X-Forwarded-For` mit `HV_TRUST_PROXY_HOPS=1`, gefälschter linker Eintrag ändert die Quelle nicht (`cors034b.test.ts` oder `config034b.test.ts`) |
+| T-G1-D-01 | berührt (Konfiguration der Grenzen) | gesetzte Grenzen aus dem Schema wirken (z. B. `HV_RATE_LIMIT_WRITES_PER_MIN=2` → 3. Schreibvorgang 429); Verbindung von einer vertrauenswürdigen Proxy-Adresse mit `X-Forwarded-For: <gefälscht>, <Client>` → Quelle `<Client>`; **direkte Verbindung** (nicht in `HV_TRUSTED_PROXY_CIDRS`) mit `X-Forwarded-For` → Quelle ist die Verbindungsadresse; `0.0.0.0/0` in der Liste → Start verweigert; `HV_REQUEST_TIMEOUT_MS=6000` → Start verweigert (`config034b.test.ts`, Quelle über die Option `sourceOf` bzw. die Verbindungsadresse der Test-Anfrage) |
 
 `.env.example`-Drift: Variable im Schema, aber nicht in der Datei, und umgekehrt → Test rot; unbekannte `HV_`-Variable
 → eine feste stderr-Zeile mit dem Namen (`config034b.test.ts`).
@@ -122,7 +135,7 @@ Startzeilen-Test in `config034b.test.ts`.
 - `apps/api/src/config/**` (neu: Schema, Fehlersätze, Normalisierung der Herkünfte)
 - `apps/api/src/server.ts` (Schema zuerst, ausdrückliche Optionen an createApp, Pool und Node-Server aus dem Schema, Startzeile)
 - `apps/api/src/app.ts` (nur CORS aus Option, Übergabe der Grenzen-, Timeout- und Quellen-Optionen)
-- `apps/api/src/limits/**` (nur Quelle aus X-Forwarded-For und Übernahme konfigurierter Werte)
+- `apps/api/src/limits/**` (nur Quelle aus X-Forwarded-For hinter vertrauenswürdigen Proxys und Übernahme konfigurierter Werte)
 - `apps/api/src/observability/config.ts` (Hülle über dem Schema, Verzeichnisrechte)
 - `apps/api/src/clock/ntp.ts` (nur parseNtpEnv als Hülle über dem Schema)
 - `apps/api/.env.example` (neu)
@@ -179,9 +192,18 @@ Slice: 034b-konfigurationsschema-cors
 Done: <drei Zeilen>
 Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Keycloak-CI-Lauf; Startproben
 Bedrohungs-ID → Test: <je Zeile der Tabelle oben>
-Open: Prüfung im Image, Secrets aus der Plattform, automatischer Vergleich der Startzeile (037, Ausnahme bis 30.10.2026); process.env-Rückfälle in app.ts bleiben als Bibliotheksstandard; Migrations-CLI ohne Schema
+Open: Prüfung im Image, Secrets aus der Plattform, automatischer Vergleich der Startzeile (037, Ausnahme bis 30.10.2026); process.env-Rückfälle in app.ts bleiben als Bibliotheksstandard; Migrations-CLI ohne Schema; HV_DEMO=0 verweigert jetzt den Start (vorher „aus“)
 Touched: <Dateiliste>
 ```
+
+## Lesebefund vor dem Bau
+
+Lesebefund in frischem Kontext (Opus, 29.09.2026, gemeinsam mit 034a): kein Blocker; für 034b eingearbeitet:
+`X-Forwarded-For` nur von vertrauenswürdigen Proxys nach CIDR-Liste, direkte Verbindung mit gefälschtem Header zählt
+unter der Verbindungsadresse (M7); Preflights auf eigenem Zähler, CORS-Header auf Grenzantworten (M8); Minimum des
+Request-Timeouts 7 000 ms über dem `/readyz`-Budget (m13); Startzeile nennt die Proxy-Blöcke, `HV_DEMO=0` verweigert
+künftig den Start und steht im Bericht (m14); neue Variablen für Lese-, Proben- und Preflight-Grenzen und
+`query_timeout` (aus 034a m10–m12); Checkliste um SC-01 und SC-11 ergänzt (m7); Abhängigkeitsangabe (m1).
 
 ## Review findings
 
