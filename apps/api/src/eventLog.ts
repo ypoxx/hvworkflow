@@ -16,8 +16,14 @@ export function createFileEventLog(path: string): Persistence {
       const events = lines.flatMap((raw, index) => {
         const line = raw.trim();
         if (line.length === 0) return [];
+        let parsed: unknown;
         try {
-          const parsed: unknown = JSON.parse(line);
+          parsed = JSON.parse(line);
+        } catch {
+          // The V8 message quotes an excerpt of the raw line, which may hold personal data (SC-11).
+          throw new Error(`Invalid JSONL event at line ${index + 1}: not valid JSON.`);
+        }
+        try {
           assertEventShape(parsed);
           return [parsed];
         } catch (error) {

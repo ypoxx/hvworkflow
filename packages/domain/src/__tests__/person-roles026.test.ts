@@ -236,3 +236,28 @@ describe('Scheibe 026: Personentabelle und Rollenereignisse', () => {
     await expect(api.listSpeakers()).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe('takt-028: role fields without plaintext PII', () => {
+  it('rejects deputyForSubjectId that looks like an e-mail, has whitespace or is too long', async () => {
+    const { api, actor, store } = fixture();
+    actor(admin);
+    const before = store.lastSeq();
+    for (const deputyForSubjectId of ['erika@example.test', 'two words', '', 'd'.repeat(129)]) {
+      await expect((api as unknown as { assignRole(i: object): Promise<unknown> })
+        .assignRole({ subjectId: 'deputy-s', role: 'capture', deputyForSubjectId })).rejects.toMatchObject({ status: 422 });
+    }
+    expect(store.lastSeq()).toBe(before);
+    await expect((api as unknown as { assignRole(i: object): Promise<unknown> })
+      .assignRole({ subjectId: 'deputy-s', role: 'capture', deputyForSubjectId: 'pseudo-1' })).resolves.toBeDefined();
+  });
+
+  it('rejects a revoke reason longer than 500 characters without an event', async () => {
+    const { api, actor, store } = fixture();
+    actor(admin);
+    const granted = await (api as unknown as RoleOps).assignRole({ subjectId: 'r-subject', role: 'capture' });
+    const before = store.lastSeq();
+    await expect((api as unknown as RoleOps).revokeRole(granted.id, 'x'.repeat(501))).rejects.toMatchObject({ status: 422 });
+    expect(store.lastSeq()).toBe(before);
+    await expect((api as unknown as RoleOps).revokeRole(granted.id, 'x'.repeat(500))).resolves.toBeDefined();
+  });
+});

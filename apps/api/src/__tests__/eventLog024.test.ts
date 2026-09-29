@@ -73,4 +73,15 @@ describe('slice 024 JSONL dev adapter', () => {
     writeFileSync(file, `${JSON.stringify(recalculated)}\n`);
     expect(() => createInMemoryEventStore(createFileEventLog(file))).toThrow(/seq 1/i);
   });
+
+  it('takt-028: a broken JSONL line yields a fixed text with the line number and no raw content', () => {
+    const file = path();
+    writeFileSync(file, `${JSON.stringify({ ...event('q1'), seq: 1 })}\n{"secret":"RAW-MARKER-Erika", oops}\n`);
+    let message = '';
+    try { createInMemoryEventStore(createFileEventLog(file)); } catch (error) { message = (error as Error).message; }
+    expect(message).toBe('Invalid JSONL event at line 2: not valid JSON.');
+    expect(message).not.toContain('RAW-MARKER');
+    writeFileSync(file, '{"a": RAW-MARKER-2\n');
+    expect(() => createInMemoryEventStore(createFileEventLog(file))).toThrow(/^Invalid JSONL event at line 1: not valid JSON\.$/);
+  });
 });
