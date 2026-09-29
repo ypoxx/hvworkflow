@@ -97,6 +97,32 @@ Weitere Dateien sind Scope-Befunde: erst Spec klären, nicht still ausweichen.
 
 `pnpm gates`-Schluss, Testnamen je Bedrohungs-ID, `curl`-Ausgaben von `/healthz` und `/readyz`, Beispielzeile des Zugriffslogs aus einem Testlauf mit synthetischem Akteur, Keycloak-CI-Schritt grün.
 
+## Nachweis
+
+**Gates-Commit:** `c8de407` (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` auf lokalem Postgres 16 (Datenbank `hv_s033a`, migriert), Exit 0. `@hv/api`: 27 Testdateien, 252 Tests, keine übersprungen (die Postgres-Dateien liefen); Operation-Coverage ohne `getHealth` in der Allowlist grün; `slice-scope`: 20 Dateien, alle in „Files allowed“. Wörtlicher Schluss der Ausgabe:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.42s
+mark-test-run: wrote /home/user/wt/s033a/.claude/state/last-test-run (clean tree) at commit c8de407, tree 5f8a54346ba9…
+```
+
+Abnahme (lokal, Ausgaben gekürzt auf das Wesentliche):
+
+- `pnpm --filter @hv/api start` ohne `HV_DEMO`, `HV_ACCESS_LOG_DIR`, `HV_ACCESS_LOG_HASH_KEY`: Exit 1 (pnpm meldet `Exit status 1`), einziger Satz vom Dienst: `HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must name a writable directory.`
+- `pnpm --filter @hv/api exec tsx src/server.ts` mit `HV_DEMO=1`, `HV_ACCESS_LOG_DIR`, zufälligem `HV_ACCESS_LOG_HASH_KEY` und `HV_NTP_SERVERS=127.0.0.1:12345` (lokaler UDP-Testserver, kein Netz):
+  - `curl -si /healthz` gibt `HTTP/1.1 200 OK`, `x-server-time: 2026-09-29T18:43:05.301Z`, Body `{"status":"ok"}`.
+  - `curl -s /readyz` gibt `{"status":"not_ready","checks":{"clock":{"status":"ok"},"db":{"status":"fail","code":"not_configured"},"migrations":{"status":"fail","code":"not_configured"}},"serverTime":"2026-09-29T18:43:05.315Z"}` (Uhr `ok`; `db`/`migrations` `not_configured`, weil dieser Lauf weder Postgres noch JSONL-Log hat).
+  - Zugriffslog dieses Laufs (Datei `access-2026-09-29.jsonl`, synthetischer Akteur `a:admin`):
+    `{"v":1,"ts":"2026-09-29T18:43:05.334Z","requestId":"9dfa9470-cd30-4e88-a952-99f43bcfeec8","subjectHash":"pMgx_oRC4RaRiNtRl39zW9V2SZnSy0pjxnQJiabihFo","operationId":"getMeeting","status":200,"latencyMs":4,"seq":null}`
+  - Ohne `HV_NTP_SERVERS`: `/readyz` mit `"clock":{"status":"fail","code":"not_configured"}` (heutiges Verhalten).
+- Keycloak-CI-Schritt: lokal nicht ausführbar (kein Docker); `node scripts/keycloak-ci-029b.mjs --check` grün, Syntax geprüft. Der Lauf mit der neuen Prüfung der Log-Dateien (kein Client-Secret, Token, Cookie-Wert, Actor-ID) und der Postgres-Schritt mit `postgres-access-log033a.test.ts` laufen in der PR-CI.
+
+Bedrohungs-ID zu Test: T-G2-I-02 `access-log033a.test.ts › reduces the error log to four keys …`, `postgres-access-log033a.test.ts › logs null after a rollback …`; T-G1-R-01 `access-log033a.test.ts › logs the new seq of a write …`, `postgres-access-log033a.test.ts › logs the seq inserted after COMMIT …`; T-G3-I-04 `access-log033a.test.ts › hashes the actor id …`, `› is an HMAC of the actor id …`; T-G2-D-01 `ntp033a.test.ts › SNTP client` und `/readyz with the clock check`; T-G1-T-07 `platform033a.test.ts › X-Server-Time on every response`; T-G1-I-05 `access-log033a.test.ts › maps a request to an operation only under the base URL …`, `› survives hostile client strings …`; T-G1-D-04 `ntp033a.test.ts › sends one query for 100 calls within 30 s …`; T-G2-D-04 `access-log033a.test.ts › sink failure is fail-open`, `› start refusal without an access log`.
+
+Abweichungen und Festlegungen im Bau (für das Review): (1) `subjectHash` wird für `/auth/me` und `/auth/logout` aus der von `readSession` gelieferten `actorId` gesetzt, weil dort der Auth-Adapter nicht läuft, die Sitzung aber benutzt wurde. (2) Ungültige Antworten (falsche Quelle, Leap 3, Stratum 0, falsches Originate-Feld) beenden die Teilfrist des Servers sofort; ein Angreifer im Netz kann so höchstens `clock_unsynced` statt `timeout` erzwingen. (3) Ohne Injektion misst die Latenz Differenzen der injizierten Uhr; `server.ts` verdrahtet den Prozess-Timer. (4) Das Zugriffslog öffnet die Tagesdatei mit `O_NOFOLLOW`, damit ein untergeschobener Symlink unter dem Tagesnamen die Zeile nicht umlenkt. (5) `.github/workflows/gates.yml` nimmt `postgres-access-log033a.test.ts` in den Postgres-Schritt auf.
+
 ## Bericht (nach Bau ausfüllen)
 
 ```
