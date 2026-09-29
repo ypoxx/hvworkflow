@@ -66,3 +66,6 @@ geprüft, `legal-trace.md` nur sechs Zeilennummern. Mutationsprobe: Lückenprüf
 1. minor → Folgeliste: Test (c) läuft über den `commandOperation`-Pfad, nicht über `legacyMatch` (Titel ungenau).
 2. minor → Folgeliste: Test (a) prüft nur `registerSpeaker` (pauschales `return true`); die operationsspezifischen
    Zweige von `legacyMatch` (etwa `captureQuestions`, Agenda) sind ungetestet.
+
+Codex (ein Lauf): 1 × P2 — Test (a) mit zwei SpeakerRegistered schrieb eine Fehleinordnung fest → auf captureQuestions
+umgestellt; Code-Korrektur (409 für mehrere Registrierungs-Kandidaten) → Folgeliste.

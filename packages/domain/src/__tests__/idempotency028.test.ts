@@ -234,17 +234,26 @@ describe('Scheibe 028: durable idempotency and resource versions', () => {
     });
     const legacyKey = (key: string) => ({ idempotencyKey: key });
 
-    it('replays contiguous same-actor candidates with the original ids and appends nothing', async () => {
+    it('replays a contiguous multi-event captureQuestions command with the original ids and appends nothing', async () => {
       const f = fixture();
-      f.store.append([
-        registered('legacy-a', 'Alt A', moderation, legacyKey('legacy-1')),
-        registered('legacy-b', 'Alt B', moderation, legacyKey('legacy-1'), 2),
-      ]);
-      expect(f.store.all().some((event) => event.commandId !== undefined)).toBe(false);
+      const speaker = await register(f.api());
+      f.as(capture);
+      const contribution = await f.api().captureContribution({ speakerId: speaker.id, text: 'Two questions' },
+        { ifMatch: etagOf(speaker.version) });
+      const question = (id: string, number: string, text: string) => ({
+        id: `evt-${id}`, type: 'QuestionCaptured' as const, at, actor: capture, subjectId: id, meetingId: 'hv-2027',
+        idempotencyKey: 'legacy-atomise',
+        payload: { number, contributionId: contribution.id, speakerId: speaker.id, text },
+      });
+      f.store.append([question('legacy-q1', 'F-1', 'First?'), question('legacy-q2', 'F-2', 'Second?')]);
+      expect(f.store.all().filter((event) => event.idempotencyKey === 'legacy-atomise')
+        .every((event) => event.commandId === undefined)).toBe(true);
       const before = f.store.lastSeq();
-      const replay = await f.api().registerSpeaker({ displayName: 'Changed retry body' },
-        { idempotencyKey: 'legacy-1', ifMatch: etagOf(1) });
-      expect(replay).toMatchObject({ id: 'legacy-a', displayName: 'Alt A' });
+      const replay = await f.api().captureQuestions(contribution.id, [{ text: 'Changed retry body' }],
+        { idempotencyKey: 'legacy-atomise', ifMatch: etagOf(1) });
+      expect(replay.map((q) => ({ id: q.id, text: q.text }))).toEqual([
+        { id: 'legacy-q1', text: 'First?' }, { id: 'legacy-q2', text: 'Second?' },
+      ]);
       expect(f.store.lastSeq()).toBe(before);
     });
 
