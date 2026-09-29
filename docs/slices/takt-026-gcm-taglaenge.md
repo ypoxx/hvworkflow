@@ -35,4 +35,10 @@ Keine Schlüsselrotation, kein Formatwechsel, keine anderen Kryptostellen (es gi
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer, Opus, 29.09.2026): **freigabefähig**, 0 blocker, 0 major. Tag-Länge auf beiden
+Seiten, Offsets 12 + 16 = 28 wie vorher, Format IV | Tag | Chiffrat unverändert (Werte aus 029b lesbar); keine weiteren
+GCM-Stellen in `apps/` oder `packages/`.
+
+1. minor → Folgeliste: der Test „gekürzter Tag“ prüft nur die Längenprüfung; die feste Tag-Länge ist durch den festen
+   Ausschnitt nicht separat testbar, Nachweis bleibt Semgrep im Nightly.
+2. minor → Folgeliste: IV-Länge 12 als nackte Zahl, Konstante `GCM_IV_BYTES`.
