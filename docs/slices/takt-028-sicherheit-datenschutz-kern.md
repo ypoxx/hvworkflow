@@ -81,4 +81,18 @@ mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean t
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (reviewer, Opus, Datenschutz/Security, 29.09.2026): Kern trägt (Hash-Kette des Seeds mit
+altem und neuem `stampEvent` Glied für Glied identisch), aber zunächst nicht mergefähig:
+1. major (behoben): R10 — fester englischer Fehlertext erschien unübersetzt im Startbildschirm → `DemoLogParseError`,
+   Anzeige über `boot.failed.invalidJson` (DE/EN), Paritätstest 506.
+2. major (behoben): `subscribe` verschluckte Integritätsfehler ohne Signal → Option `onIntegrityError`, Schleife läuft
+   weiter, Test prüft das Signal.
+3. minor (behoben): fester Hash-Testvektor, gegen das alte `stampEvent` gegengeprüft.
+4. minor (behoben): `classifyQuestion` baut die Payload aus benannten Feldern.
+5. minor (behoben): Längengrenze 128 für `id`, `subjectId`, `meetingId` und `assignRole.subjectId`.
+6. nit (behoben): positive Assertion für `id`/`role` verschachtelter Akteure, Kommentar zur Sperrliste.
+7. nit (behoben): Positivtest leeres `commandResource`.
+
+Schmale Nachprüfung (Opus): beide Major gelöst; keine neuen Blocker oder Major. Restpunkt → Folgeliste: der ältere Text
+„Demo event log is not an array.“ erscheint weiter unübersetzt über `error.message`. Hinweis: alte v1-JSONL-Zeilen mit
+unbekannten Feldern werden jetzt abgewiesen statt mitgehasht (nur Dev-Adapter).
