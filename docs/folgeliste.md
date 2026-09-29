@@ -165,6 +165,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-027 R1 nit · `packages/domain/src/api.ts` `viewClaim` · Parametertyp von Hand statt `Claim` aus `types.ts`;
   Idempotenz-Wiederholung, Listen und Bühne nicht eigens auf fehlende `personId` getestet.
 
+- 033a R1 nit · `apps/api/src/observability/config.ts` · Rechte des Log-Verzeichnisses nicht geprüft (Dateien 0600) ·
+  mit 034/037.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -198,3 +201,6 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-027 R1 minor · `packages/contract/openapi.yaml` `Claim.personId` · ohne Beschreibung („in Antworten nie befüllt,
   nur im Ereignis“)
   → **takt-028**
+- 033a R1 minor (Verfügbarkeit) · `apps/api/src/observability/accessLog.ts` · synchrones Schreiben je Anfrage; ein
+  hängender Datenträger blockiert die Event-Loop · lokaler Datenträger als Betriebsvorgabe oder gepufferter Strom.
+  → **037**
