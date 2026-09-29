@@ -18,8 +18,12 @@ let poolA: Pool;
 let poolB: Pool;
 let schema: string;
 
-function scopedPool(connectionString: string | undefined): Pool {
-  return new Pool({ connectionString, options: `-c search_path=${schema}`, max: 3 });
+// `application_name` scopes the lock-wait polls below to this test's own pools: the Postgres test
+// files run in parallel against one database, and advisory locks are database-wide, so an unscoped
+// poll could be satisfied by another file's waiter and release the gate too early (flaky 201 vs 412).
+function scopedPool(connectionString: string | undefined, name = 'owner'): Pool {
+  return new Pool({ connectionString, options: `-c search_path=${schema}`, max: 3,
+    application_name: `${schema}_${name}` });
 }
 
 function fixtureEvents(): readonly DomainEvent[] {
@@ -71,6 +75,14 @@ async function speakerListTag(instance: ReturnType<typeof app>, id: string): Pro
   return tag!;
 }
 
+async function waiting(name: string, _type: 'Lock', event: string): Promise<boolean> {
+  const result = await owner.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM pg_stat_activity
+     WHERE datname = current_database() AND application_name = $1
+       AND wait_event_type = 'Lock' AND wait_event = $2`, [`${schema}_${name}`, event]);
+  return Number(result.rows[0]?.count) > 0;
+}
+
 async function pollUntil(check: () => Promise<boolean>): Promise<void> {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
@@ -87,8 +99,8 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     try { await admin.query(`CREATE SCHEMA ${schema}`); } finally { await admin.end(); }
     owner = scopedPool(databaseUrl);
     await runMigrations(owner, { direction: 'up', ...(runtimeRole ? { runtimeRole } : {}) });
-    poolA = scopedPool(runtimeUrl);
-    poolB = scopedPool(runtimeUrl);
+    poolA = scopedPool(runtimeUrl, 'a');
+    poolB = scopedPool(runtimeUrl, 'b');
     await insertEvents(fixtureEvents());
   });
 
@@ -113,22 +125,11 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       await gate.query('BEGIN');
       await gate.query('UPDATE lock_gate SET touched = touched + 1 WHERE id = 1');
       const first = register(poolA, 'one', 'Erste Testperson');
-      await pollUntil(async () => {
-        const result = await owner.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM pg_stat_activity
-           WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'transactionid'`,
-        );
-        return Number(result.rows[0]?.count) > 0;
-      });
+      await pollUntil(() => waiting('a', 'Lock', 'transactionid'));
 
       const second = register(poolB, 'two', 'Zweite Testperson');
-      await pollUntil(async () => {
-        const result = await owner.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM pg_stat_activity
-           WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'`,
-        );
-        return Number(result.rows[0]?.count) > 0;
-      });
+      // The second instance has read the old list tag before it can queue on the advisory lock.
+      await pollUntil(() => waiting('b', 'Lock', 'advisory'));
       await gate.query('COMMIT');
       expect((await first).status).toBe(201);
       expect((await second).status).toBe(412);

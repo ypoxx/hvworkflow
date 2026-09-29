@@ -18,8 +18,11 @@ let owner: Pool;
 let pool: Pool;
 let schema: string;
 
-function scopedPool(connectionString: string | undefined): Pool {
-  return new Pool({ connectionString, options: `-c search_path=${schema}`, max: 4 });
+// Scoped by application_name: the Postgres test files share one database and run in parallel, and
+// advisory locks are database-wide, so waiters of other files must not count here.
+function scopedPool(connectionString: string | undefined, name = 'owner'): Pool {
+  return new Pool({ connectionString, options: `-c search_path=${schema}`, max: 4,
+    application_name: `${schema}_${name}` });
 }
 
 function fixtureEvents(): readonly DomainEvent[] {
@@ -37,7 +40,8 @@ async function eventCount(): Promise<number> {
 async function advisoryWaiters(): Promise<number> {
   const result = await owner.query<{ count: string }>(
     `SELECT count(*)::text AS count FROM pg_stat_activity
-     WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'`);
+     WHERE datname = current_database() AND application_name = $1
+       AND wait_event_type = 'Lock' AND wait_event = 'advisory'`, [`${schema}_rt`]);
   return Number(result.rows[0]?.count);
 }
 
@@ -66,7 +70,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     try { await admin.query(`CREATE SCHEMA ${schema}`); } finally { await admin.end(); }
     owner = scopedPool(databaseUrl);
     await runMigrations(owner, { direction: 'up', ...(runtimeRole ? { runtimeRole } : {}) });
-    pool = scopedPool(runtimeUrl);
+    pool = scopedPool(runtimeUrl, 'rt');
     for (const event of fixtureEvents()) {
       await owner.query(
         'INSERT INTO events (seq, id, meeting_id, hash, prev_hash, envelope) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
@@ -127,6 +131,33 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     }
     expect((await valid!).status).toBe(201);
     expect(await eventCount()).toBe(3);
+  });
+
+  it('lets exactly one of two concurrent writes with the same If-Match win, in either lock order', async () => {
+    const poolTwo = scopedPool(runtimeUrl, 'rt2');
+    try {
+      const make = (p: Pool, prefix: string) => {
+        let n = 0;
+        return createApp({ demoEnabled: true, postgres: p, clock: () => new Date('2027-04-20T10:15:00.000Z'),
+          idGenerator: () => `${prefix}-${++n}` });
+      };
+      const one = make(pool, 'one');
+      const two = make(poolTwo, 'two');
+      for (let round = 0; round < 5; round += 1) {
+        const tag = (await one.request(`/v1/meetings/${meetingId}/speakers`,
+          { headers: { 'X-Actor': ACTOR.admin } })).headers.get('ETag')!;
+        const write = (instance: typeof one, name: string) => Promise.resolve(instance.request(
+          `/v1/meetings/${meetingId}/speakers`, { method: 'POST',
+            headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+            body: JSON.stringify({ displayName: name, round: 1 }) }));
+        const results = await Promise.all(round % 2 === 0
+          ? [write(one, `A${round}`), write(two, `B${round}`)] : [write(two, `B${round}`), write(one, `A${round}`)]);
+        expect(results.map((r) => r.status).sort()).toEqual([201, 412]);
+      }
+      expect(await eventCount()).toBe(2 + 5);
+    } finally {
+      await poolTwo.end();
+    }
   });
 
   it('keeps every /v1 handler behind the boundary, including routes without contract validation', async () => {
