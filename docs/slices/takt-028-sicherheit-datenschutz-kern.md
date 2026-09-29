@@ -62,11 +62,11 @@ allowed“: melden und anhalten.
 
 ## Nachweis
 
-`pnpm gates` lief auf Commit `7687e0cddd36b30d198bd2883f67b9c79fd05d59` (sauberer Baum, Exit 0). Schluss der Ausgabe, wörtlich:
+`pnpm gates` lief auf Commit `9392eed4b77304cf6b35f2becff7f71b28d6eeaf` (sauberer Baum, Exit 0; nach Behebung der Review-Befunde, ersetzt den Lauf auf 7687e0c). Schluss der Ausgabe, wörtlich:
 
 ```
 dist/assets/index-CA8a643A.css                        42.33 kB │ gzip:   9.09 kB
-dist/assets/index-Mf8hIXSv.js                        619.40 kB │ gzip: 181.39 kB │ map: 2,557.45 kB
+dist/assets/index-BYKUsmVP.js                        620.09 kB │ gzip: 181.57 kB │ map: 2,559.49 kB
 
 [plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -75,8 +75,8 @@ dist/assets/index-Mf8hIXSv.js                        619.40 kB │ gzip: 181.39 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 2.84s
-mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 7687e0c, tree 9443a37e6b57…
+✓ built in 2.57s
+mark-test-run: wrote /home/user/wt/takt-028/.claude/state/last-test-run (clean tree) at commit 9392eed, tree 178819317ec5…
 ```
 
 ## Review findings
