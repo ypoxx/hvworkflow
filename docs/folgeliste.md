@@ -347,6 +347,17 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 036a Review nit 12 · `apps/web/src/api/index.ts`, `liveStore.ts` · `clear('logout')` ruft die Hörer, `useApiVersion`
   zählt zusätzlich den Akteur `undefined`; bei 401 läuft `clear` doppelt · harmlos, die Shell hängt ab.
 
+## Strom-Client (aus 036b)
+
+- 036b Bau · `apps/web/e2e/031-http-betriebsart.spec.ts` (H13) · die geschriebenen Texte von H13 stehen lokal in der Datei
+  (wie H9), nicht in `e2e/support/e2e-texts.ts` `WRITTEN_TEXTS`; die Zugriffslog-Prüfung des Harness sucht sie daher nicht ·
+  nach `e2e-texts.ts` verschieben.
+- 036b Bau · `apps/web/src/api/http.ts` (N5) · die Invalidierung nach der ersten `cursor`-Nachricht trifft Listenlesungen
+  eines Themas ganz, auch solche nach dem Senden der Stromanfrage (nur zu viel) · epochgebundene Invalidierung als API in
+  `liveStore.ts` (036a-Datei).
+- 036b Bau · `apps/web/src/app/ConnectionStatus.tsx` · „Verbindung wird aufgebaut“ erscheint bei jedem Laden kurz und
+  wird vom Statusbereich angesagt · `connecting` erst nach 1–2 s zeigen.
+
 ## Historie (aus takt-038)
 
 - takt-038 Review minor 1 · `apps/web/src/features/history/Page.tsx:189-192` (`moreResults`, `olderRows`) · die Seitenzahl

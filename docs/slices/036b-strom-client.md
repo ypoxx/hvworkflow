@@ -275,12 +275,111 @@ Keine eigenen. Es gelten 035b Frage 3 (Produktionsweg für lange Verbindungen) u
 
 ```
 Slice: 036b-strom-client
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; PR-CI-Lauf <id> (H11, H12); Zustellzeit; Netztrace-Tabelle;
-docs/evidence/031-h11-zweiter-browser.png, docs/evidence/031-h12-verbindungsanzeige.png
-Open: Lasttest 071; Produktionsweg (035b Frage 3)
-Touched: <Dateiliste>
+Done: Strom-Leser mit fetch in http.ts (reiner Parser sse.ts), geöffnet bei jeder bestätigten Sitzung vor dem Einhängen,
+Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wächter 45 s, 5 min Rückfall bei kurzlebigen
+Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
+Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
+e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
+Evidence: Baucommit 62c7c4a; `pnpm gates` NICHT grün (ein Scope-Befund, siehe Open 1); PR-CI-Lauf mit H13/H14 steht aus;
+Zustellzeit und Netztrace-Tabelle erst aus der PR-CI (H13 druckt sie); docs/evidence/031-h13-zweiter-browser.png,
+docs/evidence/031-h14-verbindungsanzeige.png entstehen in der PR-CI (Artefakt evidence-031-http, E56).
+Open: (1) Scope: i18n/parity.test.ts zählt die Schlüssel fest (510 → 515, fünf neue shell.connection.*), Datei nicht
+erlaubt; (2) Scope: H10 wartet auf networkidle, das bei offenem Strom nie eintritt (Probe unten); (3) Lasttest 071;
+Produktionsweg (035b Frage 3).
+Touched: siehe Liste unten.
 ```
+
+**Vor dem Bau prüfen (Ergebnisse).**
+1. Vertrag 0.3.12 mit `StreamTopic`, `StreamChange`, `StreamCursor`, `StreamReset`, `StreamEnd` in
+   `packages/contract/src/types.ts`; 035b und 036a gemergt: erfüllt.
+2. `vite preview`-Proxy (m6): gegen einen Stellvertreter-Dienst (Node-Stub mit `text/event-stream`, `HV_API_ORIGIN`,
+   HTTP-Build in einem privaten Verzeichnis, keine Konfigurationsänderung) ungepuffert und unkomprimiert: in Chromium
+   kommt `cursor` nach 60 ms, danach je Heartbeat ein Stück (2014, 4014, 6015 ms), `content-encoding` fehlt. Den echten
+   Dienst hinter `vite preview` belegt erst der PR-CI-Lauf von H13/H14.
+3. Rollen für H13 (N6): die Wortmeldeliste hat kein `requires` in `featureRegistry.ts`; capture und coordination halten
+   `speaker.read`. Kontext A = capture auf `/speakers`.
+4. `onActorChange(actor)` kommt bei jedem erfolgreichen `/auth/me` (neues Objekt); `openStream()` öffnet nur ohne offenen
+   Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
+   actor“).
+
+**Schluss von `pnpm gates` auf 62c7c4a (sauberer Baum, Postgres-Variablen gesetzt), echter Auszug:**
+
+```
+apps/web test:  FAIL  src/i18n/parity.test.ts > i18n parity checks > (f) Total key count is 507 across all modules and matches de and en
+apps/web test: AssertionError: expected 515 to be 510 // Object.is equality
+apps/web test:  ❯ src/i18n/parity.test.ts:166:23
+apps/web test:  Test Files  1 failed | 22 passed (23)
+apps/web test:       Tests  1 failed | 435 passed (436)
+/home/user/wt/s036b/apps/web:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @hv/web@0.0.0 test: `vitest run --passWithNoTests`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+Davor grün: `contract:lint`, `typecheck`, `lint`; `packages/domain` 261/261. Die Schritte nach `test` einzeln auf
+demselben Commit: `apps/api` 39 Dateien, 586/586 Tests; vocabulary, arch, role-literals, now-check, plan-honesty,
+i18n-literals, slice-scope („14 changed file(s), all within … Files allowed“, Warnung wegen der Bauklärung),
+downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle grün. In-process-e2e: 131 passed (7,0 min).
+
+**Tests zuerst.** Rot vor dem Bau: `sse.test.ts` 9 failed (Stub mit leeren Funktionen), `connection.test.ts` 7 failed,
+`http.test.ts` 21 failed | 64 passed (bestehende grün), `ConnectionStatus.test.tsx` rot (Modul fehlt). Grün danach:
+`src/api` und `src/app` 180/180; die takt-030- und 036a-Tests unverändert grün.
+
+**Mutationen (je eine, Datei danach zurückgesetzt; alle getötet):**
+
+| Wächter | Mutation | getötet von |
+|---|---|---|
+| kein Neuaufbau ohne Bestätigung | `endForSession` plant einen Neuaufbau statt `wanted = false` | end {roles_changed, forbidden, session}, „structurally equal actor“ (5 rot) |
+| dto. | 401 beim Öffnen wie ein Verlust | „401 on open and on reopen“ |
+| dto. | 403 beim Öffnen wie ein Verlust | „reopen after a hidden tab answered 403“ |
+| `clear()` bei Stromende | `onStreamEnd` nicht gerufen | 6 rot (end ×3, equal actor, 401, 403) |
+| Cursor / `Last-Event-ID` | Kopfzeile nicht gesetzt | 7 rot (Rückzug, rotate, end ×3, …) |
+| dto. | `reset` behält den Cursor | „reset: … without a cursor“ |
+| dto. (N5) | erste `cursor`-Nachricht invalidiert nichts | „after the first cursor only entries …“ |
+| Rückzug, Obergrenzen | Obergrenze 60 s | „reconnects … at most 30 s“ |
+| dto. | Zufallsanteil über der Stufe | „draws the jitter below the step“ |
+| dto. | `Retry-After` ignoriert | 429, 503 |
+| dto. | keine 5-min-Pause nach kurzlebigen Strömen | „three short-lived streams“ |
+| dto. (SP-2) | Nachrichtengrenze 10 MiB | Parser 1 MiB, „message over 1 MiB drops the connection“ |
+| Rückfall auf den 30-s-Takt | Takt ruht nicht bei offenem Strom | „poll rests …“, „45 s without a heartbeat“ |
+| dto. | Takt läuft nie | 5 rot (takt-030-Takt, 429, 503, Wächter, …) |
+| dto. | Wächter 450 s | „45 s without a heartbeat“ |
+
+**Bauentscheidungen (im Rahmen der Spec, für den Review):**
+1. N5-Genauigkeit: `liveStore.ts` ist gesperrt und kennt keine epochgebundene Invalidierung. `http.ts` merkt sich die
+   Lesezugriffe (Methode, Argumente), die ohne synchronen Strom starten, schnappt sie beim Senden einer Stromanfrage ohne
+   Cursor ab und invalidiert sie nach der ersten `cursor`-Nachricht über `onStreamMessage([], {topics, subjects})`:
+   Einzellesungen genau je Kennung, Listenlesungen eines betroffenen Themas ganz (auch solche nach dem Senden; nur zu
+   viel, nie zu wenig). Über 200 Einträge: alles. Beim regulären Start ist der Schnappschuss leer, es entsteht kein Abruf.
+2. Ein bei Start verborgener Tab öffnet erst beim Sichtbarwerden; ein Neuaufbau, der in einen verborgenen Tab fällt,
+   wartet ebenso (ein Strom je sichtbarem Tab). Nebenwirkung: H8 (verborgen per `defineProperty`) bleibt ohne Strom.
+3. `reset` und `end {rotate}` bauen sofort neu auf, wenn der Strom mindestens 10 s lebte, sonst nach Rückzug (Schutz
+   gegen eine Rotations- oder Reset-Schleife, MF-SC-2).
+4. Eine fehlerhafte Nachricht bekannter Art invalidiert alles; ein 422 beim Öffnen verwirft den Cursor.
+5. `Retry-After` wird auf 1–300 s begrenzt; nach `end {unavailable}` gilt das Größere aus `retry:` (sonst 3 s) und Rückzug.
+6. Jeder 401 einer Lesung schließt auch den Strom; nach `end`/403 wird mit der letzten `id` neu verbunden (Vertrag).
+7. „Stand von“: letzte Nachricht oder Heartbeat bei offenem Strom, sonst letzte erfolgreiche Lesung oder Takt.
+8. Die Anzeige hängt als Geschwister vor der `lg:`-Gruppe in `HeaderStrip.tsx`, damit sie auf jeder Breite sichtbar ist; in
+   `live`/`idle` bleibt ein leerer `role="status"`-Bereich (`sr-only`), damit spätere Wechsel angesagt werden.
+9. H13 Schritt 1b: der Aufruf kann zuerst eine laufende Rede beenden (zwei PATCH); die Regel lautet daher höchstens ein GET
+   je Schlüssel **und je Schreibvorgang**. H13 klassifiziert in `fast_track` (nicht Bühne), damit die Bühnenliste für
+   `abnahme` unverändert bleibt.
+10. Restrisiko: ein `/auth/me`, das vor einem Stromende abgeschickt war und danach bestätigt, öffnet den Strom wieder; der
+    Dienst prüft Sitzung und Rechte beim Öffnen (403/401/end), der Puffer ist dann bereits leer.
+
+**Scope-Befunde (nicht umgangen):**
+1. `apps/web/src/i18n/parity.test.ts` zählt die Schlüssel fest (Test f: 510). Die fünf neuen `shell.connection.*`
+   verlangen 515 und je eine Kommentarzeile; die Datei steht nicht in „Files allowed“. Einziger roter Schritt von `gates`.
+2. H10 (`031-http-betriebsart.spec.ts`) wartet zweimal auf `waitForLoadState('networkidle')`. Playwright zählt eine offene
+   Strom-Anfrage als laufend. Probe (Chromium, Stub): ohne Strom `networkidle` nach 501 ms, mit offenem Strom „NOT reached
+   within 8000 ms“. H10 läuft damit in der PR-CI in den Timeout. Die Spec verlangt H10 unverändert. Vorschlag: H10 wartet
+   auf Ruhe der `/v1`-Lesungen ohne den Strom (wie `quiet()` in H13) statt `networkidle`, oder die Strom-503-Route wie in
+   H11/H12a (dann prüft H10 nur den Rückfall).
+
+**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
+`connection.ts`, `connection.test.ts`, `http.ts`, `http.test.ts`, `index.ts`, `apps/web/src/app/ConnectionStatus.tsx`,
+`ConnectionStatus.test.tsx`, `HeaderStrip.tsx`, `apps/web/src/i18n/shell.de.ts`, `shell.en.ts`,
+`apps/web/e2e/031-http-betriebsart.spec.ts`.
 
 ## Review findings
 
