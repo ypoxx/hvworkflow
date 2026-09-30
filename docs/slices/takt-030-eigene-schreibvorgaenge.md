@@ -103,3 +103,10 @@ Lokal gelaufen: Unit-Tests `http.test.ts` (58 grün), Projekt `in-process` (127 
 ## Review findings
 
 _(nach Review)_
+
+Nachlauf nach der Umbenennung des Screenshots (Orchestrator): `pnpm gates` auf `54cf368` (sauberer Baum), Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 1.88s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 54cf368, tree 86559f330497…
+```
