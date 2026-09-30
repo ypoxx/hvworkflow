@@ -214,6 +214,13 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
   reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
 
+## Dienst: Kettenprüfung (aus takt-033)
+
+- takt-033 Review nit 6 · `apps/api/src/persistence/postgres.ts` (`PROBE_SQL`) · die warme Digest-Abfrage liest je
+  Anfrage alle Zeilen mit `envelope::text` (22–25 ms bei 2138 Ereignissen unter Last, linear mit der Loggröße) ·
+  Digest je Zeile in einer Spalte speichern (Migration) oder den Präfix-Digest in Postgres materialisieren; erst mit
+  Messung ab ca. 10.000 Ereignissen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
