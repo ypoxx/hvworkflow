@@ -3,7 +3,7 @@
 **Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 1 von 4 der geteilten Scheibe 040, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
 **Risikoklasse:** hoch · 1,25 AStd · Plan 040: 03.11.2026 (W6); 040a hat keinen Vertragsschritt und darf früher starten, wenn der Orchestrator es einplant (Eigentümerfrage 1) · Lanes: core; service (nur Tests); e2e (nur die genannten Testumbauten); web-stage (nur Verlegen einer reinen Funktion mit Test); docs-legal (nur Vermerk im Rechtekonzept); docs-sicherheit
 **Rolle:** implementierer-backend; Review in frischem Kontext mit Perspektive Security/Admin (Rechte, Wahrheitstabelle) und Legal (Rechtekonzept §4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** neu R-ADM-07 (keine Selbstzuordnung einer Rolle), R-ADM-08 (die letzte aktive Verwaltungsrolle eines nicht geschlossenen Jahrgangs ist nicht entziehbar). Angewandt: R-PERM-01, R-PERM-02, R-GUARD-06. Dazu AGENTS.md R2, R3, R4, R12
+**Rule ids:** neu R-ADM-07 (keine Selbstzuordnung einer Rolle), R-ADM-08 (die letzte tragfähige Verwaltungsrolle eines nicht geschlossenen Jahrgangs ist nicht entziehbar). Angewandt: R-PERM-01, R-PERM-02, R-GUARD-06. Dazu AGENTS.md R2, R3, R4, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5/040 (Zeile 625–630: „deny by default“, „Wahrheitstabellen-Diff für admin-Rechte“), §10 E8, E25
 - `docs/rollen-und-rechtekonzept.md` Kopfvermerk Scheibe 025 („Die Inhalts- und Override-Rechte der Administration werden erst in 040 neu geordnet“), §3 Punkt 4 (deny by default), §4 Zeile 173 („Administration ist Rechteverwaltung, nicht Inhaltsbearbeitung. Dass die Administration eine Frage überall hinschicken kann, ist praktisch nötig und bleibt — aber jede administrative Aktion auf Inhalte erzeugt einen herausgehobenen Auditeintrag und ist im Verlauf der Frage sichtbar“), §5 Tabelle („Administration: Rechte, keine Inhalte“), §5 Zeile 205 („mindestens zwei benannte Vertreter“)
@@ -209,8 +209,8 @@ Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin
      (die Erstellerzuordnung aus 040c trägt die Verwaltung hinüber) und „die Verwaltungsrolle ohne Ablauf oder mit
      Vertretung vergeben“. Beide stehen in `docs/betrieb/erstinbetriebnahme.md` (040c) und im Runbook (070).
    - **Wiederherstellung:** Der einzige Weg zurück ist der auditierte Betreiberweg aus 040c (Kommandozeile, nur mit
-     Datenbankzugang, nur für einen Jahrgang ohne nutzbare Verwaltungsrolle: keine aktive, oder jede aktive gehört einem
-     gesperrten Subject aus 029b; befristete Zuordnung mit Akteur `system` und Betreiberkennung). Einen Weg über HTTP gibt
+     Datenbankzugang, nur wenn kein nicht geschlossener Jahrgang eine tragfähige, ungesperrte Verwaltungsrolle hat (die
+     Sitzung löst Rollen global auf); gesperrt heißt: Subject aus 029b gesperrt; befristete Zuordnung mit Akteur `system` und Betreiberkennung). Einen Weg über HTTP gibt
      es nicht.
 4. **Testumbauten, die mehr als einen Akteurwechsel brauchen** (die Schutzwirkung jedes Tests bleibt; eine Abschwächung
    nennt der Bericht mit Datei und Testname):
@@ -225,8 +225,8 @@ Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin
      - Wortmeldung registrieren (Zeile 444): ebenso dauerhaft zu `{ id: 'u-mod-2', role: 'moderation', displayName:
        'Versammlungsbüro 2' }`; der Dialog ist neu geöffnet sichtbar und leer.
      - Antwortentwurf (Zeile 415): Wechsel zu `legal` (hält `answer.draft` und sieht das Formular); Feld sichtbar und leer.
-     - Zusammenführen (Zeile 462): Wechsel zu `moderation` (`question.merge`), wenn der Dialog dort erscheint; sonst
-       dauerhaft zu `u-cap-2`. Dialog sichtbar und leer.
+     - Zusammenführen (Zeile 462): Wechsel zu `moderation`, die `question.merge` hält (`permissions.ts:30`), wenn der
+       Dialog dort erscheint; sonst dauerhaft zu `u-cap-2`. Dialog sichtbar und leer.
      - Rückgabe (Zeilen 428, 478): admin behält `question.return`; die Tests bleiben unverändert.
      - `setActor` (`apps/web/src/api/actor.ts:42-51`) nimmt jedes `Actor`-Objekt, nicht nur Einträge aus
        `DEMO_ACTORS`; im Demo-Betrieb prüft der Kern eine nicht zuordnungsgebundene Identität nicht gegen eine Liste.
@@ -461,7 +461,7 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
 
 - **Invarianten:** admin hält kein Recht, das Text schreibt oder einen fachlichen Arbeitsschritt ausführt; nur
   Weiterleiten. Die Liste ist die einzige Quelle; `PERMISSIONS` vergibt nichts. Niemand ordnet sich selbst eine Rolle zu.
-  Ein nicht geschlossener Jahrgang behält mindestens eine aktive Verwaltungsrolle, solange sie nicht abläuft.
+  Ein nicht geschlossener Jahrgang behält mindestens eine tragfähige Verwaltungsrolle, solange sie nicht abläuft.
 - **Fehlerfall:** Wer sich am HV-Tag auf admin als Rückfallkonto für Inhalte verlässt, hat diesen Weg nicht mehr. Der
   Rückfall sind Vertretungen je Rolle (040d) und Rollenzuordnung durch ein zweites Verwaltungskonto. Das Runbook (070)
   nennt das.
@@ -482,7 +482,7 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
 Keine blockiert die Specs. Frage 1 braucht vor dem ersten Bau ein ausdrückliches Go; die übrigen sind auf Standard
 gebaut, mit den genannten Kosten einer späteren Änderung.
 
-1. **Zuschnitt, Budget, Reihenfolge, Plananpassungen (Go nötig).** Standard: vier Teile a → b → c → d, rund 6,25 AStd
+1. **Zuschnitt, Budget, Reihenfolge, Plananpassungen (Go nötig).** Standard: vier Teile a → b → c → d, rund 6,75 AStd
    statt 2,5 (a 1,25, b 1,5, c 2, d 2), alle hoch. Mit Go ändert der Orchestrator den Plan-Eintrag 040
    (Teilungsvermerk, Lanes: contract für b bis d, falls 043a-Frage 5 freigegeben ist; web-api für b bis d, weil `HvApi`
    wächst und `http.ts` und `liveStore.ts` es umsetzen; web-shell und web-history für die erzwungenen i18n-Schlüssel;
@@ -580,3 +580,7 @@ dauerhaftem Wechsel zu synthetischen Personen derselben Rolle, Feld sichtbar und
 `unrelatedEvent` und Zeilen 914/923 benannt; `setActor` ohne Codeänderung), N6 (`question.withdraw` entfällt,
 Eigentümerfrage 2c, Diff 63, §4 „teilweise“), N10 (R-ADM-08 mit 24-Stunden-Spanne), Verweis auf die Wiederherstellung
 bei gesperrten Subjects (N5, gebaut in 040c).
+
+**Letzte Nachprüfung (30.09.2026, zu `a1395b7`):** eingearbeitet in 040a: „tragfähig“ statt „aktiv“ in Kopf und
+Invariante, Budget 6,75 AStd, Verweis `permissions.ts:30` für den Zusammenführen-Test, Wiederherstellung über alle nicht
+geschlossenen Jahrgänge (Umsetzung in 040c).

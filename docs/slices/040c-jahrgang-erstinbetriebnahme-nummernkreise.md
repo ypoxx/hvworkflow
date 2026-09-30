@@ -57,7 +57,8 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
    - **Die Erstellerzuordnung hebt keine Grenze auf.** Maßgeblich ist die Zuordnung, unter der der Akteur gerade handelt:
      die älteste aktive Zuordnung seines Subjects über alle nicht geschlossenen Jahrgänge, dieselbe Auswahl wie
      `sessionActorFromEvents` (`apps/api/src/actor.ts:112-114`), im Kern aus dem Store bestimmt. Die neue Zuordnung
-     übernimmt deren `expiresAt` und `deputyForSubjectId` unverändert. Stammt diese Zuordnung aus der Wiederherstellung
+     übernimmt deren `expiresAt` unverändert. `deputyForSubjectId` wird **nicht** übernommen: Die vertretene Person hat
+     im neuen Jahrgang keine Zuordnung, eine Vertretung dort wäre nach R-ADM-06 (040d) ungültig. Stammt diese Zuordnung aus der Wiederherstellung
      (Befehlsoperation `operatorRecovery`), antwortet `createMeeting` mit **409 R-ADM-09**, ohne Ereignis: Ein
      befristeter Notzugang darf sich nicht über einen neuen Jahrgang verlängern. So verleiht die Erstellerzuordnung nichts
      Neues, weder Rolle noch Dauer.
@@ -87,18 +88,23 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
    - **Wiederherstellung (auditiert, 040a R-ADM-08):** dieselbe Datei bietet eine zweite reine Funktion, etwa
      `recoveryEvents({ meetingId, adminSubjectId, operatorRef, expiresAt, reason }, { existing, newId, now })`. Sie
      liefert genau ein `RoleAssigned` (Akteur `SYSTEM_ACTOR`, Befehlsoperation `operatorRecovery`, Rolle wie beim
-     Bootstrap abgeleitet) und bricht ab, wenn der Jahrgang fehlt, geschlossen ist oder **noch eine aktive Zuordnung einer
-     nutzbaren Verwaltungsrolle** hat. Nutzbar ist eine aktive Zuordnung (nicht entzogen, nicht abgelaufen), deren
-     Subject **nicht** gesperrt ist; gesperrt heißt: in `auth_subject_blocks` aus 029b. Damit hilft die Wiederherstellung
+     Bootstrap abgeleitet) und bricht ab, wenn der Jahrgang fehlt oder geschlossen ist oder wenn **irgendein nicht
+     geschlossener Jahrgang** noch eine **tragfähige** Zuordnung einer Verwaltungsrolle hat. Tragfähig heißt wie bei
+     R-ADM-08 (040a): nicht entzogen, ohne Ablauf oder mit Ablauf frühestens 24 Stunden nach `now`, und das Subject ist
+     **nicht** gesperrt; gesperrt heißt: in `auth_subject_blocks` aus 029b. Damit hilft die Wiederherstellung
      auch im typischen Fall, in dem das Subject der einzigen Verwaltung verloren und gesperrt ist, die Zuordnung aber
      aktiv bleibt. Die Funktion erhält die gesperrten Subjects als Parameter; die Kommandozeile liest sie in derselben
      Transaktion. `expiresAt` ist Pflicht und liegt höchstens 14 Tage nach `now`; `reason` (1–500, keine
      Personendaten) steht in der Nutzlast. Die befristete Zuordnung ist ein Notzugang: Die Person ordnet damit eine
      reguläre Verwaltungsrolle einem anderen Subject zu (R-ADM-07) und lässt den Notzugang ablaufen. Einen anderen
      Wiederherstellungsweg gibt es nicht, insbesondere keinen über HTTP.
-   - **Geltungsbereich je Jahrgang, bewusst.** Die Prüfung gilt für den genannten Jahrgang, nicht für alle. Eine
-     Verwaltung in einem anderen Jahrgang kann hier nichts zuordnen (sie hat hier keine Zuordnung); eine Prüfung über alle
-     Jahrgänge ließe den ausgesperrten Jahrgang ohne Weg zurück. Der Missbrauchsfall dazu steht unten.
+   - **Geltungsbereich über alle nicht geschlossenen Jahrgänge.** Grund ist die globale Rollenauflösung der Sitzung:
+     `sessionActorFromEvents` wählt die älteste aktive Zuordnung über alle nicht geschlossenen Jahrgänge
+     (`apps/api/src/actor.ts:108-114`), und jahrgangsbezogene Routen wie `POST /v1/meetings/:meetingId/role-assignments`
+     (`apps/api/src/app.ts:993-996`) nutzen diesen Akteur. Eine Verwaltung in Jahrgang A kann also auch in Jahrgang B
+     Rollen zuordnen, und ein Notzugang wirkte umgekehrt auf jeden Jahrgang. Solange irgendwo eine tragfähige,
+     ungesperrte Verwaltung besteht, ist niemand ausgesperrt; die Wiederherstellung wird dann verweigert. Der
+     Missbrauchsfall dazu steht unten.
    - **Nach dem Freeze** (ab 040d) schreibt die Wiederherstellung in einem eingefrorenen Jahrgang zusätzlich
      `ConfigOverridden`; das legt 040d fest.
    - **Kommandozeile** `apps/api/src/admin/bootstrap-cli.ts`, Aufrufe
@@ -291,14 +297,15 @@ Kern (`meeting040c.test.ts`):
 10. **Wiederholung, global:** `createMeeting` mit gleichem `Idempotency-Key` liefert denselben Jahrgang und kein zweites
     `MeetingCreated`, auch wenn inzwischen ein anderer Jahrgang der Alias ist; mit anderem Akteur gilt der Schlüssel nicht.
 10a. **Betreiberkennung und Wiederherstellung:** `bootstrapEvents` schreibt `operatorRef` in beide Nutzlasten und kein
-    `expiresAt`; `recoveryEvents` bricht ab, solange eine nutzbare Verwaltungsrolle besteht; mit derselben Zuordnung,
-    deren Subject in den übergebenen gesperrten Subjects steht, gelingt sie; bei geschlossenem Jahrgang, ohne
+    `expiresAt`; `recoveryEvents` bricht ab, solange eine tragfähige Verwaltungsrolle besteht, **auch wenn sie in einem
+    anderen nicht geschlossenen Jahrgang liegt**; eine Zuordnung, die in weniger als 24 Stunden abläuft, zählt nicht; mit
+    derselben Zuordnung, deren Subject in den übergebenen gesperrten Subjects steht, gelingt sie; bei geschlossenem Jahrgang, ohne
     `expiresAt` und bei `expiresAt` mehr als 14 Tage nach `now`; sonst genau ein `RoleAssigned` mit Akteur `system`,
     `operatorRef`, `reason` und `expiresAt`.
 10b. **Surrogate:** `title: '\uDC00'` in `createMeeting` und `label` mit einzelnem Surrogat in
     `replaceMeetingCaptureRanges` → 422, kein Ereignis.
 10d. **Erstellerzuordnung ohne Grenzaufhebung:** Handelt der Akteur unter einer Zuordnung mit `expiresAt` und
-    `deputyForSubjectId`, trägt die neue Zuordnung beide Werte; handelt er unter einer Zuordnung aus `operatorRecovery`
+    `deputyForSubjectId`, trägt die neue Zuordnung dasselbe `expiresAt` und kein `deputyForSubjectId`; handelt er unter einer Zuordnung aus `operatorRecovery`
     → 409 R-ADM-09, kein Ereignis.
 10c. **Anderer Jahrgang:** `replaceMeetingCaptureRanges` auf einem Jahrgang in `preparation`, während ein anderer läuft,
     schreibt mit dessen `meetingId`.
@@ -326,7 +333,8 @@ Dienst:
 - R-ADM-05 entfernt → Test 7 rot.
 - Erstellerzuordnung mit der `meetingId` des Alias-Jahrgangs → Test 3 rot.
 - Wiederholungssuche für `createMeeting` auf den Alias-Jahrgang begrenzt (heutiges Verhalten) → Test 10 rot.
-- Wiederherstellung ohne Prüfung „keine nutzbare Verwaltungsrolle“ → Test 10a rot.
+- Wiederherstellung ohne Prüfung „keine tragfähige Verwaltungsrolle“ → Test 10a rot.
+- Wiederherstellung prüft nur den genannten Jahrgang (Prüfung je Jahrgang wiederhergestellt) → Test 10a rot.
 - Erstellerzuordnung ohne `expiresAt` (heutiger Entwurf) → Test 10d rot.
 - Prüfung R-ADM-09 entfernt → Test 10d rot.
 
@@ -334,7 +342,7 @@ Dienst:
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`.
-2. Tests 1–14 (mit 10a–10d) grün, acht Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
+2. Tests 1–14 (mit 10a–10d) grün, neun Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
 3. Ein Trockenlauf der Kommandozeile gegen die CI-Datenbank (Test 13) ist im Bericht mit Ausgabezeile belegt.
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040c-…`; Schluss der
    Ausgabe einmal im Bericht.
@@ -379,7 +387,7 @@ in 040a
   | Missbrauch | Abwehr | Erkennung, Nachweis |
   |---|---|---|
   | Bootstrap später erneut, um sich Admin zu geben | Einmal-Prüfung auf `MeetingCreated` | Test 5, Test 13; `RoleAssigned` mit Befehlsoperation `operatorBootstrap` nach dem ersten Jahrgang kann es nicht geben; jedes `operatorRecovery` meldet ein Alarmvorschlag an 085 |
-  | Wiederherstellung missbrauchen, um sich neben einer bestehenden Verwaltung einen Zugang zu geben | nur, wenn der genannte Jahrgang keine nutzbare Verwaltungsrolle hat (keine aktive oder nur gesperrte Subjects); befristet höchstens 14 Tage; nur mit Datenbankzugang. **Restrisiko:** Wer Datenbankzugang hat und ein Verwaltungs-Subject sperren kann, kann danach wiederherstellen; beides sind Betreiberhandlungen mit eigenem Protokoll. Eine Verwaltung in einem anderen Jahrgang verhindert die Wiederherstellung hier nicht (Geltungsbereich je Jahrgang) | Test 10a, Test 13; `RoleAssigned` mit `operatorRecovery`, `operatorRef` und Grund; Protokoll im Tagesbericht |
+  | Wiederherstellung missbrauchen, um sich neben einer bestehenden Verwaltung einen Zugang zu geben | nur, wenn **kein** nicht geschlossener Jahrgang eine tragfähige, ungesperrte Verwaltungsrolle hat (die Sitzung löst Rollen global auf, ein Notzugang wirkt auf jeden Jahrgang); befristet höchstens 14 Tage; nur mit Datenbankzugang. **Restrisiko:** Wer Datenbankzugang hat und alle Verwaltungs-Subjects sperren kann, kann danach wiederherstellen; beides sind Betreiberhandlungen mit eigenem Protokoll | Test 10a, Test 13; `RoleAssigned` mit `operatorRecovery`, `operatorRef` und Grund; Protokoll im Tagesbericht |
   | Jahrgang anlegen, um darin eine fremde Rolle zu erhalten | nur die eigene Rolle wird übertragen; weitere Zuordnungen laufen über `assignRole` (seit 040a ohne Selbstzuordnung, R-ADM-07); Ablauf und Vertretung der eigenen Zuordnung werden übernommen; ein Notzugang legt keinen Jahrgang an (R-ADM-09) | Test 3; `RoleAssigned` in der Historie |
   | Personen und Geräte des Vorjahres still übernehmen | Klonen ohne `personId`/`deviceId` | Test 2 |
   | Nummernkreis nachträglich über vergebene Nummern legen, um Papier- und Systemvorgänge zu vermischen | R-ADM-05 | Test 7; `CaptureRangesReplaced` mit Akteur |
@@ -448,5 +456,10 @@ Wiederholungsschlüssel, Test 10 mit Mutationsprobe), Major 9 (auditierte Wieder
 
 **Nachprüfung (30.09.2026, zu `bccba04`):** eingearbeitet in 040c: N2 (Erstellerzuordnung übernimmt Ablauf und
 Vertretung; Notzugang legt keinen Jahrgang an, R-ADM-09; Test 10d mit zwei Mutationsproben), N5 (Wiederherstellung auch,
-wenn jede aktive Verwaltungsrolle einem gesperrten Subject gehört), N7 (Geltungsbereich je Jahrgang begründet,
-Missbrauchszeile mit Restrisiko), N9 (Verweis auf 040a).
+wenn jede aktive Verwaltungsrolle einem gesperrten Subject gehört), N7 (Geltungsbereich zunächst je Jahrgang, nach der
+letzten Nachprüfung zu `a1395b7` über alle nicht geschlossenen Jahrgänge wegen der globalen Rollenauflösung; Missbrauchszeile
+mit Restrisiko), N9 (Verweis auf 040a).
+
+**Letzte Nachprüfung (30.09.2026, zu `a1395b7`):** eingearbeitet: Wiederherstellung nur, wenn kein nicht geschlossener
+Jahrgang eine tragfähige, ungesperrte Verwaltungsrolle hat (globale Rollenauflösung, `actor.ts:108-114`, `app.ts:993-996`),
+Test 10a und Mutationsprobe; Erstellerzuordnung ohne `deputyForSubjectId` (Test 10d).

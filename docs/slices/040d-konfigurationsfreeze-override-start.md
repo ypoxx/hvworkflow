@@ -388,8 +388,8 @@ Kern (`config040d.test.ts`):
 11. **Override-Wiederholung:** Ein Override mit `Idempotency-Key`, danach verliert der Akteur seine Zuordnung (Entzug durch
     ein zweites Verwaltungskonto); die Wiederholung → 403, kein zweites Ereignis. Die Wiederholungsprüfung liest beide
     Rechte aus der Bereichstabelle.
-11b. **Wiederherstellung nach dem Freeze:** `recoveryEvents` auf einem eingefrorenen Jahrgang ohne nutzbare
-    Verwaltungsrolle liefert `RoleAssigned` und `ConfigOverridden` (`scope: roleAssignment`, Grund, alter und neuer Hash)
+11b. **Wiederherstellung nach dem Freeze:** `recoveryEvents` auf einem eingefrorenen Jahrgang ohne tragfähige, ungesperrte
+    Verwaltungsrolle in irgendeinem nicht geschlossenen Jahrgang liefert `RoleAssigned` und `ConfigOverridden` (`scope: roleAssignment`, Grund, alter und neuer Hash)
     in einem `append` mit aufeinanderfolgenden `seq`; `Meeting.configHash` ist danach der neue Hash; ohne Freeze nur
     `RoleAssigned`.
 11a. **Surrogate:** `reason` mit einzelnem Surrogat → 422, kein Ereignis.
@@ -419,6 +419,7 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
 - Entzogene Zuordnungen im Schnappschuss → Test 3 rot.
 - Fachbereiche im Schnappschuss nicht sortiert → Test 1 rot.
 - R-MTG-09 entfernt → Test 8 rot.
+- Wiederherstellung in einem eingefrorenen Jahrgang ohne `ConfigOverridden` → Test 11b rot.
 - Wiederholung des Override prüft nur `admin.override` → Test 11 rot (über eine übergebene Bereichstabelle im Test).
 - R-MTG-08 auch in `reduce` geprüft → Test 9 rot.
 
@@ -426,7 +427,7 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`, (d) ohne Eintrag mit `slice` 040.
-2. Tests 1–16 (mit 11a, 11b) grün, sieben Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+2. Tests 1–16 (mit 11a, 11b) grün, acht Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
 3. Die Planbelege sind erfüllt: „Stammdatenänderung nach Freeze → 409 R-ADM-03“ (Tests 5, 15), „override erzeugt Ereignis
    mit Grund“ (Test 6), „Wahrheitstabellen-Diff für admin-Rechte“ (040a–d).
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040d-…`; Schluss der
@@ -565,3 +566,5 @@ Minor 18 (Wiederholung prüft beide Rechte, Test 11), Minor 19 (ein `append`, Te
 Jahrgang läuft; Test 8, Missbrauchszeile), N4 (Wiederherstellung nach dem Freeze schreibt `ConfigOverridden`; §4,
 Invariante, Test 11b), N8 (Guard liest andere Jahrgänge aus dem globalen Store), N9 (Regel-id-Bereiche R-ADM-01..09,
 R-MTG-08/09; `startMeeting` nennt R-MTG-09).
+
+**Letzte Nachprüfung (30.09.2026, zu `a1395b7`):** Mutationsprobe zu Test 11b ergänzt.
