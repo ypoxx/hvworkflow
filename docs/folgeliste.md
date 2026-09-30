@@ -300,5 +300,6 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Dialog bleibt ohne Hinweis offen) · Sperre sichtbar machen (Ziehen aus, Knopf `aria-disabled`, Rundensignal) oder Hinweis.
 - takt-032 R2 nit · `capture/Page.tsx:224-226`, `speakers/Page.tsx` · `shownRef`/`latest` im passiven Effekt; zwischen
   Commit und Effekt kann `base` kurz veralten → normales 412 mit Banner · Ref im Layout-Effekt oder beim Landen setzen.
+- takt-032 Codex P2 · `apps/web/src/features/capture/Page.tsx:218` · schlägt die automatische Aktualisierung der Wortmeldeliste nach `captureContribution` fehl, hebt `status === 'error'` die Sperre `speakerLocked` auf und erlaubt ein Schreiben mit veralteter Sprecherversion (412) · Sperre bis zu einer erfolgreichen Aktualisierung halten.
 - takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
 - takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).

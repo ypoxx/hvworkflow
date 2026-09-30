@@ -108,8 +108,8 @@ export function keepNewest(kept: readonly Speaker[], returned: readonly Speaker[
 
 /**
  * takt-032: the tag of the Wortmeldeliste to send as `ifMatch`. `mark` is what an own write answered
- * with (the `ETag` from `lastWriteEtag()`, passed on unchanged, never parsed) and the list version the
- * write was made on (`base`). It holds while the list shown is still that one; a list read after the
+ * with (the `ETag` from `lastWriteEtag()`, passed on unchanged; only `listMarkAfterAnswer` reads its
+ * version) and the list version the write was made on (`base`). It holds while the list shown is still that one; a list read after the
  * answer has another version and takes over. The page never counts a version up itself.
  */
 export function etagForList(
@@ -119,6 +119,33 @@ export function etagForList(
   // `<=`: a list requested before the answer may still land later, with the version shown when the
   // answer came or an older one; only a list read after the answer shows a newer version.
   return mark !== null && version <= mark.base ? mark.etag : etagOf(version);
+}
+
+/**
+ * The version an `ETag` of this API stands for (`etagOf`), or `null` for a tag it cannot place. Only
+ * used to compare an answer with what is shown; the tag itself is always sent on unchanged.
+ */
+export function versionOfEtag(etag: string): number | null {
+  const match = /^(?:W\/)?"v(\d+)"$/.exec(etag);
+  return match === null ? null : Number(match[1]);
+}
+
+/**
+ * Codex P1 on PR #86: the list mark for an own write's answer. A concurrent writer may have moved the
+ * list while the answer was delayed; if the list shown is already at or past the version the answer
+ * tag stands for, the mark is dropped (`null`) and the next write uses the tag of the list shown, so
+ * a stale tag never outlives a newer read. The decision compares the answer tag's version with the
+ * shown version, never arrival order. Otherwise the base is the version shown now, as before.
+ */
+export function listMarkAfterAnswer(
+  writtenOn: number,
+  shownNow: number | null,
+  etag: string,
+): { readonly base: number; readonly etag: string } | null {
+  const answered = versionOfEtag(etag);
+  if (answered === null) return null;
+  const base = Math.max(shownNow ?? 0, writtenOn);
+  return base >= answered ? null : { base, etag };
 }
 
 /**

@@ -283,17 +283,32 @@ export function etagForContribution(
 }
 
 /**
+ * The version an `ETag` of this API stands for (`etagOf`), or `null` for a tag it cannot place. Only
+ * used to compare an answer with what is shown; the tag itself is always sent on unchanged.
+ */
+export function versionOfEtag(etag: string): number | null {
+  const match = /^(?:W\/)?"v(\d+)"$/.exec(etag);
+  return match === null ? null : Number(match[1]);
+}
+
+/**
  * The mark for an answer just received. Its base is the version shown *now*, not the one the write
  * began with: a reload may have landed while the write ran, and a mark based on the older closure
  * would let that newer list override the fresher tag of this answer.
+ * Codex P1 on PR #86: another desk may have moved the Redebeitrag while the answer was delayed. If the
+ * version shown is already at or past the one the answer tag stands for, there is no mark (`null`):
+ * the next write uses the tag of the shown read, and a stale tag never outlives a newer read.
  */
 export function markAfterAnswer(
   written: { readonly id: string; readonly version: number },
   shownNow: { readonly id: string; readonly version: number } | undefined,
   etag: string,
-): ContributionMark {
+): ContributionMark | null {
+  const answered = versionOfEtag(etag);
+  if (answered === null) return null;
   const shown = shownNow !== undefined && shownNow.id === written.id ? shownNow.version : written.version;
-  return { id: written.id, base: Math.max(shown, written.version), etag };
+  const base = Math.max(shown, written.version);
+  return base >= answered ? null : { id: written.id, base, etag };
 }
 
 /** After `captureContribution` the new version of the Wortmeldung is not in the answer (Befund). */

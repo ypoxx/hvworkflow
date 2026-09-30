@@ -283,10 +283,11 @@ export function CapturePage() {
             contributionMark !== null && contributionMark.actorId === actorId ? contributionMark : null,
           ),
         });
-        // Right after the await: the tag of the answer is the Redebeitrag's new version (opaque, not parsed).
+        // Right after the await: the tag of the answer is the Redebeitrag's new version (sent on unchanged).
         const etag = api.lastWriteEtag();
         if (etag !== undefined) {
-          setContributionMark({ actorId: startedActor, ...markAfterAnswer(contribution, shownRef.current, etag) });
+          const mark = markAfterAnswer(contribution, shownRef.current, etag);
+          setContributionMark(mark === null ? null : { actorId: startedActor, ...mark });
         }
         setStaleFor(null);
         return true;

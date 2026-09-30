@@ -292,7 +292,30 @@ describe('markAfterAnswer', () => {
   });
 
   it('another Redebeitrag on screen leaves the closure version as the base', () => {
-    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c2', version: 9 }, '"v6"').base).toBe(5);
-    expect(markAfterAnswer({ id: 'c1', version: 5 }, undefined, '"v6"').base).toBe(5);
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c2', version: 9 }, '"v6"')?.base).toBe(5);
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, undefined, '"v6"')?.base).toBe(5);
+  });
+});
+
+/** Codex P1 on PR #86: a delayed answer whose tag is older than what the page already shows. */
+describe('markAfterAnswer with a delayed answer', () => {
+  it('drops the mark when the shown Redebeitrag is already newer than the answer tag', () => {
+    // Write begun on v5 answers "v6"; another desk writes v7 and a read showing v7 lands first.
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 7 }, '"v6"');
+    expect(mark).toBeNull();
+    expect(etagForContribution({ id: 'c1', version: 7 }, mark)).toBe('"v7"');
+  });
+
+  it('drops the mark when the shown version equals the answer version (the read tag is the same)', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v6"')).toBeNull();
+  });
+
+  it('keeps the mark while the shown version is older than the answer tag', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 5 }, '"v6"');
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v6"');
+  });
+
+  it('a tag it cannot place is not kept as a stand-in', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 5 }, 'opaque')).toBeNull();
   });
 });

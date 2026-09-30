@@ -13,6 +13,7 @@ import {
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
+  listMarkAfterAnswer,
   loadKey,
   NO_VERDICT,
   readVerdict,
@@ -266,5 +267,36 @@ describe('stale lists after own writes', () => {
     expect(isListStale(3, { base: 4 })).toBe(true);
     expect(isListStale(5, { base: 4 })).toBe(false);
     expect(isListStale(4, null)).toBe(false);
+  });
+});
+
+/** Codex P1 on PR #86: a delayed list answer whose tag is older than the list already shown. */
+describe('listMarkAfterAnswer', () => {
+  it('drops the mark when the shown list is already newer than the answer tag', () => {
+    // Registration begun on v3 answers "v4"; another desk writes v5 and a read showing v5 lands first.
+    const mark = listMarkAfterAnswer(3, 5, '"v4"');
+    expect(mark).toBeNull();
+    expect(etagForList(5, mark)).toBe('"v5"');
+  });
+
+  it('drops the mark when the shown list already has the answer version', () => {
+    expect(listMarkAfterAnswer(3, 4, '"v4"')).toBeNull();
+  });
+
+  it('keeps the mark while the shown list is older than the answer tag', () => {
+    const mark = listMarkAfterAnswer(3, 3, '"v4"');
+    expect(mark).toEqual({ base: 3, etag: '"v4"' });
+    expect(etagForList(3, mark)).toBe('"v4"');
+  });
+
+  it('keeps the answer tag when a list shown during the write is newer than the write base but older than the answer', () => {
+    const mark = listMarkAfterAnswer(3, 4, '"v6"');
+    expect(etagForList(4, mark)).toBe('"v6"');
+    expect(etagForList(6, mark)).toBe('"v6"');
+    expect(etagForList(7, mark)).toBe('"v7"');
+  });
+
+  it('a tag it cannot place is not kept as a stand-in', () => {
+    expect(listMarkAfterAnswer(3, 3, 'opaque')).toBeNull();
   });
 });

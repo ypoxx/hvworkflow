@@ -27,7 +27,15 @@ import { NowSpeaking } from './NowSpeaking';
 import { RoundSection } from './RoundSection';
 import { ROW_COLUMNS } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
-import { applyWriteResult, etagForList, isListStale, keepNewest, moveSpeakerToRound, useSpeakers } from './useSpeakers';
+import {
+  applyWriteResult,
+  etagForList,
+  isListStale,
+  keepNewest,
+  listMarkAfterAnswer,
+  moveSpeakerToRound,
+  useSpeakers,
+} from './useSpeakers';
 import { RegisterDialog } from './RegisterDialog';
 
 /** The failed-write message: title from the problem, fallback from the dictionary. */
@@ -304,8 +312,10 @@ export function SpeakersPage() {
             // Right after the await, before anything else can write: the tag is this write's own.
             const etag = api.lastWriteEtag();
             if (etag !== undefined && stillCurrent(start)) {
-              // Based on the list version shown now: a list may have landed while the write ran.
-              setListMark({ actorId: start.actorId, base: Math.max(latest.current.listVersion ?? 0, listVersion), etag });
+              // Based on the list version shown now: a list may have landed while the write ran. If that
+              // list is already as new as the answer or newer, the mark is dropped (Codex P1, PR #86).
+              const mark = listMarkAfterAnswer(listVersion, latest.current.listVersion, etag);
+              setListMark(mark === null ? null : { actorId: start.actorId, ...mark });
             }
           }),
     [run, listVersion, listEtag, startOf, stillCurrent],
@@ -407,7 +417,8 @@ export function SpeakersPage() {
           if (stillCurrent(start)) {
             keepRows(start, rows);
             if (etag !== undefined) {
-              setListMark({ actorId: start.actorId, base: Math.max(latest.current.listVersion ?? 0, listVersion), etag });
+              const mark = listMarkAfterAnswer(listVersion, latest.current.listVersion, etag);
+              setListMark(mark === null ? null : { actorId: start.actorId, ...mark });
             }
             setOverride(null);
           }
