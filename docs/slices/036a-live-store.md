@@ -162,6 +162,9 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
   Akteurwechsel, 401, Abmelden; Uhr als Option)
 - `apps/web/src/api/useApiVersion.ts`, `apps/web/src/api/useApiVersion.test.ts` (nur falls die Hülle den Hörerweg dort
   braucht; Signatur unverändert)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (nur Helfer `unrelatedEvent`; Bauklärung 30.09.2026)
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (nur Helfer `unrelatedEvent`, `currentVersionAsAdmin` (jetzt `currentVersion`), `elsewhere` und ihre
+  Aufrufe; Bauklärung 30.09.2026)
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
 
@@ -300,6 +303,20 @@ Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen; PR-CI-Lauf <id> 
 Open: Eigentümerfrage 1; Strom-Client in 036b
 Touched: <Dateiliste>
 ```
+
+Hinweis zum Akzeptanzkriterium 2 (Bau, 30.09.2026): `grep -rn "fetch(" apps/web/src` trifft außerhalb von `http.ts` nur
+`refetch();` in `apps/web/src/features/capture/Page.tsx:316`, ein Fehltreffer des Musters, vorbestehend, kein
+`fetch`-Aufruf. `localStorage`/`sessionStorage` in `liveStore.ts`: kein Treffer.
+
+## Bauklärung (Orchestrator, 30.09.2026)
+
+- Die e2e-Helfer in 010c/010d wechselten für einen Lesezugriff auf die Administration und **vor** dessen Antwort zurück.
+  Die Hülle hält diese Antwort nach Entscheidung 4 zu Recht zurück (Akteur-Epoche geändert); die Helfer warteten ewig
+  (11 Fälle rot). Entscheidung 4 bleibt unverändert. Die Helfer beenden die Admin-Arbeit jetzt vor dem Rückwechsel:
+  Versionen liest der aktuelle Akteur (`getMeeting` ist Stammdaten; die Frage steht auf seinem Schirm), die zweite Version
+  in 010d kommt aus der Antwort des ersten Schreibens. Die Schreibvorgänge der Administration laufen im In-Process-Kern
+  vollständig synchron (Rechteprüfung, Anhängen und Antwort sind bei der Rückkehr des Aufrufs fertig); es ist beim
+  Rückwechsel keine Admin-Anfrage unterwegs. Die Regel selbst halten die Tests (j2b) und (j2c) in `liveStore.test.ts`.
 
 ## Review findings
 

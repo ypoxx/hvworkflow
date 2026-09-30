@@ -290,6 +290,11 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
   `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
 
+## Live-Store (aus 036a)
+
+- 036a Bauhinweis · `apps/web/src/api/liveStore.ts` · der In-Process-`subscribe` meldet `[]` ohne `change`, wenn für den Leser nichts Lesbares geändert wurde; nach Entscheidung 3 leert das den ganzen Puffer (Verhalten wie vor 036a, aber unnötige Abrufe) · im Demo-Adapter nur melden, wenn es etwas zu melden gibt, oder einen leeren Aufruf als „nichts“ kennzeichnen.
+- 036a Bauhinweis · `apps/web/src/api/index.ts` · bei 401 läuft `clear()` zweimal (HTTP-`onUnauthorized`, dann `onActorChange(undefined)`), die Hörer laufen zweimal; harmlos, die Hülle hängt im selben Stapel aus · einen der beiden Aufrufe weglassen oder `clear()` bei leerem Puffer ohne Hörer-Aufruf.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf

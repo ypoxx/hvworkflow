@@ -282,26 +282,22 @@ async function callCount(page: Page, method: string): Promise<number> {
  * bumps `version` for every view. The actor is swapped and restored in the same task, around the
  * synchronous part of the write — the view never sees an actor change (same identity before and
  * after), only the new event.
+ *
+ * Slice 036a (Bauklärung): the list version is read as the current actor — `getMeeting` is master
+ * data every role may read — and no longer as the administration persona. The live store never
+ * delivers an answer asked for one actor once the actor has changed (Entscheidung 4); the old read
+ * swapped back while its answer was still on the way and so waited forever. The in-process write
+ * below does its whole work synchronously (it has appended and computed its answer when the call
+ * returns), so no admin request is on its way when the actor is restored.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
   await installHarness(page);
-  const speakerListVersion = await page.evaluate((actorUrl) => {
+  const speakerListVersion = await page.evaluate(() => {
     const w = window as unknown as Harness;
-    const mod = w.__modules[actorUrl] as {
-      DEMO_ACTORS: readonly { id: string }[];
-      getActor: () => unknown;
-      setActor: (actor: unknown) => void;
-    };
-    const before = mod.getActor();
-    mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
-    let read: Promise<unknown>;
-    try {
-      read = w.__original['getMeeting']!();
-    } finally {
-      mod.setActor(before);
-    }
-    return read.then((meeting) => (meeting as { speakerListVersion: number }).speakerListVersion);
-  }, ACTOR_MODULE);
+    return w.__original['getMeeting']!().then(
+      (meeting) => (meeting as { speakerListVersion: number }).speakerListVersion,
+    );
+  });
   // Synchronous on purpose: the evaluate awaits nothing in the page, the outcome is polled below.
   const index = await page.evaluate(
     ([actorUrl, displayName, version]) => {
