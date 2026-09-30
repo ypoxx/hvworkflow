@@ -105,9 +105,15 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
   wie `LoginPage.test.tsx`)
 - `apps/web/src/app/HeaderStrip.tsx` (nur Einhängen der Anzeige)
 - `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts` (nur Texte der Anzeige)
-- `apps/web/e2e/031-http-betriebsart.spec.ts` (nur neue Tests H11 und H12 am Dateiende und der Kopfkommentar zur
-  `page.route`-Ausnahme für H12, m5; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus 031b bleibt)
-- `docs/evidence/031-h11-zweiter-browser.png`, `docs/evidence/031-h12-verbindungsanzeige.png`
+- `apps/web/e2e/031-http-betriebsart.spec.ts` (nur neue Tests H13 und H14 am Dateiende, der Kopfkommentar zu den
+  `page.route`-Doubles, m5, und — Bauklärung vom 30.09. — die Strom-503-Route vor `goto` in den takt-039-Tests H11 und
+  H12a samt je einer Kommentarzeile; — zweite Bauklärung — in H10 nur der Ersatz der beiden `networkidle`-Wartepunkte
+  durch Ruhe der `/v1`-Lesungen ohne `/v1/stream`; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus
+  031b bleibt)
+- `apps/web/src/i18n/parity.test.ts` (zweite Bauklärung: nur Schlüsselzahl 510 → 515 an drei Stellen und der veraltete
+  Testtitel)
+- `apps/web/e2e/support/e2e-texts.ts` (Bauklärung 3: nur die H13-Texte als Konstanten und in `WRITTEN_TEXTS`)
+- `docs/evidence/031-h13-zweiter-browser.png`, `docs/evidence/031-h14-verbindungsanzeige.png`
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
 
@@ -117,6 +123,37 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 
 `apps/web/src/api/liveStore.ts`, `apps/web/playwright.config.ts`, `apps/web/vite.config.ts`, `apps/web/src/features/**`.
 Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht als erlaubt liest.
+
+## Bauklärung (Orchestrator, 30.09.)
+
+- takt-039 (`769df38`) ist nach dieser Spec (`f702822`) gemergt und hat in `031-http-betriebsart.spec.ts` bereits H11
+  („Vorgelesen, weiter“ während der Bühnenlesung) und H12a/H12b (Umsortieren per Tastatur) angelegt. Die hier geplanten
+  Tests H11 und H12 heißen deshalb **H13** (zweiter Browser) und **H14** (Verbindungsanzeige); die Nachweise heißen
+  `docs/evidence/031-h13-zweiter-browser.png` und `docs/evidence/031-h14-verbindungsanzeige.png`. Wo unten H11/H12 im
+  Sinn dieser Scheibe steht, sind H13/H14 gemeint.
+- takt-039 H11 und H12a steuern die Auffrischung über den 30-s-Takt (`page.clock.install()`, `fastForward('00:30')`). Bei
+  offenem Strom ruht der Takt (Entscheidung 5, Test 2); beide Tests liefen dann ins Leere. Entscheidung (a): Beide Tests
+  beantworten `**/v1/stream*` vor `goto` mit 503 und `Retry-After: 30` über `page.route` und laufen damit im
+  Polling-Rückfall, den sie prüfen. H12b wartet nicht auf den Takt und bleibt unverändert. Entscheidung 5 und Test 2
+  bleiben unverändert.
+- Der Kopfkommentar der Datei (m5) nennt die tatsächlichen `page.route`-Doubles: 030, G1, takt-039 H11 (und H12a), H14.
+- **Zweite Bauklärung (Orchestrator, 30.09.), nach dem Bau:**
+  1. `apps/web/src/i18n/parity.test.ts` zählt die Schlüssel fest (Test f). Die fünf neuen `shell.connection.*` verlangen
+     515 statt 510; die Pins und der veraltete Titel („507“) werden angepasst, sonst nichts. Das erledigt takt-038 nit 8.
+  2. H10 wartete auf `waitForLoadState('networkidle')`; Playwright zählt einen offenen Strom als laufende Anfrage, das
+     Ereignis tritt nie ein. Entscheidung (a): nur diese beiden Wartepunkte werden durch Ruhe der `/v1`-Lesungen ohne
+     `/v1/stream` ersetzt (Hilfsfunktion `quiet()` wie in H13); die Aussage „genau ein Abruf je Einhängen“ bleibt, H10
+     läuft weiter gegen den echten Strom.
+  3. Restrisiko „`/auth/me` vor einem Stromende abgeschickt, danach bestätigt, öffnet den Strom wieder“ ist angenommen
+     (der Dienst prüft beim Öffnen, der Puffer ist dann leer); es bleibt im Bericht, nicht auf der Folgeliste.
+- **Bauklärung 3 (Orchestrator, 30.09.), nach dem Review von `f761931`:**
+  1. Review major 1 (T-G1-D-03, MF-SC-2): nach einem Sitzungs- oder Rechteende (end, 403, 401) geht das nächste
+     `openStream()` über den Rückzug; `attempt` wird nur nach einem gesunden Strom (≥ 10 s) zurückgesetzt. Nach drei
+     solchen Enden ohne gesunden Strom folgt die 5-min-Pause wie bei m8. Kein Neuaufbau ohne neue Bestätigung bleibt.
+  2. Review minor 2: `closeStream()` verwirft den Cursor; damit auch beim strukturellen Akteurwechsel und beim Abmelden.
+  3. Review minor 3: ein strukturell anderer Akteur schließt den offenen Strom und öffnet neu (`followSessionActor`).
+  4. Review minor 4 (Datenschutz): die H13-Texte stehen in `apps/web/e2e/support/e2e-texts.ts` `WRITTEN_TEXTS`, damit die
+     Zugriffslog-Prüfung des Harness sie sucht.
 
 ## Vor dem Bau prüfen
 
@@ -238,7 +275,7 @@ Perspektive(n): Security, Betrieb, UX · Nachweise: Tests 1–6, Netztrace · Of
 | SC-03 | ja: Nachrichten ohne Inhalt außer für `event.read`; der Client zeigt nichts aus dem Strom direkt an, er macht nur ungültig |
 | SC-04 | nicht anwendbar (kein Massenlesen im Client über den Vertrag hinaus) |
 | SC-05 | ja: Stromende und 401 leeren den Puffer, kein Neuaufbau ohne Bestätigung (Test 2); kein Geheimnis im Diff |
-| SC-06 | ja: MF-SC-1, MF-SC-2 |
+| SC-06 | ja: MF-SC-1, MF-SC-2. **Regel (T-G1-D-03): die Wiederverbindungsgrenze gilt je Tab und überlebt jedes Schließen außer dem ausdrücklichen Abmelden und einem 401.** Ein anstehender Wiederholversuch (Rückzug, Sitzungstor, 5-min-Pause) bleibt bei jedem anderen Schließen (anderer Akteur, keine aktive Rolle), die Zähler (`attempt`, kurzlebige Ströme, Sitzungsenden) ebenso; wer eine junge Verbindung ohne Daten oder eine laufende Anfrage schließt, zählt sie als kurzlebig und das nächste Öffnen wartet. Nach jedem Sitzungs- oder Rechteende Rückzug, nach drei Enden oder drei kurzlebigen Strömen 5 min Pause; `reset`, `cursor` und fehlerhafte Rahmen gelten nie als gesund, nur `event`/`change` oder 10 s Lebensdauer. Nachweis: Matrix „reconnect limit matrix“ (9 Endarten × 3 Akteurmuster, Auffrischen alle 500 ms, je höchstens 6 Öffnungen in 10 min) und die Tests „403 on every open …“, „actor change while the gated open is in flight“ |
 | SC-07 | nicht anwendbar |
 | SC-08 | nicht anwendbar |
 | SC-09 | nicht anwendbar |
@@ -260,12 +297,265 @@ Keine eigenen. Es gelten 035b Frage 3 (Produktionsweg für lange Verbindungen) u
 
 ```
 Slice: 036b-strom-client
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; PR-CI-Lauf <id> (H11, H12); Zustellzeit; Netztrace-Tabelle;
-docs/evidence/031-h11-zweiter-browser.png, docs/evidence/031-h12-verbindungsanzeige.png
-Open: Lasttest 071; Produktionsweg (035b Frage 3)
-Touched: <Dateiliste>
+Done: Strom-Leser mit fetch in http.ts (reiner Parser sse.ts), geöffnet bei jeder bestätigten Sitzung vor dem Einhängen,
+Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wächter 45 s, 5 min Rückfall bei kurzlebigen
+Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
+Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
+e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d, Grenze je Tab 2747258,
+Codex P2 c869987; `pnpm gates` grün auf c869987
+(Auszug unten); PR-CI auf f761931 grün in e2e-http (33 passed, H10, H13, H14): Zustellzeit 862 ms (Anmeldung) und 796 ms
+(Aufruf); Screenshots im CI-Artefakt evidence-031-http (E56, Angaben unten).
+Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem letzten Commit ist der laufende Nachweis (R2).
+(Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
+Touched: siehe Liste unten.
 ```
+
+**Vor dem Bau prüfen (Ergebnisse).**
+1. Vertrag 0.3.12 mit `StreamTopic`, `StreamChange`, `StreamCursor`, `StreamReset`, `StreamEnd` in
+   `packages/contract/src/types.ts`; 035b und 036a gemergt: erfüllt.
+2. `vite preview`-Proxy (m6): gegen einen Stellvertreter-Dienst (Node-Stub mit `text/event-stream`, `HV_API_ORIGIN`,
+   HTTP-Build in einem privaten Verzeichnis, keine Konfigurationsänderung) ungepuffert und unkomprimiert: in Chromium
+   kommt `cursor` nach 60 ms, danach je Heartbeat ein Stück (2014, 4014, 6015 ms), `content-encoding` fehlt. Den echten
+   Dienst hinter `vite preview` belegt erst der PR-CI-Lauf von H13/H14.
+3. Rollen für H13 (N6): die Wortmeldeliste hat kein `requires` in `featureRegistry.ts`; capture und coordination halten
+   `speaker.read`. Kontext A = capture auf `/speakers`.
+4. `onActorChange(actor)` kommt bei jedem erfolgreichen `/auth/me` (neues Objekt); `openStream()` öffnet nur ohne offenen
+   Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
+   actor“).
+
+**PR-CI auf fbb2b24 (Code 2747258):** Lauf 36763477007, Job e2e-http 110052142763: 33 passed; H10, H11, H12a, H12b, H13 und
+H14 grün. H13: Anmeldung 848 ms, Aufruf 801 ms; Schritt 1a 2 GET, Schritt 1b 4 GET, Schritt 2 1 GET (`/v1/meeting`).
+Zugriffslog 653 Zeilen PASS. Artefakt `evidence-031-http`, ID 11119178846, Digest sha256
+5a6a088f31893456b5dae46b801e6d7acddd4a44d59d380730f750349c7be3d9. Der Lauf auf f761931 (unten) bleibt als Verlauf. Die
+Korrektur zu Codex P2 (c869987) kam nach diesem Lauf; laufender Nachweis ist die PR-CI auf dem letzten Commit (R2), die
+Bestätigung erfolgt am PR.
+
+**Codex P2 (Wiederverbindungsgrenze bei Sichtbarkeit):** Die Rückkehr in einen verborgenen Tab setzte `attempt` zurück;
+Hintergrund-/Vordergrund-Wechsel zwischen gescheiterten Öffnungen machten aus 1/2/4 s wiederholte 1-s-Versuche. Jetzt
+bleiben die Zähler, nur ein gesunder Strom setzt sie zurück. Test: 403 bzw. `reset` bei jedem Öffnen, Verbergen/Zeigen alle
+2 s, Auffrischen alle 500 ms → Öffnungen bei 0, 1, 3, 303, 307, 315 s (6 in 10 min). Mutation „Rückkehr setzt `attempt`
+zurück“ (ergibt 0, 1, 2, 302, 304, 308 s): getötet von beiden Tests.
+
+**Schluss von `pnpm gates` auf c869987 (sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  473 passed (473)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 2.13s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit c869987, tree 67a00aaf1e02…
+```
+
+(Der erste Versuch auf c869987 lief nicht: die lokale Postgres-Instanz war beendet, `pg_isready` brach die Kette ab; nach
+dem Neustart der Lauf oben.)
+
+**Schluss von `pnpm gates` auf 2747258 (Wiederverbindungsgrenze je Tab; sauberer Baum, Postgres-Variablen gesetzt), grün
+im ersten Lauf, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  471 passed (471)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 1.88s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 2747258, tree 382897a41056…
+```
+
+**Letzte Nachprüfung von 89dc78d (MAJOR, T-G1-D-03): Grenze je Tab statt Einzelfälle.** Regel: die
+Wiederverbindungsgrenze gilt je Tab und überlebt jedes Schließen außer dem ausdrücklichen Abmelden (`resetStreamLimits`
+über den `signOut`-Weg in `index.ts`) und einem 401. `closeStream()` behält jeden anstehenden Wiederholversuch und alle
+Zähler; das Schließen einer jungen Verbindung ohne Daten oder einer laufenden Anfrage zählt als kurzlebig und lässt das
+nächste Öffnen warten. `retryIsGate` und `keepGate` entfallen.
+
+Matrix (9 Endarten × 3 Akteurmuster, Auffrischen alle 500 ms, 10 min Scheinzeit), Öffnungen:
+
+| Endart | gleicher Akteur | wechselnder Akteur | noRole-Flattern | vorher (89dc78d): wechselnd / noRole |
+|---|---|---|---|---|
+| 403 | 6 | 6 | 6 | 6 / 801 |
+| end {forbidden} | 6 | 6 | 6 | 6 / 801 |
+| end {roles_changed} | 6 | 6 | 6 | 6 / 801 |
+| end {session} | 6 | 6 | 6 | 6 / 801 |
+| reset | 6 | 6 | 6 | 1201 / 601 |
+| nur cursor | 6 | 6 | 6 | 1201 / 601 |
+| fehlerhaft | 6 | 6 | 6 | 1201 / 601 |
+| rotate | 6 | 6 | 6 | 1201 / 601 |
+| reset und 403 gemischt | 6 | 6 | 6 | 12 / 701 |
+
+Auf 89dc78d 15 von 27 Kombinationen rot. Positivfall: ein gesunder Strom (Daten, oder 15 s nur Heartbeats) verbindet nach
+1 s neu. Mutationen (je eine, zurückgesetzt, alle getötet):
+
+| Mutation | getötet von |
+|---|---|
+| Schließen ohne Abmelden verwirft einen anstehenden Wiederholversuch (Nicht-Tor) | 18 Matrixfälle |
+| noRole-/Akteur-Schließen setzt die Zähler zurück | 21 Tests (Matrix, minor 3, In-flight-Tor) |
+| Schließen einer ungesunden Verbindung lässt das nächste Öffnen nicht warten | minor 3, In-flight-Tor |
+| `stopStream` räumt den Wiederholversuch wieder | 18 Matrixfälle |
+| ausdrückliches Abmelden setzt die Grenze nicht zurück | „only an explicit sign-out …“ |
+
+Folge im Bericht (Bauentscheidung): ein strukturell anderer Akteur auf einem jungen Strom ohne Daten öffnet nach 1 s neu
+statt sofort (Test minor 3 angepasst).
+
+**Schluss von `pnpm gates` auf 89dc78d (Nachprüfung), grün im ersten Lauf, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  444 passed (444)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 2.09s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 89dc78d, tree d6eab7e0d895…
+```
+
+**Nachprüfung von e254cb0 (zwei Verfügbarkeitsbefunde, T-G1-D-03), Proben und Mutationen:**
+
+- Rot auf dem Stand e254cb0 (neue Tests gegen das alte `http.ts`): Akteur wechselt bei jedem `/auth/me` plus Auffrischen
+  alle 500 ms, 403 bei jedem Öffnen → 121 Öffnungen in 60 s (wie die Probe des Prüfers); `reset` bei jedem Öffnen → eine
+  Öffnung je Sekunde (im Test durch 50 vorbereitete Antworten begrenzt; Probe des Prüfers: 61 in 60 s); kurzer Strom mit
+  Daten zwischen Sitzungsenden → keine Pause.
+- Grün auf 89dc78d: Akteurwechsel-Fall 3 Öffnungen in 60 s (0, 1, 3 s), Pause bis 303 s über alle Akteurwechsel;
+  `reset`-Fall 3 in 60 s und 6 in 10 min (0, 1, 3, 303, 307, 315 s); Daten-Fall 4 Öffnungen, dann Pause.
+
+| Punkt | Mutation | getötet von |
+|---|---|---|
+| Befund 1 | Akteurwechsel-Schließen verwirft den anstehenden Rückzug/die Pause | „actor alternating …“ |
+| Befund 1 | Akteurwechsel-Schließen schärft das Tor nicht nach | „actor change while the gated open is in flight“ |
+| Befund 1 | `followSessionActor` schließt wie beim Abmelden | beide Tests zu Befund 1 |
+| Befund 1 | Abmelden setzt das Tor nicht zurück | „actor alternating …“ (Teil Abmelden) |
+| Befund 2 | `reset` zählt als gesund | „reset on every open …“ |
+| nit 1.4 | Datenrahmen beenden eine Folge von Sitzungsenden | „a short stream with data …“ |
+
+**Früherer Lauf auf e254cb0 (Review-Nacharbeit), grün:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  440 passed (440)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 1.95s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit e254cb0, tree 629b020685d7…
+```
+
+Der erste Lauf auf e254cb0 war rot in zwei zeitkritischen Postgres-Tests von `apps/api` (034a „query that hangs past the
+service timer“, 035b Test 28 „ten idle streams“), ohne Änderung an `apps/api`; allein gelaufen 586/586, der
+Wiederholungslauf oben grün. Ein Flackern unter paralleler Last, kein Befund dieser Scheibe.
+
+**Früherer Lauf auf 3bb3a61, grün:**
+
+```
+apps/web test:       Tests  436 passed (436)
+apps/api test:       Tests  586 passed (586)
+packages/domain test:       Tests  261 passed (261)
+slice-scope: 16 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (30 pattern(s)).
+✓ built in 1.87s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 3bb3a61, tree 8f6433adefb5…
+```
+
+**Früherer Lauf auf 62c7c4a (vor der zweiten Bauklärung), rot am Paritäts-Pin:**
+
+```
+apps/web test:  FAIL  src/i18n/parity.test.ts > i18n parity checks > (f) Total key count is 507 across all modules and matches de and en
+apps/web test: AssertionError: expected 515 to be 510 // Object.is equality
+apps/web test:  ❯ src/i18n/parity.test.ts:166:23
+apps/web test:  Test Files  1 failed | 22 passed (23)
+apps/web test:       Tests  1 failed | 435 passed (436)
+/home/user/wt/s036b/apps/web:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @hv/web@0.0.0 test: `vitest run --passWithNoTests`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+Davor grün: `contract:lint`, `typecheck`, `lint`; `packages/domain` 261/261. Die Schritte nach `test` einzeln auf
+demselben Commit: `apps/api` 39 Dateien, 586/586 Tests; vocabulary, arch, role-literals, now-check, plan-honesty,
+i18n-literals, slice-scope („14 changed file(s), all within … Files allowed“, Warnung wegen der Bauklärung),
+downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle grün. In-process-e2e: 131 passed (7,0 min).
+
+**Tests zuerst.** Rot vor dem Bau: `sse.test.ts` 9 failed (Stub mit leeren Funktionen), `connection.test.ts` 7 failed,
+`http.test.ts` 21 failed | 64 passed (bestehende grün), `ConnectionStatus.test.tsx` rot (Modul fehlt). Grün danach:
+`src/api` und `src/app` 180/180; die takt-030- und 036a-Tests unverändert grün.
+
+**Mutationen (je eine, Datei danach zurückgesetzt; alle getötet):**
+
+| Wächter | Mutation | getötet von |
+|---|---|---|
+| kein Neuaufbau ohne Bestätigung | `endForSession` plant einen Neuaufbau statt `wanted = false` | end {roles_changed, forbidden, session}, „structurally equal actor“ (5 rot) |
+| dto. | 401 beim Öffnen wie ein Verlust | „401 on open and on reopen“ |
+| dto. | 403 beim Öffnen wie ein Verlust | „reopen after a hidden tab answered 403“ |
+| `clear()` bei Stromende | `onStreamEnd` nicht gerufen | 6 rot (end ×3, equal actor, 401, 403) |
+| Cursor / `Last-Event-ID` | Kopfzeile nicht gesetzt | 7 rot (Rückzug, rotate, end ×3, …) |
+| dto. | `reset` behält den Cursor | „reset: … without a cursor“ |
+| dto. (N5) | erste `cursor`-Nachricht invalidiert nichts | „after the first cursor only entries …“ |
+| Rückzug, Obergrenzen | Obergrenze 60 s | „reconnects … at most 30 s“ |
+| dto. | Zufallsanteil über der Stufe | „draws the jitter below the step“ |
+| dto. | `Retry-After` ignoriert | 429, 503 |
+| dto. | keine 5-min-Pause nach kurzlebigen Strömen | „three short-lived streams“ |
+| dto. (SP-2) | Nachrichtengrenze 10 MiB | Parser 1 MiB, „message over 1 MiB drops the connection“ |
+| Rückfall auf den 30-s-Takt | Takt ruht nicht bei offenem Strom | „poll rests …“, „45 s without a heartbeat“ |
+| dto. | Takt läuft nie | 5 rot (takt-030-Takt, 429, 503, Wächter, …) |
+| dto. | Wächter 450 s | „45 s without a heartbeat“ |
+
+**Mutationen der Review-Nacharbeit (auf e254cb0-Stand, je eine, danach zurückgesetzt; alle getötet):**
+
+| Punkt | Mutation | getötet von |
+|---|---|---|
+| Major 1 | nach Sitzungsende sofort öffnen statt Rückzug | end ×3, „403 on every open …“ (5 rot) |
+| Major 1 | Sitzungsende-Tor ganz entfernt | dieselben 5 |
+| Major 1 | keine 5-min-Pause nach drei Enden | „403 on every open …“ |
+| Major 1 | `attempt` bei jedem Sitzungsende zurückgesetzt | „403 on every open …“ |
+| Minor 2 | `closeStream()` behält den Cursor | „sign-out and sign-in as another actor …“, „structural actor change …“ |
+| Minor 3 | strukturell anderer Akteur behält den offenen Strom | „structural actor change while live …“ |
+
+Minor 2 und ein roles_changed mit strukturell anderem Akteur: `closeStream()` verwirft den Cursor, der neue Strom geht den
+N5-Weg (mehr Invalidierung, nie weniger); bei strukturell gleichem Akteur bleibt der Cursor (Entscheidung 6).
+
+**E56-Nachweis (PR-CI auf f761931, Verlauf):** Artefakt `evidence-031-http`, Lauf 36758090399, Artefakt-ID 11117652692, Digest
+sha256 1123dcfbcd366d07f7560cfca9137e4c336bafca7f1dc48e664027ffcc8929fb (enthält `031-h13-zweiter-browser.png`,
+`031-h14-verbindungsanzeige.png`). H13 aus diesem Lauf: Anmeldung 862 ms, Aufruf 796 ms; Schritt 1a 2 GET (`/v1/meeting`,
+`/v1/speakers`); Schritt 1b mit 2 Schreibvorgängen 4 GET; Schritt 2 1 GET (`/v1/meeting`), kein GET auf `/v1/speakers`
+oder `/v1/contributions`.
+
+**Bauentscheidungen (im Rahmen der Spec, für den Review):**
+1. N5-Genauigkeit: `liveStore.ts` ist gesperrt und kennt keine epochgebundene Invalidierung. `http.ts` merkt sich die
+   Lesezugriffe (Methode, Argumente), die ohne synchronen Strom starten, schnappt sie beim Senden einer Stromanfrage ohne
+   Cursor ab und invalidiert sie nach der ersten `cursor`-Nachricht über `onStreamMessage([], {topics, subjects})`:
+   Einzellesungen genau je Kennung, Listenlesungen eines betroffenen Themas ganz (auch solche nach dem Senden; nur zu
+   viel, nie zu wenig). Über 200 Einträge: alles. Beim regulären Start ist der Schnappschuss leer, es entsteht kein Abruf.
+2. Ein bei Start verborgener Tab öffnet erst beim Sichtbarwerden; ein Neuaufbau, der in einen verborgenen Tab fällt,
+   wartet ebenso (ein Strom je sichtbarem Tab). Nebenwirkung: H8 (verborgen per `defineProperty`) bleibt ohne Strom.
+3. `reset` und `end {rotate}` bauen sofort neu auf, wenn der Strom mindestens 10 s lebte, sonst nach Rückzug (Schutz
+   gegen eine Rotations- oder Reset-Schleife, MF-SC-2).
+4. Eine fehlerhafte Nachricht bekannter Art invalidiert alles; ein 422 beim Öffnen verwirft den Cursor.
+5. `Retry-After` wird auf 1–300 s begrenzt; nach `end {unavailable}` gilt das Größere aus `retry:` (sonst 3 s) und Rückzug.
+6. Jeder 401 einer Lesung schließt auch den Strom; nach `end`/403 wird mit der letzten `id` neu verbunden (Vertrag).
+7. „Stand von“: letzte Nachricht oder Heartbeat bei offenem Strom, sonst letzte erfolgreiche Lesung oder Takt.
+8. Die Anzeige hängt als Geschwister vor der `lg:`-Gruppe in `HeaderStrip.tsx`, damit sie auf jeder Breite sichtbar ist; in
+   `live`/`idle` bleibt ein leerer `role="status"`-Bereich (`sr-only`), damit spätere Wechsel angesagt werden.
+9. H13 Schritt 1b: der Aufruf kann zuerst eine laufende Rede beenden (zwei PATCH); die Regel lautet daher höchstens ein GET
+   je Schlüssel **und je Schreibvorgang**. H13 klassifiziert in `fast_track` (nicht Bühne), damit die Bühnenliste für
+   `abnahme` unverändert bleibt.
+10. Restrisiko: ein `/auth/me`, das vor einem Stromende abgeschickt war und danach bestätigt, öffnet den Strom wieder; der
+    Dienst prüft Sitzung und Rechte beim Öffnen (403/401/end), der Puffer ist dann bereits leer.
+
+**Scope-Befunde (nicht umgangen; mit der zweiten Bauklärung in 3bb3a61 erledigt):**
+1. `apps/web/src/i18n/parity.test.ts` zählt die Schlüssel fest (Test f: 510). Die fünf neuen `shell.connection.*`
+   verlangen 515 und je eine Kommentarzeile; die Datei steht nicht in „Files allowed“. Einziger roter Schritt von `gates`.
+2. H10 (`031-http-betriebsart.spec.ts`) wartet zweimal auf `waitForLoadState('networkidle')`. Playwright zählt eine offene
+   Strom-Anfrage als laufend. Probe (Chromium, Stub): ohne Strom `networkidle` nach 501 ms, mit offenem Strom „NOT reached
+   within 8000 ms“. H10 läuft damit in der PR-CI in den Timeout. Die Spec verlangt H10 unverändert. Vorschlag: H10 wartet
+   auf Ruhe der `/v1`-Lesungen ohne den Strom (wie `quiet()` in H13) statt `networkidle`, oder die Strom-503-Route wie in
+   H11/H12a (dann prüft H10 nur den Rückfall).
+
+**Lehre:** `networkidle` ist unbrauchbar, sobald ein langlebiger Strom existiert (Playwright zählt ihn als laufende
+Anfrage); passt zur früheren Lehre, dass `networkidle` kein Ersatz für das Warten auf ein konkretes Signal ist.
+
+**Restrisiko (angenommen, zweite Bauklärung 3):** Bauentscheidung 10 oben.
+
+**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/i18n/parity.test.ts`,
+`apps/web/e2e/support/e2e-texts.ts`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
+`connection.ts`, `connection.test.ts`, `http.ts`, `http.test.ts`, `index.ts`, `apps/web/src/app/ConnectionStatus.tsx`,
+`ConnectionStatus.test.tsx`, `HeaderStrip.tsx`, `apps/web/src/i18n/shell.de.ts`, `shell.en.ts`,
+`apps/web/e2e/031-http-betriebsart.spec.ts`.
 
 ## Review findings
 

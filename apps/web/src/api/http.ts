@@ -1,7 +1,10 @@
 /** Same-origin HTTP implementation of the domain-facing HvApi port. */
-import { ApiProblem, type HvApi } from '@hv/domain';
+import { ApiProblem, type Actor, type HvApi, type ReadEvent, type StreamChange, type StreamTopic } from '@hv/domain';
 import type { components, paths } from '../../../../packages/contract/src/types';
 import { translate } from '../i18n';
+import { createConnectionStore, type ConnectionSignal, type ConnectionStore } from './connection';
+import { actorKey, READ_TOPICS } from './liveStore';
+import { createSseParser, decodeMessage, type SseItem } from './sse';
 
 export type HttpSession = components['schemas']['Session'];
 export type TransparencyNotice = components['schemas']['TransparencyNotice'];
@@ -24,9 +27,113 @@ export interface HttpApiOptions {
    * `local_reject` for a write refused here without a request (no CSRF token, the speaker reopen reason).
    */
   onWriteSettled?: (outcome: WriteOutcome) => void;
+  /** Slice 036b: every message of the stream, for the live store (`liveStore.onStreamMessage`); `[]` = everything. */
+  onStreamMessage?: (events: readonly ReadEvent[], change?: StreamChange) => void;
+  /**
+   * Slice 036b: the stream ended through a loss of session or rights (`end {session|forbidden|roles_changed}`, 403 or 401
+   * on open). The buffer must be emptied now; for all but `unauthorized` the session is read again (`/auth/me`). The
+   * adapter opens no new stream until `openStream()` is called after a confirmed session.
+   */
+  onStreamEnd?: (reason: StreamEndReason) => void;
+  /** Slice 036b: where the connection state goes (the shell's indicator); a private store if absent. */
+  connection?: ConnectionStore;
+  /** Slice 036b: visibility, online state and jitter of the browser; injected by tests. */
+  environment?: StreamEnvironment;
 }
 
 export type WriteOutcome = 'success' | 'server_error' | 'local_reject';
+export type StreamEndReason = 'session' | 'forbidden' | 'roles_changed' | 'unauthorized';
+
+export interface StreamEnvironment {
+  hidden(): boolean;
+  onVisibilityChange(listener: () => void): () => void;
+  online(): boolean;
+  onOnlineChange(listener: () => void): () => void;
+  /** A number in [0, 1) for the jitter of the backoff. */
+  random(): number;
+}
+
+/** The HTTP adapter plus the stream it holds for the confirmed session (slice 036b). */
+export interface HttpApi extends HvApi {
+  /** A session is confirmed (`onActorChange(actor)`): open the stream unless one is open or a retry is pending. */
+  openStream(): void;
+  /**
+   * Close the stream (no actor, another actor, no active role). The reconnect limit of the tab survives: a pending
+   * retry (backoff, session gate, pause) stays, the counters stay, and closing an unhealthy connection gates the next
+   * open (final re-check, T-G1-D-03).
+   */
+  closeStream(): void;
+  /** An explicit sign-out: the reconnect limit of the tab starts afresh (a 401 does the same inside the adapter). */
+  resetStreamLimits(): void;
+}
+
+/**
+ * Slice 036b: what a change of the session's actor does to the stream (`index.ts`). Every confirmed actor asks for the
+ * stream; a structurally other actor first closes the open one (review minor 3), so nothing opened under the previous
+ * actor keeps running and its cursor is dropped (minor 2); no actor closes it.
+ */
+export function followSessionActor(api: Pick<HttpApi, 'openStream' | 'closeStream'>): (actor: Actor | undefined) => void {
+  let last: string | undefined;
+  return (actor) => {
+    const next = actor === undefined ? undefined : actorKey(actor);
+    if (next === undefined) api.closeStream();
+    else {
+      if (last !== undefined && next !== last) api.closeStream();
+      api.openStream();
+    }
+    last = next;
+  };
+}
+
+const browserEnvironment: StreamEnvironment = {
+  hidden: () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
+  onVisibilityChange(listener) {
+    if (typeof document === 'undefined') return () => undefined;
+    document.addEventListener('visibilitychange', listener);
+    return () => document.removeEventListener('visibilitychange', listener);
+  },
+  online: () => typeof navigator === 'undefined' || navigator.onLine !== false,
+  onOnlineChange(listener) {
+    if (typeof window === 'undefined') return () => undefined;
+    window.addEventListener('online', listener);
+    window.addEventListener('offline', listener);
+    return () => { window.removeEventListener('online', listener); window.removeEventListener('offline', listener); };
+  },
+  random: () => Math.random(),
+};
+
+/**
+ * Stream limits of the client (spec 036b decision 3). Fixed constants: a change is a spec change.
+ * Backoff 1 s, 2 s, 4 s … 30 s, each step drawn up to 20 % below itself (never above the cap, MF-SC-2).
+ */
+const STREAM_PATH = '/v1/stream';
+const BACKOFF_BASE_MS = 1_000;
+const BACKOFF_MAX_MS = 30_000;
+const BACKOFF_JITTER = 0.2;
+/** Three heartbeat intervals of the service (15 s) without a heartbeat or message. */
+const WATCHDOG_MS = 45_000;
+/** A stream shorter than this with nothing but heartbeats and cursors counts as short-lived (m8). */
+const SHORT_LIVED_MS = 10_000;
+const SHORT_LIVED_LIMIT = 3;
+const SHORT_LIVED_PAUSE_MS = 300_000;
+/** Session or rights ends in a row without a healthy stream before the 5 min pause (review major 1, MF-SC-2). */
+const SESSION_END_LIMIT = 3;
+const HIDDEN_CLOSE_MS = 60_000;
+/** Used after `end {unavailable}` when the stream named no `retry:` (contract: `retry: 3000`). */
+const DEFAULT_RETRY_MS = 3_000;
+const RETRY_AFTER_MAX_S = 300;
+/** More reads than this before a stream without cursor: the first cursor invalidates everything. */
+const MAX_RECORDED_READS = 200;
+const CURSOR_PATTERN = /^[0-9]{1,16}$/;
+
+type ReadName = keyof typeof READ_TOPICS;
+
+/** `Retry-After` as whole seconds (contract: a plain integer), within 1 s and 5 min; anything else is ignored. */
+function retryAfterMs(response: Response): number | undefined {
+  const raw = response.headers.get('Retry-After')?.trim();
+  if (raw === undefined || !/^[0-9]{1,6}$/.test(raw)) return undefined;
+  return Math.min(Math.max(Number(raw), 1), RETRY_AFTER_MAX_S) * 1000;
+}
 
 function genericProblem(status: number, language: Language): ApiProblem {
   return new ApiProblem(status, translate(language, 'http.errorTitle'), translate(language, 'http.errorDetail'));
@@ -124,7 +231,7 @@ async function perform<T>(
   }
 }
 
-export function createHttpApi(options: HttpApiOptions): HvApi {
+export function createHttpApi(options: HttpApiOptions): HttpApi {
   const transport: Transport = options.fetcher ?? ((url, init) => fetch(url, init));
   const language = () => options.locale?.() ?? 'de';
   let writeEtag: string | undefined;
@@ -151,15 +258,324 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
     try { options.onWriteSettled?.(outcome); } catch { /* swallowed on purpose, like a throwing listener */ }
   };
   const onUnauthorized = () => {
+    // Any 401 ends the stream too; only a new confirmed session (`openStream`) starts it again. A 401 needs a real
+    // sign-in to go on, so it is no loop: the reconnect limit starts afresh.
+    stopStream();
+    resetStreamLimits();
     if (unauthorized) return;
     unauthorized = true;
     options.onUnauthorized();
     observedToken = options.getCsrfToken();
     stopPolling();
   };
+
+  // ---- the stream (slice 036b) ---------------------------------------------------------------------------------------
+  const environment = options.environment ?? browserEnvironment;
+  const connection = options.connection ?? createConnectionStore(() => Date.now());
+  const signal = (next: ConnectionSignal) => { connection.dispatch(next); };
+  const now = () => Date.now();
+  interface Connection {
+    abort: AbortController;
+    reader?: ReadableStreamDefaultReader<Uint8Array>;
+    openedAt?: number;
+    /** Something other than heartbeats and cursors arrived (m8). */
+    sawData: boolean;
+    /** Opened without a cursor and its first `cursor` is still to come (N5). */
+    awaitingCursor: boolean;
+    /** The reads asked for before this stream request was sent (N5); `'all'` when too many. */
+    beforeSend: Map<string, { method: ReadName; args: readonly unknown[] }> | 'all' | undefined;
+  }
+  /** A confirmed session asked for the stream; false after sign-out and after a loss of session or rights. */
+  let wanted = false;
+  let current: Connection | undefined;
+  /** The stream is open (200 with `text/event-stream`): the 30 s poll rests (decision 5). */
+  let streamOpen = false;
+  /** Last received `id` (never derived from `reset` or `end`, which carry none). */
+  let cursor: string | undefined;
+  let attempt = 0;
+  let shortLived = 0;
+  let serverRetryMs: number | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let hiddenTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Closed after 60 s hidden, or not opened because hidden: opens when the tab is visible again. */
+  let pausedHidden = false;
+  let detachEnvironment: (() => void) | undefined;
+  /**
+   * The reconnect limit of the tab (review major 1 and the re-checks, T-G1-D-03, MF-SC-2): session or rights ends in a
+   * row without a healthy stream, and whether the next `openStream()` has to wait. A proxy answering 403 only on the
+   * stream, a service whose hub lags behind `/auth/me`, or an actor or role flapping on every `/auth/me` would otherwise
+   * loop end → `/auth/me` → open without any pause. It survives every close but an explicit sign-out or a 401.
+   */
+  let sessionEnds = 0;
+  let gateNextOpen = false;
+  /** Reads started while no stream is in step (N5), keyed by method and arguments. */
+  let recorded: Map<string, { method: ReadName; args: readonly unknown[] }> | 'all' = new Map();
+
+  const recordRead = (method: ReadName, args: readonly unknown[]) => {
+    if (current !== undefined && streamOpen && !current.awaitingCursor) return;
+    if (recorded === 'all') return;
+    recorded.set(JSON.stringify([method, args]), { method, args });
+    if (recorded.size > MAX_RECORDED_READS) recorded = 'all';
+  };
+  const deliver = (events: readonly ReadEvent[], change?: StreamChange) => {
+    try {
+      if (change === undefined) options.onStreamMessage?.(events);
+      else options.onStreamMessage?.(events, change);
+    } catch { /* a throwing hook must not end the stream */ }
+  };
+  /** N5: after the first cursor, only what was asked for before the stream request is stale. */
+  const invalidateBeforeSend = (before: Connection['beforeSend']) => {
+    if (before === undefined) return;
+    if (before === 'all') { deliver([]); return; }
+    if (before.size === 0) return;
+    const topics = new Set<StreamTopic>();
+    const subjects = new Set<string>();
+    for (const { method, args } of before.values()) {
+      for (const topic of READ_TOPICS[method]) topics.add(topic);
+      // Item reads are named by their id; list reads of a named topic are invalidated whatever the ids.
+      if (typeof args[0] === 'string') subjects.add(args[0]);
+    }
+    deliver([], { seq: 0, topics: [...topics], subjects: [...subjects] });
+  };
+  const clearRetry = () => { if (retryTimer !== undefined) clearTimeout(retryTimer); retryTimer = undefined; };
+  const clearWatchdog = () => { if (watchdog !== undefined) clearTimeout(watchdog); watchdog = undefined; };
+  /** Ends the current connection on this side; nothing of it is read any more. */
+  const drop = () => {
+    clearWatchdog();
+    streamOpen = false;
+    const closing = current;
+    current = undefined;
+    if (closing === undefined) return;
+    // Reads before a request that never reached its first cursor still need their invalidation.
+    if (closing.awaitingCursor && closing.beforeSend !== undefined) {
+      if (closing.beforeSend === 'all' || recorded === 'all') recorded = 'all';
+      else for (const [key, value] of closing.beforeSend) recorded.set(key, value);
+    }
+    closing.abort.abort();
+    closing.reader?.cancel().catch(() => undefined);
+  };
+  const backoffDelay = () => {
+    const step = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** attempt);
+    attempt = Math.min(attempt + 1, 16);
+    return step * (1 - BACKOFF_JITTER * environment.random());
+  };
+  const retryIn = (ms: number) => {
+    clearRetry();
+    retryTimer = setTimeout(() => { retryTimer = undefined; connect(); }, ms);
+  };
+  /** A loss of session or rights: empty the buffer (the hook), no new stream without a new confirmation. */
+  const endForSession = (reason: StreamEndReason) => {
+    const closing = current;
+    const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
+    if (lifetime >= SHORT_LIVED_MS) { attempt = 0; sessionEnds = 0; } else sessionEnds += 1;
+    gateNextOpen = true;
+    drop();
+    clearRetry();
+    wanted = false;
+    recorded = new Map();
+    signal({ type: 'stop' });
+    try { options.onStreamEnd?.(reason); } catch { /* the stream stays closed either way */ }
+  };
+  /** Closes the stream; a pending retry stays, so that no close shortens the wait (final re-check). */
+  function stopStream() {
+    wanted = false;
+    drop();
+    signal({ type: 'stop' });
+  }
+  function resetStreamLimits() {
+    clearRetry();
+    attempt = 0;
+    shortLived = 0;
+    sessionEnds = 0;
+    gateNextOpen = false;
+  }
+  /**
+   * The service or the network ended a stream that was open. `soon`: rotate or reset, at once unless the stream was
+   * itself short; `fallback`: `end {unavailable}`.
+   */
+  const ended = (how: 'lost' | 'soon' | 'fallback') => {
+    const closing = current;
+    const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
+    const healthy = closing !== undefined && (closing.sawData || lifetime >= SHORT_LIVED_MS);
+    drop();
+    if (healthy) { attempt = 0; shortLived = 0; } else shortLived += 1;
+    // Re-check nit 1.4: only a lifetime of 10 s ends a series of session ends, as in `endForSession`.
+    if (lifetime >= SHORT_LIVED_MS) sessionEnds = 0;
+    if (shortLived >= SHORT_LIVED_LIMIT) {
+      // A cutting or buffering proxy: stay on the poll for a while (m8).
+      shortLived = 0;
+      signal({ type: 'fallback' });
+      retryIn(SHORT_LIVED_PAUSE_MS);
+      return;
+    }
+    if (how === 'fallback') {
+      signal({ type: 'fallback' });
+      retryIn(Math.max(serverRetryMs ?? DEFAULT_RETRY_MS, backoffDelay()));
+      return;
+    }
+    if (how === 'soon' && lifetime >= SHORT_LIVED_MS) { connect(); return; }
+    signal({ type: 'lost' });
+    retryIn(backoffDelay());
+  };
+  const armWatchdog = (owner: Connection) => {
+    clearWatchdog();
+    watchdog = setTimeout(() => { if (current === owner) ended('lost'); }, WATCHDOG_MS);
+  };
+  const handle = (owner: Connection, item: SseItem, lastEventId: string | undefined) => {
+    if (item.kind === 'retry') { serverRetryMs = Math.min(item.ms, BACKOFF_MAX_MS); return; }
+    armWatchdog(owner);
+    signal({ type: 'synced' });
+    if (item.kind === 'comment') return;
+    if (lastEventId !== undefined && CURSOR_PATTERN.test(lastEventId)) cursor = lastEventId;
+    const message = decodeMessage(item);
+    // Only data (`event`, `change`) counts as health; control frames and malformed ones never do (re-check finding 2).
+    if (message === undefined) { deliver([]); return; }
+    switch (message.kind) {
+      case 'event': owner.sawData = true; deliver([message.event]); return;
+      case 'change': owner.sawData = true; deliver([], message.change); return;
+      case 'cursor':
+        if (owner.awaitingCursor) {
+          owner.awaitingCursor = false;
+          const before = owner.beforeSend;
+          owner.beforeSend = undefined;
+          recorded = new Map();
+          invalidateBeforeSend(before);
+        }
+        return;
+      case 'reset':
+        // The whole buffer once (the listeners reload their views), then a new stream without a cursor.
+        deliver([]);
+        cursor = undefined;
+        ended('soon');
+        return;
+      case 'end':
+        if (message.reason === 'rotate') ended('soon');
+        else if (message.reason === 'unavailable') ended('fallback');
+        else endForSession(message.reason);
+        return;
+    }
+  };
+  const readBody = async (owner: Connection, body: ReadableStream<Uint8Array>) => {
+    const reader = body.getReader();
+    owner.reader = reader;
+    const parser = createSseParser();
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (current !== owner) return;
+        if (done) break;
+        for (const item of parser.push(value)) {
+          handle(owner, item, parser.lastEventId);
+          if (current !== owner) return;
+        }
+      }
+    } catch {
+      // Over 1 MiB (`SseTooLargeError`, SP-2) or a broken body: this connection is dropped, a new one follows with
+      // backoff. Nothing of the body is reported anywhere (SC-11).
+    }
+    if (current === owner) ended('lost');
+  };
+  const opened = (owner: Connection, response: Response) => {
+    if (current !== owner) { response.body?.cancel().catch(() => undefined); return; }
+    const status = response.status;
+    if (status === 401) {
+      // m4 (Codex P1): the buffer first, then the path every request takes on a 401.
+      endForSession('unauthorized');
+      onUnauthorized();
+      return;
+    }
+    if (status === 403) { endForSession('forbidden'); return; }
+    if (status === 429 || status === 503) {
+      drop();
+      signal({ type: 'fallback' });
+      retryIn(retryAfterMs(response) ?? backoffDelay());
+      return;
+    }
+    const type = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
+    if (!response.ok || type !== 'text/event-stream' || response.body === null) {
+      // A cursor the service refuses (422) is not sent again.
+      if (status === 422) cursor = undefined;
+      response.body?.cancel().catch(() => undefined);
+      drop();
+      signal({ type: 'lost' });
+      retryIn(backoffDelay());
+      return;
+    }
+    owner.openedAt = now();
+    streamOpen = true;
+    signal({ type: 'opened' });
+    armWatchdog(owner);
+    void readBody(owner, response.body);
+  };
+  function connect() {
+    clearRetry();
+    if (!wanted || current !== undefined) return;
+    if (environment.hidden()) { pausedHidden = true; return; }
+    observeSession();
+    if (!options.getCsrfToken()) { stopStream(); return; }
+    const owner: Connection = {
+      abort: new AbortController(),
+      sawData: false,
+      awaitingCursor: cursor === undefined,
+      beforeSend: cursor === undefined ? recorded : undefined,
+    };
+    recorded = new Map();
+    current = owner;
+    signal({ type: 'start' });
+    const headers = new Headers({ Accept: 'text/event-stream' });
+    if (cursor !== undefined) headers.set('Last-Event-ID', cursor);
+    let request: Promise<Response>;
+    try {
+      request = transport(STREAM_PATH, { method: 'GET', credentials: 'same-origin', headers, cache: 'no-store', signal: owner.abort.signal });
+    } catch (error) {
+      request = Promise.reject(error);
+    }
+    request.then((response) => { opened(owner, response); }, () => {
+      if (current !== owner) return;
+      drop();
+      signal({ type: 'networkError' });
+      retryIn(backoffDelay());
+    });
+  }
+  const onVisibility = () => {
+    if (environment.hidden()) {
+      if (hiddenTimer === undefined && current !== undefined) {
+        hiddenTimer = setTimeout(() => {
+          hiddenTimer = undefined;
+          if (!environment.hidden() || !wanted) return;
+          pausedHidden = true;
+          drop();
+          clearRetry();
+          signal({ type: 'lost' });
+        }, HIDDEN_CLOSE_MS);
+      }
+      return;
+    }
+    if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
+    if (pausedHidden) {
+      // Codex P2: the counters stay; only a healthy stream resets them (per-tab limit, SC-06).
+      pausedHidden = false;
+      if (wanted && current === undefined) connect();
+    }
+  };
+  const onOnline = () => { signal({ type: environment.online() ? 'online' : 'offline' }); };
+  const attachEnvironment = () => {
+    if (detachEnvironment !== undefined) return;
+    const offVisibility = environment.onVisibilityChange(onVisibility);
+    const offOnline = environment.onOnlineChange(onOnline);
+    detachEnvironment = () => { offVisibility(); offOnline(); };
+    if (!environment.online()) signal({ type: 'offline' });
+  };
+
   const read = <T, M extends Verb>(method: M, route: Route<M>, details: RequestDetails = {}): Promise<T> => {
     observeSession();
-    return perform<T>(method.toUpperCase() as Uppercase<M>, route, details, transport, language(), onUnauthorized);
+    return perform<T>(method.toUpperCase() as Uppercase<M>, route, details, transport, language(), onUnauthorized)
+      .then((value) => {
+        // Without a stream, what a view shows is as current as its last read ("Stand von", slice 036b).
+        if (!streamOpen) signal({ type: 'synced' });
+        return value;
+      });
   };
   const write = <T, M extends Exclude<Verb, 'get'>>(method: M, route: Route<M>, details: RequestDetails = {}): Promise<T> => {
     observeSession();
@@ -184,7 +600,7 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
   const meetingRoute = async () => ({ meetingId: await currentMeetingId() });
   const questionPath = (questionId: string) => ({ questionId });
   const contributionPath = (contributionId: string) => ({ contributionId });
-  return {
+  const api: HttpApi = {
     getMeeting: () => read('get', '/meeting'),
     listMeetings: (status) => read('get', '/meetings', { query: { status } }),
     getMeetingById: (meetingId) => read('get', '/meetings/{meetingId}', { params: { meetingId } }),
@@ -242,13 +658,63 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
       if (pollTimer === undefined) {
         pollTimer = setInterval(() => {
           if (!options.getCsrfToken()) { stopPolling(); return; }
-          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-          for (const current of listeners) current([]);
+          if (environment.hidden()) return;
+          // Slice 036b decision 5: the poll rests while the stream is open, and is the fallback while it is not.
+          if (streamOpen) return;
+          // The whole buffer goes stale with this impulse, so nothing recorded before it needs the N5 invalidation.
+          recorded = new Map();
+          signal({ type: 'synced' });
+          for (const each of listeners) each([]);
         }, 30_000);
       }
       return () => { listeners.delete(listener); if (listeners.size === 0) stopPolling(); };
     },
+    openStream() {
+      wanted = true;
+      attachEnvironment();
+      if (current !== undefined || retryTimer !== undefined || pausedHidden) {
+        if (pausedHidden && !environment.hidden()) onVisibility();
+        return;
+      }
+      if (gateNextOpen) {
+        // The open after a session end or after closing an unhealthy connection waits: backoff, and after three such
+        // ends the 5 min pause of m8. Nothing opens without this confirmation either way.
+        gateNextOpen = false;
+        if (sessionEnds >= SESSION_END_LIMIT || shortLived >= SHORT_LIVED_LIMIT) {
+          sessionEnds = 0;
+          shortLived = 0;
+          signal({ type: 'start' });
+          signal({ type: 'fallback' });
+          retryIn(SHORT_LIVED_PAUSE_MS);
+        } else retryIn(backoffDelay());
+        return;
+      }
+      connect();
+    },
+    closeStream() {
+      // Review minor 2: the cursor belongs to this session and actor; the next stream starts without it (N5 path).
+      cursor = undefined;
+      pausedHidden = false;
+      if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
+      // Final re-check: the reconnect limit survives this close. Cutting a connection that is in flight or young without
+      // data counts like a short-lived stream and gates the next open; a pending retry and every counter stay.
+      const closing = current;
+      const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
+      if (closing !== undefined && !closing.sawData && lifetime < SHORT_LIVED_MS) {
+        shortLived += 1;
+        gateNextOpen = true;
+      }
+      stopStream();
+    },
+    resetStreamLimits,
   };
+  // N5: the reads of this adapter note that they started while no stream was in step.
+  const methods = api as unknown as Record<string, (...args: unknown[]) => unknown>;
+  for (const method of Object.keys(READ_TOPICS) as ReadName[]) {
+    const inner = methods[method]!;
+    methods[method] = (...args: unknown[]) => { recordRead(method, args); return inner(...args); };
+  }
+  return api;
 }
 
 const authTransport: Transport = (url, init) => fetch(url, init);

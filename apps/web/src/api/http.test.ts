@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiProblem, type HvApi } from '@hv/domain';
-import { createHttpApi, getHttpSession, getTransparencyNotice, logoutHttpSession } from './http';
+import { ApiProblem, type Actor, type HvApi } from '@hv/domain';
+import { createHttpApi, followSessionActor, getHttpSession, getTransparencyNotice, logoutHttpSession, type HttpApi, type StreamEnvironment } from './http';
+import { createConnectionStore } from './connection';
+import { createLiveStore, type LiveStore } from './liveStore';
+import { createSessionAuth } from './auth';
 
 const json = (value: unknown, status = 200, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...headers } });
@@ -329,6 +332,748 @@ describe('HTTP HvApi adapter', () => {
       expect(outcomes).toEqual(['success']);
       expect(listener).toHaveBeenCalledTimes(1);
       stop();
+    });
+  });
+});
+
+/**
+ * Slice 036b: the stream client inside the HTTP adapter. A fake fetcher answers `/v1/stream` with a readable body the test
+ * writes into, every other path with JSON; timers, `Date` and the jitter are fake. Where the buffer matters, the real live
+ * store (036a) sits on top, wired as in `index.ts`.
+ */
+describe('stream client (slice 036b)', () => {
+  const encoder = new TextEncoder();
+  const CURSOR = (seq: number) => `event: cursor\nid: ${seq}\ndata: {"seq":${seq}}\n\n`;
+  const CHANGE = (seq: number, topics: string[]) => `event: change\nid: ${seq}\ndata: ${JSON.stringify({ seq, topics })}\n\n`;
+  const END = (reason: string) => `event: end\ndata: {"reason":"${reason}"}\n\n`;
+  const RESET = 'event: reset\ndata: {"lastSeq":99}\n\n';
+  const HEARTBEAT = ': heartbeat\n\n';
+  const ACTOR: Actor = { id: 'p1', role: 'capture' };
+
+  function sse() {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const state = { cancelled: false };
+    const body = new ReadableStream<Uint8Array>({
+      start(c) { controller = c; },
+      cancel() { state.cancelled = true; },
+    });
+    return {
+      response: new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+      send: (text: string) => controller.enqueue(encoder.encode(text)),
+      close: () => controller.close(),
+      get cancelled() { return state.cancelled; },
+    };
+  }
+  /** A stream that delivers `retry` and a cursor and is over at once (a cutting proxy). */
+  const shortLived = () => new Response(`retry: 3000\n\n${CURSOR(5)}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+  const refused = (status: number, headers: Record<string, string> = {}) => new Response(null, { status, headers });
+
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 8; i++) await vi.advanceTimersByTimeAsync(0);
+  }
+  /** Lets time pass in 15 s steps with a heartbeat after each, as the service sends it. */
+  async function beat(stream: { send(text: string): void }, ms: number): Promise<void> {
+    for (let passed = 0; passed < ms; passed += 15_000) {
+      await vi.advanceTimersByTimeAsync(15_000);
+      stream.send(HEARTBEAT);
+      await settle();
+    }
+  }
+
+  function harness(options: { hidden?: boolean; random?: number; withStore?: boolean } = {}) {
+    let csrf: string | undefined = 'csrf-1';
+    let hidden = options.hidden ?? false;
+    const visibility = new Set<() => void>();
+    const environment: StreamEnvironment = {
+      hidden: () => hidden,
+      onVisibilityChange: (listener) => { visibility.add(listener); return () => { visibility.delete(listener); }; },
+      online: () => true,
+      onOnlineChange: () => () => undefined,
+      random: () => options.random ?? 0,
+    };
+    const streams: { at: number; headers: Headers; init: RequestInit }[] = [];
+    const streamReplies: (Response | Error)[] = [];
+    const reads: string[] = [];
+    const fetcher = vi.fn(async (url: string, init: RequestInit): Promise<Response> => {
+      if (url.startsWith('/v1/stream')) {
+        streams.push({ at: Date.now(), headers: new Headers(init.headers), init });
+        const next = streamReplies.shift();
+        if (next === undefined) return new Promise<Response>(() => undefined);
+        if (next instanceof Error) throw next;
+        return next;
+      }
+      reads.push(url);
+      return json(url.startsWith('/v1/questions') ? { items: [], total: 0 } : []);
+    });
+    const connection = createConnectionStore(() => Date.now());
+    let live: LiveStore | undefined;
+    const onStreamMessage = vi.fn((...args: Parameters<LiveStore['onStreamMessage']>) => { live?.onStreamMessage(...args); });
+    const onStreamEnd = vi.fn((reason: 'session' | 'forbidden' | 'roles_changed' | 'unauthorized') => { live?.clear(reason); });
+    const onUnauthorized = vi.fn(() => { live?.clear('unauthorized'); csrf = undefined; });
+    const api: HttpApi = createHttpApi({
+      getCsrfToken: () => csrf, onUnauthorized, fetcher, onStreamMessage, onStreamEnd, connection, environment,
+    });
+    if (options.withStore) {
+      live = createLiveStore(api, { getActor: () => ACTOR, now: () => Date.now(), monotonic: () => Date.now() });
+    }
+    return {
+      api, live: live!, fetcher, streams, streamReplies, reads, connection, onStreamMessage, onStreamEnd, onUnauthorized,
+      setCsrf: (value: string | undefined) => { csrf = value; },
+      setHidden: (value: boolean) => { hidden = value; for (const listener of [...visibility]) listener(); },
+      readsOf: (path: string) => reads.filter((url) => url.split('?')[0] === path).length,
+    };
+  }
+
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('opens without a cursor once the session is confirmed, before any read, and not without a session (N5)', async () => {
+    const h = harness();
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    expect(h.fetcher).toHaveBeenCalledTimes(1);
+    expect(h.fetcher.mock.calls[0]?.[0]).toBe('/v1/stream');
+    const { headers, init } = h.streams[0]!;
+    expect(headers.get('Last-Event-ID')).toBeNull();
+    expect(headers.get('Accept')).toBe('text/event-stream');
+    expect(headers.get('X-CSRF-Token')).toBeNull();
+    expect(init.credentials).toBe('same-origin');
+    expect(h.connection.get().phase).toBe('live');
+    s.send(CURSOR(5));
+    await settle();
+    // Nothing was read before the stream request: the first cursor invalidates nothing, no extra read (H10).
+    expect(h.onStreamMessage).not.toHaveBeenCalled();
+
+    const none = harness();
+    none.setCsrf(undefined);
+    none.api.openStream();
+    await settle();
+    expect(none.fetcher).not.toHaveBeenCalled();
+  });
+
+  it('after the first cursor only entries asked for before the stream request are invalidated (N5)', async () => {
+    const h = harness({ withStore: true });
+    const stop = h.live.subscribe(vi.fn());
+    await h.live.listSpeakers(); // before the stream request
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    await h.live.listQuestions(); // after the stream request, before the cursor
+    s.send(CURSOR(5));
+    await settle();
+    await vi.advanceTimersByTimeAsync(100); // the live store's batch
+    await h.live.listSpeakers();
+    await h.live.listQuestions();
+    expect(h.readsOf('/v1/speakers')).toBe(2);
+    expect(h.readsOf('/v1/questions')).toBe(1);
+    // A later cursor (heartbeat, catch-up) invalidates nothing more.
+    s.send(CURSOR(6));
+    await settle();
+    await vi.advanceTimersByTimeAsync(100);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers')).toBe(2);
+    stop();
+  });
+
+  it('reconnects with Last-Event-ID along 1 s, 2 s, 4 s … at most 30 s', async () => {
+    const h = harness();
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    s.send(CHANGE(5, ['speakers']));
+    await settle();
+    for (let i = 0; i < 7; i++) h.streamReplies.push(new TypeError('network'));
+    s.close();
+    await settle();
+    for (const step of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
+      const before = h.streams.length;
+      await vi.advanceTimersByTimeAsync(step - 1);
+      expect(h.streams.length, `no attempt before ${step} ms`).toBe(before);
+      await vi.advanceTimersByTimeAsync(1);
+      await settle();
+      expect(h.streams.length, `an attempt after ${step} ms`).toBe(before + 1);
+    }
+    expect(h.streams.slice(1).map((call) => call.headers.get('Last-Event-ID'))).toEqual(Array(7).fill('5'));
+    expect(h.connection.get().phase).toBe('offline'); // three network errors in a row
+  });
+
+  it('draws the jitter below the step, never above it', async () => {
+    const h = harness({ random: 1 });
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    s.send(CHANGE(5, ['speakers']));
+    s.close();
+    await settle();
+    await vi.advanceTimersByTimeAsync(799);
+    expect(h.streams).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.streams).toHaveLength(2);
+  });
+
+  it('reset: the whole buffer once, then a new stream without a cursor', async () => {
+    const h = harness();
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    h.api.openStream();
+    await settle();
+    s1.send(CHANGE(5, ['speakers']));
+    s1.send(RESET);
+    await settle();
+    expect(h.onStreamMessage).toHaveBeenLastCalledWith([]);
+    expect(h.onStreamMessage).toHaveBeenCalledTimes(2);
+    expect(s1.cancelled).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBeNull();
+  });
+
+  it('end {rotate}: at once again, with the last id', async () => {
+    const h = harness();
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    h.api.openStream();
+    await settle();
+    s1.send(CURSOR(5));
+    await vi.advanceTimersByTimeAsync(11_000);
+    s1.send(END('rotate'));
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBe('5');
+    expect(h.connection.get().phase).toBe('live');
+  });
+
+  it.each(['roles_changed', 'forbidden', 'session'] as const)(
+    'end {%s}: the buffer is emptied, and no new stream follows until the session is confirmed again',
+    async (reason) => {
+      const h = harness({ withStore: true });
+      const stop = h.live.subscribe(vi.fn());
+      const s = sse();
+      h.streamReplies.push(s.response);
+      h.api.openStream();
+      await settle();
+      s.send(CURSOR(5));
+      await settle();
+      await h.live.listSpeakers();
+      await h.live.listSpeakers();
+      expect(h.readsOf('/v1/speakers')).toBe(1);
+      s.send(END(reason));
+      await settle();
+      expect(h.onStreamEnd).toHaveBeenCalledWith(reason);
+      await h.live.listSpeakers();
+      expect(h.readsOf('/v1/speakers'), 'a buffered read goes to the network after the end').toBe(2);
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(h.streams).toHaveLength(1);
+      expect(h.connection.get().phase).toBe('idle');
+      h.api.openStream(); // `onActorChange(actor)` after a confirmed `/auth/me`
+      await settle();
+      // Review major 1: the open after a session end waits for the backoff.
+      await vi.advanceTimersByTimeAsync(999);
+      expect(h.streams).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await settle();
+      expect(h.streams).toHaveLength(2);
+      expect(h.streams[1]!.headers.get('Last-Event-ID')).toBe('5');
+      stop();
+    },
+  );
+
+  function sessionWiring(h: ReturnType<typeof harness>, readSession: () => Promise<unknown>) {
+    // The same wiring as `index.ts`: open on every confirmed actor, close without one, re-read the session on an end.
+    const auth = createSessionAuth({
+      readSession: readSession as never,
+      signOut: vi.fn(),
+      onActorChange: followSessionActor(h.api),
+    });
+    h.onStreamEnd.mockImplementation((reason) => {
+      h.live.clear(reason);
+      if (reason !== 'unauthorized') void auth.refresh().catch(() => undefined);
+    });
+    return auth;
+  }
+  const session = () => ({ scheme: 'session', csrfToken: 'c'.repeat(43), actor: { ...ACTOR }, roles: [ACTOR.role] });
+
+  it('after end {roles_changed} a successful /auth/me with a structurally equal actor opens the stream again', async () => {
+    const h = harness({ withStore: true });
+    const readSession = vi.fn(async () => session());
+    const auth = sessionWiring(h, readSession);
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    await auth.start();
+    await settle();
+    expect(h.streams).toHaveLength(1);
+    s1.send(CURSOR(5));
+    s1.send(END('roles_changed'));
+    await settle();
+    expect(readSession).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+  });
+
+  it.each([429, 503])('%i: the poll runs, a new attempt after Retry-After', async (status) => {
+    const h = harness();
+    const listener = vi.fn();
+    const stop = h.api.subscribe(listener);
+    h.streamReplies.push(refused(status, { 'Retry-After': '40' }));
+    h.api.openStream();
+    await settle();
+    expect(h.connection.get().phase).toBe('polling');
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(listener).toHaveBeenCalledWith([]);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(h.streams).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.streams).toHaveLength(2);
+    stop();
+  });
+
+  it('401 on open and on reopen: the buffer is emptied, onUnauthorized runs, no new stream without a new confirmation', async () => {
+    const h = harness({ withStore: true });
+    const stop = h.live.subscribe(vi.fn());
+    await h.live.listSpeakers();
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers')).toBe(1);
+    h.streamReplies.push(refused(401));
+    h.api.openStream();
+    await settle();
+    expect(h.onStreamEnd).toHaveBeenCalledWith('unauthorized');
+    expect(h.onUnauthorized).toHaveBeenCalledTimes(1);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers'), 'the buffered read goes to the network').toBe(2);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(h.streams).toHaveLength(1);
+
+    // Signed in again: the stream opens; its reopen after a loss answers 401.
+    h.setCsrf('csrf-2');
+    const s = sse();
+    h.streamReplies.push(s.response, refused(401));
+    h.api.openStream();
+    await vi.advanceTimersByTimeAsync(1000); // the backoff after a session end (review major 1)
+    await settle();
+    s.send(CHANGE(7, ['questions']));
+    await settle();
+    await h.live.listSpeakers();
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers')).toBe(3);
+    s.close();
+    await vi.advanceTimersByTimeAsync(2000);
+    await settle();
+    expect(h.streams).toHaveLength(3);
+    expect(h.onStreamEnd).toHaveBeenCalledTimes(2);
+    expect(h.onUnauthorized).toHaveBeenCalledTimes(2);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers')).toBe(4);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(h.streams).toHaveLength(3);
+    stop();
+  });
+
+  it('a reopen after a hidden tab answered 403: buffer empty, /auth/me read, no further open without confirmation', async () => {
+    const h = harness({ withStore: true });
+    const readSession = vi.fn(async () => session());
+    const auth = sessionWiring(h, readSession);
+    const stop = h.live.subscribe(vi.fn());
+    const s = sse();
+    h.streamReplies.push(s.response);
+    await auth.start();
+    await settle();
+    s.send(CURSOR(5));
+    await settle();
+    h.setHidden(true);
+    await beat(s, 45_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(s.cancelled).toBe(true);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers')).toBe(1);
+    // The session read after the 403 fails (no confirmation): nothing opens again.
+    readSession.mockImplementation(async () => { throw new ApiProblem(500, 't', 'd'); });
+    h.streamReplies.push(refused(403));
+    h.setHidden(false);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBe('5');
+    expect(h.onStreamEnd).toHaveBeenCalledWith('forbidden');
+    expect(readSession).toHaveBeenCalledTimes(2);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers'), 'the buffered read goes to the network').toBe(2);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(h.streams).toHaveLength(2);
+    stop();
+  });
+
+  it('45 s without a heartbeat: dropped, reconnecting, the poll runs', async () => {
+    const h = harness();
+    const listener = vi.fn();
+    const stop = h.api.subscribe(listener);
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    s.send(CURSOR(5));
+    await vi.advanceTimersByTimeAsync(30_000);
+    s.send(HEARTBEAT);
+    await settle();
+    await vi.advanceTimersByTimeAsync(44_990);
+    expect(s.cancelled).toBe(false);
+    expect(h.connection.get().phase).toBe('live');
+    await vi.advanceTimersByTimeAsync(10);
+    expect(s.cancelled).toBe(true);
+    expect(h.connection.get().phase).toBe('reconnecting');
+    expect(listener).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(15_000); // the tick at 90 s
+    expect(listener).toHaveBeenCalledWith([]);
+    stop();
+  });
+
+  it('three short-lived streams in a row: 5 min polling, then a new attempt', async () => {
+    const h = harness();
+    h.streamReplies.push(shortLived(), shortLived(), shortLived(), sse().response);
+    h.api.openStream();
+    await settle();
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    await vi.advanceTimersByTimeAsync(2000);
+    await settle();
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
+    expect(h.connection.get().phase).toBe('polling');
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(h.streams).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1);
+    await settle();
+    expect(h.streams).toHaveLength(4);
+    expect(h.connection.get().phase).toBe('live');
+  });
+
+  it('the poll rests while the stream is open and resumes once it is lost', async () => {
+    const h = harness();
+    const listener = vi.fn();
+    const stop = h.api.subscribe(listener);
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    s.send(CURSOR(5));
+    for (let i = 0; i < 8; i++) {
+      await vi.advanceTimersByTimeAsync(15_000);
+      s.send(HEARTBEAT);
+      await settle();
+    }
+    expect(listener).not.toHaveBeenCalled();
+    s.close();
+    await settle();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(listener).toHaveBeenCalledWith([]);
+    stop();
+  });
+
+  it('a tab hidden for more than 60 s closes its stream; visible again reopens it with the last id', async () => {
+    const h = harness();
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    h.api.openStream();
+    await settle();
+    s1.send(CURSOR(5));
+    h.setHidden(true);
+    await beat(s1, 45_000);
+    await vi.advanceTimersByTimeAsync(14_000);
+    h.setHidden(false); // back after 59 s: the stream stays
+    h.setHidden(true);
+    await beat(s1, 45_000);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(s1.cancelled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(s1.cancelled).toBe(true);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(h.streams).toHaveLength(1);
+    h.setHidden(false);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBe('5');
+  });
+
+  it('a tab hidden at the start opens its stream only once it is visible', async () => {
+    const h = harness({ hidden: true });
+    h.streamReplies.push(sse().response);
+    h.api.openStream();
+    await settle();
+    expect(h.streams).toHaveLength(0);
+    h.setHidden(false);
+    await settle();
+    expect(h.streams).toHaveLength(1);
+  });
+
+  it('a message over 1 MiB drops the connection; a read answered 401 closes the stream', async () => {
+    const h = harness();
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    h.api.openStream();
+    await settle();
+    s1.send(`event: change\ndata: ${'x'.repeat(1_100_000)}`);
+    await settle();
+    expect(s1.cancelled).toBe(true);
+    expect(h.connection.get().phase).toBe('reconnecting');
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    h.fetcher.mockImplementationOnce(async () => refused(401));
+    await expect(h.api.getSpeaker('s1')).rejects.toMatchObject({ status: 401 });
+    await settle();
+    expect(s2.cancelled).toBe(true);
+    expect(h.connection.get().phase).toBe('idle');
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(h.streams).toHaveLength(2);
+  });
+
+  it('a malformed message invalidates everything (never too little)', async () => {
+    const h = harness();
+    const s = sse();
+    h.streamReplies.push(s.response);
+    h.api.openStream();
+    await settle();
+    s.send('event: change\nid: 9\ndata: {"seq":"x"}\n\n');
+    await settle();
+    expect(h.onStreamMessage).toHaveBeenCalledWith([]);
+  });
+
+  it('review major 1: 403 on every open with a confirming /auth/me backs off and pauses 5 min after three ends', async () => {
+    const h = harness({ withStore: true });
+    const readSession = vi.fn(async () => session());
+    const auth = sessionWiring(h, readSession);
+    for (let i = 0; i < 20; i++) h.streamReplies.push(refused(403));
+    await auth.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settle();
+    // 0 s, 1 s, 3 s — then the pause; never a loop of opens and session reads.
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
+    expect(readSession).toHaveBeenCalledTimes(4);
+    expect(h.connection.get().phase).toBe('polling');
+    // The pause runs from the third end (3 s) for 5 min.
+    await vi.advanceTimersByTimeAsync(242_999);
+    expect(h.streams).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1);
+    await settle();
+    expect(h.streams).toHaveLength(4);
+  });
+
+  it('review major 1: a healthy stream (≥ 10 s) before a session end resets the count and the backoff', async () => {
+    const h = harness();
+    const s1 = sse();
+    h.streamReplies.push(s1.response, refused(403), refused(403), sse().response);
+    h.api.openStream();
+    await settle();
+    s1.send(CURSOR(5));
+    await vi.advanceTimersByTimeAsync(11_000);
+    s1.send(END('roles_changed'));
+    await settle();
+    h.api.openStream();
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams.map((call) => call.at)).toEqual([0, 12_000]);
+  });
+
+  it('review minor 2: after sign-out and sign-in as another actor the stream opens without Last-Event-ID (N5 path)', async () => {
+    const h = harness({ withStore: true });
+    const stop = h.live.subscribe(vi.fn());
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    const follow = followSessionActor(h.api);
+    follow(ACTOR);
+    await settle();
+    s1.send(CHANGE(5, ['speakers']));
+    await settle();
+    follow(undefined); // sign-out
+    expect(s1.cancelled).toBe(true);
+    await h.live.listSpeakers(); // read before the new stream request
+    follow({ id: 'p2', role: 'capture' });
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBeNull();
+    const before = h.readsOf('/v1/speakers');
+    s2.send(CURSOR(9));
+    await settle();
+    await vi.advanceTimersByTimeAsync(100);
+    await h.live.listSpeakers();
+    expect(h.readsOf('/v1/speakers'), 'the read before the request is invalidated by the first cursor').toBe(before + 1);
+    stop();
+  });
+
+  it('review minor 3: a structural actor change while live aborts the old stream and opens a new one', async () => {
+    const h = harness();
+    const s1 = sse();
+    const s2 = sse();
+    h.streamReplies.push(s1.response, s2.response);
+    const follow = followSessionActor(h.api);
+    follow(ACTOR);
+    await settle();
+    s1.send(CURSOR(5));
+    await settle();
+    follow({ ...ACTOR }); // a refresh with an equal actor keeps the stream
+    await settle();
+    expect(s1.cancelled).toBe(false);
+    expect(h.streams).toHaveLength(1);
+    follow({ ...ACTOR, unitId: 'unit-fin' });
+    await settle();
+    expect(s1.cancelled).toBe(true);
+    // The old stream was young and carried only a cursor: closing it counts as short-lived, the new open waits 1 s.
+    expect(h.streams).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2);
+    expect(h.streams[1]!.headers.get('Last-Event-ID')).toBeNull();
+    expect(h.connection.get().phase).toBe('live');
+  });
+
+  it('re-check nit 1.4: a short stream with data does not end a series of session ends', async () => {
+    const h = harness({ withStore: true });
+    const readSession = vi.fn(async () => session());
+    const auth = sessionWiring(h, readSession);
+    const withData = new Response(`${CHANGE(5, ['speakers'])}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    h.streamReplies.push(refused(403), refused(403), withData, refused(403), refused(403), refused(403));
+    await auth.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settle();
+    // 403 (1), 403 (2), a short stream with data, 403 (3) → the pause.
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 4000]);
+    expect(h.connection.get().phase).toBe('polling');
+  });
+
+  it('re-check finding 1: an actor change while the gated open is in flight re-arms the gate', async () => {
+    const h = harness();
+    const follow = followSessionActor(h.api);
+    h.streamReplies.push(refused(403));
+    follow(ACTOR);
+    await settle();
+    follow({ ...ACTOR }); // the session is confirmed again after the end: the gate waits 1 s
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2); // in flight, no answer yet
+    follow({ id: 'p2', role: ACTOR.role });
+    await settle();
+    expect(h.streams, 'no open at once after the actor change').toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(2000);
+    await settle();
+    expect(h.streams).toHaveLength(3);
+  });
+
+  /**
+   * Final re-check (T-G1-D-03): the reconnect limit is per tab and survives every close but an explicit sign-out or a
+   * 401. Every end kind with every actor pattern, each with a session refresh every 500 ms, for 10 min of fake time.
+   */
+  describe('reconnect limit matrix (final re-check)', () => {
+    const body = (text: string) => () => new Response(`retry: 3000\n\n${text}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    const END_KINDS: [string, (i: number) => () => Response][] = [
+      ['403', () => () => refused(403)],
+      ['end {forbidden}', () => body(END('forbidden'))],
+      ['end {roles_changed}', () => body(`${CURSOR(5)}${END('roles_changed')}`)],
+      ['end {session}', () => body(END('session'))],
+      ['reset', () => body(RESET)],
+      ['cursor only', () => body(CURSOR(5))],
+      ['malformed', () => body('event: change\nid: 9\ndata: {"seq":"x"}\n\n')],
+      ['rotate', () => body(`${CURSOR(5)}${END('rotate')}`)],
+      ['reset and 403 mixed', (i) => (i % 2 === 0 ? body(RESET) : () => refused(403))],
+    ];
+    const noRole = () => Object.assign(new ApiProblem(403, 't', 'd'), { csrfToken: 'n'.repeat(43) });
+    const PATTERNS: [string, (n: number) => unknown][] = [
+      ['same actor', () => session()],
+      ['alternating actor', (n) => ({ ...session(), actor: { id: n % 2 === 0 ? 'p1' : 'p2', role: ACTOR.role } })],
+      ['noRole flapping', (n) => { if (n % 2 === 0) throw noRole(); return session(); }],
+    ];
+    const cases = END_KINDS.flatMap(([kind, reply]) => PATTERNS.map(([pattern, answer]) => [kind, pattern, reply, answer] as const));
+
+    it.each(cases)('%s with %s: at most 6 opens in 10 min', async (kind, pattern, reply, answer) => {
+      const h = harness({ withStore: true });
+      let n = 0;
+      const readSession = vi.fn(async () => { n += 1; return answer(n); });
+      const auth = sessionWiring(h, readSession as () => Promise<unknown>);
+      for (let i = 0; i < 400; i++) h.streamReplies.push(reply(i)());
+      await auth.start().catch(() => undefined);
+      await settle();
+      for (let t = 0; t < 600_000; t += 500) {
+        void auth.refresh().catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      console.log(`[matrix] ${kind} | ${pattern} | ${h.streams.length} opens in 10 min`);
+      expect(h.streams.length).toBeGreaterThan(0);
+      expect(h.streams.length).toBeLessThanOrEqual(6);
+    });
+
+    it.each(['403', 'reset'] as const)('%s on every open with a hide/show cycle every 2 s: at most 6 opens in 10 min', async (kind) => {
+      const h = harness({ withStore: true });
+      const readSession = vi.fn(async () => session());
+      const auth = sessionWiring(h, readSession);
+      for (let i = 0; i < 400; i++) {
+        h.streamReplies.push(kind === '403' ? refused(403) : body(RESET)());
+      }
+      await auth.start();
+      await settle();
+      for (let t = 0; t < 600_000; t += 500) {
+        if (t % 2000 === 0) h.setHidden(true);
+        if (t % 2000 === 1000) h.setHidden(false);
+        void auth.refresh().catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      console.log(`[matrix] ${kind} | hide/show every 2 s | ${h.streams.length} opens in 10 min | at ${h.streams.map((c) => c.at).join(",")}`);
+      expect(h.streams.length).toBeLessThanOrEqual(6);
+      // Codex P2: the backoff steps stay 1, 2, 4 s across hide/show; a return to the tab does not shorten them.
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 303_000, 307_000, 315_000]);
+    });
+
+    it('a healthy stream still reconnects in about 1 s: with data, and after 10 s without', async () => {
+      const h = harness();
+      const s1 = sse();
+      const s2 = sse();
+      const s3 = sse();
+      h.streamReplies.push(s1.response, s2.response, s3.response);
+      h.api.openStream();
+      await settle();
+      s1.send(CHANGE(5, ['speakers']));
+      s1.close();
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000]);
+      s2.send(CURSOR(6));
+      await beat(s2, 15_000);
+      s2.close();
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 17_000]);
+    });
+
+    it('only an explicit sign-out lets the limit start afresh', async () => {
+      const h = harness();
+      const follow = followSessionActor(h.api);
+      h.streamReplies.push(refused(403), refused(403), sse().response);
+      follow(ACTOR);
+      await settle();
+      follow(undefined); // closing (no role, other actor) keeps the gate
+      follow(ACTOR);
+      await settle();
+      expect(h.streams).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams).toHaveLength(2);
+      h.api.resetStreamLimits(); // explicit sign-out
+      follow(undefined);
+      follow({ id: 'p9', role: ACTOR.role });
+      await settle();
+      expect(h.streams).toHaveLength(3);
     });
   });
 });

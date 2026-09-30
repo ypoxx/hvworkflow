@@ -8,6 +8,7 @@
  */
 import type { Meeting, QuestionStatus } from '@hv/domain';
 import { ProcessStrip, statusTone } from '../components';
+import { ConnectionStatus } from './ConnectionStatus';
 import type { TKey } from '../i18n';
 import { useT } from '../i18n';
 
@@ -91,6 +92,10 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
   );
 
   return (
+    <>
+    {/* Slice 036b: the connection indicator sits next to the counters, outside their `lg:` group so that it shows at
+        every width. HTTP mode only, and only outside `live` (it renders nothing in the demo). */}
+    <ConnectionStatus />
     <div
       role="group"
       aria-label={t('header.counters')}
@@ -125,5 +130,6 @@ export function HeaderStrip({ meeting }: { meeting: Meeting | null }) {
         {t('header.counter.staged')}: {staged ?? '—'}
       </span>
     </div>
+    </>
   );
 }

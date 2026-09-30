@@ -358,6 +358,34 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 036a Review nit 12 · `apps/web/src/api/index.ts`, `liveStore.ts` · `clear('logout')` ruft die Hörer, `useApiVersion`
   zählt zusätzlich den Akteur `undefined`; bei 401 läuft `clear` doppelt · harmlos, die Shell hängt ab.
 
+## Strom-Client (aus 036b)
+
+- 036b Bau · `apps/web/src/api/http.ts` (N5) · die Invalidierung nach der ersten `cursor`-Nachricht trifft Listenlesungen
+  eines Themas ganz, auch solche nach dem Senden der Stromanfrage (nur zu viel) · epochgebundene Invalidierung als API in
+  `liveStore.ts` (036a-Datei).
+- 036b Review minor 4 · `apps/web/src/api/http.test.ts` · `end {unavailable}` und der Weg offline/online haben keinen
+  Unit-Test · je einen Test ergänzen.
+- 036b Review minor 5 · `apps/web/src/app/ConnectionStatus.tsx` · der Live-Bereich sagt „Stand von“ außerhalb von `live` bei
+  jeder Lesung neu an · nur die Phase in `aria-live`, die Zeit außerhalb.
+- 036b Review minor 7 · `apps/web/e2e/031-http-betriebsart.spec.ts` (H13 Schritt 1a) · das Trace-Fenster beginnt erst nach
+  der Antwort in B · vor dem Klick beginnen.
+- 036b Review minor 8 · `apps/web/src/api/http.ts` · der Neuaufbau nach `end {rotate}` ist synchron (alle Ströme eines
+  Prozesses gleichzeitig) · 0–2 s Zufallsanteil, ggf. volles Jitter.
+- 036b Review nit 9 · `apps/web/src/api/http.ts` · `hiddenTimer` wird in `endForSession` nicht geräumt, `detachEnvironment`
+  wird nie gerufen · räumen bzw. beim Schließen lösen.
+- 036b Review nit 10 · `apps/web/src/api/index.ts`, `http.ts` · ein 401 beim Öffnen leert den Live-Store dreimal
+  (`onStreamEnd`, `onUnauthorized`, `onActorChange(undefined)`) · auf einen Aufruf zusammenführen.
+- 036b Nachprüfung · `scripts/e2e-http-031.test.mjs:229` · die Strukturprüfung nennt nur die H8-Namen, nicht die H13-Texte
+  (der Zugriffslog-Scan selbst deckt sie über `WRITTEN_TEXTS` ab) · H13-Texte in die Prüfung aufnehmen (Datei nicht in 036b).
+- 036b Codex P2 · `apps/web/src/api/http.ts` (`onOnline`, `connection.ts`) · ein offener Strom, der offline → online
+  übersteht, bleibt in `reconnecting`, obwohl Daten ankommen (`synced` stellt `live` nicht wieder her) · `synced` bei
+  offenem Strom auf `live` führen oder bei `online` mit offenem Strom `opened` melden.
+- 036b Nachprüfung · `apps/web/src/api/http.ts` (`closeStream`, `openStream`) · nach einem Akteurwechsel oder `noRole`
+  während einer Pause zeigt die Anzeige `idle` statt `polling`, bis der behaltene Wiederholversuch fällig ist (Zeitverhalten
+  unberührt) · beim Behalten des Wiederholversuchs die Phase erneut melden.
+- 036b Bau · `apps/web/src/app/ConnectionStatus.tsx` · „Verbindung wird aufgebaut“ erscheint bei jedem Laden kurz und
+  wird vom Statusbereich angesagt · `connecting` erst nach 1–2 s zeigen.
+
 ## Historie (aus takt-038)
 
 - takt-038 Review minor 1 · `apps/web/src/features/history/Page.tsx:189-192` (`moreResults`, `olderRows`) · die Seitenzahl
@@ -381,7 +409,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   im Code kommentieren.
 - takt-038 Review nit 7 · `apps/web/src/features/history/lib.ts:175` · eine Rücksicherung, deren `lastSeq` schon wieder
   über dem alten Cursor liegt, wird nicht erkannt · mit dem `reset` aus 035b im Client (036b) verbinden.
-- takt-038 Review nit 8 · `apps/web/src/i18n/parity.test.ts:161` · Testtitel nennt noch 507 statt 510 · anpassen.
+- ~~takt-038 Review nit 8 · `apps/web/src/i18n/parity.test.ts:161` · Testtitel nennt noch 507 statt 510 · anpassen.~~ → erledigt in **036b** (Titel und Pin auf 515).
 - takt-038 Review nit 9 · `docs/evidence/takt-038-historie-weitere.png` · zeigt den Zustand nach dem Klick, nicht den Knopf
   selbst · bei Gelegenheit ein zweites Bild vor dem Klick.
 
