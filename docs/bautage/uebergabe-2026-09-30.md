@@ -28,8 +28,9 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Betrieb der Bauumgebung
 
-- Postgres-16-Cluster `/var/tmp/pgtest/data`; nach Container-Neustart `postmaster.pid` löschen und mit
-  `pg_ctl -l /var/tmp/pgtest/log start` starten. Rollen `hv_owner`/`hv_runtime` (Passwörter nur lokal, Testwerte).
+- Postgres-16-Cluster `/var/tmp/pgtest/data`; nach Container-Neustart
+  `rm -f /var/tmp/pgtest/data/postmaster.pid` und
+  `su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/tmp/pgtest/data -l /var/tmp/pgtest/log start"`. Rollen `hv_owner`/`hv_runtime` (Passwörter nur lokal, Testwerte).
 - Kein Docker lokal: Keycloak-Tests (H4–H9, 029b, das `http`-Projekt der gemeinsamen Dateien) laufen nur in der PR-CI.
 - Harness-Port 18091: belegt → abbrechen, nie fremde Prozesse beenden; Implementierer und Reviewer nicht gleichzeitig
   e2e fahren lassen.
