@@ -1,5 +1,4 @@
 [
-  {"operationId":"streamEvents","reason":"Vertrag 0.3.0 (Scheibe 023): SSE /v1/stream mit Last-Event-ID und Jahrgangsfilter (ADR 0014); Dienst in 035","slice":"035","expires":"2026-11-25"},
   {"operationId":"createMeeting","reason":"Vertrag 0.3.0 (Scheibe 023): Jahrgang anlegen/klonen mit admin.meetings.manage; Kern in 040; Lane service seit takt-011; wird mit Scheibe 040 ausgeübt und entfernt","slice":"040","expires":"2026-11-25"},
   {"operationId":"replaceMeetingAgendaItems","reason":"Vertrag 0.3.0 (Scheibe 023): Tagesordnung setzen mit agenda.manage; Kern in 040; Lane service seit takt-011; wird mit Scheibe 040 ausgeübt und entfernt","slice":"040","expires":"2026-11-25"},
   {"operationId":"replaceMeetingUnits","reason":"Vertrag 0.3.0 (Scheibe 023): Fachbereiche setzen mit admin.units.manage; Kern in 040; Lane service seit takt-011; wird mit Scheibe 040 ausgeübt und entfernt","slice":"040","expires":"2026-11-25"},
