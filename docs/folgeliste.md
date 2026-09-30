@@ -264,6 +264,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   hinnehmen oder im Test 11 ausdrücklich festhalten.
 - 035a Review nit 7 · `packages/contract/CHANGELOG.md` (0.3.11) · Einordnung der Versionsstufe (Patch) trotz geänderter
   Semantik der vorab erklärten, nie ausgelieferten Operation · Begründung im CHANGELOG ergänzen oder Stufe prüfen.
+
 ## Bühne und Wortmeldeliste (aus takt-039)
 
 - ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im
