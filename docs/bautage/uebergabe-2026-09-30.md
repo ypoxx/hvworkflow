@@ -28,7 +28,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 4. Aus früheren Berichten weiter offen: E55 (Patch-Stufe strengerer Anfrageschemas), ADR-0015-Nachtrag, Netlify Deploy
    Previews und Branch Deploys auf „None“ (nur vorgeschlagen, nichts geändert), Admin-Selbstzuweisung im
    Entscheidungsregister, Token-Abrechnung, 031b-Frage zum ADR-0002-Umfang (Standard: fünf gemeinsame Dateien).
-5. Aus den Specs 035/036 (in den Specs festgelegte Standards, gebaut wird danach; noch nicht gebaut, umkehrbar): 035a Frage 1 Freigabe der Sichtbarkeitstabelle R-PERM-04;
+5. Aus den Specs 035/036 (Standards in den Specs festgelegt, noch nicht gebaut, umkehrbar): 035a Frage 1 Freigabe der Sichtbarkeitstabelle R-PERM-04;
    035b Frage 1 der Neuaufbau des Stroms alle 25 min verlängert das Leerlauffenster der Sitzung (Standard: hinnehmen);
    035b Frage 2 Aktivitätsvolumen über `id`-Sprünge und Zeitpunkte (Standard: hinnehmen wie die Zähler); 035b Frage 3
    Produktionsweg für `text/event-stream` über Netlify bzw. Konzern-Proxy und HTTP/2 (Standard: Polling-Rückfall aus
