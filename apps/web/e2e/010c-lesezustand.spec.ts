@@ -1191,9 +1191,7 @@ test('010c Ziel 6 (N3): Bühne — ein Druck ohne Schreiben lenkt den Fokus spä
   await openStage(page);
   await tabTo(page, 'stage-next', 30);
 
-  // Every `getStage` is answered by the API at once but handed over only on release; every
-  // `deliverQuestion` of the page is counted.
-  await holdCalls(page, 'getStage', true);
+  // Every `deliverQuestion` of the page is counted and reaches the API.
   await page.evaluate(async (url) => {
     const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
     const w = window as unknown as Harness;
@@ -1204,21 +1202,20 @@ test('010c Ziel 6 (N3): Bühne — ein Druck ohne Schreiben lenkt den Fokus spä
     };
   }, API_MODULE);
 
-  // An event from somebody else: the stage reads again (held), and until that answer is in there is
-  // no record to act on — "Vorgelesen, weiter" writes nothing.
-  await unrelatedEvent(page, 'Testperson 010c N3');
-  await expect.poll(() => callCount(page, 'getStage')).toBeGreaterThan(0);
-  await page.keyboard.press('Enter');
-  await settle(page);
-  expect(await callCount(page, 'deliverQuestion')).toBe(0);
+  // takt-039: a press during a read writes now (the drawn record is the target), so the old scenario (a press while
+  // the stage read again) no longer writes nothing. A press that writes nothing under the one rule of lib.ts: the
+  // second activation in the same task, before React has drawn the lock of the first. The first is Space from outside
+  // the podium's buttons, which sets no focus marker; the second is the click of "Vorgelesen, weiter", which finds the
+  // lock of the first (`writing`) and writes nothing. Focus stays on the button throughout.
+  await page.evaluate(() => {
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }));
+    (document.querySelector('[data-testid="stage-next"]') as HTMLButtonElement).click();
+  });
 
-  // Somebody else reads the last question out; the button leaves with it. That press wrote nothing,
+  // Space read the last question out; the button leaves with it and its focus falls to BODY. The click wrote nothing,
   // so it does not own this focus move.
-  await deliverCurrentElsewhere(page);
-  await expect.poll(() => callCount(page, 'getStage')).toBeGreaterThan(1);
-  await releaseAll(page, 'getStage');
   await expect(page.getByTestId('stage-next')).toHaveCount(0);
   await settle(page);
+  expect(await callCount(page, 'deliverQuestion')).toBe(1);
   expect(await focusedTestId(page)).not.toBe('stage-current');
-  expect(await callCount(page, 'deliverQuestion')).toBe(0);
 });

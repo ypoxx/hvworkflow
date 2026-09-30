@@ -170,8 +170,13 @@ dem Handler überein.
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (neue Tests H11 und H12)
 - `apps/web/e2e/002-speakers-capture.spec.ts` (nur der Kommentar in Z. 77-78, nur bei H-2b)
 - `docs/folgeliste.md` (nicht blockierende Reviewbefunde; offener 002-Befund, falls keine Hypothese bestätigt)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (nur das Szenario N3, etwa Z. 1186-1223; Bauklärung unten)
 
 Weitere Dateien sind Scope-Befunde (R1).
+
+## Bauklärung
+
+- 30.09.2026 (Orchestrator): Der alte Test N3 in `010c-lesezustand.spec.ts` sicherte genau das stille Verwerfen eines Drucks während einer Lesung, das Ziel 1 entfernt. Er wird auf einen Druck umgestellt, der nach der neuen Regel wirklich nichts schreibt (zweite Aktivierung in derselben Aufgabe); die Absicht bleibt: Ein Druck ohne Schreiben hinterlässt keine Fokusmarke.
 
 ## Tests zuerst
 
