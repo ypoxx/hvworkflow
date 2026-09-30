@@ -302,11 +302,11 @@ Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wä
 Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
 Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
 e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
-Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d; `pnpm gates` grün
-auf 89dc78d
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d, Grenze je Tab 2747258;
+`pnpm gates` grün auf 2747258
 (Auszug unten); PR-CI auf f761931 grün in e2e-http (33 passed, H10, H13, H14): Zustellzeit 862 ms (Anmeldung) und 796 ms
 (Aufruf); Screenshots im CI-Artefakt evidence-031-http (E56, Angaben unten).
-Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Stand der Nachprüfung (89dc78d ff.) steht aus.
+Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Stand 2747258 ff. steht aus.
 (Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
 Touched: siehe Liste unten.
 ```
@@ -324,8 +324,53 @@ Touched: siehe Liste unten.
    Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
    actor“).
 
-**Schluss von `pnpm gates` auf 89dc78d (Nachprüfung; sauberer Baum, Postgres-Variablen gesetzt), grün im ersten Lauf,
-echter Auszug:**
+**Schluss von `pnpm gates` auf 2747258 (Wiederverbindungsgrenze je Tab; sauberer Baum, Postgres-Variablen gesetzt), grün
+im ersten Lauf, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  471 passed (471)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 1.88s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 2747258, tree 382897a41056…
+```
+
+**Letzte Nachprüfung von 89dc78d (MAJOR, T-G1-D-03): Grenze je Tab statt Einzelfälle.** Regel: die
+Wiederverbindungsgrenze gilt je Tab und überlebt jedes Schließen außer dem ausdrücklichen Abmelden (`resetStreamLimits`
+über den `signOut`-Weg in `index.ts`) und einem 401. `closeStream()` behält jeden anstehenden Wiederholversuch und alle
+Zähler; das Schließen einer jungen Verbindung ohne Daten oder einer laufenden Anfrage zählt als kurzlebig und lässt das
+nächste Öffnen warten. `retryIsGate` und `keepGate` entfallen.
+
+Matrix (9 Endarten × 3 Akteurmuster, Auffrischen alle 500 ms, 10 min Scheinzeit), Öffnungen:
+
+| Endart | gleicher Akteur | wechselnder Akteur | noRole-Flattern | vorher (89dc78d): wechselnd / noRole |
+|---|---|---|---|---|
+| 403 | 6 | 6 | 6 | 6 / 801 |
+| end {forbidden} | 6 | 6 | 6 | 6 / 801 |
+| end {roles_changed} | 6 | 6 | 6 | 6 / 801 |
+| end {session} | 6 | 6 | 6 | 6 / 801 |
+| reset | 6 | 6 | 6 | 1201 / 601 |
+| nur cursor | 6 | 6 | 6 | 1201 / 601 |
+| fehlerhaft | 6 | 6 | 6 | 1201 / 601 |
+| rotate | 6 | 6 | 6 | 1201 / 601 |
+| reset und 403 gemischt | 6 | 6 | 6 | 12 / 701 |
+
+Auf 89dc78d 15 von 27 Kombinationen rot. Positivfall: ein gesunder Strom (Daten, oder 15 s nur Heartbeats) verbindet nach
+1 s neu. Mutationen (je eine, zurückgesetzt, alle getötet):
+
+| Mutation | getötet von |
+|---|---|
+| Schließen ohne Abmelden verwirft einen anstehenden Wiederholversuch (Nicht-Tor) | 18 Matrixfälle |
+| noRole-/Akteur-Schließen setzt die Zähler zurück | 21 Tests (Matrix, minor 3, In-flight-Tor) |
+| Schließen einer ungesunden Verbindung lässt das nächste Öffnen nicht warten | minor 3, In-flight-Tor |
+| `stopStream` räumt den Wiederholversuch wieder | 18 Matrixfälle |
+| ausdrückliches Abmelden setzt die Grenze nicht zurück | „only an explicit sign-out …“ |
+
+Folge im Bericht (Bauentscheidung): ein strukturell anderer Akteur auf einem jungen Strom ohne Daten öffnet nach 1 s neu
+statt sofort (Test minor 3 angepasst).
+
+**Schluss von `pnpm gates` auf 89dc78d (Nachprüfung), grün im ersten Lauf, echter Auszug:**
 
 ```
 packages/domain test:       Tests  261 passed (261)
