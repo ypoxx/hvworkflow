@@ -394,10 +394,50 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Off
 
 ```
 Slice: 035b-sse-dienst
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 12–29; Zustellzeiten; Lastwerte
-Open: Eigentümerfragen 1–3; Lasttest 071
-Touched: <Dateiliste>
+Done: GET /v1/stream über die ganze Middleware-Kette und validateOperation, ohne Postgres-Grenze und ohne domain-Proxy.
+      Verteiler je App mit eigener Kontinuitätsprüfung (lastSeq, lastHash), Übergabe Nachlauf -> live ohne Lücke.
+      Akteurkarte und frische Sitzungsprüfung je Stapel, Herzschlag und Frame; Grenzen 3/6/200, Rotation 25 min, Rückstau.
+Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa (geprüfte Fassung, letzter Codecommit);
+      ADR-Commits des Architekten 598273f, 2f24065, 03a8dec.
+      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 5736faa:
+        apps/api test:  Test Files  39 passed (39)
+        apps/api test:       Tests  578 passed (578)
+        apps/api test: operation-coverage: 66 operations in the contract, 60 exercised by tests, 6 pre-declared in allowlist.json
+        apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+        slice-scope: 14 changed file(s), all within "docs/slices/035b-sse-dienst.md"'s "Files allowed" list (20 pattern(s)).
+        ✓ built in 1.81s
+        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 5736faa, tree f15a2ade137a…
+        exit 0
+      Stabilität auf 5736faa: beide Stromdateien dreimal hintereinander je 54/54 grün.
+      Tests (apps/api/src/__tests__/stream035.test.ts, postgres-stream035.test.ts); rot auf 6034a90 (Route fehlte, 37 von 38 rot),
+      grün auf 5736faa:
+        12 Öffnen (200, Köpfe, retry, Heartbeat); Fehlerfälle 401/403/422/404/Preflight; Demo-Filter 403; 12 (Postgres) Migrationen 503
+        13, 13a (Commit während der Übergabe), 13b (cursor nach Aufbau), 13c (nach reset)
+        14 podium/moderation/expert/capture nach Trennung; 15 Cursor > Kopf, Abstand > 1000
+        16 RoleRevoked forbidden, Einengung und zweiter Jahrgang roles_changed, Ablauf am Heartbeat
+        17 Abmelden/Sperre/Leerlauf session, slideIdle false, eine Prüfung je Stapel und Sitzung, Abmelden zwischen Stapeln, Prüffehler
+        18 Grenzen 429/429/503, 10 parallele Öffnungen 3x200/7x429, Freigabe nach Abbruch; 19 rotate
+        20 Nachlauf 1000 an langsamen Leser, Rückstau; 21 Zugriffslog; 22 Jahrgangsfilter; 23 Ereignis ohne Hash, Hörer ohne Arbeit
+        23a Frische beim Öffnen; 23b Kontinuität ohne Postgres; 23c Lebensdauer < SESSION_IDLE_MS (von Anfang an grün: Konstante vor dem Test)
+        24 zweite Instanz; 25 Manipulation; 25b/25c Kette ersetzt/gekürzt, zuerst von Fachanfrage gesehen; 26; 27; 28; 29
+        echter Server über 30 s mit den serverOptions aus server.ts
+      Review-Tests (rot auf dem Stand vor der jeweiligen Behebung bzw. Mutant getötet):
+        R1 hängender Nachlauf: Abmelden+Sperre (rot: 1000 Ereignisse), Ablauf (rot: change,cursor,end), Rotation (rot: 429)
+        R1d hängender Live-Stapel (rot auf 1bcfd4f: 7 > 1); R1e Warten je Nachlauf-Frame (Mutant catchUpMayGoOn: 133 > 1)
+        R1f Warten je Live-Frame bei hängender Prüfung (Mutant ohne Zeile 306: 7 > 1); R1g end nicht abgenommen -> Abbruch (rot auf 28f7af3)
+        R2 Ablauf vor gepuffertem Stapel (rot: Strom blieb offen); R3 Cursor > Kopf höchstens 2 Nachladen (rot: 10)
+        R3b Leerlauf-Nachladen mit Abstand (rot: kleinster Abstand 20 ms); R4a/R4b/R4c Mutanten (leere Karte, unitId, Byte-Grenze) getötet
+        R6 keine Lesung ohne Wartende (rot: 1); R6b Beitretender (Mutant ohne callers.push getötet); R6c GONE (rot auf 1bcfd4f)
+      Messwerte (5736faa, drei Läufe): Test 24 zweite Instanz 253–258 ms, gleiche Instanz 259–262 ms;
+        Test 28 210–216 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
+        Test 29 Schreiben max 596–722 ms, Median 354–445 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
+        Stapel bis letzte Zustellung 46–89 ms.
+Open: Eigentümerfragen 1–3; Lasttest 071; Vertragswortlaut „gap-free in seq“ unter meetingId vor dem Bau von 036b (Folgeliste).
+Touched: apps/api/src/stream/hub.ts, apps/api/src/stream/route.ts, apps/api/src/stream/sessionCheck.ts, apps/api/src/stream/sse.ts,
+      apps/api/src/app.ts, apps/api/src/limits/config.ts, apps/api/src/__tests__/stream035.test.ts,
+      apps/api/src/__tests__/stream-reader035.ts, apps/api/src/__tests__/postgres-stream035.test.ts,
+      packages/contract/allowlist.json, docs/sicherheit/bedrohungsmodell.md, docs/folgeliste.md,
+      docs/slices/035b-sse-dienst.md, docs/adr/0014-realtime-sse.md (Architekt, Restrisiko-Satz auf Vorgabe)
 ```
 
 ## Bauklärung (Bau 035b, 30.09.2026)
