@@ -4,15 +4,17 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `5a013f9`. Etappe A fertig; 031a gemergt.
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `bdcfb9e` (takt-034). Etappe A fertig; 031a gemergt.
 - **#82 takt-030** — mergefertig bis auf Codex P1 (Screenshot H9 nur im Artefakt `evidence-031-http`, zuletzt ID
   11074530002 aus Lauf 36660269666). Thread offen, kein Merge ohne Eigentümerentscheidung.
 - **#83 031b** — Entwurf, Basis vorläufig `claude/takt-030-eigene-schreibvorgaenge`. `gates` dort rot nur durch
   `slice-scope` (gestapelt). Nach Merge von #82: Basis auf den Integrationszweig umstellen, Basis einmergen, Gates auf
   dem integrierten Commit. Fachlich wartet 031b auf takt-032 und takt-033; danach warten die Tests auf das Busy-Signal
   aus takt-032 statt auf Netzantworten. ADR-0002-Ergänzung schreibt der Architekt nach grüner CI.
-- **takt-032 / takt-033** — Specs in Arbeit (Zweige `claude/takt-032-umsortieren-versionen`,
-  `claude/takt-033-kette-einmal-pruefen`). takt-033 ist Risikoklasse hoch (Kettenprüfung); Review mit Opus.
+- **takt-032 / takt-033 / takt-033b** — Specs fertig; takt-033 (Dienst, hoch) im Bau mit Opus, takt-032 (Web, mittel,
+  gestapelt auf takt-030) im Bau; takt-033b (kein Doppelabruf beim Einhängen, mittel) folgt. Offene Eigentümerfrage aus
+  takt-033: Verhalten bei geänderter oder gekürzter, aber gültiger Kette (gebaut wird Vorschlag b: annehmen und feste
+  Logzeile).
 
 ## Eigentümerentscheidungen (offen)
 
