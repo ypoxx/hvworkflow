@@ -5,7 +5,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 ## Stand
 
 - Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `a8ad326` (takt-032). Etappe A fertig;
-  aus B gemergt: 031a, takt-030 bis takt-036 (ohne takt-034 als B-Takt: Sicherheitstakt), E56.
+  gemergt: 031a, takt-030 bis takt-036, E56.
 - **#83 031b** — Basis auf den Integrationszweig umgestellt, Bau läuft: Netz-Warteschritte durch Busy-Signale aus takt-032
   ersetzen, Halteregel unverändert. Danach PR-CI (Keycloak nur dort), Review in frischem Kontext, ADR-0002-Ergänzung durch
   den Architekten, ready, Codex, Merge.
