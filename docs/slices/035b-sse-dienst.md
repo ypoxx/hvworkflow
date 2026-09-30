@@ -5,7 +5,7 @@
 **Rolle:** service-implementer; Architekt für die ADR-0014-Ergänzung; Review in frischem Kontext mit Perspektive Security und Betrieb, Lesebefund der Spec vor dem Bau, nie gebündelt; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** R-PERM-04 (aus 035a, hier durchgesetzt), R-PERM-01, R-PERM-02; AGENTS.md R2, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/035; ADR 0014, ADR 0011, ADR 0006, ADR 0013; Scheiben 029b, takt-023, 033a, 034a, 034b, takt-033; Lesebefund zu Spec 035/036 (Opus, 30.09.2026: B1, M4–M8, m2, m4, m5, m6, m7, m8, m9, m11, m12); Bedrohungsmodell T-G1-I-09, T-G1-S-02, T-G1-D-03, T-G3-I-01, SG1, SG2, SG4, SG5; Register B11, E10, E33
-**Depends on:** 035a (gemergt: Vertrag 0.3.11, `stream.ts`), 023, 010, 024, 034b, takt-033 (im Code auf `59ef4fd`)
+**Depends on:** 035a (Voraussetzung: der Bau von 035a, Spec #96, ist gemergt, bevor dieser Bau beginnt; liefert Vertrag 0.3.11 und `stream.ts`), 023, 010, 024, 034b, takt-033 (im Code auf `59ef4fd`)
 **Perspektive:** Security (Sitzungsentzug, Leserechte), Betrieb (lange Verbindungen, Grenzen) · **Glossar: neue Begriffe:** nein
 
 ## Warum hoch
