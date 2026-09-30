@@ -18,6 +18,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { chmodSync, realpathSync, writeFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -35,6 +36,26 @@ export const REALM_NAME = 'hv-e2e-031';
 export const KEYCLOAK_PORT = 18080;
 export const SERVICE_PORT = 18091;
 export const START_LINE = 'HV-Tool API: start mode=service persistence=postgres auth=oidc cors=none trusted-proxies=none';
+
+/** The whole run stays inside the 9 minutes of the CI step (`gates.yml`), so that the cleanup surely runs. */
+const TOTAL_MS = 480_000;
+const CLEANUP_RESERVE_MS = 30_000;
+
+/** The tsx loader is needed for the TypeScript of the service and the domain (spec decision 6). */
+export function loaderIsActive(execArgv = process.execArgv, options = process.env.NODE_OPTIONS ?? '') {
+  return [...execArgv, options].join(' ').includes('tsx');
+}
+export const LOADER_HINT =
+  '031a needs the tsx loader: node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs';
+
+/** A port that is taken belongs to someone else: the run stops and reports, it never ends a foreign process. */
+function assertPortFree(port) {
+  return new Promise((resolvePort, rejectPort) => {
+    const probe = createServer();
+    probe.once('error', () => rejectPort(new Error('port in use')));
+    probe.listen(port, () => probe.close(() => resolvePort()));
+  });
+}
 
 /** The synthetic persons of the realm. `role` is the assignment the bootstrap writes; `norole` has none. */
 export const PERSONS = [
@@ -250,7 +271,18 @@ async function withDatabase(url, name) {
   return next.toString();
 }
 
+let playwrightChild;
+
+/** Playwright starts Vite and the browser; the whole group ends, not just the pnpm process. */
+function endGroup(child, signal) {
+  if (!child || child.exitCode !== null || child.pid === undefined) return;
+  try { process.kill(-child.pid, signal); } catch { /* already gone */ }
+}
+
 async function main() {
+  const startedAt = Date.now();
+  stage = 'tsx loader check';
+  if (!loaderIsActive()) { console.error(LOADER_HINT); process.exitCode = 1; return; }
   if (process.argv.includes('--check')) { await check(); return; }
   const ownerBase = process.env.TEST_DATABASE_URL;
   const runtimeBase = process.env.TEST_RUNTIME_DATABASE_URL;
@@ -273,9 +305,21 @@ async function main() {
   const databaseName = `hv_e2e031_${randomBytes(4).toString('hex')}`;
   let containerStarted = false;
   let databaseCreated = false;
+  // Signals and the total time limit end the run through the same cleanup as a failure (the temporary directory holds credentials).
+  let interrupt;
+  const interruption = new Promise((_, rejectRun) => { interrupt = rejectRun; });
+  interruption.catch(() => {});
+  const onSignal = () => { stage = 'interrupted by a signal'; interrupt(new Error('signal')); };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  const limit = setTimeout(() => { stage = `total time limit, last stage ${stage}`; interrupt(new Error('deadline')); }, TOTAL_MS);
   let service;
   let serviceOutput = { stdout: '', stderr: '' };
-  try {
+  const body = async () => {
+    stage = 'port check';
+    await assertPortFree(SERVICE_PORT);
+    if (!withoutIdp) await assertPortFree(KEYCLOAK_PORT);
+    await assertPortFree(httpPort);
     // 1. Keycloak
     if (!withoutIdp) {
       stage = 'Keycloak startup';
@@ -336,7 +380,9 @@ async function main() {
 
     // 5. Playwright
     stage = 'end-to-end run';
-    const exit = await runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets });
+    const limitMs = TOTAL_MS - (Date.now() - startedAt) - CLEANUP_RESERVE_MS;
+    assert(limitMs > 30_000, 'Not enough time left for the end-to-end run.');
+    const exit = await runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets, limitMs });
     assert.equal(exit, 0);
 
     // 6. access log
@@ -347,9 +393,17 @@ async function main() {
     assertQuietStderr(serviceOutput.stderr);
     const lines = await checkAccessLogFiles(logDir, forbidden);
     say(`031a access log: ${lines} lines with exactly the eight keys and no secret, token, cookie, actor id or written text: PASS`);
+  };
+  try {
+    await Promise.race([body(), interruption]);
   } finally {
     // 7. cleanup, always
+    clearTimeout(limit);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    endGroup(playwrightChild, 'SIGTERM');
     await stopService(service);
+    endGroup(playwrightChild, 'SIGKILL');
     if (containerStarted) await removeKeycloak(container).catch(() => {});
     if (databaseCreated) await dropDatabase(ownerBase, databaseName).catch(() => {});
     await rm(temp, { recursive: true, force: true });
@@ -435,10 +489,13 @@ async function dropDatabase(ownerBase, name) {
   }
 }
 
-function runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets }) {
+function runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets, limitMs }) {
   const env = {
     PATH: process.env.PATH ?? '',
     HOME: process.env.HOME ?? '',
+    // Stops the page snapshot of a failed test (it can hold what was typed into a password field); the output directory
+    // in the private state directory covers the failed matcher, which this variable does not (slice 031a review).
+    PLAYWRIGHT_NO_COPY_PROMPT: '1',
     E2E_HTTP: '1',
     E2E_HTTP_PORT: String(httpPort),
     E2E_HTTP_API_ORIGIN: apiOrigin,
@@ -449,7 +506,8 @@ function runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets }) {
     ...(process.env.CI ? { CI: process.env.CI } : {}),
   };
   const child = spawn('pnpm', ['--filter', '@hv/web', 'exec', 'playwright', 'test', '--project=http', '--workers=1'],
-    { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  playwrightChild = child;
   const forward = (stream, target) => {
     let pending = '';
     stream.on('data', (chunk) => {
@@ -463,8 +521,8 @@ function runPlaywright({ httpPort, apiOrigin, stateDir, withoutIdp, secrets }) {
   forward(child.stdout, process.stdout);
   forward(child.stderr, process.stderr);
   return new Promise((resolveRun, rejectRun) => {
-    // Below the step limit of the workflow (9 minutes), so that the cleanup still runs.
-    const timer = setTimeout(() => { child.kill('SIGTERM'); rejectRun(new Error('timeout')); }, 480_000);
+    // The rest of the total time minus the reserve for the cleanup, so that the cleanup still runs inside the step limit.
+    const timer = setTimeout(() => { endGroup(child, 'SIGTERM'); rejectRun(new Error('timeout')); }, limitMs);
     child.once('error', rejectRun);
     child.once('exit', (code) => { clearTimeout(timer); resolveRun(code ?? 1); });
   });
@@ -492,5 +550,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     // Provider and driver errors can embed credentials; report only the safe stage.
     console.error(`031a e2e http harness failed during ${stage}.`);
     process.exitCode = 1;
+    // A stage that was interrupted can still hold an open handle; the cleanup has run, so the process ends.
+    setTimeout(() => process.exit(1), 2_000).unref();
   });
 }

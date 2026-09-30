@@ -31,6 +31,12 @@ const launch = executablePath ? { launchOptions: { executablePath } } : {};
  * Security (decision 4): no trace, no video in the HTTP projects: they would hold the values typed into the
  * Keycloak form, i.e. the passwords of the test persons. Failure screenshots stay.
  */
+// The failure report of Playwright (`error-context.md`, a page snapshot) can hold the text typed into a password field, and
+// the variable `PLAYWRIGHT_NO_COPY_PROMPT` does not stop it for a failed matcher (probe, slice 031a review). So the output
+// of both HTTP projects goes into the private state directory of the harness, which is removed with the temporary directory.
+const stateDir = process.env['E2E_HTTP_STATE_DIR'];
+const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
+
 const httpUse = {
   ...devices['Desktop Chrome'],
   baseURL: `http://localhost:${httpPort}`,
@@ -41,10 +47,11 @@ const httpUse = {
 
 const httpProjects: NonNullable<PlaywrightTestConfig['projects']> = httpEnabled
   ? [
-      ...(withoutIdp ? [] : [{ name: 'http-setup', testMatch: HTTP_SETUP, use: httpUse }]),
+      ...(withoutIdp ? [] : [{ name: 'http-setup', testMatch: HTTP_SETUP, ...httpOutput, use: httpUse }]),
       {
         name: 'http',
         testMatch: HTTP_SPECS,
+        ...httpOutput,
         ...(withoutIdp ? { grepInvert: /@idp/ } : { dependencies: ['http-setup'] }),
         use: httpUse,
       },
@@ -66,23 +73,21 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     ...launch,
   },
-  webServer: [
-    {
-      command: `pnpm exec vite --port ${port} --strictPort`,
-      url: `http://localhost:${port}`,
-      reuseExistingServer: true,
-      timeout: 120_000,
-    },
-    ...(httpEnabled
-      ? [{
-          command: `pnpm exec vite --port ${httpPort} --strictPort`,
-          url: `http://localhost:${httpPort}`,
-          reuseExistingServer: false,
-          timeout: 120_000,
-          env: { HV_WEB_MODE: 'http', HV_API_ORIGIN: httpApiOrigin },
-        }]
-      : []),
-  ],
+  // The demo server exists only without the HTTP run: `in-process` does not run with `E2E_HTTP=1` (slice 031a review).
+  webServer: httpEnabled
+    ? [{
+        command: `pnpm exec vite --port ${httpPort} --strictPort`,
+        url: `http://localhost:${httpPort}`,
+        reuseExistingServer: false,
+        timeout: 120_000,
+        env: { HV_WEB_MODE: 'http', HV_API_ORIGIN: httpApiOrigin },
+      }]
+    : [{
+        command: `pnpm exec vite --port ${port} --strictPort`,
+        url: `http://localhost:${port}`,
+        reuseExistingServer: true,
+        timeout: 120_000,
+      }],
   projects: [
     {
       name: 'in-process',

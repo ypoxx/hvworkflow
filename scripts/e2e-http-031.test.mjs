@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ALLOWED_SERVICE_VARIABLES, FORBIDDEN_SERVICE_VARIABLES, PERSONS, START_LINE, assertLoginLimits, assertOutsideRepository,
+  ALLOWED_SERVICE_VARIABLES, FORBIDDEN_SERVICE_VARIABLES, LOADER_HINT, PERSONS, START_LINE, loaderIsActive, assertLoginLimits, assertOutsideRepository,
   assertServiceEnv, buildFixture, buildServiceEnv, checkAccessLogFiles, writePrivateFile,
 } from './e2e-http-031.mjs';
 import { KEYCLOAK_IMAGE, KEYCLOAK_IMAGE_FORM } from './lib/keycloak-ci.mjs';
@@ -235,7 +235,7 @@ function loadConfig(env) {
       webServer: [config.webServer].flat().map((entry) => ({ command: entry.command, url: entry.url,
         reuse: entry.reuseExistingServer, env: entry.env })),
       projects: config.projects.map((project) => ({ name: project.name, use: project.use,
-        dependencies: project.dependencies ?? [], testMatch: project.testMatch, testIgnore: project.testIgnore,
+        dependencies: project.dependencies ?? [], outputDir: project.outputDir, testMatch: project.testMatch, testIgnore: project.testIgnore,
         grepInvert: plain(project.grepInvert) })),
     }));`;
   const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e', script], {
@@ -288,8 +288,8 @@ test('configuration: with an IdP the setup project runs first; the port comes fr
   assert.deepEqual(config.projects.find((project) => project.name === 'http').dependencies, ['http-setup']);
   assert.equal(config.projects.find((project) => project.name === 'http').use.baseURL, 'http://localhost:4555');
   assert.equal(config.projects.find((project) => project.name === 'http-setup').use.baseURL, 'http://localhost:4555');
-  const [demo, http] = config.webServer;
-  assert.match(demo.command, /--port 4173 --strictPort/);
+  assert.equal(config.webServer.length, 1, 'the demo server only runs without E2E_HTTP');
+  const [http] = config.webServer;
   assert.match(http.command, /--port 4555 --strictPort/);
   assert.equal(http.url, 'http://localhost:4555');
   assert.equal(http.reuse, false);
@@ -399,4 +399,50 @@ test('MF-12: no file of this slice sets a test switch, a HV_E2E variable or a wi
     assert.doesNotMatch(source, /HV_E2E_[A-Z_]*\s*[:=]/, file);
     assert.doesNotMatch(source, /HV_CORS_ORIGINS\s*[:=]\s*['"`]?\S/, file);
   }
+});
+
+// ---- review round: failure report, signals, time, process group, loader ------------------------------------------------
+
+test('configuration: the output of both HTTP projects goes into the private state directory', () => {
+  const config = loadConfig({ E2E_HTTP: '1', E2E_HTTP_STATE_DIR: '/tmp/synthetic-state' });
+  for (const name of ['http-setup', 'http']) {
+    assert.equal(config.projects.find((project) => project.name === name).outputDir, '/tmp/synthetic-state/test-results', name);
+  }
+  assert.equal(config.projects.find((project) => project.name === 'in-process').outputDir, undefined);
+});
+
+test('the failure report cannot leave a password behind: variable set and output directory private', () => {
+  // Probe of the review: a password typed with `fill` lands in `error-context.md` (page snapshot). The variable
+  // `PLAYWRIGHT_NO_COPY_PROMPT` stops it for a plain failure but not for a failed matcher, so the output directory in the
+  // private state directory is what protects it; both are pinned here.
+  const harness = readFileSync(HARNESS, 'utf8');
+  assert.match(harness, /PLAYWRIGHT_NO_COPY_PROMPT: '1'/);
+  const config = readFileSync(join(WEB, 'playwright.config.ts'), 'utf8');
+  assert.match(config, /outputDir: `\$\{stateDir\}\/test-results`/);
+});
+
+test('harness: signals, total time limit, process group and free ports are handled', () => {
+  const source = readFileSync(HARNESS, 'utf8');
+  assert.match(source, /process\.once\('SIGINT'/);
+  assert.match(source, /process\.once\('SIGTERM'/);
+  assert.match(source, /detached: true/);
+  assert.match(source, /process\.kill\(-child\.pid/);
+  assert.match(source, /assertPortFree\(SERVICE_PORT\)/);
+  assert.doesNotMatch(source, /pkill|killall|lsof/);
+  const total = Number(/const TOTAL_MS = ([\d_]+);/.exec(source)?.[1].replaceAll('_', ''));
+  assert(total > 0 && total < 9 * 60_000, 'the total limit stays inside the 9 minutes of the CI step');
+});
+
+test('harness: without the tsx loader it says so with a fixed sentence', () => {
+  assert.equal(loaderIsActive(['--import', '/x/tsx/dist/loader.mjs'], ''), true);
+  assert.equal(loaderIsActive([], ''), false);
+  const result = spawnSync(process.execPath, [HARNESS, '--check'], { cwd: ROOT, encoding: 'utf8', timeout: 30_000, env: baseEnv });
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr, `${LOADER_HINT}\n`);
+});
+
+test('the guard test exists: a 429 from a route double must turn a test.fail() test into a pass', () => {
+  const source = readFileSync(join(WEB, 'e2e/031-http-betriebsart.spec.ts'), 'utf8');
+  assert.match(source, /G1: a 429[^]*?test\.fail\(\)[^]*?status: 429/);
+  assert.doesNotMatch(source.slice(source.indexOf('G1: a 429'), source.indexOf('H4/H5')), /@idp/);
 });

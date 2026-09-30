@@ -145,10 +145,20 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   konfigurierbar machen (mit 037).
 - 031a Bau · `apps/api/src/app.ts` (`/auth/callback`) · eine Person ohne aktive Rolle bekommt keine Sitzung (403 vor dem
   Cookie), die Seite „Keine aktive Rolle“ (takt-023) ist so nie erreichbar; die Spec 031a (H7) ging vom Gegenteil aus ·
-  Absicht klären, Spec H7 oder Dienst anpassen (H7 prüft heute „kein Cookie, `/auth/me` 401“).
-- 031a Bau · `apps/web/e2e/031-http-betriebsart.spec.ts` (H8) · die Seite lädt den Redebeitrag alle 30 s neu (Abfrage
-  in `http.ts`); trifft das Neuladen genau zwischen dem Schreiben des zweiten Schreibenden und dem Schreiben der Seite,
-  entfällt der 412 (Fenster unter einer Sekunde) · bei einem Fehlschlag den Lauf wiederholen, ggf. Uhr der Seite anhalten.
+  Absicht klären, Spec H7 oder Dienst anpassen (H7 prüft heute „kein Cookie, `/auth/me` 401“). Produktfrage: eine Person
+  ohne Rolle landet nach der Keycloak-Anmeldung auf einem rohen 403-JSON-Dokument des Dienstes, und die Keycloak-SSO-Sitzung
+  bleibt bestehen (die nächste Anmeldung geht ohne Formular wieder dorthin) · gestaltete Fehlerseite oder Weiterleitung zur
+  Seite „Keine aktive Rolle“, Abmelden beim IdP klären.
+- 031a Review major (Produktcode, **eigener Takt vor 031b**) · `apps/web/src/api/http.ts:146-152`, `:207-216`,
+  `features/speakers/Page.tsx:149-163` · im HTTP-Modus löst ein eigener erfolgreicher Schreibvorgang kein Neuladen aus: Liste
+  und ETag bleiben bis zu 30 s (Polling) veraltet, der nächste eigene Schreibvorgang läuft in 412; H6 und H8 laden deshalb
+  von Hand neu · nach jedem eigenen Schreibvorgang die Version erhöhen (wie der In-Process-Speicher). Nit 12 gehört dazu: H6
+  prüft den Weg `onUnauthorized` einer laufenden Seite nicht (nur Neuladen nach der Sperre); mit dem Takt ein Test, der ohne
+  Neuladen auf den Wechsel zur Anmeldung wartet.
+- 031a Bau · H8 · das 30-s-Polling der Seite hätte den 412 verhindern können; behoben: die Seite gilt für das Polling als
+  verborgen (`visibilityState` per `addInitScript`), kein Wiederholen nötig.
+- 031a Bau · Dienst (`viewSpeaker`) · Rollen ohne `question.identity.reveal` sehen nur „Redner N“; H8 nimmt die Kennung aus
+  der Antwort der Registrierung statt aus einer Suche nach dem Namen.
 - 030 nit · Auth-Fehlertexte fest `'de'`; HTTP-Build bündelt `CORPUS_DEMO` statisch; `Idempotency-Key` auch an Logout.
 - Nachprüfung e2e · `apps/web/e2e/003-answers-stage.spec.ts:44` · ein Test mit zehn axe-Läufen und Screenshots braucht
   auf langsamer Maschine > 90 s · teilen oder `test.slow()`. → eigener kleiner Takt (Teilung an der Seitengrenze, je Test < 60 s, kein `test.slow()`), nicht Teil von

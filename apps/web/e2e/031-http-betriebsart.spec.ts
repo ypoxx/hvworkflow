@@ -98,6 +98,18 @@ test.describe('H1–H3: the interface before any sign-in', () => {
     expect(headers['content-security-policy']).toContain("default-src 'none'");
     expect(headers['x-server-time']).toBeTruthy();
   });
+
+  test('G1: a 429 answered by the service turns the test red (the guard)', async ({ page }) => {
+    // The guard fails the test after its body; `test.fail()` turns that expected failure into a pass. Without the guard
+    // this test would end green and therefore fail.
+    test.fail();
+    await page.route('**/auth/transparency-notice', (route) => route.fulfill({
+      status: 429, contentType: 'application/problem+json',
+      body: JSON.stringify({ status: 429, title: 'Too Many Requests', detail: 'synthetic' }),
+    }));
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
+  });
 });
 
 test.describe.serial('H4/H5 @idp: sign in through the Keycloak form, then sign out', () => {
@@ -178,7 +190,8 @@ test.describe('H6 @idp: a blocked subject loses the session in the middle of it'
 
     expect((await page.request.get('/auth/me')).status()).toBe(401);
     // The page may already have left the app by itself (the 30 s poll ends in `onUnauthorized`), so nothing is clicked:
-    // a reload asks the service again, and the answer must be the sign-in page whichever way the page got there.
+    // a reload asks the service again, and the answer must be the sign-in page whichever way the page got there. This does
+    // not prove the `onUnauthorized` path of a running page; see the product entry "eigener Takt vor 031b" in docs/folgeliste.md.
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('session-role')).toHaveCount(0);
@@ -226,22 +239,28 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await expect(moderation.getByTestId('speaker-register')).toBeVisible({ timeout: 60_000 });
       await moderation.getByTestId('speaker-register').click();
       await moderation.getByTestId('speaker-register-name').fill(H8_SPEAKER_NAME);
-      // HTTP mode has no push: an own write does not refresh the list before the next 30 s poll, so the test
+      // HTTP mode has no push (product entry "eigener Takt vor 031b", docs/folgeliste.md): an own write does not refresh the list before the next 30 s poll, so the test
       // checks the answer of the service (status only, never the body) and then reloads the page.
       const registered = moderation.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
         new URL(candidate.url()).pathname === '/v1/speakers');
       await moderation.getByTestId('speaker-register-submit').click();
-      const registration = (await registered).status();
-      expect(registration, `HTTP status of the registration (${registration})`).toBe(201);
+      const registration = await registered;
+      expect(registration.status(), `HTTP status of the registration (${registration.status()})`).toBe(201);
+      // The id comes from the answer of the registration: the list read with the capture session shows only "Redner N",
+      // because that role may not reveal names (`question.identity.reveal`), so it cannot be searched by name.
+      const created = (await registration.json()) as { id?: unknown };
+      expect(typeof created.id, 'the registration answer carries an id').toBe('string');
+      const speakerId = created.id as string;
       await moderation.reload();
       await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible({ timeout: 30_000 });
 
-      const speakers = (await (await other.get('/v1/speakers')).json()) as { id: string; displayName: string }[];
-      const speaker = speakers.find((entry) => entry.displayName === H8_SPEAKER_NAME);
-      expect(speaker).toBeDefined();
-
       // 2. Capture writes the Redebeitrag of that Wortmeldung first and opens it.
-      await page.goto(`/capture?speaker=${speaker!.id}`);
+      // The 30 s poll of the page must not fire between the 201 of the second writer and the Enter key below: a hidden page
+      // does not poll (`http.ts`). Deterministic instead of a small window (folgeliste, 031a review).
+      await page.addInitScript(() => {
+        Object.defineProperty(document, 'visibilityState', { get: () => 'hidden' });
+      });
+      await page.goto(`/capture?speaker=${speakerId}`);
       await page.getByTestId('capture-text').fill(H8_CONTRIBUTION_TEXT);
       const captured = page.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
         new URL(candidate.url()).pathname === '/v1/contributions');
@@ -254,7 +273,7 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await expect(free).toBeVisible({ timeout: 30_000 });
 
       // 3. The second writer is the same capture session: it adds a question with the valid ETag.
-      const contributions = (await (await other.get(`/v1/contributions?speakerId=${speaker!.id}`)).json()) as
+      const contributions = (await (await other.get(`/v1/contributions?speakerId=${speakerId}`)).json()) as
         { id: string; version: number }[];
       expect(contributions).toHaveLength(1);
       const accepted = await other.post(`/v1/contributions/${contributions[0]!.id}/questions`, {
