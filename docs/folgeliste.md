@@ -275,14 +275,14 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 
 ## Strom-Dienst (aus 035b)
 
-- 035b Bau · `packages/contract/openapi.yaml` (`streamEvents`, Abschnitt „Rights per message“) · der Satz „gap-free in
+- ~~035b Bau · `packages/contract/openapi.yaml` (`streamEvents`, Abschnitt „Rights per message“) · der Satz „gap-free in
   `seq`“ gilt nur ohne `meetingId`-Filter; gebaut: mit Filter kommt jedes Ereignis dieses Jahrgangs nach dem Cursor genau
   einmal und aufsteigend, `id` bleibt global (Lücken = Ereignisse anderer Jahrgänge), Ereignisse ohne Jahrgang gehören
   nicht zum Filter; der Kopf rückt über `cursor` mit dem Heartbeat nach · Wortlaut im nächsten 0.3.x-Vertragsstand angleichen;
-  **vor dem Bau von 036b beheben** (Review 035b minor 7, vom Koordinator eingeplant).
-- 035b Bau · `packages/contract/openapi.yaml` (`components/headers/RetryAfter`) · die Beschreibung nennt nur die Werte
+  vor dem Bau von 036b beheben (Review 035b minor 7).~~ → erledigt in **takt-040** (Vertrag 0.3.12, Absatz „`meetingId` filter“).
+- ~~035b Bau · `packages/contract/openapi.yaml` (`components/headers/RetryAfter`) · die Beschreibung nennt nur die Werte
   für 429 und `PersistenceBusy`; `StreamUnavailable` sendet immer 30 (Stromgrenze, Migrationen offen, Persistenz beschäftigt),
-  auch die stromeigenen 429 senden 30; im Schema 1–60 · Beschreibung ergänzen.
+  auch die stromeigenen 429 senden 30; im Schema 1–60 · Beschreibung ergänzen.~~ → erledigt in **takt-040** (Vertrag 0.3.12).
 - 035b Bau · `packages/contract/openapi.yaml` · keine Operation dokumentiert 500; ein Öffnen bei verletzter Kette antwortet
   wie jede Fachanfrage 500 (Test 25 liest es deshalb über `app.request`, nicht über `req()`) · mit 0.4.0 (043) klären.
 - 035b Bau · `apps/api/src/server.ts:58` · die `serverOptions` sind nicht exportiert; der Test mit echtem Server wiederholt
