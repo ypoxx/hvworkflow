@@ -28,11 +28,12 @@ erwarten. Deshalb wird der Wortlaut vor 036b angeglichen.
 ## Ziel
 
 1. **`streamEvents`-Beschreibung:** „gap-free in `seq`“ gilt nur ohne `meetingId`-Filter. Ein neuer Absatz
-   „`meetingId` filter“ nennt die Filtersemantik: jedes Ereignis des Jahrgangs nach dem Cursor genau einmal und
-   aufsteigend, lückenlos innerhalb des Jahrgangs; `id` = globale `seq`; keine Ereignisse ohne Jahrgang unter Filter,
-   auch nicht bei `event.read`; Kopf über Heartbeat-`cursor`; die Grenze 1000 zählt `(cursor, head]` global.
-2. **`streamEvents`, Abschnitt „Limits“:** `Retry-After` ist immer 30 bei jedem 503 `StreamUnavailable` und beim 429 für
-   zu viele offene Ströme; eine `end`-Nachricht (auch `unavailable`) trägt keinen `Retry-After`.
+   „`meetingId` filter“ nennt die Filtersemantik: ein Leser mit `event.read` bekommt jedes Ereignis des Jahrgangs
+   nach dem Cursor genau einmal und aufsteigend, lückenlos innerhalb des Jahrgangs; jeder andere Leser nur
+   `change`-Nachrichten zu Ereignissen dieses Jahrgangs (R-PERM-04); `id` = globale `seq`; keine Ereignisse ohne Jahrgang unter Filter,
+   auch nicht bei `event.read`; Kopf über die `cursor`-Nachricht (nach dem Nachholen und mit dem Heartbeat); die Grenze 1000 zählt `(cursor, head]` global.
+2. **`streamEvents`, Abschnitt „Limits“:** `Retry-After` ist 30 bei jedem 503 `StreamUnavailable` und beim 429 für
+   zu viele offene Ströme; eine `end`-Nachricht (auch `unavailable`) trägt keinen `Retry-After`; danach gilt der SSE-`retry`-Wert (3000 ms) oder das eigene Backoff des Clients.
 3. **`RetryAfter`-Kopf:** der Wert 30 auf `/stream` für alle drei 503-Ursachen und die stromeigenen 429; ein 429 aus
    einer Lesequote behält die Fensterregel; ein offener Strom sendet den Kopf nie.
 4. **Version 0.3.12** nach ADR 0015 (Patch-Stufe, siehe „Versionsentscheidung“), mit CHANGELOG-Abschnitt, regenerierten
