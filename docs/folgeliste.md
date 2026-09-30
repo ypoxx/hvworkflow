@@ -302,6 +302,17 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035b Nachprüfung minor · `apps/api/src/__tests__/postgres-stream035.test.ts` (28) · im vollen Lauf unter Last zählte eine
   von rund 200 Stichproben eine belegte Verbindung (Gates-Lauf auf 8983814, Wiederholung grün); vermutlich ein Backend im
   Übergang „active → idle“ nach der Antwort · Stichprobe nur werten, wenn derselbe Backend-Zustand zweimal hintereinander besteht.
+- 035b Nachprüfung minor · `apps/api/src/stream/route.ts` (Prüfung `hub.loaded()` nach `ensureFresh()`) · die Zeile ist
+  ungetestet; die Mikrotask-Lücke zwischen `ensureFresh` und Akteurauflösung ließ sich mit den vorhandenen Hooks nicht
+  deterministisch erzeugen, eine Mutante ohne die Zeile überlebt · Hook an dieser Stelle ergänzen und testen.
+- 035b Gates-Lauf · `apps/api/src/__tests__/postgres-limits034a.test.ts` („query hangs past the service timer“, „COMMIT
+  phase hangs“) · lokal einmal rot unter Last (Last ≈ 5 auf 4 Kernen, 8983814), allein dreimal grün, in CI bisher grün ·
+  Zeitfenster der 034a-Tests unter Last prüfen.
+- takt-040 Review nit 5 · `packages/contract/openapi.yaml` (`components/responses/StreamUnavailable`) · sagt „one response
+  for both causes“, `RetryAfter` zählt drei Ursachen · Zählung bei der nächsten Vertragsänderung angleichen.
+- 035a Vertrag nit · `packages/contract/openapi.yaml` · `contract:lint` meldet vier `no-unused-components` für die
+  `Stream*`-Schemas, die nur über `x-sse-messages` verwendet werden; OpenAPI 3.1 kann SSE-Nachrichten nicht anders
+  ausdrücken · hinnehmen, bei 0.4.0 (043) erneut prüfen.
 
 ## Bühne und Wortmeldeliste (aus takt-039)
 
