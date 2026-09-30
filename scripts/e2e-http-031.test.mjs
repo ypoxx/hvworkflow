@@ -296,6 +296,71 @@ test('configuration: with an IdP the setup project runs first; the port comes fr
   assert.deepEqual(http.env, { HV_WEB_MODE: 'http', HV_API_ORIGIN: 'http://localhost:18999' });
 });
 
+test('takt-035: the HTTP web server builds, then previews the build on E2E_HTTP_PORT with the same outDir', () => {
+  const config = loadConfig({ E2E_HTTP: '1', E2E_HTTP_PORT: '4555', E2E_HTTP_STATE_DIR: '/tmp/synthetic-state' });
+  const [http] = config.webServer;
+  const match = /^pnpm exec vite build --outDir (\S+) --emptyOutDir && pnpm exec vite preview --outDir (\S+) --port 4555 --strictPort$/
+    .exec(http.command);
+  assert(match, `command shape: ${http.command}`);
+  assert.equal(match[1], match[2], 'build and preview use the same outDir');
+  assert.equal(match[1], "'/tmp/synthetic-state/web-build'", 'the build lies in the private state directory');
+  assert.doesNotMatch(http.command, /vite --port|vite dev|vite serve/, 'no dev server in the HTTP branch');
+  assert.deepEqual(http.env, { HV_WEB_MODE: 'http', HV_API_ORIGIN: 'http://localhost:18091' }, 'env stays exactly these two');
+  assert.equal(http.reuse, false);
+  assert.equal(http.url, 'http://localhost:4555');
+});
+
+test('takt-035: without a state directory the build goes below apps/web, outside dist and inside an ignored path', () => {
+  const [http] = loadConfig({ E2E_HTTP: '1' }).webServer;
+  const outDir = /vite build --outDir '([^']+)'/.exec(http.command)?.[1] ?? '';
+  assert(outDir.startsWith(`${WEB}/`), outDir);
+  assert(!outDir.startsWith(`${WEB}/dist`), 'not the dist of the gates build');
+  assert(outDir.startsWith(`${WEB}/node_modules/`), 'below node_modules, which git ignores');
+  assert.match(outDir, /\/\.e2e-http-build-\d+\/web-build$/, 'per-run suffix: runs do not share the directory');
+});
+
+test('takt-035: an empty or blank E2E_HTTP_STATE_DIR is treated as absent; a relative or root-level one is refused', () => {
+  for (const value of ['', '   ']) {
+    const [http] = loadConfig({ E2E_HTTP: '1', E2E_HTTP_STATE_DIR: value }).webServer;
+    const outDir = /vite build --outDir '([^']+)'/.exec(http.command)?.[1] ?? '';
+    assert(outDir.startsWith(`${WEB}/node_modules/.e2e-http-build-`), `fallback for ${JSON.stringify(value)}: ${outDir}`);
+  }
+  for (const value of ['/', 'relative/dir']) {
+    const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e',
+      `await import(${JSON.stringify(join(WEB, 'playwright.config.ts'))});`], {
+      cwd: WEB, encoding: 'utf8', timeout: 60_000, env: { ...baseEnv, E2E_HTTP: '1', E2E_HTTP_STATE_DIR: value } });
+    assert.notEqual(result.status, 0, value);
+    assert.match(result.stderr, /absolute path below the root directory/);
+  }
+});
+
+test('takt-035: a single quote in E2E_HTTP_STATE_DIR is refused at config load', () => {
+  const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e',
+    `await import(${JSON.stringify(join(WEB, 'playwright.config.ts'))});`], {
+    cwd: WEB, encoding: 'utf8', timeout: 60_000,
+    env: { ...baseEnv, E2E_HTTP: '1', E2E_HTTP_STATE_DIR: "/tmp/x'; touch /tmp/pwned; '" },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must not contain a single quote/);
+});
+
+test('takt-035: the demo branch stays the dev server', () => {
+  const [demo] = loadConfig({}).webServer;
+  assert.equal(demo.command, 'pnpm exec vite --port 4173 --strictPort');
+  assert.equal(demo.reuse, true);
+  assert.equal(demo.env, undefined);
+  const [demoPort] = loadConfig({ E2E_PORT: '4235' }).webServer;
+  assert.equal(demoPort.command, 'pnpm exec vite --port 4235 --strictPort');
+});
+
+test('takt-035: the comments say production build, not dev server; preview takes the proxy of server.proxy', () => {
+  const config = readFileSync(join(WEB, 'playwright.config.ts'), 'utf8');
+  assert.match(config, /vite preview/);
+  assert.doesNotMatch(config, /HTTP-Modus = Vite-Entwicklungsserver/);
+  const vite = readFileSync(join(WEB, 'vite.config.ts'), 'utf8');
+  assert.doesNotMatch(vite, /preview:\s*\{[^}]*proxy/, 'preview inherits server.proxy (Vite: preview.proxy ?? server.proxy)');
+});
+
 test('configuration: the default HTTP port is 4174', () => {
   const config = loadConfig({ E2E_HTTP: '1' });
   assert.equal(config.projects.find((project) => project.name === 'http').use.baseURL, 'http://localhost:4174');

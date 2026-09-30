@@ -218,6 +218,37 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
   reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
 
+- 031a Codex P2 (#80) / Review N1 · `scripts/e2e-http-031.mjs` (~398) · SIGINT/SIGTERM oder die Gesamtfrist gewinnt das
+  `Promise.race`, `body()` läuft weiter; ein Abbruch mitten in `startKeycloak()` oder `CREATE DATABASE` kann Container
+  oder Testdatenbank nach dem Aufräumen anlegen · laufenden Startschritt abbrechen bzw. `body()` vor dem Aufräumen
+  abwarten (nur lokal relevant; in CI räumt das Runner-Ende ab).
+- 031a Review N2 · `scripts/e2e-http-031.mjs` · SIGKILL der Playwright-Prozessgruppe ohne Gnadenfrist · erst SIGTERM,
+  kurze Frist, dann SIGKILL.
+- 031a Review G1 · `apps/web/e2e/031-http-betriebsart.spec.ts` G1 · `test.fail` kann einen Fehlschlag aus anderem Grund
+  als erwartet verdecken · erwartete Fehlermeldung ausdrücklich prüfen.
+- 034b nit · Startzeile des Dienstes · IPv6-Adressen der Proxy-Quelle nicht in kanonischer Form ausgegeben · kanonisch
+  ausgeben.
+- takt-033b Review minor · `apps/web/src/api/useApiVersion.ts`, `App.tsx` · nach Rückkehr in einen Hintergrund-Tab bleibt
+  die Ansicht bis zum nächsten 30-s-Takt alt (früher sofortiges Neuladen über den `/auth/me`-Refresh) · Polling-Hörer
+  beim Sichtbarwerden einmal auslösen (`http.ts`).
+- takt-033b Review minor · `apps/web/e2e/031-http-betriebsart.spec.ts` H10 · Probe nach dem Sichtbarkeitswechsel nicht
+  geprüft; `networkidle` als Wartebedingung ist eine Heuristik · beide Zählungen am Ende prüfen, auf Produktsignal warten.
+
+## Dienst: Kettenprüfung (aus takt-033)
+
+- takt-033 Review nit 6 · `apps/api/src/persistence/postgres.ts` (`PROBE_SQL`) · die warme Digest-Abfrage liest je
+  Anfrage alle Zeilen mit `envelope::text` (22–25 ms bei 2138 Ereignissen unter Last, linear mit der Loggröße) ·
+  Digest je Zeile in einer Spalte speichern (Migration) oder den Präfix-Digest in Postgres materialisieren; erst mit
+  Messung ab ca. 10.000 Ereignissen. (Seit dem Codex-P1-Fix heißt die Abfrage `CHAIN_SQL`.)
+- takt-033 Nachprüfung Codex P1 minor · `apps/api/src/persistence/postgres.ts` (`ChainLoad.rowsRead`) · die Doku sagt
+  „alle auf dem vollen Pfad“; nach einer abweichenden Probe zählt `rowsRead` zusätzlich die Suffixzeilen aus `CHAIN_SQL` ·
+  Doku-Zeile anpassen.
+- takt-033 Nachprüfung Codex P1 nit · `apps/api/src/persistence/postgres.ts` (`CHAIN_SQL`) · bei Digest- oder
+  Lückenabweichung werden neuere Zeilen zweimal gelesen (`CHAIN_SQL`, dann `loadFull`) · nur Kosten im Seltenfall; mit
+  dem Digest-Punkt oben zusammen betrachten.
+- takt-033 Nachprüfung Codex P1 nit · Postgres-Tests takt-033 · pg-Warnung „Calling client.query() when the client is
+  already executing a query“ (alter wie neuer Stand) · Ursache vor pg@9 klären.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -269,3 +300,5 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Dialog bleibt ohne Hinweis offen) · Sperre sichtbar machen (Ziehen aus, Knopf `aria-disabled`, Rundensignal) oder Hinweis.
 - takt-032 R2 nit · `capture/Page.tsx:224-226`, `speakers/Page.tsx` · `shownRef`/`latest` im passiven Effekt; zwischen
   Commit und Effekt kann `base` kurz veralten → normales 412 mit Banner · Ref im Layout-Effekt oder beim Landen setzen.
+- takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
+- takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).
