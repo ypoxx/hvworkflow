@@ -2,7 +2,7 @@
 
 **Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `6552a1e`: 12 major, 11 minor, 3 nit; Teil 1 der geteilten Scheibe 043, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
 **Risikoklasse:** hoch · 1,5 AStd · 23.10.2026 (W4) laut Plan; Baustart frühestens nach Auswertung von Feedback-Runde 2, vorher nur mit Go des Eigentümers (Eigentümerfrage 1) · Lanes: contract; web-api (nur Aufhebung der lokalen Sperre für `reason`); service nur Vertragstests
-**Rolle:** architect (Vertrag, CHANGELOG, Allowlist, Registervermerke; erster Commit). web-implementer für die Aufhebung in `apps/web/src/api/http.ts` (zweiter Commit, nach dem Vertrag). Review in frischem Kontext mit Perspektive Vertrag (6.4), Legal (Verweigerung) und Security (Maskierung der Begründung, SG2). Vor dem Bau liest ein frischer Kontext die Spec erneut. Das Review wird nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
+**Rolle:** architect (Vertrag, CHANGELOG, Allowlist, Verweise im Register ohne Statuswechsel; erster Commit). web-implementer für die Aufhebung in `apps/web/src/api/http.ts` (zweiter Commit, nach dem Vertrag). Review in frischem Kontext mit Perspektive Vertrag (6.4), Legal (Verweigerung) und Security (Maskierung der Begründung, SG2). Vor dem Bau liest ein frischer Kontext die Spec erneut. Das Review wird nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue Regel im Kern. Dokumentiert werden R-SPK-00..05 und R-SPK-GUARD-01 (409 auf `updateSpeaker`) sowie R-PERM-01 und R-PERM-02. Für 044 reserviert und nur im Vertragstext genannt: R-GUARD-08 („Verweigerung nur mit Rechtsfreigabe-Ereignis“) und R-GUARD-09 (Grundpflicht für Pfad B); angewandt werden R-GUARD-06 und R-GUARD-07. Dazu AGENTS.md R1, R2, R4, R6, R7, R10, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5.5/043, §3 „Zustandsmodell und Verweigerung“, §10 (E15, E21, E25), §11 Etappe C, Lane-Tabelle §5.1 (Zeile 286)
@@ -10,7 +10,7 @@
 - Spec 080 (Nachtrag R1, „Open“)
 - `docs/folgeliste.md`: 029a nit 6, 080 → 043, 035b „kein 500“, takt-040 nit 5, 035a nit `no-unused-components`, 034a „→ 043“
 - Review 012 Punkt 18; Review 023 (keine Erweiterung bestehender Anfrageschemas durch einen reinen Vertragsstand)
-- Bedrohungsmodell SG2, T-G1-I-01, T-G1-E-02, T-G1-E-03, MF-07
+- Bedrohungsmodell SG2, T-G1-I-01, T-G1-I-02, T-G1-I-04, T-G1-I-09, T-G1-E-02, T-G1-E-03, T-G1-E-04, MF-07
 - Lesebefund zu Spec 043a (30.09.2026)
 
 **Depends on:** 023, 014, 080 (alle gemergt); Vertrag 0.3.12 auf `ca94899`
@@ -137,7 +137,7 @@ die Nummer aus dem Plan. Die veralteten Verweise stehen an diesen Stellen: ADR 0
   (Domänentyp `packages/domain/src/types.ts:301-306`). Der Validator lässt ihn heute durch, weil `SpeakerUpdate` Zusatzfelder
   nicht verbietet. Im Vertrag steht er nicht.
   - Der Web-Client im Dienstmodus **sperrt `reason` lokal**: `apps/web/src/api/http.ts:621-625` antwortet ohne Anfrage mit
-    422 und `http.unsupported`. Festgeschrieben ist das in `apps/web/src/api/http.test.ts:192-196` und 310-318.
+    422 und `http.unsupported`. Festgeschrieben ist das in `apps/web/src/api/http.test.ts:192-196` und 311-319.
   - Folge: R-SPK-05 ist im Dienstmodus über die Oberfläche nicht erreichbar, auch wenn der Vertrag den Grund
     aufnimmt. Heute sendet keine Oberflächenstelle `follow_up` (keine Fundstelle außerhalb der Tests). Die Aufhebung ist
     trotzdem Teil von 043a: Die Sperre verweist ausdrücklich auf „einen späteren Vertrag“, und das ist 0.4.0.
@@ -201,7 +201,8 @@ und der Dienst ändern sich nicht. Nur Vertragstests, die Ausnahmeliste und die 
   - Das engt ein, was der Validator bisher angenommen hat, und gehört deshalb in 0.4.0.
 - **Aufhebung der lokalen Sperre (web-api, zweiter Commit):** `updateSpeaker` in `apps/web/src/api/http.ts` sendet
   `reason` an den Dienst wie jedes andere Feld. Die beiden Tests in `http.test.ts` prüfen dann den gesendeten Body mit
-  `reason: 'follow_up'` und das Ergebnis `ok` statt `local_reject`. Wird `http.unsupported` danach nirgends mehr
+  `reason: 'follow_up'`; das Ergebnis heißt `'success'` statt `'local_reject'` (`WriteOutcome`, `http.ts:44`). Der
+  JSDoc-Satz in `http.ts:27` („the speaker reopen reason“) entfällt. Wird `http.unsupported` danach nirgends mehr
   verwendet, entfällt der Schlüssel in beiden Sprachdateien.
 
 ### 2. Nachträge dokumentierter Status (Antwortseite, additiv, aber im selben Schritt)
@@ -217,10 +218,10 @@ und der Dienst ändern sich nicht. Nur Vertragstests, die Ausnahmeliste und die 
   - **`seq` im `detail` ist offengelegt und bleibt:** Die globale Folgenummer ist kein Geheimnis. Jeder Leser erhält sie
     ohnehin als `id` der `change`- und `cursor`-Nachrichten auf `/stream` (R-PERM-04). Die Beschreibung sagt das. Sonst
     stehen im `detail` kein Stack, keine Verbindungsdaten und keine internen Kennungen.
-  - `InternalError` wird auf **jeder Operation unter `/v1` und auf `getMetrics`** dokumentiert (Vorbild 034a mit 503
-    `PersistenceBusy`).
-  - Die übrigen Operationen mit eigenem `servers`-Eintrag (`/healthz`, `/readyz`, `/auth/*`) prüft der Architekt beim Bau
-    einzeln (Vor-dem-Bau-Punkt 5). Kann eine davon 500 liefern, nimmt er es auf und nennt es im Bericht.
+  - `InternalError` wird auf **jeder Operation** dokumentiert: unter `/v1` wie auch auf `getMetrics`, `getHealth`,
+    `getReadiness` und den `/auth/*`-Operationen (Vorbild 034a mit 503 `PersistenceBusy`). Begründung: `onError`
+    (`apps/api/src/app.ts:716`) gilt global. Jede Route, auch `/healthz` und `/readyz`, antwortet bei einer unerwarteten
+    Ausnahme mit 500 `An unexpected error occurred.`. Eine Ausnahme je Route gibt es nicht.
 - `UNDOCUMENTED_STATUS_EXCEPTIONS` wird dadurch leer (`{}`). Export, Typ und Prüfung bleiben, damit eine künftige
   Ausnahme wieder begründet eingetragen werden kann. Der Kommentar nennt 0.4.0 als Ende der fünf Lücken.
 
@@ -235,8 +236,8 @@ und der Dienst ändern sich nicht. Nur Vertragstests, die Ausnahmeliste und die 
 - `AnswerVersion` erhält vier **optionale** Antwortfelder. `required` bleibt `[version, text, createdAt, createdBy]`.
   - `answerKind` (`AnswerKind`); fehlt es, gilt `answer`.
   - `refusalGroundId` (string, maxLength 128).
-  - `refusalGroundHash` (`Sha256Hex`): SHA-256 über das kanonische JSON des `RefusalGround`-Eintrags zum Zeitpunkt des
-    Vorschlags. Das ist der **Audit-Pfad des Katalogs** (Entscheidung unten).
+  - `refusalGroundHash` (`Sha256Hex`): der Wert von `RefusalGround.hash` des gewählten Eintrags **beim Vorschlag**. Das
+    ist der **Audit-Pfad des Katalogs** (Entscheidung und Definition unten).
   - `refusalJustification` (string): die Begründung, eine Rechtseinschätzung (SG2). Maskiert nach der Regel unten.
   - Invarianten (Antwortseite, `if`/`then`):
     - Ist `answerKind` `answer` oder fehlt es, erscheint keines der drei `refusal*`-Felder.
@@ -251,12 +252,17 @@ und der Dienst ändern sich nicht. Nur Vertragstests, die Ausnahmeliste und die 
   - `citation`: string;
   - `docVersion` und `docHash`: `type: [string, 'null']`;
   - `verified`: boolean.
+  - **Bewusste Erweiterung gegenüber dem Domänentyp:** Im Kern sind `docHash` heute das Literal `null` und `verified`
+    das Literal `false`. Der Vertrag erlaubt string bzw. `true`, weil die Rechtsprüfung (076) genau diese Werte setzt.
+    Ohne die Erweiterung bräuchte 076 einen Vertragszyklus.
 - `RefusalGround`: `required: [id, title, stageText, legalRef, hash]`.
   - `id`: maxLength 128.
   - `title`.
   - `stageText`: Formulierungsbaustein für die Bühne.
   - `legalRef`: `LegalRef`.
-  - `hash`: `Sha256Hex`, derselbe Wert, den `refusalGroundHash` beim Vorschlag festhält.
+  - `hash`: `Sha256Hex`. **Definition:** SHA-256, hexadezimal in Kleinbuchstaben, über die UTF-8-Bytes der
+    kanonischen Form nach RFC 8785 (JSON Canonicalization Scheme) des `RefusalGround`-Eintrags **ohne** das Feld `hash`
+    selbst. Die Definition ist also nicht zirkulär.
   - Die Texte sind Inhalt in der Inhaltssprache des Jahrgangs (E21: `de`), keine Oberflächentexte. Das Kennzeichen
     „ungeprüft“ leitet die Oberfläche aus `legalRef.verified === false` ab (045, i18n).
 - `RefusalProposal`, der Body der neuen Operation: `required: [answerKind, text]`, **`additionalProperties: false`**.
@@ -277,7 +283,7 @@ und der Dienst ändern sich nicht. Nur Vertragstests, die Ausnahmeliste und die 
 
 | operationId | Methode und Pfad | Body | Recht (ab 044) | Wirkung (ab 044) | Antworten |
 |---|---|---|---|---|---|
-| `listRefusalGrounds` | `GET /refusal-grounds` (global, ohne Jahrgang) | — | lesbar für Halter von `question.read`, `question.read.delivered` oder `stage.read`, also für jeden, der eine Verweigerung sehen darf | Katalog aus `packages/domain/src/refusalGrounds.ts` (044), jeder Eintrag mit `hash` | 200 (Array aus `RefusalGround`), 401, 403, 408, 429, 500, 503 |
+| `listRefusalGrounds` | `GET /refusal-grounds` (global, ohne Jahrgang) | — | lesbar für Halter von `question.read`, `question.read.delivered` oder `stage.read`, also für jeden, der eine Verweigerung sehen darf, **ausdrücklich auch der Beobachter** (`question.read.delivered`). Das ist vertretbar: Der Katalog ist allgemeiner Inhalt (Titel, Formulierungsbaustein, Normzitat) und keine Rechtseinschätzung zu einer Frage. SG2 (`docs/sicherheit/bedrohungsmodell.md:85`) schützt die Begründung der einzelnen Verweigerung, nicht den Katalog | Katalog aus `packages/domain/src/refusalGrounds.ts` (044), jeder Eintrag mit `hash` | 200 (Array aus `RefusalGround`), 401, 403, 408, 429, 500, 503 |
 | `proposeRefusal` | `POST /questions/{questionId}/refusals` | `RefusalProposal` | `question.refuse.propose` | Eine neue, unveränderliche Antwortversion mit `answerKind` ≠ `answer`, geschrieben als `AnswerDrafted`. Kein neuer Ereignistyp: Eine Verweigerung ist technisch eine Antwortversion (ADR 0012). Der Übergang folgt der Tabelle aus 044 | wie `draftAnswer` plus 401 und 500. Die 409-Beschreibung nennt R-GUARD-09 und die Übergangszeilen aus 044 |
 | `approveRefusal` | `POST /questions/{questionId}/refusal-approvals` | `{ answerVersion }` | `question.refuse.approve` | Geschrieben als `QuestionApproved`, gebunden an die Version. Ab 044 ist `approveQuestion` auf einer Verweigerungsversion 409, `approveRefusal` auf einer Antwortversion ebenfalls 409 | wie `approveQuestion` plus 401 und 500. Die 409-Beschreibung nennt R-GUARD-06 (Vier-Augen), R-GUARD-08 (Rechtsfreigabe-Ereignis) und die Zeile aus 044 |
 
@@ -299,7 +305,20 @@ bekäme die Verweigerung bis 044 einen stillen Annahmepfad.
 - Ohne Festhalten ließe sich später nicht belegen, welcher Wortlaut und welches Zitat bei der Freigabe galten.
 - Ein optionales Antwortfeld mit dem Hash des Eintrags ist additiv-sicher. Es macht jede Verweigerung gegen eine
   Katalogfassung prüfbar und braucht keinen neuen Pfad.
-- Kosten jetzt: 0 AStd Vertrag über diese Spec hinaus; 044 berechnet den Hash, etwa 0,25 AStd.
+- **Wann der Nachweis entsteht:** Der Hash wird **beim Vorschlag** festgehalten. Bei der Freigabe (`approveRefusal`)
+  prüft 044 ihn gegen den **aktuellen** Katalog. Hat sich der Eintrag seit dem Vorschlag geändert, antwortet
+  `approveRefusal` mit 409. Die Regel-id vergibt 044 beim Bau, als nächste freie R-GUARD-Nummer. Die Verweigerung muss
+  dann neu vorgeschlagen werden, und die Freigabe gilt nie einem Wortlaut, den niemand vorgeschlagen hat.
+- **Wo alte Einträge wiederzufinden sind:**
+  - Primär enthält die `AnswerDrafted`-Nutzlast von `proposeRefusal` additiv einen Schnappschuss `answer.refusalGround`
+    mit `title`, `stageText` und `legalRef` des Eintrags beim Vorschlag. Beschrieben ist er in der `Event`-Beschreibung
+    von 043a; gebunden wird er im Nutzlastschema von 043c, geschrieben von 044. Daraus lässt sich der Hash jederzeit neu
+    berechnen.
+  - Sekundär bleibt die Git-Historie von `packages/domain/src/refusalGrounds.ts`.
+- `text` und `refusalJustification` der Version schützt die Hash-Kette der Ereignisse: `hash`/`prevHash` im
+  gespeicherten Original, in `EventRead` als `sourceHash`. Der Katalog-Hash deckt nur den Katalogeintrag ab.
+- Kosten jetzt: 0 AStd Vertrag über diese Spec hinaus. 044 berechnet Hash, Schnappschuss und Freigabeprüfung, etwa
+  0,5 AStd.
 - Verworfen: `GET /meetings/{meetingId}/refusal-grounds`. Das kostet rund 0,5 AStd mehr (Katalog in den
   Jahrgangsstammdaten, Kopplung an den Konfigurationsfreeze aus 040) und belegt trotzdem nicht, welcher Eintrag der
   einzelnen Verweigerung zugrunde lag.
@@ -308,23 +327,26 @@ bekäme die Verweigerung bis 044 einen stillen Annahmepfad.
 - Leserkreis: nur Halter von `question.refuse.propose` oder `question.refuse.approve`, nach Standard also `legal`,
   `coordination` und `approver`.
   - **Nicht** über `question.legal.clear`, sonst läse admin mit (`permissions.ts:74`).
-  - **admin ist ausdrücklich ausgeschlossen** (Rechtekonzept §4: „Administration ist Rechteverwaltung, nicht Inhaltsbearbeitung“; Tabelle „Administration | Rechte, keine Inhalte“). 044 nimmt
+  - **admin ist ausdrücklich ausgeschlossen** (Rechtekonzept §4, `docs/rollen-und-rechtekonzept.md:173`: „Administration ist Rechteverwaltung, nicht Inhaltsbearbeitung“; §5, Tabelle Zeile 202: „Administration: Rechte, keine Inhalte“). 044 nimmt
     `question.refuse.*` in die Ausschlussliste von admin auf.
 - Die Regel gilt für **jeden Lesepfad**, und der Vertrag nennt sie an jeder Stelle:
   - `Question.answers`: `getQuestion`, `listQuestions`, `listMeetingQuestions` und jede Antwort `QuestionUpdated`. Das Feld
     fehlt für andere Leser.
   - `StageView` (`getStage`, `getMeetingStage`): fehlt immer. Das Podium hält kein `refuse.*`.
   - `EventRead` (`getQuestionHistory`, `listEvents`, `event`-Nachrichten von `streamEvents`): **fehlt immer, für jeden
-    Leser.** Im Schema steht `payload.answer.properties.refusalJustification: false`, neben `personId: false`. Diese
+    Leser.** Im Schema steht `payload.answer.properties.refusalJustification: false`, wie `createdBy.personId: false`. Diese
     Maskierung ist statisch, weil `maskEvent` den Leser nicht kennt. Berechtigte Leser sehen die Begründung über
     `Question.answers`.
   - Export (043d): Standard nein; 043d entscheidet mit Perspektive Legal.
-- Das gespeicherte Original-Ereignis trägt die Begründung (Append-only, R7). Es verlässt den Dienst nur über den
-  Hash-Nachweis.
+- Das gespeicherte Original-Ereignis trägt die Begründung (Append-only, R7) und ist über die Hash-Kette geschützt. Die
+  Begründung verlässt den Dienst nur über `Question.answers` an Halter von `refuse.*`.
+- **Suche:** `listQuestions` mit `q` durchsucht heute `answers[].text` (`packages/domain/src/api.ts:702`). 044 darf
+  `refusalJustification` nie in diesen Suchtext aufnehmen. Sonst verriete ein Treffer die Begründung (T-G1-I-04).
 - `refusalGroundId`, `refusalGroundHash` und `text` werden nicht maskiert: Der Grund ist Katalogdatum, `text` ist der
   Wortlaut für die Bühne.
 - Die Beschreibung von `Event` nennt die Verweigerungsfelder der `AnswerDrafted`-Nutzlast (`answer.answerKind`,
-  `answer.refusalGroundId`, `answer.refusalGroundHash`; `answer.refusalJustification` nur im gespeicherten Original). Ein
+  `answer.refusalGroundId`, `answer.refusalGroundHash`, Schnappschuss `answer.refusalGround`; `answer.refusalJustification`
+  nur im gespeicherten Original). Ein
   gebundenes Nutzlastschema für `AnswerDrafted` folgt mit 043c (Webhooks).
 
 **Rechte.** `Action` erhält `question.refuse.propose` und `question.refuse.approve`. Beschreibung: „Since 0.4.0
@@ -359,11 +381,14 @@ enthält sie ab 044 nach Tabelle und Guards (R-GUARD-08, R-GUARD-09).
   - `reason` nennt Scheibe und Recht.
   - Die sechs Einträge von 040 bleiben unverändert.
 - **Typen:** `pnpm contract:types` regeneriert `packages/contract/src/types.ts`. Der Diff gehört als Auszug in den Bericht.
-- **`docs/entscheidungsregister.md`** (durch den Orchestrator mit dem Merge, Plan Zeilen 9, 190, 234 und Registerregel
-  „nur mit dem Merge der genannten Scheibe“):
-  - Status von E15, E21 und E25: `auf Standard gebaut am <Merge-Datum> in 043a (Vertragsform)`.
-  - Zeile S6 (ADR 0012) erhält den Verweis auf 043a.
-  - Keine andere Zeile. 044 ergänzt „im Code“.
+- **`docs/entscheidungsregister.md`** (durch den Orchestrator mit dem Merge):
+  - **Kein Statuswechsel.** Nach der Registerregel wechselt der Status nur „mit dem Merge der genannten Scheibe“.
+    043a ist in keiner Zeile genannt: E15 nennt 011, 044, 052, 076; E21 nennt 055; E25 nennt 021, 059
+    (`entscheidungsregister.md:50, 56, 60`). „(Vertragsform)“ ist keine der vier festen Statusformen, und den Standard
+    von E21 baut 043a nicht. Die Statuswechsel kommen mit 044.
+  - Erlaubt ist nur ein Verweis in einer Textspalte: „Betroffene Scheibe(n)“ von E15 und E25 erhält „043a (Vertragsform)“,
+    und Zeile S6 (ADR 0012) erhält in ihrer Textspalte den Verweis auf 043a.
+  - Keine andere Zeile, keine Statusspalte.
 
 ## Versionierung und Tore (ADR 0015)
 
@@ -434,8 +459,8 @@ Vertragstests (nur so weit, wie der Vertrag sie mitzieht):
 
 Web-Client (web-implementer, zweiter Commit, nach dem Vertrag):
 
-- `apps/web/src/api/http.ts` (nur die lokale Sperre in `updateSpeaker`)
-- `apps/web/src/api/http.test.ts` (nur die beiden Tests zur Sperre, Zeilen 192-196 und 310-318)
+- `apps/web/src/api/http.ts` (nur die lokale Sperre in `updateSpeaker` und der JSDoc-Satz in Zeile 27)
+- `apps/web/src/api/http.test.ts` (nur die beiden Tests zur Sperre, Zeilen 192-196 und 311-319)
 - `apps/web/src/i18n/shell.de.ts` und `apps/web/src/i18n/shell.en.ts` (nur Streichung von `http.unsupported`, falls
   unbenutzt)
 
@@ -444,8 +469,8 @@ Dokumente:
 - `docs/slices/043a-vertrag-bereinigung-verweigerung.md` (diese Spec: Bericht, Review findings)
 - `docs/folgeliste.md` (nur: die von 043a erledigten Einträge abhaken, 034a „→ 043“ umlenken, die drei neuen Einträge aus
   „Folgelisten-Einträge“ unten, neue nicht blockierende Befunde)
-- `docs/entscheidungsregister.md` (nur durch den Orchestrator mit dem Merge: Status von E15, E21 und E25 sowie der
-  Verweis in S6, siehe Ziel 5)
+- `docs/entscheidungsregister.md` (nur durch den Orchestrator mit dem Merge und nur Textspalten: „043a“ in „Betroffene
+  Scheibe(n)“ von E15 und E25 und der Verweis in S6; keine Statusspalte, siehe Ziel 5)
 - `docs/produktplan-beta.md` (nur nach dem Merge durch den Orchestrator und nur so weit, wie der Eigentümer die Fragen 2
   und 5 freigegeben hat: Teilungsvermerk im Eintrag 043, Vermerke aus Eigentümerfrage 5, Stand-Zeile Etappe C)
 
@@ -472,7 +497,8 @@ liest.
 4. Ein PATCH mit leerem Body `{}` auf `/v1/speakers/{id}` antwortet 200 ohne Ereignis und ohne neue Version (takt-015).
    Das ist der Ersatz für den `requestedMinutes`-Block in `contract.test.ts`. Ist es anders, den Block mit dem
    tatsächlichen Verhalten neu fassen und im Bericht nennen.
-5. Welche Operationen mit eigenem `servers`-Eintrag außer `/metrics` können 500 liefern (Ziel 2)? Befund in den Bericht.
+5. Fängt eine Route mit eigenem `servers`-Eintrag Fehler selbst ab, sodass `onError` sie nicht erreicht? Dann bleibt 500
+   trotzdem dokumentiert (Ziel 2): die Antwort ist nur unwahrscheinlicher, nicht ausgeschlossen. Befund in den Bericht.
 6. Wird `http.unsupported` außer in `http.ts:624` noch verwendet? Wenn ja, bleibt der Schlüssel.
 7. Weichen Zeilenangaben ab: melden und anhalten.
 
@@ -487,11 +513,11 @@ liest.
    - `updateSpeaker` dokumentiert 409;
    - HTTP: PATCH mit `reason: 'x'` → 422;
    - `finished → waiting` mit `reason: 'follow_up'` → 200;
-   - `finished → waiting` ohne Grund → 409 mit `ruleId` **R-SPK-GUARD-01** (`transitions.ts:789`).
+   - `finished → waiting` ohne Grund → 409 mit `ruleId` **R-SPK-GUARD-01** (Guard `isFollowUp`, `packages/domain/src/transitions.ts:674-675`, an der Zeile R-SPK-05).
 4. Jede Operation aus `OPERATIONS_0_2` dokumentiert 401. `listQuestions`, `returnQuestion` und `withdrawQuestion`
    dokumentieren 422. `UNDOCUMENTED_STATUS_EXCEPTIONS` ist leer.
 5. `InternalError`:
-   - jede Operation ohne eigenen `servers`-Eintrag und `getMetrics` dokumentieren 500 mit `InternalError`;
+   - jede Operation dokumentiert 500 mit `InternalError`, auch `getHealth`, `getReadiness`, `getMetrics` und `/auth/*`;
    - die Beschreibung enthält die vier `detail`-Texte aus dem Befund.
 6. `AnswerKind` hat genau die drei Werte, und `AnswerVersion.required` ist unverändert. Ajv-Prüfung der Antwortseite,
    **ausgehend von einer vollständigen gültigen `AnswerVersion`** (`version`, `text`, `createdAt`, gültiger `createdBy`).
@@ -500,6 +526,9 @@ liest.
    - `answerKind: 'answer'` plus `refusalGroundId: 'g'`: ungültig;
    - `refusal_with_ground` mit `refusalGroundId` und `refusalGroundHash`, ohne Begründung: gültig;
    - `refusal_with_ground` ohne `refusalGroundHash`: ungültig;
+   - `refusal_with_ground` ohne `refusalGroundId`: ungültig;
+   - `answer` mit `refusalJustification`: ungültig;
+   - `answer` mit `refusalGroundHash`: ungültig;
    - `refusal_no_claim` mit `refusalGroundId`: ungültig;
    - `refusal_no_claim` nur mit `refusalJustification`: gültig.
 7. `RefusalProposal`:
@@ -528,7 +557,8 @@ liest.
 13. `EventRead`:
     - `payload.answer.properties.refusalJustification` ist `false`;
     - ein `EventRead` mit `payload.answer.refusalJustification` ist ungültig.
-14. `RefusalGround.required` enthält `hash`, und `AnswerVersion.properties.refusalGroundHash` verweist auf `Sha256Hex`.
+14. `RefusalGround.required` enthält `hash`, und `AnswerVersion.properties.refusalGroundHash` verweist auf `Sha256Hex`. Die
+    Beschreibung von `RefusalGround.hash` nennt RFC 8785, UTF-8, Kleinbuchstaben-Hex und „ohne `hash`“.
 
 **Mutationsproben** (im Bericht mit dem Ergebnis „rot“ belegt, danach zurückgesetzt):
 - `kind` wieder in `SpeakerRegistration` → Test 2 und Test 10 rot.
@@ -541,8 +571,10 @@ liest.
   wandert als Test 11 hierher. In den übrigen Bodies entfällt `kind: 'shareholder'`.
 - `contract.test.ts`: Der Block der Zeilen 175-186 sendet `{}` statt `{ requestedMinutes: 7 }` (Vor-dem-Bau-Punkt 4), und
   der Kommentar nennt 0.4.0.
-- `http.test.ts`: Die beiden Tests zur lokalen Sperre prüfen jetzt den gesendeten Body mit `reason: 'follow_up'` und das
-  Ergebnis `ok`. Der CSRF-Teil des zweiten Tests bleibt unverändert.
+- `http.test.ts`:
+  - Der erste Test (Zeilen 192-196) prüft den gesendeten Body mit `reason: 'follow_up'` (eine Anfrage, Methode PATCH).
+  - Der zweite Test (Zeilen 311-319) erwartet `['local_reject', 'success']` und genau eine Anfrage. Der CSRF-Teil
+    ohne Sitzung bleibt `local_reject`.
 
 ## Akzeptanzkriterium
 
@@ -590,13 +622,19 @@ E15, E21, E25, ADR 0012 (Standards unten)
 - **Rechte-Diff vor dem Bau: leer.** `ROLE_PERMISSIONS` und die Wahrheitstabelle bleiben unverändert, beide neuen
   Bezeichner sind bis 044 deny by default. Vorschau für 044 (nicht Teil dieser Scheibe): propose an `legal` und
   `coordination`, approve an `approver`, **ausdrücklich nicht an `admin`**.
-- **Bedrohungen, die 043a berührt:**
+- **Bedrohungen, die 043a berührt** (SG2, T-G1-I-01, T-G1-I-02, T-G1-I-04, T-G1-I-09, T-G1-E-02, T-G1-E-03, T-G1-E-04,
+  MF-07):
   - **SG2** (Rechtseinschätzungen): Die Begründung ist neu im Vertrag. 043a legt die Maskierung für alle Lesepfade fest,
     044 setzt sie durch.
   - **T-G1-I-01** (Lesen ohne Recht): Historie, `listEvents` und Strom liefern die Begründung nie (Schema-`false`).
   - **T-G1-E-02** (Selbstfreigabe) und **MF-07** (Selbstfreigabe über Rollenwechsel oder Vertretung): `approveRefusal`
     unterliegt R-GUARD-06, die 409-Beschreibung nennt es.
   - **T-G1-E-03** (Rechtstor umgehen): R-GUARD-08 vor jeder Freigabe einer Verweigerung; kein Eilpfad.
+  - **T-G1-I-02** (Massenlesen über `listEvents`): Die Begründung fehlt in jedem `EventRead` (Schema-`false`).
+  - **T-G1-I-09** (SSE als eigene Leseschnittstelle): `event`-Nachrichten sind `EventRead`, dasselbe Schema-`false`.
+  - **T-G1-E-04** (Administration als Inhaltskonto): admin erhält weder `refuse.*` noch den Leserkreis der Begründung.
+  - **T-G1-I-04** (Ableitung über Suche): `refusalJustification` kommt nie in den Suchtext von `listQuestions`
+    (`api.ts:702`, Hinweis an 044).
 - **Missbrauchsfälle, mit Erkennung:**
 
   | Missbrauch | Abwehr | Erkennung, Nachweis |
@@ -606,7 +644,9 @@ E15, E21, E25, ADR 0012 (Standards unten)
   | Begründung über `listEvents` oder `/stream` gelesen (admin mit `event.read`) | dasselbe Schema-`false` | 044: Negativtests `listEvents` und `/stream` als admin |
   | Begründung als admin über `getQuestion` gelesen | Leserkreis ohne `question.legal.clear`; admin ausgeschlossen | 044: Negativtest admin → Feld fehlt |
   | Selbstfreigabe der eigenen Verweigerung, auch über Vertretung | R-GUARD-06 an `approveRefusal` | 044: Vier-Augen-Negativtest; verweigerter Versuch als 409 mit Regel-id im Zugriffslog (033a) |
-  | Grund später im Katalog geändert, alte Verweigerung verweist auf neuen Text | `refusalGroundHash` hält die Fassung fest | 044: Test „Hash der Version ≠ Hash des geänderten Eintrags“ |
+  | Verweigerung freigegeben ohne Rechtsfreigabe-Ereignis (T-G1-E-03) | R-GUARD-08 an `approveRefusal` (409), kein Eilpfad | 044: Negativtest `approveRefusal` ohne `QuestionLegalCleared` für diese Version → 409 R-GUARD-08; verweigerter Versuch mit Regel-id im Zugriffslog (033a) |
+  | Begründung über die Suche erschlossen (`listQuestions?q=…`, T-G1-I-04) | `refusalJustification` nie im Suchtext | 044: Negativtest „Suchbegriff nur aus der Begründung → kein Treffer“ |
+  | Grund später im Katalog geändert, alte Verweigerung verweist auf neuen Text | `refusalGroundHash` beim Vorschlag, Prüfung gegen den aktuellen Katalog bei der Freigabe (409), Schnappschuss im Ereignis | 044: Test „Hash der Version ≠ Hash des geänderten Eintrags“ |
 
 - **Kompatibilität:**
   - Wer `kind` oder `requestedMinutes` sendet, bricht nicht; die Felder werden ignoriert.
@@ -643,13 +683,13 @@ E15, E21, E25, ADR 0012 (Standards unten)
 6. **Die Aufhebung im Web-Client** sendet nur `reason` mit. Die CSRF-Sperre ohne Sitzung bleibt, der Test dazu bleibt
    unverändert.
 
-## Standards (auf Standard gebaut; Vermerk mit Datum im CHANGELOG, im Register und im Bericht)
+## Standards (auf Standard gebaut; Vermerk mit Datum im CHANGELOG und im Bericht, im Register nur als Verweis ohne Statuswechsel)
 
 Die Antworten aus Feedback-Runde 2 (09.10.) und der Entscheidungsstunde (16.10.) stehen aus. **043a baut auf E25 und
-E15, die beide in Feedback-Runde 2 zur Antwort stehen** (E25 fällig 09.10., E15: Satzung und GO bis 09.10.). Die in der
+E15, die beide in Feedback-Runde 2 zur Antwort stehen** (E25 fällig 09.10.; von E15 nur Satzung und GO bis 09.10., Katalog und Pfad A bis 15.01.2027). Die in der
 Planzeile 043 genannten Punkte E2, E3a, E4, E6, E7 und E17 liegen dagegen in 043b–d. Deshalb baut 043a standardmäßig erst
-nach der Auswertung von Runde 2 (Eigentümerfrage 1). Vermerk: „auf Standard gebaut am <Merge-Datum> in 043a
-(Vertragsform)“.
+nach der Auswertung von Runde 2 (Eigentümerfrage 1). Vermerk im CHANGELOG: „auf Standard gebaut am <Merge-Datum> in 043a
+(Vertragsform)“. Das Register ändert keinen Status (Ziel 5).
 
 | Standard | Quelle | Was 043a daraus baut | Kosten einer späteren Änderung |
 |---|---|---|---|
@@ -664,11 +704,14 @@ nach der Auswertung von Runde 2 (Eigentümerfrage 1). Vermerk: „auf Standard g
 Keine blockiert die Spec. Fragen 1, 2 und 5 brauchen vor dem Bau ein ausdrückliches Go.
 
 1. **Baustart (Go nötig).** Standard: 043a baut **nach** Feedback-Runde 2, also nicht vor dem 09.10.; der früheste Start
-   nach `scripts/plan-graph.mjs` ist der 12.10.2026. Grund: 043a baut auf E25 und E15, die dort beantwortet werden sollen.
+   nach `scripts/plan-graph.mjs` ist der 12.10.2026. Grund: 043a baut auf E25 (fällig 09.10.) und E15. Bei E15 ist nur der Teil „Satzung und Geschäftsordnung“ am 09.10.
+   fällig. Der Teil zu Katalog und Pfad A ist bis 15.01.2027 erbeten, Frist 29.01.2027 (`entscheidungsregister.md:50`).
+   Er bleibt also auch nach Runde 2 auf Standard gebaut.
    Früher nur, wenn der Eigentümer ausdrücklich Go gibt. Eine spätere abweichende Antwort kostet dann die Beträge aus
    „Standards“.
 2. **Zuschnitt, Budget und Klasse (Go nötig).** Die Planzeile 043 (2 AStd, mittel) wird vier Teile mit rund 6,5 AStd,
-   jeder hoch. Ohne Go bleibt es bei der Planzeile; dann wird 043a in dieser Form nicht gebaut, und der Architekt meldet
+   jeder hoch. Mit dem Go ändert der Orchestrator auch die Lanes der Plan-Einträge 043 (`web-api`, `service-tests`) und
+   044 (`service`, `web-api`), siehe Frage 5. Ohne Go bleibt es bei der Planzeile; dann wird 043a in dieser Form nicht gebaut, und der Architekt meldet
    sich mit einem neuen Zuschnitt.
 3. **Leserkreis der Begründung.** Standard: nur Halter von `question.refuse.propose` oder `question.refuse.approve`
    (`legal`, `coordination`, `approver`); nie admin; nie in Historie, `listEvents`, Strom oder Bühne.
@@ -693,7 +736,11 @@ Keine blockiert die Spec. Fragen 1, 2 und 5 brauchen vor dem Bau ein ausdrückli
      (`AnswerDraft.body`), **056** und **057** (Query-Parameter von getStage), **059** (Prüfpunkte an
      `clearQuestionLegally`), **068** (`source: submitted`);
    - bei jeder dieser Scheiben kommt die Lane `contract` in die Kopfzeile, und `packages/contract/**` gehört in ihre
-     „Files allowed“.
+     „Files allowed“;
+   - der Plan-Eintrag **044** erhält die Lanes `service` (Routen montieren, Allowlist-Einträge entfernen) und `web-api`
+     (`HvApi`/`http.ts`);
+   - der Plan-Eintrag **043** erhält in der Kopfzeile die Lanes `web-api` und `service-tests` (Aufhebung der Sperre,
+     Vertragstests dieser Spec).
 
    Ohne Go gilt die Planzeile. Dann muss jeder 043-Teil seine Anfragefelder zusammen mit der Umsetzung liefern, und die
    Teile b bis d werden zu gemischten Scheiben mit Kerncode.
@@ -713,7 +760,11 @@ Keine blockiert die Spec. Fragen 1, 2 und 5 brauchen vor dem Bau ein ausdrückli
 - 044 montiert die drei Routen im Dienst und entfernt die drei Allowlist-Einträge (`slice` 044). Dafür braucht die
   Spec von 044 die Lane service, wie 040 über takt-011.
 - 044 erweitert `HvApi`, den In-Process-Adapter und `apps/web/src/api/http.ts` gemeinsam.
-- `refusalGroundHash` berechnet 044 über das kanonische JSON des Eintrags, derselbe Algorithmus wie `RefusalGround.hash`.
+- `RefusalGround.hash` und `refusalGroundHash`: SHA-256, Kleinbuchstaben-Hex, über RFC 8785 (JCS) des Eintrags ohne
+  `hash`, UTF-8. Dazu der Schnappschuss `answer.refusalGround` (`title`, `stageText`, `legalRef`) in der
+  `AnswerDrafted`-Nutzlast. Guard: `approveRefusal` antwortet mit 409, wenn der Hash der Version nicht mehr dem aktuellen
+  Katalogeintrag entspricht (nächste freie R-GUARD-Nummer beim Bau; Test).
+- Die Suche (`listQuestions` mit `q`, `api.ts:702`) indexiert `refusalJustification` nie; Negativtest.
 - **`question.submit_review` hält nur `expert`** (`permissions.ts:60`). Wer eine Verweigerung vorschlägt (`legal`,
   `coordination`), kann sie heute nicht zur Prüfung geben. 044 entscheidet eines von beiden, mit Tabellenzeile und Test:
   - `proposeRefusal` führt direkt nach `in_review`;
@@ -789,3 +840,13 @@ eingearbeitet:
 - Major 11: Test 6 von einer gültigen Version aus, Mutationsproben.
 - Major 12: `refusalGroundHash`.
 - Minor und nit: wie oben in den jeweiligen Abschnitten.
+
+**Nachprüfung (30.09.2026, zu `3a6d054`):** Major 1–6 und 8–11 erledigt. Offen waren Major 7 und 12 sowie mehrere Minor.
+In dieser Fassung behoben:
+- Major 7: kein Statuswechsel im Register, nur Verweise in Textspalten.
+- Major 12: Hash nach RFC 8785 ohne `hash`, Schnappschuss im Ereignis, Prüfung bei der Freigabe (409), Hash-Kette für
+  `text` und Begründung.
+- Security-Minor: T-G1-I-02, T-G1-I-09, T-G1-E-04 und T-G1-I-04; Suchhinweis; Missbrauchszeile R-GUARD-08; Beobachter
+  liest den Katalog; Widerspruch „Hash-Nachweis“ behoben.
+- Übrige Minor und Nit: `'success'`; 500 überall; `LegalRef`-Erweiterung benannt; Fristen von E15; Lanes 043/044;
+  Test 6 ergänzt; `createdBy.personId`; Rechtekonzept §4/§5; Guard-Zeile zitiert.
