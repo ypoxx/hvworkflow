@@ -147,7 +147,7 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
     `pnpm/action-setup` (Hash wie in `gates`); `actions/setup-node` per Commit-Hash; Install; Doku-Filter wie in `gates`
     (bei reiner Doku alle folgenden Schritte übersprungen, der Job meldet trotzdem); „Create separate Postgres runtime
     login for grant tests“ (wie in `gates`); „Install Chromium for Playwright“ (`timeout-minutes: 4`); „End-to-end http
-    project against Hono, Postgres and Keycloak“ (`timeout-minutes: 10`,
+    project against Hono, Postgres and Keycloak“ (`timeout-minutes: 9`,
     `node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs`); Upload nur von
     `docs/evidence/031-*.png` als Artefakt `evidence-031-http` (Upload-Baustein per Hash v4.6.2). **Kein** Upload von
     `playwright-report`, Traces oder Videos. Ein Schritt „Run operational migration command“ auf `hv_test` entfällt in
@@ -161,9 +161,9 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
     jeder neue Baustein per Commit-Hash.
 11. **Laufzeitbudget (feste Zahlen).** Heute rund 10 min je Lauf im Job `gates`; der bleibt unverändert (≤ 10 min, keine
     neuen Schritte außer den Pins). `e2e-http`: Ziel ≤ 12 min, harte Grenze 15 min. Summe der festen Schrittgrenzen
-    Chromium 4 + Harness 10 = 14 min ≤ 15 min Job-Grenze; Checkout, Install und Upload bleiben ohne eigene Grenze und
-    teilen sich die übrige Minute bewusst nicht: überschreitet der Job 15 min, bricht er ab und das ist ein Befund, keine
-    Grenze wird still angehoben. Das `http`-Projekt selbst in 031a ≤ 3 min. Beide Jobs laufen parallel.
+    Chromium 4 + Harness 9 = 13 min; für Checkout, Install, Filter und Upload ohne eigene Grenze bleiben bewusst 2 min bis
+    zur Job-Grenze von 15 min. Überschreitet der Job sie, bricht er ab; das ist ein Befund, keine Grenze wird still
+    angehoben. Das `http`-Projekt selbst in 031a ≤ 3 min. Beide Jobs laufen parallel.
 12. **Neue Datei `apps/web/e2e/031-http-betriebsart.spec.ts`**, feste Kennungen; `@idp` braucht Keycloak. Die Tests
     berühren den geteilten Datenbankzustand so wenig wie möglich: kein Test ändert Fragen oder Wortmeldungen des Korpus;
     nur H8 schreibt, und zwar auf einem Redebeitrag, den er selbst anlegt.
