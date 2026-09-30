@@ -3,71 +3,37 @@
  * Every identity and secret exists only for this CI run. Never print browser traces or tokens.
  */
 import { randomBytes, randomUUID } from 'node:crypto';
-import { spawn, execFile as execFileCallback } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdir, mkdtemp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { KEYCLOAK_IMAGE as image, KEYCLOAK_IMAGE_FORM, buildRealm, randomSecret, removeKeycloak, startKeycloak,
+  waitForHttp } from './lib/keycloak-ci.mjs';
 
-const execFile = promisify(execFileCallback);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const apiRequire = createRequire(pathToFileURL(join(root, 'apps/api/package.json')));
 const webRequire = createRequire(pathToFileURL(join(root, 'apps/web/package.json')));
-const image = 'quay.io/keycloak/keycloak:26.7.4';
 const keycloakPort = 18080;
 const apiPort = 18081;
 const realmName = 'hv-ci-029b';
 const issuer = `http://localhost:${keycloakPort}/realms/${realmName}`;
 const apiOrigin = `http://localhost:${apiPort}`;
 const callback = `${apiOrigin}/auth/callback`;
-const randomSecret = () => randomBytes(32).toString('base64url');
 let stage = 'setup';
 
 function realmFixture() {
-  const identity = {
-    adminName: `admin-${randomUUID()}`,
-    adminPassword: randomSecret(),
-    clientId: `hv-ci-${randomUUID()}`,
-    clientSecret: randomSecret(),
-    userId: randomUUID(),
-    username: `synthetic-${randomUUID()}`,
-    userPassword: randomSecret(),
-  };
-  const realm = {
-    realm: realmName,
-    enabled: true,
-    registrationAllowed: false,
-    resetPasswordAllowed: false,
-    clients: [{
-      clientId: identity.clientId,
-      enabled: true,
-      protocol: 'openid-connect',
-      publicClient: false,
-      secret: identity.clientSecret,
-      standardFlowEnabled: true,
-      directAccessGrantsEnabled: false,
-      redirectUris: [callback],
-      webOrigins: [apiOrigin],
-    }],
-    users: [{
-      id: identity.userId,
-      username: identity.username,
-      email: `${identity.username}@example.test`,
-      firstName: 'Synthetic',
-      lastName: 'Testperson',
-      enabled: true,
-      emailVerified: true,
-      credentials: [{ type: 'password', value: identity.userPassword, temporary: false }],
-    }],
-  };
-  return { identity, realm };
+  // Slice 031a: the realm is built by the shared module; the fields below keep the shape this script always used.
+  const built = buildRealm({ realmName, redirectUris: [callback], webOrigins: [apiOrigin], persons: ['main'] });
+  const user = built.users.main;
+  const identity = { ...built.identity, userId: user.id, username: user.username, userPassword: user.password };
+  return { identity, realm: built.realm };
 }
 
 function checkFixture() {
-  assert.match(image, /^quay\.io\/keycloak\/keycloak:\d+\.\d+\.\d+$/);
+  assert.match(image, KEYCLOAK_IMAGE_FORM);
   const { identity, realm } = realmFixture();
   assert.equal(realm.clients[0].secret, identity.clientSecret);
   assert.equal(realm.users[0].id, identity.userId);
@@ -77,21 +43,6 @@ function checkFixture() {
   assert.equal(realm.users[0].credentials[0].value, identity.userPassword);
   assert.notEqual(identity.clientSecret, identity.userPassword);
   console.log('029b Keycloak fixture structure: PASS');
-}
-
-async function waitForHttp(url, expectedStatus, timeoutMs, child) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (child?.exitCode !== null && child?.exitCode !== undefined) {
-      throw new Error('API process exited before it became ready.');
-    }
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(2_000) });
-      if (response.status === expectedStatus) return response;
-    } catch { /* startup can temporarily refuse connections */ }
-    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
-  }
-  throw new Error(`Timed out waiting for ${new URL(url).pathname}.`);
 }
 
 async function waitForApi(child) {
@@ -320,16 +271,9 @@ async function main() {
   let containerStarted = false;
   try {
     stage = 'Keycloak startup';
-    const realmFile = join(temp, 'realm.json');
-    const envFile = join(temp, 'keycloak.env');
-    await writeFile(realmFile, JSON.stringify(realm), { mode: 0o644 });
-    await writeFile(envFile, `KC_BOOTSTRAP_ADMIN_USERNAME=${identity.adminName}\nKC_BOOTSTRAP_ADMIN_PASSWORD=${identity.adminPassword}\n`, { mode: 0o600 });
     containerStarted = true;
-    await execFile('docker', ['run', '--detach', '--rm', '--name', container,
-      '-p', `127.0.0.1:${keycloakPort}:8080`, '--env-file', envFile,
-      '-v', `${realmFile}:/opt/keycloak/data/import/realm.json:ro`, image,
-      'start-dev', '--import-realm', `--hostname=http://localhost:${keycloakPort}`],
-    { cwd: root, timeout: 120_000 });
+    await startKeycloak({ directory: temp, container, port: keycloakPort, realm, adminName: identity.adminName,
+      adminPassword: identity.adminPassword, cwd: root });
     await waitForHttp(`${issuer}/.well-known/openid-configuration`, 200, 120_000);
     stage = 'synthetic Postgres bootstrap';
     const { actorId, meetingId } = await bootstrapMeeting(ownerUrl, identity.userId);
@@ -347,7 +291,7 @@ async function main() {
     stage = 'access log check';
     await checkAccessLog(logDir, secrets);
     stage = 'IdP outage';
-    await execFile('docker', ['rm', '-f', container], { timeout: 10_000 });
+    await removeKeycloak(container);
     containerStarted = false;
     api = startApi(runtimeUrl, identity, encryptionKey, accessLog);
     await waitForApi(api);
@@ -357,7 +301,7 @@ async function main() {
     console.log('029b IdP outage blocks a new login: PASS');
   } finally {
     await stopApi(api);
-    if (containerStarted) await execFile('docker', ['rm', '-f', container], { timeout: 10_000 }).catch(() => {});
+    if (containerStarted) await removeKeycloak(container).catch(() => {});
     await rm(temp, { recursive: true, force: true });
   }
 }
