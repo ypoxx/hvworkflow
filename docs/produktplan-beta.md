@@ -236,7 +236,7 @@ Drei Umgebungen: Demo (Netlify, In-Process, Taktfläche), Staging-synthetisch (A
 | ADR | Inhalt | Nachweis in | Annahme |
 |---|---|---|---|
 | 0001 | Keine inhaltliche Änderung; operativ bindend über die Leitplanken. 009 bereitet die Vorlage vor | 009 | Prüfpunkt 1, Umsetzer und Projektleitung (E42) |
-| 0002 | Ergänzung: Demo-Betriebsart bleibt bis beta-1 Taktfläche, besteht dieselbe e2e-Suite, Reset-Banner statt Upcaster, localStorage-Adapter bleibt Wegwerfcode; Ende nach beta-1 durch Eigentümerentscheid | 015, 031 | Prüfpunkt 1 (Ergänzung), Eigentümer |
+| 0002 | Ergänzung: Demo-Betriebsart bleibt bis beta-1 Taktfläche, besteht dieselbe e2e-Suite, Reset-Banner statt Upcaster, localStorage-Adapter bleibt Wegwerfcode; Ende nach beta-1 durch Eigentümerentscheid | 015, 031b | Prüfpunkt 1 (Ergänzung), Eigentümer |
 | 0003 Persistenz | Postgres-Ereignistabelle nur anhängend (INSERT/SELECT-Grant, `seq` global mit Advisory-Lock), Projektion rebuildbar, Snapshot optional, JSONL als Dev-Adapter, Rebuild < 5 min als Generalprobe-Pflicht, eine Datenhaltung mit PITR, keine zweite Zone in der Beta | 027 | Prüfpunkt 3 |
 | 0004 Identität | Interne Beta: OIDC-BFF im Dienst (Authorization Code serverseitig, HttpOnly-Sitzung, JWKS), Rollenzuordnung als Ereignisse je Jahrgang mit Ablauf und optionaler Einheit, IdP-Gruppen als Vorschlag, Sitzung 14 h, X-Actor nur bei HV_DEMO=1 und nie mit OIDC-Issuer; spätere Ergänzung: Notfallkonten nur bei IdP-Ausfall mit Alarmereignis (029); Subject-Sperrliste bereits in 029b | 029b; Ergänzung 029 nach Fortführungsentscheidung | Prüfpunkt 3 für 029b; 029 später |
 | 0005 Antwortformat | Blockdokument mit Whitelist (paragraph, list; bold, italic, highlight), Normalisierung in der Domäne, Klartextprojektion für Suche und Diff, ein Renderer für Bühne, Historie, Export, reserviertes Feld `language` | 055 | Prüfpunkt 5 |
@@ -550,13 +550,20 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* Screenshot Anmeldeseite und 401-Behandlung; Unit-Tests des Wrappers; pnpm gates
   - *Offene Entscheidung:* —
-- **031 · e2e gegen Hono, Postgres und Keycloak in beiden Betriebsarten** — hoch · 3 AStd · Kalender 23.10.2026 (W4) · Lanes: e2e, infra
-  - *Ziel:* Playwright-Projekt „http" führt alle Szenarien gegen den Dienst mit OIDC-Testrealm aus; Projekt „in-process" bleibt; beide Pflicht auf PR nach main; Test „altes Demo-Protokoll → Reset-Banner"; Nachweis für die Ergänzung zu ADR 0002; die Job-Matrix aus 084 erhält das http-Projekt.
-  - *Abhängigkeiten:* 030, 027, 084
-  - *Rolle:* Implementierer-Oberfläche; Review
+**Historische Scheibe 031 (am 30.09.2026 in 031a–b geteilt): e2e gegen Hono, Postgres und Keycloak in beiden Betriebsarten.** Ursprüngliche Schätzung: mittel · 1,5 AStd · Kalender 23.10.2026 (W4) · Lanes: e2e, infra.
+  - *Ziel:* Am 30.09. nach dem Lesebefund zur Spec (nicht baureif, 5 major) geteilt in 031a (HTTP-Projekt mit Harness, Keycloak-Modul, Anmeldung, eigene Tests, Verdrahtung von 030, CI-Job `e2e-http`, Pins) und 031b (fünf gemeinsame Dateien in beiden Betriebsarten, Nachweis für ADR 0002); die Einträge dort gelten. Grund: zwei getrennt prüfbare Flächen (Sicherheits- und Infrastrukturgrenze gegen Portierung fachlicher Szenarien), Umfang über einer Agentenschicht; Risikoklasse von 031a nach Leitplanken §4 hoch (Sitzung im Browser als Pflicht-Tor, Geheimnisse je Lauf in der Pipeline, Rollenzuordnung am Verwaltungsweg vorbei, Netzgrenze). 084 wird nicht vorausgesetzt; 031a baut den PR-Teil der Job-Matrix als eigenen Job. Die Teilung des langen Tests in 003 ist ein eigener Takt (Folgeliste), nicht Teil von 031.
+- **031a · HTTP-Projekt der e2e-Suite: Harness, Keycloak, Anmeldung und CI-Job** — hoch · 2,5 AStd · Kalender 23.10.2026 (W4) · Lanes: e2e, infra, docs-sicherheit
+  - *Ziel:* Teil 1 von 031 (geteilt am 30.09.): Playwright-Projekte „http-setup“ und „http“ (HTTP-Modus über den Vite-Proxy, gleiche Herkunft, kein CORS) gegen den Dienst mit Postgres und Keycloak-Testrealm; Harness mit frischer Datenbank je Lauf, Bootstrap über `insertPostgresEvents`, Startprüfung aus 034b, nur Schreib- und Lesegrenze angehoben, 429-Wächter, Zugriffslog-Prüfung; gemeinsames Keycloak-Modul mit 029b, Image per Digest; eigene Tests (Anmeldeseite, altes Demo-Protokoll ohne Reset-Banner im HTTP-Modus, gleiche Herkunft, Anmeldung, Abmelden, Subject-Sperre, ohne Rolle, echtes 412); 030 im Projekt „http“; Job `e2e-http` auf jedem PR ohne Report-, Trace- und Video-Upload; Projekt „in-process“ bleibt. Der Keycloak-Schritt 029b bleibt in `gates`, bis der Eigentümer `e2e-http` zum Pflicht-Check macht.
+  - *Abhängigkeiten:* 030, 027
+  - *Rolle:* Implementierer-Oberfläche mit Infra-Anteil; Review mit Perspektive Security/Betrieb; zusätzlich Sicherheits-Checkliste des Reviewers
+  - *Nachweise:* e2e-Lauf beider Projekte grün mit Laufzeiten (lokal ohne Keycloak, PR-CI mit Keycloak); wörtliche Startzeile des Test-Dienstes; Test „kein Trace, kein HTML-Report“; Screenshots der Anmeldung, der 401- und 412-Behandlung
+  - *Offene Entscheidung:* — (Pflicht-Check `e2e-http` in den Repository-Einstellungen durch den Eigentümer)
+- **031b · Gemeinsame e2e-Szenarien in beiden Betriebsarten und Nachweis für ADR 0002** — mittel · 1 AStd · Kalender 28.10.2026 (W5) · Lanes: e2e, docs-adr
+  - *Ziel:* Teil 2 von 031 (geteilt am 30.09.): abnahme, 002, 021b, 021c und 080 laufen über eine gemeinsame Rollenwechsel- und Nachweishilfe in beiden Projekten, feste Reihenfolge im Projekt „http“, Halteregel 120 s für die Abnahme; Test „altes Demo-Protokoll → Reset-Banner“ in beiden Betriebsarten benannt (024 in-process, Gegenstück aus 031a im HTTP-Modus); Nachweis für die Ergänzung zu ADR 0002 mit Liste der nicht portierten Dateien.
+  - *Abhängigkeiten:* 031a
+  - *Rolle:* Implementierer-Oberfläche; Architekt für ADR 0002; Review
   - *Nachweise:* e2e-Lauf beider Projekte grün mit Laufzeiten; ADR-0002-Ergänzung mit Nachweis
-  - *Stand 30.09.2026:* Spec `docs/slices/031-e2e-http-zwei-betriebsarten.md` (Entwurf). Risikoklasse nach Leitplanken §4 hoch (Sitzung im Browser als Pflicht-Tor, Geheimnisse je Lauf in der Pipeline, Rollenzuordnung am Verwaltungsweg vorbei, Netzgrenze Oberfläche–Dienst); Aufwand 3 statt 1,5 AStd; 084 wird nicht vorausgesetzt, 031 baut den PR-Teil der Job-Matrix als eigenen Job.
-  - *Offene Entscheidung:* —
+  - *Offene Entscheidung:* — (Umfang „dieselbe e2e-Suite“, Prüfpunkt 1)
 **Historische Scheibe 033 (am 29.09.2026 in 033a–b geteilt): Zwei Protokollebenen, Health, NTP-Status, Kennzahlen, Serverzeit-Header.** Ursprüngliche Schätzung: hoch · 2 AStd · Kalender 26.10.2026 (W5) · Lanes: service.
   - *Ziel:* Am 29.09. geteilt in 033a (Serverzeit-Header, /healthz, NTP-Status, Korrelations-ID, Zugriffslog, Verfahren „nur zu zweit“) und 033b (/metrics, Kennzahlen-Allowlist-Tor, Auswertungskatalog); die Einträge dort gelten. Grund: zwei getrennt prüfbare Datenschutzflächen (Protokoll je Anfrage gegen Aggregat ohne Personenbezug) und ein Umfang über einer Agentenschicht. Ursprüngliches Ziel und Nachweise stehen vollständig in 033a und 033b.
 - **033a · Serverzeit-Header, Health, NTP-Status, Korrelations-ID und Zugriffslog** — hoch · 1,25 AStd · Kalender 26.10.2026 (W5) · Lanes: service, infra, docs-adr, docs-datenschutz, docs-sicherheit
@@ -893,7 +900,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E26 technischer Betreiber während der Probe
 - **071 · Lasttest 50+15 Nutzer, Vielfrager-Szenario, nightly** — mittel · 2 AStd · Kalender 02.12.2026 (W10) · Lanes: infra, e2e
   - *Ziel:* k6-Szenario gegen Staging-synthetisch: 50 Backoffice (Lesen, Entwurf, Freigabe) und 15 Erfasser (Redebeitrag, Atomisierung mit Claim) über 30 Minuten gegen 800 Fragen; p90 Schreiben < 300 ms, SSE-Latenz < 2 s, Fehlerrate < 0,1 %; Vielfrager (500 Fragen eines Sprechers); Browser-Zeitbudget aus 084 im Lauf; nightly Job mit Schwellen.
-  - *Abhängigkeiten:* 037, 036, 031, 053, 056
+  - *Abhängigkeiten:* 037, 036, 031b, 053, 056
   - *Rolle:* Implementierer-Backend; Review
   - *Nachweise:* docs/evidence/071-last.md mit p50/p90/p99 und Fehlerrate; nightly Lauf grün; Befunde als Kleinänderungen
   - *Offene Entscheidung:* —
@@ -929,7 +936,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —
@@ -1024,7 +1031,7 @@ Ein Bautag ist eine Orchestrierungssitzung, die der Umsetzer mit einem Satz star
 - Migrationstor vorwärts/rückwärts, Append-only-Test gegen Postgres, Rebuild-Zeit, /readyz mit DB (027).
 - Zwei-Schreiber-, Claim-Ablauf- und Neustart-Idempotenz-Test (028).
 - Identitäts-Negativtests mit Keycloak-Container und Demo-Verriegelung (029b); Subject-Sperrlisten-Test in 029b; Notfallkonto-Tests erst nach der Fortführungsentscheidung (029).
-- Dual-Mode-e2e-Matrix (031).
+- Dual-Mode-e2e-Matrix (031a, 031b).
 - now()-Check web (032).
 - Zugriffslog-Tor ohne Nutzdaten (033a); Kennzahlen-Allowlist, Auswertungskatalog als Artefakt (033b).
 - Header- und Limit-Proben (034a), Konfigurationsschema (034b).
@@ -1152,8 +1159,8 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 1 | 28.09.–02.10. | Bau | **009**, **017**, **012**, **014**, **015**, **016**, **018**, **019**, **013**, **020** | Fragenpaket an die Projektleitung (02.10.); HV-Datum und Format bestätigt (02.10., E20) |
 | 2 | 05.10.–09.10. | Bau | **039**, **082**, **010**, **011**, **080**, **021** | **Prüfpunkt 1** mit Feedback-Runde 2 (09.10.); Satzung und Geschäftsordnung bis 09.10. |
 | 3 | 12.10.–16.10. | Bau | **022**, **084**, **023**, **024**, **025**, **026** | **Prüfpunkt 2** (16.10.); Entscheidungsstunde; Ansprechperson Tool-Team (E3a) bis 16.10. |
-| 4 | 19.10.–23.10. | Bau | **027**, **028**, **029b**, **030**, **031**, **043** | Vertrag 0.4.0 (043); 029 erst nach Fortführungsentscheidung |
-| 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034a**, **034b**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
+| 4 | 19.10.–23.10. | Bau | **027**, **028**, **029b**, **030**, **031a**, **043** | Vertrag 0.4.0 (043); 029 erst nach Fortführungsentscheidung |
+| 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034a**, **034b**, **031b**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
 | 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **048**, **088**, **044** | Restore-Drill auf Staging (038) |
 | 7 | 09.11.–13.11. | Bau | **045**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
 | 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **060**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
@@ -1217,7 +1224,7 @@ Nie gestrichen werden: Audit-Befunde, Persistenz, echte OIDC-Identität für die
 | Recht hat in der HV zu wenig Kapazität, weil jede Frage vor die Bühne durch die Rechtsfreigabe muss | Wer `question.legal.clear` hält, ist eine Rollenzuordnung (z. B. Fast-Track-Mitglieder); Prüflistentiefe je Pfad als Daten; Kennzahl „Fragen in Rechtsfreigabe > 10 min" im Leitstand als Go/No-Go-Schwelle; Rechnung in E37 |
 | Tor-Inventar überzeichnet erneut | Plan-Ehrlichkeits-Tor (012); Spalte „geplant in Scheibe"; Reviewer-Checkliste prüft gates.yml; finaler Abgleich in 079; Branch-Schutz verhindert rote Merges |
 | Vertragsbrüche brechen e2e, Seed und Demo mehrfach | Drei gebündelte Vertragspakete vom Architekten (019, 023, 043), die additiven Brücken 0.3.2 in takt-016 und 0.3.3 in takt-019 sowie 0.3.4 in 026, 0.3.5 in 027 sowie 0.3.6 in 028; neue Pflichtfelder erst optional mit Ablauf; eine Korpusquelle; Alias /v1/meeting; Changelog-Tor; generierter Client; Allowlist mit Ablauf; Freeze in 077 |
-| Zwei Betriebsarten driften auseinander; die Demo zeigt Verhalten, das der Dienst nicht hat | Ein HvApi-Interface; Dual-Mode-e2e als Tor (031); Demo bleibt Taktfläche bis beta-1, Staging Abnahmefläche; Reset-Banner statt Upcaster (ADR 0002) |
+| Zwei Betriebsarten driften auseinander; die Demo zeigt Verhalten, das der Dienst nicht hat | Ein HvApi-Interface; Dual-Mode-e2e als Tor (031a, 031b); Demo bleibt Taktfläche bis beta-1, Staging Abnahmefläche; Reset-Banner statt Upcaster (ADR 0002) |
 | Podium-Ausfall (weißer Bildschirm) in der Generalprobe | Offline-Lesepuffer mit Absichtswarteschlange (058), Test auf realer Geräteklasse, Einfrieren beim Öffnen (056), eigenes Bundle mit Größentor, gedruckter Katalog und Papierpfad (070), Chaos-Szenario Partition (072) |
 | Corporate-Browser-Richtlinie löscht oder blockiert localStorage/IndexedDB auf den Podiumsgeräten | Registerzeile E33 in Woche 0 angefragt; 058 prüft auf dem realen Gerät, sobald E33 beantwortet ist; Geräteeinstellungen sind reine Bequemlichkeit, „Vorgelesen" bestätigt der Dienst |
 | CI-Laufzeit wächst mit Postgres, Keycloak, Dual-Mode-e2e, axe, Semgrep, Last und bremst die Bautage | Laufzeitbudget und Job-Matrix (084): Push ≤ 12 min, PR ≤ 25 min, nightly für Last/Restore/Semgrep-Vollauf; Pfadfilter; Laufzeit je Job in docs/messung.md |
@@ -1270,7 +1277,7 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 | E32 | Pentest | Extern, Scope aus 039, Beschaffung ab 25.09., Bestellung spätestens 15.12.2026, Durchführung 01.–12.02.2027 auf Staging mit OIDC; ohne externen Test interner ZAP-Lauf, externer Test vor der Vollprobe | 15.12.2026 | Eigentümer, Konzern-Security | Wer bestellt und bezahlt den Pentest, und gibt es einen Rahmenvertrag? |
 | E33 | Endgeräte und Browser-Richtlinie (Podium, Erfassung, Externe) | Tablet oder Laptop je Podiumsmitglied im Kiosk-Modus, Chromium-basiert, localStorage/IndexedDB nicht gelöscht, Hallen-WLAN plus Hotspot-Rückfall | Anfrage 25.09.; Antwort bis 27.11.; 058 (23.11.2026) baut auf Standard, Test auf realer Klasse danach in der Anpassungsphase | Konzern-IT, Projektleitung | Welche Geräte nutzen die Podiumsmitglieder, welcher Browser, welche Speicher- und MDM-Richtlinie, welches Netz im Saal? |
 | E34 | Formales Kriterium für „Beta abgenommen" | B1–B18 mit Nachweisen; Einschränkungen nur mit Registerzeile | 079 (08.03.2027) | Eigentümer | Wer unterschreibt Go/No-Go und Abnahme? |
-| E35 | Taktfläche nach Umstellung auf HTTP | Netlify-Demo bleibt Taktfläche bis beta-1; Staging-synthetisch mit dem nächsten freigegebenen Deploy | 031 (23.10.2026) | Umsetzer | — |
+| E35 | Taktfläche nach Umstellung auf HTTP | Netlify-Demo bleibt Taktfläche bis beta-1; Staging-synthetisch mit dem nächsten freigegebenen Deploy | 031a (23.10.2026) | Umsetzer | — |
 | E36 | Personenzuweisung von Einzelfragen (Person statt Fachbereich) | Zuweisung an Fachbereich; Person nur über Claim (weiche Sperre) sichtbar; keine automatisierte Personenzuweisung (BV) | 028 (20.10.2026) | Projektleitung, Betriebsrat | Sollen Einzelfragen einzelnen Personen zugewiesen werden, oder bleibt die Zuweisung beim Fachbereich mit sichtbarer Übernahme? |
 | E37 | Freigabetiefe je Pfad und Kapazität Recht | Rechtsfreigabe für jede Frage; Kapazität über die Zahl der Inhaber von question.legal.clear und die Prüflistentiefe je Pfad; Rechnung: rund 200 Fragen in 8 h, bei 3 Minuten je Freigabe rund 10 Personenstunden Recht in der HV, also mindestens zwei bis drei Freigebende parallel; Go/No-Go-Schwelle „Fragen in Rechtsfreigabe > 10 min" | 021 (09.10.2026), 059 (24.11.2026); Prüfliste und Rollenzuordnung sind Daten | Recht, Projektleitung | Wie viele Personen aus Recht und Fast-Track dürfen in der HV freigeben, und wie tief prüft jeder Pfad? |
 | E38 | MFA-Richtlinie und Konten für Keycloak im Rückfall | TOTP-Pflicht für Freigabe-, Rechts- und Admin-Rechte; Erstpasswort-Verfahren; Sperre und Löschung nach der Probe | 088 (05.11.2026) | Eigentümer, Konzern-Security | — |
@@ -1297,7 +1304,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **A Fundament:** 021c, 024, 025, 026, 027, 028, 033a, 033b, 034a, 034b.
   *Stand 29.09.2026:* erledigt 021c, 024, 025, 026, 027, 028 (Codex, 27.–29.09., nachgeprüft; Reparaturen takt-021..026); Spec 033a/033b gemergt; offen 033a, 033b, 034a, 034b (Spec 034 am 29.09. in 034a/034b geteilt).
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
-  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031 (Spec als Entwurf, 30.09.), 035, 036.
+  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031a, 031b (Specs nach Lesebefund, 30.09.; 031 geteilt), 035, 036.
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
