@@ -98,12 +98,13 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await expect(page).toHaveURL(/\/capture$/);
 
   // Whoever is at the microphone is preselected without revealing their name to capture.
-  const selectedOption = await page.getByTestId('capture-speaker-select').evaluate((node) => {
+  // The list of Wortmeldungen arrives from the service in `http`; the select shows the chosen one once it has.
+  const selectedText = () => page.getByTestId('capture-speaker-select').evaluate((node) => {
     const select = node as HTMLSelectElement;
     return select.options[select.selectedIndex]?.text ?? '';
   });
-  expect(selectedOption).toContain(`Redner ${speakerNumber}`);
-  expect(selectedOption).not.toContain(speakerName);
+  await expect.poll(selectedText).toContain(`Redner ${speakerNumber}`);
+  expect(await selectedText()).not.toContain(speakerName);
 
   await page.getByTestId('capture-text').fill(SPEECH);
   await page.getByTestId('capture-submit').click();

@@ -172,4 +172,24 @@ Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Halteregel auch für `ans
 
 ## Review findings
 
-folgt
+Unabhängiges Review (kein Blocker) und die drei CI-Fehlschläge des Laufs 36661676716 auf 8ccd827; alles test-only, kein Produktunterschied.
+
+CI-Fehlschläge, Ursache und Behebung:
+
+1. `002`: ein Reorder erhöht die Version jeder Wortmeldung der Runde (`packages/domain/src/state.ts`, `SpeakersReordered`). Im Projekt `http` wird die Liste erst nach dem Schreiben neu gelesen; der Aufruf davor (`features/speakers/Page.tsx` `onCall`, ifMatch mit Version aus der alten Ansicht) wurde mit 412 abgelehnt, 21 blieb am Mikrofon. Behoben: nach dem Ablegen `waitForLoadState('networkidle')`.
+2. `021c`: der ausgewählte Vorgang wird im HTTP-Modus eigenständig gelesen (`selectedLoading`); `isVisible()` direkt nach dem Klick sah die Aktionen noch nicht. Behoben: pro Zeile erst auf die Nummer im Detail warten.
+3. `abnahme` (und dieselbe Stelle in `002`): Die Liste der Wortmeldungen kommt im HTTP-Modus vom Dienst; die Vorauswahl (`features/capture/Page.tsx`, Rückfall auf die sprechende Person) steht erst nach der Antwort. Behoben: `expect.poll` auf den gewählten Eintrag.
+
+Review-Befunde:
+
+| # | Befund | Behandlung |
+|---|---|---|
+| 1 major | Rollenanzeige-Prüfungen in 002/021b verloren | `expectRoleLabel(page, role, lang)` in `roles.ts`, an den alten Stellen (auch nach dem EN-Wechsel) aufgerufen; `asRole` prüft im Projekt `in-process` nun ebenfalls die Anzeige |
+| 3 minor | `asRole` in `http` wartete nur auf die Sitzungsanzeige | zusätzlich auf `header-counter-questions` (erstes Datensignal), Wert 60 s wie Setup und H4/H6, kein bestehendes Limit angehoben |
+| 4 minor | 60-s-Limit in `roles.ts` | begründet im Kommentar, Dauer je Wechsel als `[timing]`-Zeile |
+| 5 minor | Kommentar 021c falsch | umformuliert; Sprache wird geprüft statt still wiederhergestellt |
+| 6 minor | Konstanten vor Deklaration genutzt | im Testskript nach oben verschoben |
+| 8 nit | Parse-Fehler könnte Cookie-Zeichen zeigen | nur Rolle und Dateipfad im Fehler |
+| 7 nit | IdP-Modus ohne `E2E_HTTP_STATE_DIR` | nicht bearbeitet (Harness setzt es immer) |
+| 2 | im übermittelten Befundtext nicht genannt | nicht bearbeitet; beim Review nachfragen |
+

@@ -21,6 +21,13 @@ import { KEYCLOAK_IMAGE, KEYCLOAK_IMAGE_FORM } from './lib/keycloak-ci.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'apps/web');
+
+// Slice 031b (decision 4): with an IdP the five shared files run in the http project, in the order of their paths.
+const SHARED_FILES = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
+  '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
+const HTTP_ORDER = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
+  '030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts', '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
+
 const LOADER = join(ROOT, 'apps/api/node_modules/tsx/dist/loader.mjs');
 const HARNESS = join(ROOT, 'scripts/e2e-http-031.mjs');
 const baseEnv = { PATH: process.env.PATH ?? '' };
@@ -337,12 +344,6 @@ function listedFiles(env) {
   }
   return files;
 }
-
-// Slice 031b (decision 4): with an IdP the five shared files run in the http project, in the order of their paths.
-const SHARED_FILES = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
-  '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
-const HTTP_ORDER = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
-  '030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts', '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
 
 test('order: the http project lists the seven files in the pinned order, with one worker', () => {
   assert.deepEqual(listedFiles({ E2E_HTTP: '1', E2E_HTTP_IDP: 'none' }), ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts'],

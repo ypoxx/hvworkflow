@@ -12,7 +12,7 @@ import {
 } from './support/e2e-texts';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
-import { asRole } from './support/roles';
+import { asRole, expectRoleLabel } from './support/roles';
 import type { Page } from '@playwright/test';
 
 /** A synthetic speech with exactly seven questions of record (texts in `support/e2e-texts.ts`, checked against the access log). */
@@ -58,6 +58,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   // The meeting office is the desk that owns the Wortmeldeliste.
   await asRole(page, 'moderation');
+  await expectRoleLabel(page, 'moderation', 'de');
 
   const round = page.getByTestId('speakers-round-3');
   await expect(round).toBeVisible();
@@ -80,6 +81,10 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(announcer).not.toHaveText(lifted);
   await page.keyboard.press('Space');
   await expect(announcer).toContainText('abgelegt');
+  // A reorder raises the version of every Wortmeldung of the round (`state.ts`, SpeakersReordered). In `http` the list is
+  // re-read after the write, and a call made on the rows of before that re-read is refused with 412. Wait until the traffic
+  // of the write and of the re-read is over, as a person would before the next step; nothing waits in `in-process`.
+  await page.waitForLoadState('networkidle');
 
   await expect(waiting.nth(0)).toHaveAttribute('data-number', secondBefore);
   await expect(waiting.nth(1)).toHaveAttribute('data-number', firstBefore);
@@ -129,11 +134,12 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await expect(page).toHaveURL(/\/capture$/);
 
   // Whoever is at the microphone is preselected — the Wortmeldung that was just called.
-  const selected = await page.getByTestId('capture-speaker-select').evaluate((node) => {
+  // The list of Wortmeldungen arrives from the service in `http`; the select shows the chosen one once it has.
+  const selectedText = () => page.getByTestId('capture-speaker-select').evaluate((node) => {
     const select = node as HTMLSelectElement;
     return select.options[select.selectedIndex]?.text ?? '';
   });
-  expect(selected).toContain(`Nr. ${called}`);
+  await expect.poll(selectedText).toContain(`Nr. ${called}`);
   await checkAxe(page, 'capture (Erfassung, kein Redebeitrag erfasst)');
 
   await page.getByTestId('capture-text').fill(SPEECH);

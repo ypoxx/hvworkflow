@@ -11,33 +11,71 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from './http-guard';
 import type { Page } from '@playwright/test';
 
-/** Display names of the roles in both languages, as the session display shows them (`shell.de.ts`, `shell.en.ts`). */
-const ROLE_LABELS: Readonly<Record<string, RegExp>> = {
-  moderation: /^(Versammlungsbüro|Meeting office)$/,
-  capture: /^(Erfassung|Capture desk)$/,
-  coordination: /^(Koordination|Coordination)$/,
-  expert: /^(Fachbereich|Expert)$/,
-  legal: /^(Recht|Legal)$/,
-  approver: /^(Freigabe|Approver)$/,
-  podium: /^Podium$/,
+type Lang = 'de' | 'en';
+
+/** Display names of the roles as the shell shows them (`shell.de.ts`, `shell.en.ts`). */
+const ROLE_LABELS: Readonly<Record<string, Readonly<Record<Lang, string>>>> = {
+  moderation: { de: 'Versammlungsbüro', en: 'Meeting office' },
+  capture: { de: 'Erfassung', en: 'Capture desk' },
+  coordination: { de: 'Koordination', en: 'Coordination' },
+  expert: { de: 'Fachbereich', en: 'Expert' },
+  legal: { de: 'Recht', en: 'Legal' },
+  approver: { de: 'Freigabe', en: 'Approver' },
+  podium: { de: 'Podium', en: 'Podium' },
 };
 
+const isHttp = (): boolean => test.info().project.name === 'http';
+
+function labelsOf(role: string): Readonly<Record<Lang, string>> {
+  const labels = ROLE_LABELS[role];
+  if (!labels) throw new Error(`No display name known for role ${role}.`);
+  return labels;
+}
+
+/** Where the shell shows the acting role: the demo switcher in `in-process`, the session display in `http`. */
+const roleDisplay = (page: Page) => page.getByTestId(isHttp() ? 'session-role' : 'role-switcher');
+
+/**
+ * The shell names the role in the one language the test expects (exact, not either of the two). Used after a switch
+ * and after a language change, so the role stays proven in both projects.
+ */
+export async function expectRoleLabel(page: Page, role: string, lang: Lang): Promise<void> {
+  const label = labelsOf(role)[lang];
+  if (isHttp()) await expect(roleDisplay(page)).toHaveText(label);
+  else await expect(roleDisplay(page)).toContainText(label);
+}
+
 export async function asRole(page: Page, role: string): Promise<void> {
-  if (test.info().project.name !== 'http') {
+  const labels = labelsOf(role);
+  // The switch itself does not know the language of the page; either display name proves the role. Tests that care
+  // about the language call `expectRoleLabel` with the one they expect.
+  const either = new RegExp(`^(${labels.de}|${labels.en})$`);
+  if (!isHttp()) {
     await page.getByTestId('role-switcher').click();
     await page.getByTestId(`role-option-${role}`).click();
     await expect(page.getByTestId(`role-option-${role}`)).toBeHidden();
+    await expect(page.getByTestId('role-switcher')).toContainText(new RegExp(`(${labels.de}|${labels.en})`));
     return;
   }
   const stateDir = process.env['E2E_HTTP_STATE_DIR'];
   if (!stateDir) throw new Error('E2E_HTTP_STATE_DIR is required.');
-  const label = ROLE_LABELS[role];
-  if (!label) throw new Error(`No display name known for role ${role}.`);
-  const state = JSON.parse(readFileSync(`${stateDir}/state-${role}.json`, 'utf8')) as
-    { cookies: Parameters<ReturnType<Page['context']>['addCookies']>[0] };
+  const file = `${stateDir}/state-${role}.json`;
+  let state: { cookies: Parameters<ReturnType<Page['context']>['addCookies']>[0] };
+  try {
+    state = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    // The parse error can echo characters of the file, which holds a session cookie: name the file only.
+    throw new Error(`The state file for role ${role} could not be read or parsed (${file}).`);
+  }
+  const started = Date.now();
   const context = page.context();
   await context.clearCookies();
   await context.addCookies(state.cookies);
   await page.reload();
-  await expect(page.getByTestId('session-role')).toHaveText(label, { timeout: 60_000 });
+  await expect(page.getByTestId('session-role')).toHaveText(either);
+  // The session display comes before the data. The next steps of the tests wait 5 s for lists; the header counter is the
+  // first data signal of every page, so the switch is over once it shows. 60 s is the wait of the sign-in setup and of
+  // H4/H6 for the same signal on a cold page (031a), not a new allowance.
+  await expect(page.getByTestId('header-counter-questions')).toBeVisible({ timeout: 60_000 });
+  console.log(`[timing] switch to ${role} (http, reload until the first data): ${Date.now() - started} ms`);
 }

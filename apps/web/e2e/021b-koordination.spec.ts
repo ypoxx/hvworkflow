@@ -9,7 +9,7 @@ import { CORPUS_DEMO } from '@hv/domain';
 import { checkAxe } from './support/axe';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
-import { asRole } from './support/roles';
+import { asRole, expectRoleLabel } from './support/roles';
 import type { Page } from '@playwright/test';
 
 async function waitForCorpus(page: Page): Promise<void> {
@@ -44,6 +44,7 @@ test('021b: Koordination klassifiziert auf der Erfassung, die Erfassung nicht me
 
   // Coordination: the same desk, "Klassifizieren" on every open card, nothing to capture with.
   await asRole(page, 'coordination');
+  await expectRoleLabel(page, 'coordination', 'de');
   const firstCard = page.getByTestId('capture-question-card').first();
   await expect(firstCard).toBeVisible();
   const openClassify = firstCard.getByTestId('capture-classify-open');
@@ -68,6 +69,7 @@ test('021b: Koordination klassifiziert auf der Erfassung, die Erfassung nicht me
   // English: the same desk, the role and the action in American English.
   await page.getByTestId('lang-toggle').click();
   await page.getByTestId('lang-option-en').click();
+  await expectRoleLabel(page, 'coordination', 'en');
   await expect(page.getByTestId('capture-question-card').first().getByTestId('capture-classify-open')).toHaveText(
     'Classify',
   );
