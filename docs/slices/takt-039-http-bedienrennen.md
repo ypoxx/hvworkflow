@@ -168,7 +168,7 @@ dem Handler überein.
 - `apps/web/src/features/speakers/Page.tsx` (nur die Korrektur zur bestätigten Hypothese aus Ziel 5)
 - `apps/web/src/features/speakers/useSpeakers.ts` und `useSpeakers.test.ts` (nur bei H-2a, nur neue reine Funktion)
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (neue Tests H11 und H12)
-- `apps/web/e2e/002-speakers-capture.spec.ts` (nur der Kommentar in Z. 77-78, nur bei H-2b)
+- `apps/web/e2e/002-speakers-capture.spec.ts` (nur der Kommentar in Z. 77-78, nur bei H-2b; dazu ein passives Protokoll, Bauklärung unten)
 - `docs/folgeliste.md` (nicht blockierende Reviewbefunde; offener 002-Befund, falls keine Hypothese bestätigt)
 - `apps/web/e2e/010c-lesezustand.spec.ts` (nur das Szenario N3, etwa Z. 1186-1223, und ein neues Szenario zur Rückgabe; Bauklärung unten)
 - `apps/web/src/i18n/stage.de.ts`, `apps/web/src/i18n/stage.en.ts` (nur die Nummer der Frage im Rückgabedialog; Bauklärung unten)
@@ -180,6 +180,7 @@ Weitere Dateien sind Scope-Befunde (R1).
 
 - 30.09.2026 (Orchestrator): Der alte Test N3 in `010c-lesezustand.spec.ts` sicherte genau das stille Verwerfen eines Drucks während einer Lesung, das Ziel 1 entfernt. Er wird auf einen Druck umgestellt, der nach der neuen Regel wirklich nichts schreibt (zweite Aktivierung in derselben Aufgabe); die Absicht bleibt: Ein Druck ohne Schreiben hinterlässt keine Fokusmarke.
 - 30.09.2026 (Orchestrator): „Antwort zurückgeben“ wirkt auf die Frage, für die der Dialog geöffnet wurde (Taste R oder Knopf), mit deren Version im `If-Match`, nie auf eine inzwischen gezeichnete andere; der Dialog nennt ihre Nummer (Recht/Audit-Befund aus dem Review, minor 7; mit takt-039 wahrscheinlicher, weil ein Absenden während einer Lesung jetzt wirkt).
+- 30.09.2026 (Orchestrator): 002: nur passives Protokoll. `recordTimeline` in `002-speakers-capture.spec.ts` hängt im Projekt `http` nur Hörer an (Scroll, Größe, Sichtbarkeit, Layoutverschiebung, DOM-Änderungen in Runde 3, Ansage, `/v1/`- und `/auth/`-Verkehr, Geometrie bei Leertaste und Pfeil); kein Schritt und keine Zusicherung ändert sich.
 
 ## Tests zuerst
 
