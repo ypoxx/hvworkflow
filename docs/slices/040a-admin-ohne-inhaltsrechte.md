@@ -576,30 +576,218 @@ Die offene Eigentümerfrage 5 aus 043a ist keine neue Frage; der Abschnitt „Ve
 
 ```
 Slice: 040a-admin-ohne-inhaltsrechte
-Done:
-Evidence:
-Open:
-Touched:
+Done: ROLE_PERMISSIONS.admin ist eine ausdrückliche Liste mit 12 Rechten (Lesen, question.assign, question.return,
+  agenda.manage, admin.roles.manage, demo.seed); 63 ✓ entfallen, neuer Tabellenabschnitt. R-ADM-07 (keine
+  Selbstzuordnung) und R-ADM-08 (letzte tragfähige Verwaltungsrolle, 24-h-Spanne) in api.ts und im Regelregister.
+  Historie: Abzeichen „Administration“ aus den Rechtedaten in Zeitleiste und Ereignisstrom; Testumbauten nach Spec.
+Evidence: pnpm gates grün auf fed4b6f (Schluss unten); in-process e2e 133/133 grün auf fed4b6f;
+  docs/evidence/040a-admin-ohne-schreibaktionen.png, 040a-historie-administration-de.png, -en.png
+Open: http-Projekt (Keycloak) läuft in der PR-CI; drei neue Warnungen des Architekturtors (nicht blockierend,
+  docs/folgeliste.md); Eigentümerfragen 1, 2a, 2b, 2c bleiben wie in der Spec.
+Touched: siehe Liste unten
 ```
 
 **Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
+1. `permissions.ts:74` stand wie im Befund (Ableitung über `PERMISSIONS.filter(…)` plus `agenda.manage`,
+   `admin.roles.manage`). `PERMISSIONS` war seit dem Befund nicht erweitert (30 Rechte, kein `question.refuse.*`).
+2. Umgestellte Tests: siehe „Umgestellte Tests“. Kein Test außerhalb von „Files allowed“ fiel um.
+3. `scripts/e2e-http-031.mjs` nutzt admin nicht: `PERSONS` enthält keine Administration; der Bootstrap ordnet als
+   `SYSTEM_ACTOR` (id `system`) Rollen an andere Subjects zu (`actorIdForIdentity`), keine Selbstzuordnung.
+4. Kein Testaufbau (Domäne, Dienst, Postgres, Strom) ordnet ein Subject sich selbst zu oder entzieht die letzte
+   Verwaltungsrolle: nach der Änderung schlug kein bestehender Test mit R-ADM-07 oder R-ADM-08 fehl. Der Entzug in
+   `postgres-takt033.test.ts` (`assignment-1`) und in `stream035.test.ts` (`revokeGrant`) betrifft keine letzte
+   Verwaltungsrolle und bleibt unverändert als admin.
+5. Das Leeren hängt an der Person: `ContributionPane.tsx:108-115` und `capture/Page.tsx:235-239` vergleichen
+   `useActor().id`, die Wortmeldeliste und die Bühne sind mit `key={actorId}` gebunden, `actorKey` (`liveStore.ts:134`)
+   enthält alle Felder. Der Wechsel zu `u-cap-2`/`u-mod-2` trägt; kein Eintrag in `DEMO_ACTORS` nötig (e2e grün).
+   Hinweis: `u-cap-2` ist zugleich die Seed-Person „Erfassung 2“ (`seed.ts:53`, gleiche Rolle, gleicher Name); das
+   ändert nichts, es bleibt eine zweite Person der Erfassung.
+6. admin sieht die Erfassungsansicht weiter (Leserechte `speaker.read`, `contribution.read`, `question.read`), aber
+   ohne Eingabefelder: `capture-text` und `capture-free-input` erscheinen nur mit `question.capture`. Deshalb der
+   Umbau auf `u-cap-2`.
 
-**Umgestellte Tests (mit Umbauten und Abschwächungen).**
+**Umgestellte Tests (mit Umbauten und Abschwächungen).** Keine Abschwächung; eine Verlagerung (020 m2).
 
-**Wahrheitstabellen-Diff.**
+Domäne (`packages/domain/src/__tests__/`):
+- `api.test.ts` › „R-IDEM-01: the same actor key stays separate across meetings…“ und „…delimiters cannot alias
+  another log scope“: admin → moderation (registerSpeaker); die Trennzeichen-Strings folgen der Akteur-id
+  (`hv|admin|…` → `hv|mod|…`), damit der Aliasversuch dieselbe Form behält.
+- `api.test.ts` › „409 detail (Festlegung 8)“: Leser-Hälfte admin/`deliverQuestion` → approver/`stageQuestion` (mit
+  If-Match). Grund: nach 040a hält keine Rolle `question.deliver` zusammen mit `question.read`; die Aussage (Leser
+  erhält R-TRANS-00 mit Stand, Nicht-Leser den generischen 409) bleibt.
+- `api.test.ts` › „admin drafts and approves: 409 R-GUARD-06“ → „admin drafts: 403 R-PERM-01“ (wie in der Spec
+  vorgesehen; Guard-Aussage trägt der legal-Fall, `transitions.test.ts` und Test 9).
+- `envelope.test.ts` › „carries the write idempotency key…“: Aussaat als admin, registerSpeaker als moderation.
+- `meeting025.test.ts` › „does not write an unscoped event…“, „keeps pre-lifecycle logs usable…“, „isolates writes,
+  F-n counters…“: registerSpeaker als moderation, captureContribution/captureQuestions als capture.
+- `transitions.test.ts`: neuer erzeugter Abschnitt „Role × Wortmeldung, Erfassung und Demo“.
 
-**Mutationsproben (Ergebnis).**
+Dienst (`apps/api/src/__tests__/`):
+- `idempotency028.test.ts` › „checks the question version before the state guard for %s“: je Zeile die zuständige
+  Rolle (classification coordination, answers/review-submissions expert, approvals/staging approver,
+  legal-clearances legal, closure podium, withdrawal/merge moderation; assignment/returns bleiben admin).
+- `meeting025.test.ts` › „exercises all canonical readers, speaker writes…“: Sprecher moderation, Beitrag capture.
+- `read-rights.test.ts` › „404 precedence: podium may still deliverQuestion…“: Aufbau classify als coordination,
+  staging als approver.
+- `limits034a.test.ts` (Block „limits per subject“): zweites Schreib-Subject `mod2:moderation` statt admin; „dieselbe
+  id unter anderer Rolle“ als `mod2:approver` statt `admin:moderation` (gleiche Aussage: Zähler je id).
+- `metrics033b.test.ts` › „contains no actor id…“, „shows a new question only after the window“: Schreiber
+  `${SYNTHETIC_ACTOR}:capture`, Ereignisse weiter als admin gelesen.
+- `postgres027.test.ts`, `postgres-takt033.test.ts`, `postgres-takt024.test.ts`, `postgres-limits034a.test.ts`,
+  `postgres-access-log033a.test.ts`: Sprecher-POSTs als moderation (12 Stellen). In `postgres027.test.ts` › „rolls back
+  a failed insert…“ prüfte die letzte Erwartung die Maskierung in der Schreibantwort eines Schreibers ohne
+  `question.identity.reveal`; einen solchen Schreiber gibt es nach 040a nicht mehr (moderation hält das Recht). Die
+  Schreibantwort trägt jetzt den Klarnamen, die Maskierung wird auf dem Lesepfad als admin geprüft („Redner 1“) —
+  Aussage erhalten, Ort gewechselt.
+- `stream035.test.ts`: `PEOPLE` um `approver` und `coordination` ergänzt; `registerSpeaker(h, …)` als moderation (7
+  Stellen); `questionWrite` nimmt den Schreiber (staging approver, classification coordination).
+- `negative.test.ts`: neuer Test 10 (Wahl: `negative.test.ts`).
 
-**`pnpm gates` (Schluss, Commit):**
+e2e (`apps/web/e2e/`):
+- `090-eingaben-je-akteur.spec.ts` (090 R1): Redebeitrag und freie Einzelfrage dauerhaft zu `u-cap-2`, Wortmeldung
+  dauerhaft zu `u-mod-2` (neuer Helfer `switchToPerson`, prüft `getActor().id`), Antwortentwurf zu legal,
+  Zusammenführen zu moderation (Dialog erscheint dort). `expectCleared` unverändert; zusätzlich `expectVisibleAndEmpty`
+  (Feld sichtbar und leer; beim Redebeitrag nach Neuöffnen des Formulars, mit `watchForSecret`). Rückgaben (428, 478)
+  unverändert.
+- `010c-lesezustand.spec.ts`: `unrelatedEvent` schreibt als `u-mod-2` (synchroner Wechsel wie zuvor). Zusätzlich, von
+  der Spec nicht benannt, aber reine Akteurwechsel: die sechs Bühnenfälle „Ziel 6 (N1)“, „Ziel 6 (N2)“ ×2, „Ziel 6 (N3)“,
+  „takt-039 minor 7“ ×2 lesen als podium statt admin vor (admin hält `question.deliver` nicht mehr).
+- `010d-ansichtsdaten.spec.ts` (von der Spec nicht benannt, Akteurwechsel): `elsewhere` nimmt den Schreiber;
+  registerSpeaker als `u-mod-2`, returnQuestion weiter als admin, submitForReview als Fachbereich (`u-exp-fin`).
+- `010b-lesepfade.spec.ts` › „Runde 4 (A)“: podium liefert aus; der fremde Schreibvorgang als `u-mod-2`, synchron
+  getauscht und zurückgesetzt.
+- `020-rueckbau-passung.spec.ts` › m2: Block entfällt, Regel als Unit-Test in `features/stage/lib.test.ts`
+  (Verlagerung, keine Abschwächung).
+- neu `040a-administration.spec.ts`: Beantwortung als admin (nur Rückgabe) und Historie DE/EN mit Abzeichen.
+
+**Wahrheitstabellen-Diff.** 63 ✓ → `·` nur in den 22 admin-Zeilen (q.capture 22, q.classify 4, answer.draft 5,
+q.submit_review 1, q.approve 1, q.legal.clear 2, q.deliver 2, q.close 2, q.withdraw 16, q.merge 8), dazu der neue
+Abschnitt; sonst nichts.
+
+```diff
+@@ -163,22 +163,22 @@ one answer version; podium-track rows are marked separately.
+-| admin | captured | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | captured (podium) | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | classified | ✓ | · | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | classified (podium) | ✓ | · | ✓ | · | · | · | · | ✓ | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | assigned | ✓ | · | · | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | answer_drafted | ✓ | · | · | · | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
+-| admin | in_review | ✓ | · | · | · | ✓ | · | ✓ | ✓ | ✓ | · | · | · | ✓ | · | ✓ | · |
+-| admin | in_review (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
+-| admin | approved | ✓ | · | · | · | ✓ | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
+-| admin | approved (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
+-| admin | staged | ✓ | · | · | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
+-| admin | staged (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
+-| admin | delivered | ✓ | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
+-| admin | delivered (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
+-| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+-| admin | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+-| admin | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+-| admin | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+-| admin | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+-| admin | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | in_review | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | in_review (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | approved | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | approved (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | staged | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | staged (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
++| admin | delivered | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | ✓ |
++| admin | delivered (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | ✓ |
++| admin | closed | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| admin | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
++| admin | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | merged | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
++| admin | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+@@ -256,0 +257,17 @@ role management is limited to administration. Both are independent of question s
++
++# Policy truth table — Role × Wortmeldung, Erfassung und Demo
++
++Scheibe 040a: rights on speaker requests, contribution capture and the demo seed; independent of
++question status. The administration holds none of the writing ones.
++
++| Role | speaker.register | speaker.reorder | speaker.update | contribution.capture | contribution.claim | demo.seed |
++|---|---|---|---|---|---|---|
++| moderation | ✓ | ✓ | ✓ | · | · | · |
++| capture | · | · | · | ✓ | ✓ | · |
++| coordination | · | · | · | · | · | · |
++| expert | · | · | · | · | · | · |
++| legal | · | · | · | · | · | · |
++| approver | · | · | · | · | · | · |
++| podium | · | · | · | · | · | · |
++| admin | · | · | · | · | · | ✓ |
++| observer | · | · | · | · | · | · |
+```
+
+**Mutationsproben (Ergebnis).** Alle auf `fed4b6f` angewendet, Tests laufen gelassen, mit `git checkout` zurückgesetzt.
+- Ableitung `...PERMISSIONS.filter(…)` wiederhergestellt → rot: Tabellen-Snapshot, Test 1, 2, 3, 5; Test 10 (HTTP).
+- `answer.draft` in die Liste → rot: Tabellen-Snapshot, Test 1, 2, 3, 5.
+- `question.return` entfernt → rot: Tabellen-Snapshot, Test 1, 4, 5.
+- Prüfung R-ADM-07 entfernt → rot: Test 7 (beide), Test 10.
+- R-ADM-08 zählt abgelaufene und bald ablaufende Zuordnungen mit → rot: Test 8 „an expired assignment and one
+  expiring in under 24 hours are no backing“.
+- `question.withdraw` in die Liste → rot: Tabellen-Snapshot, Test 1, 2, 3, 5.
+- Abzeichen in der Tabellendarstellung entfernt → rot: Test 13 „stream table“ (de, en); `isAdministrativeRole` immer
+  falsch → rot: Test 12 und Test 13 (alle vier Darstellungen).
+
+Rot vor dem Bau (Tests zuerst): `admin040a.test.ts` 10 rot / 5 grün (die grünen sind Erhaltungstests: 4, 6, 8
+„nicht verwaltende Rolle“, 8 „geschlossener Jahrgang“, 9); `stage/lib.test.ts` 3 rot (`stageOnlyByRights is not a
+function`); `history/lib.test.ts` 2 rot, `Timeline.test.tsx` 6 rot; Test 10 rot in den Mutationsproben 1 und 4.
+
+**Bauentscheidungen.**
+- R-ADM-07 prüft nach Rechte- und Eingabeprüfung, vor der Duplikatprüfung; Vergleich `input.subjectId === actor().id`
+  (für Sitzungen die aufgelöste Identität).
+- R-ADM-08: eine Zuordnung, die selbst nicht tragfähig ist (bald ablaufend), ist nie „die letzte tragfähige“ und darf
+  gehen; genau 24 h Ablauf zählt als tragfähig („frühestens 24 Stunden nach now“). Status aus `Meeting['status']` in
+  `['preparation', 'running']`; Verwaltungsrolle aus `ROLE_PERMISSIONS[role].includes('admin.roles.manage')`.
+- Regelregister: beide als `Guard`, Quelle `Leitplanken` mit Verweis auf die Regeltabelle dieser Spec (Zeilen 102/103),
+  keine erfundene Norm.
+- Abzeichen: eigenes `span` mit den Klassen des Kits (`hv-badge tone-warning`), `role="note"`, `aria-label` und `title`
+  mit dem Label-Schlüssel; `Badge` aus `components/` reicht `data-testid`/`aria-label` nicht durch und liegt außerhalb
+  der erlaubten Dateien. In der Tabellendarstellung umschließt ein Flex-`span` Akteur und Abzeichen.
+- `WORK_ACTIONS` zieht mit `stageOnlyByRights` nach `stage/lib.ts` (nur dort genutzt), unverändert.
+- Architekturtor: drei neue Warnungen `web-features-i18n-domain-types-only` (Wertimport aus `@hv/domain` in
+  `history/lib.ts` und zwei Testdateien, von der Spec verlangt); nicht blockierend, in `docs/folgeliste.md`.
+
+**`pnpm gates` (Schluss, Commit):** gelaufen auf `fed4b6f` (sauberer Baum), mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` wie in CI. Zusammenfassung aus demselben Lauf: domain 276/276, web
+484/484, api 587/587 (39 Dateien, operation-coverage ok), slice-scope „43 changed file(s), all within … Files allowed“.
 
 ```
+✓ 1730 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
+dist/assets/index-FPfXZyJ_.js                        647.06 kB │ gzip: 190.34 kB │ map: 2,750.58 kB
+✓ built in 2.05s
+mark-test-run: wrote /home/user/wt/s040a/.claude/state/last-test-run (clean tree) at commit fed4b6f, tree 32e4f6e81f2d…
 ```
+
+**Touched.** `packages/domain/src/{permissions,api,rules}.ts`, `packages/domain/policy-truth-table.md`,
+`packages/domain/src/__tests__/{admin040a (neu),transitions,api,envelope,meeting025}.test.ts`, `docs/legal-trace.md`;
+`apps/api/src/__tests__/{negative,idempotency028,meeting025,read-rights,limits034a,metrics033b,stream035,postgres027,
+postgres-takt033,postgres-takt024,postgres-limits034a,postgres-access-log033a}.test.ts`;
+`apps/web/e2e/{040a-administration (neu),090-eingaben-je-akteur,010b-lesepfade,010c-lesezustand,010d-ansichtsdaten,
+020-rueckbau-passung}.spec.ts`; `apps/web/src/features/stage/{Page.tsx,lib.ts,lib.test.ts}`,
+`apps/web/src/features/history/{Timeline.tsx,Timeline.test.tsx (neu),lib.ts,lib.test.ts}`,
+`apps/web/src/i18n/{history.de.ts,history.en.ts,parity.test.ts}`; `docs/evidence/040a-*.png` (drei, neu);
+`docs/rollen-und-rechtekonzept.md`, `docs/sicherheit/bedrohungsmodell.md`, `docs/folgeliste.md`, diese Spec.
 
 ## Review findings
 
