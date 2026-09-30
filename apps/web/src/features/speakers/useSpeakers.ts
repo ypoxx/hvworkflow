@@ -69,6 +69,94 @@ export async function moveSpeakerToRound(client: HvApi, speaker: Speaker, round:
   await client.reorderSpeakers(round, [...target, speaker.id], { ifMatch: etagOf(version) });
 }
 
+/**
+ * takt-032: carry the rows an own write answered with (`updateSpeaker` → one row, `reorderSpeakers` →
+ * the rows of the round) into the rows on screen. Per `id` the higher `version` wins, so a row that is
+ * already newer is never replaced by an older one; an unknown `id` is not inserted (the list decides
+ * what exists). Rows are then ordered by round and position of the merged rows. Nothing to take: the
+ * very same array comes back, so a caller may compare by identity.
+ */
+export function applyWriteResult(
+  view: readonly Speaker[],
+  returned: readonly Speaker[],
+): readonly Speaker[] {
+  const newest = new Map<string, Speaker>();
+  for (const row of returned) {
+    const known = newest.get(row.id);
+    if (known === undefined || row.version > known.version) newest.set(row.id, row);
+  }
+  let changed = false;
+  const merged = view.map((row) => {
+    const next = newest.get(row.id);
+    if (next === undefined || next.version <= row.version) return row;
+    changed = true;
+    return next;
+  });
+  if (!changed) return view;
+  return merged.sort((a, b) => a.round - b.round || a.position - b.position);
+}
+
+/** Of two row sets, the newest row per `id` (used to remember what own writes answered with). */
+export function keepNewest(kept: readonly Speaker[], returned: readonly Speaker[]): readonly Speaker[] {
+  const newest = new Map<string, Speaker>();
+  for (const row of [...kept, ...returned]) {
+    const known = newest.get(row.id);
+    if (known === undefined || row.version >= known.version) newest.set(row.id, row);
+  }
+  return [...newest.values()];
+}
+
+/**
+ * takt-032: the tag of the Wortmeldeliste to send as `ifMatch`. `mark` is what an own write answered
+ * with (the `ETag` from `lastWriteEtag()`, passed on unchanged; only `listMarkAfterAnswer` reads its
+ * version) and the list version the write was made on (`base`). It holds while the list shown is still that one; a list read after the
+ * answer has another version and takes over. The page never counts a version up itself.
+ */
+export function etagForList(
+  version: number,
+  mark: { readonly base: number; readonly etag: string } | null,
+): string {
+  // `<=`: a list requested before the answer may still land later, with the version shown when the
+  // answer came or an older one; only a list read after the answer shows a newer version.
+  return mark !== null && version <= mark.base ? mark.etag : etagOf(version);
+}
+
+/**
+ * The version an `ETag` of this API stands for (`etagOf`), or `null` for a tag it cannot place. Only
+ * used to compare an answer with what is shown; the tag itself is always sent on unchanged.
+ */
+export function versionOfEtag(etag: string): number | null {
+  const match = /^(?:W\/)?"v(\d+)"$/.exec(etag);
+  return match === null ? null : Number(match[1]);
+}
+
+/**
+ * Codex P1 on PR #86: the list mark for an own write's answer. A concurrent writer may have moved the
+ * list while the answer was delayed; if the list shown is already at or past the version the answer
+ * tag stands for, the mark is dropped (`null`) and the next write uses the tag of the list shown, so
+ * a stale tag never outlives a newer read. The decision compares the answer tag's version with the
+ * shown version, never arrival order. Otherwise the base is the version shown now, as before.
+ */
+export function listMarkAfterAnswer(
+  writtenOn: number,
+  shownNow: number | null,
+  etag: string,
+): { readonly base: number; readonly etag: string } | null {
+  const answered = versionOfEtag(etag);
+  if (answered === null) return null;
+  const base = Math.max(shownNow ?? 0, writtenOn);
+  return base >= answered ? null : { base, etag };
+}
+
+/**
+ * takt-032: after an own `updateSpeaker` the list version has moved (`SpeakerUpdated`), and the answer
+ * does not say to what. The list tag is not usable for reorder or register until a list shows a
+ * version newer than the one the update was made on.
+ */
+export function isListStale(version: number, lock: { readonly base: number } | null): boolean {
+  return lock !== null && version <= lock.base;
+}
+
 export function useSpeakers(): SpeakersState {
   const version = useApiVersion();
   const [token, setToken] = useState(0);

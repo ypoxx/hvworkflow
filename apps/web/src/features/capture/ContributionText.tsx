@@ -41,6 +41,7 @@ function offsetOf(container: HTMLElement, node: Node, offset: number): number | 
 export function ContributionText({
   contribution,
   canCapture,
+  busy,
   onCapture,
   questions,
   hoveredQuestionId,
@@ -48,6 +49,8 @@ export function ContributionText({
 }: {
   contribution: Contribution;
   canCapture: boolean;
+  /** takt-032: a write on this Redebeitrag is in flight; marking and Alt+Q wait for its answer. */
+  busy: boolean;
   onCapture: (questions: QuestionCapture[]) => Promise<boolean>;
   /** In card order: a marker's number is this Einzelfrage's 1-based position in that list. */
   questions: readonly Question[];
@@ -79,13 +82,14 @@ export function ContributionText({
 
   const capture = useCallback(
     async (selection: PendingSelection) => {
+      if (busy) return;
       const confirmed = await onCapture([{ text: selection.text, span: { start: selection.start, end: selection.end } }]);
       if (confirmed) {
         window.getSelection()?.removeAllRanges();
         setPending(null);
       }
     },
-    [onCapture],
+    [onCapture, busy],
   );
 
   useEffect(() => {
@@ -216,6 +220,7 @@ export function ContributionText({
             variant="primary"
             size="sm"
             data-testid="capture-add-selection"
+            aria-disabled={busy}
             // Keep the marked passage alive: a plain mousedown would collapse the selection.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => void capture(pending)}

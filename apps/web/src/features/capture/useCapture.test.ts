@@ -6,9 +6,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  etagForContribution,
   isCurrentLoad,
   isReadForbidden,
+  isSpeakerLocked,
   isVersionConflict,
+  landPair,
+  markAfterAnswer,
   keyBelongsTo,
   loadKey,
   NO_VERDICT,
@@ -189,5 +193,129 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/** takt-032: continue with the version from the answer (Ziel 1), and land cards with coverage as a pair (Ziel 3). */
+describe('etagForContribution', () => {
+  const mark = { id: 'c1', base: 4, etag: '"v5"' };
+
+  it('the tag of the answer is the next ifMatch for the same Redebeitrag', () => {
+    expect(etagForContribution({ id: 'c1', version: 4 }, mark)).toBe('"v5"');
+  });
+
+  it('another Redebeitrag does not use it', () => {
+    expect(etagForContribution({ id: 'c2', version: 4 }, mark)).toBe('"v4"');
+  });
+
+  it('a list read after the answer (another version) takes over', () => {
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v5"');
+    expect(etagForContribution({ id: 'c1', version: 7 }, mark)).toBe('"v7"');
+  });
+
+  it('without a mark the version of the list counts', () => {
+    expect(etagForContribution({ id: 'c1', version: 2 }, null)).toBe('"v2"');
+  });
+});
+
+describe('isSpeakerLocked', () => {
+  it('stays locked while the Wortmeldung still has the version the write was made on', () => {
+    expect(isSpeakerLocked({ id: 's1', version: 3 }, { speakerId: 's1', base: 3 })).toBe(true);
+  });
+
+  it('opens once a list with another version has arrived, and for another Wortmeldung', () => {
+    expect(isSpeakerLocked({ id: 's1', version: 4 }, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked({ id: 's2', version: 3 }, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked(undefined, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked({ id: 's1', version: 3 }, null)).toBe(false);
+  });
+});
+
+describe('landPair', () => {
+  const old = { questions: ['q-old'], contributions: ['c-old'] };
+
+  it('only the cards new: the old pair stays', () => {
+    const next = landPair(old, {
+      questions: ['q-new'], contributions: ['c-old'], questionsReady: true, contributionsReady: false,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('only the coverage new: the old pair stays', () => {
+    const next = landPair(old, {
+      questions: ['q-old'], contributions: ['c-new'], questionsReady: false, contributionsReady: true,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('both new: the new pair lands', () => {
+    const next = landPair(old, {
+      questions: ['q-new'], contributions: ['c-new'], questionsReady: true, contributionsReady: true,
+    });
+    expect(next).toEqual({ questions: ['q-new'], contributions: ['c-new'] });
+  });
+
+  it('the same data again returns the pair shown (safe to store during render)', () => {
+    const next = landPair(old, {
+      questions: old.questions, contributions: old.contributions, questionsReady: true, contributionsReady: true,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('the first pair lands as soon as both are there', () => {
+    expect(landPair(null, {
+      questions: ['q'], contributions: ['c'], questionsReady: false, contributionsReady: true,
+    })).toBeNull();
+    expect(landPair(null, {
+      questions: ['q'], contributions: ['c'], questionsReady: true, contributionsReady: true,
+    })).toEqual({ questions: ['q'], contributions: ['c'] });
+  });
+});
+
+/** Review of takt-032, major 1: three quick writes while a reload lands in between. */
+describe('markAfterAnswer', () => {
+  it('bases the mark on what is shown when the answer arrives, not on the closure the write began with', () => {
+    // write 1 answered "v6" (shown v5); reload lands showing v6; write 2 (begun on v5) answers "v7".
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(mark).toEqual({ id: 'c1', base: 6, etag: '"v7"' });
+    expect(etagForContribution({ id: 'c1', version: 6 }, mark)).toBe('"v7"');
+  });
+
+  it('an older list landing after the answer does not undo it', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v7"');
+  });
+
+  it('a list read after the answer takes over', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(etagForContribution({ id: 'c1', version: 8 }, mark)).toBe('"v8"');
+  });
+
+  it('another Redebeitrag on screen leaves the closure version as the base', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c2', version: 9 }, '"v6"')?.base).toBe(5);
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, undefined, '"v6"')?.base).toBe(5);
+  });
+});
+
+/** Codex P1 on PR #86: a delayed answer whose tag is older than what the page already shows. */
+describe('markAfterAnswer with a delayed answer', () => {
+  it('drops the mark when the shown Redebeitrag is already newer than the answer tag', () => {
+    // Write begun on v5 answers "v6"; another desk writes v7 and a read showing v7 lands first.
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 7 }, '"v6"');
+    expect(mark).toBeNull();
+    expect(etagForContribution({ id: 'c1', version: 7 }, mark)).toBe('"v7"');
+  });
+
+  it('drops the mark when the shown version equals the answer version (the read tag is the same)', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v6"')).toBeNull();
+  });
+
+  it('keeps the mark while the shown version is older than the answer tag', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 5 }, '"v6"');
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v6"');
+  });
+
+  it('a tag it cannot place is not kept as a stand-in', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 5 }, 'opaque')).toBeNull();
   });
 });

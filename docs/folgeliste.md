@@ -289,6 +289,17 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
   derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
   → **043**
-
+- takt-032 R1 minor 4 · `apps/web/src/api/http.ts` setzt `lastWriteEtag()` vor dem Lesen des Rumpfs; `ClassifyDialog`
+  (schreibt auf die Frage) ist beim Erfassen nicht gesperrt · Fix in `http.ts`, Sperre im Dialog.
+- takt-032 R1 minor 7 · `speakers/Page.tsx` `run` · ein Schreiben, das während eines anderen läuft, wird ohne Hinweis
+  verworfen · kurzer Hinweis oder Warteschlange.
+- takt-032 R1 nit 9 · `apps/web/src/features/capture/Page.tsx:170-176` · beim Wechsel des Redebeitrags stehen kurz die
+  Karten des vorigen da (vorbestehend) · `contributionId` der Fragelesung im Paar speichern.
+- takt-032 R2 minor · `apps/web/src/features/speakers/Page.tsx:85/299/389` · solange `isListStale` gilt (nach eigenem
+  `updateSpeaker` bis zur neueren Liste, meist 0,5–1 s), scheitern Umsortieren und Anmelden still (Ablage springt zurück,
+  Dialog bleibt ohne Hinweis offen) · Sperre sichtbar machen (Ziehen aus, Knopf `aria-disabled`, Rundensignal) oder Hinweis.
+- takt-032 R2 nit · `capture/Page.tsx:224-226`, `speakers/Page.tsx` · `shownRef`/`latest` im passiven Effekt; zwischen
+  Commit und Effekt kann `base` kurz veralten → normales 412 mit Banner · Ref im Layout-Effekt oder beim Landen setzen.
+- takt-032 Codex P2 · `apps/web/src/features/capture/Page.tsx:218` · schlägt die automatische Aktualisierung der Wortmeldeliste nach `captureContribution` fehl, hebt `status === 'error'` die Sperre `speakerLocked` auf und erlaubt ein Schreiben mit veralteter Sprecherversion (412) · Sperre bis zu einer erfolgreichen Aktualisierung halten.
 - takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
 - takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).

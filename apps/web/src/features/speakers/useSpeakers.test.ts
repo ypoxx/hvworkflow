@@ -5,10 +5,15 @@
  * the same table, so a change to one that silently drifts from the others fails loudly here.
  */
 import { describe, expect, it } from 'vitest';
+import type { Speaker } from '@hv/domain';
 import {
+  applyWriteResult,
+  etagForList,
+  isListStale,
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
+  listMarkAfterAnswer,
   loadKey,
   NO_VERDICT,
   readVerdict,
@@ -179,5 +184,119 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/** takt-032: carry the version out of the answer of an own write (Ziel 1). */
+function speaker(id: string, round: number, position: number, version: number): Speaker {
+  return {
+    id, number: position, displayName: id, round, position, status: 'waiting', questionCount: 0,
+    version, _actions: ['speaker.update', 'speaker.reorder'],
+  };
+}
+
+describe('applyWriteResult', () => {
+  const a = speaker('a', 1, 1, 1);
+  const b = speaker('b', 1, 2, 1);
+  const c = speaker('c', 2, 1, 1);
+  const view = [a, b, c];
+
+  it('takes rows with a higher version and orders by round and position of the merged rows', () => {
+    const result = applyWriteResult(view, [speaker('b', 1, 1, 2), speaker('a', 1, 2, 2)]);
+    expect(result.map((s) => [s.id, s.version])).toEqual([['b', 2], ['a', 2], ['c', 1]]);
+  });
+
+  it('keeps rows of other rounds as the very same objects', () => {
+    const result = applyWriteResult(view, [speaker('b', 1, 1, 2), speaker('a', 1, 2, 2)]);
+    expect(result[2]).toBe(c);
+  });
+
+  it('replaces nothing for an equal or a smaller version', () => {
+    const result = applyWriteResult(view, [speaker('a', 1, 2, 1), speaker('b', 1, 1, 0)]);
+    expect(result).toBe(view);
+  });
+
+  it('never inserts an unknown id', () => {
+    const result = applyWriteResult(view, [speaker('x', 1, 3, 9)]);
+    expect(result).toBe(view);
+  });
+
+  it('leaves the view as it is for an empty answer', () => {
+    expect(applyWriteResult(view, [])).toBe(view);
+  });
+
+  it('does not put an older row over a row that is already newer', () => {
+    const newer = [speaker('a', 1, 1, 5), b, c];
+    expect(applyWriteResult(newer, [speaker('a', 1, 2, 3)])).toBe(newer);
+  });
+});
+
+describe('etagForList', () => {
+  it('uses the tag of the answer while the list shown is the one the write was made on', () => {
+    expect(etagForList(3, { base: 3, etag: '"v4"' })).toBe('"v4"');
+  });
+
+  it('a list that differs from the one written on (read after the answer) takes over', () => {
+    expect(etagForList(4, { base: 3, etag: '"v4"' })).toBe('"v4"');
+    expect(etagForList(5, { base: 3, etag: '"v4"' })).toBe('"v5"');
+  });
+
+  it('without a mark the list version counts', () => {
+    expect(etagForList(7, null)).toBe('"v7"');
+  });
+});
+
+/** Review of takt-032, major 2 and minor 3: a list requested before the answer must not undo it. */
+describe('stale lists after own writes', () => {
+  it('a list that lands during the write with an older version keeps the tag of the answer', () => {
+    // The mark was made on the version shown at answer time (4); an older list (3) lands afterwards.
+    expect(etagForList(3, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(4, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(5, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(6, { base: 4, etag: '"v5"' })).toBe('"v6"');
+  });
+
+  it('an older list does not undo the version of a row an own write answered with', () => {
+    const called = speaker('a', 1, 1, 3);
+    const older = [speaker('a', 1, 1, 2), speaker('b', 1, 2, 1)];
+    expect(applyWriteResult(older, [called])[0]).toBe(called);
+  });
+
+  it('after an own updateSpeaker the list version is stale until a list shows a newer one', () => {
+    expect(isListStale(4, { base: 4 })).toBe(true);
+    expect(isListStale(3, { base: 4 })).toBe(true);
+    expect(isListStale(5, { base: 4 })).toBe(false);
+    expect(isListStale(4, null)).toBe(false);
+  });
+});
+
+/** Codex P1 on PR #86: a delayed list answer whose tag is older than the list already shown. */
+describe('listMarkAfterAnswer', () => {
+  it('drops the mark when the shown list is already newer than the answer tag', () => {
+    // Registration begun on v3 answers "v4"; another desk writes v5 and a read showing v5 lands first.
+    const mark = listMarkAfterAnswer(3, 5, '"v4"');
+    expect(mark).toBeNull();
+    expect(etagForList(5, mark)).toBe('"v5"');
+  });
+
+  it('drops the mark when the shown list already has the answer version', () => {
+    expect(listMarkAfterAnswer(3, 4, '"v4"')).toBeNull();
+  });
+
+  it('keeps the mark while the shown list is older than the answer tag', () => {
+    const mark = listMarkAfterAnswer(3, 3, '"v4"');
+    expect(mark).toEqual({ base: 3, etag: '"v4"' });
+    expect(etagForList(3, mark)).toBe('"v4"');
+  });
+
+  it('keeps the answer tag when a list shown during the write is newer than the write base but older than the answer', () => {
+    const mark = listMarkAfterAnswer(3, 4, '"v6"');
+    expect(etagForList(4, mark)).toBe('"v6"');
+    expect(etagForList(6, mark)).toBe('"v6"');
+    expect(etagForList(7, mark)).toBe('"v7"');
+  });
+
+  it('a tag it cannot place is not kept as a stand-in', () => {
+    expect(listMarkAfterAnswer(3, 3, 'opaque')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
  * left, atomise it into Einzelfragen on the right, and see at any moment how much of the wording is
  * covered. Everything runs through `HvApi`; every list refetches on `useApiVersion()`.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eye, Lock } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
@@ -16,8 +16,18 @@ import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
-import { isVersionConflict, NO_VERDICT, readVerdict, useAsync, useHoveredQuestion } from './useCapture';
-import type { ReadVerdict } from './useCapture';
+import {
+  etagForContribution,
+  isSpeakerLocked,
+  isVersionConflict,
+  landPair,
+  markAfterAnswer,
+  NO_VERDICT,
+  readVerdict,
+  useAsync,
+  useHoveredQuestion,
+} from './useCapture';
+import type { ContributionMark, ReadVerdict, ShownPair, SpeakerLock } from './useCapture';
 
 const NO_SPEAKERS: readonly Speaker[] = [];
 const NO_CONTRIBUTIONS: readonly Contribution[] = [];
@@ -132,19 +142,44 @@ export function CapturePage() {
   if (verdict !== shownVerdict) setShownVerdict(verdict);
   const forbidden = verdict.forbidden;
   const [chosenContribution, setChosenContribution] = useState<string | null>(null);
-  // The most recent Redebeitrag of this Wortmeldung is the one being worked on.
-  const contribution =
+  // The most recent Redebeitrag of this Wortmeldung is the one being worked on. What is asked for
+  // comes from the freshest read; what is shown comes from the shown pair below.
+  const latestContribution =
     contributions.data.find((c) => c.id === chosenContribution) ??
     contributions.data[contributions.data.length - 1];
 
-  const questions = useAsync(
+  const fetchedQuestions = useAsync(
     () =>
-      contribution === undefined
+      latestContribution === undefined
         ? Promise.resolve(NO_QUESTIONS)
-        : api.listQuestions({ contributionId: contribution.id }),
+        : api.listQuestions({ contributionId: latestContribution.id }),
     NO_QUESTIONS,
-    `q:${version}:${contribution?.id ?? ''}`,
+    `q:${version}:${latestContribution?.id ?? ''}`,
   );
+
+  /**
+   * takt-032, Ziel 3: the cards and the Restabdeckung (which lives on the Redebeitrag) are read apart,
+   * and used to land in different renders. A newer pair replaces the shown one only once both reads
+   * have answered for the current key (`landPair`); until then the old pair stays (design principle 8).
+   * Owned by the actor, like every view datum (slice 010d).
+   */
+  const [shownPair, setShownPair] = useState<{
+    actorId: string;
+    pair: ShownPair<{ items: Question[]; total: number }, readonly Contribution[]>;
+  } | null>(null);
+  const ownPair = shownPair !== null && shownPair.actorId === actorId ? shownPair.pair : null;
+  const landed = landPair(ownPair, {
+    questions: fetchedQuestions.data,
+    contributions: contributions.data,
+    questionsReady: fetchedQuestions.settled,
+    contributionsReady: contributions.settled,
+  });
+  if (landed !== ownPair && landed !== null) setShownPair({ actorId, pair: landed });
+  const shownContributions = landed?.contributions ?? NO_CONTRIBUTIONS;
+  const contribution =
+    shownContributions.find((c) => c.id === chosenContribution) ??
+    shownContributions[shownContributions.length - 1];
+  const questions = { ...fetchedQuestions, data: landed?.questions ?? NO_QUESTIONS };
 
   /**
    * Rights are data (AGENTS.md rule 4). Capturing a Redebeitrag and capturing an Einzelfrage belong
@@ -163,6 +198,32 @@ export function CapturePage() {
   const knowsCaptureRight = deskActions.length > 0;
 
   const [writing, setWriting] = useState(false);
+  /**
+   * takt-032, Ziel 2: a `captureQuestions` write is in flight (marking, Alt+Q, free entry, proposal).
+   * `writingRef` is the deterministic guard read by the handlers; the state is the signal that locks
+   * the interface. At most one own write per page runs at a time, so `lastWriteEtag()` read right
+   * after an await is that write's own tag.
+   */
+  const [writingQuestions, setWritingQuestions] = useState(false);
+  const writingRef = useRef(false);
+  /** The tag the last `captureQuestions` answered with, for the Redebeitrag it was made on (Ziel 1). */
+  const [contributionMark, setContributionMark] = useState<(ContributionMark & { actorId: string }) | null>(null);
+  /** After `captureContribution` the Wortmeldung's new version is unknown: locked until a list shows it. */
+  const [speakerLock, setSpeakerLock] = useState<(SpeakerLock & { actorId: string }) | null>(null);
+  const lockedSpeaker = speakers.data.find((item) => item.id === speakerLock?.speakerId);
+  const speakerLocked =
+    speakerLock !== null &&
+    speakerLock.actorId === actorId &&
+    speakers.status !== 'error' &&
+    isSpeakerLocked(lockedSpeaker, speakerLock);
+  // Only a write on the Wortmeldung waits for its new version (`speakerLocked`); marking, Alt+Q, free
+  // entry and proposals write on the Redebeitrag just created and stay open (review of takt-032, minor 5).
+  const busy = writing || writingQuestions;
+  // The shown Redebeitrag as of now, read after an await (a reload may have landed while it ran).
+  const shownRef = useRef<Contribution | undefined>(undefined);
+  useEffect(() => {
+    shownRef.current = contribution;
+  });
   const [staleFor, setStaleFor] = useState<string | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   /**
@@ -181,13 +242,18 @@ export function CapturePage() {
     async (text: string): Promise<boolean> => {
       if (speakerId === null) return false;
       const speaker = speakers.data.find((item) => item.id === speakerId);
-      if (speaker === undefined) return false;
+      if (speaker === undefined || writingRef.current || speakerLocked) return false;
+      writingRef.current = true;
       setWriting(true);
+      const startedActor = actorId;
       try {
         const created = await api.captureContribution(
           { speakerId, text, source: 'manual' },
           { ifMatch: etagOf(speaker.version) },
         );
+        // The answer carries the Redebeitrag, not the Wortmeldung's new version: the input for
+        // another Redebeitrag of this Wortmeldung waits for a list that shows it.
+        setSpeakerLock({ actorId: startedActor, speakerId, base: speaker.version });
         setChosenContribution(created.id);
         setStaleFor(null);
         return true;
@@ -196,36 +262,56 @@ export function CapturePage() {
         else showProblem(error, problemTitle());
         return false;
       } finally {
+        writingRef.current = false;
         setWriting(false);
       }
     },
-    [speakerId, speakers.data],
+    [speakerId, speakers.data, speakerLocked, actorId],
   );
 
   const captureQuestions = useCallback(
     async (items: QuestionCapture[]): Promise<boolean> => {
-      if (contribution === undefined || items.length === 0) return false;
+      if (contribution === undefined || items.length === 0 || writingRef.current) return false;
+      writingRef.current = true;
+      setWritingQuestions(true);
+      const startedActor = actorId;
       try {
         // No toast: the new cards and the rising Restabdeckung are the answer (design principle 8).
-        await api.captureQuestions(contribution.id, items, { ifMatch: etagOf(contribution.version) });
+        await api.captureQuestions(contribution.id, items, {
+          ifMatch: etagForContribution(
+            contribution,
+            contributionMark !== null && contributionMark.actorId === actorId ? contributionMark : null,
+          ),
+        });
+        // Right after the await: the tag of the answer is the Redebeitrag's new version (sent on unchanged).
+        const etag = api.lastWriteEtag();
+        if (etag !== undefined) {
+          const mark = markAfterAnswer(contribution, shownRef.current, etag);
+          setContributionMark(mark === null ? null : { actorId: startedActor, ...mark });
+        }
         setStaleFor(null);
         return true;
       } catch (error: unknown) {
         if (isVersionConflict(error)) setStaleFor(contribution.id);
         else showProblem(error, problemTitle());
         return false;
+      } finally {
+        writingRef.current = false;
+        setWritingQuestions(false);
       }
     },
-    [contribution, questions, contributions],
+    [contribution, contributionMark, actorId],
   );
 
   const refetch = useCallback(() => {
-    questions.reload();
+    fetchedQuestions.reload();
     contributions.reload();
-  }, [questions, contributions]);
+  }, [fetchedQuestions, contributions]);
 
   const reloadStale = useCallback(() => {
     setStaleFor(null);
+    setSpeakerLock(null);
+    setContributionMark(null);
     speakers.reload();
     refetch();
   }, [speakers, refetch]);
@@ -278,16 +364,20 @@ export function CapturePage() {
               speakers={speakers.data}
               speakerId={speakerId}
               onSelectSpeaker={selectSpeaker}
-              contributions={contributions.data}
+              contributions={shownContributions}
               contribution={contribution}
               onSelectContribution={setChosenContribution}
-              loading={contributions.status === 'loading'}
+              // Until the first pair has landed the desk is still loading: showing the empty input form for a
+              // moment, only to swap it for the Redebeitrag, would invite typing into the wrong state.
+              loading={contributions.status === 'loading' || landed === null}
               failed={contributions.status === 'error'}
               onRetry={contributions.reload}
               stale={staleFor !== null && (staleFor === contribution?.id || staleFor === speakerId)}
               onReloadStale={reloadStale}
               canCapture={canCapture}
               writing={writing}
+              busy={busy}
+              submitBusy={speakerLocked}
               onWrite={writeContribution}
               onCaptureQuestions={captureQuestions}
               onOpenSuggest={() => setSuggestOpen(true)}
@@ -315,6 +405,7 @@ export function CapturePage() {
           contribution={contribution}
           onClose={() => setSuggestOpen(false)}
           onSubmit={captureQuestions}
+          locked={busy}
         />
       )}
     </div>
