@@ -3,8 +3,8 @@
  * H1–H3 need no sign-in and run everywhere; H4–H9 carry `@idp` and need the Keycloak realm (CI only, the local mode
  * `E2E_HTTP_IDP=none` filters them out). The only `page.route` double of this suite lives in `030-anmeldung.spec.ts`.
  *
- * Nothing here changes questions or Wortmeldungen of the corpus; H8 writes, and only on a Wortmeldung and a
- * Redebeitrag it creates itself. Passwords, cookies and tokens are read from state files and never printed.
+ * Nothing here changes questions or Wortmeldungen of the corpus; H8 and H9 write, and only on Wortmeldungen and a
+ * Redebeitrag they create themselves. Passwords, cookies and tokens are read from state files and never printed.
  */
 import { request } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -267,7 +267,8 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await page.getByTestId('capture-submit').click();
       const capture = (await captured).status();
       expect(capture, `HTTP status of the Redebeitrag (${capture})`).toBe(201);
-      // Same reason as above: the desk shows the new Redebeitrag only after a reload in HTTP mode.
+      // The own write refreshes the desk by itself (takt-030); the reload stays until a CI run shows the free field mounts
+      // without it and the ETag of the page is still the one before the second writer (folgeliste, takt-030).
       await page.reload();
       const free = page.getByTestId('capture-free-input');
       await expect(free).toBeVisible({ timeout: 30_000 });

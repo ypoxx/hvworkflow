@@ -1,6 +1,6 @@
 # takt-030 — Eigene Schreibvorgänge im HTTP-Modus sofort sichtbar
 
-**Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung im Web, ohne Hoch-Auslöser; Leitplanken §4) · **Lanes:** web, e2e · **Perspektive:** Qualität/Betrieb
+**Status:** gebaut, Review durch · **Risikoklasse:** mittel (Verhaltensänderung im Web, ohne Hoch-Auslöser; Leitplanken §4) · **Lanes:** web, e2e · **Perspektive:** Qualität/Betrieb
 **Regeln:** AGENTS.md R2 (Nachweis), R4 (kein Rollenname), R6 (nur `HvApi`, kein Ad-hoc-`fetch`), R8, R12; ADR 0002 (zwei Betriebsarten, gleiches Verhalten)
 **Depends on:** 031a (gemergt; Projekt `http`, Datei `031-http-betriebsart.spec.ts`). Der Unit-Test hängt nicht davon ab; der e2e-Test schon.
 **Ausgangspunkt:** 031a-Test H8 musste die Seite neu laden, um die eigene neue Wortmeldung zu sehen. 031b lässt fünf
@@ -100,9 +100,23 @@ mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree)
 
 Lokal gelaufen: Unit-Tests `http.test.ts` (58 grün), Projekt `in-process` (127 grün), Projekt `http` ohne Keycloak (`E2E_HTTP_IDP=none`, 8 Tests, H1–H3 grün, G1 wie vorgesehen rot). H9 und H8 tragen `@idp` und laufen nur in der PR-CI (kein Docker-Daemon lokal); H9 ist per `--list` gelistet und typgeprüft. Screenshot `031-h9-eigene-schreibvorgaenge.png` kommt aus dem CI-Artefakt `evidence-031-http`.
 
+Nachweis PR-CI (Keycloak): Job `e2e-http` im Lauf 36659515442 auf `a4eb67a` grün, darin H8 (ohne Neuladen der Liste) und H9.
+Screenshot `031-h9-eigene-schreibvorgaenge.png` im Artefakt `evidence-031-http` (ID 11074490024,
+`sha256:1fb2514d517b1dc0a39f6052c1b0dce6551c1179b3cf8f87887fb4719a50906b`, gültig bis 29.12.2026). Offen: die PNG-Datei
+liegt nur im Artefakt, nicht unter `docs/evidence/` (Download-Host durch den R11-Hook gesperrt; der Eigentümer kann sie
+aus dem Lauf übernehmen).
+
 ## Review findings
 
-_(nach Review)_
+Review in frischem Kontext (Opus, nur Spec und Diff), Urteil: mergefähig nach grünem `e2e-http` und Befund 1.
+
+1. major (Nachweis) · Screenshot H9 fehlte im Diff · H9 und H8 liefen grün im PR-Job `e2e-http` (Lauf 36659515442, Commit a4eb67a); der Screenshot liegt im Artefakt `evidence-031-http` (Nachweis unten). Die PNG-Datei selbst ist nicht im Repo: das Herunterladen vom Artefakt-Host sperrt die Repo-Richtlinie (R11-Hook), wie schon bei 031a · offen, siehe Nachweis.
+2. minor · Kommentar vor dem zweiten `page.reload()` in H8 war veraltet · Kommentar neu gefasst; das Neuladen selbst bleibt auf der Folgeliste.
+3. minor · Test (a) prüft „nicht vor der Antwort“ nur synchron; Reihenfolge bei 204 nicht festgenagelt · Folgeliste.
+4. minor (vorbestehend) · 2xx mit nicht lesbarem Rumpf setzt das ETag, lehnt ab und benachrichtigt nicht · Folgeliste.
+5. nit · Polling-Schleife ruft Hörer ohne try/catch (anders als der Schreibpfad) · Folgeliste.
+6. nit · Dateikopf nannte nur H8 als schreibend · behoben.
+7. nit · Status und Review-Abschnitt der Spec · behoben.
 
 Nachlauf nach der Umbenennung des Screenshots (Orchestrator): `pnpm gates` auf `54cf368` (sauberer Baum), Exit 0. Wörtlicher Schluss:
 

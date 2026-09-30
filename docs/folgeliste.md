@@ -155,6 +155,10 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   von Hand neu · nach jedem eigenen Schreibvorgang die Version erhöhen (wie der In-Process-Speicher). Nit 12 gehört dazu: H6
   prüft den Weg `onUnauthorized` einer laufenden Seite nicht (nur Neuladen nach der Sperre); mit dem Takt ein Test, der ohne
   Neuladen auf den Wechsel zur Anmeldung wartet.
+- takt-030 Review minor · `apps/web/src/api/http.test.ts:212-225` · Test (a) prüft „nicht vor der Antwort“ nur synchron, die Reihenfolge ETag → Hörer bei einer 204-Antwort ist nicht eigens getestet · Test ergänzen.
+- takt-030 Review minor (vorbestehend) · `apps/web/src/api/http.ts:110-116` · eine 2xx-Antwort mit nicht lesbarem Rumpf setzt `writeEtag`, lehnt dann ab und benachrichtigt nicht: Fehlermeldung und bis zu 30 s alte Ansicht, obwohl der Dienst angenommen hat · als angenommen behandeln und benachrichtigen, oder begründen.
+- takt-030 Review nit · `apps/web/src/api/http.ts:224` · die Polling-Schleife ruft Hörer ohne try/catch, ein werfender Hörer stoppt die übrigen · `notifyListeners()` wiederverwenden.
+- takt-030 offen · `apps/web/e2e/031-http-betriebsart.spec.ts` H8 · das Neuladen der Erfassungsseite nach dem eigenen Redebeitrag ist vermutlich überflüssig; entfernen, sobald ein CI-Lauf zeigt, dass das freie Feld ohne Neuladen erscheint und das 412 bestehen bleibt.
 - 031a Bau · H8 · das 30-s-Polling der Seite hätte den 412 verhindern können; behoben: die Seite gilt für das Polling als
   verborgen (`visibilityState` per `addInitScript`), kein Wiederholen nötig.
 - 031a Bau · Dienst (`viewSpeaker`) · Rollen ohne `question.identity.reveal` sehen nur „Redner N“; H8 nimmt die Kennung aus
