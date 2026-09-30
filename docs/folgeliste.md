@@ -149,12 +149,16 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   ohne Rolle landet nach der Keycloak-Anmeldung auf einem rohen 403-JSON-Dokument des Dienstes, und die Keycloak-SSO-Sitzung
   bleibt bestehen (die nächste Anmeldung geht ohne Formular wieder dorthin) · gestaltete Fehlerseite oder Weiterleitung zur
   Seite „Keine aktive Rolle“, Abmelden beim IdP klären.
-- 031a Review major (Produktcode, **eigener Takt vor 031b**) · `apps/web/src/api/http.ts:146-152`, `:207-216`,
+- **Erledigt durch takt-030 (Schreibvorgänge; H8 lädt die Liste nicht mehr von Hand neu; H6 lädt weiter neu, Nit 12 und das Neuladen der Erfassungsseite in H8 bleiben offen)** · 031a Review major (Produktcode, **eigener Takt vor 031b**) · `apps/web/src/api/http.ts:146-152`, `:207-216`,
   `features/speakers/Page.tsx:149-163` · im HTTP-Modus löst ein eigener erfolgreicher Schreibvorgang kein Neuladen aus: Liste
   und ETag bleiben bis zu 30 s (Polling) veraltet, der nächste eigene Schreibvorgang läuft in 412; H6 und H8 laden deshalb
   von Hand neu · nach jedem eigenen Schreibvorgang die Version erhöhen (wie der In-Process-Speicher). Nit 12 gehört dazu: H6
   prüft den Weg `onUnauthorized` einer laufenden Seite nicht (nur Neuladen nach der Sperre); mit dem Takt ein Test, der ohne
   Neuladen auf den Wechsel zur Anmeldung wartet.
+- takt-030 Review minor · `apps/web/src/api/http.test.ts:212-225` · Test (a) prüft „nicht vor der Antwort“ nur synchron, die Reihenfolge ETag → Hörer bei einer 204-Antwort ist nicht eigens getestet · Test ergänzen.
+- takt-030 Review minor (vorbestehend) · `apps/web/src/api/http.ts:110-116` · eine 2xx-Antwort mit nicht lesbarem Rumpf setzt `writeEtag`, lehnt dann ab und benachrichtigt nicht: Fehlermeldung und bis zu 30 s alte Ansicht, obwohl der Dienst angenommen hat · als angenommen behandeln und benachrichtigen, oder begründen.
+- takt-030 Review nit · `apps/web/src/api/http.ts:224` · die Polling-Schleife ruft Hörer ohne try/catch, ein werfender Hörer stoppt die übrigen · `notifyListeners()` wiederverwenden.
+- takt-030 offen · `apps/web/e2e/031-http-betriebsart.spec.ts` H8 · das Neuladen der Erfassungsseite nach dem eigenen Redebeitrag ist vermutlich überflüssig; entfernen, sobald ein CI-Lauf zeigt, dass das freie Feld ohne Neuladen erscheint und das 412 bestehen bleibt.
 - 031a Bau · H8 · das 30-s-Polling der Seite hätte den 412 verhindern können; behoben: die Seite gilt für das Polling als
   verborgen (`visibilityState` per `addInitScript`), kein Wiederholen nötig.
 - 031a Bau · Dienst (`viewSpeaker`) · Rollen ohne `question.identity.reveal` sehen nur „Redner N“; H8 nimmt die Kennung aus
