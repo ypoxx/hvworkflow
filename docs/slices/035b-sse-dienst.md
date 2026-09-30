@@ -422,6 +422,12 @@ herstellbar). `req()` puffert SSE nicht; der Test-Leser öffnet über `req()`, d
 Instanz innerhalb der Frische-Sekunde). Die `serverOptions` aus `server.ts` sind nicht exportiert; der Test mit echtem
 Server wiederholt die drei Zahlen (Befund, `server.ts` unverändert).
 
+- **Orchestrator (30.09.2026):** Der ADR-0014-Nachtrag geht über die enge Erlaubnis („Nachweis“ und Ergänzung
+  Domänenfunktion, Teilung, Rotation) hinaus: Dienstentwurf, Grenzentabelle, Bauklärungen, Client-Seite 036,
+  Eigentümerfragen. Vom Orchestrator angenommen, weil ADR 0014 die Entscheidung dokumentiert und diese Punkte zu ihr
+  gehören; Überbehauptungen aus der Nachprüfung (Prüfung beim hängenden Live-Stapel, `Retry-After` nach `end`) sind
+  berichtigt.
+
 ## Review findings
 
 Lesebefund zu Spec 035 (Opus, frischer Kontext, `9f2560c`): nicht baureif. In dieser Fassung eingearbeitet: B1

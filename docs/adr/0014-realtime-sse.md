@@ -127,22 +127,26 @@ Rechten zum Zustellzeitpunkt. Es gibt kein Rollenliteral und keine Erkennung der
   | Lebensdauer | 25 min | `end {rotate}`, Neuaufbau mit `Last-Event-ID` durch alle Prüfungen des Öffnens |
   | Nachlauf | 1000 Ereignisse | darüber `reset` |
   | Rückstau je Verbindung | 256 Nachrichten oder 1 MiB | `change` zusammenführen, darüber schließen |
-  | Heartbeat | 15 s, versetzt | Anlass für Rechte- und Sitzungsprüfung, bei Bedarf `cursor` |
+  | Heartbeat | 15 s, versetzt | Anlass für Rechte- und Sitzungsprüfung (direkt bei Nachlauf oder hängendem Schreiben, sonst als Frame in der Schlange), bei Bedarf `cursor` |
 
 - **`reset` und `end`.** Beide tragen keine `id`, der Dienst schließt danach. Nach `reset {lastSeq}` verwirft der Client
   seinen Stand und verbindet **ohne** Cursor neu; er erhält sofort `cursor` mit dem Kopf. Ein Client auf Basis von
   `EventSource` braucht dafür eine neue Instanz ohne `Last-Event-ID`. `end {reason}` mit `session`, `forbidden`,
-  `roles_changed`, `rotate` oder `unavailable` beendet den Strom. Der Client verbindet nach `rotate` sofort und nach
-  `unavailable` nach `Retry-After` von selbst neu, nach den übrigen erst mit erneut bestätigter Sitzung (036b).
+  `roles_changed`, `rotate` oder `unavailable` beendet den Strom. Geplant für den Client (036b, noch nicht gebaut): nach
+  `rotate` sofort neu verbinden, nach `unavailable` mit Rückfall-Abstand (ein `end` im Strom trägt kein `Retry-After`,
+  nur eine 503 beim Öffnen), nach den übrigen erst mit erneut bestätigter Sitzung.
 
 **Rechte zum Zustellzeitpunkt, auch während des Nachlaufs.** Beim Öffnen wird die Akteurkarte
 (`resolveReaderActors`, `meetingId → Actor`) aus der Projektion des Verteilers als Referenz bestimmt. Vor jedem Stapel
 mit sichtbarer Nachricht und bei jedem Heartbeat wird sie neu bestimmt. Eine leere Karte führt zu `end {forbidden}`,
 jede andere Abweichung zu `end {roles_changed}`, und aus diesem Stapel wird nichts zugestellt. Das gilt ab der
 Registrierung, nicht erst ab live: Heartbeat- und Rotationszeitgeber starten mit der Registrierung. Sitzung und Rechte
-werden je Heartbeat auch während eines Nachlaufs geprüft, der wegen Gegendrucks lange dauert. Ein Nachlauf verlängert
-die Zeit ohne Prüfung also nicht. Umgesetzt in 035b (`1bcfd4f`): Zeitgeber ab `hub.register`, Prüfung je Heartbeat
-während des Nachlaufs (`checkDuringHandover`), Rechte unmittelbar vor jedem geschriebenen Stapel (`rightsNow`); Tests R1–R2.
+werden je Heartbeat direkt geprüft, solange ein Nachlauf läuft oder ein Schreibvorgang hängt (Gegendruck, auch im
+Livebetrieb); jedes weitere Frame wartet auf eine laufende Prüfung. Ein Nachlauf oder ein hängender Stapel verlängert
+die Zeit ohne Prüfung also nicht. Restrisiko: ein Frame, das vor der Abmeldung bereits an den Transport übergeben war,
+erreicht den Leser noch vor dem `end` (Tests R1d/R1e erlauben höchstens eines). Umgesetzt in 035b (`1bcfd4f`,
+`28f7af3`): Zeitgeber ab `hub.register`, direkte Prüfung je Heartbeat bei Nachlauf oder hängendem Schreiben, Warten je
+Frame (`catchUpMayGoOn`), Rechte unmittelbar vor jedem geschriebenen Stapel (`rightsNow`); Tests R1, R1d, R1e, R2.
 
 **Bauklärungen von 035b** (im Rahmen von Spec und Vertrag, keine Vertragsänderung):
 
