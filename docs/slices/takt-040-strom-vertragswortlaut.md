@@ -106,21 +106,28 @@ Slice: takt-040-strom-vertragswortlaut
 Done: streamEvents-Beschreibung (gap-free nur ohne Filter, Absatz zum meetingId-Filter, Retry-After 30 und kein
       Retry-After auf end) und RetryAfter-Kopf (30 auf /stream) an den Dienst 035b angeglichen; Vertrag 0.3.12 mit
       CHANGELOG, regenerierten Typen und den zwei Versionszeilen-Tests.
-Evidence: siehe unten (pnpm gates auf d618177)
+Evidence: siehe unten (pnpm gates auf 78ebb06, nach der Überarbeitung aus dem Review)
 Open: Folgeliste 035b Einträge 1 und 2 abhaken, sobald PR #107 und dieser Takt gemergt sind (Orchestrator).
 Touched: packages/contract/openapi.yaml, packages/contract/package.json, packages/contract/CHANGELOG.md,
          packages/contract/src/types.ts, apps/api/src/__tests__/contract.test.ts,
          apps/api/src/__tests__/takt-019-contract.test.ts, docs/slices/takt-040-strom-vertragswortlaut.md
 ```
 
-**`pnpm gates`** auf `d618177` (sauberer Baum, mit den Postgres-Variablen `TEST_DATABASE_URL`,
-`TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`), Exit 0. Ausschnitt Vertragstor, Tests und slice-scope, wörtlich:
+**Überarbeitung nach Review (frischer Kontext, kein Blocker, kein Major), Commit `78ebb06`:** Befunde 1–4 behoben
+(Leserbezug im Filterabsatz, `end` ohne `Retry-After` mit SSE-`retry` oder eigenem Backoff, „always“ gestrichen,
+`cursor` auch nach dem Nachholen), in `openapi.yaml`, CHANGELOG 0.3.12 und Ziel dieser Spec. Version bleibt 0.3.12;
+`pnpm contract:types` ändert nur JSDoc-Kommentare. Befund 5 (Nit, `StreamUnavailable` „both causes“) liegt außerhalb
+von Files allowed und geht auf die Folgeliste (Orchestrator).
+
+**`pnpm gates`** auf `78ebb06` (sauberer Baum, mit den Postgres-Variablen `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`, Datenbank `hv_t033`), Exit 0. Ausschnitt, wörtlich:
 
 ```
 packages/contract test: contract gate: packages/contract/openapi.yaml (info.version 0.3.12, 66 operations)
 packages/contract test:   ok    (a) info.version 0.3.12 = package.json version
 packages/contract test:   ok    (b) CHANGELOG.md has a section for 0.3.12
 packages/contract test:   ok    (c) openapi.yaml changed against merge base 2e708e1; version 0.3.11 -> 0.3.12
+packages/contract test:   ok    (d) allowlist.json well-formed, 7 pre-declared operation(s), none expired (today 2026-09-30)
 packages/contract test: contract gate: ok
 packages/domain test:       Tests  261 passed (261)
 apps/web test:       Tests  374 passed (374)
@@ -132,10 +139,11 @@ slice-scope: 7 changed file(s), all within "docs/slices/takt-040-strom-vertragsw
 Schluss, wörtlich:
 
 ```
-✓ built in 2.04s
-mark-test-run: wrote /home/user/wt/t040/.claude/state/last-test-run (clean tree) at commit d618177, tree 0c615a16ea1c…
+✓ built in 2.11s
+mark-test-run: wrote /home/user/wt/t040/.claude/state/last-test-run (clean tree) at commit 78ebb06, tree 9f63d1b543ba…
 ```
 
-Dieser Berichtsnachtrag ist ein reiner Doku-Commit (R2: kein neuer lokaler Lauf nötig).
+Der erste Lauf auf `d618177` (vor dem Review) war ebenfalls grün. Dieser Berichtsnachtrag ist ein reiner Doku-Commit
+(R2: kein neuer lokaler Lauf nötig).
 
 ## Review findings
