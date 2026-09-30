@@ -105,7 +105,14 @@ suchen, ob eine Ansicht `version === 0` oder das Hochzählen beim Einhängen als
 
 ## Nachweis
 
-_offen (Gates-Commit, wörtlicher Schluss von `pnpm gates`, Lauf `e2e-http` mit H10, Screenshot)_
+Gates-Commit `505cfc0`, `pnpm gates` grün. Wörtlicher Schluss:
+
+```
+✓ built in 3.65s
+mark-test-run: wrote /home/user/wt/t033b/.claude/state/last-test-run (clean tree) at commit 505cfc0, tree d2d931042400…
+```
+
+Unit-Test erst rot (6 von 6, `actorChanged` fehlte), dann grün. `pnpm --filter @hv/web e2e`, Projekt in-process: 127 passed. H10 läuft nur in der PR-CI (`e2e-http`); der Screenshot `031-h10-einhaengen-ein-abruf.png` entsteht dort. Diese Änderung hat keine sichtbare Oberfläche.
 
 ## Review findings
 
