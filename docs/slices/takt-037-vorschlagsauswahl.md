@@ -35,6 +35,10 @@ Keine Änderung an `suggestQuestions`, am Vertrag oder an der Domäne, keine neu
 - `apps/web/src/features/capture/SuggestDialog.test.tsx` (neu)
 - `docs/slices/takt-037-vorschlagsauswahl.md`
 - `docs/folgeliste.md` (nur nicht blockierende Reviewbefunde)
+- `apps/web/e2e/takt-037-vorschlagsauswahl.spec.ts` (neu)
+- `docs/evidence/takt-037-vorschlagsauswahl.png` (neu)
+
+Die beiden letzten Pfade sind nachträglich ergänzt: Das Codex-P1 auf #95 verlangte Screenshot-Nachweis.
 
 ## Akzeptanzkriterium
 
@@ -62,5 +66,5 @@ mark-test-run: wrote /home/user/wt/t037/.claude/state/last-test-run (clean tree)
 ```
 
 Unit-Tests `SuggestDialog.test.tsx` zuerst rot (5 von 5, die Modellfunktionen fehlten im alten Code), dann grün (5 von 5).
-e2e Projekt `in-process`: `002-speakers-capture.spec.ts` und `abnahme.spec.ts`, 2 passed. Diese Änderung hat keine
-sichtbare Oberfläche, deshalb kein neuer Screenshot.
+e2e Projekt `in-process`: `002-speakers-capture.spec.ts` und `abnahme.spec.ts`, 2 passed. Nachtrag (Codex P1 auf #95): Das Verhalten ist sichtbar, der Screenshot
+folgt im Abschnitt „Nachweis Screenshot“.
