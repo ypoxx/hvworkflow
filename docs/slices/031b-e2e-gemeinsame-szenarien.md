@@ -45,8 +45,10 @@ Die fünf Dateien, die Verhalten des Dienstes berühren, laufen in beiden Projek
 6. **Texte für die Zugriffslog-Prüfung.** Die Fragetexte und Redebeiträge aus `abnahme.spec.ts` und
    `002-speakers-capture.spec.ts` wandern in `apps/web/e2e/support/e2e-texts.ts` (aus 031a); die Dateien importieren sie
    von dort, damit Harness-Stufe 6 sie als verbotene Texte im Zugriffslog prüft.
-7. **Reset-Banner in beiden Betriebsarten (ADR 0002).** `in-process`: `024-ereignis-umschlag.spec.ts`, Test „024: old
-   demo log requires an explicit reset in German and English“; `http`: H2 aus 031a. Beide stehen namentlich im Nachweis.
+7. **Altes Demo-Protokoll in beiden Betriebsarten (ADR 0002).** `in-process` (positiv): `024-ereignis-umschlag.spec.ts`,
+   Test „024: old demo log requires an explicit reset in German and English“ – das Reset-Banner erscheint. `http`
+   (negativ, Isolation): H2 aus 031a – das alte Protokoll unter `hv-demo-events-v1` wird ignoriert, **kein** Reset-Banner.
+   H2 ist ausdrücklich kein Reset-Banner-Test; beide stehen mit dieser Einordnung namentlich im Nachweis.
 8. **Nicht portierte Dateien (Standard, ehrlich begründet).** Nur `in-process`, unter „Offen“ im Bericht:
 
    | Datei | Grund |
@@ -60,7 +62,7 @@ Die fünf Dateien, die Verhalten des Dienstes berühren, laufen in beiden Projek
 
 9. **ADR-0002-Ergänzung (Architekt).** Der Architekt ersetzt in der Ergänzung „Sie besteht dieselbe e2e-Suite wie die
    HTTP-Betriebsart“ durch eine Fassung, die die Liste aus Entscheidung 1 und 8 nennt, und trägt den Nachweis ein
-   (PR-CI-Lauf mit beiden Projekten, beide Reset-Banner-Tests). Die Planzeile ADR 0002 (§4) und
+   (PR-CI-Lauf mit beiden Projekten, positiver Reset-Banner-Test in-process und negativer Isolationstest H2 in http). Die Planzeile ADR 0002 (§4) und
    `docs/produktplan-beta.md` bleiben unverändert, außer der Stand-Zeile nach dem Merge.
 
 ## Nicht-Ziele
@@ -76,6 +78,7 @@ dass die `in-process`-Bilder unverändert bleiben.
 - `apps/web/e2e/support/roles.ts` (neu)
 - `apps/web/e2e/support/evidence.ts` (neu)
 - `apps/web/e2e/support/e2e-texts.ts` (nur Texte der gemeinsamen Dateien ergänzen)
+- `apps/web/e2e/030-anmeldung.spec.ts` (nur ausdrücklich leerer Zustand `test.use({ storageState: { cookies: [], origins: [] } })`, weil `http` jetzt `capture` als Standardzustand hat; Codex P1 auf #79)
 - `apps/web/e2e/abnahme.spec.ts`, `apps/web/e2e/002-speakers-capture.spec.ts`, `apps/web/e2e/021b-koordination.spec.ts`, `apps/web/e2e/021c-rechtsfreigabe.spec.ts`, `apps/web/e2e/080-sprecher-zustand.spec.ts` (nur Rollenwechsel- und Nachweishilfe, Import von `test`/`expect` aus `apps/web/e2e/support/http-guard.ts` statt aus `@playwright/test` (429-Wächter, 031a Entscheidung 9), Texte aus der Konstante, ausdrückliches Wiederherstellen von Zustand nach Rollenwechsel)
 - `scripts/e2e-http-031.test.mjs` (nur Erweiterung der Reihenfolgeprüfung)
 - `docs/adr/0002-demo-betriebsart-in-process.md` (nur Abschnitt „Ergänzung“: Wortlaut zur gemeinsamen Suite und Nachweis; **geschrieben vom Architekten**, nicht vom Implementierer; steht hier, damit dessen Commit auf dem Baubranch das Scheibenumfang-Tor passiert)
@@ -109,7 +112,7 @@ Weitere Dateien sind Scope-Befunde: erst Spec klären, nicht still ausweichen.
 ## Nachweise
 
 `pnpm gates`-Schluss; e2e-Laufzeiten beider Projekte mit Lauf-ID; Laufzeit von `abnahme` im Projekt `http`; die beiden
-Reset-Banner-Tests; ADR-0002-Ergänzung mit Nachweis.
+Reset-Banner-Test (in-process) und Isolationstest H2 (http); ADR-0002-Ergänzung mit Nachweis.
 
 ## Nachweis
 
