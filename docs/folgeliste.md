@@ -301,5 +301,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-032 R2 nit · `capture/Page.tsx:224-226`, `speakers/Page.tsx` · `shownRef`/`latest` im passiven Effekt; zwischen
   Commit und Effekt kann `base` kurz veralten → normales 412 mit Banner · Ref im Layout-Effekt oder beim Landen setzen.
 - takt-032 Codex P2 · `apps/web/src/features/capture/Page.tsx:218` · schlägt die automatische Aktualisierung der Wortmeldeliste nach `captureContribution` fehl, hebt `status === 'error'` die Sperre `speakerLocked` auf und erlaubt ein Schreiben mit veralteter Sprecherversion (412) · Sperre bis zu einer erfolgreichen Aktualisierung halten.
+- takt-032 Nachprüfung Codex P1 minor · `speakers/Page.tsx:315-318/420-421`, `capture/Page.tsx:289-290` · die Verdrahtung
+  der Antwortmarke ist nur über reine Funktionen getestet · Komponententest mit verspäteter Antwort durch die Seite.
+- takt-032 Nachprüfung Codex P1 nit · `versionOfEtag` (capture, speakers) · koppelt den Client an das interne Tag-Format
+  `"v<n>"`; ein Formatwechsel des Dienstes schaltet die Marke still ab (412 nach eigenem Schreiben) · Vertragstest auf das
+  Tag-Format oder Version im Antwortrumpf.
+- takt-032 Nachprüfung Codex P1 nit · schwaches `W/"vN"` würde als `If-Match` zurückgeschickt, die Domäne vergleicht
+  strikt (`packages/domain/src/api.ts:458`) · vorbestehend, heute ohne Folge (kein Dienst sendet schwache Tags).
 - takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
 - takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).
