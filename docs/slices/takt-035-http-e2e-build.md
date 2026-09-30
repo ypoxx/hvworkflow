@@ -114,3 +114,15 @@ Postgres-Variablen, sauberer Baum, Exit 0. Wörtlicher Schluss:
 ✓ built in 1.74s
 mark-test-run: wrote /home/user/wt/t035/.claude/state/last-test-run (clean tree) at commit 453bfdc, tree e79f9cc697c8…
 ```
+
+### Nachweis nach Codex-P2 (leeres `E2E_HTTP_STATE_DIR`)
+
+Ein leerer oder nur aus Leerzeichen bestehender Wert gilt als nicht gesetzt (Fallback je Lauf); ein relativer Pfad oder ein Pfad direkt unter `/`
+wird beim Laden der Konfiguration abgelehnt (Test in `e2e-http-031.test.mjs`, 39 Tests grün).
+Gates-Commit: `ca58423` (`pnpm gates` Exit 0, Postgres-Umgebung gesetzt). Wörtlicher Schluss:
+
+```
+✓ built in 1.98s
+mark-test-run: wrote /home/user/wt/t035/.claude/state/last-test-run (clean tree) at commit ca58423, tree aff4005bc8dd…
+```
+
