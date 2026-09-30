@@ -1,9 +1,9 @@
 # Scheibe 040c — Administration im Kern, Teil 3: Jahrgang, Erstinbetriebnahme, Nummernkreise
 
-**Status:** spec (30.09.2026; Teil 3 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
-**Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service (Routen und Kommandozeile); web-api (nur neue `HvApi`-Methoden); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-betrieb; docs-plan (nur Glossar)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`; Teil 3 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Risikoklasse:** hoch · 1,75 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service (Routen und Kommandozeile); web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); manifests (nur ein Skript in `apps/api/package.json`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-betrieb; docs-plan (nur Glossar)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend. Review in frischem Kontext mit Perspektive Security/Admin (Erst-Admin, Rechteerhöhung) und Betrieb (Kommandozeile gegen Postgres); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** neu R-ADM-05 (Nummernkreis-Zugehörigkeit vergebener Nummern ändert sich nie). Angewandt: R-ADM-01 (aus 040b, hier auch für Nummernkreise), R-MTG-01, R-PERM-01, R-IDEM-01. Dazu AGENTS.md R2, R4, R6, R7, R8, R11, R12
+**Rule ids:** neu R-ADM-05 (Nummernkreis-Zugehörigkeit vergebener Nummern ändert sich nie). Angewandt: R-ADM-01 (aus 040b, hier auch für Nummernkreise), R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-01, R-PERM-01, R-IDEM-01. Dazu AGENTS.md R2, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5/040 („Jahrgang anlegen/klonen“, „Nummernkreise je Erfassungsplatz als Meeting-Daten (für den Papierpfad)“), §5/068 (Nachweis „Nummer außerhalb des Kreises → 422“), §5/070 (Runbook: Papierpfad mit Nummernkreisen), B14
 - `docs/anforderungen-recherche.md:264, 373, 491` (MUSS: Papier-Fallback mit vorab reservierten Nummernkreisen je Erfassungsplatz)
@@ -57,32 +57,57 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
      Jahrgang, den der Akteur selbst angelegt hat. Die Demo-Identität (nicht zuordnungsgebunden) erhält keine Zuordnung.
    - Beide Ereignisse tragen die `meetingId` des neuen Jahrgangs. `append` erhält dafür einen eng begrenzten Weg (nur für
      diesen Befehl), belegt durch Test 3.
-   - Antwort 201 `Meeting` mit `ETag`; Projektion von `Meeting.format` und `Meeting.clonedFromMeetingId`. Wiederholbar
-     über `Idempotency-Key` (R-IDEM-01).
+   - Antwort 201 `Meeting` mit `ETag`; Projektion von `Meeting.format` und `Meeting.clonedFromMeetingId`.
+   - **Wiederholung mit globalem Geltungsbereich.** `idempotent()` sucht heute nur Ereignisse des Alias-Jahrgangs
+     (`api.ts:565-569`, `event.meetingId === meetingId`). Der neue Jahrgang ist nie der Alias, also fände eine Wiederholung
+     ihr erstes Ergebnis nicht und legte einen zweiten Jahrgang an. Für `createMeeting` sucht die Wiederholung deshalb über
+     **alle** Jahrgänge: gleiche Akteur-id, gleicher `Idempotency-Key`, Befehlsoperation `createMeeting`. Die
+     Rekonstruktion liefert den damals angelegten Jahrgang. Test 10 mit Mutationsprobe.
+   - Zeichenketten (`title`, `legalEntity`) müssen wohlgeformtes UTF-16 sein, sonst 422 (wie 040b).
 2. **Betreiber-Bootstrap (029b).**
    - **Kern:** eine reine Funktion in `packages/domain/src/bootstrap.ts`, etwa
-     `bootstrapEvents({ title, date, format?, adminSubjectId }, { existing, newId, now })`. Sie liefert `MeetingCreated`
-     (`lifecycleVersion: 2`) und `RoleAssigned` für `adminSubjectId`, beide mit Akteur `SYSTEM_ACTOR` und der
-     Befehlsoperation `operatorBootstrap`.
+     `bootstrapEvents({ title, date, format?, adminSubjectId, operatorRef }, { existing, newId, now })`. Sie liefert
+     `MeetingCreated` (`lifecycleVersion: 2`) und `RoleAssigned` für `adminSubjectId`, beide mit Akteur `SYSTEM_ACTOR` und
+     der Befehlsoperation `operatorBootstrap`.
+   - **Betreiberkennung:** `operatorRef` (pseudonym, Regeln wie `subjectId`, keine E-Mail, kein Klarname) steht in der
+     Nutzlast beider Ereignisse. So nennt das Log, welche Betreiberkennung den Bootstrap ausgeführt hat; die Zuordnung der
+     Kennung zu einer Person führt das Protokoll im Tagesbericht.
+   - **Ablauf der Erstzuordnung:** keiner. Sie endet mit dem Schluss des Jahrgangs (wie jede Zuordnung ohne `expiresAt`).
+     Die Verwaltung trägt die Erstellerzuordnung in den nächsten Jahrgang (Betriebsregel unten).
    - Die Rolle wird **aus den Daten abgeleitet**: die eine Rolle in `ROLE_PERMISSIONS`, die `admin.roles.manage` und
      `admin.meetings.manage` hält. Ist es nicht genau eine, bricht die Funktion ab (kein Rollenname, AGENTS.md R4).
    - **Einmalig:** Enthält `existing` irgendein `MeetingCreated`, bricht sie ab und liefert nichts.
    - `adminSubjectId` wird wie in `assignRole` geprüft (pseudonym, ohne `@` und Leerraum, höchstens 128 Zeichen).
-   - **Kommandozeile** `apps/api/src/admin/bootstrap-cli.ts`, Aufruf
-     `HV_DATABASE_URL=… tsx src/admin/bootstrap-cli.ts --title "…" --date JJJJ-MM-TT --subject oidc_<actor-id>`
-     (Format des Subjects wie `subject-block-cli.ts`). Ablauf:
+   - **Wiederherstellung (auditiert, 040a R-ADM-08):** dieselbe Datei bietet eine zweite reine Funktion, etwa
+     `recoveryEvents({ meetingId, adminSubjectId, operatorRef, expiresAt, reason }, { existing, newId, now })`. Sie
+     liefert genau ein `RoleAssigned` (Akteur `SYSTEM_ACTOR`, Befehlsoperation `operatorRecovery`, Rolle wie beim
+     Bootstrap abgeleitet) und bricht ab, wenn der Jahrgang fehlt, geschlossen ist oder **noch eine aktive Zuordnung einer
+     Verwaltungsrolle** hat. `expiresAt` ist Pflicht und liegt höchstens 14 Tage nach `now`; `reason` (1–500, keine
+     Personendaten) steht in der Nutzlast. Die befristete Zuordnung ist ein Notzugang: Die Person ordnet damit eine
+     reguläre Verwaltungsrolle einem anderen Subject zu (R-ADM-07) und lässt den Notzugang ablaufen. Einen anderen
+     Wiederherstellungsweg gibt es nicht, insbesondere keinen über HTTP.
+   - **Kommandozeile** `apps/api/src/admin/bootstrap-cli.ts`, Aufrufe
+     `bootstrap --title "…" --date JJJJ-MM-TT --subject oidc_<actor-id> --operator <kennung>` und
+     `recover --meeting <id> --subject oidc_<actor-id> --operator <kennung> --expires <ISO-Zeit> --reason "…"`
+     (Format des Subjects wie `subject-block-cli.ts`), gestartet wie die übrigen Betreiberwerkzeuge des Dienstes (heute
+     `tsx`, vgl. das Skript `db:migrate` in `apps/api/package.json`); ein Skript `admin:bootstrap` kommt dazu. Ablauf:
      - `assertRuntimePrivileges`;
-     - eine Transaktion mit derselben Schreibsperre wie der Dienst (die Konstante wird aus `app.ts` exportiert, nicht
-       dupliziert);
+     - eine Transaktion mit derselben Schreibsperre wie der Dienst. Die Sperrschlüssel wandern aus dem Literal in
+       `app.ts:630` in ein kleines eigenes Modul `apps/api/src/writeLock.ts`, das Dienst und Kommandozeile importieren;
+       die Kommandozeile importiert `app.ts` nicht (sie soll den Dienst nicht aufbauen);
      - geprüfte Kette laden, Ereignisse über die Kernfunktion bilden und über denselben Umschlag- und Hashweg wie der
        Dienst anhängen (`envelope.ts`, `insertPostgresEvents`), nie mit selbst gebauten Hashwerten;
      - COMMIT.
-   - Ausgabe genau eine Zeile: „Bootstrap completed.“ (Code 0), „Bootstrap refused: a meeting already exists.“ (Code 2),
-     „Bootstrap failed.“ (Code 1). Kein Subject, keine Datenbankdiagnose in der Ausgabe.
+   - Ausgabe genau eine Zeile: „Bootstrap completed.“ bzw. „Recovery completed.“ (Code 0), „Bootstrap refused: a meeting
+     already exists.“ bzw. „Recovery refused.“ (Code 2), „Bootstrap failed.“ bzw. „Recovery failed.“ (Code 1). Kein
+     Subject, keine Betreiberkennung, keine Datenbankdiagnose in der Ausgabe.
    - Nur mit Postgres. Die JSONL-Datei ist ein Entwicklungsadapter (T-G2-E-02); dort sät die Demo.
    - `docs/betrieb/erstinbetriebnahme.md`: wer den Bootstrap ausführt (Plattformbetreiber, nach dem Go des Eigentümers,
-     R11), Voraussetzungen (Migrationen, Keycloak-Subject aus 088), Schritte, erwartete Ausgabe, Vorgehen bei „refused“,
-     Protokoll im Tagesbericht (Datum, ausführende Person, Commit, Ausgabezeile).
+     R11), Voraussetzungen (Migrationen, Keycloak-Subject aus 088), wie das Werkzeug im Laufzeitabbild gestartet wird,
+     Schritte, erwartete Ausgabe, Vorgehen bei „refused“, Protokoll im Tagesbericht (Datum, ausführende Person,
+     Betreiberkennung, Commit, Ausgabezeile). Dazu die **Betriebsregeln** aus 040a: den nächsten Jahrgang anlegen, bevor der
+     laufende schließt; die Verwaltungsrolle mit Vertretung und ohne kurzen Ablauf vergeben; Wiederherstellung nur mit Go
+     des Eigentümers und Protokoll.
 3. **Nummernkreise je Erfassungsplatz.**
    - Neue Operationen `listMeetingCaptureRanges` (`GET /meetings/{meetingId}/capture-ranges`, jeder angemeldete Akteur)
      und `replaceMeetingCaptureRanges` (`PUT`, Recht `admin.meetings.manage`, `If-Match` Pflicht, weil die Operation neu
@@ -101,8 +126,12 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
      **außerhalb** aller Kreise (0, wenn keine) und in keinem Kreis liegt. Ohne Kreise ergibt das genau die heutigen Nummern
      (Test 8). Papiernummern (068) liegen in Kreisen und verschieben die Systemfolge nicht.
 4. **Rechte:** `admin.meetings.manage` kommt in `PERMISSIONS` und in die Liste der Administration.
-5. **`HvApi`:** `createMeeting(input, opts)` (global), `listCaptureRanges()`, `replaceCaptureRanges(items, opts)` (je
-   Jahrgang). `apps/web/src/api/http.ts` setzt sie um. Die Namen stehen im Bericht.
+5. **`HvApi`:** `createMeeting(input, opts)` (global), `listMeetingCaptureRanges(meetingId)`,
+   `replaceMeetingCaptureRanges(meetingId, items, opts)` (Gemeinsame Entscheidung 5 in 040a: jeder Jahrgang, über eine
+   auf `meetingId` eingegrenzte Instanz im Kern). `apps/web/src/api/http.ts` setzt sie um. Im Live-Puffer
+   (`liveStore.ts`) kommt `listMeetingCaptureRanges` in `READ_TOPICS` (Thema `meeting`) und `WATERMARKS.version`;
+   `createMeeting` und `replaceMeetingCaptureRanges` kommen in `WRITE_METHODS`. `label` der Nummernkreise muss
+   wohlgeformtes UTF-16 sein, sonst 422.
 
 ## Vertragsschritt (Architekt, erster Commit; additiv, 043a Regel 1)
 
@@ -115,7 +144,10 @@ Version: die nächste freie Patch-Stufe beim Baustart.
   `CsrfToken`, `IfMatchRequired`; Antworten wie `replaceMeetingStageSeats` beim Baustart plus 428. Ohne Go auf
   043a-Frage 5: vorab erklärt mit Allowlist-Eintrag `slice` 040c, Ablauf 2026-11-25 (040a, Tabelle).
 - **`Event.type`**: `CaptureRangesReplaced` mit gebundener Nutzlast. Beschreibung von `Event`: `MeetingCreated` trägt
-  optional `format`, `clonedFromMeetingId`, `stageSeats`.
+  optional `format`, `clonedFromMeetingId`, `stageSeats`, `operatorRef`. `RoleAssignedPayload` erhält die optionalen
+  Antwortfelder `operatorRef` und `reason` für die Befehlsoperationen `operatorBootstrap` und `operatorRecovery`
+  (heute steht dort `reason: false`; der Architekt fasst das als Bedingung: `reason` nur bei `operatorRecovery`).
+- **`createMeeting`**: Die Beschreibung nennt den globalen Geltungsbereich des `Idempotency-Key`.
 - **`Problem.ruleId`**: R-ADM-05.
 - **Allowlist:** Eintrag `createMeeting` entfernen.
 - **CHANGELOG** und **Typen** wie üblich. Die Kommandozeile ist keine HTTP-Operation und steht nicht im Vertrag.
@@ -125,7 +157,7 @@ Version: die nächste freie Patch-Stufe beim Baustart.
 - Keine Oberfläche (041).
 - Keine öffentliche Schlussaktion des Jahrgangs (takt-019: eigene Spec); kein Start (040d).
 - Keine Papiererfassung mit Nummer und keine Prüfung „Nummer außerhalb des Kreises“ (068).
-- Keine Bindung eines Kreises an Gerät oder Person; keine Wortmeldungsnummern (Eigentümerfrage 5 in 040a).
+- Keine Bindung eines Kreises an Gerät oder Person; keine Wortmeldungsnummern (Eigentümerfrage 6 in 040a).
 - Kein Ändern von Titel, Datum oder Format eines bestehenden Jahrgangs.
 - Kein Bootstrap über HTTP, keine Umgebungsvariable, die beim Start schreibt.
 - Kein Übertragen von Rollenzuordnungen beim Klonen.
@@ -155,22 +187,28 @@ Kern:
 - `packages/domain/policy-truth-table.md` (nur regeneriert)
 - `packages/domain/src/__tests__/meeting040c.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur neue Spalte im Abschnitt „Role × Administration“)
+- `packages/domain/src/__tests__/stream035.test.ts` (nur die Liste aller Ereignistypen und die Erwartungen an Themen je Ereignistyp)
 - `docs/legal-trace.md` (nur regeneriert)
 
 Dienst:
 
-- `apps/api/src/app.ts` (nur die drei Routen und der Export der Schreibsperren-Konstante)
+- `apps/api/src/app.ts` (nur die drei Routen und der Import der Sperrschlüssel aus dem neuen Modul)
+- `apps/api/src/writeLock.ts` (neu: nur die Sperrschlüssel der Schreibtransaktion)
 - `apps/api/src/admin/bootstrap-cli.ts` (neu)
 - `apps/api/src/__tests__/meeting040c.test.ts` (neu)
 - `apps/api/src/__tests__/postgres-bootstrap040c.test.ts` (neu)
 - `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Versionszeile)
 - `apps/api/src/__tests__/takt-016-contract.test.ts` (nur die Versionszeile, falls die Minor-Stufe wechselt)
+- `apps/api/src/__tests__/contract-043a.test.ts` (nur die Versionszeile, falls 043a gemergt ist)
+- `apps/api/package.json` (nur das Skript für das Betreiberwerkzeug)
 
-Web (nur was `HvApi` und die erschöpfenden Zuordnungen erzwingen):
+Web (nur was die Schnittstelle des Kerns und die erschöpfenden Zuordnungen erzwingen):
 
 - `apps/web/src/api/http.ts` (nur die neuen Methoden)
 - `apps/web/src/api/http.test.ts` (nur Tests der neuen Methoden)
+- `apps/web/src/api/liveStore.ts` (nur Einträge in den Lesethemen, den Schreibmethoden und dem Versionszähler)
+- `apps/web/src/api/index.ts` (nur falls die Verdrahtung der neuen Methoden es verlangt)
 - `apps/web/src/i18n/shell.de.ts` und `apps/web/src/i18n/shell.en.ts` (nur ein Aktions- und ein Ereignisschlüssel)
 - `apps/web/src/i18n/labels.ts` (nur Einträge in den Zuordnungen der Aktionen und Ereignisse)
 - `apps/web/src/i18n/parity.test.ts` (nur Zahl und Kommentar)
@@ -205,6 +243,11 @@ Weitere Dateien sind Scope-Befunde.
    folgen derselben Funktion.
 5. Liest `sessionActorFromEvents` ein `RoleAssigned` mit Akteur `system` im neuen Jahrgang als gültige Zuordnung des
    Subjects? Beleg in Test 13.
+6. **Laufzeit des Werkzeugs:** Wie startet `subject-block-cli.ts` im Laufzeitabbild (037) — über `tsx` wie `start` und
+   `db:migrate`, oder anders? Das Betreiberwerkzeug startet genauso; die Antwort steht in `erstinbetriebnahme.md`. Ist im
+   Abbild kein Weg vorhanden: anhalten und melden.
+7. Gilt der globale Wiederholungsschlüssel für `createMeeting` ohne Änderung an den übrigen Operationen? Die Änderung an
+   `idempotent()` bleibt auf `createMeeting` begrenzt.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -230,8 +273,16 @@ Kern (`meeting040c.test.ts`):
 8. **Nummerierung:** Mit vier vergebenen Fragen und dem Kreis 5–9 erhalten die nächsten zwei Fragen F-0010 und F-0011.
    Auf dem Seed ohne Kreise sind alle Nummern gleich wie vorher (Vergleich mit einer Referenzfolge im Test).
 9. **Rechte Nummernkreise:** nur `admin.meetings.manage`; `listCaptureRanges` für jeden angemeldeten Akteur.
-10. **Wiederholung:** `createMeeting` mit gleichem `Idempotency-Key` liefert denselben Jahrgang, kein zweites
-    `MeetingCreated`.
+10. **Wiederholung, global:** `createMeeting` mit gleichem `Idempotency-Key` liefert denselben Jahrgang und kein zweites
+    `MeetingCreated`, auch wenn inzwischen ein anderer Jahrgang der Alias ist; mit anderem Akteur gilt der Schlüssel nicht.
+10a. **Betreiberkennung und Wiederherstellung:** `bootstrapEvents` schreibt `operatorRef` in beide Nutzlasten und kein
+    `expiresAt`; `recoveryEvents` bricht ab, solange eine aktive Verwaltungsrolle besteht, bei geschlossenem Jahrgang, ohne
+    `expiresAt` und bei `expiresAt` mehr als 14 Tage nach `now`; sonst genau ein `RoleAssigned` mit Akteur `system`,
+    `operatorRef`, `reason` und `expiresAt`.
+10b. **Surrogate:** `title: '\uDC00'` in `createMeeting` und `label` mit einzelnem Surrogat in
+    `replaceMeetingCaptureRanges` → 422, kein Ereignis.
+10c. **Anderer Jahrgang:** `replaceMeetingCaptureRanges` auf einem Jahrgang in `preparation`, während ein anderer läuft,
+    schreibt mit dessen `meetingId`.
 
 Dienst:
 
@@ -241,7 +292,9 @@ Dienst:
 13. **Postgres** (`postgres-bootstrap040c.test.ts`, läuft in CI mit Postgres): Kernablauf der Kommandozeile auf leerer
     Datenbank → zwei Ereignisse, die Kette ist beim nächsten Laden gültig, eine Sitzung des Subjects löst im neuen
     Jahrgang die abgeleitete Rolle auf; zweiter Lauf → Code 2, Ereigniszahl unverändert; keine Ausgabezeile enthält das
-    Subject.
+    Subject oder die Betreiberkennung. Wiederherstellung: nach dem Entzug aller Verwaltungsrollen im Testaufbau (über
+    Ablauf, weil R-ADM-08 den letzten Entzug sperrt) → „Recovery completed.“, danach löst die Sitzung die befristete
+    Rolle auf; ein zweiter Lauf → Code 2.
 14. **Vertrag:** Die Allowlist enthält `createMeeting` nicht mehr; die zwei neuen Operationen verlangen `If-Match`; das
     Abdeckungstor meldet alle drei als ausgeübt.
 
@@ -252,12 +305,14 @@ Dienst:
 - Nummerierung ohne Kreise (`base + i + 1`) → Test 8 rot.
 - R-ADM-05 entfernt → Test 7 rot.
 - Erstellerzuordnung mit der `meetingId` des Alias-Jahrgangs → Test 3 rot.
+- Wiederholungssuche für `createMeeting` auf den Alias-Jahrgang begrenzt (heutiges Verhalten) → Test 10 rot.
+- Wiederherstellung ohne Prüfung „keine aktive Verwaltungsrolle“ → Test 10a rot.
 
 ## Akzeptanzkriterium
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`.
-2. Tests 1–14 grün, vier Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
+2. Tests 1–14 (mit 10a–10c) grün, sechs Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
 3. Ein Trockenlauf der Kommandozeile gegen die CI-Datenbank (Test 13) ist im Bericht mit Ausgabezeile belegt.
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040c-…`; Schluss der
    Ausgabe einmal im Bericht.
@@ -282,7 +337,7 @@ Ausgelöst:
 - [ ] Oberfläche
 
 Perspektive: Security/Admin (6.5, 6.8), Betrieb (6.7), Vertrag (6.4) · Nachweise: Tests 1–14, Mutationsproben,
-Trockenlauf · Offene Entscheidung: E8 (Tabelle ist Wahrheit, unverändert), E11 (Keycloak-Subject aus 088), Eigentümerfrage 5
+Trockenlauf · Offene Entscheidung: E8 (Tabelle ist Wahrheit, unverändert), E11 (Keycloak-Subject aus 088), Eigentümerfrage 6
 in 040a
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
@@ -301,7 +356,8 @@ in 040a
 
   | Missbrauch | Abwehr | Erkennung, Nachweis |
   |---|---|---|
-  | Bootstrap später erneut, um sich Admin zu geben | Einmal-Prüfung auf `MeetingCreated` | Test 5, Test 13; Ereignis `RoleAssigned` mit Akteur `system` nach dem ersten Jahrgang wäre auffällig (Alarmvorschlag an 085) |
+  | Bootstrap später erneut, um sich Admin zu geben | Einmal-Prüfung auf `MeetingCreated` | Test 5, Test 13; `RoleAssigned` mit Befehlsoperation `operatorBootstrap` nach dem ersten Jahrgang kann es nicht geben; jedes `operatorRecovery` meldet ein Alarmvorschlag an 085 |
+  | Wiederherstellung missbrauchen, um sich neben einer bestehenden Verwaltung einen Zugang zu geben | nur ohne aktive Verwaltungsrolle, befristet höchstens 14 Tage, nur mit Datenbankzugang | Test 10a, Test 13; `RoleAssigned` mit `operatorRecovery`, `operatorRef` und Grund; Protokoll im Tagesbericht |
   | Jahrgang anlegen, um darin eine fremde Rolle zu erhalten | nur die eigene Rolle wird übertragen; weitere Zuordnungen laufen über `assignRole` (ab 040d ohne Selbstzuordnung) | Test 3; `RoleAssigned` in der Historie |
   | Personen und Geräte des Vorjahres still übernehmen | Klonen ohne `personId`/`deviceId` | Test 2 |
   | Nummernkreis nachträglich über vergebene Nummern legen, um Papier- und Systemvorgänge zu vermischen | R-ADM-05 | Test 7; `CaptureRangesReplaced` mit Akteur |
@@ -322,14 +378,14 @@ in 040a
 
 ## Offene Eigentümerfragen
 
-Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Fragen 1 und 5.
+Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Fragen 1 und 6.
 
 ## Hinweise an Folgescheiben
 
 - **068:** Papiernummern liegen in einem Kreis; die Prüfung „Nummer außerhalb des Kreises → 422“ und das Vergeben der
   Papiernummer liegen dort. R-ADM-05 schützt die Zuordnung danach.
 - **070:** Runbook verweist auf `docs/betrieb/erstinbetriebnahme.md` und auf die Nummernkreise.
-- **085:** Alarmvorschläge: `RoleAssigned` mit Akteur `system` nach dem ersten Jahrgang; Anlegen eines Jahrgangs.
+- **085:** Alarmvorschläge: jedes `RoleAssigned` mit Befehlsoperation `operatorRecovery`; Anlegen eines Jahrgangs. Die Erstellerzuordnung (Akteur = Subjekt, gleiche Rolle) ist kein Alarmfall.
 - **088:** liefert das Subject des Erst-Admins; die Checkliste nennt den Bootstrap.
 
 ## Bericht (nach Bau ausfüllen)
@@ -361,3 +417,9 @@ Touched:
 ```
 
 ## Review findings
+
+**Lesebefund der Spec (30.09.2026, zu `4fac838`):** eingearbeitet in 040c: Major 1 (`liveStore.ts`), Major 2
+(`stream035.test.ts`), Major 3 (`contract-043a.test.ts`), Major 6 (`meetingId`, Test 10c), Major 7 (globaler
+Wiederholungsschlüssel, Test 10 mit Mutationsprobe), Major 9 (auditierte Wiederherstellung, Betriebsregeln), Minor 16
+(Surrogate, Test 10b), Minor 20 (`operatorRef`, kein Ablauf der Erstzuordnung, befristete Wiederherstellung), Minor 21
+(`writeLock.ts` statt Import aus `app.ts`, Prüfung der Laufzeit), Nit 27 (Ausnahme der Erstellerzuordnung).

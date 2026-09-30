@@ -1,7 +1,7 @@
 # Scheibe 040b — Administration im Kern, Teil 2: Stammdaten und Bühnenplätze
 
-**Status:** spec (30.09.2026; Teil 2 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
-**Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit; siehe „Vertragsschritt“); core; service; web-api (nur neue `HvApi`-Methoden); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-datenschutz; docs-plan (nur Glossarzeile)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`; Teil 2 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit; siehe „Vertragsschritt“); core; service; web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-datenschutz; docs-plan (nur Glossarzeile)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend (Kern, Dienst, Web-Adapter, zweiter und folgende Commits). Review in frischem Kontext mit Perspektive Security/Admin und Vertrag (6.4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu R-ADM-01 (Konfiguration eines geschlossenen Jahrgangs unveränderlich; die Registerbeschreibung nennt schon Nummernkreise, Freeze und Override aus 040c/040d), R-ADM-02 (referenzierte Stammdaten bleiben). Angewandt: R-PERM-01, R-PERM-02, R-IDEM-01. Dazu AGENTS.md R2, R4, R5, R6, R7, R10, R12
 **Quellen-IDs:**
@@ -73,9 +73,20 @@ Fachbereich und Bühnenfragen je Platz aus `Meeting.counts`.
      nach Regel 1 nicht verengt werden).
    - Jede Operation ist über `Idempotency-Key` wiederholbar (R-IDEM-01); `operationPermission` und `legacyEventType`
      erhalten die neuen Einträge.
-   - `HvApi` erhält die Methoden je Jahrgang (Vorschlag: `replaceAgendaItems`, `replaceUnits`, `listStageSeats`,
-     `replaceStageSeats`). Der In-Process-Adapter ist der Kern selbst; `apps/web/src/api/http.ts` setzt sie über den Vertrag
-     um (ADR 0002). Die Namen stehen im Bericht.
+   - `HvApi` erhält die Methoden mit `meetingId` als erstem Parameter (Gemeinsame Entscheidung 5 in 040a):
+     `replaceMeetingAgendaItems(meetingId, items, opts)`, `replaceMeetingUnits(meetingId, items, opts)`,
+     `listMeetingStageSeats(meetingId)`, `replaceMeetingStageSeats(meetingId, items, opts)`, gleichnamig mit den
+     Vertragsoperationen. Sie wirken auf jeden Jahrgang, nicht nur auf den Alias: Der Kern führt den Schreibvorgang über
+     eine auf `meetingId` eingegrenzte Instanz auf demselben Store aus, weil `append` sonst Ereignisse eines anderen
+     Jahrgangs abweist (`api.ts:601-609`). Der Demo-Adapter ist der Kern selbst (`apps/web/src/api/index.ts` bleibt
+     unverändert, wenn die Verdrahtung keine neue Methode braucht); `apps/web/src/api/http.ts` setzt sie über den Vertrag
+     um (ADR 0002).
+   - **Live-Puffer** (`apps/web/src/api/liveStore.ts`): `listMeetingStageSeats` kommt in `READ_TOPICS` (Thema `meeting`)
+     und in `WATERMARKS.version`; die drei Schreibmethoden kommen in `WRITE_METHODS`. Sonst bricht die Typprüfung, und
+     `liveStore.test.ts` (p) prüft die Vollständigkeit.
+   - **Zeichenketten:** `title`, `name`, `shortName`, `label`, `personId`, `deviceId` und jede `id` müssen wohlgeformtes
+     UTF-16 sein (kein einzelnes Surrogat), sonst 422. So bleibt jede Zeichenkette, die später in den Schnappschuss des
+     Freeze eingeht (040d), im Geltungsbereich von RFC 8785.
 3. **Bühnenplatz an der Frage.**
    - `Classification.seatId` (optional, Vertragszeile von 040b). Muss ein Platz des Jahrgangs sein, sonst 422. Werden
      `seatId` und `stageAssignment` beide gesendet, müssen sie gleich sein, sonst 422.
@@ -111,7 +122,9 @@ Fachbereich und Bühnenfragen je Platz aus `Meeting.counts`.
 ## Vertragsschritt (Architekt, erster Commit; additiv, 043a Regel 1)
 
 Version: die nächste freie Patch-Stufe beim Baustart (heute 0.3.13; nach 043a 0.4.1). Alles additiv; kein Pflichtfeld in
-einem bestehenden Anfrageschema.
+einem bestehenden Anfrageschema. Die Versionszeilen in `apps/api/src/__tests__/contract.test.ts`,
+`takt-019-contract.test.ts`, `takt-016-contract.test.ts` (Muster der Minor-Stufe) und, falls 043a gemergt ist,
+`contract-043a.test.ts` folgen im selben Commit.
 
 - **Anfragezeile** `Classification.seatId` (`type: string, maxLength: 128`), Beschreibung wie Ziel 3. Die Beschreibung von
   `Classification.stageAssignment` („arrives with 0.4.0 (slice 043, ahead of 040)“) wird berichtigt. Ohne Go auf
@@ -157,12 +170,12 @@ Kern:
 
 - `packages/domain/src/types.ts`
 - `packages/domain/src/events.ts`
-- `packages/domain/src/envelope.ts` (nur `EVENT_TYPES`)
+- `packages/domain/src/envelope.ts` (nur die Liste der Ereignistypen)
 - `packages/domain/src/state.ts`
 - `packages/domain/src/api.ts`
 - `packages/domain/src/permissions.ts` (nur die zwei Rechte in der Liste der Administration)
 - `packages/domain/src/rules.ts` (nur R-ADM-01, R-ADM-02)
-- `packages/domain/src/stream.ts` (nur `EVENT_TOPICS`, `EVENT_SUBJECTS`)
+- `packages/domain/src/stream.ts` (nur Themen und Subjekte je Ereignistyp)
 - `packages/domain/src/seed.ts` (nur AR-Büro und Standardplätze)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/src/masterData.ts` (neu, optional: Prüfungen der Listen)
@@ -170,7 +183,7 @@ Kern:
 - `packages/domain/src/__tests__/master-data040b.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur neuer Abschnitt „Role × Administration“)
 - `packages/domain/src/__tests__/seed.test.ts` (nur Erwartungen an Fachbereiche und Plätze)
-- `packages/domain/src/__tests__/stream035.test.ts` (nur Erwartungen an Themen je Ereignistyp)
+- `packages/domain/src/__tests__/stream035.test.ts` (nur die Liste aller Ereignistypen und die Erwartungen an Themen je Ereignistyp)
 - `docs/legal-trace.md` (nur regeneriert)
 
 Dienst:
@@ -180,11 +193,14 @@ Dienst:
 - `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Versionszeile)
 - `apps/api/src/__tests__/takt-016-contract.test.ts` (nur die Versionszeile, falls die Minor-Stufe wechselt)
+- `apps/api/src/__tests__/contract-043a.test.ts` (nur die Versionszeile und die Eigenschaftsliste der Klassifizierung, falls 043a gemergt ist)
 
-Web (nur was `HvApi` und die erschöpfenden Zuordnungen erzwingen):
+Web (nur was die Schnittstelle des Kerns und die erschöpfenden Zuordnungen erzwingen):
 
 - `apps/web/src/api/http.ts` (nur die neuen Methoden)
 - `apps/web/src/api/http.test.ts` (nur Tests der neuen Methoden)
+- `apps/web/src/api/liveStore.ts` (nur Einträge in den Lesethemen, den Schreibmethoden und dem Versionszähler)
+- `apps/web/src/api/index.ts` (nur falls die Verdrahtung der neuen Methoden es verlangt)
 - `apps/web/src/i18n/shell.de.ts` und `apps/web/src/i18n/shell.en.ts` (nur zwei Aktions- und drei Ereignisschlüssel)
 - `apps/web/src/i18n/labels.ts` (nur Einträge in den Zuordnungen der Aktionen und Ereignisse)
 - `apps/web/src/i18n/parity.test.ts` (nur Zahl und Kommentar)
@@ -236,6 +252,7 @@ Kern (`master-data040b.test.ts`, Demo-Identität bzw. Rollenzuordnungen wie in `
 6. **Klassifizierung:** `seatId` eines eigenen Platzes → `Question.seatId` gesetzt, `stageAssignment` fehlt; `seatId: 'ceo'`
    → beide `'ceo'`; `seatId` und `stageAssignment` verschieden → 422; unbekannter Platz → 422; nur `stageAssignment` →
    `seatId` abgeleitet. Jede Antwort ist gültig gegen das Vertragsschema `Question` (Ajv, `if`/`then`).
+   Klassifizierung in einem Jahrgang, der nicht der Alias ist, prüft gegen dessen Plätze.
 7. **Zähler:** Auf dem Seed hat `byUnit` genau die neun Fachbereiche als Schlüssel (AR-Büro mit 0) und `bySeat` genau die
    vier Plätze; die Werte stimmen mit einer unabhängigen Zählung im Test überein. Nach `assignQuestion` bzw.
    `stageQuestion` ändern sich die Werte um 1.
@@ -247,6 +264,10 @@ Kern (`master-data040b.test.ts`, Demo-Identität bzw. Rollenzuordnungen wie in `
     `seatId`.
 11. **Wiederholung:** Derselbe `Idempotency-Key` nach einer späteren zweiten Änderung liefert das Ergebnis der ersten
     (R-IDEM-01), je Operation einmal.
+15. **Anderer Jahrgang:** `replaceMeetingUnits` auf einem Jahrgang in `preparation`, während ein anderer läuft (Alias),
+    schreibt das Ereignis mit dessen `meetingId` und ändert den Alias nicht.
+16. **Surrogate:** `label: '\uD800'` (einzelnes Surrogat) in `replaceMeetingStageSeats` → 422, kein Ereignis; ebenso
+    `name` bei Fachbereichen und `title` bei TOPs.
 12. **Strom und Maskierung:** `StageSeatsReplaced` erscheint in `listEvents` (admin) ohne `personId` in
     `payload.stageSeats`; ein Leser ohne `event.read` erhält nur ein `change` mit Thema `meeting`.
 
@@ -285,7 +306,7 @@ Sonst ändert sich die Wahrheitstabelle nicht (Diff im Bericht).
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` erzeugt den eingecheckten Stand; `check.mjs` meldet
    (a)–(d) `ok` mit der neuen Version und der um vier kleineren Zahl vorab erklärter Operationen.
-2. Tests 1–14 grün, die vier Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+2. Tests 1–16 grün, die vier Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
 3. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040b-…`; der
    Schluss der Ausgabe steht einmal im Bericht.
 4. Kein Screenshot: Keine Ansicht ändert sich; die neuen i18n-Schlüssel erscheinen erst mit 041 bzw. in der Historie nur
@@ -309,7 +330,7 @@ Ausgelöst:
 - [ ] Persistenz, Migration (neue Ereignistypen ohne Migration; `events.envelope` ist `jsonb` ohne Typprüfung)
 - [ ] Oberfläche
 
-Perspektive: Security/Admin (6.5, 6.8), Vertrag (6.4), Datenschutz (6.6) · Nachweise: Tests 1–14, Mutationsproben ·
+Perspektive: Security/Admin (6.5, 6.8), Vertrag (6.4), Datenschutz (6.6) · Nachweise: Tests 1–16, Mutationsproben ·
 Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage, Schalter in 047)
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
@@ -349,7 +370,7 @@ Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage,
 
 ## Offene Eigentümerfragen
 
-Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Fragen 1 und 5; 043a-Frage 5 mit beiden Wegen dort.
+Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Frage 1; 043a-Frage 5 mit beiden Wegen dort.
 
 ## Hinweise an Folgescheiben
 
@@ -379,7 +400,7 @@ Touched:
 5.
 6.
 
-**Namen der neuen `HvApi`-Methoden.**
+**Signaturen der neuen `HvApi`-Methoden.**
 
 **Wahrheitstabellen-Diff.**
 
@@ -391,3 +412,7 @@ Touched:
 ```
 
 ## Review findings
+
+**Lesebefund der Spec (30.09.2026, zu `4fac838`):** eingearbeitet in 040b: Major 1 (`liveStore.ts`), Major 2
+(`stream035.test.ts` mit Ereignistypliste), Major 3 (`contract-043a.test.ts`), Major 6 (`meetingId` an jeder Methode,
+Test 12a), Minor 16 (Surrogate → 422, Test 12b), Nit 28 (Versionszeilen im Vertragsschritt).
