@@ -500,3 +500,12 @@ Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Mechanismus des 429-Wäch
 ## Review findings
 
 folgt
+
+### Nachweis PR-CI (#80)
+
+Lauf `36656082381` auf `316072b` (https://github.com/ypoxx/hvworkflow/actions/runs/36656082381): Job `e2e-http` grün
+(2 min 4 s; Setup mit 8 Keycloak-Anmeldungen, 030 ×4, G1, H1–H8, alle bestanden), Job `gates` grün (10 min, inklusive
+„Keycloak browser login against migrated Postgres“ mit dem Digest-gepinnten Image aus `scripts/lib/keycloak-ci.mjs`).
+Artefakt `evidence-031-http` (ID `11071984417`, 192 306 Byte, `sha256:abc534c24c6600b2d58ef3c0c8797ff7d6e7c76a336df620143dae174516b26b`)
+enthält die drei `@idp`-Screenshots `031-http-angemeldet.png`, `031-http-401.png`, `031-http-412.png`. Sie sind nicht
+eingecheckt (kein `gh` in der Bauumgebung, Rückfall nach Entscheidung 13/m14): Lauf-ID und Artefakt sind der Nachweis.
