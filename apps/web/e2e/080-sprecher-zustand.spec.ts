@@ -2,11 +2,10 @@
  * Slice 080: the Wortmeldeliste without kind (Art) and speaking time (Redezeit), in German and in
  * American English, with axe on both. Evidence: docs/evidence/080-wortmeldeliste-{de,en}.png.
  */
-import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
-
-const evidence = (name: string): string =>
-  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
+import { evidence } from './support/evidence';
+import { expect, test } from './support/http-guard';
+import { asRole } from './support/roles';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -15,8 +14,7 @@ test('080: Wortmeldeliste ohne Art und Redezeit, DE und EN @screenshot', async (
   const counter = page.getByTestId('header-counter-questions');
   await expect(counter).toBeVisible({ timeout: 90_000 });
 
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-moderation').click();
+  await asRole(page, 'moderation');
 
   const round = page.getByTestId('speakers-round-3');
   await expect(round.locator('[data-testid="speaker-row"]').first()).toBeVisible();

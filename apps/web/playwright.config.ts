@@ -29,6 +29,16 @@ const executablePath = process.env['PW_CHROMIUM_PATH'] ?? (existsSync(pinnedChro
 
 /** Files of the HTTP project, in the order they run (`scripts/e2e-http-031.test.mjs` pins it). 031b extends the list. */
 const HTTP_SPECS = ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts'];
+/**
+ * Slice 031b: the five files that run in both projects. They need signed-in states, so they join the `http` project only
+ * with an IdP, never in the local mode. With one worker Playwright runs the files in the order of their paths (002, 021b,
+ * 021c, 030, 031, 080, abnahme); `scripts/e2e-http-031.test.mjs` pins that order, because every file starts from the
+ * database state its predecessors leave behind.
+ */
+const SHARED_SPECS = [
+  '002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
+  '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts',
+];
 const HTTP_SETUP = 'http/anmeldung.setup.ts';
 
 const launch = executablePath ? { launchOptions: { executablePath } } : {};
@@ -66,10 +76,11 @@ const httpProjects: NonNullable<PlaywrightTestConfig['projects']> = httpEnabled
       ...(withoutIdp ? [] : [{ name: 'http-setup', testMatch: HTTP_SETUP, ...httpOutput, use: httpUse }]),
       {
         name: 'http',
-        testMatch: HTTP_SPECS,
+        testMatch: withoutIdp ? HTTP_SPECS : [...HTTP_SPECS, ...SHARED_SPECS],
         ...httpOutput,
         ...(withoutIdp ? { grepInvert: /@idp/ } : { dependencies: ['http-setup'] }),
-        use: httpUse,
+        // The default person of the demo is `DEMO_ACTORS[1]` (capture); 030 and H1-H3 set an empty state themselves.
+        use: withoutIdp || !stateDir ? httpUse : { ...httpUse, storageState: `${stateDir}/state-capture.json` },
       },
     ]
   : [];

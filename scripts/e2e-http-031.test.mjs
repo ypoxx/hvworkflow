@@ -21,6 +21,13 @@ import { KEYCLOAK_IMAGE, KEYCLOAK_IMAGE_FORM } from './lib/keycloak-ci.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'apps/web');
+
+// Slice 031b (decision 4): with an IdP the five shared files run in the http project, in the order of their paths.
+const SHARED_FILES = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
+  '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
+const HTTP_ORDER = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
+  '030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts', '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
+
 const LOADER = join(ROOT, 'apps/api/node_modules/tsx/dist/loader.mjs');
 const HARNESS = join(ROOT, 'scripts/e2e-http-031.mjs');
 const baseEnv = { PATH: process.env.PATH ?? '' };
@@ -282,6 +289,28 @@ test('configuration: the local mode has no setup, no dependency and skips @idp',
   assert.deepEqual(http.testMatch, ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts']);
 });
 
+test('configuration: the shared files and the default state capture belong to the http project with an IdP only (031b)', () => {
+  const config = loadConfig({ E2E_HTTP: '1', E2E_HTTP_STATE_DIR: '/tmp/synthetic-state' });
+  const http = config.projects.find((project) => project.name === 'http');
+  assert.deepEqual([...http.testMatch].sort(), [...HTTP_ORDER].sort());
+  assert.equal(http.use.storageState, '/tmp/synthetic-state/state-capture.json');
+  assert.equal(config.projects.find((project) => project.name === 'http-setup').use.storageState, undefined);
+  const ignored = config.projects.find((project) => project.name === 'in-process').testIgnore.join(' ');
+  for (const file of SHARED_FILES) assert.doesNotMatch(ignored, new RegExp(file.replace(/\./g, '\\.')), `${file} stays in-process`);
+});
+
+test('shared files: they take test from the guard, roles from support/roles, evidence from support/evidence (031b)', () => {
+  for (const file of SHARED_FILES) {
+    const source = readFileSync(join(WEB, 'e2e', file), 'utf8');
+    assert.match(source, /from '\.\/support\/http-guard'/, file);
+    assert.match(source, /from '\.\/support\/evidence'/, file);
+    assert.doesNotMatch(source, /import\s+(?:type\s+)?\{[^}]*\b(test|expect)\b[^}]*\}\s+from\s+'@playwright\/test'/, file);
+    const code = source.split('\n').filter((line) => !/^\s*(\/\*|\*|\/\/)/.test(line)).join('\n');
+    assert.doesNotMatch(code, /role-switcher|role-option-/, `${file} switches roles only through asRole`);
+    assert.doesNotMatch(code, /docs\/evidence\//, `${file} writes evidence only through the helper`);
+  }
+});
+
 test('configuration: with an IdP the setup project runs first; the port comes from E2E_HTTP_PORT everywhere', () => {
   const config = loadConfig({ E2E_HTTP: '1', E2E_HTTP_PORT: '4555', E2E_HTTP_API_ORIGIN: 'http://localhost:18999' });
   assert.deepEqual(config.projects.map((project) => project.name), ['in-process', 'http-setup', 'http']);
@@ -381,11 +410,12 @@ function listedFiles(env) {
   return files;
 }
 
-test('order: the http project lists 030 and then 031, in this order, with one worker', () => {
-  assert.deepEqual(listedFiles({ E2E_HTTP: '1', E2E_HTTP_IDP: 'none' }), ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts']);
+test('order: the http project lists the seven files in the pinned order, with one worker', () => {
+  assert.deepEqual(listedFiles({ E2E_HTTP: '1', E2E_HTTP_IDP: 'none' }), ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts'],
+    'the local mode has no signed-in states: the shared files stay out');
   const files = listedFiles({ E2E_HTTP: '1' });
-  assert.deepEqual(files.filter((file) => file.endsWith('.spec.ts')), ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts']);
-  assert.equal(files[0], 'http/anmeldung.setup.ts', 'the setup runs before both');
+  assert.deepEqual(files.filter((file) => file.endsWith('.spec.ts')), HTTP_ORDER);
+  assert.equal(files[0], 'http/anmeldung.setup.ts', 'the setup runs before all of them');
   assert.match(readFileSync(HARNESS, 'utf8'), /'--workers=1'/, 'the harness starts the project with one worker');
 });
 

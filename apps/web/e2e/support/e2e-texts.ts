@@ -19,8 +19,37 @@ export const H8_CONTRIBUTION_TEXT = 'Synthetischer Wortlaut für den Schreibkonf
 export const H8_OTHER_WRITER_QUESTION = 'Synthetische Frage der zweiten schreibenden Person?';
 export const H8_UNCONFIRMED_QUESTION = 'Synthetische unbestätigte Frage nach dem Schreibkonflikt?';
 
+/**
+ * Slice 031b: the speech of `002-speakers-capture.spec.ts` and `abnahme.spec.ts` (both write it as a Redebeitrag), with
+ * exactly seven question sentences, and the other texts of those two files. The files compose the speech from the parts.
+ */
+export const SPEECH_OPENING = 'Sehr geehrte Damen und Herren, ich danke dem Vorstand für den Bericht zur Lage der Gesellschaft.';
+export const SPEECH_QUESTIONS: readonly string[] = [
+  'Wie hoch war der Investitionsaufwand im abgelaufenen Geschäftsjahr?',
+  'Welche Rückstellungen hat die Gesellschaft für die anhängigen Verfahren gebildet?',
+  'Wie entwickelt sich die Eigenkapitalquote im laufenden Geschäftsjahr?',
+  'Welche Maßnahmen ergreift der Vorstand gegen den Rückgang der operativen Marge?',
+  'Wann rechnet die Gesellschaft mit einer Entscheidung der Kartellbehörde?',
+  'Wie viele Stellen sind im Zuge des Sparprogramms bereits entfallen?',
+  'Welche Dividende schlägt der Vorstand für das kommende Geschäftsjahr vor?',
+];
+export const SPEECH_CLOSING = 'Ich danke Ihnen für die Beantwortung.';
+export const SPEAKER_002_NAME = 'Henrike Baumgart';
+export const SPEAKER_002_FREE_QUESTION = 'Wie viele Stimmrechte waren bei Abstimmung vertreten?';
+export const ABNAHME_SPEAKER_NAME = 'Abnahme Testperson';
+export const ABNAHME_ANSWER_TEXT =
+  'Die Ausschüttungsquote lag im Berichtsjahr bei 47 Prozent des bereinigten Konzernergebnisses. ' +
+  'Die Einzelheiten sind im Geschäftsbericht auf Seite 42 dargestellt.';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
+  SPEECH_OPENING,
+  ...SPEECH_QUESTIONS,
+  SPEECH_CLOSING,
+  SPEAKER_002_NAME,
+  SPEAKER_002_FREE_QUESTION,
+  ABNAHME_SPEAKER_NAME,
+  ABNAHME_ANSWER_TEXT,
   H8_SPEAKER_NAME,
   H8_CONTRIBUTION_TEXT,
   H8_OTHER_WRITER_QUESTION,

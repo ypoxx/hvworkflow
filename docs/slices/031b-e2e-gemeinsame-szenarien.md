@@ -116,22 +116,84 @@ Reset-Banner-Test (in-process) und Isolationstest H2 (http); ADR-0002-Ergänzung
 
 ## Nachweis
 
-(nach dem Bau ausfüllen)
+**Aktueller Stand (maßgeblich):** Baucommit `245bdc1` (Gates Exit 0), Review-Gates auf `12d0189` Exit 0, PR-CI Lauf
+36685779155 auf `a7d4d7f` grün mit erfüllter Halteregel (Absatz „Halteregel nach takt-030/032/033/033b/035 erfüllt“ unten).
+Die folgenden Blöcke zu `1b1cd3b`, den Läufen 36661676716, 36662799847, 36664034530 und `afterOwnWrite` sind Verlauf aus
+der Zeit vor den Produkttakten und durch den aktuellen Stand ersetzt.
 
-**Gates-Commit:** `<sha>`, `pnpm gates` auf sauberem Baum, Exit 0.
+**Gates-Commit:** `1b1cd3b`, `pnpm gates` auf sauberem Baum. Lokal auf dem Stapel über takt-030 (PR #82, noch nicht gemergt): das
+Scheibenumfang-Tor nennt allein die takt-030-Dateien (Exit 1 dort, erwartet); alle Tore davor liefen grün, die Tore danach
+(`downgrade-check`, `metrics-allowlist`, `plan-graph`, `test:scripts`, Web-Build, `mark-test-run`) einzeln, Exit 0.
 
 ```
-<Schluss einfügen>
+slice-scope: 4 file(s) outside "docs/slices/031b-e2e-gemeinsame-szenarien.md"'s "Files allowed" list:
+  apps/web/e2e/031-http-betriebsart.spec.ts
+  apps/web/src/api/http.test.ts
+  apps/web/src/api/http.ts
+  docs/slices/takt-030-eigene-schreibvorgaenge.md
+(danach einzeln:) ... vite build: built in 1.52s
+mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
 ```
 
 | Lauf | Projekt | Tests (bestanden/übersprungen) | Laufzeit |
 |---|---|---|---|
-| lokal | `in-process` | | |
-| PR-CI Lauf `<id>`, Job `gates` | `in-process` | | Job gesamt: |
-| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | | Job gesamt: ; `abnahme`: |
+| lokal (`PW_CHROMIUM_PATH`) | `in-process` | 127/0 | 6,7 min; `abnahme` 56,1 s, `answersFilterMs` 134 ms, `stageNavMs` 170 ms |
+| lokal, `E2E_HTTP_IDP=none` (ohne Keycloak) | `http` (H1–H3, G1, 030) | 8/0 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | 12,4 s |
+| PR-CI Lauf 36685779155 (a7d4d7f), Job `gates` | `in-process` | grün | Job gesamt 10 min 13 s |
+| PR-CI Lauf 36685779155 (a7d4d7f), Job `e2e-http` | `http-setup` + `http` | 28/0 (G1 als erwarteter Fehlschlag), Zugriffslog 509 Zeilen PASS | Playwright 1,8 min, Job gesamt 4 min 13 s; `abnahme` 37,8 s, `answersFilterMs` 54,0 ms, `stageNavMs` 351,5 ms |
+
+**PR-CI Lauf 36662799847 (Baucommit f0db555), Job `e2e-http`: 25 bestanden, 2 rot. Halteregel (Entscheidung 5) ausgelöst.**
+
+- `abnahme`: `stageNavMs` im Projekt `http` = 2374 ms (Folgelauf 36664034530 auf 6f7c414: 3401,6 ms; Halteregel unverändert) > 1 500 ms (`answersFilterMs` im Projekt `http` = 35 ms, in Ordnung). Ursache
+  (gemessen, Koordinator): produktseitig, der Dienst prüft die gesamte Ereigniskette je Anfrage zwei- bis dreimal, die Web-Ansicht
+  liest beim Einhängen doppelt. Die Grenze bleibt unverändert, kein Timeout angehoben; die Scheibe wartet auf den Folgetakt
+  takt-033 (Leistung von `/stage` im HTTP-Modus).
+- `002`: `networkidle` ist nach dem ersten Leerlauf der Seite ein No-op; der Test klickte "Aufrufen" noch während PUT und
+  Neulesen liefen (412). Behoben ohne Produktänderung: der Test wartet auf PUT `/v1/speakers/order` und danach auf das
+  Neulesen von Liste und Meeting (nur im Projekt `http`). Die Produktseite (frische Versionen aus der PUT-Antwort, Aktionen der
+  Runde während des Umsortierens gesperrt) kommt als eigener Takt takt-032.
+
+**PR-CI Lauf 36664034530 (6f7c414):** 25 bestanden, 2 rot. `002` Zeile 192 (`afterAll` > 70, gelesen 23): Ursache produktseitig als Klasse
+"veraltete Version nach eigenem Schreiben" wie beim Umsortieren. Jede Frage hebt die Version des Redebeitrags
+(`packages/domain/src/state.ts:285-288`); die Erfassung nimmt `contribution.version` aus der Liste (`features/capture/Page.tsx:210`),
+die erst nach dem Schreiben neu gelesen wird; Karten (`/v1/questions`) und Restabdeckung (Feld des Redebeitrags, `/v1/contributions`,
+`features/capture/CoverageBar.tsx`) kommen aus zwei getrennten Neulesevorgängen, der Test las die Abdeckung nach dem Eintreffen der
+Karten. Behoben nur im Test: `afterOwnWrite` (`support/roles.ts`) wartet im Projekt `http` nach jedem Schreiben von Fragen auf
+das POST und danach auf GET `/v1/questions` und GET `/v1/contributions`. Produktfix gehört in takt-032.
+
+Reihenfolge (`playwright test --list --project=http`, mit IdP): Setup, dann 002, 021b, 021c, 030, 031, 080, abnahme (27 Tests in 8 Dateien).
 
 Reset-Banner: `024-ereignis-umschlag.spec.ts` › „024: old demo log requires an explicit reset in German and English“
 (`in-process`), `031-http-betriebsart.spec.ts` › H2 (`http`).
+
+**Stand nach takt-030/032/033/035 (Integrationszweig eingemergt, Waits auf Produktsignale umgestellt).**
+
+Gates-Commit: `245bdc1`, `pnpm gates` auf sauberem Baum, Exit 0. Schluss:
+
+```
+✓ built in 2.15s
+mark-test-run: wrote /home/user/wt/s031b-build/.claude/state/last-test-run (clean tree) at commit 245bdc1, tree 5fe40845691a…
+```
+
+Ersetzt: `afterOwnWrite` (`support/roles.ts`, Warten auf POST plus GET `/v1/questions`/`/v1/contributions`) und das Warten auf
+PUT `/v1/speakers/order` mit Neulesen in `002` sind entfallen. Stattdessen `expectNotBusy(region)` (`support/roles.ts`): nach dem
+Ablegen auf `speakers-round-3` ohne `data-busy="true"`/`aria-busy="true"`, nach jedem Schreiben von Fragen auf
+`capture-contribution-pane` ohne diese Marke (Attribute nur während des Schreibens gesetzt, `RoundSection.tsx:66`,
+`ContributionPane.tsx:188`). Kein `networkidle`, kein Netzverkehrs-Wait; in-process geht die Marke nach einem Microtask, das Warten
+besteht sofort. Keine Zeitgrenze angehoben.
+
+| Lauf | Projekt | Tests | Laufzeit |
+|---|---|---|---|
+| lokal (`PW_CHROMIUM_PATH`), auf 245bdc1 | `in-process` | 127/0 | 7,7 min; `abnahme` 59,4 s, `answersFilterMs` 265 ms, `stageNavMs` 164 ms |
+| lokal, `E2E_HTTP_IDP=none pnpm e2e:http` | `http` (H1–H3, G1, 030) | 8 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | Playwright 14,0 s, Harness gesamt 22,7 s |
+
+Die fünf gemeinsamen Dateien im Projekt `http` laufen lokal nicht (Keycloak, kein Docker); Nachweis nur im PR-CI.
+
+**Halteregel nach takt-030/032/033/033b/035 erfüllt (PR-CI Lauf 36685779155 auf a7d4d7f).** Die fünf gemeinsamen Dateien laufen
+im Projekt `http` gegen Keycloak grün; `stageNavMs` 351,5 ms statt 2374/3402 ms, `abnahme` 37,8 s ≤ 120 s, Projekt `http`
+1,8 min ≤ 6 min, Job 4 min 13 s ≤ 12 min. Keine Grenze und kein Timeout angehoben. Bildnachweis nach E56: Artefakt
+`evidence-031-http`, Lauf 36685779155, Artefakt-ID 11083847088, Digest
+`sha256:8d7433c166e15541083f1c1d601dfa40b6d2f986fd39a367d48eb06bbb63c113`.
 
 ## Bericht (nach Bau ausfüllen)
 
@@ -161,4 +223,24 @@ Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Halteregel auch für `ans
 
 ## Review findings
 
-folgt
+Unabhängiges Review (kein Blocker) und die drei CI-Fehlschläge des Laufs 36661676716 auf 8ccd827; alles test-only, kein Produktunterschied.
+
+CI-Fehlschläge, Ursache und Behebung:
+
+1. `002`: ein Reorder erhöht die Version jeder Wortmeldung der Runde (`packages/domain/src/state.ts`, `SpeakersReordered`). Im Projekt `http` wird die Liste erst nach dem Schreiben neu gelesen; der Aufruf davor (`features/speakers/Page.tsx` `onCall`, ifMatch mit Version aus der alten Ansicht) wurde mit 412 abgelehnt, 21 blieb am Mikrofon. Behoben: nach dem Ablegen `waitForLoadState('networkidle')`.
+2. `021c`: der ausgewählte Vorgang wird im HTTP-Modus eigenständig gelesen (`selectedLoading`); `isVisible()` direkt nach dem Klick sah die Aktionen noch nicht. Behoben: pro Zeile erst auf die Nummer im Detail warten.
+3. `abnahme` (und dieselbe Stelle in `002`): Die Liste der Wortmeldungen kommt im HTTP-Modus vom Dienst; die Vorauswahl (`features/capture/Page.tsx`, Rückfall auf die sprechende Person) steht erst nach der Antwort. Behoben: `expect.poll` auf den gewählten Eintrag.
+
+Review-Befunde:
+
+| # | Befund | Behandlung |
+|---|---|---|
+| 1 major | Rollenanzeige-Prüfungen in 002/021b verloren | `expectRoleLabel(page, role, lang)` in `roles.ts`, an den alten Stellen (auch nach dem EN-Wechsel) aufgerufen; `asRole` prüft im Projekt `in-process` nun ebenfalls die Anzeige |
+| 3 minor | `asRole` in `http` wartete nur auf die Sitzungsanzeige | zusätzlich auf `header-counter-questions` (erstes Datensignal), Wert 60 s wie Setup und H4/H6, kein bestehendes Limit angehoben |
+| 4 minor | 60-s-Limit in `roles.ts` | begründet im Kommentar, Dauer je Wechsel als `[timing]`-Zeile |
+| 5 minor | Kommentar 021c falsch | umformuliert; Sprache wird geprüft statt still wiederhergestellt |
+| 6 minor | Konstanten vor Deklaration genutzt | im Testskript nach oben verschoben |
+| 8 nit | Parse-Fehler könnte Cookie-Zeichen zeigen | nur Rolle und Dateipfad im Fehler |
+| 7 nit | IdP-Modus ohne `E2E_HTTP_STATE_DIR` | nicht bearbeitet (Harness setzt es immer) |
+| 2 | im übermittelten Befundtext nicht genannt | nicht bearbeitet; beim Review nachfragen |
+

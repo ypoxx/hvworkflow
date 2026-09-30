@@ -37,7 +37,7 @@ nicht an Logik).
 - **Gehostete Postgres-Instanz.** Richtig für den Piloten, zu viel Betriebsaufwand und
   Zugangsdatenrisiko für die Demo.
 
-## Ergänzung (vorgeschlagen, 23.09.2026; Annahme Prüfpunkt 1)
+## Ergänzung (vorgeschlagen, 23.09.2026; Annahme Prüfpunkt 1; e2e-Suite und Nachweis präzisiert 30.09.2026, Scheibe 031b)
 
 **Status der Ergänzung:** vorgeschlagen · **Entscheider:** Eigentümer (Plan 4, Zeile 0002) · Der
 bisherige Text dieses ADR bleibt unverändert; „angenommen" gilt für den bisherigen Teil.
@@ -54,8 +54,24 @@ Standardannahme aus Plan 3 („Taktfläche für Kleinänderungen") und Plan 4 (Z
   Orchestrators, trägt `[skip netlify]`; ein Demo-Build geschieht nur nach ausdrücklichem Go des
   Eigentümers. Die dauerhafte Regel ist offen (E35, E48, Prüfpunkt 1); ADR 0016 nennt denselben
   Konflikt.
-- **Sie besteht dieselbe e2e-Suite wie die HTTP-Betriebsart** (Dual-Mode-e2e-Matrix, B17). Demo und
-  HTTP teilen Kern, Vertrag und e2e-Suite.
+- **Sie teilt mit der HTTP-Betriebsart eine gemeinsame e2e-Suite mit fester Dateiliste** (Dual-Mode-e2e-Matrix,
+  B17; Fassung vom 30.09.2026, Scheibe 031b). Demo und HTTP teilen Kern, Vertrag und diese Suite:
+  - **In beiden Projekten (`in-process` und `http`):** `abnahme.spec.ts`, `002-speakers-capture.spec.ts`,
+    `021b-koordination.spec.ts`, `021c-rechtsfreigabe.spec.ts`, `080-sprecher-zustand.spec.ts`. Das sind die
+    Dateien, die Verhalten des Dienstes berühren; Rollenwechsel über die gemeinsame Hilfe `asRole`.
+  - **Nur im Projekt `http` (aus 031a):** `031-http-betriebsart.spec.ts` mit H1–H10 (Anmeldung, Isolation vom
+    Demo-Protokoll, gleicher Ursprung, Abmeldung, Sperre, fehlende Rolle, echter 412, Aktualisierung ohne Neuladen,
+    Abrufe je Einhängen) samt Wächtertest G1, und `030-anmeldung.spec.ts`.
+  - **Nur im Projekt `in-process`, mit Grund:**
+
+    | Datei | Grund |
+    |---|---|
+    | `001-shell.spec.ts` | prüft den Rollenumschalter selbst; den gibt es in der HTTP-Betriebsart nicht |
+    | `003-answers-stage.spec.ts` | aus Aufwand nicht portiert; ein Test > 90 s, erst nach seiner Teilung (eigener Takt) Kandidat für eine Folgescheibe |
+    | `010b-lesepfade.spec.ts`, `010c-lesezustand.spec.ts`, `010d-ansichtsdaten.spec.ts` | Fehlerinjektion im Browser-Kern bzw. Demo-Speicher für Lesezustände |
+    | `013-tastaturpfad.spec.ts`, `020-rueckbau-passung.spec.ts`, `090-eingaben-je-akteur.spec.ts`, `takt-009-toast-kontrast.spec.ts` | Oberflächenverhalten mit Demo-Speicher oder Fehlerinjektion; aus Aufwand nicht portiert |
+    | `024-ereignis-umschlag.spec.ts` | prüft das Demo-Protokoll selbst; Gegenstück in `http` ist H2 |
+    | `028-konflikte.spec.ts` | 412 per Fehlerinjektion; echtes Gegenstück in `http` ist H8 |
 - **Reset-Banner statt Upcaster.** Bei einem Schemawechsel des Ereignis-Umschlags (ADR 0011) zeigt
   die Demo bei altem `localStorage`-Protokoll ein Reset-Banner; es gibt keinen Upcaster für
   Demo-Protokolle.
@@ -63,8 +79,20 @@ Standardannahme aus Plan 3 („Taktfläche für Kleinänderungen") und Plan 4 (Z
   außer Kern und Vertrag (unverändert aus dem bisherigen Teil).
 - **Ende nach beta-1 durch Eigentümerentscheid.**
 
-**Nachweis:** Scheibe 015 (dieser Text) und Scheibe 031 (e2e-Lauf beider Projekte grün, Test „altes
-Demo-Protokoll → Reset-Banner"); der Reset-Banner-Test entsteht in 024.
+**Nachweis:** Scheibe 015 (dieser Text) und Scheibe 031b (Stand 30.09.2026):
+
+- **PR-CI-Lauf 36685779155 auf Commit `a7d4d7f`:** Job `gates` mit Projekt `in-process` grün; Job `e2e-http` mit
+  den Projekten `http-setup` und `http` grün, 28 Tests (G1 als erwarteter Fehlschlag), `abnahme.spec.ts` 37,8 s,
+  `stageNavMs` 351,5 ms (Grenze 1 500 ms, nicht angehoben).
+- **Reset-Banner, positiv (`in-process`):** `024-ereignis-umschlag.spec.ts` › „024: old demo log requires an
+  explicit reset in German and English“ – bei altem Demo-Protokoll erscheint das Reset-Banner.
+- **Isolation, negativ (`http`):** `031-http-betriebsart.spec.ts` › H2 („an old demo log is ignored in HTTP mode“) –
+  das alte Protokoll unter `hv-demo-events-v1` wird ignoriert, es erscheint **kein** Reset-Banner. H2 ist
+  ausdrücklich kein Reset-Banner-Test, sondern der Nachweis, dass die HTTP-Betriebsart das Demo-Protokoll nicht liest.
+
+**Offene Eigentümerfrage (Prüfpunkt 1, Scheibe 031b):** Genügt die obige Liste (fünf gemeinsame Dateien plus die
+HTTP-eigenen Tests aus 031a) für „dieselbe e2e-Suite“, oder sind die nur in-process laufenden Dateien in einer
+Folgescheibe zu portieren? Bis zur Entscheidung gilt die Liste wie gebaut.
 
 **Offene Registerzeilen:** E35 (Taktfläche nach Umstellung auf HTTP), E48 (Merge-Befugnis; dauerhafte
 Regel für Demo-Builds, Prüfpunkt 1).
