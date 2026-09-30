@@ -29,4 +29,11 @@ Keine Änderung an Produktivcode, Vertrag oder anderen Tests; keine abgeschwäch
 
 ## Nachweis
 
-(folgt im zweiten Commit)
+Gates-Commit: `3ba3b35` (sauberer Baum, `pnpm gates` mit Postgres-Variablen, DB `hv_t031`, Exit 0). `postgres-limits034a.test.ts` fünfmal einzeln: je 21/21 grün.
+
+Wörtlicher Schluss von `pnpm gates`:
+
+```
+✓ built in 1.67s
+mark-test-run: wrote /home/user/wt/t031/.claude/state/last-test-run (clean tree) at commit 3ba3b35, tree fedb7841b6b2…
+```
