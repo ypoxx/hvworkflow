@@ -28,3 +28,15 @@ Keine Änderung an Produktivcode, Vertrag oder anderen Tests; keine abgeschwäch
 
 1. Pg-Schritt-Dateiliste der CI gegen Postgres (DB `hv_t036`) fünfmal parallel grün.
 2. `pnpm gates` mit Postgres-Variablen grün auf sauberem Commit; Nachweis in eigenem Doku-Commit.
+
+## Nachweis
+
+Gates-Commit: `7bfce09` (sauberer Baum, `pnpm gates` mit Postgres-Variablen, DB `hv_t036`, Exit 0). Pg-Dateiliste der CI
+(8 Dateien) fünfmal parallel: je 8/8 Dateien, 60/60 Tests grün.
+
+Wörtlicher Schluss von `pnpm gates`:
+
+```
+✓ built in 1.73s
+mark-test-run: wrote /home/user/wt/t036/.claude/state/last-test-run (clean tree) at commit 7bfce09, tree 8f13d655b64c…
+```
