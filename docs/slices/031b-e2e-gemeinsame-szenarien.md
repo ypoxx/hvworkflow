@@ -1,7 +1,7 @@
 # Scheibe 031b — Gemeinsame e2e-Szenarien in beiden Betriebsarten und Nachweis für ADR 0002
 
 **Status:** spec (nach Lesebefund 30.09.2026 aus der Teilung von 031)
-**Risikoklasse:** mittel · 1 AStd · 28.10.2026 (W5) · Lanes: e2e; docs-adr nur Architekt
+**Risikoklasse:** mittel · 1 AStd · 30.10.2026 (W5) · Lanes: e2e; docs-adr nur Architekt
 **Rolle:** Implementierer-Oberfläche; Architekt für die ADR-0002-Ergänzung (Lane docs-adr, „nur Architekt“, Plan 5.1); unabhängiges Review in frischem Kontext (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel, keine Änderung an Produktcode, Vertrag, `ROLE_PERMISSIONS` oder Übergangstabelle; AGENTS.md R2 (Nachweis), R4 (Rollennamen nur in Testhilfen)
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/031b (Teil 2 der am 30.09.2026 geteilten Scheibe 031); ADR 0002 Ergänzung („besteht dieselbe e2e-Suite“, „Reset-Banner statt Upcaster“, Nachweis „Scheibe 031“); Lesebefund zu 031 vom 30.09.2026 (M4, m15, n24); Leitplanken §4
