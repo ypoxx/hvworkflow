@@ -5,7 +5,7 @@
 **Rolle:** web-implementer; Review in frischem Kontext mit Perspektive Security (Sitzungsende im Client) und Betrieb/Resilienz; Lesebefund der Spec vor dem Bau; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel; AGENTS.md R2, R4, R6 (`fetch` nur in `apps/web/src/api/http.ts`), R10, R12
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/036; ADR 0014, ADR 0002; Scheiben 035b, 036a, 030, takt-023, takt-030, takt-033b, takt-035 (e2e gegen Produktions-Build hinter `vite preview`), 031a; Lesebefund zu Spec 036 (Opus, 30.09.2026: N5, N6, m4, m5, m6, m8); Bedrohungsmodell T-G1-S-02, T-G1-I-09, T-G1-D-03; Register B11, E33
-**Depends on:** 035b (gemergt: `/v1/stream` im Dienst), 036a (gemergt: `liveStore` mit `clear()` und `onStreamMessage`)
+**Depends on:** 035b und 036a (Voraussetzung: die Bauten von 035b, Spec #97, und 036a, Spec #98, sind gemergt, bevor dieser Bau beginnt; sie liefern `/v1/stream` im Dienst und `liveStore` mit `clear()` und `onStreamMessage`)
 **Perspektive:** Security (Sitzungsende), Betrieb, UX/Barrierefreiheit · **Glossar: neue Begriffe:** nein
 
 ## Warum hoch
