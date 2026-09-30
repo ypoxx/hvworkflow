@@ -327,3 +327,34 @@ test.describe('H9 @idp: an own write shows without a reload', () => {
     await page.screenshot({ path: evidence('031-h9-eigene-schreibvorgaenge.png') });
   });
 });
+
+test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
+  test.use({ storageState: statePath('moderation') });
+
+  test('H10 @idp: one GET /v1/stage and one probe per mount, none after a visibility change', async ({ page }) => {
+    const stageReads: string[] = [];
+    const probes: string[] = [];
+    // The http project serves a production build (takt-035, H1 asserts it), where StrictMode does not double the
+    // mount effects: exactly one request per mount. The old bug (a bump after mount) would give 2.
+    page.on('request', (request) => {
+      if (request.method() !== 'GET') return;
+      const url = new URL(request.url());
+      if (url.pathname === '/v1/stage') stageReads.push(url.pathname);
+      if (url.pathname === '/v1/questions' && url.searchParams.get('limit') === '1') probes.push(url.search);
+    });
+    await page.goto('/stage');
+    await expect(page.getByTestId('stage-only-toggle')).toBeVisible({ timeout: 60_000 });
+    await page.waitForLoadState('networkidle');
+    expect(stageReads, 'GET /v1/stage after the mount').toHaveLength(1);
+    expect(probes, 'GET /v1/questions?limit=1 after the mount').toHaveLength(1);
+
+    // A session refresh without an actor change must not reload the views.
+    const me = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/auth/me');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await me;
+    await page.waitForLoadState('networkidle');
+    expect(stageReads, 'GET /v1/stage after the visibility change').toHaveLength(1);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('031-h10-einhaengen-ein-abruf.png') });
+  });
+});
