@@ -120,6 +120,14 @@ das nicht. H10 erwartet deshalb 2 im Dev- und 1 im Build-Modus (erkannt an `/@vi
 Einhängen) ergäbe 3 und bleibt rot. Der Dev-Zweig entfällt mit takt-035 (Projekt `http` gegen Produktions-Build). Der Dev-Zweig in H10 wurde nach takt-035 entfernt; H10 erwartet genau 1 Abruf.
 `pnpm gates` auf `92bcba8`, sauberer Baum, Exit 0.
 
+Nachlauf nach Merge von takt-035 (Dev-Zweig in H10 entfernt): `pnpm gates` auf `0134d57`, sauberer Baum, Exit 0, mit
+Postgres. H10 selbst braucht Keycloak und läuft nur in der PR-CI (`e2e-http`). Wörtlicher Schluss:
+
+```
+✓ built in 1.97s
+mark-test-run: wrote /home/user/wt/t033b/.claude/state/last-test-run (clean tree) at commit 0134d57, tree c44d91fba931…
+```
+
 ## Review findings
 
 Review in frischem Kontext (reviewer-sonnet, nur Spec und Diff, f33b1fd): **freigegeben**, kein Blocker, kein Major.
