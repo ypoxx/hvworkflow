@@ -128,20 +128,24 @@ describe('takt-033: chain cache (pure logic, no Postgres)', () => {
 });
 
 /**
- * Review finding 2: a write runs under READ COMMITTED, so the probe and the next statements see different snapshots.
- * A fake client answers the probe as "unchanged" and then shows a changed database; the verified result decides.
+ * Review finding 2: a write runs under READ COMMITTED, so the probe statement and the full path see different
+ * snapshots. A fake client answers the probe as "unchanged" and then shows a changed database; the verified result
+ * decides. Since Codex P1 (PR #88) probe and suffix are one statement (`CHAIN_SQL`); the fake answers it with a probe
+ * that does not fit its own suffix (six rows reported, none returned), which must also run the full path.
  */
 describe('takt-033: history change seen only after the probe (fake client, no Postgres)', () => {
   const rowOf = (event: DomainEvent) => ({ seq: String(event.seq), id: event.id, meeting_id: event.meetingId ?? null,
     hash: event.hash, prev_hash: event.prevHash, envelope: JSON.stringify(event) });
+  const noRow = { seq: null, id: null, meeting_id: null, hash: null, prev_hash: null, envelope: null };
 
   function client(state: { probe?: { count: number; max: number; digest: string }; suffix: DomainEvent[]; full: DomainEvent[] }) {
     return { query: async (text: string) => {
       if (text.includes('count(*)')) {
-        return { rows: [{ count: String(state.probe!.count), max_seq: String(state.probe!.max), digest: state.probe!.digest }] };
+        expect(text).toContain('events.seq > $1');
+        const probe = { count: String(state.probe!.count), max_seq: String(state.probe!.max), digest: state.probe!.digest };
+        return { rows: state.suffix.length === 0 ? [{ ...probe, ...noRow }] : state.suffix.map((event) => ({ ...probe, ...rowOf(event) })) };
       }
       if (text.includes('FROM persons')) return { rows: [] };
-      if (text.includes('events.seq > $1')) return { rows: state.suffix.map(rowOf) };
       return { rows: state.full.map(rowOf) };
     } } as unknown as PoolClient;
   }

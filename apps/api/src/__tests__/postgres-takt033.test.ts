@@ -358,6 +358,87 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     expect(await maxSeq()).toBe(end);
   });
 
+  /**
+   * Codex P1 on PR #88: runs `change` on the owner connection once, right before the statement that reads the
+   * suffix rows (`events.seq > $1`) on a runtime connection of `pool`. With a separate digest probe, that is the gap
+   * between probe and suffix under READ COMMITTED; with one statement, the change lands before both.
+   */
+  function changeBeforeSuffixRead(pool: Pool, change: () => Promise<void>): { fired: () => number } {
+    let armed = true;
+    let fired = 0;
+    const patched = new WeakSet<object>();
+    pool.on('acquire', (client) => {
+      if (patched.has(client)) return;
+      patched.add(client);
+      const original = client.query.bind(client) as (...args: unknown[]) => unknown;
+      (client as unknown as { query: (...args: unknown[]) => unknown }).query = (...args: unknown[]) => {
+        if (armed && typeof args[0] === 'string' && args[0].includes('events.seq > $1')) {
+          armed = false;
+          fired++;
+          return change().then(() => original(...args));
+        }
+        return original(...args);
+      };
+    });
+    return { fired: () => fired };
+  }
+
+  const postSpeaker = (instance: TestApp, displayName: string, tag: string) => instance.request(`/v1/meetings/${meetingId}/speakers`, {
+    method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+    body: JSON.stringify({ displayName, round: 1 }),
+  });
+
+  it('does not stamp oldEnd+1 when the last row vanishes between cache warm and the write read (Codex P1, PR #88)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    const tag = (await speakers(instance)).headers.get('ETag')!;
+    // seq 23 is the role assignment (no person row, not part of the speaker list version), so the person rows and
+    // the ETag stay valid for the shorter chain.
+    const hook = changeBeforeSuffixRead(poolA, async () => { await owner.query(`DELETE FROM events WHERE seq = ${end}`); });
+    const written = await postSpeaker(instance, 'Nach Kuerzung', tag);
+    expect(hook.fired()).toBe(1);
+    // Full path on the shortened chain: the new event continues seq 22, nothing lands on the old end.
+    expect(written.status).toBe(201);
+    expect(infos.at(-1)).toMatchObject({ hashed: end - 1, cachedSeq: end - 1 });
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE]);
+    const stored = await storedEvents();
+    expect(stored.map((event) => event.seq)).toEqual(Array.from({ length: end }, (_, index) => index + 1));
+    expect(stored[end - 1]!.prevHash).toBe(stored[end - 2]!.hash);
+    expect((await speakers(app(poolB))).status).toBe(200);
+  });
+
+  it('does not stamp oldEnd+1 onto the old hash when the last row is replaced between cache warm and the write read (Codex P1, PR #88)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    const tag = (await speakers(instance)).headers.get('ETag')!;
+    const before = await storedEvents();
+    // A different, validly chained role assignment at seq 23 (other id): same speaker list, other hash.
+    const rewrite = createInMemoryEventStore({ load: () => before.slice(0, end - 1), save: () => undefined });
+    await createInProcessApi({ store: rewrite, actor: () => SYSTEM_ACTOR, meetingId, clock: () => new Date(at),
+      idGenerator: () => 'assignment-2' }).assignRole({ subjectId: sessionActorId, role: 'moderation' });
+    const replacement = rewrite.all().slice(end - 1);
+    expect(replacement.map((event) => event.seq)).toEqual([end]);
+    expect(replacement[0]!.hash).not.toBe(before[end - 1]!.hash);
+    const hook = changeBeforeSuffixRead(poolA, async () => {
+      await owner.query(`DELETE FROM events WHERE seq = ${end}`);
+      await insertEvents(replacement);
+    });
+    const written = await postSpeaker(instance, 'Nach Ersatz', tag);
+    expect(hook.fired()).toBe(1);
+    expect(written.status).toBe(201);
+    expect(infos.at(-1)).toMatchObject({ hashed: end, cachedSeq: end });
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE]);
+    const stored = await storedEvents();
+    expect(stored).toHaveLength(end + 1);
+    // The new event continues the replaced row, never the cached (old) hash at seq 23.
+    expect(stored[end]!.prevHash).toBe(replacement[0]!.hash);
+    expect((await speakers(app(poolB))).status).toBe(200);
+  });
+
   it('keeps the database and service digests equal for emoji, newline, backslash and quotes, also after a jsonb round trip (review finding 3)', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await insertEvents(await stampNext([speaker(70, 'Grüße 🎉 "zitiert" \\ Rück\nzeile \u00e9\u0301 \ud83d\udc68\u200d\ud83d\udc69')]));

@@ -200,12 +200,25 @@ function rowDigest(row: EventDbRow): string {
 }
 
 /**
- * One statement, so one snapshot: row count, highest seq, and the digest over all rows up to the checkpoint
- * (sha256 over the concatenated row digests in seq order; the same as `prefixDigest` in `chainCache.ts`).
+ * One statement, so one snapshot, also under READ COMMITTED (writes), where every statement takes its own: the probe
+ * (row count, highest seq, and the digest over all rows up to the cached end: sha256 over the concatenated row
+ * digests in seq order, the same as `prefixDigest` in `chainCache.ts`) together with the suffix rows `seq > $1`.
+ * Codex P1 on PR #88: with probe and suffix as two statements, an owner-level DELETE or restore in between could
+ * return an empty suffix beside the old `max(seq)`, and a write stamped oldEnd+1 onto a chain that no longer
+ * matched. The LEFT JOIN yields one row with NULL suffix columns when there are no newer rows.
  */
-const PROBE_SQL = `SELECT count(*)::text AS count, coalesce(max(seq), 0)::text AS max_seq,
-  encode(sha256(coalesce(string_agg(${ROW_DIGEST_SQL}, ''::bytea ORDER BY events.seq) FILTER (WHERE events.seq <= $1), ''::bytea)), 'hex') AS digest
-  FROM events`;
+const CHAIN_SQL = `WITH probe AS (
+    SELECT count(*)::text AS count, coalesce(max(seq), 0)::text AS max_seq,
+      encode(sha256(coalesce(string_agg(${ROW_DIGEST_SQL}, ''::bytea ORDER BY events.seq) FILTER (WHERE events.seq <= $1), ''::bytea)), 'hex') AS digest
+    FROM events),
+  suffix AS (SELECT ${EVENT_COLUMNS}, events.seq AS seq_order FROM events WHERE events.seq > $1)
+  SELECT probe.count, probe.max_seq, probe.digest, suffix.seq, suffix.id, suffix.meeting_id, suffix.hash, suffix.prev_hash,
+    suffix.envelope
+  FROM probe LEFT JOIN suffix ON true ORDER BY suffix.seq_order`;
+
+/** A row of `CHAIN_SQL`: the probe values on every row, the suffix columns NULL when there is no newer row. */
+type ChainDbRow = { count: string; max_seq: string; digest: string } &
+  ({ [K in keyof EventDbRow]: EventDbRow[K] } | { [K in keyof EventDbRow]: null });
 
 interface PersonDbRow {
   meeting_id: string;
@@ -438,8 +451,9 @@ export interface ChainLoad {
 /**
  * takt-033: the snapshot through the per-app chain cache. Reads the cache before the first statement it sends, so
  * the transaction's snapshot is never older than the entry it starts from (callers must not have read `events` in
- * this transaction before). Incremental only when the database reports an unchanged, gap-free prefix at the cached
- * end (`decide`); then only newer rows are read and hashed, and all person rows are compared as before. Any deviation
+ * this transaction before). One statement (`CHAIN_SQL`) returns the probe and the newer rows from one snapshot.
+ * Incremental only when that probe reports an unchanged, gap-free prefix at the cached end (`decide`) and the newer
+ * rows end at its `max(seq)`; then only those rows are hashed, and all person rows are compared as before. Any deviation
  * runs the full path; an integrity error there empties the cache and propagates unchanged. The cache moves only
  * from database data verified here, by compare-and-swap; the caller's own new events never enter it directly.
  */
@@ -448,19 +462,22 @@ export async function loadPostgresSnapshotCached(
 ): Promise<ChainLoad> {
   const base = cache.current();
   let decision: ChainDecision = { kind: 'full', reason: 'empty' };
+  let suffixRows: EventDbRow[] = [];
   if (base !== undefined) {
     const end = base.checkpoints.at(-1)!;
-    let probe: { count: string; max_seq: string; digest: string } | undefined;
+    let rows: ChainDbRow[];
     try {
-      probe = (await timedQuery<{ count: string; max_seq: string; digest: string }>(client, queryTimeoutMs, PROBE_SQL,
-        [end.seq])).rows[0];
+      rows = (await timedQuery<ChainDbRow>(client, queryTimeoutMs, CHAIN_SQL, [end.seq])).rows;
     } catch (error) {
       throw new PostgresPersistenceError(error);
     }
+    const probe = rows[0];
+    suffixRows = rows.filter((row): row is ChainDbRow & EventDbRow => row.seq !== null);
+    // Incremental versus full is decided from this one statement only; any deviation runs the full path.
     decision = probe === undefined ? { kind: 'full', reason: 'digest' }
       : decide(base, { count: Number(probe.count), maxSeq: Number(probe.max_seq), checkpointSeq: end.seq, digest: probe.digest });
     if (decision.kind === 'incremental') {
-      const incremental = await loadSuffix(client, cache, base, Number(probe!.max_seq), queryTimeoutMs);
+      const incremental = await loadSuffix(client, cache, base, Number(probe!.max_seq), suffixRows, queryTimeoutMs);
       if (incremental !== undefined) return incremental;
     }
   }
@@ -475,11 +492,12 @@ export async function loadPostgresSnapshotCached(
   return {
     snapshot: { events: full.events, persons: full.persons },
     hashed: full.hashed,
-    rowsRead: full.rowsRead,
+    // The suffix rows of `CHAIN_SQL` were read too, even when the full path then ran.
+    rowsRead: full.rowsRead + suffixRows.length,
     historyChanged: base !== undefined && (
       (decision.kind === 'full' && (decision.reason === 'shortened' || decision.reason === 'digest')) ||
-      // Review finding 2: the probe may have passed (a write under READ COMMITTED sees each statement on a new
-      // snapshot) and the prefix vanished or changed before the next statement. Judge the verified result itself.
+      // Review finding 2: the probe may have passed and the full path (a later statement; a write under READ
+      // COMMITTED sees each statement on a new snapshot) found the prefix vanished or changed. Judge the result itself.
       !continuesCachedEnd(full.events, base)),
   };
 }
@@ -490,15 +508,17 @@ function continuesCachedEnd(log: VerifiedEventLog, base: ChainCacheEntry): boole
   return log.length >= end.seq && (end.seq === 0 || log[end.seq - 1]?.hash === end.lastHash);
 }
 
-/** The incremental path; `undefined` means "deviation, check in full" (never an answer from unchecked data). */
+/**
+ * The incremental path on the suffix rows `CHAIN_SQL` returned beside the probe (same snapshot); only the person rows
+ * are a further statement, as on the full path. `undefined` means "deviation, check in full" (never an answer from
+ * unchecked data).
+ */
 async function loadSuffix(
-  client: PoolClient, cache: ChainCache, base: ChainCacheEntry, maxSeq: number, queryTimeoutMs: number,
+  client: PoolClient, cache: ChainCache, base: ChainCacheEntry, maxSeq: number, eventRows: readonly EventDbRow[],
+  queryTimeoutMs: number,
 ): Promise<ChainLoad | undefined> {
-  let eventRows: EventDbRow[];
   let personRows: PersonDbRow[];
   try {
-    eventRows = (await timedQuery<EventDbRow>(client, queryTimeoutMs,
-      `SELECT ${EVENT_COLUMNS} FROM events WHERE events.seq > $1 ORDER BY events.seq`, [base.log.length])).rows;
     personRows = (await timedQuery<PersonDbRow>(client, queryTimeoutMs, PERSONS_SQL)).rows;
   } catch (error) {
     throw new PostgresPersistenceError(error);
@@ -506,8 +526,8 @@ async function loadSuffix(
   try {
     const { events, digests } = parseEventRows(eventRows, base.log.length + 1);
     const { log, hashed } = events.length === 0 ? { log: base.log, hashed: 0 } : sealChecked(base.log, events);
-    // Under READ COMMITTED (writes) the suffix is a later statement than the probe; fewer rows means rows vanished.
-    if (log.length < maxSeq) return undefined;
+    // Probe and suffix share one snapshot, so the suffix must end exactly at `max(seq)`; anything else is a deviation.
+    if (log.length !== maxSeq) return undefined;
     const expected = events.some((event) => event.type === 'SpeakerRegistered')
       ? addExpectedPersons(new Map(base.persons), events) : base.persons;
     const persons = comparePersons(expected, personRows);
