@@ -92,6 +92,23 @@ Datenbankverbindung.
    - Cursor > Kopf oder Abstand > 1000 → `reset`, schließen.
    - Sonst Nachlauf: Leser mit `event.read` alle Ereignisse einzeln; die übrigen `replayMessage` (035a), die `change`
      mit `replay: true` oder `reset` liefert.
+   - **Übergabe Nachlauf → live, lückenlos (Codex P1).** Der Verteiler wendet Stapel nur in einem einzigen,
+     nicht unterbrochenen synchronen Schritt an (kein `await` zwischen „Stapel anwenden“ und „Nachrichten an registrierte
+     Verbindungen verteilen“). Die Route hält diese Reihenfolge ein:
+     1. Die Verbindung wird als **wartend** mit eigenem Puffer beim Verteiler registriert. Ab jetzt erhält sie jeden
+        angewandten Stapel als berechnete Live-Nachrichten (`visibleMessages` mit dem Zustand vorher und nachher), aber
+        nur in ihren Puffer, nicht auf den Socket.
+     2. Im selben synchronen Schritt wie die Registrierung wird der Kopf `H` aus der aktuellen Projektion des Verteilers
+        gelesen.
+     3. Der Nachlauf `(Cursor, H]` wird geschrieben, mit Gegendruck. Ohne Cursor entfällt er, und es folgt `cursor` mit
+        `id` = `H`.
+     4. Aus dem Puffer werden alle Nachrichten mit `seq > H` in Reihenfolge geschrieben, Nachrichten mit `seq ≤ H`
+        verworfen.
+     5. Im selben synchronen Schritt wie das Leeren des letzten Pufferinhalts wechselt die Verbindung auf **live**.
+     Der Puffer im Zustand „wartend“ unterliegt derselben Rückstaugrenze wie live; `change`-Nachrichten werden dort
+     zusammengeführt. Läuft er über, wird die Verbindung geschlossen, und der Client setzt mit seiner letzten `id` ohne
+     Lücke fort. Ein `reset` oder `end` aus dem Verteiler während der Übergabe hat Vorrang: Puffer verwerfen, Nachricht
+     senden, schließen.
    - **Gegendruck (M8):** Der Nachlauf wird mit Gegendruck geschrieben: warten, bis der Socket wieder aufnimmt, nicht
      vorab puffern. Die Rückstaugrenze gilt nur für **eingereihte, noch nicht gesendete Live-Nachrichten** (256 oder
      1 MiB). Noch nicht gesendete `change`-Nachrichten werden zu einer zusammengeführt (Vereinigung von Themen und
@@ -204,6 +221,11 @@ m5).
 13. **Trennen und wieder verbinden, keine Lücke:** admin empfängt `1…k`, trennt, Schreibvorgänge folgen, neu mit
     `Last-Event-ID: k` → genau `k+1…m`, ohne Doppel. Dasselbe mit `after`. Mit beiden gewinnt `Last-Event-ID`. Admin
     erhält auch Ereignisse eines Jahrgangs ohne eigene Zuordnung (M5).
+13a. **Commit während der Übergabe (Codex P1):** Test-Haken hält die Route zwischen Schritt 2 (Kopf `H` gewählt) und
+    Schritt 4 an; in dieser Zeit werden zwei Ereignisse festgeschrieben und vom Verteiler angewandt. admin erhält danach
+    genau `…H, H+1, H+2` ohne Lücke und ohne Doppel. capture erhält für dieselben Ereignisse eine `change`-Nachricht mit
+    `id` > `H`, deren Themen und Kennungen beide Ereignisse abdecken. Dasselbe beim Öffnen ohne Cursor (`cursor` mit `H`,
+    dann die gepufferten Nachrichten).
 14. Nicht-admin nach Trennung: `change` mit `replay: true` bzw. `reset` nach 035a Test 9. **podium** trennt, eine Frage
     wird vorgelesen oder auf die Bühne gestellt, neu verbinden → `reset` (jeder Leser mit `stage.read` gilt für `stage`
     als gegenstandsgebunden, 035a). **moderation** trennt, eine Frage wird auf die Bühne gestellt, neu verbinden →
@@ -262,7 +284,7 @@ m5).
 
 ## Akzeptanzkriterium
 
-1. Tests 12–29 (mit 23a–23c) und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
+1. Tests 12–29 (mit 13a und 23a–23c) und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
    Abdeckungstor grün.
 2. Bedrohungsmodell T-G1-I-09, T-G1-S-02 (Stromteil), T-G1-D-03, T-G3-I-01 mit Stand und Testnamen; ADR-0014-Ergänzung vom
    Architekten vor dem Merge.
