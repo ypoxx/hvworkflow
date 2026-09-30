@@ -156,9 +156,9 @@ export interface CreateAppOptions {
     at?: (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>) => Promise<void>;
     /**
      * takt-033: after each Postgres load (business request or auth lookup), the number of events hashed for it
-     * (loader plus request store) and the seq the chain cache ends at afterwards.
+     * (loader plus request store), the seq the chain cache ends at afterwards, and the event rows the load read.
      */
-    chain?: (info: { hashed: number; cachedSeq: number | undefined }) => void;
+    chain?: (info: { hashed: number; cachedSeq: number | undefined; rowsRead: number }) => void;
   };
   /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
   readiness?: {
@@ -257,29 +257,40 @@ export function createApp(options: CreateAppOptions = {}): App {
   // takt-033: one verified-chain cache per app (and so per process), shared by business requests and auth lookups.
   // Every load still reads its own snapshot: the database digest decides whether the cached prefix is usable.
   const chainCache = createChainCache();
-  // Repeats of the history line since it was last written. An environment where the database digest never matches
-  // the service's (e.g. a non-UTF-8 database, a lagging replica) would otherwise write it on every request and dull
-  // the signal (review finding 3): the line is written once per streak, the repeats as one count when it ends.
-  let historyRepeats: number | undefined;
+  // Repeats of the history line since it (or the last count line) was written. An environment where the database
+  // digest never matches the service's (e.g. a non-UTF-8 database, a lagging replica) would otherwise write it on
+  // every request and dull the signal (review finding 3): the line is written once per streak, and the repeats as one
+  // fixed count line every 100 repeats, after five minutes of the app's clock, and when the streak ends (review nit a).
+  const HISTORY_COUNT_EVERY = 100;
+  const HISTORY_COUNT_AFTER_MS = 5 * 60_000;
+  let historyStreak: { repeats: number; since: number } | undefined;
+  const writeHistoryCount = (): void => {
+    if (historyStreak === undefined || historyStreak.repeats === 0) return;
+    console.error(`HV-Tool API: the event history line repeated ${historyStreak.repeats} more times.`);
+    historyStreak = { repeats: 0, since: clock().getTime() };
+  };
   const loadChain = async (client: PoolClient): Promise<ChainLoad> => {
     const load = await loadPostgresSnapshotCached(client, chainCache, limits.queryTimeoutMs);
     // Open owner question 1, default (b): a changed or shortened history with a valid chain is accepted, with a
     // fixed line and no content (no seq, no id, no value).
     if (load.historyChanged) {
-      if (historyRepeats === undefined) {
+      if (historyStreak === undefined) {
         console.error('HV-Tool API: stored event history changed or was shortened; the valid chain was accepted.');
-        historyRepeats = 0;
+        historyStreak = { repeats: 0, since: clock().getTime() };
       } else {
-        historyRepeats += 1;
+        historyStreak.repeats += 1;
+        if (historyStreak.repeats >= HISTORY_COUNT_EVERY || clock().getTime() - historyStreak.since >= HISTORY_COUNT_AFTER_MS) {
+          writeHistoryCount();
+        }
       }
-    } else if (historyRepeats !== undefined) {
-      if (historyRepeats > 0) console.error(`HV-Tool API: the event history line repeated ${historyRepeats} more times.`);
-      historyRepeats = undefined;
+    } else if (historyStreak !== undefined) {
+      writeHistoryCount();
+      historyStreak = undefined;
     }
     return load;
   };
-  const reportChain = (hashed: number): void => {
-    options.testHooks?.chain?.({ hashed, cachedSeq: chainCache.current()?.log.length });
+  const reportChain = (hashed: number, rowsRead: number): void => {
+    options.testHooks?.chain?.({ hashed, cachedSeq: chainCache.current()?.log.length, rowsRead });
   };
   // One read-only snapshot on a connection of its own (sign-in role lookup, metrics). A connection whose own query
   // timer fired is destroyed, never returned to the pool (slice 034a). The suffix is read on every call, so a
@@ -291,7 +302,7 @@ export function createApp(options: CreateAppOptions = {}): App {
       await timedQuery(client, limits.queryTimeoutMs, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
       const load = await loadChain(client);
       await timedQuery(client, limits.queryTimeoutMs, 'COMMIT');
-      reportChain(load.hashed);
+      reportChain(load.hashed, load.rowsRead);
       return load.snapshot.events;
     } catch (error) {
       if (mustDiscardConnection(error)) discard = error as Error;
@@ -580,7 +591,7 @@ export function createApp(options: CreateAppOptions = {}): App {
         load: () => snapshot.events,
         save: (all) => { pendingEvents = all.slice(snapshot.events.length); },
       });
-      reportChain(load.hashed + verifiedEventCount() - hashedBefore);
+      reportChain(load.hashed + verifiedEventCount() - hashedBefore, load.rowsRead);
       const persons = new Map<string, { personId: string; displayName: string; organisation?: string }[]>();
       for (const row of snapshot.persons) {
         const list = persons.get(row.meetingId) ?? [];
