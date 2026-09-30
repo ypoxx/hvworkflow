@@ -5,6 +5,8 @@
  *   1. Keycloak (skipped with `E2E_HTTP_IDP=none`)   2. a fresh Postgres database, migrated
  *   3. bootstrap of the corpus and the role assignments, past the administration path (only here, into an empty database)
  *   4. the service (explicit environment, start line checked)   5. `playwright test --project=http --workers=1`
+ *      (its web server: `vite build`, then `vite preview` on the build, takt-035: the dev server doubles mount effects
+ *      in StrictMode and compiles on demand)
  *   6. stop the service, check the access log   7. remove container, database and temporary directory, also after a failure
  *
  * Secrets (client secret, passwords, keys) are random per run, live only in child process environments and in files
@@ -273,7 +275,7 @@ async function withDatabase(url, name) {
 
 let playwrightChild;
 
-/** Playwright starts Vite and the browser; the whole group ends, not just the pnpm process. */
+/** Playwright builds the interface, starts `vite preview` (takt-035: production build, not the dev server) and the browser; the whole group ends, not just the pnpm process. */
 function endGroup(child, signal) {
   if (!child || child.exitCode !== null || child.pid === undefined) return;
   try { process.kill(-child.pid, signal); } catch { /* already gone */ }

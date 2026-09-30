@@ -230,6 +230,13 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-033b Review minor · `apps/web/e2e/031-http-betriebsart.spec.ts` H10 · Probe nach dem Sichtbarkeitswechsel nicht
   geprüft; `networkidle` als Wartebedingung ist eine Heuristik · beide Zählungen am Ende prüfen, auf Produktsignal warten.
 
+## Dienst: Kettenprüfung (aus takt-033)
+
+- takt-033 Review nit 6 · `apps/api/src/persistence/postgres.ts` (`PROBE_SQL`) · die warme Digest-Abfrage liest je
+  Anfrage alle Zeilen mit `envelope::text` (22–25 ms bei 2138 Ereignissen unter Last, linear mit der Loggröße) ·
+  Digest je Zeile in einer Spalte speichern (Migration) oder den Präfix-Digest in Postgres materialisieren; erst mit
+  Messung ab ca. 10.000 Ereignissen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -270,3 +277,6 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
   derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
   → **043**
+
+- takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
+- takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).

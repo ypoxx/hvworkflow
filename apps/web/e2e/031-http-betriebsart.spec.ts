@@ -56,6 +56,13 @@ test.describe('H1–H3: the interface before any sign-in', () => {
   test.use({ storageState: noState });
 
   test('H1: the sign-in page comes from the real service, in the empty state', async ({ page }) => {
+    // Takt-035: the served page is the production build, not the dev server (which would double mount effects).
+    const html = await (await page.request.get('/')).text();
+    expect(html, 'no dev client in the served page').not.toContain('/@vite/client');
+    expect(html, 'no React refresh preamble in the served page').not.toContain('/@react-refresh');
+    const scripts = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((match) => match[1]);
+    expect(scripts.length, 'the page loads a script').toBeGreaterThan(0);
+    for (const src of scripts) expect(src, 'script served from the build output').toMatch(/^\/assets\//);
     await page.goto('/speakers?round=2');
     await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
     await expect(page.getByText(NOTICE_DE)).toBeVisible();
