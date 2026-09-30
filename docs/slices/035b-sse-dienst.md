@@ -400,19 +400,21 @@ Done: GET /v1/stream über die ganze Middleware-Kette und validateOperation, ohn
 Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa, 2769802 (Codex P1/P2), fd2d233
       (letzter Codecommit: Tests R8b, R9, R10, Test 24 ab COMMIT, 24b); ADR-Commits des Architekten 598273f, 2f24065, 03a8dec;
       Basis 036a eingebracht in f37647d; takt-040 (Vertrag 0.3.12) eingebracht in 228b234; eac50cb (R9 Vollvergleich,
-      Rahmenfehler beendet alle Ströme); geprüfte Fassung eac50cb.
-      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf eac50cb:
+      Rahmenfehler beendet alle Ströme); 8983814 (hub.fail nur bei fehlendem Hash, Öffnen bei Integritätsfehler 500,
+      verworfener Verteiler vor der Rechteprüfung); geprüfte Fassung 8983814.
+      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 8983814 (zweiter Lauf; der erste Lauf auf 8983814 war
+      rot mit zwei zeitabhängigen 034a-Tests und einer von rund 200 Stichproben in Test 28 unter Last, siehe Folgeliste):
         apps/api test:  Test Files  39 passed (39)
-        apps/api test:       Tests  584 passed (584)
+        apps/api test:       Tests  586 passed (586)
         apps/api test: operation-coverage: 66 operations in the contract, 60 exercised by tests, 6 pre-declared in allowlist.json
         apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
         slice-scope: 14 changed file(s), all within "docs/slices/035b-sse-dienst.md"'s "Files allowed" list (20 pattern(s)).
-        ✓ built in 1.63s
-        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit eac50cb, tree c7144a4b214e…
+        ✓ built in 1.80s
+        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 8983814, tree e3756768730f…
         exit 0
       Stabilität auf a82225b: beide Stromdateien dreimal hintereinander je 60/60 grün.
       Tests (apps/api/src/__tests__/stream035.test.ts, postgres-stream035.test.ts); rot auf 6034a90 (Route fehlte, 37 von 38 rot),
-      grün auf eac50cb:
+      grün auf 8983814:
         12 Öffnen (200, Köpfe, retry, Heartbeat); Fehlerfälle 401/403/422/404/Preflight; Demo-Filter 403; 12 (Postgres) Migrationen 503
         13, 13a (Commit während der Übergabe), 13b (cursor nach Aufbau), 13c (nach reset)
         14 podium/moderation/expert/capture nach Trennung; 15 Cursor > Kopf, Abstand > 1000
@@ -436,7 +438,11 @@ Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 57
         R9 jeder Nachlauf- und Live-Rahmen gleich maskEvent des gespeicherten Originals (Log älterer Form mit Akteur-Klarname
         und personId; Mutanten `event: e`, `{ ...maskEvent(e), payload: e.payload }`, `{ ...maskEvent(e), actor: e.actor }` getötet)
         R10 Nachlauf-Ereignis ohne Hash: frühere Ereignisse gehen hinaus, dann end {unavailable} auf allen Strömen, neues
-        Öffnen 503 mit Retry-After 30, stderr-Zeile (Mutanten „reset statt end“ und „ohne hub.fail“ getötet).
+        Öffnen 500 ohne Retry-After, stderr-Zeile (Mutanten „reset statt end“ und „ohne hub.fail“ getötet; rot auf eac50cb: 503)
+        R11 anderer Rahmenfehler im Nachlauf beendet nur diese Verbindung, der Live-Strom bleibt, neues Öffnen 200
+        (Mutant „jeder Fehler ruft hub.fail“ getötet; rot auf eac50cb)
+        R12 nach hub.fail meldet der Verteiler „nicht geladen“ (Mutant „loaded immer true“ getötet); die Prüfung in der
+        Route vor der Rechteauflösung ist nicht eigens getestet (Mikrotask-Lücke nicht deterministisch herstellbar)
         Verhaltensänderung seit 2769802: früher wurde der ganze Nachlauf zu `reset`, jetzt gehen die früheren Ereignisse
         hinaus, und alle Ströme enden mit `end {unavailable}` (wie Entscheidung 3, m6).
         24 Zustellung ab COMMIT, zweite Instanz vorgewärmt; 24b langsamer Schreibvorgang (2,1 s): ab Anfrage gemessen 3,0 s

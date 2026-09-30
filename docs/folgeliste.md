@@ -299,6 +299,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   des 1-s-Takts des Verteilers gebunden; ein Mutant, der jeden zweiten Takt auslässt, bleibt grün (24 mit 128 ms, 24b mit
   1846 ms) · Messung in der ungünstigsten Phase mit Schranke `reloadTickMs + spacingMs + Marge` gehört zum B11-Nachweis
   im Lasttest 071.
+- 035b Nachprüfung minor · `apps/api/src/__tests__/postgres-stream035.test.ts` (28) · im vollen Lauf unter Last zählte eine
+  von rund 200 Stichproben eine belegte Verbindung (Gates-Lauf auf 8983814, Wiederholung grün); vermutlich ein Backend im
+  Übergang „active → idle“ nach der Antwort · Stichprobe nur werten, wenn derselbe Backend-Zustand zweimal hintereinander besteht.
 
 ## Bühne und Wortmeldeliste (aus takt-039)
 
