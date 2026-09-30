@@ -143,7 +143,8 @@ test.describe.serial('H4/H5 @idp: sign in through the Keycloak form, then sign o
     const logout = page.waitForRequest((candidate) => new URL(candidate.url()).pathname === '/auth/logout');
     await page.getByRole('button', { name: 'Abmelden' }).click();
     const token = (await logout).headers()['x-csrf-token'] ?? '';
-    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    // A boolean, so that a failing check never prints the token itself.
+    expect(/^[A-Za-z0-9_-]{43}$/.test(token)).toBe(true);
     await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
     const stale = await request.newContext({ baseURL: origin, extraHTTPHeaders: { Cookie: `hv_session=${oldCookie}` } });
     try {
@@ -165,10 +166,15 @@ test.describe('H6 @idp: a blocked subject loses the session in the middle of it'
     await expect(page.getByTestId('header-counter-questions')).toBeVisible({ timeout: 60_000 });
 
     const root = `${test.info().project.testDir}/../../..`;
-    execFileSync(process.execPath, ['--import', `${root}/apps/api/node_modules/tsx/dist/loader.mjs`,
-      `${root}/apps/api/src/auth/subject-block-cli.ts`, grant.actorId], {
-      env: { PATH: process.env['PATH'] ?? '', HV_DATABASE_URL: grant.databaseUrl }, stdio: 'ignore', timeout: 60_000,
-    });
+    try {
+      execFileSync(process.execPath, ['--import', `${root}/apps/api/node_modules/tsx/dist/loader.mjs`,
+        `${root}/apps/api/src/auth/subject-block-cli.ts`, grant.actorId], {
+        env: { PATH: process.env['PATH'] ?? '', HV_DATABASE_URL: grant.databaseUrl }, stdio: 'ignore', timeout: 60_000,
+      });
+    } catch {
+      // The error of the child would name the actor id in its command line; keep it out of the report.
+      throw new Error('The subject block command failed.');
+    }
 
     expect((await page.request.get('/auth/me')).status()).toBe(401);
     await page.getByTestId('nav-capture').click();
@@ -219,7 +225,7 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await moderation.getByTestId('speaker-register').click();
       await moderation.getByTestId('speaker-register-name').fill(H8_SPEAKER_NAME);
       await moderation.getByTestId('speaker-register-submit').click();
-      await expect(moderation.getByText(H8_SPEAKER_NAME)).toBeVisible();
+      await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible();
 
       const speakers = (await (await other.get('/v1/speakers')).json()) as { id: string; displayName: string }[];
       const speaker = speakers.find((entry) => entry.displayName === H8_SPEAKER_NAME);

@@ -120,7 +120,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 027 · `postgres027.test.ts`, `migrations027.test.ts` · `describe.skipIf` ohne DB still grün · CI-Schalter
   `HV_REQUIRE_POSTGRES_TESTS=1`, der Überspringen zum Fehler macht; Laufzeitrolle explizit übergeben.
 - 027 · `app.ts` Readiness · unbekannter Migrationsstand → `unreachable`/500 statt `migrations_pending`/503.
-- 027 nit · `postgres:16` per Digest pinnen; TLS standardmäßig aus (037); kein Owner-Trigger gegen UPDATE (038).
+- 027 nit · ~~`postgres:16` per Digest pinnen~~ → erledigt in **031a** (beide Jobs); TLS standardmäßig aus (037); kein Owner-Trigger gegen UPDATE (038).
 - ~~028 · `claim.personId` an alle Leser~~ → behoben in **takt-027** (#67, `4daa317`; Datenschutz hält den Merge, AGENTS.md R3; Codex P1 auf #66).
 - 028 · `envelope.ts` · Ersatzkennung `legacy-unscoped` auch bei neuen Schreibvorgängen ohne `meetingId` · nur im
   Hochzieh-Pfad, sonst Fehler.
@@ -132,12 +132,23 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 029b · `apps/api/src/actor.ts` vs. `packages/domain/src/api.ts` · Regeln „aktive Zuordnung“ doppelt · gemeinsamer
   Domain-Helfer.
 - 029b · MF-08 (Zähler verworfener `X-Actor`-Versuche) fehlt · in 033.
-- 029b nit · `CURRENT_TIMESTAMP` statt injizierter Uhr in `auth/store.ts`/`0002_auth.up.sql`; Keycloak-Image per Tag;
+- 029b nit · `CURRENT_TIMESTAMP` statt injizierter Uhr in `auth/store.ts`/`0002_auth.up.sql`; ~~Keycloak-Image per Tag~~ (→ erledigt in **031a**, Tag und Digest);
   `subject-block-cli.ts` ohne Rechenhilfe aus Issuer+`sub`.
-- 030 · `apps/web/e2e/030-anmeldung.spec.ts` · überspringt sich ohne `HV_WEB_MODE=http`; kein HTTP-Build in CI ·
-  in 031 verdrahten.
-- 030 · `apps/web/src/api/http.test.ts` · „zwei Aufrufe → verschiedene Idempotenzschlüssel“ nicht geprüft; 401 mitten
-  in der Sitzung nur als Unit-Test.
+- ~~030 · `apps/web/e2e/030-anmeldung.spec.ts` · überspringt sich ohne `HV_WEB_MODE=http`; kein HTTP-Build in CI~~ →
+  erledigt in **031a** (Projekt `http`, Job `e2e-http`; der Nachweis des Jobs steht mit dem grünen PR-Lauf).
+- ~~030 · `apps/web/src/api/http.test.ts` · „zwei Aufrufe → verschiedene Idempotenzschlüssel“ nicht geprüft; 401 mitten
+  in der Sitzung nur als Unit-Test.~~ → erledigt in **031a** (Unit-Test; 401 mitten in der Sitzung: H6, nur in der PR-CI).
+- 031a Bau · `apps/web/vite.config.ts` · Proxy-Standard `HV_API_ORIGIN` `http://localhost:3000` passt nicht zu `PORT`
+  8787 des Dienstes · Standard angleichen (Produktcode, Web-Scheibe); Beobachtung beim Bau: der Proxy setzt `Host` auf den
+  Zielhost, nicht auf den Vite-Ursprung.
+- 031a Bau · `apps/api/src/server.ts` · `serve` ohne `hostname` bindet an alle Schnittstellen · Bindeadresse
+  konfigurierbar machen (mit 037).
+- 031a Bau · `apps/api/src/app.ts` (`/auth/callback`) · eine Person ohne aktive Rolle bekommt keine Sitzung (403 vor dem
+  Cookie), die Seite „Keine aktive Rolle“ (takt-023) ist so nie erreichbar; die Spec 031a (H7) ging vom Gegenteil aus ·
+  Absicht klären, Spec H7 oder Dienst anpassen (H7 prüft heute „kein Cookie, `/auth/me` 401“).
+- 031a Bau · `apps/web/e2e/031-http-betriebsart.spec.ts` (H8) · die Seite lädt den Redebeitrag alle 30 s neu (Abfrage
+  in `http.ts`); trifft das Neuladen genau zwischen dem Schreiben des zweiten Schreibenden und dem Schreiben der Seite,
+  entfällt der 412 (Fenster unter einer Sekunde) · bei einem Fehlschlag den Lauf wiederholen, ggf. Uhr der Seite anhalten.
 - 030 nit · Auth-Fehlertexte fest `'de'`; HTTP-Build bündelt `CORPUS_DEMO` statisch; `Idempotency-Key` auch an Logout.
 - Nachprüfung e2e · `apps/web/e2e/003-answers-stage.spec.ts:44` · ein Test mit zehn axe-Läufen und Screenshots braucht
   auf langsamer Maschine > 90 s · teilen oder `test.slow()`. → eigener kleiner Takt (Teilung an der Seitengrenze, je Test < 60 s, kein `test.slow()`), nicht Teil von
@@ -187,8 +198,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   `mitarbeiter`, `redner` fehlen); Schutz wirkt über die Label-Whitelist · Liste per Spec-Änderung erweitern.
 - 033b R1 nit · `apps/api/src/metrics/prometheus.ts` · `catalogJson as never` ohne Laufzeitprüfung · kleine Prüfung beim
   Laden.
-- 033b R1 nit (vorbestehend, SC-10) · `.github/workflows/gates.yml` · zweites `actions/upload-artifact@v4` (evidence)
-  ungepinnt · mit der nächsten Infra-Scheibe auf vollen Hash pinnen.
+- ~~033b R1 nit (vorbestehend, SC-10) · `.github/workflows/gates.yml` · zweites `actions/upload-artifact@v4` (evidence)
+  ungepinnt~~ → erledigt in **031a** (voller Hash v4.6.2; dort auch `actions/checkout` und `actions/setup-node` im Job `gates`).
 - 033b Codex P2 · `packages/domain/src/indicators.ts` / Fachbereichsprüfung in `api.ts` · ein konfigurierter Fachbereich
   mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
   reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
