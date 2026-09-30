@@ -136,8 +136,8 @@ mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
 |---|---|---|---|
 | lokal (`PW_CHROMIUM_PATH`) | `in-process` | 127/0 | 6,7 min; `abnahme` 56,1 s, `answersFilterMs` 134 ms, `stageNavMs` 170 ms |
 | lokal, `E2E_HTTP_IDP=none` (ohne Keycloak) | `http` (H1–H3, G1, 030) | 8/0 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | 12,4 s |
-| PR-CI Lauf `<id>`, Job `gates` | `in-process` | offen (nur CI) | Job gesamt: offen |
-| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | offen (nur CI, Keycloak) | Job gesamt: offen; `abnahme`: offen |
+| PR-CI Lauf 36685779155 (a7d4d7f), Job `gates` | `in-process` | grün | Job gesamt 10 min 13 s |
+| PR-CI Lauf 36685779155 (a7d4d7f), Job `e2e-http` | `http-setup` + `http` | 28/0 (G1 als erwarteter Fehlschlag), Zugriffslog 509 Zeilen PASS | Playwright 1,8 min, Job gesamt 4 min 13 s; `abnahme` 37,8 s, `answersFilterMs` 54,0 ms, `stageNavMs` 351,5 ms |
 
 **PR-CI Lauf 36662799847 (Baucommit f0db555), Job `e2e-http`: 25 bestanden, 2 rot. Halteregel (Entscheidung 5) ausgelöst.**
 
@@ -185,6 +185,12 @@ besteht sofort. Keine Zeitgrenze angehoben.
 | lokal, `E2E_HTTP_IDP=none pnpm e2e:http` | `http` (H1–H3, G1, 030) | 8 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | Playwright 14,0 s, Harness gesamt 22,7 s |
 
 Die fünf gemeinsamen Dateien im Projekt `http` laufen lokal nicht (Keycloak, kein Docker); Nachweis nur im PR-CI.
+
+**Halteregel nach takt-030/032/033/033b/035 erfüllt (PR-CI Lauf 36685779155 auf a7d4d7f).** Die fünf gemeinsamen Dateien laufen
+im Projekt `http` gegen Keycloak grün; `stageNavMs` 351,5 ms statt 2374/3402 ms, `abnahme` 37,8 s ≤ 120 s, Projekt `http`
+1,8 min ≤ 6 min, Job 4 min 13 s ≤ 12 min. Keine Grenze und kein Timeout angehoben. Bildnachweis nach E56: Artefakt
+`evidence-031-http`, Lauf 36685779155, Artefakt-ID 11083847088, Digest
+`sha256:8d7433c166e15541083f1c1d601dfa40b6d2f986fd39a367d48eb06bbb63c113`.
 
 ## Bericht (nach Bau ausfüllen)
 
