@@ -231,6 +231,15 @@ Wörtlicher Schluss:
 mark-test-run: wrote /home/user/wt/t032/.claude/state/last-test-run (clean tree) at commit 3fd3595, tree 04dfd79dbcf2…
 ```
 
+**Nachlauf nach den Codex-P1-Befunden (PR #86) auf Commit `0af81a1`**, `pnpm gates` mit Postgres-Variablen, sauberer
+Baum, Exit 0; domain 243, web 315, api 523 Tests grün (slice-scope: 19 Dateien, alle in Files allowed). In-Prozess-e2e
+`002-speakers-capture.spec.ts` grün. Wörtlicher Schluss:
+
+```
+✓ built in 2.00s
+mark-test-run: wrote /home/user/wt/t032/.claude/state/last-test-run (clean tree) at commit 0af81a1, tree 3a1a1a265889…
+```
+
 ## Review findings
 
 Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested, 2 major. Disposition:
@@ -260,3 +269,11 @@ Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested
 
 **Enge Nachprüfung (4a6752b/7e6543b):** Major 1 und Major 2 geschlossen, kein neuer Blocker oder Major. Neu: ein Minor
 (stilles Scheitern bei `isListStale`) und zwei Nits zur Effekt-Zeitlage → Folgeliste.
+
+**Codex P1 (PR #86), behoben in `0af81a1`.** (A) `markAfterAnswer` und (B) die Listenmarke in `speakers/Page.tsx` nahmen
+mit `Math.max` eine schon neuere Anzeige als Basis für ein älteres Antwort-ETag; das veraltete Tag galt dann bis zur
+nächsten noch neueren Lesung weiter → 412. Jetzt vergleichen `markAfterAnswer` und das neue `listMarkAfterAnswer` die
+Version des Antwort-ETags (`versionOfEtag`) mit der angezeigten Version: ist die Anzeige gleich alt oder neuer, entfällt
+die Marke, und das nächste Schreiben nutzt das Tag der angezeigten Lesung. Tests zuerst rot auf dem alten Verhalten
+(`markAfterAnswer with a delayed answer`, `listMarkAfterAnswer`), danach grün. Codex P2 (Sperre `speakerLocked` nach
+gescheiterter Aktualisierung) → `docs/folgeliste.md`.
