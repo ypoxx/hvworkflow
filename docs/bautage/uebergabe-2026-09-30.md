@@ -4,31 +4,25 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `eb6d7c3` (035b). Etappe A ist fertig.
-  Aus Etappe B sind fertig:
-  - Scheibe 031 (031a, 031b, takt-030 bis takt-037);
-  - 035a (#102);
-  - takt-039 (#104);
-  - 036a (#106, Live-Store);
-  - takt-040 (#108, Vertrag 0.3.12);
-  - takt-038 (#109, Historie paginiert);
-  - 035b (#107, SSE-Dienst `GET /v1/stream`, ADR-0014-Nachtrag).
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `ca94899` (036b). **Etappe A und Etappe B
+  sind fertig:**
+  - 031 (031a, 031b, takt-030 bis takt-037);
+  - 035a (#102), 035b (#107), 036a (#106), 036b (#111);
+  - takt-038 (#109), takt-039 (#104), takt-040 (#108, Vertrag 0.3.12).
+
   E56 gilt.
-- **Berichtigung (bleibt):** Die Takte takt-035 und takt-036 sind nicht die Plan-Scheiben 035 und 036.
-- **Offen in Zielpfad B: nur 036b** (Strom-Client, Verbindungsanzeige, zweiter Browser; Risiko hoch). Der Bau läuft mit
-  Opus in `/home/user/wt/s036b`, Branch `claude/slice-036b-strom-client`, Basis `eb6d7c3`.
-  - Danach: Review in frischem Kontext (Security und Resilienz), PR, CI mit H11/H12 im Projekt `http`, ready, Codex,
-    Merge.
-  - Der Bericht-Abschnitt der Spec muss vor ready ausgefüllt sein.
-- **Danach Zielpfad C** (043 zuerst). D (064–066) darf nach 043 parallel zum Rest von C laufen
-  (`docs/produktplan-beta.md`, Abschnitt Zielpfad).
-- **Offene Punkte aus 035b auf der Folgeliste (nicht sicherheitsrelevant):**
-  - Worst-Phase-Latenznachweis (gehört zu Lasttest 071);
-  - der ungetestete `hub.loaded()`-Zweig;
-  - eine Stichprobe von Test 28 unter Last;
-  - 034a-Zeitfenster unter Last.
-- takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile). Die Eigentümerfrage bleibt
-  offen und ist umkehrbar.
+- **Offen aus B:**
+  - Lasttest 071 (B11-Nachweis in der ungünstigsten Phase);
+  - Produktionsweg für `text/event-stream` (035b Frage 3, Standard: Polling-Rückfall aus 036b, Prüfung beim ersten
+    Staging-Deploy).
+- **Zielpfad C beginnt mit 043** (Vertragspaket 0.4.0).
+  - Die Spec schreibt der Architekt (Opus) in `/home/user/wt/spec043`, Branch `claude/spec-043-vertrag-040`, mit einem
+    Vorschlag zur Teilung.
+  - 043 kommt vor der Feedback-Runde 2 (09.10.) und der Entscheidungsstunde (16.10.). Unbeantwortete Punkte werden auf
+    Standard gebaut und mit Datum vermerkt, wie der Plan es vorsieht; spätere Antworten kosten eine Enum-, Tabellen-
+    oder Vertragsänderung.
+  - D (064–066) darf nach 043 parallel zum Rest von C laufen.
+- takt-033 ist mit Vorschlag (b) gemergt; die Eigentümerfrage bleibt offen und ist umkehrbar.
 
 ## Eigentümerentscheidungen (offen)
 
