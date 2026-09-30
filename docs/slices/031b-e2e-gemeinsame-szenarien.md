@@ -139,6 +139,17 @@ mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
 | PR-CI Lauf `<id>`, Job `gates` | `in-process` | offen (nur CI) | Job gesamt: offen |
 | PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | offen (nur CI, Keycloak) | Job gesamt: offen; `abnahme`: offen |
 
+**PR-CI Lauf 36662799847 (Baucommit f0db555), Job `e2e-http`: 25 bestanden, 2 rot. Halteregel (Entscheidung 5) ausgelöst.**
+
+- `abnahme`: `stageNavMs` im Projekt `http` = 2374 ms > 1 500 ms (`answersFilterMs` im Projekt `http` = 35 ms, in Ordnung). Ursache
+  (gemessen, Koordinator): produktseitig, der Dienst prüft die gesamte Ereigniskette je Anfrage zwei- bis dreimal, die Web-Ansicht
+  liest beim Einhängen doppelt. Die Grenze bleibt unverändert, kein Timeout angehoben; die Scheibe wartet auf den Folgetakt
+  takt-033 (Leistung von `/stage` im HTTP-Modus).
+- `002`: `networkidle` ist nach dem ersten Leerlauf der Seite ein No-op; der Test klickte "Aufrufen" noch während PUT und
+  Neulesen liefen (412). Behoben ohne Produktänderung: der Test wartet auf PUT `/v1/speakers/order` und danach auf das
+  Neulesen von Liste und Meeting (nur im Projekt `http`). Die Produktseite (frische Versionen aus der PUT-Antwort, Aktionen der
+  Runde während des Umsortierens gesperrt) kommt als eigener Takt takt-032.
+
 Reihenfolge (`playwright test --list --project=http`, mit IdP): Setup, dann 002, 021b, 021c, 030, 031, 080, abnahme (27 Tests in 8 Dateien).
 
 Reset-Banner: `024-ereignis-umschlag.spec.ts` › „024: old demo log requires an explicit reset in German and English“

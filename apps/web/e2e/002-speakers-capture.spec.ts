@@ -79,12 +79,25 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   const lifted = await announcer.innerText();
   await page.keyboard.press('ArrowDown');
   await expect(announcer).not.toHaveText(lifted);
+  // A reorder raises the version of every Wortmeldung of the round (`state.ts`, SpeakersReordered). In `http` the list is
+  // shown at once from the drag (old versions) and re-read after the PUT (getMeeting, listSpeakers, getMeeting); a call made
+  // before that re-read is refused with 412. So the drop is followed by the PUT and then by the re-read of list and meeting.
+  // `networkidle` does not do this (it is a no-op once the page has been idle). In `in-process` there is no traffic.
+  const traffic: string[] = [];
+  const record = (response: { request(): { method(): string }; url(): string }): void => {
+    traffic.push(`${response.request().method()} ${new URL(response.url()).pathname}`);
+  };
+  if (test.info().project.name === 'http') page.on('response', record);
   await page.keyboard.press('Space');
   await expect(announcer).toContainText('abgelegt');
-  // A reorder raises the version of every Wortmeldung of the round (`state.ts`, SpeakersReordered). In `http` the list is
-  // re-read after the write, and a call made on the rows of before that re-read is refused with 412. Wait until the traffic
-  // of the write and of the re-read is over, as a person would before the next step; nothing waits in `in-process`.
-  await page.waitForLoadState('networkidle');
+  if (test.info().project.name === 'http') {
+    await expect.poll(() => {
+      const put = traffic.indexOf('PUT /v1/speakers/order');
+      const list = put < 0 ? -1 : traffic.indexOf('GET /v1/speakers', put);
+      return list >= 0 && traffic.indexOf('GET /v1/meeting', list) >= 0;
+    }, { message: 'the reorder and the re-read of the list', timeout: 15_000 }).toBe(true);
+    page.off('response', record);
+  }
 
   await expect(waiting.nth(0)).toHaveAttribute('data-number', secondBefore);
   await expect(waiting.nth(1)).toHaveAttribute('data-number', firstBefore);
