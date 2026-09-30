@@ -87,7 +87,7 @@ describe('Scheibe 029b: browser-bound OIDC correlation cookies', () => {
 
 describe('Scheibe 028: mandatory version contract', () => {
   it('requires the 0.3.6 fields and per-operation If-Match without changing array responses', () => {
-    expect(openapiDoc.info.version).toBe('0.3.10');
+    expect(openapiDoc.info.version).toBe('0.3.11');
     const schemas = openapiDoc.components.schemas;
     expect(schemas.Meeting.required).toEqual(expect.arrayContaining(['version', 'speakerListVersion']));
     expect(schemas.Speaker.required).toContain('meetingId');

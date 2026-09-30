@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.3.10
+  version: 0.3.11
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -81,6 +81,15 @@ info:
     `503`, `5xx` or a network error, and never uses it for a second intention; `429` and `503` consume
     no key, and neither does `408` in the service with Postgres. Length and list limits of request
     schemas were added in this release (see the CHANGELOG).
+
+    Stream (since 0.3.11, slice 035a; served from slice 035b): `/stream` delivers per reader what the
+    reader may read at delivery time (rule R-PERM-04). A reader with `event.read` receives the masked
+    events (`EventRead`), everyone else content-free change signals (`StreamChange`) naming topics and
+    readable ids only. Without a cursor the stream starts at the head and sends `cursor` first; a
+    cursor that cannot be resumed yields `reset` without `id`, after which the client reconnects
+    without a cursor (an `EventSource` client with a new instance). `end` closes a stream with a fixed
+    reason. The semantics of the pre-declared, never served 0.3.0 operation are replaced by this
+    release (see the CHANGELOG).
   x-legal-notice: >
     This contract cites no statute. Legal references live only in the domain: from slice 011 on,
     every rule of the domain rule tables (transitions and guards in `packages/domain`) carries a
@@ -838,33 +847,106 @@ paths:
     get:
       tags: [events]
       operationId: streamEvents
-      summary: Realtime event stream (Server-Sent Events) with resumption
-      description: >-
-        Since 0.3.0 (slice 035, ADR 0014). `text/event-stream`: every message carries one `EventRead`
-        as JSON in `data:` and its `seq` in `id:`; a comment line is sent as heartbeat every 15 s.
-        Resume with `after` or the `Last-Event-ID` header (the browser sends it on reconnect). When
-        both are present, `Last-Event-ID` wins: it is the newer cursor on a reconnect, `after` applies
-        to the first connection only (Codex on PR #25). The
-        same read permission as `listEvents` applies per delivered event (`event.read` plus the read
-        scopes of slice 010): no event reaches a reader who may not read it. Polling `/events` stays
-        the fallback. In-app alarms (`NotificationRaised`, slice 085) travel on this stream later.
+      summary: Realtime stream (Server-Sent Events) with resumption, filtered per reader
+      description: |
+        Since 0.3.0 (slice 023, ADR 0014); message kinds, cursor rules, limits and stream end since
+        0.3.11 (slice 035a; served from slice 035b). Polling `/events` stays the fallback. In-app alarms
+        (`NotificationRaised`, slice 085) travel on this stream later.
+
+        **Framing.** `text/event-stream`. The first line of every stream is `retry: 3000`. Every message
+        is one SSE block with an `event:` line naming its kind and exactly one `data:` line holding one
+        JSON document; `event`, `change` and `cursor` also carry an `id:` line, `reset` and `end` never
+        do. A comment line is sent as heartbeat every 15 s. The kinds (schemas in `x-sse-messages` of
+        the `200` response):
+        - `event`: one `EventRead`, the same JSON `listEvents` returns for that `seq`; `id` = `seq`.
+        - `change`: one `StreamChange`, a change signal without content; `id` = `seq` of the last event
+          it covers (for a catch-up change: the head).
+        - `cursor`: one `StreamCursor`; `id` = the current head (the highest global `seq`).
+        - `reset`: one `StreamReset`, without `id`; the client must not derive a cursor from it. The
+          service closes the stream after it.
+        - `end`: one `StreamEnd` with a fixed `reason`, without `id`; the service closes the stream
+          after it.
+
+        **Rights per message (R-PERM-04).** Visibility is decided per event, per reader, with the
+        reader's rights at delivery time, through the same permission check as the read operations
+        (never by role name). A reader who holds `event.read` in any active meeting receives every
+        event as an `event` message, masked exactly like `listEvents`, gap-free in `seq`. Every other
+        reader receives `change` messages only: topics for which the reader holds a read permission
+        (`meeting` for every reader with an active role assignment), and in `subjects` only the ids of
+        items the reader may read before or after the change (live) or now (catch-up); counter changes
+        arrive as a topic without ids. The events of one delivery are merged into one `change`. No
+        message carries a payload, a text or an id the reader may not read; when nothing is visible,
+        nothing is sent. Events without a meeting reach only readers with `event.read`.
+
+        **Cursor.** Resume with `after` or the `Last-Event-ID` header (the browser sends it on
+        reconnect). When both are present, `Last-Event-ID` wins: it is the newer cursor on a reconnect,
+        `after` applies to the first connection only (Codex on PR #25). Without either, the stream
+        starts at the head. A `cursor` message is sent (a) as the first message after `retry:` when the
+        stream is opened without a cursor, (b) right after a completed catch-up, also when the last
+        catch-up message already carried the head as `id`, and (c) with the heartbeat when the head
+        moved on through events the reader cannot see. So every connection holds a valid `id` right
+        after it is established.
+
+        **Catch-up and reset.** With a cursor, the events in `(cursor, head]` are caught up before live
+        delivery: as `event` messages for readers with `event.read`, otherwise as at most one `change`
+        with `replay: true`. The service sends `reset` instead of a catch-up when the range holds more
+        than 1000 events, when the cursor lies beyond the head, or when the reader's view of an item
+        may have left their read scope within the range (a catch-up only sees today's state). After
+        `reset` the client discards its state, reloads by the read operations and reconnects **without**
+        a cursor (neither `after` nor `Last-Event-ID`); it then receives `cursor` with the head as in
+        (a). A client built on `EventSource` must create a new `EventSource` instance without
+        `Last-Event-ID` after `reset`: the built-in reconnect would send the old `id` again and receive
+        `reset` again.
+
+        **Stream end.** `end` names why the service closes the stream: `session` (the session expired
+        or was signed out; sign in again), `forbidden` (the reader has no active role assignment any
+        more; do not reconnect), `roles_changed` (the reader's role assignments changed; reconnect
+        with the last `id`), `rotate` (the service ends long connections; reconnect with the last `id`),
+        `unavailable` (the service cannot deliver reliably now, e.g. the persistence; reconnect with
+        the last `id` after a pause). A reconnect after `session` or `forbidden` is answered `401` or
+        `403`, which ends an `EventSource` for good.
+
+        **Limits.** A stream per session or per subject beyond the service's limit is `429`; beyond the
+        service's global stream limit, or while the persistence is busy or not ready, it is `503`
+        `StreamUnavailable`. Both carry `Retry-After`.
       parameters:
-        - { $ref: '#/components/parameters/After' }
+        - { $ref: '#/components/parameters/StreamAfter' }
         - { $ref: '#/components/parameters/MeetingIdFilter' }
         - { $ref: '#/components/parameters/LastEventId' }
       responses:
         '200':
-          description: Stream opened; messages follow until the client closes the connection
+          description: >-
+            Stream opened; messages follow until the client closes the connection or the service
+            ends it with `reset` or `end`. `x-sse-messages` maps each SSE `event:` name to the schema
+            of its single `data:` line and to the meaning of its `id:` line.
           headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
           content:
             text/event-stream:
-              schema: { type: string, description: 'SSE framing; each `data:` line is one `EventRead` JSON document' }
+              schema: { type: string, description: 'SSE framing: first line `retry: 3000`, then blocks of `event:`, optional `id:` and one `data:` line with JSON (see `x-sse-messages`); comment lines as heartbeat' }
+              x-sse-messages:
+                event: { id: 'seq of the event', data: { $ref: '#/components/schemas/EventRead' } }
+                change: { id: 'seq of the last covered event (catch-up: the head)', data: { $ref: '#/components/schemas/StreamChange' } }
+                cursor: { id: 'the head', data: { $ref: '#/components/schemas/StreamCursor' } }
+                reset: { id: none, data: { $ref: '#/components/schemas/StreamReset' } }
+                end: { id: none, data: { $ref: '#/components/schemas/StreamEnd' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Since 0.3.11 (slice 035a) the `meetingId` filter names no known meeting (Jahrgang).
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 404 } } } ] } } }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { $ref: '#/components/responses/PersistenceBusy' }
+        '429':
+          description: >-
+            Since 0.3.11 (slice 035a): the caller's session or subject already holds as many open streams
+            as the service allows, or a read quota of the service is used up for the current window.
+            `Retry-After` is required. `detail` is a fixed sentence, never the limit.
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+            X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 429 } } } ] } } }
+        '503': { $ref: '#/components/responses/StreamUnavailable' }
   # ---- meetings (Jahrgang) — canonical since 0.3.0 --------------------------------------------------
   /meetings:
     get:
@@ -1763,7 +1845,26 @@ components:
     AssignmentId: { name: assignmentId, in: path, required: true, schema: { type: string } }
     MeetingIdFilter: { name: meetingId, in: query, required: false, schema: { type: string }, description: 'Only events of this meeting (Jahrgangsfilter, ADR 0014); the cursor stays global' }
     After: { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: 'Last seen global sequence number' }
-    LastEventId: { name: Last-Event-ID, in: header, required: false, schema: { type: string, pattern: '^[0-9]+$' }, description: 'Sent by the browser on reconnect; the same meaning as `after` (a sequence number). A value that is not a non-negative integer is a 422.' }
+    StreamAfter:
+      name: after
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      description: >-
+        Since 0.3.11 (slice 035a), `/stream` only: the last global sequence number the client has seen.
+        No default: without `after` and without `Last-Event-ID` the stream starts at the head (the
+        shared `After` parameter with `default: 0` stays for `/events`). A value above the head is
+        answered with `reset`; `Last-Event-ID` wins when both are present.
+    LastEventId:
+      name: Last-Event-ID
+      in: header
+      required: false
+      schema: { type: string, pattern: '^[0-9]{1,16}$', maxLength: 16 }
+      description: >-
+        Sent by the browser on reconnect; the same meaning as `after` (a global sequence number) and
+        wins over it. Decimal digits only, at most 16 of them, and at most 9007199254740991 (the largest
+        safe integer): a value that is not a non-negative integer, or lies above that bound, is a 422
+        (the bound since 0.3.11, slice 035a).
     RoundFilter: { name: round, in: query, schema: { type: integer, minimum: 1 } }
     SpeakerStatusFilter: { name: status, in: query, schema: { $ref: '#/components/schemas/SpeakerStatus' } }
     SpeakerIdFilter: { name: speakerId, in: query, schema: { type: string } }
@@ -1937,6 +2038,17 @@ components:
         "Persistence is busy." or "Migrations are pending."; `Retry-After` is 2 or 30. Nothing was
         written, no `Idempotency-Key` is consumed, and no database text is included. (A `500` with the
         detail "Persistence outcome is unknown." is different: see `info.description`.)
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
+    StreamUnavailable:
+      description: >-
+        Since 0.3.11 (slice 035a), `/stream` only, one response for both causes: the service's global
+        limit of open streams is reached, or the persistence is busy or not ready (the causes of
+        `PersistenceBusy`). `Retry-After` is required; `detail` is a fixed sentence per cause, never the
+        limit, a host name or database text. Nothing was opened; the client retries after the given
+        seconds with its cursor.
       headers:
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
         X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
@@ -2786,11 +2898,78 @@ components:
       properties:
         keyId: { type: string }
       additionalProperties: true
+    StreamTopic:
+      type: string
+      enum: [meeting, speakers, contributions, questions, stage, roles]
+      description: >-
+        Since 0.3.11 (slice 035a): an area of the read views a `change` message touches. `meeting` —
+        the meeting and its counters (`getMeeting`); `speakers` — the list of speakers; `contributions` —
+        speeches; `questions` — questions, their history and answer versions; `stage` — the podium view
+        (`getStage`); `roles` — role assignments (for readers without `admin.roles.manage` only their
+        own). The client reloads the read views of a topic it receives. A client ignores an unknown
+        topic (additive enum values may appear within 0.3.x).
+    StreamChange:
+      type: object
+      description: >-
+        Since 0.3.11 (slice 035a): `data` of the SSE message `change`. A change signal without content
+        for a reader without `event.read`: which areas changed and, where the reader may read them,
+        which items. It merges all events of one delivery; its SSE `id` is `seq`.
+      required: [seq, topics]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 1, maximum: 9007199254740991, description: 'Global sequence number of the last event this message covers (for a catch-up: the head)' }
+        topics: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/StreamTopic' } }
+        subjects:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string }
+          description: >-
+            Ids of the changed items the reader may read (questions, speakers, contributions, role
+            assignments). Counter changes never carry an id. Absent when no readable item is named or
+            when more than 100 would be named; the client then reloads the topics as a whole.
+        meetingId: { type: string, description: 'The meeting (Jahrgang) the covered events belong to, when it is one' }
+        replay: { type: boolean, const: true, description: 'Present only on the single `change` of a catch-up (`(cursor, head]`)' }
+    StreamCursor:
+      type: object
+      description: >-
+        Since 0.3.11 (slice 035a): `data` of the SSE message `cursor`; its SSE `id` is `seq`. Sent first
+        on a stream opened without a cursor, right after a completed catch-up, and with the heartbeat
+        when the head moved on through events the reader cannot see.
+      required: [seq]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 0, maximum: 9007199254740991, description: 'The current head: the highest global sequence number (0 while the log is empty)' }
+    StreamReset:
+      type: object
+      description: >-
+        Since 0.3.11 (slice 035a): `data` of the SSE message `reset`, sent **without** an SSE `id`. The
+        cursor cannot be resumed (catch-up over 1000 events, cursor beyond the head, or an item may have
+        left the reader's read scope). The service closes the stream. The client discards its state and
+        reconnects without `after` and without `Last-Event-ID`; an `EventSource` client creates a new
+        instance for that. `lastSeq` is informative and never a cursor.
+      required: [lastSeq]
+      additionalProperties: false
+      properties:
+        lastSeq: { type: integer, minimum: 0, maximum: 9007199254740991, description: 'The head when the reset was sent; not to be used as a cursor' }
+    StreamEnd:
+      type: object
+      description: >-
+        Since 0.3.11 (slice 035a): `data` of the SSE message `end`, sent without an SSE `id`; the service
+        closes the stream after it. Reasons: `session` (session expired or signed out), `forbidden` (no
+        active role assignment any more), `roles_changed` (role assignments changed), `rotate` (the
+        service ends long connections), `unavailable` (the service cannot deliver reliably now). After
+        `roles_changed`, `rotate` and `unavailable` the client reconnects with its last `id`.
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: { type: string, enum: [session, forbidden, roles_changed, rotate, unavailable] }
     EventRead:
       type: object
       description: >-
         Standard read projection of a stored Event (slice 026, ADR 0009/0013/0015), returned by
-        question history, the global event feed and each SSE data message. The original Event is
+        question history, the global event feed and each SSE `event` message of `/stream` (readers with
+        `event.read`; since 0.3.11 other readers receive `StreamChange` instead). The original Event is
         unchanged in the append-only log. This projection omits personId, payload.pii, historical
         clear-name fields, hash and prevHash. sourceHash identifies the stored original; it is not a
         digest of this redacted JSON and cannot be recomputed from it. Only the complete stored
