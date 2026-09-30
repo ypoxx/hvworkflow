@@ -247,3 +247,6 @@ Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested
    Fragelesung im Paar speichern.
 10. **Nit, erledigt mit Befund 1/2.** `useSpeakers.test.ts` (`etagForList`) · der Fall „weicht ab → übernimmt“ unterschied
     Marke und Liste nicht · durch die Tests der beiden Szenarien veralteter Listen ersetzt.
+
+**Enge Nachprüfung (4a6752b/7e6543b):** Major 1 und Major 2 geschlossen, kein neuer Blocker oder Major. Neu: ein Minor
+(stilles Scheitern bei `isListStale`) und zwei Nits zur Effekt-Zeitlage → Folgeliste.
