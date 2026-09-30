@@ -4,23 +4,30 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `8a4c8bd` (035a). Etappe A fertig;
-  Scheibe 031 fertig (031a, 031b, alle Takte aus der 031b-Diagnose: takt-030 bis takt-037). E56 gilt.
-- **Berichtigung:** Die früheren Takte takt-035 (Produktions-Build) und takt-036 (Katalog-Rennen) sind **nicht** die
-  Plan-Scheiben 035 (SSE-Strom) und 036 (Live-Store und Strom-Client). Zielpfad B endet erst mit den Plan-Scheiben 035
-  und 036.
-- Plan-Scheiben 035/036 sind in vier Specs geteilt, alle gemergt: 035a (#96), 035b (#97), 036a (#98), 036b (#99); dazu
-  takt-038 Historie paginiert (#100).
-- **035a gemergt** (#102, `8a4c8bd`): Vertrag 0.3.11 und Strom-Domäne (R-PERM-04 über `can()`).
-- **takt-039 gemergt** (#104, `769df38`): `e2e-http` war auf der Basis rot (Diagnose-PR #103). Behoben wurden ein
-  Produktfehler auf der Bühne („weiter“ ging im HTTP-Modus still verloren), die Rückgabe auf die falsche Frage (Recht/Audit)
-  und ein Testrennen mit dnd-kit (Tasten-Hörer erst per `setTimeout`, Helfer `liftWithKeyboard`).
-- **Bau läuft:** 035b (Dienst, `/home/user/wt/s035b`, Branch `claude/slice-035b-sse-dienst`) und 036a (Live-Store,
-  `/home/user/wt/s036a`, Branch `claude/slice-036a-live-store`), beide Opus. Für 035b offen: `meetingId`-Filter gegen
-  „lückenlos“ und der `Retry-After`-Wert bei 503 `StreamUnavailable`.
-- Reihenfolge danach: 036b nach 035b und 036a; takt-038 nach 036a. Danach Zielpfad C (043 zuerst);
-  D (064–066) darf nach 043 parallel zum Rest von C laufen (`docs/produktplan-beta.md`, Abschnitt Zielpfad).
-- takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile); die Eigentümerfrage bleibt
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `eb6d7c3` (035b). Etappe A ist fertig.
+  Aus Etappe B sind fertig:
+  - Scheibe 031 (031a, 031b, takt-030 bis takt-037);
+  - 035a (#102);
+  - takt-039 (#104);
+  - 036a (#106, Live-Store);
+  - takt-040 (#108, Vertrag 0.3.12);
+  - takt-038 (#109, Historie paginiert);
+  - 035b (#107, SSE-Dienst `GET /v1/stream`, ADR-0014-Nachtrag).
+  E56 gilt.
+- **Berichtigung (bleibt):** Die Takte takt-035 und takt-036 sind nicht die Plan-Scheiben 035 und 036.
+- **Offen in Zielpfad B: nur 036b** (Strom-Client, Verbindungsanzeige, zweiter Browser; Risiko hoch). Der Bau läuft mit
+  Opus in `/home/user/wt/s036b`, Branch `claude/slice-036b-strom-client`, Basis `eb6d7c3`.
+  - Danach: Review in frischem Kontext (Security und Resilienz), PR, CI mit H11/H12 im Projekt `http`, ready, Codex,
+    Merge.
+  - Der Bericht-Abschnitt der Spec muss vor ready ausgefüllt sein.
+- **Danach Zielpfad C** (043 zuerst). D (064–066) darf nach 043 parallel zum Rest von C laufen
+  (`docs/produktplan-beta.md`, Abschnitt Zielpfad).
+- **Offene Punkte aus 035b auf der Folgeliste (nicht sicherheitsrelevant):**
+  - Worst-Phase-Latenznachweis (gehört zu Lasttest 071);
+  - der ungetestete `hub.loaded()`-Zweig;
+  - eine Stichprobe von Test 28 unter Last;
+  - 034a-Zeitfenster unter Last.
+- takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile). Die Eigentümerfrage bleibt
   offen und ist umkehrbar.
 
 ## Eigentümerentscheidungen (offen)
@@ -32,13 +39,16 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 4. Aus früheren Berichten weiter offen: E55 (Patch-Stufe strengerer Anfrageschemas), ADR-0015-Nachtrag, Netlify Deploy
    Previews und Branch Deploys auf „None“ (nur vorgeschlagen, nichts geändert), Admin-Selbstzuweisung im
    Entscheidungsregister, Token-Abrechnung, 031b-Frage zum ADR-0002-Umfang (Standard: fünf gemeinsame Dateien).
-5. Aus den Specs 035/036 (Standards in den Specs festgelegt, umkehrbar; die Tabelle aus 035a ist gebaut, die übrigen noch
-   nicht): 035a Frage 1 Freigabe der Sichtbarkeitstabelle R-PERM-04;
+5. Aus den Specs 035/036 (Standards in den Specs festgelegt, umkehrbar; mit 035b und 036a sind alle Standards bis auf
+   den Polling-Rückfall aus 036b gebaut): 035a Frage 1 Freigabe der Sichtbarkeitstabelle R-PERM-04;
    035b Frage 1 der Neuaufbau des Stroms alle 25 min verlängert das Leerlauffenster der Sitzung (Standard: hinnehmen);
    035b Frage 2 Aktivitätsvolumen über `id`-Sprünge und Zeitpunkte (Standard: hinnehmen wie die Zähler); 035b Frage 3
    Produktionsweg für `text/event-stream` über Netlify bzw. Konzern-Proxy und HTTP/2 (Standard: Polling-Rückfall aus
    036b, Prüfung beim ersten Staging-Deploy); 036a Frage 1 ADR 0014 gezieltes Ungültigmachen statt Deltasichten
    (Standard: Ungültigmachen).
+6. **Brauchen Tagesberichte eine Spec?** Codex hielt das auf #105 als P1 fest. Ich habe es abgelehnt: R1 („no slice
+   without a spec“) betrifft Scheiben mit Code, Tagesberichte und Übergaben sind Orchestrator-Doku ohne Scope. Das ist
+   meine Auslegung und umkehrbar; eine Entscheidung des Eigentümers würde die Frage für Codex beenden.
 
 ## Betrieb der Bauumgebung
 
