@@ -44,7 +44,9 @@ its working directory between calls.
    criterion, files allowed. Work outside the allowed files is a finding, not initiative.
 2. **Evidence, not claims.** A slice is done when the report names the commit `pnpm gates` ran on and
    contains the real tail of its output once, and, for interface work, a screenshot in
-   `docs/evidence/`. Docs-only commits afterwards need no new local run; the PR's CI is the running proof,
+   `docs/evidence/`. For a test that runs only against Keycloak in the CI job `e2e-http`, the CI artifact
+   counts as that screenshot when the slice's evidence section names artifact name, run id, artifact id and
+   digest (owner, 30.09.2026, E56). Docs-only commits afterwards need no new local run; the PR's CI is the running proof,
    and a merge needs green CI on the PR's last commit.
    "Tests pass" without output counts as not run.
 3. **Whoever builds does not review.** Reviews run in a fresh context that sees only spec and diff —

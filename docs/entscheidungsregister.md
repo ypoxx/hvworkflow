@@ -1,7 +1,7 @@
 # Entscheidungsregister
 
 **Stand:** 23.09.2026 — Prüfpunkt 0, durch den Umsetzer vorgezogen (im Plan auf den 25.09.2026 datiert):
-Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen · E50–E54 ergänzt am 25.09.2026 mit Scheibe 089 · E55 ergänzt am 29.09.2026 mit Spec 034a ·
+Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen · E50–E54 ergänzt am 25.09.2026 mit Scheibe 089 · E55 ergänzt am 29.09.2026 mit Spec 034a · E56 ergänzt am 30.09.2026 (Antwort des Eigentümers) ·
 **Herkunft:** Produktplan Beta (`docs/produktplan-beta.md`) Abschnitte 3, 4, 7, 10 und 11; Leitplanken
 (`docs/qualitaetsleitplanken-produktreife.md`) Abschnitt 11 · **Rang:** Ab dieser Scheibe führt dieses
 Register die offenen Entscheidungen (Leitplanken 11); Plan Abschnitt 10 bleibt die Herkunft der Zeilen.
@@ -27,7 +27,7 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 
 ---
 
-## 1. Register E1–E55
+## 1. Register E1–E56
 
 | Nr. | Entscheidung | Standardannahme | Eigentümer | Fällig | Rückfalltrigger | Kosten bei Änderung | Betroffene Scheibe(n) | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -88,6 +88,7 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 | E53 | Kontrastmodus der Bühne (dunkler Grund, Umschalter „Kontrast" je Gerät, gebaut in 005–007) als Standard des Podiums (Zielbild Z20; Scheibe 089) | Nein: Standard bleibt hell, der Umschalter bleibt, 056 übernimmt ihn in die Anzeigeeinstellungen je Gerät | Projektleitung, Eigentümer | 13.11.2026 (vor 056) | 13.11.2026 / 056: ohne Antwort bleibt der Standard hell | Standardwert umstellen: Minuten | 056 | auf Standard gebaut am 03.09.2026 in 007 (nachgetragen mit 089, Bestätigung durch den Umsetzer an Prüfpunkt 1) |
 | E54 | Rückkanal vom Versammlungsbüro zum Bühnengerät für kurze Hinweise (Zielbild Z21; Scheibe 089) | Nicht in der Beta; bleibt B-Liste „Rollen-Chat, Souffleur-Kanal" | Projektleitung | 16.10.2026 (Prüfpunkt 2) | keiner (Standard ist Nichtbau) | Hinweis über die Alarme aus 085 mit Zielrecht der Bühne, rund 1,5 AStd | 056, 085 | offen |
 | E55 | Stufe einer Vertragsänderung, die Anfrageschemas einschränkt (`maxLength`/`maxItems` in 034a; gleiche Frage wie bei 0.3.4/0.3.6, Bautag 27.–29.09.2026; ADR 0015 nennt nur additive Änderungen als Patch) | Patch-Stufe, weil jede Grenze weit über realen Eingaben liegt und der Dienst bisher unbegrenzt annahm (Sicherheitskorrektur, SP-2); der CHANGELOG nennt die Einschränkung unter „Changed“ | Eigentümer | 27.10.2026 (vor 034a) | 27.10.2026 / 034a: ohne Antwort Patch-Stufe | Minor-Stufe statt Patch: Versionsnummer, CHANGELOG, zwei Versionsaussagen, unter 0,25 AStd | 034a, 043, 077 | offen (034a gebaut mit Standard Patch-Stufe, Vertrag 0.3.10; Bestätigung oder Minor-Stufe durch den Eigentümer steht aus) |
+| E56 | Bildnachweis für Tests, die nur gegen Keycloak im CI-Job `e2e-http` laufen (AGENTS.md R2; Codex P1 auf #82 und #87; der R11-Hook sperrt dem Agenten den Download von CI-Artefakten) | Das CI-Artefakt genügt als Screenshot-Nachweis, wenn der Nachweisabschnitt der Scheibe Artefaktname, Lauf-ID, Artefakt-ID und Digest nennt | Eigentümer | 30.09.2026 | — | Rückkehr zum committeten PNG: der Eigentümer lädt das Artefakt herunter und committet, Minuten je Scheibe | takt-030, takt-033b, 031b | beantwortet am 30.09.2026: Artefakt-Nachweis erlaubt (AGENTS.md R2 ergänzt) |
 
 ---
 
