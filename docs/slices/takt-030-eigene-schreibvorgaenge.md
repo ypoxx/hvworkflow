@@ -131,3 +131,11 @@ Nachlauf nach den Review-Befunden: `pnpm gates` auf `9b019c4` (sauberer Baum), E
 ✓ built in 1.66s
 mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 9b019c4, tree 439c14f46f0c…
 ```
+
+Nachlauf auf dem integrierten Commit `5acd1b5` (Basis mit takt-031 eingemergt), `pnpm gates` mit Postgres-Variablen
+(DB `hv_t030`), sauberer Baum, Exit 0; domain 231, web 263, api 480 grün. Wörtlicher Schluss:
+
+```
+✓ built in 1.73s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 5acd1b5, tree 8ba5cf554508…
+```
