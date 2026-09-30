@@ -170,13 +170,16 @@ dem Handler überein.
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (neue Tests H11 und H12)
 - `apps/web/e2e/002-speakers-capture.spec.ts` (nur der Kommentar in Z. 77-78, nur bei H-2b)
 - `docs/folgeliste.md` (nicht blockierende Reviewbefunde; offener 002-Befund, falls keine Hypothese bestätigt)
-- `apps/web/e2e/010c-lesezustand.spec.ts` (nur das Szenario N3, etwa Z. 1186-1223; Bauklärung unten)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (nur das Szenario N3, etwa Z. 1186-1223, und ein neues Szenario zur Rückgabe; Bauklärung unten)
+- `apps/web/src/i18n/stage.de.ts`, `apps/web/src/i18n/stage.en.ts` (nur die Nummer der Frage im Rückgabedialog; Bauklärung unten)
+- `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl, +1 für `stage.return.question`)
 
 Weitere Dateien sind Scope-Befunde (R1).
 
 ## Bauklärung
 
 - 30.09.2026 (Orchestrator): Der alte Test N3 in `010c-lesezustand.spec.ts` sicherte genau das stille Verwerfen eines Drucks während einer Lesung, das Ziel 1 entfernt. Er wird auf einen Druck umgestellt, der nach der neuen Regel wirklich nichts schreibt (zweite Aktivierung in derselben Aufgabe); die Absicht bleibt: Ein Druck ohne Schreiben hinterlässt keine Fokusmarke.
+- 30.09.2026 (Orchestrator): „Antwort zurückgeben“ wirkt auf die Frage, für die der Dialog geöffnet wurde (Taste R oder Knopf), mit deren Version im `If-Match`, nie auf eine inzwischen gezeichnete andere; der Dialog nennt ihre Nummer (Recht/Audit-Befund aus dem Review, minor 7; mit takt-039 wahrscheinlicher, weil ein Absenden während einer Lesung jetzt wirkt).
 
 ## Tests zuerst
 
@@ -323,6 +326,17 @@ wartet auf die Routen-Registrierung (Review major; dazu Review nit 8, nur Kommen
     herunterladen): `031-h11-buehne-waehrend-lesung.png`, `031-h12-umsortieren-nach-auffrischung.png`.
 - Die Review-Korrektur in `ff4beee` (H11 registriert die Route vor `fastForward`) läuft mit der CI dieses PR.
 
+**Rückgabe (Review minor 7, Recht/Audit; Bauklärung):** Der Rückgabedialog hält beim Öffnen (Taste R oder Knopf) die
+Frage fest (`id`, `version`, `number`; `returnTargetOf` in `stage/lib.ts`) und nennt ihre Nummer
+(`stage.return.question`, DE und EN). `returnAnswer` schreibt nur für sie, mit ihrer Version im `If-Match`
+(`returnWrite`); ist sie inzwischen weiter, lehnt der Dienst ab (Toast, Neuladen), nichts wird umgelenkt.
+
+- Rot vor der Korrektur (lokal): `lib.test.ts` 2 neue Tests rot (`Tests  2 failed | 30 passed (32)`, Funktionen fehlen).
+  Das neue in-process-Szenario in `010c-lesezustand.spec.ts` („takt-039 minor 7“) ist auf altem Code rot; ohne die
+  beiden Prüfungen der Nummer im Dialog zeigt es die Umlenkung selbst: `returnQuestion` ging an `fr-000f6` (die
+  inzwischen gezeichnete Frage) statt an `fr-000ci` (die, für die der Dialog geöffnet wurde).
+- Grün nach der Korrektur: `Tests  32 passed (32)` in `stage/`; das Szenario grün (siehe in-process unten).
+
 **Entscheidung zu 002 (Ziel 5):** Keine Hypothese bestätigt: H-2a, H-2b und H-2c sind nicht belegt (H12a und H12b auf
 altem Code grün, während `002` im selben Lauf rot war). Kein Produktcode für 002. Einschränkung aus dem Review: Eine
 fertige Netzantwort belegt nicht, dass React die Auffrischung schon angewandt hat; ein grünes H12a widerlegt H-2a daher
@@ -330,7 +344,7 @@ nicht. Der Befund bleibt offen mit einem Eintrag in `docs/folgeliste.md` (Abschn
 takt-039)“).
 
 **In-process (lokal, auf `ff4beee`):** `010c-lesezustand`, `abnahme`, `013-tastaturpfad`: 37 passed. Vorher auf
-`9d65427` zusätzlich `002-speakers-capture` (38 passed mit 010c, abnahme, 013) und auf `e0097ab` `003-answers-stage`.
+`9d65427` zusätzlich `002-speakers-capture` (38 passed mit 010c, abnahme, 013) und auf `e0097ab` `003-answers-stage`. Mit der Rückgabe-Korrektur (Commit „Zurückgeben wirkt auf die Frage …“): `010c-lesezustand` (mit dem neuen Szenario), `abnahme`, `013-tastaturpfad`, `090-eingaben-je-akteur`, `003-answers-stage`: 59 passed. Der Gates-Lauf dazu steht im Bericht dieses Commits; der Block unten gilt für `ff4beee`.
 
 **`pnpm gates`** auf `ff4beee` (sauberer Baum, mit den Postgres-Variablen), wörtlicher Schluss:
 

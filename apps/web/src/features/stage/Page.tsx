@@ -37,8 +37,10 @@ import {
   loadKey,
   lockHolds,
   readVerdict,
+  returnTargetOf,
+  returnWrite,
 } from './lib';
-import type { DeliverLock, KeyedRead, ReadVerdict } from './lib';
+import type { DeliverLock, KeyedRead, ReadVerdict, ReturnTarget } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -111,12 +113,13 @@ function Counter({ testId, label, value }: { testId: string; label: string; valu
 
 /** The podium's own return dialog: the reason is written under time pressure, so it gets room. */
 function ReturnDialog({
-  open,
+  target,
   busy,
   onClose,
   onSubmit,
 }: {
-  open: boolean;
+  /** takt-039, minor 7: the question the dialog was opened for; the dialog is open while there is one. */
+  target: ReturnTarget | null;
   busy: boolean;
   onClose: () => void;
   onSubmit: (reason: string) => void;
@@ -124,6 +127,7 @@ function ReturnDialog({
   const t = useT();
   const [reason, setReason] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
+  const open = target !== null;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -154,6 +158,10 @@ function ReturnDialog({
         </>
       }
     >
+      {/* takt-039, minor 7: the dialog names the question it acts on, which stays put if the stage moves on. */}
+      <p data-testid="stage-return-question" className="mb-3 font-mono text-[13px] text-ink-700">
+        {target !== null ? t('stage.return.question', { number: target.number }) : null}
+      </p>
       <label className="block">
         <span className="hv-label">{t('stage.return.reason')}</span>
         <textarea
@@ -202,7 +210,10 @@ export function StagePage() {
   // The same lock for a second activation in the same task, before React has rendered it.
   const writing = useRef<HeldLock | null>(null);
   const stageBusy = busy || delivering !== null;
-  const [returnOpen, setReturnOpen] = useState(false);
+  // takt-039, review minor 7 (Recht/Audit): the return dialog belongs to the question it was opened for (R or the
+  // button), captured then — never to a question the stage draws later. Open while there is one.
+  const [returnFor, setReturnFor] = useState<ReturnTarget | null>(null);
+  const returnOpen = returnFor !== null;
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
   // either layout (see the early return below) — not a silent stand-in for `false` any more.
   const [stageOnly, setStageOnly] = useState<boolean | null>(loadStoredStageOnly);
@@ -259,7 +270,7 @@ export function StagePage() {
     setLayoutActorId(actorId);
     // Slice 090 (review R1, finding 5): the return dialog and its reason belong to the actor who
     // opened it; the next actor starts with it closed.
-    setReturnOpen(false);
+    setReturnFor(null);
     setLoading(true);
     setStage(null);
     setShownVerdict({ actor: actorId, forbidden: false });
@@ -449,15 +460,19 @@ export function StagePage() {
     return true;
   }, [reload, t]);
 
+  /**
+   * takt-039, review minor 7 (Recht/Audit): written for the question the dialog was opened for, with its captured
+   * version. If that question has moved on meanwhile, the service refuses (412/409): toast and re-read, and the dialog
+   * stays with its question. It is never written for the question drawn now.
+   */
   const returnAnswer = useCallback(
-    async (reason: string) => {
-      const current = stageRef.current?.current;
-      if (current === null || current === undefined) return;
+    async (target: ReturnTarget, reason: string) => {
+      const write = returnWrite(target, reason);
       setBusy(true);
       try {
-        await api.returnQuestion(current.id, reason, { ifMatch: etagOf(current.version) });
-        setReturnOpen(false);
-        showToast({ tone: 'success', title: t('action.question.return'), detail: current.number });
+        await api.returnQuestion(write.questionId, write.reason, { ifMatch: write.ifMatch });
+        setReturnFor((held) => (held === target ? null : held));
+        showToast({ tone: 'success', title: t('action.question.return'), detail: target.number });
       } catch (error) {
         showProblem(error, t('toast.problem'));
         reload();
@@ -472,7 +487,7 @@ export function StagePage() {
     const onKeyDown = (event: KeyboardEvent): void => {
       // Minor 4 (review round 2): a role without `stage.read` has no current question of its own
       // to act on — `stage` is `null` (cleared above) by the time this can fire, but the shortcuts
-      // are refused outright rather than relying on `deliver`/`setReturnOpen` to no-op quietly.
+      // are refused outright rather than relying on `deliver`/`setReturnFor` to no-op quietly.
       if (forbidden) return;
       if (returnOpen) return; // the dialog owns the keyboard
       // B1 (review round 1): the queue preview (`QueuePreview` in Podium.tsx) is a dialog too, and
@@ -495,14 +510,10 @@ export function StagePage() {
         return;
       }
       if (isR) {
-        const current = stageRef.current?.current;
-        if (
-          current !== null &&
-          current !== undefined &&
-          current._actions.includes('question.return')
-        ) {
+        const target = returnTargetOf(stageRef.current?.current);
+        if (target !== null) {
           event.preventDefault();
-          setReturnOpen(true);
+          setReturnFor(target);
         }
       }
     };
@@ -612,17 +623,19 @@ export function StagePage() {
       lock={delivering}
       returning={busy}
       onNext={deliver}
-      onReturn={() => setReturnOpen(true)}
+      onReturn={(question) => setReturnFor(returnTargetOf(question))}
     />
   );
 
   const dialog = (
     <ReturnDialog
       key={actorId}
-      open={returnOpen}
+      target={returnFor}
       busy={stageBusy}
-      onClose={() => setReturnOpen(false)}
-      onSubmit={(reason) => void returnAnswer(reason)}
+      onClose={() => setReturnFor(null)}
+      onSubmit={(reason) => {
+        if (returnFor !== null) void returnAnswer(returnFor, reason);
+      }}
     />
   );
 

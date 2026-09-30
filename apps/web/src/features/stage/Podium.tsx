@@ -36,7 +36,8 @@ interface PodiumProps {
    * drawn with (takt-039) and returns whether a write was started (slice 010c, Ziel 6: N3 of takt-008's Nachprüfung).
    */
   onNext: (question: Question) => boolean;
-  onReturn: () => void;
+  /** takt-039, minor 7: receives the question the button was drawn with; the dialog acts on it alone. */
+  onReturn: (question: Question) => void;
 }
 
 /**
@@ -332,7 +333,7 @@ export function Podium({ stage, lock, returning, onNext, onReturn }: PodiumProps
             variant="secondary"
             testId="stage-return"
             disabled={busy}
-            onClick={onReturn}
+            onClick={() => onReturn(current)}
             hint={<Kbd>{t('stage.key.return')}</Kbd>}
           >
             <Undo2 size={18} strokeWidth={1.75} aria-hidden="true" />

@@ -16,6 +16,8 @@ import {
   nextButton,
   NO_VERDICT,
   readVerdict,
+  returnTargetOf,
+  returnWrite,
   shownQuestion,
 } from './lib';
 import type { DeliverLock, KeyedRead } from './lib';
@@ -224,5 +226,27 @@ describe('deliverTarget, lockHolds, nextButton (takt-039)', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * takt-039, review minor 7 (Recht/Audit): "Antwort zurückgeben" writes for the question the dialog was opened on, with
+ * that question's version, never for a question drawn later.
+ */
+describe('returnTargetOf, returnWrite (takt-039, minor 7)', () => {
+  const a = staged('qa', 3, ['question.deliver', 'question.return']);
+
+  it('the dialog opened for F-A writes for F-A with its version after the stage moved on to F-B', () => {
+    const opened = returnTargetOf(a);
+    expect(opened).toEqual({ id: 'qa', version: 3, number: 'F-qa' });
+    // The stage now draws F-B (qb, version 7); the captured target does not follow it, and the write takes nothing
+    // from the drawn stage (the in-process e2e in 010c proves the same through the page).
+    expect(returnWrite(opened!, 'Grund')).toEqual({ questionId: 'qa', reason: 'Grund', ifMatch: '"v3"' });
+  });
+
+  it('no target without question.return in _actions, and none without a question', () => {
+    expect(returnTargetOf(staged('qa', 3, ['question.deliver']))).toBeNull();
+    expect(returnTargetOf(null)).toBeNull();
+    expect(returnTargetOf(undefined)).toBeNull();
   });
 });

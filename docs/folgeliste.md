@@ -308,14 +308,10 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
   derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
   → **043**
-- takt-039 Review minor 7 (vorbestehend, durch takt-039 stärker exponiert) · **Recht/Audit prüfen** ·
-  `apps/web/src/features/stage/Page.tsx:452-458` (`returnAnswer`) · die Rückgabe wirkt auf die zuletzt gezeichnete Frage
-  (`stageRef` beim Absenden), nicht auf die, für die der Dialog geöffnet wurde; rückt die Bühne bei offenem Dialog weiter
-  (fremdes „Vorgelesen“, Takt), wird die Rückgabe mit Begründung für eine andere Frage geschrieben, und das `If-Match`
-  passt, weil es die Version der neuen Frage trägt · Frage beim Öffnen festhalten und nur auf sie schreiben; Wirkung auf
-  Freigabe und Protokoll (Audit) prüfen. Kein Minor: eine Rückgabe auf die falsche Frage ist ein fachlich falscher
-  Protokolleintrag.
-  → Orchestrator (Einplanung offen)
+- ~~takt-039 Review minor 7 · **Recht/Audit** · `apps/web/src/features/stage/Page.tsx` (`returnAnswer`) · die Rückgabe
+  wirkte auf die zuletzt gezeichnete Frage statt auf die, für die der Dialog geöffnet wurde.~~
+  → erledigt in **takt-039** (Frage beim Öffnen festgehalten, `returnTargetOf`/`returnWrite` in `stage/lib.ts`, Dialog
+  nennt die Nummer; Nachweis in der Spec)
 - takt-032 R1 minor 4 · `apps/web/src/api/http.ts` setzt `lastWriteEtag()` vor dem Lesen des Rumpfs; `ClassifyDialog`
   (schreibt auf die Frage) ist beim Erfassen nicht gesperrt · Fix in `http.ts`, Sperre im Dialog.
 - takt-032 R1 minor 7 · `speakers/Page.tsx` `run` · ein Schreiben, das während eines anderen läuft, wird ohne Hinweis

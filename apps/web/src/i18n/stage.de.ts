@@ -35,6 +35,7 @@ export const stageDe = {
   'stage.return.title': 'Antwort zurückgeben',
   'stage.return.body':
     'Die Einzelfrage geht mit Begründung zurück in die Bearbeitung und verlässt die Bühne.',
+  'stage.return.question': 'Frage {number}',
   'stage.return.reason': 'Begründung',
   'stage.return.placeholder': 'Warum kann die Antwort nicht vorgelesen werden?',
   'stage.toast.delivered': 'Vorgelesen',

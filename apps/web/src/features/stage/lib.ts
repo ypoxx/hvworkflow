@@ -2,6 +2,7 @@
  * Helpers of the podium. Deliberately tiny and local: the podium is a different device (design
  * principle 10) and must not start depending on the backlog's machinery.
  */
+import { etagOf } from '@hv/domain';
 import type { AnswerVersion, Question, StageView } from '@hv/domain';
 
 /** Wall clock of the hall, 24 hours, zero padded — the form an approval is quoted in. */
@@ -172,4 +173,32 @@ export function deliverTarget(
 ): Question | null {
   const button = nextButton(question, lock, returning);
   return button.drawn && !button.locked && question !== null && question !== undefined ? question : null;
+}
+
+/**
+ * takt-039, review minor 7 (Recht/Audit): the question a return dialog was opened for (R or the button), captured at
+ * that moment. The return is written for it alone; a question drawn later never takes its place.
+ */
+export interface ReturnTarget {
+  readonly id: string;
+  readonly version: number;
+  readonly number: string;
+}
+
+/** The target of a return dialog opened on `question`: only where `_actions` offers the return (never by role). */
+export function returnTargetOf(question: Question | null | undefined): ReturnTarget | null {
+  if (question === null || question === undefined) return null;
+  if (!question._actions.includes('question.return')) return null;
+  return { id: question.id, version: question.version, number: question.number };
+}
+
+/**
+ * The write of a return: for the captured question, with the captured version in `If-Match`. If that question has moved
+ * on meanwhile, the service refuses (412/409) and the podium shows it and reads again; nothing is retargeted.
+ */
+export function returnWrite(
+  target: ReturnTarget,
+  reason: string,
+): { questionId: string; reason: string; ifMatch: string } {
+  return { questionId: target.id, reason, ifMatch: etagOf(target.version) };
 }
