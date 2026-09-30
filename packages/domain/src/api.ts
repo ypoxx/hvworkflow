@@ -13,7 +13,8 @@
 import type { DomainEvent, NewEvent, ReadEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
-import { emptyState, reduce, type State } from './state.js';
+import { emptyState, isOnStage, reduce, type State } from './state.js';
+import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamStates } from './stream.js';
 import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
 import type {
@@ -42,6 +43,7 @@ import type {
   SpeakerRegistration,
   SpeakerUpdate,
   StageView,
+  StreamChange,
   Unit,
   WriteOptions,
 } from './types.js';
@@ -125,8 +127,12 @@ export interface HvApi {
   /** Defaults to CORPUS_DEMO. `roundSizes` is a domain-only option; the contract names `questions` and `seed`. */
   seedDemo(options?: { questions?: number; seed?: number; roundSizes?: readonly number[] }): Promise<Meeting>;
 
-  /** In-process realtime: called after every append. The HTTP adapter maps this to SSE/polling. */
-  subscribe(listener: (events: ReadEvent[]) => void): () => void;
+  /**
+   * In-process realtime: called after every append. The HTTP adapter maps this to SSE/polling.
+   * R-PERM-04 (slice 035a): a reader with `event.read` gets the masked events; everyone else gets
+   * `[]` plus, when something readable changed, one `change` signal without content.
+   */
+  subscribe(listener: (events: ReadEvent[], change?: StreamChange) => void): () => void;
 }
 
 export interface InProcessApiOptions {
@@ -297,7 +303,14 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     state.lastSeq = store.lastSeq();
   };
   if (options.meetingId === undefined) refreshAliasState();
+  /** The projections `subscribe` reads per meeting: the scoped one, or every alias projection. */
+  const meetingStates = (): StreamStates =>
+    options.meetingId !== undefined ? new Map([[options.meetingId, state]]) : aliasStates;
+  // "Before" for R-PERM-04 (slice 035a, m6): a copy of the items the batch touches, taken here,
+  // before the reduction below; this listener runs before every `subscribe` listener.
+  let beforeBatch: StreamStates = new Map();
   store.subscribe((events) => {
+    beforeBatch = snapshotBefore(meetingStates(), events);
     if (options.meetingId === undefined) {
       for (const e of events) {
         if (!e.meetingId) continue;
@@ -319,17 +332,12 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   });
 
   const now = (): string => clock().toISOString();
+  // A synthetic demo identity stays as it is; a session uses the oldest active grant in this meeting
+  // (`resolveMeetingActor`, stream.ts — the same resolution the stream uses per meeting).
   const actor = (): Actor => {
-    const current = options.actor();
-    const history = [...state.roleAssignments.values()].filter((assignment) => assignment.subjectId === current.id);
-    if (history.length === 0 && current.assignmentScoped !== true) return current; // synthetic demo identity
-    // The projection retains event order; a session uses the oldest active grant in this meeting.
-    const assignment = history.find((item) => (current.assignmentScoped === true || item.role === current.role) && !item.revokedAt &&
-      (item.expiresAt === undefined || Date.parse(item.expiresAt) > clock().getTime()) && state.meeting?.status !== 'closed');
-    if (!assignment) throw new ApiProblem(403, 'Forbidden', 'Role assignment is no longer active.', 'R-PERM-01');
-    return { id: current.id, role: assignment.role, assignmentScoped: true,
-      ...(assignment.personId !== undefined ? { personId: assignment.personId } : {}),
-      ...(assignment.unitId !== undefined ? { unitId: assignment.unitId } : {}) };
+    const resolved = resolveMeetingActor(state, options.actor(), clock);
+    if (!resolved) throw new ApiProblem(403, 'Forbidden', 'Role assignment is no longer active.', 'R-PERM-01');
+    return resolved;
   };
 
   const viewRoleAssignment = (assignment: RoleAssignment): RoleAssignment => ({ ...assignment,
@@ -337,28 +345,6 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     ...(assignment.revokedBy !== undefined ? { revokedBy: { id: assignment.revokedBy.id, role: assignment.revokedBy.role } } : {}),
   });
   const viewActor = (source: Actor): Actor => ({ id: source.id, role: source.role });
-  // Nested actors and person blocks may sit anywhere in a payload (approval, clearance, answer
-  // versions), so the strip is recursive; `id` and `role` of a nested actor stay visible.
-  const MASKED_KEYS: ReadonlySet<string> = new Set(['displayName', 'organisation', 'pii', 'personId']);
-  const maskValue = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(maskValue);
-    if (value !== null && typeof value === 'object') {
-      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => !MASKED_KEYS.has(key)).map(([key, item]) => [key, maskValue(item)]));
-    }
-    return value;
-  };
-  const maskEvent = (event: DomainEvent): ReadEvent => {
-    if (!event.hash) throw new Error(`Event seq ${event.seq}: integrity check failed (source hash missing).`);
-    const { personId: _personId, hash: sourceHash, prevHash: _prevHash,
-      commandId: _commandId, commandOperation: _commandOperation, commandResource: _commandResource,
-      ...visible } = event;
-    const { displayName: _actorName, personId: _actorPerson, ...eventActor } = event.actor;
-    const payload = maskValue(event.payload) as Record<string, unknown>;
-    if (event.type === 'IdempotencyRecorded') delete visible.idempotencyKey;
-    return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
-  };
-
   const viewSpeaker = (s: SpeakerRecord, source: State = state): Speaker => ({
     ...s,
     ...(can(actor(), 'question.identity.reveal').allow && s.personId !== undefined && source.persons.has(s.personId)
@@ -1192,7 +1178,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     async getStage() {
       requireReadPermission('getStage');
       const staged = [...state.questions.values()]
-        .filter((q) => q.status === 'staged')
+        .filter(isOnStage)
         .sort((a, b) => (a.stagePosition ?? 0) - (b.stagePosition ?? 0))
         .map((question) => viewQuestion(question));
       const [current, ...queue] = staged;
@@ -1225,24 +1211,30 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       return this.getMeeting();
     },
     subscribe(listener) {
-      // Festlegung 5: the 13th read method. Payloads only for `event.read`; everyone else gets `[]`
-      // as a bare change signal (the interface only reacts to it, `api/useApiVersion.ts`). Checked
-      // fresh against the *current* actor on every delivery, because the demo role switcher changes
-      // `actor()` at runtime — a subscription started under one role must not keep leaking events
-      // once the demo user switches to a role without `event.read`.
+      // Festlegung 5 with R-PERM-04 (slice 035a): checked fresh against the *current* actor on every
+      // delivery, because the demo role switcher changes `actor()` at runtime. The same function as
+      // the SSE service decides: `event.read` gets the masked events (a broken event is skipped and
+      // reported, `onIntegrityError`), everyone else `[]` plus at most one `change`.
       return store.subscribe((events) => {
-        if (!can(actor(), 'event.read').allow) { listener([]); return; }
-        // A broken event must not abort the store's notification loop (other subscribers, the
-        // append that already persisted). It is skipped here; `listEvents` reports it by seq.
-        const visible: ReadEvent[] = [];
-        for (const event of events) {
-          try {
-            visible.push(maskEvent(event));
-          } catch (error) {
-            try { options.onIntegrityError?.(error instanceof Error ? error : new Error('Event integrity check failed.')); } catch { /* a faulty callback must not break delivery */ }
-          }
+        let reader: Actor;
+        try {
+          reader = actor();
+        } catch {
+          // No active assignment (e.g. after a switch in the demo): a bare signal, and the store's
+          // notification loop (other listeners, the append that already persisted) goes on (m6).
+          listener([]);
+          return;
         }
-        listener(visible);
+        // Without a meeting projection yet, the key matches no event's meetingId: `event` only.
+        const readerActors = new Map([[options.meetingId ?? state.meeting?.id ?? '', reader]]);
+        const messages = visibleMessages(readerActors, events, beforeBatch, meetingStates(), {
+          can,
+          ...(options.onIntegrityError !== undefined ? { onIntegrityError: options.onIntegrityError } : {}),
+        });
+        const visible = messages.flatMap((m) => (m.kind === 'event' ? [m.event] : []));
+        const change = messages.find((m) => m.kind === 'change');
+        if (change?.kind === 'change') listener(visible, change.change);
+        else listener(visible);
       });
     },
   };

@@ -203,6 +203,29 @@ const OTHER_RULES: readonly RuleEntry[] = [
     },
   },
   {
+    ruleId: 'R-PERM-04',
+    kind: 'Recht',
+    description:
+      'Stream visibility (stream.ts, slice 035a): decided per event, per reader, with the rights at ' +
+      'delivery time, always through can(). A reader holding event.read in any active meeting gets ' +
+      'the masked event; every other reader gets at most one change signal per batch without content: ' +
+      'topics it may read and ids of items it may read before or after the batch (in a catch-up: now), ' +
+      'counters without an id. A catch-up in whose range an item may have left the reader\'s scope resets.',
+    legalRef: {
+      source: 'Prozess',
+      citation:
+        'docs/adr/0014-realtime-sse.md:19-20 ("Rechteprüfung wie bei den Leserechten — kein Ereignis, ' +
+        'das die lesende Person nicht lesen darf"); docs/sicherheit/bedrohungsmodell.md:202 (T-G1-I-09, ' +
+        'SSE-Strom als eigene Leseschnittstelle). Herleitung der Sichtbarkeitstabelle: ' +
+        'docs/slices/035a-sse-domaene-vertrag.md, Entscheidung 2 (Freigabe: Eigentümerfrage 1). Keine ' +
+        'Fundstelle in Recherche oder Ist-Analyse; eine Architektur- und Sicherheitsentscheidung, keine ' +
+        'externe Vorgabe.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
     ruleId: 'R-AUTH-01',
     kind: 'Guard',
     description: 'A session-cookie write requires its non-empty, matching CSRF token before any workflow event is appended.',

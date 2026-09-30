@@ -249,6 +249,14 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-033 Nachprüfung Codex P1 nit · Postgres-Tests takt-033 · pg-Warnung „Calling client.query() when the client is
   already executing a query“ (alter wie neuer Stand) · Ursache vor pg@9 klären.
 
+## Strom-Domäne (aus 035a)
+
+- 035a Bau · `packages/domain/src/events.ts:150` · der Kommentar zu `ReadEvent` nennt `maskEvent (api.ts)`, die
+  Funktion liegt seit 035a in `stream.ts` · Verweis bei der nächsten Änderung an `events.ts` anpassen.
+- 035a Bau · `packages/domain/src/api.ts` (`idempotent`) · kein Befehl auf eine Frage erzeugt heute `IdempotencyRecorded`
+  mit der Frage als `subjectId` (jeder Fragenbefehl hängt ein Ereignis an); Test 2b deckt den Fall über ein direkt
+  angehängtes Ereignis ab · bei einem künftigen No-op-Befehl den 2b-Lauf auf den echten Befehl umstellen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf

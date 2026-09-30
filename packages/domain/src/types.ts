@@ -352,3 +352,20 @@ export interface WriteOptions {
   ifMatch?: string;
   idempotencyKey?: string;
 }
+
+/* ---------- stream (slice 035a, contract 0.3.11) ---------- */
+
+/** Areas a change signal names (contract `StreamTopic`); working term "Thema", not a glossary entry. */
+export type StreamTopic = 'meeting' | 'speakers' | 'contributions' | 'questions' | 'stage' | 'roles';
+
+/**
+ * A change signal without content (contract `StreamChange`, R-PERM-04): the areas that changed and,
+ * where the reader may read them, the ids of the changed items. `seq` is the last covered event.
+ */
+export interface StreamChange {
+  seq: number;
+  topics: StreamTopic[];
+  subjects?: string[];
+  meetingId?: string;
+  replay?: true;
+}

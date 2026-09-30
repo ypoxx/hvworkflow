@@ -48,6 +48,15 @@ export function emptyState(): State {
   };
 }
 
+/**
+ * The stage predicate (Bühne, slice 035a m10): a question is on the podium queue. The single place
+ * that names the stage status — `getStage` (api.ts), the stream visibility (stream.ts) and the
+ * counters below all ask this, so there is no second status literal for the stage.
+ */
+export function isOnStage(q: Pick<QuestionRecord, 'status'>): boolean {
+  return q.status === 'staged';
+}
+
 /** Recompute the aggregate counters shown in the header and on the podium. */
 export function refreshCounts(state: State): void {
   if (!state.meeting) return;
@@ -57,7 +66,7 @@ export function refreshCounts(state: State): void {
   const byStatus = Object.fromEntries(QUESTION_STATUSES.map((s) => [s, 0])) as Record<QuestionStatus, number>;
   for (const q of state.questions.values()) {
     byStatus[q.status] += 1;
-    if (q.status === 'staged') staged++;
+    if (isOnStage(q)) staged++;
     else if (q.status === 'delivered' || q.status === 'closed') delivered++;
     if (!['closed', 'withdrawn', 'merged', 'delivered'].includes(q.status)) open++;
   }
