@@ -404,6 +404,23 @@ Erfassung, `norole` ohne aktive Rolle); (5) lokales
 Postgres: Owner legt Datenbanken an; (6) Startzeile wörtlich; (1), (7) und (8) siehe oben; (9) `pnpm -r typecheck` erfasst die
 e2e-Dateien; (10) die heutigen CI-Laufzeiten habe ich nicht ablesen können (kein `gh`, keine Web-Abfrage in der Bauumgebung).
 
+### Nachweis nach dem ersten CI-Lauf
+
+Erster PR-CI-Lauf `36654542400` (PR #80, Job `e2e-http`): Keycloak-Digest trägt, Setup mit 8 Anmeldungen, `030` ×4, H1 bis H5 und H7
+grün, Startzeile passt, Laufzeit 2,1 min. Rot waren H6 und H8; Ursachen und Korrektur (Commit `361389f`):
+
+- **H6:** der Test klickte `nav-capture` nach dem 401 und wartete 90 s. Die Seite kann nach der Sperre schon von selbst zur Anmeldung
+  gewechselt sein (Polling alle 30 s endet in `onUnauthorized`), dann gibt es den Eintrag nicht mehr. Jetzt: `/auth/me` 401, dann
+  `page.reload()` und direktes Warten auf die Überschrift „Anmelden“, ohne Klick; Timeout unverändert.
+- **H8:** im HTTP-Modus gibt es kein Push; ein eigener Schreibvorgang löst kein Neuladen aus, die Liste aktualisiert sich erst mit dem
+  30-s-Polling (`api/http.ts`, `useApiVersion`). Der neue Name erschien deshalb nicht (Produktverhalten, hier nicht geändert). Der Test wartet
+  jetzt auf die Antwort der Registrierung (`POST /v1/speakers`, Status 201, bei Abweichung meldet die Prüfung nur den Status) und lädt neu.
+  Dasselbe gilt für den Redebeitrag (`POST /v1/contributions`, 201, dann Neuladen), sonst erscheint `capture-free-input` nie. Ungeprüft in
+  CI bis zum nächsten Lauf.
+
+Lokal auf `361389f`: `CONTRACT_GATE_STRICT=1 pnpm gates` Exit 0, `node --test scripts/e2e-http-031.test.mjs` 28 bestanden, Typecheck und
+Lint (`oxlint src`, nur die vorhandenen Warnungen), `E2E_HTTP_IDP=none pnpm e2e:http` 7 bestanden.
+
 ## Bericht (nach Bau ausfüllen)
 
 ```
