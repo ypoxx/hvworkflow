@@ -85,6 +85,8 @@ export const STREAM_REPLAY_MAX = 1_000;
 /** Queued, not yet sent live messages per connection (count and bytes); beyond, the connection closes. */
 export const STREAM_BACKLOG_MESSAGES = 256;
 export const STREAM_BACKLOG_BYTES = 1_048_576;
+/** A closing `end` or `reset` not taken by the reader within this time: the stream is aborted (no socket piles up). */
+export const STREAM_END_DRAIN_MS = 5_000;
 /** `Retry-After` of the stream's own 429 and 503 answers (within the contract's 1 to 60). */
 export const STREAM_RETRY_AFTER_SECONDS = 30;
 /** Reload tick of the distributor while streams are open (writes of other instances). */
@@ -105,6 +107,7 @@ export interface StreamLimits {
   replayMax: number;
   backlogMessages: number;
   backlogBytes: number;
+  endDrainMs: number;
 }
 
 export const DEFAULT_STREAM_LIMITS: Readonly<StreamLimits> = {
@@ -116,6 +119,7 @@ export const DEFAULT_STREAM_LIMITS: Readonly<StreamLimits> = {
   replayMax: STREAM_REPLAY_MAX,
   backlogMessages: STREAM_BACKLOG_MESSAGES,
   backlogBytes: STREAM_BACKLOG_BYTES,
+  endDrainMs: STREAM_END_DRAIN_MS,
 };
 
 /** Only a lower positive value is taken: a test may tighten a stream limit, never widen it. */

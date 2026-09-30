@@ -41,7 +41,7 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
     try { options.onWindow?.(phase, occasion); } catch { /* a test hook never breaks a check */ }
   };
 
-  return {
+  const checker: SessionChecker = {
     check(occasion, sessionKey, read, alive = () => true) {
       const key = `${occasion}\u0000${sessionKey}`;
       const joined = running.get(key);
@@ -49,7 +49,7 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
         if (value !== GONE) return value;
         // The check was dropped because nobody waited when it got its slot. A caller that still waits (it
         // joined in that window) checks anew instead of reading "invalid" (re-check nit).
-        return alive() ? this.check(occasion, sessionKey, read, alive) : false;
+        return alive() ? checker.check(occasion, sessionKey, read, alive) : false;
       });
       if (joined) {
         joined.callers.push(alive);
@@ -81,4 +81,5 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
       return answer(run);
     },
   };
+  return checker;
 }

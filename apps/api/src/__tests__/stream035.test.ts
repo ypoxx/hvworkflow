@@ -935,6 +935,66 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(200);
   });
 
+  it('R1f a live batch stalled mid-write while the heartbeat check hangs: no further frame before end session (live per-frame wait)', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 150 } });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await reader.nextMessage();
+    await sleep(50);
+    const frozen = h.head();
+    h.hooks.load = (log) => log.slice(0, frozen);
+    reader.hold();
+    for (let i = 0; i < 6; i++) await assignFiller(h, 'admin2', OTHER);
+    h.hooks.load = undefined;
+    await assignFiller(h, 'admin2', OTHER);
+    await eventually(() => h.hooks.appliedHead === h.head(), 3_000, 'batch applied');
+    await sleep(100); // the batch's own session check has passed; the first frame waits in the transport
+    let openGate!: () => void;
+    h.hang.until = new Promise<void>((resolve) => { openGate = resolve; });
+    h.hang.token = token('admin');
+    const before = reader.blocks.filter(isEvent).length;
+    h.sessions.delete(token('admin'));
+    await sleep(400); // a heartbeat starts the direct check, which hangs at the gate
+    reader.resume();
+    await sleep(300);
+    openGate();
+    const rest = await reader.rest(3_000);
+    expect(reader.blocks.filter(isEvent).length - before).toBeLessThanOrEqual(1);
+    expect(rest.at(-1)!.data).toEqual({ reason: 'session' });
+  });
+
+  it('R1g an end the reader never takes: the stream is aborted after the drain time (no socket piles up)', async () => {
+    const h = await harness({ session: true, streamLimits: { lifetimeMs: 200, endDrainMs: 300 } });
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: asSession('admin') });
+    expect(stalled.status).toBe(200);
+    await sleep(1_000);
+    const reader = track(new StreamReader(stalled));
+    await reader.rest(2_000);
+    expect(reader.closed).toBe(true);
+    // Aborted: the queued `end` was dropped with the stream instead of waiting for a reader forever.
+    expect(reader.blocks.some((b) => b.event === 'end')).toBe(false);
+  });
+
+  it('R6c a check dropped because its only caller died: a caller joining at that moment gets a real read', async () => {
+    const checker = createSessionChecker({ concurrency: 1 });
+    let releaseFirst!: (valid: boolean) => void;
+    const first = checker.check('b:1', 'k1', () => new Promise<boolean>((resolve) => { releaseFirst = resolve; }));
+    let reads = 0;
+    const read = async (): Promise<boolean> => { reads += 1; return true; };
+    let fresh: Promise<boolean> | undefined;
+    // The only caller has died; at the moment the check asks, a fresh caller for the same key arrives.
+    const dead = checker.check('b:1', 'k2', read, () => {
+      fresh ??= checker.check('b:1', 'k2', read, () => true);
+      return false;
+    });
+    await eventually(() => typeof releaseFirst === 'function', 1_000, 'first read started');
+    releaseFirst(true);
+    await first;
+    expect(await dead).toBe(false);
+    expect(fresh).toBeDefined();
+    expect(await fresh).toBe(true);
+    expect(reads).toBe(1);
+  });
+
   // ---- real server ---------------------------------------------------------------------------------------------
   it('real server: a stream stays open beyond 30 s with the serverOptions of server.ts and receives heartbeats', async () => {
     const h = await harness({ streamLimits: { heartbeatMs: 5_000 } });

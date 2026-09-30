@@ -143,8 +143,7 @@ jede andere Abweichung zu `end {roles_changed}`, und aus diesem Stapel wird nich
 Registrierung, nicht erst ab live: Heartbeat- und Rotationszeitgeber starten mit der Registrierung. Sitzung und Rechte
 werden je Heartbeat direkt geprüft, solange ein Nachlauf läuft oder ein Schreibvorgang hängt (Gegendruck, auch im
 Livebetrieb); jedes weitere Frame wartet auf eine laufende Prüfung. Ein Nachlauf oder ein hängender Stapel verlängert
-die Zeit ohne Prüfung also nicht. Restrisiko: ein Frame, das vor der Abmeldung bereits an den Transport übergeben war,
-erreicht den Leser noch vor dem `end` (Tests R1d/R1e erlauben höchstens eines). Umgesetzt in 035b (`1bcfd4f`,
+die Zeit ohne Prüfung also nicht. Restrisiko: Frames eines Stapels, der vor der Abmeldung bereits geprüft war, können bis zur nächsten Heartbeat-Prüfung noch hinausgehen (höchstens ein Heartbeat-Intervall und höchstens ein Stapel innerhalb der Rückstaugrenze); danach höchstens das eine Frame, das bereits an den Transport übergeben war (Tests R1d/R1e). Umgesetzt in 035b (`1bcfd4f`,
 `28f7af3`): Zeitgeber ab `hub.register`, direkte Prüfung je Heartbeat bei Nachlauf oder hängendem Schreiben, Warten je
 Frame (`catchUpMayGoOn`), Rechte unmittelbar vor jedem geschriebenen Stapel (`rightsNow`); Tests R1, R1d, R1e, R2.
 

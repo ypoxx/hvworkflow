@@ -355,7 +355,9 @@ class Connection implements HubConnection {
   /**
    * Ends the connection once: the queue is dropped (a terminal message has priority), the slot and the
    * registration are released at once. With a frame: written after anything already on its way, then
-   * the stream is closed. Without: the stream is aborted (client gone, backlog over the limit).
+   * the stream is closed; a reader that does not take it within `endDrainMs` gets the stream aborted, so a
+   * reader that never reads cannot keep sockets and buffered frames outside the limits. Without a frame: the
+   * stream is aborted (client gone, backlog over the limit).
    */
   close(frame: Frame | null): void {
     if (this.state === 'closed') return;
@@ -366,8 +368,10 @@ class Connection implements HubConnection {
     this.s.hub.unregister(this);
     this.s.release();
     if (frame !== null) {
+      const drain = setTimeout(() => { this.s.writer.abort().catch(() => undefined); }, this.s.limits.endDrainMs);
+      const settled = (): void => clearTimeout(drain);
       this.s.writer.write(frame.bytes).catch(() => undefined);
-      this.s.writer.close().catch(() => undefined);
+      this.s.writer.close().then(settled, settled);
     } else {
       this.s.writer.abort().catch(() => undefined);
     }
