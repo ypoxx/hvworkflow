@@ -3,7 +3,7 @@
 **Status:** spec · **Risikoklasse:** hoch (Integrität der Ereigniskette, Produktivpersistenz, Auflösung des Akteurs; Leitplanken §4) · **Lanes:** service, domain · **Perspektive:** Security (Integrität), Betrieb
 **Rolle:** service-implementer; Review in frischem Kontext mit Perspektive Security, Lesebefund der Spec vor dem Bau (Leitplanken §4, hoch; nie gebündelt), Modell nur in `.claude/agents/`
 **Regeln:** AGENTS.md R2, R3, R7 (append-only), R8, R11, R12; ADR 0011 (Umschlag v2, Hash-Kette); Scheibe 024 (Kettenprüfung beim Laden), 027 (Postgres, Dienstrolle nur INSERT/SELECT, Prüfung nach Neustart), 034a (Zeitbudgets); Bedrohungsmodell T-G2-T-01, T-G2-R-01, SG4
-**Depends on:** takt-030 (PR #82, Branch `claude/takt-030-eigene-schreibvorgaenge`, **noch nicht gemergt**). Im Code ist diese Scheibe unabhängig. Die Abhängigkeit betrifft die Reihenfolge und den späteren Nachweis: takt-030 macht jedes eigene Schreiben im Web zu einem zusätzlichen Neuladen, also zu mehr Lesen am Dienst, und die Zeitgrenze aus 031b (Abnahmekriterium 6) wird auf der Basis mit takt-030 gemessen. Bau von der Basis nach dem Merge von takt-030.
+**Depends on:** takt-030 ist keine Code-Abhängigkeit: diese Dienst-Scheibe wurde auf der aktuellen Basis ohne takt-030 gebaut; takt-030 betrifft nur die Reihenfolge und den späteren Nachweis aus Abnahmekriterium 6.
 **Aufgeteilt:** Der Web-Teil (kein Doppelabruf beim Einhängen, `useApiVersion`) steht in `docs/slices/takt-033b-einhaengen-ohne-doppelabruf.md` (mittel). Beide Teile haben verschiedene Lanes, Risikoklassen und Reviewperspektiven und sind im Code unabhängig.
 **Quellen-IDs:** Diagnoselauf für Scheibe 031b, gemessen gegen Postgres am 30.09.2026 (2069 Ereignisse, lokal); E41 (Performance-Ziel D9, offen); `apps/web/e2e/abnahme.spec.ts:257` (bestehende Grenze 1500 ms)
 
@@ -201,8 +201,28 @@ anhalten.
    (a) still annehmen wie heute, (b) annehmen und je Vorkommen eine feste stderr-Zeile ohne Inhalt schreiben, (c)
    Fachanfragen verweigern bis zum Neustart. Standard bis zur Entscheidung: (b). Eine Rücksicherung geht in der Regel
    mit einem Neustart einher, dann ist der Cache ohnehin leer.
+   **Gebaut ist der Standard (b)**, die Entscheidung bleibt beim Owner offen: feste Zeile
+   `HV-Tool API: stored event history changed or was shortened; the valid chain was accepted.` je Vorkommen, ohne
+   `seq`, ID oder Wert; ausgelöst, wenn ein vorhandener Cache wegen geänderten Präfix-Digests oder wegen
+   `max(seq)` unter dem gecachten Ende vollständig geprüft wurde und die Kette gültig ist.
 2. Reicht der Anteil ohne Projektion für die Grenze aus 031b? Erst die Messung aus Akzeptanzkriterium 3 zeigt es. Falls
    nein, folgt ein eigener Takt für den Cache der Projektion.
+
+## Umsetzungshinweise (Bau)
+
+- **Digest-Bindung.** Das Log wird aus `envelope::text` geparst (wie der jsonb-Parser des Treibers: `JSON.parse`); der
+  Zeilen-Digest entsteht in Node über genau diese Bytes und in Postgres über dieselbe Kodierung
+  (`<UTF-8-Länge>:<Text>` bzw. `N` für NULL je Spalte, sha256 je Zeile, sha256 über die Folge). So bezieht sich ein
+  Prüfpunkt immer auf die Bytes, aus denen das gecachte Log stammt, auch unter READ COMMITTED.
+- **Ältere Prüfpunkte.** Der Lader liest den Cache, bevor die Transaktion ihre erste Anweisung sendet; der Snapshot
+  der Anfrage ist deshalb nie älter als ihr Cache-Eintrag. `max(seq)` unter dem gecachten Ende heißt also: Zeilen
+  sind verschwunden, und das wird nach (c)/(d) vollständig geprüft. Die Liste von höchstens 16 Prüfpunkten und die
+  Wahl des größten passenden (`selectCheckpoint`) sind gebaut und getestet; in dieser Reihenfolge ist der gewählte
+  Prüfpunkt stets das Ende.
+- **Zähler.** `verifiedEventCount()` (Domäne, öffentlich, monoton) zählt die von `verifyEventChain` gehashten
+  Ereignisse; der Test-Haken `testHooks.chain` meldet je Laden die Differenz um die synchronen Prüfaufrufe.
+- **Typ.** `Persistence.load()` liefert jetzt `readonly DomainEvent[]`, damit ein versiegeltes Log ohne Kopie
+  übergeben werden kann.
 
 ## Nachweis
 
