@@ -1,5 +1,5 @@
 /**
- * Bühne — the view of the person who reads the answers out.
+ * Bühne — the view of the person who reads the answers out. (diag: base e2e-http probe, not for merge)
  *
  * It is a different device (design principle 10): large type, maximum contrast, two keys, and in
  * "Nur Bühne" no navigation at all. The shell may not be touched from a feature, so podium-only
