@@ -249,6 +249,25 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-033 Nachprüfung Codex P1 nit · Postgres-Tests takt-033 · pg-Warnung „Calling client.query() when the client is
   already executing a query“ (alter wie neuer Stand) · Ursache vor pg@9 klären.
 
+## Bühne und Wortmeldeliste (aus takt-039)
+
+- takt-039 Befund 2 (offen) · `apps/web/e2e/002-speakers-capture.spec.ts:83-84`, `apps/web/src/features/speakers/Page.tsx:334-337` ·
+  Umsortieren per Tastatur: ArrowDown blieb im Projekt `http` ohne Wirkung („Position 6 von 7“), 2 rot in 6 HTTP-Läufen;
+  Ursache offen, H-2a/H-2b/H-2c durch H12 nicht belegt (Messwerte im „Nachweis“ von takt-039) · nächster Schritt: ein
+  Produktsignal „Liste aufgefrischt“ (danach kann H12a auf die angewandte Auffrischung warten) oder den Zugbeginn
+  (`onDragStart`, Messungen des Sensors) im Fehlerfall aufzeichnen.
+- takt-039 Review minor 3 · `apps/web/src/features/stage/lib.test.ts:199-206` · Test (c) ist eine Tautologie
+  (`shownQuestion(null)` ist `null`); der Schutz nach Akteurwechsel (`setStage(null)` im Render, `Page.tsx`) ist damit
+  nicht geprüft · Komponenten- oder e2e-Test, der nach einem Akteurwechsel keinen Druck auf den vorigen Datensatz zulässt.
+- takt-039 Review minor 4 · `apps/web/src/features/stage/Podium.test.tsx:53-66` · der Test ruft `nextPress` direkt statt
+  des gerenderten `onClick`; dass der Knopf `nextPress` mit der gezeichneten Frage verdrahtet, prüft er nicht · Weitergabe
+  über gerenderte Props prüfen (ohne neue Testabhängigkeit) oder e2e-Zusicherung auf die Frage-ID im `POST …/delivery`.
+- takt-039 Review minor 6 · `apps/web/e2e/031-http-betriebsart.spec.ts:507` · die Vorbedingung von H12b („Ziel in der
+  unteren Hälfte“) hängt vom Korpusstand ab, den 002, 021b, 021c, H8 und H9 hinterlassen · Lage des Ziels im Test
+  herstellen (Scrollposition setzen) statt vorauszusetzen.
+- takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
+  `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -289,6 +308,14 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
   derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
   → **043**
+- takt-039 Review minor 7 (vorbestehend, durch takt-039 stärker exponiert) · **Recht/Audit prüfen** ·
+  `apps/web/src/features/stage/Page.tsx:452-458` (`returnAnswer`) · die Rückgabe wirkt auf die zuletzt gezeichnete Frage
+  (`stageRef` beim Absenden), nicht auf die, für die der Dialog geöffnet wurde; rückt die Bühne bei offenem Dialog weiter
+  (fremdes „Vorgelesen“, Takt), wird die Rückgabe mit Begründung für eine andere Frage geschrieben, und das `If-Match`
+  passt, weil es die Version der neuen Frage trägt · Frage beim Öffnen festhalten und nur auf sie schreiben; Wirkung auf
+  Freigabe und Protokoll (Audit) prüfen. Kein Minor: eine Rückgabe auf die falsche Frage ist ein fachlich falscher
+  Protokolleintrag.
+  → Orchestrator (Einplanung offen)
 - takt-032 R1 minor 4 · `apps/web/src/api/http.ts` setzt `lastWriteEtag()` vor dem Lesen des Rumpfs; `ClassifyDialog`
   (schreibt auf die Frage) ist beim Erfassen nicht gesperrt · Fix in `http.ts`, Sperre im Dialog.
 - takt-032 R1 minor 7 · `speakers/Page.tsx` `run` · ein Schreiben, das während eines anderen läuft, wird ohne Hinweis

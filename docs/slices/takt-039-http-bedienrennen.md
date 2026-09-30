@@ -287,7 +287,63 @@ geht `page.clock` nicht, melden und anhalten. Kein Ersatz durch Wartezeiten.
 
 ## Nachweis
 
-(folgt mit dem Bau)
+**Commits:** `1cf9573` Tests zuerst (rot) · `e0097ab` Korrektur Bühne · `9d65427` Bauklärung N3 (010c) · `ff4beee` H11
+wartet auf die Routen-Registrierung (Review major; dazu Review nit 8, nur Kommentar) · dieser Doku-Commit.
+
+**Unit- und Komponententests (lokal):**
+
+- Rot auf `1cf9573` (`npx vitest run src/features/stage`): `Test Files  2 failed (2)`, `Tests  10 failed | 20 passed (30)`.
+  Rot sind alle sechs neuen Tests in `lib.test.ts` (Funktionen fehlen) und vier von sechs in `Podium.test.tsx`
+  (`nextPress` fehlt; kein `aria-disabled="true"` bei Sperre oder laufender Rückgabe). Die zwei übrigen Podium-Tests
+  („frei ohne Sperre oder mit Sperre auf anderer Version“, „ohne `question.deliver` nicht gezeichnet“) sind schon auf
+  altem Code grün und kein Rotnachweis.
+- Grün ab `e0097ab`: `Test Files  2 passed (2)`, `Tests  30 passed (30)`; die ganze Web-Suite 332 von 332.
+- N3 (010c) neu gefasst (Bauklärung): grün auf der Korrektur; eine Variante, die die Fokusmarke bedingungslos setzt, ist
+  rot (`Expected: not "stage-current"`).
+
+**HTTP-Projekt (PR-CI, `e2e-http`):**
+
+- **Rot auf altem Code**, Commit `1cf9573`, Lauf 36706938439, Job 109859290686:
+  - H11 rot: `031:397`, „F-0043“ bleibt stehen.
+  - `abnahme` rot: `abnahme.spec.ts:250`, „F-0116“.
+  - `002` rot: `002-speakers-capture.spec.ts:84`, „Position 6 von 7“.
+  - H12a grün: angehoben 8/9 → „Position 9 von 9“, scrollTop 0.
+  - H12b grün: 8/9 → 9/9, scrollTop 0.
+  - Artefakt `evidence-031-http`: ID 11092701472, Digest
+    `b51a19a68e27a27ed5cdf496a2aff49c616bf284321f6204c522a50b5c596e66`.
+- **Grün auf der Korrektur**, Commit `9d65427`, Lauf 36707822239, Job 109862185420:
+  - 31 passed, `retries: 0`; H11 grün.
+  - `abnahme` grün, 6 Drücke bis F-0240.
+  - `002` grün.
+  - H12a grün: 9/10 → 10/10, scrollTop 0.
+  - H12b grün: 9/10 → 10/10, scrollTop 31.
+  - Artefakt `evidence-031-http`: ID 11092139585, Digest
+    `0973de3bc1c01a27776f22aec0e67697616738748eae01d6c45c811386507695`.
+  - Erwartete Bilder im Artefakt (von der Spec verlangt; vom Bau nicht angesehen, Artefakte lassen sich hier nicht
+    herunterladen): `031-h11-buehne-waehrend-lesung.png`, `031-h12-umsortieren-nach-auffrischung.png`.
+- Die Review-Korrektur in `ff4beee` (H11 registriert die Route vor `fastForward`) läuft mit der CI dieses PR.
+
+**Entscheidung zu 002 (Ziel 5):** Keine Hypothese bestätigt: H-2a, H-2b und H-2c sind nicht belegt (H12a und H12b auf
+altem Code grün, während `002` im selben Lauf rot war). Kein Produktcode für 002. Einschränkung aus dem Review: Eine
+fertige Netzantwort belegt nicht, dass React die Auffrischung schon angewandt hat; ein grünes H12a widerlegt H-2a daher
+nicht. Der Befund bleibt offen mit einem Eintrag in `docs/folgeliste.md` (Abschnitt „Bühne und Wortmeldeliste (aus
+takt-039)“).
+
+**In-process (lokal, auf `ff4beee`):** `010c-lesezustand`, `abnahme`, `013-tastaturpfad`: 37 passed. Vorher auf
+`9d65427` zusätzlich `002-speakers-capture` (38 passed mit 010c, abnahme, 013) und auf `e0097ab` `003-answers-stage`.
+
+**`pnpm gates`** auf `ff4beee` (sauberer Baum, mit den Postgres-Variablen), wörtlicher Schluss:
+
+```
+apps/web test:       Tests  332 passed (332)
+slice-scope: warning — "docs/slices/takt-039-http-bedienrennen.md"'s "Files allowed" section differs from its version at the commit that introduced it (178655f).
+slice-scope: 8 changed file(s), all within "docs/slices/takt-039-http-bedienrennen.md"'s "Files allowed" list (18 pattern(s)).
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.64s
+mark-test-run: wrote /home/user/wt/t039/.claude/state/last-test-run (clean tree) at commit ff4beee, tree 03a6ceaefd28…
+```
+
+Die Warnung von `slice-scope` ist erwartet (Files allowed um N3 ergänzt, Bauklärung).
 
 ## Review findings
 
