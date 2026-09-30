@@ -265,6 +265,13 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-039 Review minor 6 · `apps/web/e2e/031-http-betriebsart.spec.ts:507` · die Vorbedingung von H12b („Ziel in der
   unteren Hälfte“) hängt vom Korpusstand ab, den 002, 021b, 021c, H8 und H9 hinterlassen · Lage des Ziels im Test
   herstellen (Scrollposition setzen) statt vorauszusetzen.
+- takt-039 Nachprüfung minor 7 · `apps/web/src/features/stage/Page.tsx:476-479` · nach einer Ablehnung (412/409) bleibt der
+  Rückgabedialog auf der Frage in der alten Version offen; ein erneutes Absenden scheitert wieder · Dialog schließen oder
+  „Frage hat sich geändert, bitte neu öffnen“ zeigen, nie still auffrischen.
+- takt-039 Nachprüfung nit · `apps/web/src/features/stage/lib.test.ts:242` · der Kommentar nennt `qb`, das im Test nicht
+  vorkommt · Kommentar kürzen oder `qb` als gezeichnete Frage wirklich verwenden.
+- takt-039 Nachprüfung nit (geerbt) · `apps/web/e2e/010c-lesezustand.spec.ts:95` · `expectOneToast` wartet mit
+  `waitForTimeout(300)` · auf ein Produktsignal umstellen (gebündelt mit den übrigen `waitForTimeout` der Datei).
 - takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
   `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
 

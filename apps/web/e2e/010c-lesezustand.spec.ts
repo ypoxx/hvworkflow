@@ -1220,43 +1220,55 @@ test('010c Ziel 6 (N3): Bühne — ein Druck ohne Schreiben lenkt den Fokus spä
   expect(await focusedTestId(page)).not.toBe('stage-current');
 });
 
-test('takt-039 minor 7: Bühne — "Antwort zurückgeben" schreibt für die Frage, für die der Dialog geöffnet wurde', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await waitForCorpus(page);
-  await asRole(page, 'admin');
-  await openStage(page);
-  const currentNumber = page.getByTestId('stage-current-number');
-  const opened = await page.evaluate(async () => {
-    const stage = (await (window as unknown as Harness).__original['getStage']!()) as {
-      current: { id: string; number: string } | null;
-    };
-    return stage.current!;
+for (const via of ['button', 'key R'] as const) {
+  test(`takt-039 minor 7 (${via}): Bühne — "Antwort zurückgeben" schreibt für die Frage, für die der Dialog geöffnet wurde`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await waitForCorpus(page);
+    await asRole(page, 'admin');
+    await openStage(page);
+    const currentNumber = page.getByTestId('stage-current-number');
+    const opened = await page.evaluate(async () => {
+      const stage = (await (window as unknown as Harness).__original['getStage']!()) as {
+        current: { id: string; number: string } | null;
+      };
+      return stage.current!;
+    });
+    await expect(currentNumber).toHaveText(opened.number);
+
+    // Every `returnQuestion` of the page is counted and reaches the API.
+    await page.evaluate(async (url) => {
+      const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
+      const w = window as unknown as Harness;
+      w.__calls['returnQuestion'] = [];
+      api['returnQuestion'] = (...args: unknown[]) => {
+        w.__calls['returnQuestion']!.push(args[0] ?? null);
+        return w.__original['returnQuestion']!(...args);
+      };
+    }, API_MODULE);
+
+    // The dialog is opened for F-A — by the button, or by R with focus outside any control — and names it; then somebody
+    // else reads F-A out and the stage draws F-B.
+    if (via === 'button') {
+      await page.getByTestId('stage-return').click();
+    } else {
+      await page.getByTestId('stage-current-text').click();
+      await page.keyboard.press('r');
+    }
+    const question = page.getByTestId('stage-return-question');
+    await expect(question).toContainText(opened.number);
+    await page.getByTestId('stage-return-reason').fill('Testgrund takt-039');
+    await deliverCurrentElsewhere(page);
+    await expect(currentNumber).not.toHaveText(opened.number);
+    await expect(question).toContainText(opened.number);
+
+    // The return goes to F-A (whose version has moved on: the service refuses it with a problem toast), never to F-B,
+    // and the dialog stays on F-A.
+    await page.getByTestId('stage-return-submit').click();
+    await expectOneToast(page);
+    await expect(toasts(page).first()).toHaveClass(/border-tone-danger-bd/);
+    await expect(question).toContainText(opened.number);
+    expect(await page.evaluate(() => (window as unknown as Harness).__calls['returnQuestion'])).toEqual([opened.id]);
   });
-  await expect(currentNumber).toHaveText(opened.number);
-
-  // Every `returnQuestion` of the page is counted and reaches the API.
-  await page.evaluate(async (url) => {
-    const { api } = ((window as unknown as Harness).__modules[url]) as { api: Wrapped };
-    const w = window as unknown as Harness;
-    w.__calls['returnQuestion'] = [];
-    api['returnQuestion'] = (...args: unknown[]) => {
-      w.__calls['returnQuestion']!.push(args[0] ?? null);
-      return w.__original['returnQuestion']!(...args);
-    };
-  }, API_MODULE);
-
-  // The dialog is opened for F-A and names it; then somebody else reads F-A out and the stage draws F-B.
-  await page.getByTestId('stage-return').click();
-  await expect(page.getByTestId('stage-return-question')).toContainText(opened.number);
-  await page.getByTestId('stage-return-reason').fill('Testgrund takt-039');
-  await deliverCurrentElsewhere(page);
-  await expect(currentNumber).not.toHaveText(opened.number);
-  await expect(page.getByTestId('stage-return-question')).toContainText(opened.number);
-
-  // The return goes to F-A (whose version has moved on: the service refuses it, one toast), never to F-B.
-  await page.getByTestId('stage-return-submit').click();
-  await expectOneToast(page);
-  expect(await page.evaluate(() => (window as unknown as Harness).__calls['returnQuestion'])).toEqual([opened.id]);
-});
+}
