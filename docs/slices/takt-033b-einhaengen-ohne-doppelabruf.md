@@ -116,4 +116,15 @@ Unit-Test erst rot (6 von 6, `actorChanged` fehlte), dann grün. `pnpm --filter 
 
 ## Review findings
 
-_offen_
+Review in frischem Kontext (reviewer-sonnet, nur Spec und Diff, f33b1fd): **freigegeben**, kein Blocker, kein Major.
+Rechte bleiben aktuell: Ein Rechtewechsel ändert `role` am Akteur und zählt; Rollenverlust läuft über `onUnauthorized`.
+
+1. minor · `useApiVersion.ts:31-34`, `App.tsx:111-121` · Der Refresh bei `visibilitychange` lud bisher alle Ansichten neu;
+   jetzt bleibt eine im Hintergrund gewesene Ansicht bis zum nächsten 30-s-Takt alt (der Takt läuft nur sichtbar) ·
+   Folgeliste: Polling-Hörer einmal beim Sichtbarwerden auslösen.
+2. minor · H10 · nach dem Sichtbarkeitswechsel wird nur `/v1/stage` geprüft, nicht die Probe · Folgeliste.
+3. minor · H10 · `networkidle` nach `/auth/me` ist eine Ruhezeit-Heuristik (in 031b gezeigt: nach dem ersten Leerlauf
+   wartet sie nicht mehr); ein Doppelabruf entstünde im selben Takt nach dem Rendern und würde gezählt · Folgeliste:
+   auf ein Produktsignal statt `networkidle` warten.
+4. nit · `useApiVersion.test.ts:19` `_unused` · Lint grün (Gates).
+5. nit · Rot-zuerst nur in Prosa belegt · keine Änderung.

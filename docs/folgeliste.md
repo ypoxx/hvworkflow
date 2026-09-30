@@ -214,6 +214,12 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
   reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
 
+- takt-033b Review minor · `apps/web/src/api/useApiVersion.ts`, `App.tsx` · nach Rückkehr in einen Hintergrund-Tab bleibt
+  die Ansicht bis zum nächsten 30-s-Takt alt (früher sofortiges Neuladen über den `/auth/me`-Refresh) · Polling-Hörer
+  beim Sichtbarwerden einmal auslösen (`http.ts`).
+- takt-033b Review minor · `apps/web/e2e/031-http-betriebsart.spec.ts` H10 · Probe nach dem Sichtbarkeitswechsel nicht
+  geprüft; `networkidle` als Wartebedingung ist eine Heuristik · beide Zählungen am Ende prüfen, auf Produktsignal warten.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
