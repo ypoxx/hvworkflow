@@ -293,12 +293,12 @@ Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wä
 Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
 Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
 e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
-Evidence: Baucommit 62c7c4a; `pnpm gates` NICHT grün (ein Scope-Befund, siehe Open 1); PR-CI-Lauf mit H13/H14 steht aus;
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61; `pnpm gates` grün auf 3bb3a61 (Auszug unten); PR-CI-Lauf mit
+H13/H14 steht aus;
 Zustellzeit und Netztrace-Tabelle erst aus der PR-CI (H13 druckt sie); docs/evidence/031-h13-zweiter-browser.png,
 docs/evidence/031-h14-verbindungsanzeige.png entstehen in der PR-CI (Artefakt evidence-031-http, E56).
-Open: (1) Scope: i18n/parity.test.ts zählt die Schlüssel fest (510 → 515, fünf neue shell.connection.*), Datei nicht
-erlaubt; (2) Scope: H10 wartet auf networkidle, das bei offenem Strom nie eintritt (Probe unten); (3) Lasttest 071;
-Produktionsweg (035b Frage 3).
+Open: Lasttest 071; Produktionsweg (035b Frage 3); H13/H14 und das geänderte H10 laufen erst in der PR-CI.
+(Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
 Touched: siehe Liste unten.
 ```
 
@@ -315,7 +315,18 @@ Touched: siehe Liste unten.
    Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
    actor“).
 
-**Schluss von `pnpm gates` auf 62c7c4a (sauberer Baum, Postgres-Variablen gesetzt), echter Auszug:**
+**Schluss von `pnpm gates` auf 3bb3a61 (sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+
+```
+apps/web test:       Tests  436 passed (436)
+apps/api test:       Tests  586 passed (586)
+packages/domain test:       Tests  261 passed (261)
+slice-scope: 16 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (30 pattern(s)).
+✓ built in 1.87s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 3bb3a61, tree 8f6433adefb5…
+```
+
+**Früherer Lauf auf 62c7c4a (vor der zweiten Bauklärung), rot am Paritäts-Pin:**
 
 ```
 apps/web test:  FAIL  src/i18n/parity.test.ts > i18n parity checks > (f) Total key count is 507 across all modules and matches de and en
@@ -380,7 +391,7 @@ downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle gr
 10. Restrisiko: ein `/auth/me`, das vor einem Stromende abgeschickt war und danach bestätigt, öffnet den Strom wieder; der
     Dienst prüft Sitzung und Rechte beim Öffnen (403/401/end), der Puffer ist dann bereits leer.
 
-**Scope-Befunde (nicht umgangen):**
+**Scope-Befunde (nicht umgangen; mit der zweiten Bauklärung in 3bb3a61 erledigt):**
 1. `apps/web/src/i18n/parity.test.ts` zählt die Schlüssel fest (Test f: 510). Die fünf neuen `shell.connection.*`
    verlangen 515 und je eine Kommentarzeile; die Datei steht nicht in „Files allowed“. Einziger roter Schritt von `gates`.
 2. H10 (`031-http-betriebsart.spec.ts`) wartet zweimal auf `waitForLoadState('networkidle')`. Playwright zählt eine offene
@@ -389,7 +400,12 @@ downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle gr
    auf Ruhe der `/v1`-Lesungen ohne den Strom (wie `quiet()` in H13) statt `networkidle`, oder die Strom-503-Route wie in
    H11/H12a (dann prüft H10 nur den Rückfall).
 
-**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
+**Lehre:** `networkidle` ist unbrauchbar, sobald ein langlebiger Strom existiert (Playwright zählt ihn als laufende
+Anfrage); passt zur früheren Lehre, dass `networkidle` kein Ersatz für das Warten auf ein konkretes Signal ist.
+
+**Restrisiko (angenommen, zweite Bauklärung 3):** Bauentscheidung 10 oben.
+
+**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/i18n/parity.test.ts`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
 `connection.ts`, `connection.test.ts`, `http.ts`, `http.test.ts`, `index.ts`, `apps/web/src/app/ConnectionStatus.tsx`,
 `ConnectionStatus.test.tsx`, `HeaderStrip.tsx`, `apps/web/src/i18n/shell.de.ts`, `shell.en.ts`,
 `apps/web/e2e/031-http-betriebsart.spec.ts`.
