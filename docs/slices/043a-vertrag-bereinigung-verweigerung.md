@@ -455,6 +455,7 @@ Vertragstests (nur so weit, wie der Vertrag sie mitzieht):
 - `apps/api/src/__tests__/helpers.ts` (nur `UNDOCUMENTED_STATUS_EXCEPTIONS` und sein Kommentar)
 - `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile und der Block `requestedMinutes` in Zeilen 175-186)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Versionszeile)
+- `apps/api/src/__tests__/takt-016-contract.test.ts` (nur die Versionsprüfung; sie verlangt heute eine Version 0.3.x und wird mit 0.4.0 rot; Nachtrag aus der Spec von 040, 30.09.2026)
 - `apps/api/src/__tests__/negative.test.ts` (nur die `kind`-Stellen)
 
 Web-Client (web-implementer, zweiter Commit, nach dem Vertrag):
