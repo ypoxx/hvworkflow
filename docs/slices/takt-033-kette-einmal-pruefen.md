@@ -243,6 +243,19 @@ anhalten.
 
 ## Nachweis
 
+**Gates-Commit nach dem Codex-Befund P1 (PR #88):** `a6cc950` (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime` gegen `hv_t033`, Exit 0. domain 15 Dateien / 243 Tests,
+web 13 / 255, api 36 / 523 (keine übersprungen); slice-scope: „12 changed file(s), all within … "Files allowed" list“.
+Wörtlicher Schluss:
+
+```
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.08s
+mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit a6cc950, tree a82853488717…
+```
+
 **Aktueller Gates-Commit (nach der engen Nachprüfung, Basis mit takt-034 gemergt als `e451fee`):** `9d757ec`
 (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime`
 gegen `hv_t033`, Exit 0. domain 15 Dateien / 243 Tests, web 13 / 255, api 36 / 521 (keine übersprungen); slice-scope:
@@ -336,3 +349,14 @@ Postgres-Variablen, sauberer Baum, Exit 0. Wörtlicher Schluss:
 ✓ built in 1.61s
 mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 15b5a0e, tree c3e7fe394273…
 ```
+
+**Codex P1 (PR #88), behoben in `a6cc950`.** Die Schreibanfrage läuft unter READ COMMITTED; Digest-Probe und
+Suffix-SELECT waren zwei Anweisungen mit je eigenem Snapshot. Löschte oder ersetzte jemand mit Owner-Rechten dazwischen
+Zeilen, kam das Suffix leer neben dem alten `max(seq)` zurück, und die Anfrage stempelte oldEnd+1 auf eine Kette, die
+nicht mehr passte. Jetzt liefert eine Abfrage (`CHAIN_SQL`, CTE mit LEFT JOIN) Probe und Zeilen `seq > Ende` aus einem
+Snapshot; entschieden wird nur daraus, das Suffix muss genau bei `max(seq)` enden, jede Abweichung nimmt den vollen
+Pfad. Tests in `postgres-takt033.test.ts` (Änderung per Owner-Verbindung unmittelbar vor der Anweisung, die das Suffix
+liest): „does not stamp oldEnd+1 when the last row vanishes …“ und „… when the last row is replaced …“. Auf dem alten
+Code (`bdbfe15`) scheiterten beide: inkrementeller Pfad mit `hashed: 0, cachedSeq: 23` und 201, also ein Anhängen an
+das alte Ende; mit der Änderung voller Pfad, Meldezeile, neues Ereignis setzt die geänderte Kette fort. Bedrohungsmodell
+T-G2-R-01 um einen Satz zum Fenster zwischen Lesen und Einfügen ergänzt.
