@@ -114,6 +114,12 @@ mark-test-run: wrote /home/user/wt/t033b/.claude/state/last-test-run (clean tree
 
 Unit-Test erst rot (6 von 6, `actorChanged` fehlte), dann grün. `pnpm --filter @hv/web e2e`, Projekt in-process: 127 passed. H10 läuft nur in der PR-CI (`e2e-http`); der Screenshot `031-h10-einhaengen-ein-abruf.png` entsteht dort. Diese Änderung hat keine sichtbare Oberfläche.
 
+Nachlauf nach dem ersten PR-CI-Lauf (Lauf 36668137833: H10 sah zwei `GET /v1/stage` je Einhängen). Ursache: Das Projekt
+`http` läuft gegen den Vite-Dev-Server, `<StrictMode>` führt Einhänge-Effekte dort doppelt aus; ein Produktions-Build tut
+das nicht. H10 erwartet deshalb 2 im Dev- und 1 im Build-Modus (erkannt an `/@vite/client`); der alte Fehler (Zählen beim
+Einhängen) ergäbe 3 und bleibt rot. Der Dev-Zweig entfällt mit takt-035 (Projekt `http` gegen Produktions-Build).
+`pnpm gates` auf `92bcba8`, sauberer Baum, Exit 0.
+
 ## Review findings
 
 Review in frischem Kontext (reviewer-sonnet, nur Spec und Diff, f33b1fd): **freigegeben**, kein Blocker, kein Major.
