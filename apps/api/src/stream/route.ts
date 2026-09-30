@@ -143,6 +143,8 @@ class Connection implements HubConnection {
   private heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   private rotateTimer: ReturnType<typeof setTimeout> | undefined;
   private heartbeats = 0;
+  /** A rights and session check started by the heartbeat while the catch-up is written (review major 1). */
+  private handoverCheck: Promise<boolean> | undefined;
   private readonly id = ++connectionCounter;
   private readonly openedAt: number;
 
@@ -154,13 +156,18 @@ class Connection implements HubConnection {
 
   get closed(): boolean { return this.state === 'closed'; }
 
+  /**
+   * Started at registration, not after the catch-up (review major 1): a reader that stalls the catch-up
+   * must not keep a stream past its lifetime, a sign-out, a block or a lost grant.
+   */
   startTimers(): void {
     const { heartbeatMs, lifetimeMs } = this.s.limits;
     // Staggered heartbeats (decision 4): a start offset per stream within one interval.
     const beat = (delay: number): void => {
       this.heartbeatTimer = setTimeout(() => {
         if (this.closed) return;
-        this.enqueueHeartbeat();
+        if (this.state === 'handover') this.checkDuringHandover();
+        else this.enqueueHeartbeat();
         beat(heartbeatMs);
       }, delay);
     };
@@ -209,6 +216,28 @@ class Connection implements HubConnection {
       return;
     }
     this.pump();
+  }
+
+  /**
+   * While the catch-up is written the queue does not drain, so the heartbeat checks directly: lifetime,
+   * the actor map from the distributor's projection and a fresh session check. A failure closes with the
+   * matching `end`; the catch-up waits for a running check after every write (`catchUpMayGoOn`).
+   */
+  private checkDuringHandover(): void {
+    if (this.handoverCheck !== undefined) return;
+    const run = (async () => {
+      if (!this.heartbeatRights()) return false;
+      return this.sessionValid(`h:${this.id}:${++this.heartbeats}`);
+    })();
+    this.handoverCheck = run;
+    const clear = (): void => { if (this.handoverCheck === run) this.handoverCheck = undefined; };
+    run.then(clear, clear);
+  }
+
+  /** After each catch-up write: a heartbeat check that ran meanwhile must pass before the next frame. */
+  async catchUpMayGoOn(): Promise<boolean> {
+    if (this.handoverCheck !== undefined && !await this.handoverCheck.catch(() => false)) return false;
+    return !this.closed;
   }
 
   private enqueueHeartbeat(): void {
@@ -264,6 +293,9 @@ class Connection implements HubConnection {
         return;
       }
       if (item.kind === 'batch') {
+        // Rights at the moment of writing too (review minor 3): a grant may have expired by the clock since
+        // the batch was applied, while the reader was slow.
+        if (!this.rightsNow()) return;
         if (!await this.sessionValid(item.occasion)) return;
         const frames = [...item.events, ...(item.change !== undefined ? [messageFrame({ kind: 'change', change: item.change })] : [])];
         for (const frame of frames) {
@@ -286,6 +318,11 @@ class Connection implements HubConnection {
       this.close(endFrame('rotate'));
       return false;
     }
+    return this.rightsNow();
+  }
+
+  /** The actor map from the distributor's projection with the clock now, against the reference of the open. */
+  private rightsNow(): boolean {
     const current = this.s.resolveActors(this.s.hub.states());
     if (current.size === 0) { this.close(endFrame('forbidden')); return false; }
     if (!sameActors(current, this.s.reference)) { this.close(endFrame('roles_changed')); return false; }
@@ -400,10 +437,10 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
 
       const pipe = new TransformStream<Uint8Array, Uint8Array>();
       const writer = pipe.writable.getWriter();
-      const connection = new Connection({
+      const connection: Connection = new Connection({
         writer, reference, resolveActors, meetingFilter,
         checkSession: options.session !== undefined && token !== null
-          ? (occasion) => options.sessionChecks.check(occasion, sessionKey, () => options.session!.valid(token))
+          ? (occasion: string): Promise<boolean> => options.sessionChecks.check(occasion, sessionKey, () => options.session!.valid(token), () => !connection.closed)
           : undefined,
         release: slot.release, limits: options.limits, clock, hub, notice: options.notice,
       });
@@ -419,6 +456,8 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
         connection.close(null);
         throw error;
       }
+      // Rotation and heartbeat checks from registration on, also while the catch-up is written (review major 1).
+      connection.startTimers();
       const signal = c.req.raw.signal;
       if (signal.aborted) connection.close(null);
       else signal.addEventListener('abort', () => connection.close(null), { once: true });
@@ -430,9 +469,12 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           return;
         }
         // Step 3: the catch-up `(cursor, H]` with backpressure, then `cursor` with `H`.
-        for (const frame of opening.frames) if (!await connection.write(frame)) return;
+        for (const frame of opening.frames) {
+          if (!await connection.catchUpMayGoOn()) return;
+          if (!await connection.write(frame)) return;
+        }
+        if (!await connection.catchUpMayGoOn()) return;
         // Steps 4 and 5: what arrived meanwhile (all with seq > H), then live.
-        connection.startTimers();
         connection.goLive();
       })();
       handedOver = true;

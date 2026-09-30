@@ -68,9 +68,15 @@ export class StreamReader {
     for (const wake of waiting) wake();
   }
 
+  /** While held, the reader takes no further chunk: a client that stops reading (backpressure on the service). */
+  held = false;
+  hold(): void { this.held = true; }
+  resume(): void { this.held = false; }
+
   private async pump(): Promise<void> {
     try {
       for (;;) {
+        while (this.held) await new Promise((resolve) => setTimeout(resolve, 5));
         const { value, done } = await this.reader.read();
         if (done) break;
         this.bytes += value.byteLength;

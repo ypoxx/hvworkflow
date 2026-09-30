@@ -246,7 +246,10 @@ export function createHub(options: HubOptions): Hub {
   return {
     async ensureFresh(force = false) {
       if (inflight) await inflight.catch(() => undefined);
-      if (force || !loaded || stale || options.clock().getTime() - lastReloadAt > options.freshnessMs) await reload();
+      if (!loaded || stale || options.clock().getTime() - lastReloadAt > options.freshnessMs) await reload();
+      // A forced reload keeps the spacing between reloads (review minor 4): a cursor beyond the head cannot
+      // drive more reloads than the batches do.
+      else if (force && !cooling) await reload();
     },
     register(connection) {
       const first = connections.size === 0;

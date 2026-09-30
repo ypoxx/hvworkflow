@@ -9,12 +9,16 @@
  * the route passes a key (a hash) and a function that reads the session from its own closure.
  */
 export interface SessionChecker {
-  /** `true` when the session is valid now. Rejects when the check itself fails (fail closed at the caller). */
-  check(occasion: string, sessionKey: string, read: () => Promise<boolean>): Promise<boolean>;
+  /**
+   * `true` when the session is valid now. Rejects when the check itself fails (fail closed at the caller).
+   * `alive` tells whether the caller still waits for the answer: when every caller of a check has gone by the
+   * time it gets a slot, the session is not read at all (review minor 6).
+   */
+  check(occasion: string, sessionKey: string, read: () => Promise<boolean>, alive?: () => boolean): Promise<boolean>;
 }
 
-export function createSessionChecker(options: { concurrency: number; onWindow?: (phase: 'start' | 'end') => void }): SessionChecker {
-  const running = new Map<string, Promise<boolean>>();
+export function createSessionChecker(options: { concurrency: number; onWindow?: (phase: 'start' | 'end', occasion: string) => void }): SessionChecker {
+  const running = new Map<string, { run: Promise<boolean>; callers: (() => boolean)[] }>();
   const waiting: (() => void)[] = [];
   let active = 0;
 
@@ -30,28 +34,37 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
     if (next) next(); // the slot passes on directly; `active` stays
     else active -= 1;
   };
-  const window = (phase: 'start' | 'end'): void => {
-    try { options.onWindow?.(phase); } catch { /* a test hook never breaks a check */ }
+  const window = (phase: 'start' | 'end', occasion: string): void => {
+    try { options.onWindow?.(phase, occasion); } catch { /* a test hook never breaks a check */ }
   };
 
   return {
-    check(occasion, sessionKey, read) {
+    check(occasion, sessionKey, read, alive = () => true) {
       const key = `${occasion}\u0000${sessionKey}`;
       const joined = running.get(key);
-      if (joined) return joined;
+      if (joined) {
+        joined.callers.push(alive);
+        return joined.run;
+      }
+      const callers = [alive];
       const run = (async () => {
         await acquire();
-        window('start');
         try {
-          return await read();
+          // Nobody waits any more (every stream of this check closed while queued): no pool connection taken.
+          if (!callers.some((caller) => caller())) return false;
+          window('start', occasion);
+          try {
+            return await read();
+          } finally {
+            window('end', occasion);
+          }
         } finally {
-          window('end');
           releaseSlot();
         }
       })();
-      running.set(key, run);
+      running.set(key, { run, callers });
       // Forget the result as soon as it is known: the next batch or heartbeat checks anew.
-      const forget = (): void => { if (running.get(key) === run) running.delete(key); };
+      const forget = (): void => { if (running.get(key)?.run === run) running.delete(key); };
       run.then(forget, forget);
       return run;
     },

@@ -23,6 +23,7 @@ import type { OidcFlow } from '../auth/oidc.ts';
 import { SESSION_IDLE_MS } from '../auth/sessions.ts';
 import { DEFAULT_STREAM_LIMITS, STREAM_LIFETIME_MS, type StreamLimits } from '../limits/config.ts';
 import { req } from './helpers.ts';
+import { createSessionChecker } from '../stream/sessionCheck.ts';
 import { StreamReader, eventually, idOf, mustOpen, openStream, sleep, type SseBlock } from './stream-reader035.ts';
 
 // Test 23 (m8): the distributor's store listener only schedules. The spy passes every call through and
@@ -52,6 +53,8 @@ const PEOPLE: readonly Person[] = [
   { key: 'multi', role: 'capture' }, { key: 'multi', role: 'moderation' },
   { key: 'temp', role: 'capture', expiresInMs: 10 * 60_000 },
   { key: 'admin2', role: 'admin', meetingId: OTHER },
+  // Review 035b minor 5 (b): an expert whose grant moves to another unit (revoke and new grant in one batch).
+  { key: 'unitswap', role: 'expert', unitId: 'unit-fin' },
 ];
 const subject = (key: string): string => `subject-${key}`;
 const token = (key: string, n = 1): string => `tok_${key}_${n}_`.padEnd(48, 'x');
@@ -102,7 +105,7 @@ interface Harness {
     handover?: (() => Promise<void>) | undefined;
     reloads: number;
     appliedHead: number;
-    windows: { kind: string; phase: string }[];
+    windows: { kind: string; phase: string; occasion?: string }[];
   };
   accessLines: string[];
 }
@@ -116,8 +119,8 @@ afterEach(async () => {
 const track = (reader: StreamReader): StreamReader => { readers.push(reader); return reader; };
 
 async function harness(options: { session?: boolean; streamLimits?: Partial<StreamLimits>; extra?: Partial<CreateAppOptions>;
-  sessionsPerPerson?: number } = {}): Promise<Harness> {
-  const { events } = await corpus();
+  sessionsPerPerson?: number; events?: DomainEvent[] } = {}): Promise<Harness> {
+  const events = options.events ?? (await corpus()).events;
   let log: readonly DomainEvent[] = events;
   const clock = { now: new Date(at0), advance(ms: number) { this.now = new Date(this.now.getTime() + ms); } };
   const sessions = new Map<string, { actorId: string; csrfToken: string }>();
@@ -165,8 +168,8 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
     testHooks: {
       streamLoad: (loaded) => (hooks.load ? hooks.load(loaded) : loaded),
       streamHandover: async () => { if (hooks.handover) await hooks.handover(); },
-      streamWindow: (kind, phase) => {
-        hooks.windows.push({ kind, phase });
+      streamWindow: (kind, phase, occasion) => {
+        hooks.windows.push({ kind, phase, ...(occasion !== undefined ? { occasion } : {}) });
         if (kind === 'reload' && phase === 'end') hooks.reloads += 1;
       },
       streamApplied: (head) => { hooks.appliedHead = head; },
@@ -491,7 +494,8 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
       await reader.nextMessage();
       streams.push(reader);
     }
-    const mine = (): number => h.readSessionCalls.filter((c) => c.token === token('admin', 2)).length;
+    // Batch checks only: a staggered heartbeat of one of the streams may check in between (its own occasion).
+    const mine = (): number => h.hooks.windows.filter((w) => w.kind === 'session' && w.phase === 'start' && w.occasion?.startsWith('b:')).length;
     const before = mine();
     await assignFiller(h, 'admin2', OTHER);
     for (const reader of streams) await reader.until(isEvent);
@@ -538,6 +542,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     for (let i = 0; i < 3; i++) track(await mustOpen(h.app, '/v1/stream', asSession('admin', 2)));
     const seventh = await req(h.app, 'GET', '/v1/stream', { headers: asSession('admin', 3) });
     expect(seventh.status).toBe(429);
+    expect(seventh.headers.get('Retry-After')).toBe('30');
     const small = await harness({ session: true, streamLimits: { perProcess: 2 } });
     track(await mustOpen(small.app, '/v1/stream', asSession('admin')));
     track(await mustOpen(small.app, '/v1/stream', asSession('capture')));
@@ -725,6 +730,129 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
   it('23c the stream lifetime (25 min) lies below SESSION_IDLE_MS (M7)', () => {
     expect(STREAM_LIFETIME_MS).toBe(25 * 60_000);
     expect(STREAM_LIFETIME_MS).toBeLessThan(SESSION_IDLE_MS);
+  });
+
+  // ---- review of 035b (fresh context) ------------------------------------------------------------------------------
+  it('R1 a stalled catch-up: sign-out and subject block end it with session before any further event (major 1)', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 150 } });
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: { ...asSession('admin'), 'Last-Event-ID': String(h.head() - 1_000) } });
+    expect(stalled.status).toBe(200);
+    await sleep(200);
+    h.sessions.delete(token('admin'));
+    h.blocked.add(subject('admin'));
+    await sleep(500);
+    const reader = track(new StreamReader(stalled));
+    const rest = await reader.rest(3_000);
+    expect(rest.filter(isEvent)).toHaveLength(0);
+    expect(kinds(rest)).toEqual(['end']);
+    expect(rest[0]!.data).toEqual({ reason: 'session' });
+  });
+
+  it('R1 a stalled catch-up: an expired grant (injected clock) ends it with forbidden before the catch-up (major 1)', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 150 } });
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: { ...asSession('temp'), 'Last-Event-ID': String(h.head() - 500) } });
+    expect(stalled.status).toBe(200);
+    await sleep(100);
+    h.clock.advance(11 * 60_000);
+    await sleep(500);
+    const rest = await track(new StreamReader(stalled)).rest(3_000);
+    expect(kinds(rest)).toEqual(['end']);
+    expect(rest[0]!.data).toEqual({ reason: 'forbidden' });
+  });
+
+  it('R1 a stalled catch-up still rotates, and the slot is free again (major 1)', async () => {
+    const h = await harness({ session: true, streamLimits: { lifetimeMs: 600, perSession: 1 } });
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: { ...asSession('admin'), 'Last-Event-ID': String(h.head() - 1_000) } });
+    expect(stalled.status).toBe(200);
+    await sleep(1_000);
+    const next = await openStream(h.app, '/v1/stream', asSession('admin'));
+    if (next.reader) track(next.reader);
+    expect(next.res.status).toBe(200);
+    const rest = await track(new StreamReader(stalled)).rest(3_000);
+    expect(rest.filter(isEvent)).toHaveLength(0);
+    expect(kinds(rest)).toEqual(['end']);
+    expect(rest[0]!.data).toEqual({ reason: 'rotate' });
+  });
+
+  it('R2 a grant that expires while batches wait for a slow reader: end forbidden before the queued batch (minor 3)', async () => {
+    const h = await harness({ session: true });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('temp')));
+    await reader.nextMessage();
+    reader.hold();
+    for (let i = 0; i < 3; i++) {
+      const target = h.head() + 1;
+      await registerSpeaker(h, 'admin');
+      await eventually(() => h.hooks.appliedHead === target, 3_000, 'batch applied');
+      await sleep(300);
+    }
+    h.clock.advance(11 * 60_000);
+    reader.resume();
+    const rest = await reader.rest(3_000);
+    expect(rest.filter((b) => b.event === 'change').length).toBeLessThan(3);
+    expect(rest.at(-1)!.event).toBe('end');
+    expect(rest.at(-1)!.data).toEqual({ reason: 'forbidden' });
+  });
+
+  it('R3 a cursor beyond the head forces at most the spaced reloads, not one per open (minor 4)', async () => {
+    const h = await harness({ session: true });
+    track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await sleep(400);
+    const before = h.hooks.reloads;
+    for (let i = 0; i < 10; i++) {
+      const opened = await openStream(h.app, '/v1/stream', { ...asSession('capture'), 'Last-Event-ID': String(h.head() + 5) });
+      expect(kinds(await track(opened.reader!).rest())).toEqual(['reset']);
+    }
+    expect(h.hooks.reloads - before).toBeLessThanOrEqual(2);
+  });
+
+  it('R4a the route itself answers 403 R-PERM-01 when the reader has no actor in any meeting (demo header, empty log)', async () => {
+    const h = await harness({ events: [] });
+    const res = await req(h.app, 'GET', '/v1/stream', { headers: asDemo('admin:admin') });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ ruleId: 'R-PERM-01' });
+  });
+
+  it('R4b another unit (Fachbereich) of the same role ends with roles_changed', async () => {
+    const h = await harness({ session: true });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('unitswap')));
+    await reader.nextMessage();
+    // Revocation and new grant must land in one batch (else the gap between them is `forbidden`): both are written
+    // right after a reload, inside the distributor's spacing of 250 ms.
+    const target = h.head() + 1;
+    await assignFiller(h, 'admin');
+    await eventually(() => h.hooks.appliedHead === target, 3_000, 'filler applied');
+    await revokeGrant(h, 'unitswap', 0);
+    await ok(call(h, 'admin', 'POST', `/v1/meetings/${MEETING}/role-assignments`, {}, { subjectId: subject('unitswap'), role: 'expert', unitId: 'unit-ops' }));
+    const rest = await reader.rest();
+    expect(kinds(rest)).toEqual(['end']);
+    expect(rest[0]!.data).toEqual({ reason: 'roles_changed' });
+  });
+
+  it('R4c the byte limit of the backlog (lowered) closes a stalled connection below the message limit', async () => {
+    const h = await harness({ session: true, streamLimits: { backlogBytes: 2_000 } });
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: asSession('admin') });
+    expect(stalled.status).toBe(200);
+    for (let i = 0; i < 8; i++) await assignFiller(h, 'admin');
+    await sleep(400);
+    const reader = track(new StreamReader(stalled));
+    await reader.rest(2_000);
+    expect(reader.closed).toBe(true);
+    expect(reader.blocks.filter(isEvent).length).toBeLessThan(8);
+  });
+
+  it('R6 the session checker reads nothing for a queued check whose callers have all gone (minor 6)', async () => {
+    const checker = createSessionChecker({ concurrency: 1 });
+    let releaseFirst!: (valid: boolean) => void;
+    const first = checker.check('b:1', 'k1', () => new Promise<boolean>((resolve) => { releaseFirst = resolve; }));
+    let reads = 0;
+    let alive = true;
+    const second = checker.check('b:1', 'k2', async () => { reads += 1; return true; }, () => alive);
+    alive = false;
+    await eventually(() => typeof releaseFirst === 'function', 1_000, 'first read started');
+    releaseFirst(true);
+    await first;
+    await second;
+    expect(reads).toBe(0);
   });
 
   // ---- real server ---------------------------------------------------------------------------------------------

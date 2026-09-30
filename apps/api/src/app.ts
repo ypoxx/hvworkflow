@@ -172,8 +172,11 @@ export interface CreateAppOptions {
     streamLoad?: (log: readonly DomainEvent[]) => readonly DomainEvent[];
     /** Slice 035b: awaited on open between reading the head and writing the catch-up (test 13a). */
     streamHandover?: () => Promise<void>;
-    /** Slice 035b: start and end of every distributor reload and every session check (tests 28, 29). */
-    streamWindow?: (kind: 'reload' | 'session', phase: 'start' | 'end') => void;
+    /**
+     * Slice 035b: start and end of every distributor reload and every session check (tests 17, 28, 29); a session check
+     * names its occasion (`b:<seq>` for a batch, `h:…` for a heartbeat).
+     */
+    streamWindow?: (kind: 'reload' | 'session', phase: 'start' | 'end', occasion?: string) => void;
     /** Slice 035b: the head after every applied batch or rebuild of the distributor. */
     streamApplied?: (head: number) => void;
     /** Slice 035b: awaited before every distributor reload (tests 25b, 25c: a business request loads first). */
@@ -373,7 +376,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     ...(hooks?.streamReloadGate ? { reloadGate: hooks.streamReloadGate } : {}),
   });
   const streamSessionChecks = createSessionChecker({ concurrency: STREAM_SESSION_CHECKS,
-    ...(hooks?.streamWindow ? { onWindow: (phase: 'start' | 'end') => hooks.streamWindow!('session', phase) } : {}) });
+    ...(hooks?.streamWindow ? { onWindow: (phase: 'start' | 'end', occasion: string) => hooks.streamWindow!('session', phase, occasion) } : {}) });
 
   const currentActor = (): Actor => {
     const actor = actorStorage.getStore();
