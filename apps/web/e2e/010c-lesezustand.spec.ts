@@ -278,7 +278,8 @@ async function callCount(page: Page, method: string): Promise<number> {
 }
 
 /**
- * An event from somebody else: a new Wortmeldung, registered by the administration persona, which
+ * An event from somebody else: a new Wortmeldung, registered by a second, synthetic person of the
+ * Versammlungsbüro (`u-mod-2`; Scheibe 040a: the administration may not register any more), which
  * bumps `version` for every view. The actor is swapped and restored in the same task, around the
  * synchronous part of the write — the view never sees an actor change (same identity before and
  * after), only the new event.
@@ -288,7 +289,7 @@ async function callCount(page: Page, method: string): Promise<number> {
  * delivers an answer asked for one actor once the actor has changed (Entscheidung 4); the old read
  * swapped back while its answer was still on the way and so waited forever. The in-process write
  * below does its whole work synchronously (it has appended and computed its answer when the call
- * returns), so no admin request is on its way when the actor is restored.
+ * returns), so no request of the other person is on its way when the actor is restored.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
   await installHarness(page);
@@ -303,12 +304,11 @@ async function unrelatedEvent(page: Page, name: string): Promise<void> {
     ([actorUrl, displayName, version]) => {
       const w = window as unknown as Harness;
       const mod = w.__modules[actorUrl!] as {
-        DEMO_ACTORS: readonly { id: string }[];
         getActor: () => unknown;
         setActor: (actor: unknown) => void;
       };
       const before = mod.getActor();
-      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
+      mod.setActor({ id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' });
       let written: Promise<unknown>;
       try {
         written = w.__original['registerSpeaker']!({ displayName }, { ifMatch: `"v${version}"` });
@@ -363,7 +363,8 @@ async function deliverCurrentElsewhere(page: Page): Promise<void> {
   });
 }
 
-/** Reads out every staged question but one, on the unpatched API, so the next "weiter" empties the stage. */
+/** Reads out every staged question but one, on the unpatched API, so the next "weiter" empties the stage.
+ * Scheibe 040a: the stage cases that read out run as podium (the administration no longer holds `question.deliver`). */
 async function leaveOneOnStage(page: Page): Promise<void> {
   await installHarness(page);
   await page.evaluate(async () => {
@@ -1063,7 +1064,7 @@ test('010c Ziel 6 (N1): Bühne — nach einem 412 auf "Vorgelesen, weiter" fäll
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  await asRole(page, 'admin');
+  await asRole(page, 'podium');
   await leaveOneOnStage(page);
   await openStage(page);
 
@@ -1131,7 +1132,7 @@ test('010c Ziel 6 (N2): Bühne — der Fehler eines älteren "Vorgelesen" gibt d
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  await asRole(page, 'admin');
+  await asRole(page, 'podium');
   await openStage(page);
   const next = page.getByTestId('stage-next');
   const currentNumber = page.getByTestId('stage-current-number');
@@ -1161,7 +1162,7 @@ test('010c Ziel 6 (N2): Bühne — ein gescheitertes Nachlesen gibt die Sperre e
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  await asRole(page, 'admin');
+  await asRole(page, 'podium');
   await openStage(page);
   const next = page.getByTestId('stage-next');
 
@@ -1182,7 +1183,7 @@ test('010c Ziel 6 (N2): Bühne — ein gescheitertes Nachlesen gibt die Sperre e
 test('010c Ziel 6 (N3): Bühne — ein Druck ohne Schreiben lenkt den Fokus später nicht um', async ({ page }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  await asRole(page, 'admin');
+  await asRole(page, 'podium');
   await leaveOneOnStage(page);
   await openStage(page);
   await tabTo(page, 'stage-next', 30);
@@ -1222,7 +1223,7 @@ for (const via of ['button', 'key R'] as const) {
   }) => {
     await page.goto('/');
     await waitForCorpus(page);
-    await asRole(page, 'admin');
+    await asRole(page, 'podium');
     await openStage(page);
     const currentNumber = page.getByTestId('stage-current-number');
     const opened = await page.evaluate(async () => {

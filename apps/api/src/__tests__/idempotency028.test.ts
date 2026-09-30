@@ -120,24 +120,25 @@ describe('Scheibe 028: HTTP comparison versions', () => {
     expect(events()).toHaveLength(before);
   });
 
+  // Scheibe 040a: each write runs with a role that holds it; the administration keeps only assign and return.
   it.each([
-    ['/classification', { track: 'podium' }],
-    ['/assignment', { unitId: 'unit-fin' }],
-    ['/answers', { text: 'Antworttext', sources: [] }],
-    ['/review-submissions', undefined],
-    ['/approvals', { answerVersion: 1 }],
-    ['/legal-clearances', { answerVersion: 1 }],
-    ['/returns', { reason: 'Erneut prüfen' }],
-    ['/staging', undefined],
-    ['/closure', undefined],
-    ['/withdrawal', { reason: 'Zurückgezogen' }],
-    ['/merge', { intoQuestionId: 'other-question' }],
-  ] as const)('checks the question version before the state guard for %s', async (suffix, body) => {
+    ['/classification', { track: 'podium' }, 'coord:coordination'],
+    ['/assignment', { unitId: 'unit-fin' }, ACTOR.admin],
+    ['/answers', { text: 'Antworttext', sources: [] }, ACTOR.expert],
+    ['/review-submissions', undefined, ACTOR.expert],
+    ['/approvals', { answerVersion: 1 }, ACTOR.approver],
+    ['/legal-clearances', { answerVersion: 1 }, ACTOR.legal],
+    ['/returns', { reason: 'Erneut prüfen' }, ACTOR.admin],
+    ['/staging', undefined, ACTOR.approver],
+    ['/closure', undefined, ACTOR.podium],
+    ['/withdrawal', { reason: 'Zurückgezogen' }, ACTOR.moderation],
+    ['/merge', { intoQuestionId: 'other-question' }, ACTOR.moderation],
+  ] as const)('checks the question version before the state guard for %s', async (suffix, body, actor) => {
     const { app, events } = fixture();
     const path = `/v1/questions/question${suffix}`;
     const before = events().length;
-    expect((await request(app, 'POST', path, ACTOR.admin, body)).status).toBe(428);
-    expect((await request(app, 'POST', path, ACTOR.admin, body, { 'If-Match': tag(999) })).status).toBe(412);
+    expect((await request(app, 'POST', path, actor, body)).status).toBe(428);
+    expect((await request(app, 'POST', path, actor, body, { 'If-Match': tag(999) })).status).toBe(412);
     expect(events()).toHaveLength(before);
   });
 });

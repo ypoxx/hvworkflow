@@ -58,7 +58,7 @@ async function register(pool: Pool, idPrefix: string, name: string, key?: string
   const instance = app(pool, idPrefix);
   const tag = await speakerListTag(instance, meetingId);
   return instance.request(`/v1/meetings/${meetingId}/speakers`, {
-    method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
+    method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json',
       'If-Match': tag,
       ...(key === undefined ? {} : { 'Idempotency-Key': key }) },
     body: JSON.stringify({ displayName: name, round: 1 }),
@@ -177,7 +177,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
 
     const instance = app(poolA, 'two-meetings');
     const request = (id: string, name: string, tag: string) => instance.request(`/v1/meetings/${id}/speakers`, {
-      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
+      method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json',
         'Idempotency-Key': 'same-key', 'If-Match': tag },
       body: JSON.stringify({ displayName: name, round: 1 }),
     });
@@ -206,7 +206,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const instance = app(poolA, 'rollback');
     const tag = await speakerListTag(instance, meetingId);
     const request = () => instance.request(`/v1/meetings/${meetingId}/speakers`, {
-      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json',
+      method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json',
         'Idempotency-Key': 'retry-after-rollback', 'If-Match': tag },
       body: JSON.stringify({ displayName: 'Nur nach Commit', round: 1 }),
     });
@@ -219,8 +219,13 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const retried = await request();
     expect(retried.status).toBe(201);
     expect((await events()).map((event) => event.seq)).toEqual([1, 2, 3]);
-    // Admin may register a speaker but has no right to reveal the clear name in the response.
-    expect((await retried.json() as { displayName: string }).displayName).toBe('Redner 1');
+    // Scheibe 040a: only moderation registers now, and it holds question.identity.reveal, so the write
+    // response carries the clear name. The masking for a role without that right stays checked on the
+    // read path: the administration reads the same speaker as "Redner 1".
+    const written = await retried.json() as { id: string; displayName: string };
+    expect(written.displayName).toBe('Nur nach Commit');
+    const masked = await instance.request(`/v1/meetings/${meetingId}/speakers`, { headers: { 'X-Actor': ACTOR.admin } });
+    expect((await masked.json() as { id: string; displayName: string }[]).find((s) => s.id === written.id)?.displayName).toBe('Redner 1');
     expect((await owner.query<{ display_name: string }>('SELECT display_name FROM persons')).rows)
       .toEqual([{ display_name: 'Nur nach Commit' }]);
   });

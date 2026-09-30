@@ -28,6 +28,9 @@ export const historyDe = {
   'history.col.event': 'Ereignis',
   'history.col.detail': 'Angaben',
   'history.col.subject': 'Vorgang',
+  // Scheibe 040a (Rechtekonzept §4): badge at an event of a role-managing role, and its accessible name.
+  'history.actor.administrative': 'Administration',
+  'history.actor.administrative.label': 'Aktion der Administration',
   'history.payload.version': 'Version {version}',
   'history.payload.reason': 'Begründung: {reason}',
   'history.payload.unit': 'Fachbereich: {unit}',

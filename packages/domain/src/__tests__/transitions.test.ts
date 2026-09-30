@@ -281,6 +281,17 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       lines.push(`| ${role} | ${can({ id: 'x', role }, 'question.identity.reveal').allow ? '✓' : '·'} | ${can({ id: 'x', role }, 'admin.roles.manage').allow ? '✓' : '·'} |`);
     }
 
+    // Scheibe 040a: the speaker, contribution-capture and demo rights stood in no section, so their
+    // loss for the administration would have been invisible. Same `can()` decision as above.
+    const intake: Permission[] = ['speaker.register', 'speaker.reorder', 'speaker.update', 'contribution.capture', 'contribution.claim', 'demo.seed'];
+    lines.push('', '# Policy truth table — Role × Wortmeldung, Erfassung und Demo', '',
+      'Scheibe 040a: rights on speaker requests, contribution capture and the demo seed; independent of',
+      'question status. The administration holds none of the writing ones.', '',
+      '| Role | ' + intake.join(' | ') + ' |', '|---|' + intake.map(() => '---').join('|') + '|');
+    for (const role of ROLES) {
+      lines.push(`| ${role} | ${intake.map((p) => (can({ id: 'x', role }, p).allow ? '✓' : '·')).join(' | ')} |`);
+    }
+
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');
   });
 

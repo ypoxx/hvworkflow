@@ -226,6 +226,43 @@ const OTHER_RULES: readonly RuleEntry[] = [
     },
   },
   {
+    ruleId: 'R-ADM-07',
+    kind: 'Guard',
+    description:
+      'Nobody assigns a role to themselves: assignRole with subjectId equal to the acting identity answers ' +
+      '409 with this rule id and appends no event, for every role and every identity (Scheibe 040a).',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/slices/040a-admin-ohne-inhaltsrechte.md:102 (Regeltabelle; interne Sicherheitsentscheidung gegen ' +
+        'Rechteerhöhung über die Rollenzuordnung, Bedrohungsmodell MF-01/MF-07). Teilweise zu ' +
+        'docs/rollen-und-rechtekonzept.md:173 ("Administration ist Rechteverwaltung, nicht Inhaltsbearbeitung"): ' +
+        'die Zeile verbietet die Selbstzuordnung nicht ausdrücklich; keine extern bestätigte Rechtsnorm.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-ADM-08',
+    kind: 'Guard',
+    description:
+      'The last usable assignment of a role holding admin.roles.manage (not revoked; no expiry, or expiry at ' +
+      'least 24 hours after now) in a meeting in preparation or running cannot be revoked: revokeRole answers ' +
+      '409 with this rule id and appends no event. The managing roles are derived from ROLE_PERMISSIONS. ' +
+      'Expiry and meeting close still end assignments without a revoke; the margin only delays that (Scheibe 040a).',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/slices/040a-admin-ohne-inhaltsrechte.md:103 (Regeltabelle; interne Betriebsentscheidung gegen das ' +
+        'Aussperren eines Jahrgangs, Bedrohungsmodell BF-09). Keine Fundstelle in Recherche oder Ist-Analyse; ' +
+        'keine extern bestätigte Rechtsnorm.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
     ruleId: 'R-AUTH-01',
     kind: 'Guard',
     description: 'A session-cookie write requires its non-empty, matching CSRF token before any workflow event is appended.',

@@ -69,6 +69,8 @@ const PEOPLE: readonly Person[] = [
   { key: 'admin2', role: 'admin', meetingId: OTHER },
   // Review 035b minor 5 (b): an expert whose grant moves to another unit (revoke and new grant in one batch).
   { key: 'unitswap', role: 'expert', unitId: 'unit-fin' },
+  // Scheibe 040a: the administration writes no content any more; staging and classification run with these.
+  { key: 'approver', role: 'approver' }, { key: 'coordination', role: 'coordination' },
 ];
 const subject = (key: string): string => `subject-${key}`;
 const token = (key: string, n = 1): string => `tok_${key}_${n}_`.padEnd(48, 'x');
@@ -222,7 +224,8 @@ let fillers = 0;
 async function assignFiller(h: Harness, who: string, meetingId = MEETING): Promise<{ id: string }> {
   return ok(call(h, who, 'POST', `/v1/meetings/${meetingId}/role-assignments`, {}, { subjectId: `filler-${++fillers}`, role: 'observer' }));
 }
-/** A speaker registration: visible to every reader with `speaker.read` (topic `speakers`, the speaker's id). */
+/** A speaker registration: visible to every reader with `speaker.read` (topic `speakers`, the speaker's id).
+ * Scheibe 040a: the writer is moderation (the administration may not register any more). */
 async function registerSpeaker(h: Harness, who: string): Promise<{ id: string }> {
   const list = await call(h, who, 'GET', `/v1/meetings/${MEETING}/speakers`);
   expect(list.status).toBe(200);
@@ -235,8 +238,9 @@ async function questionIn(h: Harness, status: string, unitId?: string): Promise<
   if (!found) throw new Error(`no question in ${status}`);
   return found;
 }
-async function questionWrite(h: Harness, q: Q, action: string, body?: unknown): Promise<Q> {
-  return ok(call(h, 'admin', 'POST', `/v1/questions/${q.id}/${action}`, { 'If-Match': `"v${q.version}"` }, body));
+/** Scheibe 040a: `who` is a role holding the action; the administration keeps only assignment and return. */
+async function questionWrite(h: Harness, q: Q, action: string, body?: unknown, who = 'admin'): Promise<Q> {
+  return ok(call(h, who, 'POST', `/v1/questions/${q.id}/${action}`, { 'If-Match': `"v${q.version}"` }, body));
 }
 async function revokeGrant(h: Harness, key: string, index = 0, meetingId = MEETING): Promise<void> {
   const { assignments } = await corpus();
@@ -333,8 +337,8 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
       const H = h.head();
       const opening = mustOpen(h.app, '/v1/stream', { ...asSession(who), ...(cursor === 'with' ? { 'Last-Event-ID': String(H - 2) } : {}) });
       await reachedP;
-      const a = await registerSpeaker(h, 'admin');
-      const b = await registerSpeaker(h, 'admin');
+      const a = await registerSpeaker(h, 'moderation');
+      const b = await registerSpeaker(h, 'moderation');
       await eventually(() => h.hooks.appliedHead === H + 2, 3_000, 'distributor applied both');
       release();
       const reader = track(await opening);
@@ -400,20 +404,20 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     };
     // podium: a question is put on the stage -> reset (every stage.read reader is item-bound for `stage`).
     const approved = await questionIn(h, 'approved');
-    const staged = await resumeAfter('podium', () => questionWrite(h, approved, 'staging'));
+    const staged = await resumeAfter('podium', () => questionWrite(h, approved, 'staging', undefined, 'approver'));
     expect(kinds(staged)).toEqual(['reset']);
     // moderation: another question on the stage -> reset; only a classification -> change with replay: true.
     const approved2 = await questionIn(h, 'approved');
-    expect(kinds(await resumeAfter('moderation', () => questionWrite(h, approved2, 'staging')))).toEqual(['reset']);
+    expect(kinds(await resumeAfter('moderation', () => questionWrite(h, approved2, 'staging', undefined, 'approver')))).toEqual(['reset']);
     const captured = await questionIn(h, 'captured');
-    const classified = await resumeAfter('moderation', () => questionWrite(h, captured, 'classification', { track: 'expert_track' }));
+    const classified = await resumeAfter('moderation', () => questionWrite(h, captured, 'classification', { track: 'expert_track' }, 'coordination'));
     expect(kinds(classified)).toEqual(['change', 'cursor']);
     expect(classified[0]!.data).toMatchObject({ replay: true, topics: expect.arrayContaining(['questions']), subjects: [captured.id] });
     // expert (unit-fin): a question of the unit is assigned away -> reset (M3).
     const mine = await questionIn(h, 'assigned', 'unit-fin');
     expect(kinds(await resumeAfter('expert', () => questionWrite(h, mine, 'assignment', { unitId: 'unit-ops' })))).toEqual(['reset']);
     // capture: a speaker registration -> one change with replay: true.
-    const speakers = await resumeAfter('capture', () => registerSpeaker(h, 'admin'));
+    const speakers = await resumeAfter('capture', () => registerSpeaker(h, 'moderation'));
     expect(kinds(speakers)).toEqual(['change', 'cursor']);
     expect(speakers[0]!.data).toMatchObject({ replay: true, topics: expect.arrayContaining(['speakers']) });
     expect(idOf(speakers[0]!)).toBe(h.head());
@@ -622,7 +626,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(stalledAdmin.status).toBe(200);
     const speakers: string[] = [];
     for (let i = 0; i < 8; i++) {
-      speakers.push((await registerSpeaker(h, 'admin')).id);
+      speakers.push((await registerSpeaker(h, 'moderation')).id);
       await sleep(30);
     }
     await sleep(400);
@@ -801,7 +805,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     reader.hold();
     for (let i = 0; i < 3; i++) {
       const target = h.head() + 1;
-      await registerSpeaker(h, 'admin');
+      await registerSpeaker(h, 'moderation');
       await eventually(() => h.hooks.appliedHead === target, 3_000, 'batch applied');
       await sleep(300);
     }
@@ -1055,7 +1059,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     h.hooks.load = (log) => log.map(legacyActor);
     const from = h.head() - 300;
     // Service writes: a speaker registration (clear name in the payload, command fields) and a role assignment.
-    await registerSpeaker(h, 'admin');
+    await registerSpeaker(h, 'moderation');
     await assignFiller(h, 'admin');
     const head = h.head();
     const stored = h.log().slice(from, head).map(legacyActor);
@@ -1073,7 +1077,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     const catchUp = (await reader.messagesUntil((b) => b.event === 'cursor', 5_000)).filter(isEvent);
     expect(catchUp.map(idOf)).toEqual(stored.map((e) => e.seq));
     catchUp.forEach((block, i) => expect(block.data).toEqual(expected(stored[i]!)));
-    await registerSpeaker(h, 'admin');
+    await registerSpeaker(h, 'moderation');
     const live = await reader.until(isEvent);
     const liveStored = legacyActor(h.log()[idOf(live) - 1]!);
     expect(typeof payloadName(liveStored)).toBe('string');

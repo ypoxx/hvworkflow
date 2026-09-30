@@ -7,7 +7,7 @@
  * - Transitions are checked in `transitions.ts`; `can()` combines both.
  */
 import type { Actor, Permission, QuestionStatus, Role } from './types.js';
-import { PERMISSIONS, READ_PERMISSIONS } from './types.js';
+import { READ_PERMISSIONS } from './types.js';
 
 /**
  * Rights vested by role (Festlegung 4 of docs/slices/010-lesepfade-leserechte.md — the read grants
@@ -70,9 +70,25 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'question.identity.reveal',
   ],
   podium: ['question.deliver', 'question.return', 'question.close', 'stage.read', 'question.identity.reveal'],
-  // Scheibe 025: the agenda grant is explicit. All other bundles deny it by default.
-  admin: [...PERMISSIONS.filter((permission) => !['agenda.manage', 'admin.roles.manage', 'question.identity.reveal', 'contribution.claim', 'question.claim'].includes(permission)),
-    'agenda.manage', 'admin.roles.manage'],
+  // Scheibe 040a (Rechtekonzept §4, "Administration: Rechte, keine Inhalte"): an explicit list, no
+  // derivation from PERMISSIONS, so a new permission never falls to the administration silently
+  // (§3 point 4, deny by default). It reads, routes (assign to a unit, return into the work) and
+  // manages; it writes no content and takes no working step, `question.withdraw` included
+  // (Eigentümerfrage 2c). Parts 040b–040d add their rights here, visibly.
+  admin: [
+    'speaker.read',
+    'contribution.read',
+    'question.read',
+    'question.read.delivered',
+    'stage.read',
+    'history.read',
+    'event.read',
+    'question.assign',
+    'question.return',
+    'agenda.manage', // Scheibe 025: the only holder (Ablaufsteuerung)
+    'admin.roles.manage',
+    'demo.seed', // demo only; 042 limits it
+  ],
   observer: ['question.read.delivered'],
 };
 

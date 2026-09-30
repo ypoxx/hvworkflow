@@ -18,6 +18,7 @@ import {
   readVerdict,
   returnTargetOf,
   returnWrite,
+  stageOnlyByRights,
   shownQuestion,
 } from './lib';
 import type { DeliverLock, KeyedRead } from './lib';
@@ -248,5 +249,28 @@ describe('returnTargetOf, returnWrite (takt-039, minor 7)', () => {
     expect(returnTargetOf(staged('qa', 3, ['question.deliver']))).toBeNull();
     expect(returnTargetOf(null)).toBeNull();
     expect(returnTargetOf(undefined)).toBeNull();
+  });
+});
+
+/**
+ * Scheibe 040a, Test 11: "Nur Bühne" by rights, moved unchanged from `Page.tsx`. The e2e case 020 m2
+ * needed a demo role holding `question.deliver` together with working actions; after 040a none does,
+ * so the rule is checked here with synthetic action lists instead (a move, not a weakening).
+ */
+describe('stageOnlyByRights (Scheibe 040a, moved from Page.tsx)', () => {
+  it('is true for the read-out right alone', () => {
+    expect(stageOnlyByRights(['question.deliver'])).toBe(true);
+    expect(stageOnlyByRights(['question.deliver', 'question.return', 'question.close'])).toBe(true);
+  });
+
+  it('is false as soon as a working action comes with it', () => {
+    for (const work of ['question.capture', 'question.classify', 'answer.draft', 'question.approve'] as const) {
+      expect(stageOnlyByRights(['question.deliver', work]), work).toBe(false);
+    }
+  });
+
+  it('is false without the read-out right', () => {
+    expect(stageOnlyByRights([])).toBe(false);
+    expect(stageOnlyByRights(['question.return', 'question.stage'])).toBe(false);
   });
 });

@@ -158,13 +158,14 @@ describe('i18n parity checks', () => {
   // Scheibe takt-028: +1 `boot.failed.invalidJson` for an unreadable demo log.
   // Scheibe takt-023: +2 `noRole.title`/`noRole.body` for the lost-role page.
   // takt-039 (review minor 7): +1 `stage.return.question`, the return dialog names its question.
-  it('(f) Total key count is 515 across all modules and matches de and en', () => {
+  // Scheibe 040a: +2 `history.actor.administrative` and `.label`, the badge at an administrative event.
+  it('(f) Total key count is 517 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(515);
-    expect(deKeys).toBe(515);
-    expect(enKeys).toBe(515);
+    expect(totalKeys).toBe(517);
+    expect(deKeys).toBe(517);
+    expect(enKeys).toBe(517);
   });
 });

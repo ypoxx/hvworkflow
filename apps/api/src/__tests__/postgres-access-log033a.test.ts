@@ -51,7 +51,7 @@ function build() {
     { headers: { 'X-Actor': ACTOR.admin } })).headers.get('ETag')!;
   const register = async (ifMatch?: string): Promise<Response> => app.request(`/v1/meetings/${meetingId}/speakers`, {
     method: 'POST',
-    headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': ifMatch ?? await tag() },
+    headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': ifMatch ?? await tag() },
     body: JSON.stringify({ displayName: 'Nur synthetisch', round: 1 }) });
   return { app, sink, lines, register };
 }

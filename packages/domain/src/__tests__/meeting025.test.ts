@@ -8,6 +8,10 @@ import { ROLE_PERMISSIONS } from '../permissions.js';
 import { stampEvent } from '../envelope.js';
 
 const admin: Actor = { id: 'test-admin', role: 'admin' };
+// Scheibe 040a: the administration writes no content; speaker requests and capture run with the
+// roles that hold those rights.
+const moderation: Actor = { id: 'test-mod', role: 'moderation' };
+const capture: Actor = { id: 'test-cap', role: 'capture' };
 const at = '2027-04-20T10:00:00.000Z';
 
 function meetingEvent(id: string, date: string): NewEvent {
@@ -26,7 +30,7 @@ function lifecycleEvent(type: 'MeetingStarted' | 'MeetingClosed' | 'DebateClosed
 describe('Scheibe 025: Jahrgang und R-MTG', () => {
   it('does not write an unscoped event before a meeting exists', async () => {
     const store = createInMemoryEventStore();
-    const api = createInProcessApi({ store, actor: () => admin });
+    const api = createInProcessApi({ store, actor: () => moderation });
     await expect(api.registerSpeaker({ displayName: 'Ohne Jahrgang' })).rejects.toMatchObject({ status: 404 });
     expect(store.lastSeq()).toBe(0);
   });
@@ -49,9 +53,11 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
     const legacy = stampEvent(meetingEvent('hv-2026', '2026-04-20'), 1, '');
     const persisted = [legacy];
     const store = createInMemoryEventStore({ load: () => persisted, save: (events) => { persisted.splice(0, persisted.length, ...events); } });
-    const api = createInProcessApi({ store, actor: () => admin });
+    let who: Actor = moderation;
+    const api = createInProcessApi({ store, actor: () => who });
     expect((await api.getMeeting()).status).toBe('running');
     const speaker = await api.registerSpeaker({ displayName: 'Bestandsdatum' }, { ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
+    who = capture;
     await expect(api.captureContribution({ speakerId: speaker.id, text: 'Weiter nutzbar' }, { ifMatch: etagOf(speaker.version) })).resolves.toMatchObject({ text: 'Weiter nutzbar' });
     expect(store.all()[0]).toEqual(legacy);
     expect(store.all().some((event) => event.type === 'MeetingStarted')).toBe(false);
@@ -138,16 +144,18 @@ describe('Scheibe 025: Jahrgang und R-MTG', () => {
       lifecycleEvent('MeetingStarted', 'hv-2026', '2026-04-20T10:01:00.000Z'),
       meetingEvent('hv-2027', '2027-04-20'),
       lifecycleEvent('MeetingStarted', 'hv-2027', '2027-04-20T10:01:00.000Z')]);
-    const old = createInProcessApi({ store, actor: () => admin, meetingId: 'hv-2026',
+    let who: Actor = moderation;
+    const old = createInProcessApi({ store, actor: () => who, meetingId: 'hv-2026',
       clock: () => new Date('2027-04-20T10:30:00.000Z') });
-    const current = createInProcessApi({ store, actor: () => admin, meetingId: 'hv-2027',
+    const current = createInProcessApi({ store, actor: () => who, meetingId: 'hv-2027',
       clock: () => new Date('2027-04-20T10:30:00.000Z') });
-    const alias = createInProcessApi({ store, actor: () => admin });
+    const alias = createInProcessApi({ store, actor: () => who });
     const oldSpeaker = await old.registerSpeaker({ displayName: 'Alt' }, { ifMatch: etagOf((await old.getMeeting()).speakerListVersion) });
     const newSpeaker = await current.registerSpeaker({ displayName: 'Neu' }, { ifMatch: etagOf((await current.getMeeting()).speakerListVersion) });
     expect((await alias.getMeeting()).id).toBe('hv-2027');
     expect((await alias.listSpeakers()).map((s) => s.id)).toEqual([newSpeaker.id]);
     await expect(current.getSpeaker(oldSpeaker.id)).rejects.toMatchObject({ status: 404 });
+    who = capture;
     await expect(current.captureContribution({ speakerId: oldSpeaker.id, text: 'Fremd' }))
       .rejects.toMatchObject({ status: 404 });
     const oldContribution = await old.captureContribution({ speakerId: oldSpeaker.id, text: 'Alttext' }, { ifMatch: etagOf(oldSpeaker.version) });

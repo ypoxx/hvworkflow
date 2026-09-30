@@ -707,6 +707,26 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     return true;
   };
 
+  /**
+   * R-ADM-08 (Scheibe 040a): whether revoking `assignment` would leave a meeting in preparation or
+   * running without a usable ("tragfähig") assignment of a role-managing role. The managing roles
+   * come from the rights data (every bundle holding `admin.roles.manage`, AGENTS.md R4). Usable means
+   * not revoked and not expiring within the next 24 hours, so an assignment about to lapse is no
+   * backing. Expiry and meeting close still end assignments without a revoke; the margin only
+   * delays that (named limit, docs/slices/040a-admin-ohne-inhaltsrechte.md, Ziel 3).
+   */
+  const USABLE_MARGIN_MS = 24 * 60 * 60 * 1000;
+  const GUARDED_MEETING_STATUSES: readonly Meeting['status'][] = ['preparation', 'running'];
+  const managesRoles = (role: Role): boolean => ROLE_PERMISSIONS[role]?.includes('admin.roles.manage') === true;
+  const isUsable = (item: RoleAssignment): boolean => !item.revokedAt &&
+    (item.expiresAt === undefined || Date.parse(item.expiresAt) >= clock().getTime() + USABLE_MARGIN_MS);
+  const isLastUsableManagingAssignment = (assignment: RoleAssignment): boolean => {
+    if (!state.meeting || !GUARDED_MEETING_STATUSES.includes(state.meeting.status)) return false;
+    if (!managesRoles(assignment.role) || !isUsable(assignment)) return false;
+    return ![...state.roleAssignments.values()].some((item) =>
+      item.id !== assignment.id && managesRoles(item.role) && isUsable(item));
+  };
+
   return {
     async listRoleAssignments(filter = {}) {
       requirePermission('admin.roles.manage');
@@ -726,6 +746,10 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           throw new ApiProblem(422, 'Unprocessable', 'A pseudonymous deputyForSubjectId is required.');
         if (!input.role || !Object.hasOwn(ROLE_PERMISSIONS, input.role))
           throw new ApiProblem(422, 'Unprocessable', 'A valid role is required.');
+        // R-ADM-07 (Scheibe 040a): nobody assigns a role to themselves, whatever the role; otherwise an
+        // administrator could grant itself an approving role and act under it (MF-01, MF-07).
+        if (input.subjectId === actor().id)
+          throw new ApiProblem(409, 'Conflict', 'A role cannot be assigned to oneself.', 'R-ADM-07');
         if (input.unitId !== undefined && !state.units.some((unit) => unit.id === input.unitId))
           throw new ApiProblem(404, 'Not found', 'Unit does not exist here.');
         if (input.personId !== undefined && !state.persons.has(input.personId))
@@ -754,6 +778,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         if (assignment.revokedAt) throw new ApiProblem(409, 'Conflict', 'Role assignment already revoked.');
         if (reason !== undefined && !reason.trim()) throw new ApiProblem(422, 'Unprocessable', 'reason must not be empty.');
         if (reason !== undefined && reason.trim().length > 500) throw new ApiProblem(422, 'Unprocessable', 'reason must not exceed 500 characters.');
+        if (isLastUsableManagingAssignment(assignment))
+          throw new ApiProblem(409, 'Conflict', 'The last usable role-management assignment of this meeting cannot be revoked.', 'R-ADM-08');
         append([{ type: 'RoleRevoked', subjectId: id, payload: {
           assignmentId: id, subjectId: assignment.subjectId, role: assignment.role,
           ...(reason !== undefined ? { reason: reason.trim() } : {}),

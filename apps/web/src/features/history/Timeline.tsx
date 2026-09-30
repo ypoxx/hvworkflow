@@ -9,7 +9,7 @@ import { EmptyState, Sparkline, cx } from '../../components';
 import { eventTypeLabel, useT } from '../../i18n';
 import { eventSubject, eventSummary } from './eventSummary';
 import type { SummaryContext } from './eventSummary';
-import { clockTime, elapsedSpan, eventGap, historyKpi } from './lib';
+import { clockTime, elapsedSpan, eventGap, historyKpi, isAdministrativeRole } from './lib';
 import { History } from 'lucide-react';
 
 function Kpi({ label, value }: { label: string; value: string }) {
@@ -42,6 +42,27 @@ export function HistoryKpiLine({ events }: { events: readonly DomainEvent[] }) {
       <Kpi label={t('history.kpi.versions')} value={String(kpi.versions)} />
       <Kpi label={t('history.kpi.returns')} value={String(kpi.returns)} />
     </div>
+  );
+}
+
+/**
+ * Scheibe 040a (Rechtekonzept §4): an action of a role-managing role is highlighted where the actor
+ * stands, in both readings of the log. Text, not colour alone (accessibility); the role is judged
+ * from the rights data (`isAdministrativeRole`), never by name. Display only.
+ */
+function AdministrativeBadge({ event }: { event: DomainEvent }) {
+  const t = useT();
+  if (!isAdministrativeRole(event.actor.role)) return null;
+  return (
+    <span
+      data-testid="history-admin-badge"
+      role="note"
+      aria-label={t('history.actor.administrative.label')}
+      title={t('history.actor.administrative.label')}
+      className="hv-badge tone-warning"
+    >
+      {t('history.actor.administrative')}
+    </span>
   );
 }
 
@@ -85,6 +106,7 @@ export function Timeline({
                 <span className="text-2xs text-ink-600">
                   {event.actor.displayName ?? event.actor.id}
                 </span>
+                <AdministrativeBadge event={event} />
                 {previous !== undefined && (
                   <span
                     data-testid="history-duration"
@@ -158,8 +180,11 @@ export function EventStream({
               <span className="block truncate text-[13px] text-ink-900">
                 {eventTypeLabel(t, event.type)}
               </span>
-              <span className="block truncate text-2xs text-ink-600">
-                {event.actor.displayName ?? event.actor.id}
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="truncate text-2xs text-ink-600">
+                  {event.actor.displayName ?? event.actor.id}
+                </span>
+                <AdministrativeBadge event={event} />
               </span>
             </span>
             <span className="truncate text-[13px] text-ink-600">

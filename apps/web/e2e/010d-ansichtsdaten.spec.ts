@@ -285,15 +285,22 @@ async function switchActor(page: Page, role: string): Promise<void> {
   );
 }
 
+/** Scheibe 040a: who writes out of view. A write runs with a person that holds its right. */
+type WriteActor = { id: string; role: string; displayName: string };
+const SECOND_MODERATION: WriteActor = { id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' };
+const DEMO_ADMIN: WriteActor = { id: 'u-admin', role: 'admin', displayName: 'Administration' };
+const DEMO_EXPERT: WriteActor = { id: 'u-exp-fin', role: 'expert', displayName: 'Fachbereich Finanzen' };
+
 /**
- * An event from somebody else: a new Wortmeldung, registered by the administration persona, which
+ * An event from somebody else: a new Wortmeldung, registered by a second, synthetic person of the
+ * Versammlungsbüro (`u-mod-2`; Scheibe 040a: the administration may not register any more), which
  * bumps `version` for every view. The actor is swapped and restored in the same task — the view
  * never sees an actor change, only the new event. Synchronous: the evaluate awaits nothing in the
  * page; the outcome is polled.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
   const version = await currentVersion(page, 'getMeeting', 'speakerListVersion');
-  await elsewhere(page, 'registerSpeaker', [{ displayName: name }, { ifMatch: `"v${version}"` }]);
+  await elsewhere(page, 'registerSpeaker', [{ displayName: name }, { ifMatch: `"v${version}"` }], SECOND_MODERATION);
 }
 
 /**
@@ -322,28 +329,27 @@ async function currentVersion(
 }
 
 /**
- * A write from somebody else — the administration persona, on the unpatched API, the actor swapped
- * and restored in the same task. Synchronous: the evaluate awaits nothing in the page; the outcome
+ * A write from somebody else — `who`, on the unpatched API, the actor swapped and restored in the
+ * same task (Scheibe 040a: `who` holds the right; before, the administration persona wrote everything). Synchronous: the evaluate awaits nothing in the page; the outcome
  * is polled and must be `ok`. Returns the `version` of the written resource from the write's answer.
  *
  * Slice 036a (Bauklärung): the in-process write does its whole work synchronously — it has checked
- * the rights of the administration persona, appended and computed its answer when the call returns —
- * so no admin request is on its way when the actor is restored. Writes are never withheld by the
+ * the rights of `who`, appended and computed its answer when the call returns — so no request of
+ * `who` is on its way when the actor is restored. Writes are never withheld by the
  * live store; only reads are bound to the actor they were asked for.
  */
-async function elsewhere(page: Page, method: string, args: unknown[]): Promise<number | undefined> {
+async function elsewhere(page: Page, method: string, args: unknown[], who: WriteActor): Promise<number | undefined> {
   const index = await page.evaluate(
-    ([actorUrl, name, callArgs]) => {
+    ([actorUrl, name, callArgs, writer]) => {
       const w = window as unknown as Harness & { __writes?: string[]; __written?: (number | undefined)[] };
       const mod = w.__modules[actorUrl as string] as {
-        DEMO_ACTORS: readonly { id: string }[];
         getActor: () => unknown;
         setActor: (actor: unknown) => void;
       };
       const writes = (w.__writes ??= []);
       const written = (w.__written ??= []);
       const before = mod.getActor();
-      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
+      mod.setActor(writer);
       let answer: Promise<unknown>;
       try {
         answer = w.__original[name as string]!(...(callArgs as unknown[]));
@@ -361,7 +367,7 @@ async function elsewhere(page: Page, method: string, args: unknown[]): Promise<n
       );
       return at;
     },
-    [ACTOR_MODULE, method, args] as const,
+    [ACTOR_MODULE, method, args, who] as const,
   );
   await expect
     .poll(() => page.evaluate((at) => (window as unknown as { __writes: string[] }).__writes[at], index))
@@ -762,9 +768,10 @@ async function approveAThenChangeElsewhere(
   // Slice 036a (Bauklärung): A is on legal's screen, so legal reads its version; the version for the second write
   // comes from the answer of the first.
   const beforeReturn = await currentVersion(page, 'getQuestion', 'version', firstId);
-  const beforeReview = await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.', { ifMatch: `"v${beforeReturn}"` }]);
+  const beforeReview = await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.', { ifMatch: `"v${beforeReturn}"` }], DEMO_ADMIN);
   expect(beforeReview).toBeGreaterThan(beforeReturn);
-  await elsewhere(page, 'submitForReview', [firstId, { ifMatch: `"v${beforeReview}"` }]);
+  // Scheibe 040a: submitting is the Fachbereich's step; the administration no longer holds it.
+  await elsewhere(page, 'submitForReview', [firstId, { ifMatch: `"v${beforeReview}"` }], DEMO_EXPERT);
   return { first, second, rowB };
 }
 

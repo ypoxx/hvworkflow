@@ -2,8 +2,19 @@
  * Helpers of the history view. Local to the feature: how a time is printed and how much of a text a
  * row can carry is a decision of this view, not of the component kit.
  */
-import type { DomainEvent, HvApi, Question, QuestionFilter, ReadEvent } from '@hv/domain';
+import { hasPermission } from '@hv/domain';
+import type { DomainEvent, HvApi, Question, QuestionFilter, ReadEvent, Role } from '@hv/domain';
 import type { Translate } from '../../i18n';
+
+/**
+ * Scheibe 040a (Rechtekonzept §4: every administrative action on content is highlighted in the
+ * course of the question): whether an event's role is a role-managing one, read from the rights data
+ * (`admin.roles.manage` in its bundle), never from a role name (AGENTS.md R4). For display only; it
+ * decides nothing about what anybody may do.
+ */
+export function isAdministrativeRole(role: Role): boolean {
+  return hasPermission({ id: 'history-display', role }, 'admin.roles.manage').allow;
+}
 
 /** How many results are rendered before the person is asked to narrow the search. */
 export const RESULT_LIMIT = 200;
