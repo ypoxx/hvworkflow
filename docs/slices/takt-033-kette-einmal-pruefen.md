@@ -299,6 +299,17 @@ Deterministisch in jedem Lauf: kalt alle gehasht (Lader alle, Store 0), warm 0 g
 3 neuen genau 3 gehasht und 3 Zeilen gelesen. „Lader warm“ ist Digest-Abfrage plus Suffix plus Personen. Die absolute
 Grenze von 100 ms für die ganze Anfrage wurde in allen drei Läufen eingehalten; sie wird nur noch protokolliert.
 
+**Nachlauf nach Codex P1 auf dem integrierten Commit `05ae921`** (Fix `a6cc950` plus Basis mit takt-035 eingemergt),
+`pnpm gates` mit Postgres-Variablen, sauberer Baum, Exit 0; domain 243, web 255, api 523 Tests grün. Wörtlicher Schluss:
+
+```
+✓ built in 1.71s
+mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 05ae921, tree 97d41a59c987…
+```
+
+Nachprüfung des Fixes in frischem Kontext (Opus): kein Blocker, kein Major. Ein Minor und zwei Nits gehen auf die
+Folgeliste (Doku `ChainLoad.rowsRead`, doppeltes Lesen im Abweichungsfall, pg-Warnung zu parallelen Abfragen).
+
 ## Review findings
 
 Security-Review (Opus, frischer Kontext, Kopf `57fde30`): kein Blocker, kein Major zur Sicherheit, keine
