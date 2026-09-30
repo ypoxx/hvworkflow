@@ -394,11 +394,99 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Off
 
 ```
 Slice: 035b-sse-dienst
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 12–29; Zustellzeiten; Lastwerte
-Open: Eigentümerfragen 1–3; Lasttest 071
-Touched: <Dateiliste>
+Done: GET /v1/stream über die ganze Middleware-Kette und validateOperation, ohne Postgres-Grenze und ohne domain-Proxy.
+      Verteiler je App mit eigener Kontinuitätsprüfung (lastSeq, lastHash), Übergabe Nachlauf -> live ohne Lücke.
+      Akteurkarte und frische Sitzungsprüfung je Stapel, Herzschlag und Frame; Grenzen 3/6/200, Rotation 25 min, Rückstau.
+Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa, 2769802 (Codex P1/P2), fd2d233
+      (letzter Codecommit: Tests R8b, R9, R10, Test 24 ab COMMIT, 24b); ADR-Commits des Architekten 598273f, 2f24065, 03a8dec;
+      Basis 036a eingebracht in f37647d; takt-040 (Vertrag 0.3.12) eingebracht in 228b234; eac50cb (R9 Vollvergleich,
+      Rahmenfehler beendet alle Ströme); 8983814 (hub.fail nur bei fehlendem Hash, Öffnen bei Integritätsfehler 500,
+      verworfener Verteiler vor der Rechteprüfung); geprüfte Fassung 8983814.
+      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 8983814 (zweiter Lauf; der erste Lauf auf 8983814 war
+      rot mit zwei zeitabhängigen 034a-Tests und einer von rund 200 Stichproben in Test 28 unter Last, siehe Folgeliste):
+        apps/api test:  Test Files  39 passed (39)
+        apps/api test:       Tests  586 passed (586)
+        apps/api test: operation-coverage: 66 operations in the contract, 60 exercised by tests, 6 pre-declared in allowlist.json
+        apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+        slice-scope: 14 changed file(s), all within "docs/slices/035b-sse-dienst.md"'s "Files allowed" list (20 pattern(s)).
+        ✓ built in 1.80s
+        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 8983814, tree e3756768730f…
+        exit 0
+      Stabilität auf a82225b: beide Stromdateien dreimal hintereinander je 60/60 grün.
+      Tests (apps/api/src/__tests__/stream035.test.ts, postgres-stream035.test.ts); rot auf 6034a90 (Route fehlte, 37 von 38 rot),
+      grün auf 8983814:
+        12 Öffnen (200, Köpfe, retry, Heartbeat); Fehlerfälle 401/403/422/404/Preflight; Demo-Filter 403; 12 (Postgres) Migrationen 503
+        13, 13a (Commit während der Übergabe), 13b (cursor nach Aufbau), 13c (nach reset)
+        14 podium/moderation/expert/capture nach Trennung; 15 Cursor > Kopf, Abstand > 1000
+        16 RoleRevoked forbidden, Einengung und zweiter Jahrgang roles_changed, Ablauf am Heartbeat
+        17 Abmelden/Sperre/Leerlauf session, slideIdle false, eine Prüfung je Stapel und Sitzung, Abmelden zwischen Stapeln, Prüffehler
+        18 Grenzen 429/429/503, 10 parallele Öffnungen 3x200/7x429, Freigabe nach Abbruch; 19 rotate
+        20 Nachlauf 1000 an langsamen Leser, Rückstau; 21 Zugriffslog; 22 Jahrgangsfilter; 23 Ereignis ohne Hash, Hörer ohne Arbeit
+        23a Frische beim Öffnen; 23b Kontinuität ohne Postgres; 23c Lebensdauer < SESSION_IDLE_MS (von Anfang an grün: Konstante vor dem Test)
+        24 zweite Instanz; 25 Manipulation; 25b/25c Kette ersetzt/gekürzt, zuerst von Fachanfrage gesehen; 26; 27; 28; 29
+        echter Server über 30 s mit den serverOptions aus server.ts
+      Review-Tests (rot auf dem Stand vor der jeweiligen Behebung bzw. Mutant getötet):
+        R1 hängender Nachlauf: Abmelden+Sperre (rot: 1000 Ereignisse), Ablauf (rot: change,cursor,end), Rotation (rot: 429)
+        R1d hängender Live-Stapel (rot auf 1bcfd4f: 7 > 1); R1e Warten je Nachlauf-Frame (Mutant catchUpMayGoOn: 133 > 1)
+        R1f Warten je Live-Frame bei hängender Prüfung (Mutant ohne Zeile 306: 7 > 1); R1g end nicht abgenommen -> Abbruch (rot auf 28f7af3)
+        R2 Ablauf vor gepuffertem Stapel (rot: Strom blieb offen); R3 Cursor > Kopf höchstens 2 Nachladen (rot: 10)
+        R3b Leerlauf-Nachladen mit Abstand (rot: kleinster Abstand 20 ms); R4a/R4b/R4c Mutanten (leere Karte, unitId, Byte-Grenze) getötet
+        R6 keine Lesung ohne Wartende (rot: 1); R6b Beitretender (Mutant ohne callers.push getötet); R6c GONE (rot auf 1bcfd4f)
+        R7 Nachlauf-Frames einzeln erzeugt, höchstens 2 bei hängendem Leser (rot auf 5736faa: 1000)
+        R8 Rückstau zählt den laufenden Stapel (rot auf 5736faa: Verbindung blieb offen)
+        R8b Zähler des laufenden Stapels sinkt je Frame (Mutant ohne Abzug getötet; Mutant nur ohne Rücksetzen ist gleichwertig)
+        R9 jeder Nachlauf- und Live-Rahmen gleich maskEvent des gespeicherten Originals (Log älterer Form mit Akteur-Klarname
+        und personId; Mutanten `event: e`, `{ ...maskEvent(e), payload: e.payload }`, `{ ...maskEvent(e), actor: e.actor }` getötet)
+        R10 Nachlauf-Ereignis ohne Hash: frühere Ereignisse gehen hinaus, dann end {unavailable} auf allen Strömen, neues
+        Öffnen 500 ohne Retry-After, stderr-Zeile (Mutanten „reset statt end“ und „ohne hub.fail“ getötet; rot auf eac50cb: 503)
+        R11 anderer Rahmenfehler im Nachlauf beendet nur diese Verbindung, der Live-Strom bleibt, neues Öffnen 200
+        (Mutant „jeder Fehler ruft hub.fail“ getötet; rot auf eac50cb)
+        R12 nach hub.fail meldet der Verteiler „nicht geladen“ (Mutant „loaded immer true“ getötet); die Prüfung in der
+        Route vor der Rechteauflösung ist nicht eigens getestet (Mikrotask-Lücke nicht deterministisch herstellbar)
+        Verhaltensänderung seit 2769802: früher wurde der ganze Nachlauf zu `reset`, jetzt gehen die früheren Ereignisse
+        hinaus, und alle Ströme enden mit `end {unavailable}` (wie Entscheidung 3, m6).
+        24 Zustellung ab COMMIT, zweite Instanz vorgewärmt; 24b langsamer Schreibvorgang (2,1 s): ab Anfrage gemessen 3,0 s
+        (alte Messung rot, wie CI-Lauf 36740563257 mit 3014 ms), ab COMMIT 0,7–0,8 s (grün)
+      Messwerte (a82225b, drei Läufe, Rechner durch parallele Playwright-Läufe belastet, Last 5 auf 4 Kernen):
+        Test 24 ab COMMIT zweite Instanz 8–98 ms, gleiche Instanz 168–191 ms; 24b ab COMMIT 794–836 ms;
+        Test 28 177–196 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
+        Test 29 Schreiben max 1285–1935 ms, Median 622–1127 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
+        Stapel bis letzte Zustellung 341–586 ms.
+Open: Eigentümerfragen 1–3; Lasttest 071; Vertragswortlaut „gap-free in seq“ unter meetingId vor dem Bau von 036b (Folgeliste).
+Touched: apps/api/src/stream/hub.ts, apps/api/src/stream/route.ts, apps/api/src/stream/sessionCheck.ts, apps/api/src/stream/sse.ts,
+      apps/api/src/app.ts, apps/api/src/limits/config.ts, apps/api/src/__tests__/stream035.test.ts,
+      apps/api/src/__tests__/stream-reader035.ts, apps/api/src/__tests__/postgres-stream035.test.ts,
+      packages/contract/allowlist.json, docs/sicherheit/bedrohungsmodell.md, docs/folgeliste.md,
+      docs/slices/035b-sse-dienst.md, docs/adr/0014-realtime-sse.md (Architekt, Restrisiko-Satz auf Vorgabe)
 ```
+
+## Bauklärung (Bau 035b, 30.09.2026)
+
+Zwei Punkte, die Vertrag 0.3.11 offen ließ, im Rahmen von Spec und Vertrag entschieden (keine Vertragsänderung; Wortlaut
+auf der Folgeliste):
+
+1. **`meetingId`-Filter.** Mit Filter liefert der Strom jedes Ereignis dieses Jahrgangs nach dem Cursor genau einmal und
+   aufsteigend; `id` bleibt die globale `seq`, Lücken sind Ereignisse anderer Jahrgänge. „Gap-free in `seq`“ gilt nur
+   ohne Filter (so auch Entscheidung 5, Garantie). Ereignisse ohne Jahrgang gehören nicht zu „events of this meeting“
+   (`MeetingIdFilter`) und kommen unter einem Filter auch bei `event.read` nicht; ohne Filter nur bei `event.read`
+   (unverändert 035a). Der Kopf rückt über `cursor` mit dem Heartbeat nach. Die Grenze von 1000 für den Nachlauf zählt
+   den globalen Abstand.
+2. **`Retry-After` bei 503 `StreamUnavailable`.** Immer 30, für alle drei Ursachen (Prozessgrenze, Migrationen offen,
+   Persistenz beschäftigt beim Öffnen); ebenso 30 bei den stromeigenen 429. Das liegt im Schema 1–60 des gemeinsamen
+   Kopfs; 2 wie bei `PersistenceBusy` entfällt, weil das Öffnen keine Schreibwarteschlange kennt und viele Clients sonst
+   im Zwei-Sekunden-Takt wiederkämen.
+
+Abweichungen vom Spec-Text: Test 12 „Migrationen offen“ steht in `postgres-stream035.test.ts` (ohne Postgres nicht
+herstellbar). `req()` puffert SSE nicht; der Test-Leser öffnet über `req()`, damit zählt das Abdeckungstor `streamEvents`
+(Vor-dem-Bau-Punkt 4). Ein Cursor über dem Kopf lädt vor dem `reset` einmal frisch nach (ein Schreibvorgang einer anderen
+Instanz innerhalb der Frische-Sekunde). Die `serverOptions` aus `server.ts` sind nicht exportiert; der Test mit echtem
+Server wiederholt die drei Zahlen (Befund, `server.ts` unverändert).
+
+- **Orchestrator (30.09.2026):** Der ADR-0014-Nachtrag geht über die enge Erlaubnis („Nachweis“ und Ergänzung
+  Domänenfunktion, Teilung, Rotation) hinaus: Dienstentwurf, Grenzentabelle, Bauklärungen, Client-Seite 036,
+  Eigentümerfragen. Vom Orchestrator angenommen, weil ADR 0014 die Entscheidung dokumentiert und diese Punkte zu ihr
+  gehören; Überbehauptungen aus der Nachprüfung (Prüfung beim hängenden Live-Stapel, `Retry-After` nach `end`) sind
+  berichtigt.
 
 ## Review findings
 

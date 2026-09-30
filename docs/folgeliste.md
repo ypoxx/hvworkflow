@@ -273,6 +273,36 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035a Nachprüfung nit 4 · `apps/api/src/__tests__/postgres-stream035a.test.ts` (Kopf) · der Test ist ein Happy-Path-Pin;
   die Ursache des damaligen `e2e-http`-Rots war die Basis (takt-039), nicht 035a · im Kopf vermerken.
 
+## Strom-Dienst (aus 035b)
+
+- ~~035b Bau · `packages/contract/openapi.yaml` (`streamEvents`, Abschnitt „Rights per message“) · der Satz „gap-free in
+  `seq`“ gilt nur ohne `meetingId`-Filter; gebaut: mit Filter kommt jedes Ereignis dieses Jahrgangs nach dem Cursor genau
+  einmal und aufsteigend, `id` bleibt global (Lücken = Ereignisse anderer Jahrgänge), Ereignisse ohne Jahrgang gehören
+  nicht zum Filter; der Kopf rückt über `cursor` mit dem Heartbeat nach · Wortlaut im nächsten 0.3.x-Vertragsstand angleichen;
+  vor dem Bau von 036b beheben (Review 035b minor 7).~~ → erledigt in **takt-040** (Vertrag 0.3.12, Absatz „`meetingId` filter“).
+- ~~035b Bau · `packages/contract/openapi.yaml` (`components/headers/RetryAfter`) · die Beschreibung nennt nur die Werte
+  für 429 und `PersistenceBusy`; `StreamUnavailable` sendet immer 30 (Stromgrenze, Migrationen offen, Persistenz beschäftigt),
+  auch die stromeigenen 429 senden 30; im Schema 1–60 · Beschreibung ergänzen.~~ → erledigt in **takt-040** (Vertrag 0.3.12).
+- 035b Bau · `packages/contract/openapi.yaml` · keine Operation dokumentiert 500; ein Öffnen bei verletzter Kette antwortet
+  wie jede Fachanfrage 500 (Test 25 liest es deshalb über `app.request`, nicht über `req()`) · mit 0.4.0 (043) klären.
+- 035b Bau · `apps/api/src/server.ts:58` · die `serverOptions` sind nicht exportiert; der Test mit echtem Server wiederholt
+  die drei Zahlen · bei der nächsten Änderung an `server.ts` als Konstante exportieren und im Test verwenden.
+- 035b Bau · Spec 035b „Befund“ und m5 · `req()` (`helpers.ts`) puffert eine SSE-Antwort nicht und kehrt mit den Köpfen
+  zurück; der Test-Leser öffnet deshalb über `req()`, so zählt das Abdeckungstor `streamEvents` · Spec-Wortlaut angleichen.
+- 035b Bau · Spec 035b Test 12 · „Migrationen offen → 503“ ist ohne Postgres nicht herstellbar; der Fall steht in
+  `postgres-stream035.test.ts` („12 (Postgres)“) · hinnehmen.
+- 035b Nachprüfung nit · `apps/api/src/stream/route.ts` (`overLimit`) · die Bytes einer `change`-Nachricht zählen in der
+  Warteschlange als JSON-Länge + 64, im laufenden Stapel als echte Rahmenbytes · beide Stellen auf die Rahmenbytes vereinheitlichen.
+- 035b Nachprüfung nit · `apps/api/src/__tests__/stream035.test.ts` (R8b) · der Test sichert nur den Abzug der
+  Nachrichtenzahl, nicht den der Bytes im laufenden Stapel · Variante mit gesenkter `backlogBytes` ergänzen.
+- 035b Nachprüfung minor · `apps/api/src/__tests__/postgres-stream035.test.ts` (24, 24b) · die Tests sind an die Phase
+  des 1-s-Takts des Verteilers gebunden; ein Mutant, der jeden zweiten Takt auslässt, bleibt grün (24 mit 128 ms, 24b mit
+  1846 ms) · Messung in der ungünstigsten Phase mit Schranke `reloadTickMs + spacingMs + Marge` gehört zum B11-Nachweis
+  im Lasttest 071.
+- 035b Nachprüfung minor · `apps/api/src/__tests__/postgres-stream035.test.ts` (28) · im vollen Lauf unter Last zählte eine
+  von rund 200 Stichproben eine belegte Verbindung (Gates-Lauf auf 8983814, Wiederholung grün); vermutlich ein Backend im
+  Übergang „active → idle“ nach der Antwort · Stichprobe nur werten, wenn derselbe Backend-Zustand zweimal hintereinander besteht.
+
 ## Bühne und Wortmeldeliste (aus takt-039)
 
 - ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im
