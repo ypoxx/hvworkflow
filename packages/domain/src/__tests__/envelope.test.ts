@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DomainEvent, NewEvent } from '../events.js';
 import { createInMemoryEventStore } from '../store.js';
-import { canonicalJson, upcastJsonlEvents } from '../envelope.js';
+import { canonicalJson, upcastJsonlEvents, verifyEventChain } from '../envelope.js';
 import type { PiiCodec } from '../piiCodec.js';
 import { createInProcessApi, etagOf } from '../api.js';
 import { seedEvents } from '../seed.js';
@@ -115,5 +115,32 @@ describe('slice 024: event envelope v2', () => {
     await api.registerSpeaker({ displayName: 'Demo' }, { idempotencyKey: 'x', ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     const event = store.all().at(-1)!;
     expect(event).toMatchObject({ type: 'SpeakerRegistered', idempotencyKey: 'x', recordedAt: at });
+  });
+});
+
+describe('takt-033: verifyEventChain from a start point', () => {
+  const chain = () => createInMemoryEventStore().append([closed('q1'), closed('q2'), closed('q3'), closed('q4')]);
+
+  it('keeps the default start (seq 0, empty predecessor) for a whole log', () => {
+    const events = chain();
+    expect(() => verifyEventChain(events)).not.toThrow();
+    expect(() => verifyEventChain(events, { seq: 0, prevHash: '' })).not.toThrow();
+    expect(() => verifyEventChain(events.slice(1))).toThrow(/seq 1/i);
+  });
+
+  it('accepts the correct suffix after a verified prefix', () => {
+    const events = chain();
+    expect(() => verifyEventChain(events.slice(2), { seq: 2, prevHash: events[1]!.hash! })).not.toThrow();
+    expect(() => verifyEventChain([], { seq: 4, prevHash: events[3]!.hash! })).not.toThrow();
+  });
+
+  it('rejects a wrong first seq or a wrong predecessor, naming the seq', () => {
+    const events = chain();
+    expect(() => verifyEventChain(events.slice(2), { seq: 3, prevHash: events[1]!.hash! })).toThrow(/seq 4/i);
+    expect(() => verifyEventChain(events.slice(2), { seq: 1, prevHash: events[1]!.hash! })).toThrow(/seq 2/i);
+    expect(() => verifyEventChain(events.slice(2), { seq: 2, prevHash: events[0]!.hash! })).toThrow(/seq 3/i);
+    expect(() => verifyEventChain(events.slice(2), { seq: 2, prevHash: '' })).toThrow(/seq 3/i);
+    const tampered = [events[2]!, { ...events[3]!, subjectId: 'changed' } as DomainEvent];
+    expect(() => verifyEventChain(tampered, { seq: 2, prevHash: events[1]!.hash! })).toThrow(/seq 4/i);
   });
 });
