@@ -118,17 +118,28 @@ Reset-Banner-Test (in-process) und Isolationstest H2 (http); ADR-0002-Ergänzung
 
 (nach dem Bau ausfüllen)
 
-**Gates-Commit:** `<sha>`, `pnpm gates` auf sauberem Baum, Exit 0.
+**Gates-Commit:** `1b1cd3b`, `pnpm gates` auf sauberem Baum. Lokal auf dem Stapel über takt-030 (PR #82, noch nicht gemergt): das
+Scheibenumfang-Tor nennt allein die takt-030-Dateien (Exit 1 dort, erwartet); alle Tore davor liefen grün, die Tore danach
+(`downgrade-check`, `metrics-allowlist`, `plan-graph`, `test:scripts`, Web-Build, `mark-test-run`) einzeln, Exit 0.
 
 ```
-<Schluss einfügen>
+slice-scope: 4 file(s) outside "docs/slices/031b-e2e-gemeinsame-szenarien.md"'s "Files allowed" list:
+  apps/web/e2e/031-http-betriebsart.spec.ts
+  apps/web/src/api/http.test.ts
+  apps/web/src/api/http.ts
+  docs/slices/takt-030-eigene-schreibvorgaenge.md
+(danach einzeln:) ... vite build: built in 1.52s
+mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
 ```
 
 | Lauf | Projekt | Tests (bestanden/übersprungen) | Laufzeit |
 |---|---|---|---|
-| lokal | `in-process` | | |
-| PR-CI Lauf `<id>`, Job `gates` | `in-process` | | Job gesamt: |
-| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | | Job gesamt: ; `abnahme`: |
+| lokal (`PW_CHROMIUM_PATH`) | `in-process` | 127/0 | 6,7 min; `abnahme` 56,1 s, `answersFilterMs` 134 ms, `stageNavMs` 170 ms |
+| lokal, `E2E_HTTP_IDP=none` (ohne Keycloak) | `http` (H1–H3, G1, 030) | 8/0 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | 12,4 s |
+| PR-CI Lauf `<id>`, Job `gates` | `in-process` | offen (nur CI) | Job gesamt: offen |
+| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | offen (nur CI, Keycloak) | Job gesamt: offen; `abnahme`: offen |
+
+Reihenfolge (`playwright test --list --project=http`, mit IdP): Setup, dann 002, 021b, 021c, 030, 031, 080, abnahme (27 Tests in 8 Dateien).
 
 Reset-Banner: `024-ereignis-umschlag.spec.ts` › „024: old demo log requires an explicit reset in German and English“
 (`in-process`), `031-http-betriebsart.spec.ts` › H2 (`http`).
