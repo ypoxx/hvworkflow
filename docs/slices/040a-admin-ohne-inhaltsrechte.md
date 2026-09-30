@@ -580,7 +580,8 @@ Done: ROLE_PERMISSIONS.admin ist eine ausdrückliche Liste mit 12 Rechten (Lesen
   agenda.manage, admin.roles.manage, demo.seed); 63 ✓ entfallen, neuer Tabellenabschnitt. R-ADM-07 (keine
   Selbstzuordnung) und R-ADM-08 (letzte tragfähige Verwaltungsrolle, 24-h-Spanne) in api.ts und im Regelregister.
   Historie: Abzeichen „Administration“ aus den Rechtedaten in Zeitleiste und Ereignisstrom; Testumbauten nach Spec.
-Evidence: pnpm gates grün auf fed4b6f (Schluss unten); in-process e2e 133/133 grün auf fed4b6f;
+Evidence: pnpm gates grün auf 9ca8a95 (nach Review-Befund major 1; Schluss unten), zuvor auf fed4b6f;
+  in-process e2e 133/133 grün auf fed4b6f (9ca8a95 ändert nur R-ADM-08 im Kern, Tests und Dokumente);
   docs/evidence/040a-admin-ohne-schreibaktionen.png, 040a-historie-administration-de.png, -en.png
 Open: http-Projekt (Keycloak) läuft in der PR-CI; drei neue Warnungen des Architekturtors (nicht blockierend,
   docs/folgeliste.md); Eigentümerfragen 1, 2a, 2b, 2c bleiben wie in der Spec.
@@ -612,8 +613,8 @@ Domäne (`packages/domain/src/__tests__/`):
 - `api.test.ts` › „R-IDEM-01: the same actor key stays separate across meetings…“ und „…delimiters cannot alias
   another log scope“: admin → moderation (registerSpeaker); die Trennzeichen-Strings folgen der Akteur-id
   (`hv|admin|…` → `hv|mod|…`), damit der Aliasversuch dieselbe Form behält.
-- `api.test.ts` › „409 detail (Festlegung 8)“: Leser-Hälfte admin/`deliverQuestion` → approver/`stageQuestion` (mit
-  If-Match). Grund: nach 040a hält keine Rolle `question.deliver` zusammen mit `question.read`; die Aussage (Leser
+- `api.test.ts` › „409 detail (Festlegung 8)“: **Umbau, Akteur und Operation gewechselt** (Review 040a, minor 3):
+  Leser-Hälfte admin/`deliverQuestion` → approver/`stageQuestion` (mit If-Match). Grund: nach 040a hält keine Rolle `question.deliver` zusammen mit `question.read`; die Aussage (Leser
   erhält R-TRANS-00 mit Stand, Nicht-Leser den generischen 409) bleibt.
 - `api.test.ts` › „admin drafts and approves: 409 R-GUARD-06“ → „admin drafts: 403 R-PERM-01“ (wie in der Spec
   vorgesehen; Guard-Aussage trägt der legal-Fall, `transitions.test.ts` und Test 9).
@@ -637,8 +638,10 @@ Dienst (`apps/api/src/__tests__/`):
   `postgres-access-log033a.test.ts`: Sprecher-POSTs als moderation (12 Stellen). In `postgres027.test.ts` › „rolls back
   a failed insert…“ prüfte die letzte Erwartung die Maskierung in der Schreibantwort eines Schreibers ohne
   `question.identity.reveal`; einen solchen Schreiber gibt es nach 040a nicht mehr (moderation hält das Recht). Die
-  Schreibantwort trägt jetzt den Klarnamen, die Maskierung wird auf dem Lesepfad als admin geprüft („Redner 1“) —
-  Aussage erhalten, Ort gewechselt.
+  Schreibantwort trägt jetzt den Klarnamen, die Maskierung wird auf dem Lesepfad als admin geprüft („Redner 1“).
+  **Umbau, nicht nur Akteurwechsel:** die Prüfung wanderte von der Schreibantwort auf den Lesepfad; die Maskierung
+  der Schreibantwort für eine künftige Rolle mit `speaker.register` ohne `question.identity.reveal` ist damit nicht
+  mehr festgenagelt (Review 040a, minor 2).
 - `stream035.test.ts`: `PEOPLE` um `approver` und `coordination` ergänzt; `registerSpeaker(h, …)` als moderation (7
   Stellen); `questionWrite` nimmt den Schreiber (staging approver, classification coordination).
 - `negative.test.ts`: neuer Test 10 (Wahl: `negative.test.ts`).
@@ -745,6 +748,31 @@ Rot vor dem Bau (Tests zuerst): `admin040a.test.ts` 10 rot / 5 grün (die grüne
 „nicht verwaltende Rolle“, 8 „geschlossener Jahrgang“, 9); `stage/lib.test.ts` 3 rot (`stageOnlyByRights is not a
 function`); `history/lib.test.ts` 2 rot, `Timeline.test.tsx` 6 rot; Test 10 rot in den Mutationsproben 1 und 4.
 
+**Nacharbeit nach Review (fresh context, 1 major, 2 minor, 2 nit).**
+- Major 1 (Sicherheit), `api.ts` `isLastUsableManagingAssignment`: eine Verwaltungszuordnung hinter einer älteren
+  aktiven Zuordnung desselben Subjects zählte als Rückhalt, obwohl die Sitzung nur die älteste aktive über alle nicht
+  geschlossenen Jahrgänge wählt (`apps/api/src/actor.ts:105-116`). Behoben (Variante a): tragfähig heißt zusätzlich,
+  dass `sessionAssignmentFor` (neu, `api.ts`, liest den globalen Store) genau diese Zuordnung wählt. Die Regel lebt als
+  Spiegel von `sessionActorFromEvents`, weil `apps/api/src/actor.ts` außerhalb von „Files allowed“ liegt und nicht auf
+  den gemeinsamen Helfer umgestellt werden darf; `apps/api/src/__tests__/admin040a.test.ts` (neu) pinnt beide über
+  fünf Szenarien gegeneinander (zwei Rollen in einem Jahrgang, ältere entzogen, ältere abgelaufen, ältere in einem
+  anderen offenen Jahrgang, ältere in einem geschlossenen Jahrgang) plus „keine aktive Zuordnung“. Die Umstellung
+  von `actor.ts` auf den Helfer ist ein Folgeschritt außerhalb dieser Scheibe (Lane service).
+  Neue Fälle in Test 8: B hält capture, dann admin → Entzug von A 409 R-ADM-08; dasselbe mit Bs älterer Zuordnung in
+  einem anderen, nicht geschlossenen Jahrgang (409), nach dessen Schluss erlaubt. Regelregister und
+  `docs/legal-trace.md` nennen die Bedingung.
+  Mutationsproben: Bedingung entfernt (`isUsable` ohne Sitzungswahl) → rot: beide neuen Test-8-Fälle; Spiegel
+  verfälscht (neueste statt älteste Zuordnung) → rot: `apps/api/src/__tests__/admin040a.test.ts` „two roles in one
+  meeting“ und „older one in another open meeting“. Beide zurückgesetzt.
+- Minor 2 und 3: oben unter „Umgestellte Tests“ als Umbau benannt.
+- Nit 4: `bedrohungsmodell.md` Zeile 040 ohne „gemergt“. BF-09 und MF-01 beschreiben R-ADM-08 jetzt mit der
+  Sitzungswahl.
+- Nit 5: Test 8 um die erlaubten Fälle „Sitzungsidentität entzieht die eigene Verwaltungszuordnung neben einer
+  weiteren tragfähigen“ und „Entzug einer abgelaufenen Verwaltungszuordnung“ ergänzt.
+- Im ersten Gates-Lauf auf `9ca8a95` fiel `postgres-limits034a.test.ts` › „a COMMIT that is already on its way wins
+  over the timer“ einmal (408 statt 201, Zeitrennen unter Last, schreibt einen Sprecher, berührt R-ADM-08 nicht); allein
+  dreimal grün, der zweite volle Lauf auf demselben Commit grün.
+
 **Bauentscheidungen.**
 - R-ADM-07 prüft nach Rechte- und Eingabeprüfung, vor der Duplikatprüfung; Vergleich `input.subjectId === actor().id`
   (für Sitzungen die aufgelöste Identität).
@@ -760,28 +788,27 @@ function`); `history/lib.test.ts` 2 rot, `Timeline.test.tsx` 6 rot; Test 10 rot 
 - Architekturtor: drei neue Warnungen `web-features-i18n-domain-types-only` (Wertimport aus `@hv/domain` in
   `history/lib.ts` und zwei Testdateien, von der Spec verlangt); nicht blockierend, in `docs/folgeliste.md`.
 
-**`pnpm gates` (Schluss, Commit):** gelaufen auf `fed4b6f` (sauberer Baum), mit `TEST_DATABASE_URL`,
-`TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` wie in CI. Zusammenfassung aus demselben Lauf: domain 276/276, web
-484/484, api 587/587 (39 Dateien, operation-coverage ok), slice-scope „43 changed file(s), all within … Files allowed“.
+**`pnpm gates` (Schluss, Commit):** gelaufen auf `9ca8a95` (sauberer Baum), mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE` wie in CI. Zusammenfassung aus demselben Lauf: domain 280/280, web
+484/484, api 593/593 (40 Dateien, operation-coverage ok), slice-scope „46 changed file(s), all within … Files allowed“.
+Vorheriger grüner Lauf: `fed4b6f`.
 
 ```
 ✓ 1730 modules transformed.
-rendering chunks...
-computing gzip size...
 dist/index.html                                        0.43 kB │ gzip:   0.27 kB
 dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
 dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
-dist/assets/index-FPfXZyJ_.js                        647.06 kB │ gzip: 190.34 kB │ map: 2,750.58 kB
-✓ built in 2.05s
-mark-test-run: wrote /home/user/wt/s040a/.claude/state/last-test-run (clean tree) at commit fed4b6f, tree 32e4f6e81f2d…
+dist/assets/index-D_XXpNDR.js                        647.75 kB │ gzip: 190.56 kB │ map: 2,753.79 kB
+✓ built in 1.79s
+mark-test-run: wrote /home/user/wt/s040a/.claude/state/last-test-run (clean tree) at commit 9ca8a95, tree b34a90d25ebc…
 ```
 
 **Touched.** `packages/domain/src/{permissions,api,rules}.ts`, `packages/domain/policy-truth-table.md`,
 `packages/domain/src/__tests__/{admin040a (neu),transitions,api,envelope,meeting025}.test.ts`, `docs/legal-trace.md`;
-`apps/api/src/__tests__/{negative,idempotency028,meeting025,read-rights,limits034a,metrics033b,stream035,postgres027,
+`apps/api/src/__tests__/{admin040a (neu, Review),negative,idempotency028,meeting025,read-rights,limits034a,metrics033b,stream035,postgres027,
 postgres-takt033,postgres-takt024,postgres-limits034a,postgres-access-log033a}.test.ts`;
 `apps/web/e2e/{040a-administration (neu),090-eingaben-je-akteur,010b-lesepfade,010c-lesezustand,010d-ansichtsdaten,
 020-rueckbau-passung}.spec.ts`; `apps/web/src/features/stage/{Page.tsx,lib.ts,lib.test.ts}`,
