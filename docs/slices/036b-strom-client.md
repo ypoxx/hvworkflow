@@ -275,7 +275,7 @@ Perspektive(n): Security, Betrieb, UX · Nachweise: Tests 1–6, Netztrace · Of
 | SC-03 | ja: Nachrichten ohne Inhalt außer für `event.read`; der Client zeigt nichts aus dem Strom direkt an, er macht nur ungültig |
 | SC-04 | nicht anwendbar (kein Massenlesen im Client über den Vertrag hinaus) |
 | SC-05 | ja: Stromende und 401 leeren den Puffer, kein Neuaufbau ohne Bestätigung (Test 2); kein Geheimnis im Diff |
-| SC-06 | ja: MF-SC-1, MF-SC-2; Review major 1: keine Schleife Ende → `/auth/me` → Öffnen → Ende — Rückzug nach jedem Sitzungs- oder Rechteende, 5-min-Pause nach drei Enden ohne gesunden Strom (Test „403 on every open …“) |
+| SC-06 | ja: MF-SC-1, MF-SC-2; Review major 1: keine Schleife Ende → `/auth/me` → Öffnen → Ende — Rückzug nach jedem Sitzungs- oder Rechteende, 5-min-Pause nach drei Enden ohne gesunden Strom (Test „403 on every open …“); Nachprüfung 1: ein Akteurwechsel (Schließen, dann Öffnen) hebt Rückzug oder Pause nicht auf, nur das Abmelden (Tests „actor alternating …“, „actor change while the gated open is in flight“); Nachprüfung 2: `reset` und andere Steuernachrichten gelten nicht als gesund, nur `event`/`change` oder 10 s Lebensdauer (Test „reset on every open …“) |
 | SC-07 | nicht anwendbar |
 | SC-08 | nicht anwendbar |
 | SC-09 | nicht anwendbar |
@@ -302,10 +302,11 @@ Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wä
 Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
 Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
 e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
-Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0; `pnpm gates` grün auf e254cb0
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d; `pnpm gates` grün
+auf 89dc78d
 (Auszug unten); PR-CI auf f761931 grün in e2e-http (33 passed, H10, H13, H14): Zustellzeit 862 ms (Anmeldung) und 796 ms
 (Aufruf); Screenshots im CI-Artefakt evidence-031-http (E56, Angaben unten).
-Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Review-Stand (e254cb0 ff.) steht aus.
+Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Stand der Nachprüfung (89dc78d ff.) steht aus.
 (Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
 Touched: siehe Liste unten.
 ```
@@ -323,7 +324,37 @@ Touched: siehe Liste unten.
    Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
    actor“).
 
-**Schluss von `pnpm gates` auf e254cb0 (Review-Nacharbeit; sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+**Schluss von `pnpm gates` auf 89dc78d (Nachprüfung; sauberer Baum, Postgres-Variablen gesetzt), grün im ersten Lauf,
+echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  444 passed (444)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 2.09s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit 89dc78d, tree d6eab7e0d895…
+```
+
+**Nachprüfung von e254cb0 (zwei Verfügbarkeitsbefunde, T-G1-D-03), Proben und Mutationen:**
+
+- Rot auf dem Stand e254cb0 (neue Tests gegen das alte `http.ts`): Akteur wechselt bei jedem `/auth/me` plus Auffrischen
+  alle 500 ms, 403 bei jedem Öffnen → 121 Öffnungen in 60 s (wie die Probe des Prüfers); `reset` bei jedem Öffnen → eine
+  Öffnung je Sekunde (im Test durch 50 vorbereitete Antworten begrenzt; Probe des Prüfers: 61 in 60 s); kurzer Strom mit
+  Daten zwischen Sitzungsenden → keine Pause.
+- Grün auf 89dc78d: Akteurwechsel-Fall 3 Öffnungen in 60 s (0, 1, 3 s), Pause bis 303 s über alle Akteurwechsel;
+  `reset`-Fall 3 in 60 s und 6 in 10 min (0, 1, 3, 303, 307, 315 s); Daten-Fall 4 Öffnungen, dann Pause.
+
+| Punkt | Mutation | getötet von |
+|---|---|---|
+| Befund 1 | Akteurwechsel-Schließen verwirft den anstehenden Rückzug/die Pause | „actor alternating …“ |
+| Befund 1 | Akteurwechsel-Schließen schärft das Tor nicht nach | „actor change while the gated open is in flight“ |
+| Befund 1 | `followSessionActor` schließt wie beim Abmelden | beide Tests zu Befund 1 |
+| Befund 1 | Abmelden setzt das Tor nicht zurück | „actor alternating …“ (Teil Abmelden) |
+| Befund 2 | `reset` zählt als gesund | „reset on every open …“ |
+| nit 1.4 | Datenrahmen beenden eine Folge von Sitzungsenden | „a short stream with data …“ |
+
+**Früherer Lauf auf e254cb0 (Review-Nacharbeit), grün:**
 
 ```
 packages/domain test:       Tests  261 passed (261)
