@@ -91,6 +91,26 @@ describe('takt-033: sealed (verified) event logs', () => {
     expect(Object.isFrozen((sealed[0]!.payload as unknown as { note: object }).note)).toBe(true);
   });
 
+  it('seals plain-data copies: accessors, symbols and non-enumerables cannot change after the check', () => {
+    const events = source(2);
+    let reads = 0;
+    const tricky = { ...events[1]! } as Record<string | symbol, unknown>;
+    const realSubject = tricky['subjectId'];
+    Object.defineProperty(tricky, 'subjectId', { enumerable: true, get: () => (++reads === 1 ? realSubject : 'changed') });
+    Object.defineProperty(tricky, 'hidden', { enumerable: false, value: 'not copied' });
+    tricky[Symbol('extra')] = 'not copied';
+    const sealed = sealVerifiedLog(undefined, [events[0]!, tricky as unknown as DomainEvent]);
+    expect(sealed[1]!.subjectId).toBe(realSubject);
+    expect(sealed[1]!.subjectId).toBe(realSubject);
+    expect(Object.getOwnPropertyDescriptor(sealed[1], 'subjectId')).toMatchObject({ value: realSubject, writable: false });
+    expect(Object.hasOwn(sealed[1]!, 'hidden')).toBe(false);
+    expect(Object.getOwnPropertySymbols(sealed[1])).toEqual([]);
+    // The caller's objects are copied, not frozen.
+    expect(Object.isFrozen(events[0])).toBe(false);
+    expect(sealed[0]).not.toBe(events[0]);
+    expect(() => sealVerifiedLog(undefined, [new Proxy(events[0]!, {})])).toThrow();
+  });
+
   it('keeps the sealed log unchanged when a store built on it appends', () => {
     const sealed = sealVerifiedLog(undefined, source(2));
     const saved: DomainEvent[][] = [];

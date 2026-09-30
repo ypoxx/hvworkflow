@@ -25,6 +25,10 @@ export interface Checkpoint {
 export interface ChainCacheEntry {
   readonly log: VerifiedEventLog;
   readonly rowDigests: readonly string[];
+  /**
+   * Expected person rows of `log`. A `Map` cannot be frozen, so the entry keeps its own copy (made in `createEntry`
+   * and `extendEntry`) and hands it out only as `ReadonlyMap`; nothing in the service writes to it (review finding 7).
+   */
   readonly persons: ReadonlyMap<string, PersonRow>;
   readonly checkpoints: readonly Checkpoint[];
 }
@@ -66,7 +70,7 @@ export function createEntry(
   log: VerifiedEventLog, rowDigests: readonly string[], persons: ReadonlyMap<string, PersonRow>,
 ): ChainCacheEntry {
   assertAligned(log, rowDigests);
-  return Object.freeze({ log, rowDigests: Object.freeze([...rowDigests]), persons,
+  return Object.freeze({ log, rowDigests: Object.freeze([...rowDigests]), persons: new Map(persons) as ReadonlyMap<string, PersonRow>,
     checkpoints: Object.freeze([checkpointAt(log, rowDigests)]) });
 }
 
@@ -84,7 +88,8 @@ export function extendEntry(
   }
   if (log.length === end.seq) return entry;
   const checkpoints = [...entry.checkpoints, checkpointAt(log, rowDigests)].slice(-MAX_CHECKPOINTS);
-  return Object.freeze({ log, rowDigests: Object.freeze([...rowDigests]), persons, checkpoints: Object.freeze(checkpoints) });
+  return Object.freeze({ log, rowDigests: Object.freeze([...rowDigests]), persons: new Map(persons) as ReadonlyMap<string, PersonRow>,
+    checkpoints: Object.freeze(checkpoints) });
 }
 
 /** The largest checkpoint with `seq <= maxSeq`, if any. */

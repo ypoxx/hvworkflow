@@ -5,6 +5,8 @@ import {
   createChainCache, createEntry, decide, extendEntry, MAX_CHECKPOINTS, prefixDigest, selectCheckpoint,
   type ChainCacheEntry, type Checkpoint,
 } from '../persistence/chainCache.ts';
+import { loadPostgresSnapshotCached } from '../persistence/postgres.ts';
+import type { PoolClient } from 'pg';
 
 const at = '2027-04-20T10:00:00.000Z';
 const actor = { id: 'fixture', role: 'admin' as const };
@@ -116,4 +118,53 @@ describe('takt-033: chain cache (pure logic, no Postgres)', () => {
     expect(cache.compareAndSet(first, entryWith(3))).toBe(false);
     expect(cache.current()).toBeUndefined();
   });
+
+  it('keeps its own copy of the expected persons', () => {
+    const persons = new Map([['m\0p', { meetingId: 'm', personId: 'p', displayName: 'X', keyId: 'm', sourceSeq: 1 }]]);
+    const entry = createEntry(sealVerifiedLog(undefined, []), [], persons);
+    persons.clear();
+    expect(entry.persons.size).toBe(1);
+  });
+});
+
+/**
+ * Review finding 2: a write runs under READ COMMITTED, so the probe and the next statements see different snapshots.
+ * A fake client answers the probe as "unchanged" and then shows a changed database; the verified result decides.
+ */
+describe('takt-033: history change seen only after the probe (fake client, no Postgres)', () => {
+  const rowOf = (event: DomainEvent) => ({ seq: String(event.seq), id: event.id, meeting_id: event.meetingId ?? null,
+    hash: event.hash, prev_hash: event.prevHash, envelope: JSON.stringify(event) });
+
+  function client(state: { probe?: { count: number; max: number; digest: string }; suffix: DomainEvent[]; full: DomainEvent[] }) {
+    return { query: async (text: string) => {
+      if (text.includes('count(*)')) {
+        return { rows: [{ count: String(state.probe!.count), max_seq: String(state.probe!.max), digest: state.probe!.digest }] };
+      }
+      if (text.includes('FROM persons')) return { rows: [] };
+      if (text.includes('events.seq > $1')) return { rows: state.suffix.map(rowOf) };
+      return { rows: state.full.map(rowOf) };
+    } } as unknown as PoolClient;
+  }
+
+  it.each([
+    ['shortened', (original: DomainEvent[]) => original.slice(0, 3), true],
+    ['rewritten', () => events(6, 'other-'), true],
+    ['extended as expected', (original: DomainEvent[]) => [...original, ...events(6).slice(5)], false],
+  ] as const)('reports the history as changed only when the verified full log does not continue the cache: %s',
+    async (_label, fullAfter, changed) => {
+      const original = events(5);
+      const cache = createChainCache();
+      const state: Parameters<typeof client>[0] = { suffix: [], full: original };
+      const first = await loadPostgresSnapshotCached(client(state), cache);
+      expect(first).toMatchObject({ hashed: 5, rowsRead: 5, historyChanged: false });
+      const end = cache.current()!.checkpoints.at(-1)!;
+      // The probe still sees the old, unchanged prefix plus one row; the suffix statement then finds nothing.
+      state.probe = { count: 6, max: 6, digest: end.prefixDigest };
+      state.suffix = [];
+      state.full = fullAfter(original);
+      const second = await loadPostgresSnapshotCached(client(state), cache);
+      expect(second.historyChanged).toBe(changed);
+      expect(second.hashed).toBe(state.full.length);
+      expect(cache.current()!.log).toHaveLength(state.full.length);
+    });
 });

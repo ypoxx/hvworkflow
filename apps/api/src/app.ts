@@ -257,11 +257,25 @@ export function createApp(options: CreateAppOptions = {}): App {
   // takt-033: one verified-chain cache per app (and so per process), shared by business requests and auth lookups.
   // Every load still reads its own snapshot: the database digest decides whether the cached prefix is usable.
   const chainCache = createChainCache();
+  // Repeats of the history line since it was last written. An environment where the database digest never matches
+  // the service's (e.g. a non-UTF-8 database, a lagging replica) would otherwise write it on every request and dull
+  // the signal (review finding 3): the line is written once per streak, the repeats as one count when it ends.
+  let historyRepeats: number | undefined;
   const loadChain = async (client: PoolClient): Promise<ChainLoad> => {
     const load = await loadPostgresSnapshotCached(client, chainCache, limits.queryTimeoutMs);
-    // Open owner question 1, default (b): a changed or shortened history with a valid chain is accepted, with one
-    // fixed line per occurrence and no content (no seq, no id, no value).
-    if (load.historyChanged) console.error('HV-Tool API: stored event history changed or was shortened; the valid chain was accepted.');
+    // Open owner question 1, default (b): a changed or shortened history with a valid chain is accepted, with a
+    // fixed line and no content (no seq, no id, no value).
+    if (load.historyChanged) {
+      if (historyRepeats === undefined) {
+        console.error('HV-Tool API: stored event history changed or was shortened; the valid chain was accepted.');
+        historyRepeats = 0;
+      } else {
+        historyRepeats += 1;
+      }
+    } else if (historyRepeats !== undefined) {
+      if (historyRepeats > 0) console.error(`HV-Tool API: the event history line repeated ${historyRepeats} more times.`);
+      historyRepeats = undefined;
+    }
     return load;
   };
   const reportChain = (hashed: number): void => {

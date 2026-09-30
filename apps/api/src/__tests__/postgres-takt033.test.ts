@@ -12,7 +12,9 @@ import {
 import { createApp, type CreateAppOptions } from '../app.ts';
 import { actorIdForIdentity, type OidcFlow } from '../auth/oidc.ts';
 import { createAuthStore } from '../auth/store.ts';
+import { createChainCache } from '../persistence/chainCache.ts';
 import { runMigrations } from '../persistence/migrations.ts';
+import { loadPostgresSnapshotCached } from '../persistence/postgres.ts';
 import { ACTOR } from './helpers.ts';
 
 const databaseUrl = process.env['TEST_DATABASE_URL'];
@@ -122,6 +124,23 @@ async function expectIntegrityFailure(response: Response, seq: number, secrets: 
   const body = await response.text();
   expect(body).toMatch(new RegExp(`seq ${seq}\\b`, 'i'));
   for (const secret of ['Synthetische HV', 'Synthetische Person', ...secrets]) expect(body).not.toContain(secret);
+}
+
+/** A session-mode app (real Postgres auth store, synthetic IdP) and a signed-in session cookie for the role holder. */
+async function sessionApp(pool: Pool, infos: ChainInfo[]): Promise<{ first: TestApp; cookie: string }> {
+  const oidcFlow: OidcFlow = {
+    async authorizationUrl({ state }) { return `https://idp.example.invalid/authorize?state=${state}`; },
+    async complete() { return { issuer, subject: 'synthetic-user' }; },
+  };
+  const first = createApp({ demoEnabled: false, oidcIssuer: issuer, oidcFlow, authStore: createAuthStore(pool, randomBytes(32)),
+    postgres: pool, clock: () => now, testHooks: { chain: (info) => { infos.push(info); } },
+    transparencyNotice: { version: 'synthetic-1', text: { de: 'Testhinweis.', en: 'Test notice.' } } });
+  const login = await first.request('/auth/login');
+  const state = new URL(login.headers.get('Location')!).searchParams.get('state');
+  const correlation = login.headers.getSetCookie().find((line) => line.startsWith('hv_auth_state='))!.split(';')[0]!;
+  const callback = await first.request(`/auth/callback?code=synthetic-code&state=${state}`, { headers: { Cookie: correlation } });
+  const cookie = callback.headers.getSetCookie().find((line) => line.startsWith('hv_session='))!.split(';')[0]!;
+  return { first, cookie };
 }
 
 const median = (values: number[]): number => {
@@ -292,20 +311,8 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
   });
 
   it('removes a revoked role on the next session request of the first instance (no stale actor from the cache)', async () => {
-    const key = randomBytes(32);
-    const oidcFlow: OidcFlow = {
-      async authorizationUrl({ state }) { return `https://idp.example.invalid/authorize?state=${state}`; },
-      async complete() { return { issuer, subject: 'synthetic-user' }; },
-    };
     const infos: ChainInfo[] = [];
-    const first = createApp({ demoEnabled: false, oidcIssuer: issuer, oidcFlow, authStore: createAuthStore(poolA, key),
-      postgres: poolA, clock: () => now, testHooks: { chain: (info) => { infos.push(info); } },
-      transparencyNotice: { version: 'synthetic-1', text: { de: 'Testhinweis.', en: 'Test notice.' } } });
-    const login = await first.request('/auth/login');
-    const state = new URL(login.headers.get('Location')!).searchParams.get('state');
-    const correlation = login.headers.getSetCookie().find((line) => line.startsWith('hv_auth_state='))!.split(';')[0]!;
-    const callback = await first.request(`/auth/callback?code=synthetic-code&state=${state}`, { headers: { Cookie: correlation } });
-    const cookie = callback.headers.getSetCookie().find((line) => line.startsWith('hv_session='))!.split(';')[0]!;
+    const { first, cookie } = await sessionApp(poolA, infos);
     const meeting = () => first.request('/v1/meeting', { headers: { Cookie: cookie } });
     expect((await meeting()).status).toBe(200);
     expect((await meeting()).status).toBe(200);
@@ -320,6 +327,68 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
 
     expect((await meeting()).status).toBe(403);
     expect((await first.request('/auth/me', { headers: { Cookie: cookie } })).status).toBe(403);
+  });
+
+  it('fails the auth lookup closed after an old row changed under a warm cache (review finding 4)', async () => {
+    const infos: ChainInfo[] = [];
+    const { first, cookie } = await sessionApp(poolA, infos);
+    const me = () => first.request('/auth/me', { headers: { Cookie: cookie } });
+    expect((await me()).status).toBe(200);
+    expect((await me()).status).toBe(200);
+    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{subjectId}', '"tampered"') WHERE seq = 2`);
+    const refused = await me();
+    expect(refused.status).toBeGreaterThanOrEqual(500);
+    const body = await refused.text();
+    for (const secret of ['Synthetische HV', 'Synthetische Person', 'tampered', 'moderation']) expect(body).not.toContain(secret);
+    expect((await first.request('/v1/meeting', { headers: { Cookie: cookie } })).status).toBeGreaterThanOrEqual(500);
+  });
+
+  it('refuses a write under READ COMMITTED after an old row changed under a warm cache, naming seq 2 (review finding 4)', async () => {
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    const tag = (await speakers(instance)).headers.get('ETag')!;
+    await owner.query(`UPDATE events SET id = 'different-index-id' WHERE seq = 2`);
+    const written = await instance.request(`/v1/meetings/${meetingId}/speakers`, {
+      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+      body: JSON.stringify({ displayName: 'Nie gespeichert', round: 1 }),
+    });
+    await expectIntegrityFailure(written, 2, ['different-index-id', 'Nie gespeichert']);
+    expect(await maxSeq()).toBe(end);
+  });
+
+  it('keeps the database and service digests equal for emoji, newline, backslash and quotes, also after a jsonb round trip (review finding 3)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await insertEvents(await stampNext([speaker(70, 'Grüße 🎉 "zitiert" \\ Rück\nzeile \u00e9\u0301 \ud83d\udc68\u200d\ud83d\udc69')]));
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 24 });
+    await owner.query('UPDATE events SET envelope = envelope::text::jsonb');
+    expect((await speakers(instance)).status).toBe(200);
+    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 24 });
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('writes the history line once per streak and the repeats as one count (review finding 3)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    // Content-equivalent rewrite: `1` -> `1.0` keeps the canonical JSON and so the hash (the chain stays valid) but
+    // changes the stored text, so the database digest no longer matches. A new spelling each time keeps it going,
+    // like a database whose digest never matches the service's.
+    for (const spelling of ['1.0', '1.00', '1.000']) {
+      await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{payload,number}', $1::jsonb) WHERE seq = 3`, [spelling]);
+      expect((await speakers(instance)).status).toBe(200);
+      expect(infos.at(-1)).toEqual({ hashed: 23, cachedSeq: 23 });
+    }
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE]);
+    expect((await speakers(instance)).status).toBe(200);
+    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE,
+      'HV-Tool API: the event history line repeated 2 more times.']);
   });
 
   it('serves 20 parallel reads and 5 writes on a warm app correctly and ends with the cache at the database seq', async () => {
@@ -374,51 +443,100 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     try { await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); } finally { await admin.end(); }
   });
 
-  it('hashes 0 / k / all and keeps the warm median at most half the cold one and under 100 ms', async () => {
+  /**
+   * Amended by the architect after the security review (finding 1, see the spec): the hard gate is the deterministic
+   * part plus the loader's own warm/cold ratio from interleaved pairs. Whole-request medians, the absolute 100 ms and
+   * the breakdown are logged as evidence, not asserted: they include the projection (a non-goal) and are load-bound.
+   */
+  it('hashes 0 / k / all, reads exactly k rows warm, and keeps the loader warm/cold ratio at most 0.5', async () => {
     const corpus = createInMemoryEventStore().append(seedEvents({ ...CORPUS_LOAD, questions: 250, roundSizes: [30, 24, 18, 12],
       now: new Date(at), actor: SYSTEM_ACTOR }));
     expect(corpus.length).toBeGreaterThanOrEqual(2000);
     await insertEvents(corpus);
     const stage = (instance: TestApp) => instance.request('/v1/stage', { headers: { 'X-Actor': ACTOR.admin } });
+    const newSpeakers = (from: number, base: readonly DomainEvent[]) => stampNext(Array.from({ length: 3 }, (_, index): NewEvent => ({
+      id: `budget-speaker-${from + index}`, type: 'SpeakerRegistered', at, actor, subjectId: `budget-speaker-${from + index}`,
+      personId: `budget-person-${from + index}`, meetingId: corpus.at(-1)!.meetingId!,
+      payload: { number: 900 + from + index, round: 1, position: 900 + from + index,
+        pii: { keyId: corpus.at(-1)!.meetingId!, displayName: `Budget ${from + index}` } },
+    }) as NewEvent), base);
 
-    // (a) deterministic: re-hash count through the test hook.
+    // (a) deterministic, through the test hook of the whole request.
     const infos: ChainInfo[] = [];
     const instance = app(poolA, infos);
     expect((await stage(instance)).status).toBe(200);
     expect(infos.at(-1)).toEqual({ hashed: corpus.length, cachedSeq: corpus.length });
     expect((await stage(instance)).status).toBe(200);
     expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: corpus.length });
-    const extra = await stampNext(Array.from({ length: 3 }, (_, index): NewEvent => ({
-      id: `budget-speaker-${index}`, type: 'SpeakerRegistered', at, actor, subjectId: `budget-speaker-${index}`,
-      personId: `budget-person-${index}`, meetingId: corpus.at(-1)!.meetingId!,
-      payload: { number: 900 + index, round: 1, position: 900 + index,
-        pii: { keyId: corpus.at(-1)!.meetingId!, displayName: `Budget ${index}` } },
-    }) as NewEvent), corpus);
-    await insertEvents(extra);
+    const firstExtra = await newSpeakers(0, corpus);
+    await insertEvents(firstExtra);
     expect((await stage(instance)).status).toBe(200);
     expect(infos.at(-1)).toEqual({ hashed: 3, cachedSeq: corpus.length + 3 });
 
-    // (b) time: 20 cold (fresh app each) against 20 warm on one warmed app, same database.
-    const cold: number[] = [];
-    for (let run = 0; run < 20; run++) {
-      const fresh = app(poolA);
-      const started = performance.now();
-      const response = await stage(fresh);
-      cold.push(performance.now() - started);
-      expect(response.status).toBe(200);
+    // (a) rows: the loader itself, on its own cache, in a read transaction like the request's.
+    const load = async (cache: ReturnType<typeof createChainCache>) => {
+      const client = await poolA.connect();
+      try {
+        await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+        const result = await loadPostgresSnapshotCached(client, cache);
+        await client.query('COMMIT');
+        return result;
+      } finally {
+        client.release();
+      }
+    };
+    const cache = createChainCache();
+    expect(await load(cache)).toMatchObject({ hashed: corpus.length + 3, rowsRead: corpus.length + 3 });
+    expect(await load(cache)).toMatchObject({ hashed: 0, rowsRead: 0 });
+    await insertEvents(await newSpeakers(3, [...corpus, ...firstExtra]));
+    expect(await load(cache)).toMatchObject({ hashed: 3, rowsRead: 3 });
+    const warmSnapshot = await load(cache);
+    expect(warmSnapshot).toMatchObject({ hashed: 0, rowsRead: 0 });
+
+    // (b) loader ratio from 30 interleaved cold/warm pairs (median of the per-pair ratios): hard gate.
+    const ratios: number[] = [];
+    const loaderCold: number[] = [];
+    const loaderWarm: number[] = [];
+    for (let pair = 0; pair < 30; pair++) {
+      let started = performance.now();
+      await load(createChainCache());
+      const cold = performance.now() - started;
+      started = performance.now();
+      await load(cache);
+      const warm = performance.now() - started;
+      loaderCold.push(cold);
+      loaderWarm.push(warm);
+      ratios.push(warm / cold);
     }
-    const warmTimes: number[] = [];
-    for (let run = 0; run < 20; run++) {
-      const started = performance.now();
-      const response = await stage(instance);
-      warmTimes.push(performance.now() - started);
-      expect(response.status).toBe(200);
+
+    // (d) evidence only: whole-request medians (interleaved), full SELECT alone, projection alone.
+    const requestCold: number[] = [];
+    const requestWarm: number[] = [];
+    for (let pair = 0; pair < 20; pair++) {
+      let started = performance.now();
+      expect((await stage(app(poolA))).status).toBe(200);
+      requestCold.push(performance.now() - started);
+      started = performance.now();
+      expect((await stage(instance)).status).toBe(200);
+      requestWarm.push(performance.now() - started);
     }
-    const coldMedian = median(cold);
-    const warmMedian = median(warmTimes);
-    console.info(`takt-033: ${corpus.length + 3} events, GET /v1/stage median cold ${coldMedian.toFixed(1)} ms, ` +
-      `warm ${warmMedian.toFixed(1)} ms`);
-    expect(warmMedian).toBeLessThanOrEqual(coldMedian * 0.5);
-    expect(warmMedian).toBeLessThan(100);
-  }, 180_000);
+    const selectOnly: number[] = [];
+    const projection: number[] = [];
+    for (let run = 0; run < 15; run++) {
+      let started = performance.now();
+      await poolA.query('SELECT events.seq::text AS seq, id, meeting_id, hash, prev_hash, envelope::text AS envelope FROM events ORDER BY events.seq');
+      selectOnly.push(performance.now() - started);
+      started = performance.now();
+      const store = createInMemoryEventStore({ load: () => warmSnapshot.snapshot.events, save: () => undefined });
+      await createInProcessApi({ store, actor: () => actor, clock: () => now }).getStage();
+      projection.push(performance.now() - started);
+    }
+    const f = (value: number) => value.toFixed(1);
+    console.info(`takt-033: ${corpus.length + 6} events; loader median cold ${f(median(loaderCold))} ms, warm ` +
+      `${f(median(loaderWarm))} ms (digest probe + suffix + persons), median pair ratio ${median(ratios).toFixed(3)}; ` +
+      `GET /v1/stage median cold ${f(median(requestCold))} ms, warm ${f(median(requestWarm))} ms ` +
+      `(absolute target < 100 ms: ${median(requestWarm) < 100 ? 'met' : 'missed'}); full SELECT alone ` +
+      `${f(median(selectOnly))} ms; projection alone ${f(median(projection))} ms`);
+    expect(median(ratios)).toBeLessThanOrEqual(0.5);
+  }, 240_000);
 });

@@ -389,6 +389,7 @@ function comparePersons(expected: ReadonlyMap<string, PersonRow>, personRows: re
 }
 
 interface FullLoad extends PostgresSnapshot {
+  rowsRead: number;
   rowDigests: string[];
   expected: Map<string, PersonRow>;
   hashed: number;
@@ -407,7 +408,7 @@ async function loadFull(client: PoolClient, queryTimeoutMs: number): Promise<Ful
   const { log, hashed } = sealChecked(undefined, events);
   const expected = addExpectedPersons(new Map(), log);
   const persons = comparePersons(expected, personRows);
-  return { events: log, persons, rowDigests: digests, expected, hashed };
+  return { events: log, persons, rowsRead: eventRows.length, rowDigests: digests, expected, hashed };
 }
 
 /**
@@ -425,6 +426,8 @@ export interface ChainLoad {
   snapshot: PostgresSnapshot;
   /** Events whose hash was recomputed by this load (0 on a warm read without new events). */
   hashed: number;
+  /** Event rows this load read into the service (k on a warm read with k new events; all on a full load). */
+  rowsRead: number;
   /**
    * The cached history no longer matches the database (prefix changed, or rows vanished) and the full check still
    * found a valid chain: a restore or a rewrite. Open owner question 1, default (b): accepted, reported by the caller.
@@ -472,8 +475,19 @@ export async function loadPostgresSnapshotCached(
   return {
     snapshot: { events: full.events, persons: full.persons },
     hashed: full.hashed,
-    historyChanged: base !== undefined && decision.kind === 'full' && (decision.reason === 'shortened' || decision.reason === 'digest'),
+    rowsRead: full.rowsRead,
+    historyChanged: base !== undefined && (
+      (decision.kind === 'full' && (decision.reason === 'shortened' || decision.reason === 'digest')) ||
+      // Review finding 2: the probe may have passed (a write under READ COMMITTED sees each statement on a new
+      // snapshot) and the prefix vanished or changed before the next statement. Judge the verified result itself.
+      !continuesCachedEnd(full.events, base)),
   };
+}
+
+/** Whether a verified log still contains the cached end unchanged (same hash at the cached end seq). */
+function continuesCachedEnd(log: VerifiedEventLog, base: ChainCacheEntry): boolean {
+  const end = base.checkpoints.at(-1)!;
+  return log.length >= end.seq && (end.seq === 0 || log[end.seq - 1]?.hash === end.lastHash);
 }
 
 /** The incremental path; `undefined` means "deviation, check in full" (never an answer from unchecked data). */
@@ -501,7 +515,7 @@ async function loadSuffix(
       const next = extendEntry(base, log, [...base.rowDigests, ...digests], expected);
       cache.compareAndSet(base, next);
     }
-    return { snapshot: { events: log, persons }, hashed, historyChanged: false };
+    return { snapshot: { events: log, persons }, hashed, rowsRead: eventRows.length, historyChanged: false };
   } catch (error) {
     if (error instanceof PostgresIntegrityError) return undefined;
     throw error;

@@ -257,14 +257,17 @@ export function isVerifiedLog(value: unknown): value is VerifiedEventLog {
 
 /**
  * Verify `suffix` as the continuation of an already sealed `prefix` (or as a whole log without one),
- * then return prefix plus suffix as a new, deeply frozen, sealed log. The suffix events are frozen
- * *before* they are checked, so what was verified is what stays in the log. A failed check throws
- * (naming the seq) and seals nothing; the frozen suffix objects are then simply not part of any log.
- * There is no flag to skip the check: `createInMemoryEventStore` trusts only arrays sealed here.
+ * then return prefix plus suffix as a new, deeply frozen, sealed log. The suffix is first copied with
+ * `structuredClone` (review finding 5): the copy is plain data only (getters are read once into data
+ * properties, symbol keys, non-enumerable properties and prototypes are dropped, a Proxy or a function
+ * throws), so nothing can answer differently after the check, and the caller's objects stay unfrozen.
+ * The copies are frozen *before* they are checked, so what was verified is what stays in the log. A
+ * failed check throws (naming the seq) and seals nothing. There is no flag to skip the check:
+ * `createInMemoryEventStore` trusts only arrays sealed here.
  */
 export function sealVerifiedLog(prefix: VerifiedEventLog | undefined, suffix: readonly DomainEvent[]): VerifiedEventLog {
   if (prefix !== undefined && !isVerifiedLog(prefix)) throw new Error('Only a sealed event log can be extended.');
-  const events = [...suffix];
+  const events = suffix.map((event) => structuredClone(event));
   for (const event of events) deepFreeze(event);
   const last = prefix?.at(-1);
   verifyEventChain(events, last === undefined ? WHOLE_LOG : { seq: prefix!.length, prevHash: last.hash ?? '' });
