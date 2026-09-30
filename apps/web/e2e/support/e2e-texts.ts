@@ -41,12 +41,12 @@ export const ABNAHME_ANSWER_TEXT =
   'Die Ausschüttungsquote lag im Berichtsjahr bei 47 Prozent des bereinigten Konzernergebnisses. ' +
   'Die Einzelheiten sind im Geschäftsbericht auf Seite 42 dargestellt.';
 
-/** Every text the suite writes; none of them may appear in the access log. */
 /** Slice 036b, H13: what the second-browser test writes (a Wortmeldung, a Redebeitrag, one question). */
 export const H13_SPEAKER_NAME = 'Synthetische Testperson Sigma';
 export const H13_CONTRIBUTION_TEXT = 'Synthetischer Wortlaut für den zweiten Browser im HTTP-Modus.';
 export const H13_QUESTION = 'Synthetische Frage für die Einordnung im zweiten Browser?';
 
+/** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
   ...SPEECH_QUESTIONS,

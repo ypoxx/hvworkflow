@@ -932,4 +932,90 @@ describe('stream client (slice 036b)', () => {
     expect(h.streams[1]!.headers.get('Last-Event-ID')).toBeNull();
     expect(h.connection.get().phase).toBe('live');
   });
+
+  it('re-check finding 1: an actor alternating on every /auth/me plus a refresh every 500 ms never lifts the gate', async () => {
+    const h = harness({ withStore: true });
+    let flip = 0;
+    const readSession = vi.fn(async () => {
+      flip += 1;
+      return { ...session(), actor: { id: flip % 2 === 0 ? 'p1' : 'p2', role: ACTOR.role } };
+    });
+    const auth = sessionWiring(h, readSession);
+    for (let i = 0; i < 200; i++) h.streamReplies.push(refused(403));
+    await auth.start();
+    await settle();
+    for (let t = 0; t < 60_000; t += 500) {
+      void auth.refresh().catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    await settle();
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
+    // The pause from the third end (3 s) holds through every actor change until 303 s.
+    for (let t = 60_000; t < 302_500; t += 500) {
+      void auth.refresh().catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    expect(h.streams).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await settle();
+    expect(h.streams.length).toBeGreaterThanOrEqual(4);
+    // Sign-out resets the gate: the next session opens at once.
+    const other = harness();
+    const follow = followSessionActor(other.api);
+    other.streamReplies.push(refused(403), sse().response);
+    follow(ACTOR);
+    await settle();
+    follow(undefined);
+    follow({ id: 'p9', role: ACTOR.role });
+    await settle();
+    expect(other.streams).toHaveLength(2);
+  });
+
+  it('re-check finding 2: reset on every open is no health; the backoff runs and the m8 pause follows after three', async () => {
+    const h = harness();
+    const resetOnly = () => new Response(`retry: 3000\n\n${RESET}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    for (let i = 0; i < 50; i++) h.streamReplies.push(resetOnly());
+    h.api.openStream();
+    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settle();
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
+    expect(h.connection.get().phase).toBe('polling');
+    await vi.advanceTimersByTimeAsync(540_000);
+    await settle();
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 303_000, 307_000, 315_000]);
+  });
+
+  it('re-check nit 1.4: a short stream with data does not end a series of session ends', async () => {
+    const h = harness({ withStore: true });
+    const readSession = vi.fn(async () => session());
+    const auth = sessionWiring(h, readSession);
+    const withData = new Response(`${CHANGE(5, ['speakers'])}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    h.streamReplies.push(refused(403), refused(403), withData, refused(403), refused(403), refused(403));
+    await auth.start();
+    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settle();
+    // 403 (1), 403 (2), a short stream with data, 403 (3) → the pause.
+    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 4000]);
+    expect(h.connection.get().phase).toBe('polling');
+  });
+
+  it('re-check finding 1: an actor change while the gated open is in flight re-arms the gate', async () => {
+    const h = harness();
+    const follow = followSessionActor(h.api);
+    h.streamReplies.push(refused(403));
+    follow(ACTOR);
+    await settle();
+    follow({ ...ACTOR }); // the session is confirmed again after the end: the gate waits 1 s
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
+    expect(h.streams).toHaveLength(2); // in flight, no answer yet
+    follow({ id: 'p2', role: ACTOR.role });
+    await settle();
+    expect(h.streams, 'no open at once after the actor change').toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(2000);
+    await settle();
+    expect(h.streams).toHaveLength(3);
+  });
 });

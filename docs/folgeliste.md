@@ -364,6 +364,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   wird nie gerufen · räumen bzw. beim Schließen lösen.
 - 036b Review nit 10 · `apps/web/src/api/index.ts`, `http.ts` · ein 401 beim Öffnen leert den Live-Store dreimal
   (`onStreamEnd`, `onUnauthorized`, `onActorChange(undefined)`) · auf einen Aufruf zusammenführen.
+- 036b Nachprüfung · `scripts/e2e-http-031.test.mjs:229` · die Strukturprüfung nennt nur die H8-Namen, nicht die H13-Texte
+  (der Zugriffslog-Scan selbst deckt sie über `WRITTEN_TEXTS` ab) · H13-Texte in die Prüfung aufnehmen (Datei nicht in 036b).
 - 036b Bau · `apps/web/src/app/ConnectionStatus.tsx` · „Verbindung wird aufgebaut“ erscheint bei jedem Laden kurz und
   wird vom Statusbereich angesagt · `connecting` erst nach 1–2 s zeigen.
 

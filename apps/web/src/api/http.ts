@@ -57,8 +57,12 @@ export interface StreamEnvironment {
 export interface HttpApi extends HvApi {
   /** A session is confirmed (`onActorChange(actor)`): open the stream unless one is open or a retry is pending. */
   openStream(): void;
-  /** No session any more: close the stream, no new attempt. */
-  closeStream(): void;
+  /**
+   * Close the stream, no new attempt. Without options (sign-out, no actor) everything is reset. `keepGate` (a
+   * structurally other actor, re-check finding 1): a pending backoff or pause after a session end stays, and a count of
+   * session ends re-arms the gate, so that close-then-open never bypasses it.
+   */
+  closeStream(options?: { keepGate?: boolean }): void;
 }
 
 /**
@@ -72,7 +76,7 @@ export function followSessionActor(api: Pick<HttpApi, 'openStream' | 'closeStrea
     const next = actor === undefined ? undefined : actorKey(actor);
     if (next === undefined) api.closeStream();
     else {
-      if (last !== undefined && next !== last) api.closeStream();
+      if (last !== undefined && next !== last) api.closeStream({ keepGate: true });
       api.openStream();
     }
     last = next;
@@ -329,7 +333,9 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     }
     deliver([], { seq: 0, topics: [...topics], subjects: [...subjects] });
   };
-  const clearRetry = () => { if (retryTimer !== undefined) clearTimeout(retryTimer); retryTimer = undefined; };
+  /** Whether the pending retry is the backoff or pause after a session end (re-check finding 1). */
+  let retryIsGate = false;
+  const clearRetry = () => { if (retryTimer !== undefined) clearTimeout(retryTimer); retryTimer = undefined; retryIsGate = false; };
   const clearWatchdog = () => { if (watchdog !== undefined) clearTimeout(watchdog); watchdog = undefined; };
   /** Ends the current connection on this side; nothing of it is read any more. */
   const drop = () => {
@@ -351,7 +357,11 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     attempt = Math.min(attempt + 1, 16);
     return step * (1 - BACKOFF_JITTER * environment.random());
   };
-  const retryIn = (ms: number) => { clearRetry(); retryTimer = setTimeout(() => { retryTimer = undefined; connect(); }, ms); };
+  const retryIn = (ms: number, gate = false) => {
+    clearRetry();
+    retryIsGate = gate;
+    retryTimer = setTimeout(() => { retryTimer = undefined; retryIsGate = false; connect(); }, ms);
+  };
   /** A loss of session or rights: empty the buffer (the hook), no new stream without a new confirmation. */
   const endForSession = (reason: StreamEndReason) => {
     const closing = current;
@@ -380,7 +390,9 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
     const healthy = closing !== undefined && (closing.sawData || lifetime >= SHORT_LIVED_MS);
     drop();
-    if (healthy) { attempt = 0; shortLived = 0; sessionEnds = 0; } else shortLived += 1;
+    if (healthy) { attempt = 0; shortLived = 0; } else shortLived += 1;
+    // Re-check nit 1.4: only a lifetime of 10 s ends a series of session ends, as in `endForSession`.
+    if (lifetime >= SHORT_LIVED_MS) sessionEnds = 0;
     if (shortLived >= SHORT_LIVED_LIMIT) {
       // A cutting or buffering proxy: stay on the poll for a while (m8).
       shortLived = 0;
@@ -408,7 +420,8 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     if (item.kind === 'comment') return;
     if (lastEventId !== undefined && CURSOR_PATTERN.test(lastEventId)) cursor = lastEventId;
     const message = decodeMessage(item);
-    if (message === undefined) { owner.sawData = true; deliver([]); return; }
+    // Only data (`event`, `change`) counts as health; control frames and malformed ones never do (re-check finding 2).
+    if (message === undefined) { deliver([]); return; }
     switch (message.kind) {
       case 'event': owner.sawData = true; deliver([message.event]); return;
       case 'change': owner.sawData = true; deliver([], message.change); return;
@@ -423,7 +436,6 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
         return;
       case 'reset':
         // The whole buffer once (the listeners reload their views), then a new stream without a cursor.
-        owner.sawData = true;
         deliver([]);
         cursor = undefined;
         ended('soon');
@@ -663,18 +675,30 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
           sessionEnds = 0;
           signal({ type: 'start' });
           signal({ type: 'fallback' });
-          retryIn(SHORT_LIVED_PAUSE_MS);
-        } else retryIn(backoffDelay());
+          retryIn(SHORT_LIVED_PAUSE_MS, true);
+        } else retryIn(backoffDelay(), true);
         return;
       }
       connect();
     },
-    closeStream() {
+    closeStream(options) {
       // Review minor 2: the cursor belongs to this session and actor; the next stream starts without it (N5 path).
       cursor = undefined;
       pausedHidden = false;
       if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
+      if (options?.keepGate === true) {
+        // Re-check finding 1: an actor change never lifts the gate after a session end. A pending backoff or pause stays
+        // (and keeps `openStream()` waiting); an end that has not led to a healthy stream re-arms the gate.
+        const gate = retryIsGate ? retryTimer : undefined;
+        if (gate !== undefined) retryTimer = undefined;
+        stopStream();
+        if (gate !== undefined) { retryTimer = gate; retryIsGate = true; }
+        else if (sessionEnds > 0) afterSessionEnd = true;
+        return;
+      }
       stopStream();
+      sessionEnds = 0;
+      afterSessionEnd = false;
     },
   };
   // N5: the reads of this adapter note that they started while no stream was in step.
