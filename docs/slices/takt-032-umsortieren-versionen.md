@@ -1,154 +1,209 @@
-# takt-032 — Umsortieren übernimmt die frischen Versionen; Aufrufen erst nach der Antwort
+# takt-032 — Nach eigenem Schreiben mit der Version aus der Antwort weiterarbeiten (Wortmeldeliste und Erfassung)
 
-**Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung im Web, kein Hoch-Auslöser; Leitplanken §4) · **Lanes:** web · **Perspektive:** Qualität/Betrieb, UX/Barrierefreiheit
+**Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung im Web, kein Hoch-Auslöser; Leitplanken §4) · **Lanes:** web · **Perspektive:** Qualität/Nebenläufigkeit, UX/Barrierefreiheit
 **Rolle:** web-implementer; Review in frischem Kontext (Perspektive Nebenläufigkeit und UX), Modell nur in `.claude/agents/`
-**Regeln:** AGENTS.md R2 (Nachweis), R4 (kein Rollenname, Angebot nur aus `_actions`), R6 (nur `HvApi`), R10 (i18n), R12; ADR 0002 (zwei Betriebsarten, gleiches Verhalten); Slice 010d (Override gehört der Liste, auf der er entstand)
-**Depends on:** takt-030 (PR #82, Branch `claude/takt-030-eigene-schreibvorgaenge`, **noch nicht gemergt**). takt-030 lässt `apps/web/src/api/http.ts` nach jedem eigenen 2xx-Schreiben die Hörer rufen; das Umsortieren löst damit sofort ein Neuladen der Liste aus. Diese Scheibe setzt genau dieses Verhalten voraus (das Neuladen ersetzt den Override durch frische Zeilen) und wird erst nach dem Merge von takt-030 von der dann aktuellen Basis aus gebaut.
-**Quellen-IDs:** Diagnoselauf für Scheibe 031b, gemessen gegen Postgres am 30.09.2026 (Nachlauf zur Zeitgrenze und zum 412 im Projekt `http`); Slice 002 (Umsortieren), 010d (Override)
+**Regeln:** AGENTS.md R2 (Nachweis), R4 (kein Rollenname, Angebot nur aus `_actions`), R6 (nur `HvApi`), R10 (i18n), R12; ADR 0002 (zwei Betriebsarten, gleiches Verhalten); Slice 010d (Override und Daten gehören der Liste bzw. dem Akteur, für die sie entstanden); takt-008 (Sperre beim Schreiben mit `aria-disabled`, Fokus bleibt)
+**Depends on:** takt-030 (PR #82, Branch `claude/takt-030-eigene-schreibvorgaenge`, **noch nicht gemergt**). takt-030 lässt `apps/web/src/api/http.ts` nach jedem eigenen 2xx-Schreiben die Hörer rufen; darauf lädt jede Ansicht sofort neu. Diese Scheibe setzt das voraus: Die neu gelesene Liste löst die Version aus der Antwort ab. Bau erst nach dem Merge von takt-030 von der dann aktuellen Basis.
+**Quellen-IDs:** Diagnoselauf für Scheibe 031b, gemessen gegen Postgres am 30.09.2026 (Wortmeldeliste); CI-Lauf 36664034530 auf 031b und Lesen des Codes (Erfassung); Slice 002 (Umsortieren, Erfassen), 010d, takt-008
 
 ## Befund (Ist-Stand, gelesen auf `5a013f9`)
 
-- `apps/web/src/features/speakers/Page.tsx:284` setzt beim Ablegen `setOverride(...)` mit den Zeilen **vor** dem
-  Umsortieren, also mit deren alten `version`-Werten.
-- `Page.tsx:290-300` schickt `api.reorderSpeakers(...)` und hängt nur `.catch` an. Die Antwort (`PUT /v1/speakers/order`,
-  200, `ETag`, Rumpf: die Zeilen der Runde mit neuen Versionen) wird verworfen. `HvApi.reorderSpeakers` liefert diese
-  Zeilen bereits: `packages/domain/src/api.ts:92` (`Promise<Speaker[]>`), Vertrag `packages/contract/openapi.yaml:224`
-  (Array von `Speaker`). Keine Vertragsänderung nötig.
-- Der Override fällt weg, sobald eine neue Liste ankommt (`Page.tsx:73-77`). Die kommt aus `useSpeakers.ts:98-124`
-  über `readStableSpeakerList` (`useSpeakers.ts:50-60`), also aus drei GETs nacheinander. `viewRef` wird erst nach dem
-  Rendern nachgezogen (`Page.tsx:80-83`).
-- `onCall` (`Page.tsx:169-186`) liest `viewRef` und die Zeile aus den Props. Im HTTP-Modus läuft ein Aufruf zwischen
-  der Antwort auf das Umsortieren und dem Eintreffen der neu gelesenen Liste (gemessen: ca. 0,5–1 s) mit veraltetem
-  `If-Match`. Folge: 412, Toast und Neuladen, und die laufende Wortmeldung bleibt stehen. Dasselbe gilt für `onFinish`,
-  `onWithdraw`, `onMove` und die Knöpfe in `NowSpeaking.tsx` (`speaker-call-next`, Beenden), denn alle schicken
-  `etagOf(speaker.version)` aus der angezeigten Zeile.
-- Der Server arbeitet richtig. Im Nachspielen kamen 200/200 mit frischen Versionen, mit einer alten Version 412.
-  Im Demo-Modus tritt das Problem nicht auf, weil der In-Process-Aufruf im selben Mikrotask-Takt auflöst.
+Es ist ein einziges Muster: Im HTTP-Modus schreibt die Seite, und das nächste Schreiben auf dieselbe Ressource
+schickt die Version aus der Liste **vor** dem ersten Schreiben. Die Liste wird erst danach neu gelesen (drei GETs bzw.
+zwei getrennte Lesungen). Folge: 412, Toast oder Veraltet-Banner, Neuladen. Der Server arbeitet richtig. Im
+Nachspielen kamen 200/200 mit frischen Versionen, mit einer alten Version 412. Im Demo-Modus tritt das nicht auf,
+weil der In-Process-Aufruf im selben Mikrotask-Takt auflöst.
+
+**Wortmeldeliste**
+- `apps/web/src/features/speakers/Page.tsx:284` setzt beim Ablegen `setOverride(...)` mit den Zeilen vor dem
+  Umsortieren, also mit alten `version`-Werten. `Page.tsx:290-300` verwirft die Antwort von `reorderSpeakers` und hängt
+  nur `.catch` an. Dabei trägt die Antwort (200, `ETag` = neue Listenversion) die Zeilen der Runde mit neuen Versionen:
+  `packages/domain/src/api.ts:92` (`Promise<Speaker[]>`), Vertrag `packages/contract/openapi.yaml:224`.
+- Der Override fällt weg, sobald eine neue Liste eintrifft (`Page.tsx:73-77`). Die kommt aus `useSpeakers.ts:98-124`
+  über `readStableSpeakerList` (`useSpeakers.ts:50-60`), drei GETs nacheinander. `viewRef` wird erst nach dem Rendern
+  nachgezogen (`Page.tsx:80-83`).
+- `onCall` (`Page.tsx:169-186`), `onFinish`, `onWithdraw`, `onMove` und `NowSpeaking.tsx` (`speaker-call-next`,
+  Beenden) schicken `etagOf(speaker.version)` aus der angezeigten Zeile. Im Fenster zwischen der Antwort und der neu
+  gelesenen Liste (gemessen: ca. 0,5–1 s) endet das mit 412, und die laufende Wortmeldung bleibt stehen. Dasselbe gilt
+  für ein Beenden direkt nach dem Aufrufen: Die Antwort von `updateSpeaker` (Rumpf `Speaker` mit neuer Version) wird
+  ebenfalls verworfen.
+- `register` (`Page.tsx:211-215`) und das nächste Umsortieren nutzen `listVersion` aus der Liste. Nach einem eigenen
+  Anmelden oder Umsortieren ist sie bis zum Neuladen veraltet.
+
+**Erfassung**
+- `apps/web/src/features/capture/Page.tsx:210`: `captureQuestions` schickt `contribution.version` aus der Liste. Jede
+  erfasste Einzelfrage erhöht die Version des Redebeitrags (`packages/domain/src/state.ts:285-288`). Zwei schnelle
+  Erfassungen hintereinander (Markieren, Alt+Q, freie Eingabe, Vorschlag) → die zweite bekommt 412. Die Antwort
+  (`Question[]`, Vertrag `openapi.yaml:345`) trägt die neue Version des Redebeitrags **nicht im Rumpf**, aber im
+  `ETag` (`ETagRequired`). Beide Adapter geben sie über `HvApi.lastWriteEtag()` heraus: Domäne `api.ts:604`, HTTP über
+  `perform`/`onWriteEtag`.
+- `capture/Page.tsx:189`: `captureContribution` schickt `speaker.version`. `ContributionCaptured` erhöht die Version
+  der Wortmeldung (`state.ts:249`). Die Antwort ist der `Contribution` mit dessen Version als `ETag`; die **neue
+  Version der Wortmeldung steht nicht in der Antwort**.
+- Karten (`/v1/questions`) und Restabdeckung (`/v1/contributions`, angezeigt in `CoverageBar.tsx`) werden getrennt neu
+  gelesen, einmal über den `version`-Schlüssel der beiden `useAsync` und einmal über `refetch` (`capture/Page.tsx:222-225`).
+  Sie landen in verschiedenen Renders, die Restabdeckung hinkt den Karten hinterher.
 
 ## Ziel
 
-1. **Frische Versionen nach Erfolg.** Löst `reorderSpeakers` auf, übernimmt die Seite die gelieferten Zeilen in den
-   Override. Jede zurückgegebene Zeile ersetzt die Zeile mit gleicher `id`, aber nur, wenn ihre `version` größer ist
-   als die angezeigte (eine schon neuere Zeile wird nie durch eine ältere ersetzt). Zeilen anderer Runden bleiben
-   unverändert. Die Zusammenführung ist eine reine Funktion in `useSpeakers.ts`, Vorschlag
-   `applyReorderResult(view, returned)`, damit sie ohne DOM testbar ist.
-2. **Nur auf den eigenen Override.** Das Ergebnis wird nur übernommen, wenn der Override dieses Umsortierens noch der
-   aktive ist (Marke oder Ref je Umsortieren). Ist inzwischen eine neue Liste eingetroffen (Regel 010d: Override fällt
-   in demselben Render), wird das Ergebnis verworfen und kein Override wiederbelebt, auch nicht nach einem
-   Akteurwechsel. Die neue Liste kommt dann aus dem Neuladen, das takt-030 anstößt.
-3. **Gesperrt, solange das Schreiben läuft.** Ab dem Ablegen bis zur Antwort (Erfolg oder Fehler) gilt die Runde als
-   beschäftigt:
-   - In dieser Runde sind die Zeilenaktionen `speaker-call`, `speaker-finish`, `speaker-move` und `speaker-withdraw`
-     deaktiviert (`disabled`). Ebenso deaktiviert sind in `NowSpeaking` die Knöpfe `speaker-call-next` und Beenden,
-     wenn die betroffene Wortmeldung in dieser Runde liegt. Ist das nicht sicher zu bestimmen, sind sie während jedes
-     laufenden Umsortierens gesperrt.
-   - Ziehen ist in dieser Runde gesperrt (`useSortable({ disabled })`), und `onDragEnd` bricht zusätzlich ab, solange
-     ein Umsortieren derselben Runde läuft. Kein zweites Schreiben mit alter Listenversion.
-   - Die Runde trägt ein deterministisches Signal: `data-busy="true"` und `aria-busy="true"` am Element
-     `speakers-round-<n>` (`<section>` in `RoundSection.tsx`). Ohne laufendes Schreiben fehlen beide Attribute oder
-     stehen auf `false`. Dieses Signal nutzen Tests und assistive Technik. Die Ankündigungen von dnd-kit bleiben
-     unverändert.
-4. **Fehlschlag unverändert.** Toast, Override verwerfen, `reload()`. Das Busy-Signal endet auch hier, im selben
-   Render wie das Verwerfen.
-5. **Nichts am Server, am Vertrag oder an der Domäne.** Rechte kommen weiter nur aus `_actions`. Das Busy-Signal ist
-   ein Ladezustand, keine Berechtigung.
+1. **Regel für beide Seiten: weiterarbeiten mit der Version aus der Antwort.** Nach einem erfolgreichen eigenen
+   Schreiben nutzt das nächste Schreiben auf dieselbe Ressource die Version aus dieser Antwort:
+   - Trägt der Rumpf die Ressource, gilt deren `version`: `updateSpeaker` → `Speaker`, `reorderSpeakers` → `Speaker[]`
+     der Runde.
+   - Sonst gilt das `ETag` der Antwort über `api.lastWriteEtag()`, gelesen **unmittelbar** nach dem `await` des
+     Schreibens: `registerSpeaker` und `reorderSpeakers` → Listenversion, `captureQuestions` → Version des
+     Redebeitrags. Der Wert wird als `ifMatch` unverändert weitergegeben, nicht geparst.
+   - Die Seite zählt nie selbst hoch.
+   - Die Version aus der Antwort gilt, bis eine Liste eintrifft, die **nach** der Antwort angefordert wurde; die ist
+     mindestens so neu. Je `id` gewinnt die höhere Version, eine schon neuere Zeile wird nie durch eine ältere ersetzt.
+   - Die Zusammenführung sind reine Funktionen: für die Wortmeldeliste in `useSpeakers.ts`, Vorschlag
+     `applyWriteResult(view, returned)`, für die Erfassung in `useCapture.ts`. So sind sie ohne DOM testbar.
+2. **Gesperrt, solange ein Schreiben läuft, mit deterministischem Signal.** Je Seite läuft höchstens ein eigenes
+   Schreiben zugleich. Damit ist auch das Lesen von `lastWriteEtag()` eindeutig, denn ein zweites Schreiben kann das
+   `ETag` nicht überholen.
+   - **Wortmeldeliste:** Während ein Umsortieren einer Runde läuft, sind in dieser Runde `speaker-call`,
+     `speaker-finish`, `speaker-move` und `speaker-withdraw` deaktiviert, ebenso das Ziehen (`useSortable({ disabled })`,
+     zusätzlich bricht `onDragEnd` ab). In `NowSpeaking` sind `speaker-call-next` und Beenden gesperrt, wenn die
+     betroffene Wortmeldung in dieser Runde liegt; ist das nicht sicher zu bestimmen, während jedes laufenden
+     Umsortierens. Die Runde trägt `data-busy="true"` und `aria-busy="true"` am Element `speakers-round-<n>`
+     (`<section>` in `RoundSection.tsx`). Ohne laufendes Schreiben fehlen beide oder stehen auf `false`. Zeilenaktionen
+     sperren weiter über `busyId` wie heute.
+   - **Erfassung:** Während ein Schreiben auf den gewählten Redebeitrag läuft (`captureQuestions` aus Markieren, Alt+Q,
+     freier Eingabe oder Vorschlag), sind alle diese Wege gesperrt. Nach takt-008 geschieht das mit `aria-disabled`
+     und einer Wächterprüfung im Handler, nicht mit `disabled`, damit der Fokus bleibt. Das Signal
+     `data-busy="true"`/`aria-busy="true"` sitzt an einem Element mit `data-testid="capture-contribution-pane"`
+     (`ContributionPane.tsx`). Für `captureContribution` gilt: Die neue Version der Wortmeldung kennt die Seite nicht
+     (siehe Befund). Nach dem Erfolg bleibt die Eingabe für einen **weiteren** Redebeitrag derselben Wortmeldung
+     deshalb gesperrt, mit demselben Signal, bis eine Liste der Wortmeldungen eintrifft, die nach der Antwort
+     angefordert wurde. Das ist das Neuladen aus takt-030.
+3. **Karten und Restabdeckung landen zusammen.** Die angezeigten Karten und die angezeigte Restabdeckung stammen immer
+   aus Lesungen desselben Stands: gleicher `useApiVersion`-Wert bzw. dasselbe Neuladen nach dem eigenen Schreiben. Ein
+   neueres Paar ersetzt das ältere erst, wenn beide Teile da sind; bis dahin bleibt das alte Paar sichtbar
+   (Designprinzip 8). Die Restabdeckung kann nicht aus der Antwort kommen, denn `captureQuestions` liefert nur
+   `Question[]` (siehe offene Frage 1). `CoverageBar.tsx` bleibt reine Anzeige.
+4. **Nur auf den eigenen Stand.** Ein Ergebnis wird nur übernommen, wenn der Zustand, auf dem das Schreiben begann,
+   noch der aktive ist: derselbe Akteur, beim Umsortieren derselbe Override (Marke oder Ref je Schreiben). Nach einem
+   Akteurwechsel oder einer inzwischen eingetroffenen neueren Liste wird es verworfen, und kein Override wird
+   wiederbelebt (010d).
+5. **Fehlschlag unverändert.** Wortmeldeliste: Toast, Override verwerfen, `reload()`. Erfassung: Veraltet-Banner bei
+   412 bzw. Toast wie heute. Das Busy-Signal endet im selben Render.
+6. **Nichts am Server, am Vertrag, an der Domäne oder an den API-Adaptern.** Rechte kommen weiter nur aus `_actions`.
+   Das Busy-Signal ist ein Ladezustand, keine Berechtigung.
 
 ## Nicht-Ziele
 
-- Keine Vertrags- oder Serveränderung, keine Änderung an `http.ts`, `index.ts` oder `useApiVersion.ts`.
-- Die **Listenversion** (`listVersion`, das Listen-ETag für Anmelden und nächstes Umsortieren) bleibt bis zum
-  Neuladen die alte. Bis die neu gelesene Liste eintrifft, kann ein direkt folgendes Anmelden oder zweites
-  Umsortieren weiter mit 412 enden (Toast, Neuladen). Das Fenster ist kurz, weil takt-030 sofort neu lädt. Wer es
-  schließen will, braucht eine eigene Regel für das ETag der Antwort; das ist ein Folgeliste-Eintrag, nicht diese
-  Scheibe (siehe offene Frage 1).
-- Kein Warten auf das Neuladen nach dem Erfolg: Das Busy-Signal endet mit der Antwort auf das Schreiben.
+- Keine Vertragsänderung (offene Frage 1), keine Änderung an `http.ts`, `index.ts`, `useApiVersion.ts` oder am
+  Demo-Adapter.
+- Keine Sperre über Seiten hinweg und keine Änderung an Schreibwegen, die eine andere Ressource betreffen
+  (Einordnen einer Einzelfrage, `ClassifyDialog`, schreibt auf die Frage).
 - Keine Änderung an den e2e-Tests. Der e2e-Test 002 aus 031b wartet später auf `data-busy`; das gehört nicht in
   diesen Takt.
 - Keine neue Testabhängigkeit (jsdom, Testing Library). Komponenten werden wie in `app/LoginPage.test.tsx` statisch
-  gerendert (`react-dom/server`), die Logik ist eine reine Funktion.
+  gerendert (`react-dom/server`), die Logik steckt in reinen Funktionen.
 
 ## Files allowed
 
 - `docs/slices/takt-032-umsortieren-versionen.md`
-- `apps/web/src/features/speakers/Page.tsx` (Erfolgszweig von onDragEnd, Busy-Zustand je Runde, Weitergabe an die Kinder)
-- `apps/web/src/features/speakers/RoundSection.tsx` (Prop für Busy, data-busy und aria-busy am section-Element, Weitergabe an die Zeilen)
+- `apps/web/src/features/speakers/Page.tsx` (Übernahme der Antworten, Busy-Zustand, Weitergabe)
+- `apps/web/src/features/speakers/RoundSection.tsx` (Prop für Busy, data-busy und aria-busy am section-Element)
 - `apps/web/src/features/speakers/SpeakerRow.tsx` (Knöpfe und Ziehen gesperrt, solange die Runde beschäftigt ist)
-- `apps/web/src/features/speakers/NowSpeaking.tsx` (Aufrufen/Beenden gesperrt, solange die Runde beschäftigt ist)
-- `apps/web/src/features/speakers/useSpeakers.ts` (nur die neue reine Funktion zum Zusammenführen)
+- `apps/web/src/features/speakers/NowSpeaking.tsx` (Aufrufen und Beenden gesperrt, solange die Runde beschäftigt ist)
+- `apps/web/src/features/speakers/useSpeakers.ts` (nur neue reine Funktionen)
 - `apps/web/src/features/speakers/useSpeakers.test.ts`
 - `apps/web/src/features/speakers/RoundSection.test.tsx` (neu)
 - `apps/web/src/features/speakers/NowSpeaking.test.tsx` (neu)
-- `apps/web/src/i18n/speakers.de.ts`, `apps/web/src/i18n/speakers.en.ts` (nur falls ein neuer sichtbarer Text oder ein neues aria-label nötig wird, dann DE und EN)
-- `docs/folgeliste.md` (nicht blockierende Reviewbefunde; Eintrag zur Listenversion aus den Nicht-Zielen)
+- `apps/web/src/features/capture/Page.tsx` (Version aus der Antwort, Busy-Zustand, gemeinsames Landen von Karten und Restabdeckung)
+- `apps/web/src/features/capture/ContributionPane.tsx` (Busy-Signal, Sperre der Eingaben nach takt-008)
+- `apps/web/src/features/capture/ContributionText.tsx` (Wächter für Markieren und Alt+Q)
+- `apps/web/src/features/capture/SuggestDialog.tsx` (Wächter beim Übernehmen)
+- `apps/web/src/features/capture/CoverageBar.tsx` (nur falls die Anzeige eine Prop für den Stand braucht)
+- `apps/web/src/features/capture/useCapture.ts` (nur neue reine Funktionen)
+- `apps/web/src/features/capture/useCapture.test.ts`
+- `apps/web/src/features/capture/ContributionPane.test.tsx` (neu)
+- `apps/web/src/features/capture/CoverageBar.test.tsx` (neu, nur falls CoverageBar.tsx geändert wird)
+- `apps/web/src/i18n/speakers.de.ts`, `apps/web/src/i18n/speakers.en.ts`, `apps/web/src/i18n/capture.de.ts`, `apps/web/src/i18n/capture.en.ts` (nur falls ein neuer sichtbarer Text oder ein neues aria-label nötig wird, dann DE und EN)
+- `docs/folgeliste.md` (nicht blockierende Reviewbefunde)
 - `docs/evidence/takt-032-*.png`
 
 Weitere Dateien sind Scope-Befunde.
 
 ## Akzeptanzkriterium
 
-1. **Unit-Tests zuerst rot, dann grün** (`useSpeakers.test.ts`, reine Funktion aus Ziel 1):
-   (a) Zeilen der Runde 3 mit höherer `version` ersetzen die angezeigten, die Reihenfolge der Override-Zeilen bleibt;
-   (b) Zeilen anderer Runden bleiben dieselben Objekte;
-   (c) eine zurückgegebene Zeile mit gleicher oder kleinerer `version` ersetzt nichts;
-   (d) eine zurückgegebene `id`, die nicht angezeigt wird, wird nicht eingefügt;
-   (e) leere Rückgabe: die Ansicht bleibt unverändert.
+1. **Unit-Tests zuerst rot, dann grün** (reine Funktionen):
+   - `useSpeakers.test.ts`: (a) zurückgegebene Zeilen mit höherer `version` ersetzen die angezeigten, die Reihenfolge
+     folgt `round`/`position` der zusammengeführten Zeilen; (b) Zeilen anderer Runden bleiben dieselben Objekte;
+     (c) gleiche oder kleinere `version` ersetzt nichts; (d) eine unbekannte `id` wird nicht eingefügt; (e) leere
+     Rückgabe lässt die Ansicht gleich; (f) die Listenversion aus der Antwort gilt, bis eine nach der Antwort
+     angeforderte Liste da ist, danach die der Liste.
+   - `useCapture.test.ts`: (a) das `ETag` aus der Antwort gilt als `ifMatch` für den nächsten `captureQuestions`
+     desselben Redebeitrags, für einen anderen Redebeitrag nicht; (b) eine nach der Antwort angeforderte Liste löst es
+     ab; (c) Karten und Restabdeckung werden nur als Paar desselben Stands übernommen: nur Karten neu → altes Paar
+     bleibt; beide neu → neues Paar.
 2. **Komponententests** (statisch gerendert):
-   - `RoundSection.test.tsx`: mit Busy tragen die `<section>` `data-busy="true"` und `aria-busy="true"`, und jeder
-     `speaker-call`/`speaker-finish`/`speaker-move`/`speaker-withdraw` der Runde ist `disabled`. Ohne Busy fehlen beide
-     Attribute (oder stehen auf `false`), und die Knöpfe sind so aktiv wie heute (gleiche `_actions`, kein `busyId`).
-   - `NowSpeaking.test.tsx`: Aufrufen und Beenden sind bei Busy `disabled`, ohne Busy wie heute.
-3. **Ablauf in `Page.tsx`, vom Review am Diff geprüft:** Der Erfolgszweig nutzt den Rückgabewert von
-   `reorderSpeakers`. Die Marke aus Ziel 2 verhindert ein Übernehmen nach einer neuen Liste oder einem Akteurwechsel.
-   Das Busy-Signal endet in `finally` bzw. im selben Render wie der Fehlerzweig. Ohne `listVersion` wird kein Busy
-   gesetzt. Kein Rollenname im Diff (`pnpm role-literals`).
-4. **Demo unverändert:** Projekt `in-process` nicht verändert, alle Web-Unit-Tests grün. Kein Diff in
-   `packages/`, `apps/api/`, `apps/web/src/api/`, `apps/web/e2e/`.
-5. **Screenshot** `docs/evidence/takt-032-umsortieren.png`: Wortmeldeliste (Rolle Versammlungsbüro, Demo) nach einem
-   Umsortieren per Tastatur, gleicher Zustand wie in 002. Das Busy-Signal selbst dauert im Demo-Modus nur einen
-   Mikrotask; es wird durch den Komponententest belegt, nicht durch ein Bild (siehe offene Frage 2).
+   - `RoundSection.test.tsx`: mit Busy `data-busy="true"`, `aria-busy="true"` und jeder `speaker-call`,
+     `speaker-finish`, `speaker-move`, `speaker-withdraw` der Runde `disabled`; ohne Busy keine Attribute (oder
+     `false`) und Knöpfe wie heute.
+   - `NowSpeaking.test.tsx`: Aufrufen und Beenden bei Busy `disabled`, sonst wie heute.
+   - `ContributionPane.test.tsx`: bei Busy `data-busy="true"`/`aria-busy="true"` an `capture-contribution-pane`,
+     `capture-free-add`, `capture-suggest` und `capture-submit` mit `aria-disabled="true"`; ohne Busy wie heute.
+3. **Ablauf, vom Review am Diff geprüft:** `lastWriteEtag()` wird direkt nach dem `await` gelesen, und je Seite läuft
+   höchstens ein Schreiben. Ergebnisse werden nach Akteurwechsel oder neuerer Liste verworfen. Das Busy-Signal endet in
+   `finally` bzw. im Fehlerzweig. Es gibt kein Hochzählen von Versionen und keinen Rollennamen (`pnpm role-literals`).
+4. **Demo unverändert:** Projekt `in-process` nicht verändert, alle Web-Unit-Tests grün. Kein Diff in `packages/`,
+   `apps/api/`, `apps/web/src/api/`, `apps/web/e2e/`.
+5. **Screenshots** `docs/evidence/takt-032-umsortieren.png` (Wortmeldeliste nach einem Umsortieren per Tastatur, Rolle
+   Versammlungsbüro, Demo) und `docs/evidence/takt-032-erfassung.png` (Erfassung nach zwei Einzelfragen hintereinander,
+   Karten und Restabdeckung auf gleichem Stand). Das Busy-Signal dauert im Demo-Modus nur einen Mikrotask; es wird
+   durch die Komponententests belegt, nicht durch ein Bild (offene Frage 2).
 6. `pnpm gates` grün auf sauberem Commit, Abschnitt „Nachweis“ mit Gates-Commit und wörtlichem Schluss (eigener
    Doku-Commit, gezielt stagen, kein Amend). `slice-scope` akzeptiert nur die Dateien oben.
-7. **Späterer Nachweis, nicht Teil dieser Abnahme:** Der 031b-Test 002 im Projekt `http` ruft nach dem Umsortieren auf,
-   wartet dabei auf `data-busy` ohne `"true"` und erhält kein 412.
+7. **Späterer Nachweis, nicht Teil dieser Abnahme:** Im Projekt `http` ruft der 031b-Test 002 nach dem Umsortieren auf
+   und erfasst zwei Einzelfragen schnell hintereinander, ohne 412; er wartet dabei auf `data-busy` ohne `"true"`.
 
 ## Wirkung und Risiko (Leitplanken §4, mittel)
 
-- Nebenläufigkeit: Die Seite übernimmt Versionen nur vom Server, nie selbst hochgezählt. Ein zweiter Schreiber mit
-  alter Version bekommt weiter 412 (6.3). Das Busy-Fenster dauert so lange wie das Schreiben (lokal unter 100 ms,
-  CI http bis ca. 1 s).
-- Restfall: Ein Neuladen, das vor dem COMMIT des Umsortierens gestartet ist (z. B. der 30-s-Takt), kann nach dem
-  Erfolg mit älteren Zeilen eintreffen. Der Override fällt dann nach 010d weg, und bis zum Neuladen aus takt-030 zeigt
-  die Liste die alte Reihenfolge und die alten Versionen. Ein Aufruf in diesem Fenster endet mit 412 und Neuladen wie
-  heute, also kein Datenfehler.
-- Barrierefreiheit (6.9): `aria-busy` an der Runde. Deaktivierte Knöpfe behalten ihre `aria-label`. Der Fokus bleibt
-  am Ziehgriff, den dnd-kit nach dem Ablegen fokussiert. Die Scheibe verschiebt keinen Fokus.
-- Betrieb: kein zusätzlicher Aufruf, die Antwort wird nur nicht mehr verworfen.
+- Nebenläufigkeit (6.3): Versionen kommen nur vom Server. Ein fremder Schreiber mit alter Version bekommt weiter 412.
+  Das Busy-Fenster dauert so lange wie das Schreiben (lokal unter 100 ms, CI http bis ca. 1 s). Nur nach
+  `captureContribution` dauert es bis zum Neuladen der Wortmeldungen.
+- Restfall: Ein Neuladen, das vor dem COMMIT gestartet ist (z. B. der 30-s-Takt), kann nach dem Erfolg mit älteren
+  Zeilen eintreffen. Die Regel „höhere Version gewinnt“ fängt das für Zeilen ab, deren Antwort den Rumpf trägt. Für
+  ETag-Versionen gilt die Ablösung erst durch eine Liste, die nach der Antwort angefordert wurde. Bleibt ein Fall
+  übrig, endet er mit 412 und Neuladen wie heute, also kein Datenfehler.
+- Barrierefreiheit (6.9): `aria-busy` an Runde bzw. Erfassungsbereich. In der Erfassung gilt `aria-disabled` statt
+  `disabled` (takt-008), damit der Fokus nicht verloren geht. Deaktivierte Knöpfe behalten ihr `aria-label`.
+- Betrieb: kein zusätzlicher Aufruf. Die Antworten werden nur nicht mehr verworfen, und das gemeinsame Landen wartet
+  auf Lesungen, die ohnehin laufen.
+- Umfang: zwei Seiten, ein Muster. Überschreitet der Bau einen Agententag, wird entlang der Seiten geteilt (032a
+  Wortmeldeliste, 032b Erfassung). Das entscheidet der Orchestrator, nicht der Bauende.
 - Kein Hoch-Auslöser. Berührt der Bau doch Rechte, Identität oder Persistenz, gilt hoch, und das ist ein Scope-Befund.
 
 ## Qualitätswirkung
 
 Reifestufe: pilot · Risikoklasse: mittel
 Ausgelöst: [x] Oberfläche, Barrierefreiheit [x] Persistenz, Migration, Nebenläufigkeit (nur clientseitige Versionsführung, kein Speicher)
-Perspektive(n): UX/Barrierefreiheit (6.9), Nebenläufigkeit (6.3) · Nachweise: Unit- und Komponententests, Screenshot · Offene Entscheidung: keine E-Nummer
+Perspektive(n): UX/Barrierefreiheit (6.9), Nebenläufigkeit (6.3) · Nachweise: Unit- und Komponententests, Screenshots · Offene Entscheidung: keine E-Nummer, offene Fragen unten
 
 ## Vor dem Bau prüfen
 
-Nach dem Merge von takt-030: `Page.tsx` (`onDragEnd`, `run`, `actions`, Override-Regel 010d), `RoundSection.tsx`,
-`SpeakerRow.tsx` (`busy`, `useSortable`), `NowSpeaking.tsx` (`busyId`), `useSpeakers.ts` (`reload`, `listVersion`),
-`apps/web/src/api/http.ts` (Hörer nach 2xx aus takt-030). Weichen die Zeilenangaben im Befund ab oder fehlt eine
-Datei, melden und anhalten.
+Nach dem Merge von takt-030: `speakers/Page.tsx` (`onDragEnd`, `run`, `actions`, `register`, Override-Regel 010d),
+`RoundSection.tsx`, `SpeakerRow.tsx`, `NowSpeaking.tsx`, `useSpeakers.ts`, `capture/Page.tsx` (`writeContribution`,
+`captureQuestions`, `refetch`, `useAsync`-Schlüssel), `ContributionPane.tsx` (`writing`, takt-008), `ContributionText.tsx`
+(Alt+Q), `SuggestDialog.tsx`, `apps/web/src/api/http.ts` (Hörer nach 2xx, `lastWriteEtag`). Weichen die Zeilenangaben ab
+oder fehlt eine Datei, melden und anhalten.
 
 ## Offene Fragen
 
-1. Soll ein späterer Takt auch die Listenversion aus der Antwort übernehmen (`lastWriteEtag()` nach dem Schreiben)?
-   Damit schlösse sich das 412-Fenster für Anmelden und zweites Umsortieren. Standard bis zur Entscheidung: nein, nur
-   Folgeliste.
+1. **Vertrag (Architekt/Owner):** Zwei Antworten tragen die neue Version nicht im Rumpf. `captureQuestions` liefert
+   nur `Question[]`: Die Version des Redebeitrags steht im `ETag`, die Restabdeckung gar nicht. `captureContribution`
+   liefert den `Contribution`: Die neue Version der Wortmeldung fehlt. Soll ein späterer Vertragsschritt den
+   geänderten Redebeitrag (mit `coverage` und `version`) bzw. die Version der Wortmeldung mitliefern? Standard bis zur
+   Entscheidung: kein Vertragsschritt. Diese Scheibe nutzt das `ETag` und das Neuladen aus takt-030.
 2. R2 verlangt für Oberflächenarbeit einen Screenshot. Der Busy-Zustand ist im Demo-Modus nicht fotografierbar.
-   Standard: Screenshot des Endzustands plus Komponententest. Ein Bild aus dem Projekt `http` kommt mit 031b.
+   Standard: Screenshots des Endzustands plus Komponententests. Ein Bild aus dem Projekt `http` kommt mit 031b.
 
 ## Nachweis
 
-_offen (Gates-Commit, wörtlicher Schluss von `pnpm gates`, Screenshot)_
+_offen (Gates-Commit, wörtlicher Schluss von `pnpm gates`, Screenshots)_
 
 ## Review findings
 
