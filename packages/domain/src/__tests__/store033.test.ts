@@ -83,6 +83,14 @@ describe('takt-033: sealed (verified) event logs', () => {
     expect(sealed).toHaveLength(2);
   });
 
+  it('freezes the children of an event the caller froze only shallowly', () => {
+    const events = source(1);
+    Object.freeze(events[0]);
+    const sealed = sealVerifiedLog(undefined, events);
+    expect(Object.isFrozen(sealed[0]!.payload)).toBe(true);
+    expect(Object.isFrozen((sealed[0]!.payload as unknown as { note: object }).note)).toBe(true);
+  });
+
   it('keeps the sealed log unchanged when a store built on it appends', () => {
     const sealed = sealVerifiedLog(undefined, source(2));
     const saved: DomainEvent[][] = [];
