@@ -233,9 +233,10 @@ export function StagePage() {
   if (delivering !== null && !lockHolds(delivering, stage?.current)) {
     setDelivering(null);
   }
-  // takt-039 (Befund 1, Punkt 4): the handler's copy follows in the same commit. It no longer
-  // matters for a press on another question — `deliverTarget` asks whether the lock holds for the
-  // drawn question — but a lock the render has let go of must not come back with that question.
+  // takt-039 (Befund 1, Punkt 4): the handler's copy is let go of in the commit that lets go of the
+  // drawn lock. For a press on another question it does not matter — `deliverTarget` asks whether
+  // the lock holds for the drawn question. This mirrors the render as far as React commits it; it is
+  // not a guarantee against every interleaving of a press with a pending render.
   useLayoutEffect(() => {
     if (delivering === null) writing.current = null;
   }, [delivering]);

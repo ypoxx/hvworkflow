@@ -382,9 +382,10 @@ test.describe('H11 @idp: "Vorgelesen, weiter" acts while the stage is being read
       }
     });
     // Hold the next read of the stage: the one the poll starts. Only that one; the read after the own write passes.
-    const held = new Promise<Route>((resolve) => {
-      void page.route('**/v1/stage', (route) => resolve(route), { times: 1 });
-    });
+    // The route is registered (awaited) before the clock moves, or the poll's read could leave unintercepted (review).
+    let hold: (route: Route) => void = () => undefined;
+    const held = new Promise<Route>((resolve) => { hold = resolve; });
+    await page.route('**/v1/stage', (route) => hold(route), { times: 1 });
     await page.clock.fastForward('00:30');
     const read = await held;
 
