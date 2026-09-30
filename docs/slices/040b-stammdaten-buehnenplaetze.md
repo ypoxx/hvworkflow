@@ -65,6 +65,13 @@ Fachbereich und Bühnenfragen je Platz aus `Meeting.counts`.
    | `listMeetingStageSeats` | jeder angemeldete Akteur (Stammdaten) | — | nach `position`, dann `id`; `personId` und `deviceId` **nur** für Halter von `admin.seats.manage` (über `can()`), sonst fehlen beide |
    | `replaceMeetingStageSeats` | `admin.seats.manage` | 422: doppelte `id`, doppelte `position`, doppelte `deviceId`, `personId`/`deviceId` nicht pseudonym (enthält `@` oder Leerraum; wie `subjectId` in `api.ts:722-723`); 409 R-ADM-01; 409 R-ADM-02: ein entfallender Platz ist `seatId` einer Frage (ausdrücklich oder abgeleitet) | `StageSeatsReplaced` |
 
+   - **R-ADM-01 je Schicht.** Die Regel sitzt im Kern und antwortet dort 409, wenn der Akteur den Jahrgang noch
+     erreicht: die Demo-Identität (nicht zuordnungsgebunden) und Kern-Tests mit synthetischem Akteur. Über HTTP mit einer
+     Sitzung kommt es nicht so weit: `sessionActorFromEvents` (`apps/api/src/actor.ts:104-111`) und die eingegrenzte
+     Akteurauflösung (`resolveMeetingActor`) verwerfen jede Zuordnung eines geschlossenen Jahrgangs, also antwortet der
+     Dienst **403** (keine aktive Zuordnung), bevor R-ADM-01 greift. Beides ist gewollt und dokumentiert: Die 403 ist die
+     beobachtbare Antwort für Anwender, R-ADM-01 die Absicherung im Kern für jeden anderen Weg (Demo, Betreiberwerkzeuge,
+     künftige Adapter).
    - Ein Eintrag ohne `id` erhält eine Server-id. Umbenennen (gleiche `id`) ist immer erlaubt.
    - `personId` am Platz wird **nicht** gegen `state.persons` geprüft: Podiumsmitglieder stehen nicht in der
      Personentabelle der Wortmeldungen (Befund). 047 löst den Platz aus Rollenzuordnung und Platz auf.
@@ -134,9 +141,16 @@ einem bestehenden Anfrageschema. Die Versionszeilen in `apps/api/src/__tests__/c
   `AgendaItemsReplacedPayload`, `UnitsReplacedPayload`, `StageSeatsReplacedPayload`, gebunden in `Event` und `EventRead`
   (`allOf` mit `if`/`then`, `required: [subjectId]`). In `EventRead` gilt für `payload.stageSeats.items.personId`:
   `false`. Die Beschreibung von `Event` nennt das optionale `stageSeats` an `MeetingCreated`.
+- **`MeetingCreated` in `EventRead` binden (Datenschutz).** `MeetingCreated` trägt ab 040b optional `stageSeats` in
+  derselben Form (Seed; ab 040c das Klonen). `EventRead.payload` lässt sonst alles zu. Der Vertragsschritt bindet deshalb
+  in `EventRead` für `type: MeetingCreated` ein Nutzlastschema mit `stageSeats.items.properties.personId: false`, wie bei
+  `StageSeatsReplaced`. So steht die Maskierungsregel für Plätze an einer Stelle, für beide Ereignistypen. (040c klont
+  Plätze ohne `personId`; die Bindung schützt auch dann, wenn sich das ändert.)
 - **Beschreibungen:**
   - `listMeetingStageSeats` und `StageSeat`: `personId`/`deviceId` nur für Halter von `admin.seats.manage`.
-  - Die drei `replace…`-Operationen: 422-Fälle, R-ADM-01, R-ADM-02; R-ADM-03 bleibt „ab 040d“.
+  - Die drei `replace…`-Operationen: 422-Fälle, R-ADM-01, R-ADM-02; R-ADM-03 bleibt „ab 040d“. Die 409 mit R-ADM-01
+    sieht nur ein Akteur, der den geschlossenen Jahrgang noch erreicht (Demo); mit Sitzung antwortet der Dienst 403
+    (keine aktive Zuordnung). 403 ist an allen drei Operationen schon dokumentiert; die Beschreibung sagt das.
   - `Meeting.counts.byUnit`/`bySeat`: jeder Fachbereich bzw. Platz als Schlüssel, Summe kann kleiner sein.
   - `Problem.ruleId`: R-ADM-01 und R-ADM-02 mit Inhalt; „R-ADM-01..09 und R-MTG-08/09 (slice 040)“.
 - **Allowlist:** die vier Einträge entfernen (`replaceMeetingAgendaItems`, `replaceMeetingUnits`,
@@ -175,7 +189,7 @@ Kern:
 - `packages/domain/src/state.ts`
 - `packages/domain/src/api.ts`
 - `packages/domain/src/permissions.ts` (nur die zwei Rechte in der Liste der Administration)
-- `packages/domain/src/rules.ts` (nur R-ADM-01, R-ADM-02)
+- `packages/domain/src/rules.ts` (nur R-ADM-01, R-ADM-02; die Beschreibung von R-ADM-01 nennt die 403 über HTTP)
 - `packages/domain/src/stream.ts` (nur Themen und Subjekte je Ereignistyp)
 - `packages/domain/src/seed.ts` (nur AR-Büro und Standardplätze)
 - `packages/domain/src/index.ts` (nur Exporte)
@@ -257,8 +271,8 @@ Kern (`master-data040b.test.ts`, Demo-Identität bzw. Rollenzuordnungen wie in `
 7. **Zähler:** Auf dem Seed hat `byUnit` genau die neun Fachbereiche als Schlüssel (AR-Büro mit 0) und `bySeat` genau die
    vier Plätze; die Werte stimmen mit einer unabhängigen Zählung im Test überein. Nach `assignQuestion` bzw.
    `stageQuestion` ändern sich die Werte um 1.
-8. **R-ADM-01:** Auf einem Jahrgang mit `MeetingClosed` (synthetisches Ereignis wie in `meeting025.test.ts`) antworten
-   alle drei `replace…` mit 409 R-ADM-01, ohne Ereignis.
+8. **R-ADM-01 (Kern):** Auf einem Jahrgang mit `MeetingClosed` (synthetisches Ereignis wie in `meeting025.test.ts`)
+   antworten alle drei `replace…` für die Demo-Identität mit 409 R-ADM-01, ohne Ereignis.
 9. **Rechte:** `replaceMeetingUnits` und `replaceMeetingStageSeats` als `moderation`, `coordination`, `expert`, `approver`, `podium`,
    `observer` → 403 R-PERM-01; `replaceMeetingAgendaItems` als jede Rolle ohne `agenda.manage` → 403 R-PERM-01; als admin 200.
 10. **Seed:** `unit-ar` und die vier Standardplätze sind da; jede klassifizierte Frage mit `stageAssignment` hat dasselbe
@@ -277,9 +291,12 @@ Dienst (`apps/api/src/__tests__/master-data040b.test.ts`, über `req()`):
 
 15. `PUT /v1/meetings/{id}/agenda-items`, `…/units`, `…/stage-seats` und `GET …/stage-seats`: 200, `ETag` = neue
     Version, Antwort gültig gegen den Vertrag; 412 bei veraltetem `If-Match`; 422 bei `maxItems + 1`; 403 als `observer`
-    mit `ruleId`; 404 für einen unbekannten Jahrgang.
+    mit `ruleId`; 404 für einen unbekannten Jahrgang. **Geschlossener Jahrgang mit Sitzung:** Ein Subject mit
+    Verwaltungsrolle in einem Jahrgang, der danach `MeetingClosed` erhält, schreibt `PUT …/units` → 403 (keine aktive
+    Zuordnung), kein Ereignis; mit dem Demo-Kopf im Demo-Betrieb → 409 R-ADM-01.
 16. Vertrag: `Classification` hat genau `{track, agendaItemId, stageAssignment, seatId}`; `Event.type` enthält die drei
-    Typen; `EventRead` mit `payload.stageSeats[0].personId` ist ungültig; die Allowlist enthält die vier Einträge nicht
+    Typen; `EventRead` mit `payload.stageSeats[0].personId` ist ungültig, sowohl für `type: StageSeatsReplaced` als auch
+    für `type: MeetingCreated` (Negativprobe mit Ajv); ohne `personId` ist beides gültig; die Allowlist enthält die vier Einträge nicht
     mehr; das Abdeckungstor meldet sie als ausgeübt.
 
 `transitions.test.ts`: neuer erzeugter Abschnitt **„Role × Administration“**:
@@ -423,3 +440,7 @@ Test 12), Minor 16 (Surrogate → 422, Test 13), Nit 28 (Versionszeilen im Vertr
 **Nachprüfung (30.09.2026, zu `bccba04`):** eingearbeitet in 040b: N8 (eingegrenzte Instanz je `meetingId`
 zwischengespeichert, Test 12 mit Mutationsprobe), N9 (Regel-id-Bereich R-ADM-01..09 und R-MTG-08/09 im Vertragsschritt,
 Tests neu durchnummeriert 1–16, Verweise angeglichen).
+
+**Codex-Befund zu #115 (zwei P2):** eingearbeitet: R-ADM-01 je Schicht (Kern 409, HTTP mit Sitzung 403 ohne aktive
+Zuordnung; Vertragsbeschreibung, Tests 8 und 15); `MeetingCreated` in `EventRead` mit `stageSeats.items.personId: false`
+gebunden, Negativprobe in Test 16. 040c braucht keine eigene Zeile: Die Bindung steht hier, und 040c klont ohne `personId`.
