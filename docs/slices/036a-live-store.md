@@ -318,11 +318,28 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
 
 ```
 Slice: 036a-live-store
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen; PR-CI-Lauf <id> (H8–H10, in-process)
-Open: Eigentümerfrage 1; Strom-Client in 036b
-Touched: <Dateiliste>
+Done: `createLiveStore` über beiden Adaptern: Schlüssel aus strukturellem Akteur, Methode, Argumenten; Epochen A/E und
+      Generation je Schlüssel; Antworten nie nach Akteurwechsel; Höchstalter 30 s (monoton) für jeden Eintrag, Claims
+      wecken die Hörer; Invalidierung je Thema/Kennung und Schreibvorgang; Haken `onWriteSettled` in `http.ts`.
+Evidence: Baucommits 898ef2d (Bau), 2a0cf5a (e2e-Helfer 010c/010d, Bauklärung), 53e644b (Review), 561e28d (Nachprüfung,
+      geprüfte Fassung). `liveStore.test.ts` 34 Tests: 18 rot gegen Durchreich-Platzhalter, weitere je Fix rot vor dem Fix
+      (o, q, s, t, u) oder per Mutation (r1–r4, k); `http.test.ts` 6 rot, dann grün. In-process e2e 131/131 auf 561e28d.
+      `pnpm gates` auf 561e28d (hv_t030), Exit 0:
+        packages/domain test:  Tests  261 passed (261)
+        apps/web test:         Tests  374 passed (374)
+        apps/api test:         Tests  524 passed (524)
+        slice-scope: 9 changed file(s), all within "docs/slices/036a-live-store.md"'s "Files allowed" list (22 pattern(s)).
+        ✓ built in 1.42s
+        mark-test-run: wrote … (clean tree) at commit 561e28d
+      PR-CI auf 561e28d: gates und e2e-http (H8–H10 u. a.) grün, Lauf 36731294282.
+Open: Eigentümerfrage 1 (ADR 0014, Invalidieren statt Deltas); Strom-Client in 036b; Minor 5 als bekanntes Restrisiko.
+Touched: apps/web/src/api/{liveStore.ts,liveStore.test.ts,http.ts,http.test.ts,index.ts};
+      apps/web/e2e/{010c-lesezustand.spec.ts,010d-ansichtsdaten.spec.ts} (nur Helfer); docs/folgeliste.md; diese Spec.
 ```
+
+Review (Opus, frischer Kontext, 8a4c8bd..2a0cf5a): kein Leck zwischen Akteuren; zwei Major (M1 Höchstalter nur für
+Claims, M2 Flugregel ungetestet) und Minors 3/4 behoben in 53e644b. Nachprüfung (2a0cf5a..53e644b): kein Blocker/Major;
+Minor 2 (Wanduhr, Sicherheit) und Spec-Text behoben in 561e28d. Übrige Punkte in `docs/folgeliste.md`.
 
 Hinweis zum Akzeptanzkriterium 2 (Bau, 30.09.2026): `grep -rn "fetch(" apps/web/src` trifft außerhalb von `http.ts` nur
 `refetch();` in `apps/web/src/features/capture/Page.tsx:316`, ein Fehltreffer des Musters, vorbestehend, kein
