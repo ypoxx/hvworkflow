@@ -4,17 +4,17 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `bdcfb9e` (takt-034). Etappe A fertig; 031a gemergt.
-- **#82 takt-030** — mergefertig bis auf Codex P1 (Screenshot H9 nur im Artefakt `evidence-031-http`, zuletzt ID
-  11074530002 aus Lauf 36660269666). Thread offen, kein Merge ohne Eigentümerentscheidung.
-- **#83 031b** — Entwurf, Basis vorläufig `claude/takt-030-eigene-schreibvorgaenge`. `gates` dort rot nur durch
-  `slice-scope` (gestapelt). Nach Merge von #82: Basis auf den Integrationszweig umstellen, Basis einmergen, Gates auf
-  dem integrierten Commit. Fachlich wartet 031b auf takt-032 und takt-033; danach warten die Tests auf das Busy-Signal
-  aus takt-032 statt auf Netzantworten. ADR-0002-Ergänzung schreibt der Architekt nach grüner CI.
-- **takt-032 / takt-033 / takt-033b** — Specs fertig; takt-033 (Dienst, hoch) im Bau mit Opus, takt-032 (Web, mittel,
-  gestapelt auf takt-030) im Bau; takt-033b (kein Doppelabruf beim Einhängen, mittel) folgt. Offene Eigentümerfrage aus
-  takt-033: Verhalten bei geänderter oder gekürzter, aber gültiger Kette (gebaut wird Vorschlag b: annehmen und feste
-  Logzeile).
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `7180da3` (takt-033). Etappe A fertig;
+  aus B gemergt: 031a, takt-031, takt-033, takt-034, takt-035, takt-036.
+- **#82 takt-030** und **#87 takt-033b** — mergefertig bis auf Codex P1 (Screenshot nur im Artefakt). Threads offen, kein
+  Merge ohne Eigentümerentscheidung 1. Beide mergen konfliktfrei auf `7180da3`; vor dem Merge Basis einbringen und Gates
+  auf dem integrierten Commit. In #87 kann der Dev-Zweig von H10 entfallen, seit takt-035 gemergt ist.
+- **#86 takt-032** — Nachprüfung bestanden, gestapelt auf takt-030. Nach #82: Basis auf den Integrationszweig, Gates auf dem
+  integrierten Commit, ready, Codex, Merge.
+- **#83 031b** — Entwurf, Basis vorläufig takt-030. Wartet auf takt-032 und takt-033b; danach warten die Tests auf das
+  Busy-Signal aus takt-032, `/stage` < 1500 ms bleibt. ADR-0002-Ergänzung schreibt der Architekt nach grüner CI.
+- takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile); die Eigentümerfrage bleibt
+  offen und ist umkehrbar.
 
 ## Eigentümerentscheidungen (offen)
 
