@@ -61,8 +61,15 @@ Nachrichten.
      - `event`: `EventRead` wie `listEvents`, `id` = `seq`.
      - `change`: `StreamChange {seq, topics: StreamTopic[], subjects?: string[] (maxItems 100), meetingId?: string,
        replay?: true}`, `id` = `seq` des letzten abgedeckten Ereignisses.
-     - `cursor`: `StreamCursor {seq}`, `id` = Kopf.
-     - `reset`: `StreamReset {lastSeq}`, **ohne `id`** (m1). Der Client darf seinen Cursor daraus nicht ableiten.
+     - `cursor`: `StreamCursor {seq}`, `id` = Kopf. **Wann (Codex P2):** (a) sofort nach dem Aufbau jedes Stroms als
+       erste Nachricht nach `retry:`, wenn ohne Cursor geöffnet wird; (b) sofort nach einem abgeschlossenen Nachlauf
+       (auch wenn dessen letzte Nachricht schon `id` = Kopf trug); (c) mit dem Heartbeat, wenn der Kopf nur durch
+       unsichtbare Ereignisse vorgerückt ist. So hat jede Verbindung nach dem Aufbau eine gültige `id`.
+     - `reset`: `StreamReset {lastSeq}`, **ohne `id`** (m1). Der Client darf seinen Cursor daraus nicht ableiten. Danach
+       schließt der Dienst. **Ablauf nach `reset`:** Der Client verwirft seinen Stand und verbindet **ohne** Cursor neu
+       (weder `after` noch `Last-Event-ID`). Er erhält sofort `cursor` mit dem Kopf (a). Die Beschreibung im Vertrag sagt
+       ausdrücklich: Ein Client auf Basis von `EventSource` muss nach `reset` eine neue Instanz ohne `Last-Event-ID`
+       anlegen. Die eingebaute Wiederverbindung würde die alte `id` senden und erneut `reset` erhalten.
      - `end`: `StreamEnd {reason}` mit `reason ∈ session | forbidden | roles_changed | rotate | unavailable`, ohne `id`.
      - Heartbeat: Kommentarzeile. Erste Zeile `retry: 3000`.
    - `StreamTopic` = `meeting | speakers | contributions | questions | stage | roles`.
@@ -111,6 +118,11 @@ Nachrichten.
        - **Zähler:** `meeting` ohne Kennung, wenn sich `meeting.counts` im Stapel ändert. `stage` ohne Kennung für
          Leser mit `stage.read`, wenn sich `openCount` oder `deliveredCount` ändert (M2).
        - Ohne sichtbares Thema entsteht keine Nachricht. `subjects` höchstens 100, darüber entfällt das Feld.
+       - **Ein `change` je Stapel (Codex P2):** Die Beiträge aller Ereignisse eines Stapels (einer Zustellung von
+         `store.subscribe` bzw. eines Nachladens im Verteiler) werden zu **einer** `change`-Nachricht zusammengeführt:
+         `seq` = das letzte abgedeckte Ereignis des Stapels, Vereinigung der Themen und der Kennungen (höchstens 100,
+         darüber ohne `subjects`). Beispiel: `captureQuestions` mit drei Einzelfragen hängt drei `QuestionCaptured` in
+         einer Benachrichtigung an und ergibt eine Nachricht mit drei Kennungen. `event`-Nachrichten bleiben je Ereignis.
      - **Ereignisse ohne `meetingId`** gehen nur als `event` an Leser mit `event.read` (M4), nie als `change`.
    - **Nachlauf** `replayMessage(readerActors, events, stateNow)` für den Bereich `(cursor, Kopf]`, ohne historische
      Projektionen:
@@ -240,11 +252,19 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
     → nur `event` für Leser mit `event.read`, sonst nichts.
 11. (m11) `isOnStage` ist die einzige Stelle mit dem Status der Bühne (Test über `getStage` und `visibleMessages` mit
     derselben Frage); `subjects` mit 101 Kennungen → Feld entfällt; `IdempotencyRecorded` → nur `event`.
+12. **Ein `change` je Stapel (Codex P2):** `captureQuestions` mit drei Einzelfragen als capture im In-Process-
+    `subscribe` → genau ein Hörer-Aufruf mit genau einer `change`: alle drei Kennungen der Fragen (dazu Redebeitrag und
+    Wortmeldung), `seq` des letzten der drei Ereignisse. Dasselbe über `visibleMessages` mit dem Stapel direkt.
+13. **`cursor` (Codex P2), Prüfpunkt statt Laufzeittest:** Diese Scheibe hat keine Route. Der Review des Vertrags
+    prüft, dass die Beschreibung von `/stream` in `openapi.yaml` enthält: `cursor` sofort nach dem Aufbau ohne Cursor und
+    nach dem Nachlauf; nach `reset` Neuaufbau ohne Cursor, dann `cursor` mit dem Kopf; bei `EventSource` eine neue
+    Instanz ohne `Last-Event-ID`. Das Laufzeitverhalten testet 035b (Tests 13b und 13c). Ein Test der Domäne liest
+    keine Vertragsdatei (keine I/O im Kern).
 
 ## Akzeptanzkriterium
 
 1. Vertrag 0.3.11 vom Architekten vor dem Code; `pnpm contract:types` ohne Diff; Allowlist unverändert (035b).
-2. Tests 1–11 grün, zuerst rot belegt; bestehende Domänentests unverändert grün; Wahrheitstabelle ohne Diff;
+2. Tests 1–12 grün und Prüfpunkt 13 im Review, zuerst rot belegt; bestehende Domänentests unverändert grün; Wahrheitstabelle ohne Diff;
    `role-literals` grün.
 3. Bedrohungsmodell T-G1-I-09 und T-G3-I-01 mit Stand „Domäne gebaut, Dienst in 035b“ und Testnamen.
 4. `pnpm gates` grün auf sauberem Baucommit; `slice-scope` akzeptiert nur die Dateien oben.
@@ -253,14 +273,14 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 
 ## Nachweise
 
-Schluss von `pnpm gates`; Testnamen 1–11; erzeugte Sichtbarkeitstabelle aus Test 3 im Bericht; serialisierte
+Schluss von `pnpm gates`; Testnamen 1–12; erzeugte Sichtbarkeitstabelle aus Test 3 im Bericht; serialisierte
 Beobachter-Ausgabe aus Test 4.
 
 ## Qualitätswirkung
 
 Reifestufe: pilot · Risikoklasse: hoch
 Ausgelöst: [x] Vertrag, Ereignis [x] Rolle, Recht (R-PERM-04) [x] vertrauliche Daten (SG1, SG2)
-Perspektive(n): Security (6.5), Vertrag (6.4) · Nachweise: Tests 1–11, Tabelle · Offene Entscheidung: Eigentümerfrage 1
+Perspektive(n): Security (6.5), Vertrag (6.4) · Nachweise: Tests 1–12, Prüfpunkt 13, Tabelle · Offene Entscheidung: Eigentümerfrage 1
 
 ## Wirkung und Risiko
 
@@ -306,7 +326,7 @@ Perspektive(n): Security (6.5), Vertrag (6.4) · Nachweise: Tests 1–11, Tabell
 ```
 Slice: 035a-sse-domaene-vertrag
 Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen 1–11; Sichtbarkeitstabelle
+Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen 1–12; Sichtbarkeitstabelle
 Open: Eigentümerfrage 1; Dienst in 035b
 Touched: <Dateiliste>
 ```
