@@ -221,6 +221,16 @@ mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit eb0998e
 Screenshots: `docs/evidence/takt-032-umsortieren.png`, `docs/evidence/takt-032-erfassung.png`. Das Busy-Signal ist nur durch
 Komponententests belegt (offene Frage 2, Abnahme durch den Owner offen).
 
+**Nachlauf auf dem integrierten Commit `3fd3595`** (Basis auf den Integrationszweig umgestellt; takt-030, takt-033,
+takt-033b, takt-035 und E56 eingebracht; Konflikte nur in Doku und in den von takt-030 übernommenen Dateien, dort gilt
+der gemergte Stand), `pnpm gates` mit Postgres-Variablen, sauberer Baum, Exit 0; domain 243, web 306, api 523 Tests grün.
+Wörtlicher Schluss:
+
+```
+✓ built in 2.13s
+mark-test-run: wrote /home/user/wt/t032/.claude/state/last-test-run (clean tree) at commit 3fd3595, tree 04dfd79dbcf2…
+```
+
 ## Review findings
 
 Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested, 2 major. Disposition:
