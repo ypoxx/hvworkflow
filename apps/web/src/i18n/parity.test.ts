@@ -163,8 +163,8 @@ describe('i18n parity checks', () => {
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(507);
-    expect(deKeys).toBe(507);
-    expect(enKeys).toBe(507);
+    expect(totalKeys).toBe(510);
+    expect(deKeys).toBe(510);
+    expect(enKeys).toBe(510);
   });
 });

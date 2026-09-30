@@ -5,17 +5,25 @@
  * carries the same table, so a change to one that silently drifts from the others fails loudly
  * here.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Actor, HvApi, Question, QuestionFilter, ReadEvent } from '@hv/domain';
+import { createLiveStore } from '../../api/liveStore';
 import {
+  advanceStream,
   createDetailProblemGate,
+  extendWindow,
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
   loadKey,
+  mergeResultPages,
   NO_VERDICT,
+  readResultPages,
   readVerdict,
+  STREAM_SCAN_LIMIT,
+  tableRows,
 } from './lib';
-import type { KeyedRead } from './lib';
+import type { KeyedRead, PagedResults, ResultPage } from './lib';
 
 describe('isReadForbidden', () => {
   it('R-PERM-02 (no read permission): true', () => {
@@ -295,5 +303,240 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/* ---------------------------------------------------------------------------------------------
+ * takt-038 — Historie paginiert, Ereignisstrom-Reiter inkrementell.
+ * ------------------------------------------------------------------------------------------- */
+
+type Item = { id: string; v?: number };
+const items = (from: number, to: number): Item[] =>
+  Array.from({ length: to - from }, (_, i) => ({ id: `q${from + i}` }));
+const page = (list: Item[], total: number): ResultPage<Item> => ({ items: list, total });
+
+describe('mergeResultPages (takt-038 Ziel 1)', () => {
+  it('(a) a second page is appended in order, no duplicate by id', () => {
+    const first = mergeResultPages(null, [page(items(0, 3), 5)], 3);
+    expect(first).not.toBeNull();
+    const both = mergeResultPages(first, [page(items(0, 3), 5), page(items(3, 5), 5)], 3);
+    expect(both?.total).toBe(5);
+    expect(both?.pages.flat().map((item) => item.id)).toEqual(['q0', 'q1', 'q2', 'q3', 'q4']);
+  });
+
+  it('(a) a duplicate id at the page boundary is refused', () => {
+    expect(mergeResultPages(null, [page(items(0, 3), 6), page(items(2, 5), 6)], 3)).toBeNull();
+  });
+
+  it('(a) a missing id at the page boundary (short inner page) is refused', () => {
+    expect(mergeResultPages(null, [page(items(0, 2), 5), page(items(3, 5), 5)], 3)).toBeNull();
+  });
+
+  it('(b) a different total between the pages is refused', () => {
+    expect(mergeResultPages(null, [page(items(0, 3), 5), page(items(3, 5), 6)], 3)).toBeNull();
+  });
+
+  it('(b) a smaller total than the pages shown before: the further pages are dropped', () => {
+    const previous = mergeResultPages(null, [page(items(0, 3), 6), page(items(3, 6), 6)], 3);
+    expect(previous).not.toBeNull();
+    expect(mergeResultPages(previous, [page(items(0, 3), 5), page(items(3, 5), 5)], 3)).toBeNull();
+  });
+
+  it('(b) a shifted first page: the further pages are dropped', () => {
+    const previous = mergeResultPages(null, [page(items(0, 3), 6), page(items(3, 6), 6)], 3);
+    const shifted = [page(items(1, 4), 6), page(items(4, 7), 6)];
+    expect(mergeResultPages(previous, shifted, 3)).toBeNull();
+  });
+
+  it('(b) the first page alone always stands (nothing to piece together)', () => {
+    const previous: PagedResults<Item> = { pages: [items(0, 3), items(3, 6)], total: 6 };
+    expect(mergeResultPages(previous, [page(items(1, 4), 4)], 3)?.pages).toEqual([items(1, 4)]);
+  });
+
+  it('a growing total keeps the loaded pages', () => {
+    const previous = mergeResultPages(null, [page(items(0, 3), 5), page(items(3, 5), 5)], 3);
+    const grown = mergeResultPages(previous, [page(items(0, 3), 7), page(items(3, 6), 7)], 3);
+    expect(grown?.pages.flat()).toHaveLength(6);
+    expect(grown?.total).toBe(7);
+  });
+});
+
+describe('readResultPages over the live store (takt-038 (a2))', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('(a2) a question on page 2 changes at the same total and first page: page 2 shows the new object', async () => {
+    vi.useFakeTimers();
+    const actor: Actor = { id: 'a1', role: 'coordination', displayName: 'A' } as Actor;
+    const corpus: Item[] = items(0, 5);
+    let calls = 0;
+    const adapter = {
+      listQuestions: (filter: QuestionFilter = {}) => {
+        calls += 1;
+        const offset = filter.offset ?? 0;
+        const limit = filter.limit ?? 500;
+        return Promise.resolve({ items: corpus.slice(offset, offset + limit).map((item) => ({ ...item })), total: corpus.length });
+      },
+      subscribe: () => () => undefined,
+    };
+    const store = createLiveStore(adapter as unknown as HvApi, {
+      getActor: () => actor,
+      now: () => 0,
+      monotonic: () => 0,
+    });
+    const stop = store.subscribe(() => undefined);
+    const api = store as Pick<HvApi, 'listQuestions'>;
+
+    const before = await readResultPages(api, {}, 2, 3);
+    const shown = mergeResultPages(null, before as ResultPage<Question>[], 3);
+    expect(shown?.pages[1]?.[0]).toEqual({ id: 'q3' });
+    expect(calls).toBe(2);
+
+    // Without a change both pages come from the buffer.
+    await readResultPages(api, {}, 2, 3);
+    expect(calls).toBe(2);
+
+    corpus[3] = { id: 'q3', v: 2 };
+    store.onStreamMessage([], { seq: 9, topics: ['questions'] });
+    await vi.advanceTimersByTimeAsync(100);
+
+    const after = await readResultPages(api, {}, 2, 3);
+    const next = mergeResultPages(shown, after as ResultPage<Question>[], 3);
+    expect(next?.pages[0]?.map((item) => item.id)).toEqual(['q0', 'q1', 'q2']);
+    expect(next?.pages[1]?.[0]).toEqual({ id: 'q3', v: 2 });
+    stop();
+  });
+
+  it('reads the pages by offset with the page size as limit and keeps the filter', async () => {
+    const asked: QuestionFilter[] = [];
+    const api = {
+      listQuestions: (filter: QuestionFilter = {}) => {
+        asked.push(filter);
+        return Promise.resolve({ items: [], total: 0 });
+      },
+    } as unknown as Pick<HvApi, 'listQuestions'>;
+    await readResultPages(api, { q: 'Dividende' }, 3, 200);
+    expect(asked).toEqual([
+      { q: 'Dividende', limit: 200, offset: 0 },
+      { q: 'Dividende', limit: 200, offset: 200 },
+      { q: 'Dividende', limit: 200, offset: 400 },
+    ]);
+  });
+});
+
+const ev = (seq: number): ReadEvent => ({ seq, at: '2026-09-30T10:00:00.000Z', type: 'X' }) as unknown as ReadEvent;
+const seqs = (list: readonly ReadEvent[]): number[] => list.map((event) => event.seq);
+
+/** An event log as a fake `listEvents`: `seq` 1..head, optionally failing on the n-th call. */
+function fakeLog(initial: number) {
+  let head = initial;
+  let failOn: number | undefined;
+  const calls: { after: number; limit: number }[] = [];
+  const api: Pick<HvApi, 'listEvents'> = {
+    listEvents: (after = 0, limit = 1000) => {
+      calls.push({ after, limit });
+      if (failOn !== undefined && calls.length === failOn) return Promise.reject(new Error('page failed'));
+      const out: ReadEvent[] = [];
+      for (let seq = after + 1; seq <= head && out.length < limit; seq++) out.push(ev(seq));
+      return Promise.resolve({ items: out, lastSeq: head });
+    },
+  };
+  return {
+    api,
+    calls,
+    grow: (n: number) => { head += n; },
+    setHead: (n: number) => { head = n; },
+    failOnCall: (n: number) => { failOn = calls.length + n; },
+  };
+}
+
+describe('stream window (takt-038 Ziel 2)', () => {
+  it('(c) extendWindow appends new events, capped, the oldest fall out', () => {
+    const held = [ev(1), ev(2), ev(3)];
+    expect(seqs(extendWindow(held, [ev(4)], 10))).toEqual([1, 2, 3, 4]);
+    expect(seqs(extendWindow(held, [ev(4), ev(5)], 4))).toEqual([2, 3, 4, 5]);
+    expect(STREAM_SCAN_LIMIT).toBe(5000);
+  });
+
+  it('(c) the first load reads the trailing window only; a later count reads only what is new', async () => {
+    const log = fakeLog(12);
+    const first = await advanceStream(log.api, null, { pageSize: 5, windowLimit: 5 });
+    expect(seqs(first.events)).toEqual([8, 9, 10, 11, 12]);
+    expect(first.cursor).toBe(12);
+    log.grow(2);
+    const next = await advanceStream(log.api, first, { pageSize: 5, windowLimit: 5 });
+    expect(seqs(next.events)).toEqual([10, 11, 12, 13, 14]);
+    expect(next.cursor).toBe(14);
+    expect(log.calls.at(-1)).toEqual({ after: 12, limit: 5 });
+  });
+
+  it('(c) an unchanged head keeps the very same window object', async () => {
+    const log = fakeLog(3);
+    const first = await advanceStream(log.api, null, { pageSize: 5, windowLimit: 5 });
+    const again = await advanceStream(log.api, first, { pageSize: 5, windowLimit: 5 });
+    expect(again).toBe(first);
+  });
+
+  it('(c2) 7000 new events between two counts: paged to the head, window ends at the head without a gap', async () => {
+    const log = fakeLog(100);
+    const options = { pageSize: 1000, windowLimit: 5000 };
+    const first = await advanceStream(log.api, null, options);
+    log.grow(7000);
+    const next = await advanceStream(log.api, first, options);
+    expect(next.cursor).toBe(7100);
+    expect(next.events).toHaveLength(5000);
+    expect(next.events.at(-1)?.seq).toBe(7100);
+    expect(next.events[0]?.seq).toBe(2101);
+    const gaps = next.events.filter((event, i) => i > 0 && event.seq !== (next.events[i - 1]?.seq ?? 0) + 1);
+    expect(gaps).toEqual([]);
+  });
+
+  it('(c2) several pages appended when the head is within the window', async () => {
+    const log = fakeLog(100);
+    const options = { pageSize: 1000, windowLimit: 5000 };
+    const first = await advanceStream(log.api, null, options);
+    log.grow(3500);
+    const next = await advanceStream(log.api, first, options);
+    expect(next.cursor).toBe(3600);
+    expect(seqs(next.events)).toEqual(Array.from({ length: 3600 }, (_, i) => i + 1));
+  });
+
+  it('(c2) a failing second page leaves cursor and window unchanged', async () => {
+    const log = fakeLog(100);
+    const options = { pageSize: 1000, windowLimit: 5000 };
+    const first = await advanceStream(log.api, null, options);
+    const snapshot = { cursor: first.cursor, events: [...first.events] };
+    log.grow(7000);
+    log.failOnCall(2);
+    await expect(advanceStream(log.api, first, options)).rejects.toThrow('page failed');
+    expect(first.cursor).toBe(snapshot.cursor);
+    expect(seqs(first.events)).toEqual(seqs(snapshot.events));
+  });
+
+  it('(d) lastSeq below the last seq (restore): the window is dropped and read afresh', async () => {
+    const log = fakeLog(20);
+    const first = await advanceStream(log.api, null, { pageSize: 5, windowLimit: 5 });
+    log.setHead(3);
+    const next = await advanceStream(log.api, first, { pageSize: 5, windowLimit: 5 });
+    expect(seqs(next.events)).toEqual([1, 2, 3]);
+    expect(next.cursor).toBe(3);
+  });
+});
+
+describe('tableRows (takt-038 (e))', () => {
+  const window = Array.from({ length: 450 }, (_, i) => ev(i + 1));
+
+  it('(e) 200 rows per page, newest first, with older rows left to load', () => {
+    const one = tableRows(window, 1);
+    expect(one.rows).toHaveLength(200);
+    expect(one.rows[0]?.seq).toBe(450);
+    expect(one.hasOlder).toBe(true);
+    const two = tableRows(window, 2);
+    expect(two.rows).toHaveLength(400);
+    expect(two.rows.at(-1)?.seq).toBe(51);
+    const three = tableRows(window, 3);
+    expect(three.rows).toHaveLength(450);
+    expect(three.hasOlder).toBe(false);
   });
 });

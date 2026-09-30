@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { History, Lock, Search } from 'lucide-react';
-import type { AgendaItem, DomainEvent, Question, Unit } from '@hv/domain';
+import type { AgendaItem, DomainEvent, Question, ReadEvent, Unit } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -26,9 +26,8 @@ import { getLang, translate, useT } from '../../i18n';
 import { EventStream, HistoryKpiLine, Timeline } from './Timeline';
 import type { SummaryContext } from './eventSummary';
 import {
-  RESULT_LIMIT,
-  STREAM_LIMIT,
-  STREAM_SCAN_LIMIT,
+  RESULT_PAGE_MAX,
+  advanceStream,
   createDetailProblemGate,
   excerpt,
   isCurrentLoad,
@@ -36,15 +35,20 @@ import {
   keyBelongsTo,
   loadCurve,
   loadKey,
+  mergeResultPages,
   NO_VERDICT,
+  readResultPages,
   readVerdict,
+  tableRows,
 } from './lib';
-import type { KeyedRead, ReadVerdict } from './lib';
+import type { KeyedRead, PagedResults, ReadVerdict } from './lib';
 
 type Tab = 'question' | 'stream';
 
 const NO_QUESTIONS: readonly Question[] = [];
 const NO_EVENTS: readonly DomainEvent[] = [];
+const NO_READ_EVENTS: readonly ReadEvent[] = [];
+const NO_PAGES: PagedResults = { pages: [], total: 0 };
 const NO_CURVE: readonly number[] = [];
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
 
@@ -114,10 +118,16 @@ export function HistoryPage() {
    * time until the new role has answered; the panes show their skeleton instead. A newer `version`
    * of the same actor keeps them on screen while it loads (design principle 8).
    */
+  /**
+   * takt-038, Ziel 1: the result list is read page by page. `paging` is the actor and search the
+   * loaded pages belong to (a new search or another actor starts at page 1 again, 010d);
+   * `backToFirst` marks that freshly read pages did not fit together and only page 1 stands.
+   */
   const [resultsState, setResultsState] = useState<{
     key: string;
-    items: readonly Question[];
-    total: number;
+    paging: string;
+    paged: PagedResults;
+    backToFirst: boolean;
   } | null>(null);
   const [resultsLoadingState, setResultsLoading] = useState(true);
   const [corpusState, setCorpusState] = useState<{
@@ -141,12 +151,14 @@ export function HistoryPage() {
   // the same place the read happens, so it is bucketed once per fetched tail, keyed on `lastSeq` —
   // never on a render that leaves the tail untouched (R10, 007 rework). Slice 010d: `key` is the
   // load that read it.
+  // takt-038, Ziel 2: `cursor` is the `seq` the window has been read up to; later counts read only
+  // from there to the head (`advanceStream`, lib.ts).
   const [streamState, setStreamState] = useState<{
     key: string | null;
-    lastSeq: number;
-    window: readonly DomainEvent[];
+    cursor: number;
+    window: readonly ReadEvent[];
     curve: readonly number[];
-  }>({ key: null, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE });
+  }>({ key: null, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
   // Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Historie — set from the 403's
   // ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
@@ -171,6 +183,13 @@ export function HistoryPage() {
     setQuery('');
   }
   const mainKey = loadKey(actorId, version);
+  // takt-038: the loaded result pages and the table pages of the Ereignisstrom belong to one actor
+  // (and, for the results, one search); for anyone else they count from page 1.
+  const pagingKey = loadKey(actorId, search);
+  const [moreResults, setMoreResults] = useState({ paging: '', count: 1 });
+  const pageCount = moreResults.paging === pagingKey ? moreResults.count : 1;
+  const [olderRows, setOlderRows] = useState({ actor: '', count: 1 });
+  const tablePageCount = olderRows.actor === actorId ? olderRows.count : 1;
   const timelineKey = loadKey(actorId, `${version}:${selectedId ?? ''}`);
   const [corpusRead, setCorpusRead] = useState<KeyedRead | null>(null);
   const [resultsRead, setResultsRead] = useState<KeyedRead | null>(null);
@@ -204,8 +223,13 @@ export function HistoryPage() {
 
   // Slice 010d, Ziel 1: what this actor may be shown of each record (see above).
   const resultsOwned = resultsState !== null && keyBelongsTo(resultsState.key, actorId);
-  const results = resultsOwned ? resultsState.items : NO_QUESTIONS;
-  const total = resultsOwned ? resultsState.total : 0;
+  const paged = resultsOwned ? resultsState.paged : NO_PAGES;
+  const results = useMemo(
+    () => paged.pages.flat().sort((a, b) => a.number.localeCompare(b.number)),
+    [paged],
+  );
+  const total = paged.total;
+  const backToFirst = resultsOwned && resultsState.backToFirst;
   const resultsLoading = resultsLoadingState || !resultsOwned;
   const corpusOwned = corpusState !== null && keyBelongsTo(corpusState.key, actorId);
   const corpus = corpusOwned ? corpusState.items : NO_QUESTIONS;
@@ -218,7 +242,7 @@ export function HistoryPage() {
       ? historyState.events
       : null;
   const streamOwned = keyBelongsTo(streamState.key, actorId);
-  const streamWindow = streamOwned ? streamState.window : NO_EVENTS;
+  const streamWindow = streamOwned ? streamState.window : NO_READ_EVENTS;
   const curve = streamOwned ? streamState.curve : NO_CURVE;
   /**
    * Slice 010d, review round 1, finding 3: the stream effect reads its own record through this ref
@@ -228,8 +252,12 @@ export function HistoryPage() {
    * Kept after each commit, before any effect of that commit runs.
    */
   const streamRef = useRef(streamState);
+  // takt-038: the results effect reads the pages shown so far the same way, to compare fresh pages
+  // with them (`mergeResultPages`) without running again on its own answer.
+  const resultsRef = useRef(resultsState);
   useLayoutEffect(() => {
     streamRef.current = streamState;
+    resultsRef.current = resultsState;
   });
 
   /**
@@ -345,16 +373,37 @@ export function HistoryPage() {
     let cancelled = false;
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
+    const paging = loadKey(getActor().id, search);
     setResultsLoading(true);
-    api
-      .listQuestions({ limit: RESULT_LIMIT, ...(search !== '' ? { q: search } : {}) })
-      .then((page) => {
+    // takt-038, Ziel 1 (Codex P1): every loaded page is read again, not only the first; over the
+    // live store (036a) that costs network only after a change of `questions`. The new pages replace
+    // the old ones only once all of them are here.
+    readResultPages(api, search !== '' ? { q: search } : {}, pageCount)
+      .then((pages) => {
         if (!isCurrentLoad(requested, current())) return;
-        setResultsState({
-          key: requested,
-          items: [...page.items].sort((a, b) => a.number.localeCompare(b.number)),
-          total: page.total,
-        });
+        const held = resultsRef.current;
+        const sameList = held !== null && held.paging === paging;
+        const merged = mergeResultPages(sameList ? held.paged : null, pages);
+        if (merged === null) {
+          // Pages that do not fit together: page 1 alone, with a notice — never a list silently
+          // put together from different states.
+          const first = pages[0];
+          setResultsState({
+            key: requested,
+            paging,
+            paged: first === undefined ? NO_PAGES : { pages: [first.items], total: first.total },
+            backToFirst: true,
+          });
+          setMoreResults({ paging, count: 1 });
+        } else {
+          setResultsState({
+            key: requested,
+            paging,
+            paged: merged,
+            // The notice stays on page 1 until the person loads further pages again.
+            backToFirst: pageCount === 1 && sameList && held.backToFirst,
+          });
+        }
         setResultsLoading(false);
         setResultsRead({ key: requested, status: 'ready' });
       })
@@ -362,7 +411,7 @@ export function HistoryPage() {
         if (!isCurrentLoad(requested, current())) return;
         setResultsLoading(false);
         if (isReadForbidden(error)) {
-          setResultsState({ key: requested, items: NO_QUESTIONS, total: 0 });
+          setResultsState({ key: requested, paging, paged: NO_PAGES, backToFirst: false });
           setResultsRead({ key: requested, status: 'forbidden' });
           return;
         }
@@ -370,14 +419,14 @@ export function HistoryPage() {
         setResultsState((previous) =>
           previous !== null && keyBelongsTo(previous.key, getActor().id)
             ? previous
-            : { key: requested, items: NO_QUESTIONS, total: 0 },
+            : { key: requested, paging, paged: NO_PAGES, backToFirst: false },
         );
         problem(error);
       });
     return () => {
       cancelled = true;
     };
-  }, [version, search]);
+  }, [version, search, pageCount]);
 
   // Codex P2-A on 948a721: only a complete corpus (nothing cut off by the limit) of this very actor
   // says that "not in the corpus" means "not readable".
@@ -441,41 +490,37 @@ export function HistoryPage() {
     let cancelled = false;
     const requested = loadKey(getActor().id, version);
     const current = (): string | null => (cancelled ? null : loadKey(getActor().id, version));
-    // `version` bumps on every actor switch too (api/useApiVersion.ts), which never grows the log
-    // — a cheap read of just the tail `seq` first, and skipping the bounded read below when it has
-    // not moved, means switching roles while this tab is open no longer re-reads the log at all
-    // (R10, 007 rework). The table and the Lastkurve (point 9) both read the last STREAM_SCAN_LIMIT
-    // events rather than the whole log, which at seed volume is already several thousand events.
-    api
-      .listEvents(0, 1)
-      .then(({ lastSeq }) => {
-        if (!isCurrentLoad(requested, current())) return undefined;
+    // The table and the Lastkurve (point 9) both read at most the last STREAM_SCAN_LIMIT events
+    // rather than the whole log (R10, 007 rework). takt-038, Ziel 2: only the first load reads that
+    // window; later counts read from the held cursor up to the head and extend it (`advanceStream`).
+    // `version` bumps on every actor switch too (api/useApiVersion.ts), which never grows the log —
+    // an unchanged head then costs one empty read and leaves the window as it is.
+    // Slice 010d: only this actor's own window is extended; a window another actor read is not shown
+    // (`streamOwned`) and is read afresh, once.
+    const held = streamRef.current;
+    const base = keyBelongsTo(held.key, getActor().id)
+      ? { cursor: held.cursor, events: held.window }
+      : null;
+    advanceStream(api, base)
+      .then((next) => {
+        if (!isCurrentLoad(requested, current())) return;
         setStreamRead({ key: requested, status: 'ready' });
-        // Slice 010d: an unchanged tail is skipped only if this actor read it; a window another
-        // actor read is not shown (`streamOwned`) and is read again, once.
-        const held = streamRef.current;
-        if (lastSeq === held.lastSeq && keyBelongsTo(held.key, getActor().id)) return undefined;
-        return api
-          .listEvents(Math.max(0, lastSeq - STREAM_SCAN_LIMIT), STREAM_SCAN_LIMIT)
-          .then((page) => {
-            if (!isCurrentLoad(requested, current())) return;
-            setStreamState({
-              key: requested,
-              lastSeq,
-              window: page.items,
-              curve: loadCurve(page.items, Date.now()),
-            });
-          });
+        if (next === base) return;
+        setStreamState({
+          key: requested,
+          cursor: next.cursor,
+          window: next.events,
+          curve: loadCurve(next.events, Date.now()),
+        });
       })
       .catch((error: unknown) => {
         if (!isCurrentLoad(requested, current())) return;
         if (isReadForbidden(error)) {
           // Ziel 3: e.g. observer, who holds no `event.read` at all — a gestalteter Zustand, not
-          // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds
-          // `lastSeq` to 0 — a role that regains `event.read` later must not see the
-          // unchanged-tail short-circuit above skip its own first, honest read back.
+          // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds the
+          // cursor to 0 — a role that regains `event.read` later reads its window afresh.
           setStreamRead({ key: requested, status: 'forbidden' });
-          setStreamState({ key: requested, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE });
+          setStreamState({ key: requested, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
           return;
         }
         // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
@@ -484,7 +529,7 @@ export function HistoryPage() {
         setStreamState((previous) =>
           keyBelongsTo(previous.key, getActor().id)
             ? previous
-            : { key: requested, lastSeq: 0, window: NO_EVENTS, curve: NO_CURVE },
+            : { key: requested, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE },
         );
         problem(error);
       });
@@ -493,7 +538,12 @@ export function HistoryPage() {
     };
   }, [version, tab]);
 
-  const stream = useMemo(() => streamWindow.slice(-STREAM_LIMIT).reverse(), [streamWindow]);
+  // takt-038 (e): 200 rows per table page, "Ältere laden" within the window.
+  const { rows: stream, hasOlder } = useMemo(
+    () => tableRows(streamWindow, tablePageCount),
+    [streamWindow, tablePageCount],
+  );
+  const canLoadMore = resultsOwned && total > results.length && pageCount < RESULT_PAGE_MAX;
 
   const context = useMemo<SummaryContext>(
     () => ({
@@ -663,10 +713,32 @@ export function HistoryPage() {
                 )}
               </div>
 
-              {total > results.length && (
-                <p className="shrink-0 border-t border-line bg-sunken px-4 py-1.5 text-2xs text-ink-600">
-                  {t('history.results.more')}
+              {backToFirst && (
+                <p
+                  role="status"
+                  data-testid="history-results-back-to-first"
+                  className="shrink-0 border-t border-line bg-sunken px-4 py-1.5 text-2xs text-ink-600"
+                >
+                  {t('history.results.backToFirst')}
                 </p>
+              )}
+              {canLoadMore ? (
+                <div className="shrink-0 border-t border-line px-4 py-2">
+                  <Button
+                    size="sm"
+                    data-testid="history-results-load-more"
+                    disabled={resultsLoadingState}
+                    onClick={() => setMoreResults({ paging: pagingKey, count: pageCount + 1 })}
+                  >
+                    {t('history.results.loadMore')}
+                  </Button>
+                </div>
+              ) : (
+                total > results.length && (
+                  <p className="shrink-0 border-t border-line bg-sunken px-4 py-1.5 text-2xs text-ink-600">
+                    {t('history.results.more')}
+                  </p>
+                )
               )}
             </Panel>
           }
@@ -740,7 +812,20 @@ export function HistoryPage() {
                   ) : !streamOwned ? (
                     paneLoading
                   ) : (
-                    <EventStream events={stream} context={context} curve={curve} />
+                    <>
+                      <EventStream events={stream} context={context} curve={curve} />
+                      {hasOlder && (
+                        <div className="px-4 pb-4">
+                          <Button
+                            size="sm"
+                            data-testid="history-stream-older"
+                            onClick={() => setOlderRows({ actor: actorId, count: tablePageCount + 1 })}
+                          >
+                            {t('history.stream.older')}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )
                 ) : selected === null ? (
                   // Slice 010d: a selection whose record this actor has not read yet is loading,
