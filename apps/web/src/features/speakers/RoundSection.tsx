@@ -39,6 +39,7 @@ export function RoundSection({
   open,
   current,
   busyId,
+  busy = false,
   onToggle,
   actions,
 }: {
@@ -47,6 +48,8 @@ export function RoundSection({
   open: boolean;
   current: boolean;
   busyId: string | null;
+  /** takt-032: a reorder of this round is in flight; the answer carries the versions to go on with. */
+  busy?: boolean;
   onToggle: () => void;
   actions: SpeakerRowActions;
 }) {
@@ -58,7 +61,10 @@ export function RoundSection({
   const mayReorder = speakers.some((speaker) => speaker._actions.includes('speaker.reorder'));
 
   return (
-    <section data-testid={`speakers-round-${round}`}>
+    <section
+      data-testid={`speakers-round-${round}`}
+      {...(busy ? { 'data-busy': 'true', 'aria-busy': true } : {})}
+    >
       <Panel
         padded={false}
         className={cx('shrink-0', current && 'border-line-strong')}
@@ -152,6 +158,7 @@ export function RoundSection({
                       key={speaker.id}
                       speaker={speaker}
                       busy={busyId === speaker.id}
+                      roundBusy={busy}
                       actions={actions}
                     />
                   ))}

@@ -6,9 +6,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  etagForContribution,
   isCurrentLoad,
   isReadForbidden,
+  isSpeakerLocked,
   isVersionConflict,
+  landPair,
   keyBelongsTo,
   loadKey,
   NO_VERDICT,
@@ -189,5 +192,81 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/** takt-032: continue with the version from the answer (Ziel 1), and land cards with coverage as a pair (Ziel 3). */
+describe('etagForContribution', () => {
+  const mark = { id: 'c1', base: 4, etag: '"v5"' };
+
+  it('the tag of the answer is the next ifMatch for the same Redebeitrag', () => {
+    expect(etagForContribution({ id: 'c1', version: 4 }, mark)).toBe('"v5"');
+  });
+
+  it('another Redebeitrag does not use it', () => {
+    expect(etagForContribution({ id: 'c2', version: 4 }, mark)).toBe('"v4"');
+  });
+
+  it('a list read after the answer (another version) takes over', () => {
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v5"');
+    expect(etagForContribution({ id: 'c1', version: 7 }, mark)).toBe('"v7"');
+  });
+
+  it('without a mark the version of the list counts', () => {
+    expect(etagForContribution({ id: 'c1', version: 2 }, null)).toBe('"v2"');
+  });
+});
+
+describe('isSpeakerLocked', () => {
+  it('stays locked while the Wortmeldung still has the version the write was made on', () => {
+    expect(isSpeakerLocked({ id: 's1', version: 3 }, { speakerId: 's1', base: 3 })).toBe(true);
+  });
+
+  it('opens once a list with another version has arrived, and for another Wortmeldung', () => {
+    expect(isSpeakerLocked({ id: 's1', version: 4 }, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked({ id: 's2', version: 3 }, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked(undefined, { speakerId: 's1', base: 3 })).toBe(false);
+    expect(isSpeakerLocked({ id: 's1', version: 3 }, null)).toBe(false);
+  });
+});
+
+describe('landPair', () => {
+  const old = { questions: ['q-old'], contributions: ['c-old'] };
+
+  it('only the cards new: the old pair stays', () => {
+    const next = landPair(old, {
+      questions: ['q-new'], contributions: ['c-old'], questionsReady: true, contributionsReady: false,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('only the coverage new: the old pair stays', () => {
+    const next = landPair(old, {
+      questions: ['q-old'], contributions: ['c-new'], questionsReady: false, contributionsReady: true,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('both new: the new pair lands', () => {
+    const next = landPair(old, {
+      questions: ['q-new'], contributions: ['c-new'], questionsReady: true, contributionsReady: true,
+    });
+    expect(next).toEqual({ questions: ['q-new'], contributions: ['c-new'] });
+  });
+
+  it('the same data again returns the pair shown (safe to store during render)', () => {
+    const next = landPair(old, {
+      questions: old.questions, contributions: old.contributions, questionsReady: true, contributionsReady: true,
+    });
+    expect(next).toBe(old);
+  });
+
+  it('the first pair lands as soon as both are there', () => {
+    expect(landPair(null, {
+      questions: ['q'], contributions: ['c'], questionsReady: false, contributionsReady: true,
+    })).toBeNull();
+    expect(landPair(null, {
+      questions: ['q'], contributions: ['c'], questionsReady: true, contributionsReady: true,
+    })).toEqual({ questions: ['q'], contributions: ['c'] });
   });
 });

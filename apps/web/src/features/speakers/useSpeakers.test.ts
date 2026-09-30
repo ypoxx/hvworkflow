@@ -5,7 +5,10 @@
  * the same table, so a change to one that silently drifts from the others fails loudly here.
  */
 import { describe, expect, it } from 'vitest';
+import type { Speaker } from '@hv/domain';
 import {
+  applyWriteResult,
+  etagForList,
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
@@ -179,5 +182,64 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/** takt-032: carry the version out of the answer of an own write (Ziel 1). */
+function speaker(id: string, round: number, position: number, version: number): Speaker {
+  return {
+    id, number: position, displayName: id, round, position, status: 'waiting', questionCount: 0,
+    version, _actions: ['speaker.update', 'speaker.reorder'],
+  };
+}
+
+describe('applyWriteResult', () => {
+  const a = speaker('a', 1, 1, 1);
+  const b = speaker('b', 1, 2, 1);
+  const c = speaker('c', 2, 1, 1);
+  const view = [a, b, c];
+
+  it('takes rows with a higher version and orders by round and position of the merged rows', () => {
+    const result = applyWriteResult(view, [speaker('b', 1, 1, 2), speaker('a', 1, 2, 2)]);
+    expect(result.map((s) => [s.id, s.version])).toEqual([['b', 2], ['a', 2], ['c', 1]]);
+  });
+
+  it('keeps rows of other rounds as the very same objects', () => {
+    const result = applyWriteResult(view, [speaker('b', 1, 1, 2), speaker('a', 1, 2, 2)]);
+    expect(result[2]).toBe(c);
+  });
+
+  it('replaces nothing for an equal or a smaller version', () => {
+    const result = applyWriteResult(view, [speaker('a', 1, 2, 1), speaker('b', 1, 1, 0)]);
+    expect(result).toBe(view);
+  });
+
+  it('never inserts an unknown id', () => {
+    const result = applyWriteResult(view, [speaker('x', 1, 3, 9)]);
+    expect(result).toBe(view);
+  });
+
+  it('leaves the view as it is for an empty answer', () => {
+    expect(applyWriteResult(view, [])).toBe(view);
+  });
+
+  it('does not put an older row over a row that is already newer', () => {
+    const newer = [speaker('a', 1, 1, 5), b, c];
+    expect(applyWriteResult(newer, [speaker('a', 1, 2, 3)])).toBe(newer);
+  });
+});
+
+describe('etagForList', () => {
+  it('uses the tag of the answer while the list shown is the one the write was made on', () => {
+    expect(etagForList(3, { base: 3, etag: '"v4"' })).toBe('"v4"');
+  });
+
+  it('a list that differs from the one written on (read after the answer) takes over', () => {
+    expect(etagForList(4, { base: 3, etag: '"v4"' })).toBe('"v4"');
+    expect(etagForList(5, { base: 3, etag: '"v4"' })).toBe('"v5"');
+  });
+
+  it('without a mark the list version counts', () => {
+    expect(etagForList(7, null)).toBe('"v7"');
   });
 });

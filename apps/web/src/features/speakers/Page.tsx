@@ -27,11 +27,13 @@ import { NowSpeaking } from './NowSpeaking';
 import { RoundSection } from './RoundSection';
 import { ROW_COLUMNS } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
-import { moveSpeakerToRound, useSpeakers } from './useSpeakers';
+import { applyWriteResult, etagForList, keepNewest, moveSpeakerToRound, useSpeakers } from './useSpeakers';
 import { RegisterDialog } from './RegisterDialog';
 
 /** The failed-write message: title from the problem, fallback from the dictionary. */
 const problemTitle = (): string => translate(getLang(), 'toast.problem');
+
+const NO_ROWS: readonly Speaker[] = [];
 
 function SkeletonRows() {
   const t = useT();
@@ -63,7 +65,49 @@ function SkeletonRows() {
 export function SpeakersPage() {
   const t = useT();
   const meeting = useMeeting();
-  const { status, speakers, listVersion, reload } = useSpeakers();
+  const { status, speakers: listed, listVersion, reload } = useSpeakers();
+  const actorId = useActor().id;
+
+  /**
+   * takt-032: an own write answers with the rows (`updateSpeaker`, `reorderSpeakers`) or the tag of
+   * the list (`lastWriteEtag()`) to go on with. They are kept here, per actor, and hold until a list
+   * with newer rows arrives: per row the higher version wins (`applyWriteResult`), the list tag holds
+   * while the list shown is the one the write was made on (`etagForList`). Nothing is counted up.
+   */
+  const [written, setWritten] = useState<{ actorId: string; rows: readonly Speaker[] } | null>(null);
+  const [listMark, setListMark] = useState<{ actorId: string; base: number; etag: string } | null>(null);
+  const writtenRows = written !== null && written.actorId === actorId ? written.rows : NO_ROWS;
+  const speakers = useMemo(() => applyWriteResult(listed, writtenRows), [listed, writtenRows]);
+  const listEtag =
+    listVersion === null
+      ? null
+      : etagForList(listVersion, listMark !== null && listMark.actorId === actorId ? listMark : null);
+  // Read by the write handlers after an await, which run outside the render pass.
+  const latest = useRef({ actorId, listed });
+  useEffect(() => {
+    latest.current = { actorId, listed };
+  });
+  /** What a write started on: its own actor and the list it saw. Its answer counts only for these. */
+  const startOf = useCallback(() => ({ actorId: latest.current.actorId, listed: latest.current.listed }), []);
+  const stillCurrent = useCallback(
+    (start: { actorId: string; listed: readonly Speaker[] }) =>
+      latest.current.actorId === start.actorId && latest.current.listed === start.listed,
+    [],
+  );
+  const keepRows = useCallback(
+    (start: { actorId: string; listed: readonly Speaker[] }, rows: readonly Speaker[]) => {
+      if (!stillCurrent(start)) return;
+      setWritten((previous) => ({
+        actorId: start.actorId,
+        rows: keepNewest(previous !== null && previous.actorId === start.actorId ? previous.rows : NO_ROWS, rows),
+      }));
+    },
+    [stillCurrent],
+  );
+  // At most one own write on this page at a time: the tag read right after an await is then its own.
+  const inFlight = useRef(false);
+  // The round whose reorder is in flight (takt-032, Ziel 2): a signal for the interface, not a right.
+  const [reorderRound, setReorderRound] = useState<number | null>(null);
 
   // While a reorder is in flight the list shows the new order; the refetch then confirms it.
   const [override, setOverride] = useState<readonly Speaker[] | null>(null);
@@ -92,7 +136,6 @@ export function SpeakersPage() {
    * an actor change it closes in the same render (compared by `id`, never by role, AGENTS.md rule
    * 4) — the next actor has offered nothing yet, and may not be allowed what it would submit.
    */
-  const actorId = useActor().id;
   const [dialogActorId, setDialogActorId] = useState(actorId);
   if (dialogActorId !== actorId) {
     setDialogActorId(actorId);
@@ -148,6 +191,8 @@ export function SpeakersPage() {
 
   const run = useCallback(
     async (id: string, action: () => Promise<unknown>): Promise<boolean> => {
+      if (inFlight.current) return false;
+      inFlight.current = true;
       setBusyId(id);
       try {
         await action();
@@ -157,6 +202,7 @@ export function SpeakersPage() {
         reload();
         return false;
       } finally {
+        inFlight.current = false;
         setBusyId(null);
       }
     },
@@ -168,50 +214,79 @@ export function SpeakersPage() {
       // Calling the next speaker ends the running speech first: only one microphone is open.
       onCall: (speaker) => {
         void run(speaker.id, async () => {
+          const start = startOf();
           const running = viewRef.current.find(
             (s) => s.status === 'speaking' && s.id !== speaker.id,
           );
+          const answers: Speaker[] = [];
           if (running !== undefined) {
-            await api.updateSpeaker(
-              running.id,
-              { status: 'finished' },
-              { ifMatch: etagOf(running.version) },
+            answers.push(
+              await api.updateSpeaker(
+                running.id,
+                { status: 'finished' },
+                { ifMatch: etagOf(running.version) },
+              ),
             );
           }
-          await api.updateSpeaker(
-            speaker.id,
-            { status: 'speaking' },
-            { ifMatch: etagOf(speaker.version) },
+          answers.push(
+            await api.updateSpeaker(
+              speaker.id,
+              { status: 'speaking' },
+              { ifMatch: etagOf(speaker.version) },
+            ),
           );
+          keepRows(start, answers);
         });
       },
       onFinish: (speaker) => {
-        void run(speaker.id, () =>
-          api.updateSpeaker(
-            speaker.id,
-            { status: 'finished' },
-            { ifMatch: etagOf(speaker.version) },
-          ),
-        );
+        void run(speaker.id, async () => {
+          const start = startOf();
+          keepRows(
+            start,
+            [
+              await api.updateSpeaker(
+                speaker.id,
+                { status: 'finished' },
+                { ifMatch: etagOf(speaker.version) },
+              ),
+            ],
+          );
+        });
       },
       onWithdraw: (speaker) => {
-        void run(speaker.id, () =>
-          api.updateSpeaker(
-            speaker.id,
-            { status: 'withdrawn' },
-            { ifMatch: etagOf(speaker.version) },
-          ),
-        );
+        void run(speaker.id, async () => {
+          const start = startOf();
+          keepRows(
+            start,
+            [
+              await api.updateSpeaker(
+                speaker.id,
+                { status: 'withdrawn' },
+                { ifMatch: etagOf(speaker.version) },
+              ),
+            ],
+          );
+        });
       },
       onMove: (speaker) => setMoving(speaker),
     }),
-    [run],
+    [run, startOf, keepRows],
   );
 
   const register = useCallback(
     async (input: SpeakerRegistration): Promise<boolean> =>
-      listVersion === null ? false : run('new', () => api.registerSpeaker(input, { ifMatch: etagOf(listVersion) })),
-    [run, listVersion],
+      listVersion === null || listEtag === null
+        ? false
+        : run('new', async () => {
+            const start = startOf();
+            await api.registerSpeaker(input, { ifMatch: listEtag });
+            // Right after the await, before anything else can write: the tag is this write's own.
+            const etag = api.lastWriteEtag();
+            if (etag !== undefined && stillCurrent(start)) {
+              setListMark({ actorId: start.actorId, base: listVersion, etag });
+            }
+          }),
+    [run, listVersion, listEtag, startOf, stillCurrent],
   );
 
   const move = useCallback(
@@ -269,6 +344,8 @@ export function SpeakersPage() {
   const onDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
       if (over === null || active.id === over.id) return;
+      // takt-032: while an own write runs, the versions on screen are not the ones to write with.
+      if (inFlight.current) return;
       const list = viewRef.current;
       const moved = list.find((s) => s.id === active.id);
       const target = list.find((s) => s.id === over.id);
@@ -283,23 +360,40 @@ export function SpeakersPage() {
       let cursor = 0;
       setOverride(list.map((s) => (s.round === moved.round ? reordered[cursor++]! : s)));
       // The order is a property of the entire meeting's speaker list, including other rounds.
-      if (listVersion === null) {
+      if (listVersion === null || listEtag === null) {
         setOverride(null);
         return;
       }
-      api
-        .reorderSpeakers(
-          moved.round,
-          reordered.map((s) => s.id),
-          { ifMatch: etagOf(listVersion) },
-        )
-        .catch((error: unknown) => {
+      inFlight.current = true;
+      setReorderRound(moved.round);
+      const start = startOf();
+      void (async () => {
+        try {
+          const rows = await api.reorderSpeakers(
+            moved.round,
+            reordered.map((s) => s.id),
+            { ifMatch: listEtag },
+          );
+          // Right after the await: the answer's tag is the list version this write produced.
+          const etag = api.lastWriteEtag();
+          // Only the state the write began on takes the answer; after an actor switch or a newer
+          // list it is dropped, and no override is revived (slice 010d).
+          if (stillCurrent(start)) {
+            keepRows(start, rows);
+            if (etag !== undefined) setListMark({ actorId: start.actorId, base: listVersion, etag });
+            setOverride(null);
+          }
+        } catch (error: unknown) {
           showProblem(error, problemTitle());
           setOverride(null);
           reload();
-        });
+        } finally {
+          inFlight.current = false;
+          setReorderRound(null);
+        }
+      })();
     },
-    [reload, listVersion],
+    [reload, listVersion, listEtag, startOf, stillCurrent, keepRows],
   );
 
   const registerButton = mayRegister ? (
@@ -387,6 +481,7 @@ export function SpeakersPage() {
             speaking={speaking}
             next={next}
             busyId={busyId}
+            busyRound={reorderRound}
             onCall={actions.onCall}
             onFinish={actions.onFinish}
           />
@@ -409,6 +504,7 @@ export function SpeakersPage() {
                   current={round === currentRound}
                   open={roundOpen[round] ?? round === currentRound}
                   busyId={busyId}
+                  busy={reorderRound === round}
                   onToggle={() =>
                     setRoundOpen((state) => ({
                       ...state,
