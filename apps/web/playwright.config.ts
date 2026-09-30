@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import type { PlaywrightTestConfig } from '@playwright/test';
 
@@ -40,12 +40,16 @@ const launch = executablePath ? { launchOptions: { executablePath } } : {};
 // The failure report of Playwright (`error-context.md`, a page snapshot) can hold the text typed into a password field, and
 // the variable `PLAYWRIGHT_NO_COPY_PROMPT` does not stop it for a failed matcher (probe, slice 031a review). So the output
 // of both HTTP projects goes into the private state directory of the harness, which is removed with the temporary directory.
-const stateDir = process.env['E2E_HTTP_STATE_DIR'];
+// An empty or blank value counts as absent (never a root-level path such as '/web-build', which `--emptyOutDir` would wipe).
+const stateDir = process.env['E2E_HTTP_STATE_DIR']?.trim() || undefined;
 // Build output of the HTTP project: private and per run under the state directory; without it below `node_modules` of this
 // package (git ignores it, and it is not `dist/`, which the gates build and parallel agents use).
 // Without the state directory the fallback is per run (process id), so two runs never share or empty each other's build.
 const httpBuildDir = `${stateDir ?? join(import.meta.dirname, `node_modules/.e2e-http-build-${process.pid}`)}/web-build`;
 // The path goes into a shell command inside single quotes: a single quote in it would end the quoting (injection).
+if (!isAbsolute(httpBuildDir) || dirname(resolve(httpBuildDir)) === '/') {
+  throw new Error('E2E_HTTP_STATE_DIR must be an absolute path below the root directory.');
+}
 if (httpBuildDir.includes("'")) throw new Error('E2E_HTTP_STATE_DIR must not contain a single quote.');
 const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
 

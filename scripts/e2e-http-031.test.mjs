@@ -319,6 +319,21 @@ test('takt-035: without a state directory the build goes below apps/web, outside
   assert.match(outDir, /\/\.e2e-http-build-\d+\/web-build$/, 'per-run suffix: runs do not share the directory');
 });
 
+test('takt-035: an empty or blank E2E_HTTP_STATE_DIR is treated as absent; a relative or root-level one is refused', () => {
+  for (const value of ['', '   ']) {
+    const [http] = loadConfig({ E2E_HTTP: '1', E2E_HTTP_STATE_DIR: value }).webServer;
+    const outDir = /vite build --outDir '([^']+)'/.exec(http.command)?.[1] ?? '';
+    assert(outDir.startsWith(`${WEB}/node_modules/.e2e-http-build-`), `fallback for ${JSON.stringify(value)}: ${outDir}`);
+  }
+  for (const value of ['/', 'relative/dir']) {
+    const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e',
+      `await import(${JSON.stringify(join(WEB, 'playwright.config.ts'))});`], {
+      cwd: WEB, encoding: 'utf8', timeout: 60_000, env: { ...baseEnv, E2E_HTTP: '1', E2E_HTTP_STATE_DIR: value } });
+    assert.notEqual(result.status, 0, value);
+    assert.match(result.stderr, /absolute path below the root directory/);
+  }
+});
+
 test('takt-035: a single quote in E2E_HTTP_STATE_DIR is refused at config load', () => {
   const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e',
     `await import(${JSON.stringify(join(WEB, 'playwright.config.ts'))});`], {
