@@ -550,11 +550,12 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* Screenshot Anmeldeseite und 401-Behandlung; Unit-Tests des Wrappers; pnpm gates
   - *Offene Entscheidung:* —
-- **031 · e2e gegen Hono, Postgres und Keycloak in beiden Betriebsarten** — mittel · 1,5 AStd · Kalender 23.10.2026 (W4) · Lanes: e2e, infra
+- **031 · e2e gegen Hono, Postgres und Keycloak in beiden Betriebsarten** — hoch · 3 AStd · Kalender 23.10.2026 (W4) · Lanes: e2e, infra
   - *Ziel:* Playwright-Projekt „http" führt alle Szenarien gegen den Dienst mit OIDC-Testrealm aus; Projekt „in-process" bleibt; beide Pflicht auf PR nach main; Test „altes Demo-Protokoll → Reset-Banner"; Nachweis für die Ergänzung zu ADR 0002; die Job-Matrix aus 084 erhält das http-Projekt.
   - *Abhängigkeiten:* 030, 027, 084
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* e2e-Lauf beider Projekte grün mit Laufzeiten; ADR-0002-Ergänzung mit Nachweis
+  - *Stand 30.09.2026:* Spec `docs/slices/031-e2e-http-zwei-betriebsarten.md` (Entwurf). Risikoklasse nach Leitplanken §4 hoch (Sitzung im Browser als Pflicht-Tor, Geheimnisse je Lauf in der Pipeline, Rollenzuordnung am Verwaltungsweg vorbei, Netzgrenze Oberfläche–Dienst); Aufwand 3 statt 1,5 AStd; 084 wird nicht vorausgesetzt, 031 baut den PR-Teil der Job-Matrix als eigenen Job.
   - *Offene Entscheidung:* —
 **Historische Scheibe 033 (am 29.09.2026 in 033a–b geteilt): Zwei Protokollebenen, Health, NTP-Status, Kennzahlen, Serverzeit-Header.** Ursprüngliche Schätzung: hoch · 2 AStd · Kalender 26.10.2026 (W5) · Lanes: service.
   - *Ziel:* Am 29.09. geteilt in 033a (Serverzeit-Header, /healthz, NTP-Status, Korrelations-ID, Zugriffslog, Verfahren „nur zu zweit“) und 033b (/metrics, Kennzahlen-Allowlist-Tor, Auswertungskatalog); die Einträge dort gelten. Grund: zwei getrennt prüfbare Datenschutzflächen (Protokoll je Anfrage gegen Aggregat ohne Personenbezug) und ein Umfang über einer Agentenschicht. Ursprüngliches Ziel und Nachweise stehen vollständig in 033a und 033b.
@@ -1296,7 +1297,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **A Fundament:** 021c, 024, 025, 026, 027, 028, 033a, 033b, 034a, 034b.
   *Stand 29.09.2026:* erledigt 021c, 024, 025, 026, 027, 028 (Codex, 27.–29.09., nachgeprüft; Reparaturen takt-021..026); Spec 033a/033b gemergt; offen 033a, 033b, 034a, 034b (Spec 034 am 29.09. in 034a/034b geteilt).
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
-  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031, 035, 036.
+  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031 (Spec als Entwurf, 30.09.), 035, 036.
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
