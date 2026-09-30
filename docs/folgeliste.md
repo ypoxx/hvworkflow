@@ -317,6 +317,33 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 036a Review nit 12 · `apps/web/src/api/index.ts`, `liveStore.ts` · `clear('logout')` ruft die Hörer, `useApiVersion`
   zählt zusätzlich den Akteur `undefined`; bei 401 läuft `clear` doppelt · harmlos, die Shell hängt ab.
 
+## Historie (aus takt-038)
+
+- takt-038 Review minor 1 · `apps/web/src/features/history/Page.tsx:189-192` (`moreResults`, `olderRows`) · die Seitenzahl
+  wird aus dem Zustand abgeleitet, der Zustand selbst aber nie zurückgesetzt; nach Rückkehr zum selben Akteur oder zur
+  selben Suche kommen die weiteren Seiten wieder (neu gelesen unter dem richtigen Schlüssel, kein Datenleck), Ziel 1
+  verlangt „verwerfen“ · beim Wechsel von `pagingKey`/`actorId` zurücksetzen, Muster wie `queryActorId` (`Page.tsx:180`).
+- takt-038 Review minor 2 · `apps/web/src/features/history/lib.ts:176` · die Sprungregel aus Ziel 2 ist ungetestet
+  (Mutante `if (false)` überlebt, weil die Fenstergrenze dasselbe Ergebnis erzeugt); weitere Wächter (`:82`, `:88`,
+  `:181`, `:183`, `:138`) ungepinnt · in (c2) die Aufruffolge prüfen (`calls[1]` = `{after: head − 5000, limit}`).
+- takt-038 Review minor 3 · `apps/web/src/features/history/lib.ts:173-179` · im Sprungpfad wird die erste Seite verworfen
+  und neu gelesen (bis 10 000 statt 5 000 Ereignisse) · den Teil mit `seq > head − windowLimit` behalten und dort
+  weiterblättern.
+- takt-038 Review minor 4 · `apps/web/src/features/history/lib.ts:86-93` · Lücken an Seitengrenzen werden nur über die
+  Anzahl erkannt; ein Tausch bei gleichem `total` zwischen dem Lesen von Seite n und n+1 bleibt unbemerkt · Seite n+1 mit
+  einer Überlappung von einem Eintrag lesen und die Überlappungs-`id` prüfen, ohne Vertragsänderung.
+- takt-038 Review minor 5 · `apps/web/src/features/history/Page.tsx:372-429` · die Verdrahtung (Neu-Lesen mit
+  `pageCount`, Rückfall auf Seite 1, `sameList`) ist ungetestet, kein e2e berührt `history-results-load-more`,
+  `history-results-back-to-first` oder `history-stream-older` · ein In-Process-e2e-Schritt „Weitere laden“ → 230 von 230.
+- takt-038 Review nit 6 · `apps/web/src/features/history/lib.ts:138`, `:183` · nach einer kurzen Seite springt der Cursor
+  auf den Kopf; kürzt ein Dienst `limit` unter `pageSize`, fehlen Ereignisse dauerhaft (heute nicht möglich) · Annahme
+  im Code kommentieren.
+- takt-038 Review nit 7 · `apps/web/src/features/history/lib.ts:175` · eine Rücksicherung, deren `lastSeq` schon wieder
+  über dem alten Cursor liegt, wird nicht erkannt · mit dem `reset` aus 035b im Client (036b) verbinden.
+- takt-038 Review nit 8 · `apps/web/src/i18n/parity.test.ts:161` · Testtitel nennt noch 507 statt 510 · anpassen.
+- takt-038 Review nit 9 · `docs/evidence/takt-038-historie-weitere.png` · zeigt den Zustand nach dem Klick, nicht den Knopf
+  selbst · bei Gelegenheit ein zweites Bild vor dem Klick.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf

@@ -158,4 +158,8 @@ Nit für die Folgeliste an.
 
 ## Review findings
 
-folgt
+Review in frischem Kontext (Opus, 30.09.2026) auf 10e60ff. `pnpm gates` lief dort grün. Keine Blocker, keine Major.
+Befunde nach schlankem Review-Modus (AGENTS.md R3): 5 minor, 4 nit, alle in `docs/folgeliste.md` unter
+„Historie (aus takt-038)“. Keiner betrifft Sicherheit, Recht oder Datenschutz: minor 1 liest die Seiten unter dem
+Schlüssel des richtigen Akteurs neu, `previous` ist dabei leer. Die acht Bauentscheidungen hat der Review als
+spec-konform bewertet.
