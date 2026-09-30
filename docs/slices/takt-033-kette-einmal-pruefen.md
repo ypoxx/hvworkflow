@@ -243,6 +243,20 @@ anhalten.
 
 ## Nachweis
 
+**Aktueller Gates-Commit (nach der engen Nachprüfung, Basis mit takt-034 gemergt als `e451fee`):** `9d757ec`
+(sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime`
+gegen `hv_t033`, Exit 0. domain 15 Dateien / 243 Tests, web 13 / 255, api 36 / 521 (keine übersprungen); slice-scope:
+„12 changed file(s), all within … "Files allowed" list“. Wörtlicher Schluss:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.12s
+mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 9d757ec, tree 12548cf120db…
+```
+
+Der Lauf auf `350391f` unten bleibt als Nachweis der Review-Runde stehen.
+
 **Gates-Commit (nach dem Review):** `350391f` (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`,
 `TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime` gegen die eigene Datenbank `hv_t033` (Postgres 16,
 lokal), Exit 0. Testzahlen aus demselben Lauf: domain 15 Dateien / 243 Tests, web 13 / 255, api 36 / 519 (keine
