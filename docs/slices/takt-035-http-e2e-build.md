@@ -58,7 +58,7 @@ der Umsetzer prüft zuerst, welcher Fall gilt, und vermerkt es im Bericht. Ein t
 - `scripts/e2e-http-031.mjs`
 - `scripts/e2e-http-031.test.mjs`
 - `docs/folgeliste.md`
-- `apps/web/e2e/033-einhaengen-ohne-doppelabruf.spec.ts` (nur der Rückbau des H10-Dev-Zweigs, nur wenn 033b bereits gemergt ist; Dateiname vom Umsetzer gegen den Stand von 033b zu bestätigen)
+- `apps/web/e2e/031-http-betriebsart.spec.ts` (nur: Prüfung „ausgelieferte Seite ist der Build“ als Zusicherung in H1 — kein `/@vite/client`, kein `/@react-refresh`, Skript unter `/assets/` —, und der Rückbau des H10-Dev-Zweigs, falls takt-033b vorher gemergt ist)
 
 ## Abnahme
 
@@ -79,3 +79,7 @@ der Umsetzer prüft zuerst, welcher Fall gilt, und vermerkt es im Bericht. Ein t
 
 Platzhalter, vom Umsetzer zu füllen: Gates-Commit; wörtlicher Schluss von `pnpm gates`; Dauer des Build-Schritts; Dauer
 des Projekts `http`; Lauf-ID des grünen CI-Jobs `e2e-http`.
+
+**Orchestrator-Entscheidungen (30.09.2026) zu den offenen Fragen:** (1) H10 steht in `apps/web/e2e/031-http-betriebsart.spec.ts`
+(Files allowed korrigiert). (2) Die Build-Prüfung ist eine Zusicherung in H1 derselben Datei, keine neue Spec-Datei.
+(3) `.github/workflows/gates.yml` bleibt außerhalb; reicht das Zeitbudget nicht, ist das ein Befund mit Spec-Änderung.
