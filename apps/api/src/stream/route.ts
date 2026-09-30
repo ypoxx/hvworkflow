@@ -15,6 +15,7 @@ import type { Context } from 'hono';
 import {
   ApiProblem,
   can,
+  maskEvent,
   replayMessage,
   resolveMeetingActor,
   resolveReaderActors,
@@ -248,9 +249,12 @@ class Connection implements HubConnection {
     this.pump();
   }
 
+  /** Frames of the batch being written that are not written yet (Codex P2: they count toward the backlog). */
+  private inFlight = { count: 0, bytes: 0 };
+
   private overLimit(): boolean {
-    let count = 0;
-    let bytes = 0;
+    let count = this.inFlight.count;
+    let bytes = this.inFlight.bytes;
     for (const item of this.queue) {
       if (item.kind !== 'batch') continue;
       count += item.events.length + (item.change !== undefined ? 1 : 0);
@@ -300,12 +304,17 @@ class Connection implements HubConnection {
         if (!this.rightsNow()) return;
         if (!await this.sessionValid(item.occasion)) return;
         const frames = [...item.events, ...(item.change !== undefined ? [messageFrame({ kind: 'change', change: item.change })] : [])];
+        this.inFlight = { count: frames.length, bytes: frames.reduce((sum, f) => sum + f.bytes.byteLength, 0) };
         for (const frame of frames) {
           // An id is never lower than or equal to one already sent on this connection.
-          if (frame.id !== undefined && frame.id <= this.lastSentId) continue;
-          if (!await this.catchUpMayGoOn()) return;
-          if (!await this.write(frame)) return;
+          if (frame.id === undefined || frame.id > this.lastSentId) {
+            if (!await this.catchUpMayGoOn()) return;
+            if (!await this.write(frame)) return;
+          }
+          // Written (or skipped): no longer part of the backlog.
+          this.inFlight = { count: this.inFlight.count - 1, bytes: this.inFlight.bytes - frame.bytes.byteLength };
         }
+        this.inFlight = { count: 0, bytes: 0 };
       } else {
         if (!this.heartbeatRights()) return;
         if (!await this.sessionValid(item.occasion)) return;
@@ -476,10 +485,21 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           connection.close(resetFrame(H));
           return;
         }
-        // Step 3: the catch-up `(cursor, H]` with backpressure, then `cursor` with `H`.
-        for (const frame of opening.frames) {
+        // Step 3: the catch-up `(cursor, H]` with backpressure, then `cursor` with `H`. Each frame is built only
+        // when the previous one was taken (Codex P1): the catch-up is never serialized ahead of the reader.
+        const frames = opening.frames[Symbol.iterator]();
+        for (;;) {
           if (!await connection.catchUpMayGoOn()) return;
-          if (!await connection.write(frame)) return;
+          let next: IteratorResult<Frame>;
+          try {
+            next = frames.next();
+          } catch {
+            connection.close(endFrame('unavailable'));
+            options.notice(UNAVAILABLE_LINE);
+            return;
+          }
+          if (next.done) break;
+          if (!await connection.write(next.value)) return;
         }
         if (!await connection.catchUpMayGoOn()) return;
         // Steps 4 and 5: what arrived meanwhile (all with seq > H), then live.
@@ -500,7 +520,7 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
   };
 }
 
-type Opening = { kind: 'reset' } | { kind: 'frames'; frames: Frame[] };
+type Opening = { kind: 'reset' } | { kind: 'frames'; frames: Iterable<Frame> };
 
 /** What a new connection gets first (decision 5): `cursor` alone, a catch-up then `cursor`, or `reset`. */
 function openingFrames(cursor: number | undefined, head: number, log: readonly DomainEvent[], states: StreamStates,
@@ -508,6 +528,14 @@ function openingFrames(cursor: number | undefined, head: number, log: readonly D
   if (cursor === undefined) return { kind: 'frames', frames: [cursorFrame(head)] };
   if (cursor > head || head - cursor > replayMax) return { kind: 'reset' };
   const range = log.slice(cursor, head).filter((e) => meetingFilter === undefined || e.meetingId === meetingFilter);
+  // A reader with `event.read` gets every event (R-PERM-04, as `replayMessage` decides): masked and framed one at a
+  // time, while the catch-up is written.
+  if ([...reference.values()].some((a) => can(a, 'event.read').allow)) {
+    return { kind: 'frames', frames: (function* lazy(): Generator<Frame> {
+      for (const e of range) yield messageFrame({ kind: 'event', event: maskEvent(e) });
+      yield cursorFrame(head);
+    })() };
+  }
   let failed = false;
   const replay = replayMessage(reference, range, states, { can, onIntegrityError: () => { failed = true; } });
   if (failed || replay.kind === 'reset') return { kind: 'reset' };

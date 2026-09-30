@@ -40,6 +40,19 @@ vi.mock('@hv/domain', async (importOriginal) => {
   };
 });
 
+// Codex P1 on #107: count the frames the service builds (a passthrough spy on the frame builder).
+const frameCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock('../stream/sse.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stream/sse.ts')>();
+  return {
+    ...actual,
+    messageFrame: (...args: Parameters<typeof actual.messageFrame>) => {
+      frameCalls.count += 1;
+      return actual.messageFrame(...args);
+    },
+  };
+});
+
 const at0 = new Date('2027-04-20T10:15:00.000Z');
 const MEETING = 'hv-2027';
 const OTHER = 'hv-2026';
@@ -993,6 +1006,42 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(fresh).toBeDefined();
     expect(await fresh).toBe(true);
     expect(reads).toBe(1);
+  });
+
+  it('R7 the catch-up builds its frames one at a time: a stalled reader of 1000 events holds at most 2 built frames (Codex P1)', async () => {
+    const h = await harness({ session: true });
+    frameCalls.count = 0;
+    const stalled = await req(h.app, 'GET', '/v1/stream', { headers: { ...asSession('admin'), 'Last-Event-ID': String(h.head() - 1_000) } });
+    expect(stalled.status).toBe(200);
+    await sleep(300);
+    expect(frameCalls.count).toBeLessThanOrEqual(2);
+    const reader = track(new StreamReader(stalled));
+    const blocks = await reader.messagesUntil((b) => b.event === 'cursor', 10_000);
+    expect(blocks.filter(isEvent)).toHaveLength(1_000);
+  }, 20_000);
+
+  it('R8 the backlog limit counts the batch being written: in flight at the limit, one more batch closes (Codex P2)', async () => {
+    const h = await harness({ session: true, streamLimits: { backlogMessages: 5 } });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await reader.nextMessage();
+    await sleep(50);
+    reader.hold();
+    const batchOf = async (n: number): Promise<void> => {
+      const frozen = h.head();
+      h.hooks.load = (log) => log.slice(0, frozen);
+      for (let i = 0; i < n - 1; i++) await assignFiller(h, 'admin2', OTHER);
+      h.hooks.load = undefined;
+      await assignFiller(h, 'admin2', OTHER);
+      await eventually(() => h.hooks.appliedHead === h.head(), 3_000, 'batch applied');
+      await sleep(300);
+    };
+    await batchOf(5); // at the limit, not over it: taken, then stuck in flight behind the held reader
+    expect(reader.closed).toBe(false);
+    await batchOf(3); // queued 3 plus at least 3 unsent in flight: over 5
+    reader.resume();
+    await reader.rest(2_000);
+    expect(reader.closed).toBe(true);
+    expect(reader.blocks.filter(isEvent).length).toBeLessThan(8);
   });
 
   // ---- real server ---------------------------------------------------------------------------------------------
