@@ -197,6 +197,7 @@ Domäne:
 - `packages/domain/src/state.ts` (nur falls `isOnStage` dort liegt)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/src/rules.ts` (nur R-PERM-04)
+- `docs/legal-trace.md` (nur regeneriert, nur die Zeile R-PERM-04; `rules.test.ts` vergleicht sie mit `ruleRegister()`)
 - `packages/domain/src/types.ts` (nur neue Typen)
 - `packages/domain/src/__tests__/stream035.test.ts` (neu)
 - `docs/sicherheit/bedrohungsmodell.md` (nur Zeilen T-G1-I-09 und T-G3-I-01: Stand Domäne)
@@ -219,6 +220,24 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 3. Welche Zustandsfelder ändert `reduce` je Ereignistyp (`state.ts`)? Das ist die Grundlage für `EVENT_SUBJECTS`. Weicht
    der Code von den Beispielen in Entscheidung 2 ab, gilt der Code, und der Test 2b entscheidet.
 4. Weichen Zeilenangaben ab, melden und anhalten.
+
+## Bauklärungen (Orchestrator, 30.09.2026, nach „Vor dem Bau prüfen“)
+
+- **B1:** `docs/legal-trace.md` steht jetzt in „Files allowed“ (nur regeneriert).
+- **C1:** Test 11 widersprach Test 2b bei `IdempotencyRecorded` (`api.ts:597` setzt `subjectId` auf die Ressource;
+  `getQuestionHistory` zeigt jedes Ereignis mit dieser Kennung). Nach Punkt 3 oben entscheidet Test 2b; Test 11 ist
+  angepasst. Der 2b-Lauf deckt einen Schreibvorgang mit Idempotenzschlüssel auf eine Frage ab.
+- **Import-Zyklus:** `stream.ts` importiert aus `api.ts` nur Typen (`import type`). `can()` bleibt in `api.ts` und wird
+  `visibleMessages` als Funktion übergeben; `maskEvent` wandert nach `stream.ts` (oder in ein reines Hilfsmodul unter den
+  erlaubten Dateien), `api.ts` importiert es. Kein Laufzeit-Zyklus.
+- **Zählersignal im Nachholen:** Die Datentabelle `STAGE_COUNTER_EVENTS` in `stream.ts` ist erlaubt; Test 2 prüft sie
+  gegen jede Änderung von `openCount`/`deliveredCount` im Korpuslauf.
+- **`isOnStage`** liegt in `state.ts` und ersetzt dort auch das Literal in `refreshCounts`.
+- **`resolveMeetingActor(state, current, now: () => Date)`**, gemeinsamer Helfer „aktive Zuweisung“ für
+  `resolveReaderActors`; kein Rollenliteral.
+- **In-process ohne Versammlungsprojektion:** Ersatzschlüssel, der nie auf eine `meetingId` passt; nur `event`.
+- **Thema `roles`:** über `can(reader, 'admin.roles.manage')` plus Selbstausnahme, keine Rollennamen.
+- **`QuestionMerged`** bleibt in `EVENT_SUBJECTS` mit dem Ziel (harmlose Obermenge, nur lesbare Kennungen).
 
 ## Tests zuerst (rot, dann grün; `stream035.test.ts`)
 
@@ -254,7 +273,8 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
     Jahrgang; `RoleAssigned` in einem zweiten Jahrgang → die Karte gewinnt einen Eintrag. Ein Ereignis ohne `meetingId`
     → nur `event` für Leser mit `event.read`, sonst nichts.
 11. (m11) `isOnStage` ist die einzige Stelle mit dem Status der Bühne (Test über `getStage` und `visibleMessages` mit
-    derselben Frage); `subjects` mit 101 Kennungen → Feld entfällt; `IdempotencyRecorded` → nur `event`.
+    derselben Frage); `subjects` mit 101 Kennungen → Feld entfällt; `IdempotencyRecorded` mit `subjectId` einer Frage → `change {questions, [id]}` (die Historie der Frage ändert sich,
+    Test 2b entscheidet), sonst nur `event`.
 12. **Ein `change` je Stapel (Codex P2):** `captureQuestions` mit drei Einzelfragen als capture im In-Process-
     `subscribe` → genau ein Hörer-Aufruf mit genau einer `change`: alle drei Kennungen der Fragen (dazu Redebeitrag und
     Wortmeldung), `seq` des letzten der drei Ereignisse. Dasselbe über `visibleMessages` mit dem Stapel direkt.
