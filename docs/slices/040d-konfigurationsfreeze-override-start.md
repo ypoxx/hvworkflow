@@ -3,7 +3,7 @@
 **Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 4 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
 **Risikoklasse:** hoch · 2,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service; web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz; docs-plan (nur Glossar)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend. Review in frischem Kontext mit Perspektive Security/Admin (Freeze, Override, Rechteerhöhung) und Legal (Nachweis „wer durfte was am HV-Tag“); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** neu R-ADM-03 (nach dem Freeze nur Override), R-ADM-04 (Freeze einmal; Override nur eingefroren und mit Grund), R-ADM-06 (Vertretung), R-MTG-08 (Start nur eingefroren), R-MTG-09 (kein Start, solange ein anderer Jahrgang läuft), R-ADM-10 (Freeze nur mit mindestens zwei tragfähigen Vertretungen je besetzter Rolle). Angewandt: R-ADM-01, R-ADM-02, R-ADM-05, R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-02, R-PERM-01, R-IDEM-01, R-GUARD-06. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R12
+**Rule ids:** neu R-ADM-03 (nach dem Freeze nur Override), R-ADM-04 (Freeze einmal; Override nur eingefroren und mit Grund), R-ADM-06 (Vertretung), R-MTG-08 (Start nur eingefroren), R-MTG-09 (kein Start, solange ein anderer Jahrgang läuft), R-ADM-10 (Freeze nur mit mindestens zwei tragfähigen Vertretungen je besetzter Rolle), R-ADM-11 (Freeze und Override nur mit bekannter Build-Kennung). Angewandt: R-ADM-01, R-ADM-02, R-ADM-05, R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-02, R-PERM-01, R-IDEM-01, R-GUARD-06. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5/040 („Konfigurationsfreeze (Ereignis ConfigFrozen mit Hash über Rechtetabelle, Übergangstabelle, Stammdaten; Änderung danach nur mit admin.override und Grund)“, „Rollenzuordnung mit Ablauf und zwei Vertretungen“, „Meeting-Lebenszyklus-Aktionen“; Nachweise „Stammdatenänderung nach Freeze → 409 R-ADM-03“, „override erzeugt Ereignis mit Grund“), §10 E8, E25, Risiko-Tabelle Zeile 1232 (zwei Vertretungen)
 - `docs/rollen-und-rechtekonzept.md` §3 Punkt 3 („Eingefrorener Snapshot je HV-Jahrgang … gehasht … wer am HV-Tag was durfte“), §4, §5 („mindestens zwei benannte Vertreter“)
@@ -11,7 +11,7 @@
 - takt-019 (Start-Aktion in 040; Schlussaktion eigene Spec), Spec 023 (`freezeMeetingConfig` vorab erklärt, `Meeting.configHash`), Spec 043a (Hashdefinition nach RFC 8785 für `RefusalGround.hash`; Lücken „Start-Aktion“, „Grund für admin.override“)
 - Bedrohungsmodell SG4, SG6, SG9, MF-01, MF-07, T-G1-E-04, T-G1-R-01, T-G2-R-01, T-G3-E-03, T-G1-T-02
 
-**Depends on:** 040c (gemergt, bevor dieser Bau beginnt); 025, 026, 028 (gemergt)
+**Depends on:** 040c (gemergt, bevor dieser Bau beginnt); 025, 026, 028 (gemergt); 037 (die Pipeline setzt `HV_BUILD_ID` beim Bau des Abbilds; ohne sie kann der Dienst nicht einfrieren, Ziel 1)
 **Perspektive:** Security/Admin, Legal · **Glossar: neue Begriffe:** ja: „Konfigurationsfreeze“ (configuration freeze) und „Änderung nach Freeze“ (configuration override)
 
 ## Befund (Ist-Stand, gelesen auf `a3ba94b`, ergänzt um den erwarteten Stand nach 040a–c)
@@ -64,7 +64,7 @@ Schnappschuss, `hashVersion` 1:
     "readScopes":        { "<Permission>": { "statuses": ["<QuestionStatus>", …], "extends": "<Permission>" } },
     "readPermissions":   { "<ReadMethod>": ["<Permission>", …] },      // READ_PERMISSIONS
     "overrideScopePermission": { "<Scope>": "<Permission>" },           // OVERRIDE_SCOPE_PERMISSION
-    "operationPermissions": { "<operation>": "<Permission>" }           // OPERATION_PERMISSION
+    "operationPermissions": { "<operation>": "<Permission>" }           // OPERATION_PERMISSION (nur einzelne Rechte)
   },
   "buildId": "<Build-Kennung>",
   "transitions": {
@@ -100,13 +100,23 @@ Was abgedeckt ist und was nicht:
   den Regel-ids ihrer Guards; `LEGAL_GATE_BY_TRACK`; `TERMINAL_STATUSES`.
 - **Operation → Recht als Daten:** Heute steckt die Zuordnung in `operationPermission` (`api.ts:458-465`) und in 14
   Aufrufen `requirePermission('…')` mit wörtlichem Recht. 040d führt eine Datentabelle `OPERATION_PERMISSION`
-  (`packages/domain/src/permissions.ts`) ein: je schreibender und je rechtegeprüfter lesender Operation des Kerns genau
-  ein Recht. `operationPermission` und jeder Aufruf lesen aus ihr; im Kern steht danach kein Recht mehr als Literal an
+  (`packages/domain/src/permissions.ts`) ein: je Operation, die heute `requirePermission` mit **einem** Recht aufruft
+  (die schreibenden Operationen und `listRoleAssignments`), genau dieses Recht. **Lesemethoden mit Alternativen bleiben in
+  `READ_PERMISSIONS`** (`types.ts:76-86`, ODER-Semantik, etwa `listQuestions`/`getQuestion`: `question.read` oder
+  `question.read.delivered`). Gewählt ist diese Variante statt Arrays in `OPERATION_PERMISSION`, weil sie den kleineren
+  Bau-Diff hat: `READ_PERMISSIONS` steht schon unverändert als `rights.readPermissions` im Schnappschuss (mit allen
+  Alternativen), `requireReadPermission` und `can()` bleiben unberührt, und `OPERATION_PERMISSION` nimmt nur die
+  einwertigen Prüfungen auf. Beide Tabellen stehen im Schnappschuss. `operationPermission` und jeder Aufruf lesen aus ihr; im Kern steht danach kein Recht mehr als Literal an
   einem `requirePermission`-Aufruf (Test 18 prüft den Quelltext im Dienst-Testbaum, weil der Kern keine Dateien lesen
   darf). Die Tabelle steht als `operationPermissions` im Schnappschuss.
 - **Build-Kennung (`buildId`):** eine Kennung der ausgelieferten Fassung, im Dienst aus der Konfiguration `HV_BUILD_ID`
   (die Pipeline setzt beim Bau des Abbilds den Commit, 037), in der Demo der feste Wert `demo`, fehlt sie: `unknown`. Sie
   steht im Schnappschuss und damit im Hash. Jede Auslieferung nach dem Freeze ändert die Kennung.
+- **R-ADM-11, kein Freeze mit unbekannter Build-Kennung.** Mit `unknown` könnte eine Abweichung `build` nie verschwinden
+  (jeder spätere Vergleich meldet sie). Deshalb antworten `freezeMeetingConfig` und jeder `overrideMeetingConfig`
+  (auch `rebase`), die den Schnappschuss neu bilden, mit **409 R-ADM-11** ohne Ereignis, solange die Kennung `unknown`
+  ist. Die Demo behält `demo` und friert ein. `HV_BUILD_ID` bleibt in der Konfiguration optional, damit der Dienst ohne
+  sie startet und liest; nur das Einfrieren verlangt sie.
 - **Nicht abgedeckt als Daten, aber über die Build-Kennung:** der Rumpf einer Guard-Funktion, die Bedingung `allowed`
   einer Tagesordnungszeile, ein berechnetes Ziel (steht als wörtliches `"<computed>"`, heute R-TRANS-06) und der
   Sonderfall von R-PERM-03 in `hasPermission` (Fachkraft ohne Einheit liest keine Fragen). Ändert ein Release eines
@@ -172,8 +182,8 @@ Ereignis prüft man immer gegen seinen eigenen gespeicherten Schnappschuss.
 
 | Operation | Recht | Prüfungen, in dieser Reihenfolge | Wirkung |
 |---|---|---|---|
-| `freezeMeetingConfig` (`POST /meetings/{id}/config-freeze`, vorab erklärt) | `admin.config.freeze` | 403; 409 R-ADM-01 (geschlossen); 409 R-ADM-04 (schon eingefroren); 409 R-ADM-10 (zu wenige Vertretungen, Ziel 5); 412 bei veraltetem `If-Match` | `ConfigFrozen`; Antwort `ConfigFreeze` |
-| `overrideMeetingConfig` (`POST /meetings/{id}/config-overrides`, neu) | `admin.override` **und** das Recht des Bereichs: `agendaItems` → `agenda.manage`, `units` → `admin.units.manage`, `stageSeats` → `admin.seats.manage`, `captureRanges` → `admin.meetings.manage`, `roleAssignment` → `admin.roles.manage`, `rebase` → nur `admin.override` | 403; 409 R-ADM-01; 409 R-ADM-04 (nicht eingefroren, oder `reason` nach Trimmen leer); danach dieselben Prüfungen wie der normale Weg (422, R-ADM-02, R-ADM-05, R-ADM-06, R-ADM-07); 428/412 | ein Befehl: Änderungsereignis (`AgendaItemsReplaced`, `UnitsReplaced`, `StageSeatsReplaced`, `CaptureRangesReplaced` oder `RoleAssigned`) und `ConfigOverridden`; Antwort `ConfigFreeze` mit neuem Hash |
+| `freezeMeetingConfig` (`POST /meetings/{id}/config-freeze`, vorab erklärt) | `admin.config.freeze` | 403; 409 R-ADM-01 (geschlossen); 409 R-ADM-04 (schon eingefroren); 409 R-ADM-10 (zu wenige Vertretungen, Ziel 5); 409 R-ADM-11 (Build-Kennung `unknown`); 412 bei veraltetem `If-Match` | `ConfigFrozen`; Antwort `ConfigFreeze` |
+| `overrideMeetingConfig` (`POST /meetings/{id}/config-overrides`, neu) | `admin.override` **und** das Recht des Bereichs: `agendaItems` → `agenda.manage`, `units` → `admin.units.manage`, `stageSeats` → `admin.seats.manage`, `captureRanges` → `admin.meetings.manage`, `roleAssignment` → `admin.roles.manage`, `rebase` → nur `admin.override` | 403; 409 R-ADM-01; 409 R-ADM-04 (nicht eingefroren, oder `reason` nach Trimmen leer); 409 R-ADM-11 (Build-Kennung `unknown`); danach dieselben Prüfungen wie der normale Weg (422, R-ADM-02, R-ADM-05, R-ADM-06, R-ADM-07); 428/412 | ein Befehl: Änderungsereignis (`AgendaItemsReplaced`, `UnitsReplaced`, `StageSeatsReplaced`, `CaptureRangesReplaced` oder `RoleAssigned`) und `ConfigOverridden`; Antwort `ConfigFreeze` mit neuem Hash |
 | `startMeeting` (`POST /meetings/{id}/opening`, neu) | `agenda.manage` | 403; 409 R-MTG-02 (nicht `preparation`); 409 R-MTG-08 (nicht eingefroren); 409 R-MTG-09 (irgendein anderer Jahrgang läuft); 428/412 | `MeetingStarted`; Antwort `Meeting` |
 
 - Der Bereich `rebase` schreibt nur `ConfigOverridden` (ohne Änderungsereignis und ohne `changeType`); er quittiert eine
@@ -221,10 +231,17 @@ Gilt vor und nach dem Freeze, für `assignRole` und den Override-Bereich `roleAs
   Vertretungen nicht.
 - **R-ADM-07** (aus 040a) gilt auch im Override-Bereich `roleAssignment`.
 - **R-ADM-10, Mindestzahl der Vertretungen beim Freeze** (Rechtekonzept §5, Zeilen 204-206; Plan 040 „zwei
-  Vertretungen“): `freezeMeetingConfig` antwortet 409 R-ADM-10 ohne Ereignis, wenn es eine Rolle gibt, die im Jahrgang
-  mindestens eine tragfähige Inhaberschaft ohne `deputyForSubjectId` hat, aber weniger als zwei tragfähige Zuordnungen
-  derselben Rolle mit `deputyForSubjectId` auf eine solche Inhaberschaft. Tragfähig wie bei R-ADM-08 (nicht entzogen,
-  ohne Ablauf oder Ablauf ≥ 24 h). Die Antwort nennt die betroffenen Rollen (aus den Daten, kein Literal). Keine
+  Vertretungen“), gemessen an den **aktiven Inhaberschaften**. Tragfähig wie bei R-ADM-08 (nicht entzogen, ohne Ablauf
+  oder Ablauf ≥ 24 h). Je Rolle gilt:
+  - **Inhaberschaft** ist jede tragfähige Zuordnung der Rolle ohne `deputyForSubjectId` **und jede verwaiste
+    Vertretung**: eine tragfähige Zuordnung mit `deputyForSubjectId`, deren Ziel keine tragfähige Zuordnung derselben
+    Rolle mehr hat (etwa weil die Hauptperson entzogen wurde). Eine verwaiste Vertretung vertritt niemanden; sie hält die
+    Rolle allein und braucht selbst Deckung.
+  - **Vertretung** ist eine tragfähige Zuordnung der Rolle mit `deputyForSubjectId` auf eine Inhaberschaft ohne
+    `deputyForSubjectId` dieser Rolle.
+  - `freezeMeetingConfig` antwortet 409 R-ADM-10 ohne Ereignis, wenn eine Rolle mindestens eine Inhaberschaft, aber
+    weniger als zwei Vertretungen hat. Beispiel: Hauptperson und eine Vertretung, Hauptperson entzogen → die Vertretung
+    ist verwaist, die Rolle hat eine Inhaberschaft und null Vertretungen → 409. Die Antwort nennt die betroffenen Rollen (aus den Daten, kein Literal). Keine
   Obergrenze. Nach dem Freeze prüft der Kern die Mindestzahl nicht erneut (ein Entzug bleibt frei); ein Rückgang
   meldet 085 als Alarmvorschlag. Eigentümerfrage 5 in 040a fragt nur nach einer Lockerung.
 
@@ -284,8 +301,8 @@ Version: die nächste freie Patch-Stufe beim Baustart.
     „a deputy (at least two recommended)“ statt „one of the two deputies“.
   - `ConfigSnapshot` und `freezeMeetingConfig`: Nachrechnen nur am gespeicherten Original, nicht aus `EventRead` (Ziel 1).
   - `startMeeting`: R-MTG-02, R-MTG-08, R-MTG-09.
-  - `freezeMeetingConfig`: 409 nennt R-ADM-10 (Mindestzahl der Vertretungen).
-  - `Problem.ruleId`: R-ADM-01..10 mit Inhalt, R-MTG-08, R-MTG-09.
+  - `freezeMeetingConfig`: 409 nennt R-ADM-10 (Mindestzahl der Vertretungen, verwaiste Vertretungen als Inhaberschaft) und R-ADM-11 (Build-Kennung `unknown`); `overrideMeetingConfig`: 409 nennt R-ADM-11.
+  - `Problem.ruleId`: R-ADM-01..11 mit Inhalt, R-MTG-08, R-MTG-09.
 - **Allowlist:** Eintrag `freezeMeetingConfig` entfernen. Danach steht kein Eintrag mit `slice` 040 mehr darin.
 - **CHANGELOG**, **Typen** wie üblich.
 
@@ -319,7 +336,7 @@ Kern:
 - `packages/domain/src/api.ts`
 - `packages/domain/src/permissions.ts` (nur die zwei Rechte in der Liste der Administration und die Tabelle der Operationsrechte)
 - `packages/domain/src/transitions.ts` (nur Guards R-MTG-08 und R-MTG-09 an der Startzeile und die Option in der Auflösung des Lebenszyklus)
-- `packages/domain/src/rules.ts` (nur R-ADM-03, R-ADM-04, R-ADM-06, R-ADM-10, R-MTG-08, R-MTG-09)
+- `packages/domain/src/rules.ts` (nur R-ADM-03, R-ADM-04, R-ADM-06, R-ADM-10, R-ADM-11, R-MTG-08, R-MTG-09)
 - `packages/domain/src/stream.ts` (nur Themen und Subjekte je Ereignistyp)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/src/configFreeze.ts` (neu: Schnappschuss, Hash, Prüfung, Abweichung)
@@ -432,6 +449,12 @@ Kern (`config040d.test.ts`):
 11c. **Vertretungen beim Freeze (R-ADM-10):** Rolle `approver` mit einer Inhaberin und einer Vertretung → 409 R-ADM-10,
     die Antwort nennt die Rolle, kein Ereignis; mit zwei tragfähigen Vertretungen gelingt der Freeze; eine Vertretung,
     die in weniger als 24 h abläuft, zählt nicht; eine Rolle ohne Inhaberschaft braucht keine Vertretung.
+    **Regression verwaiste Vertretung:** Hauptperson und eine Vertretung, danach `revokeRole` der Hauptperson → Freeze
+    409 R-ADM-10 (die verwaiste Vertretung ist Inhaberschaft ohne Deckung); ebenso Hauptperson mit zwei Vertretungen,
+    Hauptperson entzogen → 409.
+11e. **Build-Kennung (R-ADM-11):** Kern mit `buildId: 'unknown'` → `freezeMeetingConfig` und Override `rebase` → 409
+    R-ADM-11, kein Ereignis; mit `demo` bzw. einer echten Kennung gelingt der Freeze. Dienst ohne `HV_BUILD_ID` startet,
+    `POST …/config-freeze` → 409 mit `ruleId` R-ADM-11; mit `HV_BUILD_ID` → 200.
 11d. **Abweichung `build`:** Freeze mit `buildId` A; eine zweite Instanz auf demselben Store mit `buildId` B meldet
     `configDrift` = `['build']` und `Meeting.configDrift` enthält `build`; ein Override `rebase` mit Grund bildet den
     Schnappschuss neu, danach ist die Abweichung leer.
@@ -451,11 +474,15 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
     R-ADM-03; ein Override-Rumpf mit unbekanntem Feld oder mit `items` bei `roleAssignment` → 422.
 16. **Vertrag:** Kein Allowlist-Eintrag mit `slice` 040; `ConfigOverride.additionalProperties` ist `false`; `Event.type`
     enthält `ConfigOverridden`; ein `EventRead` mit `payload.snapshot.masterData.stageSeats[0].personId` ist ungültig;
-    `Problem.ruleId` nennt R-ADM-01..10, R-MTG-08 und R-MTG-09.
+    `Problem.ruleId` nennt R-ADM-01..11, R-MTG-08 und R-MTG-09.
 
 17. **Operationsrechte als Daten (Kern):** Für jeden Eintrag von `OPERATION_PERMISSION` antwortet die Operation einer
     Rolle ohne dieses Recht mit 403; der Schnappschuss enthält die Tabelle; eine veränderte Tabelle (übergeben im Test)
-    ändert den Hash und meldet `rights` in `configDrift`.
+    ändert den Hash und meldet `rights` in `configDrift`. **ODER-Alternativen:** `snapshot.rights.readPermissions`
+    enthält für `listQuestions` und `getQuestion` genau `question.read` und `question.read.delivered`; ein Beobachter
+    (nur `question.read.delivered`) liest eine vorgelesene Frage weiterhin; eine übergebene `READ_PERMISSIONS`-Tabelle, der
+    eine Alternative fehlt, ändert den Hash und meldet `rights` — der Test schlägt also fehl, wenn eine Alternative
+    verloren geht.
 18. **Keine Rechte-Literale (Dienst-Testbaum, `operation-permission040d.test.ts`):** `packages/domain/src/api.ts` enthält
     keinen Aufruf `requirePermission(` mit einer Zeichenkette als Argument.
 
@@ -470,6 +497,9 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
 - R-MTG-09 entfernt → Test 8 rot.
 - R-ADM-10 zählt auch Vertretungen mit Ablauf unter 24 h → Test 11c rot.
 - `buildId` nicht im Schnappschuss → Test 11d rot.
+- Verwaiste Vertretung als Vertretung gezählt → Test 11c (Regression) rot.
+- Freeze nimmt `buildId: 'unknown'` an → Test 11e rot.
+- Schnappschuss nimmt nur `OPERATION_PERMISSION` auf, nicht `READ_PERMISSIONS` → Test 17 (ODER-Alternativen) rot.
 - Ein `requirePermission('question.approve')` als Literal zurückgesetzt → Test 18 rot.
 - Wiederherstellung in einem eingefrorenen Jahrgang ohne `ConfigOverridden` → Test 11b rot.
 - Wiederholung des Override prüft nur `admin.override` → Test 11 rot (über eine übergebene Bereichstabelle im Test).
@@ -479,7 +509,7 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`, (d) ohne Eintrag mit `slice` 040.
-2. Tests 1–18 (mit 11a–11d) grün, elf Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+2. Tests 1–18 (mit 11a–11e) grün, vierzehn Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
 3. Die Planbelege sind erfüllt: „Stammdatenänderung nach Freeze → 409 R-ADM-03“ (Tests 5, 15), „override erzeugt Ereignis
    mit Grund“ (Test 6), „Wahrheitstabellen-Diff für admin-Rechte“ (040a–d).
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040d-…`; Schluss der
@@ -627,3 +657,8 @@ Schnappschuss, Build-Kennung `buildId` im Schnappschuss, Abweichung `build` sich
 quittiert nur per Override `rebase` mit Grund (Tests 11d, 17, 18, drei Mutationsproben); „nicht abgedeckt“ nur noch
 Funktionsrümpfe, erfasst über die Build-Kennung. R-ADM-10: Freeze nur mit mindestens zwei tragfähigen Vertretungen je
 besetzter Rolle (Test 11c, Mutationsprobe).
+
+**Codex-Befund zu #117 (zwei P1, ein P2):** eingearbeitet: Lesemethoden mit ODER-Alternativen bleiben in
+`READ_PERMISSIONS` (kleinerer Bau-Diff), beide Tabellen im Schnappschuss, Test 17 prüft die Alternativen; R-ADM-10 zählt
+verwaiste Vertretungen als Inhaberschaft (Regression in Test 11c); R-ADM-11: kein Freeze und kein Override mit
+`buildId: 'unknown'`, Abhängigkeit 037 (Test 11e).
