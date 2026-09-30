@@ -1,9 +1,9 @@
 # Scheibe 040c — Administration im Kern, Teil 3: Jahrgang, Erstinbetriebnahme, Nummernkreise
 
-**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`; Teil 3 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
-**Risikoklasse:** hoch · 1,75 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service (Routen und Kommandozeile); web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); manifests (nur ein Skript in `apps/api/package.json`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-betrieb; docs-plan (nur Glossar)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 3 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Risikoklasse:** hoch · 2 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service (Routen und Kommandozeile); web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); manifests (nur ein Skript in `apps/api/package.json`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-betrieb; docs-plan (nur Glossar)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend. Review in frischem Kontext mit Perspektive Security/Admin (Erst-Admin, Rechteerhöhung) und Betrieb (Kommandozeile gegen Postgres); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** neu R-ADM-05 (Nummernkreis-Zugehörigkeit vergebener Nummern ändert sich nie). Angewandt: R-ADM-01 (aus 040b, hier auch für Nummernkreise), R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-01, R-PERM-01, R-IDEM-01. Dazu AGENTS.md R2, R4, R6, R7, R8, R11, R12
+**Rule ids:** neu R-ADM-05 (Nummernkreis-Zugehörigkeit vergebener Nummern ändert sich nie), R-ADM-09 (ein Notzugang aus der Wiederherstellung legt keinen Jahrgang an). Angewandt: R-ADM-01 (aus 040b, hier auch für Nummernkreise), R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-01, R-PERM-01, R-IDEM-01. Dazu AGENTS.md R2, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5/040 („Jahrgang anlegen/klonen“, „Nummernkreise je Erfassungsplatz als Meeting-Daten (für den Papierpfad)“), §5/068 (Nachweis „Nummer außerhalb des Kreises → 422“), §5/070 (Runbook: Papierpfad mit Nummernkreisen), B14
 - `docs/anforderungen-recherche.md:264, 373, 491` (MUSS: Papier-Fallback mit vorab reservierten Nummernkreisen je Erfassungsplatz)
@@ -53,8 +53,14 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
      Wortmeldungen, Redebeiträge, Fragen, Ereignisse.
    - **Erstellerzuordnung.** Ist der Akteur zuordnungsgebunden (Sitzung), schreibt derselbe Befehl im neuen Jahrgang
      `RoleAssigned` für `actor.id` mit der Rolle, unter der er `admin.meetings.manage` gerade hält (`actor.role`, kein
-     Rollenname im Code), ohne Einheit und ohne Ablauf. Das verleiht nichts Neues: Es überträgt die eigene Rolle in den
-     Jahrgang, den der Akteur selbst angelegt hat. Die Demo-Identität (nicht zuordnungsgebunden) erhält keine Zuordnung.
+     Rollenname im Code), ohne Einheit. Die Demo-Identität (nicht zuordnungsgebunden) erhält keine Zuordnung.
+   - **Die Erstellerzuordnung hebt keine Grenze auf.** Maßgeblich ist die Zuordnung, unter der der Akteur gerade handelt:
+     die älteste aktive Zuordnung seines Subjects über alle nicht geschlossenen Jahrgänge, dieselbe Auswahl wie
+     `sessionActorFromEvents` (`apps/api/src/actor.ts:112-114`), im Kern aus dem Store bestimmt. Die neue Zuordnung
+     übernimmt deren `expiresAt` und `deputyForSubjectId` unverändert. Stammt diese Zuordnung aus der Wiederherstellung
+     (Befehlsoperation `operatorRecovery`), antwortet `createMeeting` mit **409 R-ADM-09**, ohne Ereignis: Ein
+     befristeter Notzugang darf sich nicht über einen neuen Jahrgang verlängern. So verleiht die Erstellerzuordnung nichts
+     Neues, weder Rolle noch Dauer.
    - Beide Ereignisse tragen die `meetingId` des neuen Jahrgangs. `append` erhält dafür einen eng begrenzten Weg (nur für
      diesen Befehl), belegt durch Test 3.
    - Antwort 201 `Meeting` mit `ETag`; Projektion von `Meeting.format` und `Meeting.clonedFromMeetingId`.
@@ -82,10 +88,19 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
      `recoveryEvents({ meetingId, adminSubjectId, operatorRef, expiresAt, reason }, { existing, newId, now })`. Sie
      liefert genau ein `RoleAssigned` (Akteur `SYSTEM_ACTOR`, Befehlsoperation `operatorRecovery`, Rolle wie beim
      Bootstrap abgeleitet) und bricht ab, wenn der Jahrgang fehlt, geschlossen ist oder **noch eine aktive Zuordnung einer
-     Verwaltungsrolle** hat. `expiresAt` ist Pflicht und liegt höchstens 14 Tage nach `now`; `reason` (1–500, keine
+     nutzbaren Verwaltungsrolle** hat. Nutzbar ist eine aktive Zuordnung (nicht entzogen, nicht abgelaufen), deren
+     Subject **nicht** gesperrt ist; gesperrt heißt: in `auth_subject_blocks` aus 029b. Damit hilft die Wiederherstellung
+     auch im typischen Fall, in dem das Subject der einzigen Verwaltung verloren und gesperrt ist, die Zuordnung aber
+     aktiv bleibt. Die Funktion erhält die gesperrten Subjects als Parameter; die Kommandozeile liest sie in derselben
+     Transaktion. `expiresAt` ist Pflicht und liegt höchstens 14 Tage nach `now`; `reason` (1–500, keine
      Personendaten) steht in der Nutzlast. Die befristete Zuordnung ist ein Notzugang: Die Person ordnet damit eine
      reguläre Verwaltungsrolle einem anderen Subject zu (R-ADM-07) und lässt den Notzugang ablaufen. Einen anderen
      Wiederherstellungsweg gibt es nicht, insbesondere keinen über HTTP.
+   - **Geltungsbereich je Jahrgang, bewusst.** Die Prüfung gilt für den genannten Jahrgang, nicht für alle. Eine
+     Verwaltung in einem anderen Jahrgang kann hier nichts zuordnen (sie hat hier keine Zuordnung); eine Prüfung über alle
+     Jahrgänge ließe den ausgesperrten Jahrgang ohne Weg zurück. Der Missbrauchsfall dazu steht unten.
+   - **Nach dem Freeze** (ab 040d) schreibt die Wiederherstellung in einem eingefrorenen Jahrgang zusätzlich
+     `ConfigOverridden`; das legt 040d fest.
    - **Kommandozeile** `apps/api/src/admin/bootstrap-cli.ts`, Aufrufe
      `bootstrap --title "…" --date JJJJ-MM-TT --subject oidc_<actor-id> --operator <kennung>` und
      `recover --meeting <id> --subject oidc_<actor-id> --operator <kennung> --expires <ISO-Zeit> --reason "…"`
@@ -148,7 +163,7 @@ Version: die nächste freie Patch-Stufe beim Baustart.
   Antwortfelder `operatorRef` und `reason` für die Befehlsoperationen `operatorBootstrap` und `operatorRecovery`
   (heute steht dort `reason: false`; der Architekt fasst das als Bedingung: `reason` nur bei `operatorRecovery`).
 - **`createMeeting`**: Die Beschreibung nennt den globalen Geltungsbereich des `Idempotency-Key`.
-- **`Problem.ruleId`**: R-ADM-05.
+- **`Problem.ruleId`**: R-ADM-05, R-ADM-09; `createMeeting` dokumentiert 409 (R-ADM-09).
 - **Allowlist:** Eintrag `createMeeting` entfernen.
 - **CHANGELOG** und **Typen** wie üblich. Die Kommandozeile ist keine HTTP-Operation und steht nicht im Vertrag.
 
@@ -180,7 +195,7 @@ Kern:
 - `packages/domain/src/state.ts`
 - `packages/domain/src/api.ts`
 - `packages/domain/src/permissions.ts` (nur das neue Recht in der Liste der Administration)
-- `packages/domain/src/rules.ts` (nur R-ADM-05)
+- `packages/domain/src/rules.ts` (nur R-ADM-05, R-ADM-09)
 - `packages/domain/src/stream.ts` (nur Themen und Subjekte je Ereignistyp)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/src/bootstrap.ts` (neu)
@@ -272,15 +287,19 @@ Kern (`meeting040c.test.ts`):
    vergebene Nummer darin gelingt.
 8. **Nummerierung:** Mit vier vergebenen Fragen und dem Kreis 5–9 erhalten die nächsten zwei Fragen F-0010 und F-0011.
    Auf dem Seed ohne Kreise sind alle Nummern gleich wie vorher (Vergleich mit einer Referenzfolge im Test).
-9. **Rechte Nummernkreise:** nur `admin.meetings.manage`; `listCaptureRanges` für jeden angemeldeten Akteur.
+9. **Rechte Nummernkreise:** nur `admin.meetings.manage`; `listMeetingCaptureRanges` für jeden angemeldeten Akteur.
 10. **Wiederholung, global:** `createMeeting` mit gleichem `Idempotency-Key` liefert denselben Jahrgang und kein zweites
     `MeetingCreated`, auch wenn inzwischen ein anderer Jahrgang der Alias ist; mit anderem Akteur gilt der Schlüssel nicht.
 10a. **Betreiberkennung und Wiederherstellung:** `bootstrapEvents` schreibt `operatorRef` in beide Nutzlasten und kein
-    `expiresAt`; `recoveryEvents` bricht ab, solange eine aktive Verwaltungsrolle besteht, bei geschlossenem Jahrgang, ohne
+    `expiresAt`; `recoveryEvents` bricht ab, solange eine nutzbare Verwaltungsrolle besteht; mit derselben Zuordnung,
+    deren Subject in den übergebenen gesperrten Subjects steht, gelingt sie; bei geschlossenem Jahrgang, ohne
     `expiresAt` und bei `expiresAt` mehr als 14 Tage nach `now`; sonst genau ein `RoleAssigned` mit Akteur `system`,
     `operatorRef`, `reason` und `expiresAt`.
 10b. **Surrogate:** `title: '\uDC00'` in `createMeeting` und `label` mit einzelnem Surrogat in
     `replaceMeetingCaptureRanges` → 422, kein Ereignis.
+10d. **Erstellerzuordnung ohne Grenzaufhebung:** Handelt der Akteur unter einer Zuordnung mit `expiresAt` und
+    `deputyForSubjectId`, trägt die neue Zuordnung beide Werte; handelt er unter einer Zuordnung aus `operatorRecovery`
+    → 409 R-ADM-09, kein Ereignis.
 10c. **Anderer Jahrgang:** `replaceMeetingCaptureRanges` auf einem Jahrgang in `preparation`, während ein anderer läuft,
     schreibt mit dessen `meetingId`.
 
@@ -293,7 +312,8 @@ Dienst:
     Datenbank → zwei Ereignisse, die Kette ist beim nächsten Laden gültig, eine Sitzung des Subjects löst im neuen
     Jahrgang die abgeleitete Rolle auf; zweiter Lauf → Code 2, Ereigniszahl unverändert; keine Ausgabezeile enthält das
     Subject oder die Betreiberkennung. Wiederherstellung: nach dem Entzug aller Verwaltungsrollen im Testaufbau (über
-    Ablauf, weil R-ADM-08 den letzten Entzug sperrt) → „Recovery completed.“, danach löst die Sitzung die befristete
+    Ablauf, weil R-ADM-08 den letzten Entzug sperrt, und über einen Eintrag in `auth_subject_blocks` für eine noch aktive
+    Zuordnung) → „Recovery completed.“, danach löst die Sitzung die befristete
     Rolle auf; ein zweiter Lauf → Code 2.
 14. **Vertrag:** Die Allowlist enthält `createMeeting` nicht mehr; die zwei neuen Operationen verlangen `If-Match`; das
     Abdeckungstor meldet alle drei als ausgeübt.
@@ -306,13 +326,15 @@ Dienst:
 - R-ADM-05 entfernt → Test 7 rot.
 - Erstellerzuordnung mit der `meetingId` des Alias-Jahrgangs → Test 3 rot.
 - Wiederholungssuche für `createMeeting` auf den Alias-Jahrgang begrenzt (heutiges Verhalten) → Test 10 rot.
-- Wiederherstellung ohne Prüfung „keine aktive Verwaltungsrolle“ → Test 10a rot.
+- Wiederherstellung ohne Prüfung „keine nutzbare Verwaltungsrolle“ → Test 10a rot.
+- Erstellerzuordnung ohne `expiresAt` (heutiger Entwurf) → Test 10d rot.
+- Prüfung R-ADM-09 entfernt → Test 10d rot.
 
 ## Akzeptanzkriterium
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`.
-2. Tests 1–14 (mit 10a–10c) grün, sechs Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
+2. Tests 1–14 (mit 10a–10d) grün, acht Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
 3. Ein Trockenlauf der Kommandozeile gegen die CI-Datenbank (Test 13) ist im Bericht mit Ausgabezeile belegt.
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040c-…`; Schluss der
    Ausgabe einmal im Bericht.
@@ -357,8 +379,8 @@ in 040a
   | Missbrauch | Abwehr | Erkennung, Nachweis |
   |---|---|---|
   | Bootstrap später erneut, um sich Admin zu geben | Einmal-Prüfung auf `MeetingCreated` | Test 5, Test 13; `RoleAssigned` mit Befehlsoperation `operatorBootstrap` nach dem ersten Jahrgang kann es nicht geben; jedes `operatorRecovery` meldet ein Alarmvorschlag an 085 |
-  | Wiederherstellung missbrauchen, um sich neben einer bestehenden Verwaltung einen Zugang zu geben | nur ohne aktive Verwaltungsrolle, befristet höchstens 14 Tage, nur mit Datenbankzugang | Test 10a, Test 13; `RoleAssigned` mit `operatorRecovery`, `operatorRef` und Grund; Protokoll im Tagesbericht |
-  | Jahrgang anlegen, um darin eine fremde Rolle zu erhalten | nur die eigene Rolle wird übertragen; weitere Zuordnungen laufen über `assignRole` (ab 040d ohne Selbstzuordnung) | Test 3; `RoleAssigned` in der Historie |
+  | Wiederherstellung missbrauchen, um sich neben einer bestehenden Verwaltung einen Zugang zu geben | nur, wenn der genannte Jahrgang keine nutzbare Verwaltungsrolle hat (keine aktive oder nur gesperrte Subjects); befristet höchstens 14 Tage; nur mit Datenbankzugang. **Restrisiko:** Wer Datenbankzugang hat und ein Verwaltungs-Subject sperren kann, kann danach wiederherstellen; beides sind Betreiberhandlungen mit eigenem Protokoll. Eine Verwaltung in einem anderen Jahrgang verhindert die Wiederherstellung hier nicht (Geltungsbereich je Jahrgang) | Test 10a, Test 13; `RoleAssigned` mit `operatorRecovery`, `operatorRef` und Grund; Protokoll im Tagesbericht |
+  | Jahrgang anlegen, um darin eine fremde Rolle zu erhalten | nur die eigene Rolle wird übertragen; weitere Zuordnungen laufen über `assignRole` (seit 040a ohne Selbstzuordnung, R-ADM-07); Ablauf und Vertretung der eigenen Zuordnung werden übernommen; ein Notzugang legt keinen Jahrgang an (R-ADM-09) | Test 3; `RoleAssigned` in der Historie |
   | Personen und Geräte des Vorjahres still übernehmen | Klonen ohne `personId`/`deviceId` | Test 2 |
   | Nummernkreis nachträglich über vergebene Nummern legen, um Papier- und Systemvorgänge zu vermischen | R-ADM-05 | Test 7; `CaptureRangesReplaced` mit Akteur |
 
@@ -423,3 +445,8 @@ Touched:
 Wiederholungsschlüssel, Test 10 mit Mutationsprobe), Major 9 (auditierte Wiederherstellung, Betriebsregeln), Minor 16
 (Surrogate, Test 10b), Minor 20 (`operatorRef`, kein Ablauf der Erstzuordnung, befristete Wiederherstellung), Minor 21
 (`writeLock.ts` statt Import aus `app.ts`, Prüfung der Laufzeit), Nit 27 (Ausnahme der Erstellerzuordnung).
+
+**Nachprüfung (30.09.2026, zu `bccba04`):** eingearbeitet in 040c: N2 (Erstellerzuordnung übernimmt Ablauf und
+Vertretung; Notzugang legt keinen Jahrgang an, R-ADM-09; Test 10d mit zwei Mutationsproben), N5 (Wiederherstellung auch,
+wenn jede aktive Verwaltungsrolle einem gesperrten Subject gehört), N7 (Geltungsbereich je Jahrgang begründet,
+Missbrauchszeile mit Restrisiko), N9 (Verweis auf 040a).

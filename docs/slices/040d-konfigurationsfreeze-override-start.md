@@ -1,9 +1,9 @@
 # Scheibe 040d — Administration im Kern, Teil 4: Konfigurationsfreeze, Override, Start
 
-**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`; Teil 4 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
-**Risikoklasse:** hoch · 1,75 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service; web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz; docs-plan (nur Glossar)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 4 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Risikoklasse:** hoch · 2 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit); core; service; web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz; docs-plan (nur Glossar)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend. Review in frischem Kontext mit Perspektive Security/Admin (Freeze, Override, Rechteerhöhung) und Legal (Nachweis „wer durfte was am HV-Tag“); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
-**Rule ids:** neu R-ADM-03 (nach dem Freeze nur Override), R-ADM-04 (Freeze einmal; Override nur eingefroren und mit Grund), R-ADM-06 (Vertretung), R-MTG-08 (Start nur eingefroren), R-MTG-09 (kein zweiter laufender Jahrgang desselben Rechtsträgers). Angewandt: R-ADM-01, R-ADM-02, R-ADM-05, R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-02, R-PERM-01, R-IDEM-01, R-GUARD-06. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R12
+**Rule ids:** neu R-ADM-03 (nach dem Freeze nur Override), R-ADM-04 (Freeze einmal; Override nur eingefroren und mit Grund), R-ADM-06 (Vertretung), R-MTG-08 (Start nur eingefroren), R-MTG-09 (kein Start, solange ein anderer Jahrgang läuft). Angewandt: R-ADM-01, R-ADM-02, R-ADM-05, R-ADM-07 und R-ADM-08 (aus 040a), R-MTG-02, R-PERM-01, R-IDEM-01, R-GUARD-06. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` §5/040 („Konfigurationsfreeze (Ereignis ConfigFrozen mit Hash über Rechtetabelle, Übergangstabelle, Stammdaten; Änderung danach nur mit admin.override und Grund)“, „Rollenzuordnung mit Ablauf und zwei Vertretungen“, „Meeting-Lebenszyklus-Aktionen“; Nachweise „Stammdatenänderung nach Freeze → 409 R-ADM-03“, „override erzeugt Ereignis mit Grund“), §10 E8, E25, Risiko-Tabelle Zeile 1232 (zwei Vertretungen)
 - `docs/rollen-und-rechtekonzept.md` §3 Punkt 3 („Eingefrorener Snapshot je HV-Jahrgang … gehasht … wer am HV-Tag was durfte“), §4, §5 („mindestens zwei benannte Vertreter“)
@@ -156,7 +156,7 @@ Ereignis prüft man immer gegen seinen eigenen gespeicherten Schnappschuss.
 |---|---|---|---|
 | `freezeMeetingConfig` (`POST /meetings/{id}/config-freeze`, vorab erklärt) | `admin.config.freeze` | 403; 409 R-ADM-01 (geschlossen); 409 R-ADM-04 (schon eingefroren); 412 bei veraltetem `If-Match` | `ConfigFrozen`; Antwort `ConfigFreeze` |
 | `overrideMeetingConfig` (`POST /meetings/{id}/config-overrides`, neu) | `admin.override` **und** das Recht des Bereichs: `agendaItems` → `agenda.manage`, `units` → `admin.units.manage`, `stageSeats` → `admin.seats.manage`, `captureRanges` → `admin.meetings.manage`, `roleAssignment` → `admin.roles.manage` | 403; 409 R-ADM-01; 409 R-ADM-04 (nicht eingefroren, oder `reason` nach Trimmen leer); danach dieselben Prüfungen wie der normale Weg (422, R-ADM-02, R-ADM-05, R-ADM-06, R-ADM-07); 428/412 | ein Befehl: Änderungsereignis (`AgendaItemsReplaced`, `UnitsReplaced`, `StageSeatsReplaced`, `CaptureRangesReplaced` oder `RoleAssigned`) und `ConfigOverridden`; Antwort `ConfigFreeze` mit neuem Hash |
-| `startMeeting` (`POST /meetings/{id}/opening`, neu) | `agenda.manage` | 403; 409 R-MTG-02 (nicht `preparation`); 409 R-MTG-08 (nicht eingefroren); 409 R-MTG-09 (ein anderer Jahrgang mit gleichem `legalEntity` läuft; fehlt `legalEntity` bei beiden, gilt das als gleich); 428/412 | `MeetingStarted`; Antwort `Meeting` |
+| `startMeeting` (`POST /meetings/{id}/opening`, neu) | `agenda.manage` | 403; 409 R-MTG-02 (nicht `preparation`); 409 R-MTG-08 (nicht eingefroren); 409 R-MTG-09 (irgendein anderer Jahrgang läuft); 428/412 | `MeetingStarted`; Antwort `Meeting` |
 
 - Der Bereichsschlüssel und das zugehörige Recht stehen als Datentabelle im Kern (etwa
   `OVERRIDE_SCOPE_PERMISSION`), nicht als Verzweigung.
@@ -181,6 +181,13 @@ Ereignis prüft man immer gegen seinen eigenen gespeicherten Schnappschuss.
   gilt weiter), Tagesordnungsfortschritt,
   der Start, der ganze Fragen-, Wortmeldungs- und Erfassungsablauf, das Anlegen anderer Jahrgänge.
 - Ein Entzug nach dem Freeze ändert `configHash` nicht; `configDrift` meldet ihn nicht als Abweichung (Ziel 1).
+- **Wiederherstellung (040c) in einem eingefrorenen Jahrgang.** Sie fügt eine Zuordnung hinzu, also eine
+  Konfigurationsänderung. Damit die Invariante „nach dem Freeze keine Änderung ohne `ConfigOverridden`“ auch für den
+  Betreiberweg gilt, liefert `recoveryEvents` in einem eingefrorenen Jahrgang **zwei** Ereignisse in einem `append`:
+  `RoleAssigned` und `ConfigOverridden` mit `scope: roleAssignment`, `reason` (der Grund der Wiederherstellung),
+  `previousConfigHash`, neuem `configHash`, Schnappschuss und `changeType: RoleAssigned`, beide mit Akteur `system` und
+  Befehlsoperation `operatorRecovery`. Das Recht `admin.override` prüft dieser Weg nicht; er ist der auditierte
+  Betreiberweg mit Datenbankzugang (040c). `packages/domain/src/bootstrap.ts` wird dafür erweitert.
 - Eigentümerfrage 4 in 040a (Zuordnungen nach dem Freeze nur per Override) ist auf Standard gebaut.
 
 ### 5. Rollenzuordnung: Vertretungen
@@ -201,11 +208,14 @@ Gilt vor und nach dem Freeze, für `assignRole` und den Override-Bereich `roleAs
 - **Nur der Befehlsweg prüft den Guard.** `reduce` prüft weiter nur `from → to`. Sonst ließe sich kein bestehendes Log
   mehr laden: Der Seed und alle Testaufbauten seit 025 schreiben `MeetingStarted` ohne Freeze. `resolveMeetingLifecycle`
   erhält dafür eine ausdrückliche Option; Test 9 belegt beide Wege.
-- **R-MTG-09**, ebenfalls ein Guard der Startzeile und nur im Befehlsweg: Läuft ein anderer Jahrgang mit gleichem
-  `legalEntity` (fehlt es bei beiden, gilt das als gleich), antwortet der Start 409. Grund: Ein zweiter laufender Jahrgang
-  mit späterem Datum übernähme den Alias (Befund) und leitete die Arbeit aller Clients auf Aliaspfaden um — am HV-Tag ein
-  Ausfall durch einen einzigen Klick. Ein Jahrgang eines anderen Rechtsträgers bleibt startbar (ADR 0011 modelliert ihn
-  nicht, schließt ihn aber nicht aus).
+- **R-MTG-09**, ebenfalls ein Guard der Startzeile und nur im Befehlsweg: Läuft **irgendein** anderer Jahrgang,
+  antwortet der Start 409. Grund: Der Alias ist der jüngste laufende Jahrgang, gleich welcher Rechtsträger
+  (`api.ts:295-304`); ein zweiter laufender Jahrgang mit späterem Datum übernähme ihn und leitete die Arbeit aller Clients
+  auf Aliaspfaden um — am HV-Tag ein Ausfall durch einen einzigen Klick. ADR 0011 modelliert genau eine Gesellschaft; ein
+  zweiter Rechtsträger ist B-Liste. Eine Unterscheidung nach `legalEntity` würde den Alias nicht schützen.
+- **Datenquelle des Guards.** Der Start läuft in der auf `meetingId` eingegrenzten Instanz, deren Projektion nur den
+  eigenen Jahrgang kennt. R-MTG-09 liest den Status der **anderen** Jahrgänge deshalb aus dem globalen Store
+  (`MeetingCreated`, `MeetingStarted`, `MeetingClosed` je `meetingId`), nie aus der eingegrenzten Projektion.
 - Wer startet: Halter von `agenda.manage` (heute nur admin; Eigentümerfrage 3 in 040a). Keine Schlussaktion (takt-019).
 
 ### 7. Rechte
@@ -225,7 +235,8 @@ Version: die nächste freie Patch-Stufe beim Baustart.
     `CaptureRangeInput`, gleiche Obergrenzen wie die `replace…`-Operationen); `assignment` (`RoleAssignmentCreate`) nur
     für `roleAssignment`; das jeweils andere Feld ist verboten. Parameter `IdempotencyKey`, `CsrfToken`,
     `IfMatchRequired`. Antwort 200 `ConfigFreeze` mit `ETag`. 409 nennt R-ADM-01/02/04/05/06/07.
-  - `startMeeting` ohne Rumpf, Parameter wie oben, Antwort 200 `Meeting` mit `ETag`; 409 nennt R-MTG-02 und R-MTG-08.
+  - `startMeeting` ohne Rumpf, Parameter wie oben, Antwort 200 `Meeting` mit `ETag`; 409 nennt R-MTG-02, R-MTG-08 und
+    R-MTG-09.
   - Antwortlisten wie `replaceMeetingStageSeats` beim Baustart plus 428.
   - Ohne Go auf 043a-Frage 5: beide vorab erklärt mit Allowlist-Eintrag `slice` 040d, Ablauf 2026-11-25 (040a).
 - **Antwortseite (additiv):**
@@ -241,7 +252,7 @@ Version: die nächste freie Patch-Stufe beim Baustart.
     „a deputy (at least two recommended)“ statt „one of the two deputies“.
   - `ConfigSnapshot` und `freezeMeetingConfig`: Nachrechnen nur am gespeicherten Original, nicht aus `EventRead` (Ziel 1).
   - `startMeeting`: R-MTG-02, R-MTG-08, R-MTG-09.
-  - `Problem.ruleId`: R-ADM-01..08 mit Inhalt, R-MTG-08, R-MTG-09.
+  - `Problem.ruleId`: R-ADM-01..09 mit Inhalt, R-MTG-08, R-MTG-09.
 - **Allowlist:** Eintrag `freezeMeetingConfig` entfernen. Danach steht kein Eintrag mit `slice` 040 mehr darin.
 - **CHANGELOG**, **Typen** wie üblich.
 
@@ -279,6 +290,7 @@ Kern:
 - `packages/domain/src/stream.ts` (nur Themen und Subjekte je Ereignistyp)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/src/configFreeze.ts` (neu: Schnappschuss, Hash, Prüfung, Abweichung)
+- `packages/domain/src/bootstrap.ts` (nur: Wiederherstellung in einem eingefrorenen Jahrgang schreibt zusätzlich das Override-Ereignis)
 - `packages/domain/policy-truth-table.md` (nur regeneriert)
 - `packages/domain/src/__tests__/config040d.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur zwei neue Spalten im Abschnitt „Role × Administration“)
@@ -366,8 +378,9 @@ Kern (`config040d.test.ts`):
    Bereich `roleAssignment` mit eigenem Subject → 409 R-ADM-07. Die Datentabelle der Bereichsrechte ist genau die aus
    Ziel 3.
 8. **Start:** `preparation` und eingefroren → `running`, `MeetingStarted`; nicht eingefroren → 409 R-MTG-08; schon
-   `running` → 409 R-MTG-02; ohne `agenda.manage` → 403; ein anderer Jahrgang mit gleichem `legalEntity` läuft → 409
-   R-MTG-09 und der Alias bleibt; mit anderem `legalEntity` gelingt der Start.
+   `running` → 409 R-MTG-02; ohne `agenda.manage` → 403; ein anderer Jahrgang läuft → 409 R-MTG-09
+   und der Alias bleibt, auch bei anderem `legalEntity`; nach `MeetingClosed` des anderen gelingt der Start.
+   Der Guard liest den anderen Jahrgang aus dem globalen Store, obwohl der Start in der eingegrenzten Instanz läuft.
 9. **Projektion ohne Guard:** Der Seed (mit `MeetingStarted` ohne Freeze) und ein Log aus `meeting025.test.ts` laden
    unverändert.
 10. **Vertretungen:** Vertretung für ein Subject ohne aktive Zuordnung derselben Rolle → 409 R-ADM-06; Selbstvertretung →
@@ -375,6 +388,10 @@ Kern (`config040d.test.ts`):
 11. **Override-Wiederholung:** Ein Override mit `Idempotency-Key`, danach verliert der Akteur seine Zuordnung (Entzug durch
     ein zweites Verwaltungskonto); die Wiederholung → 403, kein zweites Ereignis. Die Wiederholungsprüfung liest beide
     Rechte aus der Bereichstabelle.
+11b. **Wiederherstellung nach dem Freeze:** `recoveryEvents` auf einem eingefrorenen Jahrgang ohne nutzbare
+    Verwaltungsrolle liefert `RoleAssigned` und `ConfigOverridden` (`scope: roleAssignment`, Grund, alter und neuer Hash)
+    in einem `append` mit aufeinanderfolgenden `seq`; `Meeting.configHash` ist danach der neue Hash; ohne Freeze nur
+    `RoleAssigned`.
 11a. **Surrogate:** `reason` mit einzelnem Surrogat → 422, kein Ereignis.
 12. **Prüfung und Abweichung:** `verifyConfigEvent` ist wahr für das gespeicherte Ereignis und falsch für eine Kopie mit
     geändertem Schnappschuss; `configDrift` nach einem Entzug meldet keine Abweichung; mit einer übergebenen, veränderten
@@ -391,13 +408,13 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
     R-ADM-03; ein Override-Rumpf mit unbekanntem Feld oder mit `items` bei `roleAssignment` → 422.
 16. **Vertrag:** Kein Allowlist-Eintrag mit `slice` 040; `ConfigOverride.additionalProperties` ist `false`; `Event.type`
     enthält `ConfigOverridden`; ein `EventRead` mit `payload.snapshot.masterData.stageSeats[0].personId` ist ungültig;
-    `Problem.ruleId` nennt R-ADM-01..07 und R-MTG-08.
+    `Problem.ruleId` nennt R-ADM-01..09, R-MTG-08 und R-MTG-09.
 
 **Wahrheitstabellen-Diff (vor dem Bau):** Abschnitt „Role × Administration“ erhält die Spalten `admin.config.freeze` und
 `admin.override`, ✓ nur in der Zeile admin. Sonst keine Änderung.
 
 **Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
-- R-ADM-03 in `replaceUnits` übersprungen → Test 5 rot.
+- R-ADM-03 in `replaceMeetingUnits` übersprungen → Test 5 rot.
 - Leerer Grund angenommen → Test 7 rot.
 - Entzogene Zuordnungen im Schnappschuss → Test 3 rot.
 - Fachbereiche im Schnappschuss nicht sortiert → Test 1 rot.
@@ -409,7 +426,7 @@ Dienst (`apps/api/src/__tests__/config040d.test.ts`):
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`, (d) ohne Eintrag mit `slice` 040.
-2. Tests 1–16 (mit 11a) grün, sieben Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+2. Tests 1–16 (mit 11a, 11b) grün, sieben Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
 3. Die Planbelege sind erfüllt: „Stammdatenänderung nach Freeze → 409 R-ADM-03“ (Tests 5, 15), „override erzeugt Ereignis
    mit Grund“ (Test 6), „Wahrheitstabellen-Diff für admin-Rechte“ (040a–d).
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040d-…`; Schluss der
@@ -461,7 +478,8 @@ Goldwert · Offene Entscheidung: E8 (Tabelle ist Wahrheit), E25 (Vertretungen), 
   |---|---|---|
   | admin ordnet sich am HV-Tag selbst `approver` zu | R-ADM-07 (040a); nach dem Freeze zusätzlich R-ADM-03 | 040a Test 7, hier Test 7; verweigerter Versuch mit Regel-id im Zugriffslog (033a) |
   | admin entzieht am HV-Tag nach dem Freeze reihenweise die Rollen von Freigabe, Recht oder Podium (Sabotage) | Entzug bleibt frei (ein Entzug darf nie blockiert werden); R-ADM-08 schützt nur die Verwaltungsrolle; ein Grund wird empfohlen, nicht erzwungen | `RoleRevoked` einer Zuordnung, deren Rolle `question.approve`, `question.legal.clear` oder `question.deliver` hält, nach dem Freeze → Alarmvorschlag an 085; Grund und Akteur im Log. **Restrisiko:** Bis zur Reaktion fehlt die Rolle; Wiederherstellung per Override mit Grund durch ein zweites Verwaltungskonto und über Vertretungen. Eine Vier-Augen-Pflicht für den Entzug ist nicht gebaut |
-  | ein zweiter Jahrgang wird am HV-Tag gestartet und übernimmt den Alias (Ausfall) | R-MTG-09 | Test 8; `MeetingStarted`, während ein anderer Jahrgang läuft → Alarmvorschlag an 085 (auch für andere Rechtsträger) |
+  | ein zweiter Jahrgang wird am HV-Tag gestartet und übernimmt den Alias (Ausfall) | R-MTG-09: kein Start, solange irgendein anderer Jahrgang läuft | Test 8; verweigerter Start mit R-MTG-09 im Zugriffslog; Alarmvorschlag an 085 für jeden verweigerten oder gelungenen Start am HV-Tag |
+  | Betreiber stellt nach dem Freeze still eine Verwaltung wieder her | Wiederherstellung schreibt `ConfigOverridden` mit Grund und neuem Hash | Test 11b; Hash im Kopf (041); Alarmvorschlag an 085 für jedes `operatorRecovery` |
   | zwei admins ordnen einander `approver` zu | nach dem Freeze nur per Override mit Grund | `ConfigOverridden` mit `scope: roleAssignment`, Grund und neuem Hash; Hash im Kopf (041); Alarmvorschlag an 085 „Override mit Bereich roleAssignment“ |
   | Stammdaten nach dem Freeze still ändern | R-ADM-03 | Test 5; Planbeleg |
   | Override ohne echten Grund („x“) | nur nicht leer erzwungen; Inhalt ist Verantwortung der Person | Grund steht im Log und im Export (051); Auswertung zu zweit (Rechtekonzept §6) |
@@ -469,7 +487,8 @@ Goldwert · Offene Entscheidung: E8 (Tabelle ist Wahrheit), E25 (Vertretungen), 
   | Freeze umgehen, indem man ohne Freeze startet | R-MTG-08 | Test 8 |
   | Entzug einer kompromittierten Rolle durch den Freeze blockiert | Entzug nie eingefroren | Test 5 |
 
-- **Invarianten:** Nach dem Freeze gibt es keine Konfigurationsänderung ohne `ConfigOverridden` mit Grund. Jeder
+- **Invarianten:** Nach dem Freeze gibt es keine Konfigurationsänderung ohne `ConfigOverridden` mit Grund, auch nicht über
+  die Wiederherstellung des Betreibers. Jeder
   gespeicherte Hash lässt sich aus dem gespeicherten Schnappschuss nachrechnen. Ein Entzug ist immer möglich. Kein Start
   ohne Freeze über den Befehlsweg.
 - **Fehlerfälle:** Ein Freeze auf veraltetem Stand (anderes Admin-Fenster) antwortet 412, wenn `If-Match` gesendet wird.
@@ -541,3 +560,8 @@ verlegt), Minor 14 (`overrideScopePermission`, `pseudonymiseForUnits`, benannte 
 Original), Minor 16 (wohlgeformte Zeichenketten, 422), Minor 17 (Aufbewahrungsklasse, `reason` ohne Personendaten),
 Minor 18 (Wiederholung prüft beide Rechte, Test 11), Minor 19 (ein `append`, Test 6), Minor 24 (weitere Testdateien mit
 `assignRole` benannt).
+
+**Nachprüfung (30.09.2026, zu `bccba04`):** eingearbeitet in 040d: N3 (R-MTG-09: kein Start, solange irgendein anderer
+Jahrgang läuft; Test 8, Missbrauchszeile), N4 (Wiederherstellung nach dem Freeze schreibt `ConfigOverridden`; §4,
+Invariante, Test 11b), N8 (Guard liest andere Jahrgänge aus dem globalen Store), N9 (Regel-id-Bereiche R-ADM-01..09,
+R-MTG-08/09; `startMeeting` nennt R-MTG-09).

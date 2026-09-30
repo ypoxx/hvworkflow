@@ -1,6 +1,6 @@
 # Scheibe 040b — Administration im Kern, Teil 2: Stammdaten und Bühnenplätze
 
-**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`; Teil 2 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 2 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
 **Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit; siehe „Vertragsschritt“); core; service; web-api (nur neue `HvApi`-Methoden in `http.ts` und die Einträge im Live-Puffer `liveStore.ts`); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-datenschutz; docs-plan (nur Glossarzeile)
 **Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend (Kern, Dienst, Web-Adapter, zweiter und folgende Commits). Review in frischem Kontext mit Perspektive Security/Admin und Vertrag (6.4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu R-ADM-01 (Konfiguration eines geschlossenen Jahrgangs unveränderlich; die Registerbeschreibung nennt schon Nummernkreise, Freeze und Override aus 040c/040d), R-ADM-02 (referenzierte Stammdaten bleiben). Angewandt: R-PERM-01, R-PERM-02, R-IDEM-01. Dazu AGENTS.md R2, R4, R5, R6, R7, R10, R12
@@ -78,7 +78,8 @@ Fachbereich und Bühnenfragen je Platz aus `Meeting.counts`.
      `listMeetingStageSeats(meetingId)`, `replaceMeetingStageSeats(meetingId, items, opts)`, gleichnamig mit den
      Vertragsoperationen. Sie wirken auf jeden Jahrgang, nicht nur auf den Alias: Der Kern führt den Schreibvorgang über
      eine auf `meetingId` eingegrenzte Instanz auf demselben Store aus, weil `append` sonst Ereignisse eines anderen
-     Jahrgangs abweist (`api.ts:601-609`). Der Demo-Adapter ist der Kern selbst (`apps/web/src/api/index.ts` bleibt
+     Jahrgangs abweist (`api.ts:601-609`). Die Instanz wird je `meetingId` einmal erzeugt und zwischengespeichert (jede
+     meldet sich mit `store.subscribe` an, `api.ts:314`); 040b baut diesen Zwischenspeicher, 040c und 040d nutzen ihn. Der Demo-Adapter ist der Kern selbst (`apps/web/src/api/index.ts` bleibt
      unverändert, wenn die Verdrahtung keine neue Methode braucht); `apps/web/src/api/http.ts` setzt sie über den Vertrag
      um (ADR 0002).
    - **Live-Puffer** (`apps/web/src/api/liveStore.ts`): `listMeetingStageSeats` kommt in `READ_TOPICS` (Thema `meeting`)
@@ -137,7 +138,7 @@ einem bestehenden Anfrageschema. Die Versionszeilen in `apps/api/src/__tests__/c
   - `listMeetingStageSeats` und `StageSeat`: `personId`/`deviceId` nur für Halter von `admin.seats.manage`.
   - Die drei `replace…`-Operationen: 422-Fälle, R-ADM-01, R-ADM-02; R-ADM-03 bleibt „ab 040d“.
   - `Meeting.counts.byUnit`/`bySeat`: jeder Fachbereich bzw. Platz als Schlüssel, Summe kann kleiner sein.
-  - `Problem.ruleId`: R-ADM-01 und R-ADM-02 mit Inhalt; „R-ADM-01..07 (slice 040)“.
+  - `Problem.ruleId`: R-ADM-01 und R-ADM-02 mit Inhalt; „R-ADM-01..09 und R-MTG-08/09 (slice 040)“.
 - **Allowlist:** die vier Einträge entfernen (`replaceMeetingAgendaItems`, `replaceMeetingUnits`,
   `listMeetingStageSeats`, `replaceMeetingStageSeats`). `createMeeting` und `freezeMeetingConfig` bleiben.
 - **CHANGELOG** `## [<Version>]` mit `### Added` (Anfragezeile, Ereignistypen, Nutzlasten) und `### Changed`
@@ -258,25 +259,26 @@ Kern (`master-data040b.test.ts`, Demo-Identität bzw. Rollenzuordnungen wie in `
    `stageQuestion` ändern sich die Werte um 1.
 8. **R-ADM-01:** Auf einem Jahrgang mit `MeetingClosed` (synthetisches Ereignis wie in `meeting025.test.ts`) antworten
    alle drei `replace…` mit 409 R-ADM-01, ohne Ereignis.
-9. **Rechte:** `replaceUnits` und `replaceStageSeats` als `moderation`, `coordination`, `expert`, `approver`, `podium`,
-   `observer` → 403 R-PERM-01; `replaceAgendaItems` als jede Rolle ohne `agenda.manage` → 403 R-PERM-01; als admin 200.
+9. **Rechte:** `replaceMeetingUnits` und `replaceMeetingStageSeats` als `moderation`, `coordination`, `expert`, `approver`, `podium`,
+   `observer` → 403 R-PERM-01; `replaceMeetingAgendaItems` als jede Rolle ohne `agenda.manage` → 403 R-PERM-01; als admin 200.
 10. **Seed:** `unit-ar` und die vier Standardplätze sind da; jede klassifizierte Frage mit `stageAssignment` hat dasselbe
     `seatId`.
 11. **Wiederholung:** Derselbe `Idempotency-Key` nach einer späteren zweiten Änderung liefert das Ergebnis der ersten
     (R-IDEM-01), je Operation einmal.
-15. **Anderer Jahrgang:** `replaceMeetingUnits` auf einem Jahrgang in `preparation`, während ein anderer läuft (Alias),
-    schreibt das Ereignis mit dessen `meetingId` und ändert den Alias nicht.
-16. **Surrogate:** `label: '\uD800'` (einzelnes Surrogat) in `replaceMeetingStageSeats` → 422, kein Ereignis; ebenso
+12. **Anderer Jahrgang:** `replaceMeetingUnits` auf einem Jahrgang in `preparation`, während ein anderer läuft (Alias),
+    schreibt das Ereignis mit dessen `meetingId` und ändert den Alias nicht. Nach drei Schreibvorgängen auf denselben
+    Jahrgang ist genau eine zusätzliche Anmeldung am Store entstanden (Zwischenspeicher, kein Leck).
+13. **Surrogate:** `label: '\uD800'` (einzelnes Surrogat) in `replaceMeetingStageSeats` → 422, kein Ereignis; ebenso
     `name` bei Fachbereichen und `title` bei TOPs.
-12. **Strom und Maskierung:** `StageSeatsReplaced` erscheint in `listEvents` (admin) ohne `personId` in
+14. **Strom und Maskierung:** `StageSeatsReplaced` erscheint in `listEvents` (admin) ohne `personId` in
     `payload.stageSeats`; ein Leser ohne `event.read` erhält nur ein `change` mit Thema `meeting`.
 
 Dienst (`apps/api/src/__tests__/master-data040b.test.ts`, über `req()`):
 
-13. `PUT /v1/meetings/{id}/agenda-items`, `…/units`, `…/stage-seats` und `GET …/stage-seats`: 200, `ETag` = neue
+15. `PUT /v1/meetings/{id}/agenda-items`, `…/units`, `…/stage-seats` und `GET …/stage-seats`: 200, `ETag` = neue
     Version, Antwort gültig gegen den Vertrag; 412 bei veraltetem `If-Match`; 422 bei `maxItems + 1`; 403 als `observer`
     mit `ruleId`; 404 für einen unbekannten Jahrgang.
-14. Vertrag: `Classification` hat genau `{track, agendaItemId, stageAssignment, seatId}`; `Event.type` enthält die drei
+16. Vertrag: `Classification` hat genau `{track, agendaItemId, stageAssignment, seatId}`; `Event.type` enthält die drei
     Typen; `EventRead` mit `payload.stageSeats[0].personId` ist ungültig; die Allowlist enthält die vier Einträge nicht
     mehr; das Abdeckungstor meldet sie als ausgeübt.
 
@@ -297,16 +299,17 @@ Dienst (`apps/api/src/__tests__/master-data040b.test.ts`, über `req()`):
 Sonst ändert sich die Wahrheitstabelle nicht (Diff im Bericht).
 
 **Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
-- Maskierung von `personId`/`deviceId` in `listStageSeats` entfernt → Test 5 rot.
+- Maskierung von `personId`/`deviceId` in `listMeetingStageSeats` entfernt → Test 5 rot.
 - Prüfung der aktiven Rollenzuordnung in R-ADM-02 entfernt → Test 3 rot.
 - `bySeat` zählt alle Fragen statt `isOnStage` → Test 7 rot.
 - Gleichheitsprüfung `seatId`/`stageAssignment` entfernt → Test 6 rot.
+- Eingegrenzte Instanz je Aufruf neu erzeugt → Test 12 rot.
 
 ## Akzeptanzkriterium
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` erzeugt den eingecheckten Stand; `check.mjs` meldet
    (a)–(d) `ok` mit der neuen Version und der um vier kleineren Zahl vorab erklärter Operationen.
-2. Tests 1–16 grün, die vier Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+2. Tests 1–16 grün, die fünf Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
 3. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040b-…`; der
    Schluss der Ausgabe steht einmal im Bericht.
 4. Kein Screenshot: Keine Ansicht ändert sich; die neuen i18n-Schlüssel erscheinen erst mit 041 bzw. in der Historie nur
@@ -364,8 +367,8 @@ Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage,
 
 1. Die beiden neuen Rechte hält nur admin (Tabellen-Diff).
 2. Die Rechte werden im Kern über `requirePermission`/`can()` geprüft, nie über einen Rollennamen.
-3. `personId`/`deviceId` fehlen in jeder Antwort an Nicht-Halter (Test 5) und `personId` in jedem `EventRead` (Test 12).
-4. Keine Anfrageerweiterung außer `Classification.seatId` (Test 14).
+3. `personId`/`deviceId` fehlen in jeder Antwort an Nicht-Halter (Test 5) und `personId` in jedem `EventRead` (Test 14).
+4. Keine Anfrageerweiterung außer `Classification.seatId` (Test 16).
 5. Vier Allowlist-Einträge entfernt, nicht mehr (Diff).
 
 ## Offene Eigentümerfragen
@@ -415,4 +418,8 @@ Touched:
 
 **Lesebefund der Spec (30.09.2026, zu `4fac838`):** eingearbeitet in 040b: Major 1 (`liveStore.ts`), Major 2
 (`stream035.test.ts` mit Ereignistypliste), Major 3 (`contract-043a.test.ts`), Major 6 (`meetingId` an jeder Methode,
-Test 12a), Minor 16 (Surrogate → 422, Test 12b), Nit 28 (Versionszeilen im Vertragsschritt).
+Test 12), Minor 16 (Surrogate → 422, Test 13), Nit 28 (Versionszeilen im Vertragsschritt).
+
+**Nachprüfung (30.09.2026, zu `bccba04`):** eingearbeitet in 040b: N8 (eingegrenzte Instanz je `meetingId`
+zwischengespeichert, Test 12 mit Mutationsprobe), N9 (Regel-id-Bereich R-ADM-01..09 und R-MTG-08/09 im Vertragsschritt,
+Tests neu durchnummeriert 1–16, Verweise angeglichen).

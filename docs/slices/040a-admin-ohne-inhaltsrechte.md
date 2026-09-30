@@ -1,6 +1,6 @@
 # Scheibe 040a — Administration im Kern, Teil 1: Administration ohne Inhaltsrechte
 
-**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838`: 13 major, 11 minor, 3 nit; Teil 1 von 4 der geteilten Scheibe 040, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
+**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 1 von 4 der geteilten Scheibe 040, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
 **Risikoklasse:** hoch · 1,25 AStd · Plan 040: 03.11.2026 (W6); 040a hat keinen Vertragsschritt und darf früher starten, wenn der Orchestrator es einplant (Eigentümerfrage 1) · Lanes: core; service (nur Tests); e2e (nur die genannten Testumbauten); web-stage (nur Verlegen einer reinen Funktion mit Test); docs-legal (nur Vermerk im Rechtekonzept); docs-sicherheit
 **Rolle:** implementierer-backend; Review in frischem Kontext mit Perspektive Security/Admin (Rechte, Wahrheitstabelle) und Legal (Rechtekonzept §4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu R-ADM-07 (keine Selbstzuordnung einer Rolle), R-ADM-08 (die letzte aktive Verwaltungsrolle eines nicht geschlossenen Jahrgangs ist nicht entziehbar). Angewandt: R-PERM-01, R-PERM-02, R-GUARD-06. Dazu AGENTS.md R2, R3, R4, R12
@@ -28,12 +28,12 @@ Jede Spec ist vollständig; diese hier trägt zusätzlich Zuschnitt, gemeinsame 
 
 | Teil | Thema | Inhalt | Vertragsschritt | Klasse · AStd |
 |---|---|---|---|---|
-| **040a** (diese Spec) | Administration ohne Inhaltsrechte | `ROLE_PERMISSIONS.admin` wird eine ausdrückliche Liste: Lesen, Weiterleiten (`question.assign`, `question.return`, `question.withdraw`), Verwaltung; ohne Schreibrechte auf Inhalte; keine Selbstzuordnung (R-ADM-07); letzte Verwaltungsrolle nicht entziehbar (R-ADM-08); neuer Wahrheitstabellen-Abschnitt; Testumbauten | keiner (R-ADM-07/08 nutzen das schon dokumentierte 409 an `assignRole`/`revokeRole`) | hoch · 1,25 |
+| **040a** (diese Spec) | Administration ohne Inhaltsrechte | `ROLE_PERMISSIONS.admin` wird eine ausdrückliche Liste: Lesen, Weiterleiten (`question.assign`, `question.return`), Verwaltung; ohne Schreibrechte auf Inhalte; keine Selbstzuordnung (R-ADM-07); letzte Verwaltungsrolle nicht entziehbar (R-ADM-08); neuer Wahrheitstabellen-Abschnitt; Testumbauten | keiner (R-ADM-07/08 nutzen das schon dokumentierte 409 an `assignRole`/`revokeRole`) | hoch · 1,25 |
 | **040b** | Stammdaten und Bühnenplätze | `replaceMeetingAgendaItems`, `replaceMeetingUnits`, `listMeetingStageSeats`, `replaceMeetingStageSeats`; `Classification.seatId` und `Question.seatId`; `counts.byUnit`/`bySeat`; Einheit „AR-Büro“ und vier Standardplätze im Seed; R-ADM-01, R-ADM-02 | ja (Architekt, erster Commit) | hoch · 1,5 |
-| **040c** | Jahrgang, Erstinbetriebnahme, Nummernkreise | `createMeeting` mit Klonen, Erstellerzuordnung und globalem Wiederholungsschlüssel; Betreiber-Bootstrap und auditierter Wiederherstellungsweg (Kommandozeile); Nummernkreise je Erfassungsplatz mit Aussparen bei der Fragenummer; R-ADM-05 | ja | hoch · 1,75 |
-| **040d** | Konfigurationsfreeze, Override, Start | `freezeMeetingConfig` mit Hash (RFC 8785), `overrideMeetingConfig` mit Pflichtgrund, `startMeeting`; Rollenzuordnung nach dem Freeze nur per Override; Vertretungsregel; R-ADM-03, R-ADM-04, R-ADM-06, R-MTG-08, R-MTG-09 | ja | hoch · 1,75 |
+| **040c** | Jahrgang, Erstinbetriebnahme, Nummernkreise | `createMeeting` mit Klonen, Erstellerzuordnung und globalem Wiederholungsschlüssel; Betreiber-Bootstrap und auditierter Wiederherstellungsweg (Kommandozeile); Nummernkreise je Erfassungsplatz mit Aussparen bei der Fragenummer; R-ADM-05, R-ADM-09 | ja | hoch · 2 |
+| **040d** | Konfigurationsfreeze, Override, Start | `freezeMeetingConfig` mit Hash (RFC 8785), `overrideMeetingConfig` mit Pflichtgrund, `startMeeting`; Rollenzuordnung nach dem Freeze nur per Override; Vertretungsregel; R-ADM-03, R-ADM-04, R-ADM-06, R-MTG-08, R-MTG-09 | ja | hoch · 2 |
 
-Summe rund 6,25 AStd statt 2,5. Die Planschätzung enthielt weder den Bootstrap aus 029b noch den Wiederherstellungsweg,
+Summe rund 6,75 AStd statt 2,5. Die Planschätzung enthielt weder den Bootstrap aus 029b noch den Wiederherstellungsweg,
 das Umstellen der Testakteure, die heute admin als Allzweck-Schreiber nutzen (Befund), noch Vertragsschritt,
 Web-Adapter, Live-Puffer und i18n-Schlüssel je Teil. Zuschnitt und Budget brauchen das Go des Eigentümers
 (Eigentümerfrage 1).
@@ -89,25 +89,26 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
    `admin.roles.manage` hält.
 2. **Stammdaten sind Ereignisse** mit ganzer Liste je Änderung (`AgendaItemsReplaced`, `UnitsReplaced`,
    `StageSeatsReplaced`, `CaptureRangesReplaced`). Jedes erhöht `Meeting.version` (das ETag von `getMeetingById`).
-3. **Regel-ids.** Frei und geprüft am 30.09.2026 (Suche über `packages/`, `apps/`, `docs/`): R-ADM-01..08 (im Code
+3. **Regel-ids.** Frei und geprüft am 30.09.2026 (Suche über `packages/`, `apps/`, `docs/`): R-ADM-01..09 (im Code
    unbelegt; im Vertrag nur als Beschreibung „R-ADM-01..04 (slice 040)“, R-ADM-03 dort schon als „Stammdatenänderung
    nach Freeze“), R-MTG-08 und R-MTG-09 (R-MTG-07 ist für 087 reserviert). Der Plan nennt R-ADM-01..04; die Nummern 05
-   bis 08 sind die nächsten freien, weil Zuschnitt und Lesebefund vier eigenständige Regeln mehr zeigen. Kein neuer
+   bis 09 sind die nächsten freien, weil Zuschnitt, Lesebefund und Nachprüfung fünf eigenständige Regeln mehr zeigen. Kein neuer
    R-GUARD: die nächste freie Nummer wäre R-GUARD-12 (R-GUARD-08/-09 sind für 044 belegt, R-GUARD-10 für 059, R-GUARD-11
    für 043a/044).
 
    | Regel | Teil | Inhalt |
    |---|---|---|
    | R-ADM-07 | 040a | Keine Selbstzuordnung einer Rolle (409) |
-   | R-ADM-08 | 040a | Die letzte aktive Zuordnung einer Verwaltungsrolle in einem Jahrgang in `preparation` oder `running` ist nicht entziehbar (409) |
+   | R-ADM-08 | 040a | Die letzte tragfähige Zuordnung einer Verwaltungsrolle (ohne Ablauf oder Ablauf ≥ 24 h) in einem Jahrgang in `preparation` oder `running` ist nicht entziehbar (409) |
    | R-ADM-01 | 040b | Die Konfiguration eines geschlossenen Jahrgangs ist unveränderlich (409): Stammdaten ab 040b, Nummernkreise ab 040c, Freeze und Override ab 040d; die Beschreibung im Regelregister nennt von Anfang an alle drei |
    | R-ADM-02 | 040b | Stammdaten, auf die etwas zeigt, bleiben (Entfernen eines referenzierten TOP, Fachbereichs oder Bühnenplatzes → 409) |
    | R-ADM-05 | 040c | Die Nummernkreis-Zugehörigkeit einer vergebenen Fragenummer ändert sich nie (409) |
+   | R-ADM-09 | 040c | Ein Notzugang aus der Wiederherstellung legt keinen Jahrgang an (409) |
    | R-ADM-03 | 040d | Nach dem Freeze ändert nur der Override die Konfiguration; der normale Weg antwortet 409 |
    | R-ADM-04 | 040d | Freeze genau einmal; Override nur bei eingefrorener Konfiguration und mit nicht leerem Grund (409) |
    | R-ADM-06 | 040d | Vertretung: Ziel hält die Rolle aktiv, keine Selbstvertretung (409); Obergrenze nach Eigentümerfrage 5 |
    | R-MTG-08 | 040d | Ein Jahrgang startet nur mit eingefrorener Konfiguration (409) |
-   | R-MTG-09 | 040d | Ein Jahrgang startet nicht, solange ein anderer Jahrgang desselben Rechtsträgers läuft (409) |
+   | R-MTG-09 | 040d | Ein Jahrgang startet nicht, solange irgendein anderer Jahrgang läuft (409; der Alias folgt dem jüngsten laufenden Jahrgang, ADR 0011 kennt eine Gesellschaft) |
 
 4. **Oberfläche kommt mit 041.** 040b bis 040d ändern keine Ansicht. Sie ergänzen nur, was erschöpfende Zuordnungen im
    Web erzwingen: `ACTION_KEYS`, `EVENT_KEYS` (`apps/web/src/i18n/labels.ts`), den `switch` in `eventSummary.ts`, jeweils
@@ -118,7 +119,10 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
    Jahrgang der Alias ist. Weil `append` Ereignisse eines anderen als des Alias-Jahrgangs abweist
    (`packages/domain/src/api.ts:601-609`), führt der Kern jeden solchen Schreibvorgang über eine je Jahrgang
    eingegrenzte Instanz auf demselben Store aus (dieselbe Konstruktion wie `meetingDomain` in `apps/api/src/app.ts:407`,
-   nur im Kern). Der Demo-Adapter (`apps/web/src/api/index.ts`, unveränderte Verdrahtung) und `apps/web/src/api/http.ts`
+   nur im Kern). Die Instanz wird je `meetingId` **einmal** erzeugt und zwischengespeichert, nicht je Aufruf: Jede
+   Instanz meldet sich mit `store.subscribe` an (`api.ts:314`), neue Instanzen je Aufruf wären ein Leck. Ein Test zählt die
+   Anmeldungen nach mehreren Aufrufen. Prüfungen, die andere Jahrgänge brauchen (R-MTG-09, `createMeeting`-Wiederholung,
+   Erstellerzuordnung), lesen den globalen Store, nie die eingegrenzte Projektion. Der Demo-Adapter (`apps/web/src/api/index.ts`, unveränderte Verdrahtung) und `apps/web/src/api/http.ts`
    setzen dieselbe Signatur um.
 
 ## Befund (Ist-Stand, gelesen auf `a3ba94b`)
@@ -167,25 +171,28 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
 ## Ziel
 
 admin verwaltet Rechte und Stammdaten, liest und leitet Vorgänge weiter; admin schreibt keine Inhalte und führt keinen
-fachlichen Arbeitsschritt aus. Das entspricht Rechtekonzept §4 wörtlich: Inhaltsbearbeitung nein, „eine Frage überall
-hinschicken“ ja, mit sichtbarem Audit. Das ist keine Eigentümerentscheidung mehr, sondern Umsetzung des Rechtekonzepts,
-des Kopfvermerks 025 und von T-G1-E-04/BF-09.
+fachlichen Arbeitsschritt aus. Das setzt Rechtekonzept §4 **teilweise** um: Inhaltsbearbeitung nein, „eine Frage überall
+hinschicken“ ja; die von §4 verlangte Hervorhebung des Auditeintrags ist offen (Eigentümerfrage 2b). Das Streichen der
+Inhaltsrechte ist keine Eigentümerentscheidung mehr, sondern Umsetzung des Rechtekonzepts, des Kopfvermerks 025 und von
+T-G1-E-04/BF-09. Das Zurückziehen einer Frage (`question.withdraw`) ist kein Weiterleiten: Es nimmt die Frage eines
+Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin (Eigentümerfrage 2c).
 
 1. **Liste.** `ROLE_PERMISSIONS.admin`:
 
    ```
    speaker.read, contribution.read, question.read, question.read.delivered, stage.read, history.read, event.read,
-   question.assign, question.return, question.withdraw,
+   question.assign, question.return,
    agenda.manage, admin.roles.manage, demo.seed
    ```
 
-   - **Weiterleiten bleibt:** `question.assign` (an einen Fachbereich), `question.return` (zurück in die Bearbeitung),
-     `question.withdraw` (herausnehmen). Jeder dieser Schritte ist ein Ereignis mit `actor.role`, das in der
+   - **Weiterleiten bleibt:** `question.assign` (an einen Fachbereich) und `question.return` (zurück in die Bearbeitung).
+     Jeder dieser Schritte ist ein Ereignis mit `actor.role`, das in der
      Vorgangshistorie jeder Frage für alle Halter von `history.read` sichtbar ist (`EventRead.actor.role`). Einen
      eigenen „herausgehobenen“ Auditeintrag oder eine Kennzeichnung baut 040a nicht (Eigentümerfrage 2b).
-   - **Entfällt (14 Rechte):** `speaker.register`, `speaker.reorder`, `speaker.update`, `contribution.capture`,
+   - **Entfällt (15 Rechte):** `speaker.register`, `speaker.reorder`, `speaker.update`, `contribution.capture`,
      `question.capture`, `question.classify`, `answer.draft`, `question.submit_review`, `question.approve`,
-     `question.legal.clear`, `question.stage`, `question.deliver`, `question.close`, `question.merge`.
+     `question.legal.clear`, `question.stage`, `question.deliver`, `question.close`, `question.withdraw`,
+     `question.merge`. Die Rückkehr von `question.withdraw` wäre eine Zeile (Eigentümerfrage 2c).
    - Lesen bleibt unverändert (Eigentümerfrage 2a). `agenda.manage` bleibt (Ablaufsteuerung, einziger Halter;
      Eigentümerfrage 3). `demo.seed` bleibt (nur Demo; 042 begrenzt es).
    - Die Rechte aus 040b bis 040d fügen die Teile selbst hinzu.
@@ -193,30 +200,46 @@ des Kopfvermerks 025 und von T-G1-E-04/BF-09.
    für jede Rolle, auch in der Demo. Nicht betroffen: die Erstellerzuordnung aus 040c (kein `assignRole`; sie überträgt
    nur die eigene Rolle) und der Bootstrap (Akteur `system`, anderes Subject).
 3. **R-ADM-08, kein Aussperren.** `revokeRole` einer Zuordnung, deren Rolle `admin.roles.manage` hält, antwortet 409
-   R-ADM-08, wenn sie im Jahrgang (Status `preparation` oder `running`) die letzte aktive solche Zuordnung ist (nicht
-   entzogen, nicht abgelaufen). Die Verwaltungsrolle wird aus den Daten abgeleitet (Gemeinsame Entscheidung 1).
+   R-ADM-08, wenn sie im Jahrgang (Status `preparation` oder `running`) die letzte **tragfähige** solche Zuordnung ist.
+   Tragfähig ist eine Zuordnung, die nicht entzogen ist und entweder keinen Ablauf hat oder frühestens 24 Stunden nach
+   `now` abläuft. Eine Zuordnung, die bald abläuft, zählt also nicht als Rückhalt; so verhindert die Regel auch, dass die
+   letzte dauerhafte Verwaltungsrolle zugunsten einer auslaufenden entzogen wird. Die Verwaltungsrolle wird aus den Daten abgeleitet (Gemeinsame Entscheidung 1).
    - **Grenze, benannt:** Ablauf (`expiresAt`) und Jahrgangsschluss beenden Zuordnungen ohne `revokeRole`; R-ADM-08
-     verhindert das nicht. Deshalb gilt die Betriebsregel „den nächsten Jahrgang anlegen, bevor der laufende schließt“
+     verhindert das nicht, die 24-Stunden-Spanne verschiebt es nur. Deshalb gilt die Betriebsregel „den nächsten Jahrgang anlegen, bevor der laufende schließt“
      (die Erstellerzuordnung aus 040c trägt die Verwaltung hinüber) und „die Verwaltungsrolle ohne Ablauf oder mit
      Vertretung vergeben“. Beide stehen in `docs/betrieb/erstinbetriebnahme.md` (040c) und im Runbook (070).
    - **Wiederherstellung:** Der einzige Weg zurück ist der auditierte Betreiberweg aus 040c (Kommandozeile, nur mit
-     Datenbankzugang, nur für einen Jahrgang ohne aktive Verwaltungsrolle, befristete Zuordnung mit Akteur `system` und
-     Betreiberkennung). Einen Weg über HTTP gibt es nicht.
+     Datenbankzugang, nur für einen Jahrgang ohne nutzbare Verwaltungsrolle: keine aktive, oder jede aktive gehört einem
+     gesperrten Subject aus 029b; befristete Zuordnung mit Akteur `system` und Betreiberkennung). Einen Weg über HTTP gibt
+     es nicht.
 4. **Testumbauten, die mehr als einen Akteurwechsel brauchen** (die Schutzwirkung jedes Tests bleibt; eine Abschwächung
    nennt der Bericht mit Datei und Testname):
-   - **090 R1** (sieben Tests, `090-eingaben-je-akteur.spec.ts:371-480`): Ziel des Wechsels wird eine Rolle, die dasselbe
-     Feld sieht bzw. dasselbe Recht hält:
-     - Antwortentwurf (Zeile 415): Wechsel zu `legal` (`answer.draft`).
-     - Zusammenführen (Zeile 462): Wechsel zu `moderation` (`question.merge`).
-     - Rückgabe (Zeilen 428, 478): admin behält `question.return`; der Test bleibt, wie er ist, sonst Wechsel zu
-       `approver`.
-     - Redebeitrag und freie Einzelfrage (Zeilen 371, 394): Sieht admin die Erfassung weiter (Lesen), bleibt der Test;
-       sonst Wechsel zu `moderation` ohne Rückwechsel (der Rückwechsel ist schon der Nachbartest).
-     - Wortmeldung registrieren (Zeile 444): Nur `moderation` hält `speaker.register`. Wechsel zu einer zweiten Person
-       derselben Rolle über den synchronen Akteurwechsel, wie ihn `unrelatedEvent` in `010c-lesezustand.spec.ts` nutzt.
-       Vor dem Bau prüfen, ob das Leeren an der Person (Akteur-id) hängt, nicht an der Rolle (Punkt 5).
-   - **Runde 4 (A)** (`010b-lesepfade.spec.ts:743-780`): `podium` liefert aus; die fremde Schreibaktion nebenher löst
-     eine andere Person über denselben synchronen Akteurwechsel aus (`moderation` registriert eine Wortmeldung).
+   - **090 R1** (sieben Tests, `090-eingaben-je-akteur.spec.ts:371-480`). Jeder Test muss nach dem Wechsel das Feld
+     **sichtbar und leer** sehen; ein fehlendes Feld zählt nicht (genau die schwache Form, die R1 ausgeschlossen hat).
+     `expectCleared` wird dafür nicht gelockert.
+     - Redebeitrag und freie Einzelfrage (Zeilen 371, 394): Die Felder erscheinen nur mit `question.capture`
+       (`ContributionPane.tsx:137, 210`; `capture/Page.tsx:192`), das nach 040a nur `capture` hält. Der Wechsel geht
+       **dauerhaft** (`setActor`, nicht nur für einen Tick) zu einer zweiten, synthetischen Person derselben Rolle,
+       `{ id: 'u-cap-2', role: 'capture', displayName: 'Erfassung 2' }`; danach ist das Feld sichtbar und leer. Kein
+       Rückfall auf `moderation` (sie sieht das Feld nicht).
+     - Wortmeldung registrieren (Zeile 444): ebenso dauerhaft zu `{ id: 'u-mod-2', role: 'moderation', displayName:
+       'Versammlungsbüro 2' }`; der Dialog ist neu geöffnet sichtbar und leer.
+     - Antwortentwurf (Zeile 415): Wechsel zu `legal` (hält `answer.draft` und sieht das Formular); Feld sichtbar und leer.
+     - Zusammenführen (Zeile 462): Wechsel zu `moderation` (`question.merge`), wenn der Dialog dort erscheint; sonst
+       dauerhaft zu `u-cap-2`. Dialog sichtbar und leer.
+     - Rückgabe (Zeilen 428, 478): admin behält `question.return`; die Tests bleiben unverändert.
+     - `setActor` (`apps/web/src/api/actor.ts:42-51`) nimmt jedes `Actor`-Objekt, nicht nur Einträge aus
+       `DEMO_ACTORS`; im Demo-Betrieb prüft der Kern eine nicht zuordnungsgebundene Identität nicht gegen eine Liste.
+       Gespeichert wird nur die Rolle; nach einem Neuladen steht wieder die Demo-Person dieser Rolle da. Die Tests laden
+       nicht neu, also ist keine Änderung am Code nötig. Vor dem Bau prüfen (Punkt 5): Das Leeren hängt an der Person
+       (`actorKey` in `liveStore.ts:134` enthält die id); zeigt der Probelauf etwas anderes, ist die kleinste Änderung ein
+       Eintrag `u-cap-2`/`u-mod-2` in `DEMO_ACTORS` (Lane web-api, dann Scope-Befund mit Nachtrag der Spec).
+   - **`unrelatedEvent`** (`010c-lesezustand.spec.ts:311`) schreibt heute als admin eine Wortmeldung. Nach 040a schreibt
+     es als synthetische `{ id: 'u-mod-2', role: 'moderation' }` (synchroner Wechsel bleibt, weil es nur um einen
+     fremden Schreibvorgang geht, nicht um eine Anzeige); die Aufrufe in Zeilen 914 und 923 bleiben unverändert und
+     erben die Umstellung.
+   - **Runde 4 (A)** (`010b-lesepfade.spec.ts:743-780`): `podium` liefert aus; den fremden Schreibvorgang nebenher löst
+     dieselbe synthetische `u-mod-2` aus.
    - **020 m2** (`020-rueckbau-passung.spec.ts:547-561`): Kein Demo-Akteur hält nach 040a `question.deliver` zusammen mit
      Arbeitsaktionen. Die reine Funktion `stageOnlyByRights` (`apps/web/src/features/stage/Page.tsx:84`) zieht
      unverändert nach `apps/web/src/features/stage/lib.ts` um; `lib.test.ts` prüft sie mit künstlichen Aktionslisten
@@ -225,16 +248,16 @@ des Kopfvermerks 025 und von T-G1-E-04/BF-09.
 
 ## Wahrheitstabellen-Diff (vor dem Bau, Leitplanken §4)
 
-**Role × Status × Action** (`policy-truth-table.md`, Abschnitt 1): In den 22 admin-Zeilen werden **47 ✓** zu `·`, in den
+**Role × Status × Action** (`policy-truth-table.md`, Abschnitt 1): In den 22 admin-Zeilen werden **63 ✓** zu `·`, in den
 Spalten q.capture (22), q.classify (4), answer.draft (5), q.submit_review (1), q.approve (1), q.legal.clear (2),
-q.deliver (2), q.close (2), q.merge (8). Unverändert bleiben q.assign (2), q.return (8), q.withdraw (16), q.read (✓ in
+q.deliver (2), q.close (2), q.withdraw (16), q.merge (8). Unverändert bleiben q.assign (2), q.return (8), q.read (✓ in
 allen Zeilen) und q.read.delivered (✓ nur in delivered und closed); q.claim und q.stage waren schon leer. Beispiel:
 
 ```
 - | admin | in_review | ✓ | · | · | · | ✓ | · | ✓ | ✓ | ✓ | · | · | · | ✓ | · | ✓ | · |
-+ | admin | in_review | · | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
++ | admin | in_review | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
 - | admin | delivered | ✓ | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
-+ | admin | delivered | · | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | ✓ |
++ | admin | delivered | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | ✓ |
 ```
 
 Keine Zeile einer anderen Rolle ändert sich. **Role × Leserecht**, **Role × Agenda** und **Role × Identität und
@@ -298,7 +321,7 @@ Oberfläche (nur Verlegen ohne Verhaltensänderung):
 Nachweis und Dokumente:
 
 - `docs/evidence/040a-admin-ohne-schreibaktionen.png` (neu)
-- `docs/rollen-und-rechtekonzept.md` (nur ein Kopfvermerk „Scheibe 040a“ wie bei 025, 026, 028)
+- `docs/rollen-und-rechtekonzept.md` (nur ein Kopfvermerk „Scheibe 040a“ wie bei 025, 026, 028; er nennt: Inhaltsrechte entfallen, Weiterleiten bleibt, die Hervorhebung nach §4 ist offen (Eigentümerfrage 2b), Zurückziehen entfällt (2c))
 - `docs/sicherheit/bedrohungsmodell.md` (nur T-G1-E-04, BF-09, MF-01, der Nachweis von MF-07 und die Zeile 040 der Zuordnungstabelle)
 - `docs/folgeliste.md`
 - `docs/slices/040a-admin-ohne-inhaltsrechte.md`
@@ -331,25 +354,28 @@ steht bewusst außerhalb von „Files allowed“.
 
 `packages/domain/src/__tests__/admin040a.test.ts`:
 
-1. **Genaue Liste.** Die Menge `ROLE_PERMISSIONS.admin` ist genau die 13 Rechte aus „Ziel“.
+1. **Genaue Liste.** Die Menge `ROLE_PERMISSIONS.admin` ist genau die 12 Rechte aus „Ziel“.
 2. **Deny by default.** Für jedes Recht in `PERMISSIONS`, das nicht in der Liste steht, liefert
    `hasPermission({role: admin}, p)` `allow: false` mit R-PERM-01 bzw. R-PERM-02 (nach `READ_PERMISSION_LIST`).
 3. **Schreiben als admin, Domäne.** Auf dem Seed antworten als admin mit 403 und `ruleId` R-PERM-01, und `store.lastSeq()`
    bleibt gleich: `registerSpeaker`, `reorderSpeakers`, `updateSpeaker`, `captureContribution`,
    `captureMeetingContribution`, `captureQuestions`, `classifyQuestion`, `draftAnswer`, `submitForReview`,
-   `approveQuestion`, `clearQuestionLegally`, `stageQuestion`, `deliverQuestion`, `closeQuestion`, `mergeQuestion`. Je
+   `approveQuestion`, `clearQuestionLegally`, `stageQuestion`, `deliverQuestion`, `closeQuestion`, `withdrawQuestion`,
+   `mergeQuestion`. Je
    Aufruf eine Frage im passenden Status und eine gültige Eingabe, damit das Recht antwortet, nicht Tabelle oder Validierung.
-4. **Weiterleiten als admin.** `assignQuestion`, `returnQuestion` und `withdrawQuestion` gelingen; das Ereignis trägt
+4. **Weiterleiten als admin.** `assignQuestion` und `returnQuestion` gelingen; das Ereignis trägt
    `actor.role` admin und erscheint in `getQuestionHistory` für einen Halter von `history.read` (etwa `coordination`).
 5. **`_actions`.** Für jede Frage des Seeds enthält `actionsFor(admin, q)` höchstens `question.assign`,
-   `question.return`, `question.withdraw`, `question.read`, `question.read.delivered`.
+   `question.return`, `question.read`, `question.read.delivered`.
 6. **Lesen und Verwaltung bleiben.** Als admin: `listSpeakers`, `listContributions`, `listQuestions`,
    `getQuestionHistory`, `getStage`, `listEvents`; `openAgendaItem` auf einem laufenden Jahrgang, `assignRole` für ein
    anderes Subject, `revokeRole` einer nicht letzten Zuordnung, `seedDemo`.
 7. **R-ADM-07.** `assignRole` mit dem eigenen Subject → 409 R-ADM-07, kein Ereignis; für jede Rolle mit
    `admin.roles.manage` und als Demo-Identität.
-8. **R-ADM-08.** Zwei aktive Zuordnungen mit Verwaltungsrolle: die erste zu entziehen gelingt, die zweite → 409 R-ADM-08,
-   kein Ereignis. Eine abgelaufene Zuordnung zählt nicht als aktiv. In einem geschlossenen Jahrgang greift die Regel nicht.
+8. **R-ADM-08.** Zwei tragfähige Zuordnungen mit Verwaltungsrolle: die erste zu entziehen gelingt, die zweite → 409
+   R-ADM-08, kein Ereignis. Eine abgelaufene Zuordnung und eine, die in weniger als 24 Stunden abläuft, zählen nicht als
+   Rückhalt: Neben einer solchen ist die dauerhafte Zuordnung die letzte tragfähige → 409. In einem geschlossenen Jahrgang
+   greift die Regel nicht.
 9. **Vier Augen unverändert.** `legal` entwirft und gibt dieselbe Version rechtlich frei → 409 R-GUARD-06; die Probe in
    `transitions.test.ts:97` bleibt.
 
@@ -368,17 +394,18 @@ steht bewusst außerhalb von „Files allowed“.
 - `answer.draft` in die Liste von admin → Test 1, Test 3, Tabellen-Snapshot rot.
 - `question.return` aus der Liste entfernt → Test 1 und Test 4 rot.
 - Prüfung R-ADM-07 entfernt → Test 7 und Test 10 rot.
-- R-ADM-08 zählt abgelaufene Zuordnungen mit → Test 8 rot.
+- R-ADM-08 zählt abgelaufene oder bald ablaufende Zuordnungen mit → Test 8 rot.
+- `question.withdraw` wieder in der Liste → Test 1, Test 3, Tabellen-Snapshot rot.
 
 ## Akzeptanzkriterium
 
-1. Die Tests 1–11 sind grün, die fünf Mutationsproben rot belegt.
-2. `git diff -- packages/domain/policy-truth-table.md` zeigt genau den Diff aus „Wahrheitstabellen-Diff“: 47 ✓ → `·` in
+1. Die Tests 1–11 sind grün, die sechs Mutationsproben rot belegt.
+2. `git diff -- packages/domain/policy-truth-table.md` zeigt genau den Diff aus „Wahrheitstabellen-Diff“: 63 ✓ → `·` in
    admin-Zeilen und den neuen Abschnitt; sonst nichts.
 3. `pnpm --filter @hv/web e2e` (Projekt in-process) ist grün; das Projekt http läuft in der PR-CI grün. Die Liste der
    umgebauten e2e-Tests steht im Bericht, jede Abschwächung benannt.
 4. Screenshot `docs/evidence/040a-admin-ohne-schreibaktionen.png`: Demo als Administration auf der Beantwortung mit einer
-   Frage in Prüfung; sichtbar sind höchstens Rückgabe und Zurückziehen, keine Freigabe- oder Entwurfsaktion.
+   Frage in Prüfung; sichtbar ist höchstens die Rückgabe, keine Freigabe-, Entwurfs- oder Zurückziehen-Aktion.
 5. `pnpm gates` (mit Postgres-Variablen wie in CI) ist grün, einschließlich `slice-scope` auf `claude/slice-040a-…`. Der
    Schluss der Ausgabe steht einmal im Bericht.
 
@@ -403,14 +430,14 @@ Ausgelöst:
 - [x] Oberfläche (nur sichtbar weniger Aktionen für die Administration; eine reine Funktion zieht um)
 
 Perspektive: Security/Admin (6.5, 6.8), Legal (Rechtekonzept §4) · Nachweise: Tests 1–11, Mutationsproben,
-Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a, 2b; E25 unberührt
+Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a, 2b, 2c; E25 unberührt
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
 
 - **Bedrohungen:**
   - **T-G1-E-04** (Administration als Inhaltskonto): Der Inhaltsteil ist geschlossen. admin kann weder erfassen noch
-    entwerfen, freigeben, auf die Bühne stellen oder vorlesen. Das Weiterleiten bleibt nach Rechtekonzept §4 und ist in
-    der Historie mit Rolle sichtbar. Über die Rollenzuordnung ist der Weg durch R-ADM-07 für eine einzelne Person
+    entwerfen, freigeben, auf die Bühne stellen oder vorlesen. Das Weiterleiten (Zuweisen, Zurückgeben) bleibt nach Rechtekonzept §4
+    und ist in der Historie mit Rolle sichtbar; die Hervorhebung ist offen (2b). Über die Rollenzuordnung ist der Weg durch R-ADM-07 für eine einzelne Person
     geschlossen; zwei zusammenwirkende Verwaltungskonten bleiben ein Restrisiko (MF-01).
   - **MF-01** (Rechteerhöhung über die Rollenzuordnung): Eine Person kann sich keine Rolle mehr selbst geben und sich
     damit auch nicht über „`approver` zuordnen, eigene admin-Zuordnung entziehen, freigeben“ (`actor.ts:112-114`) zur
@@ -428,7 +455,7 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
   | Neues Recht fällt still an admin (Ableitung) | ausdrückliche Liste | Test 1 mit Mutationsprobe; Tabellen-Snapshot |
   | admin ordnet sich `approver` zu, entzieht die eigene admin-Zuordnung und gibt frei | R-ADM-07 | Test 7, Test 10; verweigerter Versuch mit R-ADM-07 im Zugriffslog |
   | zwei admins geben einander `approver` | vor dem Freeze nicht verhindert; nach dem Freeze Override mit Grund (040d) | Ereignis `RoleAssigned` in `listEvents`; Alarmvorschlag an 085 „Zuordnung eines Freigabe- oder Rechtsrechts“ |
-  | admin leitet eine Frage an einen fremden Fachbereich oder zieht sie zurück, um sie der Beantwortung zu entziehen | erlaubt (§4); Rückgabe und Zurückziehen verlangen einen Grund (bestehende Regeln) | Ereignis mit `actor.role` admin und Grund in der Historie der Frage; Eigentümerfrage 2b |
+  | admin leitet eine Frage an einen fremden Fachbereich oder gibt sie immer wieder zurück, um die Beantwortung zu verzögern | erlaubt (§4); die Rückgabe verlangt einen Grund (bestehende Regel); Zurückziehen hält admin nicht mehr (2c) | Ereignis mit `actor.role` admin und Grund in der Historie der Frage; Eigentümerfrage 2b |
   | admin entzieht die letzte Verwaltungsrolle und sperrt den Jahrgang | R-ADM-08 | Test 8 |
   | admin liefert als Podium „vorgelesen“ | kein `question.deliver` | Test 3 und Test 10 |
 
@@ -456,17 +483,22 @@ Keine blockiert die Specs. Frage 1 braucht vor dem ersten Bau ein ausdrückliche
 gebaut, mit den genannten Kosten einer späteren Änderung.
 
 1. **Zuschnitt, Budget, Reihenfolge, Plananpassungen (Go nötig).** Standard: vier Teile a → b → c → d, rund 6,25 AStd
-   statt 2,5 (a 1,25, b 1,5, c 1,75, d 1,75), alle hoch. Mit Go ändert der Orchestrator den Plan-Eintrag 040
+   statt 2,5 (a 1,25, b 1,5, c 2, d 2), alle hoch. Mit Go ändert der Orchestrator den Plan-Eintrag 040
    (Teilungsvermerk, Lanes: contract für b bis d, falls 043a-Frage 5 freigegeben ist; web-api für b bis d, weil `HvApi`
    wächst und `http.ts` und `liveStore.ts` es umsetzen; web-shell und web-history für die erzwungenen i18n-Schlüssel;
    web-stage für 040a; manifests für ein Skript in 040c; docs-legal, docs-sicherheit, docs-datenschutz, docs-betrieb)
    und rechnet den Kalender neu (041 rückt um etwa einen bis zwei Bautage). 040a darf vor dem 03.11. laufen. Ohne Go wird
    040 in dieser Form nicht gebaut, und der Architekt legt einen neuen Zuschnitt vor.
 2. **Umfang der Administration (Rechtekonzept §4).** Entschieden und nicht Gegenstand der Frage: admin schreibt keine
-   Inhalte und behält das Weiterleiten (`question.assign`, `question.return`, `question.withdraw`). Offen sind nur:
+   Inhalte und behält das Weiterleiten (`question.assign`, `question.return`). Offen sind nur:
    - **2a. Lesen einschränken?** Standard: admin liest weiter alles, was es heute liest. Alternative: admin verliert das
      Lesen von Inhalten (Need-to-know); nur `event.read` für das Audit bleibt. Rund 0,5 AStd (Tabellenzeilen, Tests, die
      als admin lesen). Wer entscheidet: Eigentümer mit Projektleitung; DSB sieht es mit (E14).
+   - **2c. Zurückziehen durch admin?** `question.withdraw` nimmt eine Aktionärsfrage aus der Beantwortung, auch nach dem
+     Vorlesen (`delivered`); das ist eine fachliche Entscheidung, kein Weiterleiten. Standard: admin verliert
+     `question.withdraw`. Alternativen: (a) zurück wie heute, eine Tabellenzeile, < 0,25 AStd; (b) Zurückziehen nur vor
+     dem Vorlesen, als statusgebundenes Recht wie `READ_SCOPES`, rund 0,5 AStd mit Tabellen-Diff. Wer entscheidet:
+     Eigentümer mit Recht.
    - **2b. Herausgehobener Auditeintrag für Weiterleitungen durch admin?** Rechtekonzept §4 verlangt einen
      „herausgehobenen Auditeintrag“, „im Verlauf der Frage sichtbar“. Standard: Die Historie zeigt `actor.role` admin an
      jedem Ereignis; das gilt als sichtbar, eine eigene Hervorhebung gibt es nicht. Alternative: ein Kennzeichen
@@ -474,7 +506,7 @@ gebaut, mit den genannten Kosten einer späteren Änderung.
      Vertrag und Kern in einer Scheibe nach 040 (Vorschlag: mit 041, weil die Oberfläche dort liegt), Anzeige in der
      Historie. Wer entscheidet: Eigentümer mit Recht.
 3. **Start des Jahrgangs (040d).** Standard: Start nur mit eingefrorener Konfiguration (R-MTG-08) und nicht, solange ein
-   anderer Jahrgang desselben Rechtsträgers läuft (R-MTG-09), durch Halter von `agenda.manage` (heute nur admin).
+   anderer Jahrgang läuft (R-MTG-09), durch Halter von `agenda.manage` (heute nur admin).
    Alternative zu R-MTG-08: Start ohne Freeze erlaubt, nur Hinweis; < 0,25 AStd. Verlagerung von `agenda.manage` und
    Start an die Versammlungsleitung (`moderation`): eine Tabellenzeile, 0,25 AStd mit Tests.
 4. **Rollenzuordnung nach dem Freeze (040d).** Standard: Eine neue Zuordnung nach dem Freeze geht nur über den Override
@@ -542,3 +574,9 @@ Major 4 (Testumbauten 090 R1, 010b Runde 4, 020 m2), Major 5 (R-ADM-07 in 040a, 
 (Eigentümerfrage 5 statt Obergrenze), Major 12 (Weiterleiten bleibt, Diff 47 statt 73, Eigentümerfrage 2 neu gefasst),
 Major 13 (Personen einer Einheit), Major 1 (Gemeinsame Entscheidung 4), Minor 22 (Rückfall Allowlist), Minor 23
 (Schätzung), Minor 25 (Allowlist je Weg), Nit 26, Nit 27. Die übrigen Punkte stehen in 040b–d.
+
+**Nachprüfung (30.09.2026, zu `bccba04`):** 10 von 13 major erledigt; neu N1–N10. Eingearbeitet in 040a: N1 (090 R1 mit
+dauerhaftem Wechsel zu synthetischen Personen derselben Rolle, Feld sichtbar und leer, kein Rückfall auf `moderation`;
+`unrelatedEvent` und Zeilen 914/923 benannt; `setActor` ohne Codeänderung), N6 (`question.withdraw` entfällt,
+Eigentümerfrage 2c, Diff 63, §4 „teilweise“), N10 (R-ADM-08 mit 24-Stunden-Spanne), Verweis auf die Wiederherstellung
+bei gesperrten Subjects (N5, gebaut in 040c).
