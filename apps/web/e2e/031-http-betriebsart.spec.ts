@@ -304,10 +304,16 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
 test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
   test.use({ storageState: statePath('moderation') });
 
-  test('H10 @idp: one GET /v1/stage and one probe on mount, none after a visibility change', async ({ page }) => {
+  test('H10 @idp: one GET /v1/stage and one probe per mount (two under dev StrictMode), none after a visibility change', async ({ page }) => {
     const stageReads: string[] = [];
     const probes: string[] = [];
+    // The http project serves the app through the Vite dev server (playwright.config.ts), where StrictMode runs every
+    // mount effect twice (main.tsx): that is one extra request per mount that a production build does not send. The
+    // count is therefore 2 in dev and 1 in a build. The old bug (a bump after mount) would give 3 in dev, so the
+    // check still fails on it. The visibility-change check below is independent of this.
+    let dev = false;
     page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/@vite/client') dev = true;
       if (request.method() !== 'GET') return;
       const url = new URL(request.url());
       if (url.pathname === '/v1/stage') stageReads.push(url.pathname);
@@ -316,15 +322,16 @@ test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
     await page.goto('/stage');
     await expect(page.getByTestId('stage-only-toggle')).toBeVisible({ timeout: 60_000 });
     await page.waitForLoadState('networkidle');
-    expect(stageReads, 'GET /v1/stage after the mount').toHaveLength(1);
-    expect(probes, 'GET /v1/questions?limit=1 after the mount').toHaveLength(1);
+    const perMount = dev ? 2 : 1;
+    expect(stageReads, 'GET /v1/stage after the mount').toHaveLength(perMount);
+    expect(probes, 'GET /v1/questions?limit=1 after the mount').toHaveLength(perMount);
 
     // A session refresh without an actor change must not reload the views.
     const me = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/auth/me');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await me;
     await page.waitForLoadState('networkidle');
-    expect(stageReads, 'GET /v1/stage after the visibility change').toHaveLength(1);
+    expect(stageReads, 'GET /v1/stage after the visibility change').toHaveLength(perMount);
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: evidence('031-h10-einhaengen-ein-abruf.png') });
   });
