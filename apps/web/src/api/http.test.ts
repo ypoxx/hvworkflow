@@ -207,4 +207,74 @@ describe('HTTP HvApi adapter', () => {
     unsubscribe();
     vi.useRealTimers();
   });
+
+  describe('notification after an own successful write (takt-030)', () => {
+    it('calls every listener once with [] after a 2xx write, after the ETag is set', async () => {
+      const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+      let etagSeen: string | undefined;
+      let seenBeforeResponse = false;
+      const listener = vi.fn(() => { etagSeen = api.lastWriteEtag(); });
+      const stop = api.subscribe(listener);
+      replies.push(json({ id: 's' }, 201, { ETag: '"v7"' }));
+      const pending = api.registerSpeaker({ name: 'A' } as Parameters<HvApi['registerSpeaker']>[0]);
+      seenBeforeResponse = listener.mock.calls.length > 0;
+      await pending;
+      expect(seenBeforeResponse).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith([]);
+      expect(etagSeen).toBe('"v7"');
+      stop();
+    });
+
+    const failures: [string, () => void][] = [
+      ['403', () => replies.push(json({ title: 'x' }, 403))],
+      ['412', () => replies.push(json({ title: 'x' }, 412))],
+      ['500', () => replies.push(json({ title: 'x' }, 500))],
+      ['network error', () => { /* no fixture: the fetcher throws */ }],
+    ];
+    it.each(failures)('does not notify after a write answered with %s', async (_name, arrange) => {
+      const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+      const listener = vi.fn();
+      const stop = api.subscribe(listener);
+      arrange();
+      await expect(api.closeQuestion('q')).rejects.toBeDefined();
+      expect(listener).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it('does not notify after a write refused locally without a session', async () => {
+      const api = createHttpApi({ getCsrfToken: () => undefined, onUnauthorized: vi.fn(), fetcher: request });
+      const listener = vi.fn();
+      const stop = api.subscribe(listener);
+      await expect(api.closeQuestion('q')).rejects.toMatchObject({ status: 401 });
+      expect(listener).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it('does not notify after a read, and a write without listeners is fine', async () => {
+      const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+      const listener = vi.fn();
+      const stop = api.subscribe(listener);
+      replies.push(json([]));
+      await api.listSpeakers({ round: 1 });
+      expect(listener).not.toHaveBeenCalled();
+      stop();
+      replies.push(json({ id: 'q' }));
+      await expect(api.closeQuestion('q')).resolves.toBeDefined();
+    });
+
+    it('lets a throwing listener neither break the write nor the other listeners', async () => {
+      const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+      const first = vi.fn(() => { throw new Error('boom'); });
+      const second = vi.fn();
+      const stopFirst = api.subscribe(first);
+      const stopSecond = api.subscribe(second);
+      replies.push(json({ id: 'q' }));
+      await expect(api.closeQuestion('q')).resolves.toEqual({ id: 'q' });
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(second).toHaveBeenCalledWith([]);
+      stopFirst();
+      stopSecond();
+    });
+  });
 });

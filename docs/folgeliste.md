@@ -149,7 +149,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   ohne Rolle landet nach der Keycloak-Anmeldung auf einem rohen 403-JSON-Dokument des Dienstes, und die Keycloak-SSO-Sitzung
   bleibt bestehen (die nächste Anmeldung geht ohne Formular wieder dorthin) · gestaltete Fehlerseite oder Weiterleitung zur
   Seite „Keine aktive Rolle“, Abmelden beim IdP klären.
-- 031a Review major (Produktcode, **eigener Takt vor 031b**) · `apps/web/src/api/http.ts:146-152`, `:207-216`,
+- **Erledigt durch takt-030 (Schreibvorgänge; H8 lädt die Liste nicht mehr von Hand neu; H6 lädt weiter neu, Nit 12 und das Neuladen der Erfassungsseite in H8 bleiben offen)** · 031a Review major (Produktcode, **eigener Takt vor 031b**) · `apps/web/src/api/http.ts:146-152`, `:207-216`,
   `features/speakers/Page.tsx:149-163` · im HTTP-Modus löst ein eigener erfolgreicher Schreibvorgang kein Neuladen aus: Liste
   und ETag bleiben bis zu 30 s (Polling) veraltet, der nächste eigene Schreibvorgang läuft in 412; H6 und H8 laden deshalb
   von Hand neu · nach jedem eigenen Schreibvorgang die Version erhöhen (wie der In-Process-Speicher). Nit 12 gehört dazu: H6

@@ -1,6 +1,6 @@
 /**
  * Slice 031a — the HTTP mode of the interface against the real service (Hono, Postgres, Keycloak test realm).
- * H1–H3 need no sign-in and run everywhere; H4–H8 carry `@idp` and need the Keycloak realm (CI only, the local mode
+ * H1–H3 need no sign-in and run everywhere; H4–H9 carry `@idp` and need the Keycloak realm (CI only, the local mode
  * `E2E_HTTP_IDP=none` filters them out). The only `page.route` double of this suite lives in `030-anmeldung.spec.ts`.
  *
  * Nothing here changes questions or Wortmeldungen of the corpus; H8 writes, and only on a Wortmeldung and a
@@ -17,6 +17,8 @@ import {
 } from './support/e2e-texts';
 import { expect, test } from './support/http-guard';
 
+// Synthetic name, distinct from H8 so that the two tests never find each other's entry.
+const H9_SPEAKER_NAME = 'Synthetische Testperson Omega';
 const stateDir = process.env['E2E_HTTP_STATE_DIR'] ?? '';
 const httpPort = Number(process.env['E2E_HTTP_PORT'] ?? 4174);
 const origin = `http://localhost:${httpPort}`;
@@ -239,8 +241,7 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await expect(moderation.getByTestId('speaker-register')).toBeVisible({ timeout: 60_000 });
       await moderation.getByTestId('speaker-register').click();
       await moderation.getByTestId('speaker-register-name').fill(H8_SPEAKER_NAME);
-      // HTTP mode has no push (product entry "eigener Takt vor 031b", docs/folgeliste.md): an own write does not refresh the list before the next 30 s poll, so the test
-      // checks the answer of the service (status only, never the body) and then reloads the page.
+      // The own write refreshes the list by itself (takt-030); the test checks the status of the answer only, never the body.
       const registered = moderation.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
         new URL(candidate.url()).pathname === '/v1/speakers');
       await moderation.getByTestId('speaker-register-submit').click();
@@ -251,8 +252,7 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       const created = (await registration.json()) as { id?: unknown };
       expect(typeof created.id, 'the registration answer carries an id').toBe('string');
       const speakerId = created.id as string;
-      await moderation.reload();
-      await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible({ timeout: 30_000 });
+      await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible({ timeout: 5_000 });
 
       // 2. Capture writes the Redebeitrag of that Wortmeldung first and opens it.
       // The 30 s poll of the page must not fire between the 201 of the second writer and the Enter key below: a hidden page
@@ -298,5 +298,24 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await other.dispose();
       await moderationContext.close();
     }
+  });
+});
+
+test.describe('H9 @idp: an own write shows without a reload', () => {
+  test.use({ storageState: statePath('moderation') });
+
+  test('H9 @idp: a created Wortmeldung appears in the list without reload and without the 30 s poll', async ({ page }) => {
+    await page.goto('/speakers');
+    await expect(page.getByTestId('speaker-register')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('speaker-register').click();
+    await page.getByTestId('speaker-register-name').fill(H9_SPEAKER_NAME);
+    const registered = page.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
+      new URL(candidate.url()).pathname === '/v1/speakers');
+    await page.getByTestId('speaker-register-submit').click();
+    expect((await registered).status()).toBe(201);
+    // No reload, no goto: the interface has to refresh itself, far below the 30 s of the poll.
+    await expect(page.getByText(H9_SPEAKER_NAME).first()).toBeVisible({ timeout: 5_000 });
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('takt-030-eigene-schreibvorgaenge.png') });
   });
 });
