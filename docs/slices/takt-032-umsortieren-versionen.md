@@ -203,7 +203,23 @@ oder fehlt eine Datei, melden und anhalten.
 
 ## Nachweis
 
-_offen (Gates-Commit, wörtlicher Schluss von `pnpm gates`, Screenshots)_
+Gates-Commit: `eb0998e` (sauberer Baum). `pnpm gates` läuft bis `slice-scope` durch und bricht dort erwartungsgemäß ab: Die
+gestapelten Dateien von takt-030 (`apps/web/src/api/http.ts`, `http.test.ts`, `e2e/031-http-betriebsart.spec.ts`,
+`docs/slices/takt-030-*`) stehen noch nicht auf der Basis. Danach einzeln und grün: `downgrade-check`, `metrics-allowlist`,
+`plan-graph`, `test:scripts`, Web-Build, `mark-test-run`. Web-Unit-Tests: 292 grün (vorher rot, dann grün). In-Process-e2e:
+127 grün (`E2E_PORT=4232`). Der HTTP-Lauf entfällt hier, der Nachweis kommt aus der CI.
+
+```
+slice-scope: 4 file(s) outside "docs/slices/takt-032-umsortieren-versionen.md"'s "Files allowed" list:
+  apps/web/e2e/031-http-betriebsart.spec.ts
+  apps/web/src/api/http.test.ts
+  apps/web/src/api/http.ts
+  docs/slices/takt-030-eigene-schreibvorgaenge.md
+mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit eb0998e
+```
+
+Screenshots: `docs/evidence/takt-032-umsortieren.png`, `docs/evidence/takt-032-erfassung.png`. Das Busy-Signal ist nur durch
+Komponententests belegt (offene Frage 2, Abnahme durch den Owner offen).
 
 ## Review findings
 
