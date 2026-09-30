@@ -18,7 +18,15 @@ export interface HttpApiOptions {
   onUnauthorized: () => void;
   locale?: () => Language;
   fetcher?: Transport;
+  /**
+   * Slice 036a: how each own write ended, for the live store (liveStore.ts). `success` after a 2xx, once the ETag
+   * is set and before the listeners run; `server_error` for any answer or network failure after sending;
+   * `local_reject` for a write refused here without a request (no CSRF token, the speaker reopen reason).
+   */
+  onWriteSettled?: (outcome: WriteOutcome) => void;
 }
+
+export type WriteOutcome = 'success' | 'server_error' | 'local_reject';
 
 function genericProblem(status: number, language: Language): ApiProblem {
   return new ApiProblem(status, translate(language, 'http.errorTitle'), translate(language, 'http.errorDetail'));
@@ -138,6 +146,10 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
       try { current([]); } catch { /* swallowed on purpose: the server has already accepted the write */ }
     }
   };
+  // A throwing hook must not turn the outcome of a write into another one.
+  const settled = (outcome: WriteOutcome) => {
+    try { options.onWriteSettled?.(outcome); } catch { /* swallowed on purpose, like a throwing listener */ }
+  };
   const onUnauthorized = () => {
     if (unauthorized) return;
     unauthorized = true;
@@ -152,13 +164,20 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
   const write = <T, M extends Exclude<Verb, 'get'>>(method: M, route: Route<M>, details: RequestDetails = {}): Promise<T> => {
     observeSession();
     const csrf = options.getCsrfToken();
-    if (!csrf) return Promise.reject(new ApiProblem(401, translate(language(), 'http.errorTitle'), translate(language(), 'http.noSession')));
+    if (!csrf) {
+      settled('local_reject');
+      return Promise.reject(new ApiProblem(401, translate(language(), 'http.errorTitle'), translate(language(), 'http.noSession')));
+    }
     // Own successful writes refresh the views at once (the demo adapter does the same); the ETag is set inside `perform`
     // before the listeners run, so a reload sees the current `lastWriteEtag()`. Failures reject before this line.
     return perform<T>(method.toUpperCase() as Uppercase<M>, route, { ...details, csrf }, transport,
       language(), onUnauthorized, (etag) => { writeEtag = etag ?? undefined; }).then((result) => {
+      settled('success');
       notifyListeners();
       return result;
+    }, (error: unknown) => {
+      settled('server_error');
+      throw error;
     });
   };
   const currentMeetingId = async () => (await read<Awaited<ReturnType<HvApi['getMeeting']>>, 'get'>('get', '/meeting')).id;
@@ -184,7 +203,10 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
     registerSpeaker: (input, writeOptions) => write('post', '/speakers', { body: input, write: writeOptions }),
     reorderSpeakers: (round, speakerIds, writeOptions) => write('put', '/speakers/order', { body: { round, speakerIds }, write: writeOptions }),
     updateSpeaker: (speakerId, input, writeOptions) => {
-      if (input.reason !== undefined) return Promise.reject(new ApiProblem(422, translate(language(), 'http.errorTitle'), translate(language(), 'http.unsupported')));
+      if (input.reason !== undefined) {
+        settled('local_reject');
+        return Promise.reject(new ApiProblem(422, translate(language(), 'http.errorTitle'), translate(language(), 'http.unsupported')));
+      }
       return write('patch', '/speakers/{speakerId}', { params: { speakerId }, body: input, write: writeOptions });
     },
     listContributions: (filter) => read('get', '/contributions', { query: { speakerId: filter?.speakerId } }),

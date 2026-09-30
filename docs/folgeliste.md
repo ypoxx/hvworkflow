@@ -265,6 +265,14 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035a Review nit 7 · `packages/contract/CHANGELOG.md` (0.3.11) · Einordnung der Versionsstufe (Patch) trotz geänderter
   Semantik der vorab erklärten, nie ausgelieferten Operation · Begründung im CHANGELOG ergänzen oder Stufe prüfen.
 
+- 035a Nachprüfung minor 1 · `packages/domain/src/api.ts` (catch um `snapshotBefore` im Projektions-Hörer) · ein Fehler
+  im Vorher-Abzug wird still verschluckt; die Sicht wird dann nur nach „nachher“ beurteilt (enger, nie weiter), aber
+  ohne Spur · Fehler über `onIntegrityError` oder einen Diagnose-Haken melden, das Verschlucken behalten.
+- 035a Nachprüfung minor 2 · `packages/domain/src/api.ts` (catch um `visibleMessages` in `subscribe`) · ein Fehler dort
+  liefert still `[]` statt der Ereignisse (schließt nach innen, nie mehr Daten) · vor dem nackten Signal melden.
+- 035a Nachprüfung nit 4 · `apps/api/src/__tests__/postgres-stream035a.test.ts` (Kopf) · der Test ist ein Happy-Path-Pin;
+  die Ursache des damaligen `e2e-http`-Rots war die Basis (takt-039), nicht 035a · im Kopf vermerken.
+
 ## Strom-Dienst (aus 035b)
 
 - 035b Bau · `packages/contract/openapi.yaml` (`streamEvents`, Abschnitt „Rights per message“) · der Satz „gap-free in
@@ -308,6 +316,25 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   `waitForTimeout(300)` · auf ein Produktsignal umstellen (gebündelt mit den übrigen `waitForTimeout` der Datei).
 - takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
   `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
+
+## Live-Store (aus 036a)
+
+- 036a Bauhinweis · `apps/web/src/api/liveStore.ts` · der In-Process-`subscribe` meldet `[]` ohne `change`, wenn für den Leser nichts Lesbares geändert wurde; nach Entscheidung 3 leert das den ganzen Puffer (Verhalten wie vor 036a, aber unnötige Abrufe) · im Demo-Adapter nur melden, wenn es etwas zu melden gibt, oder einen leeren Aufruf als „nichts“ kennzeichnen.
+- 036a Nachprüfung nit 3 · `apps/web/src/api/liveStore.ts` · ein abgelaufener Eintrag ohne Claim bleibt im Speicher, bis
+  er gelesen oder verdrängt wird (höchstens 200 Einträge); ausgeliefert wird er nie · optionales Aufräumen in `keep`/`read`.
+- 036a Review minor 5 · `apps/web/src/features/speakers/*` (mehrstufige Abläufe, z. B. `moveSpeakerToRound`) · wird ein
+  Lesezugriff nach einem strukturellen Akteurwechsel zurückgehalten (Entscheidung 4, unerledigtes Promise), bleibt die
+  Busy-Referenz des Ablaufs bis zum Neu-Einhängen gesetzt · den Ablauf an den Akteur binden und beim Akteurwechsel freigeben.
+- 036a Review nit 11 · `apps/web/src/api/liveStore.ts` · der Themenweg (`change`/`event` → gezielte Invalidierung) ist nur
+  durch Unit-Tests belegt, kein e2e prüft ihn gegen den echten Adapter · mit 036b (H11) e2e-Nachweis ergänzen.
+- 036a Bauhinweis · `apps/web/src/api/index.ts` · bei 401 läuft `clear()` zweimal (HTTP-`onUnauthorized`, dann `onActorChange(undefined)`), die Hörer laufen zweimal; harmlos, die Hülle hängt im selben Stapel aus · einen der beiden Aufrufe weglassen oder `clear()` bei leerem Puffer ohne Hörer-Aufruf.
+- 036a Review nit 9 · `apps/web/src/api/liveStore.ts` (Wasserzeichen-Prüfungen bei Auslieferung, Aufnahme und
+  `mark = undefined` in `clearAll`) · doppelt abgesichert und ungepinnt, die Invalidierung durch `raiseMark` verdeckt sie
+  · direkten Test ergänzen oder die redundanten Prüfungen streichen.
+- 036a Review nit 10 · `apps/web/src/api/liveStore.ts` (Verdrängung) · FIFO statt nach letzter Nutzung; ein ständig
+  gelesener `getMeeting`-Eintrag wird als ältester verdrängt · spec-konform, kostet nur Abrufe; bei Bedarf LRU.
+- 036a Review nit 12 · `apps/web/src/api/index.ts`, `liveStore.ts` · `clear('logout')` ruft die Hörer, `useApiVersion`
+  zählt zusätzlich den Akteur `undefined`; bei 401 läuft `clear` doppelt · harmlos, die Shell hängt ab.
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 

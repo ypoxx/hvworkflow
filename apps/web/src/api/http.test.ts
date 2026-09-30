@@ -277,4 +277,58 @@ describe('HTTP HvApi adapter', () => {
       stopSecond();
     });
   });
+
+  describe('write outcome hook onWriteSettled (slice 036a)', () => {
+    it('reports success after a 2xx write, after the ETag is set and before the listeners run', async () => {
+      const order: string[] = [];
+      const api = createHttpApi({
+        getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request,
+        onWriteSettled: (outcome) => { order.push(`${outcome}:${api.lastWriteEtag() ?? '-'}`); },
+      });
+      const stop = api.subscribe(() => { order.push('listener'); });
+      replies.push(json({ id: 'q' }, 200, { ETag: '"v9"' }));
+      await api.closeQuestion('q');
+      expect(order).toEqual(['success:"v9"', 'listener']);
+      stop();
+    });
+
+    const serverFailures: [string, () => void][] = [
+      ['412', () => replies.push(json({ title: 'x' }, 412))],
+      ['500', () => replies.push(json({ title: 'x' }, 500))],
+      ['network error', () => { /* no fixture: the fetcher throws */ }],
+    ];
+    it.each(serverFailures)('reports server_error for a write answered with %s', async (_name, arrange) => {
+      const outcomes: string[] = [];
+      const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request, onWriteSettled: (o) => { outcomes.push(o); } });
+      arrange();
+      await expect(api.closeQuestion('q')).rejects.toBeDefined();
+      expect(outcomes).toEqual(['server_error']);
+    });
+
+    it('reports local_reject without a CSRF token and for updateSpeaker with a reason, without a request', async () => {
+      const outcomes: string[] = [];
+      const noSession = createHttpApi({ getCsrfToken: () => undefined, onUnauthorized: vi.fn(), fetcher: request, onWriteSettled: (o) => { outcomes.push(o); } });
+      await expect(noSession.closeQuestion('q')).rejects.toMatchObject({ status: 401 });
+      const session = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request, onWriteSettled: (o) => { outcomes.push(o); } });
+      await expect(session.updateSpeaker('s', { status: 'waiting', reason: 'follow_up' })).rejects.toMatchObject({ status: 422 });
+      expect(outcomes).toEqual(['local_reject', 'local_reject']);
+      expect(calls).toHaveLength(0);
+    });
+
+    it('does not report reads, and a throwing hook neither breaks the write nor the listeners', async () => {
+      const outcomes: string[] = [];
+      const api = createHttpApi({
+        getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request,
+        onWriteSettled: (o) => { outcomes.push(o); throw new Error('boom'); },
+      });
+      const listener = vi.fn();
+      const stop = api.subscribe(listener);
+      replies.push(json([]), json({ id: 'q' }));
+      await api.listSpeakers();
+      await expect(api.closeQuestion('q')).resolves.toEqual({ id: 'q' });
+      expect(outcomes).toEqual(['success']);
+      expect(listener).toHaveBeenCalledTimes(1);
+      stop();
+    });
+  });
 });

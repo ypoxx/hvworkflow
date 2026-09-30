@@ -292,65 +292,70 @@ async function switchActor(page: Page, role: string): Promise<void> {
  * page; the outcome is polled.
  */
 async function unrelatedEvent(page: Page, name: string): Promise<void> {
-  const version = await currentVersionAsAdmin(page, 'getMeeting', 'speakerListVersion');
+  const version = await currentVersion(page, 'getMeeting', 'speakerListVersion');
   await elsewhere(page, 'registerSpeaker', [{ displayName: name }, { ifMatch: `"v${version}"` }]);
 }
 
-/** Read the exact resource version before an out-of-view write; restore the actor before awaiting. */
-async function currentVersionAsAdmin(
+/**
+ * Read the exact resource version before an out-of-view write, as the current actor, who may read
+ * it (`getMeeting` is master data; the question is one on this actor's screen).
+ *
+ * Slice 036a (Bauklärung): this used to read as the administration persona and swap back before the
+ * answer came. The live store never delivers an answer asked for one actor once the actor has
+ * changed (Entscheidung 4), so that read waited forever. No actor swap here any more.
+ */
+async function currentVersion(
   page: Page,
   method: 'getMeeting' | 'getQuestion',
   field: 'speakerListVersion' | 'version',
   id?: string,
 ): Promise<number> {
   return page.evaluate(
-    ([actorUrl, name, key, resourceId]) => {
+    ([name, key, resourceId]) => {
       const w = window as unknown as Harness;
-      const mod = w.__modules[actorUrl] as {
-        DEMO_ACTORS: readonly { id: string }[];
-        getActor: () => unknown;
-        setActor: (actor: unknown) => void;
-      };
-      const before = mod.getActor();
-      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
-      let read: Promise<unknown>;
-      try {
-        read = w.__original[name]!(...(resourceId === undefined ? [] : [resourceId]));
-      } finally {
-        mod.setActor(before);
-      }
-      return read.then((resource) => (resource as Record<string, number>)[key]!);
+      return w.__original[name]!(...(resourceId === undefined ? [] : [resourceId])).then(
+        (resource) => (resource as Record<string, number>)[key]!,
+      );
     },
-    [ACTOR_MODULE, method, field, id] as const,
+    [method, field, id] as const,
   );
 }
 
 /**
  * A write from somebody else — the administration persona, on the unpatched API, the actor swapped
  * and restored in the same task. Synchronous: the evaluate awaits nothing in the page; the outcome
- * is polled and must be `ok`.
+ * is polled and must be `ok`. Returns the `version` of the written resource from the write's answer.
+ *
+ * Slice 036a (Bauklärung): the in-process write does its whole work synchronously — it has checked
+ * the rights of the administration persona, appended and computed its answer when the call returns —
+ * so no admin request is on its way when the actor is restored. Writes are never withheld by the
+ * live store; only reads are bound to the actor they were asked for.
  */
-async function elsewhere(page: Page, method: string, args: unknown[]): Promise<void> {
+async function elsewhere(page: Page, method: string, args: unknown[]): Promise<number | undefined> {
   const index = await page.evaluate(
     ([actorUrl, name, callArgs]) => {
-      const w = window as unknown as Harness & { __writes?: string[] };
+      const w = window as unknown as Harness & { __writes?: string[]; __written?: (number | undefined)[] };
       const mod = w.__modules[actorUrl as string] as {
         DEMO_ACTORS: readonly { id: string }[];
         getActor: () => unknown;
         setActor: (actor: unknown) => void;
       };
       const writes = (w.__writes ??= []);
+      const written = (w.__written ??= []);
       const before = mod.getActor();
       mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-admin'));
-      let written: Promise<unknown>;
+      let answer: Promise<unknown>;
       try {
-        written = w.__original[name as string]!(...(callArgs as unknown[]));
+        answer = w.__original[name as string]!(...(callArgs as unknown[]));
       } finally {
         mod.setActor(before);
       }
       const at = writes.push('pending') - 1;
-      written.then(
-        () => (writes[at] = 'ok'),
+      answer.then(
+        (resource) => {
+          written[at] = (resource as { version?: number } | null)?.version;
+          writes[at] = 'ok';
+        },
         (error: unknown) =>
           (writes[at] = `failed: ${(error as { detail?: string } | null)?.detail ?? String(error)}`),
       );
@@ -361,6 +366,7 @@ async function elsewhere(page: Page, method: string, args: unknown[]): Promise<v
   await expect
     .poll(() => page.evaluate((at) => (window as unknown as { __writes: string[] }).__writes[at], index))
     .toBe('ok');
+  return page.evaluate((at) => (window as unknown as { __written: (number | undefined)[] }).__written[at], index);
 }
 
 /** None of `testIds` is in the page — not hidden, not greyed out: absent (principle 9). */
@@ -753,9 +759,11 @@ async function approveAThenChangeElsewhere(
   await expect(page.getByTestId('answers-detail-number')).toHaveText(first);
   await page.getByTestId('answer-legal-clear').click();
   await expect.poll(() => callCount(page, 'clearQuestionLegally')).toBe(1);
-  const beforeReturn = await currentVersionAsAdmin(page, 'getQuestion', 'version', firstId);
-  await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.', { ifMatch: `"v${beforeReturn}"` }]);
-  const beforeReview = await currentVersionAsAdmin(page, 'getQuestion', 'version', firstId);
+  // Slice 036a (Bauklärung): A is on legal's screen, so legal reads its version; the version for the second write
+  // comes from the answer of the first.
+  const beforeReturn = await currentVersion(page, 'getQuestion', 'version', firstId);
+  const beforeReview = await elsewhere(page, 'returnQuestion', [firstId, 'Von anderer Stelle zurückgegeben.', { ifMatch: `"v${beforeReturn}"` }]);
+  expect(beforeReview).toBeGreaterThan(beforeReturn);
   await elsewhere(page, 'submitForReview', [firstId, { ifMatch: `"v${beforeReview}"` }]);
   return { first, second, rowB };
 }
