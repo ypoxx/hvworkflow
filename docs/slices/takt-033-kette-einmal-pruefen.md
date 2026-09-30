@@ -302,3 +302,15 @@ gehen nie auf die Folgeliste), außer Nit 6.
    Folgeliste** (`docs/folgeliste.md`, Abschnitt „Dienst: Kettenprüfung“).
 7. **Nit**, die Personen-Map eines eingefrorenen Eintrags ist veränderlich. **Behoben:** der Eintrag hält eine eigene
    Kopie und gibt sie nur als `ReadonlyMap` heraus; Kommentar und Test.
+
+Enge Nachprüfung (Opus, frischer Kontext): alle 7 Befunde geschlossen, kein neuer Blocker oder Major. Zwei Rest-Nits,
+beide in dieser Scheibe behoben (a berührt das Erkennungssignal, deshalb nicht Folgeliste):
+
+- **a (Nit, Erkennungssignal)**, während einer Serie, die nie endet (Digests stimmen nie überein), erschien keine
+  Zählzeile, und eine zweite, andere Änderung bekam keine eigene Spur. **Behoben:** die feste Zählzeile
+  (`HV-Tool API: the event history line repeated N more times.`, nur eine ganze Zahl) steht zusätzlich alle
+  100 Wiederholungen und spätestens nach fünf Minuten der Uhr der App (`clock`, R8), danach beginnt die Zählung neu;
+  am Ende der Serie wie bisher. Tests: Uhr um fünf Minuten weiter mitten in der Serie; 101 Umschreibungen ergeben
+  genau eine Zählzeile „100“.
+- **b (Nit)**, das Kriterium „genau k Zeilen“ prüfte nur einen eigenen Cache des Tests. **Behoben:** `testHooks.chain`
+  meldet zusätzlich `rowsRead`; der Budget-Test prüft 0 / k / alle Zeilen am Cache der App.
