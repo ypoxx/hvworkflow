@@ -200,6 +200,7 @@ Domäne:
 - `docs/legal-trace.md` (nur regeneriert, nur die Zeile R-PERM-04; `rules.test.ts` vergleicht sie mit `ruleRegister()`)
 - `packages/domain/src/types.ts` (nur neue Typen)
 - `packages/domain/src/__tests__/stream035.test.ts` (neu)
+- `apps/api/src/__tests__/postgres-stream035a.test.ts` (neu; Regressionstest e2e-http, siehe Bauklärungen)
 - `docs/sicherheit/bedrohungsmodell.md` (nur Zeilen T-G1-I-09 und T-G3-I-01: Stand Domäne)
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
@@ -238,6 +239,7 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 - **In-process ohne Versammlungsprojektion:** Ersatzschlüssel, der nie auf eine `meetingId` passt; nur `event`.
 - **Thema `roles`:** über `can(reader, 'admin.roles.manage')` plus Selbstausnahme, keine Rollennamen.
 - **`QuestionMerged`** bleibt in `EVENT_SUBJECTS` mit dem Ziel (harmlose Obermenge, nur lesbare Kennungen).
+- **Regressionstest e2e-http** (PR #102): `apps/api/src/__tests__/postgres-stream035a.test.ts`, Bühne im Dienstmodus (Postgres, Sitzung, Zuordnungen aus dem Log).
 
 ## Tests zuerst (rot, dann grün; `stream035.test.ts`)
 

@@ -133,8 +133,17 @@ export const STAGE_COUNTER_EVENTS: ReadonlySet<EventType> = new Set<EventType>([
   'QuestionCaptured', 'QuestionDelivered', 'QuestionClosed', 'QuestionWithdrawn', 'QuestionMerged', 'QuestionReturned',
 ]);
 
-const subjectsOf = (e: DomainEvent): readonly SubjectRef[] =>
-  (EVENT_SUBJECTS[e.type] as (event: DomainEvent) => readonly SubjectRef[])(e);
+/**
+ * Lookups that tolerate an event type the tables do not know (a log written by a newer or older
+ * version): no topics, no items — such an event reaches only `event.read` holders, and the stream
+ * bookkeeping never throws on it (e2e-http regression of slice 035a).
+ */
+const subjectsOf = (e: DomainEvent): readonly SubjectRef[] => {
+  const pick = (EVENT_SUBJECTS as Partial<Record<string, (event: DomainEvent) => readonly SubjectRef[]>>)[e.type];
+  return pick ? pick(e) : [];
+};
+const topicsOf = (e: DomainEvent): readonly StreamTopic[] =>
+  (EVENT_TOPICS as Partial<Record<string, readonly StreamTopic[]>>)[e.type] ?? [];
 
 /** Read methods per topic; the permissions come from `READ_PERMISSIONS` (types.ts), never by name. */
 const methodPermissions = (...methods: (keyof typeof READ_PERMISSIONS)[]): readonly Permission[] =>
@@ -294,7 +303,7 @@ function lookupIn(states: readonly (State | undefined)[]): Lookup {
 
 /** Adds what reader `a` may learn about the items of event `e` (per item, through `can()`). */
 function collect(out: ChangeBuilder, a: Actor, e: DomainEvent, meetingId: string, lookup: Lookup, can: Can): void {
-  const topics = EVENT_TOPICS[e.type];
+  const topics = topicsOf(e);
   const allowed = (t: StreamTopic): boolean => topics.includes(t) && topicReadable(a, t, can);
   for (const ref of subjectsOf(e)) {
     switch (ref.kind) {
@@ -348,7 +357,7 @@ export function visibleMessages(readerActors: ReadonlyMap<string, Actor>, batch:
     if (!a) continue;
     collect(out, a, e, e.meetingId, lookupIn([before.get(e.meetingId), after.get(e.meetingId)]), deps.can);
     const topics = touched.get(e.meetingId) ?? new Set<StreamTopic>();
-    for (const t of EVENT_TOPICS[e.type]) topics.add(t);
+    for (const t of topicsOf(e)) topics.add(t);
     touched.set(e.meetingId, topics);
   }
   for (const [meetingId, topics] of touched) {
@@ -392,7 +401,7 @@ export function replayMessage(readerActors: ReadonlyMap<string, Actor>, events: 
     const lookup = lookupIn([now]);
     for (const e of list) {
       collect(out, a, e, meetingId, lookup, can);
-      const topics = EVENT_TOPICS[e.type];
+      const topics = topicsOf(e);
       if (topics.includes('meeting') && subjectsOf(e).some((ref) => ref.kind === 'meeting')) out.add(meetingId, 'meeting');
       if (topics.includes('stage') && STAGE_COUNTER_EVENTS.has(e.type) && can(a, 'stage.read').allow) out.add(meetingId, 'stage');
     }

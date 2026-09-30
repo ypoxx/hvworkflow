@@ -14,7 +14,7 @@ import type { DomainEvent, NewEvent, ReadEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, isOnStage, reduce, type State } from './state.js';
-import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamStates } from './stream.js';
+import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamMessage, type StreamStates } from './stream.js';
 import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
 import type {
@@ -307,10 +307,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const meetingStates = (): StreamStates =>
     options.meetingId !== undefined ? new Map([[options.meetingId, state]]) : aliasStates;
   // "Before" for R-PERM-04 (slice 035a, m6): a copy of the items the batch touches, taken here,
-  // before the reduction below; this listener runs before every `subscribe` listener.
-  let beforeBatch: StreamStates = new Map();
+  // before the reduction below; this listener runs before every `subscribe` listener. Kept per
+  // notification (the store hands every listener the same array), so a nested append from inside a
+  // listener cannot overwrite the copy of the outer batch.
+  const beforeByBatch = new WeakMap<readonly DomainEvent[], StreamStates>();
   store.subscribe((events) => {
-    beforeBatch = snapshotBefore(meetingStates(), events);
+    // Stream bookkeeping is isolated from the projection: a failing copy never skips the reduction
+    // below and never fails the write that already persisted (e2e-http regression, slice 035a).
+    try {
+      beforeByBatch.set(events, snapshotBefore(meetingStates(), events));
+    } catch { /* `subscribe` then judges items by the state after the batch only */ }
     if (options.meetingId === undefined) {
       for (const e of events) {
         if (!e.meetingId) continue;
@@ -1227,10 +1233,17 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         }
         // Without a meeting projection yet, the key matches no event's meetingId: `event` only.
         const readerActors = new Map([[options.meetingId ?? state.meeting?.id ?? '', reader]]);
-        const messages = visibleMessages(readerActors, events, beforeBatch, meetingStates(), {
-          can,
-          ...(options.onIntegrityError !== undefined ? { onIntegrityError: options.onIntegrityError } : {}),
-        });
+        let messages: StreamMessage[];
+        try {
+          messages = visibleMessages(readerActors, events, beforeByBatch.get(events) ?? new Map(), meetingStates(), {
+            can,
+            ...(options.onIntegrityError !== undefined ? { onIntegrityError: options.onIntegrityError } : {}),
+          });
+        } catch {
+          // Never break the store's notification loop: a bare signal, the listener reloads (m6).
+          listener([]);
+          return;
+        }
         const visible = messages.flatMap((m) => (m.kind === 'event' ? [m.event] : []));
         const change = messages.find((m) => m.kind === 'change');
         if (change?.kind === 'change') listener(visible, change.change);

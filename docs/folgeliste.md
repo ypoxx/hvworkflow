@@ -256,6 +256,14 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035a Bau · `packages/domain/src/api.ts` (`idempotent`) · kein Befehl auf eine Frage erzeugt heute `IdempotencyRecorded`
   mit der Frage als `subjectId` (jeder Fragenbefehl hängt ein Ereignis an); Test 2b deckt den Fall über ein direkt
   angehängtes Ereignis ab · bei einem künftigen No-op-Befehl den 2b-Lauf auf den echten Befehl umstellen.
+- 035a Review nit 5 · `packages/domain/src/stream.ts` (`ChangeBuilder.build`), `openapi.yaml` `StreamChange.meetingId` ·
+  der Vertrag sagt „when it is one“, der Code setzt `meetingId` nur, wenn alle beitragenden Ereignisse eines Stapels zu
+  einem Jahrgang gehören; die Lücke „Stapel über zwei Jahrgänge“ ist nicht beschrieben · Wortlaut in Vertrag und Kommentar angleichen.
+- 035a Review nit 6 · `packages/domain/src/stream.ts` (`EVENT_SUBJECTS.IdempotencyRecorded`) · ein Beobachter erhält für
+  `IdempotencyRecorded` auf einer vorgelesenen Frage deren Kennung (die Historie ändert sich, Bauklärung C1) · bewusst
+  hinnehmen oder im Test 11 ausdrücklich festhalten.
+- 035a Review nit 7 · `packages/contract/CHANGELOG.md` (0.3.11) · Einordnung der Versionsstufe (Patch) trotz geänderter
+  Semantik der vorab erklärten, nie ausgelieferten Operation · Begründung im CHANGELOG ergänzen oder Stufe prüfen.
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 

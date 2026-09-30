@@ -2926,8 +2926,8 @@ components:
           items: { type: string }
           description: >-
             Ids of the changed items the reader may read (questions, speakers, contributions, role
-            assignments, the meeting). Absent when no readable item is named or when more than 100
-            would be named; the client then reloads the topics as a whole.
+            assignments). Counter changes never carry an id. Absent when no readable item is named or
+            when more than 100 would be named; the client then reloads the topics as a whole.
         meetingId: { type: string, description: 'The meeting (Jahrgang) the covered events belong to, when it is one' }
         replay: { type: boolean, const: true, description: 'Present only on the single `change` of a catch-up (`(cursor, head]`)' }
     StreamCursor:

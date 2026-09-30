@@ -1917,7 +1917,7 @@ export interface components {
             /** @description Global sequence number of the last event this message covers (for a catch-up: the head) */
             seq: number;
             topics: components["schemas"]["StreamTopic"][];
-            /** @description Ids of the changed items the reader may read (questions, speakers, contributions, role assignments, the meeting). Absent when no readable item is named or when more than 100 would be named; the client then reloads the topics as a whole. */
+            /** @description Ids of the changed items the reader may read (questions, speakers, contributions, role assignments). Counter changes never carry an id. Absent when no readable item is named or when more than 100 would be named; the client then reloads the topics as a whole. */
             subjects?: string[];
             /** @description The meeting (Jahrgang) the covered events belong to, when it is one */
             meetingId?: string;

@@ -650,6 +650,51 @@ describe('R-PERM-04 stream visibility (slice 035a)', () => {
     offSecond();
   });
 
+  it('8 (before snapshot): the in-process change equals the function with the full "before" projection — expert whose question is moved to another unit, podium on staged → delivered', async () => {
+    const h = await harness();
+    h.as(W.admin!);
+    await h.step(() => h.writer.assignRole({ subjectId: EXPERT_FIN.id, role: 'expert', unitId: 'unit-fin' }));
+    const { ids } = await newQuestions(h, 2);
+    const [moved, staged] = ids as [string, string];
+    await classify(h, moved);
+    await assign(h, moved, 'unit-fin');
+    await toApproved(h, staged);
+    await stage(h, staged);
+
+    const inProcess = async (who: Actor, run: () => Promise<Step>): Promise<{ got: StreamChange | undefined; expected: StreamChange | undefined }> => {
+      const api = createInProcessApi({ store: h.store, actor: () => who, clock: fixedClock });
+      const calls: (StreamChange | undefined)[] = [];
+      const off = api.subscribe((_events, change) => calls.push(change));
+      const s = await run();
+      off();
+      expect(calls).toHaveLength(1);
+      const resolved = resolveMeetingActor(s.after.get(h.meetingId)!, who, fixedClock)!;
+      return { got: calls[0], expected: changeOf(live(resolved, s, h.meetingId)) };
+    };
+    const expert = await inProcess(EXPERT_FIN, () => assign(h, moved, 'unit-hr'));
+    expect(expert.expected).toMatchObject({ topics: expect.arrayContaining(['questions']), subjects: [moved] });
+    expect(expert.got).toEqual(expert.expected);
+    const podium = await inProcess(reader('podium'), () => deliver(h, staged));
+    expect(podium.expected).toMatchObject({ topics: expect.arrayContaining(['stage']), subjects: [staged] });
+    expect(podium.got).toEqual(podium.expected);
+  });
+
+  it('8 (isolation): an event type the stream tables do not know neither fails the append nor skips the projection; listeners still run', async () => {
+    const h = await harness();
+    const api = createInProcessApi({ store: h.store, actor: () => reader('capture'), clock: fixedClock });
+    const calls: number[] = [];
+    api.subscribe((events) => calls.push(events.length));
+    const before = h.store.lastSeq();
+    const unknown = { id: 'future-1', type: 'FutureEventType', at: new Date(START).toISOString(), actor: W.admin!,
+      subjectId: h.meetingId, meetingId: h.meetingId, payload: {} } as unknown as NewEvent;
+    expect(() => h.store.append([unknown])).not.toThrow();
+    expect(h.store.lastSeq()).toBe(before + 1);
+    expect(calls).toEqual([0]);
+    // The projection went on: the next write is reduced and read back.
+    const { ids } = await newQuestions(h, 1);
+    expect((await api.getQuestion(ids[0]!)).status).toBe('captured');
+  });
+
   /* ---------- 9 ---------- */
 
   describe('9: catch-up (replayMessage)', () => {
