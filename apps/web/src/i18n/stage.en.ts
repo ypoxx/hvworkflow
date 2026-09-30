@@ -37,6 +37,7 @@ export const stageEn: typeof stageDe = {
   'stage.return.title': 'Return the answer',
   'stage.return.body':
     'The question goes back for rework, with a reason, and leaves the podium.',
+  'stage.return.question': 'Question {number}',
   'stage.return.reason': 'Reason',
   'stage.return.placeholder': 'Why can the answer not be read out?',
   'stage.toast.delivered': 'Read out',

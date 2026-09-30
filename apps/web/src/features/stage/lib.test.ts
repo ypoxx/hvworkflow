@@ -6,8 +6,21 @@
  * others fails loudly here.
  */
 import { describe, expect, it } from 'vitest';
-import { isCurrentLoad, isReadForbidden, loadKey, NO_VERDICT, readVerdict } from './lib';
-import type { KeyedRead } from './lib';
+import type { Permission, Question, StageView } from '@hv/domain';
+import {
+  deliverTarget,
+  isCurrentLoad,
+  isReadForbidden,
+  loadKey,
+  lockHolds,
+  nextButton,
+  NO_VERDICT,
+  readVerdict,
+  returnTargetOf,
+  returnWrite,
+  shownQuestion,
+} from './lib';
+import type { DeliverLock, KeyedRead } from './lib';
 
 describe('isReadForbidden', () => {
   it('R-PERM-02 (no read permission): true', () => {
@@ -143,5 +156,97 @@ describe('loadKey, isCurrentLoad, readVerdict (slice 010c)', () => {
     expect(readVerdict(refused, [], 'u-exp-fin')).toBe(refused);
     expect(readVerdict(refused, [], 'u-podium')).toEqual({ actor: 'u-podium', forbidden: false });
     expect(readVerdict(NO_VERDICT, [], 'u-exp-fin')).toEqual({ actor: 'u-exp-fin', forbidden: false });
+  });
+});
+
+/**
+ * takt-039 — one pure rule for "Vorgelesen, weiter": the button (Podium.tsx) is drawn from it and the
+ * handler (Page.tsx, click and Space) writes by it, so a button that looks free always writes and a
+ * press that would not write always looks locked (Befund 1).
+ */
+function staged(id: string, version: number, actions: Permission[] = ['question.deliver']): Question {
+  return {
+    id, number: `F-${id}`, contributionId: 'c-1', speakerId: 's-1', text: id, status: 'staged',
+    answers: [], version, createdAt: '2026-09-30T10:00:00.000Z', updatedAt: '2026-09-30T10:00:00.000Z',
+    _actions: actions,
+  };
+}
+const onStage = (current: Question | null): StageView => ({ current, queue: [], deliveredCount: 0, openCount: 0 });
+
+describe('deliverTarget, lockHolds, nextButton (takt-039)', () => {
+  const q = staged('q1', 4);
+
+  it('(a) a drawn record that offers delivery and holds no lock is the target, also while a read is on its way', () => {
+    // Befund 1, Punkt 3: a read used to take the record away from the keyboard until its answer came. The drawn stage
+    // stays on screen during the read (design principle 8), and the rule reads only what is drawn.
+    const drawnDuringRead = onStage(q);
+    expect(deliverTarget(shownQuestion(drawnDuringRead), null, false)).toBe(q);
+  });
+
+  it('(b) a lock on the drawn question in the drawn version prevents the target', () => {
+    const lock: DeliverLock = { id: 'q1', version: 4 };
+    expect(lockHolds(lock, q)).toBe(true);
+    expect(deliverTarget(q, lock, false)).toBeNull();
+  });
+
+  it('(b) a lock of another question or another version no longer holds (Befund 1, Punkt 4)', () => {
+    expect(lockHolds({ id: 'q1', version: 4 }, staged('q2', 4))).toBe(false);
+    expect(lockHolds({ id: 'q1', version: 4 }, staged('q1', 5))).toBe(false);
+    expect(deliverTarget(staged('q2', 4), { id: 'q1', version: 4 }, false)).not.toBeNull();
+    expect(deliverTarget(staged('q1', 5), { id: 'q1', version: 4 }, false)).not.toBeNull();
+    expect(lockHolds(null, q)).toBe(false);
+    expect(lockHolds({ id: 'q1', version: 4 }, null)).toBe(false);
+  });
+
+  it('(c) after an actor change (drawn stage null) and after a read refusal there is no target', () => {
+    // Review 3 Minor 4 and Codex P2-B on 948a721: Page.tsx drops the stage in the render of the actor change and on
+    // a refusal; the rule then has nothing of the previous actor to act on.
+    expect(shownQuestion(null)).toBeNull();
+    expect(deliverTarget(shownQuestion(null), null, false)).toBeNull();
+    expect(deliverTarget(shownQuestion(onStage(null)), null, false)).toBeNull();
+  });
+
+  it('no target without question.deliver in _actions, and none while a return is written', () => {
+    expect(deliverTarget(staged('q1', 4, ['question.return']), null, false)).toBeNull();
+    expect(deliverTarget(q, null, true)).toBeNull();
+  });
+
+  it('(d) "button drawn and not locked" exactly when there is a target', () => {
+    const questions = [null, q, staged('q1', 4, ['question.return']), staged('q1', 5), staged('q2', 4)];
+    const locks: (DeliverLock | null)[] = [null, { id: 'q1', version: 4 }, { id: 'q2', version: 4 }];
+    for (const question of questions) {
+      for (const lock of locks) {
+        for (const returning of [false, true]) {
+          const button = nextButton(question, lock, returning);
+          const target = deliverTarget(question, lock, returning);
+          const label = JSON.stringify({ id: question?.id, v: question?.version, lock, returning });
+          expect(button.drawn && !button.locked, label).toBe(target !== null);
+          if (target !== null) expect(target, label).toBe(question);
+          expect(button.drawn, label).toBe(question?._actions.includes('question.deliver') ?? false);
+        }
+      }
+    }
+  });
+});
+
+/**
+ * takt-039, review minor 7 (Recht/Audit): "Antwort zurückgeben" writes for the question the dialog was opened on, with
+ * that question's version, never for a question drawn later.
+ */
+describe('returnTargetOf, returnWrite (takt-039, minor 7)', () => {
+  const a = staged('qa', 3, ['question.deliver', 'question.return']);
+
+  it('the dialog opened for F-A writes for F-A with its version after the stage moved on to F-B', () => {
+    const opened = returnTargetOf(a);
+    expect(opened).toEqual({ id: 'qa', version: 3, number: 'F-qa' });
+    // The stage now draws F-B (qb, version 7); the captured target does not follow it, and the write takes nothing
+    // from the drawn stage (the in-process e2e in 010c proves the same through the page).
+    expect(returnWrite(opened!, 'Grund')).toEqual({ questionId: 'qa', reason: 'Grund', ifMatch: '"v3"' });
+  });
+
+  it('no target without question.return in _actions, and none without a question', () => {
+    expect(returnTargetOf(staged('qa', 3, ['question.deliver']))).toBeNull();
+    expect(returnTargetOf(null)).toBeNull();
+    expect(returnTargetOf(undefined)).toBeNull();
   });
 });
