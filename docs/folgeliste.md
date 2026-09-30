@@ -224,6 +224,11 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   als erwartet verdecken · erwartete Fehlermeldung ausdrücklich prüfen.
 - 034b nit · Startzeile des Dienstes · IPv6-Adressen der Proxy-Quelle nicht in kanonischer Form ausgegeben · kanonisch
   ausgeben.
+- takt-033b Review minor · `apps/web/src/api/useApiVersion.ts`, `App.tsx` · nach Rückkehr in einen Hintergrund-Tab bleibt
+  die Ansicht bis zum nächsten 30-s-Takt alt (früher sofortiges Neuladen über den `/auth/me`-Refresh) · Polling-Hörer
+  beim Sichtbarwerden einmal auslösen (`http.ts`).
+- takt-033b Review minor · `apps/web/e2e/031-http-betriebsart.spec.ts` H10 · Probe nach dem Sichtbarkeitswechsel nicht
+  geprüft; `networkidle` als Wartebedingung ist eine Heuristik · beide Zählungen am Ende prüfen, auf Produktsignal warten.
 
 ## Dienst: Kettenprüfung (aus takt-033)
 
