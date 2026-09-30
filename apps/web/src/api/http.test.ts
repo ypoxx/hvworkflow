@@ -216,7 +216,7 @@ describe('HTTP HvApi adapter', () => {
       const listener = vi.fn(() => { etagSeen = api.lastWriteEtag(); });
       const stop = api.subscribe(listener);
       replies.push(json({ id: 's' }, 201, { ETag: '"v7"' }));
-      const pending = api.registerSpeaker({ name: 'A' } as Parameters<HvApi['registerSpeaker']>[0]);
+      const pending = api.registerSpeaker({ displayName: 'A' });
       seenBeforeResponse = listener.mock.calls.length > 0;
       await pending;
       expect(seenBeforeResponse).toBe(false);
