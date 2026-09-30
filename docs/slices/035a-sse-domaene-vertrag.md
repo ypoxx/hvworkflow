@@ -350,10 +350,24 @@ Perspektive(n): Security (6.5), Vertrag (6.4) · Nachweise: Tests 1–12, Prüfp
 
 ```
 Slice: 035a-sse-domaene-vertrag
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen 1–12; Sichtbarkeitstabelle
-Open: Eigentümerfrage 1; Dienst in 035b
-Touched: <Dateiliste>
+Done: Vertrag 0.3.11 (StreamChange/Cursor/Reset/End/Topic, `after` ohne Standard, `Last-Event-ID` begrenzt, 404/429/503).
+      Domäne: `stream.ts` mit R-PERM-04 über `can()` (kein Rollenliteral), EVENT_TOPICS/EVENT_SUBJECTS/SCOPE_EXIT_EVENTS/
+      STAGE_*, resolveMeetingActor/resolveReaderActors, isOnStage als einzige Bühnenstelle, HvApi.subscribe(events, change?).
+Evidence: Baucommits 4497f8f (Vertrag), 45584a1 (Domäne), 7e77aec (Review-Major, Isolation); integriert dbd8211, gemergt
+      8a4c8bd (#102). Tests 1–12 in stream035.test.ts (18 Tests) rot gegen Platzhalter, dann grün; Mutationsproben rot.
+      `pnpm gates` auf dbd8211 (Postgres), Exit 0:
+        packages/domain test:  Tests  261 passed (261)
+        apps/web test:         Tests  334 passed (334)
+        apps/api test:         Tests  524 passed (524)
+        slice-scope: 18 changed file(s), all within "docs/slices/035a-sse-domaene-vertrag.md"'s "Files allowed" list (33 pattern(s)).
+        ✓ built in 1.95s
+        mark-test-run: wrote … (clean tree) at commit dbd8211
+      PR-CI auf dbd8211: gates und e2e-http grün (Lauf 36717885262). Sichtbarkeitstabelle aus Test 3 (siehe PR #102).
+Open: Eigentümerfrage 1 (Freigabe der Sichtbarkeitstabelle); Dienst in 035b; Nachprüfungs-Minors in der Folgeliste.
+Touched: packages/contract/{openapi.yaml,CHANGELOG.md,package.json,src/types.ts}; packages/domain/src/{stream.ts,api.ts,
+      state.ts,types.ts,index.ts,rules.ts,__tests__/stream035.test.ts}; apps/api/src/__tests__/{contract.test.ts,
+      takt-019-contract.test.ts,postgres-stream035a.test.ts}; docs/legal-trace.md; docs/sicherheit/bedrohungsmodell.md;
+      docs/folgeliste.md; diese Spec.
 ```
 
 ## Review findings
@@ -362,3 +376,7 @@ Lesebefund zu Spec 035 (Opus, frischer Kontext, `9f2560c`): nicht baureif. In di
 M2 (`EVENT_SUBJECTS`, Zählersignal `stage`, Test 2b), M3 (`can()` je Frage, `SCOPE_EXIT_EVENTS`, Test 9), M4 (Akteurkarte,
 Ereignisse ohne Jahrgang, Test 10), M5 (a), M9, m1, m2, m3, m6, m10, m11 (Domänenteil). B1, M6–M8 und die übrigen Minor
 stehen in 035b.
+
+Review des Baus (Opus, frischer Kontext, 2606f81..45584a1): ein Major (Test 8 hielt den Vorher-Abzug nicht fest), behoben
+in 7e77aec; enge Nachprüfung ohne Blocker/Major; Minors und Nits in `docs/folgeliste.md` („Strom-Domäne (aus 035a)“).
+Codex auf #102: ohne Befund.
