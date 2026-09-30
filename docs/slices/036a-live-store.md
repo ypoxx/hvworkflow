@@ -130,7 +130,10 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
    ungültig, spätestens aber 30 s nach dem Eintreffen, und die Hörer werden gerufen.
    - Zeitquelle ist die Uhr aus 032 (`apps/web/src/time.ts`), falls gemergt. Sonst die als Option injizierte Uhr der Hülle;
      `index.ts` verdrahtet die Browseruhr, Tests eine gefälschte.
-   - Einträge ohne `claim` haben kein Höchstalter.
+   - ~~Einträge ohne `claim` haben kein Höchstalter.~~ Review M1 (30.09.2026): **jeder** Eintrag hat ein Höchstalter von
+     30 s (wie der HTTP-Takt), gemessen mit der monotonen Uhr (`performance.now()`, Nachprüfung minor 2, Test u); die
+     Wanduhr vergleicht nur `claim.expiresAt`. Einträge ohne `claim` laufen still ab (kein Hörer-Aufruf, der nächste Lesezugriff geht ins
+     Netz); nur Claim-Einträge wecken die Hörer (Tests o, q).
 8. **Akteur und Sitzung (N2).** Ganzer Puffer leer (`clear()`, `E` erhöhen) bei:
    - echtem Akteurwechsel (`actorChanged`, auch im Demo-Umschalter);
    - 401 (`onUnauthorized`) und Abmelden;
@@ -162,6 +165,9 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
   Akteurwechsel, 401, Abmelden; Uhr als Option)
 - `apps/web/src/api/useApiVersion.ts`, `apps/web/src/api/useApiVersion.test.ts` (nur falls die Hülle den Hörerweg dort
   braucht; Signatur unverändert)
+- `apps/web/e2e/010c-lesezustand.spec.ts` (nur Helfer `unrelatedEvent`; Bauklärung 30.09.2026)
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (nur Helfer `unrelatedEvent`, `currentVersionAsAdmin` (jetzt `currentVersion`), `elsewhere` und ihre
+  Aufrufe; Bauklärung 30.09.2026)
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
 
@@ -218,9 +224,19 @@ außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht als erla
      Version 5 mit Zeilen 5, dann neues `getMeeting` mit 6 → die gepufferte Liste der Version 5 wird nie zusammen mit 6
      ausgeliefert; das Ergebnis hat Zeilen und Version desselben Stands oder scheitert sicher;
    - (o) (N7) Eintrag mit `claim.expiresAt` in 10 s → nach 10 s (gefälschte Uhr) ungültig und Hörer gerufen, der nächste
-     Aufruf holt neu; Eintrag mit Claim ohne frühen Ablauf → nach 30 s ungültig; Eintrag ohne Claim → bleibt;
+     Aufruf holt neu; Eintrag mit Claim ohne frühen Ablauf → nach 30 s ungültig; Eintrag ohne Claim → nach 30 s still
+     ungültig (kein Hörer-Aufruf, Test q);
    - (p) `READ_TOPICS` ist vollständig (Typprüfung über `satisfies`, Laufzeitprüfung über die Methodenliste; `listEvents`
-     fehlt ausdrücklich).
+     fehlt ausdrücklich);
+   - (q) (Review M1) jeder Eintrag hat ein Höchstalter von 30 s; er läuft still ab, der nächste Lesezugriff geht ins Netz;
+   - (u) (Nachprüfung minor 2) das Höchstalter wird mit der monotonen Uhr gemessen: eine um 10 min zurückgestellte Wanduhr
+     verlängert es nicht;
+   - (r1)–(r4) (Review M2) kein Aufrufer schließt an eine vor dem Ungültigmachen gestartete Anfrage an: nach eigenem
+     Schreiben (`success`), nach Ungültigmachen des Schlüssels (`change` mit `subjects`), nach höherem Zähler von
+     `getMeeting`, nach `clear()` für denselben Akteur;
+   - (s) (Review minor 3) Akteurwechsel in einer Mikrotask zwischen Eintreffen einer geteilten Antwort und Auslieferung →
+     nicht ausgeliefert;
+   - (t) (Review minor 4) ein Fehler beim Abschluss (nicht kopierbare Antwort) erreicht den Aufrufer als Ablehnung.
 2. `http.test.ts`: `onWriteSettled` mit `success` nach 2xx (nach `writeEtag`), `server_error` bei 412/500/Netzfehler,
    `local_reject` ohne CSRF-Token und bei `updateSpeaker` mit `reason`. Bestehende takt-030-Tests bleiben grün.
 3. **e2e ohne Rückschritt:** in-process-Suite vollständig grün; im Projekt `http` H8 (412), H9 (eigene Schreibvorgänge)
@@ -256,6 +272,13 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
   5. Nichts auf dem Datenträger.
 - **Missbrauchs- bzw. Fehlerfall MF-LS-1 (010d, SG1/SG3), Rollenwechsel am geteilten Gerät.** Abwehr: struktureller
   Schlüssel plus `clear()`. Erkennung: Tests j, j2, j3 als Tor; im Betrieb nicht beobachtbar, daher Pflicht-Tor.
+  **Restrisiko Rechteverlust ohne Signal (Review M1, SP-7, T-G1-I-08):** abgelaufene `RoleAssignment.expiresAt`, Abmelden
+  oder Entzug in einem anderen Fenster erreichen den Puffer nicht. Begrenzt auf 30 s durch das Höchstalter aller Einträge
+  (Test q); das Stromende `forbidden` aus 036b schließt es schneller. Das deckt auch einen lange verborgenen Tab (Review
+  minor 6).
+- **Bekanntes Restrisiko (Review minor 5).** Ein mehrstufiger Ablauf der Wortmeldeliste, dessen Lesezugriff nach einem
+  strukturellen Akteurwechsel zurückgehalten wird (unerledigtes Promise, Entscheidung 4), hält seine Busy-Referenz bis zum
+  Neu-Einhängen der Seite. Seiten liegen außerhalb dieser Scheibe; Folgeliste.
 - **Fehlerfall: Invalidierung zu eng.** Veraltete Anzeige bis zum nächsten Thema oder Takt. Abwehr: 035a Test 2b,
   `EVENT_SUBJECTS`, Test 1 (d).
 - **Fehlerfall: alte Liste, neue Version (N3).** Abwehr: Wasserzeichen, Test 1 (n).
@@ -278,12 +301,12 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
 | SC-10 | ja: keine neue Abhängigkeit |
 | SC-11 | ja: keine Log-Ausgabe mit Inhalt, keine Kennzahl |
 | SC-12 | ja: keine Tore oder Hooks berührt |
-| SP-2 | ja: Obergrenze 200, Höchstalter für Claim-Einträge, Generationen statt wachsender Listen |
+| SP-2 | ja: Obergrenze 200, Höchstalter 30 s für alle Einträge (Review M1), Generationen statt wachsender Listen |
 | SP-3 | ja: kein Token im Browserspeicher, CSRF und 401-Weg unverändert; der Puffer liegt nur im Speicher |
 | SP-4 | ja: keine HTML-Ausgabe, kein neuer Ursprung |
 | SP-5 | ja: kein Geheimnis im Diff; das CSRF-Token wird nicht gepuffert (`/auth/me` läuft nicht über die Hülle) |
 | SP-6 | ja: T-G1-I-08 (nichts auf dem Datenträger), T-G1-D-03 (Last) |
-| SP-7 | ja, clientseitig: Leeren bei 401 und bei Stromende `session` (Meldung aus 036b) |
+| SP-7 | ja, clientseitig: Leeren bei 401 und bei Stromende `session` (Meldung aus 036b); Höchstalter 30 s (monoton) begrenzt Rechteverlust ohne Signal (Test q) |
 
 ## Offene Eigentümerfragen
 
@@ -295,11 +318,42 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
 
 ```
 Slice: 036a-live-store
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; Testnamen; PR-CI-Lauf <id> (H8–H10, in-process)
-Open: Eigentümerfrage 1; Strom-Client in 036b
-Touched: <Dateiliste>
+Done: `createLiveStore` über beiden Adaptern: Schlüssel aus strukturellem Akteur, Methode, Argumenten; Epochen A/E und
+      Generation je Schlüssel; Antworten nie nach Akteurwechsel; Höchstalter 30 s (monoton) für jeden Eintrag, Claims
+      wecken die Hörer; Invalidierung je Thema/Kennung und Schreibvorgang; Haken `onWriteSettled` in `http.ts`.
+Evidence: Baucommits 898ef2d (Bau), 2a0cf5a (e2e-Helfer 010c/010d, Bauklärung), 53e644b (Review), 561e28d (Nachprüfung,
+      geprüfte Fassung). `liveStore.test.ts` 34 Tests: 18 rot gegen Durchreich-Platzhalter, weitere je Fix rot vor dem Fix
+      (o, q, s, t, u) oder per Mutation (r1–r4, k); `http.test.ts` 6 rot, dann grün. In-process e2e 131/131 auf 561e28d.
+      `pnpm gates` auf 561e28d (hv_t030), Exit 0:
+        packages/domain test:  Tests  261 passed (261)
+        apps/web test:         Tests  374 passed (374)
+        apps/api test:         Tests  524 passed (524)
+        slice-scope: 9 changed file(s), all within "docs/slices/036a-live-store.md"'s "Files allowed" list (22 pattern(s)).
+        ✓ built in 1.42s
+        mark-test-run: wrote … (clean tree) at commit 561e28d
+      PR-CI auf 561e28d: gates und e2e-http (H8–H10 u. a.) grün, Lauf 36731294282.
+Open: Eigentümerfrage 1 (ADR 0014, Invalidieren statt Deltas); Strom-Client in 036b; Minor 5 als bekanntes Restrisiko.
+Touched: apps/web/src/api/{liveStore.ts,liveStore.test.ts,http.ts,http.test.ts,index.ts};
+      apps/web/e2e/{010c-lesezustand.spec.ts,010d-ansichtsdaten.spec.ts} (nur Helfer); docs/folgeliste.md; diese Spec.
 ```
+
+Review (Opus, frischer Kontext, 8a4c8bd..2a0cf5a): kein Leck zwischen Akteuren; zwei Major (M1 Höchstalter nur für
+Claims, M2 Flugregel ungetestet) und Minors 3/4 behoben in 53e644b. Nachprüfung (2a0cf5a..53e644b): kein Blocker/Major;
+Minor 2 (Wanduhr, Sicherheit) und Spec-Text behoben in 561e28d. Übrige Punkte in `docs/folgeliste.md`.
+
+Hinweis zum Akzeptanzkriterium 2 (Bau, 30.09.2026): `grep -rn "fetch(" apps/web/src` trifft außerhalb von `http.ts` nur
+`refetch();` in `apps/web/src/features/capture/Page.tsx:316`, ein Fehltreffer des Musters, vorbestehend, kein
+`fetch`-Aufruf. `localStorage`/`sessionStorage` in `liveStore.ts`: kein Treffer.
+
+## Bauklärung (Orchestrator, 30.09.2026)
+
+- Die e2e-Helfer in 010c/010d wechselten für einen Lesezugriff auf die Administration und **vor** dessen Antwort zurück.
+  Die Hülle hält diese Antwort nach Entscheidung 4 zu Recht zurück (Akteur-Epoche geändert); die Helfer warteten ewig
+  (11 Fälle rot). Entscheidung 4 bleibt unverändert. Die Helfer beenden die Admin-Arbeit jetzt vor dem Rückwechsel:
+  Versionen liest der aktuelle Akteur (`getMeeting` ist Stammdaten; die Frage steht auf seinem Schirm), die zweite Version
+  in 010d kommt aus der Antwort des ersten Schreibens. Die Schreibvorgänge der Administration laufen im In-Process-Kern
+  vollständig synchron (Rechteprüfung, Anhängen und Antwort sind bei der Rückkehr des Aufrufs fertig); es ist beim
+  Rückwechsel keine Admin-Anfrage unterwegs. Die Regel selbst halten die Tests (j2b) und (j2c) in `liveStore.test.ts`.
 
 ## Review findings
 

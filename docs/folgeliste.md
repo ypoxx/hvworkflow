@@ -298,6 +298,25 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
   `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
 
+## Live-Store (aus 036a)
+
+- 036a Bauhinweis · `apps/web/src/api/liveStore.ts` · der In-Process-`subscribe` meldet `[]` ohne `change`, wenn für den Leser nichts Lesbares geändert wurde; nach Entscheidung 3 leert das den ganzen Puffer (Verhalten wie vor 036a, aber unnötige Abrufe) · im Demo-Adapter nur melden, wenn es etwas zu melden gibt, oder einen leeren Aufruf als „nichts“ kennzeichnen.
+- 036a Nachprüfung nit 3 · `apps/web/src/api/liveStore.ts` · ein abgelaufener Eintrag ohne Claim bleibt im Speicher, bis
+  er gelesen oder verdrängt wird (höchstens 200 Einträge); ausgeliefert wird er nie · optionales Aufräumen in `keep`/`read`.
+- 036a Review minor 5 · `apps/web/src/features/speakers/*` (mehrstufige Abläufe, z. B. `moveSpeakerToRound`) · wird ein
+  Lesezugriff nach einem strukturellen Akteurwechsel zurückgehalten (Entscheidung 4, unerledigtes Promise), bleibt die
+  Busy-Referenz des Ablaufs bis zum Neu-Einhängen gesetzt · den Ablauf an den Akteur binden und beim Akteurwechsel freigeben.
+- 036a Review nit 11 · `apps/web/src/api/liveStore.ts` · der Themenweg (`change`/`event` → gezielte Invalidierung) ist nur
+  durch Unit-Tests belegt, kein e2e prüft ihn gegen den echten Adapter · mit 036b (H11) e2e-Nachweis ergänzen.
+- 036a Bauhinweis · `apps/web/src/api/index.ts` · bei 401 läuft `clear()` zweimal (HTTP-`onUnauthorized`, dann `onActorChange(undefined)`), die Hörer laufen zweimal; harmlos, die Hülle hängt im selben Stapel aus · einen der beiden Aufrufe weglassen oder `clear()` bei leerem Puffer ohne Hörer-Aufruf.
+- 036a Review nit 9 · `apps/web/src/api/liveStore.ts` (Wasserzeichen-Prüfungen bei Auslieferung, Aufnahme und
+  `mark = undefined` in `clearAll`) · doppelt abgesichert und ungepinnt, die Invalidierung durch `raiseMark` verdeckt sie
+  · direkten Test ergänzen oder die redundanten Prüfungen streichen.
+- 036a Review nit 10 · `apps/web/src/api/liveStore.ts` (Verdrängung) · FIFO statt nach letzter Nutzung; ein ständig
+  gelesener `getMeeting`-Eintrag wird als ältester verdrängt · spec-konform, kostet nur Abrufe; bei Bedarf LRU.
+- 036a Review nit 12 · `apps/web/src/api/index.ts`, `liveStore.ts` · `clear('logout')` ruft die Hörer, `useApiVersion`
+  zählt zusätzlich den Akteur `undefined`; bei 401 läuft `clear` doppelt · harmlos, die Shell hängt ab.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf

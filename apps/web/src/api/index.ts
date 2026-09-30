@@ -17,6 +17,7 @@ import {
 import { getActor, setActor, setSessionActor, DEMO_ACTORS } from './actor';
 import { createSessionAuth } from './auth';
 import { createHttpApi, getHttpSession, logoutHttpSession } from './http';
+import { actorKey, createLiveStore, type LiveStore } from './liveStore';
 import { DEMO_MODE } from './mode';
 import { getLang } from '../i18n';
 
@@ -73,19 +74,48 @@ if (DEMO_MODE) {
   }
 }
 
+/** Set right below; the adapters' callbacks only run after start-up. */
+let liveStore: LiveStore | undefined;
+
+/** The session actor as seen last, for the structural comparison on a session refresh (takt-033b). */
+let sessionActorKey: string | undefined;
 export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
   readSession: getHttpSession,
   signOut: logoutHttpSession,
-  onActorChange: setSessionActor,
+  onActorChange: (actor) => {
+    // Slice 036a, Entscheidung 8: a structurally other actor or none (sign-out, 401) empties the live store before
+    // any view learns of the new actor. An equal actor object from a refresh keeps it.
+    const next = actor === undefined ? undefined : actorKey(actor);
+    if (next !== sessionActorKey) liveStore?.clear(actor === undefined ? 'logout' : 'actor');
+    sessionActorKey = next;
+    setSessionActor(actor);
+  },
 });
 
-export const api: HvApi = DEMO_MODE
+const adapter: HvApi = DEMO_MODE
   ? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents })
   : createHttpApi({
     getCsrfToken: () => sessionAuth?.getCsrfToken(),
-    onUnauthorized: () => sessionAuth?.onUnauthorized(),
+    onUnauthorized: () => {
+      liveStore?.clear('unauthorized');
+      sessionAuth?.onUnauthorized();
+    },
+    onWriteSettled: (outcome) => liveStore?.onWriteSettled(outcome),
     locale: getLang,
   });
+
+/**
+ * Slice 036a: the live store over either adapter. The demo adapter has no write hook, so the store watches its writes;
+ * the role switcher is noticed structurally on the next read or answer. The browser's wall clock compares claim ends,
+ * `performance.now()` measures the maximum age of entries (monotonic, unaffected by a clock set back).
+ */
+liveStore = createLiveStore(adapter, {
+  getActor,
+  now: () => new Date().getTime(),
+  monotonic: () => performance.now(),
+  observeWrites: DEMO_MODE,
+});
+export const api: HvApi = liveStore;
 
 /** Whether the demo corpus is loaded. The shell seeds on first start. */
 export function isSeeded(): boolean {
