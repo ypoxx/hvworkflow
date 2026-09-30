@@ -117,7 +117,7 @@ Unit-Test erst rot (6 von 6, `actorChanged` fehlte), dann grün. `pnpm --filter 
 Nachlauf nach dem ersten PR-CI-Lauf (Lauf 36668137833: H10 sah zwei `GET /v1/stage` je Einhängen). Ursache: Das Projekt
 `http` läuft gegen den Vite-Dev-Server, `<StrictMode>` führt Einhänge-Effekte dort doppelt aus; ein Produktions-Build tut
 das nicht. H10 erwartet deshalb 2 im Dev- und 1 im Build-Modus (erkannt an `/@vite/client`); der alte Fehler (Zählen beim
-Einhängen) ergäbe 3 und bleibt rot. Der Dev-Zweig entfällt mit takt-035 (Projekt `http` gegen Produktions-Build).
+Einhängen) ergäbe 3 und bleibt rot. Der Dev-Zweig entfällt mit takt-035 (Projekt `http` gegen Produktions-Build). Der Dev-Zweig in H10 wurde nach takt-035 entfernt; H10 erwartet genau 1 Abruf.
 `pnpm gates` auf `92bcba8`, sauberer Baum, Exit 0.
 
 ## Review findings
