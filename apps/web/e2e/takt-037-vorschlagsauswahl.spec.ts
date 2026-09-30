@@ -52,7 +52,8 @@ test('an unchecked suggestion stays unchecked after a refresh @screenshot', asyn
   // app's own in-process HvApi, called as the signed-in capture desk. A free question (no marked passage) changes the
   // contribution and its coverage, the listeners fire and the candidates are rebuilt with a new `uncovered` array.
   const written = await page.evaluate(async () => {
-    const { api } = (await import(/* @vite-ignore */ '/src/api/index.ts')) as {
+    const appApi = '/src/api/index.ts';
+    const { api } = (await import(/* @vite-ignore */ appApi)) as {
       api: {
         listContributions(): Promise<{ id: string; version: number }[]>;
         captureQuestions(id: string, q: { text: string }[], o: { ifMatch: string }): Promise<unknown[]>;
