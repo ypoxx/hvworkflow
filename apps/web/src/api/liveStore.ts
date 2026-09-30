@@ -116,8 +116,16 @@ export type LiveStore = HvApi & LiveStoreControl;
 export interface LiveStoreOptions {
   /** The calling actor; throws when there is none (signed out). */
   getActor: () => Actor;
-  /** Milliseconds since the epoch; injected (the web time source of slice 032 is not merged). */
+  /**
+   * Milliseconds since the epoch; injected (the web time source of slice 032 is not merged). Used only to compare a
+   * `claim.expiresAt`, which is a wall-clock time from the service.
+   */
   now: () => number;
+  /**
+   * A monotonic millisecond source (the browser's `performance.now()`), for the maximum age of entries. A wall clock set
+   * back must not extend the 30 s bound on a loss of rights without a signal (re-check minor 2, MF-LS-1, SP-2).
+   */
+  monotonic: () => number;
   /** Demo adapter: it has no write hook, so the store watches the writes' promises itself. */
   observeWrites?: boolean;
 }
@@ -168,10 +176,10 @@ interface Entry {
   args: readonly unknown[];
   value: unknown;
   watermark: number | undefined;
-  /** Not delivered from this moment on. */
-  deadline: number;
-  /** Holds a claim: its end wakes the listeners (N7). */
-  wakes: boolean;
+  /** Arrival on the monotonic clock; the entry is not delivered from `bornAt + MAX_AGE_MS` on. */
+  bornAt: number;
+  /** Earliest `claim.expiresAt` on the wall clock, if the answer holds a claim: its end wakes the listeners (N7). */
+  claimEnd: number | undefined;
 }
 type Outcome = { kind: 'ok'; value: unknown } | { kind: 'error'; error: unknown } | { kind: 'withheld' };
 interface Flight {
@@ -250,27 +258,34 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     return key;
   };
 
+  /** Past its maximum age (monotonic) or its claim (wall clock). */
+  const expired = (entry: Entry): boolean =>
+    options.monotonic() - entry.bornAt >= MAX_AGE_MS || (entry.claimEnd !== undefined && entry.claimEnd <= options.now());
+  /** Milliseconds until a claim entry ends, the earlier of its maximum age and its claim. */
+  const remaining = (entry: Entry): number =>
+    Math.min(entry.bornAt + MAX_AGE_MS - options.monotonic(), (entry.claimEnd ?? Infinity) - options.now());
   const scheduleClaims = (): void => {
     stopClaimTimer();
     let next: number | undefined;
     for (const entry of entries.values()) {
-      if (entry.wakes && (next === undefined || entry.deadline < next)) next = entry.deadline;
+      if (entry.claimEnd === undefined) continue;
+      const left = remaining(entry);
+      if (next === undefined || left < next) next = left;
     }
     if (next === undefined) return;
-    claimTimer = setTimeout(expireClaims, Math.max(0, next - options.now()));
+    claimTimer = setTimeout(expireClaims, Math.max(0, next));
   };
   function expireClaims(): void {
     claimTimer = undefined;
-    const now = options.now();
-    let expired = false;
+    let woke = false;
     for (const [key, entry] of entries) {
-      if (entry.deadline <= now) {
+      if (expired(entry)) {
         entries.delete(key);
-        if (entry.wakes) expired = true;
+        if (entry.claimEnd !== undefined) woke = true;
       }
     }
     scheduleClaims();
-    if (expired) notify();
+    if (woke) notify();
   }
 
   const markOf = (method: BufferedRead): number | undefined => {
@@ -296,20 +311,17 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   };
 
   const keep = (key: string, method: BufferedRead, args: readonly unknown[], value: unknown, watermark: number | undefined): void => {
-    const now = options.now();
     const claimEnd = earliestClaimEnd(value);
-    const deadline = Math.min(claimEnd ?? Infinity, now + MAX_AGE_MS);
     // Already past on arrival (clock skew between browser and service): not kept, and nobody is woken — no reload loop.
-    if (deadline <= now) return;
-    const wakes = claimEnd !== undefined;
+    if (claimEnd !== undefined && claimEnd <= options.now()) return;
     entries.delete(key);
-    entries.set(key, { method, args, value, watermark, deadline, wakes });
+    entries.set(key, { method, args, value, watermark, bornAt: options.monotonic(), claimEnd });
     while (entries.size > MAX_ENTRIES) {
       const oldest = entries.keys().next().value;
       if (oldest === undefined) break;
       entries.delete(oldest);
     }
-    if (wakes) scheduleClaims();
+    if (claimEnd !== undefined) scheduleClaims();
   };
 
   /**
@@ -342,7 +354,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
 
     const entry = entries.get(key);
     if (entry !== undefined) {
-      const fresh = entry.watermark === markOf(method) && entry.deadline > options.now();
+      const fresh = entry.watermark === markOf(method) && !expired(entry);
       if (fresh) {
         // Asynchronous, as a new promise (010c); withheld if the actor changes before it is delivered.
         return forCaller(Promise.resolve({ kind: 'ok', value: entry.value }), startA, actor);

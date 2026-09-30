@@ -106,9 +106,15 @@ const adapter: HvApi = DEMO_MODE
 
 /**
  * Slice 036a: the live store over either adapter. The demo adapter has no write hook, so the store watches its writes;
- * the role switcher is noticed structurally on the next read or answer. The browser clock is the store's time source.
+ * the role switcher is noticed structurally on the next read or answer. The browser's wall clock compares claim ends,
+ * `performance.now()` measures the maximum age of entries (monotonic, unaffected by a clock set back).
  */
-liveStore = createLiveStore(adapter, { getActor, now: () => new Date().getTime(), observeWrites: DEMO_MODE });
+liveStore = createLiveStore(adapter, {
+  getActor,
+  now: () => new Date().getTime(),
+  monotonic: () => performance.now(),
+  observeWrites: DEMO_MODE,
+});
 export const api: HvApi = liveStore;
 
 /** Whether the demo corpus is loaded. The shell seeds on first start. */

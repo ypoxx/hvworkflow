@@ -41,6 +41,7 @@ function track<T>(promise: Promise<T>) {
 function setup(options: { observeWrites?: boolean } = {}) {
   let actor: Actor | undefined = A;
   let clock = 0;
+  let mono = 0;
   const listeners = new Set<Listener>();
   const calls: Call[] = [];
   const held: Held[] = [];
@@ -74,6 +75,7 @@ function setup(options: { observeWrites?: boolean } = {}) {
       return actor;
     },
     now: () => clock,
+    monotonic: () => mono,
     ...(options.observeWrites !== undefined ? { observeWrites: options.observeWrites } : {}),
   });
   const heard = vi.fn();
@@ -96,7 +98,9 @@ function setup(options: { observeWrites?: boolean } = {}) {
     setHold: (next: boolean) => { hold = next; },
     setEtag: (next: string) => { etag = next; },
     setRespond: (next: typeof respond) => { respond = next; },
-    advance: async (ms: number) => { clock += ms; await vi.advanceTimersByTimeAsync(ms); },
+    advance: async (ms: number) => { clock += ms; mono += ms; await vi.advanceTimersByTimeAsync(ms); },
+    /** The wall clock alone jumps (a clock set back or forward); the monotonic source does not. */
+    jumpWall: (ms: number) => { clock += ms; },
   };
 }
 
@@ -561,6 +565,19 @@ describe('live store (slice 036a)', () => {
     await t.advance(29_999);
     await t.store.listSpeakers();
     expect(t.count('listSpeakers')).toBe(2);
+  });
+
+  it('(u) re-check minor 2: the maximum age is measured monotonically; a wall clock set back 10 min does not extend it', async () => {
+    const t = setup();
+    await t.store.listSpeakers();
+    t.jumpWall(-600_000);
+    await t.advance(29_999);
+    await t.store.listSpeakers();
+    expect(t.count('listSpeakers')).toBe(1);
+    await t.advance(1);
+    await t.store.listSpeakers();
+    expect(t.count('listSpeakers')).toBe(2);
+    expect(t.heard).not.toHaveBeenCalled();
   });
 
   describe('review M2: no caller joins a request started before an invalidation', () => {

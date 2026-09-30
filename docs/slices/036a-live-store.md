@@ -131,7 +131,8 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
    - Zeitquelle ist die Uhr aus 032 (`apps/web/src/time.ts`), falls gemergt. Sonst die als Option injizierte Uhr der Hülle;
      `index.ts` verdrahtet die Browseruhr, Tests eine gefälschte.
    - ~~Einträge ohne `claim` haben kein Höchstalter.~~ Review M1 (30.09.2026): **jeder** Eintrag hat ein Höchstalter von
-     30 s (wie der HTTP-Takt). Einträge ohne `claim` laufen still ab (kein Hörer-Aufruf, der nächste Lesezugriff geht ins
+     30 s (wie der HTTP-Takt), gemessen mit der monotonen Uhr (`performance.now()`, Nachprüfung minor 2, Test u); die
+     Wanduhr vergleicht nur `claim.expiresAt`. Einträge ohne `claim` laufen still ab (kein Hörer-Aufruf, der nächste Lesezugriff geht ins
      Netz); nur Claim-Einträge wecken die Hörer (Tests o, q).
 8. **Akteur und Sitzung (N2).** Ganzer Puffer leer (`clear()`, `E` erhöhen) bei:
    - echtem Akteurwechsel (`actorChanged`, auch im Demo-Umschalter);
@@ -223,9 +224,19 @@ außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht als erla
      Version 5 mit Zeilen 5, dann neues `getMeeting` mit 6 → die gepufferte Liste der Version 5 wird nie zusammen mit 6
      ausgeliefert; das Ergebnis hat Zeilen und Version desselben Stands oder scheitert sicher;
    - (o) (N7) Eintrag mit `claim.expiresAt` in 10 s → nach 10 s (gefälschte Uhr) ungültig und Hörer gerufen, der nächste
-     Aufruf holt neu; Eintrag mit Claim ohne frühen Ablauf → nach 30 s ungültig; Eintrag ohne Claim → bleibt;
+     Aufruf holt neu; Eintrag mit Claim ohne frühen Ablauf → nach 30 s ungültig; Eintrag ohne Claim → nach 30 s still
+     ungültig (kein Hörer-Aufruf, Test q);
    - (p) `READ_TOPICS` ist vollständig (Typprüfung über `satisfies`, Laufzeitprüfung über die Methodenliste; `listEvents`
-     fehlt ausdrücklich).
+     fehlt ausdrücklich);
+   - (q) (Review M1) jeder Eintrag hat ein Höchstalter von 30 s; er läuft still ab, der nächste Lesezugriff geht ins Netz;
+   - (u) (Nachprüfung minor 2) das Höchstalter wird mit der monotonen Uhr gemessen: eine um 10 min zurückgestellte Wanduhr
+     verlängert es nicht;
+   - (r1)–(r4) (Review M2) kein Aufrufer schließt an eine vor dem Ungültigmachen gestartete Anfrage an: nach eigenem
+     Schreiben (`success`), nach Ungültigmachen des Schlüssels (`change` mit `subjects`), nach höherem Zähler von
+     `getMeeting`, nach `clear()` für denselben Akteur;
+   - (s) (Review minor 3) Akteurwechsel in einer Mikrotask zwischen Eintreffen einer geteilten Antwort und Auslieferung →
+     nicht ausgeliefert;
+   - (t) (Review minor 4) ein Fehler beim Abschluss (nicht kopierbare Antwort) erreicht den Aufrufer als Ablehnung.
 2. `http.test.ts`: `onWriteSettled` mit `success` nach 2xx (nach `writeEtag`), `server_error` bei 412/500/Netzfehler,
    `local_reject` ohne CSRF-Token und bei `updateSpeaker` mit `reason`. Bestehende takt-030-Tests bleiben grün.
 3. **e2e ohne Rückschritt:** in-process-Suite vollständig grün; im Projekt `http` H8 (412), H9 (eigene Schreibvorgänge)
@@ -295,7 +306,7 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
 | SP-4 | ja: keine HTML-Ausgabe, kein neuer Ursprung |
 | SP-5 | ja: kein Geheimnis im Diff; das CSRF-Token wird nicht gepuffert (`/auth/me` läuft nicht über die Hülle) |
 | SP-6 | ja: T-G1-I-08 (nichts auf dem Datenträger), T-G1-D-03 (Last) |
-| SP-7 | ja, clientseitig: Leeren bei 401 und bei Stromende `session` (Meldung aus 036b) |
+| SP-7 | ja, clientseitig: Leeren bei 401 und bei Stromende `session` (Meldung aus 036b); Höchstalter 30 s (monoton) begrenzt Rechteverlust ohne Signal (Test q) |
 
 ## Offene Eigentümerfragen
 

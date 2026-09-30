@@ -293,6 +293,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 ## Live-Store (aus 036a)
 
 - 036a Bauhinweis · `apps/web/src/api/liveStore.ts` · der In-Process-`subscribe` meldet `[]` ohne `change`, wenn für den Leser nichts Lesbares geändert wurde; nach Entscheidung 3 leert das den ganzen Puffer (Verhalten wie vor 036a, aber unnötige Abrufe) · im Demo-Adapter nur melden, wenn es etwas zu melden gibt, oder einen leeren Aufruf als „nichts“ kennzeichnen.
+- 036a Nachprüfung nit 3 · `apps/web/src/api/liveStore.ts` · ein abgelaufener Eintrag ohne Claim bleibt im Speicher, bis
+  er gelesen oder verdrängt wird (höchstens 200 Einträge); ausgeliefert wird er nie · optionales Aufräumen in `keep`/`read`.
 - 036a Review minor 5 · `apps/web/src/features/speakers/*` (mehrstufige Abläufe, z. B. `moveSpeakerToRound`) · wird ein
   Lesezugriff nach einem strukturellen Akteurwechsel zurückgehalten (Entscheidung 4, unerledigtes Promise), bleibt die
   Busy-Referenz des Ablaufs bis zum Neu-Einhängen gesetzt · den Ablauf an den Akteur binden und beim Akteurwechsel freigeben.
