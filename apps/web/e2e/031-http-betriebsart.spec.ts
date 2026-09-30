@@ -177,7 +177,9 @@ test.describe('H6 @idp: a blocked subject loses the session in the middle of it'
     }
 
     expect((await page.request.get('/auth/me')).status()).toBe(401);
-    await page.getByTestId('nav-capture').click();
+    // The page may already have left the app by itself (the 30 s poll ends in `onUnauthorized`), so nothing is clicked:
+    // a reload asks the service again, and the answer must be the sign-in page whichever way the page got there.
+    await page.reload();
     await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('session-role')).toHaveCount(0);
     await expect(page.getByTestId('header-counter-questions')).toHaveCount(0);
@@ -224,8 +226,15 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       await expect(moderation.getByTestId('speaker-register')).toBeVisible({ timeout: 60_000 });
       await moderation.getByTestId('speaker-register').click();
       await moderation.getByTestId('speaker-register-name').fill(H8_SPEAKER_NAME);
+      // HTTP mode has no push: an own write does not refresh the list before the next 30 s poll, so the test
+      // checks the answer of the service (status only, never the body) and then reloads the page.
+      const registered = moderation.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
+        new URL(candidate.url()).pathname === '/v1/speakers');
       await moderation.getByTestId('speaker-register-submit').click();
-      await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible();
+      const registration = (await registered).status();
+      expect(registration, `HTTP status of the registration (${registration})`).toBe(201);
+      await moderation.reload();
+      await expect(moderation.getByText(H8_SPEAKER_NAME).first()).toBeVisible({ timeout: 30_000 });
 
       const speakers = (await (await other.get('/v1/speakers')).json()) as { id: string; displayName: string }[];
       const speaker = speakers.find((entry) => entry.displayName === H8_SPEAKER_NAME);
@@ -234,7 +243,13 @@ test.describe('H8 @idp: two writers, a real 412 through the ETag', () => {
       // 2. Capture writes the Redebeitrag of that Wortmeldung first and opens it.
       await page.goto(`/capture?speaker=${speaker!.id}`);
       await page.getByTestId('capture-text').fill(H8_CONTRIBUTION_TEXT);
+      const captured = page.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
+        new URL(candidate.url()).pathname === '/v1/contributions');
       await page.getByTestId('capture-submit').click();
+      const capture = (await captured).status();
+      expect(capture, `HTTP status of the Redebeitrag (${capture})`).toBe(201);
+      // Same reason as above: the desk shows the new Redebeitrag only after a reload in HTTP mode.
+      await page.reload();
       const free = page.getByTestId('capture-free-input');
       await expect(free).toBeVisible({ timeout: 30_000 });
 
