@@ -341,27 +341,49 @@ Frage fest (`id`, `version`, `number`; `returnTargetOf` in `stage/lib.ts`) und n
   inzwischen gezeichnete Frage) statt an `fr-000ci` (die, für die der Dialog geöffnet wurde).
 - Grün nach der Korrektur: `Tests  32 passed (32)` in `stage/`; das Szenario grün (siehe in-process unten).
 
-**Entscheidung zu 002 (Ziel 5):** Keine Hypothese bestätigt: H-2a, H-2b und H-2c sind nicht belegt (H12a und H12b auf
-altem Code grün, während `002` im selben Lauf rot war). Kein Produktcode für 002. Einschränkung aus dem Review: Eine
-fertige Netzantwort belegt nicht, dass React die Auffrischung schon angewandt hat; ein grünes H12a widerlegt H-2a daher
-nicht. Der Befund bleibt offen mit einem Eintrag in `docs/folgeliste.md` (Abschnitt „Bühne und Wortmeldeliste (aus
-takt-039)“).
+**Entscheidung zu 002 (Ziel 5):** H-2a, H-2b und H-2c sind nicht bestätigt; die Ursache ist eine vierte, im Test:
 
-**In-process (lokal, auf `ff4beee`):** `010c-lesezustand`, `abnahme`, `013-tastaturpfad`: 37 passed. Vorher auf
+- Messung (CI): H12c auf `a273f2b` (Lauf 36711109898, Job 109873006002) zeigt keine Netzaktivität von 1,8 s vor dem
+  Anheben bis nach dem Pfeil (H-2a nicht zutreffend). Das passive Protokoll in 002 auf `4ea4c2f` (Lauf 36712820597, Job
+  109878437829, 002 grün) zeigt `main scrollTop=0 scrollHeight=844 clientHeight=844`, Zeile 22@677-713, darunter
+  23@713-749, keinen Scroll-Ereignis, Ansage „Position 6 von 7“ 10 ms nach der Leertaste, Pfeil nach 24 ms, „Position 7
+  von 7“ nach 40 ms: kein Überlauf, der Zweig „weich scrollen“ wird in 002 nicht erreicht (H-2b nicht zutreffend). Die
+  8 px Überlauf in H12c kamen von zwei weiteren Zeilen in Runde 3 (9 statt 7), nicht von einem Element nur im HTTP-Modus.
+- In-process ließ sich H-2b nicht erzeugen: erzwungener Überlauf 0, 8, 36, 60, 120, 300 px und 20-fache CPU-Drosselung,
+  der Pfeil wirkte jedes Mal.
+- Ursache: `KeyboardSensor.attach()` (`@dnd-kit/core` 6.3.1, `dist/core.esm.js:1151-1159`) ruft `handleStart()` →
+  `onStart` synchron (Zugbeginn und Ansage) und hängt den Keydown-Hörer erst danach per `setTimeout` an (`:1158`). Ein
+  Pfeil zwischen Ansage und Timer geht still verloren: keine Bewegung, kein „abgebrochen“, der Zug bleibt aktiv — genau
+  das Bild von 002. Das Fenster wächst, wenn der Timer hinter Arbeit der Seite wartet (002 ist der erste geteilte Test im
+  kalten Projekt `http`). Die Laufzeiten sagten dazu nichts: rote Läufe enden nach dem 5-s-Timeout bei `:84`, der grüne
+  durchläuft den ganzen Test.
+- Nachweis in-process: `039-tastatur-anheben.spec.ts` verspätet jeden Timer der Seite um dieselbe Sekunde (Reihenfolge
+  gleicher Verzögerung bleibt). Mit dem Anheben wie bisher (Leertaste, Ansage abwarten) rot:
+  `Expected: not "Wortmeldung 22 steht auf Position 6 von 7."`, `Received: "Wortmeldung 22 steht auf Position 6 von 7."`,
+  `Timeout: 5000ms`. Mit `liftWithKeyboard` grün.
+- Korrektur (nur Tests): `liftWithKeyboard` (`e2e/support/keyboard-drag.ts`) wartet nach der Ansage auf einen danach
+  gesetzten Timer derselben Verzögerung (läuft nach dem des Sensors); kein Warten auf Zeit. Verwendet in 002, 013a und
+  H12. Kein Produktcode: eine Person drückt den Pfeil nie Millisekunden nach der Leertaste, und das Fenster schließt
+  sich mit dem nächsten Timer der Seite. Das passive Protokoll und H12c sind wieder entfernt.
+
+**In-process (lokal, auf `4dba5dc`):** `002-speakers-capture`, `010c-lesezustand`, `abnahme`, `013-tastaturpfad`, `039-tastatur-anheben`: 41 passed.
+
+**Frühere in-process-Läufe (auf `ff4beee`):** `010c-lesezustand`, `abnahme`, `013-tastaturpfad`: 37 passed. Vorher auf
 `9d65427` zusätzlich `002-speakers-capture` (38 passed mit 010c, abnahme, 013) und auf `e0097ab` `003-answers-stage`. Mit der Rückgabe-Korrektur (Commit „Zurückgeben wirkt auf die Frage …“): `010c-lesezustand` (mit dem neuen Szenario), `abnahme`, `013-tastaturpfad`, `090-eingaben-je-akteur`, `003-answers-stage`: 59 passed. Der Gates-Lauf dazu steht im Bericht dieses Commits; der Block unten gilt für `ff4beee`.
 
-**`pnpm gates`** auf `ff4beee` (sauberer Baum, mit den Postgres-Variablen), wörtlicher Schluss:
+**`pnpm gates`** auf `4dba5dc` (letzter Code-Commit, sauberer Baum, mit den Postgres-Variablen), wörtlicher Schluss:
 
 ```
-apps/web test:       Tests  332 passed (332)
+apps/web test:       Tests  334 passed (334)
+apps/api test:       Tests  523 passed (523)
 slice-scope: warning — "docs/slices/takt-039-http-bedienrennen.md"'s "Files allowed" section differs from its version at the commit that introduced it (178655f).
-slice-scope: 8 changed file(s), all within "docs/slices/takt-039-http-bedienrennen.md"'s "Files allowed" list (18 pattern(s)).
+slice-scope: 16 changed file(s), all within "docs/slices/takt-039-http-bedienrennen.md"'s "Files allowed" list (28 pattern(s)).
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.64s
-mark-test-run: wrote /home/user/wt/t039/.claude/state/last-test-run (clean tree) at commit ff4beee, tree 03a6ceaefd28…
+✓ built in 1.96s
+mark-test-run: wrote /home/user/wt/t039/.claude/state/last-test-run (clean tree) at commit 4dba5dc, tree 5d019cc57961…
 ```
 
-Die Warnung von `slice-scope` ist erwartet (Files allowed um N3 ergänzt, Bauklärung).
+Die Warnung von `slice-scope` ist erwartet (Files allowed durch die Bauklärungen ergänzt).
 
 ## Review findings
 

@@ -251,11 +251,10 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 
 ## Bühne und Wortmeldeliste (aus takt-039)
 
-- takt-039 Befund 2 (offen) · `apps/web/e2e/002-speakers-capture.spec.ts:83-84`, `apps/web/src/features/speakers/Page.tsx:334-337` ·
-  Umsortieren per Tastatur: ArrowDown blieb im Projekt `http` ohne Wirkung („Position 6 von 7“), 2 rot in 6 HTTP-Läufen;
-  Ursache offen, H-2a/H-2b/H-2c durch H12 nicht belegt (Messwerte im „Nachweis“ von takt-039) · nächster Schritt: ein
-  Produktsignal „Liste aufgefrischt“ (danach kann H12a auf die angewandte Auffrischung warten) oder den Zugbeginn
-  (`onDragStart`, Messungen des Sensors) im Fehlerfall aufzeichnen.
+- ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im
+  Projekt `http` ohne Wirkung („Position 6 von 7“).~~ → erledigt in **takt-039**: dnd-kit hängt den Keydown-Hörer erst
+  per `setTimeout` an (`@dnd-kit/core` 6.3.1, `core.esm.js:1158`); `liftWithKeyboard` (`e2e/support/keyboard-drag.ts`)
+  in 002, 013a und H12, Nachweis `039-tastatur-anheben.spec.ts`.
 - takt-039 Review minor 3 · `apps/web/src/features/stage/lib.test.ts:199-206` · Test (c) ist eine Tautologie
   (`shownQuestion(null)` ist `null`); der Schutz nach Akteurwechsel (`setStage(null)` im Render, `Page.tsx`) ist damit
   nicht geprüft · Komponenten- oder e2e-Test, der nach einem Akteurwechsel keinen Druck auf den vorigen Datensatz zulässt.
