@@ -310,3 +310,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   strikt (`packages/domain/src/api.ts:458`) · vorbestehend, heute ohne Folge (kein Dienst sendet schwache Tags).
 - takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
 - takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).
+- takt-037 Review minor 1 · `apps/web/src/features/capture/SuggestDialog.test.tsx` · die Tests prüfen nur die reinen
+  Modellfunktionen, nicht die Verdrahtung (`useState`-Initialisierer, `[open]`-Effekt, `keys`-Memo); ein Rücksetzen per
+  Effekt auf `candidates` bliebe unentdeckt · Komponententest: öffnen, abwählen, mit inhaltsgleichem neuem `uncovered`
+  neu rendern, abgewählt bleibt; schließen, öffnen, alle angehakt.
+- takt-037 Review minor 2 · `SuggestDialog.tsx:19-26` (`candidateKeys`) · verschwindet der erste von zwei gleichen Sätzen,
+  erbt der verbleibende dessen Zustand (Schlüssel nach Vorkommen) · hinnehmen mit Code-Kommentar oder Position einbeziehen.
+- takt-037 Review minor 3 · `SuggestDialog.tsx:40-44` (`setChecked`) · veraltete Schlüssel fallen erst beim nächsten Klick
+  weg; ein verschwundener und wiederkehrender Kandidat kommt vorher abgewählt zurück · beim Neuaufbau der Schlüssel bereinigen.
