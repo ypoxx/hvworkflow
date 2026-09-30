@@ -64,8 +64,14 @@ der Zeitgrenze der e2e-Tests. Keine unendliche Liste mit automatischem Nachladen
   „zurück auf Seite 1“)
 - `docs/evidence/takt-038-historie-weitere.png`
 - `docs/folgeliste.md` (nur nicht blockierende Reviewbefunde)
+- `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl-Sperre 507→510)
 
 Weitere Dateien sind Scope-Befunde.
+
+**Bauklärung (Orchestrator, 30.09.):** Die drei neuen i18n-Schlüssel, die Ziel und „Files allowed“ verlangen („Weitere
+laden“, „Ältere laden“, Hinweis „zurück auf Seite 1“), verschieben die Schlüsselzahl-Sperre in
+`apps/web/src/i18n/parity.test.ts` von 507 auf 510. Der Umfang wird für genau diese Zeilen erweitert, sonst nichts in
+der Datei.
 
 ## Akzeptanzkriterium
 

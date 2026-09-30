@@ -5,6 +5,9 @@ export const historyDe = {
   'history.results.label': 'Trefferliste',
   'history.results.count': '{shown} von {total}',
   'history.results.more': 'Grenzen Sie die Suche ein, um die übrigen Treffer zu sehen.',
+  // takt-038: paging of the result list and of the Ereignisstrom table.
+  'history.results.loadMore': 'Weitere laden',
+  'history.results.backToFirst': 'Die Trefferliste hat sich inzwischen geändert. Sie steht wieder auf Seite 1; laden Sie weitere Seiten neu.',
   'history.results.empty.title': 'Kein Treffer',
   'history.results.empty.body': 'Zu diesem Suchtext gibt es keine Einzelfrage.',
   'history.results.loading': 'Bestand wird durchsucht …',
@@ -18,6 +21,7 @@ export const historyDe = {
     'Wählen Sie links einen Treffer. Hier steht dann der Vorgang von der Erfassung bis zur Bühne.',
   'history.stream.title': 'Ereignisstrom',
   'history.stream.description': 'Die letzten {n} Ereignisse der Hauptversammlung.',
+  'history.stream.older': 'Ältere laden',
   'history.stream.empty.title': 'Noch keine Ereignisse',
   'history.stream.empty.body': 'Sobald in der Hauptversammlung gearbeitet wird, steht es hier.',
   'history.col.time': 'Zeit',

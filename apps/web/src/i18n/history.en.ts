@@ -7,6 +7,9 @@ export const historyEn: typeof historyDe = {
   'history.results.label': 'List of results',
   'history.results.count': '{shown} of {total}',
   'history.results.more': 'Narrow the search to see the remaining results.',
+  // takt-038: paging of the result list and of the Ereignisstrom table.
+  'history.results.loadMore': 'Load more',
+  'history.results.backToFirst': 'The result list has changed in the meantime. It is back on page 1; load further pages again.',
   'history.results.empty.title': 'No match',
   'history.results.empty.body': 'No question matches this search text.',
   'history.results.loading': 'Searching the corpus …',
@@ -20,6 +23,7 @@ export const historyEn: typeof historyDe = {
     'Select a result on the left. Its course from capture to podium then appears here.',
   'history.stream.title': 'Event stream',
   'history.stream.description': 'The last {n} events of the general meeting.',
+  'history.stream.older': 'Load older',
   'history.stream.empty.title': 'No events yet',
   'history.stream.empty.body': 'As soon as work happens in the meeting, it shows up here.',
   'history.col.time': 'Time',

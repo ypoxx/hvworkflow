@@ -2,7 +2,7 @@
  * Helpers of the history view. Local to the feature: how a time is printed and how much of a text a
  * row can carry is a decision of this view, not of the component kit.
  */
-import type { DomainEvent } from '@hv/domain';
+import type { DomainEvent, HvApi, Question, QuestionFilter, ReadEvent } from '@hv/domain';
 import type { Translate } from '../../i18n';
 
 /** How many results are rendered before the person is asked to narrow the search. */
@@ -18,6 +18,184 @@ export const STREAM_LIMIT = 200;
  * it on every refetch is a multi-megabyte response.
  */
 export const STREAM_SCAN_LIMIT = 5000;
+
+/**
+ * takt-038: at most this many result pages are loaded — 10 × `RESULT_LIMIT` = 2000, the contract's
+ * upper bound for `listQuestions`. Beyond it the person is asked to narrow the search.
+ */
+export const RESULT_PAGE_MAX = 10;
+
+/** One answer of `listQuestions` as the result list reads it. */
+export interface ResultPage<T extends { id: string } = Question> {
+  readonly items: readonly T[];
+  readonly total: number;
+}
+
+/** The pages the result list shows, in the order the service returned them. */
+export interface PagedResults<T extends { id: string } = Question> {
+  readonly pages: readonly (readonly T[])[];
+  readonly total: number;
+}
+
+/**
+ * takt-038, Ziel 1 (Codex P1): reads every loaded page again, not only the first — pages `0..count-1`
+ * by `offset`. Over the live store (036a) only a change of `questions` costs network; otherwise every
+ * page comes from its buffer, so no later page can keep an object that has changed since.
+ */
+export function readResultPages(
+  api: Pick<HvApi, 'listQuestions'>,
+  filter: Omit<QuestionFilter, 'limit' | 'offset'>,
+  count: number,
+  pageSize: number = RESULT_LIMIT,
+): Promise<ResultPage[]> {
+  return Promise.all(
+    Array.from({ length: count }, (_, index) =>
+      api.listQuestions({ ...filter, limit: pageSize, offset: index * pageSize }),
+    ),
+  );
+}
+
+/**
+ * takt-038, Ziel 1: pieces freshly read pages together — or refuses to (`null`). The caller then
+ * falls back to the first page with a notice ("zurück auf Seite 1"), never to a list silently put
+ * together from pages of different states. Refused when more than one page is read and
+ * - the pages report different totals, or the total shrank against `previous`;
+ * - the first page's ids differ from `previous`'s first page (the order shifted);
+ * - an id appears twice, or a page is shorter than its place requires (an id went missing at a
+ *   boundary).
+ * The first page alone is always consistent with itself. `previous` is the state shown before, of
+ * the same actor and search only (010d).
+ */
+export function mergeResultPages<T extends { id: string }>(
+  previous: PagedResults<T> | null,
+  fresh: readonly ResultPage<T>[],
+  pageSize: number = RESULT_LIMIT,
+): PagedResults<T> | null {
+  const [first] = fresh;
+  if (first === undefined) return null;
+  if (fresh.length === 1) return { pages: [first.items], total: first.total };
+  const total = first.total;
+  if (fresh.some((one) => one.total !== total)) return null;
+  if (previous !== null) {
+    if (total < previous.total) return null;
+    const before = previous.pages[0] ?? [];
+    if (before.length !== first.items.length) return null;
+    if (before.some((item, index) => item.id !== first.items[index]?.id)) return null;
+  }
+  const seen = new Set<string>();
+  for (const [index, one] of fresh.entries()) {
+    const expected = Math.min(pageSize, total - index * pageSize);
+    if (expected <= 0 || one.items.length !== expected) return null;
+    for (const item of one.items) {
+      if (seen.has(item.id)) return null;
+      seen.add(item.id);
+    }
+  }
+  return { pages: fresh.map((one) => one.items), total };
+}
+
+/** The Ereignisstrom tab's held read: the bounded window and the `seq` it has read up to. */
+export interface StreamWindowState {
+  readonly cursor: number;
+  readonly events: readonly ReadEvent[];
+}
+
+/** Page size of one `listEvents` read and the cap of the window; both `STREAM_SCAN_LIMIT` in the view. */
+export interface StreamReadOptions {
+  readonly pageSize?: number;
+  readonly windowLimit?: number;
+}
+
+/** takt-038, Ziel 2: appends new events and keeps the newest `limit`; the oldest fall out. */
+export function extendWindow(
+  held: readonly ReadEvent[],
+  fresh: readonly ReadEvent[],
+  limit: number = STREAM_SCAN_LIMIT,
+): readonly ReadEvent[] {
+  const last = held.at(-1)?.seq ?? 0;
+  const next = [...held, ...fresh.filter((event) => event.seq > last)];
+  return next.length > limit ? next.slice(next.length - limit) : next;
+}
+
+/** Pages from `from` (exclusive) up to `head`; the collected events and the last `seq` reached. */
+async function pageToHead(
+  api: Pick<HvApi, 'listEvents'>,
+  from: number,
+  head: number,
+  pageSize: number,
+): Promise<{ events: ReadEvent[]; reached: number }> {
+  const events: ReadEvent[] = [];
+  let cursor = from;
+  while (cursor < head) {
+    const page = await api.listEvents(cursor, pageSize);
+    events.push(...page.items);
+    const last = page.items.at(-1)?.seq;
+    // No progress (nothing more readable up to the head) ends the walk, never an endless loop.
+    if (last === undefined || last <= cursor) break;
+    cursor = last;
+    if (page.items.length < pageSize) break;
+  }
+  return { events, reached: Math.max(cursor, head) };
+}
+
+/** The first load (or a reload after a reset): the trailing window of at most `windowLimit` events. */
+async function readFreshWindow(
+  api: Pick<HvApi, 'listEvents'>,
+  pageSize: number,
+  windowLimit: number,
+): Promise<StreamWindowState> {
+  // A cheap read of just the head first: the window starts `windowLimit` before it.
+  const { lastSeq } = await api.listEvents(0, 1);
+  const { events, reached } = await pageToHead(api, Math.max(0, lastSeq - windowLimit), lastSeq, pageSize);
+  return { cursor: reached, events: extendWindow([], events, windowLimit) };
+}
+
+/**
+ * takt-038, Ziel 2 (Codex P2): brings the Ereignisstrom window up to the head. First load: the
+ * trailing window as before. Later counts: `listEvents(cursor, pageSize)` and onward from the last
+ * `seq` received, until an answer is short or the head of the first answer is reached; the window is
+ * extended and capped. A head more than `windowLimit` ahead makes the walk start at
+ * `head − windowLimit`, and the window is replaced rather than extended. A head below the cursor (a
+ * restore, 035b `reset`) drops the window and reads it afresh.
+ *
+ * Nothing is written until every page has answered: a failing page rejects, and the caller keeps its
+ * old cursor and window (no half-advanced state). An unchanged head returns `held` itself, so the
+ * caller can skip recomputing what it derives from the window.
+ */
+export async function advanceStream(
+  api: Pick<HvApi, 'listEvents'>,
+  held: StreamWindowState | null,
+  options: StreamReadOptions = {},
+): Promise<StreamWindowState> {
+  const pageSize = options.pageSize ?? STREAM_SCAN_LIMIT;
+  const windowLimit = options.windowLimit ?? pageSize;
+  if (held === null) return readFreshWindow(api, pageSize, windowLimit);
+  const first = await api.listEvents(held.cursor, pageSize);
+  const head = first.lastSeq;
+  if (head < held.cursor) return readFreshWindow(api, pageSize, windowLimit);
+  if (head - held.cursor > windowLimit) {
+    const { events, reached } = await pageToHead(api, head - windowLimit, head, pageSize);
+    return { cursor: reached, events: extendWindow([], events, windowLimit) };
+  }
+  const last = first.items.at(-1)?.seq;
+  if (last === undefined) return head === held.cursor ? held : { cursor: head, events: held.events };
+  const rest =
+    first.items.length < pageSize ? { events: [], reached: Math.max(last, head) } : await pageToHead(api, last, head, pageSize);
+  return {
+    cursor: rest.reached,
+    events: extendWindow(held.events, [...first.items, ...rest.events], windowLimit),
+  };
+}
+
+/** takt-038 (e): the table of the Ereignisstrom, newest first, `size` rows per page within the window. */
+export function tableRows<E>(
+  window: readonly E[],
+  pages: number,
+  size: number = STREAM_LIMIT,
+): { rows: E[]; hasOlder: boolean } {
+  const shown = Math.max(1, pages) * size;
+  return { rows: window.slice(-shown).reverse(), hasOlder: window.length > shown };
+}
 
 /** Wall clock with seconds: two events of the same minute must stay distinguishable. */
 export function clockTime(iso: string): string {
