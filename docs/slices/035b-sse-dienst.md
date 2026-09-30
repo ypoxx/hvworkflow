@@ -397,20 +397,21 @@ Slice: 035b-sse-dienst
 Done: GET /v1/stream über die ganze Middleware-Kette und validateOperation, ohne Postgres-Grenze und ohne domain-Proxy.
       Verteiler je App mit eigener Kontinuitätsprüfung (lastSeq, lastHash), Übergabe Nachlauf -> live ohne Lücke.
       Akteurkarte und frische Sitzungsprüfung je Stapel, Herzschlag und Frame; Grenzen 3/6/200, Rotation 25 min, Rückstau.
-Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa, 2769802 (geprüfte Fassung, letzter
-      Codecommit, Codex P1/P2); ADR-Commits des Architekten 598273f, 2f24065, 03a8dec; Basis 036a eingebracht in f37647d.
-      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 2769802:
+Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa, 2769802 (Codex P1/P2), fd2d233
+      (letzter Codecommit: Tests R8b, R9, R10, Test 24 ab COMMIT, 24b); ADR-Commits des Architekten 598273f, 2f24065, 03a8dec;
+      Basis 036a eingebracht in f37647d; takt-040 (Vertrag 0.3.12) eingebracht in 228b234; geprüfte Fassung a82225b.
+      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf a82225b:
         apps/api test:  Test Files  39 passed (39)
-        apps/api test:       Tests  580 passed (580)
+        apps/api test:       Tests  584 passed (584)
         apps/api test: operation-coverage: 66 operations in the contract, 60 exercised by tests, 6 pre-declared in allowlist.json
         apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
         slice-scope: 14 changed file(s), all within "docs/slices/035b-sse-dienst.md"'s "Files allowed" list (20 pattern(s)).
-        ✓ built in 1.84s
-        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 2769802, tree 748cc8522725…
+        ✓ built in 1.75s
+        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit a82225b, tree 5700a3b4433c…
         exit 0
-      Stabilität auf 2769802: beide Stromdateien dreimal hintereinander je 56/56 grün.
+      Stabilität auf a82225b: beide Stromdateien dreimal hintereinander je 60/60 grün.
       Tests (apps/api/src/__tests__/stream035.test.ts, postgres-stream035.test.ts); rot auf 6034a90 (Route fehlte, 37 von 38 rot),
-      grün auf 2769802:
+      grün auf a82225b:
         12 Öffnen (200, Köpfe, retry, Heartbeat); Fehlerfälle 401/403/422/404/Preflight; Demo-Filter 403; 12 (Postgres) Migrationen 503
         13, 13a (Commit während der Übergabe), 13b (cursor nach Aufbau), 13c (nach reset)
         14 podium/moderation/expert/capture nach Trennung; 15 Cursor > Kopf, Abstand > 1000
@@ -430,10 +431,18 @@ Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 57
         R6 keine Lesung ohne Wartende (rot: 1); R6b Beitretender (Mutant ohne callers.push getötet); R6c GONE (rot auf 1bcfd4f)
         R7 Nachlauf-Frames einzeln erzeugt, höchstens 2 bei hängendem Leser (rot auf 5736faa: 1000)
         R8 Rückstau zählt den laufenden Stapel (rot auf 5736faa: Verbindung blieb offen)
-      Messwerte (2769802, drei Läufe): Test 24 zweite Instanz 258–264 ms, gleiche Instanz 260–263 ms;
-        Test 28 211–220 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
-        Test 29 Schreiben max 743–897 ms, Median 423–482 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
-        Stapel bis letzte Zustellung 52–106 ms.
+        R8b Zähler des laufenden Stapels sinkt je Frame (Mutant ohne Abzug getötet; Mutant nur ohne Rücksetzen ist gleichwertig)
+        R9 Maskierung jedes Nachlauf- und Live-Ereignisses (Mutant `event: e` im Nachlauf getötet)
+        R10 Nachlauf-Ereignis ohne Hash: frühere Ereignisse gehen hinaus, dann end {unavailable}, kein Rahmen dafür (Mutant
+        „reset statt end“ getötet). Verhaltensänderung seit 2769802: früher wurde der ganze Nachlauf zu `reset`, jetzt
+        gehen die früheren Ereignisse hinaus und der Strom endet mit `end {unavailable}` (wie Entscheidung 3, m6).
+        24 Zustellung ab COMMIT, zweite Instanz vorgewärmt; 24b langsamer Schreibvorgang (2,1 s): ab Anfrage gemessen 3,0 s
+        (alte Messung rot, wie CI-Lauf 36740563257 mit 3014 ms), ab COMMIT 0,7–0,8 s (grün)
+      Messwerte (a82225b, drei Läufe, Rechner durch parallele Playwright-Läufe belastet, Last 5 auf 4 Kernen):
+        Test 24 ab COMMIT zweite Instanz 8–98 ms, gleiche Instanz 168–191 ms; 24b ab COMMIT 794–836 ms;
+        Test 28 177–196 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
+        Test 29 Schreiben max 1285–1935 ms, Median 622–1127 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
+        Stapel bis letzte Zustellung 341–586 ms.
 Open: Eigentümerfragen 1–3; Lasttest 071; Vertragswortlaut „gap-free in seq“ unter meetingId vor dem Bau von 036b (Folgeliste).
 Touched: apps/api/src/stream/hub.ts, apps/api/src/stream/route.ts, apps/api/src/stream/sessionCheck.ts, apps/api/src/stream/sse.ts,
       apps/api/src/app.ts, apps/api/src/limits/config.ts, apps/api/src/__tests__/stream035.test.ts,
