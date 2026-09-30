@@ -14,8 +14,8 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   takt-038 (mittel).
 - **Bau 035a läuft** auf `claude/slice-035a-sse-domaene-vertrag`: zuerst Vertrag 0.3.11 (Architekt), dann Domänenteil
   (Opus-Implementierer, Tests zuerst), Review in frischem Kontext (Opus), Entwurfs-PR, CI, ready, Codex, Merge.
-- Reihenfolge danach: 035b und 036a (036a braucht nur 035a) → 036b; takt-038 nach 036a. Danach Zielpfad C (043 zuerst),
-  dann D (064–066).
+- Reihenfolge danach: 035b und 036a (036a braucht nur 035a) → 036b; takt-038 nach 036a. Danach Zielpfad C (043 zuerst);
+  D (064–066) darf nach 043 parallel zum Rest von C laufen (`docs/produktplan-beta.md`, Abschnitt Zielpfad).
 - takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile); die Eigentümerfrage bleibt
   offen und ist umkehrbar.
 
