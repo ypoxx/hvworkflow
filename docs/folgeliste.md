@@ -140,7 +140,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   in der Sitzung nur als Unit-Test.
 - 030 nit · Auth-Fehlertexte fest `'de'`; HTTP-Build bündelt `CORPUS_DEMO` statisch; `Idempotency-Key` auch an Logout.
 - Nachprüfung e2e · `apps/web/e2e/003-answers-stage.spec.ts:44` · ein Test mit zehn axe-Läufen und Screenshots braucht
-  auf langsamer Maschine > 90 s · teilen oder `test.slow()`.
+  auf langsamer Maschine > 90 s · teilen oder `test.slow()`. → eigener kleiner Takt (Teilung an der Seitengrenze, je Test < 60 s, kein `test.slow()`), nicht Teil von
+  031a/031b (Lesebefund zu 031, 30.09.2026); danach Kandidat für die Portierung in beide Betriebsarten.
 - takt-024 R1 · `apps/api/src/__tests__/postgres-takt024.test.ts` · nur lesende Aliasroute durch die Grenze geprüft; kein
   statischer Check „jede `/v1`-Route beginnt mit `guarded(`“; Proxy-Guard wirft einfachen `Error` ohne Betriebssignal;
   `ROLLBACK` im `finally` nach `COMMIT`.
