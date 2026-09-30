@@ -12,6 +12,7 @@ import {
 } from './support/e2e-texts';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
+import { liftWithKeyboard } from './support/keyboard-drag';
 import { asRole, expectNotBusy, expectRoleLabel } from './support/roles';
 import type { Page } from '@playwright/test';
 
@@ -47,100 +48,9 @@ const capturePane = (page: Page) => page.getByTestId('capture-contribution-pane'
 const coverageOf = async (page: Page): Promise<number> =>
   Number((await page.getByTestId('capture-coverage').innerText()).replace(/\D/g, ''));
 
-/**
- * takt-039 (Bauklärung "002: nur passives Protokoll"): listeners only, in the `http` project only. They change no step and
- * no assertion of this test. From the load of each page to 6 s after its first ArrowDown they print, with wall-clock
- * milliseconds, every scroll of any element, window resize and visibility change, layout shift, DOM change inside round 3,
- * the drag announcer's text, `/v1/` and `/auth/` traffic, and — at the keydown of Space and ArrowDown, inside the page —
- * the geometry of `main`, the focused row and the row below it. The lines start with `[002-log]`.
- */
-async function recordTimeline(page: Page): Promise<void> {
-  if (test.info().project.name !== 'http') return;
-  let open = true;
-  page.on('console', (message) => {
-    const text = message.text();
-    if (!text.startsWith('[002-log]')) return;
-    console.log(text);
-    if (text.includes(' stop')) open = false;
-  });
-  const watched = (url: string): boolean => /^\/(v1|auth)\//.test(new URL(url).pathname);
-  page.on('request', (r) => {
-    if (open && watched(r.url())) console.log(`[002-log] ${Date.now()} net req ${r.method()} ${new URL(r.url()).pathname}`);
-  });
-  page.on('requestfinished', (r) => {
-    if (open && watched(r.url())) console.log(`[002-log] ${Date.now()} net done ${r.method()} ${new URL(r.url()).pathname}`);
-  });
-  await page.addInitScript(() => {
-    let active = true;
-    let lines = 0;
-    const log = (line: string): void => {
-      if (!active || lines > 600) return;
-      lines += 1;
-      console.log(`[002-log] ${Date.now()} ${line}`);
-    };
-    const box = (el: Element | null | undefined): string => {
-      if (!el) return 'none';
-      const r = el.getBoundingClientRect();
-      return `${el.getAttribute('data-number') ?? el.tagName}@${Math.round(r.top)}-${Math.round(r.bottom)}`;
-    };
-    const geometry = (label: string): void => {
-      const main = document.querySelector('main');
-      const row = document.activeElement?.closest('[data-testid="speaker-row"]') ?? null;
-      let below: Element | null = row?.nextElementSibling ?? null;
-      while (below !== null && !below.matches('[data-testid="speaker-row"]')) below = below.nextElementSibling;
-      log(`geometry ${label} window=${innerWidth}x${innerHeight} doc=${document.scrollingElement?.scrollTop} ` +
-        (main === null ? 'main=none' : `main top=${Math.round(main.getBoundingClientRect().top)} scrollTop=${main.scrollTop} ` +
-          `scrollHeight=${main.scrollHeight} clientHeight=${main.clientHeight}`) +
-        ` row=${box(row)} below=${box(below)} focus=${document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName}`);
-    };
-    window.addEventListener('keydown', (event) => {
-      if (event.code === 'Space') geometry('keydown Space');
-      if (event.code === 'ArrowDown') {
-        geometry('keydown ArrowDown');
-        requestAnimationFrame(() => geometry('frame after ArrowDown'));
-        window.setTimeout(() => { geometry('ArrowDown+1s'); }, 1000);
-        window.setTimeout(() => { geometry('ArrowDown+6s'); log('stop'); active = false; }, 6000);
-      }
-    }, true);
-    window.addEventListener('resize', () => log(`resize ${innerWidth}x${innerHeight}`));
-    document.addEventListener('visibilitychange', () => log(`visibility ${document.visibilityState}`));
-    document.addEventListener('scroll', (event) => {
-      const el = event.target instanceof Element ? event.target : document.scrollingElement;
-      log(`scroll ${el?.tagName} top=${el?.scrollTop}`);
-    }, true);
-    try {
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries() as (PerformanceEntry & { value?: number; sources?: { node?: Node | null }[] })[]) {
-          const nodes = (entry.sources ?? []).map((source) => {
-            const el = source.node instanceof Element ? source.node : source.node?.parentElement;
-            return el?.closest('[data-testid]')?.getAttribute('data-testid') ?? el?.tagName ?? '?';
-          });
-          log(`layout-shift ${entry.value?.toFixed(4)} [${nodes.join(',')}]`);
-        }
-      }).observe({ type: 'layout-shift', buffered: true });
-    } catch { log('layout-shift observer unavailable'); }
-    const observe = (): void => {
-      new MutationObserver((records) => {
-        const round = document.querySelector('[data-testid="speakers-round-3"]');
-        const announcer = document.querySelector('[role="status"][aria-live="assertive"]');
-        let inRound = 0;
-        let announced = false;
-        for (const record of records) {
-          if (round !== null && round.contains(record.target)) inRound += 1;
-          if (announcer !== null && announcer.contains(record.target)) announced = true;
-        }
-        if (announced) log(`announcer "${announcer?.textContent ?? ''}"`);
-        if (inRound > 0) log(`dom round-3 mutations=${inRound}`);
-      }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
-    };
-    if (document.body !== null) observe(); else document.addEventListener('DOMContentLoaded', observe);
-  });
-}
-
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test('speakers list and capture desk @screenshot', async ({ page }) => {
-  await recordTimeline(page);
   await page.goto('/speakers');
 
   // The corpus is seeded on first start; the counter is the proof that it is there.
@@ -165,12 +75,11 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   expect(firstBefore).not.toEqual(secondBefore);
 
   // Reordering with the keyboard: lift, move one down, drop (dnd-kit keyboard sensor). The steps
-  // wait on the announcement, which is the same signal a screen reader gets.
+  // wait on the announcement, which is the same signal a screen reader gets; the lift hands over
+  // only once the sensor listens for the arrow keys (takt-039, `support/keyboard-drag.ts`).
   const announcer = page.locator('[role="status"][aria-live="assertive"]');
   await waiting.nth(0).getByTestId('speaker-drag-handle').focus();
-  await page.keyboard.press('Space');
-  await expect(announcer).toContainText(`Wortmeldung ${firstBefore}`);
-  const lifted = await announcer.innerText();
+  const lifted = await liftWithKeyboard(page, announcer, firstBefore);
   await page.keyboard.press('ArrowDown');
   await expect(announcer).not.toHaveText(lifted);
   // A reorder raises the version of every Wortmeldung of the round. The round is locked while it is written (takt-032:

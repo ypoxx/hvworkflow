@@ -18,7 +18,7 @@ import {
   NOTICE_DE, NOTICE_EN,
 } from './support/e2e-texts';
 import { expect, test } from './support/http-guard';
-import { asRole } from './support/roles';
+import { liftWithKeyboard } from './support/keyboard-drag';
 
 // Synthetic name, distinct from H8 so that the two tests never find each other's entry.
 const H9_SPEAKER_NAME = 'Synthetische Testperson Omega';
@@ -443,11 +443,10 @@ async function liftSecondToLast(page: Page): Promise<{
   const announcer = page.locator('[role="status"][aria-live="assertive"]');
   const number = (await lifted.getAttribute('data-number')) ?? '';
   await lifted.getByTestId('speaker-drag-handle').focus();
-  await page.keyboard.press('Space');
   // The lift is announced ("angehoben, Position p von n"), and dnd-kit follows at once with the row over itself ("steht
-  // auf Position p von n"): both name the same position.
-  await expect(announcer).toContainText(new RegExp(`^Wortmeldung ${number} .*Position \\d+ von \\d+`));
-  const [, position, count] = (await announcer.innerText()).match(/Position (\d+) von (\d+)/) ?? [];
+  // auf Position p von n"): both name the same position. The helper hands over once the sensor listens for the arrows.
+  const announced = await liftWithKeyboard(page, announcer, number);
+  const [, position, count] = announced.match(/Position (\d+) von (\d+)/) ?? [];
   const box = await scrollBox(target);
   return { announcer, position: Number(position), count: Number(count), targetMiddle: await middleOf(target), box };
 }
@@ -520,139 +519,3 @@ test.describe('H12 @idp: moving a Wortmeldung with the keyboard (takt-039, decid
   });
 });
 
-/**
- * H12c (takt-039, diagnosis of 002 only): replays the steps of 002 up to the first ArrowDown — start as capture, switch to
- * moderation through `asRole` (a reload), axe, lift the first waiting Wortmeldung of round 3, ArrowDown — and logs what
- * happens around the lift: every `/v1/` and `/auth/` request and response, DOM changes inside round 3 (a React commit that
- * touches the rows), layout shifts, scroll and resize events, and the geometry dnd-kit works with. It never fails on
- * whether the arrow moved: that outcome is logged, and Esc cancels the move, so nothing is written.
- */
-test.describe('H12c @idp: diagnosis of 002 (takt-039)', () => {
-  test.use({ viewport: { width: 1440, height: 900 } });
-
-  test('H12c @idp: 002 sequence with a timeline around lift and ArrowDown (logs only)', async ({ page }) => {
-    const t0 = { lift: 0 };
-    const net: string[] = [];
-    const rel = (at: number): string => `${at - t0.lift >= 0 ? '+' : ''}${at - t0.lift}ms`;
-    const netEvents: { at: number; line: string }[] = [];
-    const watched = (url: string): boolean => /^\/(v1|auth)\//.test(new URL(url).pathname);
-    page.on('request', (r) => { if (watched(r.url())) netEvents.push({ at: Date.now(), line: `req ${r.method()} ${new URL(r.url()).pathname}` }); });
-    page.on('requestfinished', (r) => { if (watched(r.url())) netEvents.push({ at: Date.now(), line: `done ${r.method()} ${new URL(r.url()).pathname}` }); });
-    // Page side: wall-clock timestamps (Date.now), comparable with the test's.
-    await page.addInitScript(() => {
-      const log: { at: number; line: string }[] = [];
-      (window as unknown as { __h12c: typeof log }).__h12c = log;
-      const push = (line: string): void => { if (log.length < 3000) log.push({ at: Date.now(), line }); };
-      try {
-        new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as (PerformanceEntry & { value?: number; sources?: { node?: Node | null }[] })[]) {
-            const nodes = (entry.sources ?? []).map((source) => {
-              const el = source.node instanceof Element ? source.node : source.node?.parentElement;
-              return el?.closest('[data-testid]')?.getAttribute('data-testid') ?? el?.tagName ?? '?';
-            });
-            push(`layout-shift ${entry.value?.toFixed(4)} [${nodes.join(',')}]`);
-          }
-        }).observe({ type: 'layout-shift', buffered: true });
-      } catch { push('layout-shift observer unavailable'); }
-      window.addEventListener('resize', () => push(`resize ${innerWidth}x${innerHeight}`));
-      document.addEventListener('visibilitychange', () => push(`visibility ${document.visibilityState}`));
-      document.addEventListener('scroll', (event) => {
-        const el = event.target instanceof Element ? event.target : document.scrollingElement;
-        push(`scroll ${el?.tagName} top=${el?.scrollTop}`);
-      }, true);
-      const observe = (): void => {
-        new MutationObserver((records) => {
-          const round = document.querySelector('[data-testid="speakers-round-3"]');
-          let inRound = 0;
-          let rowsAdded = 0;
-          for (const record of records) {
-            if (round !== null && round.contains(record.target)) {
-              inRound += 1;
-              for (const node of record.addedNodes) if (node instanceof Element && node.matches('[data-testid="speaker-row"]')) rowsAdded += 1;
-            }
-          }
-          if (inRound > 0) push(`dom round-3 mutations=${inRound} rowsAdded=${rowsAdded}`);
-        }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
-      };
-      if (document.body !== null) observe(); else document.addEventListener('DOMContentLoaded', observe);
-    });
-
-    const geometry = async (label: string): Promise<void> => {
-      const g = await page.evaluate(() => {
-        const main = document.querySelector('main');
-        const rows = [...document.querySelectorAll('[data-testid="speakers-round-3"] [data-testid="speaker-row"]')];
-        const waiting = rows.filter((row) => row.getAttribute('data-status') === 'waiting');
-        const box = (el: Element | undefined) => {
-          if (el === undefined) return null;
-          const r = el.getBoundingClientRect();
-          return `${el.getAttribute('data-number')}@${Math.round(r.top)}-${Math.round(r.bottom)}`;
-        };
-        return {
-          window: `${innerWidth}x${innerHeight}`,
-          main: main === null ? null : `top=${Math.round(main.getBoundingClientRect().top)} overflowY=${getComputedStyle(main).overflowY} scrollTop=${main.scrollTop} scrollHeight=${main.scrollHeight} clientHeight=${main.clientHeight}`,
-          docScroll: document.scrollingElement?.scrollTop ?? null,
-          rows: rows.length,
-          waiting: waiting.map(box).join(' '),
-          fonts: document.fonts.status,
-          focus: document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? null,
-        };
-      });
-      net.push(`[H12c] geometry ${label}: ${JSON.stringify(g)}`);
-    };
-
-    await page.goto('/speakers');
-    await expect(page.getByTestId('header-counter-questions')).toBeVisible({ timeout: 60_000 });
-    await asRole(page, 'moderation');
-    const round = page.getByTestId('speakers-round-3');
-    await expect(round).toBeVisible();
-    const waiting = round.locator('[data-testid="speaker-row"][data-status="waiting"]');
-    await expect(waiting.first()).toBeVisible();
-    const listShown = Date.now();
-    await checkAxe(page, 'speakers (H12c, as in 002)');
-    const afterAxe = Date.now();
-
-    const first = (await waiting.nth(0).getAttribute('data-number')) ?? '';
-    const announcer = page.locator('[role="status"][aria-live="assertive"]');
-    await waiting.nth(0).getByTestId('speaker-drag-handle').focus();
-    await geometry('before lift');
-    t0.lift = Date.now();
-    await page.keyboard.press('Space');
-    let lifted = '';
-    try {
-      await expect(announcer).toContainText(`Wortmeldung ${first}`);
-      lifted = await announcer.innerText();
-    } catch {
-      lifted = '(no lift announcement)';
-    }
-    const liftAnnounced = Date.now();
-    await geometry('after lift');
-    const arrowAt = Date.now();
-    await page.keyboard.press('ArrowDown');
-    let moved = false;
-    try {
-      await expect(announcer).not.toHaveText(lifted);
-      moved = true;
-    } catch {
-      moved = false;
-    }
-    const settledAt = Date.now();
-    await geometry('after ArrowDown');
-    const after = await announcer.innerText();
-    await page.keyboard.press('Escape');
-
-    const pageLog = await page.evaluate(() => (window as unknown as { __h12c: { at: number; line: string }[] }).__h12c);
-    const lines = [
-      ...netEvents.map((e) => ({ at: e.at, line: `net ${e.line}` })),
-      ...pageLog.map((e) => ({ at: e.at, line: `page ${e.line}` })),
-      { at: listShown, line: 'test: round 3 with a waiting row visible' },
-      { at: afterAxe, line: 'test: axe done' },
-      { at: t0.lift, line: 'test: Space (lift)' },
-      { at: liftAnnounced, line: `test: lift announced "${lifted}"` },
-      { at: arrowAt, line: 'test: ArrowDown' },
-      { at: settledAt, line: `test: outcome moved=${moved} "${after}"` },
-    ].filter((e) => e.at >= listShown - 15_000).sort((a, b) => a.at - b.at);
-    for (const entry of lines) console.log(`[H12c] ${rel(entry.at)} ${entry.line}`);
-    for (const line of net) console.log(line);
-    console.log(`[H12c] result moved=${moved}; list shown ${rel(listShown)}, axe done ${rel(afterAxe)}, ArrowDown ${rel(arrowAt)}`);
-  });
-});
