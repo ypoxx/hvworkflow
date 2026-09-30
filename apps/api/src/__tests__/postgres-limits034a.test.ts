@@ -350,7 +350,9 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
       };
     });
     const { app, lines } = build(pool, { limits: { requestTimeoutMs: 200 } });
-    const tag = await speakerTag(app);
+    // The ETag is read through an app with default limits: on a slow runner the cold connection plus snapshot
+    // load can exceed 200 ms, and only the POST below is meant to run under that budget.
+    const tag = await speakerTag(build(pool).app);
     sql.length = 0;
     const lock = await holdWriteLock();
     const started = performance.now();
@@ -399,9 +401,11 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
   });
 
   it('a COMMIT that is already on its way wins over the timer: 201, not 408', async () => {
-    const { app, lines } = build(runtimePool(), { limits: { requestTimeoutMs: 200 },
+    const pool = runtimePool();
+    const { app, lines } = build(pool, { limits: { requestTimeoutMs: 200 },
       testHooks: { at: async (point, run) => { if (point === 'beforeCommit') await run('SELECT pg_sleep(0.6)'); } } });
-    const res = await register(app, 'Spät festgeschrieben');
+    // ETag through an app with default limits, so the read does not run under the 200 ms budget.
+    const res = await postSpeaker(app, await speakerTag(build(pool).app), 'Spät festgeschrieben');
     expect(res.status).toBe(201);
     expect(await eventCount()).toBe(3);
     expect(lines().filter((line) => line.status === 201)).toHaveLength(1);
