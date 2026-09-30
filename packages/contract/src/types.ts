@@ -660,11 +660,14 @@ export interface paths {
          *     reader with `event.read` receives every event of that meeting after the cursor exactly once and
          *     in ascending `seq`, as `event` messages, gap-free within the meeting; every other reader
          *     receives `change` messages for that meeting's events only, under the rules above (R-PERM-04).
-         *     `id` stays the global `seq`, so gaps between two `id`s are events of other meetings. Events
-         *     without a meeting do not belong to the filter and are not sent under it, not even to readers
-         *     with `event.read`. The head (and so the client's cursor) moves on through the `cursor` message
-         *     (after the catch-up and with the heartbeat). The catch-up limit of 1000 events (below)
-         *     counts the global range `(cursor, head]`, not only the meeting's events in it.
+         *     `id` stays the global `seq`. Between two `event` messages, gaps in `id` are events of other
+         *     meetings. For readers who receive `change` messages, the `id`s can also skip events of the same
+         *     meeting that they may not read, or that were merged into one `change` (its `id` is the last
+         *     covered `seq`). Events without a meeting do not belong to the filter and are not sent under
+         *     it, not even to readers with `event.read`. The head (and so the client's cursor) moves on
+         *     through the `cursor` message (after the catch-up and with the heartbeat). The catch-up limit
+         *     of 1000 events (below) counts the global range `(cursor, head]`, not only the meeting's events
+         *     in it.
          *
          *     **Cursor.** Resume with `after` or the `Last-Event-ID` header (the browser sends it on
          *     reconnect). When both are present, `Last-Event-ID` wins: it is the newer cursor on a reconnect,

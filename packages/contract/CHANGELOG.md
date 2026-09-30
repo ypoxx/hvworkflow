@@ -21,7 +21,9 @@ Each entry names the slice that implements it in core, seed, web or e2e.
   - `meetingId` filter: "gap-free in `seq`" holds only without a filter. With a filter a reader with `event.read`
     receives every event of that meeting after the cursor exactly once and in ascending order, gap-free within
     the meeting; every other reader receives `change` messages for that meeting's events only (R-PERM-04); `id`
-    stays the global `seq` (gaps are other meetings' events); events without a meeting are not sent under a
+    stays the global `seq` (between two `event` messages, gaps are other meetings' events; for `change` readers
+    the `id`s can also skip same-meeting events they may not read or that were merged into one `change`, whose
+    `id` is the last covered `seq`); events without a meeting are not sent under a
     filter, also not to readers with `event.read`; the head moves on through the `cursor` message (after the catch-up and with the heartbeat); the
     catch-up limit of 1000 counts the global range.
   - `Retry-After`: on `/stream` 30 on every `503` `StreamUnavailable` (global stream limit,
