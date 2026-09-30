@@ -26,7 +26,8 @@
     "metrics-allowlist": "node scripts/metrics-allowlist-check.mjs",
     "plan-graph": "node scripts/plan-graph.mjs",
     "test:scripts": "node --test 'scripts/**/*.test.mjs'",
-    "audit:check": "node scripts/audit-check.mjs"
+    "audit:check": "node scripts/audit-check.mjs",
+    "e2e:http": "node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs"
   },
   "devDependencies": {
     "@redocly/cli": "^2.0.0",

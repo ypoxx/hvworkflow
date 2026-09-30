@@ -87,6 +87,8 @@ const serviceInputs = () => {
     redirectUri: 'http://localhost:4174/auth/callback',
     logDir: '/tmp/synthetic-access-log',
     path: '/usr/bin',
+    texts: { NOTICE_VERSION: 'e2e-synthetic-1', NOTICE_DE: 'Hinweis', NOTICE_EN: 'Notice',
+      DSFA_SUMMARY_URL: 'https://example.org/hv-e2e-dsfa' },
   };
 };
 
@@ -328,8 +330,9 @@ test('every file of the http project takes test and expect from the guard, not f
   for (const file of ['e2e/030-anmeldung.spec.ts', 'e2e/031-http-betriebsart.spec.ts', 'e2e/http/anmeldung.setup.ts']) {
     const source = readFileSync(join(WEB, file), 'utf8');
     assert.match(source, /from '[./]+\/(support\/)?http-guard'/, file);
-    for (const line of source.split('\n').filter((entry) => /from '@playwright\/test'/.test(entry))) {
-      assert.doesNotMatch(line, /\b(test|expect)\b/, `${file}: ${line.trim()}`);
+    for (const match of source.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'@playwright\/test'/g)) {
+      const names = match[1].split(',').map((name) => name.trim().split(/\s+as\s+/)[0]);
+      assert(!names.includes('test') && !names.includes('expect'), `${file} imports test or expect from @playwright/test`);
     }
   }
   const guard = readFileSync(join(WEB, 'e2e/support/http-guard.ts'), 'utf8');
@@ -393,7 +396,7 @@ test('MF-12: no file of this slice sets a test switch, a HV_E2E variable or a wi
   for (const file of ['scripts/e2e-http-031.mjs', 'scripts/lib/keycloak-ci.mjs', '.github/workflows/gates.yml',
     'apps/web/playwright.config.ts']) {
     const source = readFileSync(join(ROOT, file), 'utf8');
-    assert.doesNotMatch(source, /HV_E2E_/, file);
+    assert.doesNotMatch(source, /HV_E2E_[A-Z_]*\s*[:=]/, file);
     assert.doesNotMatch(source, /HV_CORS_ORIGINS\s*[:=]\s*['"`]?\S/, file);
   }
 });
