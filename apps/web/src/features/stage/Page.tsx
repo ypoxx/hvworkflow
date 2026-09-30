@@ -9,10 +9,10 @@
  * close in the same breath. Both writes carry the version they read, so a podium that has been
  * away for a minute cannot overwrite a return that happened in the meantime.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
-import type { Permission, StageView } from '@hv/domain';
+import type { Permission, Question, StageView } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
@@ -30,13 +30,15 @@ import { getLang, translate, useT } from '../../i18n';
 import { Podium, StageQueue } from './Podium';
 import {
   NO_VERDICT,
+  deliverTarget,
   isCurrentLoad,
   isInteractiveTarget,
   isReadForbidden,
   loadKey,
+  lockHolds,
   readVerdict,
 } from './lib';
-import type { KeyedRead, ReadVerdict } from './lib';
+import type { DeliverLock, KeyedRead, ReadVerdict } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
@@ -50,14 +52,12 @@ const WORK_ACTIONS: readonly Permission[] = [
 ];
 
 /**
- * takt-008: the question a "Vorgelesen, weiter" was written against, as it was read. Slice 010c,
- * Ziel 6 (N2 of takt-008's Nachprüfung): `answered` is set once the write itself has answered, so
- * that a failed read-back frees only a lock that is waiting for the record, never one whose write is
- * still on its way.
+ * takt-008: the question a "Vorgelesen, weiter" was written against, as it was read (`DeliverLock`,
+ * lib.ts). Slice 010c, Ziel 6 (N2 of takt-008's Nachprüfung): `answered` is set once the write itself
+ * has answered, so that a failed read-back frees only a lock that is waiting for the record, never
+ * one whose write is still on its way.
  */
-interface DeliverLock {
-  id: string;
-  version: number;
+interface HeldLock extends DeliverLock {
   answered: boolean;
 }
 
@@ -198,9 +198,9 @@ export function StagePage() {
    * answered, or a second press would act on the old copy and meet its own 412 and a problem toast
    * (review round 1, finding 3). Released at once when the write, or the read-back, fails.
    */
-  const [delivering, setDelivering] = useState<DeliverLock | null>(null);
+  const [delivering, setDelivering] = useState<HeldLock | null>(null);
   // The same lock for a second activation in the same task, before React has rendered it.
-  const writing = useRef<DeliverLock | null>(null);
+  const writing = useRef<HeldLock | null>(null);
   const stageBusy = busy || delivering !== null;
   const [returnOpen, setReturnOpen] = useState(false);
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
@@ -212,24 +212,31 @@ export function StagePage() {
   const [probeActions, setProbeActions] = useState<readonly Permission[]>([]);
   const [probeLoading, setProbeLoading] = useState(true);
 
-  // The keyboard handler must see the current record without being rebound on every fetch.
+  // The keyboard handler must see the drawn record without being rebound on every fetch.
+  //
+  // takt-039 (Befund 1, Punkt 2): set in a layout effect, which runs in the commit, before the
+  // browser can hand an input event to the page. A passive effect runs later, as a task of its own,
+  // and a press in between read the record of the previous render (on the first load: none).
+  // Minor A (review round 4) needs no copy of its own any more: no read clears this ref, so after a
+  // load that fails with anything but a refusal it still holds the record the podium shows.
   const stageRef = useRef<StageView | null>(null);
-  // Minor A (review round 4): the record on screen, kept apart from `stageRef` — a load that fails
-  // with anything but a read refusal hands the shortcuts back the record the podium still shows.
-  const shownRef = useRef<StageView | null>(null);
-  useEffect(() => {
+  // A return in flight locks "Vorgelesen, weiter" too (`nextButton`, lib.ts); the handler reads it
+  // from the same commit as the record.
+  const returningRef = useRef(false);
+  useLayoutEffect(() => {
     stageRef.current = stage;
-    shownRef.current = stage;
-  }, [stage]);
+    returningRef.current = busy;
+  }, [stage, busy]);
 
-  // Adjusted during render: the render that shows the next question is the one that unlocks.
-  if (
-    delivering !== null &&
-    (stage?.current?.id !== delivering.id || stage.current.version !== delivering.version)
-  ) {
+  // Adjusted during render: the render that shows the next question is the one that unlocks. The
+  // same rule as the button and the handler (`lockHolds`, lib.ts).
+  if (delivering !== null && !lockHolds(delivering, stage?.current)) {
     setDelivering(null);
   }
-  useEffect(() => {
+  // takt-039 (Befund 1, Punkt 4): the handler's copy follows in the same commit. It no longer
+  // matters for a press on another question — `deliverTarget` asks whether the lock holds for the
+  // drawn question — but a lock the render has let go of must not come back with that question.
+  useLayoutEffect(() => {
     if (delivering === null) writing.current = null;
   }, [delivering]);
 
@@ -266,12 +273,13 @@ export function StagePage() {
 
   useEffect(() => {
     let cancelled = false;
-    // Minor 4 (review round 3): `version` bumps on every actor switch (api/useApiVersion.ts). Until
-    // this version's own answer is in, the keyboard has no record to act on — the previous one
-    // may belong to a role that could read (and deliver) what this one cannot. Only the ref the
-    // shortcuts read is cleared: blanking the visible podium on every bump would make it jump on
-    // every new event too (design principle 8), and the fresh answer replaces it within the load.
-    stageRef.current = null;
+    // takt-039 (Befund 1, Punkt 3): a read no longer takes the record away from the keyboard. It
+    // used to clear `stageRef` until its answer came, so every press in the length of a
+    // `GET /v1/stage` — every 30 s poll, every own write of any view — was dropped without a word
+    // while the button looked free. The podium acts on what it shows; the `If-Match` of the drawn
+    // version still guards every write (412, toast, re-read). Minor 4 (review round 3) and Codex P2-B
+    // stay kept by the render: an actor change drops the stage in the render that shows the new
+    // actor (`setStage(null)` below), and the ref follows that render.
     // Codex P2-B on 948a721: every answer is tied to the actor it was asked for. The actor can
     // change while the request is on its way, and the answer can arrive before the `version` bump
     // that would cancel this effect — it then belongs to the previous actor, with that actor's
@@ -302,10 +310,9 @@ export function StagePage() {
           setStageRead({ key: requested, status: 'forbidden' });
           return;
         }
-        // Minor A (review round 4): the podium goes on showing the last record it had, so the
-        // shortcuts and "Vorgelesen, weiter" act on it again instead of doing nothing until the
-        // next event. The server still decides every write (a stale record meets its 412/403).
-        stageRef.current = shownRef.current;
+        // Minor A (review round 4): the podium goes on showing the last record it had, and the
+        // shortcuts and "Vorgelesen, weiter" act on it (takt-039: the ref was never cleared). The
+        // server still decides every write (a stale record meets its 412/403).
         // Slice 010c: a failure is this load's answer too; a refusal of the same actor stands
         // (`readVerdict`), one of another actor was already reset with the actor change above.
         setStageRead({ key: requested, status: 'error' });
@@ -398,17 +405,19 @@ export function StagePage() {
   /**
    * Read out: deliver, and close straight away where the record allows it. One click, one hand.
    *
-   * Slice 010c, Ziel 6 (N3 of takt-008's Nachprüfung): says whether a write was started. Nothing is
-   * written while there is no record to act on (the read after a new `version` is still on its
-   * way), the record offers no delivery, or a write is already in flight — and a press that wrote
-   * nothing must not leave a focus marker behind (Podium.tsx).
+   * Slice 010c, Ziel 6 (N3 of takt-008's Nachprüfung): says whether a write was started — a press
+   * that wrote nothing must not leave a focus marker behind (Podium.tsx).
+   *
+   * takt-039: `question` is the drawn one — the click hands over the question its button was drawn
+   * with (Podium.tsx), Space the record of the last commit (`stageRef`). Whether it writes is the
+   * rule the button is drawn by (`deliverTarget`, lib.ts), with the lock of this very task
+   * (`writing`), so a second activation before React has rendered the first stays locked. There is
+   * no other refusal: nothing the render does not show as locked.
    */
-  const deliver = useCallback((): boolean => {
-    const current = stageRef.current?.current;
-    if (current === null || current === undefined) return false;
-    if (!current._actions.includes('question.deliver')) return false;
-    if (writing.current !== null) return false;
-    const lock: DeliverLock = { id: current.id, version: current.version, answered: false };
+  const deliver = useCallback((question: Question | null | undefined): boolean => {
+    const current = deliverTarget(question, writing.current, returningRef.current);
+    if (current === null) return false;
+    const lock: HeldLock = { id: current.id, version: current.version, answered: false };
     writing.current = lock;
     setDelivering(lock);
     void (async () => {
@@ -481,7 +490,7 @@ export function StagePage() {
       if (isInteractiveTarget(event.target) && !(isR && fromPodiumButton)) return;
       if (event.code === 'Space') {
         event.preventDefault();
-        deliver();
+        deliver(stageRef.current?.current);
         return;
       }
       if (isR) {
@@ -599,7 +608,8 @@ export function StagePage() {
   ) : (
     <Podium
       stage={view}
-      busy={stageBusy}
+      lock={delivering}
+      returning={busy}
       onNext={deliver}
       onReturn={() => setReturnOpen(true)}
     />

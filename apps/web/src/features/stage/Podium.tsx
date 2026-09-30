@@ -22,17 +22,36 @@ import {
   cx,
 } from '../../components';
 import { useT } from '../../i18n';
-import { approvedAnswer, clockTime } from './lib';
+import { approvedAnswer, clockTime, nextButton } from './lib';
+import type { DeliverLock } from './lib';
 
 interface PodiumProps {
   stage: StageView;
-  busy: boolean;
+  /** takt-039: the "Vorgelesen, weiter" in flight (Page.tsx), `null` when none is. */
+  lock: DeliverLock | null;
+  /** A return is being written. */
+  returning: boolean;
   /**
-   * Rendered only when the record allows it — `_actions` decides, never a role. Returns whether a
-   * write was started (slice 010c, Ziel 6: N3 of takt-008's Nachprüfung).
+   * Rendered only when the record allows it — `_actions` decides, never a role. Receives the question the button was
+   * drawn with (takt-039) and returns whether a write was started (slice 010c, Ziel 6: N3 of takt-008's Nachprüfung).
    */
-  onNext: () => boolean;
+  onNext: (question: Question) => boolean;
   onReturn: () => void;
+}
+
+/**
+ * takt-039: the click of "Vorgelesen, weiter" hands over the question the button was drawn with, not whatever a ref
+ * holds at the moment of the click; `onStarted` runs only when the press started a write (N3). Exported for the static
+ * test (Podium.test.tsx), which cannot click.
+ */
+export function nextPress(
+  question: Question,
+  onNext: (question: Question) => boolean,
+  onStarted: () => void,
+): () => void {
+  return () => {
+    if (onNext(question)) onStarted();
+  };
 }
 
 function PodiumButton({
@@ -170,10 +189,13 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
   );
 }
 
-export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
+export function Podium({ stage, lock, returning, onNext, onReturn }: PodiumProps) {
   const t = useT();
   const current = stage.current;
-  const mayDeliver = current?._actions.includes('question.deliver') ?? false;
+  // takt-039: drawn and locked by the same rule the handler writes by (`nextButton`, lib.ts).
+  const next = nextButton(current, lock, returning);
+  // Any write of the podium in flight: the return button waits for it, and so does the focus marker below.
+  const busy = returning || lock !== null;
   // takt-008: when the question just read out was the last one (or the next may not be read out
   // by this person), "Vorgelesen, weiter" leaves with it and its focus falls to `<body>`. It is
   // moved to the podium itself, which then says what is (or is not) on stage.
@@ -197,9 +219,6 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
     // The button kept its focus (the next question may be read out too): the press is settled.
     if (stage !== pressedOn) nextPressed.current = null;
   }, [busy, stage]);
-  const next = (): void => {
-    if (onNext()) nextPressed.current = stage;
-  };
 
   if (current === null) {
     return (
@@ -293,12 +312,16 @@ export function Podium({ stage, busy, onNext, onReturn }: PodiumProps) {
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-3">
-        {mayDeliver && (
+        {next.drawn && (
           <PodiumButton
             variant="primary"
             testId="stage-next"
-            disabled={busy}
-            onClick={next}
+            disabled={next.locked}
+            onClick={() =>
+              nextPress(current, onNext, () => {
+                nextPressed.current = stage;
+              })()
+            }
             hint={<Kbd>{t('stage.key.next')}</Kbd>}
           >
             {t('action.question.deliver')}
