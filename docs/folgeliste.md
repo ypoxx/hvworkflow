@@ -265,6 +265,14 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035a Review nit 7 · `packages/contract/CHANGELOG.md` (0.3.11) · Einordnung der Versionsstufe (Patch) trotz geänderter
   Semantik der vorab erklärten, nie ausgelieferten Operation · Begründung im CHANGELOG ergänzen oder Stufe prüfen.
 
+- 035a Nachprüfung minor 1 · `packages/domain/src/api.ts` (catch um `snapshotBefore` im Projektions-Hörer) · ein Fehler
+  im Vorher-Abzug wird still verschluckt; die Sicht wird dann nur nach „nachher“ beurteilt (enger, nie weiter), aber
+  ohne Spur · Fehler über `onIntegrityError` oder einen Diagnose-Haken melden, das Verschlucken behalten.
+- 035a Nachprüfung minor 2 · `packages/domain/src/api.ts` (catch um `visibleMessages` in `subscribe`) · ein Fehler dort
+  liefert still `[]` statt der Ereignisse (schließt nach innen, nie mehr Daten) · vor dem nackten Signal melden.
+- 035a Nachprüfung nit 4 · `apps/api/src/__tests__/postgres-stream035a.test.ts` (Kopf) · der Test ist ein Happy-Path-Pin;
+  die Ursache des damaligen `e2e-http`-Rots war die Basis (takt-039), nicht 035a · im Kopf vermerken.
+
 ## Bühne und Wortmeldeliste (aus takt-039)
 
 - ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im

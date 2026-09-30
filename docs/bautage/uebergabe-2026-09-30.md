@@ -4,17 +4,21 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `f702822` (Spec 036b). Etappe A fertig;
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `8a4c8bd` (035a). Etappe A fertig;
   Scheibe 031 fertig (031a, 031b, alle Takte aus der 031b-Diagnose: takt-030 bis takt-037). E56 gilt.
 - **Berichtigung:** Die früheren Takte takt-035 (Produktions-Build) und takt-036 (Katalog-Rennen) sind **nicht** die
   Plan-Scheiben 035 (SSE-Strom) und 036 (Live-Store und Strom-Client). Zielpfad B endet erst mit den Plan-Scheiben 035
-  und 036; die frühere Zeile „Nach 031b: Zielpfad C“ war falsch.
-- Plan-Scheiben 035/036 sind in vier Specs geteilt, alle gemergt: 035a Domäne und Vertrag (#96), 035b Dienst (#97),
-  036a Live-Store (#98), 036b Strom-Client (#99); dazu takt-038 Historie paginiert (#100). Alle Risiko hoch außer
-  takt-038 (mittel).
-- **Bau 035a läuft** auf `claude/slice-035a-sse-domaene-vertrag`: zuerst Vertrag 0.3.11 (Architekt), dann Domänenteil
-  (Opus-Implementierer, Tests zuerst), Review in frischem Kontext (Opus), Entwurfs-PR, CI, ready, Codex, Merge.
-- Reihenfolge danach: 035b und 036a (036a braucht nur 035a) → 036b; takt-038 nach 036a. Danach Zielpfad C (043 zuerst);
+  und 036.
+- Plan-Scheiben 035/036 sind in vier Specs geteilt, alle gemergt: 035a (#96), 035b (#97), 036a (#98), 036b (#99); dazu
+  takt-038 Historie paginiert (#100).
+- **035a gemergt** (#102, `8a4c8bd`): Vertrag 0.3.11 und Strom-Domäne (R-PERM-04 über `can()`).
+- **takt-039 gemergt** (#104, `769df38`): `e2e-http` war auf der Basis rot (Diagnose-PR #103). Behoben wurden ein
+  Produktfehler auf der Bühne („weiter“ ging im HTTP-Modus still verloren), die Rückgabe auf die falsche Frage (Recht/Audit)
+  und ein Testrennen mit dnd-kit (Tasten-Hörer erst per `setTimeout`, Helfer `liftWithKeyboard`).
+- **Bau läuft:** 035b (Dienst, `/home/user/wt/s035b`, Branch `claude/slice-035b-sse-dienst`) und 036a (Live-Store,
+  `/home/user/wt/s036a`, Branch `claude/slice-036a-live-store`), beide Opus. Für 035b offen: `meetingId`-Filter gegen
+  „lückenlos“ und der `Retry-After`-Wert bei 503 `StreamUnavailable`.
+- Reihenfolge danach: 036b nach 035b und 036a; takt-038 nach 036a. Danach Zielpfad C (043 zuerst);
   D (064–066) darf nach 043 parallel zum Rest von C laufen (`docs/produktplan-beta.md`, Abschnitt Zielpfad).
 - takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile); die Eigentümerfrage bleibt
   offen und ist umkehrbar.

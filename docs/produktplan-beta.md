@@ -1304,7 +1304,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **A Fundament:** 021c, 024, 025, 026, 027, 028, 033a, 033b, 034a, 034b.
   *Stand 29.09.2026:* erledigt 021c, 024, 025, 026, 027, 028 (Codex, 27.–29.09., nachgeprüft; Reparaturen takt-021..026); Spec 033a/033b gemergt; offen 033a, 033b, 034a, 034b (Spec 034 am 29.09. in 034a/034b geteilt).
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
-  *Stand 29.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8); offen 031a, 031b (Specs nach Lesebefund, 30.09.; 031 geteilt), 035, 036.
+  *Stand 30.09.2026:* erledigt 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8), 031 (031a, 031b), 035a (Domäne und Vertrag 0.3.11); offen 035b (Dienst), 036a (Live-Store), 036b (Strom-Client), takt-038; 035 und 036 sind je in a/b geteilt.
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
