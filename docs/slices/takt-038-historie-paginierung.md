@@ -103,11 +103,58 @@ der Datei.
 
 ```
 Slice: takt-038-historie-paginierung
-Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates`; docs/evidence/takt-038-historie-weitere.png
+Done: Ergebnisliste seitenweise („Weitere laden“, bis 10 Seiten); jede Zählung liest alle geladenen Seiten neu
+      (readResultPages über 036a), mergeResultPages prüft total/erste Seite/Doppel/Lücken, sonst Seite 1 mit Hinweis.
+      Ereignisstrom: advanceStream liest nach dem ersten Fenster nur bis zum Kopf nach, Sprung bei > STREAM_SCAN_LIMIT,
+      Neuladen bei lastSeq < Cursor, nichts halb vorgerückt; Tabelle 200 Zeilen je Seite mit „Ältere laden“.
+Evidence: Baucommit 114cef2; Schluss von `pnpm gates` unten; docs/evidence/takt-038-historie-weitere.png
 Open: —
-Touched: <Dateiliste>
+Touched: apps/web/src/features/history/Page.tsx, apps/web/src/features/history/lib.ts,
+         apps/web/src/features/history/lib.test.ts, apps/web/src/i18n/history.de.ts, apps/web/src/i18n/history.en.ts,
+         apps/web/src/i18n/parity.test.ts (nur 507→510), docs/evidence/takt-038-historie-weitere.png,
+         docs/slices/takt-038-historie-paginierung.md
 ```
+
+Schluss von `pnpm gates` auf 114cef2 (Exit 0; Einheitstests: domain 261, web 392, api 430 + 94 übersprungen):
+
+```
+slice-scope: warning — "docs/slices/takt-038-historie-paginierung.md"'s "Files allowed" section differs from its version at the merge-base (ac51ea8) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 8 changed file(s), all within "docs/slices/takt-038-historie-paginierung.md"'s "Files allowed" list (12 pattern(s)).
+...
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.86s
+mark-test-run: wrote /home/user/wt/t038/.claude/state/last-test-run (clean tree) at commit 114cef2, tree fbeaa2f5b6dc…
+```
+
+Weitere Nachweise:
+- Tests zuerst: 18 neue Tests rot (`mergeResultPages is not a function`, 18 failed | 33 passed), danach 51/51 grün.
+- Mutationen, jede danach zurückgesetzt, danach wieder 51/51 grün:
+  - Seitenprüfung ohne total- und Längenprüfung: 2 Tests rot.
+  - Seitenprüfung ohne Vergleich mit den bisherigen Seiten: 2 rot.
+  - Seitenprüfung ohne Doppelprüfung: 1 rot.
+  - Fehler einer Seite verschluckt: (c2) rot, Cursor und Fenster.
+  - Kein Neuladen bei lastSeq < Cursor: (d) rot.
+- In-process-e2e: 010b/010c/010d/abnahme 80 bestanden; die ganze Suite 131 bestanden.
+
+Bauentscheidungen (vom Orchestrator am 30.09. angenommen):
+1. „Kleineres total“ und „verschobene erste Seite“ werden gegen die zuletzt gezeigten Seiten desselben Akteurs und derselben
+   Suche geprüft. Verschoben heißt: andere id-Folge auf Seite 1. Das ist strenger als eine reine Grenzprüfung, also die
+   sichere Seite.
+2. „Weitere laden“ erhöht die Seitenzahl; der Effekt liest die Seiten 1..n+1 neu, die Seiten 1..n kommen aus dem Puffer
+   (036a). Es gibt einen Lesepfad und eine Prüfung.
+3. Die Seitengröße ist in lib.ts vom Fenster getrennt; die Ansicht setzt beide auf STREAM_SCAN_LIMIT. (c2) läuft mit
+   Seitengröße 1000 und Fenster 5000.
+4. Der Cursor steht nach dem Nachblättern auf max(letztes erhaltenes seq, lastSeq der ersten Antwort).
+5. Der Hinweis „zurück auf Seite 1“ bleibt bis zu „Weitere laden“, einer neuen Suche oder einem Akteurwechsel. Nach dem
+   Rückfall wird Seite 1 einmal aus dem Puffer gelesen.
+6. Die Zahl der Tabellenseiten („Ältere laden“) gilt je Akteur und bleibt bei neuen Ständen stehen.
+7. Der Screenshot zeigt den Stand nach dem Klick: 230 von 230, danach kein Knopf mehr. Der Korpus hat 230 Fragen.
+8. Die Treffer werden über alle geladenen Seiten nach Nummer sortiert. Die Prüfung nutzt die Reihenfolge des Dienstes.
+Hinweis: Der Testtitel in parity.test.ts:161 nennt weiter „507“. Er ist laut Bauklärung nicht geändert und steht als
+Nit für die Folgeliste an.
 
 ## Review findings
 
