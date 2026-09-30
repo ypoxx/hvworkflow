@@ -54,4 +54,13 @@ Schlüsselung der Kandidaten, die die Tests (b) und (c) abdecken.
 
 ## Nachweis
 
-(folgt im Doku-Commit)
+Gates-Commit `faca4ff`, sauberer Baum, `pnpm gates` Exit 0 (mit Postgres, Datenbank `hv_t030`). Wörtlicher Schluss:
+
+```
+✓ built in 1.92s
+mark-test-run: wrote /home/user/wt/t037/.claude/state/last-test-run (clean tree) at commit faca4ff, tree 8c64ca66ba39…
+```
+
+Unit-Tests `SuggestDialog.test.tsx` zuerst rot (5 von 5, die Modellfunktionen fehlten im alten Code), dann grün (5 von 5).
+e2e Projekt `in-process`: `002-speakers-capture.spec.ts` und `abnahme.spec.ts`, 2 passed. Diese Änderung hat keine
+sichtbare Oberfläche, deshalb kein neuer Screenshot.
