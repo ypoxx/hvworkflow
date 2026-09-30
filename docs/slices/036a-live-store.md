@@ -5,7 +5,7 @@
 **Rolle:** web-implementer; Review in frischem Kontext mit Perspektive Security (Daten je Akteur) und Nebenläufigkeit/Lesezustand (010c, 010d, takt-030, takt-032); Lesebefund der Spec vor dem Bau; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel; R-PERM-04 (035a) wird nur konsumiert; AGENTS.md R2, R4, R6, R10, R12
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/036 (am 30.09.2026 vom Orchestrator in 036a/036b und takt-038 geteilt); ADR 0014, ADR 0002; Scheiben 035a, 030, 010c, 010d, takt-030, takt-032, takt-033b; Lesebefund zu Spec 036 (Opus, 30.09.2026: N1–N4, N7, m1, m2, m3, m7); Bedrohungsmodell T-G1-I-08, T-G1-D-03
-**Depends on:** 035a (gemergt: `HvApi.subscribe` mit `change`, `EVENT_TOPICS`, `EVENT_SUBJECTS`); 030, takt-030, takt-032, takt-033b (im Code auf `59ef4fd`)
+**Depends on:** 035a (Voraussetzung: der Bau von 035a, Spec #96, ist gemergt, bevor dieser Bau beginnt; liefert `HvApi.subscribe` mit `change`, `EVENT_TOPICS`, `EVENT_SUBJECTS`); 030, takt-030, takt-032, takt-033b (im Code auf `59ef4fd`)
 **Perspektive:** Security (Daten je Akteur), Nebenläufigkeit, Betrieb · **Glossar: neue Begriffe:** nein
 
 ## Teilung und Zuschnitt
