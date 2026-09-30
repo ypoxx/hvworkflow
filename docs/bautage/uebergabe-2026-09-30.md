@@ -4,17 +4,14 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `7180da3` (takt-033). Etappe A fertig;
-  aus B gemergt: 031a, takt-031, takt-033, takt-034, takt-035, takt-036.
-- **#82 takt-030** und **#87 takt-033b** — mergefertig. Der Codex-P1 (Screenshot nur im Artefakt) ist durch E56 gelöst:
-  Der Nachweis nennt Artefaktname, Lauf-ID, Artefakt-ID und Digest, danach den Thread auflösen und mergen. Vor dem Merge
-  Basis einbringen und Gates auf dem integrierten Commit. In #87 ist der Dev-Zweig von H10 seit takt-035 entfernt.
-- **#86 takt-032** — Nachprüfung bestanden, gestapelt auf takt-030. Nach #82: Basis auf den Integrationszweig, Gates auf dem
-  integrierten Commit, ready, Codex, Merge.
-- **#83 031b** — Entwurf, Basis vorläufig takt-030. Wartet auf takt-032 und takt-033b; danach warten die Tests auf das
-  Busy-Signal aus takt-032, `/stage` < 1500 ms bleibt. ADR-0002-Ergänzung schreibt der Architekt nach grüner CI.
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `a8ad326` (takt-032). Etappe A fertig;
+  aus B gemergt: 031a, takt-030 bis takt-036 (ohne takt-034 als B-Takt: Sicherheitstakt), E56.
+- **#83 031b** — Basis auf den Integrationszweig umgestellt, Bau läuft: Netz-Warteschritte durch Busy-Signale aus takt-032
+  ersetzen, Halteregel unverändert. Danach PR-CI (Keycloak nur dort), Review in frischem Kontext, ADR-0002-Ergänzung durch
+  den Architekten, ready, Codex, Merge.
 - takt-033 ist mit Vorschlag (b) gemergt (geänderte gültige Kette: annehmen, feste Logzeile); die Eigentümerfrage bleibt
   offen und ist umkehrbar.
+- Nach 031b: Zielpfad C (043 zuerst).
 
 ## Eigentümerentscheidungen (offen)
 
