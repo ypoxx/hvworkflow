@@ -185,6 +185,9 @@ Vertrag zuerst, vom Architekten und vor jedem Code (AGENTS.md R6):
   0.3.11, ein Absatz in `info.description`; **Architekt**)
 - `packages/contract/CHANGELOG.md` (Abschnitt 0.3.11; Architekt)
 - `packages/contract/src/types.ts` (nur regeneriert)
+- `packages/contract/package.json` (nur `version` 0.3.11; der Vertragsgate verlangt Gleichheit mit `info.version`)
+- `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile 0.3.10 → 0.3.11; wie 034a)
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Versionszeile 0.3.10 → 0.3.11; wie 034a)
 
 Domäne:
 
