@@ -106,7 +106,7 @@ Slice: takt-040-strom-vertragswortlaut
 Done: streamEvents-Beschreibung (gap-free nur ohne Filter, Absatz zum meetingId-Filter, Retry-After 30 und kein
       Retry-After auf end) und RetryAfter-Kopf (30 auf /stream) an den Dienst 035b angeglichen; Vertrag 0.3.12 mit
       CHANGELOG, regenerierten Typen und den zwei Versionszeilen-Tests.
-Evidence: siehe unten (pnpm gates auf 78ebb06, nach der Überarbeitung aus dem Review)
+Evidence: siehe unten (pnpm gates auf 1393b89, nach Review und Codex P2)
 Open: Folgeliste 035b Einträge 1 und 2 abhaken, sobald PR #107 und dieser Takt gemergt sind (Orchestrator).
 Touched: packages/contract/openapi.yaml, packages/contract/package.json, packages/contract/CHANGELOG.md,
          packages/contract/src/types.ts, apps/api/src/__tests__/contract.test.ts,
@@ -119,7 +119,13 @@ Touched: packages/contract/openapi.yaml, packages/contract/package.json, package
 `pnpm contract:types` ändert nur JSDoc-Kommentare. Befund 5 (Nit, `StreamUnavailable` „both causes“) liegt außerhalb
 von Files allowed und geht auf die Folgeliste (Orchestrator).
 
-**`pnpm gates`** auf `78ebb06` (sauberer Baum, mit den Postgres-Variablen `TEST_DATABASE_URL`,
+**Codex P2 auf PR #108, Commit `1393b89`:** „gaps between two `id`s are events of other meetings“ galt nur für
+`event`-Nachrichten. Der Satz gilt jetzt nur zwischen zwei `event`-Nachrichten; ein neuer Satz sagt, dass bei
+`change`-Lesern die `id` auch Ereignisse desselben Jahrgangs überspringen können (nicht lesbar nach R-PERM-04 oder in
+einem `change` zusammengefasst, dessen `id` die letzte abgedeckte `seq` ist). Ebenso im CHANGELOG 0.3.12. Version
+bleibt 0.3.12; `pnpm contract:types` ändert nur JSDoc-Kommentare.
+
+**`pnpm gates`** auf `1393b89` (sauberer Baum, mit den Postgres-Variablen `TEST_DATABASE_URL`,
 `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`, Datenbank `hv_t033`), Exit 0. Ausschnitt, wörtlich:
 
 ```
@@ -139,11 +145,11 @@ slice-scope: 7 changed file(s), all within "docs/slices/takt-040-strom-vertragsw
 Schluss, wörtlich:
 
 ```
-✓ built in 2.11s
-mark-test-run: wrote /home/user/wt/t040/.claude/state/last-test-run (clean tree) at commit 78ebb06, tree 9f63d1b543ba…
+✓ built in 1.71s
+mark-test-run: wrote /home/user/wt/t040/.claude/state/last-test-run (clean tree) at commit 1393b89, tree ec4ff3c5577e…
 ```
 
-Der erste Lauf auf `d618177` (vor dem Review) war ebenfalls grün. Dieser Berichtsnachtrag ist ein reiner Doku-Commit
+Die früheren Läufe auf `d618177` (vor dem Review) und `78ebb06` (nach dem Review) waren ebenfalls grün. Dieser Berichtsnachtrag ist ein reiner Doku-Commit
 (R2: kein neuer lokaler Lauf nötig).
 
 ## Review findings
