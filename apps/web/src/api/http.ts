@@ -1,9 +1,9 @@
 /** Same-origin HTTP implementation of the domain-facing HvApi port. */
-import { ApiProblem, type HvApi, type ReadEvent, type StreamChange, type StreamTopic } from '@hv/domain';
+import { ApiProblem, type Actor, type HvApi, type ReadEvent, type StreamChange, type StreamTopic } from '@hv/domain';
 import type { components, paths } from '../../../../packages/contract/src/types';
 import { translate } from '../i18n';
 import { createConnectionStore, type ConnectionSignal, type ConnectionStore } from './connection';
-import { READ_TOPICS } from './liveStore';
+import { actorKey, READ_TOPICS } from './liveStore';
 import { createSseParser, decodeMessage, type SseItem } from './sse';
 
 export type HttpSession = components['schemas']['Session'];
@@ -61,6 +61,24 @@ export interface HttpApi extends HvApi {
   closeStream(): void;
 }
 
+/**
+ * Slice 036b: what a change of the session's actor does to the stream (`index.ts`). Every confirmed actor asks for the
+ * stream; a structurally other actor first closes the open one (review minor 3), so nothing opened under the previous
+ * actor keeps running and its cursor is dropped (minor 2); no actor closes it.
+ */
+export function followSessionActor(api: Pick<HttpApi, 'openStream' | 'closeStream'>): (actor: Actor | undefined) => void {
+  let last: string | undefined;
+  return (actor) => {
+    const next = actor === undefined ? undefined : actorKey(actor);
+    if (next === undefined) api.closeStream();
+    else {
+      if (last !== undefined && next !== last) api.closeStream();
+      api.openStream();
+    }
+    last = next;
+  };
+}
+
 const browserEnvironment: StreamEnvironment = {
   hidden: () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
   onVisibilityChange(listener) {
@@ -92,6 +110,8 @@ const WATCHDOG_MS = 45_000;
 const SHORT_LIVED_MS = 10_000;
 const SHORT_LIVED_LIMIT = 3;
 const SHORT_LIVED_PAUSE_MS = 300_000;
+/** Session or rights ends in a row without a healthy stream before the 5 min pause (review major 1, MF-SC-2). */
+const SESSION_END_LIMIT = 3;
 const HIDDEN_CLOSE_MS = 60_000;
 /** Used after `end {unavailable}` when the stream named no `retry:` (contract: `retry: 3000`). */
 const DEFAULT_RETRY_MS = 3_000;
@@ -273,6 +293,13 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
   /** Closed after 60 s hidden, or not opened because hidden: opens when the tab is visible again. */
   let pausedHidden = false;
   let detachEnvironment: (() => void) | undefined;
+  /**
+   * Review major 1 (T-G1-D-03): session or rights ends in a row without a healthy stream, and whether the next
+   * `openStream()` follows such an end. A proxy answering 403 only on the stream, or a service whose hub lags behind
+   * `/auth/me`, would otherwise loop end → `/auth/me` → open → end without any pause.
+   */
+  let sessionEnds = 0;
+  let afterSessionEnd = false;
   /** Reads started while no stream is in step (N5), keyed by method and arguments. */
   let recorded: Map<string, { method: ReadName; args: readonly unknown[] }> | 'all' = new Map();
 
@@ -327,6 +354,10 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
   const retryIn = (ms: number) => { clearRetry(); retryTimer = setTimeout(() => { retryTimer = undefined; connect(); }, ms); };
   /** A loss of session or rights: empty the buffer (the hook), no new stream without a new confirmation. */
   const endForSession = (reason: StreamEndReason) => {
+    const closing = current;
+    const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
+    if (lifetime >= SHORT_LIVED_MS) { attempt = 0; sessionEnds = 0; } else sessionEnds += 1;
+    afterSessionEnd = true;
     drop();
     clearRetry();
     wanted = false;
@@ -349,7 +380,7 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
     const healthy = closing !== undefined && (closing.sawData || lifetime >= SHORT_LIVED_MS);
     drop();
-    if (healthy) { attempt = 0; shortLived = 0; } else shortLived += 1;
+    if (healthy) { attempt = 0; shortLived = 0; sessionEnds = 0; } else shortLived += 1;
     if (shortLived >= SHORT_LIVED_LIMIT) {
       // A cutting or buffering proxy: stay on the poll for a while (m8).
       shortLived = 0;
@@ -624,9 +655,23 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
         if (pausedHidden && !environment.hidden()) onVisibility();
         return;
       }
+      if (afterSessionEnd) {
+        // The session is confirmed again, but the open that follows an end waits: backoff, and after three ends without
+        // a healthy stream the 5 min pause of m8 (review major 1). Still nothing opens without this confirmation.
+        afterSessionEnd = false;
+        if (sessionEnds >= SESSION_END_LIMIT) {
+          sessionEnds = 0;
+          signal({ type: 'start' });
+          signal({ type: 'fallback' });
+          retryIn(SHORT_LIVED_PAUSE_MS);
+        } else retryIn(backoffDelay());
+        return;
+      }
       connect();
     },
     closeStream() {
+      // Review minor 2: the cursor belongs to this session and actor; the next stream starts without it (N5 path).
+      cursor = undefined;
       pausedHidden = false;
       if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
       stopStream();

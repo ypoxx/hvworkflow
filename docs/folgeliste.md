@@ -349,12 +349,21 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 
 ## Strom-Client (aus 036b)
 
-- 036b Bau · `apps/web/e2e/031-http-betriebsart.spec.ts` (H13) · die geschriebenen Texte von H13 stehen lokal in der Datei
-  (wie H9), nicht in `e2e/support/e2e-texts.ts` `WRITTEN_TEXTS`; die Zugriffslog-Prüfung des Harness sucht sie daher nicht ·
-  nach `e2e-texts.ts` verschieben.
 - 036b Bau · `apps/web/src/api/http.ts` (N5) · die Invalidierung nach der ersten `cursor`-Nachricht trifft Listenlesungen
   eines Themas ganz, auch solche nach dem Senden der Stromanfrage (nur zu viel) · epochgebundene Invalidierung als API in
   `liveStore.ts` (036a-Datei).
+- 036b Review minor 4 · `apps/web/src/api/http.test.ts` · `end {unavailable}` und der Weg offline/online haben keinen
+  Unit-Test · je einen Test ergänzen.
+- 036b Review minor 5 · `apps/web/src/app/ConnectionStatus.tsx` · der Live-Bereich sagt „Stand von“ außerhalb von `live` bei
+  jeder Lesung neu an · nur die Phase in `aria-live`, die Zeit außerhalb.
+- 036b Review minor 7 · `apps/web/e2e/031-http-betriebsart.spec.ts` (H13 Schritt 1a) · das Trace-Fenster beginnt erst nach
+  der Antwort in B · vor dem Klick beginnen.
+- 036b Review minor 8 · `apps/web/src/api/http.ts` · der Neuaufbau nach `end {rotate}` ist synchron (alle Ströme eines
+  Prozesses gleichzeitig) · 0–2 s Zufallsanteil, ggf. volles Jitter.
+- 036b Review nit 9 · `apps/web/src/api/http.ts` · `hiddenTimer` wird in `endForSession` nicht geräumt, `detachEnvironment`
+  wird nie gerufen · räumen bzw. beim Schließen lösen.
+- 036b Review nit 10 · `apps/web/src/api/index.ts`, `http.ts` · ein 401 beim Öffnen leert den Live-Store dreimal
+  (`onStreamEnd`, `onUnauthorized`, `onActorChange(undefined)`) · auf einen Aufruf zusammenführen.
 - 036b Bau · `apps/web/src/app/ConnectionStatus.tsx` · „Verbindung wird aufgebaut“ erscheint bei jedem Laden kurz und
   wird vom Statusbereich angesagt · `connecting` erst nach 1–2 s zeigen.
 

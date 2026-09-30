@@ -112,6 +112,7 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
   031b bleibt)
 - `apps/web/src/i18n/parity.test.ts` (zweite Bauklärung: nur Schlüsselzahl 510 → 515 an drei Stellen und der veraltete
   Testtitel)
+- `apps/web/e2e/support/e2e-texts.ts` (Bauklärung 3: nur die H13-Texte als Konstanten und in `WRITTEN_TEXTS`)
 - `docs/evidence/031-h13-zweiter-browser.png`, `docs/evidence/031-h14-verbindungsanzeige.png`
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
@@ -145,6 +146,14 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
      läuft weiter gegen den echten Strom.
   3. Restrisiko „`/auth/me` vor einem Stromende abgeschickt, danach bestätigt, öffnet den Strom wieder“ ist angenommen
      (der Dienst prüft beim Öffnen, der Puffer ist dann leer); es bleibt im Bericht, nicht auf der Folgeliste.
+- **Bauklärung 3 (Orchestrator, 30.09.), nach dem Review von `f761931`:**
+  1. Review major 1 (T-G1-D-03, MF-SC-2): nach einem Sitzungs- oder Rechteende (end, 403, 401) geht das nächste
+     `openStream()` über den Rückzug; `attempt` wird nur nach einem gesunden Strom (≥ 10 s) zurückgesetzt. Nach drei
+     solchen Enden ohne gesunden Strom folgt die 5-min-Pause wie bei m8. Kein Neuaufbau ohne neue Bestätigung bleibt.
+  2. Review minor 2: `closeStream()` verwirft den Cursor; damit auch beim strukturellen Akteurwechsel und beim Abmelden.
+  3. Review minor 3: ein strukturell anderer Akteur schließt den offenen Strom und öffnet neu (`followSessionActor`).
+  4. Review minor 4 (Datenschutz): die H13-Texte stehen in `apps/web/e2e/support/e2e-texts.ts` `WRITTEN_TEXTS`, damit die
+     Zugriffslog-Prüfung des Harness sie sucht.
 
 ## Vor dem Bau prüfen
 
@@ -266,7 +275,7 @@ Perspektive(n): Security, Betrieb, UX · Nachweise: Tests 1–6, Netztrace · Of
 | SC-03 | ja: Nachrichten ohne Inhalt außer für `event.read`; der Client zeigt nichts aus dem Strom direkt an, er macht nur ungültig |
 | SC-04 | nicht anwendbar (kein Massenlesen im Client über den Vertrag hinaus) |
 | SC-05 | ja: Stromende und 401 leeren den Puffer, kein Neuaufbau ohne Bestätigung (Test 2); kein Geheimnis im Diff |
-| SC-06 | ja: MF-SC-1, MF-SC-2 |
+| SC-06 | ja: MF-SC-1, MF-SC-2; Review major 1: keine Schleife Ende → `/auth/me` → Öffnen → Ende — Rückzug nach jedem Sitzungs- oder Rechteende, 5-min-Pause nach drei Enden ohne gesunden Strom (Test „403 on every open …“) |
 | SC-07 | nicht anwendbar |
 | SC-08 | nicht anwendbar |
 | SC-09 | nicht anwendbar |

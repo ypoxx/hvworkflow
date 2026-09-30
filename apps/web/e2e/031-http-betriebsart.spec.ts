@@ -17,8 +17,8 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { checkAxe } from './support/axe';
 import {
-  DSFA_SUMMARY_URL, H8_CONTRIBUTION_TEXT, H8_OTHER_WRITER_QUESTION, H8_SPEAKER_NAME, H8_UNCONFIRMED_QUESTION,
-  NOTICE_DE, NOTICE_EN,
+  DSFA_SUMMARY_URL, H13_CONTRIBUTION_TEXT, H13_QUESTION, H13_SPEAKER_NAME, H8_CONTRIBUTION_TEXT, H8_OTHER_WRITER_QUESTION,
+  H8_SPEAKER_NAME, H8_UNCONFIRMED_QUESTION, NOTICE_DE, NOTICE_EN,
 } from './support/e2e-texts';
 import { expect, test } from './support/http-guard';
 import { liftWithKeyboard } from './support/keyboard-drag';
@@ -541,10 +541,6 @@ test.describe('H12 @idp: moving a Wortmeldung with the keyboard (takt-039, decid
 
 
 // ---- slice 036b: the stream in a second browser, and the connection indicator ----------------------------------------
-
-const H13_SPEAKER_NAME = 'Synthetische Testperson Sigma';
-const H13_CONTRIBUTION_TEXT = 'Synthetischer Wortlaut für den zweiten Browser im HTTP-Modus.';
-const H13_QUESTION = 'Synthetische Frage für die Einordnung im zweiten Browser?';
 
 interface TracedRequest { method: string; path: string; params: string; at: number }
 

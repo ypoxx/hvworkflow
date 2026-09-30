@@ -10,6 +10,7 @@ import {
   createInProcessApi,
   isLegacyEventShape,
   seedEvents,
+  type Actor,
   type DomainEvent,
   type HvApi,
   type EventStore,
@@ -17,7 +18,7 @@ import {
 import { getActor, setActor, setSessionActor, DEMO_ACTORS } from './actor';
 import { createSessionAuth } from './auth';
 import { connection } from './connection';
-import { createHttpApi, getHttpSession, logoutHttpSession, type HttpApi } from './http';
+import { createHttpApi, followSessionActor, getHttpSession, logoutHttpSession, type HttpApi } from './http';
 import { actorKey, createLiveStore, type LiveStore } from './liveStore';
 import { DEMO_MODE } from './mode';
 import { getLang } from '../i18n';
@@ -80,6 +81,8 @@ let liveStore: LiveStore | undefined;
 /** The HTTP adapter with its stream (slice 036b); absent in the demo, which has no stream (ADR 0002). */
 let httpAdapter: HttpApi | undefined;
 
+/** Slice 036b: opens, closes and (on a structurally other actor) restarts the stream; set once the adapter exists. */
+let followActor: ((actor: Actor | undefined) => void) | undefined;
 /** The session actor as seen last, for the structural comparison on a session refresh (takt-033b). */
 let sessionActorKey: string | undefined;
 export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
@@ -93,9 +96,8 @@ export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
     sessionActorKey = next;
     setSessionActor(actor);
     // Slice 036b (N5): every confirmed `/auth/me` asks for the stream, before the shell mounts the views; an open stream
-    // or a pending retry stays as it is. Without an actor the stream closes.
-    if (actor === undefined) httpAdapter?.closeStream();
-    else httpAdapter?.openStream();
+    // or a pending retry stays as it is, a structurally other actor restarts it. Without an actor the stream closes.
+    followActor?.(actor);
   },
 });
 
@@ -119,6 +121,7 @@ httpAdapter = DEMO_MODE ? undefined : createHttpApi({
   connection,
   locale: getLang,
 });
+followActor = httpAdapter === undefined ? undefined : followSessionActor(httpAdapter);
 const adapter: HvApi = httpAdapter
   ?? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents });
 
