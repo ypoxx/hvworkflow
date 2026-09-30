@@ -43,7 +43,10 @@ const launch = executablePath ? { launchOptions: { executablePath } } : {};
 const stateDir = process.env['E2E_HTTP_STATE_DIR'];
 // Build output of the HTTP project: private and per run under the state directory; without it below `node_modules` of this
 // package (git ignores it, and it is not `dist/`, which the gates build and parallel agents use).
-const httpBuildDir = `${stateDir ?? join(import.meta.dirname, 'node_modules/.e2e-http-build')}/web-build`;
+// Without the state directory the fallback is per run (process id), so two runs never share or empty each other's build.
+const httpBuildDir = `${stateDir ?? join(import.meta.dirname, `node_modules/.e2e-http-build-${process.pid}`)}/web-build`;
+// The path goes into a shell command inside single quotes: a single quote in it would end the quoting (injection).
+if (httpBuildDir.includes("'")) throw new Error('E2E_HTTP_STATE_DIR must not contain a single quote.');
 const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
 
 const httpUse = {

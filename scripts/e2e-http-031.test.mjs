@@ -316,6 +316,17 @@ test('takt-035: without a state directory the build goes below apps/web, outside
   assert(outDir.startsWith(`${WEB}/`), outDir);
   assert(!outDir.startsWith(`${WEB}/dist`), 'not the dist of the gates build');
   assert(outDir.startsWith(`${WEB}/node_modules/`), 'below node_modules, which git ignores');
+  assert.match(outDir, /\/\.e2e-http-build-\d+\/web-build$/, 'per-run suffix: runs do not share the directory');
+});
+
+test('takt-035: a single quote in E2E_HTTP_STATE_DIR is refused at config load', () => {
+  const result = spawnSync(process.execPath, ['--import', LOADER, '--input-type=module', '-e',
+    `await import(${JSON.stringify(join(WEB, 'playwright.config.ts'))});`], {
+    cwd: WEB, encoding: 'utf8', timeout: 60_000,
+    env: { ...baseEnv, E2E_HTTP: '1', E2E_HTTP_STATE_DIR: "/tmp/x'; touch /tmp/pwned; '" },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must not contain a single quote/);
 });
 
 test('takt-035: the demo branch stays the dev server', () => {

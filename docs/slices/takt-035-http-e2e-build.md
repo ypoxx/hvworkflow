@@ -97,3 +97,13 @@ mark-test-run: wrote /home/user/wt/t035/.claude/state/last-test-run (clean tree)
 **Orchestrator-Entscheidungen (30.09.2026) zu den offenen Fragen:** (1) H10 steht in `apps/web/e2e/031-http-betriebsart.spec.ts`
 (Files allowed korrigiert). (2) Die Build-Prüfung ist eine Zusicherung in H1 derselben Datei, keine neue Spec-Datei.
 (3) `.github/workflows/gates.yml` bleibt außerhalb; reicht das Zeitbudget nicht, ist das ein Befund mit Spec-Änderung.
+
+## Review findings
+
+Ergebnis: APPROVE, kein Blocker/Major.
+
+1. Minor: Pfad im `webServer`-Befehl in einfachen Anführungszeichen (Injektionsnähe). Erledigt: `playwright.config.ts` wirft beim Laden, wenn der Build-Pfad `'` enthält; Test in `e2e-http-031.test.mjs`.
+2. Minor: Fallback-Ausgabeverzeichnis ohne `E2E_HTTP_STATE_DIR` von parallelen Läufen geteilt. Erledigt: Suffix `process.pid` (`.e2e-http-build-<pid>`); Test prüft das Muster. Reste im ignorierten `node_modules` werden nicht aufgeräumt (nur lokaler Fallback, der Harness setzt immer das State-Verzeichnis).
+3. Minor: 031a-Spec Zeile 29 nennt noch den Entwicklungsserver. Folgeliste (außerhalb Files allowed).
+4. Nit: H1-Regex prüft `modulepreload`-Links nicht. Folgeliste (harmlos).
+
