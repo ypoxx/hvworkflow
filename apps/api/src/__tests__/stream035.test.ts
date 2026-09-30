@@ -1044,6 +1044,72 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(reader.blocks.filter(isEvent).length).toBeLessThan(8);
   });
 
+  it('R9 every catch-up and live event frame is masked like listEvents (redacted, sourceHash, no person, hash or command fields)', async () => {
+    const h = await harness({ session: true });
+    const from = h.head() - 300;
+    // Writes through the service: their events carry command fields and person references in the stored original.
+    await registerSpeaker(h, 'admin');
+    await assignFiller(h, 'admin');
+    const head = h.head();
+    const stored = h.log().slice(from, head);
+    // The stored originals carry what must never leave; otherwise the test would prove nothing.
+    expect(stored.every((e) => typeof e.hash === 'string' && e.hash !== '' && typeof e.prevHash === 'string')).toBe(true);
+    expect(stored.some((e) => e.commandId !== undefined || e.personId !== undefined)).toBe(true);
+    const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin'), 'Last-Event-ID': String(from) }));
+    const catchUp = (await reader.messagesUntil((b) => b.event === 'cursor', 5_000)).filter(isEvent);
+    expect(catchUp).toHaveLength(head - from);
+    await registerSpeaker(h, 'admin');
+    const live = await reader.until(isEvent);
+    for (const block of [...catchUp, live]) {
+      const e = block.data as Record<string, unknown> & { actor: Record<string, unknown> };
+      expect(e['redacted']).toBe(true);
+      expect(typeof e['sourceHash']).toBe('string');
+      for (const key of ['personId', 'hash', 'prevHash', 'commandId', 'commandOperation', 'commandResource']) expect(e).not.toHaveProperty(key);
+      expect(e.actor).not.toHaveProperty('displayName');
+      expect(e.actor).not.toHaveProperty('personId');
+    }
+  });
+
+  it('R8b the in-flight count goes down as frames go out: mid-batch and after it, a batch within the limit keeps the stream open', async () => {
+    const h = await harness({ session: true, streamLimits: { backlogMessages: 5 } });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await reader.nextMessage();
+    await sleep(50);
+    const batchOf = async (n: number): Promise<void> => {
+      const frozen = h.head();
+      h.hooks.load = (log) => log.slice(0, frozen);
+      for (let i = 0; i < n - 1; i++) await assignFiller(h, 'admin2', OTHER);
+      h.hooks.load = undefined;
+      await assignFiller(h, 'admin2', OTHER);
+      await eventually(() => h.hooks.appliedHead === h.head(), 3_000, 'batch applied');
+      await sleep(300);
+    };
+    reader.holdAt(4); // four of five taken: one frame of the batch is still in flight
+    await batchOf(5);
+    await batchOf(3); // 1 in flight + 3 queued = 4: within the limit
+    expect(reader.closed).toBe(false);
+    reader.resume();
+    await eventually(() => reader.blocks.filter(isEvent).length === 8, 3_000, 'all eight events');
+    await batchOf(4); // everything written: 4 is within the limit
+    await eventually(() => reader.blocks.filter(isEvent).length === 12, 3_000, 'four more events');
+    expect(reader.closed).toBe(false);
+  });
+
+  it('R10 a catch-up event without hash: the earlier events go out, then end unavailable, no frame for that event', async () => {
+    const h = await harness({ session: true });
+    track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    const broken = h.head() - 5;
+    h.hooks.load = (log) => log.map((e) => (e.seq === broken ? { ...e, hash: '' } : e));
+    const target = h.head() + 1;
+    await assignFiller(h, 'admin');
+    await eventually(() => h.hooks.appliedHead === target, 3_000, 'distributor took the log');
+    const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin', 2), 'Last-Event-ID': String(broken - 3) }));
+    const rest = await reader.rest(3_000);
+    expect(rest.filter(isEvent).map(idOf)).toEqual([broken - 2, broken - 1]);
+    expect(rest.at(-1)!.event).toBe('end');
+    expect(rest.at(-1)!.data).toEqual({ reason: 'unavailable' });
+  });
+
   // ---- real server ---------------------------------------------------------------------------------------------
   it('real server: a stream stays open beyond 30 s with the serverOptions of server.ts and receives heartbeats', async () => {
     const h = await harness({ streamLimits: { heartbeatMs: 5_000 } });

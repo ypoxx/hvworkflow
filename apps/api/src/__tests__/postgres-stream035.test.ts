@@ -161,18 +161,38 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const second = build(runtime2);
     const reader = track(await mustOpen(first, '/v1/stream', await asSession('admin')));
     await reader.nextMessage();
-    const t1 = performance.now();
+    // The budget is commit to delivery (B11). The second instance is warmed up first: its first request opens pool
+    // connections and checks the whole chain twice (sign-in lookup and request), which is not delivery time. The clock
+    // starts when the write has answered, i.e. after its COMMIT (CI run 36740563257: 3014 ms measured from before a
+    // cold write).
+    expect((await call(second, 'admin', 'GET', '/v1/meetings')).status).toBe(200);
     expect((await assignFiller(second)).status).toBe(201);
+    const t1 = performance.now();
     const viaSecond = await reader.until(isEvent, 2_000);
     const secondMs = performance.now() - t1;
     expect(idOf(viaSecond)).toBe(await head());
-    const t2 = performance.now();
     expect((await assignFiller(first)).status).toBe(201);
+    const t2 = performance.now();
     await reader.until(isEvent, 500);
     const sameMs = performance.now() - t2;
-    console.log(`035b test 24: delivery via second instance ${secondMs.toFixed(0)} ms, via same instance ${sameMs.toFixed(0)} ms`);
+    console.log(`035b test 24: delivery after commit via second instance ${secondMs.toFixed(0)} ms, via same instance ${sameMs.toFixed(0)} ms`);
     expect(secondMs).toBeLessThan(2_000);
     expect(sameMs).toBeLessThan(500);
+  }, 30_000);
+
+  it('24b a slow write on the second instance (lock held 2.1 s): delivery within 2 s of its commit', async () => {
+    const first = build(runtime);
+    const second = build(runtime2, newHooks(), undefined, {
+      testHooks: { at: async (point) => { if (point === 'afterLock') await sleep(2_100); } } });
+    const reader = track(await mustOpen(first, '/v1/stream', await asSession('admin')));
+    await reader.nextMessage();
+    const t0 = performance.now();
+    expect((await assignFiller(second)).status).toBe(201);
+    const t1 = performance.now();
+    await reader.until(isEvent, 2_000);
+    const afterCommit = performance.now() - t1;
+    console.log(`035b test 24b: write ${(t1 - t0).toFixed(0)} ms, delivery after commit ${afterCommit.toFixed(0)} ms, from request start ${(performance.now() - t0).toFixed(0)} ms`);
+    expect(afterCommit).toBeLessThan(2_000);
   }, 30_000);
 
   it('25 a tampered old row with open streams: end unavailable on every stream; a new open is a 500', async () => {

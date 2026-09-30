@@ -291,6 +291,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   zurück; der Test-Leser öffnet deshalb über `req()`, so zählt das Abdeckungstor `streamEvents` · Spec-Wortlaut angleichen.
 - 035b Bau · Spec 035b Test 12 · „Migrationen offen → 503“ ist ohne Postgres nicht herstellbar; der Fall steht in
   `postgres-stream035.test.ts` („12 (Postgres)“) · hinnehmen.
+- 035b Nachprüfung nit · `apps/api/src/stream/route.ts` (`overLimit`) · die Bytes einer `change`-Nachricht zählen in der
+  Warteschlange als JSON-Länge + 64, im laufenden Stapel als echte Rahmenbytes · beide Stellen auf die Rahmenbytes vereinheitlichen.
 
 ## Bühne und Wortmeldeliste (aus takt-039)
 

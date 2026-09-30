@@ -71,6 +71,9 @@ export class StreamReader {
   /** While held, the reader takes no further chunk: a client that stops reading (backpressure on the service). */
   held = false;
   hold(): void { this.held = true; }
+  /** Hold as soon as `n` event blocks have arrived (before taking the next chunk). */
+  private holdAtEvents: number | undefined;
+  holdAt(n: number): void { this.holdAtEvents = n; }
   resume(): void { this.held = false; }
 
   private async pump(): Promise<void> {
@@ -86,6 +89,10 @@ export class StreamReader {
           const raw = this.buffer.slice(0, end);
           this.buffer = this.buffer.slice(end + 2);
           if (raw !== '') this.blocks.push(parseBlock(raw));
+          if (this.holdAtEvents !== undefined && this.blocks.filter((b) => b.event === 'event').length >= this.holdAtEvents) {
+            this.held = true;
+            this.holdAtEvents = undefined;
+          }
           end = this.buffer.indexOf('\n\n');
         }
         this.wake();
