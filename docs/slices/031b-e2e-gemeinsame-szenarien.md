@@ -163,6 +163,29 @@ Reihenfolge (`playwright test --list --project=http`, mit IdP): Setup, dann 002,
 Reset-Banner: `024-ereignis-umschlag.spec.ts` › „024: old demo log requires an explicit reset in German and English“
 (`in-process`), `031-http-betriebsart.spec.ts` › H2 (`http`).
 
+**Stand nach takt-030/032/033/035 (Integrationszweig eingemergt, Waits auf Produktsignale umgestellt).**
+
+Gates-Commit: `245bdc1`, `pnpm gates` auf sauberem Baum, Exit 0. Schluss:
+
+```
+✓ built in 2.15s
+mark-test-run: wrote /home/user/wt/s031b-build/.claude/state/last-test-run (clean tree) at commit 245bdc1, tree 5fe40845691a…
+```
+
+Ersetzt: `afterOwnWrite` (`support/roles.ts`, Warten auf POST plus GET `/v1/questions`/`/v1/contributions`) und das Warten auf
+PUT `/v1/speakers/order` mit Neulesen in `002` sind entfallen. Stattdessen `expectNotBusy(region)` (`support/roles.ts`): nach dem
+Ablegen auf `speakers-round-3` ohne `data-busy="true"`/`aria-busy="true"`, nach jedem Schreiben von Fragen auf
+`capture-contribution-pane` ohne diese Marke (Attribute nur während des Schreibens gesetzt, `RoundSection.tsx:66`,
+`ContributionPane.tsx:188`). Kein `networkidle`, kein Netzverkehrs-Wait; in-process geht die Marke nach einem Microtask, das Warten
+besteht sofort. Keine Zeitgrenze angehoben.
+
+| Lauf | Projekt | Tests | Laufzeit |
+|---|---|---|---|
+| lokal (`PW_CHROMIUM_PATH`), auf 245bdc1 | `in-process` | 127/0 | 7,7 min; `abnahme` 59,4 s, `answersFilterMs` 265 ms, `stageNavMs` 164 ms |
+| lokal, `E2E_HTTP_IDP=none pnpm e2e:http` | `http` (H1–H3, G1, 030) | 8 (G1 als erwarteter Fehlschlag), Zugriffslog-Prüfung PASS | Playwright 14,0 s, Harness gesamt 22,7 s |
+
+Die fünf gemeinsamen Dateien im Projekt `http` laufen lokal nicht (Keycloak, kein Docker); Nachweis nur im PR-CI.
+
 ## Bericht (nach Bau ausfüllen)
 
 ```
