@@ -307,7 +307,7 @@ bekäme die Verweigerung bis 044 einen stillen Annahmepfad.
   Katalogfassung prüfbar und braucht keinen neuen Pfad.
 - **Wann der Nachweis entsteht:** Der Hash wird **beim Vorschlag** festgehalten. Bei der Freigabe (`approveRefusal`)
   prüft 044 ihn gegen den **aktuellen** Katalog. Hat sich der Eintrag seit dem Vorschlag geändert, antwortet
-  `approveRefusal` mit 409. Die Regel-id vergibt 044 beim Bau, als nächste freie R-GUARD-Nummer. Die Verweigerung muss
+  `approveRefusal` mit 409. Die Regel-id ist **R-GUARD-11** (hier reserviert: R-GUARD-10 ist im Plan für die Prüfliste aus 059 vergeben, R-GUARD-08/-09 sind belegt). Die Verweigerung muss
   dann neu vorgeschlagen werden, und die Freigabe gilt nie einem Wortlaut, den niemand vorgeschlagen hat.
 - **Wo alte Einträge wiederzufinden sind:**
   - Primär enthält die `AnswerDrafted`-Nutzlast von `proposeRefusal` additiv einen Schnappschuss `answer.refusalGround`
@@ -578,7 +578,8 @@ liest.
 
 ## Akzeptanzkriterium
 
-1. `pnpm contract:lint` ist grün. Erlaubt sind nur die vier bekannten `no-unused-components`-Meldungen aus 035a.
+1. `pnpm contract:lint` ist grün. Erlaubt sind nur die sechs heute bekannten `no-unused-components`-Meldungen (die vier
+   `Stream*`-Schemas aus 035a sowie `Event` und `oidc`, Stand `ca94899`); keine neue kommt hinzu.
 2. `pnpm contract:types` erzeugt den eingecheckten Stand. Ein zweiter Lauf ergibt keinen Diff.
 3. `check.mjs` meldet (a)–(d) `ok`, darunter `(c) … version 0.3.12 -> 0.4.0` und `(d) … N pre-declared operation(s)` mit
    N aus Vor-dem-Bau-Punkt 1 (heute 9).
@@ -763,7 +764,7 @@ Keine blockiert die Spec. Fragen 1, 2 und 5 brauchen vor dem Bau ein ausdrückli
 - `RefusalGround.hash` und `refusalGroundHash`: SHA-256, Kleinbuchstaben-Hex, über RFC 8785 (JCS) des Eintrags ohne
   `hash`, UTF-8. Dazu der Schnappschuss `answer.refusalGround` (`title`, `stageText`, `legalRef`) in der
   `AnswerDrafted`-Nutzlast. Guard: `approveRefusal` antwortet mit 409, wenn der Hash der Version nicht mehr dem aktuellen
-  Katalogeintrag entspricht (nächste freie R-GUARD-Nummer beim Bau; Test).
+  Katalogeintrag entspricht (R-GUARD-11, oben reserviert; Test).
 - Die Suche (`listQuestions` mit `q`, `api.ts:702`) indexiert `refusalJustification` nie; Negativtest.
 - **`question.submit_review` hält nur `expert`** (`permissions.ts:60`). Wer eine Verweigerung vorschlägt (`legal`,
   `coordination`), kann sie heute nicht zur Prüfung geben. 044 entscheidet eines von beiden, mit Tabellenzeile und Test:
