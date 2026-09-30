@@ -18,8 +18,8 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Eigentümerentscheidungen (offen)
 
-1. **Bildnachweis für Keycloak-Tests:** PNG aus dem CI-Artefakt übernehmen (Eigentümer lädt herunter und committet) oder
-   Regel „Artefakt mit Lauf-ID und Digest genügt für Tests, die nur mit Keycloak laufen“. Hält #82 und #87 (je Codex P1).
+1. ~~**Bildnachweis für Keycloak-Tests**~~ — **beantwortet am 30.09.2026 (E56):** Das CI-Artefakt genügt, wenn der
+   Nachweis Artefaktname, Lauf-ID, Artefakt-ID und Digest nennt (AGENTS.md R2 ergänzt). Löst die Codex-P1 auf #82 und #87.
 2. **E41 Leistungsziel D9:** vorläufig gilt die bestehende e2e-Grenze 1500 ms für `/stage` und die Antwortliste.
 3. **`e2e-http` als Pflicht-Check** (danach 029b aus `gates` verlegen).
 4. Aus früheren Berichten weiter offen: E55 (Patch-Stufe strengerer Anfrageschemas), ADR-0015-Nachtrag, Netlify Deploy
