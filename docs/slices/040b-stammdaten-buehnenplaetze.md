@@ -1,0 +1,393 @@
+# Scheibe 040b — Administration im Kern, Teil 2: Stammdaten und Bühnenplätze
+
+**Status:** spec (30.09.2026; Teil 2 von 4 der geteilten Scheibe 040; Zuschnitt, gemeinsame Entscheidungen und Eigentümerfragen in `docs/slices/040a-admin-ohne-inhaltsrechte.md`)
+**Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6) · Lanes: contract (Architekt, erster Commit; siehe „Vertragsschritt“); core; service; web-api (nur neue `HvApi`-Methoden); web-shell (nur erzwungene i18n-Schlüssel); web-history (nur `eventSummary.ts`); docs-datenschutz; docs-plan (nur Glossarzeile)
+**Rolle:** architekt (Vertragsschritt, erster Commit); implementierer-backend (Kern, Dienst, Web-Adapter, zweiter und folgende Commits). Review in frischem Kontext mit Perspektive Security/Admin und Vertrag (6.4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
+**Rule ids:** neu R-ADM-01 (Konfiguration eines geschlossenen Jahrgangs unveränderlich; die Registerbeschreibung nennt schon Nummernkreise, Freeze und Override aus 040c/040d), R-ADM-02 (referenzierte Stammdaten bleiben). Angewandt: R-PERM-01, R-PERM-02, R-IDEM-01. Dazu AGENTS.md R2, R4, R5, R6, R7, R10, R12
+**Quellen-IDs:**
+- `docs/produktplan-beta.md` §5/040 (Fachbereiche, TOPs, Bühnenplätze mit Person und Gerätekennung, Einheit „AR-Büro“, `counts.byUnit`/`bySeat`), §3 Zeile 200 (Bühnenplatzliste je Jahrgang, ADR 0006), Zeile 220 und Register E46 (AR-Büro), E7 (Bühnenplätze als Grundlage für `podiumVisibility`, 047)
+- ADR 0006 (Bühnenplatzliste statt Enum), ADR 0015, ADR 0002, ADR 0009
+- Spec 023 (Vertrag 0.3.0: Operationen und Schemas mit „slice 040“), Spec 043a (Regel 1, Tabellenzeile `Classification.seatId`), Spec 040a (Zuschnitt)
+- Bedrohungsmodell SG6, T-G1-I-01, T-G1-E-01, T-G1-E-05, T-G1-T-02, T-G1-T-03
+- DSFA-Vorentwurf V4, V8, V12
+
+**Depends on:** 040a (gemergt, bevor dieser Bau beginnt); 025, 026, 028 (gemergt)
+**Perspektive:** Security/Admin, Vertrag · **Glossar: neue Begriffe:** nein; die Zeile „Bühnenplatz“ erhält ihre Code-Spalte (`StageSeat`, `seatId`)
+
+## Befund (Ist-Stand, gelesen auf `a3ba94b`)
+
+- **Vertrag 0.3.12 hat alles Nötige als Form, der Kern nichts davon.**
+  - Vorab erklärt (Allowlist, `slice` 040, Ablauf 25.11.2026): `replaceMeetingAgendaItems` (`agenda.manage`),
+    `replaceMeetingUnits` (`admin.units.manage`), `listMeetingStageSeats`, `replaceMeetingStageSeats`
+    (`admin.seats.manage`). Schemas `AgendaItemInput`, `UnitInput`, `StageSeat`, `StageSeatInput` stehen.
+  - `Question.seatId` steht auf der Antwortseite (seit 0.3.0), mit `if`/`then`: sind `stageAssignment` und `seatId` beide
+    da, sind sie gleich. `Classification` hat **kein** `seatId` (bewusst, Review 023).
+  - `Meeting.counts.byUnit` und `bySeat` stehen im Vertrag („slice 040“), der Kern projiziert sie nicht
+    (`packages/domain/src/state.ts:61-80`, Domänentyp `Meeting.counts` ohne beide).
+  - Die Rechte `admin.units.manage` und `admin.seats.manage` stehen im Vertrag (`Action`), nicht in `PERMISSIONS`
+    (`packages/domain/src/types.ts:33-64`).
+  - Es gibt **keinen Ereignistyp** für eine Stammdatenänderung (`Event.type`; Spec 023, Offen: „die Typen müssen … in den
+    Vertrag“).
+- **Kern:** Kein Bühnenplatz, kein `seatId`. `QuestionClassified` trägt nur `stageAssignment` (Enum der vier Werte,
+  `state.ts:344-345`). `MeetingCreated` trägt TOPs und Fachbereiche (`events.ts:43-54`), sonst ändert nichts die
+  Stammdaten.
+- **Seed:** acht Fachbereiche ohne AR-Büro (`seed.ts:38-47`); die Fragen tragen `stageAssignment` aus
+  `STAGE_ASSIGNMENTS`.
+- **Personentabelle:** `state.persons` enthält die Personen der Wortmeldungen (Aktionäre), nicht die Podiumsmitglieder.
+  `assignRole` prüft `personId` gegen diese Tabelle (`api.ts:731-732`).
+- **Erschöpfende Zuordnungen im Web:** `ACTION_KEYS` und `EVENT_KEYS` (`apps/web/src/i18n/labels.ts:52, 98`) und der
+  `switch` in `apps/web/src/features/history/eventSummary.ts` brechen die Typprüfung bei jedem neuen Recht bzw.
+  Ereignistyp. `parity.test.ts:161` zählt 515 Schlüssel.
+- **Wiederholung:** `operationPermission` und `legacyEventType` (`api.ts:458-476`) steuern die Rekonstruktion eines
+  wiederholten Schreibvorgangs (R-IDEM-01); `EVENT_TYPES` (`envelope.ts:5`) prüft den Typ beim Laden.
+- **If-Match:** Die vier Operationen verwenden `IfMatch` (optional), nicht `IfMatchRequired`.
+
+## Ziel und Entscheidungen vor Bau
+
+Die Administration pflegt TOPs, Fachbereiche und Bühnenplätze eines Jahrgangs als ganze Listen. Jede Änderung ist ein
+Ereignis. Die Klassifizierung setzt einen Bühnenplatz aus dieser Liste. Kopf und Steuerung lesen offene Fragen je
+Fachbereich und Bühnenfragen je Platz aus `Meeting.counts`.
+
+1. **Drei Ereignistypen mit ganzer Liste**, `subjectId` = `meetingId`, jedes erhöht `Meeting.version`:
+   - `AgendaItemsReplaced` `{ agendaItems: [{ id, number, title }] }`. Ein TOP mit gleicher `id` behält seine
+     Fortschrittszeiten (`openedAt`, `votingOpenedAt`, `votingClosedAt`) in der Projektion.
+   - `UnitsReplaced` `{ units: [{ id, name, shortName? }] }`.
+   - `StageSeatsReplaced` `{ stageSeats: [{ id, label, position?, personId?, deviceId? }] }`.
+   - `MeetingCreated` erhält das optionale Feld `stageSeats` (gleiche Form) für den Seed und das Klonen (040c). Fehlt es
+     (alle bisherigen Logs), ist die Platzliste leer.
+   - Stromthema `meeting`, Subjekt der Jahrgang (`EVENT_TOPICS`, `EVENT_SUBJECTS` in `stream.ts`).
+2. **Operationen** (alle je Jahrgang, `meetingId` im Pfad):
+
+   | Operation | Recht | Prüfungen | Wirkung |
+   |---|---|---|---|
+   | `replaceMeetingAgendaItems` | `agenda.manage` | 422: doppelte `id`, doppelte `number`; 409 R-ADM-01; 409 R-ADM-02: ein entfallender TOP hat eine Frage (`agendaItemId`) oder einen Fortschritt (`openedAt`) | `AgendaItemsReplaced`; Antwort nach `number` sortiert |
+   | `replaceMeetingUnits` | `admin.units.manage` | 422: doppelte `id`; 409 R-ADM-01; 409 R-ADM-02: ein entfallender Fachbereich ist `unitId` einer Frage oder einer aktiven Rollenzuordnung (nicht entzogen, nicht abgelaufen) | `UnitsReplaced` |
+   | `listMeetingStageSeats` | jeder angemeldete Akteur (Stammdaten) | — | nach `position`, dann `id`; `personId` und `deviceId` **nur** für Halter von `admin.seats.manage` (über `can()`), sonst fehlen beide |
+   | `replaceMeetingStageSeats` | `admin.seats.manage` | 422: doppelte `id`, doppelte `position`, doppelte `deviceId`, `personId`/`deviceId` nicht pseudonym (enthält `@` oder Leerraum; wie `subjectId` in `api.ts:722-723`); 409 R-ADM-01; 409 R-ADM-02: ein entfallender Platz ist `seatId` einer Frage (ausdrücklich oder abgeleitet) | `StageSeatsReplaced` |
+
+   - Ein Eintrag ohne `id` erhält eine Server-id. Umbenennen (gleiche `id`) ist immer erlaubt.
+   - `personId` am Platz wird **nicht** gegen `state.persons` geprüft: Podiumsmitglieder stehen nicht in der
+     Personentabelle der Wortmeldungen (Befund). 047 löst den Platz aus Rollenzuordnung und Platz auf.
+   - ETag jeder Antwort ist die neue `Meeting.version`. `If-Match` ist laut Vertrag optional; wird es gesendet, prüft der
+     Kern es (412). Pflicht wird es mit dem Vertragszyklus 0.5 (Folgeliste; die Operationen sind vorab erklärt und dürfen
+     nach Regel 1 nicht verengt werden).
+   - Jede Operation ist über `Idempotency-Key` wiederholbar (R-IDEM-01); `operationPermission` und `legacyEventType`
+     erhalten die neuen Einträge.
+   - `HvApi` erhält die Methoden je Jahrgang (Vorschlag: `replaceAgendaItems`, `replaceUnits`, `listStageSeats`,
+     `replaceStageSeats`). Der In-Process-Adapter ist der Kern selbst; `apps/web/src/api/http.ts` setzt sie über den Vertrag
+     um (ADR 0002). Die Namen stehen im Bericht.
+3. **Bühnenplatz an der Frage.**
+   - `Classification.seatId` (optional, Vertragszeile von 040b). Muss ein Platz des Jahrgangs sein, sonst 422. Werden
+     `seatId` und `stageAssignment` beide gesendet, müssen sie gleich sein, sonst 422.
+   - `stageAssignment` allein bleibt wie heute (Enum, ohne Listenprüfung), damit bestehende Clients und Logs gültig
+     bleiben, bis 0.5 das Feld streicht.
+   - Nutzlast `QuestionClassified`: `seatId`, wenn gesendet; `stageAssignment`, wenn gesendet.
+   - Projektion: `Question.seatId` = Nutzlast-`seatId`, sonst Nutzlast-`stageAssignment`. `Question.stageAssignment` =
+     Nutzlast-`stageAssignment`, sonst `seatId`, wenn es einer der vier Enum-Werte ist, sonst fehlt es. So hält jede Antwort
+     die `if`/`then`-Bedingung des Vertrags. Eine neue Klassifizierung ohne Platz löscht beide (wie heute
+     `stageAssignment`, `state.ts:345`).
+4. **Zähler** (`refreshCounts`, ein Durchlauf):
+   - `byUnit`: für **jeden** Fachbereich des Jahrgangs ein Schlüssel (auch 0) mit der Zahl offener Fragen mit dieser
+     `unitId`. „Offen“ wie `counts.open` (`state.ts:71`).
+   - `bySeat`: für **jeden** Platz ein Schlüssel (auch 0) mit der Zahl der Fragen auf der Bühne (`isOnStage`) mit diesem
+     `seatId`.
+   - Eine Frage, deren `unitId` oder `seatId` in keiner Liste steht (Altbestand mit abgeleitetem `seatId` ohne Platz),
+     zählt in keinem Schlüssel. Die Summe kann deshalb kleiner als `open` bzw. `staged` sein; der Vertrag sagt das.
+   - Die Zähler sind Aggregate je Fachbereich und Platz, keine Kennzahl je Person (6.6, V15).
+5. **Seed.**
+   - Neuer Fachbereich `{ id: 'unit-ar', name: 'Büro des Aufsichtsratsvorsitzenden', shortName: 'AR-Büro' }` (E46).
+     Kein Thema des Korpus nutzt ihn; die Verteilung der Fragen bleibt gleich.
+   - Vier Standardplätze im `MeetingCreated`: `id` = die vier Werte von `STAGE_ASSIGNMENTS`, Beschriftung
+     „Aufsichtsratsvorsitz“, „Vorstandsvorsitz“, „Finanzvorstand“, „Vorstandsmitglied“, `position` 1–4, ohne `personId` und
+     `deviceId` (synthetisch, keine Personen). Die Beschriftungen sind Stammdaten-Inhalt in der Inhaltssprache `de`, keine
+     Oberflächentexte.
+6. **Rechte.** `admin.units.manage` und `admin.seats.manage` kommen in `PERMISSIONS` und ausdrücklich in die Liste von
+   admin (040a). Sonst erhält sie niemand.
+7. **Personenbezug.** `StageSeat.personId` ist ein Schlüssel der Personentabelle (ADR 0009); `deviceId` ist eine
+   technische Kennung des Podiumsgeräts. Beide lesen nur Halter von `admin.seats.manage` in `listMeetingStageSeats`.
+   Im `EventRead` entfernt `maskEvent` jedes `personId` rekursiv (`MASKED_KEYS`, `stream.ts:169`); `deviceId` sehen nur
+   Halter von `event.read` (admin). DSFA: neue Zeile „Bühnenplatzliste“.
+
+## Vertragsschritt (Architekt, erster Commit; additiv, 043a Regel 1)
+
+Version: die nächste freie Patch-Stufe beim Baustart (heute 0.3.13; nach 043a 0.4.1). Alles additiv; kein Pflichtfeld in
+einem bestehenden Anfrageschema.
+
+- **Anfragezeile** `Classification.seatId` (`type: string, maxLength: 128`), Beschreibung wie Ziel 3. Die Beschreibung von
+  `Classification.stageAssignment` („arrives with 0.4.0 (slice 043, ahead of 040)“) wird berichtigt. Ohne Go auf
+  043a-Frage 5 entfällt diese Zeile (Tabelle in 040a).
+- **`Event.type`**: `AgendaItemsReplaced`, `UnitsReplaced`, `StageSeatsReplaced` (additive Enum-Werte). Nutzlastschemas
+  `AgendaItemsReplacedPayload`, `UnitsReplacedPayload`, `StageSeatsReplacedPayload`, gebunden in `Event` und `EventRead`
+  (`allOf` mit `if`/`then`, `required: [subjectId]`). In `EventRead` gilt für `payload.stageSeats.items.personId`:
+  `false`. Die Beschreibung von `Event` nennt das optionale `stageSeats` an `MeetingCreated`.
+- **Beschreibungen:**
+  - `listMeetingStageSeats` und `StageSeat`: `personId`/`deviceId` nur für Halter von `admin.seats.manage`.
+  - Die drei `replace…`-Operationen: 422-Fälle, R-ADM-01, R-ADM-02; R-ADM-03 bleibt „ab 040d“.
+  - `Meeting.counts.byUnit`/`bySeat`: jeder Fachbereich bzw. Platz als Schlüssel, Summe kann kleiner sein.
+  - `Problem.ruleId`: R-ADM-01 und R-ADM-02 mit Inhalt; „R-ADM-01..07 (slice 040)“.
+- **Allowlist:** die vier Einträge entfernen (`replaceMeetingAgendaItems`, `replaceMeetingUnits`,
+  `listMeetingStageSeats`, `replaceMeetingStageSeats`). `createMeeting` und `freezeMeetingConfig` bleiben.
+- **CHANGELOG** `## [<Version>]` mit `### Added` (Anfragezeile, Ereignistypen, Nutzlasten) und `### Changed`
+  (Beschreibungen, Allowlist); **Typen** mit `pnpm contract:types`.
+- **Antworten:** Liegt 043a schon vor (0.4.0), dokumentieren die vier Operationen die Antworten so, wie sie der
+  Vertragstest „every status the generic layer can produce is documented“ dann verlangt (500 `InternalError`).
+
+## Nicht-Ziele
+
+- Keine Oberfläche (041). Keine Anzeige von Platzbeschriftungen in der Historie (`eventSummary.ts` erhält nur leere Fälle
+  für die drei neuen Typen).
+- Kein `podiumVisibility`, kein Filter der Bühne nach Platz, keine Auflösung des Geräts (047, 056, 058).
+- Kein Jahrgang anlegen oder klonen, keine Nummernkreise (040c). Kein Freeze, kein Override, kein Start (040d); R-ADM-03
+  prüft erst 040d.
+- Keine Änderung an `assignRole`, `revokeRole` oder der Personentabelle.
+- Kein `IfMatchRequired` an den vier vorab erklärten Operationen (Regel 1; Folgeliste für 0.5).
+- Keine Streichung von `StageAssignment` oder `stageAssignment` (0.5).
+
+## Files allowed
+
+Vertrag (Architekt, erster Commit):
+
+- `packages/contract/openapi.yaml`
+- `packages/contract/CHANGELOG.md`
+- `packages/contract/package.json` (nur das Versionsfeld)
+- `packages/contract/src/types.ts` (nur regeneriert)
+- `packages/contract/allowlist.json` (nur die vier genannten Einträge entfernen)
+
+Kern:
+
+- `packages/domain/src/types.ts`
+- `packages/domain/src/events.ts`
+- `packages/domain/src/envelope.ts` (nur `EVENT_TYPES`)
+- `packages/domain/src/state.ts`
+- `packages/domain/src/api.ts`
+- `packages/domain/src/permissions.ts` (nur die zwei Rechte in der Liste der Administration)
+- `packages/domain/src/rules.ts` (nur R-ADM-01, R-ADM-02)
+- `packages/domain/src/stream.ts` (nur `EVENT_TOPICS`, `EVENT_SUBJECTS`)
+- `packages/domain/src/seed.ts` (nur AR-Büro und Standardplätze)
+- `packages/domain/src/index.ts` (nur Exporte)
+- `packages/domain/src/masterData.ts` (neu, optional: Prüfungen der Listen)
+- `packages/domain/policy-truth-table.md` (nur regeneriert)
+- `packages/domain/src/__tests__/master-data040b.test.ts` (neu)
+- `packages/domain/src/__tests__/transitions.test.ts` (nur neuer Abschnitt „Role × Administration“)
+- `packages/domain/src/__tests__/seed.test.ts` (nur Erwartungen an Fachbereiche und Plätze)
+- `packages/domain/src/__tests__/stream035.test.ts` (nur Erwartungen an Themen je Ereignistyp)
+- `docs/legal-trace.md` (nur regeneriert)
+
+Dienst:
+
+- `apps/api/src/app.ts` (nur die vier Routen)
+- `apps/api/src/__tests__/master-data040b.test.ts` (neu)
+- `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile)
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Versionszeile)
+- `apps/api/src/__tests__/takt-016-contract.test.ts` (nur die Versionszeile, falls die Minor-Stufe wechselt)
+
+Web (nur was `HvApi` und die erschöpfenden Zuordnungen erzwingen):
+
+- `apps/web/src/api/http.ts` (nur die neuen Methoden)
+- `apps/web/src/api/http.test.ts` (nur Tests der neuen Methoden)
+- `apps/web/src/i18n/shell.de.ts` und `apps/web/src/i18n/shell.en.ts` (nur zwei Aktions- und drei Ereignisschlüssel)
+- `apps/web/src/i18n/labels.ts` (nur Einträge in den Zuordnungen der Aktionen und Ereignisse)
+- `apps/web/src/i18n/parity.test.ts` (nur Zahl und Kommentar)
+- `apps/web/src/features/history/eventSummary.ts` (nur drei leere Fälle)
+
+Dokumente:
+
+- `docs/glossar.md` (nur Code-Spalte der Zeile „Bühnenplatz“)
+- `docs/datenschutz/dsfa-vorentwurf.md` (nur neue Zeile „Bühnenplatzliste“ in der Verarbeitungstabelle)
+- `docs/folgeliste.md`
+- `docs/slices/040b-stammdaten-buehnenplaetze.md`
+
+Weitere Dateien sind Scope-Befunde.
+
+## Ausdrücklich nicht erlaubt
+
+`packages/domain/src/transitions.ts`, `packages/domain/src/store.ts`, `apps/api/src/persistence/**`,
+`apps/api/migrations/**`, `apps/web/src/features/**` außer `eventSummary.ts`, `apps/web/src/components/**`,
+`apps/web/src/app/**`, `docs/adr/**`, `docs/entscheidungsregister.md`, `docs/produktplan-beta.md`, die Allowlist-Einträge
+`createMeeting` und `freezeMeetingConfig`. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“.
+
+## Vor dem Bau prüfen
+
+1. 040a ist gemergt; `ROLE_PERMISSIONS.admin` ist eine Liste. Sonst anhalten.
+2. Vertragsstand und Allowlist: Welche Version, wie viele Einträge? Ist 043a gemergt, gelten dessen Tests (etwa Test 10
+   „`Classification` = `{track, agendaItemId, stageAssignment}`“ in `contract-043a.test.ts`); diese Zeile wird mit
+   `seatId` erweitert und im Bericht genannt. Ist 043a-Frage 5 nicht freigegeben: Weg „ohne Go“ aus 040a.
+3. Löscht eine neue Klassifizierung ohne `stageAssignment` heute das alte (`state.ts:344-345`)? Das Verhalten gilt dann
+   für beide Felder.
+4. Gibt es Tests mit festen Hashes oder Zählungen des Seeds (Ereignisanzahl, Kettenhash, Fachbereichszahl), die das neue
+   `MeetingCreated` ändert? Liste in den Bericht; liegt eine davon außerhalb von „Files allowed“: anhalten und melden.
+5. Hält der Validator für `PUT` mit Array-Rumpf `maxItems` (200/200/50) ein? Beleg durch einen Test.
+6. Zeilenangaben weichen ab: melden.
+
+## Tests zuerst (rot, dann grün)
+
+Kern (`master-data040b.test.ts`, Demo-Identität bzw. Rollenzuordnungen wie in `person-roles026.test.ts`):
+
+1. **TOPs:** neue Liste → `AgendaItemsReplaced` mit ganzer Liste, Server-ids, `Meeting.version` +1; ein geöffneter TOP mit
+   gleicher `id` behält `openedAt`. 422 bei doppelter `id` und doppelter `number`.
+2. **R-ADM-02 TOPs:** Entfernen eines TOP mit Frage → 409 R-ADM-02, kein Ereignis; Entfernen eines geöffneten TOP ohne
+   Frage → 409 R-ADM-02.
+3. **Fachbereiche:** Ersetzen gelingt; Entfernen eines Fachbereichs mit zugewiesener Frage → 409 R-ADM-02; mit aktiver
+   Rollenzuordnung (`unitId`) → 409 R-ADM-02; nach `revokeRole` gelingt es.
+4. **Plätze:** Ersetzen gelingt; 422 bei doppelter `id`, `position`, `deviceId` und bei `personId: 'a@b'`; Entfernen eines
+   Platzes, den eine Frage trägt (auch abgeleitet aus `stageAssignment`) → 409 R-ADM-02.
+5. **Lesen der Plätze:** Als admin mit `personId` und `deviceId`; als `coordination`, `podium` und `observer` ohne beide
+   Felder, sonst gleich.
+6. **Klassifizierung:** `seatId` eines eigenen Platzes → `Question.seatId` gesetzt, `stageAssignment` fehlt; `seatId: 'ceo'`
+   → beide `'ceo'`; `seatId` und `stageAssignment` verschieden → 422; unbekannter Platz → 422; nur `stageAssignment` →
+   `seatId` abgeleitet. Jede Antwort ist gültig gegen das Vertragsschema `Question` (Ajv, `if`/`then`).
+7. **Zähler:** Auf dem Seed hat `byUnit` genau die neun Fachbereiche als Schlüssel (AR-Büro mit 0) und `bySeat` genau die
+   vier Plätze; die Werte stimmen mit einer unabhängigen Zählung im Test überein. Nach `assignQuestion` bzw.
+   `stageQuestion` ändern sich die Werte um 1.
+8. **R-ADM-01:** Auf einem Jahrgang mit `MeetingClosed` (synthetisches Ereignis wie in `meeting025.test.ts`) antworten
+   alle drei `replace…` mit 409 R-ADM-01, ohne Ereignis.
+9. **Rechte:** `replaceUnits` und `replaceStageSeats` als `moderation`, `coordination`, `expert`, `approver`, `podium`,
+   `observer` → 403 R-PERM-01; `replaceAgendaItems` als jede Rolle ohne `agenda.manage` → 403 R-PERM-01; als admin 200.
+10. **Seed:** `unit-ar` und die vier Standardplätze sind da; jede klassifizierte Frage mit `stageAssignment` hat dasselbe
+    `seatId`.
+11. **Wiederholung:** Derselbe `Idempotency-Key` nach einer späteren zweiten Änderung liefert das Ergebnis der ersten
+    (R-IDEM-01), je Operation einmal.
+12. **Strom und Maskierung:** `StageSeatsReplaced` erscheint in `listEvents` (admin) ohne `personId` in
+    `payload.stageSeats`; ein Leser ohne `event.read` erhält nur ein `change` mit Thema `meeting`.
+
+Dienst (`apps/api/src/__tests__/master-data040b.test.ts`, über `req()`):
+
+13. `PUT /v1/meetings/{id}/agenda-items`, `…/units`, `…/stage-seats` und `GET …/stage-seats`: 200, `ETag` = neue
+    Version, Antwort gültig gegen den Vertrag; 412 bei veraltetem `If-Match`; 422 bei `maxItems + 1`; 403 als `observer`
+    mit `ruleId`; 404 für einen unbekannten Jahrgang.
+14. Vertrag: `Classification` hat genau `{track, agendaItemId, stageAssignment, seatId}`; `Event.type` enthält die drei
+    Typen; `EventRead` mit `payload.stageSeats[0].personId` ist ungültig; die Allowlist enthält die vier Einträge nicht
+    mehr; das Abdeckungstor meldet sie als ausgeübt.
+
+`transitions.test.ts`: neuer erzeugter Abschnitt **„Role × Administration“**:
+
+| Role | admin.units.manage | admin.seats.manage |
+|---|---|---|
+| moderation | · | · |
+| capture | · | · |
+| coordination | · | · |
+| expert | · | · |
+| legal | · | · |
+| approver | · | · |
+| podium | · | · |
+| admin | ✓ | ✓ |
+| observer | · | · |
+
+Sonst ändert sich die Wahrheitstabelle nicht (Diff im Bericht).
+
+**Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
+- Maskierung von `personId`/`deviceId` in `listStageSeats` entfernt → Test 5 rot.
+- Prüfung der aktiven Rollenzuordnung in R-ADM-02 entfernt → Test 3 rot.
+- `bySeat` zählt alle Fragen statt `isOnStage` → Test 7 rot.
+- Gleichheitsprüfung `seatId`/`stageAssignment` entfernt → Test 6 rot.
+
+## Akzeptanzkriterium
+
+1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` erzeugt den eingecheckten Stand; `check.mjs` meldet
+   (a)–(d) `ok` mit der neuen Version und der um vier kleineren Zahl vorab erklärter Operationen.
+2. Tests 1–14 grün, die vier Mutationsproben rot belegt; Wahrheitstabellen-Diff genau wie oben.
+3. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040b-…`; der
+   Schluss der Ausgabe steht einmal im Bericht.
+4. Kein Screenshot: Keine Ansicht ändert sich; die neuen i18n-Schlüssel erscheinen erst mit 041 bzw. in der Historie nur
+   als Ereignisbezeichnung.
+
+## Nachweise
+
+- Auszug `check.mjs` und Typen-Diff (`Classification`, `Event`, `Meeting.counts`).
+- Wahrheitstabellen-Diff, Ergebnis der Mutationsproben, Liste der Seed-abhängigen Tests (Vor-dem-Bau-Punkt 4).
+- Schluss von `pnpm gates` mit Commit-Hash.
+
+## Qualitätswirkung
+
+Reifestufe: pilot · Risikoklasse: hoch
+
+Ausgelöst:
+- [x] Vertrag, Ereignis, Konfiguration
+- [x] Rolle, Recht, Identität, Schutzklasse
+- [x] Administration
+- [x] personenbezogene oder vertrauliche Daten (`personId`, `deviceId` am Platz)
+- [ ] Persistenz, Migration (neue Ereignistypen ohne Migration; `events.envelope` ist `jsonb` ohne Typprüfung)
+- [ ] Oberfläche
+
+Perspektive: Security/Admin (6.5, 6.8), Vertrag (6.4), Datenschutz (6.6) · Nachweise: Tests 1–14, Mutationsproben ·
+Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage, Schalter in 047)
+
+## Wirkung und Risiko (Leitplanken §4, hoch)
+
+- **Bedrohungen:**
+  - **T-G1-I-01** (Lesen ohne Recht): `personId` und `deviceId` der Plätze nur für `admin.seats.manage`; im Ereignis
+    `personId` maskiert.
+  - **T-G1-E-05** (Kontext vom Client): Platz, Person und Gerät liegen im Dienst; kein Client nennt seinen Platz. 047
+    baut darauf.
+  - **T-G1-T-02** (unbekannte Felder im Log): Der Kern schreibt nur die benannten Felder jedes Eintrags ins Ereignis.
+  - **T-G1-T-03** (verlorene Änderung): `If-Match` wird geprüft, wenn gesendet; ohne `If-Match` gewinnt der letzte
+    Schreiber. Bekannte Grenze bis 0.5 (Folgeliste); jede Fassung bleibt als Ereignis erhalten.
+  - **SG6** (Rechtezuordnung): zwei neue Rechte, nur admin, im Tabellen-Diff.
+- **Missbrauchsfälle mit Erkennung:**
+
+  | Missbrauch | Abwehr | Erkennung, Nachweis |
+  |---|---|---|
+  | Fachbereich entfernen, um eine Fachkraft aus ihren Fragen zu drängen | R-ADM-02 (Frage oder aktive Zuordnung) | Test 3; Ereignis `UnitsReplaced` mit Akteur |
+  | Platz einer anderen Person oder einem fremden Gerät zuordnen, damit dort Fragen erscheinen | nur `admin.seats.manage`; ab 040d nach dem Freeze nur per Override mit Grund | `StageSeatsReplaced` in Historie und `listEvents`; Freeze-Hash ändert sich (040d, 041) |
+  | Gerätekennungen auslesen, um ein Podiumsgerät nachzuahmen | Lesen nur mit `admin.seats.manage` | Test 5 |
+  | TOP mit Fragen entfernen, um sie aus der Steuerung zu nehmen | R-ADM-02 | Test 2 |
+
+- **Invarianten:** Jede Stammdatenänderung ist ein Ereignis mit Akteur und Zeit (6.8; einen Grund verlangt erst der
+  Override in 040d, weil die Rümpfe Listen sind). Referenzierte Stammdaten bleiben. `Question.seatId` und
+  `stageAssignment` widersprechen sich nie.
+- **Fehlerfälle:** Ein veralteter Client, der nur `stageAssignment` kennt, arbeitet weiter. Ein Jahrgang ohne Plätze
+  (Altbestand) klassifiziert mit `stageAssignment` wie bisher.
+- **Betrieb:** keine Migration; neue Ereignistypen laufen durch dieselbe Kette.
+
+## Sicherheits-Checkliste (Antworten für den Reviewer)
+
+1. Die beiden neuen Rechte hält nur admin (Tabellen-Diff).
+2. Die Rechte werden im Kern über `requirePermission`/`can()` geprüft, nie über einen Rollennamen.
+3. `personId`/`deviceId` fehlen in jeder Antwort an Nicht-Halter (Test 5) und `personId` in jedem `EventRead` (Test 12).
+4. Keine Anfrageerweiterung außer `Classification.seatId` (Test 14).
+5. Vier Allowlist-Einträge entfernt, nicht mehr (Diff).
+
+## Offene Eigentümerfragen
+
+Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Fragen 1 und 5; 043a-Frage 5 mit beiden Wegen dort.
+
+## Hinweise an Folgescheiben
+
+- **043a:** Kommt 040b zuerst, erweitert 043a Test 10 um `seatId` und berichtigt `Classification.stageAssignment` nicht
+  noch einmal.
+- **047:** `personId` am Platz ist ein pseudonymer Schlüssel ohne Prüfung gegen `state.persons`; die Auflösung
+  „Gerät → Platz → Person“ und ihr Abgleich mit der Rollenzuordnung liegen bei 047.
+- **053:** `counts.byUnit`/`bySeat` enthalten jeden Fachbereich und Platz als Schlüssel.
+- **056:** Platzbeschriftung in der Historie (`eventSummary.ts`) und Filter der Bühne nach Platz.
+- **0.5:** `If-Match` Pflicht an den vier Operationen; `StageAssignment` streichen.
+
+## Bericht (nach Bau ausfüllen)
+
+```
+Slice: 040b-stammdaten-buehnenplaetze
+Done:
+Evidence:
+Open:
+Touched:
+```
+
+**Vor dem Bau prüfen (Ergebnisse).**
+1.
+2.
+3.
+4.
+5.
+6.
+
+**Namen der neuen `HvApi`-Methoden.**
+
+**Wahrheitstabellen-Diff.**
+
+**Mutationsproben (Ergebnis).**
+
+**`pnpm gates` (Schluss, Commit):**
+
+```
+```
+
+## Review findings
