@@ -230,7 +230,15 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-033 Review nit 6 · `apps/api/src/persistence/postgres.ts` (`PROBE_SQL`) · die warme Digest-Abfrage liest je
   Anfrage alle Zeilen mit `envelope::text` (22–25 ms bei 2138 Ereignissen unter Last, linear mit der Loggröße) ·
   Digest je Zeile in einer Spalte speichern (Migration) oder den Präfix-Digest in Postgres materialisieren; erst mit
-  Messung ab ca. 10.000 Ereignissen.
+  Messung ab ca. 10.000 Ereignissen. (Seit dem Codex-P1-Fix heißt die Abfrage `CHAIN_SQL`.)
+- takt-033 Nachprüfung Codex P1 minor · `apps/api/src/persistence/postgres.ts` (`ChainLoad.rowsRead`) · die Doku sagt
+  „alle auf dem vollen Pfad“; nach einer abweichenden Probe zählt `rowsRead` zusätzlich die Suffixzeilen aus `CHAIN_SQL` ·
+  Doku-Zeile anpassen.
+- takt-033 Nachprüfung Codex P1 nit · `apps/api/src/persistence/postgres.ts` (`CHAIN_SQL`) · bei Digest- oder
+  Lückenabweichung werden neuere Zeilen zweimal gelesen (`CHAIN_SQL`, dann `loadFull`) · nur Kosten im Seltenfall; mit
+  dem Digest-Punkt oben zusammen betrachten.
+- takt-033 Nachprüfung Codex P1 nit · Postgres-Tests takt-033 · pg-Warnung „Calling client.query() when the client is
+  already executing a query“ (alter wie neuer Stand) · Ursache vor pg@9 klären.
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
