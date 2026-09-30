@@ -132,6 +132,12 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
       observedToken = token;
     }
   };
+  // A listener that throws must not turn an accepted write into a failure or starve the other listeners.
+  const notifyListeners = () => {
+    for (const current of [...listeners]) {
+      try { current([]); } catch { /* swallowed on purpose: the server has already accepted the write */ }
+    }
+  };
   const onUnauthorized = () => {
     if (unauthorized) return;
     unauthorized = true;
@@ -147,8 +153,13 @@ export function createHttpApi(options: HttpApiOptions): HvApi {
     observeSession();
     const csrf = options.getCsrfToken();
     if (!csrf) return Promise.reject(new ApiProblem(401, translate(language(), 'http.errorTitle'), translate(language(), 'http.noSession')));
+    // Own successful writes refresh the views at once (the demo adapter does the same); the ETag is set inside `perform`
+    // before the listeners run, so a reload sees the current `lastWriteEtag()`. Failures reject before this line.
     return perform<T>(method.toUpperCase() as Uppercase<M>, route, { ...details, csrf }, transport,
-      language(), onUnauthorized, (etag) => { writeEtag = etag ?? undefined; });
+      language(), onUnauthorized, (etag) => { writeEtag = etag ?? undefined; }).then((result) => {
+      notifyListeners();
+      return result;
+    });
   };
   const currentMeetingId = async () => (await read<Awaited<ReturnType<HvApi['getMeeting']>>, 'get'>('get', '/meeting')).id;
   const meetingRoute = async () => ({ meetingId: await currentMeetingId() });
