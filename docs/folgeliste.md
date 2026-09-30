@@ -381,7 +381,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   im Code kommentieren.
 - takt-038 Review nit 7 · `apps/web/src/features/history/lib.ts:175` · eine Rücksicherung, deren `lastSeq` schon wieder
   über dem alten Cursor liegt, wird nicht erkannt · mit dem `reset` aus 035b im Client (036b) verbinden.
-- takt-038 Review nit 8 · `apps/web/src/i18n/parity.test.ts:161` · Testtitel nennt noch 507 statt 510 · anpassen.
+- ~~takt-038 Review nit 8 · `apps/web/src/i18n/parity.test.ts:161` · Testtitel nennt noch 507 statt 510 · anpassen.~~ → erledigt in **036b** (Titel und Pin auf 515).
 - takt-038 Review nit 9 · `docs/evidence/takt-038-historie-weitere.png` · zeigt den Zustand nach dem Klick, nicht den Knopf
   selbst · bei Gelegenheit ein zweites Bild vor dem Klick.
 

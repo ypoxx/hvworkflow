@@ -107,7 +107,11 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
 - `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts` (nur Texte der Anzeige)
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (nur neue Tests H13 und H14 am Dateiende, der Kopfkommentar zu den
   `page.route`-Doubles, m5, und — Bauklärung vom 30.09. — die Strom-503-Route vor `goto` in den takt-039-Tests H11 und
-  H12a samt je einer Kommentarzeile; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus 031b bleibt)
+  H12a samt je einer Kommentarzeile; — zweite Bauklärung — in H10 nur der Ersatz der beiden `networkidle`-Wartepunkte
+  durch Ruhe der `/v1`-Lesungen ohne `/v1/stream`; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus
+  031b bleibt)
+- `apps/web/src/i18n/parity.test.ts` (zweite Bauklärung: nur Schlüsselzahl 510 → 515 an drei Stellen und der veraltete
+  Testtitel)
 - `docs/evidence/031-h13-zweiter-browser.png`, `docs/evidence/031-h14-verbindungsanzeige.png`
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
@@ -132,6 +136,15 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
   Polling-Rückfall, den sie prüfen. H12b wartet nicht auf den Takt und bleibt unverändert. Entscheidung 5 und Test 2
   bleiben unverändert.
 - Der Kopfkommentar der Datei (m5) nennt die tatsächlichen `page.route`-Doubles: 030, G1, takt-039 H11 (und H12a), H14.
+- **Zweite Bauklärung (Orchestrator, 30.09.), nach dem Bau:**
+  1. `apps/web/src/i18n/parity.test.ts` zählt die Schlüssel fest (Test f). Die fünf neuen `shell.connection.*` verlangen
+     515 statt 510; die Pins und der veraltete Titel („507“) werden angepasst, sonst nichts. Das erledigt takt-038 nit 8.
+  2. H10 wartete auf `waitForLoadState('networkidle')`; Playwright zählt einen offenen Strom als laufende Anfrage, das
+     Ereignis tritt nie ein. Entscheidung (a): nur diese beiden Wartepunkte werden durch Ruhe der `/v1`-Lesungen ohne
+     `/v1/stream` ersetzt (Hilfsfunktion `quiet()` wie in H13); die Aussage „genau ein Abruf je Einhängen“ bleibt, H10
+     läuft weiter gegen den echten Strom.
+  3. Restrisiko „`/auth/me` vor einem Stromende abgeschickt, danach bestätigt, öffnet den Strom wieder“ ist angenommen
+     (der Dienst prüft beim Öffnen, der Puffer ist dann leer); es bleibt im Bericht, nicht auf der Folgeliste.
 
 ## Vor dem Bau prüfen
 

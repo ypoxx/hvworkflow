@@ -359,9 +359,11 @@ test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
       if (url.pathname === '/v1/stage') stageReads.push(url.pathname);
       if (url.pathname === '/v1/questions' && url.searchParams.get('limit') === '1') probes.push(url.search);
     });
+    const reads = traceReads(page);
     await page.goto('/stage');
     await expect(page.getByTestId('stage-only-toggle')).toBeVisible({ timeout: 60_000 });
-    await page.waitForLoadState('networkidle');
+    // Playwright counts the open stream (036b) as in flight, so `networkidle` never comes: wait for quiet `/v1` reads instead.
+    await quiet(reads, 500);
     expect(stageReads, 'GET /v1/stage after the mount').toHaveLength(1);
     expect(probes, 'GET /v1/questions?limit=1 after the mount').toHaveLength(1);
 
@@ -369,7 +371,7 @@ test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
     const me = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/auth/me');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await me;
-    await page.waitForLoadState('networkidle');
+    await quiet(reads, 500);
     expect(stageReads, 'GET /v1/stage after the visibility change').toHaveLength(1);
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: evidence('031-h10-einhaengen-ein-abruf.png') });
