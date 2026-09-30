@@ -316,6 +316,6 @@ test.describe('H9 @idp: an own write shows without a reload', () => {
     // No reload, no goto: the interface has to refresh itself, far below the 30 s of the poll.
     await expect(page.getByText(H9_SPEAKER_NAME).first()).toBeVisible({ timeout: 5_000 });
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: evidence('takt-030-eigene-schreibvorgaenge.png') });
+    await page.screenshot({ path: evidence('031-h9-eigene-schreibvorgaenge.png') });
   });
 });

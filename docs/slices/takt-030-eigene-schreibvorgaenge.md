@@ -46,7 +46,7 @@ Kein Eintrag im Produktplan nötig: Takts stehen dort nicht (plan-graph prüft n
 - `apps/web/src/api/http.test.ts` (neue Tests zu Ziel 1–3)
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (neuer Test H9; in H8 nur ein etwaiges Neuladen zum Sichtbarmachen entfernen)
 - `docs/folgeliste.md` (nur der 031a-Eintrag zum Neuladen in H8 als erledigt; nicht blockierende Reviewbefunde)
-- `docs/evidence/takt-030-*.png` (Screenshot H9)
+- `docs/evidence/031-h9-eigene-schreibvorgaenge.png` (Screenshot H9; Präfix 031-, damit der Upload `docs/evidence/031-*.png` im Job e2e-http ihn mitnimmt)
 
 Weitere Dateien sind Scope-Befunde.
 
@@ -62,7 +62,7 @@ Weitere Dateien sind Scope-Befunde.
 2. **e2e (Projekt `http`, in `031-http-betriebsart.spec.ts`, Test H9):** Rolle mit Recht zum Anlegen legt auf der
    Wortmeldungsseite über die Oberfläche eine Wortmeldung an; sie erscheint in der Liste **ohne** `page.reload()` und
    ohne Warten auf den 30-s-Takt (Erwartung mit Timeout deutlich unter 30 s, z. B. 5 s). Kein `page.reload()`, kein
-   `page.goto` zwischen Anlegen und Prüfen. Screenshot `docs/evidence/takt-030-eigene-schreibvorgaenge.png`. Der e2e-Lauf
+   `page.goto` zwischen Anlegen und Prüfen. Screenshot `docs/evidence/031-h9-eigene-schreibvorgaenge.png`. Der e2e-Lauf
    ist Sache der PR-CI (`e2e-http`); lokal nur, was die Bauumgebung ohne Keycloak zulässt (31a Entscheidung 15).
 3. **Demo unverändert:** Projekt `in-process` und alle vorhandenen Web-Unit-Tests grün, kein Diff in
    `packages/domain/`, `apps/web/src/api/index.ts`, `useApiVersion.ts`.
@@ -98,7 +98,7 @@ mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree)
 (Exit-Status 0)
 ```
 
-Lokal gelaufen: Unit-Tests `http.test.ts` (58 grün), Projekt `in-process` (127 grün), Projekt `http` ohne Keycloak (`E2E_HTTP_IDP=none`, 8 Tests, H1–H3 grün, G1 wie vorgesehen rot). H9 und H8 tragen `@idp` und laufen nur in der PR-CI (kein Docker-Daemon lokal); H9 ist per `--list` gelistet und typgeprüft. Screenshot `takt-030-eigene-schreibvorgaenge.png` kommt aus dem CI-Artefakt.
+Lokal gelaufen: Unit-Tests `http.test.ts` (58 grün), Projekt `in-process` (127 grün), Projekt `http` ohne Keycloak (`E2E_HTTP_IDP=none`, 8 Tests, H1–H3 grün, G1 wie vorgesehen rot). H9 und H8 tragen `@idp` und laufen nur in der PR-CI (kein Docker-Daemon lokal); H9 ist per `--list` gelistet und typgeprüft. Screenshot `031-h9-eigene-schreibvorgaenge.png` kommt aus dem CI-Artefakt `evidence-031-http`.
 
 ## Review findings
 
