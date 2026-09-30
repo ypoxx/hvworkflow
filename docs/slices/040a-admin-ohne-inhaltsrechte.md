@@ -1,7 +1,7 @@
 # Scheibe 040a — Administration im Kern, Teil 1: Administration ohne Inhaltsrechte
 
 **Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 1 von 4 der geteilten Scheibe 040, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 1,25 AStd · Plan 040: 03.11.2026 (W6); 040a hat keinen Vertragsschritt und darf früher starten, wenn der Orchestrator es einplant (Eigentümerfrage 1) · Lanes: core; service (nur Tests); e2e (nur die genannten Testumbauten); web-stage (nur Verlegen einer reinen Funktion mit Test); docs-legal (nur Vermerk im Rechtekonzept); docs-sicherheit
+**Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6); 040a hat keinen Vertragsschritt und darf früher starten, wenn der Orchestrator es einplant (Eigentümerfrage 1) · Lanes: core; service (nur Tests); e2e (nur die genannten Testumbauten); web-stage (nur Verlegen einer reinen Funktion mit Test); web-history (Hervorhebung administrativer Ereignisse); web-shell (nur zwei i18n-Schlüssel und `parity.test.ts`); docs-legal (nur Vermerk im Rechtekonzept); docs-sicherheit
 **Rolle:** implementierer-backend; Review in frischem Kontext mit Perspektive Security/Admin (Rechte, Wahrheitstabelle) und Legal (Rechtekonzept §4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu R-ADM-07 (keine Selbstzuordnung einer Rolle), R-ADM-08 (die letzte tragfähige Verwaltungsrolle eines nicht geschlossenen Jahrgangs ist nicht entziehbar). Angewandt: R-PERM-01, R-PERM-02, R-GUARD-06. Dazu AGENTS.md R2, R3, R4, R12
 **Quellen-IDs:**
@@ -28,12 +28,12 @@ Jede Spec ist vollständig; diese hier trägt zusätzlich Zuschnitt, gemeinsame 
 
 | Teil | Thema | Inhalt | Vertragsschritt | Klasse · AStd |
 |---|---|---|---|---|
-| **040a** (diese Spec) | Administration ohne Inhaltsrechte | `ROLE_PERMISSIONS.admin` wird eine ausdrückliche Liste: Lesen, Weiterleiten (`question.assign`, `question.return`), Verwaltung; ohne Schreibrechte auf Inhalte; keine Selbstzuordnung (R-ADM-07); letzte Verwaltungsrolle nicht entziehbar (R-ADM-08); neuer Wahrheitstabellen-Abschnitt; Testumbauten | keiner (R-ADM-07/08 nutzen das schon dokumentierte 409 an `assignRole`/`revokeRole`) | hoch · 1,25 |
+| **040a** (diese Spec) | Administration ohne Inhaltsrechte | `ROLE_PERMISSIONS.admin` wird eine ausdrückliche Liste: Lesen, Weiterleiten (`question.assign`, `question.return`), Verwaltung; ohne Schreibrechte auf Inhalte; keine Selbstzuordnung (R-ADM-07); letzte Verwaltungsrolle nicht entziehbar (R-ADM-08); Hervorhebung administrativer Ereignisse in der Historie (Rechtekonzept §4); neuer Wahrheitstabellen-Abschnitt; Testumbauten | keiner (R-ADM-07/08 nutzen das schon dokumentierte 409 an `assignRole`/`revokeRole`) | hoch · 1,5 |
 | **040b** | Stammdaten und Bühnenplätze | `replaceMeetingAgendaItems`, `replaceMeetingUnits`, `listMeetingStageSeats`, `replaceMeetingStageSeats`; `Classification.seatId` und `Question.seatId`; `counts.byUnit`/`bySeat`; Einheit „AR-Büro“ und vier Standardplätze im Seed; R-ADM-01, R-ADM-02 | ja (Architekt, erster Commit) | hoch · 1,5 |
 | **040c** | Jahrgang, Erstinbetriebnahme, Nummernkreise | `createMeeting` mit Klonen, Erstellerzuordnung und globalem Wiederholungsschlüssel; Betreiber-Bootstrap und auditierter Wiederherstellungsweg (Kommandozeile); Nummernkreise je Erfassungsplatz mit Aussparen bei der Fragenummer; R-ADM-05, R-ADM-09 | ja | hoch · 2 |
-| **040d** | Konfigurationsfreeze, Override, Start | `freezeMeetingConfig` mit Hash (RFC 8785), `overrideMeetingConfig` mit Pflichtgrund, `startMeeting`; Rollenzuordnung nach dem Freeze nur per Override; Vertretungsregel; R-ADM-03, R-ADM-04, R-ADM-06, R-MTG-08, R-MTG-09 | ja | hoch · 2 |
+| **040d** | Konfigurationsfreeze, Override, Start | `freezeMeetingConfig` mit Hash (RFC 8785), `overrideMeetingConfig` mit Pflichtgrund, `startMeeting`; Rollenzuordnung nach dem Freeze nur per Override; Vertretungsregel; R-ADM-03, R-ADM-04, R-ADM-06, R-ADM-10, R-MTG-08, R-MTG-09; Rechtezuordnung der Operationen als Daten und Build-Kennung im Schnappschuss | ja | hoch · 2,5 |
 
-Summe rund 6,75 AStd statt 2,5. Die Planschätzung enthielt weder den Bootstrap aus 029b noch den Wiederherstellungsweg,
+Summe rund 7,5 AStd statt 2,5. Die Planschätzung enthielt weder den Bootstrap aus 029b noch den Wiederherstellungsweg,
 das Umstellen der Testakteure, die heute admin als Allzweck-Schreiber nutzen (Befund), noch Vertragsschritt,
 Web-Adapter, Live-Puffer und i18n-Schlüssel je Teil. Zuschnitt und Budget brauchen das Go des Eigentümers
 (Eigentümerfrage 1).
@@ -89,10 +89,11 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
    `admin.roles.manage` hält.
 2. **Stammdaten sind Ereignisse** mit ganzer Liste je Änderung (`AgendaItemsReplaced`, `UnitsReplaced`,
    `StageSeatsReplaced`, `CaptureRangesReplaced`). Jedes erhöht `Meeting.version` (das ETag von `getMeetingById`).
-3. **Regel-ids.** Frei und geprüft am 30.09.2026 (Suche über `packages/`, `apps/`, `docs/`): R-ADM-01..09 (im Code
+3. **Regel-ids.** Frei und geprüft am 30.09.2026 (Suche über `packages/`, `apps/`, `docs/`): R-ADM-01..10 (im Code
    unbelegt; im Vertrag nur als Beschreibung „R-ADM-01..04 (slice 040)“, R-ADM-03 dort schon als „Stammdatenänderung
    nach Freeze“), R-MTG-08 und R-MTG-09 (R-MTG-07 ist für 087 reserviert). Der Plan nennt R-ADM-01..04; die Nummern 05
-   bis 09 sind die nächsten freien, weil Zuschnitt, Lesebefund und Nachprüfung fünf eigenständige Regeln mehr zeigen. Kein neuer
+   bis 10 sind die nächsten freien, weil Zuschnitt, Lesebefund, Nachprüfungen und der Codex-Befund sechs eigenständige
+   Regeln mehr zeigen. Kein neuer
    R-GUARD: die nächste freie Nummer wäre R-GUARD-12 (R-GUARD-08/-09 sind für 044 belegt, R-GUARD-10 für 059, R-GUARD-11
    für 043a/044).
 
@@ -106,7 +107,8 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
    | R-ADM-09 | 040c | Ein Notzugang aus der Wiederherstellung legt keinen Jahrgang an (409) |
    | R-ADM-03 | 040d | Nach dem Freeze ändert nur der Override die Konfiguration; der normale Weg antwortet 409 |
    | R-ADM-04 | 040d | Freeze genau einmal; Override nur bei eingefrorener Konfiguration und mit nicht leerem Grund (409) |
-   | R-ADM-06 | 040d | Vertretung: Ziel hält die Rolle aktiv, keine Selbstvertretung (409); Obergrenze nach Eigentümerfrage 5 |
+   | R-ADM-06 | 040d | Vertretung: Ziel hält die Rolle aktiv, keine Selbstvertretung (409); keine Obergrenze |
+   | R-ADM-10 | 040d | Freeze nur, wenn jede Rolle mit aktiver Inhaberschaft mindestens zwei tragfähige Vertretungen hat (409; Rechtekonzept §5) |
    | R-MTG-08 | 040d | Ein Jahrgang startet nur mit eingefrorener Konfiguration (409) |
    | R-MTG-09 | 040d | Ein Jahrgang startet nicht, solange irgendein anderer Jahrgang läuft (409; der Alias folgt dem jüngsten laufenden Jahrgang, ADR 0011 kennt eine Gesellschaft) |
 
@@ -171,8 +173,8 @@ schreibt. Kern, Dienst und Tests der Teile bleiben gleich.
 ## Ziel
 
 admin verwaltet Rechte und Stammdaten, liest und leitet Vorgänge weiter; admin schreibt keine Inhalte und führt keinen
-fachlichen Arbeitsschritt aus. Das setzt Rechtekonzept §4 **teilweise** um: Inhaltsbearbeitung nein, „eine Frage überall
-hinschicken“ ja; die von §4 verlangte Hervorhebung des Auditeintrags ist offen (Eigentümerfrage 2b). Das Streichen der
+fachlichen Arbeitsschritt aus. Das setzt Rechtekonzept §4 **vollständig** um: Inhaltsbearbeitung nein, „eine Frage überall
+hinschicken“ ja, und jede administrative Aktion ist im Verlauf der Frage **hervorgehoben** sichtbar (Punkt 5). Das Streichen der
 Inhaltsrechte ist keine Eigentümerentscheidung mehr, sondern Umsetzung des Rechtekonzepts, des Kopfvermerks 025 und von
 T-G1-E-04/BF-09. Das Zurückziehen einer Frage (`question.withdraw`) ist kein Weiterleiten: Es nimmt die Frage eines
 Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin (Eigentümerfrage 2c).
@@ -187,8 +189,8 @@ Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin
 
    - **Weiterleiten bleibt:** `question.assign` (an einen Fachbereich) und `question.return` (zurück in die Bearbeitung).
      Jeder dieser Schritte ist ein Ereignis mit `actor.role`, das in der
-     Vorgangshistorie jeder Frage für alle Halter von `history.read` sichtbar ist (`EventRead.actor.role`). Einen
-     eigenen „herausgehobenen“ Auditeintrag oder eine Kennzeichnung baut 040a nicht (Eigentümerfrage 2b).
+     Vorgangshistorie jeder Frage für alle Halter von `history.read` sichtbar ist (`EventRead.actor.role`) und dort
+     hervorgehoben wird (Punkt 5).
    - **Entfällt (15 Rechte):** `speaker.register`, `speaker.reorder`, `speaker.update`, `contribution.capture`,
      `question.capture`, `question.classify`, `answer.draft`, `question.submit_review`, `question.approve`,
      `question.legal.clear`, `question.stage`, `question.deliver`, `question.close`, `question.withdraw`,
@@ -246,6 +248,23 @@ Aktionärs aus der Beantwortung, auch nach dem Vorlesen. Es entfällt für admin
      (`deliver` allein → ja; `deliver` mit `question.capture` → nein; ohne `deliver` → nein). Der e2e-Block entfällt; der
      Bericht nennt das als Verlagerung, nicht als Abschwächung.
 
+5. **Hervorhebung administrativer Ereignisse in der Historie (Rechtekonzept §4).** Heute zeigt die Historie je Ereignis
+   nur `displayName` oder die Akteur-id, nicht die Rolle (`apps/web/src/features/history/Timeline.tsx:85-86, 161-162`);
+   der verlangte „herausgehobene Auditeintrag“ fehlt also. 040a ergänzt:
+   - eine reine Funktion in `apps/web/src/features/history/lib.ts`, etwa `isAdministrativeRole(role)`, die über
+     `hasPermission` aus den Rechtedaten (`ROLE_PERMISSIONS`, `@hv/domain`) prüft, ob die Rolle `admin.roles.manage`
+     hält. Kein Rollenname als Literal (AGENTS.md R4). Sie dient nur der Anzeige, nie einer Berechtigung;
+   - in beiden Darstellungen von `Timeline.tsx` (Zeile und Tabelle) neben dem Akteur ein sichtbares Abzeichen
+     „Administration“ (de) / „Administration“ (en), Schlüssel `history.actor.administrative` in
+     `apps/web/src/i18n/history.de.ts` und `history.en.ts`, dazu ein Schlüssel für den zugänglichen Namen
+     (`history.actor.administrative.label`, etwa „Aktion der Administration“ / „Action by the administration“);
+     `parity.test.ts` +2. Das Abzeichen hat Text, nicht nur Farbe (Barrierefreiheit), und `data-testid="history-admin-badge"`;
+   - kein neues Ereignisfeld: `EventRead.actor.role` trägt die Rolle schon. Ein zusätzliches Kennzeichen
+     `administrative: true` am Ereignis ist Eigentümerfrage 2b (Standard: nein).
+   - Die Hervorhebung gilt für jedes Ereignis einer Rolle mit `admin.roles.manage`, also auch für künftige
+     Verwaltungshandlungen, und für den Akteur `system` (Rolle admin) aus Seed und Bootstrap. Das ist gewollt: Auch
+     Systemhandlungen sind keine fachliche Arbeit.
+
 ## Wahrheitstabellen-Diff (vor dem Bau, Leitplanken §4)
 
 **Role × Status × Action** (`policy-truth-table.md`, Abschnitt 1): In den 22 admin-Zeilen werden **63 ✓** zu `·`, in den
@@ -281,9 +300,10 @@ Vorher stand admin hier auf `✓ ✓ ✓ ✓ · ✓`. Der Bericht nennt den Diff
 
 ## Nicht-Ziele
 
-- Kein Vertrag, keine Operation, kein Ereignistyp, kein i18n-Schlüssel, keine Ansicht.
+- Kein Vertrag, keine Operation, kein Ereignistyp. Oberfläche nur: Hervorhebung in der Historie (Punkt 5), zwei
+  i18n-Schlüssel.
 - Keine Einschränkung der Leserechte von admin (Eigentümerfrage 2a).
-- Kein eigenes Ereignis oder Kennzeichen für Weiterleitungen durch admin (Eigentümerfrage 2b).
+- Kein eigenes Ereignisfeld für administrative Handlungen (Eigentümerfrage 2b).
 - Keine Änderung an anderen Rollenbündeln, an `READ_SCOPES`, `READ_PERMISSIONS`, der Übergangstabelle oder den Guards.
 - Keine Änderung an `SYSTEM_ACTOR` oder am Seed.
 - Kein Wiederherstellungsweg in dieser Scheibe (040c).
@@ -312,16 +332,23 @@ Punkt 4 genannten Umbauten; jede andere Änderung ist ein Befund):
 - `apps/web/e2e/*.spec.ts`
 - `apps/web/e2e/support/*.ts` (nur Testakteure und der synchrone Akteurwechsel)
 
-Oberfläche (nur Verlegen ohne Verhaltensänderung):
+Oberfläche:
 
 - `apps/web/src/features/stage/Page.tsx` (nur Import der verlegten Funktion)
 - `apps/web/src/features/stage/lib.ts` (nur die verlegte Funktion)
 - `apps/web/src/features/stage/lib.test.ts` (nur Tests der verlegten Funktion)
+- `apps/web/src/features/history/Timeline.tsx` (nur das Abzeichen in beiden Darstellungen)
+- `apps/web/src/features/history/lib.ts` (nur die Funktion der Hervorhebung)
+- `apps/web/src/features/history/lib.test.ts` (nur Tests der Funktion)
+- `apps/web/src/features/history/Timeline.test.tsx` (neu: Abzeichen sichtbar bzw. nicht vorhanden)
+- `apps/web/src/i18n/history.de.ts` und `apps/web/src/i18n/history.en.ts` (nur die zwei Schlüssel)
+- `apps/web/src/i18n/parity.test.ts` (nur Zahl und Kommentar)
 
 Nachweis und Dokumente:
 
 - `docs/evidence/040a-admin-ohne-schreibaktionen.png` (neu)
-- `docs/rollen-und-rechtekonzept.md` (nur ein Kopfvermerk „Scheibe 040a“ wie bei 025, 026, 028; er nennt: Inhaltsrechte entfallen, Weiterleiten bleibt, die Hervorhebung nach §4 ist offen (Eigentümerfrage 2b), Zurückziehen entfällt (2c))
+- `docs/evidence/040a-historie-administration-de.png` und `docs/evidence/040a-historie-administration-en.png` (neu)
+- `docs/rollen-und-rechtekonzept.md` (nur ein Kopfvermerk „Scheibe 040a“ wie bei 025, 026, 028; er nennt: Inhaltsrechte entfallen, Weiterleiten bleibt, administrative Ereignisse sind in der Historie hervorgehoben (§4), Zurückziehen entfällt (2c))
 - `docs/sicherheit/bedrohungsmodell.md` (nur T-G1-E-04, BF-09, MF-01, der Nachweis von MF-07 und die Zeile 040 der Zuordnungstabelle)
 - `docs/folgeliste.md`
 - `docs/slices/040a-admin-ohne-inhaltsrechte.md`
@@ -331,7 +358,7 @@ Weitere Dateien sind Scope-Befunde.
 ## Ausdrücklich nicht erlaubt
 
 `packages/contract/**`, `packages/domain/src/types.ts`, `packages/domain/src/transitions.ts`,
-`packages/domain/src/seed.ts`, `apps/api/src/**` außer den Testdateien, `apps/web/src/**` außer den drei Dateien unter
+`packages/domain/src/seed.ts`, `apps/api/src/**` außer den Testdateien, `apps/web/src/**` außer den Dateien unter
 „Oberfläche“, `scripts/**`, `docs/adr/**`, `docs/entscheidungsregister.md`, `docs/produktplan-beta.md`. Dieser Abschnitt
 steht bewusst außerhalb von „Files allowed“.
 
@@ -389,6 +416,13 @@ steht bewusst außerhalb von „Files allowed“.
 
 11. `stageOnlyByRights` wie in „Ziel“, Punkt 4.
 
+`apps/web/src/features/history/lib.test.ts` und `Timeline.test.tsx`:
+
+12. `isAdministrativeRole` ist wahr genau für die Rollen, deren Bündel `admin.roles.manage` hält (Vergleich mit einer
+    Schleife über `ROLE_PERMISSIONS` im Test, nicht mit einer Namensliste).
+13. `Timeline` mit einem Ereignis von admin (Rückgabe) und einem von `legal`: genau ein `history-admin-badge`, sichtbarer Text
+    „Administration“, zugänglicher Name gesetzt; in der englischen Fassung der englische Text.
+
 **Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
 - Die Ableitung `...PERMISSIONS.filter(…)` wiederhergestellt → Test 1, Test 3 und der Tabellen-Snapshot rot.
 - `answer.draft` in die Liste von admin → Test 1, Test 3, Tabellen-Snapshot rot.
@@ -396,17 +430,20 @@ steht bewusst außerhalb von „Files allowed“.
 - Prüfung R-ADM-07 entfernt → Test 7 und Test 10 rot.
 - R-ADM-08 zählt abgelaufene oder bald ablaufende Zuordnungen mit → Test 8 rot.
 - `question.withdraw` wieder in der Liste → Test 1, Test 3, Tabellen-Snapshot rot.
+- Abzeichen in der Tabellendarstellung entfernt oder `isAdministrativeRole` immer falsch → Test 13 bzw. Test 12 rot.
 
 ## Akzeptanzkriterium
 
-1. Die Tests 1–11 sind grün, die sechs Mutationsproben rot belegt.
+1. Die Tests 1–13 sind grün, die sieben Mutationsproben rot belegt.
 2. `git diff -- packages/domain/policy-truth-table.md` zeigt genau den Diff aus „Wahrheitstabellen-Diff“: 63 ✓ → `·` in
    admin-Zeilen und den neuen Abschnitt; sonst nichts.
 3. `pnpm --filter @hv/web e2e` (Projekt in-process) ist grün; das Projekt http läuft in der PR-CI grün. Die Liste der
    umgebauten e2e-Tests steht im Bericht, jede Abschwächung benannt.
 4. Screenshot `docs/evidence/040a-admin-ohne-schreibaktionen.png`: Demo als Administration auf der Beantwortung mit einer
    Frage in Prüfung; sichtbar ist höchstens die Rückgabe, keine Freigabe-, Entwurfs- oder Zurückziehen-Aktion.
-5. `pnpm gates` (mit Postgres-Variablen wie in CI) ist grün, einschließlich `slice-scope` auf `claude/slice-040a-…`. Der
+5. Screenshots `docs/evidence/040a-historie-administration-de.png` und `…-en.png`: Historie einer Frage, die admin
+   zurückgegeben hat; das Abzeichen steht sichtbar am Ereignis der Administration, nicht an den übrigen.
+6. `pnpm gates` (mit Postgres-Variablen wie in CI) ist grün, einschließlich `slice-scope` auf `claude/slice-040a-…`. Der
    Schluss der Ausgabe steht einmal im Bericht.
 
 ## Nachweise
@@ -414,7 +451,7 @@ steht bewusst außerhalb von „Files allowed“.
 - Liste der umgestellten Tests (Vor-dem-Bau-Punkte 2 und 4).
 - Diff der Wahrheitstabelle (wörtlich).
 - Ergebnis der Mutationsproben.
-- Screenshot wie oben.
+- Screenshots wie oben (drei).
 - Schluss von `pnpm gates` mit Commit-Hash.
 
 ## Qualitätswirkung
@@ -427,9 +464,9 @@ Ausgelöst:
 - [x] Fachregel (R-ADM-07, R-ADM-08)
 - [ ] Vertrag, Ereignis, Konfiguration (die 409 an `assignRole`/`revokeRole` sind schon dokumentiert)
 - [ ] Persistenz
-- [x] Oberfläche (nur sichtbar weniger Aktionen für die Administration; eine reine Funktion zieht um)
+- [x] Oberfläche (weniger Aktionen für die Administration; Abzeichen „Administration“ in der Historie; eine reine Funktion zieht um)
 
-Perspektive: Security/Admin (6.5, 6.8), Legal (Rechtekonzept §4) · Nachweise: Tests 1–11, Mutationsproben,
+Perspektive: Security/Admin (6.5, 6.8), Legal (Rechtekonzept §4) · Nachweise: Tests 1–13, Mutationsproben,
 Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a, 2b, 2c; E25 unberührt
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
@@ -437,7 +474,7 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
 - **Bedrohungen:**
   - **T-G1-E-04** (Administration als Inhaltskonto): Der Inhaltsteil ist geschlossen. admin kann weder erfassen noch
     entwerfen, freigeben, auf die Bühne stellen oder vorlesen. Das Weiterleiten (Zuweisen, Zurückgeben) bleibt nach Rechtekonzept §4
-    und ist in der Historie mit Rolle sichtbar; die Hervorhebung ist offen (2b). Über die Rollenzuordnung ist der Weg durch R-ADM-07 für eine einzelne Person
+    und ist in der Historie mit Rolle sichtbar; die Hervorhebung steht in der Historie (Punkt 5). Über die Rollenzuordnung ist der Weg durch R-ADM-07 für eine einzelne Person
     geschlossen; zwei zusammenwirkende Verwaltungskonten bleiben ein Restrisiko (MF-01).
   - **MF-01** (Rechteerhöhung über die Rollenzuordnung): Eine Person kann sich keine Rolle mehr selbst geben und sich
     damit auch nicht über „`approver` zuordnen, eigene admin-Zuordnung entziehen, freigeben“ (`actor.ts:112-114`) zur
@@ -455,7 +492,7 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
   | Neues Recht fällt still an admin (Ableitung) | ausdrückliche Liste | Test 1 mit Mutationsprobe; Tabellen-Snapshot |
   | admin ordnet sich `approver` zu, entzieht die eigene admin-Zuordnung und gibt frei | R-ADM-07 | Test 7, Test 10; verweigerter Versuch mit R-ADM-07 im Zugriffslog |
   | zwei admins geben einander `approver` | vor dem Freeze nicht verhindert; nach dem Freeze Override mit Grund (040d) | Ereignis `RoleAssigned` in `listEvents`; Alarmvorschlag an 085 „Zuordnung eines Freigabe- oder Rechtsrechts“ |
-  | admin leitet eine Frage an einen fremden Fachbereich oder gibt sie immer wieder zurück, um die Beantwortung zu verzögern | erlaubt (§4); die Rückgabe verlangt einen Grund (bestehende Regel); Zurückziehen hält admin nicht mehr (2c) | Ereignis mit `actor.role` admin und Grund in der Historie der Frage; Eigentümerfrage 2b |
+  | admin leitet eine Frage an einen fremden Fachbereich oder gibt sie immer wieder zurück, um die Beantwortung zu verzögern | erlaubt (§4); die Rückgabe verlangt einen Grund (bestehende Regel); Zurückziehen hält admin nicht mehr (2c) | Ereignis mit `actor.role` admin und Grund in der Historie der Frage, dort mit Abzeichen „Administration“ hervorgehoben (Test 13) |
   | admin entzieht die letzte Verwaltungsrolle und sperrt den Jahrgang | R-ADM-08 | Test 8 |
   | admin liefert als Podium „vorgelesen“ | kein `question.deliver` | Test 3 und Test 10 |
 
@@ -482,8 +519,8 @@ Wahrheitstabellen-Diff, Screenshot · Offene Entscheidung: Eigentümerfragen 2a,
 Keine blockiert die Specs. Frage 1 braucht vor dem ersten Bau ein ausdrückliches Go; die übrigen sind auf Standard
 gebaut, mit den genannten Kosten einer späteren Änderung.
 
-1. **Zuschnitt, Budget, Reihenfolge, Plananpassungen (Go nötig).** Standard: vier Teile a → b → c → d, rund 6,75 AStd
-   statt 2,5 (a 1,25, b 1,5, c 2, d 2), alle hoch. Mit Go ändert der Orchestrator den Plan-Eintrag 040
+1. **Zuschnitt, Budget, Reihenfolge, Plananpassungen (Go nötig).** Standard: vier Teile a → b → c → d, rund 7,5 AStd
+   statt 2,5 (a 1,5, b 1,5, c 2, d 2,5), alle hoch. Mit Go ändert der Orchestrator den Plan-Eintrag 040
    (Teilungsvermerk, Lanes: contract für b bis d, falls 043a-Frage 5 freigegeben ist; web-api für b bis d, weil `HvApi`
    wächst und `http.ts` und `liveStore.ts` es umsetzen; web-shell und web-history für die erzwungenen i18n-Schlüssel;
    web-stage für 040a; manifests für ein Skript in 040c; docs-legal, docs-sicherheit, docs-datenschutz, docs-betrieb)
@@ -499,12 +536,10 @@ gebaut, mit den genannten Kosten einer späteren Änderung.
      `question.withdraw`. Alternativen: (a) zurück wie heute, eine Tabellenzeile, < 0,25 AStd; (b) Zurückziehen nur vor
      dem Vorlesen, als statusgebundenes Recht wie `READ_SCOPES`, rund 0,5 AStd mit Tabellen-Diff. Wer entscheidet:
      Eigentümer mit Recht.
-   - **2b. Herausgehobener Auditeintrag für Weiterleitungen durch admin?** Rechtekonzept §4 verlangt einen
-     „herausgehobenen Auditeintrag“, „im Verlauf der Frage sichtbar“. Standard: Die Historie zeigt `actor.role` admin an
-     jedem Ereignis; das gilt als sichtbar, eine eigene Hervorhebung gibt es nicht. Alternative: ein Kennzeichen
-     `administrative: true` am Ereignis (Umschlag oder Nutzlast) und eine Hervorhebung in der Historie, rund 0,75 AStd:
-     Vertrag und Kern in einer Scheibe nach 040 (Vorschlag: mit 041, weil die Oberfläche dort liegt), Anzeige in der
-     Historie. Wer entscheidet: Eigentümer mit Recht.
+   - **2b. Zusätzlich ein Ereigniskennzeichen?** Die Hervorhebung nach §4 baut 040a in der Historie aus
+     `actor.role` (Ziel, Punkt 5). Offen ist nur, ob das Ereignis zusätzlich `administrative: true` tragen soll, etwa für
+     Export (051) und Nachbarsysteme. Standard: nein. Alternative: additives Umschlag- oder Nutzlastfeld, rund 0,5 AStd
+     (Vertrag und Kern). Wer entscheidet: Eigentümer mit Recht.
 3. **Start des Jahrgangs (040d).** Standard: Start nur mit eingefrorener Konfiguration (R-MTG-08) und nicht, solange ein
    anderer Jahrgang läuft (R-MTG-09), durch Halter von `agenda.manage` (heute nur admin).
    Alternative zu R-MTG-08: Start ohne Freeze erlaubt, nur Hinweis; < 0,25 AStd. Verlagerung von `agenda.manage` und
@@ -513,12 +548,12 @@ gebaut, mit den genannten Kosten einer späteren Änderung.
    mit Grund (R-ADM-03); Entzug ist immer frei und nie eingefroren (Ausnahme R-ADM-08). Alternative: Zuordnungen bleiben
    nach dem Freeze frei, nur ein Alarm (085) meldet sie; < 0,25 AStd. Hintergrund: MF-01 und E8 (Tabelle ist Wahrheit; ein
    späterer IdP-Abgleich müsste nach dem Freeze ebenfalls über den Override laufen).
-5. **Vertretungen je Rolle (040d).** Rechtekonzept §5 (Zeile 205) sagt „mindestens zwei benannte Vertreter“, der Vertrag
-   sagt „one of the two deputies“ (`openapi.yaml:2391`); das widerspricht sich. Standard: **keine Obergrenze, mindestens
-   zwei empfohlen**, wie §5; der Kern prüft nur Ziel und Selbstvertretung (R-ADM-06), der Vertragstext wird in 040d
-   berichtigt. Alternativen: (a) harte Obergrenze zwei (409), < 0,25 AStd; (b) Pflicht „mindestens zwei“ vor dem Freeze
-   als Guard am Freeze, rund 0,5 AStd; (c) keine Obergrenze plus Alarm (085) bei mehr als zwei, Kosten in 085. Wer
-   entscheidet: Eigentümer mit Projektleitung (E25).
+5. **Vertretungen je Rolle (040d).** Rechtekonzept §5 (Zeilen 204-206) und der Plan verlangen mindestens zwei benannte
+   Vertreter je Rolle; der Vertrag sagt „one of the two deputies“ (`openapi.yaml:2391`, wird in 040d berichtigt).
+   Standard, gebaut: **Freeze nur mit mindestens zwei tragfähigen Vertretungen je Rolle mit aktiver Inhaberschaft**
+   (R-ADM-10, 409), **keine Obergrenze**. Offen ist nur eine Lockerung: (a) Warnung statt Abweisung (der Freeze gelingt,
+   `ConfigFrozen` nennt die Lücken), < 0,25 AStd; (b) eine Obergrenze (etwa zwei), < 0,25 AStd. Wer entscheidet:
+   Eigentümer mit Projektleitung (E25).
 6. **Nummernkreise (040c).** Standard: reserviert werden nur Fragenummern (F-n) je Erfassungsplatz. Alternative: auch
    Wortmeldungsnummern; additives Feld `series`, rund 0,5 AStd. Wer entscheidet: Projektleitung (welche Nummern stehen auf
    den Papiervordrucken?).
@@ -584,3 +619,8 @@ bei gesperrten Subjects (N5, gebaut in 040c).
 **Letzte Nachprüfung (30.09.2026, zu `a1395b7`):** eingearbeitet in 040a: „tragfähig“ statt „aktiv“ in Kopf und
 Invariante, Budget 6,75 AStd, Verweis `permissions.ts:30` für den Zusammenführen-Test, Wiederherstellung über alle nicht
 geschlossenen Jahrgänge (Umsetzung in 040c).
+
+**Codex-Befund zu `3f04fa2` (P1-3, P1-2 für die Eigentümerfragen):** eingearbeitet: Hervorhebung administrativer Ereignisse
+in der Historie aus den Rechtedaten (Ziel, Punkt 5; Tests 12–13; Screenshots DE/EN; Mutationsprobe); §4 damit erfüllt;
+Eigentümerfrage 2b auf das zusätzliche Ereigniskennzeichen verkleinert; Eigentümerfrage 5 fragt nur noch nach einer
+Lockerung von R-ADM-10; Budget 7,5 AStd.
