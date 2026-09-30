@@ -191,7 +191,7 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
       ruft `apps/api/src/auth/subject-block-cli.ts` mit ausdrücklicher Umgebung `{ PATH, HV_DATABASE_URL }` und
       `stdio: 'ignore'` auf, der nächste Abruf ist 401, die Oberfläche zeigt die Anmeldeseite ohne Fachdaten;
       Screenshot `031-http-401.png`.
-    - **H7** `@idp` Person `norole`: echtes 403 mit CSRF-Token, Seite „Keine aktive Rolle“, Abmelden funktioniert.
+    - **H7** `@idp` Person `norole` (nachgetragen nach dem Bau, Code statt Annahme): der Rückruf `/auth/callback` antwortet 403 (`R-PERM-01`), es entsteht kein `hv_session`-Cookie, `/auth/me` liefert 401. Die Seite „Keine aktive Rolle“ erscheint nur, wenn eine Rolle mitten in der Sitzung entfällt (Produktfrage in der Folgeliste).
     - **H8** `@idp` Zwei Schreibende, echtes 412 über das ETag: `moderation` legt über die Oberfläche eine neue
       Wortmeldung an; die Erfassung legt zuerst deren Redebeitrag an und öffnet ihn. Beide Schreibenden nutzen **dieselbe**
       `capture`-Sitzung aus `http-setup`: die Seite und ein Request-Kontext mit deren Cookie und CSRF-Token. Der
@@ -334,25 +334,114 @@ Bedrohungs-ID; wörtliche Startzeile des Test-Dienstes; Digests und Hashes; Arte
 
 ## Nachweis
 
-(nach dem Bau ausfüllen)
+Stand des Baus (lokal, ohne Docker und ohne Keycloak). Der Keycloak-Teil (`http-setup`, H4 bis H8) und beide CI-Jobs
+sind **nicht** gelaufen; ihr Nachweis ist die PR-CI und steht unten als offen.
 
-**Gates-Commit:** `<sha>` (Baucommit „Scheibe 031a: …“), `pnpm gates` auf sauberem Baum, Exit 0, Umgebung (Node, pnpm,
-Postgres).
+**Gates-Commit:** `6bf2bfd` (Baucommit „Scheibe 031a: Nachweis-Screenshot altes Demo-Protokoll im HTTP-Modus“),
+`CONTRACT_GATE_STRICT=1 pnpm gates` auf sauberem Baum, Exit 0. Umgebung: Node v22.22.2, pnpm 10.33.0, Postgres 16.13
+(lokal, migrierte Datenbank `hv_s031a`, Rollen `hv_owner` und `hv_runtime`). Tests im Lauf: Domäne 231, Web 255 (darunter
+der neue Unit-Test zu den Idempotenzschlüsseln), API 480, Skripte einschließlich `scripts/e2e-http-031.test.mjs` (28 Tests).
 
-Wörtlicher Schluss der Ausgabe von `pnpm gates`:
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (die Zeile `exit 0` habe ich hinter den Befehl gesetzt):
 
 ```
-<Schluss einfügen>
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.77s
+mark-test-run: wrote /home/user/wt/s031a/.claude/state/last-test-run (clean tree) at commit 6bf2bfd, tree fdcfb6a60932…
+exit 0
 ```
 
 | Lauf | Projekt | Tests (bestanden/übersprungen) | Laufzeit |
 |---|---|---|---|
-| lokal | `in-process` | | |
-| lokal, `E2E_HTTP_IDP=none` | `http` (ohne `@idp`) | | |
-| PR-CI Lauf `<id>`, Job `gates` | `in-process` | | Job gesamt: |
-| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | | Job gesamt: |
+| lokal (`E2E_PORT=4430 pnpm --filter @hv/web e2e -- --timeout=240000`) | `in-process` | 127 / 0 | 6,7 min |
+| lokal, `E2E_HTTP_IDP=none pnpm e2e:http` (Ports 4474 und 4430) | `http` (ohne `@idp`) | 7 / 0 (fünf `@idp`-Tests durch `grepInvert` herausgefiltert, nicht übersprungen) | Playwright 12,7 s, Harness gesamt 20 s |
+| PR-CI Lauf `<id>`, Job `gates` | `in-process` | offen (PR-CI) | offen |
+| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | offen (PR-CI) | offen |
 
-Startzeile: `<wörtlich>`. Digests/Hashes: `<…>`. Verworfene, neu erzeugte Screenshots: `<Liste>`.
+Startzeile des Test-Dienstes (lokal gemessen, vom Harness wörtlich geprüft):
+`HV-Tool API: start mode=service persistence=postgres auth=oidc cors=none trusted-proxies=none`.
+
+Digests und Hashes (gelesen ohne Docker-Dämon):
+
+- `actions/checkout` v4 = v4.4.0 = `11d5960a326750d5838078e36cf38b85af677262` (`git ls-remote`).
+- `actions/setup-node` v4 = v4.4.0 = `49933ea5288caeca8642d1e84afbd3f7d6820020` (`git ls-remote`).
+- `actions/upload-artifact` v4.6.2 = `ea165f8d65b6e75b540449e92b4886f43607fa02` (`git ls-remote`, wie schon im Katalog).
+- `postgres:16` = `sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54` (Index; gelesen über
+  `mirror.gcr.io/library/postgres:16`, weil Docker Hub und ECR am Ratenlimit der Bauumgebung scheiterten; enthält Version 16.15).
+- Keycloak 26.7.4 = `sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c` (Index; gelesen über
+  `mirror.gcr.io/keycloak/keycloak:26.7.4`, weil `quay.io` in der Bauumgebung gesperrt ist). **Ungeprüft:** dass derselbe Index
+  unter `quay.io/keycloak/keycloak:26.7.4` liegt. Stimmt er dort nicht, scheitern der Keycloak-Schritt in `gates` und der Job
+  `e2e-http` beim Ziehen des Images; die Korrektur ist die eine Konstante `KEYCLOAK_IMAGE` in `scripts/lib/keycloak-ci.mjs`.
+
+Verworfene, neu erzeugte Screenshots: alle Bilder unter `docs/evidence/`, die `pnpm --filter @hv/web e2e` und der lokale
+`http`-Lauf neu geschrieben haben (u. a. `001-*` bis `090-*`, `takt-*`, `030-login-*`), mit `git restore docs/evidence`
+verworfen; committet ist nur `docs/evidence/031-http-altes-demoprotokoll.png` (H2). `031-http-angemeldet.png`,
+`031-http-401.png` und `031-http-412.png` entstehen erst in der PR-CI (Artefakt `evidence-031-http`) und fehlen hier.
+
+Bedrohungs-ID → Test:
+
+| ID | Test | Stand |
+|---|---|---|
+| T-G1-S-02 | H4 (Cookie-Attribute), H5 (Abmelden, altes Cookie 401), H6 (Subject-Sperre ohne Neustart) in `031-http-betriebsart.spec.ts` | nur PR-CI |
+| T-G1-S-03 | H1, H4; `030-anmeldung.spec.ts` im Projekt `http` | H1 und `030` lokal grün, H4 nur PR-CI |
+| T-G1-T-05 | H3 (keine CORS-Antwort, lokal grün), H5 (`X-CSRF-Token`), H8 (Schreiben nur mit Token) | H3 lokal, H5 und H8 nur PR-CI |
+| T-Q-I-01 | `scripts/e2e-http-031.test.mjs` (Zufallswerte, `--check` ohne Marker-Wert, `trace`/`video` aus, kein `html`-Reporter, Workflow ohne Bericht-, Trace- und Video-Upload) | lokal grün |
+| T-G2-I-02 | Harness-Stufe 6 mit `WRITTEN_TEXTS` aus `e2e-texts.ts` (lokal: 13 Zeilen, acht Schlüssel, kein Geheimnis), Test der Prüffunktion in `e2e-http-031.test.mjs` | lokal grün, mit den H8-Texten nur PR-CI |
+
+Abweichung von der Spec (H7): eine Person ohne aktive Rolle bekommt keine Sitzung; `/auth/callback` antwortet 403 (`R-PERM-01`),
+weil `sessionActorFromEvents` vor dem Cookie läuft (`apps/api/src/app.ts`). Die Seite „Keine aktive Rolle“ und ein 403 von
+`/auth/me` mit CSRF-Token sind so für `norole` nicht erreichbar. H7 prüft deshalb: Rückruf 403, kein `hv_session`-Cookie,
+`/auth/me` 401. Die Entscheidung über die Spec liegt beim Orchestrator (Folgeliste).
+
+Vorprüfungen: (2) `Secure`-Cookie über `http://localhost` in Chromium gespeichert (`httpOnly`, `secure`, `sameSite: Lax`), ein
+wiederhergestellter `storageState` sendet es wieder, auch über einen Request-Kontext; (3) der Vite-Proxy reicht beide
+`Set-Cookie`-Felder und die relative `Location` durch; der Dienst sieht dabei als `Host` den Zielhost, nicht den Vite-Ursprung
+(entgegen dem Wortlaut der Spec, ohne Folge, da der Dienst `Host` nicht auswertet); (4) teilweise: `/v1/meeting` und die Aliasrouten brauchen eine
+Sitzung und laufen erst in der PR-CI (H4 bis H8). Lokal geprüft mit einem Wegwerfskript (nicht eingecheckt): frische Datenbank,
+Bootstrap des Harness, dann `loadPostgresSnapshot` des Dienstes (Hash-Kette und Personentabelle bestehen; 1 748 Ereignisse,
+28 Personen) und `sessionActorFromEvents` je Person (sieben Rollen richtig, `expert` mit `unit-fin`, `revoke` als
+Erfassung, `norole` ohne aktive Rolle); (5) lokales
+Postgres: Owner legt Datenbanken an; (6) Startzeile wörtlich; (1), (7) und (8) siehe oben; (9) `pnpm -r typecheck` erfasst die
+e2e-Dateien; (10) die heutigen CI-Laufzeiten habe ich nicht ablesen können (kein `gh`, keine Web-Abfrage in der Bauumgebung).
+
+### Nachweis nach dem ersten CI-Lauf
+
+Erster PR-CI-Lauf `36654542400` (PR #80, Job `e2e-http`): Keycloak-Digest trägt, Setup mit 8 Anmeldungen, `030` ×4, H1 bis H5 und H7
+grün, Startzeile passt, Laufzeit 2,1 min. Rot waren H6 und H8; Ursachen und Korrektur (Commit `361389f`):
+
+- **H6:** der Test klickte `nav-capture` nach dem 401 und wartete 90 s. Die Seite kann nach der Sperre schon von selbst zur Anmeldung
+  gewechselt sein (Polling alle 30 s endet in `onUnauthorized`), dann gibt es den Eintrag nicht mehr. Jetzt: `/auth/me` 401, dann
+  `page.reload()` und direktes Warten auf die Überschrift „Anmelden“, ohne Klick; Timeout unverändert.
+- **H8:** im HTTP-Modus gibt es kein Push; ein eigener Schreibvorgang löst kein Neuladen aus, die Liste aktualisiert sich erst mit dem
+  30-s-Polling (`api/http.ts`, `useApiVersion`). Der neue Name erschien deshalb nicht (Produktverhalten, hier nicht geändert). Der Test wartet
+  jetzt auf die Antwort der Registrierung (`POST /v1/speakers`, Status 201, bei Abweichung meldet die Prüfung nur den Status) und lädt neu.
+  Dasselbe gilt für den Redebeitrag (`POST /v1/contributions`, 201, dann Neuladen), sonst erscheint `capture-free-input` nie. Ungeprüft in
+  CI bis zum nächsten Lauf.
+
+Lokal auf `361389f`: `CONTRACT_GATE_STRICT=1 pnpm gates` Exit 0, `node --test scripts/e2e-http-031.test.mjs` 28 bestanden, Typecheck und
+Lint (`oxlint src`, nur die vorhandenen Warnungen), `E2E_HTTP_IDP=none pnpm e2e:http` 7 bestanden.
+
+### Nachweis nach dem Review
+
+Opus-Review (bis `361389f`): kein Blocker, 2 major. Zweiter CI-Lauf `36655407629` (auf `431554e`): 19 von 20 grün, H6 und H7 grün, H8 rot
+(Suche nach dem Namen in `/v1/speakers`: die Rolle Erfassung sieht nur „Redner N“, `viewSpeaker` ohne `question.identity.reveal`).
+Korrektur und Gates-Commit `682133e` (`CONTRACT_GATE_STRICT=1 pnpm gates`, Exit 0; `node --test scripts/e2e-http-031.test.mjs` 33 bestanden;
+Typecheck grün; `E2E_HTTP_IDP=none pnpm e2e:http` 8 bestanden, davon G1 als erwarteter Fehlschlag; Port 18091 wird vor dem Start geprüft, bei
+belegtem Port bricht der Lauf mit der Stufe „port check“ ab und beendet nichts Fremdes):
+
+| Befund | Stand |
+|---|---|
+| 1 major Sicherheit, `error-context.md` mit Klartext | `outputDir` beider HTTP-Projekte im privaten Zustandsverzeichnis, `PLAYWRIGHT_NO_COPY_PROMPT=1` im Harness. Probe: die Variable verhindert den Klartext nur bei einem einfachen Fehlschlag, nicht bei einem gescheiterten `expect(...).toBeVisible()`; der Ausgabeordner im Temp-Verzeichnis ist der wirksame Schutz. Test pinnt beides |
+| 2 major Produkt | eine Zeile in `docs/folgeliste.md` („eigener Takt vor 031b“, mit Nit 12), Verweis in den Kommentaren von H6 und H8 |
+| 3 minor | H7 in Entscheidung 12 nachgetragen; Folgeliste um rohes 403-Dokument und bestehende Keycloak-SSO-Sitzung geschärft |
+| 4 minor | H8: `visibilityState` per `addInitScript` auf `hidden`, Folgeliste-Satz ersetzt |
+| 5 minor | Handler für SIGINT und SIGTERM lösen dasselbe Aufräumen aus |
+| 6 minor | Gesamtfrist 480 s, Playwright-Frist = Rest minus 30 s Reserve; Playwright als Prozessgruppe (`detached`, `process.kill(-pid)`) |
+| 7 nit | Test G1 mit `test.fail()` und 429 per `page.route`, läuft ohne IdP |
+| 8 nit | Demo-Server auf 4173 nur ohne `E2E_HTTP` |
+| 9 nit | Harness prüft den tsx-Lader und gibt sonst einen festen Satz aus (getestet) |
+| 10 | Der Abschnitt „Stand Scheibe 031a“ im Bedrohungsmodell ist Teil der Nachweisspalte der Bedrohungs-IDs dieser Spec |
+| Zusatz H8 | Kennung des Sprechers aus der Antwort der Registrierung; Status von Registrierung und Redebeitrag werden gemeldet |
 
 ## Bericht (nach Bau ausfüllen)
 
@@ -411,3 +500,12 @@ Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Mechanismus des 429-Wäch
 ## Review findings
 
 folgt
+
+### Nachweis PR-CI (#80)
+
+Lauf `36656082381` auf `316072b` (https://github.com/ypoxx/hvworkflow/actions/runs/36656082381): Job `e2e-http` grün
+(2 min 4 s; Setup mit 8 Keycloak-Anmeldungen, 030 ×4, G1, H1–H8, alle bestanden), Job `gates` grün (10 min, inklusive
+„Keycloak browser login against migrated Postgres“ mit dem Digest-gepinnten Image aus `scripts/lib/keycloak-ci.mjs`).
+Artefakt `evidence-031-http` (ID `11071984417`, 192 306 Byte, `sha256:abc534c24c6600b2d58ef3c0c8797ff7d6e7c76a336df620143dae174516b26b`)
+enthält die drei `@idp`-Screenshots `031-http-angemeldet.png`, `031-http-401.png`, `031-http-412.png`. Sie sind nicht
+eingecheckt (kein `gh` in der Bauumgebung, Rückfall nach Entscheidung 13/m14): Lauf-ID und Artefakt sind der Nachweis.

@@ -302,6 +302,7 @@ ist — statt einer Zeile, die das ganze Tor überzeichnet (Audit-Befund A2).
 | Vertragsbindung (kein Rollenname in der Komponente) | `scripts/vocabulary-check.mjs` (Rollenvergleich außerhalb `RoleSwitcher`/`actor.ts`/Tests) | ein Rollenname in einer Komponente | läuft (CI: Contract lint, typecheck, lint, unit tests, vocabulary, architecture, role-literals, now-check, plan-honesty, build) |
 | Vertragsbindung (nur generierter Client) | — | ein handgeschriebener Aufruf außerhalb `apps/web/src/api/**` | geplant in Scheibe 030 |
 | Fehlerpfad (Konflikt 412 in der Oberfläche) | — | ein 412-Konflikt beim Schreiben ist in der Oberfläche ungetestet | geplant in Scheibe 060 |
+| Zwei Betriebsarten (e2e) | Playwright-Projekte `in-process` (Demo) und `http` (echter Dienst, Postgres, Keycloak-Testrealm; `scripts/e2e-http-031.mjs`, `apps/web/e2e/031-http-betriebsart.spec.ts`) | ein Test des `http`-Projekts scheitert, eine Antwort des Dienstes trägt 429, oder das Zugriffslog enthält ein Geheimnis oder einen Text der Suite | läuft (CI: End-to-end http project against Hono, Postgres and Keycloak) |
 | Fehlerpfad (Verbindungsverlust) | — | ein Verbindungsverlust ist ungetestet | geplant in Scheibe 058 |
 | Fehlerpfad (leere Liste) | — | eine leere Liste/kein Treffer ist ungetestet | geplant in Scheibe 020 |
 

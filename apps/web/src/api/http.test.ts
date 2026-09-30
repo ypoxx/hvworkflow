@@ -56,6 +56,17 @@ describe('HTTP HvApi adapter', () => {
     expect(headers[2]?.get('Idempotency-Key')).toBe('same-key');
   });
 
+  it('sends a different Idempotency-Key for two calls that name none', async () => {
+    const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+    replies.push(json({ id: 'q' }), json({ id: 'q' }));
+    await api.closeQuestion('q');
+    await api.closeQuestion('q');
+    const keys = calls.map((call) => new Headers(call.init.headers).get('Idempotency-Key'));
+    expect(keys[0]).toBeTruthy();
+    expect(keys[1]).toBeTruthy();
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it('does not send a write without a confirmed CSRF token', async () => {
     const api = createHttpApi({ getCsrfToken: () => undefined, onUnauthorized: vi.fn(), fetcher: request });
     await expect(api.closeQuestion('q')).rejects.toBeInstanceOf(ApiProblem);
