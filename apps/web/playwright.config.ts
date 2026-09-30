@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import type { PlaywrightTestConfig } from '@playwright/test';
 
@@ -12,6 +13,11 @@ import type { PlaywrightTestConfig } from '@playwright/test';
  * only when the harness (`scripts/e2e-http-031.mjs`) sets `E2E_HTTP=1`; without it `pnpm --filter @hv/web e2e`
  * behaves as before. `E2E_HTTP_IDP=none` is the local mode without Keycloak (no Docker on the workstation): no setup
  * project, no default state, only the tests that need no sign-in.
+ *
+ * Takt-035: the HTTP mode is a production build behind `vite preview`, not the dev server (which renders `<StrictMode>`
+ * with doubled mount effects and compiles modules on demand, inflating timings). `HV_WEB_MODE` is a build-time `define`,
+ * so it is set for the build step too. `vite preview` takes `preview.proxy ?? server.proxy` (Vite 8), so `/v1` and `/auth`
+ * reach the service exactly as in dev. The `in-process` project stays on the dev server.
  */
 const port = Number(process.env['E2E_PORT'] ?? 4173);
 const httpEnabled = process.env['E2E_HTTP'] === '1';
@@ -34,7 +40,17 @@ const launch = executablePath ? { launchOptions: { executablePath } } : {};
 // The failure report of Playwright (`error-context.md`, a page snapshot) can hold the text typed into a password field, and
 // the variable `PLAYWRIGHT_NO_COPY_PROMPT` does not stop it for a failed matcher (probe, slice 031a review). So the output
 // of both HTTP projects goes into the private state directory of the harness, which is removed with the temporary directory.
-const stateDir = process.env['E2E_HTTP_STATE_DIR'];
+// An empty or blank value counts as absent (never a root-level path such as '/web-build', which `--emptyOutDir` would wipe).
+const stateDir = process.env['E2E_HTTP_STATE_DIR']?.trim() || undefined;
+// Build output of the HTTP project: private and per run under the state directory; without it below `node_modules` of this
+// package (git ignores it, and it is not `dist/`, which the gates build and parallel agents use).
+// Without the state directory the fallback is per run (process id), so two runs never share or empty each other's build.
+const httpBuildDir = `${stateDir ?? join(import.meta.dirname, `node_modules/.e2e-http-build-${process.pid}`)}/web-build`;
+// The path goes into a shell command inside single quotes: a single quote in it would end the quoting (injection).
+if (!isAbsolute(httpBuildDir) || dirname(resolve(httpBuildDir)) === '/') {
+  throw new Error('E2E_HTTP_STATE_DIR must be an absolute path below the root directory.');
+}
+if (httpBuildDir.includes("'")) throw new Error('E2E_HTTP_STATE_DIR must not contain a single quote.');
 const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
 
 const httpUse = {
@@ -76,7 +92,9 @@ export default defineConfig({
   // The demo server exists only without the HTTP run: `in-process` does not run with `E2E_HTTP=1` (slice 031a review).
   webServer: httpEnabled
     ? [{
-        command: `pnpm exec vite --port ${httpPort} --strictPort`,
+        // Single quotes keep a path with spaces in one piece; a quote in the path is not expected (private temp directory).
+        command: `pnpm exec vite build --outDir '${httpBuildDir}' --emptyOutDir && ` +
+          `pnpm exec vite preview --outDir '${httpBuildDir}' --port ${httpPort} --strictPort`,
         url: `http://localhost:${httpPort}`,
         reuseExistingServer: false,
         timeout: 120_000,
