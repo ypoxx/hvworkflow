@@ -3,7 +3,7 @@
 **Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung im Web, kein Hoch-Auslöser; Leitplanken §4) · **Lanes:** web, e2e · **Perspektive:** Betrieb (Last), Qualität
 **Rolle:** web-implementer; Review in frischem Kontext (Perspektive Lesezustand 010c/010d), Modell nur in `.claude/agents/`
 **Regeln:** AGENTS.md R2, R4 (kein Vergleich mit einem Rollennamen), R6, R12; ADR 0002; Slice 010c (Lesezustand je Ladevorgang), 010d (Ansichtsdaten gehören dem Schlüssel des Akteurs)
-**Depends on:** takt-030 (PR #82, Branch `claude/takt-030-eigene-schreibvorgaenge`, **noch nicht gemergt**). takt-030 ändert, wann die Hörer von `subscribeToChanges` im HTTP-Modus feuern (nach jedem eigenen 2xx-Schreiben), und bringt H9 in `apps/web/e2e/031-http-betriebsart.spec.ts`. Diese Scheibe zählt die Abrufe genau dieser Hörerkette und hängt H10 an dieselbe Datei. Bau erst nach dem Merge von takt-030.
+**Depends on:** keine Code-Abhängigkeit. takt-030 (PR #82) ändert nur, wann die Hörer von `subscribeToChanges` feuern; `useApiVersion` und H10 sind davon unabhängig (H9 wird nicht berührt, H10 wird ans Dateiende gehängt).
 **Aufgeteilt aus:** takt-033 (`docs/slices/takt-033-kette-einmal-pruefen.md`, Dienst, hoch). Die beiden Teile sind im Code unabhängig.
 **Quellen-IDs:** Diagnoselauf für Scheibe 031b, gemessen gegen Postgres am 30.09.2026; `apps/web/e2e/abnahme.spec.ts:257` (Grenze 1500 ms)
 
