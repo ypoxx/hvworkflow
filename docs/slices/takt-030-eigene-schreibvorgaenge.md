@@ -124,3 +124,10 @@ Nachlauf nach der Umbenennung des Screenshots (Orchestrator): `pnpm gates` auf `
 ✓ built in 1.88s
 mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 54cf368, tree 86559f330497…
 ```
+
+Nachlauf nach den Review-Befunden: `pnpm gates` auf `9b019c4` (sauberer Baum), Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 1.66s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 9b019c4, tree 439c14f46f0c…
+```
