@@ -1,7 +1,7 @@
 # Scheibe 031a — HTTP-Projekt der e2e-Suite: Harness, Keycloak, Anmeldung und CI-Job
 
 **Status:** spec (nach Lesebefund 30.09.2026 nachgebessert und geteilt)
-**Risikoklasse:** hoch · 2,5 AStd · 23.10.2026 (W4) · Lanes: e2e, infra, docs-sicherheit
+**Risikoklasse:** hoch · 2,5 AStd · 29.10.2026 (W5) · Lanes: e2e, infra, docs-sicherheit
 **Rolle:** Implementierer-Oberfläche mit Infra-Anteil (Harness, CI-Job); unabhängiges Review in frischem Kontext mit Perspektive Security/Betrieb, zusätzlich Sicherheits-Checkliste des Reviewers (SC-05, SC-06, SC-10, SC-12, SP-1, SP-3, SP-5, SP-6, SP-7) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel, keine neue Regel-ID, keine Änderung an `ROLE_PERMISSIONS`, der Übergangstabelle, dem Vertrag oder am Produktcode (`apps/api/src`, `apps/web/src` außer einem Unit-Test); AGENTS.md R2 (Nachweis), R4 (Rollennamen nur in Testhilfen), R6 (Oberfläche nur über `HvApi`), R11 (nur synthetische Daten, Geheimnisse je Lauf)
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/031a (Teil 1 der am 30.09.2026 geteilten Scheibe 031), §5.4/084 (Job-Matrix: „PR voll … http-Projekt ab 031“); ADR 0002 Ergänzung, ADR 0004 (BFF im Dienst); `docs/folgeliste.md` (030, 029b nit, 027 nit, 033b nit); Lehren aus 034a/034b (CSP `default-src 'none'`, Grenzen, Konfigurationsschema); Bedrohungsmodell T-G1-S-02, T-G1-S-03, T-G1-T-05, T-Q-I-01, T-G2-I-02, 029b-Nachtrag; Leitplanken §4, 6.8
