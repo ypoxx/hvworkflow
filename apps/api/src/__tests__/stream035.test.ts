@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { serve } from '@hono/node-server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  CORPUS_DEMO, SYSTEM_ACTOR, createInMemoryEventStore, createInProcessApi, seedEvents,
+  CORPUS_DEMO, SYSTEM_ACTOR, createInMemoryEventStore, createInProcessApi, maskEvent, seedEvents,
   type DomainEvent, type NewEvent, type Role,
 } from '@hv/domain';
 import { createApp, type App, type CreateAppOptions } from '../app.ts';
@@ -1044,30 +1044,38 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(reader.blocks.filter(isEvent).length).toBeLessThan(8);
   });
 
-  it('R9 every catch-up and live event frame is masked like listEvents (redacted, sourceHash, no person, hash or command fields)', async () => {
+  it('R9 every catch-up and live event frame equals maskEvent of its stored original (payload, actor, envelope)', async () => {
     const h = await harness({ session: true });
+    // The envelope of a new event stores the actor as `{ id, role }` only (envelope.ts); an actor with person or clear
+    // name exists only in an older stored log. The distributor's log is shaped that way here (a verified log of an
+    // older version), so the actor masking is exercised, not only the payload masking.
+    const legacyActor = (e: DomainEvent): DomainEvent =>
+      ({ ...e, actor: { ...e.actor, displayName: `Klarname ${e.actor.id}`, personId: `person-${e.actor.id}` } } as DomainEvent);
+    h.hooks.load = (log) => log.map(legacyActor);
     const from = h.head() - 300;
-    // Writes through the service: their events carry command fields and person references in the stored original.
+    // Service writes: a speaker registration (clear name in the payload, command fields) and a role assignment.
     await registerSpeaker(h, 'admin');
     await assignFiller(h, 'admin');
     const head = h.head();
-    const stored = h.log().slice(from, head);
-    // The stored originals carry what must never leave; otherwise the test would prove nothing.
+    const stored = h.log().slice(from, head).map(legacyActor);
+    // The stored originals carry what must never leave; otherwise the comparison would prove nothing.
+    const payloadName = (e: DomainEvent): unknown => {
+      const p = e.payload as { displayName?: string; pii?: { displayName?: string } };
+      return p.displayName ?? p.pii?.displayName;
+    };
+    expect(stored.some((e) => e.type === 'SpeakerRegistered' && typeof payloadName(e) === 'string')).toBe(true);
     expect(stored.every((e) => typeof e.hash === 'string' && e.hash !== '' && typeof e.prevHash === 'string')).toBe(true);
-    expect(stored.some((e) => e.commandId !== undefined || e.personId !== undefined)).toBe(true);
+    expect(stored.some((e) => e.commandId !== undefined)).toBe(true);
+    const expected = (e: DomainEvent): unknown => JSON.parse(JSON.stringify(maskEvent(e)));
     const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin'), 'Last-Event-ID': String(from) }));
     const catchUp = (await reader.messagesUntil((b) => b.event === 'cursor', 5_000)).filter(isEvent);
-    expect(catchUp).toHaveLength(head - from);
+    expect(catchUp.map(idOf)).toEqual(stored.map((e) => e.seq));
+    catchUp.forEach((block, i) => expect(block.data).toEqual(expected(stored[i]!)));
     await registerSpeaker(h, 'admin');
     const live = await reader.until(isEvent);
-    for (const block of [...catchUp, live]) {
-      const e = block.data as Record<string, unknown> & { actor: Record<string, unknown> };
-      expect(e['redacted']).toBe(true);
-      expect(typeof e['sourceHash']).toBe('string');
-      for (const key of ['personId', 'hash', 'prevHash', 'commandId', 'commandOperation', 'commandResource']) expect(e).not.toHaveProperty(key);
-      expect(e.actor).not.toHaveProperty('displayName');
-      expect(e.actor).not.toHaveProperty('personId');
-    }
+    const liveStored = legacyActor(h.log()[idOf(live) - 1]!);
+    expect(typeof payloadName(liveStored)).toBe('string');
+    expect(live.data).toEqual(expected(liveStored));
   });
 
   it('R8b the in-flight count goes down as frames go out: mid-batch and after it, a batch within the limit keeps the stream open', async () => {
@@ -1095,19 +1103,35 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(reader.closed).toBe(false);
   });
 
-  it('R10 a catch-up event without hash: the earlier events go out, then end unavailable, no frame for that event', async () => {
+  it('R10 a catch-up event without hash: earlier events go out, then end unavailable on every stream; new opens 503', async () => {
     const h = await harness({ session: true });
-    track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    const live = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await live.nextMessage();
     const broken = h.head() - 5;
     h.hooks.load = (log) => log.map((e) => (e.seq === broken ? { ...e, hash: '' } : e));
     const target = h.head() + 1;
     await assignFiller(h, 'admin');
     await eventually(() => h.hooks.appliedHead === target, 3_000, 'distributor took the log');
-    const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin', 2), 'Last-Event-ID': String(broken - 3) }));
-    const rest = await reader.rest(3_000);
-    expect(rest.filter(isEvent).map(idOf)).toEqual([broken - 2, broken - 1]);
-    expect(rest.at(-1)!.event).toBe('end');
-    expect(rest.at(-1)!.data).toEqual({ reason: 'unavailable' });
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
+    try {
+      const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin', 2), 'Last-Event-ID': String(broken - 3) }));
+      const rest = await reader.rest(3_000);
+      expect(rest.filter(isEvent).map(idOf)).toEqual([broken - 2, broken - 1]);
+      expect(rest.at(-1)!.event).toBe('end');
+      expect(rest.at(-1)!.data).toEqual({ reason: 'unavailable' });
+      // Every stream ends, not only the opening one (decision 3, m6).
+      const liveRest = await live.rest(3_000);
+      expect(liveRest.at(-1)!.data).toEqual({ reason: 'unavailable' });
+      // The log is not trusted: a new open is refused.
+      const again = await req(h.app, 'GET', '/v1/stream', { headers: asSession('capture') });
+      expect(again.status).toBe(503);
+      expect(again.headers.get('Retry-After')).toBe('30');
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toContain('HV-Tool API: stream ended (unavailable).');
   });
 
   // ---- real server ---------------------------------------------------------------------------------------------

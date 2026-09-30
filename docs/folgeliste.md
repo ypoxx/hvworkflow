@@ -293,6 +293,12 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   `postgres-stream035.test.ts` („12 (Postgres)“) · hinnehmen.
 - 035b Nachprüfung nit · `apps/api/src/stream/route.ts` (`overLimit`) · die Bytes einer `change`-Nachricht zählen in der
   Warteschlange als JSON-Länge + 64, im laufenden Stapel als echte Rahmenbytes · beide Stellen auf die Rahmenbytes vereinheitlichen.
+- 035b Nachprüfung nit · `apps/api/src/__tests__/stream035.test.ts` (R8b) · der Test sichert nur den Abzug der
+  Nachrichtenzahl, nicht den der Bytes im laufenden Stapel · Variante mit gesenkter `backlogBytes` ergänzen.
+- 035b Nachprüfung minor · `apps/api/src/__tests__/postgres-stream035.test.ts` (24, 24b) · die Tests sind an die Phase
+  des 1-s-Takts des Verteilers gebunden; ein Mutant, der jeden zweiten Takt auslässt, bleibt grün (24 mit 128 ms, 24b mit
+  1846 ms) · Messung in der ungünstigsten Phase mit Schranke `reloadTickMs + spacingMs + Marge` gehört zum B11-Nachweis
+  im Lasttest 071.
 
 ## Bühne und Wortmeldeliste (aus takt-039)
 

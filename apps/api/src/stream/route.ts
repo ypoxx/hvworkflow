@@ -33,7 +33,7 @@ import { currentRequest } from '../observability/context.ts';
 import { isPersistenceBusy, PostgresIntegrityError } from '../persistence/postgres.ts';
 import { problemResponse } from '../problem.ts';
 import { getValidatedQuery, type Variables } from '../validate.ts';
-import type { Hub, HubConnection, HubTerminal } from './hub.ts';
+import { MissingHashError, type Hub, type HubConnection, type HubTerminal } from './hub.ts';
 import type { SessionChecker } from './sessionCheck.ts';
 import {
   cursorFrame, endFrame, HEARTBEAT_FRAME, messageFrame, mergeChanges, parseCursor, resetFrame, RETRY_FRAME,
@@ -61,7 +61,8 @@ export interface StreamRouteOptions {
 
 const UNAVAILABLE_LINE = 'HV-Tool API: stream ended (unavailable).';
 
-export function streamUnavailable(detail: 'The stream limit is reached.' | 'Migrations are pending.' | 'Persistence is busy.'): Response {
+export function streamUnavailable(detail: 'The stream limit is reached.' | 'Migrations are pending.' | 'Persistence is busy.' |
+  'The event log cannot be verified.'): Response {
   return problemResponse(new ApiProblem(503, 'Service Unavailable', detail), { 'Retry-After': String(STREAM_RETRY_AFTER_SECONDS) });
 }
 const tooManyStreams = (): Response =>
@@ -427,6 +428,8 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           return problemResponse(new ApiProblem(500, 'Internal Server Error', `Event seq ${error.seq}: integrity check failed.`));
         }
         if (isPersistenceBusy(error)) return streamUnavailable('Persistence is busy.');
+        // The distributor's log has an event without hash: nothing can be delivered reliably now (m6).
+        if (error instanceof MissingHashError) return streamUnavailable('The event log cannot be verified.');
         return problemResponse(new ApiProblem(500, 'Internal Server Error', 'Persistence is unavailable.'));
       }
       // The request timeout answered already (408): open nothing.
@@ -494,8 +497,9 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           try {
             next = frames.next();
           } catch {
+            // An event without hash in the distributor's log: every stream ends, not only this one (decision 3).
+            hub.fail();
             connection.close(endFrame('unavailable'));
-            options.notice(UNAVAILABLE_LINE);
             return;
           }
           if (next.done) break;

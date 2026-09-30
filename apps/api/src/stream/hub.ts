@@ -58,6 +58,11 @@ export interface Hub {
   head(): number;
   /** Nudge without payload (after a COMMIT with new events): schedules a reload while streams are open. */
   poke(): void;
+  /**
+   * A connection found an event without hash in the distributor's log (catch-up framing): the log is not trusted
+   * any more. Discard the projections and end every stream with `unavailable`, as on the batch path (decision 3, m6).
+   */
+  fail(): void;
 }
 
 export interface HubOptions {
@@ -281,10 +286,14 @@ export function createHub(options: HubOptions): Hub {
     states: () => states,
     head: () => lastSeq,
     poke: () => { inScope(schedule); },
+    fail: () => {
+      discard();
+      broadcast({ kind: 'unavailable' });
+    },
   };
 }
 
-class MissingHashError extends Error {
+export class MissingHashError extends Error {
   constructor() {
     super('Stream batch: an event without source hash.');
   }
