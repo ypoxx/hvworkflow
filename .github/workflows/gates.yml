@@ -19,7 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # Slice 031a (SC-10): the digest of the multi-architecture index of `postgres:16` (16.x), read from the registry
+        # mirror at mirror.gcr.io; the tag only says which line it is. Update tag comment and digest together.
+        image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
         env:
           POSTGRES_USER: hv_owner
           POSTGRES_PASSWORD: hv_owner_test
@@ -34,7 +36,7 @@ jobs:
       TEST_RUNTIME_DATABASE_URL: postgres://hv_runtime:hv_runtime_test@localhost:5432/hv_test
       HV_DB_RUNTIME_ROLE: hv_runtime
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0 # full history: both path filters and Semgrep's changed-file scan diff against it
           persist-credentials: false # nothing later pushes or otherwise needs git write credentials
@@ -43,7 +45,7 @@ jobs:
       # https://github.com/pnpm/action-setup refs/tags/v4*`); "v4" itself currently resolves to this
       # same commit, i.e. v4.3.0.
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Create separate Postgres runtime login for grant tests
@@ -155,11 +157,78 @@ jobs:
       - name: End-to-end acceptance scenario
         if: steps.docsfilter.outputs.code == 'true'
         run: pnpm --filter @hv/web e2e
-      - uses: actions/upload-artifact@v4
+      # Slice 031a: pinned to the full hash like the catalogue upload above (was `@v4`).
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: evidence
           path: |
             docs/evidence/
             apps/web/playwright-report/
+          if-no-files-found: ignore
+
+  # Slice 031a: the HTTP project of the e2e suite against the real service, Postgres and a Keycloak test realm
+  # (`scripts/e2e-http-031.mjs`). Only on a pull request; 084 will fold it into its job matrix later. The job inherits
+  # the workflow rights (`contents: read`, `pull-requests: read`) and declares none of its own. The Keycloak step of
+  # 029b stays in `gates` until the owner has made `e2e-http` a required check (spec 031a, owner question 1), so two
+  # Keycloak containers run one after the other, in two jobs. Only the four screenshots are uploaded, never a report.
+  e2e-http:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+        env:
+          POSTGRES_USER: hv_owner
+          POSTGRES_PASSWORD: hv_owner_test
+          POSTGRES_DB: hv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U hv_owner -d hv_test"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      TEST_DATABASE_URL: postgres://hv_owner:hv_owner_test@localhost:5432/hv_test
+      TEST_RUNTIME_DATABASE_URL: postgres://hv_runtime:hv_runtime_test@localhost:5432/hv_test
+      HV_DB_RUNTIME_ROLE: hv_runtime
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # the documentation filter below diffs against the full history
+          persist-credentials: false # nothing later pushes or otherwise needs git write credentials
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Same filter as in `gates`: a documentation-only commit skips everything below, the job still reports.
+      - name: Determine if only documentation changed
+        id: docsfilter
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '!docs/**'
+              - '!**/*.md'
+      - name: Create separate Postgres runtime login for grant tests
+        if: steps.docsfilter.outputs.code == 'true'
+        env:
+          PGPASSWORD: hv_owner_test
+        run: psql -h localhost -U hv_owner -d hv_test -c "CREATE ROLE hv_runtime LOGIN PASSWORD 'hv_runtime_test'"
+      - name: Install Chromium for Playwright
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 4
+        run: pnpm --filter @hv/web exec playwright install --with-deps chromium
+      # The harness creates and migrates its own database (`hv_e2e031_<hex>`), so the migration step of `gates` is not needed.
+      - name: End-to-end http project against Hono, Postgres and Keycloak
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 9
+        run: node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs
+      - name: Upload the screenshots of the http project
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-031-http
+          path: docs/evidence/031-*.png
           if-no-files-found: ignore

@@ -32,6 +32,7 @@ pnpm gates            # contract lint, typecheck, lint, unit tests, vocabulary c
 pnpm contract:types   # regenerate packages/contract/src/types.ts after editing openapi.yaml
 pnpm --filter @hv/web dev
 pnpm --filter @hv/web e2e
+pnpm e2e:http         # HTTP project against the real service, Postgres and Keycloak (CI job e2e-http); E2E_HTTP_IDP=none runs it locally without Keycloak
 ```
 
 Always use absolute paths or `...` in shell commands; the shell keeps

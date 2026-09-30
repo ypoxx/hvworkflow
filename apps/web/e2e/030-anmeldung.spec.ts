@@ -1,9 +1,8 @@
-import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import { expect, test } from './support/http-guard';
 
-// Existing demo tests run in the default build. These cases exercise the separate HTTP build.
-const nodeEnvironment = globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } };
-test.skip(nodeEnvironment.process?.env?.['HV_WEB_MODE'] !== 'http', 'HTTP build only');
+// Slice 031a: this file runs only in the `http` project (`playwright.config.ts`, testMatch), against the Vite
+// dev server in HTTP mode with `page.route` doubles and an empty state; the projects decide, not the file.
 
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
