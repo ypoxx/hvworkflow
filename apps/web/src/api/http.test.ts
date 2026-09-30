@@ -1012,6 +1012,27 @@ describe('stream client (slice 036b)', () => {
       expect(h.streams.length).toBeLessThanOrEqual(6);
     });
 
+    it.each(['403', 'reset'] as const)('%s on every open with a hide/show cycle every 2 s: at most 6 opens in 10 min', async (kind) => {
+      const h = harness({ withStore: true });
+      const readSession = vi.fn(async () => session());
+      const auth = sessionWiring(h, readSession);
+      for (let i = 0; i < 400; i++) {
+        h.streamReplies.push(kind === '403' ? refused(403) : body(RESET)());
+      }
+      await auth.start();
+      await settle();
+      for (let t = 0; t < 600_000; t += 500) {
+        if (t % 2000 === 0) h.setHidden(true);
+        if (t % 2000 === 1000) h.setHidden(false);
+        void auth.refresh().catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      console.log(`[matrix] ${kind} | hide/show every 2 s | ${h.streams.length} opens in 10 min | at ${h.streams.map((c) => c.at).join(",")}`);
+      expect(h.streams.length).toBeLessThanOrEqual(6);
+      // Codex P2: the backoff steps stay 1, 2, 4 s across hide/show; a return to the tab does not shorten them.
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 303_000, 307_000, 315_000]);
+    });
+
     it('a healthy stream still reconnects in about 1 s: with data, and after 10 s without', async () => {
       const h = harness();
       const s1 = sse();

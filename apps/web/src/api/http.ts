@@ -554,8 +554,8 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     }
     if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
     if (pausedHidden) {
+      // Codex P2: the counters stay; only a healthy stream resets them (per-tab limit, SC-06).
       pausedHidden = false;
-      attempt = 0;
       if (wanted && current === undefined) connect();
     }
   };

@@ -366,6 +366,12 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   (`onStreamEnd`, `onUnauthorized`, `onActorChange(undefined)`) · auf einen Aufruf zusammenführen.
 - 036b Nachprüfung · `scripts/e2e-http-031.test.mjs:229` · die Strukturprüfung nennt nur die H8-Namen, nicht die H13-Texte
   (der Zugriffslog-Scan selbst deckt sie über `WRITTEN_TEXTS` ab) · H13-Texte in die Prüfung aufnehmen (Datei nicht in 036b).
+- 036b Codex P2 · `apps/web/src/api/http.ts` (`onOnline`, `connection.ts`) · ein offener Strom, der offline → online
+  übersteht, bleibt in `reconnecting`, obwohl Daten ankommen (`synced` stellt `live` nicht wieder her) · `synced` bei
+  offenem Strom auf `live` führen oder bei `online` mit offenem Strom `opened` melden.
+- 036b Nachprüfung · `apps/web/src/api/http.ts` (`closeStream`, `openStream`) · nach einem Akteurwechsel oder `noRole`
+  während einer Pause zeigt die Anzeige `idle` statt `polling`, bis der behaltene Wiederholversuch fällig ist (Zeitverhalten
+  unberührt) · beim Behalten des Wiederholversuchs die Phase erneut melden.
 - 036b Bau · `apps/web/src/app/ConnectionStatus.tsx` · „Verbindung wird aufgebaut“ erscheint bei jedem Laden kurz und
   wird vom Statusbereich angesagt · `connecting` erst nach 1–2 s zeigen.
 
