@@ -10,6 +10,27 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.12] - 2026-09-30
+
+### Changed
+
+- **takt-040: wording of `streamEvents` (`GET /stream`) and of the shared `RetryAfter` header aligned with the
+  service built in Scheibe 035b.** Descriptions only; no schema, parameter, response or operation changes, so
+  under ADR 0015 (vorgeschlagen) this is a patch release. No client behaviour that 0.3.11 allowed becomes
+  invalid; the text now names what the service already does (035b, "Bauklärung" 1 and 2):
+  - `meetingId` filter: "gap-free in `seq`" holds only without a filter. With a filter a reader with `event.read`
+    receives every event of that meeting after the cursor exactly once and in ascending order, gap-free within
+    the meeting; every other reader receives `change` messages for that meeting's events only (R-PERM-04); `id`
+    stays the global `seq` (between two `event` messages, gaps are other meetings' events; for `change` readers
+    the `id`s can also skip same-meeting events they may not read or that were merged into one `change`, whose
+    `id` is the last covered `seq`); events without a meeting are not sent under a
+    filter, also not to readers with `event.read`; the head moves on through the `cursor` message (after the catch-up and with the heartbeat); the
+    catch-up limit of 1000 counts the global range.
+  - `Retry-After`: on `/stream` 30 on every `503` `StreamUnavailable` (global stream limit,
+    migrations pending, persistence busy at open) and on the stream's own `429` (too many open streams); a `429`
+    from a read quota keeps the window rule. An `end` message, including `end` `unavailable`, carries no
+    `Retry-After`; the SSE `retry` value (3000 ms) or the client's own backoff applies.
+
 ## [0.3.11] - 2026-09-30
 
 ### Changed
