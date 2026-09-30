@@ -39,8 +39,9 @@ const assignments = new Map<string, string>();
 const readers: StreamReader[] = [];
 const track = (reader: StreamReader): StreamReader => { readers.push(reader); return reader; };
 
+/** Every pool of one test carries the schema as application name: test 28 counts only its own connections. */
 function pool(connectionString: string, max = 10): Pool {
-  return new Pool({ connectionString, options: `-c search_path=${schema}`, max });
+  return new Pool({ connectionString, options: `-c search_path=${schema}`, max, application_name: schema });
 }
 
 async function bootstrap(): Promise<void> {
@@ -310,7 +311,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       if (quiet()) {
         const checkedOut = runtime.totalCount - runtime.idleCount;
         const rows = (await owner.query<{ n: string }>(`SELECT count(*) AS n FROM pg_stat_activity
-          WHERE usename = $1 AND datname = current_database() AND (state <> 'idle' OR xact_start IS NOT NULL)`, [runtimeRole])).rows;
+          WHERE usename = $1 AND application_name = $2 AND (state <> 'idle' OR xact_start IS NOT NULL)`, [runtimeRole, schema])).rows;
         // Only a sample during which no window opened or closed counts (the query itself takes time).
         if (quiet() && hooks.windows.length === startsBefore) {
           samples += 1;

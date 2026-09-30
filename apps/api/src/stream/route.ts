@@ -407,6 +407,8 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           : undefined,
         release: slot.release, limits: options.limits, clock, hub, notice: options.notice,
       });
+      // The first line of every stream, queued before anything else can be (also before an early `end` or `reset`).
+      const retryWritten = connection.write(RETRY_FRAME);
       // Handover steps 1 and 2 (Codex P1): registered as waiting and the head read in one synchronous step.
       const snapshot = hub.register(connection);
       const H = snapshot.head;
@@ -422,7 +424,7 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
       else signal.addEventListener('abort', () => connection.close(null), { once: true });
       void (async () => {
         if (options.handoverHook) await options.handoverHook().catch(() => undefined);
-        if (!await connection.write(RETRY_FRAME)) return;
+        if (!await retryWritten) return;
         if (opening.kind === 'reset') {
           connection.close(resetFrame(H));
           return;

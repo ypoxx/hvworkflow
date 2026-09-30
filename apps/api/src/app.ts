@@ -487,14 +487,25 @@ export function createApp(options: CreateAppOptions = {}): App {
     const allowedCors = cors({
       origin: (origin) => (corsAllowed.has(normalizeOrigin(origin) ?? '') ? origin : null),
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'If-Match', 'Idempotency-Key', 'X-CSRF-Token', 'Last-Event-ID', ...(demoEnabled ? ['X-Actor'] : [])],
+      allowHeaders: ['Content-Type', 'If-Match', 'Idempotency-Key', 'X-CSRF-Token', ...(demoEnabled ? ['X-Actor'] : [])],
       exposeHeaders: ['ETag', 'X-Server-Time', 'Retry-After'],
+      maxAge: 600,
+      credentials: !demoEnabled,
+    });
+    // Slice 035b (m9): `Last-Event-ID` is allowed on the stream path only, where the contract reads it.
+    const streamCors = cors({
+      origin: (origin) => (corsAllowed.has(normalizeOrigin(origin) ?? '') ? origin : null),
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Last-Event-ID', ...(demoEnabled ? ['X-Actor'] : [])],
+      exposeHeaders: ['X-Server-Time', 'Retry-After'],
       maxAge: 600,
       credentials: !demoEnabled,
     });
     const corsPolicy: MiddlewareHandler = async (c, next) => {
       const origin = c.req.header('Origin');
-      if (origin !== undefined && corsAllowed.has(normalizeOrigin(origin) ?? '')) return allowedCors(c, next);
+      if (origin !== undefined && corsAllowed.has(normalizeOrigin(origin) ?? '')) {
+        return c.req.path === '/v1/stream' ? streamCors(c, next) : allowedCors(c, next);
+      }
       if (c.req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { Vary: 'Origin' } });
       await next();
       c.header('Vary', 'Origin', { append: true });
