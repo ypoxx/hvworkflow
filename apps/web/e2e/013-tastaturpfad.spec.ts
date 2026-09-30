@@ -27,6 +27,7 @@
 import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import { liftWithKeyboard } from './support/keyboard-drag';
 import type { Locator, Page } from '@playwright/test';
 
 /** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
@@ -227,9 +228,8 @@ test('013a: Wortmeldung per Tastatur anlegen und mit Pfeiltasten umsortieren', a
   expect(focusedNumber).toBe(firstBefore);
 
   const announcer = page.locator('[role="status"][aria-live="assertive"]');
-  await page.keyboard.press('Space');
-  await expect(announcer).toContainText(`Wortmeldung ${firstBefore}`);
-  const lifted = await announcer.innerText();
+  // takt-039: the lift hands over only once dnd-kit's sensor listens for the arrow keys (`support/keyboard-drag.ts`).
+  const lifted = await liftWithKeyboard(page, announcer, firstBefore);
   await page.keyboard.press('ArrowDown');
   await expect(announcer).not.toHaveText(lifted);
   await page.keyboard.press('Space');

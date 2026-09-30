@@ -12,6 +12,7 @@ import {
 } from './support/e2e-texts';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
+import { liftWithKeyboard } from './support/keyboard-drag';
 import { asRole, expectNotBusy, expectRoleLabel } from './support/roles';
 import type { Page } from '@playwright/test';
 
@@ -74,12 +75,11 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   expect(firstBefore).not.toEqual(secondBefore);
 
   // Reordering with the keyboard: lift, move one down, drop (dnd-kit keyboard sensor). The steps
-  // wait on the announcement, which is the same signal a screen reader gets.
+  // wait on the announcement, which is the same signal a screen reader gets; the lift hands over
+  // only once the sensor listens for the arrow keys (takt-039, `support/keyboard-drag.ts`).
   const announcer = page.locator('[role="status"][aria-live="assertive"]');
   await waiting.nth(0).getByTestId('speaker-drag-handle').focus();
-  await page.keyboard.press('Space');
-  await expect(announcer).toContainText(`Wortmeldung ${firstBefore}`);
-  const lifted = await announcer.innerText();
+  const lifted = await liftWithKeyboard(page, announcer, firstBefore);
   await page.keyboard.press('ArrowDown');
   await expect(announcer).not.toHaveText(lifted);
   // A reorder raises the version of every Wortmeldung of the round. The round is locked while it is written (takt-032:

@@ -249,6 +249,31 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-033 Nachprüfung Codex P1 nit · Postgres-Tests takt-033 · pg-Warnung „Calling client.query() when the client is
   already executing a query“ (alter wie neuer Stand) · Ursache vor pg@9 klären.
 
+## Bühne und Wortmeldeliste (aus takt-039)
+
+- ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im
+  Projekt `http` ohne Wirkung („Position 6 von 7“).~~ → erledigt in **takt-039**: dnd-kit hängt den Keydown-Hörer erst
+  per `setTimeout` an (`@dnd-kit/core` 6.3.1, `core.esm.js:1158`); `liftWithKeyboard` (`e2e/support/keyboard-drag.ts`)
+  in 002, 013a und H12, Nachweis `039-tastatur-anheben.spec.ts`.
+- takt-039 Review minor 3 · `apps/web/src/features/stage/lib.test.ts:199-206` · Test (c) ist eine Tautologie
+  (`shownQuestion(null)` ist `null`); der Schutz nach Akteurwechsel (`setStage(null)` im Render, `Page.tsx`) ist damit
+  nicht geprüft · Komponenten- oder e2e-Test, der nach einem Akteurwechsel keinen Druck auf den vorigen Datensatz zulässt.
+- takt-039 Review minor 4 · `apps/web/src/features/stage/Podium.test.tsx:53-66` · der Test ruft `nextPress` direkt statt
+  des gerenderten `onClick`; dass der Knopf `nextPress` mit der gezeichneten Frage verdrahtet, prüft er nicht · Weitergabe
+  über gerenderte Props prüfen (ohne neue Testabhängigkeit) oder e2e-Zusicherung auf die Frage-ID im `POST …/delivery`.
+- takt-039 Review minor 6 · `apps/web/e2e/031-http-betriebsart.spec.ts:507` · die Vorbedingung von H12b („Ziel in der
+  unteren Hälfte“) hängt vom Korpusstand ab, den 002, 021b, 021c, H8 und H9 hinterlassen · Lage des Ziels im Test
+  herstellen (Scrollposition setzen) statt vorauszusetzen.
+- takt-039 Nachprüfung minor 7 · `apps/web/src/features/stage/Page.tsx:476-479` · nach einer Ablehnung (412/409) bleibt der
+  Rückgabedialog auf der Frage in der alten Version offen; ein erneutes Absenden scheitert wieder · Dialog schließen oder
+  „Frage hat sich geändert, bitte neu öffnen“ zeigen, nie still auffrischen.
+- takt-039 Nachprüfung nit · `apps/web/src/features/stage/lib.test.ts:242` · der Kommentar nennt `qb`, das im Test nicht
+  vorkommt · Kommentar kürzen oder `qb` als gezeichnete Frage wirklich verwenden.
+- takt-039 Nachprüfung nit (geerbt) · `apps/web/e2e/010c-lesezustand.spec.ts:95` · `expectOneToast` wartet mit
+  `waitForTimeout(300)` · auf ein Produktsignal umstellen (gebündelt mit den übrigen `waitForTimeout` der Datei).
+- takt-039 Review nit 8 · `apps/web/src/features/stage/Page.tsx:236-242` · der Kommentar zur `writing`-Bereinigung im
+  `useLayoutEffect` versprach mehr, als der Code sichert · in takt-039 entschärft (nur Kommentar); erledigt.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -289,6 +314,10 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vertrag und nimmt längere Texte an; die Domäne prüft nur Kennungen ≤ 128 und `revokeRole.reason` ≤ 500 · Kernprüfung
   derselben Grenzen in der Domäne (fachliche Abweichung ohne Sicherheitsfolge, Demo nur lokal).
   → **043**
+- ~~takt-039 Review minor 7 · **Recht/Audit** · `apps/web/src/features/stage/Page.tsx` (`returnAnswer`) · die Rückgabe
+  wirkte auf die zuletzt gezeichnete Frage statt auf die, für die der Dialog geöffnet wurde.~~
+  → erledigt in **takt-039** (Frage beim Öffnen festgehalten, `returnTargetOf`/`returnWrite` in `stage/lib.ts`, Dialog
+  nennt die Nummer; Nachweis in der Spec)
 - takt-032 R1 minor 4 · `apps/web/src/api/http.ts` setzt `lastWriteEtag()` vor dem Lesen des Rumpfs; `ClassifyDialog`
   (schreibt auf die Frage) ist beim Erfassen nicht gesperrt · Fix in `http.ts`, Sperre im Dialog.
 - takt-032 R1 minor 7 · `speakers/Page.tsx` `run` · ein Schreiben, das während eines anderen läuft, wird ohne Hinweis

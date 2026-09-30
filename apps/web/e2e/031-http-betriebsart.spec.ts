@@ -3,11 +3,13 @@
  * H1–H3 need no sign-in and run everywhere; H4–H9 carry `@idp` and need the Keycloak realm (CI only, the local mode
  * `E2E_HTTP_IDP=none` filters them out). The only `page.route` double of this suite lives in `030-anmeldung.spec.ts`.
  *
- * Nothing here changes questions or Wortmeldungen of the corpus; H8 and H9 write, and only on Wortmeldungen and a
- * Redebeitrag they create themselves. Passwords, cookies and tokens are read from state files and never printed.
+ * H8 and H9 write only on Wortmeldungen and a Redebeitrag they create themselves. H11 (takt-039) reads out the question
+ * that is on stage and so closes one question of the corpus: `abnahme` then needs one "Vorgelesen, weiter" less on its way
+ * to its own question. H12 lifts and moves a Wortmeldung and cancels with Esc, so nothing is written. Passwords, cookies
+ * and tokens are read from state files and never printed.
  */
 import { request } from '@playwright/test';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Locator, Page, Response, Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { checkAxe } from './support/axe';
@@ -16,6 +18,7 @@ import {
   NOTICE_DE, NOTICE_EN,
 } from './support/e2e-texts';
 import { expect, test } from './support/http-guard';
+import { liftWithKeyboard } from './support/keyboard-drag';
 
 // Synthetic name, distinct from H8 so that the two tests never find each other's entry.
 const H9_SPEAKER_NAME = 'Synthetische Testperson Omega';
@@ -358,3 +361,161 @@ test.describe('H10 @idp: mounting a view loads once (takt-033b)', () => {
     await page.screenshot({ path: evidence('031-h10-einhaengen-ein-abruf.png') });
   });
 });
+
+test.describe('H11 @idp: "Vorgelesen, weiter" acts while the stage is being read again (takt-039)', () => {
+  test.use({ storageState: statePath('podium') });
+
+  test('H11 @idp: a press during a running GET /v1/stage writes the drawn question and the number moves on', async ({ page }) => {
+    // The 30 s poll (`http.ts`) is driven by the installed clock, not waited for.
+    await page.clock.install();
+    const firstRead = page.waitForResponse((candidate) => candidate.request().method() === 'GET' &&
+      new URL(candidate.url()).pathname === '/v1/stage');
+    await page.goto('/stage');
+    const drawn = ((await (await firstRead).json()) as { current: { id: string; number: string } | null }).current;
+    expect(drawn, 'a question is on stage').not.toBeNull();
+    const number = page.getByTestId('stage-current-number');
+    await expect(number).toHaveText(drawn!.number, { timeout: 60_000 });
+
+    const deliveries: string[] = [];
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/delivery')) {
+        deliveries.push(new URL(request.url()).pathname);
+      }
+    });
+    // Hold the next read of the stage: the one the poll starts. Only that one; the read after the own write passes.
+    // The route is registered (awaited) before the clock moves, or the poll's read could leave unintercepted (review).
+    let hold: (route: Route) => void = () => undefined;
+    const held = new Promise<Route>((resolve) => { hold = resolve; });
+    await page.route('**/v1/stage', (route) => hold(route), { times: 1 });
+    await page.clock.fastForward('00:30');
+    const read = await held;
+
+    // Befund 1, Punkt 3: the read is on its way, the podium still shows its question and a free button.
+    await expect(number).toHaveText(drawn!.number);
+    const next = page.getByTestId('stage-next');
+    await expect(next).not.toHaveAttribute('aria-disabled', 'true');
+    await next.click();
+    await read.continue();
+    await expect(number).not.toHaveText(drawn!.number);
+    expect(deliveries, 'POST …/delivery of the drawn question').toEqual([`/v1/questions/${drawn!.id}/delivery`]);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('031-h11-buehne-waehrend-lesung.png') });
+  });
+});
+
+/** The scrolling ancestor of an element (the shell's `main`), as a box in viewport coordinates. */
+async function scrollBox(row: Locator): Promise<{ top: number; bottom: number; scrollTop: number }> {
+  return row.evaluate((element) => {
+    let box: HTMLElement | null = element.parentElement;
+    while (box !== null && !(box.scrollHeight > box.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(box).overflowY))) {
+      box = box.parentElement;
+    }
+    const scroller = box ?? document.documentElement;
+    const rect = scroller.getBoundingClientRect();
+    return { top: rect.top, bottom: Math.min(rect.bottom, window.innerHeight), scrollTop: scroller.scrollTop };
+  });
+}
+
+/** Middle of a row in viewport coordinates. */
+async function middleOf(row: Locator): Promise<number> {
+  return row.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.top + rect.height / 2;
+  });
+}
+
+/**
+ * Lift the second-to-last waiting Wortmeldung of round 3 with the space bar (as in 002) and return what is needed for one
+ * step down: the announcer, the position and count from the lift announcement, and where the target row lies. The corpus
+ * state here is the one 002, 021b, 021c, H8 and H9 leave behind, so the position is read, not assumed.
+ */
+async function liftSecondToLast(page: Page): Promise<{
+  announcer: Locator; position: number; count: number; targetMiddle: number; box: { top: number; bottom: number; scrollTop: number };
+}> {
+  await page.goto('/speakers');
+  const round = page.getByTestId('speakers-round-3');
+  await expect(round).toBeVisible({ timeout: 60_000 });
+  const waiting = round.locator('[data-testid="speaker-row"][data-status="waiting"]');
+  await expect(waiting.nth(1)).toBeVisible();
+  const total = await waiting.count();
+  const lifted = waiting.nth(total - 2);
+  const target = waiting.nth(total - 1);
+  const announcer = page.locator('[role="status"][aria-live="assertive"]');
+  const number = (await lifted.getAttribute('data-number')) ?? '';
+  await lifted.getByTestId('speaker-drag-handle').focus();
+  // The lift is announced ("angehoben, Position p von n"), and dnd-kit follows at once with the row over itself ("steht
+  // auf Position p von n"): both name the same position. The helper hands over once the sensor listens for the arrows.
+  const announced = await liftWithKeyboard(page, announcer, number);
+  const [, position, count] = announced.match(/Position (\d+) von (\d+)/) ?? [];
+  const box = await scrollBox(target);
+  return { announcer, position: Number(position), count: Number(count), targetMiddle: await middleOf(target), box };
+}
+
+test.describe('H12 @idp: moving a Wortmeldung with the keyboard (takt-039, decides the cause of 002)', () => {
+  test.use({ storageState: statePath('moderation') });
+
+  test.describe('H12a: after a refresh of the list, target in the upper half', () => {
+    // A tall window keeps the target in the upper half of the scrolling area, so that (a) sees the refresh alone and not
+    // the scroll branch of the keyboard sensor that (b) looks at (spec, Befund 2).
+    test.use({ viewport: { width: 1440, height: 2000 } });
+
+    test('H12a @idp: the 30 s poll lands between lifting and ArrowDown, the arrow still moves', async ({ page }) => {
+      await page.clock.install();
+      const { announcer, position, count, targetMiddle, box } = await liftSecondToLast(page);
+      console.log(`[H12a] lifted at ${position}/${count}; target middle ${targetMiddle.toFixed(0)}, box ${box.top.toFixed(0)}–${box.bottom.toFixed(0)}, scrollTop ${box.scrollTop}`);
+      expect(targetMiddle, 'target in the upper half of the scrolling area').toBeLessThan((box.top + box.bottom) / 2);
+
+      // The poll refreshes the list: `readStableSpeakerList` reads meeting, speakers, meeting. Its end is the answer of
+      // the meeting read that starts after the answer of the speakers read.
+      const refreshed = new Promise<Response>((resolve) => {
+        let speakersAnswered = false;
+        let closingRead: unknown = null;
+        page.on('response', (response) => {
+          const path = new URL(response.url()).pathname;
+          if (response.request().method() !== 'GET') return;
+          if (path === '/v1/speakers') speakersAnswered = true;
+          else if (path === '/v1/meeting' && response.request() === closingRead) resolve(response);
+        });
+        page.on('request', (request) => {
+          if (speakersAnswered && closingRead === null && request.method() === 'GET' &&
+            new URL(request.url()).pathname === '/v1/meeting') closingRead = request;
+        });
+      });
+      await page.clock.fastForward('00:30');
+      await (await refreshed).finished();
+
+      await page.keyboard.press('ArrowDown');
+      try {
+        await expect(announcer).toContainText(`steht auf Position ${position + 1} von ${count}`);
+      } finally {
+        const after = await scrollBox(page.getByTestId('speakers-round-3'));
+        console.log(`[H12a] after ArrowDown: scrollTop ${after.scrollTop}; announcer "${await announcer.innerText()}"`);
+      }
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: evidence('031-h12-umsortieren-nach-auffrischung.png') });
+      await page.keyboard.press('Escape');
+      await expect(announcer).toContainText('Verschieben abgebrochen');
+    });
+  });
+
+  test.describe('H12b: without a refresh, target in the lower half', () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    test('H12b @idp: ArrowDown moves to a target in the lower half of the scrolling area', async ({ page }) => {
+      const { announcer, position, count, targetMiddle, box } = await liftSecondToLast(page);
+      console.log(`[H12b] lifted at ${position}/${count}; target middle ${targetMiddle.toFixed(0)}, box ${box.top.toFixed(0)}–${box.bottom.toFixed(0)}, scrollTop ${box.scrollTop}`);
+      expect(targetMiddle, 'target in the lower half of the scrolling area').toBeGreaterThan((box.top + box.bottom) / 2);
+
+      await page.keyboard.press('ArrowDown');
+      try {
+        await expect(announcer).toContainText(`steht auf Position ${position + 1} von ${count}`);
+      } finally {
+        const after = await scrollBox(page.getByTestId('speakers-round-3'));
+        console.log(`[H12b] after ArrowDown: scrollTop ${after.scrollTop}; announcer "${await announcer.innerText()}"`);
+      }
+      await page.keyboard.press('Escape');
+      await expect(announcer).toContainText('Verschieben abgebrochen');
+    });
+  });
+});
+

@@ -2,7 +2,8 @@
  * Helpers of the podium. Deliberately tiny and local: the podium is a different device (design
  * principle 10) and must not start depending on the backlog's machinery.
  */
-import type { AnswerVersion, Question } from '@hv/domain';
+import { etagOf } from '@hv/domain';
+import type { AnswerVersion, Question, StageView } from '@hv/domain';
 
 /** Wall clock of the hall, 24 hours, zero padded — the form an approval is quoted in. */
 export function clockTime(iso: string): string {
@@ -121,4 +122,83 @@ export function readVerdict(
   return previous.actor === actorId && previous.forbidden === forbidden
     ? previous
     : { actor: actorId, forbidden };
+}
+
+/**
+ * takt-039: the question a "Vorgelesen, weiter" was written against, as it was drawn. The lock belongs to that question
+ * in that version and to nothing else: once the podium draws another question, or the same one in a newer version, it
+ * no longer holds (Befund 1, Punkt 4).
+ */
+export interface DeliverLock {
+  readonly id: string;
+  readonly version: number;
+}
+
+/** The question on stage in a drawn stage (`null` after an actor change or a read refusal, Page.tsx). */
+export function shownQuestion(stage: StageView | null): Question | null {
+  return stage?.current ?? null;
+}
+
+/** Whether `lock` still holds for the question that is drawn. */
+export function lockHolds(lock: DeliverLock | null, question: Question | null | undefined): boolean {
+  return (
+    lock !== null &&
+    question !== null &&
+    question !== undefined &&
+    lock.id === question.id &&
+    lock.version === question.version
+  );
+}
+
+/**
+ * takt-039: the one rule of "Vorgelesen, weiter". The button is drawn only where `_actions` offers the delivery (never
+ * by role, AGENTS.md rule 4), and it is locked while a delivery of that very question in that version is on its way, or
+ * while a return is written. Podium.tsx draws the button from it and `deliverTarget` (the handler of click and Space in
+ * Page.tsx) writes by it, so what looks free always writes and what does not write always looks locked (Befund 1).
+ */
+export function nextButton(
+  question: Question | null | undefined,
+  lock: DeliverLock | null,
+  returning: boolean,
+): { drawn: boolean; locked: boolean } {
+  const drawn = question?._actions.includes('question.deliver') ?? false;
+  return { drawn, locked: returning || lockHolds(lock, question) };
+}
+
+/** The question a press writes to: the drawn one, exactly when `nextButton` shows a free button, else `null`. */
+export function deliverTarget(
+  question: Question | null | undefined,
+  lock: DeliverLock | null,
+  returning: boolean,
+): Question | null {
+  const button = nextButton(question, lock, returning);
+  return button.drawn && !button.locked && question !== null && question !== undefined ? question : null;
+}
+
+/**
+ * takt-039, review minor 7 (Recht/Audit): the question a return dialog was opened for (R or the button), captured at
+ * that moment. The return is written for it alone; a question drawn later never takes its place.
+ */
+export interface ReturnTarget {
+  readonly id: string;
+  readonly version: number;
+  readonly number: string;
+}
+
+/** The target of a return dialog opened on `question`: only where `_actions` offers the return (never by role). */
+export function returnTargetOf(question: Question | null | undefined): ReturnTarget | null {
+  if (question === null || question === undefined) return null;
+  if (!question._actions.includes('question.return')) return null;
+  return { id: question.id, version: question.version, number: question.number };
+}
+
+/**
+ * The write of a return: for the captured question, with the captured version in `If-Match`. If that question has moved
+ * on meanwhile, the service refuses (412/409) and the podium shows it and reads again; nothing is retargeted.
+ */
+export function returnWrite(
+  target: ReturnTarget,
+  reason: string,
+): { questionId: string; reason: string; ifMatch: string } {
+  return { questionId: target.id, reason, ifMatch: etagOf(target.version) };
 }
