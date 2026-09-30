@@ -328,3 +328,11 @@ beide in dieser Scheibe behoben (a berührt das Erkennungssignal, deshalb nicht 
   genau eine Zählzeile „100“.
 - **b (Nit)**, das Kriterium „genau k Zeilen“ prüfte nur einen eigenen Cache des Tests. **Behoben:** `testHooks.chain`
   meldet zusätzlich `rowsRead`; der Budget-Test prüft 0 / k / alle Zeilen am Cache der App.
+
+**Nachlauf auf dem integrierten Commit `15b5a0e`** (Basis mit takt-034, takt-036 und Doku eingemergt), `pnpm gates` mit
+Postgres-Variablen, sauberer Baum, Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 1.61s
+mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 15b5a0e, tree c3e7fe394273…
+```
