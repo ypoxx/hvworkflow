@@ -107,3 +107,10 @@ Ergebnis: APPROVE, kein Blocker/Major.
 3. Minor: 031a-Spec Zeile 29 nennt noch den Entwicklungsserver. Folgeliste (außerhalb Files allowed).
 4. Nit: H1-Regex prüft `modulepreload`-Links nicht. Folgeliste (harmlos).
 
+**Nachlauf auf dem integrierten Commit `453bfdc`** (Basis mit takt-034, takt-036 und Doku eingemergt), `pnpm gates` mit
+Postgres-Variablen, sauberer Baum, Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 1.74s
+mark-test-run: wrote /home/user/wt/t035/.claude/state/last-test-run (clean tree) at commit 453bfdc, tree e79f9cc697c8…
+```
