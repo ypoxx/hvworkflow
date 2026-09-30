@@ -10,6 +10,23 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.12] - 2026-09-30
+
+### Changed
+
+- **takt-040: wording of `streamEvents` (`GET /stream`) and of the shared `RetryAfter` header aligned with the
+  service built in Scheibe 035b.** Descriptions only; no schema, parameter, response or operation changes, so
+  under ADR 0015 (vorgeschlagen) this is a patch release. No client behaviour that 0.3.11 allowed becomes
+  invalid; the text now names what the service already does (035b, "Bauklärung" 1 and 2):
+  - `meetingId` filter: "gap-free in `seq`" holds only without a filter. With a filter every event of that
+    meeting after the cursor comes exactly once and in ascending order, gap-free within the meeting; `id`
+    stays the global `seq` (gaps are other meetings' events); events without a meeting are not sent under a
+    filter, also not to readers with `event.read`; the head moves on through the heartbeat `cursor`; the
+    catch-up limit of 1000 counts the global range.
+  - `Retry-After`: on `/stream` always 30, on every `503` `StreamUnavailable` (global stream limit,
+    migrations pending, persistence busy at open) and on the stream's own `429` (too many open streams). An
+    `end` message, including `end` `unavailable`, carries no `Retry-After`.
+
 ## [0.3.11] - 2026-09-30
 
 ### Changed
