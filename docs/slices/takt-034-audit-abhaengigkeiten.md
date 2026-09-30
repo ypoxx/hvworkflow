@@ -33,4 +33,19 @@ Keine neue Ausnahme, keine Änderung an `scripts/audit-exceptions.json` (der bes
 
 ## Nachweis
 
-(folgt)
+Gates-Commit: `8412dd1` (sauberer Baum, `pnpm gates` ohne Postgres-Variablen, Exit 0; `pnpm install --frozen-lockfile` ok). fast-uri liegt nur in apps/api (ajv), nicht im Web-Bundle; daher kein Web-e2e.
+
+Wörtlicher Schluss von `pnpm gates`:
+
+```
+✓ built in 1.71s
+mark-test-run: wrote /home/user/wt/t034/.claude/state/last-test-run (clean tree) at commit 8412dd1, tree df796ab85b4b…
+```
+
+Schluss von `pnpm audit:check`:
+
+```
+pnpm audit: 1 advisory(ies) found, all at "moderate"+ covered by an unexpired exception.
+```
+
+(Die eine Ausnahme ist der bestehende js-yaml-Eintrag #1193727, unverändert.)
