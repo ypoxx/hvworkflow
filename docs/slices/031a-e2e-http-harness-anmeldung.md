@@ -191,7 +191,7 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
       ruft `apps/api/src/auth/subject-block-cli.ts` mit ausdrücklicher Umgebung `{ PATH, HV_DATABASE_URL }` und
       `stdio: 'ignore'` auf, der nächste Abruf ist 401, die Oberfläche zeigt die Anmeldeseite ohne Fachdaten;
       Screenshot `031-http-401.png`.
-    - **H7** `@idp` Person `norole`: echtes 403 mit CSRF-Token, Seite „Keine aktive Rolle“, Abmelden funktioniert.
+    - **H7** `@idp` Person `norole` (nachgetragen nach dem Bau, Code statt Annahme): der Rückruf `/auth/callback` antwortet 403 (`R-PERM-01`), es entsteht kein `hv_session`-Cookie, `/auth/me` liefert 401. Die Seite „Keine aktive Rolle“ erscheint nur, wenn eine Rolle mitten in der Sitzung entfällt (Produktfrage in der Folgeliste).
     - **H8** `@idp` Zwei Schreibende, echtes 412 über das ETag: `moderation` legt über die Oberfläche eine neue
       Wortmeldung an; die Erfassung legt zuerst deren Redebeitrag an und öffnet ihn. Beide Schreibenden nutzen **dieselbe**
       `capture`-Sitzung aus `http-setup`: die Seite und ein Request-Kontext mit deren Cookie und CSRF-Token. Der
@@ -420,6 +420,28 @@ grün, Startzeile passt, Laufzeit 2,1 min. Rot waren H6 und H8; Ursachen und Kor
 
 Lokal auf `361389f`: `CONTRACT_GATE_STRICT=1 pnpm gates` Exit 0, `node --test scripts/e2e-http-031.test.mjs` 28 bestanden, Typecheck und
 Lint (`oxlint src`, nur die vorhandenen Warnungen), `E2E_HTTP_IDP=none pnpm e2e:http` 7 bestanden.
+
+### Nachweis nach dem Review
+
+Opus-Review (bis `361389f`): kein Blocker, 2 major. Zweiter CI-Lauf `36655407629` (auf `431554e`): 19 von 20 grün, H6 und H7 grün, H8 rot
+(Suche nach dem Namen in `/v1/speakers`: die Rolle Erfassung sieht nur „Redner N“, `viewSpeaker` ohne `question.identity.reveal`).
+Korrektur und Gates-Commit `682133e` (`CONTRACT_GATE_STRICT=1 pnpm gates`, Exit 0; `node --test scripts/e2e-http-031.test.mjs` 33 bestanden;
+Typecheck grün; `E2E_HTTP_IDP=none pnpm e2e:http` 8 bestanden, davon G1 als erwarteter Fehlschlag; Port 18091 wird vor dem Start geprüft, bei
+belegtem Port bricht der Lauf mit der Stufe „port check“ ab und beendet nichts Fremdes):
+
+| Befund | Stand |
+|---|---|
+| 1 major Sicherheit, `error-context.md` mit Klartext | `outputDir` beider HTTP-Projekte im privaten Zustandsverzeichnis, `PLAYWRIGHT_NO_COPY_PROMPT=1` im Harness. Probe: die Variable verhindert den Klartext nur bei einem einfachen Fehlschlag, nicht bei einem gescheiterten `expect(...).toBeVisible()`; der Ausgabeordner im Temp-Verzeichnis ist der wirksame Schutz. Test pinnt beides |
+| 2 major Produkt | eine Zeile in `docs/folgeliste.md` („eigener Takt vor 031b“, mit Nit 12), Verweis in den Kommentaren von H6 und H8 |
+| 3 minor | H7 in Entscheidung 12 nachgetragen; Folgeliste um rohes 403-Dokument und bestehende Keycloak-SSO-Sitzung geschärft |
+| 4 minor | H8: `visibilityState` per `addInitScript` auf `hidden`, Folgeliste-Satz ersetzt |
+| 5 minor | Handler für SIGINT und SIGTERM lösen dasselbe Aufräumen aus |
+| 6 minor | Gesamtfrist 480 s, Playwright-Frist = Rest minus 30 s Reserve; Playwright als Prozessgruppe (`detached`, `process.kill(-pid)`) |
+| 7 nit | Test G1 mit `test.fail()` und 429 per `page.route`, läuft ohne IdP |
+| 8 nit | Demo-Server auf 4173 nur ohne `E2E_HTTP` |
+| 9 nit | Harness prüft den tsx-Lader und gibt sonst einen festen Satz aus (getestet) |
+| 10 | Der Abschnitt „Stand Scheibe 031a“ im Bedrohungsmodell ist Teil der Nachweisspalte der Bedrohungs-IDs dieser Spec |
+| Zusatz H8 | Kennung des Sprechers aus der Antwort der Registrierung; Status von Registrierung und Redebeitrag werden gemeldet |
 
 ## Bericht (nach Bau ausfüllen)
 
