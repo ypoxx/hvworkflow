@@ -68,3 +68,23 @@ mark-test-run: wrote /home/user/wt/t037/.claude/state/last-test-run (clean tree)
 Unit-Tests `SuggestDialog.test.tsx` zuerst rot (5 von 5, die Modellfunktionen fehlten im alten Code), dann grün (5 von 5).
 e2e Projekt `in-process`: `002-speakers-capture.spec.ts` und `abnahme.spec.ts`, 2 passed. Nachtrag (Codex P1 auf #95): Das Verhalten ist sichtbar, der Screenshot
 folgt im Abschnitt „Nachweis Screenshot“.
+
+## Nachweis Screenshot (Codex P1 auf #95)
+
+Die Warnung von `slice-scope`, dass „Files allowed“ vom Stand im einführenden Commit abweicht, ist erwartet: die
+beiden e2e-/Evidenzpfade sind nachträglich ergänzt.
+
+Gates-Commit `e72b94d`, sauberer Baum, `pnpm gates` Exit 0 (Postgres `hv_t030`). Wörtlicher Schluss:
+
+```
+✓ built in 1.78s
+mark-test-run: wrote /home/user/wt/t037/.claude/state/last-test-run (clean tree) at commit e72b94d, tree 9eed85bf0919…
+```
+
+Neuer e2e `apps/web/e2e/takt-037-vorschlagsauswahl.spec.ts` (nur Projekt `in-process`): Erfassung eines Redebeitrags mit
+vier Fragesätzen, Vorschlagsdialog, zweiten Eintrag abwählen, Auffrischung hinter dem offenen Dialog (Schreibvorgang über
+`HvApi` im Demo-Speicher per `page.evaluate`, weil der modale Dialog jede Bedienung der Seite sperrt), der zweite Eintrag
+bleibt abgewählt, Screenshot `docs/evidence/takt-037-vorschlagsauswahl.png`, erneutes Öffnen: alle angehakt.
+Rot auf altem Code (`SuggestDialog.tsx` aus dem Merge-Base `59ef4fd`): „Expected: not checked, Received: checked“ beim
+zweiten Eintrag; grün auf dem Stand dieses Zweigs. e2e `in-process`: neuer Test, `002-speakers-capture.spec.ts` und
+`abnahme.spec.ts` grün.
