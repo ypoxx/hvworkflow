@@ -94,7 +94,12 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
      **nicht** gesperrt; gesperrt heißt: in `auth_subject_blocks` aus 029b. Damit hilft die Wiederherstellung
      auch im typischen Fall, in dem das Subject der einzigen Verwaltung verloren und gesperrt ist, die Zuordnung aber
      aktiv bleibt. Die Funktion erhält die gesperrten Subjects als Parameter; die Kommandozeile liest sie in derselben
-     Transaktion. `expiresAt` ist Pflicht und liegt höchstens 14 Tage nach `now`; `reason` (1–500, keine
+     Transaktion. **Das Ziel-Subject selbst darf nicht gesperrt sein** (`adminSubjectId` in `auth_subject_blocks` →
+     Abbruch): Eine Sitzung eines gesperrten Subjects wird nie gelesen (`apps/api/src/auth/store.ts:104-107`), der
+     Notzugang wäre wirkungslos und meldete trotzdem Erfolg. `expiresAt` ist Pflicht und liegt **in der Zukunft**:
+     `now < expiresAt ≤ now + 14 Tage`. Ein Ablauf in der Vergangenheit oder genau `now` bricht ab, weil
+     `sessionActorFromEvents` eine solche Zuordnung sofort verwirft (`apps/api/src/actor.ts:104-106`) und „Recovery
+     completed.“ sonst einen wirkungslosen Zugang meldete; `reason` (1–500, keine
      Personendaten) steht in der Nutzlast. Die befristete Zuordnung ist ein Notzugang: Die Person ordnet damit eine
      reguläre Verwaltungsrolle einem anderen Subject zu (R-ADM-07) und lässt den Notzugang ablaufen. Einen anderen
      Wiederherstellungsweg gibt es nicht, insbesondere keinen über HTTP.
@@ -142,7 +147,9 @@ Administration Fragenummern je Erfassungsplatz; die Systemnummerierung spart sie
    - 409 R-ADM-01: geschlossener Jahrgang.
    - 409 **R-ADM-05**: Für jede schon vergebene Fragenummer n bleibt gleich, in welchem Kreis sie liegt (oder dass sie in
      keinem liegt). Ein neuer Kreis darf also keine vergebene Systemnummer umschließen, und ein Kreis mit vergebenen
-     Papiernummern (ab 068) darf sie nicht verlieren.
+     Papiernummern (ab 068) darf sie nicht verlieren. „Gleicher Kreis“ heißt **gleiche Kreis-`id`**, nicht nur „in
+     irgendeinem Kreis“: Wird `A[5..9]` durch `B[5..9]` ersetzt, während Nummer 7 vergeben ist, antwortet der Dienst 409
+     R-ADM-05, weil sonst die Zuordnung der Nummer zum Erfassungsplatz verloren ginge.
    - **Systemnummerierung:** Die nächste Nummer ist die kleinste Zahl n, die größer ist als die höchste vergebene Nummer
      **außerhalb** aller Kreise (0, wenn keine) und in keinem Kreis liegt. Ohne Kreise ergibt das genau die heutigen Nummern
      (Test 8). Papiernummern (068) liegen in Kreisen und verschieben die Systemfolge nicht.
@@ -290,7 +297,8 @@ Kern (`meeting040c.test.ts`):
    bricht sie ab.
 7. **Nummernkreise:** Ersetzen gelingt; 422 bei Überlappung, `from > to`, doppelter `id`; 409 R-ADM-01 auf einem
    geschlossenen Jahrgang; 409 R-ADM-05, wenn ein Kreis eine vergebene Nummer umschließt; Verschieben eines Kreises ohne
-   vergebene Nummer darin gelingt.
+   vergebene Nummer darin gelingt. **Kreiswechsel:** Mit vergebener Nummer 7 wird `A[5..9]` durch `B[5..9]` (andere `id`,
+   gleiche Grenzen) ersetzt → 409 R-ADM-05, kein Ereignis; dieselbe Ersetzung ohne vergebene Nummer im Bereich gelingt.
 8. **Nummerierung:** Mit vier vergebenen Fragen und dem Kreis 5–9 erhalten die nächsten zwei Fragen F-0010 und F-0011.
    Auf dem Seed ohne Kreise sind alle Nummern gleich wie vorher (Vergleich mit einer Referenzfolge im Test).
 9. **Rechte Nummernkreise:** nur `admin.meetings.manage`; `listMeetingCaptureRanges` für jeden angemeldeten Akteur.
@@ -300,7 +308,9 @@ Kern (`meeting040c.test.ts`):
     `expiresAt`; `recoveryEvents` bricht ab, solange eine tragfähige Verwaltungsrolle besteht, **auch wenn sie in einem
     anderen nicht geschlossenen Jahrgang liegt**; eine Zuordnung, die in weniger als 24 Stunden abläuft, zählt nicht; mit
     derselben Zuordnung, deren Subject in den übergebenen gesperrten Subjects steht, gelingt sie; bei geschlossenem Jahrgang, ohne
-    `expiresAt` und bei `expiresAt` mehr als 14 Tage nach `now`; sonst genau ein `RoleAssigned` mit Akteur `system`,
+    `expiresAt`, bei `expiresAt` in der Vergangenheit, bei `expiresAt` genau gleich `now` und bei `expiresAt` mehr als
+    14 Tage nach `now`; ebenso, wenn `adminSubjectId` selbst in den gesperrten Subjects steht (auch im Postgres-Test 13
+    über `auth_subject_blocks`, Ausgabe „Recovery refused.“); sonst genau ein `RoleAssigned` mit Akteur `system`,
     `operatorRef`, `reason` und `expiresAt`.
 10b. **Surrogate:** `title: '\uDC00'` in `createMeeting` und `label` mit einzelnem Surrogat in
     `replaceMeetingCaptureRanges` → 422, kein Ereignis.
@@ -331,6 +341,8 @@ Dienst:
 - Einmal-Prüfung im Bootstrap entfernt → Test 5 und Test 13 rot.
 - Nummerierung ohne Kreise (`base + i + 1`) → Test 8 rot.
 - R-ADM-05 entfernt → Test 7 rot.
+- R-ADM-05 prüft nur „in irgendeinem Kreis“ statt der Kreis-`id` → Test 7 (Kreiswechsel) rot.
+- Wiederherstellung nimmt `expiresAt ≤ now` an oder prüft das Ziel-Subject nicht auf Sperre → Test 10a rot.
 - Erstellerzuordnung mit der `meetingId` des Alias-Jahrgangs → Test 3 rot.
 - Wiederholungssuche für `createMeeting` auf den Alias-Jahrgang begrenzt (heutiges Verhalten) → Test 10 rot.
 - Wiederherstellung ohne Prüfung „keine tragfähige Verwaltungsrolle“ → Test 10a rot.
@@ -342,7 +354,7 @@ Dienst:
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs` (a)–(d)
    `ok`.
-2. Tests 1–14 (mit 10a–10d) grün, neun Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
+2. Tests 1–14 (mit 10a–10d) grün, elf Mutationsproben rot belegt; Wahrheitstabellen-Diff nur die neue Spalte.
 3. Ein Trockenlauf der Kommandozeile gegen die CI-Datenbank (Test 13) ist im Bericht mit Ausgabezeile belegt.
 4. `pnpm gates` (mit Postgres-Variablen wie in CI) grün, einschließlich `slice-scope` auf `claude/slice-040c-…`; Schluss der
    Ausgabe einmal im Bericht.
@@ -463,3 +475,7 @@ mit Restrisiko), N9 (Verweis auf 040a).
 **Letzte Nachprüfung (30.09.2026, zu `a1395b7`):** eingearbeitet: Wiederherstellung nur, wenn kein nicht geschlossener
 Jahrgang eine tragfähige, ungesperrte Verwaltungsrolle hat (globale Rollenauflösung, `actor.ts:108-114`, `app.ts:993-996`),
 Test 10a und Mutationsprobe; Erstellerzuordnung ohne `deputyForSubjectId` (Test 10d).
+
+**Codex-Befund zu #116 (drei P1):** eingearbeitet: Ablauf des Notzugangs streng in der Zukunft (`now < expiresAt ≤ now +
+14 Tage`), gesperrtes Ziel-Subject abgewiesen (Test 10a, Test 13), Kreiswechsel mit vergebener Nummer → 409 R-ADM-05
+(Test 7) mit Mutationsprobe.
