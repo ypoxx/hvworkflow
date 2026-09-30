@@ -3,7 +3,7 @@
 **Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung im Web ohne Hoch-Auslöser; Leitplanken §4) · **Lanes:** web-history · **Perspektive:** Betrieb (Last), UX
 **Rolle:** web-implementer; Review in frischem Kontext (Perspektive Lesezustand 010b/010c/010d und Last), Modell nur in `.claude/agents/`
 **Regeln:** AGENTS.md R2, R4 (kein Rollenname; der Reiter richtet sich nach dem 403 aus `listEvents`), R6 (nur `HvApi`), R10 (DE/EN), R12; ADR 0002
-**Depends on:** 036a (gemergt; Puffer hinter `HvApi`). Keine Abhängigkeit von 036b.
+**Depends on:** 036a (Voraussetzung: der Bau von 036a, Spec #98, ist gemergt, bevor dieser Takt gebaut wird; er liefert den Puffer `liveStore` hinter `HvApi`, auf dem Ziel 1 und Test (a2) aufbauen). Bis dahin wird dieser Takt nicht begonnen. Keine Abhängigkeit von 036b.
 **Aufgeteilt aus:** Scheibe 036 („Historie paginiert“), Entscheidung des Orchestrators vom 30.09.2026 nach dem Lesebefund zu Spec 036. Grund: eigene Lane (web-history), andere Reviewperspektive, sonst über einem Agententag.
 **Quellen-IDs:** `docs/produktplan-beta.md` §5.4/036 (Ziel „Historie paginiert“); Scheiben 010b, 010c, 010d; Register B11
 
