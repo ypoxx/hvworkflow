@@ -141,7 +141,7 @@ mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
 
 **PR-CI Lauf 36662799847 (Baucommit f0db555), Job `e2e-http`: 25 bestanden, 2 rot. Halteregel (Entscheidung 5) ausgelöst.**
 
-- `abnahme`: `stageNavMs` im Projekt `http` = 2374 ms > 1 500 ms (`answersFilterMs` im Projekt `http` = 35 ms, in Ordnung). Ursache
+- `abnahme`: `stageNavMs` im Projekt `http` = 2374 ms (Folgelauf 36664034530 auf 6f7c414: 3401,6 ms; Halteregel unverändert) > 1 500 ms (`answersFilterMs` im Projekt `http` = 35 ms, in Ordnung). Ursache
   (gemessen, Koordinator): produktseitig, der Dienst prüft die gesamte Ereigniskette je Anfrage zwei- bis dreimal, die Web-Ansicht
   liest beim Einhängen doppelt. Die Grenze bleibt unverändert, kein Timeout angehoben; die Scheibe wartet auf den Folgetakt
   takt-033 (Leistung von `/stage` im HTTP-Modus).
@@ -149,6 +149,14 @@ mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 1b1cd3b
   Neulesen liefen (412). Behoben ohne Produktänderung: der Test wartet auf PUT `/v1/speakers/order` und danach auf das
   Neulesen von Liste und Meeting (nur im Projekt `http`). Die Produktseite (frische Versionen aus der PUT-Antwort, Aktionen der
   Runde während des Umsortierens gesperrt) kommt als eigener Takt takt-032.
+
+**PR-CI Lauf 36664034530 (6f7c414):** 25 bestanden, 2 rot. `002` Zeile 192 (`afterAll` > 70, gelesen 23): Ursache produktseitig als Klasse
+"veraltete Version nach eigenem Schreiben" wie beim Umsortieren. Jede Frage hebt die Version des Redebeitrags
+(`packages/domain/src/state.ts:285-288`); die Erfassung nimmt `contribution.version` aus der Liste (`features/capture/Page.tsx:210`),
+die erst nach dem Schreiben neu gelesen wird; Karten (`/v1/questions`) und Restabdeckung (Feld des Redebeitrags, `/v1/contributions`,
+`features/capture/CoverageBar.tsx`) kommen aus zwei getrennten Neulesevorgängen, der Test las die Abdeckung nach dem Eintreffen der
+Karten. Behoben nur im Test: `afterOwnWrite` (`support/roles.ts`) wartet im Projekt `http` nach jedem Schreiben von Fragen auf
+das POST und danach auf GET `/v1/questions` und GET `/v1/contributions`. Produktfix gehört in takt-032.
 
 Reihenfolge (`playwright test --list --project=http`, mit IdP): Setup, dann 002, 021b, 021c, 030, 031, 080, abnahme (27 Tests in 8 Dateien).
 

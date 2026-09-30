@@ -79,3 +79,32 @@ export async function asRole(page: Page, role: string): Promise<void> {
   await expect(page.getByTestId('header-counter-questions')).toBeVisible({ timeout: 60_000 });
   console.log(`[timing] switch to ${role} (http, reload until the first data): ${Date.now() - started} ms`);
 }
+
+/**
+ * Own writes in the `http` project: a write raises the version of its resource, and the page takes the version for its next
+ * write from a list it re-reads after the write (takt-030). A second write, or a read of a value that another list carries,
+ * before that re-read is refused with 412 or shows the old value. So the step waits for the write and then for the given reads
+ * (GET, in this order after the write). In `in-process` the store is synchronous and nothing waits. `reads` are path names.
+ */
+export async function afterOwnWrite(
+  page: Page, act: () => Promise<void>, write: { method: string; path: RegExp }, reads: readonly string[],
+): Promise<void> {
+  if (!isHttp()) {
+    await act();
+    return;
+  }
+  const traffic: { method: string; path: string }[] = [];
+  const record = (response: { request(): { method(): string }; url(): string }): void => {
+    traffic.push({ method: response.request().method(), path: new URL(response.url()).pathname });
+  };
+  page.on('response', record);
+  try {
+    await act();
+    await expect.poll(() => {
+      const at = traffic.findIndex((entry) => entry.method === write.method && write.path.test(entry.path));
+      return at >= 0 && reads.every((path) => traffic.some((entry, index) => index > at && entry.method === 'GET' && entry.path === path));
+    }, { message: `the write ${write.method} ${write.path} and the re-read of ${reads.join(', ')}`, timeout: 15_000 }).toBe(true);
+  } finally {
+    page.off('response', record);
+  }
+}
