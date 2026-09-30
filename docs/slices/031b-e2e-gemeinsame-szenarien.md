@@ -116,7 +116,10 @@ Reset-Banner-Test (in-process) und Isolationstest H2 (http); ADR-0002-Ergänzung
 
 ## Nachweis
 
-(nach dem Bau ausfüllen)
+**Aktueller Stand (maßgeblich):** Baucommit `245bdc1` (Gates Exit 0), Review-Gates auf `12d0189` Exit 0, PR-CI Lauf
+36685779155 auf `a7d4d7f` grün mit erfüllter Halteregel (Absatz „Halteregel nach takt-030/032/033/033b/035 erfüllt“ unten).
+Die folgenden Blöcke zu `1b1cd3b`, den Läufen 36661676716, 36662799847, 36664034530 und `afterOwnWrite` sind Verlauf aus
+der Zeit vor den Produkttakten und durch den aktuellen Stand ersetzt.
 
 **Gates-Commit:** `1b1cd3b`, `pnpm gates` auf sauberem Baum. Lokal auf dem Stapel über takt-030 (PR #82, noch nicht gemergt): das
 Scheibenumfang-Tor nennt allein die takt-030-Dateien (Exit 1 dort, erwartet); alle Tore davor liefen grün, die Tore danach

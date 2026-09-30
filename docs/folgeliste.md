@@ -303,3 +303,14 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-032 Codex P2 · `apps/web/src/features/capture/Page.tsx:218` · schlägt die automatische Aktualisierung der Wortmeldeliste nach `captureContribution` fehl, hebt `status === 'error'` die Sperre `speakerLocked` auf und erlaubt ein Schreiben mit veralteter Sprecherversion (412) · Sperre bis zu einer erfolgreichen Aktualisierung halten.
 - takt-035 (Review): `docs/slices/031a-e2e-http-harness-anmeldung.md` Zeile 29 sagt noch „Vite-Entwicklungsserver“ (außerhalb Files allowed von 035); bei Gelegenheit auf „Produktions-Build hinter `vite preview`“ berichtigen.
 - takt-035 (Review): Die H1-Zusicherung „Seite ist der Build“ prüft `modulepreload`-Links nicht (harmlos: sie stehen nur im Build und zeigen auf `/assets/`).
+
+- 031b Review minor 1 · `apps/web/e2e/support/roles.ts:88-91` (`expectNotBusy`), `002-speakers-capture.spec.ts` · beweist
+  „kein Schreiben läuft“, nicht „Schreiben fertig“; `coverageOf` liest ungepollt · Produkttest, dass `data-busy` während
+  des Schreibens erscheint, oder `expect.poll` für die Abdeckung.
+- 031b Review minor 2 · `apps/web/playwright.config.ts:32-41`, `scripts/e2e-http-031.test.mjs` · die gemeinsamen Dateien
+  hängen still vom Datenbankzustand ihrer Vorgänger ab (021c braucht eine Frage in Prüfung, `abnahme` höchstens 130
+  Bühnenrunden) · Vorbedingung am Dateianfang mit klarer Fehlermeldung prüfen.
+- 031b Review minor 4 · `apps/web/e2e/support/roles.ts:62-65` · `asRole` im Projekt `in-process` akzeptiert beide
+  Sprachbezeichnungen · kein Fehler, `expectRoleLabel` deckt die Sprache ab; bei Gelegenheit vereinheitlichen.
+- 031b Review nit 6 · `apps/web/e2e/030-anmeldung.spec.ts` · baut einen eigenen Nachweispfad statt `support/evidence.ts` ·
+  vereinheitlichen.
