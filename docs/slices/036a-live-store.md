@@ -83,14 +83,29 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
    - Die Hülle ist der **einzige** Abonnent des Adapters. Die Hörer von `useApiVersion` hängen an der Hülle und laufen erst
      nach dem Ungültigmachen.
 4. **Generationen, genau definiert (m2).**
-   - Die Hülle führt eine globale Epoche `E` und je Schlüssel eine Generation `g(k)`, beide beginnen bei 0.
-   - Ungültigmachen von `k` erhöht `g(k)`; ganzes Ungültigmachen und `clear()` erhöhen `E`.
-   - Eine Anfrage merkt sich beim Start `(E, g(k))`. Ihre Antwort wird nur gepuffert, wenn beide bei Ankunft
-     unverändert sind. Der Aufrufer erhält sie immer; seine Ladeschlüssel (010c) entscheiden über die Anzeige.
+   - Die Hülle führt eine **Akteur-Epoche** `A`, eine Daten-Epoche `E` und je Schlüssel eine Generation `g(k)`, alle
+     beginnen bei 0.
+   - Ungültigmachen von `k` erhöht `g(k)`. Ganzes Ungültigmachen (eigenes Schreiben, Takt, `reset`) erhöht `E`.
+     `clear()` (Entscheidung 8: Akteurwechsel, 401, Abmelden, Stromende) erhöht `A` **und** `E`.
+   - Eine Anfrage merkt sich beim Start `(A, E, g(k))`. Ihre Antwort wird nur gepuffert, wenn alle drei bei Ankunft
+     unverändert sind.
+   - **Auslieferung (Codex P1, Sicherheit):**
+     - Hat sich nur `E` oder `g(k)` geändert, erhält der Aufrufer die Antwort (derselbe Akteur), und seine
+       Ladeschlüssel (010c) entscheiden über die Anzeige.
+     - Hat sich **`A` geändert**, wird die Antwort dem Aufrufer **nie** ausgeliefert: Das Promise bleibt unerledigt, es
+       wird weder erfüllt noch abgewiesen. Grund: Die Ladeschlüssel der Seiten vergleichen nur `getActor().id`
+       (z. B. `useSpeakers.ts`). Nach einem Wechsel von Rolle oder Fachbereich bei gleicher `id` könnten sonst geschützte
+       Felder oder `_actions` der alten Berechtigung erscheinen.
+     - Unerledigt statt abgewiesen, weil die Fehlerzweige der Seiten sonst eine Meldung zeigen würden. Die Seite lädt
+       ohnehin neu, denn `useApiVersion` zählt beim Akteurwechsel (takt-033b) und bei den übrigen Anlässen von `clear()`
+       über den Hörer-Aufruf nach `clear()`.
+     - Die Hülle hält keine Referenz auf das unerledigte Promise; es wird mit dem Aufrufer freigegeben.
    - Zwei gleichzeitige Aufrufe desselben Schlüssels in derselben Generation teilen eine Anfrage.
 5. **Eigene Schreibvorgänge (takt-030, takt-032; m1, m3).**
    - Der HTTP-Adapter meldet jeden Schreibausgang über einen neuen Haken `onWriteSettled(outcome)` mit
-     `outcome ∈ success | server_error | local_reject`. Das ist die einzige Änderung an `http.ts` in 036a. Den
+     `outcome ∈ success | server_error | local_reject`. Er wird in `write` gerufen und zusätzlich im lokalen
+     Abweisungszweig von `updateSpeaker` (Eingabe mit `reason`, abgewiesen vor `write`; Codex P2). Das sind die einzigen
+     Änderungen an `http.ts` in 036a. Den
      Demo-Adapter beobachtet die Hülle direkt: Erfolg → `success`, `ApiProblem` des Kerns → `server_error`.
    - **`success`:** synchron `E` erhöhen (ganzer Puffer ungültig) und die Hörer **sofort** rufen, ohne 100-ms-Stapel
      (m1). Die Reihenfolge aus takt-030 bleibt: Erst ist `writeEtag` gesetzt, dann ungültig, dann Hörer. Den doppelten
@@ -140,7 +155,8 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
 
 - `docs/slices/036a-live-store.md`
 - `apps/web/src/api/liveStore.ts` (neu), `apps/web/src/api/liveStore.test.ts` (neu)
-- `apps/web/src/api/http.ts` (nur Haken `onWriteSettled` in `write` und die Option dafür)
+- `apps/web/src/api/http.ts` (nur Haken `onWriteSettled` in `write`, im lokalen Abweisungszweig von `updateSpeaker` und
+  die Option dafür)
 - `apps/web/src/api/http.test.ts` (nur Tests zum Haken)
 - `apps/web/src/api/index.ts` (nur: Hülle über beide Adapter, Verdrahtung von `onWriteSettled`, `clear()` bei
   Akteurwechsel, 401, Abmelden; Uhr als Option)
@@ -187,6 +203,11 @@ außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht als erla
    - (j) Akteurwechsel, 401, Abmelden → Puffer leer, laufende Antworten des alten Akteurs nicht gepuffert;
    - (j2) (N2) Akteur A puffert `listQuestions`; A′ mit gleicher `id`, anderer Rolle oder anderem `unitId`, **ohne**
      vorheriges `clear()` → Anfrage geht ins Netz, der Eintrag von A wird nie ausgeliefert;
+   - (j2b) (Codex P1) laufende Anfrage `listQuestions` von Akteur A; dann Wechsel auf A′ (gleiche `id`, andere Rolle),
+     `clear()`; dann trifft die Antwort ein → das Promise des Aufrufers bleibt unerledigt (nach Durchlauf aller
+     Mikrotasks und gefälschter Timer weder erfüllt noch abgewiesen), die Antwort wird nicht gepuffert, und der nächste
+     Aufruf `listQuestions` geht ins Netz. Gegenprobe: dieselbe Lage mit nur erhöhtem `E` (eigenes Schreiben) → der
+     Aufrufer erhält die Antwort;
    - (j3) (N2) `clear()` mit Grund `roles_changed`, `forbidden` bzw. `session` → Puffer leer, laufende Antworten nicht
      gepuffert;
    - (k) Obergrenze 200 Einträge;
