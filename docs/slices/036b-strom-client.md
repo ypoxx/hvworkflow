@@ -55,6 +55,9 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
    - `end {rotate}` → sofort neu mit `Last-Event-ID`.
    - `end {roles_changed | forbidden | session}` → `liveStore.clear()` (036a Entscheidung 8), danach `sessionAuth` neu
      prüfen (`/auth/me`, Weg aus 030/takt-023). Neu verbinden nur, wenn die Sitzung wieder bestätigt ist.
+   - **403 beim Öffnen** (auch beim Wiederöffnen nach verborgenem Tab oder nach Rotation) → wie `end {forbidden}`:
+     `liveStore.clear()`, `sessionAuth.refresh()`, kein Neuaufbau ohne neue Bestätigung der Sitzung. Sonst würden nach
+     einem Rollenentzug bei geschlossenem Strom gepufferte Entwürfe, Claims und `_actions` weiter ausgeliefert.
    - `end {unavailable}` und 503 → Rückfall, Neuaufbau nach `Retry-After`.
    - 429 → dieser Tab bleibt beim Rückfall und versucht es nach `Retry-After` erneut.
    - **401 (m4)** → `onUnauthorized` wie jede Anfrage; **kein** Neuaufbau, bis `onActorChange(actor)` die Sitzung erneut
@@ -120,8 +123,10 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
 3. **Rollen für H11 (N6):** Welche Rollen sehen die Wortmeldeliste laut `featureRegistry.ts`? moderation meldet an und
    ruft auf. Für Kontext A muss eine zweite Rolle mit `speaker.read` die Wortmeldeliste öffnen können, sonst wählt der
    Test für A die Erfassung, die `listSpeakers` liest. Dann melden und die Spec anpassen, nicht still ausweichen.
-4. Setzt `onActorChange(actor)` bei jedem stillen Auffrischen ein neues Objekt (takt-033b)? Das Öffnen des Stroms muss
-   dann an `actorChanged` hängen, nicht an der Objektidentität.
+4. Setzt `onActorChange(actor)` bei jedem stillen Auffrischen ein neues Objekt (takt-033b)? Das Öffnen hängt nicht an
+   der Objektidentität und auch nicht allein an `actorChanged`. Ist ein offener Strom vorhanden, bleibt er. Nach einem
+   Stromende (`end`, 403) öffnet der Client nach **jedem** erfolgreichen `/auth/me` neu, auch wenn der Akteur strukturell
+   gleich ist. Sonst öffnete ein `roles_changed` mit strukturell gleichem Akteur nie wieder.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -140,6 +145,9 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
    - `end {roles_changed}`, `forbidden`, `session` → `clear()`, Sitzung neu lesen, Neuaufbau erst nach Bestätigung;
    - 429 → Takt aktiv, erneuter Versuch nach `Retry-After`;
    - 401 → `onUnauthorized`, kein Neuaufbau ohne neue Bestätigung (m4);
+   - **Wiederöffnen nach verborgenem Tab antwortet 403** → Puffer leer, `/auth/me` wird gerufen, kein weiteres Öffnen
+     ohne neue Bestätigung;
+   - nach `end {roles_changed}` und erfolgreichem `/auth/me` mit strukturell gleichem Akteur → Strom öffnet neu;
    - 45 s ohne Heartbeat → Verwerfen und `reconnecting` (m4);
    - drei kurzlebige Ströme → 5 min `polling` (m8);
    - der Takt ruht bei offenem Strom;
@@ -196,7 +204,7 @@ Perspektive(n): Security, Betrieb, UX · Nachweise: Tests 1–6, Netztrace · Of
 ## Wirkung und Risiko
 
 - **Invarianten.**
-  1. Nach `end {session | forbidden | roles_changed}` und nach 401 liefert der Puffer nichts mehr aus, und ohne erneute
+  1. Nach `end {session | forbidden | roles_changed}`, nach 403 beim Öffnen und nach 401 liefert der Puffer nichts mehr aus, und ohne erneute
      Bestätigung der Sitzung gibt es keinen Neuaufbau.
   2. Nie mehr als ein Strom je sichtbarem Tab.
   3. Ohne Strom gilt der heutige Stand (30-s-Takt).
@@ -206,6 +214,11 @@ Perspektive(n): Security, Betrieb, UX · Nachweise: Tests 1–6, Netztrace · Of
 - **MF-SC-2 (T-G1-D-03), Wiederverbindungssturm.** Nach einem Ausfall versuchen alle Clients gleichzeitig den Neuaufbau.
   Abwehr: Rückzug mit Zufallsanteil bis 30 s, 429/503 mit `Retry-After`, 5 min `polling` bei kurzlebigen Strömen.
   Erkennung: 429/503 im Zugriffslog.
+- **Bekanntes Restrisiko: Wettlauf beim ersten Öffnen.** Ein GET, der nach dem Senden der Stromanfrage abgeschickt wird,
+  kann aus einem älteren Snapshot stammen als der Kopf der ersten `cursor`-Nachricht, etwa wegen eines anderen
+  Dienstprozesses oder einer langsameren Lesetransaktion. Der Puffer behält ihn dann bis zum nächsten passenden Thema
+  oder bis zum 30-s-Takt, falls der Strom ausfällt. Hingenommen: Das Fenster ist kurz, und die nächste Änderung des
+  Themas korrigiert es. Kein Leck, nur mögliche kurze Veraltung.
 - **Fehlerfall: Strom hängt ohne Fehler** (puffernder Proxy, Eigentümerfrage 3 in 035b): Wächter nach 45 s, dann
   Rückfall.
 - **Last.** Je Änderung nur betroffene Schlüssel (Netztrace H11); Messung unter Last in 071.

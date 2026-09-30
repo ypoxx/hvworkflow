@@ -91,7 +91,7 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
 5. **Eigene Schreibvorgänge (takt-030, takt-032; m1, m3).**
    - Der HTTP-Adapter meldet jeden Schreibausgang über einen neuen Haken `onWriteSettled(outcome)` mit
      `outcome ∈ success | server_error | local_reject`. Das ist die einzige Änderung an `http.ts` in 036a. Den
-     Demo-Adapter beobachtet die Hülle direkt: Erfolg oder `ApiProblem` des Kerns zählt als `server_error`.
+     Demo-Adapter beobachtet die Hülle direkt: Erfolg → `success`, `ApiProblem` des Kerns → `server_error`.
    - **`success`:** synchron `E` erhöhen (ganzer Puffer ungültig) und die Hörer **sofort** rufen, ohne 100-ms-Stapel
      (m1). Die Reihenfolge aus takt-030 bleibt: Erst ist `writeEtag` gesetzt, dann ungültig, dann Hörer. Den doppelten
      Hörer-Aufruf aus `write` (takt-030) fasst die Hülle zu einem zusammen.

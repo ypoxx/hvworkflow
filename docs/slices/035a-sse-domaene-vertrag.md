@@ -117,9 +117,12 @@ Nachrichten.
      - Leser mit `event.read`: alle Ereignisse als `event` (035b schreibt sie).
      - Übrige: Gegenstände werden **nur** mit `can(a, …, q_now)` bzw. `isOnStage(q_now)` geprüft (M3). Ist der Leser für
        `questions` oder `stage` **gegenstandsgebunden** und liegt ein Ereignis aus `SCOPE_EXIT_EVENTS` im Bereich, lautet
-       das Ergebnis `reset` statt Nachlauf. Gegenstandsgebunden heißt, bestimmt über `can()` auf Daten statt über die Art
-       des Umfangs: Der Leser hält das Thema, und im aktuellen Zustand gibt es eine Frage, für die `can()` ihm die
-       Lesung verweigert. Sonst eine `change`-Nachricht mit `replay: true`, `id` = Kopf, Themen als Vereinigung wie
+       das Ergebnis `reset` statt Nachlauf. Für `questions` heißt gegenstandsgebunden, bestimmt über `can()` auf Daten
+       statt über die Art des Umfangs: Der Leser hält das Thema, und im aktuellen Zustand gibt es eine Frage, für die
+       `can()` ihm die Lesung verweigert. **Für `stage` gilt jeder Leser mit `stage.read` als gegenstandsgebunden**
+       (Entscheidung des Orchestrators, Nachprüfung 30.09.2026, Option a): Die Bühne ist über `isOnStage` immer an den
+       Gegenstand gebunden, `can(a, 'stage.read')` prüft aber nicht je Frage. Für ihn führt jedes Ereignis aus
+       `SCOPE_EXIT_EVENTS` **oder** `QuestionStaged` im Bereich zu `reset`. Sonst eine `change`-Nachricht mit `replay: true`, `id` = Kopf, Themen als Vereinigung wie
        live, `subjects` aus den jetzt lesbaren Gegenständen (höchstens 100).
    - **Akteur je Jahrgang:**
      - `resolveMeetingActor(state, current, now)`: die bisherige Closure `actor()`, ausgelagert, gleiches Verhalten.
@@ -224,7 +227,11 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 8. **In-Process-`subscribe`:** `change` entspricht für jede Rolle der Funktion. Ein Rollenwechsel im Umschalter wirkt ab
    der nächsten Zustellung. Wirft `actor()`, gibt es `[]` ohne `change`, und ein zweiter Hörer wird trotzdem
    benachrichtigt (m6). Bestehende `subscribe`-Tests bleiben grün.
-9. **Nachlauf (M3):** (a) podium, Bereich mit `QuestionDelivered` → `reset`; (b) expert, Bereich mit `QuestionAssigned`
+9. **Nachlauf (M3):** (a) podium, Bereich mit `QuestionDelivered` → `reset`, ebenso mit `QuestionStaged`; Bereich nur
+   mit `QuestionClassified` → kein `reset` (höchstens `meeting`); (a2) moderation bzw. approver (`stage.read` und
+   `question.read`): Bereich mit `QuestionStaged` oder `QuestionDelivered` → `reset`, obwohl die Frage jetzt über
+   `questions` lesbar ist; Bereich nur mit `QuestionClassified` → `change` mit `replay: true`, Themen `questions` ohne
+   `stage`; (b) expert, Bereich mit `QuestionAssigned`
    einer Frage aus seinem Fachbereich in einen anderen → `reset`; (c) capture (nicht gegenstandsgebunden) über denselben
    Bereich → `change` mit `replay: true`; (d) observer, Bereich nur mit Entwurfsereignissen und ohne
    `SCOPE_EXIT_EVENTS` → höchstens `meeting` ohne Kennung.

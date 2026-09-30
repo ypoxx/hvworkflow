@@ -43,6 +43,8 @@ Datenbankverbindung.
    Body-Limit, Akteur, Subject-Limits) → `validateOperation('streamEvents')` → dieselben Vorprüfungen wie
    `postgresBoundary` ohne Transaktion (Migrationsstand offen → 503 `StreamUnavailable`, `assertRuntimePrivileges`) →
    Platz reservieren (Entscheidung 7) → erste Auflösung aus der Projektion des Verteilers → 200.
+   - **Frische beim Öffnen:** Liegt das letzte Nachladen des Verteilers mehr als 1 s zurück (oder hat er noch nie
+     geladen), lädt er vor der ersten Auflösung frisch nach. Sonst bekäme eine gerade zugeordnete Rolle ein falsches 403.
    - Die Route nutzt weder `postgresBoundary` noch den `domain`-Proxy.
    - Das Sitzungstoken liegt nur in der Closure der Route. Es wird nie geloggt, nie in einem Fehler weitergegeben und nie
      an den Verteiler übergeben (SP-5).
@@ -189,61 +191,70 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
 ## Tests zuerst (rot, dann grün)
 
 Die Tests ohne Postgres laufen auf In-Memory-Persistenz mit Test-`authStore` und Demo-Header; Zeitgeber per Option oder
-Fake-Timer, Uhr injiziert. Offene Ströme liest `stream-reader035.ts`. Die Nummern 9–26 sind die Diensttests dieser
+Fake-Timer, Uhr injiziert. Offene Ströme liest `stream-reader035.ts`. Die Nummern 12–29 sind die Diensttests dieser
 Spec; ein Verweis auf einen Domänentest heißt immer ausdrücklich „035a Test n“. `req()` nur für Antworten, die enden (Fehlerfälle,
 m5).
 
 **Ohne Postgres** (`stream035.test.ts`):
 
-9. Öffnen: 200, Kopf aus Entscheidung 7, erste Zeile `retry: 3000`, Heartbeat nach 15 s. Fehlerfälle: ohne Sitzung 401;
+12. Öffnen: 200, Kopf aus Entscheidung 7, erste Zeile `retry: 3000`, Heartbeat nach 15 s. Fehlerfälle: ohne Sitzung 401;
    ohne aktive Rolle 403 R-PERM-01; `Last-Event-ID: abc` 422; `Last-Event-ID` über dem Maximum 422; unbekanntes
    `meetingId` 404; Migrationen offen → 503 `StreamUnavailable` mit `Retry-After` (m7); Preflight mit `Last-Event-ID`
    aus erlaubter Herkunft → erlaubt (m9).
-10. **Trennen und wieder verbinden, keine Lücke:** admin empfängt `1…k`, trennt, Schreibvorgänge folgen, neu mit
+13. **Trennen und wieder verbinden, keine Lücke:** admin empfängt `1…k`, trennt, Schreibvorgänge folgen, neu mit
     `Last-Event-ID: k` → genau `k+1…m`, ohne Doppel. Dasselbe mit `after`. Mit beiden gewinnt `Last-Event-ID`. Admin
     erhält auch Ereignisse eines Jahrgangs ohne eigene Zuordnung (M5).
-11. Nicht-admin nach Trennung: `change` mit `replay: true` bzw. `reset` nach 035a Test 9. **podium** trennt, eine Frage
-    wird vorgelesen, neu verbinden → `reset`. **expert** trennt, eine Frage wird aus seinem Fachbereich wegverteilt, neu
-    verbinden → `reset` (M3).
-12. Cursor > Kopf → `reset` ohne `id`; Abstand > 1000 → `reset`; danach geschlossen.
-13. **Rollenentzug während des offenen Stroms:** `RoleRevoked` → `end {forbidden}`, keine Nachricht aus dem Stapel.
+14. Nicht-admin nach Trennung: `change` mit `replay: true` bzw. `reset` nach 035a Test 9. **podium** trennt, eine Frage
+    wird vorgelesen oder auf die Bühne gestellt, neu verbinden → `reset` (jeder Leser mit `stage.read` gilt für `stage`
+    als gegenstandsgebunden, 035a). **moderation** trennt, eine Frage wird auf die Bühne gestellt, neu verbinden →
+    `reset`; nur eine Einordnung im Bereich → `change` mit `replay: true`. **expert** trennt, eine Frage wird aus seinem
+    Fachbereich wegverteilt, neu verbinden → `reset` (M3).
+15. Cursor > Kopf → `reset` ohne `id`; Abstand > 1000 → `reset`; danach geschlossen.
+16. **Rollenentzug während des offenen Stroms:** `RoleRevoked` → `end {forbidden}`, keine Nachricht aus dem Stapel.
     Einengung → `end {roles_changed}`. **`RoleAssigned` in einem zweiten Jahrgang → `end {roles_changed}`** (M4). Ablauf
     nach injizierter Uhr → `end {forbidden}` beim nächsten Heartbeat.
-14. **Sitzung:** Abmelden, Subject-Sperre, Leerlaufablauf → `end {session}` vor der nächsten Zustellung. `readSession`
+17. **Sitzung:** Abmelden, Subject-Sperre, Leerlaufablauf → `end {session}` vor der nächsten Zustellung. `readSession`
     nur mit `slideIdle = false` (Spy). Drei Ströme derselben Sitzung, ein Stapel → genau **eine** Sitzungsprüfung (M6).
     Prüfung wirft → `end {unavailable}`.
-15. **Obergrenzen:** vierter Strom derselben Sitzung → 429 mit `Retry-After`; siebter Strom desselben Subjects über drei
+18. **Obergrenzen:** vierter Strom derselben Sitzung → 429 mit `Retry-After`; siebter Strom desselben Subjects über drei
     Sitzungen → 429. Globale Grenze (gesenkt auf 2) → 503 `StreamUnavailable`. **Paralleles Öffnen (m4):** 10 gleichzeitige
     Öffnungen derselben Sitzung → genau 3 × 200, 7 × 429. Nach Abbruch ist der Platz sofort frei; nach einem Fehler vor
     200 ist kein Platz belegt.
-16. Lebensdauer (gesenkt) → `end {rotate}`.
-17. **Gegendruck (M8):** Nachlauf von 1000 Ereignissen an einen langsamen Leser (liest in Stücken mit Pausen) wird
+19. Lebensdauer (gesenkt) → `end {rotate}`.
+20. **Gegendruck (M8):** Nachlauf von 1000 Ereignissen an einen langsamen Leser (liest in Stücken mit Pausen) wird
     vollständig und lückenlos zugestellt, ohne Abbruch. Live-Rückstau über der Grenze: `change`-Nachrichten werden
     zusammengeführt; erst bei Überschreiten mit `event`-Nachrichten schließt die Verbindung.
-18. **Zugriffslog:** ein Strom mit 50 Nachrichten → genau eine Zeile, `operationId` `streamEvents`, ohne Inhalt, Thema,
+21. **Zugriffslog:** ein Strom mit 50 Nachrichten → genau eine Zeile, `operationId` `streamEvents`, ohne Inhalt, Thema,
     Kennung oder Token.
-19. Jahrgangsfilter: nur Ereignisse des Jahrgangs, `id` global.
-20. Ereignis ohne Hash im Stapel (Test-Persistenz) → `end {unavailable}` (m6). Auslöser `store.subscribe` erledigt keine
+22. Jahrgangsfilter: nur Ereignisse des Jahrgangs, `id` global.
+23. Ereignis ohne Hash im Stapel (Test-Persistenz) → `end {unavailable}` (m6). Auslöser `store.subscribe` erledigt keine
     Arbeit synchron (Spy: kein Aufruf von `visibleMessages` im Hörer; m8).
+23a. **Frische beim Öffnen:** `RoleAssigned` festgeschrieben, das letzte Nachladen des Verteilers liegt länger als 1 s
+    zurück, sofortiges Öffnen → 200, kein 403.
+23b. **Kontinuität ohne Postgres (B1):** In-Memory-Test-Persistenz, deren geprüftes Log beim nächsten Nachladen gekürzt
+    bzw. durch eine gültige andere Kette ersetzt ist → `reset` an alle Ströme, Neuaufbau ab dem neuen Kopf.
+23c. **„stream lifetime < SESSION_IDLE_MS“ (M7):** Die feste Lebensdauer (25 min) liegt unter `SESSION_IDLE_MS` aus
+    `apps/api/src/auth/sessions.ts` (Test gegen die beiden Konstanten). So verlängert die Rotation eine offene Sitzung,
+    bevor ihr Leerlauffenster abläuft.
 
 **Mit Postgres** (`postgres-stream035.test.ts`, eigene DB je Lauf):
 
-21. Schreiben über eine **zweite** App-Instanz → Zustellung auf dem Strom der ersten innerhalb von 2 s; über dieselbe
+24. Schreiben über eine **zweite** App-Instanz → Zustellung auf dem Strom der ersten innerhalb von 2 s; über dieselbe
     Instanz innerhalb von 500 ms.
-22. **Manipulation bei offenem Strom** (alte Zeile per Owner-Verbindung geändert) → `end {unavailable}` auf allen
+25. **Manipulation bei offenem Strom** (alte Zeile per Owner-Verbindung geändert) → `end {unavailable}` auf allen
     Strömen; ein neues Öffnen → 500 ohne Inhalt.
-22b. **Kette ersetzt, zuerst von einer Fachanfrage gesehen (B1):** Owner-Verbindung ersetzt das Log durch eine gültige
+25b. **Kette ersetzt, zuerst von einer Fachanfrage gesehen (B1):** Owner-Verbindung ersetzt das Log durch eine gültige
     andere Kette. Eine Fachanfrage derselben App lädt zuerst (Cache ersetzt, `historyChanged` dort verbraucht), danach
     lädt der Verteiler → alle Ströme `reset`. Kein Ereignis der neuen Kette wird als Fortsetzung zugestellt.
-22c. **Log gekürzt, zuerst von einer Fachanfrage gesehen (B1):** wie 22b mit gekürztem Log → `reset`; nach Neuaufbau
+25c. **Log gekürzt, zuerst von einer Fachanfrage gesehen (B1):** wie 25b mit gekürztem Log → `reset`; nach Neuaufbau
     stellt der Verteiler neue Ereignisse ab dem neuen Kopf zu.
-23. `RoleRevoked` über die zweite Instanz → `end {forbidden}` auf der ersten.
-24. Subject-Sperre über die zweite Instanz → `end {session}` spätestens beim nächsten Heartbeat oder vor der nächsten
+26. `RoleRevoked` über die zweite Instanz → `end {forbidden}` auf der ersten.
+27. Subject-Sperre über die zweite Instanz → `end {session}` spätestens beim nächsten Heartbeat oder vor der nächsten
     Zustellung.
-25. **Keine gehaltene Verbindung:** Mit 10 ruhenden Strömen ist **außerhalb** der Nachlade- und Prüffenster (per
+28. **Keine gehaltene Verbindung:** Mit 10 ruhenden Strömen ist **außerhalb** der Nachlade- und Prüffenster (per
     Test-Haken markiert) keine Pool-Verbindung ausgecheckt und keine Transaktion der Laufzeitrolle offen
     (`pg_stat_activity`). Gemessen wird nur zwischen den Fenstern (M6).
-26. **Last (M6):** 200 offene Ströme (20 Sitzungen, Heartbeat gesenkt) und parallel 20 Schreibvorgänge → alle
+29. **Last (M6):** 200 offene Ströme (20 Sitzungen, Heartbeat gesenkt) und parallel 20 Schreibvorgänge → alle
     Schreibvorgänge 2xx innerhalb des Budgets aus 034a, **kein** 503 `PersistenceBusy`, höchstens 2 gleichzeitige
     Verbindungen für Sitzungsprüfungen (Test-Haken), alle Ströme erhalten die Ereignisse.
 
@@ -251,7 +262,7 @@ m5).
 
 ## Akzeptanzkriterium
 
-1. Tests 9–26 und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
+1. Tests 12–29 (mit 23a–23c) und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
    Abdeckungstor grün.
 2. Bedrohungsmodell T-G1-I-09, T-G1-S-02 (Stromteil), T-G1-D-03, T-G3-I-01 mit Stand und Testnamen; ADR-0014-Ergänzung vom
    Architekten vor dem Merge.
@@ -261,15 +272,15 @@ m5).
 
 ## Nachweise
 
-Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 9–26; gemessene Zustellzeiten (Test 21); Messwerte aus
-Test 26 (Schreiblatenzen, Verbindungen); Rohstromausschnitte aus Test 10 (Lückenlosigkeit) und 22b (`reset`). Kein
+Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 12–29; gemessene Zustellzeiten (Test 24); Messwerte aus
+Test 29 (Schreiblatenzen, Verbindungen); Rohstromausschnitte aus Test 13 (Lückenlosigkeit) und 25b (`reset`). Kein
 Screenshot: keine Oberfläche.
 
 ## Qualitätswirkung
 
 Reifestufe: pilot · Risikoklasse: hoch
 Ausgelöst: [x] Rolle, Recht, Identität (Sitzungsentzug im Strom) [x] Persistenz, Nebenläufigkeit (Verteiler, Kette) [x] Betrieb (lange Verbindungen, Grenzen) [x] vertrauliche Daten (SG1, SG2)
-Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 9–26 · Offene Entscheidung: Eigentümerfragen 1–3; E33
+Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Offene Entscheidung: Eigentümerfragen 1–3; E33
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
 
@@ -309,12 +320,12 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 9–26 · Offe
 |---|---|
 | SC-01 | ja: Route hinter Actor-Port, `validateOperation` und R-PERM-04 (`can()` im Kern); Kontext aus der Projektion, nie vom Client; kein Rollenname |
 | SC-02 | ja: keine neue Aktion; Sichtbarkeitstabelle aus 035a unverändert angewandt |
-| SC-03 | ja: nur Nachrichten nach 035a; `reset` und `end` ohne `id` und ohne Inhalt; Tests 10–13, 18 |
+| SC-03 | ja: nur Nachrichten nach 035a; `reset` und `end` ohne `id` und ohne Inhalt; Tests 13–16, 21 |
 | SC-04 | ja: Nachlauf 1000, Grenzen je Sitzung, Subject und Prozess, Rate-Limit auf das Öffnen |
-| SC-05 | ja: Sitzungsentzug, Sperre, Rollenentzug beenden den Strom (Tests 13, 14, 23, 24); kein Geheimnis im Diff |
+| SC-05 | ja: Sitzungsentzug, Sperre, Rollenentzug beenden den Strom (Tests 16, 17, 26, 27); kein Geheimnis im Diff |
 | SC-06 | ja: MF-SSE-2 bis MF-SSE-5 mit Erkennung |
 | SC-07 | ja: nur lesend; Zeit aus der injizierten Uhr (Ablauf, Rotation) |
-| SC-08 | ja: nur SELECT in kurzen Lesetransaktionen, keine Verbindung über die Stromdauer (Test 25) |
+| SC-08 | ja: nur SELECT in kurzen Lesetransaktionen, keine Verbindung über die Stromdauer (Test 28) |
 | SC-09 | nicht anwendbar (kein Nachbarsystem); T-G3-I-01 über denselben Filter |
 | SC-10 | ja: keine neue Abhängigkeit (`hono/streaming` gehört zu Hono) |
 | SC-11 | ja: eine Zugriffslogzeile ohne Inhalt, stderr mit fester Zeile |
@@ -322,9 +333,9 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 9–26 · Offe
 | SP-2 | ja: Grenzen aus Entscheidung 7, Gegendruck, Speicher je Verbindung begrenzt, Merker der Sitzungsprüfung mit Ablauf 1 s |
 | SP-3 | ja: Cookie, CSRF (nur lesend, keine Schreibroute), Leerlauf (`slideIdle = false` beim Zustellen), 401 unverändert |
 | SP-4 | nicht anwendbar (kein HTML); `Cache-Control: no-store, no-transform` |
-| SP-5 | ja: kein Geheimnis im Diff; das Sitzungstoken lebt nur in der Closure der Route, wird nie geloggt, nie in Fehlern oder Nachrichten weitergegeben, nie an den Verteiler übergeben (Test 18 prüft das Log) |
+| SP-5 | ja: kein Geheimnis im Diff; das Sitzungstoken lebt nur in der Closure der Route, wird nie geloggt, nie in Fehlern oder Nachrichten weitergegeben, nie an den Verteiler übergeben (Test 21 prüft das Log) |
 | SP-6 | ja: T-G1-I-09 (b, c), T-G1-S-02, T-G1-D-03, T-G3-I-01 mit Tests |
-| SP-7 | ja: Sperrliste wirkt auf offene Ströme vor der nächsten Zustellung (Tests 14, 24) und bei Wiederaufnahme (Öffnen prüft die Sitzung) |
+| SP-7 | ja: Sperrliste wirkt auf offene Ströme vor der nächsten Zustellung (Tests 17, 27) und bei Wiederaufnahme (Öffnen prüft die Sitzung) |
 
 ## Offene Eigentümerfragen
 
@@ -344,7 +355,7 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 9–26 · Offe
 ```
 Slice: 035b-sse-dienst
 Done: <drei Zeilen>
-Evidence: Baucommit <sha>; Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 9–26; Zustellzeiten; Lastwerte
+Evidence: Baucommit <sha>; Schluss von `pnpm gates` mit Postgres-Variablen; Testnamen 12–29; Zustellzeiten; Lastwerte
 Open: Eigentümerfragen 1–3; Lasttest 071
 Touched: <Dateiliste>
 ```
@@ -352,6 +363,6 @@ Touched: <Dateiliste>
 ## Review findings
 
 Lesebefund zu Spec 035 (Opus, frischer Kontext, `9f2560c`): nicht baureif. In dieser Fassung eingearbeitet: B1
-(Entscheidung 3, Tests 22b/22c), M4 (Entscheidung 4, Test 13), M5 (a) (Entscheidung 5, Test 10), M6 (Entscheidung 4,
-Tests 14, 25, 26), M7 (Entscheidung 7, Eigentümerfrage 1), M8 (Entscheidung 5, Test 17), m2, m4, m5, m6, m7, m8, m9,
-m11 (Tests 9, 15, 20), m12. Domänenteil in 035a.
+(Entscheidung 3, Tests 25b/25c), M4 (Entscheidung 4, Test 16), M5 (a) (Entscheidung 5, Test 13), M6 (Entscheidung 4,
+Tests 17, 28, 29), M7 (Entscheidung 7, Eigentümerfrage 1), M8 (Entscheidung 5, Test 20), m2, m4, m5, m6, m7, m8, m9,
+m11 (Tests 12, 18, 23), m12. Domänenteil in 035a.
