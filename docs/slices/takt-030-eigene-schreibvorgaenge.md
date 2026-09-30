@@ -88,9 +88,17 @@ Datei: melden und anhalten.
 
 ## Nachweis
 
-Gates-Commit: _(nach Bau eintragen: Commit, auf dem `pnpm gates` lief)_
+Gates-Commit: 04180a5 (sauberer Baum)
 
-Wörtlicher Schluss von `pnpm gates`: _(nach Bau einfügen, einmal)_
+Wörtlicher Schluss von `pnpm gates`: 
+
+```
+✓ built in 1.53s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 04180a5, tree e9af3e2072fb…
+(Exit-Status 0)
+```
+
+Lokal gelaufen: Unit-Tests `http.test.ts` (58 grün), Projekt `in-process` (127 grün), Projekt `http` ohne Keycloak (`E2E_HTTP_IDP=none`, 8 Tests, H1–H3 grün, G1 wie vorgesehen rot). H9 und H8 tragen `@idp` und laufen nur in der PR-CI (kein Docker-Daemon lokal); H9 ist per `--list` gelistet und typgeprüft. Screenshot `takt-030-eigene-schreibvorgaenge.png` kommt aus dem CI-Artefakt.
 
 ## Review findings
 
