@@ -141,8 +141,8 @@ mit sichtbarer Nachricht und bei jedem Heartbeat wird sie neu bestimmt. Eine lee
 jede andere Abweichung zu `end {roles_changed}`, und aus diesem Stapel wird nichts zugestellt. Das gilt ab der
 Registrierung, nicht erst ab live: Heartbeat- und Rotationszeitgeber starten mit der Registrierung. Sitzung und Rechte
 werden je Heartbeat auch während eines Nachlaufs geprüft, der wegen Gegendrucks lange dauert. Ein Nachlauf verlängert
-die Zeit ohne Prüfung also nicht. (Die Umsetzung dieser Regel ist bei Abfassung dieser Ergänzung auf dem Zweig von
-035b in Arbeit.)
+die Zeit ohne Prüfung also nicht. Umgesetzt in 035b (`1bcfd4f`): Zeitgeber ab `hub.register`, Prüfung je Heartbeat
+während des Nachlaufs (`checkDuringHandover`), Rechte unmittelbar vor jedem geschriebenen Stapel (`rightsNow`); Tests R1–R2.
 
 **Bauklärungen von 035b** (im Rahmen von Spec und Vertrag, keine Vertragsänderung):
 
