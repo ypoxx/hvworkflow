@@ -56,7 +56,8 @@ import { createSingleFlightCache } from './metrics/cache.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './metrics/prometheus.ts';
 import { requireParam, writeOptions } from './http.ts';
 import { discardSink, type AccessLogSink } from './observability/accessLog.ts';
-import { READINESS_CHECK_TIMEOUT_MS, resolveLimits, type LimitsConfig } from './limits/config.ts';
+import { READINESS_CHECK_TIMEOUT_MS, resolveLimits, resolveStreamLimits, STREAM_BATCH_SPACING_MS, STREAM_OPEN_FRESHNESS_MS,
+  STREAM_RELOAD_TICK_MS, STREAM_SESSION_CHECKS, type LimitsConfig, type StreamLimits } from './limits/config.ts';
 import { DeadlineError, withDeadline } from './limits/deadline.ts';
 import { createBodyLimit, createPreflightGuard, createRequestTimeout, createSecurityHeaders, createSourceLayer,
   createSubjectLimits } from './limits/middleware.ts';
@@ -73,6 +74,9 @@ import { createChainCache } from './persistence/chainCache.ts';
 import { assertRuntimePrivileges, insertPostgresEvents, isPersistenceBusy, loadPostgresSnapshotCached, mustDiscardConnection,
   pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimers, type ChainLoad } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
+import { createHub, type HubSource } from './stream/hub.ts';
+import { createStreamRoute, streamUnavailable } from './stream/route.ts';
+import { createSessionChecker } from './stream/sessionCheck.ts';
 
 export interface CreateAppOptions {
   /** Defaults to `process.env.HV_DEMO === '1'` — kept overridable so tests need not touch env vars. */
@@ -136,6 +140,11 @@ export interface CreateAppOptions {
    */
   limits?: Partial<LimitsConfig>;
   /**
+   * Slice 035b: the stream limits (`limits/config.ts`, decision 7). A test may lower a value; a higher one is ignored
+   * (a raise is a spec change). Never read from the environment.
+   */
+  streamLimits?: Partial<StreamLimits>;
+  /**
    * Slice 034a: the peer of the TCP connection of a request, as a plain address string. Default: the connection
    * address of the Node server (`getConnInfo`); `app.request()` in tests has none, so tests set this.
    * Without an address the key is "unbekannt". `trustedProxyCidrs` (034b) then decides whether `X-Forwarded-For` counts.
@@ -159,6 +168,16 @@ export interface CreateAppOptions {
      * (loader plus request store), the seq the chain cache ends at afterwards, and the event rows the load read.
      */
     chain?: (info: { hashed: number; cachedSeq: number | undefined; rowsRead: number }) => void;
+    /** Slice 035b: replaces the verified log a distributor reload yields (a shortened, replaced or broken chain). */
+    streamLoad?: (log: readonly DomainEvent[]) => readonly DomainEvent[];
+    /** Slice 035b: awaited on open between reading the head and writing the catch-up (test 13a). */
+    streamHandover?: () => Promise<void>;
+    /** Slice 035b: start and end of every distributor reload and every session check (tests 28, 29). */
+    streamWindow?: (kind: 'reload' | 'session', phase: 'start' | 'end') => void;
+    /** Slice 035b: the head after every applied batch or rebuild of the distributor. */
+    streamApplied?: (head: number) => void;
+    /** Slice 035b: awaited before every distributor reload (tests 25b, 25c: a business request loads first). */
+    streamReloadGate?: () => Promise<void>;
   };
   /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
   readiness?: {
@@ -338,6 +357,24 @@ export function createApp(options: CreateAppOptions = {}): App {
   const actorStorage = new AsyncLocalStorage<Actor>();
   const requestStorage = new AsyncLocalStorage<PostgresRequest>();
 
+  // Slice 035b: one stream distributor per app. It reads its own verified log (Postgres: a short read transaction on a
+  // connection of its own, as the sign-in lookup; otherwise the store) and never goes through a request boundary.
+  const streamLimits = resolveStreamLimits(options.streamLimits);
+  const hooks = options.testHooks;
+  const streamLoad = (log: readonly DomainEvent[]): readonly DomainEvent[] => (hooks?.streamLoad ? hooks.streamLoad(log) : log);
+  const streamSource: HubSource = options.postgres
+    ? { load: async () => streamLoad(await readSnapshotEvents()), tick: true }
+    : { load: async () => streamLoad([...store.all()]), subscribe: (trigger) => store.subscribe(() => trigger()), tick: false };
+  const streamHub = createHub({
+    source: streamSource, clock, reloadTickMs: STREAM_RELOAD_TICK_MS, spacingMs: STREAM_BATCH_SPACING_MS,
+    freshnessMs: STREAM_OPEN_FRESHNESS_MS, notice: (text) => notices.once(text),
+    ...(hooks?.streamWindow ? { onWindow: (phase: 'start' | 'end') => hooks.streamWindow!('reload', phase) } : {}),
+    ...(hooks?.streamApplied ? { onApplied: hooks.streamApplied } : {}),
+    ...(hooks?.streamReloadGate ? { reloadGate: hooks.streamReloadGate } : {}),
+  });
+  const streamSessionChecks = createSessionChecker({ concurrency: STREAM_SESSION_CHECKS,
+    ...(hooks?.streamWindow ? { onWindow: (phase: 'start' | 'end') => hooks.streamWindow!('session', phase) } : {}) });
+
   const currentActor = (): Actor => {
     const actor = actorStorage.getStore();
     if (!actor) throw new ApiProblem(401, 'Unauthorized', 'The X-Actor header is required.');
@@ -450,7 +487,7 @@ export function createApp(options: CreateAppOptions = {}): App {
     const allowedCors = cors({
       origin: (origin) => (corsAllowed.has(normalizeOrigin(origin) ?? '') ? origin : null),
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'If-Match', 'Idempotency-Key', 'X-CSRF-Token', ...(demoEnabled ? ['X-Actor'] : [])],
+      allowHeaders: ['Content-Type', 'If-Match', 'Idempotency-Key', 'X-CSRF-Token', 'Last-Event-ID', ...(demoEnabled ? ['X-Actor'] : [])],
       exposeHeaders: ['ETag', 'X-Server-Time', 'Retry-After'],
       maxAge: 600,
       credentials: !demoEnabled,
@@ -620,6 +657,8 @@ export function createApp(options: CreateAppOptions = {}): App {
         await query('COMMIT');
         // Only what is committed counts: a rollback or a failed COMMIT leaves `seq` null.
         if (pendingEvents.length > 0) noteSeq(Math.max(...pendingEvents.map((event) => event.seq)));
+        // Slice 035b: a nudge without payload; the distributor reloads on its own connection (no-op without streams).
+        if (pendingEvents.length > 0) streamHub.poke();
         started = false;
       }
     } catch (error) {
@@ -1167,8 +1206,29 @@ export function createApp(options: CreateAppOptions = {}): App {
     return c.json(await domain.seedDemo(seedOptions));
   });
 
-  // GET /v1/stream (SSE) is not implemented: optional per the slice spec (polling /v1/events is the
-  // contract minimum) and left out of this pass under time pressure — see the slice's Open section.
+  // ---- stream (slice 035b) -----------------------------------------------------------------------------
+  // GET /v1/stream (SSE): behind the whole middleware chain and the contract check, without the Postgres boundary and
+  // without the `domain` proxy. The pre-checks of the boundary run without a transaction; the delivery reads only the
+  // distributor's projection. The request timeout covers the open (the handler returns the response right away).
+  app.get('/v1/stream', validateOperation('streamEvents'), createStreamRoute({
+    hub: streamHub,
+    sessionChecks: streamSessionChecks,
+    limits: streamLimits,
+    clock,
+    actor: currentActor,
+    ...(sessionReady ? { session: {
+      token: (c: Context) => sessionTokenFromCookie(c.req.header('Cookie')),
+      valid: async (token: string) => (await authStore!.readSession(token, clock(), false)) !== null,
+    } } : {}),
+    ...(options.postgres ? { precheck: async (): Promise<Response | undefined> => {
+      const timedPool = withQueryTimers(options.postgres!, limits.queryTimeoutMs);
+      if ((await getMigrationStatus(timedPool)).pending) return streamUnavailable('Migrations are pending.');
+      await assertRuntimePrivileges(timedPool);
+      return undefined;
+    } } : {}),
+    notice: (text) => notices.once(text),
+    ...(hooks?.streamHandover ? { handoverHook: hooks.streamHandover } : {}),
+  }));
 
   return app;
 }

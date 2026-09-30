@@ -400,6 +400,28 @@ Open: Eigentümerfragen 1–3; Lasttest 071
 Touched: <Dateiliste>
 ```
 
+## Bauklärung (Bau 035b, 30.09.2026)
+
+Zwei Punkte, die Vertrag 0.3.11 offen ließ, im Rahmen von Spec und Vertrag entschieden (keine Vertragsänderung; Wortlaut
+auf der Folgeliste):
+
+1. **`meetingId`-Filter.** Mit Filter liefert der Strom jedes Ereignis dieses Jahrgangs nach dem Cursor genau einmal und
+   aufsteigend; `id` bleibt die globale `seq`, Lücken sind Ereignisse anderer Jahrgänge. „Gap-free in `seq`“ gilt nur
+   ohne Filter (so auch Entscheidung 5, Garantie). Ereignisse ohne Jahrgang gehören nicht zu „events of this meeting“
+   (`MeetingIdFilter`) und kommen unter einem Filter auch bei `event.read` nicht; ohne Filter nur bei `event.read`
+   (unverändert 035a). Der Kopf rückt über `cursor` mit dem Heartbeat nach. Die Grenze von 1000 für den Nachlauf zählt
+   den globalen Abstand.
+2. **`Retry-After` bei 503 `StreamUnavailable`.** Immer 30, für alle drei Ursachen (Prozessgrenze, Migrationen offen,
+   Persistenz beschäftigt beim Öffnen); ebenso 30 bei den stromeigenen 429. Das liegt im Schema 1–60 des gemeinsamen
+   Kopfs; 2 wie bei `PersistenceBusy` entfällt, weil das Öffnen keine Schreibwarteschlange kennt und viele Clients sonst
+   im Zwei-Sekunden-Takt wiederkämen.
+
+Abweichungen vom Spec-Text: Test 12 „Migrationen offen“ steht in `postgres-stream035.test.ts` (ohne Postgres nicht
+herstellbar). `req()` puffert SSE nicht; der Test-Leser öffnet über `req()`, damit zählt das Abdeckungstor `streamEvents`
+(Vor-dem-Bau-Punkt 4). Ein Cursor über dem Kopf lädt vor dem `reset` einmal frisch nach (ein Schreibvorgang einer anderen
+Instanz innerhalb der Frische-Sekunde). Die `serverOptions` aus `server.ts` sind nicht exportiert; der Test mit echtem
+Server wiederholt die drei Zahlen (Befund, `server.ts` unverändert).
+
 ## Review findings
 
 Lesebefund zu Spec 035 (Opus, frischer Kontext, `9f2560c`): nicht baureif. In dieser Fassung eingearbeitet: B1

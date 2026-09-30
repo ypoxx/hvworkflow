@@ -63,7 +63,7 @@ async function bootstrap(): Promise<void> {
 }
 
 interface Hooks { windows: { kind: string; phase: string }[]; open: Map<string, number>; maxOpen: Map<string, number>;
-  appliedHead: number; appliedAt: Map<number, number>; gate?: () => Promise<void> }
+  appliedHead: number; appliedAt: Map<number, number>; gate?: (() => Promise<void>) | undefined }
 function newHooks(): Hooks { return { windows: [], open: new Map(), maxOpen: new Map(), appliedHead: 0, appliedAt: new Map() }; }
 
 function build(db: Pool, hooks: Hooks = newHooks(), streamLimits?: Partial<StreamLimits>, extra: Partial<CreateAppOptions> = {}): App {
@@ -186,7 +186,8 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       expect(kinds(rest)).toEqual(['end']);
       expect(rest[0]!.data).toEqual({ reason: 'unavailable' });
     }
-    const again = await req(app, 'GET', '/v1/stream', { headers: await asSession('moderation') });
+    // No operation of the contract documents 500 (a finding of the whole contract, not of this route): read directly.
+    const again = await app.request('/v1/stream', { headers: await asSession('moderation') });
     expect(again.status).toBe(500);
     expect(await again.text()).not.toContain('tampered');
   }, 30_000);

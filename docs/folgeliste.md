@@ -265,6 +265,24 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035a Review nit 7 · `packages/contract/CHANGELOG.md` (0.3.11) · Einordnung der Versionsstufe (Patch) trotz geänderter
   Semantik der vorab erklärten, nie ausgelieferten Operation · Begründung im CHANGELOG ergänzen oder Stufe prüfen.
 
+## Strom-Dienst (aus 035b)
+
+- 035b Bau · `packages/contract/openapi.yaml` (`streamEvents`, Abschnitt „Rights per message“) · der Satz „gap-free in
+  `seq`“ gilt nur ohne `meetingId`-Filter; gebaut: mit Filter kommt jedes Ereignis dieses Jahrgangs nach dem Cursor genau
+  einmal und aufsteigend, `id` bleibt global (Lücken = Ereignisse anderer Jahrgänge), Ereignisse ohne Jahrgang gehören
+  nicht zum Filter; der Kopf rückt über `cursor` mit dem Heartbeat nach · Wortlaut im nächsten 0.3.x-Vertragsstand angleichen.
+- 035b Bau · `packages/contract/openapi.yaml` (`components/headers/RetryAfter`) · die Beschreibung nennt nur die Werte
+  für 429 und `PersistenceBusy`; `StreamUnavailable` sendet immer 30 (Stromgrenze, Migrationen offen, Persistenz beschäftigt),
+  auch die stromeigenen 429 senden 30; im Schema 1–60 · Beschreibung ergänzen.
+- 035b Bau · `packages/contract/openapi.yaml` · keine Operation dokumentiert 500; ein Öffnen bei verletzter Kette antwortet
+  wie jede Fachanfrage 500 (Test 25 liest es deshalb über `app.request`, nicht über `req()`) · mit 0.4.0 (043) klären.
+- 035b Bau · `apps/api/src/server.ts:58` · die `serverOptions` sind nicht exportiert; der Test mit echtem Server wiederholt
+  die drei Zahlen · bei der nächsten Änderung an `server.ts` als Konstante exportieren und im Test verwenden.
+- 035b Bau · Spec 035b „Befund“ und m5 · `req()` (`helpers.ts`) puffert eine SSE-Antwort nicht und kehrt mit den Köpfen
+  zurück; der Test-Leser öffnet deshalb über `req()`, so zählt das Abdeckungstor `streamEvents` · Spec-Wortlaut angleichen.
+- 035b Bau · Spec 035b Test 12 · „Migrationen offen → 503“ ist ohne Postgres nicht herstellbar; der Fall steht in
+  `postgres-stream035.test.ts` („12 (Postgres)“) · hinnehmen.
+
 ## Bühne und Wortmeldeliste (aus takt-039)
 
 - ~~takt-039 Befund 2 · `apps/web/e2e/002-speakers-capture.spec.ts:84` · Umsortieren per Tastatur: ArrowDown blieb im

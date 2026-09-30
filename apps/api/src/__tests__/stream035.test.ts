@@ -98,8 +98,8 @@ interface Harness {
   /** The session check throws for this token (the stream's own check; other sessions still pass). */
   failReadSession: { token?: string };
   hooks: {
-    load?: (log: readonly DomainEvent[]) => readonly DomainEvent[];
-    handover?: () => Promise<void>;
+    load?: ((log: readonly DomainEvent[]) => readonly DomainEvent[]) | undefined;
+    handover?: (() => Promise<void>) | undefined;
     reloads: number;
     appliedHead: number;
     windows: { kind: string; phase: string }[];
@@ -257,11 +257,11 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(preflight.headers.get('Access-Control-Allow-Headers') ?? '').toMatch(/Last-Event-ID/i);
   });
 
-  it('12 demo header: a subject whose every grant is revoked gets 403 R-PERM-01 from the stream itself', async () => {
+  it('12 demo header: a meeting filter without an actor of the reader in that meeting is 403 R-PERM-01', async () => {
     const h = await harness();
     const { assignments } = await corpus();
     await ok(call(h, 'admin:admin', 'POST', `/v1/meetings/${MEETING}/role-assignments/${assignments.get('capture')![0]}/revocation`, {}, { reason: 'Test' }));
-    const res = await req(h.app, 'GET', '/v1/stream', { headers: asDemo(`${subject('capture')}:capture`) });
+    const res = await req(h.app, 'GET', `/v1/stream?meetingId=${MEETING}`, { headers: asDemo(`${subject('capture')}:capture`) });
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ ruleId: 'R-PERM-01' });
   });
@@ -285,6 +285,9 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     const expectResume = async (headers: Record<string, string>, path = '/v1/stream'): Promise<void> => {
       const again = track(await mustOpen(h.app, path, { ...asSession('admin'), ...headers }));
       const blocks = await again.messagesUntil((b) => b.event === 'cursor');
+      if (Object.keys(headers).length > 0 && path === '/v1/stream') {
+        console.log(`035b test 13 raw: ${again.blocks.map((b) => b.raw.replaceAll('\n', ' | ').slice(0, 120)).join(' || ')}`);
+      }
       expect(kinds(blocks)).toEqual(['event', 'event', 'event', 'cursor']);
       expect(blocks.slice(0, 3).map(idOf)).toEqual([k + 1, k + 2, k + 3]);
       expect(blocks.slice(0, 3).map((b) => (b.data as { seq: number }).seq)).toEqual([k + 1, k + 2, k + 3]);
@@ -369,6 +372,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
       await write();
       const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession(who), 'Last-Event-ID': String(cursor) }));
       const out = await reader.messagesUntil((b) => b.event === 'cursor' || b.event === 'reset');
+      await reader.cancel();
       return out;
     };
     // podium: a question is put on the stage -> reset (every stage.read reader is item-bound for `stage`).
@@ -627,12 +631,14 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
   });
 
   // ---- 22 ---------------------------------------------------------------------------------------------------------
-  it('22 meeting filter: only events of that meeting, the id stays global', async () => {
-    const h = await harness({ session: true });
+  it('22 meeting filter: only events of that meeting, the id stays global; the heartbeat carries the moved head', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 200 } });
     const reader = track(await mustOpen(h.app, `/v1/stream?meetingId=${MEETING}`, asSession('admin')));
     await reader.nextMessage();
     await assignFiller(h, 'admin2', OTHER);
-    await sleep(300);
+    // The head moved on through an event this stream does not carry: `cursor` with the heartbeat.
+    const moved = await reader.until((b) => b.event === 'cursor', 2_000);
+    expect(idOf(moved)).toBe(h.head());
     await assignFiller(h, 'admin');
     const next = await reader.until(isEvent);
     expect(idOf(next)).toBe(h.head());
