@@ -156,6 +156,23 @@ Weitere Dateien sind Scope-Befunde, besonders `postgres027.test.ts`, `eventLog02
 6. **Späterer Nachweis, nicht Teil dieser Abnahme:** Nach 033 und 033b hält `/stage` nach der Navigation im CI-Projekt
    `http` die bestehende Grenze von 1500 ms (`abnahme.spec.ts:257`, Lauf aus 031b).
 
+## Änderung am Abnahmekriterium 3 (b) nach dem Review
+
+**Entscheidung des Architekten (Orchestrator), 30.09.2026, nach Security-Review Befund 1.** Grund: Die Prüfung
+„Median warm ≤ 50 % des Medians kalt und absolut unter 100 ms“ über die **ganze Anfrage** scheiterte im Review in einem
+von zwei vollen api-Läufen. Die ganze Anfrage enthält die Projektion (Nicht-Ziel dieser Scheibe) und hängt an der Last
+des Rechners; das Verhältnis lag bei 0,43–0,50. Das ist keine stille Lockerung, sondern ein Wechsel der gemessenen
+Größe auf das, was diese Scheibe ändert:
+
+- (a) **Harte Grenze, deterministisch:** 0 / k / alle gehashten Ereignisse über `testHooks.chain`; zusätzlich liest
+  der warme Suffix-SELECT genau k Zeilen (`rowsRead` des Laders).
+- (b) **Harte Grenze, Zeit:** Verhältnis warm/kalt **des Laders** ≤ 0,5 (statt der ganzen Anfrage).
+- (c) Messung in 30 abwechselnden Paaren kalt/warm, Median der Verhältnisse je Paar.
+- (d) **Nur protokolliert, nicht in den Gates geprüft:** Mediane der ganzen Anfrage, die absolute Grenze von 100 ms
+  und die Aufteilung (SELECT, Digest mit Suffix, Projektion).
+
+Die Grenze für die Nutzer (1500 ms für `/stage` im e2e-Lauf, Abnahmekriterium 6) bleibt unverändert.
+
 ## Wirkung und Risiko (Leitplanken §4, hoch)
 
 - **Invarianten.** Eine Antwort beruht nur auf einer Kette, die vollständig geprüft ist: als Ganzes oder als Präfix,
@@ -226,64 +243,34 @@ anhalten.
 
 ## Nachweis
 
-**Gates-Commit:** `04a7fd8` (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL` und
-`HV_DB_RUNTIME_ROLE=hv_runtime` gegen die eigene Datenbank `hv_t033` (Postgres 16, lokal), Exit 0. Testzahlen aus
-demselben Lauf: domain 15 Dateien / 242 Tests, web 13 / 255, api 36 / 511 (keine übersprungen), slice-scope:
-„11 changed file(s), all within … "Files allowed" list“. Wörtlicher Schluss:
+**Gates-Commit (nach dem Review):** `350391f` (sauberer Baum), `pnpm gates` mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime` gegen die eigene Datenbank `hv_t033` (Postgres 16,
+lokal), Exit 0. Testzahlen aus demselben Lauf: domain 15 Dateien / 243 Tests, web 13 / 255, api 36 / 519 (keine
+übersprungen); slice-scope: „12 changed file(s), all within … "Files allowed" list“. Wörtlicher Schluss:
 
 ```
-dist/assets/index-DNaDsUvC.js                        620.43 kB │ gzip: 181.64 kB │ map: 2,563.54 kB
-
-[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
-
-[plugin builtin:vite-reporter] 
-(!) Some chunks are larger than 500 kB after minification. Consider:
-- Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.53s
-mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 04a7fd8, tree dedad1e79592…
+✓ built in 2.50s
+mark-test-run: wrote /home/user/wt/t033/.claude/state/last-test-run (clean tree) at commit 350391f, tree 8dcb90c2c878…
 ```
 
-**Budget (Abnahmekriterium 3), 2138 Ereignisse (Seed-Korpus, 250 Fragen), `GET /v1/stage`, je 20 Aufrufe:**
+Stabilität (Review-Befund 1): der volle api-Lauf mit Postgres auf `583d751` (Code wie `350391f`) dreimal
+hintereinander grün, je 36 Dateien / 519 Tests, bei Last 7–9,5 auf 4 Kernen. Der erste Gates-Lauf vor dem Review
+(`04a7fd8`, alte Zeitprüfung) ist damit abgelöst.
 
-- (a) deterministisch, in jedem Lauf grün: kalt 2138 gehasht (Lader 2138, Store 0), warm 0, nach 3 neuen genau 3.
-- (b) Mediane aus fünf Einzelläufen auf `04a7fd8` (Last 4,2–5,9 auf 4 Kernen, ein anderer Agent lief parallel):
+**Budget nach der Änderung an Kriterium 3 (b)**, 2141 Ereignisse (Seed-Korpus, 250 Fragen, plus 2 × 3 neue),
+drei Einzelläufe auf `350391f`, Last 8–11:
 
-  | Lauf | kalt | warm | warm/kalt |
-  |---|---|---|---|
-  | 1 | 134,6 ms | 61,4 ms | 0,46 |
-  | 2 | 140,0 ms | 69,6 ms | 0,50 |
-  | 3 | 148,7 ms | 69,6 ms | 0,47 |
-  | 4 | 152,9 ms | 75,8 ms | 0,50 |
-  | 5 | 149,8 ms | 64,8 ms | 0,43 |
+| Lauf | Lader kalt | Lader warm | Median Verhältnis je Paar (≤ 0,5) | Anfrage kalt | Anfrage warm | SELECT allein | Projektion allein |
+|---|---|---|---|---|---|---|---|
+| 1 | 116,7 ms | 28,8 ms | 0,250 | 142,3 ms | 63,4 ms | 13,5 ms | 25,4 ms |
+| 2 | 101,8 ms | 27,3 ms | 0,271 | 146,8 ms | 69,6 ms | 13,7 ms | 25,5 ms |
+| 3 | 103,5 ms | 28,3 ms | 0,275 | 141,5 ms | 63,0 ms | 15,0 ms | 27,5 ms |
 
-- **Befund (Grenze nicht gelockert):** Die Grenze hält in diesen Läufen und im Gates-Lauf, aber knapp. Das
-  Verhältnis liegt bei 0,43–0,50 gegen 0,50. Bei Last 9–12 (vor dem Gates-Lauf) scheiterten 2 von 6 Läufen an der
-  absoluten Grenze (warm 122,2 / 117,4 ms bei kalt 277,9 / 255,6 ms); das Verhältnis hielt dort. Messaufteilung
-  (Median aus 15, Last ca. 9–12, derselbe Korpus):
-  Prüfung von Migrationsstand und Dienstrechten je Anfrage 7–8 ms; Digest-Abfrage 22–25 ms (davon `envelope::text` allein
-  ca. 9 ms); warmer Lader gesamt (Digest, Suffix, Personen) 27–28 ms; Personen-SELECT 0,4 ms; voller SELECT der Ereignisse
-  als Text 18 ms; voller Lader (SELECT, Parsen, Hashen) 118–125 ms; Projektion (`createInProcessApi` und `getStage`)
-  32–38 ms. Der warme Rest gehört also zur Hälfte der Projektion (Nicht-Ziel, offene Frage 2) und zur anderen Hälfte der
-  Digest-Abfrage, die je Anfrage alle Zeilen auf Datenbankseite serialisiert.
-
-## Änderung am Abnahmekriterium 3 (b) nach dem Review
-
-**Entscheidung des Architekten (Orchestrator), 30.09.2026, nach Security-Review Befund 1.** Grund: Die Prüfung
-„Median warm ≤ 50 % des Medians kalt und absolut unter 100 ms“ über die **ganze Anfrage** scheiterte im Review in einem
-von zwei vollen api-Läufen. Die ganze Anfrage enthält die Projektion (Nicht-Ziel dieser Scheibe) und hängt an der Last
-des Rechners; das Verhältnis lag bei 0,43–0,50. Das ist keine stille Lockerung, sondern ein Wechsel der gemessenen
-Größe auf das, was diese Scheibe ändert:
-
-- (a) **Harte Grenze, deterministisch:** 0 / k / alle gehashten Ereignisse über `testHooks.chain`; zusätzlich liest
-  der warme Suffix-SELECT genau k Zeilen (`rowsRead` des Laders).
-- (b) **Harte Grenze, Zeit:** Verhältnis warm/kalt **des Laders** ≤ 0,5 (statt der ganzen Anfrage).
-- (c) Messung in 30 abwechselnden Paaren kalt/warm, Median der Verhältnisse je Paar.
-- (d) **Nur protokolliert, nicht in den Gates geprüft:** Mediane der ganzen Anfrage, die absolute Grenze von 100 ms
-  und die Aufteilung (SELECT, Digest mit Suffix, Projektion).
-
-Die Grenze für die Nutzer (1500 ms für `/stage` im e2e-Lauf, Abnahmekriterium 6) bleibt unverändert.
+Deterministisch in jedem Lauf: kalt alle gehasht (Lader alle, Store 0), warm 0 gehasht und 0 Zeilen gelesen, nach
+3 neuen genau 3 gehasht und 3 Zeilen gelesen. „Lader warm“ ist Digest-Abfrage plus Suffix plus Personen. Die absolute
+Grenze von 100 ms für die ganze Anfrage wurde in allen drei Läufen eingehalten; sie wird nur noch protokolliert.
 
 ## Review findings
 
