@@ -139,3 +139,11 @@ Nachlauf auf dem integrierten Commit `5acd1b5` (Basis mit takt-031 eingemergt), 
 ✓ built in 1.73s
 mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 5acd1b5, tree 8ba5cf554508…
 ```
+
+Nachlauf auf dem integrierten Commit `e31073f` (Basis mit takt-034 eingemergt), `pnpm gates` mit Postgres-Variablen,
+sauberer Baum, Exit 0; domain 231, web 263, api 480 grün. Wörtlicher Schluss:
+
+```
+✓ built in 3.50s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit e31073f, tree 8ba5cf554508…
+```
