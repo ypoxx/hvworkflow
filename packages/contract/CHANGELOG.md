@@ -10,6 +10,43 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.3.11] - 2026-09-30
+
+### Changed
+
+- **Scheibe 035a: semantics of the pre-declared operation `streamEvents` (`GET /stream`) replaced.** The
+  operation was pre-declared in 0.3.0 (Scheibe 023), is listed in `allowlist.json` and was never served,
+  so no client depends on its old semantics; under ADR 0015 (vorgeschlagen) this is a patch release. Changes
+  against 0.3.0:
+  - `after` is its own parameter `StreamAfter` (`minimum: 0`, `maximum: 9007199254740991`) **without
+    `default`**: without `after` and without `Last-Event-ID` the stream starts at the head. The shared
+    `After` parameter (`default: 0`) is unchanged and stays for `/events`.
+  - `Last-Event-ID` is bounded: pattern `^[0-9]{1,16}$`, `maxLength: 16`, and at most
+    9007199254740991 (a value above is a 422). It still wins over `after`.
+  - New message kinds besides `event` (`EventRead`, now for readers with `event.read` only): `change`
+    (`StreamChange`), `cursor` (`StreamCursor`), `reset` (`StreamReset`) and `end` (`StreamEnd` with the
+    fixed reasons `session`, `forbidden`, `roles_changed`, `rotate`, `unavailable`). `reset` and `end`
+    carry **no** SSE `id`. The first line is `retry: 3000`. The messages are listed in `x-sse-messages`
+    of the `200` response.
+  - Rights per message after the new rule R-PERM-04 (Scheibe 035a): readers without `event.read` receive
+    content-free change signals with topics and readable ids only, instead of no stream at all.
+  - Cursor and catch-up rules: `cursor` first on a stream without cursor, after a catch-up and with the
+    heartbeat; catch-up of at most 1000 events, otherwise `reset`; a cursor beyond the head is `reset`;
+    after `reset` the client reconnects without a cursor, and an `EventSource` client needs a new
+    instance without `Last-Event-ID`.
+  - Responses: `404` (unknown `meetingId`) is new; `429` names the limit of open streams per session or
+    subject (`Retry-After` required); the `503` is the new response `StreamUnavailable` (`Retry-After`
+    required) for both the global stream limit and a busy or not ready persistence, instead of
+    `PersistenceBusy`.
+
+### Added
+
+- Schemas `StreamTopic`, `StreamChange`, `StreamCursor`, `StreamReset`, `StreamEnd`; parameter
+  `StreamAfter`; response `StreamUnavailable`; the paragraph "Stream (since 0.3.11, slice 035a)" in
+  `info.description`. The description of `EventRead` names the `event` message of `/stream`.
+- The `streamEvents` entry stays in `allowlist.json` until Scheibe 035b serves the operation; 035a builds
+  the visibility functions in the domain only and does not exercise the operation.
+
 ## [0.3.10] - 2026-09-29
 
 ### Added
