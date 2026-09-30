@@ -35,7 +35,7 @@ let owner: Pool;
 let poolA: Pool;
 let poolB: Pool;
 
-interface ChainInfo { hashed: number; cachedSeq: number | undefined }
+interface ChainInfo { hashed: number; cachedSeq: number | undefined; rowsRead: number }
 
 function scopedPool(connectionString: string | undefined, name: string, max = 5): Pool {
   return new Pool({ connectionString, options: `-c search_path=${schema}`, max, application_name: `${schema}_${name}` });
@@ -116,7 +116,7 @@ async function warm(instance: TestApp, infos: ChainInfo[]): Promise<void> {
   expect((await speakers(instance)).status).toBe(200);
   expect((await speakers(instance)).status).toBe(200);
   // The second request found the cache filled and hashed nothing again.
-  expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: await maxSeq() });
+  expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: await maxSeq() });
 }
 
 async function expectIntegrityFailure(response: Response, seq: number, secrets: string[] = []): Promise<void> {
@@ -211,13 +211,13 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const read = await speakers(instance);
     expect(read.status).toBe(200);
     expect(await read.json()).toHaveLength(10);
-    expect(infos.at(-1)).toEqual({ hashed: 12, cachedSeq: 12 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 12, cachedSeq: 12 });
     const lines = errors.mock.calls.map((call) => call.join(' '));
     expect(lines).toEqual([HISTORY_LINE]);
     // The cache now ends at 12: one new event costs exactly one hash.
     await insertEvents(await stampNext([speaker(99, 'Nachgetragen')]));
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 1, cachedSeq: 13 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 1, cachedSeq: 13 });
     expect(errors).toHaveBeenCalledTimes(1);
   });
 
@@ -244,7 +244,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const read = await speakers(instance);
     expect(read.status).toBe(200);
     const body = JSON.stringify(await read.json());
-    expect(infos.at(-1)).toEqual({ hashed: 26, cachedSeq: 26 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 26, cachedSeq: 26 });
     expect(await (await speakers(instance)).json()).toHaveLength(24);
     expect(body).not.toContain('speaker-19-11');
     expect(body).toContain('speaker-13-14');
@@ -286,13 +286,13 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const infos: ChainInfo[] = [];
     const instance = app(poolA, infos);
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos).toEqual([{ hashed: 23, cachedSeq: 23 }]);
+    expect(infos).toMatchObject([{ hashed: 23, cachedSeq: 23, rowsRead: 23 }]);
     await insertEvents(await stampNext([speaker(31, 'Neu'), speaker(32, 'Neu'), speaker(33, 'Neu')]));
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 3, cachedSeq: 26 });
+    expect(infos.at(-1)).toEqual({ hashed: 3, cachedSeq: 26, rowsRead: 3 });
     const read = await speakers(instance);
     expect(await read.json()).toHaveLength(23);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 26 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 26 });
   });
 
   it('keeps own writes out of the cache until a later read loads them from the database', async () => {
@@ -305,9 +305,9 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
       body: JSON.stringify({ displayName: 'Eigene Schreibung', round: 1 }),
     });
     expect(written.status).toBe(201);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 23 });
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 1, cachedSeq: 24 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 1, cachedSeq: 24 });
   });
 
   it('removes a revoked role on the next session request of the first instance (no stale actor from the cache)', async () => {
@@ -316,7 +316,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const meeting = () => first.request('/v1/meeting', { headers: { Cookie: cookie } });
     expect((await meeting()).status).toBe(200);
     expect((await meeting()).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 23 });
 
     const revoked = await app(poolB).request(`/v1/meetings/${meetingId}/role-assignments/assignment-1/revocation`, {
       method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json' },
@@ -335,7 +335,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const me = () => first.request('/auth/me', { headers: { Cookie: cookie } });
     expect((await me()).status).toBe(200);
     expect((await me()).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 23 });
     await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{subjectId}', '"tampered"') WHERE seq = 2`);
     const refused = await me();
     expect(refused.status).toBeGreaterThanOrEqual(500);
@@ -364,10 +364,10 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const infos: ChainInfo[] = [];
     const instance = app(poolA, infos);
     await warm(instance, infos);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 24 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 24 });
     await owner.query('UPDATE events SET envelope = envelope::text::jsonb');
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 24 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 24 });
     expect(errors).not.toHaveBeenCalled();
   });
 
@@ -382,14 +382,55 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     for (const spelling of ['1.0', '1.00', '1.000']) {
       await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{payload,number}', $1::jsonb) WHERE seq = 3`, [spelling]);
       expect((await speakers(instance)).status).toBe(200);
-      expect(infos.at(-1)).toEqual({ hashed: 23, cachedSeq: 23 });
+      expect(infos.at(-1)).toMatchObject({ hashed: 23, cachedSeq: 23 });
     }
     expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE]);
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: 23 });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: 23 });
     expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE,
       'HV-Tool API: the event history line repeated 2 more times.']);
   });
+
+  it('writes the repeat count during a streak that does not end: after five minutes of the app clock (review nit a)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let clockNow = now.getTime();
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos, { clock: () => new Date(clockNow) });
+    await warm(instance, infos);
+    const spell = async (spelling: string) => {
+      await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{payload,number}', $1::jsonb) WHERE seq = 3`, [spelling]);
+      expect((await speakers(instance)).status).toBe(200);
+      expect(infos.at(-1)).toMatchObject({ hashed: 23 });
+    };
+    await spell('1.0');
+    await spell('1.00');
+    await spell('1.000');
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE]);
+    clockNow += 5 * 60_000;
+    await spell('1.0000');
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE,
+      'HV-Tool API: the event history line repeated 3 more times.']);
+    // The streak goes on; the count starts again and is written when the streak ends.
+    await spell('1.00000');
+    expect((await speakers(instance)).status).toBe(200);
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE,
+      'HV-Tool API: the event history line repeated 3 more times.',
+      'HV-Tool API: the event history line repeated 1 more times.']);
+  });
+
+  it('writes the repeat count every 100 repeats during a streak that does not end (review nit a)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const infos: ChainInfo[] = [];
+    const instance = app(poolA, infos);
+    await warm(instance, infos);
+    for (let zeros = 1; zeros <= 101; zeros++) {
+      await owner.query(`UPDATE events SET envelope = jsonb_set(envelope, '{payload,number}', $1::jsonb) WHERE seq = 3`,
+        [`1.${'0'.repeat(zeros)}`]);
+      expect((await speakers(instance)).status).toBe(200);
+    }
+    expect(errors.mock.calls.map((call) => call.join(' '))).toEqual([HISTORY_LINE,
+      'HV-Tool API: the event history line repeated 100 more times.']);
+  }, 120_000);
 
   it('serves 20 parallel reads and 5 writes on a warm app correctly and ends with the cache at the database seq', async () => {
     const infos: ChainInfo[] = [];
@@ -421,7 +462,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     expect(await after.json()).toHaveLength(SPEAKERS + committed);
     expect(infos.at(-1)?.cachedSeq).toBe(await maxSeq());
     expect((await speakers(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: end + committed });
+    expect(infos.at(-1)).toMatchObject({ hashed: 0, cachedSeq: end + committed });
   });
 });
 
@@ -465,13 +506,13 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const infos: ChainInfo[] = [];
     const instance = app(poolA, infos);
     expect((await stage(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: corpus.length, cachedSeq: corpus.length });
+    expect(infos.at(-1)).toEqual({ hashed: corpus.length, cachedSeq: corpus.length, rowsRead: corpus.length });
     expect((await stage(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: corpus.length });
+    expect(infos.at(-1)).toEqual({ hashed: 0, cachedSeq: corpus.length, rowsRead: 0 });
     const firstExtra = await newSpeakers(0, corpus);
     await insertEvents(firstExtra);
     expect((await stage(instance)).status).toBe(200);
-    expect(infos.at(-1)).toEqual({ hashed: 3, cachedSeq: corpus.length + 3 });
+    expect(infos.at(-1)).toEqual({ hashed: 3, cachedSeq: corpus.length + 3, rowsRead: 3 });
 
     // (a) rows: the loader itself, on its own cache, in a read transaction like the request's.
     const load = async (cache: ReturnType<typeof createChainCache>) => {
