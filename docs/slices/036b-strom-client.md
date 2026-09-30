@@ -302,11 +302,10 @@ Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wä
 Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
 Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
 e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
-Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61; `pnpm gates` grün auf 3bb3a61 (Auszug unten); PR-CI-Lauf mit
-H13/H14 steht aus;
-Zustellzeit und Netztrace-Tabelle erst aus der PR-CI (H13 druckt sie); docs/evidence/031-h13-zweiter-browser.png,
-docs/evidence/031-h14-verbindungsanzeige.png entstehen in der PR-CI (Artefakt evidence-031-http, E56).
-Open: Lasttest 071; Produktionsweg (035b Frage 3); H13/H14 und das geänderte H10 laufen erst in der PR-CI.
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0; `pnpm gates` grün auf e254cb0
+(Auszug unten); PR-CI auf f761931 grün in e2e-http (33 passed, H10, H13, H14): Zustellzeit 862 ms (Anmeldung) und 796 ms
+(Aufruf); Screenshots im CI-Artefakt evidence-031-http (E56, Angaben unten).
+Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Review-Stand (e254cb0 ff.) steht aus.
 (Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
 Touched: siehe Liste unten.
 ```
@@ -324,7 +323,22 @@ Touched: siehe Liste unten.
    Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
    actor“).
 
-**Schluss von `pnpm gates` auf 3bb3a61 (sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+**Schluss von `pnpm gates` auf e254cb0 (Review-Nacharbeit; sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  440 passed (440)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 1.95s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit e254cb0, tree 629b020685d7…
+```
+
+Der erste Lauf auf e254cb0 war rot in zwei zeitkritischen Postgres-Tests von `apps/api` (034a „query that hangs past the
+service timer“, 035b Test 28 „ten idle streams“), ohne Änderung an `apps/api`; allein gelaufen 586/586, der
+Wiederholungslauf oben grün. Ein Flackern unter paralleler Last, kein Befund dieser Scheibe.
+
+**Früherer Lauf auf 3bb3a61, grün:**
 
 ```
 apps/web test:       Tests  436 passed (436)
@@ -378,6 +392,26 @@ downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle gr
 | dto. | Takt läuft nie | 5 rot (takt-030-Takt, 429, 503, Wächter, …) |
 | dto. | Wächter 450 s | „45 s without a heartbeat“ |
 
+**Mutationen der Review-Nacharbeit (auf e254cb0-Stand, je eine, danach zurückgesetzt; alle getötet):**
+
+| Punkt | Mutation | getötet von |
+|---|---|---|
+| Major 1 | nach Sitzungsende sofort öffnen statt Rückzug | end ×3, „403 on every open …“ (5 rot) |
+| Major 1 | Sitzungsende-Tor ganz entfernt | dieselben 5 |
+| Major 1 | keine 5-min-Pause nach drei Enden | „403 on every open …“ |
+| Major 1 | `attempt` bei jedem Sitzungsende zurückgesetzt | „403 on every open …“ |
+| Minor 2 | `closeStream()` behält den Cursor | „sign-out and sign-in as another actor …“, „structural actor change …“ |
+| Minor 3 | strukturell anderer Akteur behält den offenen Strom | „structural actor change while live …“ |
+
+Minor 2 und ein roles_changed mit strukturell anderem Akteur: `closeStream()` verwirft den Cursor, der neue Strom geht den
+N5-Weg (mehr Invalidierung, nie weniger); bei strukturell gleichem Akteur bleibt der Cursor (Entscheidung 6).
+
+**E56-Nachweis (PR-CI auf f761931):** Artefakt `evidence-031-http`, Lauf 36758090399, Artefakt-ID 11117652692, Digest
+sha256 1123dcfbcd366d07f7560cfca9137e4c336bafca7f1dc48e664027ffcc8929fb (enthält `031-h13-zweiter-browser.png`,
+`031-h14-verbindungsanzeige.png`). H13 aus diesem Lauf: Anmeldung 862 ms, Aufruf 796 ms; Schritt 1a 2 GET (`/v1/meeting`,
+`/v1/speakers`); Schritt 1b mit 2 Schreibvorgängen 4 GET; Schritt 2 1 GET (`/v1/meeting`), kein GET auf `/v1/speakers`
+oder `/v1/contributions`.
+
 **Bauentscheidungen (im Rahmen der Spec, für den Review):**
 1. N5-Genauigkeit: `liveStore.ts` ist gesperrt und kennt keine epochgebundene Invalidierung. `http.ts` merkt sich die
    Lesezugriffe (Methode, Argumente), die ohne synchronen Strom starten, schnappt sie beim Senden einer Stromanfrage ohne
@@ -414,7 +448,8 @@ Anfrage); passt zur früheren Lehre, dass `networkidle` kein Ersatz für das War
 
 **Restrisiko (angenommen, zweite Bauklärung 3):** Bauentscheidung 10 oben.
 
-**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/i18n/parity.test.ts`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
+**Touched:** `docs/slices/036b-strom-client.md`, `docs/folgeliste.md`, `apps/web/src/i18n/parity.test.ts`,
+`apps/web/e2e/support/e2e-texts.ts`, `apps/web/src/api/sse.ts`, `sse.test.ts`,
 `connection.ts`, `connection.test.ts`, `http.ts`, `http.test.ts`, `index.ts`, `apps/web/src/app/ConnectionStatus.tsx`,
 `ConnectionStatus.test.tsx`, `HeaderStrip.tsx`, `apps/web/src/i18n/shell.de.ts`, `shell.en.ts`,
 `apps/web/e2e/031-http-betriebsart.spec.ts`.
