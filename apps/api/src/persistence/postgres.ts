@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import { assertEventShape, verifyEventChain, type DomainEvent } from '@hv/domain';
+import { assertEventShape, sealVerifiedLog, verifiedEventCount, type DomainEvent, type VerifiedEventLog } from '@hv/domain';
+import { createEntry, decide, extendEntry, type ChainCache, type ChainCacheEntry, type ChainDecision } from './chainCache.ts';
 
 /** The per-meeting identity projection stored beside, and reconstructed from, the event log. */
 export interface PersonRow {
@@ -12,7 +14,8 @@ export interface PersonRow {
 }
 
 export interface PostgresSnapshot {
-  events: DomainEvent[];
+  /** Sealed by the domain (`sealVerifiedLog`): verified, frozen, and loaded by the store without a second check. */
+  events: VerifiedEventLog;
   persons: PersonRow[];
 }
 
@@ -162,14 +165,60 @@ export class PostgresIntegrityError extends Error {
   }
 }
 
+/**
+ * An event row as text (takt-033): the envelope arrives as `envelope::text` and is parsed here, so the row digest
+ * is computed over exactly the bytes the event was parsed from (the driver's jsonb parser is `JSON.parse` as well).
+ */
 interface EventDbRow {
-  seq: string | number;
+  seq: string;
   id: string;
   meeting_id: string | null;
   hash: string;
   prev_hash: string;
-  envelope: unknown;
+  envelope: string;
 }
+
+// The output alias `seq` is text: every ORDER BY and WHERE below names `events.seq` (the bigint) explicitly.
+const EVENT_COLUMNS = 'events.seq::text AS seq, id, meeting_id, hash, prev_hash, envelope::text AS envelope';
+const PERSONS_SQL = 'SELECT meeting_id, person_id, display_name, organisation, key_id, source_seq FROM persons ORDER BY meeting_id, person_id';
+
+/**
+ * Injective row encoding shared by Postgres and Node: every column checked by the loader, each as
+ * `<UTF-8 byte length>:<text>` or `N` for NULL, in a fixed order; the row digest is sha256 over it.
+ */
+const ROW_FIELDS = ['seq::text', 'id', 'meeting_id', 'hash', 'prev_hash', 'envelope::text'] as const;
+const ROW_DIGEST_SQL = `sha256(convert_to(${ROW_FIELDS.map((field) =>
+  `coalesce(octet_length(convert_to(${field}, 'UTF8'))::text || ':' || ${field}, 'N')`).join(' || ')}, 'UTF8'))`;
+
+function encodeField(value: string | null): string {
+  return value === null ? 'N' : `${Buffer.byteLength(value, 'utf8')}:${value}`;
+}
+
+function rowDigest(row: EventDbRow): string {
+  const text = [row.seq, row.id, row.meeting_id, row.hash, row.prev_hash, row.envelope].map(encodeField).join('');
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/**
+ * One statement, so one snapshot, also under READ COMMITTED (writes), where every statement takes its own: the probe
+ * (row count, highest seq, and the digest over all rows up to the cached end: sha256 over the concatenated row
+ * digests in seq order, the same as `prefixDigest` in `chainCache.ts`) together with the suffix rows `seq > $1`.
+ * Codex P1 on PR #88: with probe and suffix as two statements, an owner-level DELETE or restore in between could
+ * return an empty suffix beside the old `max(seq)`, and a write stamped oldEnd+1 onto a chain that no longer
+ * matched. The LEFT JOIN yields one row with NULL suffix columns when there are no newer rows.
+ */
+const CHAIN_SQL = `WITH probe AS (
+    SELECT count(*)::text AS count, coalesce(max(seq), 0)::text AS max_seq,
+      encode(sha256(coalesce(string_agg(${ROW_DIGEST_SQL}, ''::bytea ORDER BY events.seq) FILTER (WHERE events.seq <= $1), ''::bytea)), 'hex') AS digest
+    FROM events),
+  suffix AS (SELECT ${EVENT_COLUMNS}, events.seq AS seq_order FROM events WHERE events.seq > $1)
+  SELECT probe.count, probe.max_seq, probe.digest, suffix.seq, suffix.id, suffix.meeting_id, suffix.hash, suffix.prev_hash,
+    suffix.envelope
+  FROM probe LEFT JOIN suffix ON true ORDER BY suffix.seq_order`;
+
+/** A row of `CHAIN_SQL`: the probe values on every row, the suffix columns NULL when there is no newer row. */
+type ChainDbRow = { count: string; max_seq: string; digest: string } &
+  ({ [K in keyof EventDbRow]: EventDbRow[K] } | { [K in keyof EventDbRow]: null });
 
 interface PersonDbRow {
   meeting_id: string;
@@ -287,61 +336,51 @@ function personFromEvent(event: DomainEvent): PersonRow | undefined {
   };
 }
 
-function expectedPersons(events: readonly DomainEvent[]): Map<string, PersonRow> {
-  const result = new Map<string, PersonRow>();
-  for (const event of events) {
-    const person = personFromEvent(event);
-    if (person) result.set(`${person.meetingId}\0${person.personId}`, person);
-  }
-  return result;
-}
-
-/**
- * Load a fresh snapshot on the caller's transaction-bound client. The caller chooses the read
- * transaction isolation level; it must keep both SELECTs on one consistent snapshot.
- */
-export async function loadPostgresSnapshot(
-  client: PoolClient, queryTimeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
-): Promise<PostgresSnapshot> {
-  let eventRows: EventDbRow[];
-  let personRows: PersonDbRow[];
-  try {
-    const eventResult = await timedQuery<EventDbRow>(client, queryTimeoutMs,
-      'SELECT seq, id, meeting_id, hash, prev_hash, envelope FROM events ORDER BY seq',
-    );
-    const personResult = await timedQuery<PersonDbRow>(client, queryTimeoutMs,
-      'SELECT meeting_id, person_id, display_name, organisation, key_id, source_seq FROM persons ORDER BY meeting_id, person_id',
-    );
-    eventRows = eventResult.rows;
-    personRows = personResult.rows;
-  } catch (error) {
-    throw new PostgresPersistenceError(error);
-  }
-
+/** Row checks of every loaded event (shape, index columns against the envelope, seq without gaps from `firstSeq`). */
+function parseEventRows(rows: readonly EventDbRow[], firstSeq: number): { events: DomainEvent[]; digests: string[] } {
   const events: DomainEvent[] = [];
-  for (const [index, row] of eventRows.entries()) {
-    const seq = index + 1;
+  const digests: string[] = [];
+  for (const [index, row] of rows.entries()) {
+    const seq = firstSeq + index;
     try {
-      assertEventShape(row.envelope);
-      const event = row.envelope;
+      const envelope: unknown = JSON.parse(row.envelope);
+      assertEventShape(envelope);
+      const event = envelope;
       if (safeSeq(row.seq) !== seq || event.seq !== seq || row.id !== event.id ||
           row.meeting_id !== (event.meetingId ?? null) || row.hash !== event.hash ||
           row.prev_hash !== event.prevHash) {
         throw new PostgresIntegrityError(seq);
       }
       events.push(event);
+      digests.push(rowDigest(row));
     } catch {
       throw new PostgresIntegrityError(seq);
     }
   }
+  return { events, digests };
+}
+
+/** Seal (verify and freeze) through the domain; returns the log and how many events were hashed doing so. */
+function sealChecked(prefix: VerifiedEventLog | undefined, suffix: DomainEvent[]): { log: VerifiedEventLog; hashed: number } {
+  const before = verifiedEventCount();
   try {
-    verifyEventChain(events);
+    return { log: sealVerifiedLog(prefix, suffix), hashed: verifiedEventCount() - before };
   } catch (error) {
     const match = error instanceof Error ? /Event seq (\d+)/.exec(error.message) : null;
-    throw new PostgresIntegrityError(match ? Number(match[1]) : 1);
+    throw new PostgresIntegrityError(match ? Number(match[1]) : (prefix?.length ?? 0) + 1);
   }
+}
 
-  const expected = expectedPersons(events);
+function addExpectedPersons(target: Map<string, PersonRow>, events: readonly DomainEvent[]): Map<string, PersonRow> {
+  for (const event of events) {
+    const person = personFromEvent(event);
+    if (person) target.set(`${person.meetingId}\0${person.personId}`, person);
+  }
+  return target;
+}
+
+/** Every stored person row must be exactly one expected row, and every expected row must be stored. */
+function comparePersons(expected: ReadonlyMap<string, PersonRow>, personRows: readonly PersonDbRow[]): PersonRow[] {
   const persons: PersonRow[] = [];
   const seen = new Set<string>();
   for (const row of personRows) {
@@ -359,7 +398,148 @@ export async function loadPostgresSnapshot(
   for (const [key, person] of expected) {
     if (!seen.has(key)) throw new PostgresIntegrityError(person.sourceSeq);
   }
+  return persons;
+}
+
+interface FullLoad extends PostgresSnapshot {
+  rowsRead: number;
+  rowDigests: string[];
+  expected: Map<string, PersonRow>;
+  hashed: number;
+}
+
+async function loadFull(client: PoolClient, queryTimeoutMs: number): Promise<FullLoad> {
+  let eventRows: EventDbRow[];
+  let personRows: PersonDbRow[];
+  try {
+    eventRows = (await timedQuery<EventDbRow>(client, queryTimeoutMs, `SELECT ${EVENT_COLUMNS} FROM events ORDER BY events.seq`)).rows;
+    personRows = (await timedQuery<PersonDbRow>(client, queryTimeoutMs, PERSONS_SQL)).rows;
+  } catch (error) {
+    throw new PostgresPersistenceError(error);
+  }
+  const { events, digests } = parseEventRows(eventRows, 1);
+  const { log, hashed } = sealChecked(undefined, events);
+  const expected = addExpectedPersons(new Map(), log);
+  const persons = comparePersons(expected, personRows);
+  return { events: log, persons, rowsRead: eventRows.length, rowDigests: digests, expected, hashed };
+}
+
+/**
+ * Load a fresh snapshot on the caller's transaction-bound client and check all of it (the full path). The caller
+ * chooses the read transaction isolation level; it must keep both SELECTs on one consistent snapshot.
+ */
+export async function loadPostgresSnapshot(
+  client: PoolClient, queryTimeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
+): Promise<PostgresSnapshot> {
+  const { events, persons } = await loadFull(client, queryTimeoutMs);
   return { events, persons };
+}
+
+export interface ChainLoad {
+  snapshot: PostgresSnapshot;
+  /** Events whose hash was recomputed by this load (0 on a warm read without new events). */
+  hashed: number;
+  /** Event rows this load read into the service (k on a warm read with k new events; all on a full load). */
+  rowsRead: number;
+  /**
+   * The cached history no longer matches the database (prefix changed, or rows vanished) and the full check still
+   * found a valid chain: a restore or a rewrite. Open owner question 1, default (b): accepted, reported by the caller.
+   */
+  historyChanged: boolean;
+}
+
+/**
+ * takt-033: the snapshot through the per-app chain cache. Reads the cache before the first statement it sends, so
+ * the transaction's snapshot is never older than the entry it starts from (callers must not have read `events` in
+ * this transaction before). One statement (`CHAIN_SQL`) returns the probe and the newer rows from one snapshot.
+ * Incremental only when that probe reports an unchanged, gap-free prefix at the cached end (`decide`) and the newer
+ * rows end at its `max(seq)`; then only those rows are hashed, and all person rows are compared as before. Any deviation
+ * runs the full path; an integrity error there empties the cache and propagates unchanged. The cache moves only
+ * from database data verified here, by compare-and-swap; the caller's own new events never enter it directly.
+ */
+export async function loadPostgresSnapshotCached(
+  client: PoolClient, cache: ChainCache, queryTimeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
+): Promise<ChainLoad> {
+  const base = cache.current();
+  let decision: ChainDecision = { kind: 'full', reason: 'empty' };
+  let suffixRows: EventDbRow[] = [];
+  if (base !== undefined) {
+    const end = base.checkpoints.at(-1)!;
+    let rows: ChainDbRow[];
+    try {
+      rows = (await timedQuery<ChainDbRow>(client, queryTimeoutMs, CHAIN_SQL, [end.seq])).rows;
+    } catch (error) {
+      throw new PostgresPersistenceError(error);
+    }
+    const probe = rows[0];
+    suffixRows = rows.filter((row): row is ChainDbRow & EventDbRow => row.seq !== null);
+    // Incremental versus full is decided from this one statement only; any deviation runs the full path.
+    decision = probe === undefined ? { kind: 'full', reason: 'digest' }
+      : decide(base, { count: Number(probe.count), maxSeq: Number(probe.max_seq), checkpointSeq: end.seq, digest: probe.digest });
+    if (decision.kind === 'incremental') {
+      const incremental = await loadSuffix(client, cache, base, Number(probe!.max_seq), suffixRows, queryTimeoutMs);
+      if (incremental !== undefined) return incremental;
+    }
+  }
+  let full: FullLoad;
+  try {
+    full = await loadFull(client, queryTimeoutMs);
+  } catch (error) {
+    if (error instanceof PostgresIntegrityError) cache.invalidate();
+    throw error;
+  }
+  cache.compareAndSet(base, createEntry(full.events, full.rowDigests, full.expected));
+  return {
+    snapshot: { events: full.events, persons: full.persons },
+    hashed: full.hashed,
+    // The suffix rows of `CHAIN_SQL` were read too, even when the full path then ran.
+    rowsRead: full.rowsRead + suffixRows.length,
+    historyChanged: base !== undefined && (
+      (decision.kind === 'full' && (decision.reason === 'shortened' || decision.reason === 'digest')) ||
+      // Review finding 2: the probe may have passed and the full path (a later statement; a write under READ
+      // COMMITTED sees each statement on a new snapshot) found the prefix vanished or changed. Judge the result itself.
+      !continuesCachedEnd(full.events, base)),
+  };
+}
+
+/** Whether a verified log still contains the cached end unchanged (same hash at the cached end seq). */
+function continuesCachedEnd(log: VerifiedEventLog, base: ChainCacheEntry): boolean {
+  const end = base.checkpoints.at(-1)!;
+  return log.length >= end.seq && (end.seq === 0 || log[end.seq - 1]?.hash === end.lastHash);
+}
+
+/**
+ * The incremental path on the suffix rows `CHAIN_SQL` returned beside the probe (same snapshot); only the person rows
+ * are a further statement, as on the full path. `undefined` means "deviation, check in full" (never an answer from
+ * unchecked data).
+ */
+async function loadSuffix(
+  client: PoolClient, cache: ChainCache, base: ChainCacheEntry, maxSeq: number, eventRows: readonly EventDbRow[],
+  queryTimeoutMs: number,
+): Promise<ChainLoad | undefined> {
+  let personRows: PersonDbRow[];
+  try {
+    personRows = (await timedQuery<PersonDbRow>(client, queryTimeoutMs, PERSONS_SQL)).rows;
+  } catch (error) {
+    throw new PostgresPersistenceError(error);
+  }
+  try {
+    const { events, digests } = parseEventRows(eventRows, base.log.length + 1);
+    const { log, hashed } = events.length === 0 ? { log: base.log, hashed: 0 } : sealChecked(base.log, events);
+    // Probe and suffix share one snapshot, so the suffix must end exactly at `max(seq)`; anything else is a deviation.
+    if (log.length !== maxSeq) return undefined;
+    const expected = events.some((event) => event.type === 'SpeakerRegistered')
+      ? addExpectedPersons(new Map(base.persons), events) : base.persons;
+    const persons = comparePersons(expected, personRows);
+    if (events.length > 0) {
+      const next = extendEntry(base, log, [...base.rowDigests, ...digests], expected);
+      cache.compareAndSet(base, next);
+    }
+    return { snapshot: { events: log, persons }, hashed, rowsRead: eventRows.length, historyChanged: false };
+  } catch (error) {
+    if (error instanceof PostgresIntegrityError) return undefined;
+    throw error;
+  }
 }
 
 /** Insert only the already stamped suffix; the caller commits or rolls back its transaction. */

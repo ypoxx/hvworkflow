@@ -92,8 +92,14 @@ describe.skipIf(!enabled)('Scheibe 034a: migration 0003 and the purge of login s
     expect((await owner.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map((r) => r.version))
       .toEqual([1, 2, 3]);
     expect(await functionExists()).toBe(true);
-    const index = await owner.query(`SELECT 1 FROM pg_catalog.pg_indexes WHERE schemaname = $1
-      AND tablename = 'auth_login_states' AND indexdef LIKE '%(expires_at)%'`, [schema]);
+    // Raw catalogs, not pg_indexes: that view calls pg_get_indexdef() on rows of other schemas, which
+    // races with parallel test files dropping their schemas ("could not open relation with OID").
+    const index = await owner.query(`SELECT 1 FROM pg_catalog.pg_index i
+      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = i.indkey[0]
+      WHERE n.nspname = $1 AND t.relname = 'auth_login_states' AND i.indnatts = 1
+        AND a.attname = 'expires_at'`, [schema]);
     expect(index.rowCount).toBe(1);
     await runMigrations(owner, { direction: 'down' });
     expect(await functionExists()).toBe(false);
