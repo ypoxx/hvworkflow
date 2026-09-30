@@ -397,20 +397,20 @@ Slice: 035b-sse-dienst
 Done: GET /v1/stream über die ganze Middleware-Kette und validateOperation, ohne Postgres-Grenze und ohne domain-Proxy.
       Verteiler je App mit eigener Kontinuitätsprüfung (lastSeq, lastHash), Übergabe Nachlauf -> live ohne Lücke.
       Akteurkarte und frische Sitzungsprüfung je Stapel, Herzschlag und Frame; Grenzen 3/6/200, Rotation 25 min, Rückstau.
-Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa (geprüfte Fassung, letzter Codecommit);
-      ADR-Commits des Architekten 598273f, 2f24065, 03a8dec.
-      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 5736faa:
+Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 5736faa, 2769802 (geprüfte Fassung, letzter
+      Codecommit, Codex P1/P2); ADR-Commits des Architekten 598273f, 2f24065, 03a8dec; Basis 036a eingebracht in f37647d.
+      Schluss von `pnpm gates` mit Postgres-Variablen (hv_t035b) auf 2769802:
         apps/api test:  Test Files  39 passed (39)
-        apps/api test:       Tests  578 passed (578)
+        apps/api test:       Tests  580 passed (580)
         apps/api test: operation-coverage: 66 operations in the contract, 60 exercised by tests, 6 pre-declared in allowlist.json
         apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
         slice-scope: 14 changed file(s), all within "docs/slices/035b-sse-dienst.md"'s "Files allowed" list (20 pattern(s)).
-        ✓ built in 1.81s
-        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 5736faa, tree f15a2ade137a…
+        ✓ built in 1.84s
+        mark-test-run: wrote /home/user/wt/s035b/.claude/state/last-test-run (clean tree) at commit 2769802, tree 748cc8522725…
         exit 0
-      Stabilität auf 5736faa: beide Stromdateien dreimal hintereinander je 54/54 grün.
+      Stabilität auf 2769802: beide Stromdateien dreimal hintereinander je 56/56 grün.
       Tests (apps/api/src/__tests__/stream035.test.ts, postgres-stream035.test.ts); rot auf 6034a90 (Route fehlte, 37 von 38 rot),
-      grün auf 5736faa:
+      grün auf 2769802:
         12 Öffnen (200, Köpfe, retry, Heartbeat); Fehlerfälle 401/403/422/404/Preflight; Demo-Filter 403; 12 (Postgres) Migrationen 503
         13, 13a (Commit während der Übergabe), 13b (cursor nach Aufbau), 13c (nach reset)
         14 podium/moderation/expert/capture nach Trennung; 15 Cursor > Kopf, Abstand > 1000
@@ -428,10 +428,12 @@ Evidence: Baucommits 6034a90 (Tests rot), 3345906, 2601b23, 1bcfd4f, 28f7af3, 57
         R2 Ablauf vor gepuffertem Stapel (rot: Strom blieb offen); R3 Cursor > Kopf höchstens 2 Nachladen (rot: 10)
         R3b Leerlauf-Nachladen mit Abstand (rot: kleinster Abstand 20 ms); R4a/R4b/R4c Mutanten (leere Karte, unitId, Byte-Grenze) getötet
         R6 keine Lesung ohne Wartende (rot: 1); R6b Beitretender (Mutant ohne callers.push getötet); R6c GONE (rot auf 1bcfd4f)
-      Messwerte (5736faa, drei Läufe): Test 24 zweite Instanz 253–258 ms, gleiche Instanz 259–262 ms;
-        Test 28 210–216 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
-        Test 29 Schreiben max 596–722 ms, Median 354–445 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
-        Stapel bis letzte Zustellung 46–89 ms.
+        R7 Nachlauf-Frames einzeln erzeugt, höchstens 2 bei hängendem Leser (rot auf 5736faa: 1000)
+        R8 Rückstau zählt den laufenden Stapel (rot auf 5736faa: Verbindung blieb offen)
+      Messwerte (2769802, drei Läufe): Test 24 zweite Instanz 258–264 ms, gleiche Instanz 260–263 ms;
+        Test 28 211–220 Stichproben zwischen den Fenstern, 0 mit gehaltener Verbindung oder Transaktion;
+        Test 29 Schreiben max 743–897 ms, Median 423–482 ms, alle 201, höchstens 2 gleichzeitige Sitzungsprüfungen,
+        Stapel bis letzte Zustellung 52–106 ms.
 Open: Eigentümerfragen 1–3; Lasttest 071; Vertragswortlaut „gap-free in seq“ unter meetingId vor dem Bau von 036b (Folgeliste).
 Touched: apps/api/src/stream/hub.ts, apps/api/src/stream/route.ts, apps/api/src/stream/sessionCheck.ts, apps/api/src/stream/sse.ts,
       apps/api/src/app.ts, apps/api/src/limits/config.ts, apps/api/src/__tests__/stream035.test.ts,
