@@ -242,5 +242,8 @@ Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested
 6. **Minor, behoben.** `capture-suggest` hat die Wächterprüfung `if (!busy) onOpenSuggest()`.
 7. **Minor, Folgeliste.** Ein Schreiben, das während eines anderen läuft, wird stumm verworfen (kein Hinweis).
 8. **Nachweis-Lauf.** Gates auf sauberem Commit nach dem Merge von takt-030: der Koordinator übernimmt das.
-9. **Minor, Folgeliste.** Im Auftrag nicht näher beschrieben; der Wortlaut steht im Review-Bericht.
-10. **Minor, Folgeliste.** Im Auftrag nicht näher beschrieben; der Wortlaut steht im Review-Bericht.
+9. **Nit, Folgeliste.** `capture/Page.tsx:170-176` · das Paar trägt nicht, zu welchem Redebeitrag die Karten gehören; beim
+   Wechsel des Redebeitrags stehen kurz die Karten des vorigen da (vorbestehend, kein Rückschritt) · `contributionId` der
+   Fragelesung im Paar speichern.
+10. **Nit, erledigt mit Befund 1/2.** `useSpeakers.test.ts` (`etagForList`) · der Fall „weicht ab → übernimmt“ unterschied
+    Marke und Liste nicht · durch die Tests der beiden Szenarien veralteter Listen ersetzt.
