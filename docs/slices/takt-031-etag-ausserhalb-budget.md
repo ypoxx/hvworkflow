@@ -37,3 +37,11 @@ Wörtlicher Schluss von `pnpm gates`:
 ✓ built in 1.67s
 mark-test-run: wrote /home/user/wt/t031/.claude/state/last-test-run (clean tree) at commit 3ba3b35, tree fedb7841b6b2…
 ```
+
+Nachlauf nach dem Einmergen der Basis mit 031a (Codex P1 auf #81): `pnpm gates` mit Postgres-Variablen, DB `hv_t031`,
+auf dem integrierten Commit `6d792b8` (sauberer Baum), Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 2.52s
+mark-test-run: wrote /home/user/wt/t031/.claude/state/last-test-run (clean tree) at commit 6d792b8, tree df796ab85b4b…
+```
