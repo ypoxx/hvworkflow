@@ -33,10 +33,10 @@ den Dienst). Beide sind auf jedem PR Pflicht. Offene Punkte sind auf Standard ge
    Dateien geschieht über `testMatch`/`testIgnore` mit ausdrücklichen Dateinamen, nicht über `test.skip` in der Datei.
    Das `http`-Projekt läuft mit einem Worker (`--workers=1` im Harness; eine Datenbank je Lauf, Entscheidung 6).
 2. **Welche Szenarien in welchem Projekt (Standard, Eigentümerfrage 1).** Der Planwortlaut „alle Szenarien“ und
-   ADR 0002 („dieselbe e2e-Suite“) sind wörtlich nicht in 1,5 bis 3 AStd erfüllbar: 12 der 17 Dateien prüfen
+   ADR 0002 („dieselbe e2e-Suite“) sind wörtlich nicht in 1,5 bis 3 AStd erfüllbar: zehn der 17 heutigen Dateien prüfen
    Oberflächenzustände mit Fehlerinjektion im Browser-Kern (`import('/src/api/index.ts')`), mit dem Demo-Speicher
    (`localStorage`) oder mit dem Rollenumschalter selbst; gegen den Dienst hätten sie keinen Gegenstand oder bräuchten
-   je Test eine frische Datenbank. Standard: **alle Szenarien, die Verhalten des Dienstes berühren, laufen in beiden
+   je Test eine frische Datenbank; `024` prüft das Demo-Protokoll selbst, `030` den HTTP-Build mit Attrappen. Standard: **alle Szenarien, die Verhalten des Dienstes berühren, laufen in beiden
    Projekten; Oberflächenszenarien mit Fehlerinjektion im Browser bleiben `in-process`.** Feste Liste:
 
    | Datei | in-process | http | Grund |
