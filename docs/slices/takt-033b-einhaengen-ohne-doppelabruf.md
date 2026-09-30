@@ -128,6 +128,11 @@ Postgres. H10 selbst braucht Keycloak und läuft nur in der PR-CI (`e2e-http`). 
 mark-test-run: wrote /home/user/wt/t033b/.claude/state/last-test-run (clean tree) at commit 0134d57, tree c44d91fba931…
 ```
 
+**Bildnachweis nach E56 (AGENTS.md R2, Eigentümer 30.09.2026).** H10 läuft nur gegen Keycloak im Job `e2e-http`; der
+Screenshot `031-h10-einhaengen-ein-abruf.png` liegt im CI-Artefakt, nicht im Repo:
+Artefakt `evidence-031-http`, Lauf `36674923822` (Commit `579d656`, Job `e2e-http` grün, H10 mit genau einem Abruf je
+Einhängen), Artefakt-ID `11079413526`, Digest `sha256:ce4a7bf4aec920e95b4e801deab8bd005173f83b4fd9cc5c34c959213c6c8c24`.
+
 ## Review findings
 
 Review in frischem Kontext (reviewer-sonnet, nur Spec und Diff, f33b1fd): **freigegeben**, kein Blocker, kein Major.
