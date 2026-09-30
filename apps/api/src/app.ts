@@ -24,6 +24,7 @@ import {
   etagOf,
   seedEvents,
   systemClock,
+  verifiedEventCount,
   SYSTEM_ACTOR,
   type Actor,
   type DomainEvent,
@@ -68,8 +69,9 @@ import { createRequestLog } from './observability/requestLog.ts';
 import { createSubjectHasher } from './observability/subjectHash.ts';
 import { problemBody, problemResponse } from './problem.ts';
 import { getMigrationStatus } from './persistence/migrations.ts';
-import { assertRuntimePrivileges, insertPostgresEvents, isPersistenceBusy, loadPostgresSnapshot, mustDiscardConnection,
-  pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimers } from './persistence/postgres.ts';
+import { createChainCache } from './persistence/chainCache.ts';
+import { assertRuntimePrivileges, insertPostgresEvents, isPersistenceBusy, loadPostgresSnapshotCached, mustDiscardConnection,
+  pooledQuery, PostgresIntegrityError, timedQuery, withQueryTimers, type ChainLoad } from './persistence/postgres.ts';
 import { getValidatedBody, getValidatedQuery, validateOperation, type Variables } from './validate.ts';
 
 export interface CreateAppOptions {
@@ -150,7 +152,14 @@ export interface CreateAppOptions {
    */
   corsOrigins?: readonly string[];
   /** Tests only: run a statement on the request's transaction connection at a named point of a write's Postgres boundary. */
-  testHooks?: { at?: (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>) => Promise<void> };
+  testHooks?: {
+    at?: (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>) => Promise<void>;
+    /**
+     * takt-033: after each Postgres load (business request or auth lookup), the number of events hashed for it
+     * (loader plus request store) and the seq the chain cache ends at afterwards.
+     */
+    chain?: (info: { hashed: number; cachedSeq: number | undefined }) => void;
+  };
   /** Slice 027: readiness probes are injected so the server can check real DB/migration state. */
   readiness?: {
     clock: () => Promise<ReadinessCheck>;
@@ -245,16 +254,31 @@ export function createApp(options: CreateAppOptions = {}): App {
   const transparencyNotice = noticeCandidate?.version.trim() && noticeCandidate.text.de.trim() &&
     noticeCandidate.text.en.trim() ? { version: noticeCandidate.version, text: noticeCandidate.text,
       ...(summaryUrl ? { dataProtectionSummaryUrl: summaryUrl } : {}) } : undefined;
+  // takt-033: one verified-chain cache per app (and so per process), shared by business requests and auth lookups.
+  // Every load still reads its own snapshot: the database digest decides whether the cached prefix is usable.
+  const chainCache = createChainCache();
+  const loadChain = async (client: PoolClient): Promise<ChainLoad> => {
+    const load = await loadPostgresSnapshotCached(client, chainCache, limits.queryTimeoutMs);
+    // Open owner question 1, default (b): a changed or shortened history with a valid chain is accepted, with one
+    // fixed line per occurrence and no content (no seq, no id, no value).
+    if (load.historyChanged) console.error('HV-Tool API: stored event history changed or was shortened; the valid chain was accepted.');
+    return load;
+  };
+  const reportChain = (hashed: number): void => {
+    options.testHooks?.chain?.({ hashed, cachedSeq: chainCache.current()?.log.length });
+  };
   // One read-only snapshot on a connection of its own (sign-in role lookup, metrics). A connection whose own query
-  // timer fired is destroyed, never returned to the pool (slice 034a).
+  // timer fired is destroyed, never returned to the pool (slice 034a). The suffix is read on every call, so a
+  // committed `RoleRevoked` counts on the next lookup; there is no time-based cache of the actor.
   const readSnapshotEvents = async (): Promise<readonly DomainEvent[]> => {
     const client = await options.postgres!.connect();
     let discard: Error | undefined;
     try {
       await timedQuery(client, limits.queryTimeoutMs, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-      const snapshot = await loadPostgresSnapshot(client, limits.queryTimeoutMs);
+      const load = await loadChain(client);
       await timedQuery(client, limits.queryTimeoutMs, 'COMMIT');
-      return snapshot.events;
+      reportChain(load.hashed);
+      return load.snapshot.events;
     } catch (error) {
       if (mustDiscardConnection(error)) discard = error as Error;
       else await timedQuery(client, limits.queryTimeoutMs, 'ROLLBACK').catch((rollbackError: unknown) => {
@@ -531,13 +555,18 @@ export function createApp(options: CreateAppOptions = {}): App {
       if (write) await options.testHooks?.at?.('afterLock', async (sql) => { await query(sql); });
       // A request that waited for the lock beyond its time budget was answered 408 already: leave early.
       if (phaseIs('timedOut')) return await rollback();
-      const snapshot = await loadPostgresSnapshot(client, queryMs);
+      const load = await loadChain(client);
+      const snapshot = load.snapshot;
       if (phaseIs('timedOut')) return await rollback();
       let pendingEvents = snapshot.events.slice(snapshot.events.length);
+      // The sealed log is not checked a second time here; own new events reach the cache only after COMMIT, as
+      // rows the next request reads and verifies (takt-033, goal 2 (e)).
+      const hashedBefore = verifiedEventCount();
       const requestStore = createInMemoryEventStore({
         load: () => snapshot.events,
         save: (all) => { pendingEvents = all.slice(snapshot.events.length); },
       });
+      reportChain(load.hashed + verifiedEventCount() - hashedBefore);
       const persons = new Map<string, { personId: string; displayName: string; organisation?: string }[]>();
       for (const row of snapshot.persons) {
         const list = persons.get(row.meetingId) ?? [];
