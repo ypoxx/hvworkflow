@@ -134,3 +134,11 @@ Rechte bleiben aktuell: Ein Rechtewechsel ändert `role` am Akteur und zählt; R
    auf ein Produktsignal statt `networkidle` warten.
 4. nit · `useApiVersion.test.ts:19` `_unused` · Lint grün (Gates).
 5. nit · Rot-zuerst nur in Prosa belegt · keine Änderung.
+
+**Nachlauf auf dem integrierten Commit `f9a8409`** (Basis mit takt-034, takt-036 und Doku eingemergt), `pnpm gates` mit
+Postgres-Variablen, sauberer Baum, Exit 0. Wörtlicher Schluss:
+
+```
+✓ built in 1.71s
+mark-test-run: wrote /home/user/wt/t033b/.claude/state/last-test-run (clean tree) at commit f9a8409, tree 835dd5ee1624…
+```
