@@ -17,6 +17,10 @@
 ## Befund (Ist-Stand, gelesen auf `59ef4fd`)
 
 - `createHttpApi.subscribe` (`apps/web/src/api/http.ts`) kennt nur den 30-s-Takt.
+- **Vertrag (Codex P1):** Die Steuernachrichten `cursor`, `reset` und `end` (Schemas `StreamCursor`, `StreamReset`,
+  `StreamEnd`) sowie `change` (`StreamChange`, `StreamTopic`) stehen **nicht** im heutigen `openapi.yaml` (0.3.10). Sie
+  kommen mit Vertrag **0.3.11** aus Scheibe 035a und liegen über die Voraussetzung 035b (die auf 035a baut) vor. 036b baut
+  gegen den Vertrag in dieser Fassung und ändert selbst nichts am Vertrag, auch nicht `packages/contract/src/types.ts`.
 - `createSessionAuth` (`apps/web/src/api/auth.ts`) ruft `onActorChange(actor)`, sobald `/auth/me` die Sitzung bestätigt.
   Das geschieht, **bevor** die Shell Ansichten einhängt (`App.tsx`: Zustand `checking` zeigt `BootScreen`). Bei 401
   bzw. Abmelden ruft es `onActorChange(undefined)`.
@@ -60,8 +64,8 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
      einem Rollenentzug bei geschlossenem Strom gepufferte Entwürfe, Claims und `_actions` weiter ausgeliefert.
    - `end {unavailable}` und 503 → Rückfall, Neuaufbau nach `Retry-After`.
    - 429 → dieser Tab bleibt beim Rückfall und versucht es nach `Retry-After` erneut.
-   - **401 (m4)** → `onUnauthorized` wie jede Anfrage; **kein** Neuaufbau, bis `onActorChange(actor)` die Sitzung erneut
-     bestätigt.
+   - **401 beim Öffnen oder Wiederöffnen (m4, Codex P1)** → `liveStore.clear()` wie bei 403 und `end`, dann
+     `onUnauthorized` wie jede Anfrage; **kein** Neuaufbau, bis `onActorChange(actor)` die Sitzung erneut bestätigt.
    - **Heartbeat-Wächter (m4):** 45 s ohne Heartbeat oder Nachricht → Verbindung verwerfen, Zustand `reconnecting`,
      Takt aktiv.
    - **Kurzlebige Ströme (m8):** Enden drei Ströme hintereinander innerhalb von je 10 s, ohne andere Nachrichten als
@@ -116,7 +120,7 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
 
 ## Vor dem Bau prüfen
 
-1. 035b und 036a gemergt.
+1. 035b und 036a gemergt; `packages/contract/src/types.ts` enthält Vertrag 0.3.11 aus 035a (`StreamChange`, `StreamCursor`, `StreamReset`, `StreamEnd`). Fehlt das, anhalten.
 2. **`vite preview`-Proxy (m6):** Reicht er `text/event-stream` ungepuffert durch? Probe im Projekt `http`: Ein
    Heartbeat oder `cursor` kommt innerhalb von 16 s nach dem Öffnen im Browser an. Puffert der Proxy, ist das ein
    Befund: melden und anhalten, keine Konfigurationsänderung in dieser Scheibe.
@@ -144,7 +148,8 @@ Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-
    - `end {rotate}` → sofort neu;
    - `end {roles_changed}`, `forbidden`, `session` → `clear()`, Sitzung neu lesen, Neuaufbau erst nach Bestätigung;
    - 429 → Takt aktiv, erneuter Versuch nach `Retry-After`;
-   - 401 → `onUnauthorized`, kein Neuaufbau ohne neue Bestätigung (m4);
+   - 401 beim Öffnen und beim Wiederöffnen → Puffer leer (`clear()` aufgerufen, danach geht ein zuvor gepufferter
+     Lesezugriff ins Netz), `onUnauthorized` gerufen, kein Neuaufbau ohne neue Bestätigung (m4, Codex P1);
    - **Wiederöffnen nach verborgenem Tab antwortet 403** → Puffer leer, `/auth/me` wird gerufen, kein weiteres Öffnen
      ohne neue Bestätigung;
    - nach `end {roles_changed}` und erfolgreichem `/auth/me` mit strukturell gleichem Akteur → Strom öffnet neu;
