@@ -39,8 +39,8 @@ Die fünf Dateien, die Verhalten des Dienstes berühren, laufen in beiden Projek
    031a auf genau diese Reihenfolge. Jede gemeinsame Datei muss gegen den Datenbankzustand grün sein, den ihre Vorgänger
    hinterlassen (siehe „Vor dem Bau prüfen“ 2).
 5. **Halteregel Laufzeit.** Die Zeitgrenzen im Test (`answersFilterMs`, `stageNavMs` < 1 500 ms) gelten in beiden
-   Projekten. Dauert `abnahme.spec.ts` im Projekt `http` länger als 120 s, wird angehalten und die Spec geklärt; kein
-   Timeout und keine Grenze wird still angehoben. Das `http`-Projekt insgesamt bleibt ≤ 6 min, der Job `e2e-http` ≤ 12 min
+   Projekten. Dauert `abnahme.spec.ts` im Projekt `http` länger als 120 s oder überschreitet dort `answersFilterMs` oder
+   `stageNavMs` die 1 500 ms, wird angehalten und die Spec geklärt; kein Timeout und keine Grenze wird still angehoben. Das `http`-Projekt insgesamt bleibt ≤ 6 min, der Job `e2e-http` ≤ 12 min
    (Budget aus 031a).
 6. **Texte für die Zugriffslog-Prüfung.** Die Fragetexte und Redebeiträge aus `abnahme.spec.ts` und
    `002-speakers-capture.spec.ts` wandern in `apps/web/e2e/support/e2e-texts.ts` (aus 031a); die Dateien importieren sie
@@ -76,7 +76,7 @@ dass die `in-process`-Bilder unverändert bleiben.
 - `apps/web/e2e/support/roles.ts` (neu)
 - `apps/web/e2e/support/evidence.ts` (neu)
 - `apps/web/e2e/support/e2e-texts.ts` (nur Texte der gemeinsamen Dateien ergänzen)
-- `apps/web/e2e/abnahme.spec.ts`, `apps/web/e2e/002-speakers-capture.spec.ts`, `apps/web/e2e/021b-koordination.spec.ts`, `apps/web/e2e/021c-rechtsfreigabe.spec.ts`, `apps/web/e2e/080-sprecher-zustand.spec.ts` (nur Rollenwechsel- und Nachweishilfe, Texte aus der Konstante, ausdrückliches Wiederherstellen von Zustand nach Rollenwechsel)
+- `apps/web/e2e/abnahme.spec.ts`, `apps/web/e2e/002-speakers-capture.spec.ts`, `apps/web/e2e/021b-koordination.spec.ts`, `apps/web/e2e/021c-rechtsfreigabe.spec.ts`, `apps/web/e2e/080-sprecher-zustand.spec.ts` (nur Rollenwechsel- und Nachweishilfe, Import von `test`/`expect` aus `apps/web/e2e/support/http-guard.ts` statt aus `@playwright/test` (429-Wächter, 031a Entscheidung 9), Texte aus der Konstante, ausdrückliches Wiederherstellen von Zustand nach Rollenwechsel)
 - `scripts/e2e-http-031.test.mjs` (nur Erweiterung der Reihenfolgeprüfung)
 - `docs/adr/0002-demo-betriebsart-in-process.md` (nur Abschnitt „Ergänzung“: Wortlaut zur gemeinsamen Suite und Nachweis; **geschrieben vom Architekten**, nicht vom Implementierer; steht hier, damit dessen Commit auf dem Baubranch das Scheibenumfang-Tor passiert)
 - `docs/folgeliste.md` (nur nicht blockierende Reviewbefunde dieser Scheibe)
@@ -153,6 +153,8 @@ Entscheidung 4, Prüfung gegen den Zustand der Vorgänger „Vor dem Bau prüfen
 (Teilung; 031b ist Teil 2), m15 (ehrlicher Grund für 003, Entscheidung 8), n24 (Eigentümerfrage eng gefasst), n25
 (Texte der gemeinsamen Dateien in der Konstante, Entscheidung 6). Alle übrigen Befunde betreffen 031a und sind dort
 abgearbeitet. Ein eigener Lesebefund zu 031b vor dem Bau ist bei Klasse mittel nicht Pflicht.
+
+Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Halteregel auch für `answersFilterMs` und `stageNavMs` im Projekt `http` (Entscheidung 5), Import des 429-Wächters in den fünf gemeinsamen Dateien erlaubt (Files allowed).
 
 ## Review findings
 

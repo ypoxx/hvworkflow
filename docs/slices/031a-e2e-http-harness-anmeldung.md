@@ -48,7 +48,7 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
 4. **Keine Traces, keine Videos, kein HTML-Protokoll (Sicherheit).** Für `http-setup` und `http`: `trace: 'off'`,
    `video: 'off'`, `screenshot: 'only-on-failure'`. Bei `E2E_HTTP=1` ist der Reporter nur `[['list']]` (kein
    `html`), weil das HTML-Protokoll `fill`-Werte zeigt, also Passwörter der Testpersonen. `scripts/e2e-http-031.test.mjs`
-   sichert das: es lädt die Konfiguration in einem Kindprozess mit Arbeitsverzeichnis `apps/web` und `E2E_HTTP=1`
+   sichert das (TypeScript lädt der Test nur in einem Kindprozess oder über den tsx-Lader, nie direkt): es lädt die Konfiguration in einem Kindprozess mit Arbeitsverzeichnis `apps/web` und `E2E_HTTP=1`
    (einmal mit, einmal ohne `E2E_HTTP_IDP=none`), gibt Reporter und `use` der Projekte als JSON aus und prüft
    `trace === 'off'` und `video === 'off'` in beiden HTTP-Projekten sowie das Fehlen eines `html`-Reporters.
 5. **Gleiche Herkunft über den Vite-Proxy, kein CORS (Lehre 034a/034b).** Die Oberfläche läuft vom Vite-Origin; `/v1`
@@ -134,8 +134,13 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
    | Anmeldung je Quelle / gesamt, anonym, Proben, Preflight | 120 / 600, 600, 600, 1 200 | Standard | — | alle Anfragen kommen über den Proxy von einer Quelle; `http-setup` meldet 8 Personen an, H4–H7 weitere 4; weit unter 120 je Minute |
 
    Harness-Regel: die gesamte Anmeldegrenze ist nie kleiner als die je Quelle (Standard 600 ≥ 120; das Harness prüft
-   es an seiner eigenen Umgebung). `apps/web/e2e/support/http-guard.ts` lässt jeden Test des `http`-Projekts scheitern,
-   sobald eine Antwort des Dienstes 429 trägt (Pfad im Fehlertext, ohne Header und Body). 031a behauptet nicht, dass die
+   es an seiner eigenen Umgebung). `apps/web/e2e/support/http-guard.ts` lässt jeden Test scheitern, sobald eine
+   Antwort des Dienstes 429 trägt (Pfad im Fehlertext, ohne Header und Body). Mechanismus (fest): das Modul exportiert
+   `test` als `base.extend` mit einer automatischen Fixture (`{ auto: true }`), die am Kontext `on('response')` hängt und
+   nach dem Test bei einem 429 scheitert, sowie `expect` unverändert weiter. Jede Datei des `http`-Projekts importiert
+   `test` und `expect` aus diesem Modul statt aus `@playwright/test` (in 031a `031-http-betriebsart.spec.ts`,
+   `030-anmeldung.spec.ts` und `anmeldung.setup.ts`; 031b erlaubt denselben Import in den fünf gemeinsamen Dateien).
+   Im Projekt `in-process` ist die Fixture wirkungslos (kein Dienst). 031a behauptet nicht, dass die
    Standardwerte im Betrieb reichen (Messung 071/078).
 10. **CI: eigener Job `e2e-http`, 084 nicht vorausgesetzt.** In `.github/workflows/*.yml` gibt es keine Job-Matrix aus
     084 (Job `gates` auf `push` und `pull_request`, dazu `nightly`); 031a baut den PR-Teil („PR voll … http-Projekt ab
@@ -187,10 +192,12 @@ Standard gebaut und als solche markiert. „HTTP-Modus“ heißt hier: der Vite-
       `stdio: 'ignore'` auf, der nächste Abruf ist 401, die Oberfläche zeigt die Anmeldeseite ohne Fachdaten;
       Screenshot `031-http-401.png`.
     - **H7** `@idp` Person `norole`: echtes 403 mit CSRF-Token, Seite „Keine aktive Rolle“, Abmelden funktioniert.
-    - **H8** `@idp` Zwei Schreiber, echtes 412: `moderation` legt über die Oberfläche eine neue Wortmeldung an, `capture`
-      öffnet deren Redebeitrag; eine zweite `capture`-Sitzung (Request-Kontext mit Cookie und CSRF-Token aus
-      `http-setup`) ändert ihn mit gültigem `If-Match`; die Oberfläche schreibt mit der alten Version, erhält 412 und
-      zeigt das Veraltet-Banner; der unbestätigte Text bleibt; Screenshot `031-http-412.png`. Texte aus `e2e-texts.ts`.
+    - **H8** `@idp` Zwei Schreibende, echtes 412 über das ETag: `moderation` legt über die Oberfläche eine neue
+      Wortmeldung an; die Erfassung legt zuerst deren Redebeitrag an und öffnet ihn. Beide Schreibenden nutzen **dieselbe**
+      `capture`-Sitzung aus `http-setup`: die Seite und ein Request-Kontext mit deren Cookie und CSRF-Token. Der
+      Request-Kontext ändert den Redebeitrag mit dem gültigen `If-Match`; danach schreibt die Seite mit dem alten ETag,
+      erhält 412 und zeigt das Veraltet-Banner; der unbestätigte Text bleibt; Screenshot `031-http-412.png`. Texte aus
+      `e2e-texts.ts`.
 13. **Setup und Verdrahtung von `030`.** `apps/web/e2e/http/anmeldung.setup.ts` (Projekt `http-setup`) meldet die 8
     Personen mit Rolle über das echte Keycloak-Formular an und speichert je Rolle einen `storageState` unter
     `E2E_HTTP_STATE_DIR`; die Passwörter liest es aus einer Datei mit 0600 dort. In 031a hat `http` keinen
@@ -261,9 +268,9 @@ Harness wörtlich geprüft (eine unbekannte Variable erzeugt `ignoring unknown v
 - `apps/web/e2e/031-http-betriebsart.spec.ts` (neu, H1–H8)
 - `apps/web/e2e/http/anmeldung.setup.ts` (neu, Setup-Projekt)
 - `apps/web/e2e/support/http-guard.ts` (neu, 429-Wächter)
-- `apps/web/e2e/support/e2e-texts.ts` (neu, gemeinsame synthetische Texte für Tests und Zugriffslog-Prüfung)
+- `apps/web/e2e/support/e2e-texts.ts` (neu, gemeinsame synthetische Texte für Tests und Zugriffslog-Prüfung; nur `export const` mit Zeichenketten und Listen, nichts, was Type Stripping nicht entfernen kann: kein `enum`, kein `namespace`, keine Parametereigenschaften, keine Importe)
 - `apps/web/e2e/support/node-fs.d.ts` (nur Typen für Umgebungsvariablen, Datei lesen/schreiben/Rechte und Kindprozesse)
-- `apps/web/e2e/030-anmeldung.spec.ts` (nur Selbst-Überspringen entfernen)
+- `apps/web/e2e/030-anmeldung.spec.ts` (nur Selbst-Überspringen entfernen und Import von `test`/`expect` aus dem Wächtermodul)
 - `apps/web/src/api/http.test.ts` (nur Test „zwei Aufrufe → verschiedene Idempotenzschlüssel“)
 - `scripts/e2e-http-031.mjs` (neu), `scripts/e2e-http-031.test.mjs` (neu)
 - `scripts/lib/keycloak-ci.mjs` (neu)
@@ -398,6 +405,8 @@ Lesebefund in frischem Kontext (Opus, 30.09.2026) zur ersten Fassung (Spec 031):
 | n24 Eigentümerfrage 1 eng | durch die Teilung in 031b verengt |
 | n25 gemeinsame Textkonstante | Entscheidung 6 Stufe 6, `e2e-texts.ts` |
 | n26 Summe der Schrittgrenzen | Entscheidung 11 |
+
+Enge Nachprüfung (30.09.2026): baureif; nachgetragen: Mechanismus des 429-Wächters (automatische Fixture, Import aus `http-guard.ts`, Entscheidung 9), Wortlaut H8 (eine `capture`-Sitzung, 412 über das ETag, Redebeitrag zuerst), TypeScript im Skripttest nur über Kindprozess oder tsx-Lader (Entscheidung 4), `e2e-texts.ts` nur mit entfernbarer Typsyntax (Files allowed).
 
 ## Review findings
 
