@@ -409,6 +409,9 @@ describe('live store (slice 036a)', () => {
     for (let i = 0; i <= 200; i++) await t.store.getQuestion(`q${i}`);
     await t.store.getQuestion('q200');
     expect(t.count('getQuestion', 'q200')).toBe(1);
+    // Review nit 8: exactly one entry went, the second oldest is still there (a cap off by one fails here).
+    await t.store.getQuestion('q1');
+    expect(t.count('getQuestion', 'q1')).toBe(1);
     await t.store.getQuestion('q0');
     expect(t.count('getQuestion', 'q0')).toBe(2);
   });
@@ -506,7 +509,7 @@ describe('live store (slice 036a)', () => {
     expect(fresh[0]).toMatchObject({ stand: 8 });
   });
 
-  it('(o) claims expire without an event: at claim.expiresAt, at the latest after 30 s; no claim, no maximum age', async () => {
+  it('(o) claims expire without an event and wake the listeners: at claim.expiresAt, at the latest after 30 s', async () => {
     const t = setup();
     const at = (ms: number) => new Date(ms).toISOString();
     t.setRespond((method, args) => {
@@ -525,12 +528,14 @@ describe('live store (slice 036a)', () => {
     await t.store.getQuestion('q3');
     expect(t.count('getQuestion', 'q1')).toBe(2);
     expect(t.count('getQuestion', 'q2')).toBe(1);
+    expect(t.count('getQuestion', 'q3')).toBe(1);
     await t.advance(20_000);
+    // Only q2 wakes the listeners; q3 (no claim) reaches the general maximum age silently (review M1).
     expect(t.heard).toHaveBeenCalledTimes(2);
     await t.store.getQuestion('q2');
     await t.store.getQuestion('q3');
     expect(t.count('getQuestion', 'q2')).toBe(2);
-    expect(t.count('getQuestion', 'q3')).toBe(1);
+    expect(t.count('getQuestion', 'q3')).toBe(2);
     // A claim already past on arrival (clock skew) is not buffered and wakes nobody: no reload loop.
     const heard = t.heard.mock.calls.length;
     await t.store.getQuestion('q4');
@@ -538,6 +543,102 @@ describe('live store (slice 036a)', () => {
     await t.store.getQuestion('q4');
     expect(t.count('getQuestion', 'q4')).toBe(2);
     expect(t.heard.mock.calls.length).toBe(heard);
+  });
+
+  it('(q) review M1: every entry has a maximum age of 30 s; it expires silently and the next read asks the network', async () => {
+    const t = setup();
+    await t.store.listSpeakers();
+    await t.advance(29_999);
+    await t.store.listSpeakers();
+    expect(t.count('listSpeakers')).toBe(1);
+    await t.advance(1);
+    expect(t.heard).not.toHaveBeenCalled();
+    const read = track(t.store.listSpeakers());
+    await drain();
+    expect(read.status).toBe('fulfilled');
+    expect(t.count('listSpeakers')).toBe(2);
+    // The fresh answer starts a new 30 s.
+    await t.advance(29_999);
+    await t.store.listSpeakers();
+    expect(t.count('listSpeakers')).toBe(2);
+  });
+
+  describe('review M2: no caller joins a request started before an invalidation', () => {
+    it('(r1) after an own write (success)', async () => {
+      const t = setup();
+      t.setHold(true);
+      const first = track(t.store.listQuestions());
+      t.store.onWriteSettled('success');
+      void t.store.listQuestions();
+      expect(t.count('listQuestions')).toBe(2);
+      t.held.splice(0).forEach((call) => call.resolve({ items: [], total: 0 }));
+      await drain();
+      expect(first.status).toBe('fulfilled');
+    });
+
+    it('(r2) after a key invalidation (change with subjects)', async () => {
+      const t = setup();
+      t.setHold(true);
+      void t.store.getQuestion('q1');
+      t.emit([], { seq: 2, topics: ['questions'], subjects: ['q1'] });
+      await t.advance(100);
+      void t.store.getQuestion('q1');
+      expect(t.count('getQuestion', 'q1')).toBe(2);
+    });
+
+    it('(r3) after a higher getMeeting counter', async () => {
+      const t = setup();
+      let listVersion = 5;
+      t.setRespond((method) => (method === 'getMeeting' ? { id: 'm1', version: 1, speakerListVersion: listVersion } : []));
+      await t.store.getMeeting();
+      t.setHold(true);
+      void t.store.listSpeakers();
+      t.setHold(false);
+      listVersion = 6;
+      t.emit([], { seq: 2, topics: ['meeting'] });
+      await t.advance(100);
+      await t.store.getMeeting();
+      t.setHold(true);
+      void t.store.listSpeakers();
+      expect(t.count('listSpeakers')).toBe(2);
+    });
+
+    it('(r4) after clear() for the same actor', async () => {
+      const t = setup();
+      t.setHold(true);
+      const first = track(t.store.listQuestions());
+      t.store.clear('logout');
+      void t.store.listQuestions();
+      expect(t.count('listQuestions')).toBe(2);
+      t.held.shift()!.resolve({ items: [], total: 0 });
+      await drain();
+      expect(first.status).toBe('pending');
+    });
+  });
+
+  it('(s) review minor 3: an actor switch between the arrival of a shared answer and its delivery withholds it', async () => {
+    const t = setup();
+    t.setHold(true);
+    const first = track(t.store.listQuestions());
+    const joined = track(t.store.listQuestions());
+    expect(t.count('listQuestions')).toBe(1);
+    // The answer arrives (its check passes for A); in the next microtask, before delivery, the actor switches.
+    t.held.shift()!.resolve({ items: [{ secret: true }], total: 1 });
+    queueMicrotask(() => t.setActor({ ...A, role: 'legal' }));
+    await drain();
+    expect(first.status).toBe('pending');
+    expect(joined.status).toBe('pending');
+  });
+
+  it('(t) review minor 4: a failure inside the settling (answer that cannot be copied) reaches the caller as a rejection', async () => {
+    const t = setup();
+    t.setRespond(() => ({ id: 'q1', notData: () => 1 }));
+    const read = track(t.store.getQuestion('q1'));
+    await drain();
+    expect(read.status).toBe('rejected');
+    t.setRespond(() => ({ id: 'q1' }));
+    await t.store.getQuestion('q1');
+    expect(t.count('getQuestion', 'q1')).toBe(2);
   });
 
   it('(p) READ_TOPICS names every read method of HvApi except listEvents', () => {

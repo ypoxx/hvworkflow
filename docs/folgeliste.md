@@ -293,6 +293,11 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 ## Live-Store (aus 036a)
 
 - 036a Bauhinweis · `apps/web/src/api/liveStore.ts` · der In-Process-`subscribe` meldet `[]` ohne `change`, wenn für den Leser nichts Lesbares geändert wurde; nach Entscheidung 3 leert das den ganzen Puffer (Verhalten wie vor 036a, aber unnötige Abrufe) · im Demo-Adapter nur melden, wenn es etwas zu melden gibt, oder einen leeren Aufruf als „nichts“ kennzeichnen.
+- 036a Review minor 5 · `apps/web/src/features/speakers/*` (mehrstufige Abläufe, z. B. `moveSpeakerToRound`) · wird ein
+  Lesezugriff nach einem strukturellen Akteurwechsel zurückgehalten (Entscheidung 4, unerledigtes Promise), bleibt die
+  Busy-Referenz des Ablaufs bis zum Neu-Einhängen gesetzt · den Ablauf an den Akteur binden und beim Akteurwechsel freigeben.
+- 036a Review nit 11 · `apps/web/src/api/liveStore.ts` · der Themenweg (`change`/`event` → gezielte Invalidierung) ist nur
+  durch Unit-Tests belegt, kein e2e prüft ihn gegen den echten Adapter · mit 036b (H11) e2e-Nachweis ergänzen.
 - 036a Bauhinweis · `apps/web/src/api/index.ts` · bei 401 läuft `clear()` zweimal (HTTP-`onUnauthorized`, dann `onActorChange(undefined)`), die Hörer laufen zweimal; harmlos, die Hülle hängt im selben Stapel aus · einen der beiden Aufrufe weglassen oder `clear()` bei leerem Puffer ohne Hörer-Aufruf.
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant

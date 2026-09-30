@@ -92,8 +92,13 @@ const WRITE_METHODS = {
 
 const MAX_ENTRIES = 200;
 const BATCH_MS = 100;
-/** N7: a claim ends by time, without an event; an entry holding one lives at most this long. */
-const CLAIM_MAX_AGE_MS = 30_000;
+/**
+ * Review M1 (SP-7, T-G1-I-08): every entry lives at most this long — the same as the HTTP tick — because rights can end
+ * without any signal (an expired role assignment, a sign-out or revocation in another window). Plain entries expire
+ * silently; the next read asks the network. N7: an entry holding a claim ends at the earliest `claim.expiresAt`, at the
+ * latest after the same maximum age, and wakes the listeners, since the claim ended without an event.
+ */
+const MAX_AGE_MS = 30_000;
 
 /** Why the buffer is emptied (Entscheidung 8); the last three are the stream ends of slice 036b. */
 export type ClearReason = 'actor' | 'unauthorized' | 'logout' | 'roles_changed' | 'forbidden' | 'session';
@@ -163,7 +168,10 @@ interface Entry {
   args: readonly unknown[];
   value: unknown;
   watermark: number | undefined;
-  deadline: number | undefined;
+  /** Not delivered from this moment on. */
+  deadline: number;
+  /** Holds a claim: its end wakes the listeners (N7). */
+  wakes: boolean;
 }
 type Outcome = { kind: 'ok'; value: unknown } | { kind: 'error'; error: unknown } | { kind: 'withheld' };
 interface Flight {
@@ -246,7 +254,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     stopClaimTimer();
     let next: number | undefined;
     for (const entry of entries.values()) {
-      if (entry.deadline !== undefined && (next === undefined || entry.deadline < next)) next = entry.deadline;
+      if (entry.wakes && (next === undefined || entry.deadline < next)) next = entry.deadline;
     }
     if (next === undefined) return;
     claimTimer = setTimeout(expireClaims, Math.max(0, next - options.now()));
@@ -256,7 +264,10 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     const now = options.now();
     let expired = false;
     for (const [key, entry] of entries) {
-      if (entry.deadline !== undefined && entry.deadline <= now) { entries.delete(key); expired = true; }
+      if (entry.deadline <= now) {
+        entries.delete(key);
+        if (entry.wakes) expired = true;
+      }
     }
     scheduleClaims();
     if (expired) notify();
@@ -287,23 +298,28 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   const keep = (key: string, method: BufferedRead, args: readonly unknown[], value: unknown, watermark: number | undefined): void => {
     const now = options.now();
     const claimEnd = earliestClaimEnd(value);
-    const deadline = claimEnd === undefined ? undefined : Math.min(claimEnd, now + CLAIM_MAX_AGE_MS);
+    const deadline = Math.min(claimEnd ?? Infinity, now + MAX_AGE_MS);
     // Already past on arrival (clock skew between browser and service): not kept, and nobody is woken — no reload loop.
-    if (deadline !== undefined && deadline <= now) return;
+    if (deadline <= now) return;
+    const wakes = claimEnd !== undefined;
     entries.delete(key);
-    entries.set(key, { method, args, value, watermark, deadline });
+    entries.set(key, { method, args, value, watermark, deadline, wakes });
     while (entries.size > MAX_ENTRIES) {
       const oldest = entries.keys().next().value;
       if (oldest === undefined) break;
       entries.delete(oldest);
     }
-    if (deadline !== undefined) scheduleClaims();
+    if (wakes) scheduleClaims();
   };
 
-  /** Each caller gets a promise of its own; a withheld answer leaves it unsettled, with no reference kept here. */
-  const forCaller = (shared: Promise<Outcome>): Promise<never> =>
+  /**
+   * Each caller gets a promise of its own; a withheld answer leaves it unsettled, with no reference kept here. The actor
+   * is checked again at the moment of delivery, a microtask after the arrival (review minor 3, defence in depth).
+   */
+  const forCaller = (shared: Promise<Outcome>, startA: number, actor: string): Promise<never> =>
     new Promise((resolve, reject) => {
       void shared.then((outcome) => {
+        if (startA !== actorEpoch || observeActor() !== actor) return;
         if (outcome.kind === 'ok') resolve(outcome.value as never);
         else if (outcome.kind === 'error') reject(outcome.error);
       });
@@ -326,16 +342,15 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
 
     const entry = entries.get(key);
     if (entry !== undefined) {
-      const fresh = entry.watermark === markOf(method) && (entry.deadline === undefined || entry.deadline > options.now());
+      const fresh = entry.watermark === markOf(method) && entry.deadline > options.now();
       if (fresh) {
         // Asynchronous, as a new promise (010c); withheld if the actor changes before it is delivered.
-        return forCaller(Promise.resolve().then((): Outcome =>
-          startA === actorEpoch && observeActor() === actor ? { kind: 'ok', value: entry.value } : { kind: 'withheld' }));
+        return forCaller(Promise.resolve({ kind: 'ok', value: entry.value }), startA, actor);
       }
       entries.delete(key);
     }
     const flight = flights.get(key);
-    if (flight !== undefined) return forCaller(flight.shared);
+    if (flight !== undefined) return forCaller(flight.shared, startA, actor);
 
     const startE = dataEpoch;
     const startG = generation.get(key) ?? 0;
@@ -349,19 +364,25 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
       if (flights.get(key)?.shared === shared) flights.delete(key);
       if (startA !== actorEpoch || observeActor() !== actor) return { kind: 'withheld' };
       if (!outcome.ok) return { kind: 'error', error: outcome.error };
-      const value = deepFreeze(structuredClone(outcome.value));
-      if (method === 'getMeeting') raiseMark(value as Meeting);
-      if (detach !== undefined && startE === dataEpoch && sameGeneration && watermark === markOf(method)) {
-        keep(key, method, argsKey, value, watermark);
+      try {
+        const value = deepFreeze(structuredClone(outcome.value));
+        if (method === 'getMeeting') raiseMark(value as Meeting);
+        if (detach !== undefined && startE === dataEpoch && sameGeneration && watermark === markOf(method)) {
+          keep(key, method, argsKey, value, watermark);
+        }
+        return { kind: 'ok', value };
+      } catch (error) {
+        // Review minor 4: an answer that cannot be copied (DataCloneError) or a failing bookkeeping step reaches the
+        // caller as a failure, never as a promise that hangs with an unhandled rejection behind it.
+        return { kind: 'error', error };
       }
-      return { kind: 'ok', value };
     };
     const shared: Promise<Outcome> = call().then(
       (value) => settle({ ok: true, value }),
       (error: unknown) => settle({ ok: false, error }),
     );
     flights.set(key, { method, args: argsKey, shared });
-    return forCaller(shared);
+    return forCaller(shared, startA, actor);
   };
 
   /** Collects what one message invalidates; applied once when the batch closes. */

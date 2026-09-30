@@ -130,7 +130,9 @@ Akteur sieht je eine gepufferte Antwort eines anderen. Signatur von `useApiVersi
    ungültig, spätestens aber 30 s nach dem Eintreffen, und die Hörer werden gerufen.
    - Zeitquelle ist die Uhr aus 032 (`apps/web/src/time.ts`), falls gemergt. Sonst die als Option injizierte Uhr der Hülle;
      `index.ts` verdrahtet die Browseruhr, Tests eine gefälschte.
-   - Einträge ohne `claim` haben kein Höchstalter.
+   - ~~Einträge ohne `claim` haben kein Höchstalter.~~ Review M1 (30.09.2026): **jeder** Eintrag hat ein Höchstalter von
+     30 s (wie der HTTP-Takt). Einträge ohne `claim` laufen still ab (kein Hörer-Aufruf, der nächste Lesezugriff geht ins
+     Netz); nur Claim-Einträge wecken die Hörer (Tests o, q).
 8. **Akteur und Sitzung (N2).** Ganzer Puffer leer (`clear()`, `E` erhöhen) bei:
    - echtem Akteurwechsel (`actorChanged`, auch im Demo-Umschalter);
    - 401 (`onUnauthorized`) und Abmelden;
@@ -259,6 +261,13 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
   5. Nichts auf dem Datenträger.
 - **Missbrauchs- bzw. Fehlerfall MF-LS-1 (010d, SG1/SG3), Rollenwechsel am geteilten Gerät.** Abwehr: struktureller
   Schlüssel plus `clear()`. Erkennung: Tests j, j2, j3 als Tor; im Betrieb nicht beobachtbar, daher Pflicht-Tor.
+  **Restrisiko Rechteverlust ohne Signal (Review M1, SP-7, T-G1-I-08):** abgelaufene `RoleAssignment.expiresAt`, Abmelden
+  oder Entzug in einem anderen Fenster erreichen den Puffer nicht. Begrenzt auf 30 s durch das Höchstalter aller Einträge
+  (Test q); das Stromende `forbidden` aus 036b schließt es schneller. Das deckt auch einen lange verborgenen Tab (Review
+  minor 6).
+- **Bekanntes Restrisiko (Review minor 5).** Ein mehrstufiger Ablauf der Wortmeldeliste, dessen Lesezugriff nach einem
+  strukturellen Akteurwechsel zurückgehalten wird (unerledigtes Promise, Entscheidung 4), hält seine Busy-Referenz bis zum
+  Neu-Einhängen der Seite. Seiten liegen außerhalb dieser Scheibe; Folgeliste.
 - **Fehlerfall: Invalidierung zu eng.** Veraltete Anzeige bis zum nächsten Thema oder Takt. Abwehr: 035a Test 2b,
   `EVENT_SUBJECTS`, Test 1 (d).
 - **Fehlerfall: alte Liste, neue Version (N3).** Abwehr: Wasserzeichen, Test 1 (n).
@@ -281,7 +290,7 @@ Perspektive(n): Security, Nebenläufigkeit/Lesezustand · Nachweise: Tests 1–3
 | SC-10 | ja: keine neue Abhängigkeit |
 | SC-11 | ja: keine Log-Ausgabe mit Inhalt, keine Kennzahl |
 | SC-12 | ja: keine Tore oder Hooks berührt |
-| SP-2 | ja: Obergrenze 200, Höchstalter für Claim-Einträge, Generationen statt wachsender Listen |
+| SP-2 | ja: Obergrenze 200, Höchstalter 30 s für alle Einträge (Review M1), Generationen statt wachsender Listen |
 | SP-3 | ja: kein Token im Browserspeicher, CSRF und 401-Weg unverändert; der Puffer liegt nur im Speicher |
 | SP-4 | ja: keine HTML-Ausgabe, kein neuer Ursprung |
 | SP-5 | ja: kein Geheimnis im Diff; das CSRF-Token wird nicht gepuffert (`/auth/me` läuft nicht über die Hülle) |
