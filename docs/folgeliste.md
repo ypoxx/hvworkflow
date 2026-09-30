@@ -214,6 +214,16 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   mit der ID `unassigned` fällt in `hv_open_questions` mit den nicht zugewiesenen Fragen zusammen · `unassigned` als
   reservierte ID in der Fachbereichsprüfung ablehnen (mit 040, `replaceMeetingUnits`).
 
+- 031a Codex P2 (#80) / Review N1 · `scripts/e2e-http-031.mjs` (~398) · SIGINT/SIGTERM oder die Gesamtfrist gewinnt das
+  `Promise.race`, `body()` läuft weiter; ein Abbruch mitten in `startKeycloak()` oder `CREATE DATABASE` kann Container
+  oder Testdatenbank nach dem Aufräumen anlegen · laufenden Startschritt abbrechen bzw. `body()` vor dem Aufräumen
+  abwarten (nur lokal relevant; in CI räumt das Runner-Ende ab).
+- 031a Review N2 · `scripts/e2e-http-031.mjs` · SIGKILL der Playwright-Prozessgruppe ohne Gnadenfrist · erst SIGTERM,
+  kurze Frist, dann SIGKILL.
+- 031a Review G1 · `apps/web/e2e/031-http-betriebsart.spec.ts` G1 · `test.fail` kann einen Fehlschlag aus anderem Grund
+  als erwartet verdecken · erwartete Fehlermeldung ausdrücklich prüfen.
+- 034b nit · Startzeile des Dienstes · IPv6-Adressen der Proxy-Quelle nicht in kanonischer Form ausgegeben · kanonisch
+  ausgeben.
 - takt-033b Review minor · `apps/web/src/api/useApiVersion.ts`, `App.tsx` · nach Rückkehr in einen Hintergrund-Tab bleibt
   die Ansicht bis zum nächsten 30-s-Takt alt (früher sofortiges Neuladen über den `/auth/me`-Refresh) · Polling-Hörer
   beim Sichtbarwerden einmal auslösen (`http.ts`).
