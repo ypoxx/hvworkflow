@@ -24,6 +24,7 @@ import { SESSION_IDLE_MS } from '../auth/sessions.ts';
 import { DEFAULT_STREAM_LIMITS, STREAM_LIFETIME_MS, type StreamLimits } from '../limits/config.ts';
 import { req } from './helpers.ts';
 import { createSessionChecker } from '../stream/sessionCheck.ts';
+import { createHub } from '../stream/hub.ts';
 import { StreamReader, eventually, idOf, mustOpen, openStream, sleep, type SseBlock } from './stream-reader035.ts';
 
 // Test 23 (m8): the distributor's store listener only schedules. The spy passes every call through and
@@ -1066,6 +1067,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(stored.some((e) => e.type === 'SpeakerRegistered' && typeof payloadName(e) === 'string')).toBe(true);
     expect(stored.every((e) => typeof e.hash === 'string' && e.hash !== '' && typeof e.prevHash === 'string')).toBe(true);
     expect(stored.some((e) => e.commandId !== undefined)).toBe(true);
+    expect(stored.some((e) => e.personId !== undefined)).toBe(true);
     const expected = (e: DomainEvent): unknown => JSON.parse(JSON.stringify(maskEvent(e)));
     const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin'), 'Last-Event-ID': String(from) }));
     const catchUp = (await reader.messagesUntil((b) => b.event === 'cursor', 5_000)).filter(isEvent);
@@ -1103,7 +1105,7 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     expect(reader.closed).toBe(false);
   });
 
-  it('R10 a catch-up event without hash: earlier events go out, then end unavailable on every stream; new opens 503', async () => {
+  it('R10 a catch-up event without hash: earlier events go out, then end unavailable on every stream; new opens 500', async () => {
     const h = await harness({ session: true });
     const live = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
     await live.nextMessage();
@@ -1124,14 +1126,52 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
       // Every stream ends, not only the opening one (decision 3, m6).
       const liveRest = await live.rest(3_000);
       expect(liveRest.at(-1)!.data).toEqual({ reason: 'unavailable' });
-      // The log is not trusted: a new open is refused.
-      const again = await req(h.app, 'GET', '/v1/stream', { headers: asSession('capture') });
-      expect(again.status).toBe(503);
-      expect(again.headers.get('Retry-After')).toBe('30');
+      // The log is not trusted: a new open is an integrity failure, 500 without a retry invitation (decision 3). The
+      // contract documents no 500 for any operation, so this is read directly, not through `req()`.
+      const again = await h.app.request('/v1/stream', { headers: asSession('capture') });
+      expect(again.status).toBe(500);
+      expect(again.headers.get('Retry-After')).toBeNull();
+      expect(await again.json()).toMatchObject({ status: 500, detail: 'Persistence is unavailable.' });
     } finally {
       console.error = original;
     }
     expect(errors).toContain('HV-Tool API: stream ended (unavailable).');
+  });
+
+  it('R11 a catch-up event that fails to frame for another reason ends only that stream; others stay, the next open is 200', async () => {
+    const h = await harness({ session: true });
+    const live = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await live.nextMessage();
+    const bad = h.head() - 5;
+    // A payload that JSON cannot serialize (a BigInt): framing throws a TypeError, the hash is intact.
+    h.hooks.load = (log) => log.map((e) => (e.seq === bad ? { ...e, payload: { ...(e.payload as object), big: 1n } } as unknown as DomainEvent : e));
+    const target = h.head() + 1;
+    await assignFiller(h, 'admin');
+    await eventually(() => h.hooks.appliedHead === target, 3_000, 'distributor took the log');
+    const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin', 2), 'Last-Event-ID': String(bad - 3) }));
+    const rest = await reader.rest(3_000);
+    expect(rest.filter(isEvent).map(idOf)).toEqual([bad - 2, bad - 1]);
+    expect(rest.at(-1)!.data).toEqual({ reason: 'unavailable' });
+    // Only that connection ended: the live stream still delivers, and a new open is 200.
+    await assignFiller(h, 'admin');
+    const head = h.head();
+    expect(idOf(await live.until((b) => isEvent(b) && idOf(b) === head, 3_000))).toBe(head);
+    expect(live.closed).toBe(false);
+    const next = await openStream(h.app, '/v1/stream', asSession('capture'));
+    expect(next.res.status).toBe(200);
+    track(next.reader!);
+  });
+
+  it('R12 after fail() the distributor reports itself not loaded (the open answers 500, not a rights loss)', async () => {
+    const { events } = await corpus();
+    const hub = createHub({ source: { load: async () => events, tick: false }, clock: () => at0, reloadTickMs: 1_000,
+      spacingMs: 250, freshnessMs: 1_000, notice: () => undefined });
+    await hub.ensureFresh();
+    expect(hub.loaded()).toBe(true);
+    expect(hub.states().size).toBeGreaterThan(0);
+    hub.fail();
+    expect(hub.loaded()).toBe(false);
+    expect(hub.states().size).toBe(0);
   });
 
   // ---- real server ---------------------------------------------------------------------------------------------

@@ -61,8 +61,7 @@ export interface StreamRouteOptions {
 
 const UNAVAILABLE_LINE = 'HV-Tool API: stream ended (unavailable).';
 
-export function streamUnavailable(detail: 'The stream limit is reached.' | 'Migrations are pending.' | 'Persistence is busy.' |
-  'The event log cannot be verified.'): Response {
+export function streamUnavailable(detail: 'The stream limit is reached.' | 'Migrations are pending.' | 'Persistence is busy.'): Response {
   return problemResponse(new ApiProblem(503, 'Service Unavailable', detail), { 'Retry-After': String(STREAM_RETRY_AFTER_SECONDS) });
 }
 const tooManyStreams = (): Response =>
@@ -428,12 +427,15 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           return problemResponse(new ApiProblem(500, 'Internal Server Error', `Event seq ${error.seq}: integrity check failed.`));
         }
         if (isPersistenceBusy(error)) return streamUnavailable('Persistence is busy.');
-        // The distributor's log has an event without hash: nothing can be delivered reliably now (m6).
-        if (error instanceof MissingHashError) return streamUnavailable('The event log cannot be verified.');
+        // Anything else, an event without hash in the distributor's log included (`MissingHashError`), is an
+        // integrity or persistence failure: 500 without `Retry-After`, as a business request answers (decision 3).
         return problemResponse(new ApiProblem(500, 'Internal Server Error', 'Persistence is unavailable.'));
       }
       // The request timeout answered already (408): open nothing.
       if (currentRequest()?.phase === 'timedOut') return new Response(null, { status: 408 });
+      // Another connection may have discarded the distributor's state (`hub.fail()`) after `ensureFresh` resolved:
+      // an integrity failure, not a lost right. Checked in the same synchronous run as the registration below.
+      if (!hub.loaded()) return problemResponse(new ApiProblem(500, 'Internal Server Error', 'Persistence is unavailable.'));
 
       // The reader's actor per meeting from the distributor's projection (035a `resolveReaderActors`); in
       // the demo header mode the header actor per meeting, resolved like every request of that mode.
@@ -496,9 +498,12 @@ export function createStreamRoute(options: StreamRouteOptions): (c: Context<{ Va
           let next: IteratorResult<Frame>;
           try {
             next = frames.next();
-          } catch {
+          } catch (error) {
             // An event without hash in the distributor's log: every stream ends, not only this one (decision 3).
-            hub.fail();
+            // Any other framing error ends only this connection: a reader must not be able to drop every stream
+            // again and again by resuming before an event that fails to frame.
+            if (error instanceof MissingHashError) hub.fail();
+            else options.notice(UNAVAILABLE_LINE);
             connection.close(endFrame('unavailable'));
             return;
           }
@@ -536,7 +541,10 @@ function openingFrames(cursor: number | undefined, head: number, log: readonly D
   // time, while the catch-up is written.
   if ([...reference.values()].some((a) => can(a, 'event.read').allow)) {
     return { kind: 'frames', frames: (function* lazy(): Generator<Frame> {
-      for (const e of range) yield messageFrame({ kind: 'event', event: maskEvent(e) });
+      for (const e of range) {
+        if (!e.hash) throw new MissingHashError();
+        yield messageFrame({ kind: 'event', event: maskEvent(e) });
+      }
       yield cursorFrame(head);
     })() };
   }
