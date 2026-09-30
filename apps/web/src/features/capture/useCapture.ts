@@ -277,9 +277,23 @@ export function etagForContribution(
   contribution: { readonly id: string; readonly version: number },
   mark: ContributionMark | null,
 ): string {
-  return mark !== null && mark.id === contribution.id && mark.base === contribution.version
+  return mark !== null && mark.id === contribution.id && contribution.version <= mark.base
     ? mark.etag
     : etagOf(contribution.version);
+}
+
+/**
+ * The mark for an answer just received. Its base is the version shown *now*, not the one the write
+ * began with: a reload may have landed while the write ran, and a mark based on the older closure
+ * would let that newer list override the fresher tag of this answer.
+ */
+export function markAfterAnswer(
+  written: { readonly id: string; readonly version: number },
+  shownNow: { readonly id: string; readonly version: number } | undefined,
+  etag: string,
+): ContributionMark {
+  const shown = shownNow !== undefined && shownNow.id === written.id ? shownNow.version : written.version;
+  return { id: written.id, base: Math.max(shown, written.version), etag };
 }
 
 /** After `captureContribution` the new version of the Wortmeldung is not in the answer (Befund). */

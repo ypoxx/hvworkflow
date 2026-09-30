@@ -223,4 +223,24 @@ Komponententests belegt (offene Frage 2, Abnahme durch den Owner offen).
 
 ## Review findings
 
-_offen_
+Review 1 (fresh context, Perspektive Nebenläufigkeit und UX): changes requested, 2 major. Disposition:
+
+1. **Major, behoben.** `capture/Page.tsx`, `useCapture.ts`: ein Paar mit älterer Version übersteuerte das frischere
+   Antwort-ETag. Jetzt basiert die Marke auf der zum Antwortzeitpunkt angezeigten Version (`markAfterAnswer`, Ref auf das
+   angezeigte Paar), und sie hält für jede Version `<= base`; nur eine nach der Antwort gelesene Liste (Version größer)
+   löst sie ab. Test: Folge Schreiben 1, Neuladen, Schreiben 2 in `useCapture.test.ts`.
+2. **Major, behoben.** `speakers/Page.tsx`: `stillCurrent` verglich die Liste per Identität. Jetzt zählt nur der Akteur;
+   je Zeile gewinnt die höhere Version (`applyWriteResult`), das Listen-ETag hält für Versionen `<= base`
+   (`etagForList`, base = zum Antwortzeitpunkt angezeigte Version). Tests für beide Fälle in `useSpeakers.test.ts`.
+3. **Minor, behoben.** Nach jedem eigenen `updateSpeaker` (Aufrufen, Beenden, Zurückziehen, Verschieben) wird die Marke
+   gelöscht und Umsortieren/Anmelden warten (`isListStale`), bis eine Liste eine neuere Version zeigt.
+4. **Minor, Restfall.** (a) `lastWriteEtag()` wird in `http.ts` vor dem Lesen des Rumpfs gesetzt; (b) `ClassifyDialog`
+   (schreibt auf die Frage) ist nicht gesperrt. Beides nicht Teil dieser Scheibe (Nicht-Ziel, `http.ts` außerhalb der
+   Dateiliste): `docs/folgeliste.md`.
+5. **Minor, behoben.** `speakerLocked` sperrt nur noch `writeContribution` bzw. `capture-submit` (`submitBusy`), nicht
+   Markieren, Alt+Q, freie Eingabe und Vorschlag auf dem eben angelegten Redebeitrag. Test in `ContributionPane.test.tsx`.
+6. **Minor, behoben.** `capture-suggest` hat die Wächterprüfung `if (!busy) onOpenSuggest()`.
+7. **Minor, Folgeliste.** Ein Schreiben, das während eines anderen läuft, wird stumm verworfen (kein Hinweis).
+8. **Nachweis-Lauf.** Gates auf sauberem Commit nach dem Merge von takt-030: der Koordinator übernimmt das.
+9. **Minor, Folgeliste.** Im Auftrag nicht näher beschrieben; der Wortlaut steht im Review-Bericht.
+10. **Minor, Folgeliste.** Im Auftrag nicht näher beschrieben; der Wortlaut steht im Review-Bericht.

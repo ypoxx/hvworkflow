@@ -27,7 +27,7 @@ import { NowSpeaking } from './NowSpeaking';
 import { RoundSection } from './RoundSection';
 import { ROW_COLUMNS } from './SpeakerRow';
 import type { SpeakerRowActions } from './SpeakerRow';
-import { applyWriteResult, etagForList, keepNewest, moveSpeakerToRound, useSpeakers } from './useSpeakers';
+import { applyWriteResult, etagForList, isListStale, keepNewest, moveSpeakerToRound, useSpeakers } from './useSpeakers';
 import { RegisterDialog } from './RegisterDialog';
 
 /** The failed-write message: title from the problem, fallback from the dictionary. */
@@ -78,24 +78,38 @@ export function SpeakersPage() {
   const [listMark, setListMark] = useState<{ actorId: string; base: number; etag: string } | null>(null);
   const writtenRows = written !== null && written.actorId === actorId ? written.rows : NO_ROWS;
   const speakers = useMemo(() => applyWriteResult(listed, writtenRows), [listed, writtenRows]);
+  // After an own updateSpeaker the list version moved without the answer saying to what (review of
+  // takt-032, minor 3): reorder and register wait until a list shows a newer one.
+  const [listStale, setListStale] = useState<{ actorId: string; base: number } | null>(null);
   const listEtag =
-    listVersion === null
+    listVersion === null || (listStale !== null && listStale.actorId === actorId && isListStale(listVersion, listStale))
       ? null
       : etagForList(listVersion, listMark !== null && listMark.actorId === actorId ? listMark : null);
   // Read by the write handlers after an await, which run outside the render pass.
-  const latest = useRef({ actorId, listed });
+  const latest = useRef({ actorId, listed, listVersion });
   useEffect(() => {
-    latest.current = { actorId, listed };
+    latest.current = { actorId, listed, listVersion };
   });
   /** What a write started on: its own actor and the list it saw. Its answer counts only for these. */
   const startOf = useCallback(() => ({ actorId: latest.current.actorId, listed: latest.current.listed }), []);
   const stillCurrent = useCallback(
-    (start: { actorId: string; listed: readonly Speaker[] }) =>
-      latest.current.actorId === start.actorId && latest.current.listed === start.listed,
+    // The actor only (review of takt-032, major 2): a list that landed during the write may have been
+    // requested before the answer, so it must not drop the answer. Per row the higher version wins.
+    (start: { actorId: string }) => latest.current.actorId === start.actorId,
     [],
   );
+  /** An own updateSpeaker answered: the list tag is no longer valid until a newer list is read. */
+  const noteUpdated = useCallback(
+    (start: { actorId: string }) => {
+      if (!stillCurrent(start)) return;
+      setListMark(null);
+      const base = latest.current.listVersion;
+      if (base !== null) setListStale({ actorId: start.actorId, base });
+    },
+    [stillCurrent],
+  );
   const keepRows = useCallback(
-    (start: { actorId: string; listed: readonly Speaker[] }, rows: readonly Speaker[]) => {
+    (start: { actorId: string }, rows: readonly Speaker[]) => {
       if (!stillCurrent(start)) return;
       setWritten((previous) => ({
         actorId: start.actorId,
@@ -103,6 +117,13 @@ export function SpeakersPage() {
       }));
     },
     [stillCurrent],
+  );
+  const keepUpdated = useCallback(
+    (start: { actorId: string }, rows: readonly Speaker[]) => {
+      keepRows(start, rows);
+      noteUpdated(start);
+    },
+    [keepRows, noteUpdated],
   );
   // At most one own write on this page at a time: the tag read right after an await is then its own.
   const inFlight = useRef(false);
@@ -235,13 +256,13 @@ export function SpeakersPage() {
               { ifMatch: etagOf(speaker.version) },
             ),
           );
-          keepRows(start, answers);
+          keepUpdated(start, answers);
         });
       },
       onFinish: (speaker) => {
         void run(speaker.id, async () => {
           const start = startOf();
-          keepRows(
+          keepUpdated(
             start,
             [
               await api.updateSpeaker(
@@ -256,7 +277,7 @@ export function SpeakersPage() {
       onWithdraw: (speaker) => {
         void run(speaker.id, async () => {
           const start = startOf();
-          keepRows(
+          keepUpdated(
             start,
             [
               await api.updateSpeaker(
@@ -270,7 +291,7 @@ export function SpeakersPage() {
       },
       onMove: (speaker) => setMoving(speaker),
     }),
-    [run, startOf, keepRows],
+    [run, startOf, keepUpdated],
   );
 
   const register = useCallback(
@@ -283,7 +304,8 @@ export function SpeakersPage() {
             // Right after the await, before anything else can write: the tag is this write's own.
             const etag = api.lastWriteEtag();
             if (etag !== undefined && stillCurrent(start)) {
-              setListMark({ actorId: start.actorId, base: listVersion, etag });
+              // Based on the list version shown now: a list may have landed while the write ran.
+              setListMark({ actorId: start.actorId, base: Math.max(latest.current.listVersion ?? 0, listVersion), etag });
             }
           }),
     [run, listVersion, listEtag, startOf, stillCurrent],
@@ -291,8 +313,12 @@ export function SpeakersPage() {
 
   const move = useCallback(
     async (speaker: Speaker, round: number): Promise<boolean> =>
-      run(speaker.id, () => moveSpeakerToRound(api, speaker, round)),
-    [run],
+      run(speaker.id, async () => {
+        const start = startOf();
+        await moveSpeakerToRound(api, speaker, round);
+        noteUpdated(start);
+      }),
+    [run, startOf, noteUpdated],
   );
 
   const sensors = useSensors(
@@ -380,7 +406,9 @@ export function SpeakersPage() {
           // list it is dropped, and no override is revived (slice 010d).
           if (stillCurrent(start)) {
             keepRows(start, rows);
-            if (etag !== undefined) setListMark({ actorId: start.actorId, base: listVersion, etag });
+            if (etag !== undefined) {
+              setListMark({ actorId: start.actorId, base: Math.max(latest.current.listVersion ?? 0, listVersion), etag });
+            }
             setOverride(null);
           }
         } catch (error: unknown) {

@@ -21,6 +21,7 @@ import {
   isSpeakerLocked,
   isVersionConflict,
   landPair,
+  markAfterAnswer,
   NO_VERDICT,
   readVerdict,
   useAsync,
@@ -215,7 +216,14 @@ export function CapturePage() {
     speakerLock.actorId === actorId &&
     speakers.status !== 'error' &&
     isSpeakerLocked(lockedSpeaker, speakerLock);
-  const busy = writing || writingQuestions || speakerLocked;
+  // Only a write on the Wortmeldung waits for its new version (`speakerLocked`); marking, Alt+Q, free
+  // entry and proposals write on the Redebeitrag just created and stay open (review of takt-032, minor 5).
+  const busy = writing || writingQuestions;
+  // The shown Redebeitrag as of now, read after an await (a reload may have landed while it ran).
+  const shownRef = useRef<Contribution | undefined>(undefined);
+  useEffect(() => {
+    shownRef.current = contribution;
+  });
   const [staleFor, setStaleFor] = useState<string | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   /**
@@ -278,7 +286,7 @@ export function CapturePage() {
         // Right after the await: the tag of the answer is the Redebeitrag's new version (opaque, not parsed).
         const etag = api.lastWriteEtag();
         if (etag !== undefined) {
-          setContributionMark({ actorId: startedActor, id: contribution.id, base: contribution.version, etag });
+          setContributionMark({ actorId: startedActor, ...markAfterAnswer(contribution, shownRef.current, etag) });
         }
         setStaleFor(null);
         return true;
@@ -368,6 +376,7 @@ export function CapturePage() {
               canCapture={canCapture}
               writing={writing}
               busy={busy}
+              submitBusy={speakerLocked}
               onWrite={writeContribution}
               onCaptureQuestions={captureQuestions}
               onOpenSuggest={() => setSuggestOpen(true)}

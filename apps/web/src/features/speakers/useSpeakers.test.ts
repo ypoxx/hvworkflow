@@ -9,6 +9,7 @@ import type { Speaker } from '@hv/domain';
 import {
   applyWriteResult,
   etagForList,
+  isListStale,
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
@@ -241,5 +242,29 @@ describe('etagForList', () => {
 
   it('without a mark the list version counts', () => {
     expect(etagForList(7, null)).toBe('"v7"');
+  });
+});
+
+/** Review of takt-032, major 2 and minor 3: a list requested before the answer must not undo it. */
+describe('stale lists after own writes', () => {
+  it('a list that lands during the write with an older version keeps the tag of the answer', () => {
+    // The mark was made on the version shown at answer time (4); an older list (3) lands afterwards.
+    expect(etagForList(3, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(4, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(5, { base: 4, etag: '"v5"' })).toBe('"v5"');
+    expect(etagForList(6, { base: 4, etag: '"v5"' })).toBe('"v6"');
+  });
+
+  it('an older list does not undo the version of a row an own write answered with', () => {
+    const called = speaker('a', 1, 1, 3);
+    const older = [speaker('a', 1, 1, 2), speaker('b', 1, 2, 1)];
+    expect(applyWriteResult(older, [called])[0]).toBe(called);
+  });
+
+  it('after an own updateSpeaker the list version is stale until a list shows a newer one', () => {
+    expect(isListStale(4, { base: 4 })).toBe(true);
+    expect(isListStale(3, { base: 4 })).toBe(true);
+    expect(isListStale(5, { base: 4 })).toBe(false);
+    expect(isListStale(4, null)).toBe(false);
   });
 });

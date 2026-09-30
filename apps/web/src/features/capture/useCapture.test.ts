@@ -12,6 +12,7 @@ import {
   isSpeakerLocked,
   isVersionConflict,
   landPair,
+  markAfterAnswer,
   keyBelongsTo,
   loadKey,
   NO_VERDICT,
@@ -268,5 +269,30 @@ describe('landPair', () => {
     expect(landPair(null, {
       questions: ['q'], contributions: ['c'], questionsReady: true, contributionsReady: true,
     })).toEqual({ questions: ['q'], contributions: ['c'] });
+  });
+});
+
+/** Review of takt-032, major 1: three quick writes while a reload lands in between. */
+describe('markAfterAnswer', () => {
+  it('bases the mark on what is shown when the answer arrives, not on the closure the write began with', () => {
+    // write 1 answered "v6" (shown v5); reload lands showing v6; write 2 (begun on v5) answers "v7".
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(mark).toEqual({ id: 'c1', base: 6, etag: '"v7"' });
+    expect(etagForContribution({ id: 'c1', version: 6 }, mark)).toBe('"v7"');
+  });
+
+  it('an older list landing after the answer does not undo it', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(etagForContribution({ id: 'c1', version: 5 }, mark)).toBe('"v7"');
+  });
+
+  it('a list read after the answer takes over', () => {
+    const mark = markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c1', version: 6 }, '"v7"');
+    expect(etagForContribution({ id: 'c1', version: 8 }, mark)).toBe('"v8"');
+  });
+
+  it('another Redebeitrag on screen leaves the closure version as the base', () => {
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, { id: 'c2', version: 9 }, '"v6"').base).toBe(5);
+    expect(markAfterAnswer({ id: 'c1', version: 5 }, undefined, '"v6"').base).toBe(5);
   });
 });

@@ -116,7 +116,18 @@ export function etagForList(
   version: number,
   mark: { readonly base: number; readonly etag: string } | null,
 ): string {
-  return mark !== null && mark.base === version ? mark.etag : etagOf(version);
+  // `<=`: a list requested before the answer may still land later, with the version shown when the
+  // answer came or an older one; only a list read after the answer shows a newer version.
+  return mark !== null && version <= mark.base ? mark.etag : etagOf(version);
+}
+
+/**
+ * takt-032: after an own `updateSpeaker` the list version has moved (`SpeakerUpdated`), and the answer
+ * does not say to what. The list tag is not usable for reorder or register until a list shows a
+ * version newer than the one the update was made on.
+ */
+export function isListStale(version: number, lock: { readonly base: number } | null): boolean {
+  return lock !== null && version <= lock.base;
 }
 
 export function useSpeakers(): SpeakersState {

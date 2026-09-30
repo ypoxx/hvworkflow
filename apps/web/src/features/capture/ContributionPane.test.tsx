@@ -59,4 +59,15 @@ describe('ContributionPane busy', () => {
       expect(tag(html, id), id).not.toContain('aria-disabled="true"');
     }
   });
+
+  it('a Wortmeldung waiting for its new version locks only the input for a further Redebeitrag', () => {
+    const html = renderToStaticMarkup(
+      <ContributionPane {...props({ submitBusy: true, contribution: undefined, contributions: [] })} />,
+    );
+    expect(tag(html, 'capture-contribution-pane')).toContain('data-busy="true"');
+    expect(tag(html, 'capture-submit')).toContain('aria-disabled="true"');
+    const open = renderToStaticMarkup(<ContributionPane {...props({ submitBusy: true })} />);
+    expect(tag(open, 'capture-free-add')).not.toContain('aria-disabled="true"');
+    expect(tag(open, 'capture-suggest')).not.toContain('aria-disabled="true"');
+  });
 });
