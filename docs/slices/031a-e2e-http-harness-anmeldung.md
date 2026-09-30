@@ -334,25 +334,75 @@ Bedrohungs-ID; wörtliche Startzeile des Test-Dienstes; Digests und Hashes; Arte
 
 ## Nachweis
 
-(nach dem Bau ausfüllen)
+Stand des Baus (lokal, ohne Docker und ohne Keycloak). Der Keycloak-Teil (`http-setup`, H4 bis H8) und beide CI-Jobs
+sind **nicht** gelaufen; ihr Nachweis ist die PR-CI und steht unten als offen.
 
-**Gates-Commit:** `<sha>` (Baucommit „Scheibe 031a: …“), `pnpm gates` auf sauberem Baum, Exit 0, Umgebung (Node, pnpm,
-Postgres).
+**Gates-Commit:** `6bf2bfd` (Baucommit „Scheibe 031a: Nachweis-Screenshot altes Demo-Protokoll im HTTP-Modus“),
+`CONTRACT_GATE_STRICT=1 pnpm gates` auf sauberem Baum, Exit 0. Umgebung: Node v22.22.2, pnpm 10.33.0, Postgres 16.13
+(lokal, migrierte Datenbank `hv_s031a`, Rollen `hv_owner` und `hv_runtime`). Tests im Lauf: Domäne 231, Web 255 (darunter
+der neue Unit-Test zu den Idempotenzschlüsseln), API 480, Skripte einschließlich `scripts/e2e-http-031.test.mjs` (28 Tests).
 
-Wörtlicher Schluss der Ausgabe von `pnpm gates`:
+Wörtlicher Schluss der Ausgabe von `pnpm gates` (die Zeile `exit 0` habe ich hinter den Befehl gesetzt):
 
 ```
-<Schluss einfügen>
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.77s
+mark-test-run: wrote /home/user/wt/s031a/.claude/state/last-test-run (clean tree) at commit 6bf2bfd, tree fdcfb6a60932…
+exit 0
 ```
 
 | Lauf | Projekt | Tests (bestanden/übersprungen) | Laufzeit |
 |---|---|---|---|
-| lokal | `in-process` | | |
-| lokal, `E2E_HTTP_IDP=none` | `http` (ohne `@idp`) | | |
-| PR-CI Lauf `<id>`, Job `gates` | `in-process` | | Job gesamt: |
-| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | | Job gesamt: |
+| lokal (`E2E_PORT=4430 pnpm --filter @hv/web e2e -- --timeout=240000`) | `in-process` | 127 / 0 | 6,7 min |
+| lokal, `E2E_HTTP_IDP=none pnpm e2e:http` (Ports 4474 und 4430) | `http` (ohne `@idp`) | 7 / 0 (fünf `@idp`-Tests durch `grepInvert` herausgefiltert, nicht übersprungen) | Playwright 12,7 s, Harness gesamt 20 s |
+| PR-CI Lauf `<id>`, Job `gates` | `in-process` | offen (PR-CI) | offen |
+| PR-CI Lauf `<id>`, Job `e2e-http` | `http-setup` + `http` | offen (PR-CI) | offen |
 
-Startzeile: `<wörtlich>`. Digests/Hashes: `<…>`. Verworfene, neu erzeugte Screenshots: `<Liste>`.
+Startzeile des Test-Dienstes (lokal gemessen, vom Harness wörtlich geprüft):
+`HV-Tool API: start mode=service persistence=postgres auth=oidc cors=none trusted-proxies=none`.
+
+Digests und Hashes (gelesen ohne Docker-Dämon):
+
+- `actions/checkout` v4 = v4.4.0 = `11d5960a326750d5838078e36cf38b85af677262` (`git ls-remote`).
+- `actions/setup-node` v4 = v4.4.0 = `49933ea5288caeca8642d1e84afbd3f7d6820020` (`git ls-remote`).
+- `actions/upload-artifact` v4.6.2 = `ea165f8d65b6e75b540449e92b4886f43607fa02` (`git ls-remote`, wie schon im Katalog).
+- `postgres:16` = `sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54` (Index; gelesen über
+  `mirror.gcr.io/library/postgres:16`, weil Docker Hub und ECR am Ratenlimit der Bauumgebung scheiterten; enthält Version 16.15).
+- Keycloak 26.7.4 = `sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c` (Index; gelesen über
+  `mirror.gcr.io/keycloak/keycloak:26.7.4`, weil `quay.io` in der Bauumgebung gesperrt ist). **Ungeprüft:** dass derselbe Index
+  unter `quay.io/keycloak/keycloak:26.7.4` liegt. Stimmt er dort nicht, scheitern der Keycloak-Schritt in `gates` und der Job
+  `e2e-http` beim Ziehen des Images; die Korrektur ist die eine Konstante `KEYCLOAK_IMAGE` in `scripts/lib/keycloak-ci.mjs`.
+
+Verworfene, neu erzeugte Screenshots: alle Bilder unter `docs/evidence/`, die `pnpm --filter @hv/web e2e` und der lokale
+`http`-Lauf neu geschrieben haben (u. a. `001-*` bis `090-*`, `takt-*`, `030-login-*`), mit `git restore docs/evidence`
+verworfen; committet ist nur `docs/evidence/031-http-altes-demoprotokoll.png` (H2). `031-http-angemeldet.png`,
+`031-http-401.png` und `031-http-412.png` entstehen erst in der PR-CI (Artefakt `evidence-031-http`) und fehlen hier.
+
+Bedrohungs-ID → Test:
+
+| ID | Test | Stand |
+|---|---|---|
+| T-G1-S-02 | H4 (Cookie-Attribute), H5 (Abmelden, altes Cookie 401), H6 (Subject-Sperre ohne Neustart) in `031-http-betriebsart.spec.ts` | nur PR-CI |
+| T-G1-S-03 | H1, H4; `030-anmeldung.spec.ts` im Projekt `http` | H1 und `030` lokal grün, H4 nur PR-CI |
+| T-G1-T-05 | H3 (keine CORS-Antwort, lokal grün), H5 (`X-CSRF-Token`), H8 (Schreiben nur mit Token) | H3 lokal, H5 und H8 nur PR-CI |
+| T-Q-I-01 | `scripts/e2e-http-031.test.mjs` (Zufallswerte, `--check` ohne Marker-Wert, `trace`/`video` aus, kein `html`-Reporter, Workflow ohne Bericht-, Trace- und Video-Upload) | lokal grün |
+| T-G2-I-02 | Harness-Stufe 6 mit `WRITTEN_TEXTS` aus `e2e-texts.ts` (lokal: 13 Zeilen, acht Schlüssel, kein Geheimnis), Test der Prüffunktion in `e2e-http-031.test.mjs` | lokal grün, mit den H8-Texten nur PR-CI |
+
+Abweichung von der Spec (H7): eine Person ohne aktive Rolle bekommt keine Sitzung; `/auth/callback` antwortet 403 (`R-PERM-01`),
+weil `sessionActorFromEvents` vor dem Cookie läuft (`apps/api/src/app.ts`). Die Seite „Keine aktive Rolle“ und ein 403 von
+`/auth/me` mit CSRF-Token sind so für `norole` nicht erreichbar. H7 prüft deshalb: Rückruf 403, kein `hv_session`-Cookie,
+`/auth/me` 401. Die Entscheidung über die Spec liegt beim Orchestrator (Folgeliste).
+
+Vorprüfungen: (2) `Secure`-Cookie über `http://localhost` in Chromium gespeichert (`httpOnly`, `secure`, `sameSite: Lax`), ein
+wiederhergestellter `storageState` sendet es wieder, auch über einen Request-Kontext; (3) der Vite-Proxy reicht beide
+`Set-Cookie`-Felder und die relative `Location` durch; der Dienst sieht dabei als `Host` den Zielhost, nicht den Vite-Ursprung
+(entgegen dem Wortlaut der Spec, ohne Folge, da der Dienst `Host` nicht auswertet); (4) teilweise: `/v1/meeting` und die Aliasrouten brauchen eine
+Sitzung und laufen erst in der PR-CI (H4 bis H8). Lokal geprüft mit einem Wegwerfskript (nicht eingecheckt): frische Datenbank,
+Bootstrap des Harness, dann `loadPostgresSnapshot` des Dienstes (Hash-Kette und Personentabelle bestehen; 1 748 Ereignisse,
+28 Personen) und `sessionActorFromEvents` je Person (sieben Rollen richtig, `expert` mit `unit-fin`, `revoke` als
+Erfassung, `norole` ohne aktive Rolle); (5) lokales
+Postgres: Owner legt Datenbanken an; (6) Startzeile wörtlich; (1), (7) und (8) siehe oben; (9) `pnpm -r typecheck` erfasst die
+e2e-Dateien; (10) die heutigen CI-Laufzeiten habe ich nicht ablesen können (kein `gh`, keine Web-Abfrage in der Bauumgebung).
 
 ## Bericht (nach Bau ausfüllen)
 
