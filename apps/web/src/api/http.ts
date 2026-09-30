@@ -58,11 +58,13 @@ export interface HttpApi extends HvApi {
   /** A session is confirmed (`onActorChange(actor)`): open the stream unless one is open or a retry is pending. */
   openStream(): void;
   /**
-   * Close the stream, no new attempt. Without options (sign-out, no actor) everything is reset. `keepGate` (a
-   * structurally other actor, re-check finding 1): a pending backoff or pause after a session end stays, and a count of
-   * session ends re-arms the gate, so that close-then-open never bypasses it.
+   * Close the stream (no actor, another actor, no active role). The reconnect limit of the tab survives: a pending
+   * retry (backoff, session gate, pause) stays, the counters stay, and closing an unhealthy connection gates the next
+   * open (final re-check, T-G1-D-03).
    */
-  closeStream(options?: { keepGate?: boolean }): void;
+  closeStream(): void;
+  /** An explicit sign-out: the reconnect limit of the tab starts afresh (a 401 does the same inside the adapter). */
+  resetStreamLimits(): void;
 }
 
 /**
@@ -76,7 +78,7 @@ export function followSessionActor(api: Pick<HttpApi, 'openStream' | 'closeStrea
     const next = actor === undefined ? undefined : actorKey(actor);
     if (next === undefined) api.closeStream();
     else {
-      if (last !== undefined && next !== last) api.closeStream({ keepGate: true });
+      if (last !== undefined && next !== last) api.closeStream();
       api.openStream();
     }
     last = next;
@@ -256,8 +258,10 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     try { options.onWriteSettled?.(outcome); } catch { /* swallowed on purpose, like a throwing listener */ }
   };
   const onUnauthorized = () => {
-    // Any 401 ends the stream too; only a new confirmed session (`openStream`) starts it again.
+    // Any 401 ends the stream too; only a new confirmed session (`openStream`) starts it again. A 401 needs a real
+    // sign-in to go on, so it is no loop: the reconnect limit starts afresh.
     stopStream();
+    resetStreamLimits();
     if (unauthorized) return;
     unauthorized = true;
     options.onUnauthorized();
@@ -298,12 +302,13 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
   let pausedHidden = false;
   let detachEnvironment: (() => void) | undefined;
   /**
-   * Review major 1 (T-G1-D-03): session or rights ends in a row without a healthy stream, and whether the next
-   * `openStream()` follows such an end. A proxy answering 403 only on the stream, or a service whose hub lags behind
-   * `/auth/me`, would otherwise loop end → `/auth/me` → open → end without any pause.
+   * The reconnect limit of the tab (review major 1 and the re-checks, T-G1-D-03, MF-SC-2): session or rights ends in a
+   * row without a healthy stream, and whether the next `openStream()` has to wait. A proxy answering 403 only on the
+   * stream, a service whose hub lags behind `/auth/me`, or an actor or role flapping on every `/auth/me` would otherwise
+   * loop end → `/auth/me` → open without any pause. It survives every close but an explicit sign-out or a 401.
    */
   let sessionEnds = 0;
-  let afterSessionEnd = false;
+  let gateNextOpen = false;
   /** Reads started while no stream is in step (N5), keyed by method and arguments. */
   let recorded: Map<string, { method: ReadName; args: readonly unknown[] }> | 'all' = new Map();
 
@@ -333,9 +338,7 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     }
     deliver([], { seq: 0, topics: [...topics], subjects: [...subjects] });
   };
-  /** Whether the pending retry is the backoff or pause after a session end (re-check finding 1). */
-  let retryIsGate = false;
-  const clearRetry = () => { if (retryTimer !== undefined) clearTimeout(retryTimer); retryTimer = undefined; retryIsGate = false; };
+  const clearRetry = () => { if (retryTimer !== undefined) clearTimeout(retryTimer); retryTimer = undefined; };
   const clearWatchdog = () => { if (watchdog !== undefined) clearTimeout(watchdog); watchdog = undefined; };
   /** Ends the current connection on this side; nothing of it is read any more. */
   const drop = () => {
@@ -357,17 +360,16 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     attempt = Math.min(attempt + 1, 16);
     return step * (1 - BACKOFF_JITTER * environment.random());
   };
-  const retryIn = (ms: number, gate = false) => {
+  const retryIn = (ms: number) => {
     clearRetry();
-    retryIsGate = gate;
-    retryTimer = setTimeout(() => { retryTimer = undefined; retryIsGate = false; connect(); }, ms);
+    retryTimer = setTimeout(() => { retryTimer = undefined; connect(); }, ms);
   };
   /** A loss of session or rights: empty the buffer (the hook), no new stream without a new confirmation. */
   const endForSession = (reason: StreamEndReason) => {
     const closing = current;
     const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
     if (lifetime >= SHORT_LIVED_MS) { attempt = 0; sessionEnds = 0; } else sessionEnds += 1;
-    afterSessionEnd = true;
+    gateNextOpen = true;
     drop();
     clearRetry();
     wanted = false;
@@ -375,11 +377,18 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     signal({ type: 'stop' });
     try { options.onStreamEnd?.(reason); } catch { /* the stream stays closed either way */ }
   };
+  /** Closes the stream; a pending retry stays, so that no close shortens the wait (final re-check). */
   function stopStream() {
     wanted = false;
     drop();
-    clearRetry();
     signal({ type: 'stop' });
+  }
+  function resetStreamLimits() {
+    clearRetry();
+    attempt = 0;
+    shortLived = 0;
+    sessionEnds = 0;
+    gateNextOpen = false;
   }
   /**
    * The service or the network ended a stream that was open. `soon`: rotate or reset, at once unless the stream was
@@ -667,39 +676,37 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
         if (pausedHidden && !environment.hidden()) onVisibility();
         return;
       }
-      if (afterSessionEnd) {
-        // The session is confirmed again, but the open that follows an end waits: backoff, and after three ends without
-        // a healthy stream the 5 min pause of m8 (review major 1). Still nothing opens without this confirmation.
-        afterSessionEnd = false;
-        if (sessionEnds >= SESSION_END_LIMIT) {
+      if (gateNextOpen) {
+        // The open after a session end or after closing an unhealthy connection waits: backoff, and after three such
+        // ends the 5 min pause of m8. Nothing opens without this confirmation either way.
+        gateNextOpen = false;
+        if (sessionEnds >= SESSION_END_LIMIT || shortLived >= SHORT_LIVED_LIMIT) {
           sessionEnds = 0;
+          shortLived = 0;
           signal({ type: 'start' });
           signal({ type: 'fallback' });
-          retryIn(SHORT_LIVED_PAUSE_MS, true);
-        } else retryIn(backoffDelay(), true);
+          retryIn(SHORT_LIVED_PAUSE_MS);
+        } else retryIn(backoffDelay());
         return;
       }
       connect();
     },
-    closeStream(options) {
+    closeStream() {
       // Review minor 2: the cursor belongs to this session and actor; the next stream starts without it (N5 path).
       cursor = undefined;
       pausedHidden = false;
       if (hiddenTimer !== undefined) { clearTimeout(hiddenTimer); hiddenTimer = undefined; }
-      if (options?.keepGate === true) {
-        // Re-check finding 1: an actor change never lifts the gate after a session end. A pending backoff or pause stays
-        // (and keeps `openStream()` waiting); an end that has not led to a healthy stream re-arms the gate.
-        const gate = retryIsGate ? retryTimer : undefined;
-        if (gate !== undefined) retryTimer = undefined;
-        stopStream();
-        if (gate !== undefined) { retryTimer = gate; retryIsGate = true; }
-        else if (sessionEnds > 0) afterSessionEnd = true;
-        return;
+      // Final re-check: the reconnect limit survives this close. Cutting a connection that is in flight or young without
+      // data counts like a short-lived stream and gates the next open; a pending retry and every counter stay.
+      const closing = current;
+      const lifetime = closing?.openedAt === undefined ? 0 : now() - closing.openedAt;
+      if (closing !== undefined && !closing.sawData && lifetime < SHORT_LIVED_MS) {
+        shortLived += 1;
+        gateNextOpen = true;
       }
       stopStream();
-      sessionEnds = 0;
-      afterSessionEnd = false;
     },
+    resetStreamLimits,
   };
   // N5: the reads of this adapter note that they started while no stream was in step.
   const methods = api as unknown as Record<string, (...args: unknown[]) => unknown>;

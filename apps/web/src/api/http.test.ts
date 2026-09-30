@@ -928,62 +928,13 @@ describe('stream client (slice 036b)', () => {
     follow({ ...ACTOR, unitId: 'unit-fin' });
     await settle();
     expect(s1.cancelled).toBe(true);
+    // The old stream was young and carried only a cursor: closing it counts as short-lived, the new open waits 1 s.
+    expect(h.streams).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    await settle();
     expect(h.streams).toHaveLength(2);
     expect(h.streams[1]!.headers.get('Last-Event-ID')).toBeNull();
     expect(h.connection.get().phase).toBe('live');
-  });
-
-  it('re-check finding 1: an actor alternating on every /auth/me plus a refresh every 500 ms never lifts the gate', async () => {
-    const h = harness({ withStore: true });
-    let flip = 0;
-    const readSession = vi.fn(async () => {
-      flip += 1;
-      return { ...session(), actor: { id: flip % 2 === 0 ? 'p1' : 'p2', role: ACTOR.role } };
-    });
-    const auth = sessionWiring(h, readSession);
-    for (let i = 0; i < 200; i++) h.streamReplies.push(refused(403));
-    await auth.start();
-    await settle();
-    for (let t = 0; t < 60_000; t += 500) {
-      void auth.refresh().catch(() => undefined);
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    await settle();
-    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
-    // The pause from the third end (3 s) holds through every actor change until 303 s.
-    for (let t = 60_000; t < 302_500; t += 500) {
-      void auth.refresh().catch(() => undefined);
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    expect(h.streams).toHaveLength(3);
-    await vi.advanceTimersByTimeAsync(1_000);
-    await settle();
-    expect(h.streams.length).toBeGreaterThanOrEqual(4);
-    // Sign-out resets the gate: the next session opens at once.
-    const other = harness();
-    const follow = followSessionActor(other.api);
-    other.streamReplies.push(refused(403), sse().response);
-    follow(ACTOR);
-    await settle();
-    follow(undefined);
-    follow({ id: 'p9', role: ACTOR.role });
-    await settle();
-    expect(other.streams).toHaveLength(2);
-  });
-
-  it('re-check finding 2: reset on every open is no health; the backoff runs and the m8 pause follows after three', async () => {
-    const h = harness();
-    const resetOnly = () => new Response(`retry: 3000\n\n${RESET}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
-    for (let i = 0; i < 50; i++) h.streamReplies.push(resetOnly());
-    h.api.openStream();
-    await settle();
-    await vi.advanceTimersByTimeAsync(60_000);
-    await settle();
-    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000]);
-    expect(h.connection.get().phase).toBe('polling');
-    await vi.advanceTimersByTimeAsync(540_000);
-    await settle();
-    expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 3000, 303_000, 307_000, 315_000]);
   });
 
   it('re-check nit 1.4: a short stream with data does not end a series of session ends', async () => {
@@ -1017,5 +968,91 @@ describe('stream client (slice 036b)', () => {
     await vi.advanceTimersByTimeAsync(2000);
     await settle();
     expect(h.streams).toHaveLength(3);
+  });
+
+  /**
+   * Final re-check (T-G1-D-03): the reconnect limit is per tab and survives every close but an explicit sign-out or a
+   * 401. Every end kind with every actor pattern, each with a session refresh every 500 ms, for 10 min of fake time.
+   */
+  describe('reconnect limit matrix (final re-check)', () => {
+    const body = (text: string) => () => new Response(`retry: 3000\n\n${text}`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    const END_KINDS: [string, (i: number) => () => Response][] = [
+      ['403', () => () => refused(403)],
+      ['end {forbidden}', () => body(END('forbidden'))],
+      ['end {roles_changed}', () => body(`${CURSOR(5)}${END('roles_changed')}`)],
+      ['end {session}', () => body(END('session'))],
+      ['reset', () => body(RESET)],
+      ['cursor only', () => body(CURSOR(5))],
+      ['malformed', () => body('event: change\nid: 9\ndata: {"seq":"x"}\n\n')],
+      ['rotate', () => body(`${CURSOR(5)}${END('rotate')}`)],
+      ['reset and 403 mixed', (i) => (i % 2 === 0 ? body(RESET) : () => refused(403))],
+    ];
+    const noRole = () => Object.assign(new ApiProblem(403, 't', 'd'), { csrfToken: 'n'.repeat(43) });
+    const PATTERNS: [string, (n: number) => unknown][] = [
+      ['same actor', () => session()],
+      ['alternating actor', (n) => ({ ...session(), actor: { id: n % 2 === 0 ? 'p1' : 'p2', role: ACTOR.role } })],
+      ['noRole flapping', (n) => { if (n % 2 === 0) throw noRole(); return session(); }],
+    ];
+    const cases = END_KINDS.flatMap(([kind, reply]) => PATTERNS.map(([pattern, answer]) => [kind, pattern, reply, answer] as const));
+
+    it.each(cases)('%s with %s: at most 6 opens in 10 min', async (kind, pattern, reply, answer) => {
+      const h = harness({ withStore: true });
+      let n = 0;
+      const readSession = vi.fn(async () => { n += 1; return answer(n); });
+      const auth = sessionWiring(h, readSession as () => Promise<unknown>);
+      for (let i = 0; i < 400; i++) h.streamReplies.push(reply(i)());
+      await auth.start().catch(() => undefined);
+      await settle();
+      for (let t = 0; t < 600_000; t += 500) {
+        void auth.refresh().catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      console.log(`[matrix] ${kind} | ${pattern} | ${h.streams.length} opens in 10 min`);
+      expect(h.streams.length).toBeGreaterThan(0);
+      expect(h.streams.length).toBeLessThanOrEqual(6);
+    });
+
+    it('a healthy stream still reconnects in about 1 s: with data, and after 10 s without', async () => {
+      const h = harness();
+      const s1 = sse();
+      const s2 = sse();
+      const s3 = sse();
+      h.streamReplies.push(s1.response, s2.response, s3.response);
+      h.api.openStream();
+      await settle();
+      s1.send(CHANGE(5, ['speakers']));
+      s1.close();
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000]);
+      s2.send(CURSOR(6));
+      await beat(s2, 15_000);
+      s2.close();
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams.map((call) => call.at)).toEqual([0, 1000, 17_000]);
+    });
+
+    it('only an explicit sign-out lets the limit start afresh', async () => {
+      const h = harness();
+      const follow = followSessionActor(h.api);
+      h.streamReplies.push(refused(403), refused(403), sse().response);
+      follow(ACTOR);
+      await settle();
+      follow(undefined); // closing (no role, other actor) keeps the gate
+      follow(ACTOR);
+      await settle();
+      expect(h.streams).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(h.streams).toHaveLength(2);
+      h.api.resetStreamLimits(); // explicit sign-out
+      follow(undefined);
+      follow({ id: 'p9', role: ACTOR.role });
+      await settle();
+      expect(h.streams).toHaveLength(3);
+    });
   });
 });

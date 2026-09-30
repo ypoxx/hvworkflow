@@ -87,7 +87,11 @@ let followActor: ((actor: Actor | undefined) => void) | undefined;
 let sessionActorKey: string | undefined;
 export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
   readSession: getHttpSession,
-  signOut: logoutHttpSession,
+  // Slice 036b: only an explicit sign-out (or a 401) lets the reconnect limit of the tab start afresh.
+  signOut: async (csrfToken) => {
+    await logoutHttpSession(csrfToken);
+    httpAdapter?.resetStreamLimits();
+  },
   onActorChange: (actor) => {
     // Slice 036a, Entscheidung 8: a structurally other actor or none (sign-out, 401) empties the live store before
     // any view learns of the new actor. An equal actor object from a refresh keeps it.
