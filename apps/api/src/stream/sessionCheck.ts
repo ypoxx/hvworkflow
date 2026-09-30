@@ -17,8 +17,11 @@ export interface SessionChecker {
   check(occasion: string, sessionKey: string, read: () => Promise<boolean>, alive?: () => boolean): Promise<boolean>;
 }
 
+/** A check dropped because no caller waited any more; never an answer about the session. */
+const GONE = Symbol('gone');
+
 export function createSessionChecker(options: { concurrency: number; onWindow?: (phase: 'start' | 'end', occasion: string) => void }): SessionChecker {
-  const running = new Map<string, { run: Promise<boolean>; callers: (() => boolean)[] }>();
+  const running = new Map<string, { run: Promise<boolean | typeof GONE>; callers: (() => boolean)[] }>();
   const waiting: (() => void)[] = [];
   let active = 0;
 
@@ -42,16 +45,25 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
     check(occasion, sessionKey, read, alive = () => true) {
       const key = `${occasion}\u0000${sessionKey}`;
       const joined = running.get(key);
+      const answer = (result: Promise<boolean | typeof GONE>): Promise<boolean> => result.then((value) => {
+        if (value !== GONE) return value;
+        // The check was dropped because nobody waited when it got its slot. A caller that still waits (it
+        // joined in that window) checks anew instead of reading "invalid" (re-check nit).
+        return alive() ? this.check(occasion, sessionKey, read, alive) : false;
+      });
       if (joined) {
         joined.callers.push(alive);
-        return joined.run;
+        return answer(joined.run);
       }
       const callers = [alive];
-      const run = (async () => {
+      const run = (async (): Promise<boolean | typeof GONE> => {
         await acquire();
         try {
           // Nobody waits any more (every stream of this check closed while queued): no pool connection taken.
-          if (!callers.some((caller) => caller())) return false;
+          if (!callers.some((caller) => caller())) {
+            if (running.get(key)?.callers === callers) running.delete(key);
+            return GONE;
+          }
           window('start', occasion);
           try {
             return await read();
@@ -66,7 +78,7 @@ export function createSessionChecker(options: { concurrency: number; onWindow?: 
       // Forget the result as soon as it is known: the next batch or heartbeat checks anew.
       const forget = (): void => { if (running.get(key)?.run === run) running.delete(key); };
       run.then(forget, forget);
-      return run;
+      return answer(run);
     },
   };
 }

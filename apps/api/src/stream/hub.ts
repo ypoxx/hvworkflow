@@ -92,6 +92,8 @@ export function createHub(options: HubOptions): Hub {
   let lastReloadAt = 0;
   let inflight: Promise<void> | undefined;
   let cooling = false;
+  /** Resolves when the current spacing after a reload ends (waited for by a stale open, review re-check minor). */
+  let coolingDone: Promise<void> = Promise.resolve();
   let again = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -199,8 +201,11 @@ export function createHub(options: HubOptions): Hub {
       } finally {
         inflight = undefined;
         cooling = true;
+        let endCooling!: () => void;
+        coolingDone = new Promise<void>((resolve) => { endCooling = resolve; });
         inScope(() => setTimeout(() => {
           cooling = false;
+          endCooling();
           if (again) {
             again = false;
             schedule();
@@ -246,10 +251,18 @@ export function createHub(options: HubOptions): Hub {
   return {
     async ensureFresh(force = false) {
       if (inflight) await inflight.catch(() => undefined);
-      if (!loaded || stale || options.clock().getTime() - lastReloadAt > options.freshnessMs) await reload();
-      // A forced reload keeps the spacing between reloads (review minor 4): a cursor beyond the head cannot
-      // drive more reloads than the batches do.
-      else if (force && !cooling) await reload();
+      const due = (): boolean => !loaded || stale || options.clock().getTime() - lastReloadAt > options.freshnessMs;
+      if (due()) {
+        // Also a stale or aged projection keeps the spacing (re-check minor): opens that find the distributor idle
+        // cannot drive one full load each; waiting opens share one reload through `inflight`.
+        while (cooling) await coolingDone;
+        if (inflight) await inflight;
+        if (due()) await reload();
+      } else if (force && !cooling) {
+        // A forced reload keeps the spacing between reloads (review minor 4): a cursor beyond the head cannot
+        // drive more reloads than the batches do.
+        await reload();
+      }
     },
     register(connection) {
       const first = connections.size === 0;

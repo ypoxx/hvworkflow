@@ -100,10 +100,13 @@ interface Harness {
   readSessionCalls: { token: string; slideIdle: boolean }[];
   /** The session check throws for this token (the stream's own check; other sessions still pass). */
   failReadSession: { token?: string };
+  /** The session check for this token waits for `until` (a gate the test controls). */
+  hang: { token?: string; until?: Promise<void> };
   hooks: {
     load?: ((log: readonly DomainEvent[]) => readonly DomainEvent[]) | undefined;
     handover?: (() => Promise<void>) | undefined;
     reloads: number;
+    reloadStarts: number[];
     appliedHead: number;
     windows: { kind: string; phase: string; occasion?: string }[];
   };
@@ -132,6 +135,7 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
   const idleExpired = new Set<string>();
   const readSessionCalls: { token: string; slideIdle: boolean }[] = [];
   const failReadSession: { token?: string } = {};
+  const hang: { token?: string; until?: Promise<void> } = {};
   const later = (ms: number): Date => new Date(clock.now.getTime() + ms);
   const authStore: AuthStore = {
     async createLoginState() {},
@@ -140,6 +144,7 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
     async readSession(value, _now, slideIdle = true) {
       readSessionCalls.push({ token: value, slideIdle });
       if (failReadSession.token === value) throw new Error('synthetic session store failure');
+      if (hang.token === value && hang.until) await hang.until;
       const s = sessions.get(value);
       if (!s || blocked.has(s.actorId) || idleExpired.has(value)) return null;
       return { ...s, expiresAt: later(14 * 3_600_000), idleExpiresAt: later(1_800_000) };
@@ -153,7 +158,7 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
     async authorizationUrl({ state }) { return `https://idp.example.invalid/authorize?state=${state}`; },
     async complete() { return { issuer: ISSUER, subject: 'unused' }; },
   };
-  const hooks: Harness['hooks'] = { reloads: 0, appliedHead: 0, windows: [] };
+  const hooks: Harness['hooks'] = { reloads: 0, reloadStarts: [], appliedHead: 0, windows: [] };
   const accessLines: string[] = [];
   let id = 0;
   const app = createApp({
@@ -171,6 +176,7 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
       streamWindow: (kind, phase, occasion) => {
         hooks.windows.push({ kind, phase, ...(occasion !== undefined ? { occasion } : {}) });
         if (kind === 'reload' && phase === 'end') hooks.reloads += 1;
+        if (kind === 'reload' && phase === 'start') hooks.reloadStarts.push(performance.now());
       },
       streamApplied: (head) => { hooks.appliedHead = head; },
     },
@@ -178,7 +184,7 @@ async function harness(options: { session?: boolean; streamLimits?: Partial<Stre
   });
   apps.push(app);
   return { app, log: () => log, head: () => log.length, clock, sessions, blocked, idleExpired, readSessionCalls,
-    failReadSession, hooks, accessLines };
+    failReadSession, hang, hooks, accessLines };
 }
 
 const asSession = (key: string, n = 1): Record<string, string> => ({ Cookie: `hv_session=${token(key, n)}` });
@@ -816,13 +822,14 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     const h = await harness({ session: true });
     const reader = track(await mustOpen(h.app, '/v1/stream', asSession('unitswap')));
     await reader.nextMessage();
-    // Revocation and new grant must land in one batch (else the gap between them is `forbidden`): both are written
-    // right after a reload, inside the distributor's spacing of 250 ms.
-    const target = h.head() + 1;
-    await assignFiller(h, 'admin');
-    await eventually(() => h.hooks.appliedHead === target, 3_000, 'filler applied');
+    // Revocation and new grant must land in one batch (else the gap between them is `forbidden`): the distributor's
+    // view is frozen while both are written, then a filler write triggers the reload that applies all three.
+    const frozen = h.head();
+    h.hooks.load = (log) => log.slice(0, frozen);
     await revokeGrant(h, 'unitswap', 0);
     await ok(call(h, 'admin', 'POST', `/v1/meetings/${MEETING}/role-assignments`, {}, { subjectId: subject('unitswap'), role: 'expert', unitId: 'unit-ops' }));
+    h.hooks.load = undefined;
+    await assignFiller(h, 'admin');
     const rest = await reader.rest();
     expect(kinds(rest)).toEqual(['end']);
     expect(rest[0]!.data).toEqual({ reason: 'roles_changed' });
@@ -853,6 +860,79 @@ describe('Scheibe 035b: SSE stream without Postgres', () => {
     await first;
     await second;
     expect(reads).toBe(0);
+  });
+
+  it('R6b a caller that joins a queued check and stays gets a real read, not a dropped answer (re-check nit)', async () => {
+    const checker = createSessionChecker({ concurrency: 1 });
+    let releaseFirst!: (valid: boolean) => void;
+    const first = checker.check('b:1', 'k1', () => new Promise<boolean>((resolve) => { releaseFirst = resolve; }));
+    let reads = 0;
+    let gone = true;
+    void checker.check('b:1', 'k2', async () => { reads += 1; return true; }, () => !gone);
+    const joiner = checker.check('b:1', 'k2', async () => { reads += 1; return true; }, () => true);
+    // A third check that hangs: a joiner that had to queue anew would wait behind it.
+    void checker.check('b:1', 'k3', () => new Promise<boolean>(() => undefined));
+    await eventually(() => typeof releaseFirst === 'function', 1_000, 'first read started');
+    releaseFirst(true);
+    await first;
+    expect(await Promise.race([joiner, sleep(300).then(() => 'waiting' as const)])).toBe(true);
+    expect(reads).toBe(1);
+  });
+
+  it('R1d a live batch stalled mid-write: sign-out ends it with session, the rest of the batch is not sent (re-check major)', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 150 } });
+    const reader = track(await mustOpen(h.app, '/v1/stream', asSession('admin')));
+    await reader.nextMessage();
+    await sleep(50);
+    // Freeze the distributor's view so that the writes form one batch.
+    const frozen = h.head();
+    h.hooks.load = (log) => log.slice(0, frozen);
+    reader.hold();
+    for (let i = 0; i < 6; i++) await assignFiller(h, 'admin2', OTHER);
+    h.hooks.load = undefined;
+    await assignFiller(h, 'admin2', OTHER);
+    await eventually(() => h.hooks.appliedHead === h.head(), 3_000, 'batch applied');
+    await sleep(100);
+    const before = reader.blocks.filter(isEvent).length;
+    h.sessions.delete(token('admin'));
+    await sleep(1_000);
+    reader.resume();
+    const rest = await reader.rest(3_000);
+    // At most the one frame already handed to the transport before the sign-out, then the end.
+    expect(reader.blocks.filter(isEvent).length - before).toBeLessThanOrEqual(1);
+    expect(rest.at(-1)!.data).toEqual({ reason: 'session' });
+  });
+
+  it('R1e catch-up gated per frame: a check that is still running holds the next frame (re-check minor)', async () => {
+    const h = await harness({ session: true, streamLimits: { heartbeatMs: 150 } });
+    const reader = track(await mustOpen(h.app, '/v1/stream', { ...asSession('admin'), 'Last-Event-ID': String(h.head() - 1_000) }, { pauseMs: 2 }));
+    await eventually(() => reader.blocks.filter(isEvent).length >= 5, 3_000, 'first catch-up frames');
+    reader.hold();
+    let openGate!: () => void;
+    h.hang.until = new Promise<void>((resolve) => { openGate = resolve; });
+    h.hang.token = token('admin');
+    await sleep(50);
+    const before = reader.blocks.filter(isEvent).length;
+    h.sessions.delete(token('admin'));
+    await sleep(400); // a heartbeat starts a check that now hangs at the gate
+    reader.resume();
+    await sleep(300);
+    openGate();
+    const rest = await reader.rest(3_000);
+    expect(reader.blocks.filter(isEvent).length - before).toBeLessThanOrEqual(1);
+    expect(rest.at(-1)!.data).toEqual({ reason: 'session' });
+  });
+
+  it('R3b opens that find the distributor idle keep the spacing between reloads (re-check minor)', async () => {
+    const h = await harness({ session: true });
+    for (let i = 0; i < 6; i++) {
+      const opened = await openStream(h.app, '/v1/stream', { ...asSession('capture'), 'Last-Event-ID': String(h.head() + 5) });
+      expect(kinds(await track(opened.reader!).rest())).toEqual(['reset']);
+    }
+    const starts = h.hooks.reloadStarts;
+    expect(starts.length).toBeGreaterThan(1);
+    const gaps = starts.slice(1).map((t, i) => t - starts[i]!);
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(200);
   });
 
   // ---- real server ---------------------------------------------------------------------------------------------

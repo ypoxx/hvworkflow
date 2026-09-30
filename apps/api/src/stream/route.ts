@@ -166,7 +166,9 @@ class Connection implements HubConnection {
     const beat = (delay: number): void => {
       this.heartbeatTimer = setTimeout(() => {
         if (this.closed) return;
-        if (this.state === 'handover') this.checkDuringHandover();
+        // Catch-up being written, or a live batch being written (the writer may hang behind a stalled reader):
+        // check directly; the queued heartbeat item would wait behind the hanging write (re-check major).
+        if (this.state === 'handover' || this.draining) this.checkDuringHandover();
         else this.enqueueHeartbeat();
         beat(heartbeatMs);
       }, delay);
@@ -219,7 +221,7 @@ class Connection implements HubConnection {
   }
 
   /**
-   * While the catch-up is written the queue does not drain, so the heartbeat checks directly: lifetime,
+   * While the catch-up or a live batch is written, the heartbeat checks directly: lifetime,
    * the actor map from the distributor's projection and a fresh session check. A failure closes with the
    * matching `end`; the catch-up waits for a running check after every write (`catchUpMayGoOn`).
    */
@@ -234,7 +236,7 @@ class Connection implements HubConnection {
     run.then(clear, clear);
   }
 
-  /** After each catch-up write: a heartbeat check that ran meanwhile must pass before the next frame. */
+  /** Before each frame (catch-up and live): a heartbeat check that runs meanwhile must pass first. */
   async catchUpMayGoOn(): Promise<boolean> {
     if (this.handoverCheck !== undefined && !await this.handoverCheck.catch(() => false)) return false;
     return !this.closed;
@@ -301,11 +303,13 @@ class Connection implements HubConnection {
         for (const frame of frames) {
           // An id is never lower than or equal to one already sent on this connection.
           if (frame.id !== undefined && frame.id <= this.lastSentId) continue;
+          if (!await this.catchUpMayGoOn()) return;
           if (!await this.write(frame)) return;
         }
       } else {
         if (!this.heartbeatRights()) return;
         if (!await this.sessionValid(item.occasion)) return;
+        if (!await this.catchUpMayGoOn()) return;
         if (!await this.write(HEARTBEAT_FRAME)) return;
         // The head moved on through events this reader cannot see: a cursor with the heartbeat.
         if (item.head > this.lastSentId && !await this.write(cursorFrame(item.head))) return;
