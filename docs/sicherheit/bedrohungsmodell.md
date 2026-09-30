@@ -314,7 +314,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 023 Vertrag 0.3.0 | — | T-G1-T-02, T-G1-D-01 (Zielvorschläge `additionalProperties`, `maxLength`) |
 | 026 Personentabelle | T-G1-I-03, T-G2-I-01 | T-G3-I-04, T-G3-E-03 |
 | 028 Idempotenz, If-Match | T-G1-T-03, T-G1-D-02 | — |
-| 040 Administration im Kern (040a gemergt: Inhaltsrechte, R-ADM-07, R-ADM-08; Rest 040b–d) | T-G1-E-04 (Inhaltsteil mit 040a; Override 040d) | MF-01 |
+| 040 Administration im Kern (040a: Inhaltsrechte, R-ADM-07, R-ADM-08; Rest 040b–d) | T-G1-E-04 (Inhaltsteil mit 040a; Override 040d) | MF-01 |
 | 047 Attributrechte | T-G1-I-04, T-G1-E-05 | T-G1-I-01 |
 | 049 Vorgelesen als Entität | T-G1-R-02 | T-G1-E-05 |
 | 065 Webhooks | T-G3-T-03, T-G3-I-01, T-G3-E-02 | T-G3-D-02 |
@@ -335,7 +335,9 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Verhindert durch:* T-G1-E-04, T-G3-E-03; Zuordnung als Ereignis `RoleAssigned`/`RoleRevoked` mit Ablauf
   (026); seit 040a keine Selbstzuordnung (R-ADM-07, 409, kein Ereignis) — der Weg „sich `approver` zuordnen,
   eigene admin-Zuordnung entziehen, freigeben“ ist für eine einzelne Person geschlossen; die letzte tragfähige
-  Verwaltungsrolle ist nicht entziehbar (R-ADM-08); Änderungen nach dem Konfigurationsfreeze nur mit
+  Verwaltungsrolle ist nicht entziehbar (R-ADM-08; tragfähig heißt: nicht entzogen, ohne Ablauf oder Ablauf ≥ 24 h,
+  und die Zuordnung, die die Sitzung des Subjects tatsächlich wählt — die älteste aktive über alle nicht
+  geschlossenen Jahrgänge; eine Verwaltungsrolle hinter einer älteren Zuordnung desselben Subjects zählt nicht); Änderungen nach dem Konfigurationsfreeze nur mit
   `admin.override` und Grund (040d). **Offen:** zwei Verwaltungskonten, die einander Rollen geben, und eine Person
   mit zwei Subjects.
 - *Erkennung:* Alarm (085) mit Zielrecht `admin.roles.manage` bei Zuordnung eines Freigabe- oder Rechtsrechts
@@ -504,7 +506,7 @@ der ADR bleibt in dieser Scheibe unverändert. Mit Scheibe 012 geschlossene Befu
 | BF-06 | G1 | Keine Sicherheits-Header am Dienst (`apps/api/src/app.ts:126-148`, Probe P7); keine CSP für die Demo (`netlify.toml:17-22`, `apps/web/index.html:1-13`). | mittel | 034a, 037 | Anteil Dienst behoben (034a); Web-Dokument 037 |
 | BF-07 | G1 | Unbekannte Felder gelangen ins Log (`packages/domain/src/api.ts:338, 421`, `apps/api/src/contractSchema.ts:25`, `packages/contract/openapi.yaml:701-711`; Probe P4). | mittel | 023, 024 | offen |
 | BF-08 | G1 | „Vorgelesen" ohne Bindung an Platz und aktuelle Frage (`packages/domain/src/api.ts:478-484`, `packages/domain/src/transitions.ts:127-133`; Probe P6). | mittel | 047, 049 | offen |
-| BF-09 | G1 | `admin` hielt alle Rechte einschließlich Entwurf und Freigabe (vor 040a `packages/domain/src/permissions.ts:74`); Widerspruch zum Rechtekonzept Abschnitt 4 (kein ADR). **Geschlossen (040a):** ausdrückliche Liste ohne Inhaltsrechte; `admin040a.test.ts` Tests 1–3, Wahrheitstabellen-Diff. | mittel | 040a, 021 | geschlossen |
+| BF-09 | G1 | `admin` hielt alle Rechte einschließlich Entwurf und Freigabe (vor 040a `packages/domain/src/permissions.ts:74`); Widerspruch zum Rechtekonzept Abschnitt 4 (kein ADR). **Geschlossen (040a):** ausdrückliche Liste ohne Inhaltsrechte (`admin040a.test.ts` Tests 1–3, Wahrheitstabellen-Diff). Das Aussperren durch Entzug der letzten Verwaltungsrolle verhindert R-ADM-08; als Rückhalt zählt nur eine Verwaltungszuordnung, die die Sitzung ihres Subjects auch wählt (älteste aktive über alle nicht geschlossenen Jahrgänge, wie `apps/api/src/actor.ts`; Test 8, `apps/api/src/__tests__/admin040a.test.ts`). Ablauf und Jahrgangsschluss beenden Zuordnungen weiter ohne Entzug (Grenze der Spec, Ziel 3). | mittel | 040a, 021 | geschlossen |
 | BF-10 | G1 | Klarnamen in jeder Einzelfrage und in der Suche (`packages/domain/src/state.ts:177`, `packages/domain/src/api.ts:268`, `packages/domain/src/events.ts:36-47`). | mittel | 026, 067 | offen |
 | BF-11 | G1 | `If-Match` optional (`packages/domain/src/api.ts:209-217`). | mittel | 028 | offen |
 | BF-12 | G1 | Idempotenzspeicher unbegrenzt und flüchtig (`packages/domain/src/api.ts:171, 223-230`). | niedrig | 028 | offen |

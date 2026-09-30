@@ -284,6 +284,55 @@ describe('Scheibe 040a: R-ADM-08 — the last usable administrative assignment s
     close();
     expect((await api.revokeRole(last.id)).revokedAt).toBeDefined();
   });
+
+  // Review 040a, major 1: a managing assignment is only backing if the subject's session would select
+  // it — the oldest active assignment of that subject across all non-closed meetings (apps/api/src/actor.ts).
+  const other = holder('question.capture');
+
+  it('Test 8: a managing assignment behind an older active one of the same subject is no backing', async () => {
+    const { api, store } = fixture();
+    const own = await api.assignRole({ subjectId: 'adm-a', role: managing });
+    await api.assignRole({ subjectId: 'adm-b', role: other });
+    await api.assignRole({ subjectId: 'adm-b', role: managing });
+    const before = store.lastSeq();
+    await conflict(() => api.revokeRole(own.id), 'R-ADM-08');
+    expect(store.lastSeq()).toBe(before);
+  });
+
+  it('Test 8: the same with the older assignment in another non-closed meeting; once that meeting closes, it is backing', async () => {
+    const { api, store, as } = fixture();
+    const own = await api.assignRole({ subjectId: 'adm-a', role: managing });
+    store.append([
+      { id: 'create-2028', type: 'MeetingCreated', at, actor: demoAdmin, subjectId: 'hv-2028', meetingId: 'hv-2028',
+        payload: { title: 'HV 2028', date: '2028-04-20', agendaItems: [], units: [] } },
+      { id: 'b-2028', type: 'RoleAssigned', at, actor: demoAdmin, subjectId: 'b-2028', meetingId: 'hv-2028',
+        payload: { assignmentId: 'b-2028', subjectId: 'adm-b', role: other } },
+    ] as NewEvent[]);
+    as(demoAdmin);
+    await api.assignRole({ subjectId: 'adm-b', role: managing });
+    await conflict(() => api.revokeRole(own.id), 'R-ADM-08');
+    store.append([
+      { id: 'start-2028', type: 'MeetingStarted', at, actor: demoAdmin, subjectId: 'hv-2028', meetingId: 'hv-2028', payload: {} },
+      { id: 'close-2028', type: 'MeetingClosed', at, actor: demoAdmin, subjectId: 'hv-2028', meetingId: 'hv-2028', payload: {} },
+    ] as NewEvent[]);
+    expect((await api.revokeRole(own.id)).revokedAt).toBeDefined();
+  });
+
+  it('Test 8 (allowed): a session identity revokes its own managing assignment while another usable one exists', async () => {
+    const { api, as } = fixture();
+    const own = await api.assignRole({ subjectId: 'adm-a', role: managing });
+    await api.assignRole({ subjectId: 'adm-b', role: managing });
+    as({ id: 'adm-a', role: managing, assignmentScoped: true });
+    expect((await api.revokeRole(own.id)).revokedAt).toBeDefined();
+  });
+
+  it('Test 8 (allowed): revoking an expired managing assignment', async () => {
+    const { api, advance, in: inMs } = fixture();
+    await api.assignRole({ subjectId: 'adm-1', role: managing });
+    const expired = await api.assignRole({ subjectId: 'adm-expired', role: managing, expiresAt: inMs(60_000) });
+    advance(120_000);
+    expect((await api.revokeRole(expired.id)).revokedAt).toBeDefined();
+  });
 });
 
 describe('Scheibe 040a: four eyes unchanged', () => {

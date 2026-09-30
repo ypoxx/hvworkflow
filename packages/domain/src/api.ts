@@ -254,6 +254,37 @@ const SPEAKER_ACTIONS: readonly Permission[] = ['speaker.update', 'speaker.reord
 
 export function systemClock(): Date { return new Date(); } // now-ok: default clock injection point for domain and server
 
+/**
+ * R-ADM-08 (Scheibe 040a, review major 1): the assignment a session of `subjectId` resolves to — the
+ * oldest active one (by `RoleAssigned` seq, then meeting id) across all non-closed meetings. The same
+ * selection as `sessionActorFromEvents` (apps/api/src/actor.ts); `apps/api/src/__tests__/admin040a.test.ts`
+ * pins both against each other. Only an assignment selected here can actually be exercised.
+ */
+export function sessionAssignmentFor(events: readonly DomainEvent[], subjectId: string, now: Date): RoleAssignment | undefined {
+  const states = new Map<string, State>();
+  for (const event of events) {
+    if (!event.meetingId) continue;
+    let projected = states.get(event.meetingId);
+    if (!projected) {
+      projected = emptyState();
+      states.set(event.meetingId, projected);
+    }
+    reduce(projected, event);
+  }
+  const current: { seq: number; assignment: RoleAssignment }[] = [];
+  for (const event of events) {
+    if (event.type !== 'RoleAssigned' || !event.meetingId) continue;
+    const projected = states.get(event.meetingId);
+    const assignment = projected?.roleAssignments.get(event.subjectId);
+    if (!assignment || assignment.subjectId !== subjectId || assignment.revokedAt ||
+        (assignment.expiresAt !== undefined && Date.parse(assignment.expiresAt) <= now.getTime()) ||
+        !projected?.meeting || projected.meeting.status === 'closed') continue;
+    current.push({ seq: event.seq, assignment });
+  }
+  current.sort((a, b) => a.seq - b.seq || a.assignment.meetingId.localeCompare(b.assignment.meetingId));
+  return current[0]?.assignment;
+}
+
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
   const clock = options.clock ?? systemClock;
@@ -718,13 +749,22 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const USABLE_MARGIN_MS = 24 * 60 * 60 * 1000;
   const GUARDED_MEETING_STATUSES: readonly Meeting['status'][] = ['preparation', 'running'];
   const managesRoles = (role: Role): boolean => ROLE_PERMISSIONS[role]?.includes('admin.roles.manage') === true;
-  const isUsable = (item: RoleAssignment): boolean => !item.revokedAt &&
-    (item.expiresAt === undefined || Date.parse(item.expiresAt) >= clock().getTime() + USABLE_MARGIN_MS);
+  // Usable also means exercisable: a session selects only the subject's oldest active assignment
+  // across all non-closed meetings, so an assignment behind an older one grants nothing (review major 1).
+  // Read from the global store, never from this meeting's projection alone.
+  const isUsable = (item: RoleAssignment, events: readonly DomainEvent[]): boolean => {
+    if (item.revokedAt) return false;
+    if (item.expiresAt !== undefined && Date.parse(item.expiresAt) < clock().getTime() + USABLE_MARGIN_MS) return false;
+    const selected = sessionAssignmentFor(events, item.subjectId, clock());
+    return selected?.id === item.id && selected.meetingId === item.meetingId;
+  };
   const isLastUsableManagingAssignment = (assignment: RoleAssignment): boolean => {
     if (!state.meeting || !GUARDED_MEETING_STATUSES.includes(state.meeting.status)) return false;
-    if (!managesRoles(assignment.role) || !isUsable(assignment)) return false;
+    if (!managesRoles(assignment.role)) return false;
+    const events = store.all();
+    if (!isUsable(assignment, events)) return false;
     return ![...state.roleAssignments.values()].some((item) =>
-      item.id !== assignment.id && managesRoles(item.role) && isUsable(item));
+      item.id !== assignment.id && managesRoles(item.role) && isUsable(item, events));
   };
 
   return {

@@ -248,7 +248,8 @@ const OTHER_RULES: readonly RuleEntry[] = [
     kind: 'Guard',
     description:
       'The last usable assignment of a role holding admin.roles.manage (not revoked; no expiry, or expiry at ' +
-      'least 24 hours after now) in a meeting in preparation or running cannot be revoked: revokeRole answers ' +
+      'least 24 hours after now; and the assignment a session of its subject selects, i.e. the oldest active one ' +
+      'across all non-closed meetings) in a meeting in preparation or running cannot be revoked: revokeRole answers ' +
       '409 with this rule id and appends no event. The managing roles are derived from ROLE_PERMISSIONS. ' +
       'Expiry and meeting close still end assignments without a revoke; the margin only delays that (Scheibe 040a).',
     legalRef: {
