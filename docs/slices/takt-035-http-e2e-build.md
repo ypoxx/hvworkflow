@@ -77,8 +77,22 @@ der Umsetzer prüft zuerst, welcher Fall gilt, und vermerkt es im Bericht. Ein t
 
 ## Nachweis
 
-Platzhalter, vom Umsetzer zu füllen: Gates-Commit; wörtlicher Schluss von `pnpm gates`; Dauer des Build-Schritts; Dauer
-des Projekts `http`; Lauf-ID des grünen CI-Jobs `e2e-http`.
+Gates-Commit: `80f85ca` (`pnpm gates` Exit 0). Wörtlicher Schluss:
+
+```
+✓ built in 1.58s
+mark-test-run: wrote /home/user/wt/t035/.claude/state/last-test-run (clean tree) at commit 80f85ca, tree 94f012a8ef4b…
+```
+
+- `vite preview` übernimmt `preview.proxy ?? server.proxy` (Vite 8.2.2, `chunks/node.js`); `vite.config.ts` bleibt unverändert.
+- Build-Schritt (`vite build`, HTTP-Modus, ohne Cache-Vorwärmung): 3,3 s (Gates-Build 1,58 s, dort mit `tsc -b` davor).
+- Lokal `E2E_HTTP_IDP=none pnpm e2e:http` grün: 8 Tests (G1 als erwarteter Fehlschlag), Projekt `http` 14,2 s, Harness gesamt 22 s.
+- H1-Zusicherung gegen Dev geprüft: der Dev-Server liefert `/@vite/client` und `/@react-refresh` aus, die Zusicherung würde also fehlschlagen.
+- In-process-Suite (`E2E_PORT=4235`): 127 grün, 8,0 min.
+- Nur CI (Keycloak) beweist: `@idp`-Tests H4–H8 und `http-setup` gegen den Build, die Gesamtdauer des Jobs `e2e-http` und die Lauf-ID
+  (noch offen, PR folgt).
+- 031a-Spec Zeile 29 („Vite-Entwicklungsserver“) liegt außerhalb der Files allowed und ist nicht berichtigt.
+- H10 (takt-033b) nicht angefasst: 033b ist noch nicht gemergt; der Dev-Zweig ist von dem der beiden Takte zu entfernen, der zuletzt gemergt wird.
 
 **Orchestrator-Entscheidungen (30.09.2026) zu den offenen Fragen:** (1) H10 steht in `apps/web/e2e/031-http-betriebsart.spec.ts`
 (Files allowed korrigiert). (2) Die Build-Prüfung ist eine Zusicherung in H1 derselben Datei, keine neue Spec-Datei.
