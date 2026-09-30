@@ -53,6 +53,14 @@ export interface ContributionPaneProps {
   onReloadStale: () => void;
   canCapture: boolean;
   writing: boolean;
+  /**
+   * takt-032: a write on this Redebeitrag is in flight (or the Wortmeldung's new version is not yet
+   * read back). A loading state, not a right: every way to capture is locked with `aria-disabled`
+   * (takt-008, focus stays) and the pane says so with `data-busy`/`aria-busy`.
+   */
+  busy: boolean;
+  /** takt-032: only the input for a further Redebeitrag waits (the Wortmeldung's new version is unknown). */
+  submitBusy?: boolean;
   onWrite: (text: string) => Promise<boolean>;
   onCaptureQuestions: (questions: QuestionCapture[]) => Promise<boolean>;
   onOpenSuggest: () => void;
@@ -76,6 +84,8 @@ export function ContributionPane({
   onReloadStale,
   canCapture,
   writing,
+  busy,
+  submitBusy = false,
   onWrite,
   onCaptureQuestions,
   onOpenSuggest,
@@ -141,7 +151,7 @@ export function ContributionPane({
   }
 
   const submitText = async (): Promise<void> => {
-    if (writing || submitting.current || draft.trim() === '') return;
+    if (writing || busy || submitBusy || submitting.current || draft.trim() === '') return;
     submitting.current = true;
     // Armed before the write, not after: the in-process demo reads the new Redebeitrag back (and
     // mounts the field) within the same chain of promises, before this function resumes.
@@ -160,7 +170,7 @@ export function ContributionPane({
   };
 
   const addFree = async (): Promise<void> => {
-    if (free.trim() === '' || submittingFree.current) return;
+    if (free.trim() === '' || busy || submittingFree.current) return;
     submittingFree.current = true;
     try {
       if (await onCaptureQuestions([{ text: free.trim() }])) setFree('');
@@ -172,6 +182,11 @@ export function ContributionPane({
   };
 
   return (
+    <div
+      data-testid="capture-contribution-pane"
+      className="h-full"
+      {...(busy || submitBusy ? { 'data-busy': 'true', 'aria-busy': true } : {})}
+    >
     <Panel
       className="h-full"
       padded={false}
@@ -216,6 +231,7 @@ export function ContributionPane({
               variant="secondary"
               data-testid="capture-free-add"
               disabled={free.trim() === ''}
+              aria-disabled={busy}
               onClick={() => void addFree()}
               className="h-8"
             >
@@ -225,7 +241,10 @@ export function ContributionPane({
               size="sm"
               variant="secondary"
               data-testid="capture-suggest"
-              onClick={onOpenSuggest}
+              aria-disabled={busy}
+              onClick={() => {
+                if (!busy) onOpenSuggest();
+              }}
               className="h-8"
               icon={<ListChecks size={14} strokeWidth={1.75} aria-hidden="true" />}
             >
@@ -369,7 +388,7 @@ export function ContributionPane({
                 // still uses `disabled`: while typing, focus is in the text field; after a
                 // successful write, `attachFreeInput` above moves it on.
                 disabled={draft.trim() === ''}
-                aria-disabled={writing}
+                aria-disabled={writing || busy || submitBusy}
                 onClick={() => void submitText()}
                 icon={<PencilLine size={16} strokeWidth={1.75} aria-hidden="true" />}
               >
@@ -387,6 +406,7 @@ export function ContributionPane({
           <ContributionText
             contribution={contribution}
             canCapture={canCapture}
+            busy={busy}
             onCapture={onCaptureQuestions}
             questions={questions}
             hoveredQuestionId={hoveredQuestionId}
@@ -395,5 +415,6 @@ export function ContributionPane({
         )}
       </div>
     </Panel>
+    </div>
   );
 }

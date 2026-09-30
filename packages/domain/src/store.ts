@@ -4,7 +4,7 @@
  * log after every append and load it at start. The store never mutates or deletes an event.
  */
 import type { DomainEvent, NewEvent } from './events.js';
-import { stampEvent, verifyEventChain } from './envelope.js';
+import { isVerifiedLog, stampEvent, verifyEventChain } from './envelope.js';
 import { identityPiiCodec, type PiiCodec } from './piiCodec.js';
 import { project } from './state.js';
 
@@ -18,13 +18,17 @@ export interface EventStore {
 }
 
 export interface Persistence {
-  load(): DomainEvent[] | undefined;
+  /** A sealed log (`sealVerifiedLog`) is taken as verified; any other array is checked in full. */
+  load(): readonly DomainEvent[] | undefined;
   save(events: readonly DomainEvent[]): void;
 }
 
 export function createInMemoryEventStore(persistence?: Persistence, codec: PiiCodec = identityPiiCodec): EventStore {
-  const log: DomainEvent[] = [...(persistence?.load() ?? [])];
-  verifyEventChain(log);
+  const loaded = persistence?.load();
+  const log: DomainEvent[] = [...(loaded ?? [])];
+  // takt-033: skip the check only for the very array `sealVerifiedLog` verified and froze. A copy,
+  // or any other array, is checked in full as before; there is no caller-settable switch.
+  if (!isVerifiedLog(loaded)) verifyEventChain(log);
   const listeners = new Set<(events: DomainEvent[]) => void>();
 
   return {

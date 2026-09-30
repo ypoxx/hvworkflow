@@ -106,6 +106,31 @@ Screenshot `031-h9-eigene-schreibvorgaenge.png` im Artefakt `evidence-031-http` 
 liegt nur im Artefakt, nicht unter `docs/evidence/` (Download-Host durch den R11-Hook gesperrt; der Eigentümer kann sie
 aus dem Lauf übernehmen).
 
+**Nachlauf auf dem integrierten Commit `67778ba`** (Basis mit takt-033, takt-035, takt-036 und Doku eingebracht),
+`pnpm gates` mit Postgres-Variablen, sauberer Baum, Exit 0; domain 243, web 263, api 523 Tests grün. Wörtlicher Schluss:
+
+```
+✓ built in 1.87s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 67778ba, tree 3941b01d194c…
+```
+
+**Bildnachweis nach E56 (AGENTS.md R2, Eigentümer 30.09.2026).** H9 läuft nur gegen Keycloak im Job `e2e-http`; der
+Screenshot `031-h9-eigene-schreibvorgaenge.png` liegt im CI-Artefakt, nicht im Repo: Artefakt `evidence-031-http`,
+Lauf `36677086103` (Commit `67778ba`, Job `e2e-http` grün, gegen den Produktions-Build), Artefakt-ID `11079917793`,
+Digest `sha256:a111885550243369ec25896f3922ceb0e806d01d3496686f7e105392d2dc6c1f`.
+
+**Nachlauf nach takt-033b auf dem integrierten Commit `ee4414e`** (Basis mit takt-033b und E56; Konflikt in
+`031-http-betriebsart.spec.ts` gelöst, H9 und H10 bleiben beide), `pnpm gates` mit Postgres-Variablen, sauberer Baum,
+Exit 0; domain 243, web 269, api 523 Tests grün. Wörtlicher Schluss:
+
+```
+✓ built in 1.97s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit ee4414e, tree 544094fafe52…
+```
+
+Bildnachweis H9 auf diesem Stand (E56): Artefakt `evidence-031-http`, Lauf `36678184183` (Commit `ee4414e`, Job
+`e2e-http` grün), Artefakt-ID `11080663544`, Digest `sha256:cf0204a96e8b6de8648b54796f2fcc55e2c431d8de44ffd303d1f189bf26343f`.
+
 ## Review findings
 
 Review in frischem Kontext (Opus, nur Spec und Diff), Urteil: mergefähig nach grünem `e2e-http` und Befund 1.
@@ -138,4 +163,12 @@ Nachlauf auf dem integrierten Commit `5acd1b5` (Basis mit takt-031 eingemergt), 
 ```
 ✓ built in 1.73s
 mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit 5acd1b5, tree 8ba5cf554508…
+```
+
+Nachlauf auf dem integrierten Commit `e31073f` (Basis mit takt-034 eingemergt), `pnpm gates` mit Postgres-Variablen,
+sauberer Baum, Exit 0; domain 231, web 263, api 480 grün. Wörtlicher Schluss:
+
+```
+✓ built in 3.50s
+mark-test-run: wrote /home/user/wt/t030/.claude/state/last-test-run (clean tree) at commit e31073f, tree 8ba5cf554508…
 ```

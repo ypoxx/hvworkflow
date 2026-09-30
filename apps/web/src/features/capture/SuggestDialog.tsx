@@ -12,11 +12,14 @@ import { suggestQuestions } from './sentences';
 export function SuggestDialog({
   open,
   contribution,
+  locked = false,
   onClose,
   onSubmit,
 }: {
   open: boolean;
   contribution: Contribution;
+  /** takt-032: a write on this Redebeitrag is in flight; taking over waits for its answer. */
+  locked?: boolean;
   onClose: () => void;
   onSubmit: (questions: QuestionCapture[]) => Promise<boolean>;
 }) {
@@ -40,7 +43,7 @@ export function SuggestDialog({
 
   const submit = async (): Promise<void> => {
     const chosen = candidates.filter((_, index) => checked[index] === true);
-    if (chosen.length === 0 || busy) return;
+    if (chosen.length === 0 || busy || locked) return;
     setBusy(true);
     const ok = await onSubmit(
       chosen.map((candidate) => ({
@@ -68,6 +71,7 @@ export function SuggestDialog({
             variant="primary"
             data-testid="capture-suggest-add"
             disabled={busy || count === 0}
+            aria-disabled={locked}
             onClick={() => void submit()}
           >
             {t('capture.suggest.add', { count })}

@@ -49,16 +49,27 @@ export function NowSpeaking({
   speaking,
   next,
   busyId,
+  busyRound,
   onFinish,
   onCall,
 }: {
   speaking: Speaker | undefined;
   next: Speaker | undefined;
   busyId: string | null;
+  /** takt-032: the round whose reorder is in flight, or `null`. */
+  busyRound: number | null;
   onFinish: (speaker: Speaker) => void;
   onCall: (speaker: Speaker) => void;
 }) {
   const t = useT();
+  // Calling ends the running speech first, so a reorder in either of the two rounds holds it back.
+  const callLocked =
+    next !== undefined &&
+    (busyId === next.id ||
+      (busyRound !== null && (busyRound === next.round || busyRound === speaking?.round)));
+  const finishLocked =
+    speaking !== undefined &&
+    (busyId === speaking.id || (busyRound !== null && busyRound === speaking.round));
 
   return (
     <div className="grid shrink-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
@@ -103,7 +114,7 @@ export function NowSpeaking({
               {speaking._actions.includes('speaker.update') && (
                 <Button
                   variant="secondary"
-                  disabled={busyId === speaking.id}
+                  disabled={finishLocked}
                   onClick={() => onFinish(speaking)}
                   icon={<MicOff size={16} strokeWidth={1.75} aria-hidden="true" />}
                 >
@@ -127,7 +138,7 @@ export function NowSpeaking({
               <Button
                 variant="primary"
                 data-testid="speaker-call-next"
-                disabled={busyId === next.id}
+                disabled={callLocked}
                 onClick={() => onCall(next)}
                 icon={<Mic size={16} strokeWidth={1.75} aria-hidden="true" />}
               >

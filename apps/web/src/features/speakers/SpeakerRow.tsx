@@ -41,14 +41,18 @@ function onRowKeyDown(event: KeyboardEvent<HTMLLIElement>): void {
 
 export function SpeakerRow({
   speaker,
-  busy,
+  busy: rowBusy,
+  roundBusy = false,
   actions,
 }: {
   speaker: Speaker;
   busy: boolean;
+  /** takt-032: a reorder of this round is in flight — actions and dragging wait for its answer. */
+  roundBusy?: boolean;
   actions: SpeakerRowActions;
 }) {
   const t = useT();
+  const busy = rowBusy || roundBusy;
   const mayUpdate = speaker._actions.includes('speaker.update');
   const mayReorder = speaker._actions.includes('speaker.reorder');
   const {
@@ -59,7 +63,7 @@ export function SpeakerRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: speaker.id, disabled: !mayReorder });
+  } = useSortable({ id: speaker.id, disabled: !mayReorder || roundBusy });
 
   // The list only moves vertically; zeroing x keeps a dragged row inside its column grid.
   const style: CSSProperties = {

@@ -4,6 +4,7 @@
  * Redebeitrag see each other's Einzelfragen without a reload.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { etagOf } from '@hv/domain';
 import { getActor, useActor } from '../../api/actor';
 import { showProblem } from '../../components';
 import { getLang, translate } from '../../i18n';
@@ -255,4 +256,94 @@ export function keyBelongsTo(key: string | null, actorId: string): boolean {
   if (key === null) return false;
   const [owner] = JSON.parse(key) as unknown[];
   return owner === actorId;
+}
+
+/**
+ * takt-032 (Ziel 1): what the last `captureQuestions` answered with — the `ETag` of the Redebeitrag
+ * from `lastWriteEtag()`, passed on unchanged — and the version the list showed when the write was made.
+ */
+export interface ContributionMark {
+  readonly id: string;
+  readonly base: number;
+  readonly etag: string;
+}
+
+/**
+ * The `ifMatch` for the next write on `contribution`: the tag from the answer while the list still
+ * shows the version the write was made on; once a list read after the answer has another version,
+ * that one. Another Redebeitrag never uses the mark. The page never counts a version up itself.
+ */
+export function etagForContribution(
+  contribution: { readonly id: string; readonly version: number },
+  mark: ContributionMark | null,
+): string {
+  return mark !== null && mark.id === contribution.id && contribution.version <= mark.base
+    ? mark.etag
+    : etagOf(contribution.version);
+}
+
+/**
+ * The version an `ETag` of this API stands for (`etagOf`), or `null` for a tag it cannot place. Only
+ * used to compare an answer with what is shown; the tag itself is always sent on unchanged.
+ */
+export function versionOfEtag(etag: string): number | null {
+  const match = /^(?:W\/)?"v(\d+)"$/.exec(etag);
+  return match === null ? null : Number(match[1]);
+}
+
+/**
+ * The mark for an answer just received. Its base is the version shown *now*, not the one the write
+ * began with: a reload may have landed while the write ran, and a mark based on the older closure
+ * would let that newer list override the fresher tag of this answer.
+ * Codex P1 on PR #86: another desk may have moved the Redebeitrag while the answer was delayed. If the
+ * version shown is already at or past the one the answer tag stands for, there is no mark (`null`):
+ * the next write uses the tag of the shown read, and a stale tag never outlives a newer read.
+ */
+export function markAfterAnswer(
+  written: { readonly id: string; readonly version: number },
+  shownNow: { readonly id: string; readonly version: number } | undefined,
+  etag: string,
+): ContributionMark | null {
+  const answered = versionOfEtag(etag);
+  if (answered === null) return null;
+  const shown = shownNow !== undefined && shownNow.id === written.id ? shownNow.version : written.version;
+  const base = Math.max(shown, written.version);
+  return base >= answered ? null : { id: written.id, base, etag };
+}
+
+/** After `captureContribution` the new version of the Wortmeldung is not in the answer (Befund). */
+export interface SpeakerLock {
+  readonly speakerId: string;
+  readonly base: number;
+}
+
+/** Locked until a list of the Wortmeldungen shows another version than the one the write was made on. */
+export function isSpeakerLocked(
+  speaker: { readonly id: string; readonly version: number } | undefined,
+  lock: SpeakerLock | null,
+): boolean {
+  return lock !== null && speaker !== undefined && speaker.id === lock.speakerId && speaker.version === lock.base;
+}
+
+/** The cards and the coverage as shown together. */
+export interface ShownPair<Q, C> {
+  readonly questions: Q;
+  readonly contributions: C;
+}
+
+/**
+ * takt-032 (Ziel 3): a newer pair replaces the shown one only once both reads have answered for the
+ * current key — the same `useApiVersion` stand. Until then the old pair stays on screen (design
+ * principle 8). The pair shown itself comes back when nothing changed, so the caller may store the
+ * result during render without looping.
+ */
+export function landPair<Q, C>(
+  shown: ShownPair<Q, C> | null,
+  next: { questions: Q; contributions: C; questionsReady: boolean; contributionsReady: boolean },
+): ShownPair<Q, C> | null {
+  if (!next.questionsReady || !next.contributionsReady) return shown;
+  if (shown !== null && shown.questions === next.questions && shown.contributions === next.contributions) {
+    return shown;
+  }
+  return { questions: next.questions, contributions: next.contributions };
 }

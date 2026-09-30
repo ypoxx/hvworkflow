@@ -171,12 +171,36 @@ export function stampEvent(
   return { ...envelope, hash: digest(envelope) } as DomainEvent;
 }
 
+/**
+ * Where a chain check starts (takt-033): the seq and hash of the last event already verified. The
+ * default `{ seq: 0, prevHash: '' }` checks a whole log from its first event.
+ */
+export interface ChainStart {
+  seq: number;
+  prevHash: string;
+}
+
+const WHOLE_LOG: ChainStart = { seq: 0, prevHash: '' };
+
+// Process-wide count of events whose hash `verifyEventChain` recomputed. Read-only from outside
+// (`verifiedEventCount`); tests and the service's test hook use deltas around synchronous calls.
+let hashedEvents = 0;
+
+/** How many events `verifyEventChain` has hashed in this process so far (monotonic, for tests). */
+export function verifiedEventCount(): number {
+  return hashedEvents;
+}
+
 /** Check every link before projecting or serving a persisted log. */
-export function verifyEventChain(events: readonly DomainEvent[]): void {
-  let previousHash = '';
+export function verifyEventChain(events: readonly DomainEvent[], start: ChainStart = WHOLE_LOG): void {
+  if (!Number.isSafeInteger(start.seq) || start.seq < 0 || typeof start.prevHash !== 'string' ||
+      (start.seq === 0) !== (start.prevHash === '')) {
+    throw new Error(`Event seq ${Number.isSafeInteger(start.seq) ? start.seq + 1 : 1}: integrity check failed (invalid start).`);
+  }
+  let previousHash = start.prevHash;
   for (let index = 0; index < events.length; index++) {
     const event = events[index]!;
-    const seq = index + 1;
+    const seq = start.seq + index + 1;
     try {
       assertEventShape(event);
       if (event.seq !== seq || event.schemaVersion !== 2 || event.prevHash !== previousHash) throw new Error('sequence or predecessor');
@@ -198,12 +222,58 @@ export function verifyEventChain(events: readonly DomainEvent[]): void {
       if (!Number.isFinite(recordedMs) || !Number.isFinite(occurredMs) || occurredMs > recordedMs) throw new Error('time');
       if (event.occurredAtSource === 'server' && event.occurredAt !== event.recordedAt) throw new Error('server time');
       const { hash, ...withoutHash } = event;
+      hashedEvents += 1;
       if (digest(withoutHash) !== hash) throw new Error('hash');
       previousHash = hash;
     } catch (error) {
       throw new Error(`Event seq ${seq}: integrity check failed (${error instanceof Error ? error.message : String(error)}).`);
     }
   }
+}
+
+declare const verifiedBrand: unique symbol;
+
+/**
+ * An event log this module has verified and frozen (takt-033). Only `sealVerifiedLog` produces one;
+ * the brand is a type, the proof is membership in the module-private `WeakSet` below.
+ */
+export type VerifiedEventLog = readonly DomainEvent[] & { readonly [verifiedBrand]: true };
+
+const verifiedLogs = new WeakSet<object>();
+
+// Walks every child even below an already frozen object: a shallow `Object.freeze` by a caller must
+// not leave a mutable payload behind a verified hash.
+function deepFreeze(value: unknown, seen: Set<object> = new Set()): void {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  Object.freeze(value);
+  for (const child of Object.values(value)) deepFreeze(child, seen);
+}
+
+/** Whether `value` is exactly an array returned by `sealVerifiedLog` (a copy is not). */
+export function isVerifiedLog(value: unknown): value is VerifiedEventLog {
+  return typeof value === 'object' && value !== null && verifiedLogs.has(value);
+}
+
+/**
+ * Verify `suffix` as the continuation of an already sealed `prefix` (or as a whole log without one),
+ * then return prefix plus suffix as a new, deeply frozen, sealed log. The suffix is first copied with
+ * `structuredClone` (review finding 5): the copy is plain data only (getters are read once into data
+ * properties, symbol keys, non-enumerable properties and prototypes are dropped, a Proxy or a function
+ * throws), so nothing can answer differently after the check, and the caller's objects stay unfrozen.
+ * The copies are frozen *before* they are checked, so what was verified is what stays in the log. A
+ * failed check throws (naming the seq) and seals nothing. There is no flag to skip the check:
+ * `createInMemoryEventStore` trusts only arrays sealed here.
+ */
+export function sealVerifiedLog(prefix: VerifiedEventLog | undefined, suffix: readonly DomainEvent[]): VerifiedEventLog {
+  if (prefix !== undefined && !isVerifiedLog(prefix)) throw new Error('Only a sealed event log can be extended.');
+  const events = suffix.map((event) => structuredClone(event));
+  for (const event of events) deepFreeze(event);
+  const last = prefix?.at(-1);
+  verifyEventChain(events, last === undefined ? WHOLE_LOG : { seq: prefix!.length, prevHash: last.hash ?? '' });
+  const sealed = Object.freeze([...(prefix ?? []), ...events]);
+  verifiedLogs.add(sealed);
+  return sealed as unknown as VerifiedEventLog;
 }
 
 /** Only the JSONL dev adapter calls this; demo localStorage never upcasts. */
