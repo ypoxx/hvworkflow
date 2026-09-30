@@ -81,14 +81,19 @@ Datenbankverbindung.
      `readSnapshotEvents` gelesen (M6). Leere Karte → `end {forbidden}`. Jede andere Abweichung von der Referenz (ein
      Jahrgang mehr oder weniger, andere Rolle, anderer Fachbereich, andere Person) → `end {roles_changed}`. Aus diesem
      Stapel wird dann **nichts** zugestellt, auch nichts mit kleinerem `seq`.
-   - **Sitzung:** `authStore.readSession(token, clock(), false)`. Das Ergebnis wird je Sitzung höchstens 1 s gemerkt und
-     von allen Strömen dieser Sitzung geteilt, also höchstens eine Prüfung je Sitzung und Stapel. Die Prüfungen laufen
-     über höchstens **2** gleichzeitige Pool-Verbindungen (eigene Warteschlange). Die Heartbeats der Ströme sind
+   - **Sitzung:** `authStore.readSession(token, clock(), false)`, **frisch für jeden Stapel** (Codex P1, Sicherheit).
+     Innerhalb **eines** Stapels wird die Prüfung je Sitzung einmal ausgeführt und von allen Strömen dieser Sitzung für
+     genau diesen Stapel geteilt. Gleichzeitige Prüfungen derselben Sitzung laufen zu einem Promise zusammen, das schon
+     läuft. Ein Ergebnis wird **nie** für einen späteren Stapel oder Heartbeat wiederverwendet; es gibt keinen
+     zeitbasierten Merker. Ein Abmelden, eine Sperre oder ein Ablauf zwischen zwei Stapeln verhindert damit die Zustellung
+     des zweiten. Die Prüfungen laufen über höchstens **2** gleichzeitige Pool-Verbindungen (eigene Warteschlange). Die Heartbeats der Ströme sind
      versetzt (Startversatz je Strom innerhalb der 15 s). `null` → `end {session}`. Scheitert die Prüfung selbst
      (Datenbank, Timeout) → `end {unavailable}`: fail closed.
    - Im Demo-Header-Modus (`X-Actor`, nur Tests) entfällt die Sitzungsprüfung; die Akteurkarte gilt.
 5. **Wiederaufnahme** (Semantik aus 035a, hier umgesetzt).
    - Cursor = `Last-Event-ID`, sonst `after`; ohne beide beginnt der Strom am Kopf mit `cursor`.
+   - `cursor` mit `id` = Kopf folgt sofort nach dem Aufbau ohne Cursor und sofort nach einem abgeschlossenen Nachlauf
+     (035a). Nach `reset` verbindet der Client ohne Cursor neu und erhält sofort `cursor` mit dem Kopf.
    - Cursor > Kopf oder Abstand > 1000 → `reset`, schließen.
    - Sonst Nachlauf: Leser mit `event.read` alle Ereignisse einzeln; die übrigen `replayMessage` (035a), die `change`
      mit `replay: true` oder `reset` liefert.
@@ -168,7 +173,7 @@ Datenbankverbindung.
 - `apps/api/src/stream/hub.ts` (neu: Verteiler, Kontinuität)
 - `apps/api/src/stream/sse.ts` (neu: SSE-Rahmung, reine Funktionen)
 - `apps/api/src/stream/route.ts` (neu: Öffnen, Vorprüfungen, Grenzen, Reservierung, Zustellung, Gegendruck)
-- `apps/api/src/stream/sessionCheck.ts` (neu: gemerkte Sitzungsprüfung mit Warteschlange)
+- `apps/api/src/stream/sessionCheck.ts` (neu: Sitzungsprüfung je Stapel, zusammengeführt je Sitzung, mit Warteschlange)
 - `apps/api/src/app.ts` (nur: Route registrieren, Anstoß nach COMMIT, Verteiler verdrahten, `Last-Event-ID` in CORS
   `allowHeaders`, veralteten Kommentar ersetzen, Option für die Stromgrenzen, optionaler Test-Haken in `testHooks`)
 - `apps/api/src/limits/config.ts` (nur Stromgrenzen als Konstanten)
@@ -226,6 +231,10 @@ m5).
     genau `…H, H+1, H+2` ohne Lücke und ohne Doppel. capture erhält für dieselben Ereignisse eine `change`-Nachricht mit
     `id` > `H`, deren Themen und Kennungen beide Ereignisse abdecken. Dasselbe beim Öffnen ohne Cursor (`cursor` mit `H`,
     dann die gepufferten Nachrichten).
+13b. **`cursor` nach dem Aufbau (Codex P2 auf 035a):** Öffnen ohne Cursor → erste Nachricht nach `retry:` ist `cursor`
+    mit `id` = Kopf. Öffnen mit Cursor und Nachlauf → nach der letzten Nachlaufnachricht folgt `cursor` mit `id` = Kopf.
+13c. **Ablauf nach `reset`:** Cursor > Kopf → `reset` ohne `id`, Verbindung geschlossen; Neuaufbau ohne Cursor → sofort
+    `cursor` mit dem Kopf, kein zweites `reset`.
 14. Nicht-admin nach Trennung: `change` mit `replay: true` bzw. `reset` nach 035a Test 9. **podium** trennt, eine Frage
     wird vorgelesen oder auf die Bühne gestellt, neu verbinden → `reset` (jeder Leser mit `stage.read` gilt für `stage`
     als gegenstandsgebunden, 035a). **moderation** trennt, eine Frage wird auf die Bühne gestellt, neu verbinden →
@@ -237,7 +246,9 @@ m5).
     nach injizierter Uhr → `end {forbidden}` beim nächsten Heartbeat.
 17. **Sitzung:** Abmelden, Subject-Sperre, Leerlaufablauf → `end {session}` vor der nächsten Zustellung. `readSession`
     nur mit `slideIdle = false` (Spy). Drei Ströme derselben Sitzung, ein Stapel → genau **eine** Sitzungsprüfung (M6).
-    Prüfung wirft → `end {unavailable}`.
+    **Abmelden zwischen zwei Stapeln** (Codex P1): Stapel 1 wird zugestellt, dann wird abgemeldet, dann folgt Stapel 2
+    innerhalb von weniger als 1 s → Stapel 2 wird **nicht** zugestellt, der Strom endet mit `end {session}`. Zwei Stapel
+    hintereinander → zwei Prüfungen (kein Wiederverwenden). Prüfung wirft → `end {unavailable}`.
 18. **Obergrenzen:** vierter Strom derselben Sitzung → 429 mit `Retry-After`; siebter Strom desselben Subjects über drei
     Sitzungen → 429. Globale Grenze (gesenkt auf 2) → 503 `StreamUnavailable`. **Paralleles Öffnen (m4):** 10 gleichzeitige
     Öffnungen derselben Sitzung → genau 3 × 200, 7 × 429. Nach Abbruch ist der Platz sofort frei; nach einem Fehler vor
@@ -276,15 +287,22 @@ m5).
 28. **Keine gehaltene Verbindung:** Mit 10 ruhenden Strömen ist **außerhalb** der Nachlade- und Prüffenster (per
     Test-Haken markiert) keine Pool-Verbindung ausgecheckt und keine Transaktion der Laufzeitrolle offen
     (`pg_stat_activity`). Gemessen wird nur zwischen den Fenstern (M6).
-29. **Last (M6):** 200 offene Ströme (20 Sitzungen, Heartbeat gesenkt) und parallel 20 Schreibvorgänge → alle
+29. **Last (M6):** 200 offene Ströme über **67 Sitzungen** (66 × 3 + 1 × 2) von **34 Subjects** (33 mit zwei Sitzungen,
+    eines mit einer; so bleiben die Grenzen 3 je Sitzung und 6 je Subject eingehalten, die Prozessgrenze 200 ungesenkt;
+    Codex P1), Heartbeat gesenkt, und parallel 20 Schreibvorgänge → alle
     Schreibvorgänge 2xx innerhalb des Budgets aus 034a, **kein** 503 `PersistenceBusy`, höchstens 2 gleichzeitige
-    Verbindungen für Sitzungsprüfungen (Test-Haken), alle Ströme erhalten die Ereignisse.
+    Verbindungen für Sitzungsprüfungen (Test-Haken), alle Ströme erhalten die Ereignisse. **Budget-Begründung:** Je
+    Stapel höchstens 67 Sitzungsprüfungen (eine je Sitzung, frisch), über 2 Verbindungen, Stapel frühestens alle 250 ms;
+    dazu die Heartbeat-Prüfungen, verteilt über 15 s. Die Schreibvorgänge nutzen die übrigen Pool-Verbindungen und
+    werden durch die Prüfungen nicht blockiert. Der Test protokolliert die Zeit vom Stapel bis zur letzten Zustellung;
+    sie muss unter 2 s liegen (B11). Überschreitet sie das, ist das ein Befund mit Messaufteilung; die Frische je Stapel
+    wird nicht gelockert.
 
 **Echter Server:** Ein Strom über mehr als 30 s mit den `serverOptions` aus `server.ts` bleibt offen und erhält Heartbeats.
 
 ## Akzeptanzkriterium
 
-1. Tests 12–29 (mit 13a und 23a–23c) und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
+1. Tests 12–29 (mit 13a–13c und 23a–23c) und der Test mit echtem Server grün, zuerst rot belegt; `streamEvents` nicht mehr in der Allowlist;
    Abdeckungstor grün.
 2. Bedrohungsmodell T-G1-I-09, T-G1-S-02 (Stromteil), T-G1-D-03, T-G3-I-01 mit Stand und Testnamen; ADR-0014-Ergänzung vom
    Architekten vor dem Merge.
@@ -307,7 +325,7 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Off
 ## Wirkung und Risiko (Leitplanken §4, hoch)
 
 - **Invarianten.**
-  1. Keine Nachricht ohne vorherige Akteurprüfung und ohne gültige, höchstens 1 s alte Sitzungsprüfung für diesen
+  1. Keine Nachricht ohne vorherige Akteurprüfung und ohne frische, für genau diesen Stapel ausgeführte Sitzungsprüfung für diesen
      Stapel.
   2. Nur Ereignisse aus einer geprüften Kette, deren Fortsetzung der Verteiler selbst über `(lastSeq, lastHash)` belegt
      hat; streng steigende `id`.
@@ -332,7 +350,7 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Off
 - **Betrieb.**
   - Speicher: Projektion je Jahrgang plus je Verbindung höchstens 1 MiB.
   - Datenbank: ein Nachladen je Sekunde bei offenen Strömen (Digest 22–25 ms laut takt-033), dazu höchstens eine
-    Sitzungsprüfung je Sitzung und Stapel auf höchstens 2 Verbindungen.
+    frische Sitzungsprüfung je Sitzung und Stapel auf höchstens 2 Verbindungen.
   - Messung unter Last in 071.
 - **Datenschutz (ADR 0013).** Kein neuer Log-Schlüssel, keine Zeile je Nachricht, keine Kennzahl je Person.
 
@@ -352,7 +370,7 @@ Perspektive(n): Security (6.5), Betrieb (6.7) · Nachweise: Tests 12–29 · Off
 | SC-10 | ja: keine neue Abhängigkeit (`hono/streaming` gehört zu Hono) |
 | SC-11 | ja: eine Zugriffslogzeile ohne Inhalt, stderr mit fester Zeile |
 | SC-12 | ja: nur Allowlist-Eintrag entfernt, kein Tor verändert |
-| SP-2 | ja: Grenzen aus Entscheidung 7, Gegendruck, Speicher je Verbindung begrenzt, Merker der Sitzungsprüfung mit Ablauf 1 s |
+| SP-2 | ja: Grenzen aus Entscheidung 7, Gegendruck, Speicher je Verbindung begrenzt, keine gemerkten Sitzungsergebnisse über einen Stapel hinaus |
 | SP-3 | ja: Cookie, CSRF (nur lesend, keine Schreibroute), Leerlauf (`slideIdle = false` beim Zustellen), 401 unverändert |
 | SP-4 | nicht anwendbar (kein HTML); `Cache-Control: no-store, no-transform` |
 | SP-5 | ja: kein Geheimnis im Diff; das Sitzungstoken lebt nur in der Closure der Route, wird nie geloggt, nie in Fehlern oder Nachrichten weitergegeben, nie an den Verteiler übergeben (Test 21 prüft das Log) |
