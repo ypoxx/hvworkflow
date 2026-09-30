@@ -647,13 +647,27 @@ export interface paths {
          *     **Rights per message (R-PERM-04).** Visibility is decided per event, per reader, with the
          *     reader's rights at delivery time, through the same permission check as the read operations
          *     (never by role name). A reader who holds `event.read` in any active meeting receives every
-         *     event as an `event` message, masked exactly like `listEvents`, gap-free in `seq`. Every other
+         *     event as an `event` message, masked exactly like `listEvents`; without a `meetingId` filter
+         *     gap-free in `seq`. Every other
          *     reader receives `change` messages only: topics for which the reader holds a read permission
          *     (`meeting` for every reader with an active role assignment), and in `subjects` only the ids of
          *     items the reader may read before or after the change (live) or now (catch-up); counter changes
          *     arrive as a topic without ids. The events of one delivery are merged into one `change`. No
          *     message carries a payload, a text or an id the reader may not read; when nothing is visible,
          *     nothing is sent. Events without a meeting reach only readers with `event.read`.
+         *
+         *     **`meetingId` filter.** Since 0.3.12 (takt-040, as served since slice 035b): with a filter a
+         *     reader with `event.read` receives every event of that meeting after the cursor exactly once and
+         *     in ascending `seq`, as `event` messages, gap-free within the meeting; every other reader
+         *     receives `change` messages for that meeting's events only, under the rules above (R-PERM-04).
+         *     `id` stays the global `seq`. Between two `event` messages, gaps in `id` are events of other
+         *     meetings. For readers who receive `change` messages, the `id`s can also skip events of the same
+         *     meeting that they may not read, or that were merged into one `change` (its `id` is the last
+         *     covered `seq`). Events without a meeting do not belong to the filter and are not sent under
+         *     it, not even to readers with `event.read`. The head (and so the client's cursor) moves on
+         *     through the `cursor` message (after the catch-up and with the heartbeat). The catch-up limit
+         *     of 1000 events (below) counts the global range `(cursor, head]`, not only the meeting's events
+         *     in it.
          *
          *     **Cursor.** Resume with `after` or the `Last-Event-ID` header (the browser sends it on
          *     reconnect). When both are present, `Last-Event-ID` wins: it is the newer cursor on a reconnect,
@@ -685,7 +699,12 @@ export interface paths {
          *
          *     **Limits.** A stream per session or per subject beyond the service's limit is `429`; beyond the
          *     service's global stream limit, or while the persistence is busy or not ready, it is `503`
-         *     `StreamUnavailable`. Both carry `Retry-After`.
+         *     `StreamUnavailable`. Both carry `Retry-After`; since 0.3.12 (takt-040, as served since slice
+         *     035b) its value is 30 on every `503` `StreamUnavailable` (global stream limit,
+         *     migrations pending, persistence busy at open) and on the `429` for too many open streams. An
+         *     `end` message, including `end` `unavailable`, carries no `Retry-After`: the header exists only
+         *     on a refused open; after `end` `unavailable` the SSE `retry` value (3000 ms) or the client's
+         *     own backoff applies.
          */
         get: operations["streamEvents"];
         put?: never;
@@ -2329,7 +2348,7 @@ export interface components {
         ETagRequired: string;
         /** @description Since 0.3.0 (security sweep after Codex on 50cc738): `no-store` on every response of the sign-in path (`login`, `completeLogin`, `logout`, `getSession`) — they carry a `state`, a session cookie or the CSRF token, and no shared or browser cache may keep them. Other directives may accompany it (`private, no-store`). */
         CacheControlNoStore: string;
-        /** @description Since 0.3.10 (slice 034a): whole seconds after which the client may try again, 1 to 60. On `429` the time to the end of the current counting window; on `503` `PersistenceBusy` 2 (write queue or statement abort) or 30 (migrations pending). Sent as a plain integer, never as an HTTP date. */
+        /** @description Since 0.3.10 (slice 034a): whole seconds after which the client may try again, 1 to 60. On `429` the time to the end of the current counting window; on `503` `PersistenceBusy` 2 (write queue or statement abort) or 30 (migrations pending). Since 0.3.12 (takt-040): on `/stream` 30 on every `503` `StreamUnavailable` (all three causes: global stream limit, migrations pending, persistence busy at open) and on the stream's own `429` (too many open streams per session or subject); a `429` from a read quota keeps the rule above. A stream already open never sends it: an `end` message carries no header. Sent as a plain integer, never as an HTTP date. */
         RetryAfter: number;
         /** @description Since 0.3.0 (slice 033, ADR 0011, B4): the server clock at the time of the response (UTC, RFC 3339), taken from the injected clock. Clients compute their offset from it and warn from 30 s drift (slice 032); a client clock is never the reference for a legally relevant time. Declared on every response because OpenAPI has no global response header; optional (no `required: true`) because the unchanged 0.3.0 service does not send it yet. */
         "X-Server-Time": string;
