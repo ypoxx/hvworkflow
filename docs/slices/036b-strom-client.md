@@ -302,11 +302,11 @@ Neuaufbau mit Last-Event-ID, Rückzug 1–30 s mit Zufallsanteil nach unten, Wä
 Strömen, 60-s-Regel für verborgene Tabs, Takt nur ohne offenen Strom; Sitzungs-/Rechteende (end, 403, 401) leert den
 Puffer und öffnet erst nach neuer Bestätigung. Verbindungsautomat (connection.ts) und Anzeige (DE/EN) im Kopf.
 e2e H13 (zweiter Browser) und H14 (Anzeige) geschrieben; takt-039 H11/H12a laufen im Rückfall (Bauklärung).
-Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d, Grenze je Tab 2747258;
-`pnpm gates` grün auf 2747258
+Evidence: Baucommit 62c7c4a, Bauklärung 2 in 3bb3a61, Review-Nacharbeit e254cb0, Nachprüfung 89dc78d, Grenze je Tab 2747258,
+Codex P2 c869987; `pnpm gates` grün auf c869987
 (Auszug unten); PR-CI auf f761931 grün in e2e-http (33 passed, H10, H13, H14): Zustellzeit 862 ms (Anmeldung) und 796 ms
 (Aufruf); Screenshots im CI-Artefakt evidence-031-http (E56, Angaben unten).
-Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem Stand 2747258 ff. steht aus.
+Open: Lasttest 071; Produktionsweg (035b Frage 3); PR-CI auf dem letzten Commit ist der laufende Nachweis (R2).
 (Die beiden Scope-Befunde sind mit der zweiten Bauklärung in 3bb3a61 erledigt.)
 Touched: siehe Liste unten.
 ```
@@ -323,6 +323,33 @@ Touched: siehe Liste unten.
 4. `onActorChange(actor)` kommt bei jedem erfolgreichen `/auth/me` (neues Objekt); `openStream()` öffnet nur ohne offenen
    Strom und ohne anstehenden Wiederholversuch, nach einem Sitzungsende bei jeder Bestätigung (Test „structurally equal
    actor“).
+
+**PR-CI auf fbb2b24 (Code 2747258):** Lauf 36763477007, Job e2e-http 110052142763: 33 passed; H10, H11, H12a, H12b, H13 und
+H14 grün. H13: Anmeldung 848 ms, Aufruf 801 ms; Schritt 1a 2 GET, Schritt 1b 4 GET, Schritt 2 1 GET (`/v1/meeting`).
+Zugriffslog 653 Zeilen PASS. Artefakt `evidence-031-http`, ID 11119178846, Digest sha256
+5a6a088f31893456b5dae46b801e6d7acddd4a44d59d380730f750349c7be3d9. Der Lauf auf f761931 (unten) bleibt als Verlauf. Die
+Korrektur zu Codex P2 (c869987) kam nach diesem Lauf; laufender Nachweis ist die PR-CI auf dem letzten Commit (R2), die
+Bestätigung erfolgt am PR.
+
+**Codex P2 (Wiederverbindungsgrenze bei Sichtbarkeit):** Die Rückkehr in einen verborgenen Tab setzte `attempt` zurück;
+Hintergrund-/Vordergrund-Wechsel zwischen gescheiterten Öffnungen machten aus 1/2/4 s wiederholte 1-s-Versuche. Jetzt
+bleiben die Zähler, nur ein gesunder Strom setzt sie zurück. Test: 403 bzw. `reset` bei jedem Öffnen, Verbergen/Zeigen alle
+2 s, Auffrischen alle 500 ms → Öffnungen bei 0, 1, 3, 303, 307, 315 s (6 in 10 min). Mutation „Rückkehr setzt `attempt`
+zurück“ (ergibt 0, 1, 2, 302, 304, 308 s): getötet von beiden Tests.
+
+**Schluss von `pnpm gates` auf c869987 (sauberer Baum, Postgres-Variablen gesetzt), grün, echter Auszug:**
+
+```
+packages/domain test:       Tests  261 passed (261)
+apps/web test:       Tests  473 passed (473)
+apps/api test:       Tests  586 passed (586)
+slice-scope: 17 changed file(s), all within "docs/slices/036b-strom-client.md"'s "Files allowed" list (32 pattern(s)).
+✓ built in 2.13s
+mark-test-run: wrote /home/user/wt/s036b/.claude/state/last-test-run (clean tree) at commit c869987, tree 67a00aaf1e02…
+```
+
+(Der erste Versuch auf c869987 lief nicht: die lokale Postgres-Instanz war beendet, `pg_isready` brach die Kette ab; nach
+dem Neustart der Lauf oben.)
 
 **Schluss von `pnpm gates` auf 2747258 (Wiederverbindungsgrenze je Tab; sauberer Baum, Postgres-Variablen gesetzt), grün
 im ersten Lauf, echter Auszug:**
@@ -482,7 +509,7 @@ downgrade-check, metrics-allowlist, plan-graph, test:scripts, web build: alle gr
 Minor 2 und ein roles_changed mit strukturell anderem Akteur: `closeStream()` verwirft den Cursor, der neue Strom geht den
 N5-Weg (mehr Invalidierung, nie weniger); bei strukturell gleichem Akteur bleibt der Cursor (Entscheidung 6).
 
-**E56-Nachweis (PR-CI auf f761931):** Artefakt `evidence-031-http`, Lauf 36758090399, Artefakt-ID 11117652692, Digest
+**E56-Nachweis (PR-CI auf f761931, Verlauf):** Artefakt `evidence-031-http`, Lauf 36758090399, Artefakt-ID 11117652692, Digest
 sha256 1123dcfbcd366d07f7560cfca9137e4c336bafca7f1dc48e664027ffcc8929fb (enthält `031-h13-zweiter-browser.png`,
 `031-h14-verbindungsanzeige.png`). H13 aus diesem Lauf: Anmeldung 862 ms, Aufruf 796 ms; Schritt 1a 2 GET (`/v1/meeting`,
 `/v1/speakers`); Schritt 1b mit 2 Schreibvorgängen 4 GET; Schritt 2 1 GET (`/v1/meeting`), kein GET auf `/v1/speakers`
