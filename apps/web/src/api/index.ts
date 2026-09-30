@@ -16,7 +16,8 @@ import {
 } from '@hv/domain';
 import { getActor, setActor, setSessionActor, DEMO_ACTORS } from './actor';
 import { createSessionAuth } from './auth';
-import { createHttpApi, getHttpSession, logoutHttpSession } from './http';
+import { connection } from './connection';
+import { createHttpApi, getHttpSession, logoutHttpSession, type HttpApi } from './http';
 import { actorKey, createLiveStore, type LiveStore } from './liveStore';
 import { DEMO_MODE } from './mode';
 import { getLang } from '../i18n';
@@ -76,6 +77,8 @@ if (DEMO_MODE) {
 
 /** Set right below; the adapters' callbacks only run after start-up. */
 let liveStore: LiveStore | undefined;
+/** The HTTP adapter with its stream (slice 036b); absent in the demo, which has no stream (ADR 0002). */
+let httpAdapter: HttpApi | undefined;
 
 /** The session actor as seen last, for the structural comparison on a session refresh (takt-033b). */
 let sessionActorKey: string | undefined;
@@ -89,20 +92,35 @@ export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
     if (next !== sessionActorKey) liveStore?.clear(actor === undefined ? 'logout' : 'actor');
     sessionActorKey = next;
     setSessionActor(actor);
+    // Slice 036b (N5): every confirmed `/auth/me` asks for the stream, before the shell mounts the views; an open stream
+    // or a pending retry stays as it is. Without an actor the stream closes.
+    if (actor === undefined) httpAdapter?.closeStream();
+    else httpAdapter?.openStream();
   },
 });
 
-const adapter: HvApi = DEMO_MODE
-  ? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents })
-  : createHttpApi({
-    getCsrfToken: () => sessionAuth?.getCsrfToken(),
-    onUnauthorized: () => {
-      liveStore?.clear('unauthorized');
-      sessionAuth?.onUnauthorized();
-    },
-    onWriteSettled: (outcome) => liveStore?.onWriteSettled(outcome),
-    locale: getLang,
-  });
+httpAdapter = DEMO_MODE ? undefined : createHttpApi({
+  getCsrfToken: () => sessionAuth?.getCsrfToken(),
+  onUnauthorized: () => {
+    liveStore?.clear('unauthorized');
+    sessionAuth?.onUnauthorized();
+  },
+  onWriteSettled: (outcome) => liveStore?.onWriteSettled(outcome),
+  onStreamMessage: (events, change) => {
+    if (change === undefined) liveStore?.onStreamMessage(events);
+    else liveStore?.onStreamMessage(events, change);
+  },
+  // Slice 036b: a loss of session or rights empties the buffer at once (036a decision 8); the session is read again,
+  // and only its confirmation (`onActorChange(actor)` above) opens a new stream. A 401 goes on to `onUnauthorized`.
+  onStreamEnd: (reason) => {
+    liveStore?.clear(reason);
+    if (reason !== 'unauthorized') sessionAuth?.refresh().catch(() => undefined);
+  },
+  connection,
+  locale: getLang,
+});
+const adapter: HvApi = httpAdapter
+  ?? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents });
 
 /**
  * Slice 036a: the live store over either adapter. The demo adapter has no write hook, so the store watches its writes;

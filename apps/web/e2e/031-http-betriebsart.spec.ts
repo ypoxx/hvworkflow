@@ -1,7 +1,10 @@
 /**
  * Slice 031a — the HTTP mode of the interface against the real service (Hono, Postgres, Keycloak test realm).
  * H1–H3 need no sign-in and run everywhere; H4–H9 carry `@idp` and need the Keycloak realm (CI only, the local mode
- * `E2E_HTTP_IDP=none` filters them out). The only `page.route` double of this suite lives in `030-anmeldung.spec.ts`.
+ * `E2E_HTTP_IDP=none` filters them out). `page.route` doubles of this suite: `030-anmeldung.spec.ts`; G1 here (a 429 on the
+ * transparency notice); takt-039 H11 (holds one read of the stage) and, with H12a, the answer 503 on `/v1/stream` that keeps
+ * both tests in the polling fallback they drive (slice 036b); and H14 (the 503 on `/v1/stream` behind the connection
+ * indicator, slice 036b, m5). H13 has none: it measures the real stream.
  *
  * H8 and H9 write only on Wortmeldungen and a Redebeitrag they create themselves. H11 (takt-039) reads out the question
  * that is on stage and so closes one question of the corpus: `abnahme` then needs one "Vorgelesen, weiter" less on its way
@@ -56,6 +59,17 @@ function watchLimits(context: BrowserContext): () => void {
 
 const sessionCookie = async (context: BrowserContext) =>
   (await context.cookies()).find((cookie) => cookie.name === 'hv_session');
+
+/**
+ * Slice 036b: answers the stream 503 with `Retry-After`, as the service does at its limit. Tests that drive the refresh
+ * through the 30 s poll use it, because the poll rests while a stream is open (036b decision 5).
+ */
+async function refuseStream(page: Page, retryAfter: string): Promise<void> {
+  await page.route('**/v1/stream*', (route) => route.fulfill({
+    status: 503, headers: { 'Retry-After': retryAfter }, contentType: 'application/problem+json',
+    body: JSON.stringify({ status: 503, title: 'Service Unavailable', detail: 'synthetic' }),
+  }));
+}
 
 test.describe('H1–H3: the interface before any sign-in', () => {
   test.use({ storageState: noState });
@@ -368,6 +382,8 @@ test.describe('H11 @idp: "Vorgelesen, weiter" acts while the stage is being read
   test('H11 @idp: a press during a running GET /v1/stage writes the drawn question and the number moves on', async ({ page }) => {
     // The 30 s poll (`http.ts`) is driven by the installed clock, not waited for.
     await page.clock.install();
+    // 036b decision 5: the poll rests while the stream is open; this test drives the refresh through the poll, so it runs in the fallback.
+    await refuseStream(page, '30');
     const firstRead = page.waitForResponse((candidate) => candidate.request().method() === 'GET' &&
       new URL(candidate.url()).pathname === '/v1/stage');
     await page.goto('/stage');
@@ -461,6 +477,8 @@ test.describe('H12 @idp: moving a Wortmeldung with the keyboard (takt-039, decid
 
     test('H12a @idp: the 30 s poll lands between lifting and ArrowDown, the arrow still moves', async ({ page }) => {
       await page.clock.install();
+      // 036b decision 5: the poll rests while the stream is open; this test drives the refresh through the poll, so it runs in the fallback.
+      await refuseStream(page, '30');
       const { announcer, position, count, targetMiddle, box } = await liftSecondToLast(page);
       console.log(`[H12a] lifted at ${position}/${count}; target middle ${targetMiddle.toFixed(0)}, box ${box.top.toFixed(0)}–${box.bottom.toFixed(0)}, scrollTop ${box.scrollTop}`);
       expect(targetMiddle, 'target in the upper half of the scrolling area').toBeLessThan((box.top + box.bottom) / 2);
@@ -519,3 +537,186 @@ test.describe('H12 @idp: moving a Wortmeldung with the keyboard (takt-039, decid
   });
 });
 
+
+// ---- slice 036b: the stream in a second browser, and the connection indicator ----------------------------------------
+
+const H13_SPEAKER_NAME = 'Synthetische Testperson Sigma';
+const H13_CONTRIBUTION_TEXT = 'Synthetischer Wortlaut für den zweiten Browser im HTTP-Modus.';
+const H13_QUESTION = 'Synthetische Frage für die Einordnung im zweiten Browser?';
+
+interface TracedRequest { method: string; path: string; params: string; at: number }
+
+/** Records the reads of a page on `/v1` (the stream itself excluded): method, path, the names of the query parameters. */
+function traceReads(page: Page): { list: TracedRequest[]; lastAt: () => number } {
+  const list: TracedRequest[] = [];
+  let lastAt = Date.now();
+  page.on('request', (candidate) => {
+    const url = new URL(candidate.url());
+    if (!url.pathname.startsWith('/v1/') || url.pathname === '/v1/stream') return;
+    lastAt = Date.now();
+    list.push({ method: candidate.method(), path: url.pathname, params: [...url.searchParams.keys()].join(','), at: lastAt });
+  });
+  return { list, lastAt: () => lastAt };
+}
+
+/** Waits until the page has sent no read for `ms` (at most 15 s). */
+async function quiet(trace: { lastAt: () => number }, ms: number): Promise<void> {
+  const until = Date.now() + 15_000;
+  while (Date.now() - trace.lastAt() < ms) {
+    if (Date.now() > until) throw new Error('The page did not come to rest.');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/** The GET list of a window as a table for the report (no query values, SC-11). */
+function printTable(label: string, from: number, reads: readonly TracedRequest[]): void {
+  console.log(`[H13] ${label}: ${reads.length} request(s) in A`);
+  console.log('[H13] | method | path | query parameters | +ms |');
+  for (const entry of reads) console.log(`[H13] | ${entry.method} | ${entry.path} | ${entry.params || '-'} | ${entry.at - from} |`);
+}
+
+/** The key of a read: path plus parameter names and values, as the live store keys it (values stay out of the output). */
+const readKey = (entry: TracedRequest): string => `${entry.method} ${entry.path}?${entry.params}`;
+
+test.describe('H13 @idp: a second browser sees a change in under 2 s (slice 036b)', () => {
+  test('H13 @idp: A sees what B writes in under 2 s and reads only the touched keys', async ({ browser }) => {
+    const aContext = await browser.newContext({ baseURL: origin, storageState: statePath('capture') });
+    const bContext = await browser.newContext({ baseURL: origin, storageState: statePath('moderation') });
+    const limitsA = watchLimits(aContext);
+    const limitsB = watchLimits(bContext);
+    const cookieOf = (key: string): string =>
+      (JSON.parse(readFileSync(statePath(key), 'utf8')) as { cookies: { name: string; value: string }[] })
+        .cookies.find((entry) => entry.name === 'hv_session')?.value ?? '';
+    const captureApi = await request.newContext({ baseURL: origin, extraHTTPHeaders: { Cookie: `hv_session=${cookieOf('capture')}` } });
+    const coordinationApi = await request.newContext({ baseURL: origin, extraHTTPHeaders: { Cookie: `hv_session=${cookieOf('coordination')}` } });
+    const csrfOf = async (api: typeof captureApi): Promise<string> =>
+      ((await (await api.get('/auth/me')).json()) as { csrfToken: string }).csrfToken;
+    const writeHeaders = (csrf: string, etag: string) => ({
+      'Content-Type': 'application/json', 'If-Match': etag, 'X-CSRF-Token': csrf, 'Idempotency-Key': crypto.randomUUID(),
+    });
+    try {
+      const a = await aContext.newPage();
+      const b = await bContext.newPage();
+      const streamOpen = a.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/v1/stream' && candidate.status() === 200);
+      await a.goto('/speakers');
+      await streamOpen;
+      await expect(a.getByTestId('speaker-row').first()).toBeVisible({ timeout: 60_000 });
+      await b.goto('/speakers');
+      await expect(b.getByTestId('speaker-register')).toBeVisible({ timeout: 60_000 });
+      const trace = traceReads(a);
+      await quiet(trace, 1_500);
+
+      // Step 1a: B registers a Wortmeldung; A (capture, `speaker.read`) sees the row.
+      await b.getByTestId('speaker-register').click();
+      await b.getByTestId('speaker-register-name').fill(H13_SPEAKER_NAME);
+      const registered = b.waitForResponse((candidate) => candidate.request().method() === 'POST' &&
+        new URL(candidate.url()).pathname === '/v1/speakers');
+      await b.getByTestId('speaker-register-submit').click();
+      const registration = await registered;
+      const registeredAt = Date.now();
+      expect(registration.status()).toBe(201);
+      const created = (await registration.json()) as { id: string; number: string | number };
+      const rowInA = a.locator(`[data-testid="speaker-row"][data-number="${String(created.number)}"]`);
+      await expect(rowInA).toBeVisible({ timeout: 5_000 });
+      const registerMs = Date.now() - registeredAt;
+      await quiet(trace, 1_000);
+      const registerWindow = trace.list.filter((entry) => entry.at >= registeredAt);
+
+      // Step 1b: B calls it; A sees it at the microphone. Calling may first end a running speech (one write more).
+      const rowInB = b.locator(`[data-testid="speaker-row"][data-number="${String(created.number)}"]`);
+      const patches: string[] = [];
+      b.on('request', (candidate) => {
+        if (candidate.method() === 'PATCH' && new URL(candidate.url()).pathname.startsWith('/v1/speakers/')) patches.push(candidate.url());
+      });
+      const calledResponse = b.waitForResponse((candidate) => candidate.request().method() === 'PATCH' &&
+        new URL(candidate.url()).pathname === `/v1/speakers/${created.id}`);
+      const callStart = Date.now();
+      await rowInB.getByTestId('speaker-call').click();
+      expect((await calledResponse).status()).toBe(200);
+      const calledAt = Date.now();
+      await expect(rowInA).toHaveAttribute('data-status', 'speaking', { timeout: 5_000 });
+      const callMs = Date.now() - calledAt;
+      await quiet(trace, 1_000);
+      const callWindow = trace.list.filter((entry) => entry.at >= callStart);
+
+      console.log(`[H13] delivery: registration ${registerMs} ms, call ${callMs} ms (from the write's answer in B to the view in A)`);
+      printTable('step 1a (registration)', registeredAt, registerWindow);
+      printTable(`step 1b (call, ${patches.length} write(s))`, callStart, callWindow);
+      expect(registerMs, 'registration visible in A').toBeLessThan(2_000);
+      expect(callMs, 'call visible in A').toBeLessThan(2_000);
+      const forbidden = ['/v1/questions', '/v1/contributions', '/v1/stage'];
+      for (const [label, window, writes] of [['registration', registerWindow, 1], ['call', callWindow, patches.length]] as const) {
+        const gets = window.filter((entry) => entry.method === 'GET');
+        expect(gets.filter((entry) => forbidden.includes(entry.path)).map(readKey), `${label}: no read outside the touched keys`).toEqual([]);
+        const perKey = new Map<string, number>();
+        for (const entry of gets) perKey.set(readKey(entry), (perKey.get(readKey(entry)) ?? 0) + 1);
+        // One read per touched key and per write (the live store reads once per batch; a call may be two writes).
+        for (const [key, count] of perKey) expect(count, `${label}: reads of ${key}`).toBeLessThanOrEqual(writes);
+      }
+
+      // Step 2: a question of its own (capture, third context), then coordination classifies exactly that one.
+      const captureCsrf = await csrfOf(captureApi);
+      const speaker = (await (await captureApi.get(`/v1/speakers/${created.id}`)).json()) as { version: number };
+      const contribution = await captureApi.post('/v1/contributions', {
+        headers: writeHeaders(captureCsrf, `"v${speaker.version}"`),
+        data: JSON.stringify({ speakerId: created.id, text: H13_CONTRIBUTION_TEXT, source: 'manual' }),
+      });
+      expect(contribution.status()).toBe(201);
+      const written = (await contribution.json()) as { id: string; version: number };
+      const captured = await captureApi.post(`/v1/contributions/${written.id}/questions`, {
+        headers: writeHeaders(captureCsrf, `"v${written.version}"`),
+        data: JSON.stringify({ questions: [{ text: H13_QUESTION }] }),
+      });
+      expect(captured.status()).toBe(201);
+      const question = ((await captured.json()) as { id: string; version: number }[])[0]!;
+      await quiet(trace, 1_500);
+
+      const classifyStart = Date.now();
+      const classified = await coordinationApi.post(`/v1/questions/${question.id}/classification`, {
+        headers: writeHeaders(await csrfOf(coordinationApi), `"v${question.version}"`),
+        data: JSON.stringify({ track: 'fast_track' }),
+      });
+      expect(classified.status()).toBe(200);
+      // A reacts to the counters (meeting) if at all; give it the time of a delivery, then wait for rest.
+      await a.waitForRequest((candidate) => new URL(candidate.url()).pathname === '/v1/meeting', { timeout: 3_000 }).catch(() => undefined);
+      await quiet(trace, 1_000);
+      const classifyWindow = trace.list.filter((entry) => entry.at >= classifyStart);
+      printTable('step 2 (classification)', classifyStart, classifyWindow);
+      expect(classifyWindow.filter((entry) => entry.method === 'GET' && ['/v1/speakers', '/v1/contributions'].includes(entry.path))
+        .map(readKey), 'no speaker or contribution read after a classification').toEqual([]);
+
+      await a.evaluate(() => document.fonts.ready);
+      await a.screenshot({ path: evidence('031-h13-zweiter-browser.png') });
+      limitsA();
+      limitsB();
+    } finally {
+      await captureApi.dispose();
+      await coordinationApi.dispose();
+      await aContext.close();
+      await bContext.close();
+    }
+  });
+});
+
+test.describe('H14 @idp: the connection indicator (slice 036b)', () => {
+  test.use({ storageState: statePath('capture') });
+
+  test('H14 @idp: a refused stream shows the fallback, the released one hides the indicator', async ({ page }) => {
+    // The second documented `page.route` double of this suite for 036b (m5): the service answers the stream 503.
+    await refuseStream(page, '1');
+    await page.goto('/speakers');
+    const indicator = page.getByTestId('connection-status');
+    await expect(indicator).toHaveAttribute('data-phase', 'polling', { timeout: 60_000 });
+    await expect(indicator).toContainText('Rückfall');
+    await expect(indicator).toContainText('Stand von');
+    await expect(indicator).toHaveAttribute('role', 'status');
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('031-h14-verbindungsanzeige.png') });
+
+    const opened = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/v1/stream' && candidate.status() === 200);
+    await page.unroute('**/v1/stream*');
+    await opened;
+    await expect(indicator).toHaveAttribute('data-phase', 'live', { timeout: 10_000 });
+    await expect(indicator).toHaveText('');
+  });
+});

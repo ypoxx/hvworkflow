@@ -105,9 +105,10 @@ Der Client endet sauber bei Rechte- oder Sitzungsverlust und fällt ohne Strom a
   wie `LoginPage.test.tsx`)
 - `apps/web/src/app/HeaderStrip.tsx` (nur Einhängen der Anzeige)
 - `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts` (nur Texte der Anzeige)
-- `apps/web/e2e/031-http-betriebsart.spec.ts` (nur neue Tests H11 und H12 am Dateiende und der Kopfkommentar zur
-  `page.route`-Ausnahme für H12, m5; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus 031b bleibt)
-- `docs/evidence/031-h11-zweiter-browser.png`, `docs/evidence/031-h12-verbindungsanzeige.png`
+- `apps/web/e2e/031-http-betriebsart.spec.ts` (nur neue Tests H13 und H14 am Dateiende, der Kopfkommentar zu den
+  `page.route`-Doubles, m5, und — Bauklärung vom 30.09. — die Strom-503-Route vor `goto` in den takt-039-Tests H11 und
+  H12a samt je einer Kommentarzeile; keine neue Datei im Projekt `http`, damit die gepinnte Reihenfolge aus 031b bleibt)
+- `docs/evidence/031-h13-zweiter-browser.png`, `docs/evidence/031-h14-verbindungsanzeige.png`
 - `docs/folgeliste.md` (nur nicht blockierende Befunde; Sicherheitsbefunde nie)
 - `docs/produktplan-beta.md` (nur Stand-Zeile Etappe B nach dem Merge)
 
@@ -117,6 +118,20 @@ Weitere Dateien sind Scope-Befunde (Liste im nächsten Abschnitt).
 
 `apps/web/src/api/liveStore.ts`, `apps/web/playwright.config.ts`, `apps/web/vite.config.ts`, `apps/web/src/features/**`.
 Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht als erlaubt liest.
+
+## Bauklärung (Orchestrator, 30.09.)
+
+- takt-039 (`769df38`) ist nach dieser Spec (`f702822`) gemergt und hat in `031-http-betriebsart.spec.ts` bereits H11
+  („Vorgelesen, weiter“ während der Bühnenlesung) und H12a/H12b (Umsortieren per Tastatur) angelegt. Die hier geplanten
+  Tests H11 und H12 heißen deshalb **H13** (zweiter Browser) und **H14** (Verbindungsanzeige); die Nachweise heißen
+  `docs/evidence/031-h13-zweiter-browser.png` und `docs/evidence/031-h14-verbindungsanzeige.png`. Wo unten H11/H12 im
+  Sinn dieser Scheibe steht, sind H13/H14 gemeint.
+- takt-039 H11 und H12a steuern die Auffrischung über den 30-s-Takt (`page.clock.install()`, `fastForward('00:30')`). Bei
+  offenem Strom ruht der Takt (Entscheidung 5, Test 2); beide Tests liefen dann ins Leere. Entscheidung (a): Beide Tests
+  beantworten `**/v1/stream*` vor `goto` mit 503 und `Retry-After: 30` über `page.route` und laufen damit im
+  Polling-Rückfall, den sie prüfen. H12b wartet nicht auf den Takt und bleibt unverändert. Entscheidung 5 und Test 2
+  bleiben unverändert.
+- Der Kopfkommentar der Datei (m5) nennt die tatsächlichen `page.route`-Doubles: 030, G1, takt-039 H11 (und H12a), H14.
 
 ## Vor dem Bau prüfen
 
