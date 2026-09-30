@@ -12,7 +12,7 @@ import {
 } from './support/e2e-texts';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
-import { afterOwnWrite, asRole, expectRoleLabel } from './support/roles';
+import { asRole, expectNotBusy, expectRoleLabel } from './support/roles';
 import type { Page } from '@playwright/test';
 
 /** A synthetic speech with exactly seven questions of record (texts in `support/e2e-texts.ts`, checked against the access log). */
@@ -41,9 +41,8 @@ async function markPassage(page: Page, passage: string): Promise<void> {
   await expect(page.getByTestId('capture-add-selection')).toBeVisible();
 }
 
-/** The write of questions to a Redebeitrag, and the two lists the capture desk re-reads after it (cards, and the coverage that the Redebeitrag carries). */
-const CAPTURED = { method: 'POST', path: /^\/v1\/contributions\/[^/]+\/questions$/ };
-const CAPTURE_READS = ['/v1/questions', '/v1/contributions'];
+/** The capture pane marks itself busy while a write of questions runs (takt-032); cards and coverage land with its end. */
+const capturePane = (page: Page) => page.getByTestId('capture-contribution-pane');
 
 const coverageOf = async (page: Page): Promise<number> =>
   Number((await page.getByTestId('capture-coverage').innerText()).replace(/\D/g, ''));
@@ -83,25 +82,11 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   const lifted = await announcer.innerText();
   await page.keyboard.press('ArrowDown');
   await expect(announcer).not.toHaveText(lifted);
-  // A reorder raises the version of every Wortmeldung of the round (`state.ts`, SpeakersReordered). In `http` the list is
-  // shown at once from the drag (old versions) and re-read after the PUT (getMeeting, listSpeakers, getMeeting); a call made
-  // before that re-read is refused with 412. So the drop is followed by the PUT and then by the re-read of list and meeting.
-  // `networkidle` does not do this (it is a no-op once the page has been idle). In `in-process` there is no traffic.
-  const traffic: string[] = [];
-  const record = (response: { request(): { method(): string }; url(): string }): void => {
-    traffic.push(`${response.request().method()} ${new URL(response.url()).pathname}`);
-  };
-  if (test.info().project.name === 'http') page.on('response', record);
+  // A reorder raises the version of every Wortmeldung of the round. The round is locked while it is written (takt-032:
+  // `data-busy` on `speakers-round-N`); the next step waits for the lock to end. In `in-process` that passes at once.
   await page.keyboard.press('Space');
   await expect(announcer).toContainText('abgelegt');
-  if (test.info().project.name === 'http') {
-    await expect.poll(() => {
-      const put = traffic.indexOf('PUT /v1/speakers/order');
-      const list = put < 0 ? -1 : traffic.indexOf('GET /v1/speakers', put);
-      return list >= 0 && traffic.indexOf('GET /v1/meeting', list) >= 0;
-    }, { message: 'the reorder and the re-read of the list', timeout: 15_000 }).toBe(true);
-    page.off('response', record);
-  }
+  await expectNotBusy(round);
 
   await expect(waiting.nth(0)).toHaveAttribute('data-number', secondBefore);
   await expect(waiting.nth(1)).toHaveAttribute('data-number', firstBefore);
@@ -169,27 +154,27 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   // One question by marking the passage and pressing the floating action …
   await markPassage(page, SPEECH_QUESTIONS[0]!);
-  await afterOwnWrite(page, async () => {
-    await page.getByTestId('capture-add-selection').click();
-  }, CAPTURED, CAPTURE_READS);
+  await page.getByTestId('capture-add-selection').click();
+  await expectNotBusy(capturePane(page));
+
   await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
   const afterFirst = await coverageOf(page);
   expect(afterFirst).toBeGreaterThan(0);
 
   // … one with the keyboard shortcut …
   await markPassage(page, SPEECH_QUESTIONS[1]!);
-  await afterOwnWrite(page, async () => {
-    await page.keyboard.press('Alt+q');
-  }, CAPTURED, CAPTURE_READS);
+  await page.keyboard.press('Alt+q');
+  await expectNotBusy(capturePane(page));
+
   await expect(page.getByTestId('capture-question-card')).toHaveCount(2);
 
   // … and the remaining five in one call through the batch proposal.
   await page.getByTestId('capture-suggest').click();
   await expect(page.getByTestId('capture-suggest-item')).toHaveCount(5);
   await checkAxe(page, 'capture (Vorschlagsdialog offen)');
-  await afterOwnWrite(page, async () => {
-    await page.getByTestId('capture-suggest-add').click();
-  }, CAPTURED, CAPTURE_READS);
+  await page.getByTestId('capture-suggest-add').click();
+  await expectNotBusy(capturePane(page));
+
   await expect(page.getByTestId('capture-question-card')).toHaveCount(7);
 
   // Slice 006: every one of the seven spans just captured carries its own numbered marker in the
@@ -205,9 +190,9 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   await page
     .getByTestId('capture-free-input')
     .fill(SPEAKER_002_FREE_QUESTION);
-  await afterOwnWrite(page, async () => {
-    await page.getByTestId('capture-free-add').click();
-  }, CAPTURED, CAPTURE_READS);
+  await page.getByTestId('capture-free-add').click();
+  await expectNotBusy(capturePane(page));
+
   await expect(page.getByTestId('capture-question-card')).toHaveCount(8);
 
   // Classification (point #21, slice 020): reached only through the explicit "Klassifizieren"
