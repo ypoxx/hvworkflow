@@ -4,6 +4,9 @@ import { expect, test } from './support/http-guard';
 // Slice 031a: this file runs only in the `http` project (`playwright.config.ts`, testMatch), against the Vite
 // dev server in HTTP mode with `page.route` doubles and an empty state; the projects decide, not the file.
 
+// Slice 031b: the `http` project now starts every test as `capture`; the sign-in page needs no session.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const evidence = (name: string): string =>
   `${test.info().project.testDir}/../../../docs/evidence/${name}`;
 

@@ -298,8 +298,9 @@ test('shared files: they take test from the guard, roles from support/roles, evi
     assert.match(source, /from '\.\/support\/http-guard'/, file);
     assert.match(source, /from '\.\/support\/evidence'/, file);
     assert.doesNotMatch(source, /import\s+(?:type\s+)?\{[^}]*\b(test|expect)\b[^}]*\}\s+from\s+'@playwright\/test'/, file);
-    assert.doesNotMatch(source, /role-switcher|role-option-/, `${file} switches roles only through asRole`);
-    assert.doesNotMatch(source, /docs\/evidence\//, `${file} writes evidence only through the helper`);
+    const code = source.split('\n').filter((line) => !/^\s*(\/\*|\*|\/\/)/.test(line)).join('\n');
+    assert.doesNotMatch(code, /role-switcher|role-option-/, `${file} switches roles only through asRole`);
+    assert.doesNotMatch(code, /docs\/evidence\//, `${file} writes evidence only through the helper`);
   }
 });
 

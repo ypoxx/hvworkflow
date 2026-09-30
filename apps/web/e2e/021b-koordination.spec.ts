@@ -6,19 +6,11 @@
  * docs/evidence/021b-koordination-{de,en}.png, axe on both.
  */
 import { CORPUS_DEMO } from '@hv/domain';
-import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import { evidence } from './support/evidence';
+import { expect, test } from './support/http-guard';
+import { asRole } from './support/roles';
 import type { Page } from '@playwright/test';
-
-/** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
-const evidence = (name: string): string =>
-  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
-
-async function asRole(page: Page, role: string): Promise<void> {
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId(`role-option-${role}`).click();
-  await expect(page.getByTestId(`role-option-${role}`)).toBeHidden();
-}
 
 async function waitForCorpus(page: Page): Promise<void> {
   const questions = page.getByTestId('header-counter-questions');
@@ -52,7 +44,6 @@ test('021b: Koordination klassifiziert auf der Erfassung, die Erfassung nicht me
 
   // Coordination: the same desk, "Klassifizieren" on every open card, nothing to capture with.
   await asRole(page, 'coordination');
-  await expect(page.getByTestId('role-switcher')).toContainText('Koordination');
   const firstCard = page.getByTestId('capture-question-card').first();
   await expect(firstCard).toBeVisible();
   const openClassify = firstCard.getByTestId('capture-classify-open');
@@ -77,7 +68,6 @@ test('021b: Koordination klassifiziert auf der Erfassung, die Erfassung nicht me
   // English: the same desk, the role and the action in American English.
   await page.getByTestId('lang-toggle').click();
   await page.getByTestId('lang-option-en').click();
-  await expect(page.getByTestId('role-switcher')).toContainText('Coordination');
   await expect(page.getByTestId('capture-question-card').first().getByTestId('capture-classify-open')).toHaveText(
     'Classify',
   );

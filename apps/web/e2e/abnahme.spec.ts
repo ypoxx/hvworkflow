@@ -14,34 +14,18 @@
  * `history.read`, podium does not), proves every one of those steps afterwards.
  */
 import { CORPUS_DEMO } from '@hv/domain';
-import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import {
+  ABNAHME_ANSWER_TEXT as ANSWER_TEXT, ABNAHME_SPEAKER_NAME, SPEECH_CLOSING, SPEECH_OPENING, SPEECH_QUESTIONS,
+} from './support/e2e-texts';
+import { evidence } from './support/evidence';
+import { expect, test } from './support/http-guard';
+import { asRole } from './support/roles';
 import type { Page } from '@playwright/test';
 
-/** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
-const evidence = (name: string): string =>
-  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
-
-
-/** A synthetic speech with exactly seven questions of record (same corpus as slice 002). */
-const QUESTIONS = [
-  'Wie hoch war der Investitionsaufwand im abgelaufenen Geschäftsjahr?',
-  'Welche Rückstellungen hat die Gesellschaft für die anhängigen Verfahren gebildet?',
-  'Wie entwickelt sich die Eigenkapitalquote im laufenden Geschäftsjahr?',
-  'Welche Maßnahmen ergreift der Vorstand gegen den Rückgang der operativen Marge?',
-  'Wann rechnet die Gesellschaft mit einer Entscheidung der Kartellbehörde?',
-  'Wie viele Stellen sind im Zuge des Sparprogramms bereits entfallen?',
-  'Welche Dividende schlägt der Vorstand für das kommende Geschäftsjahr vor?',
-];
-const SPEECH = [
-  'Sehr geehrte Damen und Herren, ich danke dem Vorstand für den Bericht zur Lage der Gesellschaft.',
-  ...QUESTIONS,
-  'Ich danke Ihnen für die Beantwortung.',
-].join(' ');
-
-const ANSWER_TEXT =
-  'Die Ausschüttungsquote lag im Berichtsjahr bei 47 Prozent des bereinigten Konzernergebnisses. ' +
-  'Die Einzelheiten sind im Geschäftsbericht auf Seite 42 dargestellt.';
+/** A synthetic speech with exactly seven questions of record (same corpus as slice 002; texts in `support/e2e-texts.ts`). */
+const QUESTIONS = SPEECH_QUESTIONS;
+const SPEECH = [SPEECH_OPENING, ...QUESTIONS, SPEECH_CLOSING].join(' ');
 
 /**
  * The demo corpus already carries a few questions with status "staged" (the seed's own statusFor()
@@ -53,12 +37,6 @@ const ANSWER_TEXT =
 const MAX_STAGE_ROUNDS = 130;
 
 test.use({ viewport: { width: 1440, height: 900 } });
-
-async function asRole(page: Page, role: string): Promise<void> {
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId(`role-option-${role}`).click();
-  await expect(page.getByTestId(`role-option-${role}`)).toBeHidden();
-}
 
 /** Confirmations belong on screen, not in the evidence: clear the stack before a screenshot. */
 async function clearToasts(page: Page): Promise<void> {
@@ -96,7 +74,7 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await asRole(page, 'moderation');
   await expect(page).toHaveURL(/\/speakers$/);
 
-  const speakerName = 'Abnahme Testperson';
+  const speakerName = ABNAHME_SPEAKER_NAME;
   await page.getByTestId('speaker-register').click();
   await page.getByTestId('speaker-register-name').fill(speakerName);
   await page.getByTestId('speaker-register-submit').click();
@@ -240,12 +218,14 @@ test('@abnahme Redebeitrag zu sieben Einzelfragen, beantwortet, freigegeben, vor
   await expect(page.getByTestId('answers-detail')).toContainText('auf der Bühne');
 
   /* ---------- Podium: read out our question ---------- */
-  await asRole(page, 'podium');
   // Point #3/#9 (slice 020): the podium role now defaults to "Nur Bühne"; this walk-through still
   // needs the ordinary shell (the "Nur Bühne" overlay would cover the role switcher it uses next to
   // hand the history to the Versammlungsbüro), so it starts from the explicit choice a person would
   // otherwise have made — the stored preference always wins over the default.
+  // Set before the switch: in `http` the switch reloads the page, and the stored choice must already be there when it does.
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
+  await asRole(page, 'podium');
+  await expect(page.getByTestId('nav-stage')).toBeVisible();
 
   const stageNavStart = await page.evaluate(() => performance.now());
   await page.getByTestId('nav-stage').click();

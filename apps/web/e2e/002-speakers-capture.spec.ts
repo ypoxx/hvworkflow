@@ -6,30 +6,17 @@
  * one question into the Expert Track.
  */
 import { CORPUS_DEMO } from '@hv/domain';
-import { expect, test } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import {
+  SPEECH_CLOSING, SPEECH_OPENING, SPEECH_QUESTIONS, SPEAKER_002_FREE_QUESTION, SPEAKER_002_NAME,
+} from './support/e2e-texts';
+import { evidence } from './support/evidence';
+import { expect, test } from './support/http-guard';
+import { asRole } from './support/roles';
 import type { Page } from '@playwright/test';
 
-/** Evidence belongs to the repository, not to the test run: `testDir` is `apps/web/e2e`. */
-const evidence = (name: string): string =>
-  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
-
-
-/** A synthetic speech with exactly seven questions of record. */
-const QUESTIONS = [
-  'Wie hoch war der Investitionsaufwand im abgelaufenen Geschäftsjahr?',
-  'Welche Rückstellungen hat die Gesellschaft für die anhängigen Verfahren gebildet?',
-  'Wie entwickelt sich die Eigenkapitalquote im laufenden Geschäftsjahr?',
-  'Welche Maßnahmen ergreift der Vorstand gegen den Rückgang der operativen Marge?',
-  'Wann rechnet die Gesellschaft mit einer Entscheidung der Kartellbehörde?',
-  'Wie viele Stellen sind im Zuge des Sparprogramms bereits entfallen?',
-  'Welche Dividende schlägt der Vorstand für das kommende Geschäftsjahr vor?',
-];
-const SPEECH = [
-  'Sehr geehrte Damen und Herren, ich danke dem Vorstand für den Bericht zur Lage der Gesellschaft.',
-  ...QUESTIONS,
-  'Ich danke Ihnen für die Beantwortung.',
-].join(' ');
+/** A synthetic speech with exactly seven questions of record (texts in `support/e2e-texts.ts`, checked against the access log). */
+const SPEECH = [SPEECH_OPENING, ...SPEECH_QUESTIONS, SPEECH_CLOSING].join(' ');
 
 /** Mark a passage of the Redebeitrag the way a person would with the mouse. */
 async function markPassage(page: Page, passage: string): Promise<void> {
@@ -70,9 +57,7 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
     .toBeGreaterThanOrEqual(CORPUS_DEMO.questions);
 
   // The meeting office is the desk that owns the Wortmeldeliste.
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-moderation').click();
-  await expect(page.getByTestId('role-switcher')).toContainText('Versammlungsbüro');
+  await asRole(page, 'moderation');
 
   const round = page.getByTestId('speakers-round-3');
   await expect(round).toBeVisible();
@@ -129,18 +114,17 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
 
   // A Wortmeldung that comes in while the meeting runs.
   await page.getByTestId('speaker-register').click();
-  await page.getByTestId('speaker-register-name').fill('Henrike Baumgart');
+  await page.getByTestId('speaker-register-name').fill(SPEAKER_002_NAME);
   await checkAxe(page, 'speakers (Wortmeldung registrieren, dialog open)');
   await page.getByTestId('speaker-register-submit').click();
-  await expect(round.getByText('Henrike Baumgart')).toBeVisible();
+  await expect(round.getByText(SPEAKER_002_NAME)).toBeVisible();
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('002-speakers.png') });
   await page.screenshot({ path: evidence('006-speakers.png') });
 
   /* ---- the capture desk ---- */
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-capture').click();
+  await asRole(page, 'capture');
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
 
@@ -161,14 +145,14 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   expect(await coverageOf(page)).toBe(0);
 
   // One question by marking the passage and pressing the floating action …
-  await markPassage(page, QUESTIONS[0]!);
+  await markPassage(page, SPEECH_QUESTIONS[0]!);
   await page.getByTestId('capture-add-selection').click();
   await expect(page.getByTestId('capture-question-card')).toHaveCount(1);
   const afterFirst = await coverageOf(page);
   expect(afterFirst).toBeGreaterThan(0);
 
   // … one with the keyboard shortcut …
-  await markPassage(page, QUESTIONS[1]!);
+  await markPassage(page, SPEECH_QUESTIONS[1]!);
   await page.keyboard.press('Alt+q');
   await expect(page.getByTestId('capture-question-card')).toHaveCount(2);
 
@@ -191,16 +175,14 @@ test('speakers list and capture desk @screenshot', async ({ page }) => {
   // A question without a marked passage still belongs to this Redebeitrag.
   await page
     .getByTestId('capture-free-input')
-    .fill('Wie viele Stimmrechte waren bei Abstimmung vertreten?');
+    .fill(SPEAKER_002_FREE_QUESTION);
   await page.getByTestId('capture-free-add').click();
   await expect(page.getByTestId('capture-question-card')).toHaveCount(8);
 
   // Classification (point #21, slice 020): reached only through the explicit "Klassifizieren"
   // action, in a dialog — the card itself carries no track, agenda or stage field any more.
   // Slice 021b: classifying is the Koordination's right now, so the desk changes hands for this step.
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId('role-option-coordination').click();
-  await expect(page.getByTestId('role-option-coordination')).toBeHidden();
+  await asRole(page, 'coordination');
   await expect(page.getByTestId('capture-question-card')).toHaveCount(8);
   const card = page.getByTestId('capture-question-card').first();
   await card.getByTestId('capture-classify-open').click();

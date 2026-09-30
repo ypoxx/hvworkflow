@@ -1,15 +1,8 @@
 import { CORPUS_DEMO } from '@hv/domain';
-import { expect, test, type Page } from '@playwright/test';
 import { checkAxe } from './support/axe';
-
-const evidence = (name: string): string =>
-  `${test.info().project.testDir}/../../../docs/evidence/${name}`;
-
-async function asRole(page: Page, role: string): Promise<void> {
-  await page.getByTestId('role-switcher').click();
-  await page.getByTestId(`role-option-${role}`).click();
-  await expect(page.getByTestId(`role-option-${role}`)).toBeHidden();
-}
+import { evidence } from './support/evidence';
+import { expect, test } from './support/http-guard';
+import { asRole } from './support/roles';
 
 test('021c: Recht gibt rechtlich frei, Freigabe und Bühne folgen @screenshot', async ({ page }) => {
   await page.goto('/answers');
@@ -44,6 +37,12 @@ test('021c: Recht gibt rechtlich frei, Freigabe und Bühne folgen @screenshot', 
   await page.screenshot({ path: evidence('021c-rechtsfreigabe-en.png') });
 
   await asRole(page, 'approver');
+  // Restore the language explicitly: the switch of the person must not decide it (in-process keeps it, http reloads).
+  if ((await page.locator('html').getAttribute('lang')) !== 'en') {
+    await page.getByTestId('lang-toggle').click();
+    await page.getByTestId('lang-option-en').click();
+  }
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.getByTestId('answers-search').fill(number!);
   const row = page.getByTestId('answers-row').first();
   await expect(row).toHaveAttribute('data-number', number!);
