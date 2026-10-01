@@ -19,13 +19,18 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   die Spec 044 ist in Arbeit, danach 045 und 041. Der Bau von 043a und 040b bis 040d wartet auf das Go des Eigentümers.
   Offene Eigentümerentscheidungen unverändert: 043a Fragen 1, 2 und 5; 040 Teilung und Budget für den Bau von 040b bis
   040d; Frage 6 (Doku ohne Spec); 040a Fragen 1 und 2a bis 2c.
-- **Zielpfad C beginnt mit 043** (Vertragspaket 0.4.0).
-  - Die Spec schreibt der Architekt (Opus) in `/home/user/wt/spec043`, Branch `claude/spec-043-vertrag-040`, mit einem
-    Vorschlag zur Teilung.
-  - 043 kommt vor der Feedback-Runde 2 (09.10.) und der Entscheidungsstunde (16.10.). Unbeantwortete Punkte werden auf
-    Standard gebaut und mit Datum vermerkt, wie der Plan es vorsieht; spätere Antworten kosten eine Enum-, Tabellen-
-    oder Vertragsänderung.
-  - D (064–066) darf nach 043 parallel zum Rest von C laufen.
+- **Abweichung 040a (offen beim Eigentümer):** Die Spec 040a verlangt zu Frage 1 vor dem ersten Bau ein ausdrückliches Go
+  (`docs/slices/040a-admin-ohne-inhaltsrechte.md`, „Offene Eigentümerfragen“). Der Orchestrator hat 040a ohne dieses Go
+  gebaut und gemergt; er hatte es dem Eigentümer vorher angekündigt (Begründung: Inhalt folgt aus Rechtekonzept §4,
+  schließt eine Sicherheitslücke, 1,5 AStd im Planbudget von 2,5), eine Zustimmung lag aber nicht vor. Der Eigentümer
+  entscheidet nachträglich: annehmen, oder Revert des Squash-Commits `c000567` (ein Commit, nicht ausgeliefert).
+- **Nächste Schritte Zielpfad C:**
+  - Spec 044 (Verweigerungspfad im Kern) schreibt der Architekt in `/home/user/wt/spec044`, Branch `claude/spec-044`;
+    danach Lesebefund in frischem Kontext, PR, Codex, Merge. ADR 0012 geht vor dem Bau von 044 an Recht.
+  - Danach die Specs 045 und 041.
+  - Bau 043a und 040b bis 040d erst nach dem Go des Eigentümers. Unbeantwortete Punkte werden auf Standard gebaut und mit
+    Datum vermerkt; spätere Antworten kosten eine Enum-, Tabellen- oder Vertragsänderung.
+  - D (064–066) darf nach dem Bau von 043a parallel zum Rest von C laufen.
 - takt-033 ist mit Vorschlag (b) gemergt; die Eigentümerfrage bleibt offen und ist umkehrbar.
 
 ## Eigentümerentscheidungen (offen)

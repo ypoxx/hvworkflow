@@ -1308,7 +1308,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
-  *Stand 01.10.2026:* Specs 043a und 040a bis 040d gemergt, 040a gebaut (#118); Bau 043a und 040b bis 040d wartet auf das Go des Eigentümers; Spec 044 in Arbeit, danach 045 und 041.
+  *Stand 01.10.2026:* Specs 043a und 040a bis 040d gemergt, 040a gebaut (#118, ohne das nach Frage 1 nötige Go, Annahme beim Eigentümer offen); Bau 043a und 040b bis 040d wartet auf das Go des Eigentümers; Spec 044 in Arbeit, danach 045 und 041.
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
 Zurückgestellt: 049 (hängt an 085), 047, 056, 058, der Rest von 029 und der Rest von M4–M7 bis nach der zweiten Demo.
