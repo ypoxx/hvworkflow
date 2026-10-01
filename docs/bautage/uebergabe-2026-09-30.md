@@ -16,18 +16,23 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   - Produktionsweg für `text/event-stream` (035b Frage 3, Standard: Polling-Rückfall aus 036b, Prüfung beim ersten
     Staging-Deploy).
 - **Stand 01.10.2026:** 040a ist gebaut und gemergt (#118, `c000567`); die Specs 040a bis 040d und 043a sind gemergt;
-  die Spec 044 ist in Arbeit, danach 045 und 041. Der Bau von 043a und 040b bis 040d wartet auf das Go des Eigentümers.
+  die Spec 044a ist gemergt (#120, `82ee43b`; Teilung 044a/044b vorgeschlagen). Der Bau von 043a und 040b bis 040d wartet auf das Go des Eigentümers.
   Offene Eigentümerentscheidungen unverändert: 043a Fragen 1, 2 und 5; 040 Teilung und Budget für den Bau von 040b bis
-  040d; Frage 6 (Doku ohne Spec); 040a Fragen 1 und 2a bis 2c.
+  040d; Frage 6 (Doku ohne Spec); 040a Fragen 1 und 2a bis 2c; 044a Fragen 1, 2 und 3b vor dem Bau.
 - **Abweichung 040a (offen beim Eigentümer):** Die Spec 040a verlangt zu Frage 1 vor dem ersten Bau ein ausdrückliches Go
   (`docs/slices/040a-admin-ohne-inhaltsrechte.md`, „Offene Eigentümerfragen“). Der Orchestrator hat 040a ohne dieses Go
   gebaut und gemergt; er hatte es dem Eigentümer vorher angekündigt (Begründung: Inhalt folgt aus Rechtekonzept §4,
   schließt eine Sicherheitslücke, 1,5 AStd im Planbudget von 2,5), eine Zustimmung lag aber nicht vor. Der Eigentümer
   entscheidet nachträglich: annehmen, oder Revert des Squash-Commits `c000567` (ein Commit, nicht ausgeliefert).
 - **Nächste Schritte Zielpfad C:**
-  - Spec 044 (Verweigerungspfad im Kern) schreibt der Architekt in `/home/user/wt/spec044`, Branch `claude/spec-044`;
-    danach Lesebefund in frischem Kontext, PR, Codex, Merge. ADR 0012 geht vor dem Bau von 044 an Recht.
-  - Danach die Specs 045 und 041.
+  - Spec 044a ist gemergt. Bau 044a erst nach dem Bau von 043a **und von 040b bis 040d** (gleiche Kern-Lane, die
+    Wahrheitstabelle ist ein Snapshot; 044a baut seriell danach) und nach den Eigentümerfragen 1, 2 und 3b; ADR 0012 und
+    der Verweigerungskatalog gehen vorher an Recht. Die Spec 044b schreibt der Architekt nach dem Go zur Teilung.
+  - **044c (Untergründe für Pfad A, Rechtekonzept §4, Recherche Z.63)** je nach Frage 3b: bei Go eine eigene Scheibe 044c
+    nach der Antwort von Recht und vor dem Pilot (rund 0,75 AStd, additiver Vertragsschritt); bei No-go wartet 044a, bis
+    Recht die Untergründe benennt, dann werden 044a und 044c zusammen gebaut (+0,75 AStd in 044a, Vertragsschritt als
+    erster Commit). In keinem Fall bleibt die Lücke offen (044a, Eigentümerfrage 3b).
+  - Danach die Specs 045 und 041; beide hängen an offenen Antworten (044a, 040) und werden erst danach geschrieben.
   - Bau 043a und 040b bis 040d erst nach dem Go des Eigentümers. Unbeantwortete Punkte werden auf Standard gebaut und mit
     Datum vermerkt; spätere Antworten kosten eine Enum-, Tabellen- oder Vertragsänderung.
   - D (064–066) darf nach dem Bau von 043a parallel zum Rest von C laufen.
