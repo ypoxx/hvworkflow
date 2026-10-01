@@ -1,6 +1,6 @@
 # Scheibe 040a — Administration im Kern, Teil 1: Administration ohne Inhaltsrechte
 
-**Status:** spec (30.09.2026; überarbeitet nach dem Lesebefund zu `4fac838` und der Nachprüfung zu `bccba04`; Teil 1 von 4 der geteilten Scheibe 040, Zuschnitt aller Teile im Abschnitt „Teilung und Zuschnitt“)
+**Status:** angenommen (Review Opus 5.5 in frischem Kontext, Nachprüfung: Major behoben; Codex ohne Befund; gemergt als #118 c000567)
 **Risikoklasse:** hoch · 1,5 AStd · Plan 040: 03.11.2026 (W6); 040a hat keinen Vertragsschritt und darf früher starten, wenn der Orchestrator es einplant (Eigentümerfrage 1) · Lanes: core; service (nur Tests); e2e (nur die genannten Testumbauten); web-stage (nur Verlegen einer reinen Funktion mit Test); web-history (Hervorhebung administrativer Ereignisse); web-shell (nur zwei i18n-Schlüssel und `parity.test.ts`); docs-legal (nur Vermerk im Rechtekonzept); docs-sicherheit
 **Rolle:** implementierer-backend; Review in frischem Kontext mit Perspektive Security/Admin (Rechte, Wahrheitstabelle) und Legal (Rechtekonzept §4); Lesebefund der Spec vor dem Bau; nie gebündelt (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu R-ADM-07 (keine Selbstzuordnung einer Rolle), R-ADM-08 (die letzte tragfähige Verwaltungsrolle eines nicht geschlossenen Jahrgangs ist nicht entziehbar). Angewandt: R-PERM-01, R-PERM-02, R-GUARD-06. Dazu AGENTS.md R2, R3, R4, R12

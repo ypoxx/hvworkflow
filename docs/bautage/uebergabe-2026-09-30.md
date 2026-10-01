@@ -4,7 +4,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `ca94899` (036b). **Etappe A und Etappe B
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `c000567` (040a; zuvor `ca94899`, 036b). **Etappe A und Etappe B
   sind fertig:**
   - 031 (031a, 031b, takt-030 bis takt-037);
   - 035a (#102), 035b (#107), 036a (#106), 036b (#111);
@@ -15,6 +15,10 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   - Lasttest 071 (B11-Nachweis in der ungünstigsten Phase);
   - Produktionsweg für `text/event-stream` (035b Frage 3, Standard: Polling-Rückfall aus 036b, Prüfung beim ersten
     Staging-Deploy).
+- **Stand 01.10.2026:** 040a ist gebaut und gemergt (#118, `c000567`); die Specs 040a bis 040d und 043a sind gemergt;
+  die Spec 044 ist in Arbeit, danach 045 und 041. Der Bau von 043a und 040b bis 040d wartet auf das Go des Eigentümers.
+  Offene Eigentümerentscheidungen unverändert: 043a Fragen 1, 2 und 5; 040 Teilung und Budget für den Bau von 040b bis
+  040d; Frage 6 (Doku ohne Spec); 040a Fragen 1 und 2a bis 2c.
 - **Zielpfad C beginnt mit 043** (Vertragspaket 0.4.0).
   - Die Spec schreibt der Architekt (Opus) in `/home/user/wt/spec043`, Branch `claude/spec-043-vertrag-040`, mit einem
     Vorschlag zur Teilung.

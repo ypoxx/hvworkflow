@@ -1,6 +1,6 @@
 # Scheibe 035a — SSE-Strom, Teil 1: Vertrag und Sichtbarkeit in der Domäne (R-PERM-04)
 
-**Status:** spec (überarbeitet nach dem Lesebefund vom 30.09.2026 zu `9f2560c`; Teil 1 der geteilten Scheibe 035)
+**Status:** angenommen (Review in frischem Kontext: Major behoben; Nachprüfung bestanden; gemergt als #102 8a4c8bd)
 **Risikoklasse:** hoch · 1,25 AStd · 28.10.2026 (W5) · Lanes: domain; contract nur Architekt
 **Rolle:** domain-implementer; Architekt für den Vertrag (vor dem Bau); Review in frischem Kontext mit Perspektive Security, Lesebefund der Spec vor dem Bau, nie gebündelt; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** neu **R-PERM-04** (Stromsichtbarkeit: je Ereignis, je Leser, mit den Rechten zum Zustellzeitpunkt); angewandt R-PERM-01, R-PERM-02, R-PERM-03 (über `can()`); AGENTS.md R4, R5, R6, R7, R12
