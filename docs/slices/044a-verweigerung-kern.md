@@ -1,8 +1,8 @@
 # Scheibe 044a — Verweigerungspfad A und B im Kern, Teil 1: Regeln, Rechte, Katalog, Maskierung
 
 **Status:** spec (01.10.2026; gelesen auf `c000567`; überarbeitet nach dem Lesebefund zu `0dcbe39`: 0 blocker, 9 major, Minor; Teil 1 der geteilten Scheibe 044, Zuschnitt im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 3 AStd (Teil a; Summe a+b 4,25 statt 2,5 laut Plan) · Plan 044: 06.11.2026 (W6); frühestens nach dem Merge von 043a (Vertrag 0.4.0), nach 040b–d in der Lane core und nach dem Go zu den Eigentümerfragen 2 und 3b · Lanes: core; web-api (nur `HvApi` im HTTP-Client und Live-Puffer); web-shell (nur zwei Aktionsschlüssel); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz (nur Zeile V7)
-**Rolle:** implementierer-backend. Review in frischem Kontext mit den Perspektiven **Legal** (Verweigerung, Rechtstor, Grundkatalog), **Security** (Maskierung, Vier-Augen, SG2) und **Datenschutz** (Begründung im `pii`-Teil, DSFA V7, E14). Zusätzlich die Stichprobe des Architekten in eigenem frischem Kontext mit Perspektive Legal (Plan §6, Zeile 997). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
+**Risikoklasse:** hoch · 3,25 AStd (Teil a; Summe a+b 4,25 statt 2,5 laut Plan) · Plan 044: 06.11.2026 (W6); frühestens nach dem Merge von 043a (Vertrag 0.4.0), nach 040b–d in der Lane core und nach dem Go zu den Eigentümerfragen 2 und 3b · Lanes: contract (nur Beschreibungen, erster Commit); core; web-api (nur `HvApi` im HTTP-Client und Live-Puffer); web-shell (nur zwei Aktionsschlüssel); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz (nur Zeile V7)
+**Rolle:** architect für den Vertragsschritt (erster Commit, nur Beschreibungen, AGENTS.md R6); danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Legal** (Verweigerung, Rechtstor, Grundkatalog), **Security** (Maskierung, Vier-Augen, SG2) und **Datenschutz** (Begründung im `pii`-Teil, DSFA V7, E14). Zusätzlich die Stichprobe des Architekten in eigenem frischem Kontext mit Perspektive Legal (Plan §6, Zeile 997). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** neu R-TRANS-15 (Verweigerung vorschlagen), R-TRANS-16 (Verweigerung freigeben), R-GUARD-08 (Verweigerung nur mit Rechtsfreigabe-Ereignis), R-GUARD-09 (Grund- und Begründungspflicht), R-GUARD-11 (Katalogeintrag unverändert seit dem Vorschlag), R-GUARD-12 (Antwortversion für Antwortoperationen), R-GUARD-13 (Verweigerungsversion für die Verweigerungsfreigabe), R-GUARD-14 (Freigebende ≠ rechtlich Freigebende). Angewandt: R-GUARD-01, R-GUARD-03, R-GUARD-04, R-GUARD-06, R-GUARD-07, R-TRANS-00, R-TRANS-06, R-TRANS-07, R-TRANS-09, R-TRANS-13, R-PERM-01, R-PERM-02. Dazu AGENTS.md R2, R3, R4, R5, R7, R8, R10, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` Eintrag 044 (Zeile 691–696), §3 „Zustandsmodell und Verweigerung“ (Zeile 215), §4 Zeile 249 (ADR 0012 „geht vor 044 an Recht“), §5 Abdeckung Zeilen 269 und 275 (Ist-Delta hoch 1, Recherche MUSS Recht Z.63/64), §6 Zeile 997 (Stichprobe des Architekten)
@@ -37,8 +37,8 @@ Vorbild von 035a/035b (Kern, dann Dienst) wird 044 deshalb geteilt, **ein PR je 
 
 | Teil | Thema | Inhalt | Vertrag | Klasse · AStd |
 |---|---|---|---|---|
-| **044a** (diese Spec) | Regeln, Rechte, Katalog, Maskierung im Kern | `refusalGrounds.ts` mit Hash; Rechte; R-TRANS-15/16; R-GUARD-08/09/11/12/13/14; Projektion; Begründung im `pii`-Teil; Maskierung in Projektion, Bühne, Ereignis-Lesepfad und Suche; Vermerk der Rechtsfreigabe maskiert; Kennzahl der Rechtsprüfung; `HvApi` mit drei Methoden im Kern, im HTTP-Client und im Live-Puffer; Wahrheitstabelle mit neuem Abschnitt; Regelregister; Kopfvermerk Rechtekonzept; Bedrohungsmodell; DSFA V7 | keine Änderung (0.4.0 aus 043a deckt die Formen; Beschreibungen siehe Hinweis an 044b) | hoch · 3 |
-| **044b** | Dienst und HTTP-Nachweis | Drei Routen in `apps/api/src/app.ts` montieren; die drei Allowlist-Einträge mit `slice` 044 im selben Commit entfernen (wie 035b); HTTP-Tests für 401/403/404/409/412/422, Idempotenz und `If-Match`; Maskierung über HTTP auf `getQuestion`, `listQuestions`, `listMeetingQuestions`, `getQuestionHistory`, `listEvents`, `/stream` und `getStage`; Postgres-Lauf: Vorschlag und Freigabe überstehen Neustart und Kettenprüfung; Zugriffslog mit Regel-id; gegebenenfalls Kennzahlen-Allowlist; Beschreibungen im Vertrag nachziehen | `allowlist.json` (drei Einträge entfernen); Beschreibungen in `openapi.yaml` (Patch-Stufe) | hoch · 1,25 |
+| **044a** (diese Spec) | Regeln, Rechte, Katalog, Maskierung im Kern | `refusalGrounds.ts` mit Hash; Rechte; R-TRANS-15/16; R-GUARD-08/09/11/12/13/14; Projektion; Begründung im `pii`-Teil; Maskierung in Projektion, Bühne, Ereignis-Lesepfad und Suche; Vermerk der Rechtsfreigabe maskiert; Kennzahl der Rechtsprüfung; `HvApi` mit drei Methoden im Kern, im HTTP-Client und im Live-Puffer; Aufbewahrungsklasse `record` für Verweigerungsereignisse; Wahrheitstabelle mit neuem Abschnitt; Regelregister; Kopfvermerk Rechtekonzept; Bedrohungsmodell; DSFA V7 | erster Commit: nur Beschreibungen in `openapi.yaml`, nächste freie Patch-Stufe nach 0.4.0 (Abschnitt „Vertragsschritt“) | hoch · 3,25 |
+| **044b** | Dienst und HTTP-Nachweis | Drei Routen in `apps/api/src/app.ts` montieren; die drei Allowlist-Einträge mit `slice` 044 im selben Commit entfernen (wie 035b); HTTP-Tests für 401/403/404/409/412/422, Idempotenz und `If-Match`; Maskierung über HTTP auf `getQuestion`, `listQuestions`, `listMeetingQuestions`, `getQuestionHistory`, `listEvents`, `/stream` und `getStage`; Postgres-Lauf: Vorschlag und Freigabe überstehen Neustart und Kettenprüfung; Zugriffslog mit Regel-id; gegebenenfalls Kennzahlen-Allowlist | nur `allowlist.json` (drei Einträge entfernen) | hoch · 1 |
 
 **Reihenfolge a → b.** 044b kann erst bauen, wenn der Kern die Operationen kennt. Zwischen den beiden Merges sind die
 Operationen im Dienst nicht montiert (404 des Fallbacks), in der Demo aber über `HvApi` erreichbar. Keine Oberfläche ruft
@@ -53,7 +53,7 @@ ergänzen.
 
 **Lanes.** Die Planzeile nennt nur `core`. 044a braucht zusätzlich web-api (`HvApi` wächst, `http.ts` und `liveStore.ts`
 müssen es umsetzen, Typprüfung), web-shell (`ACTION_KEYS` ist eine erschöpfende Zuordnung über `Permission`) und die drei
-Doku-Lanes. 044b braucht service und contract. Das hat 043a schon angekündigt (Eigentümerfrage 5 dort: „Plan-Eintrag 044
+Doku-Lanes sowie contract für den Vertragsschritt im ersten Commit. 044b braucht service und contract (nur Allowlist). Das hat 043a schon angekündigt (Eigentümerfrage 5 dort: „Plan-Eintrag 044
 erhält die Lanes service und web-api“).
 
 ## Befund (Ist-Stand, gelesen auf `c000567`)
@@ -294,7 +294,7 @@ zwei `check`-Funktionen verlöre eine davon aus Register und Szenariotest.
 
      Der Katalog ist allgemein lesbar; die Prüfung verrät nichts über Fragen. Fehlende Begründung oder fehlender Grund
      sind keine 422, sondern R-GUARD-09 (409, 043a). Dass Validator und Kern hier verschiedene Status liefern, beschreibt
-     044b im Vertrag (Hinweis).
+     der Vertragsschritt dieser Scheibe an `proposeRefusal`.
   2. `transition(id, 'question.refuse.propose', opts, input, build)`: 404 bzw. 403 R-PERM-01, `If-Match` (412 bei
      veralteter Version, kein Ereignis; Test 23), Tabelle (R-TRANS-00, R-GUARD-03, R-GUARD-09).
   3. `build` schreibt `AnswerDrafted` mit dieser Nutzlast:
@@ -305,9 +305,21 @@ zwei `check`-Funktionen verlöre eine davon aus Register und Szenariotest.
      - **`pii: { keyId: <meetingId>, refusalJustification }`** mit getrimmter Begründung, wie `SpeakerRegistered`
        (`api.ts:886`). Die Begründung steht **nicht** in `answer`;
      - `invalidatedApprovalOfVersion`, falls eine Freigabe bestand;
-     - `toStatus: to`.
+     - `toStatus: to`;
+     - auf dem Ereignis (Umschlag, nicht Nutzlast): **`retentionClass: 'record'`**. `append` (`api.ts:642-646`) übernimmt
+       das Feld aus `build`; ohne Angabe setzt `stampEvent` `working` (`envelope.ts:146`).
 - **`approveRefusal(id, answerVersion, opts?): Promise<Question>`:** `transition(id, 'question.refuse.approve', opts,
-  { answerVersion }, …)` schreibt `QuestionApproved { answerVersion }` wie `approveQuestion`. Guards siehe Tabelle.
+  { answerVersion }, …)` schreibt `QuestionApproved { answerVersion }` wie `approveQuestion`, ebenfalls mit `retentionClass: 'record'`. Guards
+  siehe Tabelle.
+- **Aufbewahrungsklasse (DSFA V7, ADR 0009):** Die DSFA nennt für V7 die Klasse `record`; der Code schreibt heute für jedes
+  Ereignis außer `IdempotencyRecorded` `working`. Richtig ist `record`: Eine Verweigerung ist Nachweis für Niederschrift
+  und Anfechtung (§ 131 Abs. 5, §§ 243 ff. AktG, DSFA V9). 044a setzt `record` deshalb auf die beiden Ereignisse, die nur
+  eine Verweigerung erzeugt (`AnswerDrafted` aus `proposeRefusal`, `QuestionApproved` aus `approveRefusal`; Test 28,
+  Mutationsprobe 18). `draftAnswer`, `approveQuestion` und `clearQuestionLegally` bleiben unverändert `working`, obwohl die
+  DSFA für V5 und V6 ebenfalls `record` nennt. Diese Lücke ist benannt und gehört zu Eigentümerfrage 9 (DSB); Ziel ist eine
+  Aufbewahrungsklasse je Ereignistyp als Datentabelle in einem eigenen Takt core vor dem Pilot. Die Rechtsfreigabe einer
+  Verweigerung (`QuestionLegalCleared`) bleibt dort ebenfalls `working`, weil `clearQuestionLegally` die Antwortart nicht
+  unterscheidet; der Takt schließt das mit.
 - **`draftAnswer` bleibt bei benannten Feldern.** `answerKind` und `refusal*` im Eingabeobjekt werden nicht übernommen.
   Eine Antwortversion trägt kein `answerKind` (fehlt = `answer`, Vertrag 0.4.0). Das erfüllt die Zeile von 043a „ab 044
   schreibt `draftAnswer` immer `answer`“ ohne neues Feld in jedem Antwortereignis. Der Korpus und die Ereignis-Fixtures
@@ -541,7 +553,9 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
   - die Begründung: nur Halter von `question.refuse.*` (`legal`, `coordination`, `approver`);
   - Antwortart, Grund und Wortlaut: alle Leser der Frage, die Bühne ab `staged`, der Beobachter ab `delivered`;
   - der Vermerk der Rechtsfreigabe: niemand über einen Lesepfad (nur gespeichertes Original).
-- **Aufbewahrung:** Klasse `record` wie die Antwortversion; `legalHold` wie das Ereignis.
+- **Aufbewahrung:** `retentionClass: 'record'` auf `AnswerDrafted` (Verweigerung) und `QuestionApproved` (aus
+  `approveRefusal`), gesetzt in `api.ts` und belegt durch Test 28; `legalHold` wie jedes Ereignis (`false`). Die Lücke bei
+  den übrigen Antwortereignissen (V5, V6) und bei der Rechtsfreigabe ist benannt (Entscheidung 5, Eigentümerfrage 9).
 - **Datensparsamkeit:** Die Dialoghilfe in 045 sagt „nur, was für die Entscheidung nötig ist; keine Namen Dritter“.
 - **Offene Frage an den DSB (E14, Eigentümerfrage 9):** Umfang der Betroffenenauskunft (Art. 15 DSGVO) für Begründungen,
   Rechtsgrundlage für Pfad-A-Begründungen über den Aktionär, Aufbewahrung. Ein Umschreiben des Nachweises ist
@@ -556,16 +570,44 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
     Grund ab `staged`“.
   - Ablage der Begründung im `pii`-Teil; Verweis auf E14.
 
+## Vertragsschritt (Architekt, erster Commit, vor jedem Code; AGENTS.md R6, 043a Regel 1)
+
+Der Kern schreibt neue Nutzlastfelder und ändert, was ein Ereignis-Leser sieht. Deshalb kommt der Vertrag zuerst, im
+ersten Commit dieser Scheibe, **nur additiv und nur in Beschreibungen** (kein neues Schema-Feld, keine neue Pflicht, kein
+neues Anfragefeld):
+
+- **Version:** die nächste freie Patch-Stufe nach 0.4.0 beim Merge (heute erwartet 0.4.1). `info.version`,
+  `packages/contract/package.json` und ein Abschnitt `## [0.4.x]` in `packages/contract/CHANGELOG.md` (`### Changed`:
+  Beschreibungen; Vermerk „auf Standard gebaut“).
+- **`Event`-Beschreibung, Nutzlast `AnswerDrafted`:** `toStatus` (Zielstatus aus der Übergangstabelle, nur bei
+  `proposeRefusal`, Wert aus `QuestionStatus`); `pii` mit `keyId` und `refusalJustification` (die Begründung steht nur
+  dort, nie in `answer`; 043a nannte bisher `answer.refusalJustification` „nur im gespeicherten Original“, das wird
+  berichtigt); `retentionClass: record` bei Verweigerungen.
+- **`EventRead`-Beschreibung:** `pii` fehlt wie bisher; `QuestionLegalCleared.note` fehlt in jedem Ereignis-Lesepfad
+  (`getQuestionHistory`, `listEvents`, `streamEvents`), für jeden Leser. Kein `false` im Schema: Die Maskierung ist an den
+  Ereignistyp gebunden, nicht an den Schlüssel (Nachprüfung m2); die Probe über HTTP folgt in 044b.
+- **`proposeRefusal`, Antwort 409:** R-GUARD-09 umfasst Pfad B ohne Grund **und** jede Verweigerung (Pfad A und B) ohne
+  nicht leere Begründung. **Antwort 422:** Form und Länge (Validator und Kern), unbekanntes `refusalGroundId` (Kern).
+- **`approveRefusal`, Antwort 409:** ergänzt um R-GUARD-04, R-GUARD-12/13 und R-GUARD-14.
+- **Typen:** `pnpm contract:types` regeneriert `packages/contract/src/types.ts`; ein zweiter Lauf ergibt keinen Diff.
+- **Tore:** `pnpm contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`, (c) mit `0.4.0 -> 0.4.x`. Versionsprüfungen
+  in den Vertragstests (`apps/api/src/__tests__/contract*.test.ts`, `takt-0*-contract.test.ts`) ziehen nur ihre
+  Versionszeile nach.
+- Ist beim Baustart schon eine andere 0.4.x-Stufe gemergt, nimmt dieser Schritt die nächste. Ist 043a nicht gemergt:
+  anhalten (Vor-dem-Bau-Punkt 1).
+
 ## Nicht-Ziele
 
-- Kein Vertragsschritt. 0.4.0 aus 043a deckt Schemas, Operationen und Rechte. Ein Feld, das 0.4.0 nicht kennt, ist ein
-  Befund: anhalten und melden, nicht still ergänzen. **Ausnahme, benannt:** `toStatus` und `pii.refusalJustification` in der
-  `AnswerDrafted`-Nutzlast und das Entfernen von `note` aus `EventRead`. Die Nutzlast ist im Vertrag nur beschrieben, nicht
-  gebunden (043a; Bindung mit 043c); die Beschreibungen zieht 044b nach (Hinweis).
+- Keine Formänderung am Vertrag. Der Vertragsschritt im ersten Commit ändert nur Beschreibungen (Abschnitt
+  „Vertragsschritt“). Ein Feld, das 0.4.0 nicht kennt und dort nicht steht, ist ein Befund: anhalten und melden, nicht
+  still ergänzen.
 - Keine Dienstroute, keine Allowlist-Änderung, keine HTTP-Tests der neuen Operationen (044b).
 - Keine Oberfläche: kein Dialog, kein Kennzeichen, kein „ungeprüft“-Abzeichen, keine Historienzeile „Verweigerung
   vorgeschlagen“ (045). Nur die zwei Aktionsschlüssel, die die Typprüfung erzwingt.
-- Kein Export, keine Markierung in der Niederschrift-Anlage (051; Begründung im Export: 043d, Standard nein).
+- Kein Export, keine Markierung von Verweigerungen im Export. Die Planzeile 044 nennt „Export markiert Verweigerungen“; im
+  Code gibt es noch keinen Export (`exports/record` kommt mit 051). Das ist eine **ausdrückliche Verschiebung nach 051**,
+  Teil des Go zu Eigentümerfrage 2 und der Planänderung für die Einträge 044 und 051 (Begründung im Export: 043d, Standard
+  nein).
 - Kein gebundenes Nutzlastschema für `AnswerDrafted` (043c).
 - Keine Untergründe für Pfad A, kein Katalog für Pfad A (Eigentümerfrage 3b; Zielscheibe 044c).
 - Kein Modell B, keine neuen Zustände, keine Anzeigegruppen (Register „o. Nr. 2“).
@@ -579,6 +621,13 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
   und im Bericht).
 
 ## Files allowed
+
+Vertrag (Architekt, erster Commit, nur Beschreibungen):
+
+- `packages/contract/openapi.yaml` (nur Beschreibungen und `info.version`, Abschnitt „Vertragsschritt“)
+- `packages/contract/CHANGELOG.md` (nur der neue Abschnitt)
+- `packages/contract/package.json` (nur `version`)
+- `packages/contract/src/types.ts` (nur regeneriert mit `pnpm contract:types`)
 
 Kern:
 
@@ -601,7 +650,7 @@ Tests im Kern:
 - `packages/domain/src/__tests__/transitions.test.ts` (nur: `GUARD_SCENARIOS` für die sechs Guards, Regeltests für R-TRANS-15/16, neuer Abschnitt „Role × Verweigerung“)
 - `packages/domain/src/__tests__/indicators*.test.ts` (nur der neue Fall aus Test 26)
 - `packages/domain/src/__tests__/*.test.ts` (nur Erwartungen an `_actions`, an Rechtelisten, an den maskierten Vermerk `note` und an Zählungen von Regeln oder Rechten, die sich durch diese Spec ändern; jede andere Änderung ist ein Befund)
-- `apps/api/src/__tests__/*.test.ts` (dieselbe Einschränkung; keine neuen Tests der Operationen, die kommen mit 044b)
+- `apps/api/src/__tests__/*.test.ts` (dieselbe Einschränkung, dazu die Versionszeilen der Vertragstests; keine neuen Tests der Operationen, die kommen mit 044b)
 
 HTTP-Client, Live-Puffer und Oberfläche (nur Typprüfung):
 
@@ -627,7 +676,7 @@ Weitere Dateien sind Scope-Befunde.
 
 ## Ausdrücklich nicht erlaubt
 
-`packages/contract/**` (auch `allowlist.json`; die Einträge entfernt 044b), `apps/api/src/**` außer den Testdateien,
+`packages/contract/allowlist.json` (die Einträge entfernt 044b), `packages/contract/scripts/**`, `apps/api/src/**` außer den Testdateien,
 `apps/web/src/features/**`, `apps/web/e2e/**`, `packages/domain/src/seed.ts`, `packages/domain/src/rules.ts` (das Register
 entsteht aus den Tabellen; braucht es doch eine Änderung, ist das ein Befund), `packages/domain/src/piiCodec.ts`,
 `packages/domain/src/envelope.ts`, `docs/adr/**`, `docs/glossar.md`. Dieser Abschnitt steht bewusst außerhalb von „Files
@@ -803,6 +852,12 @@ Test von `indicators.ts` (Datei nach Vor-dem-Bau-Punkt 11):
 27. Die drei Methoden senden Methode, Pfad und Body nach 0.4.0. Die beiden schreibenden senden `Idempotency-Key`, CSRF und
     `If-Match` wie `draftAnswer`.
 
+`packages/domain/src/__tests__/refusal044a.test.ts` (Fortsetzung):
+
+28. **Aufbewahrungsklasse:** Das gespeicherte `AnswerDrafted` aus `proposeRefusal` (Pfad A und B) und das
+    `QuestionApproved` aus `approveRefusal` tragen `retentionClass: 'record'`; `AnswerDrafted` aus `draftAnswer` und
+    `QuestionApproved` aus `approveQuestion` tragen weiter `working` (Enge der Änderung).
+
 **Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
 
 1. Maskierung in `viewQuestion` mit `can(actor(), p, q)` statt `can(actor(), p)` → Test 14 (Fall „ohne Rechtsfreigabe“) rot.
@@ -823,10 +878,11 @@ Test von `indicators.ts` (Datei nach Vor-dem-Bau-Punkt 11):
 15. Das Entfernen von `note` in `maskEvent` gestrichen → Test 24 rot; `note` stattdessen in `MASKED_KEYS` (rekursiv) → Test 24 (Gegenprobe) rot.
 16. `inReviewSince` bei `AnswerDrafted` nicht gesetzt → Test 26 rot.
 17. Katalog nur flach eingefroren oder flach kopiert → Test 1 bzw. Test 19 rot.
+18. `retentionClass: 'record'` in `proposeRefusal` oder `approveRefusal` weggelassen → Test 28 rot.
 
 ## Akzeptanzkriterium
 
-1. Die Tests 1–27 sind grün (Test 20 nur, wenn 040d gemergt ist), die 17 Mutationsproben rot belegt.
+1. Die Tests 1–28 sind grün (Test 20 nur, wenn 040d gemergt ist), die 18 Mutationsproben rot belegt.
 2. `git diff -- packages/domain/policy-truth-table.md` zeigt genau den Diff aus „Wahrheitstabellen-Diff“: zwei neue
    Spalten, 10 ✓ in `q.refuse.propose`, keine ✓ in `q.refuse.approve`, keine geänderte bestehende Zelle, neuer
    Abschnitt „Role × Verweigerung“ mit 27 Zeilen.
@@ -859,12 +915,12 @@ Ausgelöst:
 - [x] Fachregel, Status (zwei Zeilen, sechs Guards, Ziel `in_review` über `toStatus`)
 - [x] Rolle, Recht, Schutzklasse (zwei Rechte, Leserkreis der Begründung, Trennung Rechtsfreigabe/Freigabe)
 - [x] personenbezogene oder vertrauliche Daten (Begründung im `pii`-Teil, Vermerk maskiert; SG2; DSFA V7; E14)
-- [x] Vertrag, Ereignis (keine Vertragsänderung; neue Felder in der `AnswerDrafted`-Nutzlast, beschrieben in 0.4.0, gebunden in 043c; `note` fehlt künftig in `EventRead`)
+- [x] Vertrag, Ereignis (Patch-Stufe nach 0.4.0, nur Beschreibungen, erster Commit: `toStatus` und `pii` in `AnswerDrafted`, `note` fehlt in `EventRead`, R-GUARD-09 für beide Pfade; Bindung des Nutzlastschemas mit 043c)
 - [x] Betrieb (Kennzahl `questionsInLegalReviewOver10m`)
 - [ ] Persistenz, Migration (kein neuer Ereignistyp, keine Migration; alte Ereignisse bleiben gültig, Test 18)
 - [ ] Oberfläche (nur zwei Schlüssel, nicht gerendert)
 
-Perspektive(n): Legal, Security (6.5), Datenschutz (6.6) · Nachweise: Tests 1–27, Mutationsproben, Wahrheitstabellen-Diff,
+Perspektive(n): Legal, Security (6.5), Datenschutz (6.6) · Nachweise: Tests 1–28, Mutationsproben, Wahrheitstabellen-Diff,
 Regelregister · Offene Entscheidung: E14 (DSB), E15 (Katalog, Pfad A), E25 (Freigabe, Leserkreis), E40 (eine Juristin),
 ADR 0012 (Eigentümerfrage 1)
 
@@ -968,10 +1024,14 @@ sind auf Standard gebaut, mit den genannten Kosten.
      nicht gelesen)“ steht dann an vier Stellen: in der `citation` der acht neuen Regeln (also in `docs/legal-trace.md`),
      im Kopfvermerk des Rechtekonzepts, im Register (E15) und im Bericht.
    - Die Annahme des ADR bleibt Prüfpunkt 4 (Umsetzer und Recht). Ein späterer Wechsel kostet die Beträge aus „Standards“.
-2. **Zuschnitt 044a/044b, Budget, Lanes (Go nötig).** Standard: zwei Teile, 3 + 1,25 = 4,25 AStd statt 2,5, beide hoch,
-   seriell, ein PR je Spec. Mit Go ändert der Orchestrator:
+2. **Zuschnitt 044a/044b, Budget, Lanes, Export (Go nötig).** Standard: zwei Teile, 3,25 + 1 = 4,25 AStd statt 2,5, beide
+   hoch, seriell, ein PR je Spec. Mit Go ändert der Orchestrator:
    - Plan-Eintrag 044: Teilungsvermerk; Lanes core, web-api, web-shell, service, contract, docs-legal, docs-sicherheit,
-     docs-datenschutz;
+     docs-datenschutz; **„Export markiert Verweigerungen“ wird gestrichen** und nach 051 verschoben (im Code gibt es noch
+     keinen Export);
+   - Plan-Eintrag 051: Ziel ergänzt um „Verweigerungen mit Antwortart, Grund-id und Titel aus dem Schnappschuss markieren,
+     nie die Begründung (§ 131 Abs. 5, nur Pfad B)“, Nachweis „Test Export markiert Verweigerung Pfad A und B, Begründung
+     fehlt“, Aufwand +0,25 AStd (1,5 → 1,75);
    - den Kalender: 045 rückt um etwa einen bis zwei Bautage.
 
    Ohne Go: eine Scheibe 044 mit beiden Dateilisten und einem Review (Abschnitt „Teilung und Zuschnitt“).
@@ -1006,6 +1066,10 @@ sind auf Standard gebaut, mit den genannten Kosten.
    Antworten. Eigentümer mit Recht (E25).
 9. **DSB (E14).** Ist die Begründung personenbezogen, insbesondere bei Pfad A? Umfang der Betroffenenauskunft,
    Rechtsgrundlage, Aufbewahrung. Standard: als personenbezogen behandelt (`pii`-Teil, enger Leserkreis, `record`).
+   Dazu die benannte Lücke: Antwortversionen, Antwortfreigaben und Rechtsfreigaben werden heute als `working` gespeichert,
+   die DSFA nennt für V5 und V6 `record`. Standard: 044a ändert nur die Verweigerungsereignisse; die übrigen folgen mit
+   einer Aufbewahrungsklasse je Ereignistyp in einem Takt core vor dem Pilot. Alternative: in 044a mit erledigen, rund
+   0,25 AStd (dann mit Fixture-Änderungen).
 
 ## Hinweise an Folgescheiben
 
@@ -1013,11 +1077,7 @@ sind auf Standard gebaut, mit den genannten Kosten.
 - Die drei Routen in `apps/api/src/app.ts` nach dem Muster von `draftAnswer`/`approveQuestion` montieren, mit
   `guarded('<operationId>')`.
 - Die drei Allowlist-Einträge mit `slice` 044 im selben Commit entfernen. Das Abdeckungstor verlangt dann die Ausübung.
-- **Vertragsbeschreibungen nachziehen** (Patch-Stufe, Architekt, erster Commit): Die Begründung steht in
-  `payload.pii.refusalJustification`, nicht in `answer` (043a nannte `answer.refusalJustification` „nur im gespeicherten
-  Original“); `AnswerDrafted` trägt `toStatus`; `QuestionLegalCleared.note` fehlt in jedem `EventRead`; die Aufteilung
-  422 (Validator und Kern: Form, Länge, unbekannter Grund) und 409 (R-GUARD-09: fehlender Grund, leere Begründung) steht
-  an `proposeRefusal`.
+- Die Vertragsbeschreibungen kommen mit 044a; 044b prüft sie über HTTP (Maskierung von `note` und `pii`, 409/422).
 - HTTP-Tests:
   - 401, 403 R-PERM-01, 404, 409 (R-GUARD-04/-06/-08/-09/-11/-12/-13/-14, R-TRANS-00), 412, 422 (Validator und Kern);
   - Idempotenz und `If-Match`;
@@ -1053,7 +1113,7 @@ Pfadangabe, Grundpflicht für Pfad A in R-GUARD-09, DSFA V7 und Rechtekonzept-Ve
 **046:** Prüfen, ob die Zeilen für `correctionOpen` und Rückgabe einen Vorschlag als neue Version zulassen. Regel-ids ab
 R-TRANS-17 (R-TRANS-15/16 vergibt diese Spec), Guards ab R-GUARD-15.
 
-**051 (Niederschrift-Anlage, § 131 Abs. 5 AktG):** Nur Pfad B löst den Protokollierungsweg aus (Recherche Z.63). In die
+**051 (Niederschrift-Anlage, § 131 Abs. 5 AktG; übernimmt „Export markiert Verweigerungen“ aus Plan 044, Eigentümerfrage 2):** Nur Pfad B löst den Protokollierungsweg aus (Recherche Z.63). In die
 Anlage gehören bei einer Verweigerung nach Pfad B: Frage, `refusalGroundId` und `title` des Schnappschusses, Zeitpunkt des
 Vorlesens. **Nie** die Begründung (043d, Standard nein). Ob ein Protokollierungsverlangen des Aktionärs (050) Voraussetzung
 ist, klärt 051 mit Perspektive Legal. Für Pfad A trägt die Anlage nur die Antwortart.
@@ -1131,6 +1191,7 @@ Touched:
 15.
 16.
 17.
+18.
 
 **Geänderte `_actions`- und `note`-Erwartungen.**
 
@@ -1172,3 +1233,11 @@ Touched:
 - m3: Ein erneuter Vorschlag aus `in_review` startet die 10-Minuten-Uhr neu (Entscheidung und Test 26).
 - m4 (Datenschutz): DSFA V7 nennt beide Änderungen ausdrücklich (Podium entfällt, Koordination kommt hinzu).
 - m5: Tests in Reihenfolge nummeriert.
+
+**Codex-Review PR #120 (zu `461c497`), eingearbeitet:**
+- P1 (Vertrag zuerst, R6): Vertragsschritt als erster Commit von 044a (nur Beschreibungen, Patch-Stufe nach 0.4.0, Typen
+  regeneriert); Ausnahme im Nicht-Ziel und Vertragspunkt in 044b gestrichen; Files allowed ergänzt.
+- P2 (DSFA): `retentionClass: 'record'` auf `AnswerDrafted` (Verweigerung) und `QuestionApproved` (aus `approveRefusal`)
+  in `api.ts`; Test 28, Mutationsprobe 18; Lücke bei V5/V6 und Rechtsfreigabe benannt (Eigentümerfrage 9).
+- P2 (Umfang): Exportmarkierung ausdrücklich nach 051 verschoben, in Eigentümerfrage 2 und in der Planänderung für 044
+  und 051 (+0,25 AStd dort).
