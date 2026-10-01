@@ -209,7 +209,7 @@ unter „Nachweis“; der Keycloak-Teil (H4 bis H8) läuft nur im CI-Job `e2e-ht
 | T-G1-E-01 | Umgehung der Oberfläche bei Schreibvorgängen: ein Akteur ruft eine schreibende Operation direkt auf, die die Oberfläche ihm nicht anbietet (z. B. `POST /v1/questions/{id}/classification` als `observer`). Lesende Operationen stehen in T-G1-I-01 (offen). | vorhanden: jeder Schreibvorgang prüft Recht und Übergangstabelle im Dienst (`packages/domain/src/api.ts:205-208, 241-257`); `_actions` ist nur Anzeige (`packages/domain/src/api.ts:158-161`); deny by default (`packages/domain/src/permissions.ts:54-60`); seit 012 hält das Rollenliteral-Tor Rollennamen aus Dienst und Domäne heraus (`scripts/role-literal-check.mjs:31-36`, `package.json:15`) | B2 | `apps/api/src/__tests__/negative.test.ts › 403: observer may read but not classify (deny reason carries a rule id)`; `packages/domain/src/__tests__/transitions.test.ts › deny by default: an unknown role has no permissions`; `packages/domain/src/__tests__/transitions.test.ts › matches the committed table — any change must be reviewed` | geschlossen |
 | T-G1-E-02 | Selbstfreigabe: `legal` hält `answer.draft` und `question.approve` (`packages/domain/src/permissions.ts:33`), R-TRANS-05 hat keinen Guard „Ersteller ≠ Freigeber" (`packages/domain/src/transitions.ts:97-104`); dieselbe Kennung entwirft und gibt frei (Probe P5, `packages/domain/policy-truth-table.md:83`). | geplant: R-GUARD-06 Ersteller ≠ Freigeber, `legal` erhält `question.legal.clear` statt der Freigabe (021); personengenau erst mit Einzelidentitäten (029, B18) | B6 | geplant in Scheibe 021 („legal entwirft und versucht Freigabe → 409 R-GUARD-06") | offen |
 | T-G1-E-03 | Rechtstor umgehen: `approver` gibt frei und stellt auf die Bühne, ohne dass Recht geprüft hat; R-TRANS-07 hat keinen Guard (`packages/domain/src/transitions.ts:112-118`, Rechte `packages/domain/src/permissions.ts:34-40`). | geplant: R-GUARD-07 mit `LEGAL_GATE_BY_TRACK`, zur Laufzeit nicht abschaltbar (021) | B6 | geplant in Scheibe 021 („stage ohne Rechtsfreigabe → 409 R-GUARD-07") | offen |
-| T-G1-E-04 | Administration als Inhaltskonto: `admin` hält alle Rechte (`packages/domain/src/permissions.ts:42`) und kann allein erfassen, entwerfen, freigeben und auf die Bühne stellen (`packages/domain/policy-truth-table.md:149`) — im Widerspruch zum Rechtekonzept Abschnitt 4. | geplant: Administrationsrechte mit Wahrheitstabellen-Diff, `admin.override` nur mit Grund als Ereignis (040); Vier-Augen gilt auch für die Administration (021) | B2, B6 | geplant in Scheibe 040 („override erzeugt Ereignis mit Grund") | offen |
+| T-G1-E-04 | Administration als Inhaltskonto: `admin` hielt alle Rechte (vor 040a `packages/domain/src/permissions.ts:74`) und konnte allein erfassen, entwerfen, freigeben und auf die Bühne stellen — im Widerspruch zum Rechtekonzept Abschnitt 4. | vorhanden seit 040a: ausdrückliche Liste ohne Ableitung (Lesen, Weiterleiten mit `question.assign`/`question.return`, `agenda.manage`, `admin.roles.manage`, `demo.seed`); keine Inhaltsrechte, kein `question.withdraw`; Wahrheitstabellen-Diff (63 ✓ → `·`) und neuer Abschnitt „Role × Wortmeldung, Erfassung und Demo“; keine Selbstzuordnung (R-ADM-07); Weiterleiten in der Historie mit Abzeichen „Administration“ hervorgehoben; Vier-Augen gilt auch für die Administration (021); geplant: `admin.override` nur mit Grund als Ereignis (040d) | B2, B6 | `packages/domain/src/__tests__/admin040a.test.ts` (Tests 1–9); `apps/api/src/__tests__/negative.test.ts › 403/409: admin over HTTP — content writes are R-PERM-01, reading works, self-assignment is R-ADM-07 (Scheibe 040a)`; `packages/domain/policy-truth-table.md`; geplant in Scheibe 040d („override erzeugt Ereignis mit Grund") | teilweise (Rest: Override mit Grund, 040d; zwei zusammenwirkende Verwaltungskonten, MF-01) |
 | T-G1-E-05 | Kontext vom Client: ein Podiumsgerät markiert eine beliebige Frage der Warteschlange als vorgelesen, auch die eines anderen Bühnenplatzes und nicht die aktuelle (Probe P6); `deliverQuestion` kennt keinen Platz (`packages/domain/src/api.ts:478-484`, `packages/domain/src/transitions.ts:127-133`). | geplant: Kontext (Einheit, Platz, Vertraulichkeit) im Dienst aufgelöst, nie vom Client (047); Delivery mit Platz und Hash (049); Warteschlange je Platz (056) | B2, B7 | geplant in Scheibe 047 („Client behauptet einen fremden Platz → wird ignoriert") | offen |
 
 ### 5.2 G2 — Dienst ↔ Persistenz
@@ -314,7 +314,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 023 Vertrag 0.3.0 | — | T-G1-T-02, T-G1-D-01 (Zielvorschläge `additionalProperties`, `maxLength`) |
 | 026 Personentabelle | T-G1-I-03, T-G2-I-01 | T-G3-I-04, T-G3-E-03 |
 | 028 Idempotenz, If-Match | T-G1-T-03, T-G1-D-02 | — |
-| 040 Administration im Kern | T-G1-E-04 | MF-01 |
+| 040 Administration im Kern (040a: Inhaltsrechte, R-ADM-07, R-ADM-08; Rest 040b–d) | T-G1-E-04 (Inhaltsteil mit 040a; Override 040d) | MF-01 |
 | 047 Attributrechte | T-G1-I-04, T-G1-E-05 | T-G1-I-01 |
 | 049 Vorgelesen als Entität | T-G1-R-02 | T-G1-E-05 |
 | 065 Webhooks | T-G3-T-03, T-G3-I-01, T-G3-E-02 | T-G3-D-02 |
@@ -333,12 +333,20 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Ablauf:* ein Administrationskonto weist sich selbst oder einer zweiten Person die Rolle `approver` zu, gibt
   frei und entzieht die Rolle wieder. Heute genügt dafür ein anderer Header-Wert (T-G1-S-01).
 - *Verhindert durch:* T-G1-E-04, T-G3-E-03; Zuordnung als Ereignis `RoleAssigned`/`RoleRevoked` mit Ablauf
-  (026); Änderungen nach dem Konfigurationsfreeze nur mit `admin.override` und Grund (040).
-- *Erkennung:* Alarm (085) mit Zielrecht `admin.roles.manage` bei Selbstzuordnung, bei Zuordnung eines
-  Freigabe- oder Rechtsrechts nach dem Freeze und bei Zuordnung und Entzug innerhalb eines Tages
-  (Zielvorschlag für 040); der Freeze-Hash im Kopf (041) ändert sich sichtbar.
-- *Nachweis:* geplant in Scheibe 040 („Stammdatenänderung nach Freeze → 409 R-ADM-03"), 026 („abgelaufene
-  Rolle → 403").
+  (026); seit 040a keine Selbstzuordnung (R-ADM-07, 409, kein Ereignis) — der Weg „sich `approver` zuordnen,
+  eigene admin-Zuordnung entziehen, freigeben“ ist für eine einzelne Person geschlossen; die letzte tragfähige
+  Verwaltungsrolle ist nicht entziehbar (R-ADM-08; tragfähig heißt: nicht entzogen, ohne Ablauf oder Ablauf ≥ 24 h,
+  und die Zuordnung, die die Sitzung des Subjects tatsächlich wählt — die älteste aktive über alle nicht
+  geschlossenen Jahrgänge; eine Verwaltungsrolle hinter einer älteren Zuordnung desselben Subjects zählt nicht); Änderungen nach dem Konfigurationsfreeze nur mit
+  `admin.override` und Grund (040d). **Offen:** zwei Verwaltungskonten, die einander Rollen geben, und eine Person
+  mit zwei Subjects.
+- *Erkennung:* Alarm (085) mit Zielrecht `admin.roles.manage` bei Zuordnung eines Freigabe- oder Rechtsrechts
+  nach dem Freeze und bei Zuordnung und Entzug innerhalb eines Tages (Zielvorschlag für 040); die Selbstzuordnung
+  verhindert R-ADM-07 seit 040a, ein verweigerter Versuch steht als 409 mit R-ADM-07 im Zugriffslog (033a); der
+  Freeze-Hash im Kopf (041) ändert sich sichtbar.
+- *Nachweis:* 040a: `packages/domain/src/__tests__/admin040a.test.ts` (Test 7 R-ADM-07, Test 8 R-ADM-08),
+  `apps/api/src/__tests__/negative.test.ts` (Selbstzuordnung über HTTP → 409 R-ADM-07); geplant in Scheibe 040b
+  bis 040d („Stammdatenänderung nach Freeze → 409 R-ADM-03"), 026 („abgelaufene Rolle → 403").
 
 **MF-02 Massenlesen und Export** (010, 047, 051)
 - *Ablauf:* eine Person mit Leserecht zieht den gesamten Bestand über `/v1/events` oder seitenweise über
@@ -408,8 +416,10 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   (Protokollebenen). Im Rückfall gepoolter Stationsidentitäten wirkt der Guard nur auf Stationsebene (B18); im
   Demobetrieb ist die Akteur-id eine Angabe des Clients (`X-Actor`), personengenau erst mit Anmeldung (029).
 - *Nachweis:* umgesetzt in 021a (26.09.2026): `packages/domain/src/__tests__/transitions.test.ts` und `api.test.ts`
-  (legal, admin und dieselbe id unter anderer Rolle → 409 R-GUARD-06, kein Ereignis; `_actions` ohne Freigabe),
-  `apps/api/src/__tests__/negative.test.ts` (409 über HTTP).
+  (legal und dieselbe id unter anderer Rolle → 409 R-GUARD-06, kein Ereignis; `_actions` ohne Freigabe),
+  `apps/api/src/__tests__/negative.test.ts` (409 über HTTP). Seit 040a hält admin weder `answer.draft` noch
+  `question.approve`: der Fall „admin entwirft und gibt frei“ in `api.test.ts` antwortet 403 R-PERM-01; der Weg über
+  eine Selbstzuordnung ist durch R-ADM-07 geschlossen (`admin040a.test.ts` Tests 3, 7 und 9).
 
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.
@@ -496,7 +506,7 @@ der ADR bleibt in dieser Scheibe unverändert. Mit Scheibe 012 geschlossene Befu
 | BF-06 | G1 | Keine Sicherheits-Header am Dienst (`apps/api/src/app.ts:126-148`, Probe P7); keine CSP für die Demo (`netlify.toml:17-22`, `apps/web/index.html:1-13`). | mittel | 034a, 037 | Anteil Dienst behoben (034a); Web-Dokument 037 |
 | BF-07 | G1 | Unbekannte Felder gelangen ins Log (`packages/domain/src/api.ts:338, 421`, `apps/api/src/contractSchema.ts:25`, `packages/contract/openapi.yaml:701-711`; Probe P4). | mittel | 023, 024 | offen |
 | BF-08 | G1 | „Vorgelesen" ohne Bindung an Platz und aktuelle Frage (`packages/domain/src/api.ts:478-484`, `packages/domain/src/transitions.ts:127-133`; Probe P6). | mittel | 047, 049 | offen |
-| BF-09 | G1 | `admin` hält alle Rechte einschließlich Entwurf und Freigabe (`packages/domain/src/permissions.ts:42`, `packages/domain/policy-truth-table.md:149`); Widerspruch zum Rechtekonzept Abschnitt 4 (kein ADR). | mittel | 040, 021 | offen |
+| BF-09 | G1 | `admin` hielt alle Rechte einschließlich Entwurf und Freigabe (vor 040a `packages/domain/src/permissions.ts:74`); Widerspruch zum Rechtekonzept Abschnitt 4 (kein ADR). **Geschlossen (040a):** ausdrückliche Liste ohne Inhaltsrechte (`admin040a.test.ts` Tests 1–3, Wahrheitstabellen-Diff). Das Aussperren durch Entzug der letzten Verwaltungsrolle verhindert R-ADM-08; als Rückhalt zählt nur eine Verwaltungszuordnung, die die Sitzung ihres Subjects auch wählt (älteste aktive über alle nicht geschlossenen Jahrgänge, wie `apps/api/src/actor.ts`; Test 8, `apps/api/src/__tests__/admin040a.test.ts`). Ablauf und Jahrgangsschluss beenden Zuordnungen weiter ohne Entzug (Grenze der Spec, Ziel 3). | mittel | 040a, 021 | geschlossen |
 | BF-10 | G1 | Klarnamen in jeder Einzelfrage und in der Suche (`packages/domain/src/state.ts:177`, `packages/domain/src/api.ts:268`, `packages/domain/src/events.ts:36-47`). | mittel | 026, 067 | offen |
 | BF-11 | G1 | `If-Match` optional (`packages/domain/src/api.ts:209-217`). | mittel | 028 | offen |
 | BF-12 | G1 | Idempotenzspeicher unbegrenzt und flüchtig (`packages/domain/src/api.ts:171, 223-230`). | niedrig | 028 | offen |

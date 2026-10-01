@@ -30,6 +30,9 @@ export const historyEn: typeof historyDe = {
   'history.col.event': 'Event',
   'history.col.detail': 'Details',
   'history.col.subject': 'Subject',
+  // Scheibe 040a (Rechtekonzept §4): badge at an event of a role-managing role, and its accessible name.
+  'history.actor.administrative': 'Administration',
+  'history.actor.administrative.label': 'Action by the administration',
   'history.payload.version': 'Version {version}',
   'history.payload.reason': 'Reason: {reason}',
   'history.payload.unit': 'Answering unit: {unit}',

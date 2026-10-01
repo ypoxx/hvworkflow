@@ -313,7 +313,7 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
 
   const postSpeaker = (app: ReturnType<typeof build>['app'], tag: string, name: string, idempotencyKey?: string): Promise<Response> =>
     Promise.resolve(app.request(`/v1/meetings/${meetingId}/speakers`, { method: 'POST',
-      headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag,
+      headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag,
         ...(idempotencyKey === undefined ? {} : { 'Idempotency-Key': idempotencyKey }) },
       body: JSON.stringify({ displayName: name, round: 1 }) }));
 
@@ -396,7 +396,7 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
     });
     const { app } = build(pool, { limits: { requestTimeoutMs: 1 } });
     const res = await app.request(`/v1/meetings/${meetingId}/speakers`, { method: 'POST',
-      headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': '"v1"' },
+      headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': '"v1"' },
       body: JSON.stringify({ displayName: 'Zu spät', round: 1 }) });
     expect(res.status).toBe(408);
     await sleep(500);

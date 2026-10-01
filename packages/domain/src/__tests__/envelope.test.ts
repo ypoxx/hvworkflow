@@ -5,6 +5,7 @@ import { canonicalJson, upcastJsonlEvents, verifyEventChain } from '../envelope.
 import type { PiiCodec } from '../piiCodec.js';
 import { createInProcessApi, etagOf } from '../api.js';
 import { seedEvents } from '../seed.js';
+import type { Actor } from '../types.js';
 
 const at = '2027-04-20T10:00:00.000Z';
 const actor = { id: 'test-actor', role: 'admin' as const, displayName: 'Must not enter the envelope' };
@@ -109,9 +110,12 @@ describe('slice 024: event envelope v2', () => {
 
   it('carries the write idempotency key into the event and uses only the injected clock', async () => {
     const store = createInMemoryEventStore();
-    const api = createInProcessApi({ store, actor: () => ({ id: 'tester', role: 'admin' }),
+    // Scheibe 040a: the administration seeds (demo.seed); the speaker request is moderation's write.
+    let who: Actor = { id: 'tester', role: 'admin' };
+    const api = createInProcessApi({ store, actor: () => who,
       clock: () => new Date(at), seeder: seedEvents });
     await api.seedDemo({ questions: 0, roundSizes: [0] });
+    who = { id: 'tester', role: 'moderation' };
     await api.registerSpeaker({ displayName: 'Demo' }, { idempotencyKey: 'x', ifMatch: etagOf((await api.getMeeting()).speakerListVersion) });
     const event = store.all().at(-1)!;
     expect(event).toMatchObject({ type: 'SpeakerRegistered', idempotencyKey: 'x', recordedAt: at });

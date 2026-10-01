@@ -496,3 +496,8 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Sprachbezeichnungen · kein Fehler, `expectRoleLabel` deckt die Sprache ab; bei Gelegenheit vereinheitlichen.
 - 031b Review nit 6 · `apps/web/e2e/030-anmeldung.spec.ts` · baut einen eigenen Nachweispfad statt `support/evidence.ts` ·
   vereinheitlichen.
+- 040a Bau · `apps/web/src/features/history/lib.ts` (`isAdministrativeRole`), `lib.test.ts`, `Timeline.test.tsx` · die
+  Spec verlangt `hasPermission`/`ROLE_PERMISSIONS` aus `@hv/domain` in der Historie; das Architekturtor meldet dafür drei
+  weitere Warnungen `web-features-i18n-domain-types-only` (11 → 14, nicht blockierend) · beim Aufräumen der Regel (012)
+  eine Wertfunktion „Rolle verwaltet Rechte“ über `apps/web/src/api/**` bereitstellen oder die Regel für reine
+  Rechtedaten ausnehmen.

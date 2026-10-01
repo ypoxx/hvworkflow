@@ -111,7 +111,7 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.goto('/');
   await waitForCorpus(page);
 
-  // Point #3/#9 ("Nur Bühne" default, m2's "derive once" and its admin negative case) has its own,
+  // Point #3/#9 ("Nur Bühne" default and m2's "derive once"; the negative case is a unit test since 040a) has its own,
   // dedicated test below — the derivation only ever runs once per mount (m2), so it needs a fresh
   // page per role to observe honestly, which does not fit this continuous walk-through. This test
   // starts from an explicit, conscious choice instead (the same override 003/abnahme use, m8) so
@@ -544,19 +544,10 @@ test('020: "Nur Bühne" default — aus den Rechten, nicht aus der Rolle', async
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: evidence('020-stage-nur-buehne-default-de.png') });
 
-  // m2's negative case: admin has `question.deliver` too, but also every drafting/classifying/
-  // capturing/approving action — the probe question (any status) reveals `question.capture`,
-  // which is enough on its own to keep the ordinary layout. A fresh navigation (not just a role
-  // switch, m2 "derive once") is needed to see this role's own derivation — but not to `/stage`
-  // itself, whose "Nur Bühne" overlay from the previous section would otherwise cover the very
-  // role switcher this needs next.
-  await page.goto('/speakers');
-  await waitForCorpus(page);
-  await asRole(page, 'admin');
-  await page.getByTestId('nav-stage').click();
-  await expect(page).toHaveURL(/\/stage$/);
-  await expect(page.getByTestId('stage-current-number')).toBeVisible();
-  await expect(page.getByTestId('stage-only')).toHaveCount(0);
+  // m2's negative case ("deliver together with a working action → no default") needed a demo role
+  // holding both; after Scheibe 040a none does (admin lost `question.deliver`). The rule itself moved
+  // with `stageOnlyByRights` to `features/stage/lib.ts` and is checked there with synthetic action
+  // lists (`lib.test.ts`) — a move, not a weakening.
 
   // A role with `question.stage`/`question.approve` and no `question.deliver` at all never gets the
   // default either. Slice 010: `expert` lost `stage.read` outright (Festlegung 4) and can no longer

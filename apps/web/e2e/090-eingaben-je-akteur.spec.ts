@@ -56,6 +56,44 @@ async function switchActor(page: Page, role: string): Promise<void> {
     .toBe('done');
 }
 
+/**
+ * Scheibe 040a: after the administration lost its content rights, no second demo role sees the
+ * capture fields or the speaker dialog. These cases switch — permanently, not for one tick — to a
+ * second, synthetic person of the same role. `setActor` takes any actor object; typed text belongs to
+ * the person (`id`), so the field must be on screen and empty for that person.
+ */
+const SECOND_CAPTURE = { id: 'u-cap-2', role: 'capture', displayName: 'Erfassung 2' } as const;
+const SECOND_MODERATION = { id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' } as const;
+
+async function switchToPerson(page: Page, actor: { id: string; role: string; displayName: string }): Promise<void> {
+  await page.evaluate(
+    ([url, wanted]) => {
+      const w = window as unknown as { __switch090?: string };
+      w.__switch090 = 'pending';
+      void import(/* @vite-ignore */ url as string).then(
+        (mod: { setActor: (actor: unknown) => void; getActor: () => { id: string } }) => {
+          mod.setActor(wanted);
+          // The person, not only the role, must have changed — otherwise the case proves nothing.
+          w.__switch090 = mod.getActor().id === (wanted as { id: string }).id ? 'done' : 'failed: actor not set';
+        },
+        (error: unknown) => {
+          w.__switch090 = `failed: ${String(error)}`;
+        },
+      );
+    },
+    [ACTOR_MODULE, actor] as const,
+  );
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __switch090?: string }).__switch090))
+    .toBe('done');
+}
+
+/** Visible and empty — the strong form R1 asks for; an absent field does not count here. */
+async function expectVisibleAndEmpty(page: Page, testId: string): Promise<void> {
+  await expect(page.getByTestId(testId)).toBeVisible();
+  await expect(page.getByTestId(testId)).toHaveValue('');
+}
+
 async function waitForCorpus(page: Page): Promise<void> {
   const questions = page.getByTestId('header-counter-questions');
   await expect(questions).toBeVisible({ timeout: 90_000 });
@@ -353,7 +391,8 @@ test('090: Begründung der Rückgabe auf der Bühne — podium tippt, Wechsel zu
 
 /*
  * Review R1, finding 2: a switch to a role without the field unmounts it and hides any leak. Each
- * field is therefore also switched to a role that sees the same field (in the demo mostly admin).
+ * field is therefore also switched to a role — or, since Scheibe 040a, a second person of the same
+ * role — that sees the same field.
  */
 
 const DRAFT = 'GEHEIM-DRAFT Redebeitrag der vorigen Person.';
@@ -368,14 +407,20 @@ async function captureFree(page: Page): Promise<void> {
   await page.getByTestId('capture-free-input').fill(FREE);
 }
 
-test('090 R1: Erfassung, Redebeitrag (draft) — capture tippt, Wechsel zu admin (sieht die Erfassung auch): leer', async ({
+test('090 R1: Erfassung, Redebeitrag (draft) — capture tippt, Wechsel zu einer zweiten Person der Erfassung: sichtbar und leer', async ({
   page,
 }) => {
   await captureForm(page);
   await page.getByTestId('capture-text').fill(DRAFT);
-  await asRole(page, 'admin');
+  await switchToPerson(page, SECOND_CAPTURE);
   await expect(page.getByTestId('capture-speaker-select')).toBeVisible();
   await expectCleared(page, 'capture-text', DRAFT);
+  // The form closes with the actor change; opened again by the second person, it is empty.
+  await watchForSecret(page, DRAFT);
+  const compose = page.getByTestId('capture-contribution-new');
+  if (!(await page.getByTestId('capture-text').isVisible())) await compose.click();
+  await expectVisibleAndEmpty(page, 'capture-text');
+  expect(await secretSeen(page)).toBe(false);
 });
 
 test('090 R1: Erfassung, Redebeitrag (draft) — capture tippt, Wechsel zu moderation und zurück: leer', async ({
@@ -391,13 +436,14 @@ test('090 R1: Erfassung, Redebeitrag (draft) — capture tippt, Wechsel zu moder
   await expectCleared(page, 'capture-text', DRAFT);
 });
 
-test('090 R1: Erfassung, freie Einzelfrage (free) — capture tippt, Wechsel zu admin (sieht die Erfassung auch): leer', async ({
+test('090 R1: Erfassung, freie Einzelfrage (free) — capture tippt, Wechsel zu einer zweiten Person der Erfassung: sichtbar und leer', async ({
   page,
 }) => {
   await captureFree(page);
-  await asRole(page, 'admin');
+  await switchToPerson(page, SECOND_CAPTURE);
   await expect(page.getByTestId('capture-free-input')).toBeVisible();
   await expectCleared(page, 'capture-free-input', FREE);
+  await expectVisibleAndEmpty(page, 'capture-free-input');
 });
 
 test('090 R1: Erfassung, freie Einzelfrage (free) — capture tippt, Wechsel zu moderation und zurück: leer', async ({
@@ -412,17 +458,20 @@ test('090 R1: Erfassung, freie Einzelfrage (free) — capture tippt, Wechsel zu 
   await expectCleared(page, 'capture-free-input', FREE);
 });
 
-test('090 R1: Antwortentwurf — expert tippt, Wechsel zu admin (darf auch entwerfen): leer', async ({ page }) => {
+test('090 R1: Antwortentwurf — expert tippt, Wechsel zu legal (darf auch entwerfen): sichtbar und leer', async ({ page }) => {
   await answersWith(page, 'expert', 'assigned');
   const number = await page.getByTestId('answers-detail-number').innerText();
   await page.getByTestId('answer-editor').fill(DRAFT);
   await page.getByTestId('answer-sources').fill('GEHEIM-QUELLE');
 
-  await asRole(page, 'admin');
+  // Scheibe 040a: legal holds answer.draft and sees the form; the administration no longer does.
+  await asRole(page, 'legal');
   await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
   await expect(page.getByTestId('answer-editor')).toBeVisible();
   await expectCleared(page, 'answer-editor', DRAFT);
   await expectCleared(page, 'answer-sources', 'GEHEIM-QUELLE');
+  await expectVisibleAndEmpty(page, 'answer-editor');
+  await expectVisibleAndEmpty(page, 'answer-sources');
 });
 
 test('090 R1: Begründung der Rückgabe — legal tippt, Wechsel zu admin (darf auch zurückgeben): Dialog zu, neu geöffnet leer', async ({
@@ -441,7 +490,7 @@ test('090 R1: Begründung der Rückgabe — legal tippt, Wechsel zu admin (darf 
   expect(await secretSeen(page)).toBe(false);
 });
 
-test('090 R1: Wortmeldung registrieren (Name) — moderation tippt, Wechsel zu admin (darf auch registrieren): Dialog zu, neu geöffnet leer', async ({
+test('090 R1: Wortmeldung registrieren (Name) — moderation tippt, Wechsel zu einer zweiten Person des Versammlungsbüros: Dialog zu, neu geöffnet sichtbar und leer', async ({
   page,
 }) => {
   await page.goto('/speakers');
@@ -450,28 +499,31 @@ test('090 R1: Wortmeldung registrieren (Name) — moderation tippt, Wechsel zu a
   await page.getByTestId('speaker-register').click();
   await page.getByTestId('speaker-register-name').fill(DRAFT);
 
-  await switchActor(page, 'admin');
+  await switchToPerson(page, SECOND_MODERATION);
   await expect(page.getByTestId('speaker-register')).toBeVisible();
   await expect(page.getByTestId('speaker-register-name')).toHaveCount(0);
   await watchForSecret(page, DRAFT);
   await page.getByTestId('speaker-register').click();
   await expect.poll(() => valueOrAbsent(page, 'speaker-register-name')).toBe('');
+  await expectVisibleAndEmpty(page, 'speaker-register-name');
   expect(await secretSeen(page)).toBe(false);
 });
 
-test('090 R1: Nummer im Zusammenführen-Dialog — capture tippt, Wechsel zu admin (darf auch zusammenführen): Dialog zu, neu geöffnet leer', async ({
+test('090 R1: Nummer im Zusammenführen-Dialog — capture tippt, Wechsel zu moderation (darf auch zusammenführen): Dialog zu, neu geöffnet sichtbar und leer', async ({
   page,
 }) => {
   await answersWith(page, 'capture', 'assigned');
   await page.getByTestId('answer-merge').click();
   await page.getByTestId('answer-merge-target').fill('F-0001');
 
-  await switchActor(page, 'admin');
+  // Scheibe 040a: moderation holds question.merge (permissions.ts); the administration no longer does.
+  await switchActor(page, 'moderation');
   await expect(page.getByTestId('answer-merge')).toBeVisible();
   await expect(page.getByTestId('answer-merge-target')).toHaveCount(0);
   await watchForSecret(page, 'F-0001');
   await page.getByTestId('answer-merge').click();
   await expect.poll(() => valueOrAbsent(page, 'answer-merge-target')).toBe('');
+  await expectVisibleAndEmpty(page, 'answer-merge-target');
   expect(await secretSeen(page)).toBe(false);
 });
 

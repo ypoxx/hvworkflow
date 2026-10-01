@@ -69,21 +69,22 @@ describe('Scheibe 025: kanonische Jahrgangsrouten', () => {
       expect(response.status, path).toBe(200);
     }
     const listTag = (await req(app, 'GET', `${base}/speakers`, { actor: ACTOR.admin })).headers.get('ETag')!;
+    // Scheibe 040a: speaker writes are moderation's, capture is capture's; admin keeps the agenda.
     const registered = await req(app, 'POST', `${base}/speakers`, {
-      actor: ACTOR.admin, headers: { 'If-Match': listTag },
+      actor: ACTOR.moderation, headers: { 'If-Match': listTag },
       body: { displayName: 'Zweite Testperson', round: 1 },
     });
     expect(registered.status).toBe(201);
     const speaker = await registered.json() as { id: string; version: number };
     const speakerId = speaker.id;
     const reordered = await req(app, 'PUT', `${base}/speakers/order`, {
-      actor: ACTOR.admin, headers: { 'If-Match': registered.headers.get('ETag')! },
+      actor: ACTOR.moderation, headers: { 'If-Match': registered.headers.get('ETag')! },
       body: { round: 1, speakerIds: [speakerId, 'speaker-1'] },
     });
     expect(reordered.status).toBe(200);
     const currentSpeaker = await req(app, 'GET', `/v1/speakers/${speakerId}`, { actor: ACTOR.admin });
     const captured = await req(app, 'POST', `${base}/contributions`, {
-      actor: ACTOR.admin, headers: { 'If-Match': currentSpeaker.headers.get('ETag')! },
+      actor: ACTOR.capture, headers: { 'If-Match': currentSpeaker.headers.get('ETag')! },
       body: { speakerId, text: 'Redeinhalt', source: 'manual' },
     });
     expect(captured.status).toBe(201);

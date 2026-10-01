@@ -89,7 +89,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     let id = 0;
     const instance = createApp({ demoEnabled: true, postgres: pool,
       clock: () => new Date('2027-04-20T10:15:00.000Z'), idGenerator: () => `t024-${++id}` });
-    const json = { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json' };
+    const json = { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json' };
     const list = await instance.request(`/v1/meetings/${meetingId}/speakers`, { headers: { 'X-Actor': ACTOR.admin } });
     const tag = list.headers.get('ETag')!;
 
@@ -148,7 +148,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
           { headers: { 'X-Actor': ACTOR.admin } })).headers.get('ETag')!;
         const write = (instance: typeof one, name: string) => Promise.resolve(instance.request(
           `/v1/meetings/${meetingId}/speakers`, { method: 'POST',
-            headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+            headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag },
             body: JSON.stringify({ displayName: name, round: 1 }) }));
         const results = await Promise.all(round % 2 === 0
           ? [write(one, `A${round}`), write(two, `B${round}`)] : [write(two, `B${round}`), write(one, `A${round}`)]);

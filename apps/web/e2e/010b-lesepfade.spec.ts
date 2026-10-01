@@ -740,8 +740,9 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
-  // admin may deliver, and may write something unrelated to the stage (a Wortmeldung) below.
-  await asRole(page, 'admin');
+  // podium delivers (Scheibe 040a: the administration no longer does); the unrelated write below
+  // (a Wortmeldung) comes from a second, synthetic person of the Versammlungsbüro.
+  await asRole(page, 'podium');
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
@@ -770,13 +771,27 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
   // A new event bumps `version` for the same actor, and that reload fails. Review round 5: this
   // used to be a role switch podium → admin; since Codex P2-B on 948a721 an actor change drops the
   // previous actor's record on purpose, so the failed reload is now caused by an ordinary event.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  // Scheibe 040a: the event is written by `u-mod-2`, swapped in and restored around the synchronous
+  // part of the in-process write (as `unrelatedEvent` in 010c) — the view never sees another actor.
+  await page.evaluate(async ([url, actorUrl]) => {
+    const { api } = (await import(/* @vite-ignore */ url!)) as { api: Wrapped };
+    const actorModule = (await import(/* @vite-ignore */ actorUrl!)) as {
+      getActor: () => unknown;
+      setActor: (actor: unknown) => void;
+    };
     const meeting = (await api['getMeeting']!()) as { speakerListVersion: number };
-    await api['registerSpeaker']!({ displayName: 'Testperson Runde 5' }, {
-      ifMatch: `"v${meeting.speakerListVersion}"`,
-    });
-  }, API_MODULE);
+    const before = actorModule.getActor();
+    actorModule.setActor({ id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' });
+    let written: Promise<unknown>;
+    try {
+      written = api['registerSpeaker']!({ displayName: 'Testperson Runde 5' }, {
+        ifMatch: `"v${meeting.speakerListVersion}"`,
+      });
+    } finally {
+      actorModule.setActor(before);
+    }
+    await written;
+  }, [API_MODULE, ACTOR_MODULE] as const);
   await expect(toasts(page)).toHaveCount(1);
   await expect(currentNumber).toBeVisible();
 

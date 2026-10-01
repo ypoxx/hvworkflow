@@ -146,21 +146,24 @@ describe('Scheibe 034a: fixed values and the order of the time limits', () => {
   });
 });
 
+// Scheibe 040a: a second subject that may register speakers (the administration may not any more).
+const MOD2 = 'mod2:moderation';
+
 describe('Scheibe 034a: limits per subject (T-G1-D-01, T-G3-D-02)', () => {
   it('answers the 61st write of a subject in a window with 429 and the rest of the window, without an event or a key', async () => {
     const { app, eventCount, time } = await harness();
     // 59 stale writes (412) and one accepted write: each counts, whatever the answer.
     for (let i = 0; i < 59; i += 1) {
-      expect((await registerSpeaker(app, ACTOR.admin, '"v999"', 'x')).status).toBe(412);
+      expect((await registerSpeaker(app, MOD2, '"v999"', 'x')).status).toBe(412);
     }
     const tag = await speakerTag(app, ACTOR.moderation);
     const ok = await req(app, 'POST', '/v1/speakers', { actor: ACTOR.moderation,
       headers: { 'If-Match': tag, 'Idempotency-Key': 'key-1' }, body: { displayName: 'Erste' } });
     expect(ok.status).toBe(201);
-    // the moderation subject has its own counter; admin used 59, so its 60th and 61st decide
-    expect((await registerSpeaker(app, ACTOR.admin, '"v999"', 'x')).status).toBe(412);
+    // the moderation subject has its own counter; the second one used 59, so its 60th and 61st decide
+    expect((await registerSpeaker(app, MOD2, '"v999"', 'x')).status).toBe(412);
     const before = eventCount();
-    const limited = await req(app, 'POST', '/v1/speakers', { actor: ACTOR.admin,
+    const limited = await req(app, 'POST', '/v1/speakers', { actor: MOD2,
       headers: { 'If-Match': await speakerTag(app), 'Idempotency-Key': 'key-2' }, body: { displayName: 'Zweite' } });
     expect(limited.status).toBe(429);
     expect(limited.headers.get('Retry-After')).toBe('45');
@@ -169,7 +172,7 @@ describe('Scheibe 034a: limits per subject (T-G1-D-01, T-G3-D-02)', () => {
     expect(problem).not.toHaveProperty('ruleId');
     expect(eventCount()).toBe(before);
     time.ms += 60_000; // the next window: the same key was never consumed
-    const again = await req(app, 'POST', '/v1/speakers', { actor: ACTOR.admin,
+    const again = await req(app, 'POST', '/v1/speakers', { actor: MOD2,
       headers: { 'If-Match': await speakerTag(app), 'Idempotency-Key': 'key-2' }, body: { displayName: 'Andere Person' } });
     expect(again.status).toBe(201);
     expect(eventCount()).toBe(before + 1);
@@ -177,10 +180,10 @@ describe('Scheibe 034a: limits per subject (T-G1-D-01, T-G3-D-02)', () => {
 
   it('counts per subject, independent of the role: another subject and another role are untouched', async () => {
     const { app } = await harness({ limits: { writePerSubject: 2 } });
-    for (let i = 0; i < 2; i += 1) expect((await registerSpeaker(app, ACTOR.admin, '"v999"', 'x')).status).toBe(412);
-    expect((await registerSpeaker(app, ACTOR.admin, '"v999"', 'x')).status).toBe(429);
+    for (let i = 0; i < 2; i += 1) expect((await registerSpeaker(app, MOD2, '"v999"', 'x')).status).toBe(412);
+    expect((await registerSpeaker(app, MOD2, '"v999"', 'x')).status).toBe(429);
     // the counter belongs to the actor id, not the role: the same id under another role is still limited
-    expect((await registerSpeaker(app, 'admin:moderation', '"v999"', 'x')).status).toBe(429);
+    expect((await registerSpeaker(app, 'mod2:approver', '"v999"', 'x')).status).toBe(429);
     expect((await registerSpeaker(app, ACTOR.moderation, '"v999"', 'x')).status).toBe(412);
     expect((await registerSpeaker(app, ACTOR.capture, '"v999"', 'x')).status).toBe(403);
   });
@@ -188,19 +191,19 @@ describe('Scheibe 034a: limits per subject (T-G1-D-01, T-G3-D-02)', () => {
   it('answers the 1 201st read of a subject with 429; reads and writes have separate counters', async () => {
     const { app } = await harness();
     for (let i = 0; i < 1_200; i += 1) {
-      const res = await app.request('/v1/meeting', { headers: { 'X-Actor': ACTOR.admin } });
+      const res = await app.request('/v1/meeting', { headers: { 'X-Actor': MOD2 } });
       if (res.status !== 200) throw new Error(`read ${i + 1} answered ${res.status}`);
     }
-    const limited = await req(app, 'GET', '/v1/meeting', { actor: ACTOR.admin });
+    const limited = await req(app, 'GET', '/v1/meeting', { actor: MOD2 });
     expect(limited.status).toBe(429);
     expect(limited.headers.get('Retry-After')).toBe('45');
-    expect((await registerSpeaker(app, ACTOR.admin, '"v999"', 'x')).status).toBe(412);
+    expect((await registerSpeaker(app, MOD2, '"v999"', 'x')).status).toBe(412);
     expect((await app.request('/v1/meeting', { headers: { 'X-Actor': ACTOR.moderation } })).status).toBe(200);
   });
 
   it('logs every rejection of a subject individually (no protocol exception)', async () => {
     const { app, lines } = await harness({ limits: { writePerSubject: 1 } });
-    for (let i = 0; i < 4; i += 1) await registerSpeaker(app, ACTOR.admin, '"v999"', 'x');
+    for (let i = 0; i < 4; i += 1) await registerSpeaker(app, MOD2, '"v999"', 'x');
     const rows = lines();
     expect(rows.map((row) => row.status)).toEqual([412, 429, 429, 429]);
     expect(rows[1]!.subjectHash).toBeTruthy();

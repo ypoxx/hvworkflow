@@ -127,12 +127,13 @@ describe('read rights over HTTP (slice 010)', () => {
   });
 
   it('404 precedence (Festlegung 3): podium may still deliverQuestion on a staged question although it cannot read it', async () => {
-    // Drive one question to `staged` under admin, so the delivery below is deterministic regardless
-    // of the random seed corpus (podium track: classify -> legal clearance -> staged).
+    // Drive one question to `staged`, so the delivery below is deterministic regardless of the random
+    // seed corpus (podium track: classify -> legal clearance -> staged). Scheibe 040a: coordination
+    // classifies and approver stages; the administration no longer does either.
     const capturedRes = await req(app, 'GET', '/v1/questions?status=captured&limit=1', { actor: ACTOR.admin });
     const q = (await capturedRes.json()).items[0];
     const classifyRes = await req(app, 'POST', `/v1/questions/${q.id}/classification`, {
-      actor: ACTOR.admin,
+      actor: 'coord:coordination',
       headers: { 'If-Match': `"v${q.version}"` },
       body: { track: 'podium' },
     });
@@ -146,7 +147,7 @@ describe('read rights over HTTP (slice 010)', () => {
     expect(clearanceRes.status).toBe(200);
     const cleared = await clearanceRes.json();
     const stageRes = await req(app, 'POST', `/v1/questions/${classified.id}/staging`, {
-      actor: ACTOR.admin, headers: { 'If-Match': `"v${cleared.version}"` },
+      actor: ACTOR.approver, headers: { 'If-Match': `"v${cleared.version}"` },
     });
     const staged = await stageRes.json();
     expect(staged.status).toBe('staged');

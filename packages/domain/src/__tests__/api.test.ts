@@ -192,7 +192,7 @@ describe('invariants', () => {
     })) as NewEvent[]);
     let nextId = 0;
     const scoped = (meetingId: string) => createInProcessApi({
-      store: sharedStore, meetingId, actor: () => actors.admin!,
+      store: sharedStore, meetingId, actor: () => actors.moderation!,
       clock: () => new Date(at), idGenerator: () => `speaker-${++nextId}`,
     });
     const firstApi = scoped('hv-a');
@@ -205,7 +205,9 @@ describe('invariants', () => {
   });
 
   it('R-IDEM-01: meeting and key delimiters cannot alias another log scope', async () => {
-    const meetingA = 'hv|admin|registerSpeaker|x';
+    // Scheibe 040a: moderation registers (the administration writes no content); the delimiter
+    // strings follow the acting id `mod`, as they followed `admin` before.
+    const meetingA = 'hv|mod|registerSpeaker|x';
     const meetingB = 'hv';
     const sharedStore = createInMemoryEventStore();
     sharedStore.append([meetingA, meetingB].map((meetingId, index) => ({
@@ -215,14 +217,14 @@ describe('invariants', () => {
     })) as NewEvent[]);
     let nextId = 0;
     const scoped = (meetingId: string) => createInProcessApi({
-      store: sharedStore, meetingId, actor: () => actors.admin!,
+      store: sharedStore, meetingId, actor: () => actors.moderation!,
       clock: () => new Date('2027-04-20T10:15:00.000Z'), idGenerator: () => `speaker-${++nextId}`,
     });
     const firstApi = scoped(meetingA);
     const secondApi = scoped(meetingB);
     const first = await firstApi.registerSpeaker({ displayName: 'Person A' }, { idempotencyKey: 'y', ifMatch: etagOf((await firstApi.getMeeting()).speakerListVersion) });
     const second = await secondApi.registerSpeaker({ displayName: 'Person B' },
-      { idempotencyKey: 'x|admin|registerSpeaker|y', ifMatch: etagOf((await secondApi.getMeeting()).speakerListVersion) });
+      { idempotencyKey: 'x|mod|registerSpeaker|y', ifMatch: etagOf((await secondApi.getMeeting()).speakerListVersion) });
     expect(second.id).not.toBe(first.id);
     expect(sharedStore.all().filter((event) => event.type === 'SpeakerRegistered').map((event) => event.meetingId))
       .toEqual([meetingA, meetingB]);
@@ -625,9 +627,12 @@ describe('read rights (slice 010)', () => {
       expect(problem.detail).toBe('Transition not allowed.');
     }
 
-    as(actors.admin!); // holds question.deliver and unrestricted question.read
+    // Scheibe 040a: no role holds question.deliver together with question.read any more (admin lost
+    // deliver). The reader half uses approver, who holds question.stage and unrestricted question.read;
+    // stage allows only 'approved'/'classified', so 'captured' is the same R-TRANS-00 conflict.
+    as(actors.approver!);
     try {
-      await api.deliverQuestion(captured.id);
+      await api.stageQuestion(captured.id, { ifMatch: etagOf(captured.version) });
       expect.fail('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ApiProblem);
@@ -742,13 +747,13 @@ describe('four-eyes approval R-GUARD-06 (slice 021a)', () => {
     expect((await api.getQuestion(q.id)).status).toBe('in_review');
   });
 
-  it('admin drafts and approves: 409 R-GUARD-06 — no role bypasses the guard', async () => {
+  // Scheibe 040a: the administration may neither draft nor approve any more, so it answers 403
+  // R-PERM-01 here. "No actor bypasses the guard" is carried by the legal case above and the table
+  // probe in transitions.test.ts (R-GUARD-06, same id under another role).
+  it('admin drafts: 403 R-PERM-01 — the administration writes no answer (Scheibe 040a)', async () => {
     const q = await assignedTextQuestion();
-    await draftAs(actors.admin!, q.id, 'Entwurf von Admin.');
-    as(actors.admin!);
-    await api.submitForReview(q.id, { ifMatch: etagOf((await api.getQuestion(q.id)).version) });
     const before = store.all().length;
-    await expect(api.approveQuestion(q.id, 1, { ifMatch: etagOf((await api.getQuestion(q.id)).version) })).rejects.toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+    await expect(draftAs(actors.admin!, q.id, 'Entwurf von Admin.')).rejects.toMatchObject({ status: 403, ruleId: 'R-PERM-01' });
     expect(store.all().length).toBe(before);
   });
 

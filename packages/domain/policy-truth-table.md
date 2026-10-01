@@ -160,28 +160,28 @@ one answer version; podium-track rows are marked separately.
 | podium | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
 | podium | merged | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
 | podium | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
-| admin | captured | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | captured (podium) | ✓ | · | ✓ | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | classified | ✓ | · | ✓ | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | classified (podium) | ✓ | · | ✓ | · | · | · | · | ✓ | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | assigned | ✓ | · | · | ✓ | ✓ | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | assigned (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | answer_drafted | ✓ | · | · | · | ✓ | ✓ | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | answer_drafted (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ | ✓ | · |
-| admin | in_review | ✓ | · | · | · | ✓ | · | ✓ | ✓ | ✓ | · | · | · | ✓ | · | ✓ | · |
-| admin | in_review (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
-| admin | approved | ✓ | · | · | · | ✓ | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
-| admin | approved (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | ✓ | · |
-| admin | staged | ✓ | · | · | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
-| admin | staged (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | ✓ | · | ✓ | · | ✓ | · |
-| admin | delivered | ✓ | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
-| admin | delivered (podium) | ✓ | · | · | · | · | · | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | ✓ |
-| admin | closed | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
-| admin | closed (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
-| admin | withdrawn | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
-| admin | withdrawn (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
-| admin | merged | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
-| admin | merged (podium) | ✓ | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | classified | · | · | · | ✓ | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | classified (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | assigned | · | · | · | ✓ | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | assigned (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | answer_drafted | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | answer_drafted (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | in_review | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | in_review (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | approved | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | approved (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | staged | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | staged (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+| admin | delivered | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | ✓ |
+| admin | delivered (podium) | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | ✓ | ✓ |
+| admin | closed | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+| admin | closed (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | ✓ |
+| admin | withdrawn | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | withdrawn (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | merged | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+| admin | merged (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
 | observer | captured | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
 | observer | captured (podium) | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
 | observer | classified | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
@@ -254,3 +254,20 @@ role management is limited to administration. Both are independent of question s
 | podium | ✓ | · |
 | admin | · | ✓ |
 | observer | · | · |
+
+# Policy truth table — Role × Wortmeldung, Erfassung und Demo
+
+Scheibe 040a: rights on speaker requests, contribution capture and the demo seed; independent of
+question status. The administration holds none of the writing ones.
+
+| Role | speaker.register | speaker.reorder | speaker.update | contribution.capture | contribution.claim | demo.seed |
+|---|---|---|---|---|---|---|
+| moderation | ✓ | ✓ | ✓ | · | · | · |
+| capture | · | · | · | ✓ | ✓ | · |
+| coordination | · | · | · | · | · | · |
+| expert | · | · | · | · | · | · |
+| legal | · | · | · | · | · | · |
+| approver | · | · | · | · | · | · |
+| podium | · | · | · | · | · | · |
+| admin | · | · | · | · | · | ✓ |
+| observer | · | · | · | · | · | · |

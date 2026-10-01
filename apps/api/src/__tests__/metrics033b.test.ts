@@ -44,14 +44,15 @@ async function seeded(extra: Parameters<typeof createApp>[0] = {}) {
 }
 
 /** Capture one contribution and one question through the API; the write tags come from the responses. */
-async function addQuestion(app: App, admin: string, contributionText: string, questionText: string) {
-  const list = await req(app, 'GET', '/v1/speakers', { actor: admin });
+/** Scheibe 040a: the writer is a capture actor; the administration captures nothing any more. */
+async function addQuestion(app: App, writer: string, contributionText: string, questionText: string) {
+  const list = await req(app, 'GET', '/v1/speakers', { actor: writer });
   const speakers = await list.json() as { id: string; displayName: string; personId: string; version: number }[];
-  const made = await req(app, 'POST', '/v1/contributions', { actor: admin,
+  const made = await req(app, 'POST', '/v1/contributions', { actor: writer,
     headers: { 'If-Match': `"v${speakers[0]!.version}"` }, body: { speakerId: speakers[0]!.id, text: contributionText } });
   expect(made.status).toBe(201);
   const contribution = await made.json() as { id: string };
-  const captured = await req(app, 'POST', `/v1/contributions/${contribution.id}/questions`, { actor: admin,
+  const captured = await req(app, 'POST', `/v1/contributions/${contribution.id}/questions`, { actor: writer,
     headers: { 'If-Match': made.headers.get('ETag')! }, body: { questions: [{ text: questionText }] } });
   expect(captured.status).toBe(201);
   return speakers;
@@ -176,7 +177,7 @@ describe('Scheibe 033b: output is exactly the catalog (T-G3-I-03, T-G3-I-04, SC-
   it('contains no actor id, personId, subject id, display name or question text', async () => {
     const { app } = await seeded();
     const admin = `${SYNTHETIC_ACTOR}:admin`;
-    const speakers = await addQuestion(app, admin, `${MARKER} eins zwei drei`, MARKER);
+    const speakers = await addQuestion(app, `${SYNTHETIC_ACTOR}:capture`, `${MARKER} eins zwei drei`, MARKER);
     const events = await (await req(app, 'GET', '/v1/events?limit=1000', { actor: admin })).json() as
       { items: { type: string; actor: { id: string }; subjectId: string; personId?: string }[] };
     const body = await (await req(app, 'GET', '/metrics', { headers: bearer(TOKEN) })).text();
@@ -219,11 +220,11 @@ describe('Scheibe 033b: T-G2-D-03 result cache with one computation', () => {
 
   it('shows a new question only after the window (values are cached, the log is not the source)', async () => {
     const { app, advance } = await seeded();
-    const admin = `${SYNTHETIC_ACTOR}:admin`;
+    const writer = `${SYNTHETIC_ACTOR}:capture`;
     const value = async (): Promise<number> => Number(/^hv_questions_captured_last_5m\{[^}]*\} (\d+)$/m
       .exec(await (await req(app, 'GET', '/metrics', { headers: bearer(TOKEN) })).text())![1]);
     const before = await value();
-    await addQuestion(app, admin, 'Synthetischer Text', 'Synthetisch');
+    await addQuestion(app, writer, 'Synthetischer Text', 'Synthetisch');
     advance(9_000);
     expect(await value()).toBe(before);
     advance(1_000);

@@ -301,7 +301,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     await warm(instance, infos);
     const tag = (await speakers(instance)).headers.get('ETag')!;
     const written = await instance.request(`/v1/meetings/${meetingId}/speakers`, {
-      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+      method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag },
       body: JSON.stringify({ displayName: 'Eigene Schreibung', round: 1 }),
     });
     expect(written.status).toBe(201);
@@ -351,7 +351,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const tag = (await speakers(instance)).headers.get('ETag')!;
     await owner.query(`UPDATE events SET id = 'different-index-id' WHERE seq = 2`);
     const written = await instance.request(`/v1/meetings/${meetingId}/speakers`, {
-      method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+      method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag },
       body: JSON.stringify({ displayName: 'Nie gespeichert', round: 1 }),
     });
     await expectIntegrityFailure(written, 2, ['different-index-id', 'Nie gespeichert']);
@@ -384,7 +384,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
   }
 
   const postSpeaker = (instance: TestApp, displayName: string, tag: string) => instance.request(`/v1/meetings/${meetingId}/speakers`, {
-    method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag },
+    method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag },
     body: JSON.stringify({ displayName, round: 1 }),
   });
 
@@ -520,7 +520,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('takt-033
     const write = async (index: number): Promise<Response> => {
       const tag = (await speakers(instance)).headers.get('ETag')!;
       return instance.request(`/v1/meetings/${meetingId}/speakers`, {
-        method: 'POST', headers: { 'X-Actor': ACTOR.admin, 'Content-Type': 'application/json', 'If-Match': tag,
+        method: 'POST', headers: { 'X-Actor': ACTOR.moderation, 'Content-Type': 'application/json', 'If-Match': tag,
           'Idempotency-Key': `parallel-${index}` },
         body: JSON.stringify({ displayName: `Parallel ${index}`, round: 1 }),
       });

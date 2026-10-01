@@ -457,4 +457,45 @@ describe('negative cases and idempotency', () => {
     expectValid('classifyQuestion', 403, problem, 'application/problem+json');
     expect(problem.ruleId).toBe('R-PERM-01');
   });
+
+  // Scheibe 040a, Test 10 (T-G1-E-01: the operations called directly, past the interface): the
+  // administration writes no content, still reads, and cannot assign a role to itself.
+  it('403/409: admin over HTTP — content writes are R-PERM-01, reading works, self-assignment is R-ADM-07 (Scheibe 040a)', async () => {
+    const pick = async (status: string) => {
+      const listed = await req(app, 'GET', `/v1/questions?status=${status}&limit=1`, { actor: ACTOR.admin });
+      expect(listed.status).toBe(200);
+      return (await listed.json()).items[0] as { id: string; version: number; answers: { version: number }[] };
+    };
+    const assigned = await pick('assigned');
+    const inReview = await pick('in_review');
+    const staged = await pick('staged');
+    const writes: [string, string, Record<string, string>, unknown][] = [
+      ['registerSpeaker', '/v1/speakers', { 'If-Match': await speakerListTag(app) }, { displayName: 'Admin 040a' }],
+      ['draftAnswer', `/v1/questions/${assigned.id}/answers`, { 'If-Match': `"v${assigned.version}"` }, { text: 'Antwort der Administration.', sources: [] }],
+      ['approveQuestion', `/v1/questions/${inReview.id}/approvals`, { 'If-Match': `"v${inReview.version}"` },
+        { answerVersion: inReview.answers.at(-1)?.version ?? 1 }],
+      ['deliverQuestion', `/v1/questions/${staged.id}/delivery`, { 'If-Match': `"v${staged.version}"` }, undefined],
+    ];
+    for (const [operation, path, headers, body] of writes) {
+      const before = (await (await req(app, 'GET', '/v1/events?limit=1', { actor: ACTOR.admin })).json()).lastSeq;
+      const res = await req(app, 'POST', path, { actor: ACTOR.admin, headers, ...(body !== undefined ? { body } : {}) });
+      expect(res.status, operation).toBe(403);
+      const problem = await res.json();
+      expectValid(operation, 403, problem, 'application/problem+json');
+      expect(problem.ruleId, operation).toBe('R-PERM-01');
+      expect((await (await req(app, 'GET', '/v1/events?limit=1', { actor: ACTOR.admin })).json()).lastSeq, operation).toBe(before);
+    }
+
+    expect((await req(app, 'GET', '/v1/questions?limit=1', { actor: ACTOR.admin })).status).toBe(200);
+
+    const meetingId = (await (await req(app, 'GET', '/v1/meeting', { actor: ACTOR.admin })).json()).id as string;
+    const adminId = ACTOR.admin.split(':')[0]!;
+    const self = await req(app, 'POST', `/v1/meetings/${meetingId}/role-assignments`, {
+      actor: ACTOR.admin, body: { subjectId: adminId, role: 'approver' },
+    });
+    expect(self.status).toBe(409);
+    const conflict = await self.json();
+    expectValid('assignRole', 409, conflict, 'application/problem+json');
+    expect(conflict.ruleId).toBe('R-ADM-07');
+  });
 });

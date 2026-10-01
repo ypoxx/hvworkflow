@@ -3,7 +3,7 @@
  * principle 10) and must not start depending on the backlog's machinery.
  */
 import { etagOf } from '@hv/domain';
-import type { AnswerVersion, Question, StageView } from '@hv/domain';
+import type { AnswerVersion, Permission, Question, StageView } from '@hv/domain';
 
 /** Wall clock of the hall, 24 hours, zero padded — the form an approval is quoted in. */
 export function clockTime(iso: string): string {
@@ -201,4 +201,23 @@ export function returnWrite(
   reason: string,
 ): { questionId: string; reason: string; ifMatch: string } {
   return { questionId: target.id, reason, ifMatch: etagOf(target.version) };
+}
+
+/** Points #3/#9 (feedback, slice 020): a person who may only read out never has any of these. */
+const WORK_ACTIONS: readonly Permission[] = [
+  'question.capture',
+  'question.classify',
+  'answer.draft',
+  'question.approve',
+];
+
+/**
+ * Point #3/#9: "Nur Bühne" as the default of a role that only reads answers out. Derived the same
+ * way `deskActions` is derived in `features/capture/Page.tsx` — from `_actions` of the Bühnenfragen
+ * themselves (never from the role name, AGENTS.md rule 4): the rights bundle carries the read-out
+ * permission and none of the drafting, classifying, capturing or approving ones. Moved unchanged
+ * from `Page.tsx` in Scheibe 040a so it can be tested with synthetic action lists.
+ */
+export function stageOnlyByRights(actions: readonly Permission[]): boolean {
+  return actions.includes('question.deliver') && !WORK_ACTIONS.some((a) => actions.includes(a));
 }

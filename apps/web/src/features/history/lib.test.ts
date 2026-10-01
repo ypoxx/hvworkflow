@@ -6,12 +6,14 @@
  * here.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Actor, HvApi, Question, QuestionFilter, ReadEvent } from '@hv/domain';
+import type { Actor, HvApi, Question, QuestionFilter, ReadEvent, Role } from '@hv/domain';
+import { ROLE_PERMISSIONS } from '@hv/domain';
 import { createLiveStore } from '../../api/liveStore';
 import {
   advanceStream,
   createDetailProblemGate,
   extendWindow,
+  isAdministrativeRole,
   isCurrentLoad,
   isReadForbidden,
   keyBelongsTo,
@@ -538,5 +540,28 @@ describe('tableRows (takt-038 (e))', () => {
     const three = tableRows(window, 3);
     expect(three.rows).toHaveLength(450);
     expect(three.hasOlder).toBe(false);
+  });
+});
+
+/**
+ * Scheibe 040a, Test 12: the history highlights events of a role-managing role (Rechtekonzept §4). The
+ * expectation is computed from the rights data in a loop, never from a list of role names (AGENTS.md R4).
+ */
+describe('isAdministrativeRole (Scheibe 040a)', () => {
+  it('is true exactly for the roles whose bundle holds admin.roles.manage', () => {
+    const roles = Object.keys(ROLE_PERMISSIONS) as Role[];
+    let managing = 0;
+    for (const role of roles) {
+      const expected = ROLE_PERMISSIONS[role].includes('admin.roles.manage');
+      if (expected) managing += 1;
+      expect(isAdministrativeRole(role), role).toBe(expected);
+    }
+    // Both branches are exercised: at least one managing role and at least one other.
+    expect(managing).toBeGreaterThan(0);
+    expect(managing).toBeLessThan(roles.length);
+  });
+
+  it('is false for a role outside the rights data', () => {
+    expect(isAdministrativeRole('nobody' as Role)).toBe(false);
   });
 });

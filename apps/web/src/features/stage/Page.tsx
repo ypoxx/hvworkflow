@@ -39,19 +39,12 @@ import {
   readVerdict,
   returnTargetOf,
   returnWrite,
+  stageOnlyByRights,
 } from './lib';
 import type { DeliverLock, KeyedRead, ReadVerdict, ReturnTarget } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
-
-/** Points #3/#9 (feedback, slice 020): a person who may only read out never has any of these. */
-const WORK_ACTIONS: readonly Permission[] = [
-  'question.capture',
-  'question.classify',
-  'answer.draft',
-  'question.approve',
-];
 
 /**
  * takt-008: the question a "Vorgelesen, weiter" was written against, as it was read (`DeliverLock`,
@@ -73,16 +66,6 @@ function loadStoredStageOnly(): boolean | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Point #3/#9: "Nur Bühne" as the default of a role that only reads answers out. Derived the same
- * way `deskActions` is derived in `features/capture/Page.tsx` — from `_actions` of the Bühnenfragen
- * themselves (never from the role name, AGENTS.md rule 4): the rights bundle carries the read-out
- * permission and none of the drafting, classifying, capturing or approving ones.
- */
-function stageOnlyByRights(actions: readonly Permission[]): boolean {
-  return actions.includes('question.deliver') && !WORK_ACTIONS.some((a) => actions.includes(a));
 }
 
 function loadStageContrast(): boolean {
