@@ -46,6 +46,32 @@ Peer-Auflösung von `@hono/node-server`). `pnpm audit:check` meldet den Hinweis 
 
 ## Bericht
 
-(folgt)
+```
+Slice: takt-041-hono-sicherheitspatch
+Done: hono in apps/api/package.json auf ^4.13.7 angehoben; Lockdatei löst hono 4.13.12 auf (nur hono und
+      @hono/node-server(hono@…) geändert, 8 Zeilen); kein Ausnahmeeintrag.
+Evidence: pnpm gates auf 8baff07 (sauberer Baum, Postgres-Variablen, Datenbank hv_t035b), Exit 0; pnpm audit:check grün
+Open: nichts.
+Touched: apps/api/package.json, pnpm-lock.yaml, docs/slices/takt-041-hono-sicherheitspatch.md
+```
+
+`pnpm audit:check` auf `8baff07`, wörtlich (der js-yaml-Hinweis ist die bestehende, unabgelaufene Ausnahme):
+
+```
+pnpm audit: 1 advisory(ies) found, all at "moderate"+ covered by an unexpired exception.
+```
+
+`pnpm gates` auf `8baff07`, Ausschnitt, wörtlich:
+
+```
+packages/domain test:       Tests  280 passed (280)
+apps/web test:       Tests  484 passed (484)
+apps/api test:       Tests  593 passed (593)
+slice-scope: 3 changed file(s), all within "docs/slices/takt-041-hono-sicherheitspatch.md"'s "Files allowed" list (2 pattern(s)).
+✓ built in 2.24s
+mark-test-run: wrote /home/user/wt/takt041/.claude/state/last-test-run (clean tree) at commit 8baff07, tree 6c004b563ba0…
+```
+
+Dieser Berichtsnachtrag ist ein reiner Doku-Commit (R2: kein neuer lokaler Lauf nötig).
 
 ## Review findings
