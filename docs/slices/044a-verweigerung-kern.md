@@ -169,7 +169,7 @@ Rechtsfreigabe ist in keinem Lesepfad mehr sichtbar. **Auf Standard gebaut:** AD
 
   | id | title | stageText (Formulierungsbaustein, Entwurf, ungeprüft) |
   |---|---|---|
-  | `aktg-131-3-nr1` | Nicht unerheblicher Nachteil für die Gesellschaft oder ein verbundenes Unternehmen | Zu dieser Frage gibt der Vorstand keine Auskunft, weil die Erteilung der Auskunft nach vernünftiger kaufmännischer Beurteilung geeignet ist, der Gesellschaft oder einem verbundenen Unternehmen einen nicht unerheblichen Nachteil zuzufügen. |
+  | `aktg-131-3-nr1` | Nach vernünftiger kaufmännischer Beurteilung nicht unerheblicher Nachteil für die Gesellschaft oder ein verbundenes Unternehmen | Zu dieser Frage gibt der Vorstand keine Auskunft, weil die Erteilung der Auskunft nach vernünftiger kaufmännischer Beurteilung geeignet ist, der Gesellschaft oder einem verbundenen Unternehmen einen nicht unerheblichen Nachteil zuzufügen. |
   | `aktg-131-3-nr2` | Steuerliche Wertansätze oder Höhe einzelner Steuern | Die Frage betrifft steuerliche Wertansätze oder die Höhe einzelner Steuern; hierzu gibt der Vorstand keine Auskunft. |
   | `aktg-131-3-nr3` | Unterschied zwischen Bilanzansatz und höherem Wert — nur, wenn nicht die Hauptversammlung den Jahresabschluss feststellt | Zum Unterschied zwischen dem Wert, mit dem Gegenstände in der Jahresbilanz angesetzt sind, und einem höheren Wert dieser Gegenstände gibt der Vorstand keine Auskunft. |
   | `aktg-131-3-nr4` | Bilanzierungs- und Bewertungsmethoden — nur, soweit die Angabe im Anhang für ein den tatsächlichen Verhältnissen entsprechendes Bild ausreicht, und nur, wenn nicht die Hauptversammlung den Jahresabschluss feststellt | Über die Bilanzierungs- und Bewertungsmethoden gibt der Vorstand keine weitere Auskunft, weil ihre Angabe im Anhang ausreicht, um ein den tatsächlichen Verhältnissen entsprechendes Bild der Vermögens-, Finanz- und Ertragslage der Gesellschaft zu vermitteln. |
@@ -218,7 +218,9 @@ Entscheidungen dazu:
   - Die Tabelle bleibt die einzige Quelle des Zielstatus (AGENTS.md R5): `build` erhält `to` aus `resolveTransition` und
     schreibt genau diesen Wert.
 - **Kennzahl der Rechtsprüfung** (`indicators.ts`): Ein `AnswerDrafted` mit `toStatus === 'in_review'` setzt
-  `inReviewSince` wie `QuestionSubmittedForReview` (Test 25).
+  `inReviewSince` wie `QuestionSubmittedForReview` (Test 26). Ein erneuter Vorschlag aus `in_review` (neue Version)
+  setzt `inReviewSince` neu; die 10-Minuten-Uhr beginnt also mit jeder neuen Version von vorn. Das ist gewollt: Die
+  Rechtsprüfung gilt der neuen Version.
 - **Nur Textpfade (R-GUARD-03).** Eine Podiumsfrage (`podium`) hat keine Antwortversion. Ihre Rechtsfreigabe ist
   versionslos (R-TRANS-14), und R-GUARD-07 prüft für sie nur „es gibt eine Freigabe“. Eine Verweigerung dort bräuchte
   eigene Zeilen für das Rechtstor. Standard: Die Koordination klassifiziert die Frage zuerst auf einen Textpfad um
@@ -294,7 +296,7 @@ zwei `check`-Funktionen verlöre eine davon aus Register und Szenariotest.
      sind keine 422, sondern R-GUARD-09 (409, 043a). Dass Validator und Kern hier verschiedene Status liefern, beschreibt
      044b im Vertrag (Hinweis).
   2. `transition(id, 'question.refuse.propose', opts, input, build)`: 404 bzw. 403 R-PERM-01, `If-Match` (412 bei
-     veralteter Version, kein Ereignis; Test 26), Tabelle (R-TRANS-00, R-GUARD-03, R-GUARD-09).
+     veralteter Version, kein Ereignis; Test 23), Tabelle (R-TRANS-00, R-GUARD-03, R-GUARD-09).
   3. `build` schreibt `AnswerDrafted` mit dieser Nutzlast:
      - `answer`, aus benannten Feldern: `version` = `answers.length + 1`, `text` getrimmt, `createdAt` = `now()` (R8),
        `createdBy` = `{ id, role }`, `sources` falls gesetzt, `answerKind`;
@@ -329,12 +331,16 @@ zwei `check`-Funktionen verlöre eine davon aus Register und Szenariotest.
   `viewQuestion` (etwa `{ stage: true }`), nicht als zweite Kopie der Ansicht.
 - **Ereignis-Lesepfad:** Die Begründung liegt im `pii`-Teil, den `maskEvent` schon entfernt. Zusätzlich erhält
   `MASKED_KEYS` (`stream.ts:169`) `refusalJustification` (doppelte Sicherung, falls ein künftiger Schreiber sie
-  außerhalb von `pii` ablegt) **und `note`**. Damit fehlen Begründung und Vermerk der Rechtsfreigabe in jedem `EventRead`
-  für jeden Leser: `getQuestionHistory`, `listEvents`, `subscribe` und `/stream`. Der Schnappschuss `refusalGround` bleibt
+  außerhalb von `pii` ablegt). Der Vermerk `note` kommt **nicht** in `MASKED_KEYS`, weil diese Liste rekursiv in jeder
+  Nutzlast wirkt; `maskEvent` entfernt ihn nur bei `QuestionLegalCleared` (nächster Punkt). Damit fehlen Begründung und
+  Vermerk der Rechtsfreigabe in jedem `EventRead` für jeden Leser: `getQuestionHistory`, `listEvents`, `subscribe` und `/stream`. Der Schnappschuss `refusalGround` bleibt
   sichtbar (Katalogdatum).
 - **Vermerk der Rechtsfreigabe (`QuestionLegalCleared.note`), sichere Voreinstellung:** Er wird für alle
-  Rechtsfreigaben maskiert, nicht nur für Verweigerungen; `maskEvent` kennt die Antwortart nicht. Die Projektion
-  `LegalClearance` erhält ihn **nicht**. Der Vermerk bleibt nur im gespeicherten Original (R7). `note` kommt sonst in keiner
+  Rechtsfreigaben maskiert, nicht nur für Verweigerungen; `maskEvent` kennt die Antwortart nicht. Umsetzung **eng**, nach
+  dem Vorbild des Sonderfalls `IdempotencyRecorded` in `maskEvent` (`stream.ts:187`): `if (event.type ===
+  'QuestionLegalCleared') delete payload.note`, mit Code-Kommentar zum Grund (Seitenkanal der Begründung, SG2). Ein
+  `note` in einer anderen Nutzlast (etwa der Notiz aus 046) bleibt davon unberührt; dort entscheidet die jeweilige
+  Scheibe. Die Projektion `LegalClearance` erhält ihn **nicht**. Der Vermerk bleibt nur im gespeicherten Original (R7). `note` kommt sonst in keiner
   Nutzlast vor (`events.ts`). Eine Lesefreigabe für Berechtigte ist Eigentümerfrage 4.
 - **Suche:** `questionMatches` nimmt `refusalJustification` nicht in den Suchtext auf. Der Wortlaut `text` bleibt
   durchsuchbar.
@@ -454,8 +460,8 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
 | „Kein Kommentar“ als Begründung oder leere Begründung (Recherche Z.64) | R-GUARD-09 trimmt; leer ist 409 | Test 5. Ein inhaltsleerer, nicht leerer Text („k. A.“) ist nicht abwehrbar; dafür sorgen Rechtsfreigabe und Freigabe durch zwei weitere, verschiedene Personen (R-GUARD-06, R-GUARD-14) |
 | Verweigerung als Antwort verkleidet: `legal` oder `expert` schreibt „dazu keine Angaben“ in eine normale Antwort, ohne Grund und ohne `refuse.approve` | nicht technisch abwehrbar (Inhalt); die Antwort braucht trotzdem Rechtsfreigabe und Freigabe | Restrisiko, benannt; Prüfliste je Pfad (059) und Soll-Ist (049) sind die Folgekontrollen |
 | `expert` verdrängt eine vorgeschlagene Verweigerung durch einen neuen Antwortentwurf (R-TRANS-03 aus `in_review`) | erlaubt (neueste Version gilt); die Antwort braucht erneut Rechtsfreigabe und Freigabe | Ereignisse `AnswerDrafted` mit Akteur und Antwortart in der Historie; Test 22; Eigentümerfrage 6 |
-| Massenhaft Verweigerungen vorschlagen, um Fragen zu verzögern | jede braucht Rechtsfreigabe und Freigabe durch zwei andere Personen | Historie je Frage; Kennzahl `questionsInLegalReviewOver10m` zählt Vorschläge mit (Test 25); Kennzahl „Verweigerungen je Pfad“ als Vorschlag an 053/087, nie je Person (6.6) |
-| Verweigerung bleibt in der Rechtsprüfung liegen, ohne dass die Betriebsauswertung es zeigt | `indicators.ts` setzt `inReviewSince` beim Vorschlag | Test 25 |
+| Massenhaft Verweigerungen vorschlagen, um Fragen zu verzögern | jede braucht Rechtsfreigabe und Freigabe durch zwei andere Personen | Historie je Frage; Kennzahl `questionsInLegalReviewOver10m` zählt Vorschläge mit (Test 26); Kennzahl „Verweigerungen je Pfad“ als Vorschlag an 053/087, nie je Person (6.6) |
+| Verweigerung bleibt in der Rechtsprüfung liegen, ohne dass die Betriebsauswertung es zeigt | `indicators.ts` setzt `inReviewSince` beim Vorschlag | Test 26 |
 
 **Zusammenspiel:**
 - **Freeze:** Rechte und Übergänge stehen im Freeze-Schnappschuss (040d). Eine spätere Änderung der Guards (etwa R-GUARD-08
@@ -510,8 +516,8 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
 | Begründung über die Suche erschlossen (T-G1-I-04) | nie im Suchtext | Test 15 |
 | Begründung über eine Wiederholung mit gleichem Idempotenzschlüssel gelesen | Schlüssel gilt je Akteur (`api.ts:599`); die historische Antwort maskiert nach aktuellem Leser | Test 14 (Wiederholung) |
 | Begründung einer älteren, durch eine Antwort verdrängten Verweigerung gelesen | Maskierung gilt für jede Version | Test 14 |
-| Rechtseinschätzung im Vermerk der Rechtsfreigabe (`QuestionLegalCleared.note`) als Seitenkanal der Begründung | `note` in `MASKED_KEYS`, nicht in der Projektion | Test 27; Mutationsprobe 15 |
-| Begründung im Zugriffslog oder in einer Fehlermeldung | Zugriffslog ohne Nutzdaten (ADR 0013); kein `detail` mit Text | Test 5, Test 6 und Test 26 prüfen `detail` |
+| Rechtseinschätzung im Vermerk der Rechtsfreigabe (`QuestionLegalCleared.note`) als Seitenkanal der Begründung | `maskEvent` entfernt `note` bei `QuestionLegalCleared`, nicht in der Projektion | Test 24; Mutationsprobe 15 |
+| Begründung im Zugriffslog oder in einer Fehlermeldung | Zugriffslog ohne Nutzdaten (ADR 0013); kein `detail` mit Text | Test 5, Test 6 und Test 23 prüfen `detail` |
 
 **Zusammenspiel:**
 - **Freeze:** Der Leserkreis ist Rechtedatum und steht damit im Schnappschuss (040d).
@@ -544,7 +550,11 @@ Lehre aus 040: Für jeden neuen Mechanismus stehen die Missbrauchsfälle und das
   - Die Schutzmaßnahme „Kein Zustand ohne Grund speicherbar“ bleibt stehen und erhält den Zusatz: „für Pfad B umgesetzt
     (R-GUARD-09); für Pfad A **nicht erfüllt**: kein zugeordneter Grund (Vertrag 0.4.0), Begründung Pflicht; offen bis
     Eigentümerfrage 3b / 044c“.
-  - Empfänger wie oben; Ablage der Begründung im `pii`-Teil; Verweis auf E14.
+  - Empfänger der Begründung, ausdrücklich in zwei Änderungen: **Podium entfällt** als Empfänger (es sieht nur Antwortart,
+    Grund und Wortlaut, nie die Begründung), **Koordination kommt hinzu** (`coordination` hält
+    `question.refuse.propose`). Neu: „Begründung: Recht, Koordination, Freigabe; Podium: nur Wortlaut, Antwortart und
+    Grund ab `staged`“.
+  - Ablage der Begründung im `pii`-Teil; Verweis auf E14.
 
 ## Nicht-Ziele
 
@@ -580,7 +590,7 @@ Kern:
 - `packages/domain/src/state.ts` (nur der Fall `AnswerDrafted`: `toStatus` mit Prüfung gegen `QUESTION_STATUSES`, Begründung aus `pii`, Schnappschuss nicht in die Projektion)
 - `packages/domain/src/indicators.ts` (nur: `AnswerDrafted` mit `toStatus === 'in_review'` setzt `inReviewSince`)
 - `packages/domain/src/api.ts` (nur: `HvApi` um drei Methoden, ihre Umsetzung, die Maskierung in `viewQuestion` und `getStage`; dazu der veraltete Kommentar in Zeile 925)
-- `packages/domain/src/stream.ts` (nur `MASKED_KEYS`: `refusalJustification` und `note`)
+- `packages/domain/src/stream.ts` (nur: `refusalJustification` in `MASKED_KEYS` und das Entfernen von `note` bei `QuestionLegalCleared` in `maskEvent`)
 - `packages/domain/src/index.ts` (nur Export des Katalogs)
 - `packages/domain/policy-truth-table.md` (nur regeneriert)
 - `docs/legal-trace.md` (nur regeneriert)
@@ -589,7 +599,7 @@ Tests im Kern:
 
 - `packages/domain/src/__tests__/refusal044a.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur: `GUARD_SCENARIOS` für die sechs Guards, Regeltests für R-TRANS-15/16, neuer Abschnitt „Role × Verweigerung“)
-- `packages/domain/src/__tests__/indicators*.test.ts` (nur der neue Fall aus Test 25)
+- `packages/domain/src/__tests__/indicators*.test.ts` (nur der neue Fall aus Test 26)
 - `packages/domain/src/__tests__/*.test.ts` (nur Erwartungen an `_actions`, an Rechtelisten, an den maskierten Vermerk `note` und an Zählungen von Regeln oder Rechten, die sich durch diese Spec ändern; jede andere Änderung ist ein Befund)
 - `apps/api/src/__tests__/*.test.ts` (dieselbe Einschränkung; keine neuen Tests der Operationen, die kommen mit 044b)
 
@@ -769,26 +779,28 @@ jedem abgewiesenen Aufruf bleibt `store.lastSeq()` gleich:
     - aus `delivered` zurückgegeben: dieselbe Folge; `QuestionDelivered` der ersten Verweigerung bleibt im Log.
 22. **Verdrängen durch eine Antwort:** `expert` entwirft aus `in_review` über einer Verweigerung → `answer_drafted`. Die
     Rechtsfreigabe entfällt. Die Verweigerungsversion bleibt in `answers`.
-26. **`If-Match`:** `proposeRefusal` und `approveRefusal` mit veralteter Version → 412, kein Ereignis, `detail` ohne Text.
-27. **Vermerk der Rechtsfreigabe:** `clearQuestionLegally` mit `note` (Antwort und Verweigerung) → das gespeicherte
+23. **`If-Match`:** `proposeRefusal` und `approveRefusal` mit veralteter Version → 412, kein Ereignis, `detail` ohne Text.
+24. **Vermerk der Rechtsfreigabe:** `clearQuestionLegally` mit `note` (Antwort und Verweigerung) → das gespeicherte
     Ereignis trägt `note`; `getQuestionHistory` als `legal`, `listEvents` als admin und `subscribe` liefern es ohne
-    `note`; `getQuestion` trägt keinen Vermerk.
+    `note`; `getQuestion` trägt keinen Vermerk. **Gegenprobe (Enge):** `maskEvent` auf ein konstruiertes Ereignis eines
+    anderen Typs mit `payload.note` lässt `note` stehen.
 
 `packages/domain/src/__tests__/transitions.test.ts`:
 
-23. `GUARD_SCENARIOS` für R-GUARD-08, -09, -11, -12, -13 und -14 (erfüllt und verletzt; R-GUARD-12 und -13 auch ohne
+25. `GUARD_SCENARIOS` für R-GUARD-08, -09, -11, -12, -13 und -14 (erfüllt und verletzt; R-GUARD-12 und -13 auch ohne
     Version). Regeltests für R-TRANS-15 und R-TRANS-16 (bestehende Prüfung „jede Regel-id hat einen Test“). Der neue
     Abschnitt „Role × Verweigerung“ ist genau die Tabelle aus „Wahrheitstabellen-Diff“.
 
 Test von `indicators.ts` (Datei nach Vor-dem-Bau-Punkt 11):
 
-25. Ein Vorschlag bei t0 auf einem laufenden Jahrgang: bei t0 + 11 min zählt `questionsInLegalReviewOver10m` die Frage,
+26. Ein Vorschlag bei t0 auf einem laufenden Jahrgang: bei t0 + 11 min zählt `questionsInLegalReviewOver10m` die Frage,
     bei t0 + 9 min nicht. Eine Frage, die vorher schon einmal in `in_review` war (alter `QuestionSubmittedForReview`),
-    zählt ab dem Vorschlag, nicht ab dem alten Zeitpunkt.
+    zählt ab dem Vorschlag, nicht ab dem alten Zeitpunkt. Ein zweiter Vorschlag aus `in_review` bei t0 + 8 min: bei
+    t0 + 11 min zählt die Frage nicht, bei t0 + 19 min zählt sie (die Uhr beginnt neu).
 
 `apps/web/src/api/http.test.ts`:
 
-24. Die drei Methoden senden Methode, Pfad und Body nach 0.4.0. Die beiden schreibenden senden `Idempotency-Key`, CSRF und
+27. Die drei Methoden senden Methode, Pfad und Body nach 0.4.0. Die beiden schreibenden senden `Idempotency-Key`, CSRF und
     `If-Match` wie `draftAnswer`.
 
 **Mutationsproben** (im Bericht mit „rot“ belegt, danach zurückgesetzt):
@@ -808,8 +820,8 @@ Test von `indicators.ts` (Datei nach Vor-dem-Bau-Punkt 11):
 12. R-GUARD-06 aus R-TRANS-16 entfernt → Test 10 (zweiter Fall) rot.
 13. R-GUARD-13 aus R-TRANS-16 entfernt → Test 11 (zweiter Fall) rot.
 14. R-GUARD-14 aus R-TRANS-16 entfernt → Test 10 (R-GUARD-14) rot.
-15. `note` aus `MASKED_KEYS` entfernt → Test 27 rot.
-16. `inReviewSince` bei `AnswerDrafted` nicht gesetzt → Test 25 rot.
+15. Das Entfernen von `note` in `maskEvent` gestrichen → Test 24 rot; `note` stattdessen in `MASKED_KEYS` (rekursiv) → Test 24 (Gegenprobe) rot.
+16. `inReviewSince` bei `AnswerDrafted` nicht gesetzt → Test 26 rot.
 17. Katalog nur flach eingefroren oder flach kopiert → Test 1 bzw. Test 19 rot.
 
 ## Akzeptanzkriterium
@@ -904,8 +916,8 @@ ADR 0012 (Eigentümerfrage 1)
    und Abschnitt 1 der Wahrheitstabelle.
 2. Die Maskierung ruft `can()` ohne Frage auf und gilt für jede Version und jede Schreibantwort. Prüfen: Test 14 und
    Mutationsprobe 1.
-3. Die Begründung steht im gespeicherten Ereignis nur unter `payload.pii`; `MASKED_KEYS` enthält `refusalJustification` und
-   `note`; `getStage` maskiert immer.
+3. Die Begründung steht im gespeicherten Ereignis nur unter `payload.pii`; `MASKED_KEYS` enthält `refusalJustification`;
+   `maskEvent` entfernt `note` nur bei `QuestionLegalCleared`; `getStage` maskiert immer.
 4. R-GUARD-08 liest `legalClearance.answerVersion` der **letzten** Version; R-GUARD-14 vergleicht
    `legalClearance.clearedBy.id` mit dem Akteur.
 5. Kein Rollenname außerhalb von `ROLE_PERMISSIONS` (Tor role-literals grün). Kein Status-Literal außerhalb der Tabelle;
@@ -926,7 +938,7 @@ ADR 0012 (Eigentümerfrage 1)
 | Rechtsfreigabe und Freigabe durch verschiedene Personen (nur Verweigerung) | Lesebefund; Rechtekonzept §4 (Vier-Augen) | R-GUARD-14 | auch für Antworten: eine Guard-Zeile an R-TRANS-05, 0,25 AStd mit Diff (Eigentümerfrage 8) |
 | Begründung im `pii`-Teil | ADR 0009; DSFA V7 | `payload.pii.refusalJustification` | Klartext in `answer`: < 0,25 AStd, verliert Crypto-Shredding |
 | Leserkreis der Begründung: Halter von `refuse.*`, nie admin, nie Ereignis, Bühne oder Suche | 043a, SG2 | Entscheidung 6 | Leserkreis erweitern: Daten plus Tests, 0,25 AStd |
-| Vermerk der Rechtsfreigabe in keinem Lesepfad | Lesebefund (Seitenkanal der Begründung) | `note` in `MASKED_KEYS` | wieder sichtbar (Risiko hingenommen): < 0,25 AStd; Projektion für Berechtigte: 0,5 AStd |
+| Vermerk der Rechtsfreigabe in keinem Lesepfad | Lesebefund (Seitenkanal der Begründung) | `maskEvent` entfernt `note` bei `QuestionLegalCleared` | wieder sichtbar (Risiko hingenommen): < 0,25 AStd; Projektion für Berechtigte: 0,5 AStd |
 | Nur Textpfade | diese Spec | R-GUARD-03 an R-TRANS-15 | Podiumsfragen zulassen: 0,5 AStd (Eigentümerfrage 5) |
 | Antwortentwurf darf eine Verweigerung verdrängen | ADR 0012 (neueste Version gilt) | R-TRANS-03 unverändert | Guard „kein Entwurf über Verweigerung ohne Rückgabe“: < 0,25 AStd |
 
@@ -1130,11 +1142,11 @@ Touched:
 ## Review findings
 
 **Lesebefund der Spec (01.10.2026, zu `0dcbe39`):** 0 blocker, 9 major, Minor. Eingearbeitet in dieser Fassung:
-- Major 1 (Betrieb): `indicators.ts` setzt `inReviewSince` bei `AnswerDrafted` mit `toStatus: 'in_review'`; Test 25,
+- Major 1 (Betrieb): `indicators.ts` setzt `inReviewSince` bei `AnswerDrafted` mit `toStatus: 'in_review'`; Test 26,
   Mutationsprobe 16.
 - Major 2 (Legal/Security): R-GUARD-14 (Freigebende ≠ rechtlich Freigebende) an R-TRANS-16; Test 10, Mutationsprobe 14;
   Restrisiko „zwei Subjects“ neben MF-01; Antworten als Eigentümerfrage 8.
-- Major 3 (Security): `note` in `MASKED_KEYS`, nicht in der Projektion; Test 27; bisheriges Verhalten als Alternative a mit
+- Major 3 (Security): `note` bei `QuestionLegalCleared` in `maskEvent` entfernt (Nachprüfung m2: eng statt rekursiv), nicht in der Projektion; Test 24; bisheriges Verhalten als Alternative a mit
   „hingenommenes Risiko“ (Eigentümerfrage 4).
 - Major 4 (Datenschutz): Begründung unter `payload.pii`; Satz „keine Angabe über Personen“ berichtigt; E14 als
   Eigentümerfrage 9.
@@ -1147,8 +1159,16 @@ Touched:
 - Major 9 (Security): Test 14 prüft die Antworten von `returnQuestion` (admin) und `deliverQuestion` (`podium`).
 - Minor 10–12: Test 11 mit R-GUARD-04; Mutationsproben 12 und 13; tiefes Einfrieren und tiefe Kopie (Test 1, Test 19,
   Mutationsprobe 17); Typ- und Längenprüfung in Test 6.
-- Klarstellungen 13, 15–19: Test 26 (412); `toStatus` als benannte Ausnahme im Nicht-Ziel, Prüfung gegen
+- Klarstellungen 13, 15–19: Test 23 (412); `toStatus` als benannte Ausnahme im Nicht-Ziel, Prüfung gegen
   `QUESTION_STATUSES` (Test 18); Verweise mit Datei und Zeile; R-GUARD-12/13 ohne Version falsch; Zeile `answer_drafted`
   im Abschnitt „Role × Verweigerung“; Rechtekonzept Zeile 175.
 - Als Hinweis bzw. Folgenotiz übernommen: 14 (Vertragsbeschreibung und 422/409-Aufteilung → 044b, 045), 19 (veraltete
   Stellen in Plan, ADR 0012 und `rules.ts`), 20 (Historienzeile → 045).
+
+**Nachprüfung (01.10.2026, zu `bf8bbda`):** alle 9 major erledigt, kein neuer blocker oder major. Eingearbeitet:
+- m1 (Legal): Titel von Nr. 1 nennt „nach vernünftiger kaufmännischer Beurteilung“.
+- m2 (Security): `note` nicht mehr über `MASKED_KEYS` (rekursiv), sondern nur bei `QuestionLegalCleared` in `maskEvent`;
+  Gegenprobe in Test 24; Files allowed angepasst.
+- m3: Ein erneuter Vorschlag aus `in_review` startet die 10-Minuten-Uhr neu (Entscheidung und Test 26).
+- m4 (Datenschutz): DSFA V7 nennt beide Änderungen ausdrücklich (Podium entfällt, Koordination kommt hinzu).
+- m5: Tests in Reihenfolge nummeriert.
