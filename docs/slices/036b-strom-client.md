@@ -1,6 +1,6 @@
 # Scheibe 036b — Inkrementeller Client-Zustand, Teil 2: Strom-Client, Verbindungszustand, zweiter Browser
 
-**Status:** spec (überarbeitet nach dem Lesebefund vom 30.09.2026 zu `9f2560c`; Teil 2 der geteilten Scheibe 036)
+**Status:** angenommen (Review in frischem Kontext: Major behoben; zwei Nachprüfungen; Codex-P2 behoben; gemergt als #111 ca94899)
 **Risikoklasse:** hoch · 1,5 AStd · 30.10.2026 (W5) · Lanes: web-api; web-shell (nur Verbindungsanzeige); e2e
 **Rolle:** web-implementer; Review in frischem Kontext mit Perspektive Security (Sitzungsende im Client) und Betrieb/Resilienz; Lesebefund der Spec vor dem Bau; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel; AGENTS.md R2, R4, R6 (`fetch` nur in `apps/web/src/api/http.ts`), R10, R12

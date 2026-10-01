@@ -1,6 +1,6 @@
 # Scheibe 036a — Inkrementeller Client-Zustand, Teil 1: gepufferter Lesezugriff hinter HvApi
 
-**Status:** spec (überarbeitet nach dem Lesebefund vom 30.09.2026 zu `9f2560c`; Teil 1 der geteilten Scheibe 036)
+**Status:** angenommen (Review in frischem Kontext; Nachprüfung bestanden; Codex-P1 im Bericht behoben; gemergt als #106 2e708e1)
 **Risikoklasse:** hoch · 1,5 AStd · 29.10.2026 (W5) · Lanes: web-api
 **Rolle:** web-implementer; Review in frischem Kontext mit Perspektive Security (Daten je Akteur) und Nebenläufigkeit/Lesezustand (010c, 010d, takt-030, takt-032); Lesebefund der Spec vor dem Bau; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** keine neue fachliche Regel; R-PERM-04 (035a) wird nur konsumiert; AGENTS.md R2, R4, R6, R10, R12

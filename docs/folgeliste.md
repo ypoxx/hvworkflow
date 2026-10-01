@@ -501,3 +501,16 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   weitere Warnungen `web-features-i18n-domain-types-only` (11 → 14, nicht blockierend) · beim Aufräumen der Regel (012)
   eine Wertfunktion „Rolle verwaltet Rechte“ über `apps/web/src/api/**` bereitstellen oder die Regel für reine
   Rechtedaten ausnehmen.
+- 040a Gates-Lauf · `apps/api/src/__tests__/postgres-limits034a.test.ts` („a COMMIT that is already on its way wins over
+  the timer“) · einmal 408 statt 201 im vollen Gates-Lauf (040a, `9ca8a95`), allein 3/3 grün · das Rennen zwischen COMMIT
+  und Zeitgeber klären, nicht als Flake abtun; unter Last schon bei 035b gesehen („query hangs past the service timer“,
+  „COMMIT phase hangs“, siehe oben).
+- 040a Bau · `apps/api/src/actor.ts` · auf den gemeinsamen Helfer `sessionAssignmentFor` umstellen; lag außerhalb von
+  „Files allowed“, die Gleichheit sichert bisher nur ein Test.
+- 040a Nachprüfung minor · `apps/api/src/__tests__/admin040a.test.ts:52` · der Äquivalenztest vergleicht nur die Rolle,
+  nicht `id` und `meetingId`; die Randfälle `expiresAt == now` und eine Versammlung ohne `MeetingCreated` fehlen.
+- 040a Nachprüfung minor (Leistung) · R-ADM-08 · baut die Projektion für jede verwaltende Zuweisung neu auf (O(k·N)) ·
+  die Auswahl je Subjekt einmal berechnen.
+- 040a Review minor (im Bericht benannt) · Maskierung der Schreibantwort für eine künftige Rolle ohne
+  `question.identity.reveal` ist nicht mehr festgehalten (postgres027); beim `api.test` „409 detail“ wechselte die Leserhälfte
+  die Operation · beides wieder festhalten.

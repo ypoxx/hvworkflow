@@ -1,6 +1,6 @@
 # Scheibe 035b — SSE-Strom, Teil 2: Dienst (Verteiler, Route, Grenzen, Sitzungsentzug)
 
-**Status:** spec (überarbeitet nach dem Lesebefund vom 30.09.2026 zu `9f2560c`; Teil 2 der geteilten Scheibe 035)
+**Status:** angenommen (Review in frischem Kontext, fünf Nachprüfungen; Codex-P1/P2 behoben; gemergt als #107 eb6d7c3)
 **Risikoklasse:** hoch · 1,75 AStd · 28.10.2026 (W5) · Lanes: service; docs-sicherheit; docs-adr nur Architekt
 **Rolle:** service-implementer; Architekt für die ADR-0014-Ergänzung; Review in frischem Kontext mit Perspektive Security und Betrieb, Lesebefund der Spec vor dem Bau, nie gebündelt; Sicherheits-Checkliste des Reviewers (Abschnitt unten) (Modell nur in `.claude/agents/`, takt-012)
 **Rule ids:** R-PERM-04 (aus 035a, hier durchgesetzt), R-PERM-01, R-PERM-02; AGENTS.md R2, R4, R6, R7, R8, R11, R12
