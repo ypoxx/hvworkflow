@@ -25,8 +25,13 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   schließt eine Sicherheitslücke, 1,5 AStd im Planbudget von 2,5), eine Zustimmung lag aber nicht vor. Der Eigentümer
   entscheidet nachträglich: annehmen, oder Revert des Squash-Commits `c000567` (ein Commit, nicht ausgeliefert).
 - **Nächste Schritte Zielpfad C:**
-  - Spec 044a ist gemergt. Bau 044a erst nach dem Bau von 043a und nach den Eigentümerfragen 1, 2 und 3b; ADR 0012 und
+  - Spec 044a ist gemergt. Bau 044a erst nach dem Bau von 043a **und von 040b bis 040d** (gleiche Kern-Lane, die
+    Wahrheitstabelle ist ein Snapshot; 044a baut seriell danach) und nach den Eigentümerfragen 1, 2 und 3b; ADR 0012 und
     der Verweigerungskatalog gehen vorher an Recht. Die Spec 044b schreibt der Architekt nach dem Go zur Teilung.
+  - **044c (Untergründe für Pfad A, Rechtekonzept §4, Recherche Z.63)** je nach Frage 3b: bei Go eine eigene Scheibe 044c
+    nach der Antwort von Recht und vor dem Pilot (rund 0,75 AStd, additiver Vertragsschritt); bei No-go wartet 044a, bis
+    Recht die Untergründe benennt, dann werden 044a und 044c zusammen gebaut (+0,75 AStd in 044a, Vertragsschritt als
+    erster Commit). In keinem Fall bleibt die Lücke offen (044a, Eigentümerfrage 3b).
   - Danach die Specs 045 und 041; beide hängen an offenen Antworten (044a, 040) und werden erst danach geschrieben.
   - Bau 043a und 040b bis 040d erst nach dem Go des Eigentümers. Unbeantwortete Punkte werden auf Standard gebaut und mit
     Datum vermerkt; spätere Antworten kosten eine Enum-, Tabellen- oder Vertragsänderung.
