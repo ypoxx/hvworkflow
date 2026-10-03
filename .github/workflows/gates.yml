@@ -167,6 +167,75 @@ jobs:
             apps/web/playwright-report/
           if-no-files-found: ignore
 
+  # Slice 037a: the local operations package (deploy/, scripts/stack.mjs). Placed between `gates` and `e2e-http`
+  # because the 031a workflow tests read `e2e-http` as the last job of this file. All three images build, the compose stack with
+  # Postgres (owner without superuser), the Keycloak test realm, the service and nginx becomes healthy, and the checks
+  # S12 to S16.2 and the sign-in (S13) pass. Only on a pull request, not a required check (spec 037a, owner question 2).
+  # The job inherits the workflow rights. The script masks every generated secret first (`::add-mask::`); no step runs
+  # `stack:credentials`, `docker compose config`, `docker compose logs` or an unformatted `docker inspect`. Only the
+  # screenshot is uploaded.
+  stack-037a:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # the documentation filter below diffs against the full history
+          persist-credentials: false # nothing later pushes or otherwise needs git write credentials
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Same filter as in `gates` and `e2e-http`: a documentation-only commit skips everything below, the job still reports.
+      - name: Determine if only documentation changed
+        id: docsfilter
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '!docs/**'
+              - '!**/*.md'
+      - name: Install Chromium for Playwright
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 4
+        run: pnpm --filter @hv/web exec playwright install --with-deps chromium
+      - name: Stack up from nothing (S11, includes the smoke test)
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 15
+        run: pnpm stack:up
+      - name: Smoke test (S12)
+        if: steps.docsfilter.outputs.code == 'true'
+        run: pnpm stack:smoke
+      - name: Not root, no fill code in the api image (S14)
+        if: steps.docsfilter.outputs.code == 'true'
+        run: node scripts/stack.mjs probe images
+      - name: Schema and fill refuse outside loopback (S15)
+        if: steps.docsfilter.outputs.code == 'true'
+        run: node scripts/stack.mjs probe refusals
+      - name: Postgres restart (S16.1)
+        if: steps.docsfilter.outputs.code == 'true'
+        run: node scripts/stack.mjs probe postgres-restart
+      - name: Crash of the service (S16.2)
+        if: steps.docsfilter.outputs.code == 'true'
+        run: node scripts/stack.mjs probe api-crash
+      - name: Sign-in with screenshot (S13)
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 4
+        # A committed screenshot must never be uploaded in place of a fresh one, so it goes first.
+        run: rm -f docs/evidence/037a-stack-angemeldet.png && pnpm stack:login
+      - name: Reset the stack
+        if: always() && steps.docsfilter.outputs.code == 'true'
+        run: node scripts/stack.mjs reset --yes
+      - name: Upload the screenshot of the stack sign-in
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-037a-stack
+          path: docs/evidence/037a-stack-angemeldet.png
+          if-no-files-found: ignore
+
   # Slice 031a: the HTTP project of the e2e suite against the real service, Postgres and a Keycloak test realm
   # (`scripts/e2e-http-031.mjs`). Only on a pull request; 084 will fold it into its job matrix later. The job inherits
   # the workflow rights (`contents: read`, `pull-requests: read`) and declares none of its own. The Keycloak step of

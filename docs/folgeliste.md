@@ -413,6 +413,15 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-038 Review nit 9 · `docs/evidence/takt-038-historie-weitere.png` · zeigt den Zustand nach dem Klick, nicht den Knopf
   selbst · bei Gelegenheit ein zweites Bild vor dem Klick.
 
+## Betriebspaket (aus 037a)
+
+- 037a Bau · `apps/api/src/persistence/migrations.ts` (über `migrate-cli.ts`) · pg 8.23 meldet bei jedem Migrationslauf
+  „DeprecationWarning: Calling client.query() when the client is already executing a query“ (auch im Protokoll des
+  Einmaldienstes `migrate`) · Abfragen dort strikt nacheinander awaiten, bevor pg 9 das entfernt.
+- 037a Bau · `scripts/stack.mjs` (Stufe „Stack starten“) · ein nicht ladbares Basis-Image (gesperrter Registry-Host,
+  Rate-Limit) zeigt sich nur als Stufenname, ohne das betroffene Image · vor `up` jedes nicht lokal vorhandene Image
+  einzeln laden und bei Fehler den Image-Namen (kein Wert) im festen Satz nennen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf

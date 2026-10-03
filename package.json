@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "HV-Tool: end-to-end Q&A workflow for the general meeting of one DAX company.",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
   "engines": {
     "node": ">=22"
   },
@@ -27,7 +27,13 @@
     "plan-graph": "node scripts/plan-graph.mjs",
     "test:scripts": "node --test 'scripts/**/*.test.mjs'",
     "audit:check": "node scripts/audit-check.mjs",
-    "e2e:http": "node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs"
+    "e2e:http": "node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs",
+    "stack:up": "node scripts/stack.mjs up",
+    "stack:down": "node scripts/stack.mjs down",
+    "stack:reset": "node scripts/stack.mjs reset",
+    "stack:smoke": "node scripts/stack.mjs smoke",
+    "stack:credentials": "node scripts/stack.mjs credentials",
+    "stack:login": "node scripts/stack-login.mjs"
   },
   "devDependencies": {
     "@redocly/cli": "^2.0.0",

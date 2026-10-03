@@ -1,0 +1,19 @@
+# Slice 037a: the build context is the repository root. Nothing private, generated or irrelevant goes to the daemon.
+.git
+.github
+.claude
+**/node_modules
+.env
+.env.*
+docs
+docs/evidence
+**/playwright-report
+**/test-results
+**/dist
+**/coverage
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.test.mjs
+apps/web/e2e
+netlify.toml

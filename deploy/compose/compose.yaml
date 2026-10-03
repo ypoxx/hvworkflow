@@ -1,0 +1,186 @@
+# Slice 037a: the local operations stack of the HV-Tool. ONLY FOR A LOCAL MACHINE, ONLY SYNTHETIC DATA.
+#
+# Start, stop and reset only through `node scripts/stack.mjs` (`pnpm stack:up` and friends; docs/betrieb/installation.md).
+# The script writes the per-installation secrets into the state directory outside the repository and passes the three
+# variables below; a direct `docker compose up` stops on them instead of falling back to default ports.
+#
+#   HV_STACK_STATE_DIR  state directory (0700) with one env file per service, realm.json and build-ca.pem
+#   HV_STACK_WEB_PORT   web port on 127.0.0.1 (default 8480)
+#   HV_STACK_IDP_PORT   Keycloak port on 127.0.0.1, the same inside the container (default 8180)
+#
+# No secret is written in this file: every service gets its own env file from the state directory and nothing else.
+# Never run `docker compose config` in CI: its output would contain the values of the env files.
+name: hv-tool
+
+services:
+  # Postgres 16, the same image and digest as the CI service in .github/workflows/gates.yml. POSTGRES_USER is a bootstrap
+  # superuser used only by the init script; POSTGRES_DB stays unset (a database `hv` owned by `postgres` would stop
+  # hv_owner from migrating). No published port.
+  postgres:
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    environment:
+      POSTGRES_USER: postgres
+    env_file:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/postgres.env
+    volumes:
+      - hv-pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP, so the temporary socket-only server of the first initialisation never counts as ready.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # Keycloak with the synthetic test realm of this installation (start-dev: ONLY LOCAL, H2 inside the container, no
+  # volume). The realm is generated once and written byte-identical from the state on every start, so a recreated
+  # container imports the same ids and the role assignments in the event log stay valid.
+  #
+  # Keycloak listens inside the container on the same port as on the host. The service shares this network namespace
+  # (network_mode below), so the issuer http://localhost:<port>/realms/hv-local is the same URL for the browser and for
+  # the service, and the configuration schema's rule "http only for localhost" holds without an exception.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HTTP_PORT: ${HV_STACK_IDP_PORT:?set by scripts/stack.mjs}
+      KC_HOSTNAME: http://localhost:${HV_STACK_IDP_PORT:?set by scripts/stack.mjs}
+      KC_HEALTH_ENABLED: "true"
+    env_file:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/keycloak.env
+    volumes:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/realm.json:/opt/keycloak/data/import/realm.json:ro
+    ports:
+      - "127.0.0.1:${HV_STACK_IDP_PORT:?set by scripts/stack.mjs}:${HV_STACK_IDP_PORT:?set by scripts/stack.mjs}"
+    healthcheck:
+      # The image has bash but no curl: a plain HTTP request over /dev/tcp to the management port.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # One-off: migrations as hv_owner with the migration CLI of the api image. Holds the owner URL (docker inspect shows
+  # it; whoever may run Docker is root-equivalent anyway).
+  migrate:
+    image: hv-tool/api:local
+    pull_policy: never
+    command: ["--import", "tsx", "src/persistence/migrate-cli.ts", "up"]
+    env_file:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/migrate.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    healthcheck:
+      disable: true
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # One-off: the demo corpus and the role assignments of the nine test persons, written as hv_owner past the rights path
+  # into an EMPTY event log only (scripts/stack-seed.mjs refuses otherwise). Own image `seed`; the api image holds no
+  # fill code. Runs before the service starts, because the service keeps a chain cache.
+  seed:
+    image: hv-tool/seed:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/api.Dockerfile
+      target: seed
+      secrets:
+        - build_ca
+    env_file:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/seed.env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    healthcheck:
+      disable: true
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # The service, as the runtime role hv_runtime. No published port, no fixed address, no proxy trust
+  # (trusted-proxies=none, spec decision 10). It lives in Keycloak's network namespace (see keycloak above), which is
+  # why nginx reaches it as keycloak:8787. If Keycloak is recreated, recreate api and web too:
+  # `pnpm stack:up -- --recreate api web` (never directly with docker compose: the stored ports would be lost).
+  api:
+    image: hv-tool/api:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/api.Dockerfile
+      target: api
+      secrets:
+        - build_ca
+    network_mode: service:keycloak
+    env_file:
+      - ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/api.env
+    volumes:
+      - hv-access-log:/var/lib/hv/access-log
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # nginx with the built interface in HTTP mode and the limits in front of the service (deploy/docker/nginx.conf).
+  web:
+    image: hv-tool/web:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+      secrets:
+        - build_ca
+    ports:
+      - "127.0.0.1:${HV_STACK_WEB_PORT:?set by scripts/stack.mjs}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  hv-pgdata:
+  hv-access-log:
+
+# An optional extra root certificate for the build only (HV_STACK_BUILD_CA); the script writes an empty file otherwise.
+secrets:
+  build_ca:
+    file: ${HV_STACK_STATE_DIR:?set by scripts/stack.mjs}/build-ca.pem
