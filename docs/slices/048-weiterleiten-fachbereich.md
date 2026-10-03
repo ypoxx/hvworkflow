@@ -281,11 +281,13 @@ Standard gebaut:** E5 ist offen (Eigentümerfrage 1); der Bau beginnt erst nach 
   `Record<ForwardReasonCode, TKey>` in `labels.ts` (054 nutzt dieselbe Zuordnung im Dialog).
 - `eventSummary.ts`, Fall `QuestionForwarded`: mit `fromUnitId` der neue Schlüssel `history.payload.unitChange` (DE
   „Fachbereich: {from} → {to}“, EN „Answering unit: {from} → {to}“), ohne `fromUnitId` der bestehende
-  `history.payload.unit`; dazu die übersetzte Bezeichnung des Codes über den bestehenden `history.payload.reason`. Ein
+  `history.payload.unit`; dazu die übersetzte Bezeichnung des Codes über den neuen Schlüssel `history.payload.forwardReason`
+  (DE „Grund: {reason}“, EN „Reason: {reason}“; nicht `history.payload.reason`, das „Begründung“ sagt, Hauswort der
+  Verweigerung; Nachprüfung Minor 2). Ein
   unbekannter Code (künftige Vertragsstufe) erscheint unverändert als Code, nie als Absturz.
 - `http.ts`: `forwardQuestion` → `write('post', '/questions/{questionId}/forwards', { params, body: input, write })`.
   `liveStore.ts`: `forwardQuestion: true` in `WRITE_METHODS`.
-- Paritätstest 553 → **560** (sieben Schlüssel je Sprache: Aktion, Ereignis, `unitChange`, vier Codes). Keine Schaltfläche,
+- Paritätstest 553 → **561** (acht Schlüssel je Sprache: Aktion, Ereignis, `unitChange`, `forwardReason`, vier Codes). Keine Schaltfläche,
   kein Dialog, keine neue Ansicht (053, 054).
 
 ## Wahrheitstabellen-Diff (vor dem Bau, Leitplanken §4)
@@ -342,8 +344,14 @@ Planabweichung vom Zuschnitt aus 043a (Befund), nicht 043a Regel 1.
   (Kern, auch bei einer Wiederholung nach Entfernen des Fachbereichs). 404 auch für eine Fachkraft, deren Fachbereich die Frage
   nicht hält; nach einem Weiterleiten aus dem eigenen Fachbereich ist eine Wiederholung mit demselben `Idempotency-Key` 404.
 - **`Action`-Enum:** `question.forward` unmittelbar nach `question.assign`.
-- **`Event.type`-Enum:** `QuestionForwarded` nach `QuestionAssigned`; Beschreibung der Nutzlast `{ unitId, fromUnitId?,
-  reasonCode }`, ohne Personendaten, ungemaskt in `EventRead`, nie in `Question`.
+- **`Event.type`-Enum:** `QuestionForwarded` nach `QuestionAssigned`. Die Nutzlast `{ unitId, fromUnitId?, reasonCode }` ist
+  ohne Personendaten, ungemaskt in `EventRead`, nie in `Question`.
+- **Gebundenes Nutzlast-Schema (Nachprüfung Minor 1, Datenschutz; nie Folgeliste):** neues Schema
+  `QuestionForwardedPayload` mit `additionalProperties: false`, `required: [unitId, reasonCode]`, `fromUnitId` optional,
+  `reasonCode` → `ForwardReasonCode`; in `EventRead` per `if/then` an `type: QuestionForwarded` gebunden, nach dem Muster der
+  bestehenden Bindungen je Ereignisart (openapi.yaml ~3588-3615). So ist „kein Freitext“ auch auf dem Lesepfad Vertrag,
+  nicht nur Prosa. H1 prüft ein gelesenes `QuestionForwarded` gegen den Vertrag; Test 2 prüft, dass die Nutzlast genau die
+  Schlüssel `unitId`, `fromUnitId`, `reasonCode` trägt.
 - **Typen:** `pnpm contract:types` regeneriert `packages/contract/src/types.ts`; ein zweiter Lauf ergibt keinen Diff.
 - **Tore:** `pnpm contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`, (c) mit `0.4.2 -> 0.4.3`. Die Versionszeilen in
   `contract.test.ts:90` und `takt-019-contract.test.ts:8` ziehen nach; `forwardQuestion` kommt in die `If-Match`-Liste
@@ -372,7 +380,7 @@ Planabweichung vom Zuschnitt aus 043a (Befund), nicht 043a Regel 1.
 
 Vertrag (erster Commit, Architekt):
 
-- `packages/contract/openapi.yaml` (nur Pfad forwards, Schemas ForwardRequest und ForwardReasonCode, Action-Eintrag, Event.type-Eintrag, info.version)
+- `packages/contract/openapi.yaml` (nur Pfad forwards, Schemas ForwardRequest, ForwardReasonCode und QuestionForwardedPayload, deren `if/then`-Bindung in `EventRead`, Action-Eintrag, Event.type-Eintrag, info.version)
 - `packages/contract/src/types.ts` (nur regeneriert)
 - `packages/contract/CHANGELOG.md` (nur Abschnitt 0.4.3)
 - `packages/contract/package.json` (nur Version)
@@ -412,7 +420,7 @@ Oberfläche (nur Typzwang und Historie):
 - `apps/web/src/i18n/shell.en.ts`
 - `apps/web/src/i18n/history.de.ts`
 - `apps/web/src/i18n/history.en.ts`
-- `apps/web/src/i18n/parity.test.ts` (nur 553 → 560)
+- `apps/web/src/i18n/parity.test.ts` (nur 553 → 561)
 - `apps/web/src/features/history/eventSummary.ts`
 - `apps/web/src/features/history/eventSummary.test.ts`
 
@@ -545,7 +553,7 @@ ausgeführt):
 3. Vertrag 0.4.3: `contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`; das Abdeckungstor meldet `forwardQuestion` als
    ausgeübt; `allowlist.json` unverändert; kein Feld mit freiem Text im neuen Schema.
 4. Kein Rollenname außerhalb von `ROLE_PERMISSIONS` (`pnpm role-literals`); keine Statuslogik außerhalb der Tabelle; kein
-   Literal in Komponenten (`pnpm i18n-literals`); Paritätstest 560; `pnpm vocabulary` grün.
+   Literal in Komponenten (`pnpm i18n-literals`); Paritätstest 561; `pnpm vocabulary` grün.
 5. `pnpm slice-scope` grün auf `claude/slice-048-…`.
 6. `pnpm gates` mit Postgres-Variablen wie in CI grün auf einem sauberen Baucommit; Schluss einmal wörtlich im Bericht. Die
    Jobs `gates` und `e2e-http` der PR-CI grün auf dem letzten Commit.
@@ -745,3 +753,11 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
 | n4 | nit | EN-Bezeichnung | „Forward to another answering unit“ (Glossar: answering unit) |
 | n5 | nit | Rücksetzen im Nachholen unbenannt | Abschnitt 6 benennt den Catch-up-Reset |
 | n6 | nit | Wiederholung nach Entfernen des Fachbereichs | 422 benannt, Test 9b |
+
+### Nachprüfung (frischer Kontext, 03.10.2026, Kopf `5efa153`)
+
+M1, M2 und M3 gelöst; keine neuen blocker oder major. Eingearbeitet vom Orchestrator: Minor 1 (Datenschutz: gebundenes
+Nutzlast-Schema `QuestionForwardedPayload`, Test 2 mit genauen Schlüsseln), Minor 2 (eigener Schlüssel
+`history.payload.forwardReason`, Parität 561), Nit 3 (Files allowed nennt das Schema und seine Bindung). Nits 4, 5, 7 und 8
+gehen auf `docs/folgeliste.md` (Regel 3).
+
