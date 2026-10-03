@@ -87,8 +87,9 @@ function fingerprintOf(events: readonly unknown[]): string {
     .map((event) => {
       const { meetingId: _meetingId, ...historical } = event;
       if (event.type === 'MeetingCreated') {
-        const { lifecycleVersion: _lifecycleVersion, ...payload } = event.payload;
-        return { ...historical, payload };
+        // Scheibe 040b: the seat list and the unit AR-Büro are new master data, not RNG draws.
+        const { lifecycleVersion: _lifecycleVersion, stageSeats: _stageSeats, ...payload } = event.payload;
+        return { ...historical, payload: { ...payload, units: payload.units.filter((unit) => unit.id !== 'unit-ar') } };
       }
       if (event.type === 'SpeakerRegistered' && event.payload.pii) {
         const { personId: _personId, ...withoutPersonId } = historical;

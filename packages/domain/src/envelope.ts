@@ -12,6 +12,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   'QuestionReturned', 'QuestionStaged', 'QuestionDelivered', 'QuestionClosed',
   'QuestionWithdrawn', 'QuestionMerged',
   'ContributionClaimed', 'ContributionReleased', 'QuestionClaimed', 'QuestionReleased', 'IdempotencyRecorded',
+  'AgendaItemsReplaced', 'UnitsReplaced', 'StageSeatsReplaced',
 ]);
 const V2_ONLY_FIELDS = [
   'meetingId', 'idempotencyKey', 'causationId', 'prevHash', 'hash', 'recordedAt',

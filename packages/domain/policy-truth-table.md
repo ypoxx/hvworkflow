@@ -271,3 +271,19 @@ question status. The administration holds none of the writing ones.
 | podium | · | · | · | · | · | · |
 | admin | · | · | · | · | · | ✓ |
 | observer | · | · | · | · | · | · |
+
+# Policy truth table — Role × Administration
+
+Scheibe 040b: answering units and podium seats of a meeting; only the administration holds them.
+
+| Role | admin.units.manage | admin.seats.manage |
+|---|---|---|
+| moderation | · | · |
+| capture | · | · |
+| coordination | · | · |
+| expert | · | · |
+| legal | · | · |
+| approver | · | · |
+| podium | · | · |
+| admin | ✓ | ✓ |
+| observer | · | · |

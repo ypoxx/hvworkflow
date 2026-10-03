@@ -48,8 +48,8 @@ function requestBodySchemaOf(operationId: string): Record<string, unknown> {
 const sortedKeys = (value: unknown): string[] => Object.keys(value as object).sort();
 
 describe('Scheibe 043a: contract 0.4.0 — removals and the speaker reason', () => {
-  it('1: info.version is 0.4.0', () => {
-    expect(openapiDoc.info.version).toBe('0.4.0');
+  it('1: info.version is 0.4.0 or a later 0.4 patch (0.4.1 since slice 040b)', () => {
+    expect(openapiDoc.info.version).toMatch(/^0\.4\.\d+$/);
   });
 
   it('2: Speaker, SpeakerRegistration and SpeakerUpdate carry neither kind nor requestedMinutes', () => {
@@ -266,7 +266,8 @@ describe('Scheibe 043a: refusal as a kind of answer (ADR 0012 model A)', () => {
   it('10: no silent widening of an existing request schema (rule 1 of the split)', () => {
     expect(sortedKeys(schemas.AnswerDraft.properties)).toEqual(['sources', 'text']);
     expect(sortedKeys(requestBodySchemaOf('approveQuestion')['properties'])).toEqual(['answerVersion']);
-    expect(sortedKeys(schemas.Classification.properties)).toEqual(['agendaItemId', 'stageAssignment', 'track']);
+    // `seatId` is the contract line of slice 040b (0.4.1), written with that slice's implementation.
+    expect(sortedKeys(schemas.Classification.properties)).toEqual(['agendaItemId', 'seatId', 'stageAssignment', 'track']);
     expect(sortedKeys(schemas.SpeakerRegistration.properties)).toEqual(['displayName', 'organisation', 'round']);
   });
 

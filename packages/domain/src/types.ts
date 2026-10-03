@@ -32,6 +32,9 @@ export interface Actor {
 /** Permission identifiers. Implemented entries from the contract's `Action` enum. */
 export const PERMISSIONS = [
   'admin.roles.manage',
+  // Scheibe 040b: the administration maintains the answering units and the podium seats.
+  'admin.units.manage',
+  'admin.seats.manage',
   'agenda.manage',
   'question.identity.reveal',
   'speaker.register',
@@ -141,6 +144,13 @@ export interface Meeting {
     delivered: number;
     /** Questions per workflow status, in one pass over the projection (Prozessleiste). */
     byStatus: Record<QuestionStatus, number>;
+    /**
+     * Scheibe 040b: open questions per answering unit and questions on the podium per seat. Every
+     * unit and every seat of the meeting is a key, also with 0; aggregates, never a figure per person.
+     * Optional in the type because the contract declares them optional; the projection always sets them.
+     */
+    byUnit?: Record<string, number>;
+    bySeat?: Record<string, number>;
   };
 }
 
@@ -157,6 +167,19 @@ export interface Unit {
   id: string;
   name: string;
   shortName?: string;
+}
+
+/**
+ * Scheibe 040b (ADR 0006): a podium seat (Bühnenplatz) of a meeting. `personId` is a pseudonymous key
+ * (ADR 0009) and `deviceId` a technical id of the podium device; only holders of `admin.seats.manage`
+ * read them (`listMeetingStageSeats`).
+ */
+export interface StageSeat {
+  id: string;
+  label: string;
+  position?: number;
+  personId?: string;
+  deviceId?: string;
 }
 
 export interface SpeakerRecord {
@@ -266,6 +289,8 @@ export interface QuestionRecord {
   track?: Track;
   agendaItemId?: string;
   stageAssignment?: StageAssignment;
+  /** Scheibe 040b: the seat that answers — `Classification.seatId`, otherwise the value of `stageAssignment`. */
+  seatId?: string;
   unitId?: string;
   answers: AnswerVersion[];
   approval?: Approval;
@@ -326,6 +351,26 @@ export interface Classification {
   track: Track;
   agendaItemId?: string;
   stageAssignment?: StageAssignment;
+  /** Scheibe 040b: a seat of the question's meeting; equal to `stageAssignment` when both are sent. */
+  seatId?: string;
+}
+/** Scheibe 040b: one entry of a whole-list replacement; without `id` the server assigns one. */
+export interface AgendaItemInput {
+  id?: string;
+  number: number;
+  title: string;
+}
+export interface UnitInput {
+  id?: string;
+  name: string;
+  shortName?: string;
+}
+export interface StageSeatInput {
+  id?: string;
+  label: string;
+  position?: number;
+  personId?: string;
+  deviceId?: string;
 }
 export interface AnswerDraft {
   text: string;

@@ -87,6 +87,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'question.return',
     'agenda.manage', // Scheibe 025: the only holder (Ablaufsteuerung)
     'admin.roles.manage',
+    'admin.units.manage', // Scheibe 040b: Fachbereiche of a meeting
+    'admin.seats.manage', // Scheibe 040b: Bühnenplätze with person and device
     'demo.seed', // demo only; 042 limits it
   ],
   observer: ['question.read.delivered'],

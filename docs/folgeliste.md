@@ -527,3 +527,22 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   braucht `apps/web/src/i18n/parity.test.ts:162-169` (517 → 516) · nächster Takt web.
 - 043a Review nit 6 (Sicherheitshärtung, eingeplant für 044a) · `openapi.yaml` `StageView` · „refusalJustification
   always absent“ nur in Prosa · in 044a `refusalJustification: false` im Schema oder der Negativtest „getStage als podium“.
+
+## Stammdaten und Bühnenplätze (aus 040b)
+
+- 040b Spec (Zeilen 78-80, T-G1-T-03) · `If-Match` an den vier Stammdaten-Operationen wird mit Vertrag 0.5 Pflicht
+  (`IfMatchRequired`), und `StageAssignment`/`stageAssignment` entfällt · Vertragszyklus 0.5.
+- 040b Review · R-ADM-01 liest `meeting.status` in `api.ts` (`masterDataWrite`) außerhalb von `transitions.ts` · ein
+  Lebenszyklus-Guard in der Tabelle folgt; 040d (Freeze, R-ADM-03) nutzt ihn mit.
+- 040b Review (nur zur Kenntnis) · Demo-Pfad: ein unbekannter Jahrgang antwortet 404 vor der Rechteprüfung (403); die
+  Jahrgänge sind ohnehin über `listMeetings` lesbar.
+- 040b Review · der Zwischenspeicher der eingegrenzten Instanzen (`scopedInstances`, `api.ts`) wird nie geräumt (ab 040c
+  mit angelegten Jahrgängen relevant); `listMeetingStageSeats` auf der Alias-Instanz projiziert den Jahrgang je Aufruf aus
+  dem ganzen Log neu · 040c.
+- 040b Review · `lastWriteEtag` ist je Instanz geteilt; bei gleichzeitigen Schreibvorgängen auf derselben Instanz kann das
+  ETag des anderen gelesen werden (bestehendes Muster, vgl. „Antwort-ETag bei gleichzeitigen Demo-Anfragen“).
+- 040b Review · eine leere `id` in `AgendaItemInput`/`UnitInput`/`StageSeatInput` ergibt im Kern 422, der Vertrag
+  dokumentiert das nicht · `minLength: 1` mit Vertrag 0.5.
+- 040b Bau · `apps/api/src/__tests__/postgres-limits034a.test.ts` („a query that hangs past the service timer before the
+  COMMIT answers 503“) schlug einmal unter Last (≈ 4,5) im vollen Gates-Lauf fehl, einzeln 3/3 grün · zeitkritisch,
+  Spielraum prüfen.

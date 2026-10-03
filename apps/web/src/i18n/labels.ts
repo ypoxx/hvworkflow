@@ -51,6 +51,8 @@ const STAGE_KEYS: Readonly<Record<StageAssignment, TKey>> = {
 
 const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'admin.roles.manage': 'action.admin.roles.manage',
+  'admin.units.manage': 'action.admin.units.manage',
+  'admin.seats.manage': 'action.admin.seats.manage',
   'agenda.manage': 'action.agenda.manage',
   'question.identity.reveal': 'action.question.identity.reveal',
   'speaker.register': 'action.speaker.register',
@@ -127,6 +129,9 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   QuestionClaimed: 'event.QuestionClaimed',
   QuestionReleased: 'event.QuestionReleased',
   IdempotencyRecorded: 'event.IdempotencyRecorded',
+  AgendaItemsReplaced: 'event.AgendaItemsReplaced',
+  UnitsReplaced: 'event.UnitsReplaced',
+  StageSeatsReplaced: 'event.StageSeatsReplaced',
 };
 
 export function statusLabel(t: Translate, status: QuestionStatus): string {

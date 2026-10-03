@@ -42,7 +42,7 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Koordination | Coordination | role `coordination` | — |
 | Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | — |
 | Antwortbündel | Answer bundle | `AnswerBundle` | — |
-| Bühnenplatz | Podium seat | — (ab Scheibe 040) | — |
+| Bühnenplatz | Podium seat | `StageSeat`, `seatId` (seit Scheibe 040b) | — |
 | Weiterleiten | Forward | `question.submit_review` (Anzeige „Weiterleiten", E5; Weiterleiten zwischen Fachbereichen ab Scheibe 048) | — |
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |

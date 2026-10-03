@@ -614,6 +614,11 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     listRoleAssignments: async (filter) => read('get', '/meetings/{meetingId}/role-assignments', { params: await meetingRoute(), query: { subjectId: filter?.subjectId, role: filter?.role } }),
     assignRole: async (input, writeOptions) => write('post', '/meetings/{meetingId}/role-assignments', { params: await meetingRoute(), body: input, write: writeOptions }),
     revokeRole: async (id, reason, writeOptions) => write('post', '/meetings/{meetingId}/role-assignments/{assignmentId}/revocation', { params: { ...await meetingRoute(), assignmentId: id }, ...(reason !== undefined ? { body: { reason } } : {}), write: writeOptions }),
+    // Scheibe 040b: master data of a named meeting, whole lists.
+    replaceMeetingAgendaItems: (meetingId, items, writeOptions) => write('put', '/meetings/{meetingId}/agenda-items', { params: { meetingId }, body: items, write: writeOptions }),
+    replaceMeetingUnits: (meetingId, items, writeOptions) => write('put', '/meetings/{meetingId}/units', { params: { meetingId }, body: items, write: writeOptions }),
+    listMeetingStageSeats: (meetingId) => read('get', '/meetings/{meetingId}/stage-seats', { params: { meetingId } }),
+    replaceMeetingStageSeats: (meetingId, items, writeOptions) => write('put', '/meetings/{meetingId}/stage-seats', { params: { meetingId }, body: items, write: writeOptions }),
     listSpeakers: (filter) => read('get', '/speakers', { query: { round: filter?.round, status: filter?.status } }),
     getSpeaker: (speakerId) => read('get', '/speakers/{speakerId}', { params: { speakerId } }),
     registerSpeaker: (input, writeOptions) => write('post', '/speakers', { body: input, write: writeOptions }),

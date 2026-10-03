@@ -292,6 +292,15 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       lines.push(`| ${role} | ${intake.map((p) => (can({ id: 'x', role }, p).allow ? '✓' : '·')).join(' | ')} |`);
     }
 
+    // Scheibe 040b: the two master-data rights of the administration (Fachbereiche, Bühnenplätze).
+    const administration: Permission[] = ['admin.units.manage', 'admin.seats.manage'];
+    lines.push('', '# Policy truth table — Role × Administration', '',
+      'Scheibe 040b: answering units and podium seats of a meeting; only the administration holds them.', '',
+      '| Role | ' + administration.join(' | ') + ' |', '|---|' + administration.map(() => '---').join('|') + '|');
+    for (const role of ROLES) {
+      lines.push(`| ${role} | ${administration.map((p) => (can({ id: 'x', role }, p).allow ? '✓' : '·')).join(' | ')} |`);
+    }
+
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');
   });
 

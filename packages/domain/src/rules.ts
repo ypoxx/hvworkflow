@@ -226,6 +226,47 @@ const OTHER_RULES: readonly RuleEntry[] = [
     },
   },
   {
+    ruleId: 'R-ADM-01',
+    kind: 'Guard',
+    description:
+      'The configuration of a closed meeting is immutable: replaceMeetingAgendaItems, replaceMeetingUnits and ' +
+      'replaceMeetingStageSeats answer 409 with this rule id and append no event when the meeting is closed. Only ' +
+      'an actor that still reaches the closed meeting sees the 409 (the demo identity, operator tools); over HTTP ' +
+      'with a session the service answers 403 first, because every role assignment of a closed meeting has ended ' +
+      '(no active assignment). The rule is the safeguard in the core for every other path (Scheibe 040b).',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/slices/040b-stammdaten-buehnenplaetze.md:6 und :68-74 (Regel-IDs; R-ADM-01 je Schicht; interne ' +
+        'Betriebsentscheidung: ein abgeschlossener Jahrgang bleibt als Nachweis unverändert). Keine Fundstelle in ' +
+        'Recherche oder Ist-Analyse; keine extern bestätigte Rechtsnorm.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-ADM-02',
+    kind: 'Guard',
+    description:
+      'Referenced master data stays: a whole-list replacement answers 409 with this rule id and appends no event ' +
+      'when an agenda item to be removed has a question or progress (openedAt), a unit to be removed is the unitId ' +
+      'of a question or of an active role assignment (neither revoked nor expired), or a seat to be removed is the ' +
+      'seatId of a question (explicit or derived from stageAssignment). Renaming under the same id is always ' +
+      'allowed (Scheibe 040b).',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'docs/slices/040b-stammdaten-buehnenplaetze.md:63-66 (Operationstabelle, Spalte Prüfungen; interne ' +
+        'Entscheidung gegen das Verdrängen von Fragen und Fachkräften über die Stammdaten, Missbrauchsfälle ' +
+        'ebd. Abschnitt „Wirkung und Risiko“). Keine Fundstelle in Recherche oder Ist-Analyse; keine extern ' +
+        'bestätigte Rechtsnorm.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
     ruleId: 'R-ADM-07',
     kind: 'Guard',
     description:

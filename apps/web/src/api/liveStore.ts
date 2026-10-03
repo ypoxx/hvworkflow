@@ -44,6 +44,7 @@ export const READ_TOPICS = {
   getMeetingById: ['meeting'],
   listMeetingAgendaItems: ['meeting'],
   listMeetingUnits: ['meeting'],
+  listMeetingStageSeats: ['meeting'],
   listAgendaItems: ['meeting'],
   listUnits: ['meeting'],
   listSpeakers: ['speakers'],
@@ -71,7 +72,7 @@ const ITEM_READS: Partial<Record<BufferedRead, SubjectRef['kind']>> = {
  */
 export const WATERMARKS = {
   speakerListVersion: ['listSpeakers', 'getSpeaker'],
-  version: ['listMeetings', 'getMeetingById', 'listMeetingAgendaItems', 'listMeetingUnits', 'listAgendaItems', 'listUnits'],
+  version: ['listMeetings', 'getMeetingById', 'listMeetingAgendaItems', 'listMeetingUnits', 'listMeetingStageSeats', 'listAgendaItems', 'listUnits'],
 } as const satisfies Partial<Record<keyof Meeting, readonly Exclude<BufferedRead, 'getMeeting'>[]>>;
 type Counter = keyof typeof WATERMARKS;
 const COUNTERS = Object.keys(WATERMARKS) as Counter[];
@@ -83,6 +84,7 @@ const COUNTER_OF = new Map<BufferedRead, Counter>(
 type WriteMethodName = Exclude<keyof HvApi, ReadMethodName | 'lastWriteEtag' | 'seedDemo' | 'subscribe'>;
 const WRITE_METHODS = {
   openAgendaItem: true, openVoting: true, closeVoting: true, assignRole: true, revokeRole: true,
+  replaceMeetingAgendaItems: true, replaceMeetingUnits: true, replaceMeetingStageSeats: true,
   registerSpeaker: true, reorderSpeakers: true, updateSpeaker: true, captureContribution: true,
   captureMeetingContribution: true, captureQuestions: true, claimContribution: true, releaseContribution: true,
   claimQuestion: true, releaseQuestion: true, classifyQuestion: true, assignQuestion: true, draftAnswer: true,

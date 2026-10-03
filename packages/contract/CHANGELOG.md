@@ -10,6 +10,47 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.1] - 2026-10-03
+
+Additive patch step of the 0.4 cycle (rule 1 of slice 043a: the next free patch level after 0.4.0). The contract
+line of Scheibe 040b (Administration im Kern, Teil 2: Stammdaten und Bühnenplätze), written by the architect as
+the first commit of that slice, before its core and service code. Built on the defaults: "auf Standard gebaut
+(Go des Eigentümers 03.10.2026)" (E57: 043a question 5 and the 040 split with the budget for 040b). The four
+master-data operations pre-declared since 0.3.0 are served from slice 040b; core, service and web adapter follow
+in the later commits of that slice. No request schema gains a required field; no operation is narrowed (the
+four operations keep the optional `IfMatch`; required from 0.5).
+
+### Added
+
+- **`Classification.seatId`** (Scheibe 040b; `type: string, maxLength: 128`, optional): the podium seat
+  (Bühnenplatz) from the seat list of the question's meeting, otherwise `422`; with `stageAssignment` both must be
+  equal, otherwise `422`. `stageAssignment` alone works as before. The only request widening of this release.
+- **`Event.type`**: `AgendaItemsReplaced`, `UnitsReplaced`, `StageSeatsReplaced` (Scheibe 040b; additive enum
+  values). Each names the meeting in `subjectId`, carries the whole list and raises `Meeting.version`.
+- **Payload schemas** `AgendaItemsReplacedPayload`, `UnitsReplacedPayload`, `StageSeatsReplacedPayload`, bound
+  per type in `Event` (nested `if`/`then`/`else`) and `EventRead` (`allOf`), each with `required: [subjectId]`.
+- **`StageSeatRead`** and **`MeetingCreatedReadPayload`** (Scheibe 040b, privacy): in `EventRead` no seat carries
+  `personId`, neither in `StageSeatsReplaced` nor in the optional `stageSeats` of `MeetingCreated` (seed; cloning
+  from slice 040c). The masking rule for seats stands in one place (`StageSeatRead`, `personId: false`).
+
+### Changed
+
+- **Descriptions** (Scheibe 040b): `replaceMeetingAgendaItems`, `replaceMeetingUnits`, `replaceMeetingStageSeats`
+  (the event each emits, the `422` cases including well-formed UTF-16, `409` R-ADM-02 "referenced master data
+  stays", `409` R-ADM-01 "configuration of a closed meeting is immutable" only for an actor that still reaches the
+  closed meeting such as the demo identity, while a session gets the documented `403` first because no
+  assignment of a closed meeting is active; R-ADM-03 from slice 040d; optional `If-Match` checked when sent;
+  replay with `Idempotency-Key`); `listMeetingStageSeats` and `StageSeat` (`personId` and `deviceId` only for
+  holders of `admin.seats.manage`; order by `position`, then `id`); `Meeting.counts.byUnit`/`bySeat` (every unit
+  or seat is a key, also with 0; the sum can be smaller than `open` or `staged`); `Question.seatId` (set from
+  `Classification.seatId`, otherwise from `stageAssignment`); `Classification.stageAssignment` (successor
+  `seatId` is here now); `Event` (the three payloads, optional `stageSeats` on `MeetingCreated`);
+  `Problem.ruleId` (R-ADM-01 and R-ADM-02 with their content; the range R-ADM-01..09 and R-MTG-08/09 belongs to
+  slice 040).
+- **`allowlist.json`** (Scheibe 040b): the entries `replaceMeetingAgendaItems`, `replaceMeetingUnits`,
+  `listMeetingStageSeats` and `replaceMeetingStageSeats` are removed (nine entries become five); `createMeeting`
+  and `freezeMeetingConfig` stay (slices 040c and 040d).
+
 ## [0.4.0] - 2026-10-03
 
 The one non-additive step of the 0.4 cycle (ADR 0015, vorgeschlagen): it removes fields deprecated since 0.2.0

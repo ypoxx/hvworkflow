@@ -227,6 +227,15 @@ Dokumente:
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur neue Zeile „Bühnenplatzliste“ in der Verarbeitungstabelle)
 - `docs/folgeliste.md`
 - `docs/slices/040b-stammdaten-buehnenplaetze.md`
+- **Nachtrag des Orchestrators (03.10.2026, Bau-Halt Teil 2):** drei Folgen von Ziel 6 und dem neuen `MeetingCreated`,
+  die die Vorprüfung nicht gefunden hatte:
+  - `packages/domain/src/__tests__/admin040a.test.ts` (nur `ADMIN_LIST` um `admin.units.manage` und
+    `admin.seats.manage` erweitern, 12 → 14 und Testname);
+  - `packages/domain/src/__tests__/seed-fictitious-names.test.ts` (nur `fingerprintOf`: `stageSeats` und `unit-ar` aus
+    `MeetingCreated` herausnehmen; `PRE_CHANGE_FINGERPRINT` bleibt unverändert und belegt damit die gleiche
+    Fragenverteilung);
+  - `apps/web/src/app/featureRegistry.ts` (nur der Typ `NumericCounter`: `'byUnit' | 'bySeat'` ausschließen; Ausnahme
+    vom Verbot `apps/web/src/app/**` unten, sonst keine Zeile).
 
 Weitere Dateien sind Scope-Befunde.
 
@@ -392,6 +401,10 @@ Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage,
 
 Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Frage 1; 043a-Frage 5 mit beiden Wegen dort.
 
+**Stand 03.10.2026:** auf Standard gebaut (Go des Eigentümers 03.10.2026, E57): 043a-Frage 5 freigegeben, also Weg
+„mit Go“ (Anfragezeile `Classification.seatId` im Vertragsschritt, Test 6 vollständig); 040-Teilung und Budget für
+040b; E46 (AR-Büro) auf Standard. 040c und 040d sind zurückgestellt.
+
 ## Hinweise an Folgescheiben
 
 - **043a:** Kommt 040b zuerst, erweitert 043a Test 10 um `seatId` und berichtigt `Classification.stageAssignment` nicht
@@ -406,30 +419,138 @@ Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Frage 1; 043a-Frage 5 mit 
 
 ```
 Slice: 040b-stammdaten-buehnenplaetze
-Done:
-Evidence:
-Open:
-Touched:
+Done: Kern mit drei Stammdaten-Ereignissen (ganze Liste, Jahrgang als Subjekt), R-ADM-01/R-ADM-02, Prüfungen
+  (masterData.ts), vier HvApi-Methoden mit zwischengespeicherter eingegrenzter Instanz, Classification.seatId,
+  counts.byUnit/bySeat, Seed (AR-Büro, vier Plätze), zwei Rechte nur für admin; vier Routen im Dienst; Web-Adapter.
+Evidence: `pnpm gates` grün auf a5140cc (letzter Code-Stand nach den Review-Befunden; Schluss unten), davor auf
+  f89ac89; Tests 1–16 grün; fünf Mutationsproben rot; kein Screenshot
+  (Akzeptanzkriterium 4).
+Open: keine. Bau-Halt Teil 2 (drei Dateien außerhalb „Files allowed“) durch den Nachtrag des Orchestrators gelöst;
+  slice-scope warnt deshalb, dass „Files allowed“ von der Merge-Basis abweicht (erwartet).
+Touched: packages/domain/src/{types,events,envelope,state,api,permissions,rules,stream,seed,index,masterData}.ts,
+  packages/domain/src/__tests__/{master-data040b,stream035,transitions,admin040a,seed-fictitious-names}.test.ts,
+  packages/domain/policy-truth-table.md, docs/legal-trace.md, apps/api/src/app.ts,
+  apps/api/src/__tests__/master-data040b.test.ts, apps/web/src/api/{http,http.test,liveStore}.ts,
+  apps/web/src/i18n/{labels,shell.de,shell.en,parity.test}.ts, apps/web/src/features/history/eventSummary.ts,
+  apps/web/src/app/featureRegistry.ts (nur NumericCounter), docs/glossar.md, docs/datenschutz/dsfa-vorentwurf.md
 ```
 
-**Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
+**Abweichungen (Implementierer):**
+- Ajv-Teil von Test 6 läuft über HTTP in `apps/api/src/__tests__/master-data040b.test.ts` (die Domäne hat kein Ajv);
+  der Kerntest prüft die `if`/`then`-Bedingung von Hand.
+- `GET …/stage-seats` sendet kein ETag (der Vertrag deklariert keins für diese 200); Test 15 prüft das ETag an den drei PUTs.
+- `listMeetingStageSeats` liefert einem Leser ohne aktive Zuordnung in diesem Jahrgang die maskierte Liste statt 403
+  (Stammdaten für alle lesbar); 403 nur ohne Akteur.
+- Domänentyp `counts.byUnit`/`bySeat` optional wie im Vertrag; die Projektion setzt beide immer.
+- `app.ts`: neben den vier Routen ein kleiner Helfer; keine neuen Importe (`Parameters<HvApi[...]>`).
+- Vor-dem-Bau-Punkt 4 ergänzt: Seed-abhängig war `seed-fictitious-names.test.ts` (Fingerabdruck); mit der
+  Rekonstitution in `fingerprintOf` bleibt `PRE_CHANGE_FINGERPRINT` gleich, die Fragenverteilung ist unverändert.
+- Ein erster Gates-Lauf war rot an einem zeitkritischen Postgres-Test (`postgres-limits034a.test.ts`, „query that hangs
+  past the service timer before the COMMIT“, Last 4,5 durch einen parallelen Docker-Stack); einzeln 3/3 grün, der
+  zweite volle Lauf auf demselben Commit grün.
+
+**Vor dem Bau prüfen (Ergebnisse).** Geprüft vom Architekten am 03.10.2026 auf `88fa9be` (Integrationszweig mit 043a).
+1. 040a ist gemergt; `ROLE_PERMISSIONS.admin` ist eine ausdrückliche Liste (`permissions.ts:78-91`). Weiter.
+2. Vertrag 0.4.0 (043a gemergt), Allowlist 9 Einträge (6 × `slice` 040, 3 × `slice` 044). 040b nimmt nach 043a Regel 1 die
+   nächste freie Patch-Stufe: **0.4.1** (die Spec nennt das selbst: „nach 043a 0.4.1“). Die vier vorab erklärten
+   Operationen sind unverändert vorhanden, dokumentieren 500 `InternalError` schon (043a) und verwenden weiter `IfMatch`
+   (optional). Nach dem Vertragsschritt: 0.4.1, 5 Einträge. 043a-Frage 5 ist freigegeben (E57): `contract-043a.test.ts`
+   Test 10 lautet jetzt `Classification` = `{agendaItemId, seatId, stageAssignment, track}`; Test 1 prüft `^0\.4\.\d+$`.
+   `takt-016-contract.test.ts` prüft schon `^0\.(?:3|4)\.` und bleibt unverändert (Minor-Stufe wechselt nicht).
+3. Ja: `state.ts:344-345` setzt `stageAssignment` aus der Nutzlast oder löscht es. Das Verhalten gilt für beide Felder.
+4. Keine Seed-abhängigen festen Hashes oder Zählungen gefunden, die das neue `MeetingCreated` oder `unit-ar` ändern
+   (gesucht: Fachbereichszahl, Ereignisanzahl, Kettenhash, `counts`-Gleichheit). Der einzige feste Hash
+   (`security028.test.ts:53`) hängt an einem synthetischen Eingabeereignis, nicht am Seed. `contract.test.ts:159` prüft
+   nur `units.length > 0`. Die volle Bestätigung liefert `pnpm gates` des Implementierers.
+5. Ja: Der generische Validator (`apps/api/src/validate.ts`, `requestBodyValidator`) prüft auch Array-Rümpfe; Probe mit
+   Ajv gegen 0.4.1: 200/200/50 Einträge gültig, 201/201/51 ungültig (`maxItems`). Der HTTP-Beleg ist Test 15.
+6. Zeilen verschoben, ohne Folgen für „Files allowed“ oder Verhalten: `operationPermission`/`legacyEventType` jetzt
+   `api.ts:489-497` (Spec 458-476); `store.subscribe` `api.ts:345` (314); Abweisung fremder `meetingId` `api.ts:638`
+   (601-609); `subjectId`-Prüfung `api.ts:782-785` (722-723); `sessionActorFromEvents` `actor.ts:86` (104-111);
+   `MASKED_KEYS` unverändert `stream.ts:169`.
+
+**Sicherheitsposten (mitigiert, offen bis Vertrag 0.5).** Die Anfrageschemas `AgendaItemInput`, `UnitInput` und
+`StageSeatInput` sind offen (kein `additionalProperties: false`); unbekannte Felder passieren die Vertragsprüfung. Nach
+043a Regel 1 darf eine vorab erklärte Operation jetzt nicht verengt werden. Mitigation (T-G1-T-02): Der Kern baut jedes
+Ereignis nur aus den benannten Feldern (`api.ts`, `event`-Bauer in `replaceMeetingAgendaItems`, `replaceMeetingUnits`,
+`replaceMeetingStageSeats`); ein unbekanntes Feld erreicht das Log nie. Belegt durch Test 1 (jeder Eintrag von
+`AgendaItemsReplaced` hat genau `id`, `number`, `title`), Test 6 (Nutzlast `QuestionClassified` genau
+`{track, seatId}`) und Test 15/16 (gespeicherte Ereignisse gültig gegen `Event`, `EventRead` ohne `personId`). Verengung
+mit Vertrag 0.5. Bewusst nicht in der Folgeliste (Sicherheitsposten).
+
+**Review-Befunde (eingearbeitet).** [S] Maskierung je Jahrgang in `listMeetingStageSeats` mit zuordnungsgebundenem
+Akteur: neuer Kerntest „Review 040b [S]“ ((a) admin-Zuordnung in A, Lesen von B maskiert; (b) A nach `MeetingClosed`
+maskiert). Mutationsprobe `const full = can(options.actor(), 'admin.seats.manage').allow` → rot (nur dieser Test);
+zusätzlich `reader === null || …` → rot. Die vom Review wörtlich genannte Probe `reader !== null && can(options.actor(), …)`
+bleibt grün, weil die Nullprüfung des aufgelösten Akteurs allein schon maskiert. Lückenfälle in Test 3 (doppelte
+Fachbereichs-`id` → 422; abgelaufene Zuordnung: Fachbereich danach entfernbar — der Ablaufzweig sitzt bei den
+Fachbereichen, nicht bei den Plätzen), Test 6 (R-ADM-02 für ausdrückliches `seatId`), Test 13 (einzelnes Surrogat in
+`id`, `shortName`, `personId`, `deviceId`). Übrige Befunde in `docs/folgeliste.md`, Abschnitt 040b.
 
 **Signaturen der neuen `HvApi`-Methoden.**
 
-**Wahrheitstabellen-Diff.**
+```ts
+replaceMeetingAgendaItems(meetingId: string, items: AgendaItemInput[], opts?: WriteOptions): Promise<AgendaItem[]>;
+replaceMeetingUnits(meetingId: string, items: UnitInput[], opts?: WriteOptions): Promise<Unit[]>;
+listMeetingStageSeats(meetingId: string): Promise<StageSeat[]>;
+replaceMeetingStageSeats(meetingId: string, items: StageSeatInput[], opts?: WriteOptions): Promise<StageSeat[]>;
+```
 
-**Mutationsproben (Ergebnis).**
+**Wahrheitstabellen-Diff.** Nur der neue Abschnitt „Role × Administration“ am Ende von
+`packages/domain/policy-truth-table.md`, genau wie in der Spec (admin ✓ ✓, alle anderen · ·); sonst keine Zeile geändert.
 
-**`pnpm gates` (Schluss, Commit):**
+**Mutationsproben (Ergebnis).** Jede einzeln eingesetzt, `master-data040b.test.ts` (Kern) ausgeführt, zurückgesetzt:
+1. Maskierung in `listMeetingStageSeats` entfernt (`full = true`) → rot: nur Test 5.
+2. Prüfung der aktiven Rollenzuordnung in R-ADM-02 entfernt → rot: nur Test 3.
+3. `bySeat` zählt alle Fragen statt `isOnStage` → rot: nur Test 7.
+4. Gleichheitsprüfung `seatId`/`stageAssignment` entfernt → rot: nur Test 6.
+5. Eingegrenzte Instanz je Aufruf neu erzeugt → rot: nur Test 12.
+
+**`pnpm gates` (Schluss, Commit):** auf `f89ac89`, mit Postgres (`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`,
+`HV_DB_RUNTIME_ROLE=hv_runtime`), Exit 0; Auszug der Zusammenfassungszeilen in Laufreihenfolge:
 
 ```
+packages/domain test:  Test Files  18 passed (18)
+packages/domain test:       Tests  296 passed (296)
+apps/web test:  Test Files  24 passed (24)
+apps/web test:       Tests  488 passed (488)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+apps/api test: operation-coverage: 69 operations in the contract, 64 exercised by tests, 5 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+slice-scope: warning — "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" section differs from its version at the merge-base (88fa9be) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 40 changed file(s), all within "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" list (56 pattern(s)).
+# tests 275
+# pass 275
+# fail 0
+✓ built in 1.43s
+mark-test-run: wrote /home/user/wt/s040b/.claude/state/last-test-run (clean tree) at commit f89ac89, tree d48a8a0ceb20…
 ```
+
+**`pnpm gates` auf dem letzten Code-Stand `a5140cc`** (nach den Review-Befunden; Codex P1 auf #130), mit Postgres
+(`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE=hv_runtime`), Exit 0. Der erste Lauf auf diesem
+Commit scheiterte in `postgres-limits034a.test.ts` (Fall „a COMMIT that is already on its way wins over the timer: 201,
+not 408“, zeitkritisch unter Last, berührt 040b nicht, Folgeliste); der zweite Lauf auf demselben Commit:
+
+```
+packages/domain test:  Test Files  18 passed (18)
+packages/domain test:       Tests  297 passed (297)
+apps/web test:  Test Files  24 passed (24)
+apps/web test:       Tests  488 passed (488)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+apps/api test: operation-coverage: 69 operations in the contract, 64 exercised by tests, 5 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+slice-scope: warning — "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" section differs from its version at the merge-base (88fa9be) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 41 changed file(s), all within "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" list (56 pattern(s)).
+# tests 275
+# pass 275
+# fail 0
+✓ built in 1.28s
+mark-test-run: wrote /home/user/wt/s040b/.claude/state/last-test-run (clean tree) at commit a5140cc, tree cf8d464a7b10…
+```
+
+CI auf `a5140cc`: `gates` und `e2e-http` grün. Danach nur Doku-Commits.
 
 ## Review findings
 

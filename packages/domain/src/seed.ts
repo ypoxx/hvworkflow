@@ -44,7 +44,22 @@ export const SEED_UNITS = [
   { id: 'unit-ir', name: 'Investor Relations', shortName: 'IR' },
   { id: 'unit-ops', name: 'Operations und Technik', shortName: 'Operations' },
   { id: 'unit-fast', name: 'Fast-Track-Team (Kommunikation und Recht)', shortName: 'Fast Track' },
+  // Scheibe 040b (E46, built on the default): the office of the supervisory board chair. No topic of
+  // the corpus uses it, so the distribution of the questions stays the same.
+  { id: 'unit-ar', name: 'Büro des Aufsichtsratsvorsitzenden', shortName: 'AR-Büro' },
 ] as const;
+
+/**
+ * Scheibe 040b (ADR 0006): the four default podium seats, one per value of `STAGE_ASSIGNMENTS`, so
+ * every `stageAssignment` of the corpus names a seat. Labels are master-data content in the content
+ * language `de`, not interface text; synthetic, without person or device.
+ */
+export const SEED_STAGE_SEATS = [
+  { id: 'supervisory_board_chair', label: 'Aufsichtsratsvorsitz', position: 1 },
+  { id: 'ceo', label: 'Vorstandsvorsitz', position: 2 },
+  { id: 'cfo', label: 'Finanzvorstand', position: 3 },
+  { id: 'board_member', label: 'Vorstandsmitglied', position: 4 },
+] as const satisfies readonly { id: StageAssignment; label: string; position: number }[];
 
 export const SEED_ACTORS: Record<string, Actor> = {
   system: { id: 'system', role: 'admin', displayName: 'System' },
@@ -394,6 +409,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
       lifecycleVersion: 2,
       agendaItems: SEED_AGENDA.map((a) => ({ ...a })),
       units: SEED_UNITS.map((u) => ({ ...u })),
+      stageSeats: SEED_STAGE_SEATS.map((seat) => ({ ...seat })),
     },
   });
   // Keep the demo in its familiar running state now that MeetingCreated projects preparation.
