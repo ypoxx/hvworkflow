@@ -26,10 +26,10 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
    zugeschnittenen Form (ohne Jahrgang anlegen und ohne Freeze; der Jahrgang kommt aus dem Seed). Für Oberflächenscheiben
    mittleren Risikos gibt es keinen gesonderten Lesebefund der Spec, nur ein Review nach dem Bau (Entscheidung D vom
    03.10.2026). Sicherheits-, Rechts- und Datenschutzbefunde bleiben Pflicht.
-4. **Entwicklerstrang und Betrieb:** 066, 075 (mit dem Demoszenario „Beispieltranskript über die Schnittstelle“), 038, 070
+3. **Entwicklerstrang und Betrieb:** 066, 075 (mit dem Demoszenario „Beispieltranskript über die Schnittstelle“), 038, 070
    und 071.
-5. **064 und 065 bauen**, sobald die Eigentümerentscheidungen dazu vorliegen (064a/064b, 065a).
-6. **Doku-Nachträge des Orchestrators:**
+4. **064 und 065 bauen**, sobald die Eigentümerentscheidungen dazu vorliegen (064a/064b, 065a).
+5. **Doku-Nachträge des Orchestrators:**
    - Produktplan: die Zeile „Stand 03.10.2026“ in Abschnitt 11 nachführen; dazu Teilungsvermerk, Lanes und Kalender für
      044 sowie die Verschiebung „Export markiert Verweigerungen“ nach 051 (Spec 044a, Files allowed; Go zu
      Eigentümerfrage 2 liegt seit 03.10.2026 vor);
