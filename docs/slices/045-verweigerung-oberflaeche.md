@@ -698,7 +698,7 @@ question for …“), E4b grün (siehe oben).
 **Grün nach der Änderung:** Vitest `apps/web` 28 Dateien, 555 Tests. Playwright `045-verweigerung.spec.ts` `in-process`
 6 passed; mit `--repeat-each=3` 18 passed (2.2m). Volle Suite `in-process` 139 passed (6.9m), axe ohne serious/critical.
 
-**`pnpm gates`** auf Commit `5b5edc9` (Exit 0; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
+**`pnpm gates`** auf Commit `07162fd` (Exit 0; erster Lauf auf `5b5edc9` vor Zusammenfassung und Review; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
 Vitest: domain 393, web 555, api 663 passed), Schluss wörtlich:
 
 ```
@@ -723,7 +723,7 @@ dist/assets/index-Cnc_SFcw.js                        690.65 kB │ gzip: 202.18 
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 1.48s
-mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 5b5edc9, tree 0d83f1f2bee9…
+mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 07162fd, tree 07ea86a1fa47…
 ```
 
 **Projekt `http`:** CI-Lauf `e2e-http` des PR, Lauf-ID: (Platzhalter, trägt der Orchestrator nach).
