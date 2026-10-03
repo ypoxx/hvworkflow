@@ -11,7 +11,8 @@
  *   4. appends one event and returns the projected resource with `_actions`.
  */
 import type { DomainEvent, NewEvent, ReadEvent } from './events.js';
-import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
+import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, REFUSAL_JUSTIFICATION_READ, ROLE_PERMISSIONS, type Decision } from './permissions.js';
+import { copyRefusalGrounds, REFUSAL_GROUNDS, type RefusalGround } from './refusalGrounds.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, isOnStage, reduce, sortStageSeats, type State } from './state.js';
 import { checkAgendaItems, checkStageSeats, checkUnits } from './masterData.js';
@@ -40,6 +41,7 @@ import type {
   QuestionRecord,
   QuestionStatus,
   ReadMethod,
+  RefusalProposal,
   Speaker,
   SpeakerRecord,
   SpeakerRegistration,
@@ -135,6 +137,12 @@ export interface HvApi {
   closeQuestion(id: string, opts?: WriteOptions): Promise<Question>;
   withdrawQuestion(id: string, reason: string, opts?: WriteOptions): Promise<Question>;
   mergeQuestion(id: string, intoQuestionId: string, opts?: WriteOptions): Promise<Question>;
+  /** Scheibe 044a: the catalogue of refusal grounds, a deep copy with `hash`; global, no meeting scope. */
+  listRefusalGrounds(): Promise<RefusalGround[]>;
+  /** Scheibe 044a: a refusal (path A or B) as a new answer version, straight to `in_review` (R-TRANS-15). */
+  proposeRefusal(id: string, input: RefusalProposal, opts?: WriteOptions): Promise<Question>;
+  /** Scheibe 044a: approve exactly the latest refusal version (R-TRANS-16). */
+  approveRefusal(id: string, answerVersion: number, opts?: WriteOptions): Promise<Question>;
 
   getStage(): Promise<StageView>;
   listEvents(after?: number, limit?: number): Promise<{ items: ReadEvent[]; lastSeq: number }>;
@@ -299,6 +307,36 @@ export function sessionAssignmentFor(events: readonly DomainEvent[], subjectId: 
   return current[0]?.assignment;
 }
 
+/** Contract 0.4.0 limits of `RefusalProposal`, checked by the core (Scheibe 044a). A missing ground or
+ * justification is not a 422 but R-GUARD-09 (409). Messages never repeat the submitted text. */
+const REFUSAL_KINDS: readonly string[] = ['refusal_no_claim', 'refusal_with_ground'];
+function checkRefusalProposal(input: RefusalProposal): string | null {
+  const body = input as unknown as Record<string, unknown>;
+  const kind = body['answerKind'];
+  if (typeof kind !== 'string' || !REFUSAL_KINDS.includes(kind)) return 'answerKind must be refusal_no_claim or refusal_with_ground.';
+  const text = body['text'];
+  if (typeof text !== 'string' || text.trim().length === 0) return 'text is required.';
+  if (text.length > 20000) return 'text must not exceed 20000 characters.';
+  const justification = body['refusalJustification'];
+  if (justification !== undefined && (typeof justification !== 'string' || justification.length > 4000)) {
+    return 'refusalJustification must be a string of at most 4000 characters.';
+  }
+  const groundId = body['refusalGroundId'];
+  if (groundId !== undefined && (typeof groundId !== 'string' || groundId.length > 128)) {
+    return 'refusalGroundId must be a string of at most 128 characters.';
+  }
+  const sources = body['sources'];
+  if (sources !== undefined && (!Array.isArray(sources) || sources.some((item) => typeof item !== 'string'))) {
+    return 'sources must be an array of strings.';
+  }
+  if (kind === 'refusal_no_claim' && groundId !== undefined) return 'Refusal path A carries no refusalGroundId.';
+  // The catalogue is readable by everyone, so naming the id reveals nothing about a question.
+  if (typeof groundId === 'string' && !REFUSAL_GROUNDS.some((ground) => ground.id === groundId)) {
+    return `Refusal ground ${groundId} is not in the catalogue.`;
+  }
+  return null;
+}
+
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
   const clock = options.clock ?? systemClock;
@@ -412,13 +450,22 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     claim !== undefined && Date.parse(claim.expiresAt) > clock().getTime()
       ? { claim: { actorId: claim.actorId, claimedAt: claim.claimedAt, expiresAt: claim.expiresAt } }
       : {};
-  const viewQuestion = (q: QuestionRecord, source: State = state): Question => {
+  /**
+   * Scheibe 044a (SG2): the justification of a refusal reaches only holders of a refusal right, for
+   * every version (also a displaced one) and in every write answer, because each write answers through
+   * this view. `can()` is asked without the question on purpose: with it, the transition table would
+   * decide, and an approver would read the justification only while an approval happens to be
+   * possible. `stage: true` (getStage) never shows it, whoever reads.
+   */
+  const viewQuestion = (q: QuestionRecord, source: State = state, view: { stage?: true } = {}): Question => {
     const { claim, ...record } = q;
+    const readsJustification = view.stage !== true && REFUSAL_JUSTIFICATION_READ.some((p) => can(actor(), p).allow);
     return {
     ...record,
     ...viewClaim(claim),
     ...(source.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(source.speakers.get(q.speakerId)!, source).displayName } : {}),
-    answers: q.answers.map((a) => ({ ...a, createdBy: viewActor(a.createdBy) })),
+    answers: q.answers.map(({ refusalJustification, ...a }) => ({ ...a, createdBy: viewActor(a.createdBy),
+      ...(readsJustification && refusalJustification !== undefined ? { refusalJustification } : {}) })),
     ...(q.approval !== undefined ? { approval: { ...q.approval, approvedBy: viewActor(q.approval.approvedBy) } } : {}),
     ...(q.legalClearance !== undefined ? { legalClearance: { ...q.legalClearance, clearedBy: viewActor(q.legalClearance.clearedBy) } } : {}),
     _actions: actionsFor(actor(), q),
@@ -1086,8 +1133,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           if (!t.ok) throw new ApiProblem(409, 'Conflict', t.reason, t.ruleId);
           keepReason = (t.transition.guards?.length ?? 0) > 0;
         }
-        // Built field by field: fields the contract still accepts but the core ignores since 080
-        // (Redezeit) never reach an event; the reason only travels with a status change.
+        // Built field by field: fields the contract no longer declares since 0.4.0 but still does not
+        // reject (`requestedMinutes`, ignored since 080) never reach an event; the reason only travels
+        // with a status change.
         const payload = {
           ...(input.status !== undefined ? { status: input.status } : {}),
           ...(input.round !== undefined ? { round: input.round } : {}),
@@ -1422,12 +1470,62 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       });
     },
 
+    async listRefusalGrounds() {
+      requireReadPermission('listRefusalGrounds');
+      return copyRefusalGrounds();
+    },
+    async proposeRefusal(id, input, opts) {
+      // Scheibe 044a: the demo does not validate against the contract (034a), so the core checks the
+      // 0.4.0 limits itself, before any transition. No message repeats a submitted text.
+      const invalid = checkRefusalProposal(input);
+      if (invalid) throw new ApiProblem(422, 'Unprocessable', invalid);
+      return transition(id, 'question.refuse.propose', opts, input, (q, to) => {
+        const ground = input.answerKind === 'refusal_with_ground'
+          ? REFUSAL_GROUNDS.find((entry) => entry.id === input.refusalGroundId) : undefined;
+        return {
+          type: 'AnswerDrafted',
+          subjectId: q.id,
+          // DSFA V7: a refusal is evidence for the minutes and a challenge (record, not working).
+          retentionClass: 'record',
+          payload: {
+            answer: {
+              version: q.answers.length + 1,
+              text: input.text.trim(),
+              createdAt: now(),
+              createdBy: { id: actor().id, role: actor().role },
+              ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
+              answerKind: input.answerKind,
+              ...(ground !== undefined ? { refusalGroundId: ground.id, refusalGroundHash: ground.hash,
+                refusalGround: { title: ground.title, stageText: ground.stageText, legalRef: { ...ground.legalRef } } } : {}),
+            },
+            // The justification only in the marked PII part (ADR 0009): codec, key custody and
+            // crypto-shredding per meeting apply, and every event read path strips it. R-GUARD-09 has
+            // already ensured it is a non-blank string.
+            pii: { keyId: state.meeting?.id ?? '', refusalJustification: (input.refusalJustification ?? '').trim() },
+            ...(q.approval ? { invalidatedApprovalOfVersion: q.approval.answerVersion } : {}),
+            toStatus: to,
+          },
+        };
+      });
+    },
+    async approveRefusal(id, answerVersion, opts) {
+      if (!Number.isInteger(answerVersion) || answerVersion < 1) {
+        throw new ApiProblem(422, 'Unprocessable', 'answerVersion must be a positive integer.');
+      }
+      return transition(id, 'question.refuse.approve', opts, { answerVersion }, (q) => ({
+        type: 'QuestionApproved',
+        subjectId: q.id,
+        retentionClass: 'record',
+        payload: { answerVersion },
+      }));
+    },
+
     async getStage() {
       requireReadPermission('getStage');
       const staged = [...state.questions.values()]
         .filter(isOnStage)
         .sort((a, b) => (a.stagePosition ?? 0) - (b.stagePosition ?? 0))
-        .map((question) => viewQuestion(question));
+        .map((question) => viewQuestion(question, state, { stage: true }));
       const [current, ...queue] = staged;
       const counts = state.meeting?.counts;
       return {

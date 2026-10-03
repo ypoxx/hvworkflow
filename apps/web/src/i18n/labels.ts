@@ -67,6 +67,8 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'question.submit_review': 'action.question.submit_review',
   'question.approve': 'action.question.approve',
   'question.legal.clear': 'action.question.legal.clear',
+  'question.refuse.propose': 'action.question.refuse.propose',
+  'question.refuse.approve': 'action.question.refuse.approve',
   'question.return': 'action.question.return',
   'question.stage': 'action.question.stage',
   'question.deliver': 'action.question.deliver',

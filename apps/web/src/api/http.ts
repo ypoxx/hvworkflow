@@ -649,6 +649,10 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     closeQuestion: (questionId, writeOptions) => write('post', '/questions/{questionId}/closure', { params: questionPath(questionId), write: writeOptions }),
     withdrawQuestion: (questionId, reason, writeOptions) => write('post', '/questions/{questionId}/withdrawal', { params: questionPath(questionId), body: { reason }, write: writeOptions }),
     mergeQuestion: (questionId, intoQuestionId, writeOptions) => write('post', '/questions/{questionId}/merge', { params: questionPath(questionId), body: { intoQuestionId }, write: writeOptions }),
+    // Scheibe 044a: the refusal operations of contract 0.4.0 (served by the service from 044b).
+    listRefusalGrounds: () => read('get', '/refusal-grounds'),
+    proposeRefusal: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/refusals', { params: questionPath(questionId), body: input, write: writeOptions }),
+    approveRefusal: (questionId, answerVersion, writeOptions) => write('post', '/questions/{questionId}/refusal-approvals', { params: questionPath(questionId), body: { answerVersion }, write: writeOptions }),
     getStage: () => read('get', '/stage'),
     listEvents: (after, limit) => read('get', '/events', { query: { after, limit } }),
     seedDemo: () => Promise.reject(new ApiProblem(403, translate(language(), 'http.errorTitle'), translate(language(), 'http.demoOnly'))),

@@ -11,6 +11,9 @@ import { TERMINAL_STATUSES } from './types.js';
 // so this direction must stay type-only (isolatedModules erases it) or the two files would import
 // each other's values and form a real load-time cycle.
 import type { LegalRef } from './rules.js';
+// A value import: R-GUARD-11 reads the catalogue as data, like `LEGAL_GATE_BY_TRACK`; it is never
+// injected, and the projection never depends on it (the guard acts only at the time of a command).
+import { REFUSAL_GROUNDS } from './refusalGrounds.js';
 
 /**
  * Who asks for the transition (slice 021a). Required, not optional: a guard that depends on the
@@ -184,6 +187,144 @@ const hasLegalClearance: Guard = {
   },
 };
 
+/* ---------- refusal (Verweigerung), Scheibe 044a ---------- */
+
+// Every refusal rule below is built on the default ("auf Standard gebaut"): ADR 0012 (model A) is
+// proposed and has not been read by Recht (E15). The marker is part of each citation so that
+// docs/legal-trace.md shows it until the legal review (076).
+const ON_DEFAULT = 'Auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht nicht gelesen).';
+
+type LatestVersion = QuestionRecord['answers'][number] | undefined;
+const latestOf = (q: QuestionRecord): LatestVersion => q.answers[q.answers.length - 1];
+/** A version without `answerKind` is an answer (contract 0.4.0). */
+const isRefusalVersion = (v: LatestVersion): boolean =>
+  v !== undefined && (v.answerKind === 'refusal_no_claim' || v.answerKind === 'refusal_with_ground');
+const nonBlank = (value: unknown): boolean => typeof value === 'string' && value.trim().length > 0;
+
+const refusalLegallyCleared: Guard = {
+  ruleId: 'R-GUARD-08',
+  description: 'A refusal is approved only after a legal clearance (Rechtsfreigabe) of exactly its latest version, on every track.',
+  legalRef: {
+    source: 'Recherche',
+    citation:
+      'docs/anforderungen-recherche.md:63 ("[MUSS] Zwei getrennte Statuspfade für Nichtbeantwortung … Beide brauchen ' +
+      'Begründung und Freigabe"). Ableitung: die Freigabe einer Verweigerung setzt die Rechtsfreigabe derselben Version ' +
+      'voraus (`legalClearance.answerVersion` = letzte Version), unabhängig von LEGAL_GATE_BY_TRACK und vor R-GUARD-07, ' +
+      'damit kein Eilpfad und keine abgeschaltete Pfadzeile eine Verweigerung ohne Rechtsprüfung durchlässt. ' + ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q) => {
+    const latest = latestOf(q);
+    return latest !== undefined && q.legalClearance?.answerVersion === latest.version;
+  },
+};
+
+const refusalGroundAndJustification: Guard = {
+  ruleId: 'R-GUARD-09',
+  description: 'A refusal names a non-blank justification (Begründung); refusal path B also a catalogue ground.',
+  legalRef: {
+    source: 'Rechtekonzept',
+    citation:
+      'docs/rollen-und-rechtekonzept.md:173 (Abschnitt 4: "Keine Verweigerung ohne zugeordneten Grund und Begründung. ' +
+      'Der Zustand ist ohne diese Felder nicht speicherbar.") und docs/anforderungen-recherche.md:63-64 ("Beide brauchen ' +
+      'Begründung und Freigabe"; "Freitext „kein Kommentar“ oder ein leeres Feld dürfen technisch nicht speicherbar ' +
+      'sein"). Begründungspflicht für beide Pfade erfüllt (getrimmt, leer ist 409); das weicht vom Satz in ADR 0012 ' +
+      '("Begründung nur für Pfad B") ab. Nicht erfüllt gegenüber Rechtekonzept §4 (Zeile 173) und Recherche Z.63: Pfad A ' +
+      'trägt keinen zugeordneten Grund und keine Untergründe (Vertrag 0.4.0; Eigentümerfrage 3b, Zielscheibe 044c). Ein ' +
+      'inhaltsleerer, nicht leerer Text ist nicht abwehrbar. Ohne Nutzlast (`_actions`) erfüllt, weil jederzeit erfüllbar. ' +
+      ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (_q, payload) => {
+    if (payload === undefined) return true;
+    const p = payload as { answerKind?: unknown; refusalGroundId?: unknown; refusalJustification?: unknown };
+    if (!nonBlank(p.refusalJustification)) return false;
+    if (p.answerKind === 'refusal_with_ground') return typeof p.refusalGroundId === 'string' && p.refusalGroundId.length > 0;
+    return true;
+  },
+};
+
+const refusalGroundUnchanged: Guard = {
+  ruleId: 'R-GUARD-11',
+  description: 'The catalogue entry of a path-B refusal is unchanged since the proposal (hash equal to the current entry).',
+  legalRef: {
+    source: 'Recherche',
+    citation:
+      'docs/anforderungen-recherche.md:64 ("Die Beweislast für den Verweigerungsgrund trägt die Gesellschaft"). Ableitung ' +
+      '(Spec 043a): die Freigabe gilt nur dem Wortlaut und Zitat, auf die vorgeschlagen wurde — `refusalGroundHash` der ' +
+      'Version muss dem `hash` des aktuellen Katalogeintrags gleichen; fehlt der Eintrag, ist der Guard verletzt. Für Pfad A ' +
+      'und Antworten erfüllt. Katalog und Hash sind ungeprüft (E15). ' + ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q) => {
+    const latest = latestOf(q);
+    if (latest?.answerKind !== 'refusal_with_ground') return true;
+    const entry = REFUSAL_GROUNDS.find((ground) => ground.id === latest.refusalGroundId);
+    return entry !== undefined && entry.hash === latest.refusalGroundHash;
+  },
+};
+
+const latestIsAnswer: Guard = {
+  ruleId: 'R-GUARD-12',
+  description: 'Answer operations act only on an answer: the latest version exists and is no refusal.',
+  legalRef: {
+    source: 'Recherche',
+    citation:
+      'docs/anforderungen-recherche.md:24 ("Zwei Nichtbeantwortungen, zwei Rechtsfolgen … getrennte Statuspfade"). ' +
+      'Ableitung: eine Verweigerung wird nie über die Antwortoperationen (zur Prüfung geben, freigeben) weitergeführt, ' +
+      'sondern nur mit `question.refuse.approve`; ohne Version falsch. ' + ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q) => {
+    const latest = latestOf(q);
+    return latest !== undefined && !isRefusalVersion(latest);
+  },
+};
+
+const latestIsRefusal: Guard = {
+  ruleId: 'R-GUARD-13',
+  description: 'The refusal approval acts only on a refusal: the latest version is refusal path A or B.',
+  legalRef: {
+    source: 'Recherche',
+    citation:
+      'docs/anforderungen-recherche.md:24 ("Zwei Nichtbeantwortungen, zwei Rechtsfolgen … getrennte Statuspfade"). ' +
+      'Ableitung: aus einer Antwort wird nie über `question.refuse.approve` eine freigegebene Verweigerung; ohne Version ' +
+      'falsch. ' + ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q) => isRefusalVersion(latestOf(q)),
+};
+
+const approverIsNotLegalClearer: Guard = {
+  ruleId: 'R-GUARD-14',
+  description: 'The approver of a refusal is not the person who legally cleared it (compared by actor id).',
+  legalRef: {
+    source: 'Rechtekonzept',
+    citation:
+      'docs/rollen-und-rechtekonzept.md:168-169 (Abschnitt 4: "Kein Recht und keine Rollenkombination kann das ' +
+      'Vier-Augen-Prinzip abschalten — auch nicht durch Rollenwechsel innerhalb derselben Sitzung") und :123 (Abschnitt ' +
+      '2.4, Zeile `refused`: "Ersteller ≠ Freigeber"). Ableitung: mit R-GUARD-06 sind Erstellerin, rechtlich Freigebende und ' +
+      'Freigebende einer Verweigerung drei verschiedene Akteur-ids; ein Rollenwechsel desselben Subjects (Entzug oder Ablauf ' +
+      'der Zuordnung `legal`) hebt die Trennung nicht auf. Ohne Rechtsfreigabe erfüllt; dass sie vorliegt, verlangt ' +
+      'R-GUARD-08 in derselben Zeile. Eine Person mit zwei Subjects erkennt der Guard nicht (Restrisiko neben MF-01). Nur ' +
+      'für Verweigerungen; für Antworten offen (Eigentümerfrage 8). ' + ON_DEFAULT,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q, _payload, ctx) => q.legalClearance === undefined || q.legalClearance.clearedBy.id !== ctx.actor.id,
+};
+
 const NON_TERMINAL = (['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved', 'staged', 'delivered'] as const) satisfies readonly QuestionStatus[];
 
 export const TRANSITIONS: readonly Transition[] = [
@@ -292,7 +433,7 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.submit_review',
     from: ['answer_drafted'],
     to: 'in_review',
-    guards: [hasAnswer],
+    guards: [hasAnswer, latestIsAnswer],
     description: 'Hand the latest version to legal clearing (Zur Prüfung).',
     legalRef: {
       source: 'Prozess',
@@ -315,7 +456,7 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.approve',
     from: ['in_review'],
     to: 'approved',
-    guards: [hasAnswer, approvalIsLatest, approverIsNotCreator],
+    guards: [hasAnswer, latestIsAnswer, approvalIsLatest, approverIsNotCreator],
     description: 'Approve (Freigeben) exactly the latest answer version.',
     legalRef: {
       source: 'Rechtekonzept',
@@ -604,6 +745,52 @@ export const TRANSITIONS: readonly Transition[] = [
       citation:
         'docs/slices/021c-rechtsfreigabe-rechtstor.md (Nachtrag des Architekten a: ' +
         'Podiumspfad aus classified ohne Antwortversion, R-GUARD-02).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-TRANS-15',
+    action: 'question.refuse.propose',
+    from: ['classified', 'assigned', 'answer_drafted', 'in_review', 'approved'],
+    to: 'in_review',
+    guards: [isTextTrack, refusalGroundAndJustification],
+    description:
+      'Propose a refusal (Verweigerung vorschlagen) as a new answer version; it goes straight to legal clearing. A new version after approval invalidates the approval.',
+    legalRef: {
+      source: 'Recherche',
+      citation:
+        'docs/anforderungen-recherche.md:63 ("[MUSS] Zwei getrennte Statuspfade für Nichtbeantwortung. (A) kein ' +
+        'Auskunftsanspruch mit Untergründen; (B) Verweigerung trotz Anspruchs mit Zwangszuordnung zum gesetzlichen ' +
+        'Katalog") und :24 (§ 131 Abs. 3 AktG nur für Pfad B genannt). Recht `question.refuse.propose` aus ' +
+        'docs/rollen-und-rechtekonzept.md:60. Teilweise: Pfad A ohne Untergründe (Eigentümerfrage 3b, 044c). Ableitung ' +
+        '(Spec 044a): der Vorschlag führt direkt nach `in_review`, weil sein Inhalt schon die Rechtseinschätzung ist; ' +
+        'nur Textpfade (R-GUARD-03), eine Podiumsfrage wird vorher umklassifiziert (Eigentümerfrage 5); nicht aus ' +
+        '`staged` oder `delivered` (vorher R-TRANS-06). Die Verweigerung ist eine Antwortversion mit `answerKind` ' +
+        '(ADR 0012 Modell A, kein eigener Zustand); der Zielstatus steht im Ereignis (`toStatus`). Die Begründung liegt ' +
+        'nur im `pii`-Teil des Ereignisses (ADR 0009, DSFA V7). ' + ON_DEFAULT,
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-TRANS-16',
+    action: 'question.refuse.approve',
+    from: ['in_review'],
+    to: 'approved',
+    guards: [hasAnswer, latestIsRefusal, approvalIsLatest, approverIsNotCreator, approverIsNotLegalClearer, refusalLegallyCleared, refusalGroundUnchanged],
+    description: 'Approve a refusal (Verweigerung freigeben): exactly the latest refusal version, after its legal clearance, by a third person.',
+    legalRef: {
+      source: 'Rechtekonzept',
+      citation:
+        'docs/rollen-und-rechtekonzept.md:123 (Abschnitt 2.4, Zeile `refused`: Berechtigung `question.refuse.approve`, ' +
+        'Pflichtfelder "Verweigerungsgrund, Begründung", Vier-Augen "Ersteller ≠ Freigeber") und :61. Teilweise: kein ' +
+        'eigener Zustand `refused` (ADR 0012 Modell A: die freigegebene Verweigerung steht in `approved` und läuft über ' +
+        'die Bühne nach `delivered`); Grund und Begründung prüft R-GUARD-09 schon beim Vorschlag, für Pfad A ohne Grund ' +
+        '(nicht erfüllt, Eigentümerfrage 3b). Die Freigabe ist an die Version gebunden (R-GUARD-04, ' +
+        'docs/rollen-und-rechtekonzept.md:175). ' + ON_DEFAULT,
       docVersion: null,
       docHash: null,
       verified: false,

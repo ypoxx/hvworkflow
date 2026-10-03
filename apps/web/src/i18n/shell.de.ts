@@ -185,6 +185,8 @@ export const shellDe = {
   'action.question.submit_review': 'Weiterleiten',
   'action.question.approve': 'Freigeben',
   'action.question.legal.clear': 'Rechtlich freigeben',
+  'action.question.refuse.propose': 'Verweigerung vorschlagen',
+  'action.question.refuse.approve': 'Verweigerung freigeben',
   'action.question.return': 'Zurückgeben',
   'action.question.stage': 'Auf die Bühne',
   'action.question.deliver': 'Vorgelesen, weiter',

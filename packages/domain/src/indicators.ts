@@ -62,7 +62,9 @@ export function computeIndicators(events: readonly DomainEvent[], now: Date): In
     for (const event of group) {
       if (event.type === 'QuestionCaptured') capturedAt.set(event.subjectId, eventTime(event));
       else if (event.type === 'QuestionSubmittedForReview' ||
-        (event.type === 'QuestionReturned' && event.payload.toStatus === 'in_review')) {
+        (event.type === 'QuestionReturned' && event.payload.toStatus === 'in_review') ||
+        // Scheibe 044a: a refusal proposal enters legal review directly; every new proposal restarts the clock.
+        (event.type === 'AnswerDrafted' && event.payload.toStatus === 'in_review')) {
         inReviewSince.set(event.subjectId, eventTime(event));
       }
     }

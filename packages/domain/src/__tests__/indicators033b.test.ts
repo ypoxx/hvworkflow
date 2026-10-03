@@ -114,6 +114,26 @@ describe('Scheibe 033b: indicators (core, pure)', () => {
     expect(m.questionsCapturedLast5m).toBe(1);
   });
 
+  // Scheibe 044a, Test 26: a refusal proposal goes straight to `in_review` as `AnswerDrafted` with
+  // `toStatus`; the ten-minute clock starts with it and restarts with every new proposal.
+  it('Scheibe 044a: a refusal proposal starts the legal-review clock, a new proposal restarts it', () => {
+    const refusal = (id: string, version: number, at: string): DomainEvent => ev('AnswerDrafted', id, {
+      answer: { version, text: 'x', createdAt: at, createdBy: actor, answerKind: 'refusal_no_claim' },
+      pii: { keyId: M, refusalJustification: 'MARKER-Begruendung' }, toStatus: 'in_review' }, at);
+    const base = [...meeting(), capture('q1', ago(4000)), ...assign('q1', 'u-fin')];
+    // Proposed at t0: counted at t0 + 11 min, not at t0 + 9 min.
+    expect(only([...base, refusal('q1', 1, ago(660))]).questionsInLegalReviewOver10m).toBe(1);
+    expect(only([...base, refusal('q1', 1, ago(540))]).questionsInLegalReviewOver10m).toBe(0);
+    // Was in review long before (old submit, then returned): counts from the proposal, not the old time.
+    const earlier = [...base, draft('q1', 1, ago(3500)), submit('q1', ago(3000)),
+      ev('QuestionReturned', 'q1', { reason: 'r', fromStatus: 'in_review', toStatus: 'answer_drafted' }, ago(2900))];
+    expect(only([...earlier, refusal('q1', 2, ago(540))]).questionsInLegalReviewOver10m).toBe(0);
+    // A second proposal at t0 + 8 min: not counted at t0 + 11 min, counted at t0 + 19 min.
+    expect(only([...base, refusal('q1', 1, ago(660)), refusal('q1', 2, ago(180))]).questionsInLegalReviewOver10m).toBe(0);
+    expect(only([...base, refusal('q1', 1, ago(1140)), refusal('q1', 2, ago(660))]).questionsInLegalReviewOver10m).toBe(1);
+    expect(JSON.stringify(computeIndicators([...base, refusal('q1', 1, ago(660))], NOW))).not.toContain('MARKER');
+  });
+
   it('is deterministic and does not mutate its input', () => {
     const events = [...meeting(), capture('q1', ago(20))];
     const copy = JSON.stringify(events);

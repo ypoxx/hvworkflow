@@ -52,6 +52,11 @@ export const PERMISSIONS = [
   'question.submit_review',
   'question.approve',
   'question.legal.clear',
+  // Scheibe 044a (ADR 0012 model A, E25; built on the default): propose and approve a refusal
+  // (Verweigerung). Placed right after the legal clearance: the order is the column order of the
+  // policy truth table.
+  'question.refuse.propose',
+  'question.refuse.approve',
   'question.return',
   'question.stage',
   'question.deliver',
@@ -87,6 +92,9 @@ export const READ_PERMISSIONS = {
   getStage: ['stage.read'],
   getQuestionHistory: ['history.read'],
   listEvents: ['event.read'],
+  // Scheibe 044a (043a): the catalogue of refusal grounds is global code data; every reader of a
+  // question or of the stage may read it.
+  listRefusalGrounds: ['question.read', 'question.read.delivered', 'stage.read'],
 } as const satisfies Record<string, readonly Permission[]>;
 export type ReadMethod = keyof typeof READ_PERMISSIONS;
 
@@ -255,12 +263,30 @@ export interface Claim {
   expiresAt: string;
 }
 
+/**
+ * Scheibe 044a (contract 0.4.0, ADR 0012 model A): the kind of an answer version. `refusal_no_claim`
+ * is refusal path A (Verweigerungspfad A, "kein Auskunftsanspruch"), `refusal_with_ground` refusal
+ * path B (Verweigerungspfad B, "Verweigerung trotz Anspruchs", with a catalogue ground).
+ */
+export type AnswerKind = 'answer' | 'refusal_no_claim' | 'refusal_with_ground';
+
 export interface AnswerVersion {
   version: number;
   text: string;
   createdAt: string;
   createdBy: Actor;
   sources?: string[];
+  /** Absent means `answer`; `draftAnswer` never writes it. */
+  answerKind?: AnswerKind;
+  /** Path B only: the catalogue entry and its hash at the time of the proposal (R-GUARD-11). */
+  refusalGroundId?: string;
+  refusalGroundHash?: string;
+  /**
+   * The justification (Begründung), a legal assessment that may concern the shareholder (SG2, DSFA V7).
+   * In the log it lives only in `payload.pii`; a view carries it only for holders of
+   * `REFUSAL_JUSTIFICATION_READ` (permissions.ts).
+   */
+  refusalJustification?: string;
 }
 
 export interface Approval {
@@ -326,7 +352,7 @@ export interface SpeakerRegistration {
 export interface SpeakerUpdate {
   status?: SpeakerStatus;
   round?: number;
-  /** Domain only until contract 0.4.0 (slice 043): required by R-SPK-05 (finished → waiting). */
+  /** In the contract since 0.4.0 (slice 043a): required by R-SPK-05 (finished → waiting). */
   reason?: SpeakerReopenReason;
 }
 export interface ContributionCapture {
@@ -374,6 +400,14 @@ export interface StageSeatInput {
 }
 export interface AnswerDraft {
   text: string;
+  sources?: string[];
+}
+/** Scheibe 044a: body of `proposeRefusal` (contract `RefusalProposal`, closed). */
+export interface RefusalProposal {
+  answerKind: 'refusal_no_claim' | 'refusal_with_ground';
+  text: string;
+  refusalGroundId?: string;
+  refusalJustification?: string;
   sources?: string[];
 }
 export interface LegalClearanceRequest {
