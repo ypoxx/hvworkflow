@@ -698,7 +698,7 @@ question for …“), E4b grün (siehe oben).
 **Grün nach der Änderung:** Vitest `apps/web` 28 Dateien, 555 Tests. Playwright `045-verweigerung.spec.ts` `in-process`
 6 passed; mit `--repeat-each=3` 18 passed (2.2m). Volle Suite `in-process` 139 passed (6.9m), axe ohne serious/critical.
 
-**`pnpm gates`** auf Commit `07162fd` (Exit 0; erster Lauf auf `5b5edc9` vor Zusammenfassung und Review; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
+**`pnpm gates`** auf Commit `4259657` (Exit 0; frühere Läufe auf `5b5edc9` und `07162fd`; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
 Vitest: domain 393, web 555, api 663 passed), Schluss wörtlich:
 
 ```
@@ -713,7 +713,7 @@ dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
 dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
 dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
 dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
-dist/assets/index-Cnc_SFcw.js                        690.65 kB │ gzip: 202.18 kB │ map: 2,885.39 kB
+dist/assets/index-CmZtqmhs.js                        690.76 kB │ gzip: 202.20 kB │ map: 2,885.86 kB
 
 [plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
 
@@ -722,9 +722,17 @@ dist/assets/index-Cnc_SFcw.js                        690.65 kB │ gzip: 202.18 
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.48s
-mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 07162fd, tree 07ea86a1fa47…
+✓ built in 1.45s
+mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 4259657, tree 71683b025797…
 ```
+
+**e2e-http E2 (CI-Lauf 37152696332, Job 111289649056) behoben in `4259657`:** `findRefusableQuestion` las die
+Arbeitsliste, bevor der Einheitenfilter angekommen war. Der Filter wirkt im Dienst (`listQuestions({ unitId })`), der
+Statusfilter dagegen im Client; in `http` kommt die gefilterte Liste verzögert. Die Schleife nahm deshalb die erste
+verweigerbare `assigned`-Frage der ungefilterten Liste (F-0108, `unit-strat`; Nachweis per Domain-Skript: F-0108 ist die
+erste in Nummernfolge, `unit-fin` hält F-0121, F-0128, F-0135, F-0204). Der Fachbereich ist an `unit-fin` gebunden und
+liest sie nicht, seine Suche fand keine Zeile. Der Test wartet jetzt, bis jede Zeile die gewählte Einheit trägt (neues
+Zeilenattribut `data-unit` in `WorkList.tsx`), und prüft sie an der gewählten Zeile; die Expert-Zusicherungen sind unverändert.
 
 **Projekt `http`:** CI-Lauf `e2e-http` des PR, Lauf-ID: (Platzhalter, trägt der Orchestrator nach).
 
