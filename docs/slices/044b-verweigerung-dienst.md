@@ -3,7 +3,7 @@
 **Status:** spec (03.10.2026; gelesen auf `83bc7e2`, Merge von 044a #131; Standard zum Zugriffslog nach Vorgabe des Orchestrators umgestellt: kein neuer Schlüssel; Lesebefund zu `66e69e2` eingearbeitet (3 major, Minor und Nits, Abschnitt „Review findings“); Teil 2 der geteilten Scheibe 044, Zuschnitt in `docs/slices/044a-verweigerung-kern.md`, Abschnitt „Teilung und Zuschnitt“)
 **Risikoklasse:** hoch · 2,15 AStd (Spanne 2,0–2,3; Teilungstabelle 044a: 1; Begründung im Abschnitt „Aufwand“) · Plan 044: 06.11.2026 (W6), tatsächlich direkt nach 044a in der Lane service; **muss vor dem 27.11.2026 gemergt sein** (Ablauf der drei Allowlist-Einträge, `packages/contract/scripts/check.mjs` (d)) · Go des Eigentümers zum Zuschnitt (044a, Frage 2) am 03.10.2026, auf Standard gebaut · Lanes: service; contract (nur `allowlist.json`); core (nur die Längenprüfung von `proposeRefusal`); docs-sicherheit
 **Rolle:** implementierer-backend (kein Vertrags- und kein ADR-Schritt). Review in frischem Kontext mit den Perspektiven **Security** (Maskierung über HTTP, Rechte, Erkennung abgewiesener Versuche), **Datenschutz** (Begründung im `pii`-Teil der gespeicherten Zeile, Aufbewahrungsklasse, Zugriffslog ausdrücklich unverändert) und **Vertrag** (Gleichlauf von Validator und Kern, Antwortprüfung, Allowlist und Abdeckungstor). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
-**Rule ids:** keine neue. Über HTTP belegt: R-TRANS-15, R-TRANS-16, R-GUARD-03, R-GUARD-04, R-GUARD-06, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-13, R-GUARD-14, R-TRANS-00, R-PERM-01, R-PERM-02, R-IDEM-01 (nur Abgrenzung). Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R11, R12
+**Rule ids:** keine neue. Über HTTP belegt: R-TRANS-15, R-TRANS-16, R-GUARD-03, R-GUARD-04, R-GUARD-06, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-13, R-GUARD-14, R-TRANS-00, R-PERM-01, R-IDEM-01 (nur Abgrenzung); R-PERM-02 nur im Kern (über HTTP nicht erreichbar, Test 1). Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:**
 - `docs/slices/044a-verweigerung-kern.md`: Teilungstabelle (Zeile 044b), „Hinweise an Folgescheiben: 044b“, Missbrauchstabellen (Einträge „044b“), Abweichungen 2–6 des Baus, Review-Runde `44704c9` (Befunde 1, 2, 5), Nachtrag des Orchestrators zu R-GUARD-14
 - Codex-Review PR #131 (P2 „Count refusal lengths as Unicode characters“, `packages/domain/src/api.ts:322`)
@@ -27,7 +27,7 @@
   `contractSchema.ts:25`). Ajv zählt `maxLength`/`minLength` in Unicode-Zeichen (Code-Punkte, Standard `unicode: true`),
   wie JSON Schema 2020-12 es verlangt. `describeErrors` (`contractSchema.ts:205-208`) gibt nur Pfad und Meldung aus, keinen
   Wert.
-- **Längenprüfung im Kern** (`checkRefusalProposal`, `packages/domain/src/api.ts:311-338`) zählt `.length`, also
+- **Längenprüfung im Kern** (`checkRefusalProposal`, `packages/domain/src/api.ts:313-339`, Kommentar ab 310) zählt `.length`, also
   UTF-16-Einheiten: `text` 20000, `refusalJustification` 4000, `refusalGroundId` 128, je Eintrag in `sources` 2000. Über HTTP
   läuft erst der Validator, dann der Kern. Eine Begründung aus 4000 Emoji (4000 Code-Punkte, 8000 UTF-16-Einheiten) besteht
   den Validator und scheitert danach im Kern mit 422. Der Dienst weist also eine vertragsgültige Anfrage ab, nicht nur die
@@ -42,7 +42,7 @@
   vier Stellen: `access-log033a.test.ts:21`, `stream035.test.ts:655`, `scripts/e2e-http-031.mjs:168` (Job `e2e-http`) und
   `scripts/keycloak-ci-029b.mjs:148` (Job `gates`, Schritt „Keycloak browser login against migrated Postgres“). Die beiden
   Skripte laufen mit Keycloak nur in der CI.
-- **Problem-Antwort.** `ApiProblem` trägt `ruleId` (`apps/api/src/problem.ts:11`); `app.onError` bildet die Antwort mit
+- **Problem-Antwort.** `ApiProblem` (aus `@hv/domain`) trägt `ruleId`; der Typ `Problem` des Rumpfs steht in `apps/api/src/problem.ts:11`; `app.onError` bildet die Antwort mit
   `problemResponse` (`app.ts:716-726`). Der Anfragekontext (`observability/context.ts`) kennt `seq` und `subjectHash`, aber
   keine Regel-id.
 - **Postgres** speichert das Ereignis als Spalte **`envelope`** (jsonb, `apps/api/migrations/0001_event_log.up.sql`), nicht
@@ -170,7 +170,8 @@ erweitert, wird nicht ohne Go des Eigentümers gebaut (Orchestrator, 03.10.2026)
 - **R-GUARD-08 vor R-GUARD-14:** `approveRefusal` ohne Rechtsfreigabe antwortet `ruleId` R-GUARD-08, nicht R-GUARD-14
   (Test 4).
 - **`sources`-Grenzen:** 50 Einträge mit je 2000 Zeichen gelingen; 51 Einträge, ein Eintrag mit 2001 Zeichen, ein Eintrag,
-  der keine Zeichenkette ist, sind 422 (Validator). In der Demo dieselben Fälle 422 (Kern, Test 7).
+  der keine Zeichenkette ist, sind 422 (Validator). In der Demo sind dieselben Fälle 422 aus dem Kern; sie stehen schon in 044a
+  Test 6.
 
 ## Nicht-Ziele
 
@@ -190,7 +191,7 @@ erweitert, wird nicht ohne Go des Eigentümers gebaut (Orchestrator, 03.10.2026)
 
 Dienst:
 
-- `apps/api/src/app.ts` (nur die drei Routen)
+- `apps/api/src/app.ts` (nur drei Routen und Typimport von RefusalProposal)
 - `packages/contract/allowlist.json` (nur die drei Einträge mit slice 044 entfernen, im Commit des ersten Routentests)
 
 Kern (nur Entscheidung 3):
@@ -202,7 +203,7 @@ Tests im Dienst:
 
 - `apps/api/src/__tests__/refusal044b.test.ts` (neu, ohne Postgres)
 - `apps/api/src/__tests__/postgres-refusal044b.test.ts` (neu, mit Postgres)
-- `apps/api/src/__tests__/contract-043a.test.ts` (nur die Allowlist-Prüfung in Test 8: die drei Einträge stehen nicht mehr)
+- `apps/api/src/__tests__/contract-043a.test.ts` (nur Test 8: die Allowlist-Prüfung umgedreht, die drei Einträge stehen nicht mehr, und der Testtitel ohne „are pre-declared for 044“)
 
 Dokumente:
 
@@ -230,9 +231,11 @@ Weitere Dateien sind Scope-Befunde.
    die Allowlist führt die drei Einträge mit `slice` 044. Fehlt etwas: anhalten.
 2. **Eigentümerfrage 1:** Hat der Eigentümer die Option `ruleId` gewählt, wird diese Spec vorher vom Architekten angepasst
    (ADR-Nachtrag, Dateien, Tests); ohne Antwort gilt der Standard ohne neuen Schlüssel.
-3. **Demo-Kopf und Rollenwechsel:** Wie löst der Akteur-Port `X-Actor` (`id:rolle`) auf? Reicht derselbe `id` mit einer
-   anderen Rolle für den Fall „S klärt als `legal`, gibt als `approver` frei“ (Test 4, R-GUARD-14), oder muss der Test die
-   Rollen über `assignRole`/`revokeRole` setzen? Der Bericht nennt den Weg.
+3. **Demo-Kopf und Rollenwechsel (vom Architekten beantwortet):** `X-Actor` nimmt jedes `id:rolle` an. Hat die id aber eine
+   `RoleAssigned`-Geschichte im Seed, nutzt `resolveMeetingActor` (`packages/domain/src/stream.ts:222-226`) die bestehende
+   Zuordnung statt der Rolle aus dem Kopf. Für S, K und C (Test 4, R-GUARD-14) und für jede weitere zweite Person nimmt der
+   Test deshalb ids, die im Seed **nicht** vorkommen (vorher gegen `listRoleAssignments` bzw. die Seed-Ereignisse geprüft).
+   Dann reicht derselbe id mit anderer Rolle für „S klärt als `legal`, gibt als `approver` frei“.
 4. **R-GUARD-11 über HTTP (vom Architekten beantwortet):** `createApp` nimmt `persistence: { load, save }` (Muster
    `master-data040b.test.ts:56`). Die Ereignisse entstehen wie in 044a Test 12: ein Kern-Store mit Seed, dazu ein direkt
    angehängtes `AnswerDrafted` mit veraltetem `refusalGroundHash` (der Store stempelt Hash und Kette, die Kette bleibt
@@ -286,8 +289,9 @@ Prüfung vergessen hat.
 
 1. **Montage:**
    - `GET /v1/refusal-grounds` gelingt für alle neun Rollen des Seeds; sieben Einträge; `id` und `hash` gleich
-     `REFUSAL_GROUNDS` aus `@hv/domain`. Ohne Akteur 401. Ein Akteur ohne Leserecht → 403 R-PERM-02, sofern der Demo-Kopf
-     einen solchen Akteur zulässt (wie 044a Test 19); sonst vermerkt der Bericht, dass der Fall nur im Kern belegt ist.
+     `REFUSAL_GROUNDS` aus `@hv/domain`. Ohne Akteur 401. **R-PERM-02 ist über HTTP nicht erreichbar:** `VALID_ROLES`
+     sind die Schlüssel von `ROLE_PERMISSIONS` (`apps/api/src/actor.ts:8`), und jede Rolle hält eines der drei Leserechte;
+     ein Akteur ohne Leserecht kommt am Akteur-Port nicht vorbei. Kein HTTP-Test dafür; der Fall bleibt in 044a Test 19 belegt.
    - `proposeRefusal` (Pfad B, `legal`, Frage in `assigned` auf Textpfad) → 200, `status` `in_review`, neue Version mit
      `answerKind`, `refusalGroundId`, `refusalGroundHash` = Katalog-Hash; `ETag` gesetzt. Pfad A (`coordination`) → 200 ohne
      Grund und Hash.
@@ -298,6 +302,8 @@ Prüfung vergessen hat.
    - `approveRefusal` als `legal`, `coordination`, `expert`, admin → 403 R-PERM-01;
    - `proposeRefusal` und `approveRefusal` als `podium` → 404 (044a, Abweichung 2: ohne `question.read` meldet
      `requireQuestionFor` 404);
+   - `observer` für beide Operationen: auf einer Frage in `delivered` → 403 R-PERM-01 (lesbar über
+     `question.read.delivered`, Recht fehlt), auf einer Frage in einem anderen Status → 404 (`requireQuestionFor`);
    - unbekannte `questionId` → 404 für beide.
 4. **409 mit Regel-id** (`ruleId` im Problem-Body), jeweils kein Ereignis:
    - R-TRANS-00: Vorschlag aus `staged` und `delivered`; `approveRefusal` aus `answer_drafted` (zurückgegebene Verweigerung);
@@ -336,7 +342,9 @@ Prüfung vergessen hat.
    - in der Demo (`refusal044a.test.ts`, Test 6): dieselben Fälle; einzelne Surrogate nach Vor-dem-Bau-Punkt 5.
 8. **Idempotenz:**
    - `proposeRefusal` als `legal` zweimal mit gleichem `Idempotency-Key` und gleichem Body → gleiche Version, gleiches
-     `ETag`, kein neues Ereignis; die Wiederholung trägt die Begründung (Leser `legal`);
+     `ETag`, kein neues Ereignis; die Wiederholung trägt die Begründung (Leser `legal`). Die Wiederholung sendet das
+     `If-Match` des ersten Aufrufs, das inzwischen veraltet ist: Antwort 200 mit dem historischen Ergebnis, nicht 412 (die
+     Wiederholung kommt vor `checkIfMatch`, Abschnitt 2);
    - derselbe Schlüssel von einem anderen Akteur (`leg2:legal`) ist keine Wiederholung (Schlüssel je Akteur): ein neuer
      Vorschlag mit eigener Version;
    - `approveRefusal` zweimal mit gleichem Schlüssel → eine Freigabe, ein `QuestionApproved`.
@@ -387,8 +395,8 @@ Prüfung vergessen hat.
     `hv_questions_in_legal_review_over_10m` ist bei t0 + 11 min in der Versuchs-App um genau 1 höher als in der Kontroll-App,
     bei t0 + 9 min gleich. Kein neuer Name im Katalog.
 
-Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Datenbank je Lauf, wie
-`postgres028.test.ts`; Variablen `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`):
+Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigenes Schema je Lauf über `search_path`,
+wie `postgres028.test.ts`; Variablen `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`):
 
 - **P1 Neustart mit Kettenprüfung:** App A: Vorschlag Pfad B (`coordination`) → Rechtsfreigabe (`legal`, mit `note`) →
   Freigabe (`approver`). App B auf derselben Datenbank (Neustart): Die erste Anfrage lädt und prüft die Kette ohne
@@ -614,6 +622,11 @@ Eingearbeitet:
   (044b hat keine; 044a, MF-13, MF-06 genannt). Minor 9: Wortlaut von Mutationsprobe 3. Minor 10: Aufwand 2,15 AStd, keine
   Probe gestrichen. Minor 12: Vor-dem-Bau-Punkt 4 beantwortet. Nit 22: einzelnes Surrogat auf Postgres ergibt 500,
   hingenommen (kein Sicherheitspunkt), Folgeliste über den Bau.
-- Minor 11, 13–21 und Nit 23: Der Wortlaut dieser Punkte lag dem Architekten beim Einarbeiten nicht vor (nur die Nummern);
-  sie sind **nicht** eingearbeitet und werden nachgereicht, sobald der Text vorliegt. Sind Sicherheits- oder
-  Datenschutzpunkte darunter, gehen sie vor dem Bau in die Spec, nie auf die Folgeliste.
+- Minor 11 (T-G1-I-01/-02 angleichen) war mit Major 3 erledigt.
+- Nachgereicht (Wortlaut des Orchestrators, eigener Commit): 13 Zeilen von `checkRefusalProposal` (313-339, Kommentar ab 310);
+  14 `ApiProblem` aus `@hv/domain`, `problem.ts:11` ist der Typ `Problem`; 15 Postgres-Test mit eigenem Schema über
+  `search_path`; 16 R-PERM-02 über HTTP nicht erreichbar (`actor.ts:8`), vorn festgehalten statt getestet; 17
+  Vor-dem-Bau-Punkt 3 beantwortet (ids außerhalb des Seeds wegen `resolveMeetingActor`); 18 `observer` in Test 3 (403 auf
+  `delivered`, sonst 404); 19 Wiederholung mit veraltetem `If-Match` in Test 8 (Wiederholung vor 412); 20 Titel von
+  contract-043a Test 8; 21 Demo-Fälle der `sources`-Grenzen stehen in 044a Test 6; 23 Typimport `RefusalProposal` in
+  Files allowed. Kein neuer Sicherheitspunkt (16 und 17 machen Tests richtig, 18 ergänzt einen Rechtefall).
