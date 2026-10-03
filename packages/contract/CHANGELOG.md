@@ -10,6 +10,36 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.2] - 2026-10-03
+
+Additive patch step of the 0.4 cycle (rule 1 of slice 043a: the next free patch level, after 0.4.1 of slice
+040b). The contract line of Scheibe 044a (Verweigerungspfad A und B im Kern, Teil 1: Regeln, Rechte, Katalog,
+Maskierung), written by the architect as the first commit of that slice, before its core code. **Descriptions
+only:** no schema gains or loses a property, no field becomes required, no request is widened or narrowed, no
+operation is added; the three refusal operations stay pre-declared in `allowlist.json` until slice 044b mounts
+them. Built on the defaults: "auf Standard gebaut" (Go des Eigentümers zu den Fragen 1, 2 und 3b der Spec 044a
+am 03.10.2026; ADR 0012 proposed and not read by legal, E15, E25).
+
+### Changed
+
+- **`Event`** (Scheibe 044a): the `AnswerDrafted` payload of `proposeRefusal` carries `toStatus` (target status
+  from the transition table, a `QuestionStatus`; without it, or with an unknown value, the projection keeps
+  `answer_drafted`) and the justification only under `payload.pii` (`pii.refusalJustification` with
+  `pii.keyId`), never in `answer`. This corrects the 0.4.0 wording ("`answer.refusalJustification` exists only
+  in the stored original"). The refusal events (`AnswerDrafted` of `proposeRefusal`, `QuestionApproved` of
+  `approveRefusal`) carry `retentionClass` `record`; every other answer event keeps `working` for now.
+- **`EventRead`** and **`QuestionLegalClearedPayload.note`** (Scheibe 044a, SG2): `payload.pii` stays absent;
+  `note` of a `QuestionLegalCleared` is absent from every event read path, for every reader and every legal
+  clearance. The removal is bound to the event type, not to the key, so the schema carries no `note: false`;
+  slice 044b proves it over HTTP.
+- **`proposeRefusal`** (Scheibe 044a): the proposal leads straight to `in_review` (R-TRANS-15, text tracks
+  only); `409` R-GUARD-09 covers path B without a ground and every refusal, path A and B, without a non-blank
+  justification (default: justification required on both paths); `409` R-GUARD-03 on the podium track; `422`
+  for form and length (validator and core) and for an unknown `refusalGroundId` (core only).
+- **`approveRefusal`** (Scheibe 044a): `409` also names R-GUARD-04, R-GUARD-12/R-GUARD-13, R-GUARD-14 (approver
+  is not the legal clearer) and R-TRANS-00 (row R-TRANS-16, `in_review` to `approved`).
+- **`info.description`** ("Refusal"): the stored original keeps the justification only in `payload.pii`.
+
 ## [0.4.1] - 2026-10-03
 
 Additive patch step of the 0.4 cycle (rule 1 of slice 043a: the next free patch level after 0.4.0). The contract

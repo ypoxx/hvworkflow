@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.4.1
+  version: 0.4.2
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -82,7 +82,8 @@ info:
     reader; in `StageView` (`getStage`, `getMeetingStage`) it is always absent; in `EventRead`
     (`getQuestionHistory`, `listEvents`, `event` messages of `streamEvents`) it is absent for every
     reader (schema `false`); the full-text search `q` never matches it. The stored original event
-    keeps it under the hash chain (rule 7). The three operations are pre-declared in
+    keeps it under the hash chain (rule 7), since 0.4.2 (slice 044a) only in `payload.pii`, never in
+    `payload.answer` (see `Event`). The three operations are pre-declared in
     `allowlist.json` (slice 044) and not served before then.
 
     Conventions (see docs/ist-analyse-und-schnittstellen.md, section 6):
@@ -958,7 +959,19 @@ paths:
         transition table of slice 044. A ground on path A is a `422` of the schema; an unknown
         `refusalGroundId` is a `422`. A missing ground or justification on path B is not a schema
         error but `409` R-GUARD-09 (slice 044). `refusalJustification` is masked as described in
-        `info.description` ("Refusal").
+        `info.description` ("Refusal"). Since 0.4.2 (slice 044a, built on the default "auf Standard
+        gebaut"): the proposal leads straight to `in_review` (transition R-TRANS-15 from `classified`,
+        `assigned`, `answer_drafted`, `in_review` or `approved`, text tracks only, R-GUARD-03); the
+        event is `AnswerDrafted` with `toStatus` and the justification under `payload.pii` (see
+        `Event`). `422` covers form and length — checked by the request validator of the service and
+        again by the core, because the demo runs the core without the validator (ADR 0002): an
+        `answerKind` other than the two refusal paths, an empty or over-long `text`, an over-long or
+        non-string `refusalJustification` or `refusalGroundId`, `sources` that are not strings, a
+        ground on path A — and, checked by the core only, a `refusalGroundId` that is not in the
+        catalogue. A missing or blank (whitespace only) justification is never a `422` but `409`
+        R-GUARD-09, on path A and on path B alike; so the validator answers `422` for an empty string
+        (`minLength`) where the core answers `409` for a blank one. No `detail` repeats the text, the
+        justification or a remark.
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       requestBody:
         required: true
@@ -973,7 +986,10 @@ paths:
             From slice 044: the proposal is not allowed now, rule id in `ruleId` — the transition rows
             of slice 044 for `question.refuse.propose` (R-TRANS-00 when no row allows it from the
             current status), or R-GUARD-09 (refusal path B without a ground from the catalogue or
-            without a justification).
+            without a justification). Since 0.4.2 (slice 044a): R-GUARD-09 covers refusal path B
+            without a ground and every refusal, path A and path B, without a non-blank justification
+            (built on the default: the justification is required on both paths); R-GUARD-03 when the
+            question is on the podium track.
           headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
           content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -1012,7 +1028,14 @@ paths:
             change), R-GUARD-08 (a refusal is approved only after a legal clearance event
             `QuestionLegalCleared` for this version), R-GUARD-11 (the catalogue entry changed since the
             proposal: `refusalGroundHash` no longer equals the current `hash`; propose again), or the
-            transition row of slice 044 for `question.refuse.approve`.
+            transition row of slice 044 for `question.refuse.approve`. Since 0.4.2 (slice 044a, row
+            R-TRANS-16, `in_review` to `approved`): also R-GUARD-04 (`answerVersion` is not the latest
+            version), R-GUARD-12/R-GUARD-13 (a refusal is approved only with `approveRefusal`, an answer
+            only with `approveQuestion`: R-GUARD-13 here when the latest version is no refusal, R-GUARD-12
+            on `approveQuestion` and `submitForReview` when it is one), R-GUARD-14 (the approver is not
+            the person who cleared the version legally; together with R-GUARD-06, proposal, legal
+            clearance and approval of a refusal are three different actor ids), and R-TRANS-00 from any status but `in_review`.
+            Built on the default ("auf Standard gebaut").
           headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
           content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -3329,7 +3352,7 @@ components:
           type: string
           description: Same value as the event's `subjectId`, repeated so the payload is self-contained for neighbouring systems
         answerVersion: { type: integer, minimum: 1, description: The answer version the clearing is bound to }
-        note: { type: string, description: Optional remark of the clearing lawyer (Anmerkung) }
+        note: { type: string, description: 'Optional remark of the clearing lawyer (Anmerkung). Since 0.4.2 (slice 044a): only in the stored original; absent from every `EventRead`, for every reader (see `EventRead`)' }
     AgendaItemEventPayload:
       type: object
       description: 'Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event''s `subjectId` is the meeting. `number` is required (Codex round 5) because it is there for readers without the master data — an optional copy would fail exactly them'
@@ -3504,7 +3527,15 @@ components:
         unchanged in the append-only log. This projection omits personId, payload.pii, historical
         clear-name fields, hash and prevHash. sourceHash identifies the stored original; it is not a
         digest of this redacted JSON and cannot be recomputed from it. Only the complete stored
-        original can be checked against the hash chain. seq remains the global cursor.
+        original can be checked against the hash chain. seq remains the global cursor. Since 0.4.2
+        (slice 044a, SG2): `payload.pii` stays absent as before, and with it the justification of a
+        refusal (`pii.refusalJustification`); and `payload.note` of a `QuestionLegalCleared` (the remark
+        of the clearing lawyer) is absent from every event read path (`getQuestionHistory`,
+        `listEvents`, `event` messages of `streamEvents`), for every reader and for every legal
+        clearance, not only for refusals, because the remark can carry the legal assessment behind a
+        refusal. The removal is bound to that event type, not to the key: a `note` in another payload
+        is not affected, so the schema carries no `note: false`. The stored original keeps the remark
+        under the hash chain (rule 7). Built on the default ("auf Standard gebaut").
       required: [seq, id, type, at, actor, subjectId, payload, redacted, sourceHash]
       additionalProperties: false
       properties:
@@ -3605,8 +3636,18 @@ components:
         slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the
         fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround`
         (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash
-        can be recomputed); `answer.refusalJustification` exists only in the stored original, never in
-        `EventRead`. A bound payload schema for `AnswerDrafted` follows with slice 043c.
+        can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the
+        justification in `answer`): the justification of a refusal is never written into `answer`; it
+        stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId`
+        (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The
+        same payload carries `toStatus`, the target status taken from the transition table (a value of
+        `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an
+        `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before,
+        and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of
+        `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass`
+        `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now.
+        Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). A bound
+        payload schema for `AnswerDrafted` follows with slice 043c.
         Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`,
         `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of
         the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with
