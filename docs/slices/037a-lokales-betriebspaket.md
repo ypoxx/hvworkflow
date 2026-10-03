@@ -821,7 +821,7 @@ Done: Images api (distroless, 65532, ohne scripts/), seed (eigenes Ziel) und web
       Header am Proxy); Compose-Stack mit Postgres (hv_owner ohne Superuser, hv_runtime), Keycloak-Testrealm (einmal
       erzeugt, byte-gleich), migrate und seed; scripts/stack.mjs (up, smoke, credentials, down, reset, probe) mit Secrets
       je Installation außerhalb des Repositoriums; Installationsseite; CI-Job stack-037a; S1–S10 in test:scripts.
-Evidence: pnpm gates grün auf 8ac36d4 (Schluss unten); docs/evidence/037a-stack-protokoll.txt (S11, S12, S14–S16 lokal);
+Evidence: pnpm gates grün auf 61d204a (letzter Code-Stand, Schluss im Abschnitt „CI-Job stack-037a“), davor auf 8ac36d4; docs/evidence/037a-stack-protokoll.txt (S11, S12, S14–S16 lokal);
       docs/evidence/037a-stack-angemeldet.png fehlt lokal (quay.io gesperrt) → Rückfall CI-Artefakt evidence-037a-stack (E56)
 Open: S12.3, S13 und die Anmeldung in S16.3 lokal nicht lauffähig (Keycloak-Image von quay.io durch die Egress-Richtlinie
       der Arbeitsumgebung gesperrt) → Nachweis im CI-Job stack-037a; S17 (frischer Agent, Orchestrator); CI-Lauf-ID
@@ -905,8 +905,27 @@ Arbeitsumgebung: Docker-Daemon (vfs, kurze Pfade unter `/tmp`), Registry-Spiegel
 8180; **ohne Freigabe von quay.io kann der Agent die Anmeldung nicht erreichen** und S17 gilt dann nach der Spec als nicht
 erfüllt. Den TLS-prüfenden Proxy behandelt die Installationsseite (§10, `HV_STACK_BUILD_CA`).
 
-**CI-Job `stack-037a`:** offen (läuft erst auf dem PR; Lauf-ID, Dauer, Ergebnis und das Artefakt `evidence-037a-stack`
-mit Lauf-ID, Artefakt-ID und Digest trägt der Orchestrator nach).
+**CI-Job `stack-037a` (Nachtrag des Orchestrators, E56):** grün auf dem letzten Code-Stand `61d204a` (PR #129,
+Workflow-Lauf 37131208429), mit S11, S12 (inklusive Keycloak-Discovery S12.3 gegen das echte Image), S13 (Anmeldung mit
+Screenshot), S14, S15, S16.1, S16.2 und S16.3 (Anmeldung nach `down`/`up`, Realm-Hash gleich, „bereits befüllt“).
+Rückfall für den Screenshot `docs/evidence/037a-stack-angemeldet.png` nach E56: Artefakt `evidence-037a-stack`,
+Lauf-ID 37131208429, Artefakt-ID 11277151085, Digest
+`sha256:42265426246530ada90992c04176ce35a54748ee481614c4a924d43b92b19897`. Frühere grüne Läufe: `850055f` (Lauf
+37130033938, Artefakt 11276443054). Auf `18049f5` und `47e9c14` rot (Ursache: Rechte des Zugriffslog-Verzeichnisses je
+BuildKit-Version, Nachtrag Runde 2).
+
+**`pnpm gates` auf `61d204a`** (sauberer Baum, Exit 0), Schluss:
+
+```
+1..315
+# tests 315
+# pass 315
+# fail 0
+✓ built in 1.87s
+mark-test-run: wrote /home/user/wt/s037a-2/.claude/state/last-test-run (clean tree) at commit 61d204a, tree e8cd17a55887…
+```
+
+Danach nur Doku-Commits.
 
 **Abweichungen von der Spec (im Bau entschieden, Review bitte prüfen).**
 1. **Optionale Bau-CA `HV_STACK_BUILD_CA`.** Beide Dockerfiles hängen in der Installationsstufe ein Build-Secret
