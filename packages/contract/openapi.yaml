@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.3.12
+  version: 0.4.0
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -28,8 +28,9 @@ info:
     `/speakers/order`, `/contributions`, `/questions`, `/stage`) stay served as an alias for the
     current meeting (aktuelle HV) until contract 0.5 and are marked `deprecated` since 0.3.0.
     `/events` and `/stream` are global (the sequence number is global and gap-free); `/stream` takes
-    an optional `meetingId` filter, `/events` gets it with 0.4.0 (slice 043; the unchanged service
-    would accept and ignore it today). The current meeting behind the alias paths is the meeting in
+    an optional `meetingId` filter, `/events` gets it as the contract line of the slice that serves
+    it (not in 0.4.0: the unchanged service would accept and ignore it, see "Compatibility"). The
+    current meeting behind the alias paths is the meeting in
     status `running` with the latest `date` (several running: the latest `date` wins, ties: the latest
     `MeetingCreated`); when none is running, the meeting with the latest `date` regardless of status;
     when no meeting exists at all, every alias answers 404 (from slice 025; until then the service
@@ -42,14 +43,47 @@ info:
     scraper only and takes the `metricsBearer` token from the service configuration. `/healthz`,
     `/readyz`, `/metrics` and `/auth/*` live outside `/v1` (per-path `servers`).
 
-    Compatibility within a major version: additive enum values within the 0.3.x cycle may appear
-    in patch releases (ADR 0015; precedent 0.2.1). The 0.3.0 package added `Action` +12,
-    `Event.type` +10, `Contribution.source` +`paper` and `ReadinessCheckCode`; optional fields
-    are added. A client must ignore an unknown enum value in a response (skip the event, hide the
-    action), ignore an unknown optional field and not fail on a documented status it has not seen
-    before. A removal is deprecated one cycle ahead (ADR 0015). Request schemas of existing
-    operations are never widened by a contract-only release: the service validates every request
-    against this document, so a widening would take effect immediately (review 023).
+    Compatibility within a major version: the 0.3.x cycle is closed. 0.4.0 (slice 043a) is the one
+    non-additive step of the 0.4 cycle (ADR 0015): it removes the fields deprecated since 0.2.0
+    (`kind` and `requestedMinutes` on `Speaker`, `SpeakerRegistration` and `SpeakerUpdate`) and
+    narrows `SpeakerUpdate` by the enumerated `reason`. A client that still sends a removed field is
+    not rejected: no existing schema forbids unknown properties, and the core writes only named
+    fields, so the value is ignored. Within 0.4.x the additive rules of 0.3.x apply unchanged:
+    additive enum values within the cycle may appear in patch releases (ADR 0015; precedent 0.2.1;
+    the 0.3.0 package added `Action` +12, `Event.type` +10, `Contribution.source` +`paper` and
+    `ReadinessCheckCode`); optional fields are added. A client must ignore an unknown enum value in
+    a response (skip the event, hide the action), ignore an unknown optional field and not fail on
+    a documented status it has not seen before. A removal is deprecated one cycle ahead (ADR 0015);
+    the alias paths, `StageAssignment` and `EventActor.displayName` stay until 0.5. Request schemas
+    of existing operations are never widened by a contract-only release: the service validates
+    every request against this document and passes the raw body on, so a widening would take effect
+    immediately while the core silently drops the field (review 023). A later request field
+    therefore arrives as the contract line of the slice that implements it, written by the
+    architect before any code, and is always optional; where a rule needs the field, a guard of that
+    slice enforces it with `409` and a rule id, never the schema.
+
+    Refusal (since 0.4.0, slice 043a; behaviour from slice 044; Verweigerung, ADR 0012 model A):
+    a refusal is a kind of answer, not a status of its own. An answer version carries `answerKind`
+    (`answer`, `refusal_no_claim` = refusal path A "no right to information", `refusal_with_ground` =
+    refusal path B "refusal despite a right", with a ground from the catalogue); the eleven statuses
+    stay, and four-eyes approval (R-GUARD-06) and the legal gate before the podium (R-GUARD-07) apply
+    to a refusal as to any answer. Refusal
+    paths A/B are not the answer tracks (`Track`). A refusal is proposed with `proposeRefusal`
+    (permission `question.refuse.propose`) and approved with `approveRefusal`
+    (`question.refuse.approve`), never through `draftAnswer` or `approveQuestion`: those two
+    request schemas carry no `answerKind`, so a refusal can never slip in as an ordinary answer. The
+    catalogue of grounds is read with `listRefusalGrounds`; every entry carries `hash`, and the
+    answer version keeps that hash as `refusalGroundHash` at the time of the proposal (the audit
+    path of the catalogue; from slice 044 an approval against a changed entry is `409` R-GUARD-11).
+    The justification (`refusalJustification`) is a legal assessment (SG2) and reaches only holders
+    of `question.refuse.propose` or `question.refuse.approve`, never through `question.legal.clear`
+    and never an administrator: on `Question.answers` (`getQuestion`, `listQuestions`,
+    `listMeetingQuestions` and every `QuestionUpdated` response) it is absent for every other
+    reader; in `StageView` (`getStage`, `getMeetingStage`) it is always absent; in `EventRead`
+    (`getQuestionHistory`, `listEvents`, `event` messages of `streamEvents`) it is absent for every
+    reader (schema `false`); the full-text search `q` never matches it. The stored original event
+    keeps it under the hash chain (rule 7). The three operations are pre-declared in
+    `allowlist.json` (slice 044) and not served before then.
 
     Conventions (see docs/ist-analyse-und-schnittstellen.md, section 6):
     - Writes may carry an `Idempotency-Key`; after authentication and current rights checks, a
@@ -73,7 +107,8 @@ info:
     service. `503` `PersistenceBusy` (`Retry-After` 2 or 30) means the persistence is busy or
     migrations are pending; nothing was written. `500` "Persistence outcome is unknown." means a
     write may have been committed: the client reads the state again before it writes anew, or repeats
-    only with the same `Idempotency-Key`. Every response of the service carries the security headers
+    only with the same `Idempotency-Key`. Since 0.4.0 every operation documents `500`
+    (`InternalError`, with its four fixed `detail` texts). Every response of the service carries the security headers
     `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
     `Cross-Origin-Resource-Policy`, `Cross-Origin-Opener-Policy`, `Strict-Transport-Security` and
     `Cache-Control: no-store`. Double-click protection: a client creates exactly one
@@ -96,7 +131,9 @@ info:
     `legalRef` entry (source, citation, docVersion, docHash, verified), collected in the generated
     register `docs/legal-trace.md`. Every entry is `verified: false` until the legal department has
     checked it (decision register entry E15, feedback requested by 15.01.2027); nothing in this
-    document or in that register is a verified statement of law.
+    document or in that register is a verified statement of law. Since 0.4.0 the refusal catalogue
+    (`listRefusalGrounds`) returns such domain `legalRef` entries as data (`LegalRef`); the contract
+    defines their form, not their content.
 servers:
   - url: /v1
     description: >-
@@ -135,10 +172,12 @@ paths:
         Tagesordnung"; no slice in Plan 5 names the removal yet). Served unchanged until then.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /agenda-items:
     get:
@@ -151,10 +190,12 @@ paths:
         entfällt mit Vertrag 0.5.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AgendaItem' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /units:
     get:
@@ -167,10 +208,12 @@ paths:
         entfällt mit Vertrag 0.5.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Unit' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /speakers:
     get:
@@ -186,11 +229,13 @@ paths:
         - { $ref: '#/components/parameters/SpeakerStatusFilter' }
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [speakers]
@@ -206,6 +251,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerRegistration' } } }
       responses:
         '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -215,6 +261,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /speakers/order:
     put:
@@ -231,6 +278,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerOrder' } } }
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Speaker' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -239,6 +287,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- items with a global id: canonical as they are --------------------------------------------
   /speakers/{speakerId}:
@@ -249,29 +298,45 @@ paths:
       summary: Get a speaker
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     patch:
       tags: [speakers]
       operationId: updateSpeaker
       summary: Change speaker status or round (Redner aufrufen, beenden, zurückziehen)
+      description: >-
+        Status changes follow the speaker state table (rule table R-SPK, slice 080). A body without any
+        effective field (for example `{}`, or only a field removed in 0.4.0) writes no event and keeps
+        the version (takt-015). `reason` is required only for `finished → waiting` (R-SPK-05, a
+        follow-up question); since 0.4.0 it is in the contract (slice 043a).
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/SpeakerUpdate' } } }
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Speaker' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            Since 0.4.0 (slice 043a; served since slice 080): the speaker state table refuses the status
+            change, rule id in `ruleId`. R-SPK-00: no row for this pair, or the same status again.
+            R-SPK-GUARD-01: `finished → waiting` (R-SPK-05) without `reason: follow_up`.
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions:
     get:
@@ -286,10 +351,12 @@ paths:
         - { $ref: '#/components/parameters/SpeakerIdFilter' }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Contribution' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [contributions]
@@ -307,6 +374,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/ContributionCapture' } } }
       responses:
         '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -316,6 +384,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -325,10 +394,12 @@ paths:
       summary: Get a speech with its coverage (Restabdeckung)
       responses:
         '200': { description: 'OK — `ETag` is `Contribution.version`, the value `claimContribution`/`releaseContribution` send back as `If-Match` (required since 0.3.6)', headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/questions:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -352,6 +423,7 @@ paths:
                   items: { $ref: '#/components/schemas/QuestionCapture' }
       responses:
         '201': { description: Created, headers: { ETag: { $ref: '#/components/headers/ETagRequired' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Question' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -360,6 +432,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/claim:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -386,6 +459,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /contributions/{contributionId}/release:
     parameters: [ { $ref: '#/components/parameters/ContributionId' } ]
@@ -410,6 +484,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions:
     get:
@@ -419,7 +494,9 @@ paths:
       deprecated: true
       description: >-
         Alias for `GET /meetings/{meetingId}/questions` of the current meeting. Veraltet seit 0.3.0,
-        entfällt mit Vertrag 0.5.
+        entfällt mit Vertrag 0.5. `422` for a query parameter outside its schema (since 0.4.0
+        documented, slice 043a). Masking of `answers[].refusalJustification` and the full-text search
+        as in `listMeetingQuestions`.
       parameters:
         - { $ref: '#/components/parameters/QuestionStatusFilter' }
         - { $ref: '#/components/parameters/TrackFilter' }
@@ -432,10 +509,13 @@ paths:
         - { $ref: '#/components/parameters/QuestionOffset' }
       responses:
         '200': { $ref: '#/components/responses/QuestionList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -443,12 +523,19 @@ paths:
       tags: [questions]
       operationId: getQuestion
       summary: Get a question with its answer versions and allowed actions
+      description: >-
+        Since 0.4.0 (rule from slice 043a, enforced from slice 044): `answers[].refusalJustification`
+        is present only for a reader holding `question.refuse.propose` or `question.refuse.approve`
+        (never through `question.legal.clear`, never an administrator); for every other reader it is
+        absent. `answerKind`, `refusalGroundId`, `refusalGroundHash` and `text` are not masked.
       responses:
         '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/history:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -456,12 +543,18 @@ paths:
       tags: [questions, events]
       operationId: getQuestionHistory
       summary: Full event history of a question (Vorgangshistorie)
+      description: >-
+        Since 0.4.0 (slice 043a): the `AnswerDrafted` payload of a refusal carries `answer.answerKind`,
+        `answer.refusalGroundId`, `answer.refusalGroundHash` and the snapshot `answer.refusalGround`, but
+        never `answer.refusalJustification`, for any reader (`EventRead`, schema `false`).
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EventRead' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/classification:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -475,6 +568,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/Classification' } } }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -484,6 +578,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/assignment:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -503,6 +598,7 @@ paths:
                 unitId: { type: string, maxLength: 128 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -512,6 +608,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/answers:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -528,6 +625,7 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/AnswerDraft' } } }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -537,6 +635,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/review-submissions:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -547,6 +646,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -556,6 +656,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/approvals:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -575,6 +676,7 @@ paths:
                 answerVersion: { type: integer, minimum: 1 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -584,6 +686,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/legal-clearances:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -609,6 +712,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/returns:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -628,14 +732,17 @@ paths:
                 reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/staging:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -646,6 +753,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -655,6 +763,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/delivery:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -665,6 +774,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatch' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -673,6 +783,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/closure:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -683,6 +794,7 @@ paths:
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -692,6 +804,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/withdrawal:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -711,14 +824,17 @@ paths:
                 reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/merge:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -738,6 +854,7 @@ paths:
                 intoQuestionId: { type: string, maxLength: 128 }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -747,6 +864,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/claim:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -772,6 +890,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /questions/{questionId}/release:
     parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
@@ -795,6 +914,114 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
+  # ---- refusal (Verweigerung, ADR 0012 model A) — pre-declared in 0.4.0 (slice 043a), served from slice 044 ----
+  /refusal-grounds:
+    get:
+      tags: [questions]
+      operationId: listRefusalGrounds
+      summary: Catalogue of refusal grounds (Verweigerungsgründe) with citation and hash
+      description: >-
+        Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044, until then
+        the not-found fallback answers 404). Global, without a meeting: the catalogue is code data
+        (`packages/domain/src/refusalGrounds.ts`, slice 044) and changes only with the legal review
+        (076). Readable for holders of `question.read`, `question.read.delivered` or `stage.read`
+        (R-PERM-02 otherwise), so also for the observer: the catalogue is general content (title,
+        wording for the podium, citation), not a legal assessment of a question; SG2 protects the
+        justification of a single refusal, not the catalogue. Every `legalRef` stays
+        `verified: false` until the legal department has checked it (E15); the interface marks such a
+        ground as unverified. Texts are content in the meeting's content language (`de`, E21), not
+        interface strings.
+      responses:
+        '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RefusalGround' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
+  /questions/{questionId}/refusals:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: proposeRefusal
+      summary: Propose a refusal (Verweigerung vorschlagen) as a new answer version
+      description: >-
+        Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044). Permission
+        `question.refuse.propose` (R-PERM-01 otherwise). Creates a new, immutable answer version with
+        `answerKind` `refusal_no_claim` (refusal path A) or `refusal_with_ground` (refusal path B),
+        written as `AnswerDrafted`; no new event type, because a refusal is technically an answer
+        version (ADR 0012). The answer version keeps `refusalGroundHash`, the `hash` of the chosen
+        catalogue entry at the time of the proposal, and the event payload a snapshot
+        `answer.refusalGround` (`title`, `stageText`, `legalRef`). The status transition follows the
+        transition table of slice 044. A ground on path A is a `422` of the schema; an unknown
+        `refusalGroundId` is a `422`. A missing ground or justification on path B is not a schema
+        error but `409` R-GUARD-09 (slice 044). `refusalJustification` is masked as described in
+        `info.description` ("Refusal").
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RefusalProposal' } } }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            From slice 044: the proposal is not allowed now, rule id in `ruleId` — the transition rows
+            of slice 044 for `question.refuse.propose` (R-TRANS-00 when no row allows it from the
+            current status), or R-GUARD-09 (refusal path B without a ground from the catalogue or
+            without a justification).
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
+  /questions/{questionId}/refusal-approvals:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: approveRefusal
+      summary: Approve a refusal (Verweigerung freigeben) — the approval is bound to the version
+      description: >-
+        Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044). Permission
+        `question.refuse.approve` (R-PERM-01 otherwise). Written as `QuestionApproved`, bound to the
+        answer version. From slice 044 `approveQuestion` on a refusal version is `409`, and
+        `approveRefusal` on an answer version is `409` as well: a refusal never becomes an answer and
+        vice versa (ADR 0012). No fast path past the legal gate (E25).
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RefusalApproval' } } }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            From slice 044: the approval is not allowed now, rule id in `ruleId` — R-GUARD-06 (four
+            eyes: the approver did not create the version, also not through a deputy or a role
+            change), R-GUARD-08 (a refusal is approved only after a legal clearance event
+            `QuestionLegalCleared` for this version), R-GUARD-11 (the catalogue entry changed since the
+            proposal: `refusalGroundHash` no longer equals the current `hash`; propose again), or the
+            transition row of slice 044 for `question.refuse.approve`.
+          headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+          content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 409 } } } ] } } }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /stage:
     get:
@@ -804,13 +1031,16 @@ paths:
       deprecated: true
       description: >-
         Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0,
-        entfällt mit Vertrag 0.5.
+        entfällt mit Vertrag 0.5. `StageView` never carries a refusal justification (since 0.4.0, see
+        `getMeetingStage`).
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- global feeds: sequence numbers are global, the meeting is a filter --------------------------
   /events:
@@ -821,8 +1051,10 @@ paths:
       description: >-
         Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no
         meeting prefix and `lastSeq` stays the global cursor. Permission `event.read`. A `meetingId`
-        filter arrives with 0.4.0 (slice 043, ahead of 035): not in 0.3.0, because the unchanged
-        service would accept the parameter and silently return unfiltered events (review 023).
+        filter arrives as the contract line of the slice that serves it, not with a contract-only
+        release, because the unchanged service would accept the parameter and silently return
+        unfiltered events (review 023). Since 0.4.0 (slice 043a): `payload.answer.refusalJustification`
+        is never part of an `EventRead`, for any reader.
       parameters:
         - { $ref: '#/components/parameters/After' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 1000 } }
@@ -838,10 +1070,12 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/EventRead' } }
                   lastSeq: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /stream:
     get:
@@ -877,7 +1111,9 @@ paths:
         items the reader may read before or after the change (live) or now (catch-up); counter changes
         arrive as a topic without ids. The events of one delivery are merged into one `change`. No
         message carries a payload, a text or an id the reader may not read; when nothing is visible,
-        nothing is sent. Events without a meeting reach only readers with `event.read`.
+        nothing is sent. Events without a meeting reach only readers with `event.read`. Since 0.4.0
+        (slice 043a): an `event` message is an `EventRead` and never carries
+        `payload.answer.refusalJustification`.
 
         **`meetingId` filter.** Since 0.3.12 (takt-040, as served since slice 035b): with a filter a
         reader with `event.read` receives every event of that meeting after the cursor exactly once and
@@ -965,6 +1201,7 @@ paths:
             Retry-After: { $ref: '#/components/headers/RetryAfter' }
             X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
           content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 429 } } } ] } } }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/StreamUnavailable' }
   # ---- meetings (Jahrgang) — canonical since 0.3.0 --------------------------------------------------
   /meetings:
@@ -985,6 +1222,7 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [meeting, admin]
@@ -1008,6 +1246,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1023,6 +1262,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1038,6 +1278,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, meeting]
@@ -1062,6 +1303,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/opening:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
@@ -1084,6 +1326,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/opening:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
@@ -1104,6 +1347,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/agenda-items/{agendaItemId}/voting/closure:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AgendaItemId' } ]
@@ -1124,6 +1368,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/units:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1139,6 +1384,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, meeting]
@@ -1163,6 +1409,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/stage-seats:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1181,6 +1428,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     put:
       tags: [admin, stage]
@@ -1205,6 +1453,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/role-assignments:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1227,6 +1476,7 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [admin]
@@ -1251,6 +1501,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/role-assignments/{assignmentId}/revocation:
     parameters: [ { $ref: '#/components/parameters/MeetingId' }, { $ref: '#/components/parameters/AssignmentId' } ]
@@ -1281,6 +1532,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/config-freeze:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1306,6 +1558,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/speakers:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1325,6 +1578,7 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [speakers]
@@ -1347,6 +1601,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/speakers/order:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1370,6 +1625,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/contributions:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1387,6 +1643,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
     post:
       tags: [contributions]
@@ -1414,6 +1671,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/questions:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1423,7 +1681,10 @@ paths:
       summary: List questions of a meeting with filters
       description: >-
         Since 0.3.0 (slice 025); canonical form of `GET /questions`. Permissions `question.read` or
-        `question.read.delivered` (R-PERM-03 scope applies, slice 010).
+        `question.read.delivered` (R-PERM-03 scope applies, slice 010). Since 0.4.0 (rule from slice
+        043a, enforced from slice 044): `answers[].refusalJustification` only for holders of
+        `question.refuse.propose` or `question.refuse.approve`, as on `getQuestion`; the full-text
+        search `q` covers answer texts but never a refusal justification, so a hit cannot reveal it.
       parameters:
         - { $ref: '#/components/parameters/QuestionStatusFilter' }
         - { $ref: '#/components/parameters/TrackFilter' }
@@ -1442,6 +1703,7 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   /meetings/{meetingId}/stage:
     parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
@@ -1452,7 +1714,10 @@ paths:
       description: >-
         Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The
         per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a
-        client parameter (slices 040, 047); a `seat` query parameter is a 0.4.0 matter (slice 043).
+        client parameter (slices 040, 047); a `seat` query parameter arrives as the contract line of
+        slices 056/057, not with a contract-only release. Since 0.4.0 (slice 043a, enforced from slice
+        044): `answers[].refusalJustification` is always absent from `StageView`, for every reader
+        (the podium holds no `question.refuse.*` permission).
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1460,6 +1725,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- sign-in through the BFF (ADR 0004) — outside /v1 ---------------------------------------------
   /auth/login:
@@ -1510,6 +1776,7 @@ paths:
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /auth/callback:
     servers: [ { url: /, description: 'Outside /v1: the identity provider redirects the browser here' } ]
     get:
@@ -1593,6 +1860,7 @@ paths:
           content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /auth/logout:
     servers: [ { url: /, description: 'Outside /v1' } ]
     post:
@@ -1629,6 +1897,7 @@ paths:
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /auth/me:
     servers: [ { url: /, description: 'Outside /v1' } ]
     get:
@@ -1646,6 +1915,7 @@ paths:
         '403': { $ref: '#/components/responses/NoActiveRole' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /auth/transparency-notice:
     servers: [ { url: /, description: 'Outside /v1: read before sign-in' } ]
     get:
@@ -1663,6 +1933,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   # ---- platform (ADR 0013) — outside /v1 --------------------------------------------------------
   /healthz:
     servers: [ { url: /, description: 'Outside /v1: platform probe' } ]
@@ -1677,6 +1948,7 @@ paths:
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /readyz:
     servers: [ { url: /, description: 'Outside /v1: platform probe' } ]
     get:
@@ -1721,6 +1993,7 @@ paths:
                           - { required: [migrations], properties: { migrations: { type: object, properties: { status: { const: fail } } } } }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /metrics:
     servers: [ { url: /, description: 'Outside /v1: scraped by the monitoring stack' } ]
     get:
@@ -1742,6 +2015,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
   # ---- demo -----------------------------------------------------------------------------------------
   /demo/seed:
     post:
@@ -1759,11 +2033,13 @@ paths:
                 seed: { type: integer, default: 2027 }
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Meeting' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '408': { $ref: '#/components/responses/RequestTimeout' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
 components:
   securitySchemes:
@@ -1941,7 +2217,10 @@ components:
         `required: true`) because the unchanged 0.3.0 service does not send it yet.
   responses:
     QuestionUpdated:
-      description: Updated question with new ETag and current `_actions`
+      description: >-
+        Updated question with new ETag and current `_actions`. Since 0.4.0 (rule from slice 043a,
+        enforced from slice 044): `answers[].refusalJustification` only for holders of
+        `question.refuse.propose` or `question.refuse.approve`, as on `getQuestion`.
       headers: { ETag: { $ref: '#/components/headers/ETag' }, X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/json: { schema: { $ref: '#/components/schemas/Question' } } }
     QuestionList:
@@ -1969,9 +2248,9 @@ components:
         (slice 029), a missing metrics token, or — in the demo — a missing, malformed or unknown
         `X-Actor`. Documented on every operation new in 0.3.0 that has a non-empty `security` (Codex
         on 2779e0b: every status the generic layer produces from a contract property is documented,
-        checked for every operation in `apps/api/src/__tests__/contract.test.ts`). On the 29
-        operations of 0.2 the 401 stays undocumented in 0.3.0; it is one of the five gaps of review 012
-        point 18 (0.4.0, slice 043) and the reasoned exception in the test helper.
+        checked for every operation in `apps/api/src/__tests__/contract.test.ts`). Since 0.4.0 (slice
+        043a, review 012 point 18) also documented on the 29 operations of 0.2, where it was a reasoned
+        exception in the test helper before.
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 401 } } } ] } } }
     Forbidden:
@@ -2024,8 +2303,8 @@ components:
         Validation failed: the request body, a query parameter or a header parameter does not match
         its contract schema (`validateOperation` in the service), or the body is not valid JSON. Since
         0.3.0 documented on every operation with a request body or a parameter that can fail its
-        schema (Codex on 2779e0b), except `listQuestions`, `returnQuestion` and `withdrawQuestion`
-        (review 012 point 18, slice 043).
+        schema (Codex on 2779e0b); since 0.4.0 also on `listQuestions`, `returnQuestion` and
+        `withdrawQuestion` (review 012 point 18, slice 043a).
       headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 422 } } } ] } } }
     RequestTimeout:
@@ -2067,15 +2346,32 @@ components:
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
     StreamUnavailable:
       description: >-
-        Since 0.3.11 (slice 035a), `/stream` only, one response for both causes: the service's global
-        limit of open streams is reached, or the persistence is busy or not ready (the causes of
-        `PersistenceBusy`). `Retry-After` is required; `detail` is a fixed sentence per cause, never the
+        Since 0.3.11 (slice 035a), `/stream` only, one response for all three causes: the service's
+        global limit of open streams is reached, migrations are pending, or the persistence is busy at
+        open (the causes of `PersistenceBusy`; wording aligned with `RetryAfter` in 0.4.0, takt-040). `Retry-After` is required; `detail` is a fixed sentence per cause, never the
         limit, a host name or database text. Nothing was opened; the client retries after the given
         seconds with its cursor.
       headers:
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
         X-Server-Time: { $ref: '#/components/headers/X-Server-Time' }
       content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 503 } } } ] } } }
+    InternalError:
+      description: >-
+        Since 0.4.0 (slice 043a, follow-up list 035b): an internal error. Documented on every
+        operation, inside and outside `/v1`, because the service's global error handler (`onError`)
+        answers any unexpected exception of any route this way. `detail` is exactly one of four fixed
+        sentences: "Event seq N: integrity check failed." (the hash chain of the event log is broken at
+        global sequence number N); "Persistence outcome is unknown." (the service's own timer fired
+        while the events or the COMMIT were on the wire, so the write may have been committed: the
+        client reads the state again before it writes anew, or repeats only with the same
+        `Idempotency-Key`); "Persistence is unavailable." (the persistence failed; nothing was
+        committed); "An unexpected error occurred." (any other exception). None of them carries
+        `Retry-After`. The `seq` in the first sentence is disclosed on purpose: the global sequence
+        number is no secret, every reader receives it anyway as the `id` of the `change` and `cursor`
+        messages on `/stream` (R-PERM-04). Beyond that no `detail` carries a stack trace, connection
+        data or any other internal identifier.
+      headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }
+      content: { application/problem+json: { schema: { allOf: [ { $ref: '#/components/schemas/Problem' }, { properties: { status: { const: 500 } } } ] } } }
     ServiceUnavailable:
       description: >-
         The service cannot serve this now (e.g. no identity provider configured). Used only on
@@ -2144,6 +2440,8 @@ components:
             since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang
             überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06
             (slice 025). Administration after the configuration freeze: R-ADM-01..04 (slice 040).
+            Speaker state table: R-SPK-00..05 and R-SPK-GUARD-01 (slice 080, documented on
+            `updateSpeaker` since 0.4.0).
     Role:
       type: string
       description: >
@@ -2151,7 +2449,7 @@ components:
         never branches on a role name; it reads `_actions`.
         `coordination` (since 0.2.0) is the working name (Arbeitsname) of the role that classifies and
         assigns; displayed as "Koordination", final name pending register entry E1. Its permission
-        bundle arrives with slice 021; until then the server does not know the role.
+        bundle is built since slice 021 (`ROLE_PERMISSIONS`).
       enum: [moderation, capture, expert, legal, approver, podium, admin, observer, coordination]
     Actor:
       type: object
@@ -2207,6 +2505,11 @@ components:
         but comes after 026), `admin.override` (change after the configuration freeze with a reason,
         slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and
         personal history under four eyes, slice 047).
+        Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default
+        until then; never granted to admin): `question.refuse.propose` (propose a refusal,
+        `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice
+        043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on
+        `Question.answers`.
       enum:
         - speaker.register
         - speaker.reorder
@@ -2244,6 +2547,8 @@ components:
         - admin.override
         - question.read.protected
         - event.read.personal
+        - question.refuse.propose
+        - question.refuse.approve
         - demo.seed
     MeetingStatus:
       type: string
@@ -2545,8 +2850,6 @@ components:
       enum: [waiting, speaking, finished, withdrawn]
     Speaker:
       type: object
-      # `kind` left the `required` list in 0.2.0 (deprecated, see below); enum and range stay so the
-      # existing 422 validation keeps its meaning until slice 080 removes both fields.
       required: [id, meetingId, number, displayName, round, position, status, version]
       properties:
         id: { type: string }
@@ -2555,20 +2858,9 @@ components:
         displayName: { type: string, description: 'Since 0.3.4 (slice 026): clear name from the person table for actors with `question.identity.reveal`; otherwise `Redner <number>`.' }
         personId: { type: string, description: 'Since 0.3.0 (slice 026, ADR 0009): key into the person table; the clear name is resolved on read for holders of `question.identity.reveal`' }
         organisation: { type: string }
-        kind:
-          type: string
-          enum: [shareholder, proxy, association]
-          deprecated: true
-          description: >-
-            Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
         round: { type: integer, minimum: 1 }
         position: { type: integer, minimum: 1 }
         status: { $ref: '#/components/schemas/SpeakerStatus' }
-        requestedMinutes:
-          type: integer
-          deprecated: true
-          description: >-
-            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
         speakingStartedAt: { type: string, format: date-time }
         speakingEndedAt: { type: string, format: date-time }
         questionCount: { type: integer }
@@ -2576,35 +2868,31 @@ components:
         _actions: { type: array, items: { $ref: '#/components/schemas/Action' } }
     SpeakerRegistration:
       type: object
+      description: >-
+        Body of `registerSpeaker` / `registerMeetingSpeaker`. Since 0.4.0 (slice 043a) without `kind`
+        and `requestedMinutes` (deprecated since 0.2.0, ignored by the core since slice 080); a client
+        that still sends them is not rejected, the values are ignored and never written.
       required: [displayName]
       properties:
         displayName: { type: string, minLength: 1, maxLength: 200 }
         organisation: { type: string, maxLength: 200 }
-        kind:
-          type: string
-          enum: [shareholder, proxy, association]
-          deprecated: true
-          description: >-
-            Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
-            No longer required since 0.2.0; the enum stays so an out-of-enum value is still a 422.
         round: { type: integer, minimum: 1 }
-        requestedMinutes:
-          type: integer
-          minimum: 1
-          deprecated: true
-          description: >-
-            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
     SpeakerUpdate:
       type: object
+      description: >-
+        Body of `updateSpeaker`. Since 0.4.0 (slice 043a) without `requestedMinutes` (deprecated since
+        0.2.0, ignored by the core since slice 080; still not rejected) and with `reason`.
       properties:
         status: { $ref: '#/components/schemas/SpeakerStatus' }
         round: { type: integer, minimum: 1 }
-        requestedMinutes:
-          type: integer
-          minimum: 1
-          deprecated: true
+        reason:
+          type: string
+          enum: [follow_up]
           description: >-
-            Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+            Since 0.4.0 (slice 043a; served since slice 080): why a finished request to speak reopens.
+            Required for `finished → waiting` (R-SPK-05, a follow-up question — Nachfrage); without it
+            that change is `409` R-SPK-GUARD-01. On any other change the reason is dropped and never
+            written. Any other value is a `422`.
     SpeakerOrder:
       type: object
       description: Body of `reorderSpeakers` / `reorderMeetingSpeakers`
@@ -2749,18 +3037,133 @@ components:
         - closed
         - withdrawn
         - merged
+    AnswerKind:
+      type: string
+      description: >-
+        Since 0.4.0 (slice 043a, ADR 0012 model A): the kind of an answer version. `answer` — an
+        ordinary answer; `refusal_no_claim` — refusal path A (Verweigerungspfad A, "kein
+        Auskunftsanspruch": the shareholder has no right to the information); `refusal_with_ground` —
+        refusal path B (Verweigerungspfad B, "Verweigerung trotz Anspruchs": refusal despite a right,
+        with a ground from the catalogue, `listRefusalGrounds`). Refusal paths A/B are not the answer
+        tracks A/B/C (`Track`): a refusal can arise on any track. Built on the default ("auf Standard
+        gebaut", slice 043a; owner's go of 03.10.2026); E15 and ADR 0012 stay open.
+      enum: [answer, refusal_no_claim, refusal_with_ground]
     AnswerVersion:
       type: object
+      description: >-
+        One immutable answer version. Since 0.4.0 (slice 043a, filled from slice 044) a version may be
+        a refusal: `answerKind` (absent = `answer`), `refusalGroundId`, `refusalGroundHash` and
+        `refusalJustification`. Invariants (schema): an answer carries none of the three `refusal*`
+        fields; refusal path B carries `refusalGroundId` and `refusalGroundHash`; refusal path A
+        carries neither. `refusalJustification` is never required, because it is masked (see there).
       required: [version, text, createdAt, createdBy]
       properties:
         version: { type: integer, minimum: 1 }
-        text: { type: string }
+        text: { type: string, description: 'The wording read out on the podium; for a refusal the refusal wording, prefilled from `RefusalGround.stageText`' }
         createdAt: { type: string, format: date-time }
         createdBy: { $ref: '#/components/schemas/Actor' }
         sources:
           type: array
           description: References the answer relies on (publication, catalogue entry, document)
           items: { type: string }
+        answerKind:
+          description: 'Since 0.4.0 (slice 043a): the kind of this version; absent means `answer`'
+          allOf: [ { $ref: '#/components/schemas/AnswerKind' } ]
+        refusalGroundId: { type: string, maxLength: 128, description: 'Since 0.4.0 (slice 043a): `RefusalGround.id` of the chosen ground (refusal path B only)' }
+        refusalGroundHash:
+          description: >-
+            Since 0.4.0 (slice 043a): `RefusalGround.hash` of the chosen entry at the time of the
+            proposal — the audit path of the catalogue. It proves which wording and which citation the
+            refusal was proposed on; from slice 044 an approval against a changed entry is `409`
+            R-GUARD-11. Not masked: the ground is catalogue data.
+          allOf: [ { $ref: '#/components/schemas/Sha256Hex' } ]
+        refusalJustification:
+          type: string
+          description: >-
+            Since 0.4.0 (slice 043a, masking enforced from slice 044): the justification of a refusal, a
+            legal assessment (SG2). Present only for readers holding `question.refuse.propose` or
+            `question.refuse.approve` (never through `question.legal.clear`, never an administrator);
+            absent for every other reader of `Question.answers`, always absent in `StageView`, and never
+            part of an `EventRead`. Never matched by the full-text search `q`.
+      # Refusal invariants (slice 043a). Each branch defines the properties it names, so a `required`
+      # always refers to a property of its own sub-schema.
+      allOf:
+        # Without `required`, the condition holds when `answerKind` is absent or `answer`.
+        - if: { properties: { answerKind: { const: answer } } }
+          then:
+            properties:
+              refusalGroundId: false
+              refusalGroundHash: false
+              refusalJustification: false
+        - if: { required: [answerKind], properties: { answerKind: { const: refusal_with_ground } } }
+          then:
+            required: [refusalGroundId, refusalGroundHash]
+            properties:
+              refusalGroundId: { type: string }
+              refusalGroundHash: { type: string }
+        - if: { required: [answerKind], properties: { answerKind: { const: refusal_no_claim } } }
+          then:
+            properties:
+              refusalGroundId: false
+              refusalGroundHash: false
+    LegalRef:
+      type: object
+      description: >-
+        Since 0.4.0 (slice 043a): the trace of a rule or catalogue entry to its legal source, the same
+        form as the domain type `LegalRef` (`packages/domain/src/rules.ts`). `source` names an entry of
+        the closed domain list `LegalSource`; the contract keeps it an open string so that a new source
+        costs no contract cycle. Deliberately wider than today's domain type: `docHash` may be a string
+        and `verified` may be `true`, the values the legal review (slice 076) sets. Until then every
+        entry is `verified: false` (E15) and the interface shows it as unverified.
+      required: [source, citation, docVersion, docHash, verified]
+      properties:
+        source: { type: string, description: 'An entry of the domain list `LegalSource`' }
+        citation: { type: string, description: 'The citation (Normzitat), as content' }
+        docVersion: { type: [string, 'null'], description: 'Version of the cited document, when known' }
+        docHash: { type: [string, 'null'], description: 'Hash of the cited document, set by the legal review (076)' }
+        verified: { type: boolean, description: '`true` only after the legal department has checked the entry (E15, 076)' }
+    RefusalGround:
+      type: object
+      description: >-
+        Since 0.4.0 (slice 043a): one entry of the catalogue of refusal grounds (Verweigerungsgrund),
+        returned by `listRefusalGrounds`. Code data from slice 044, maintained by the legal review
+        (076). Texts are content in the meeting's content language (E21: `de`), not interface strings.
+      required: [id, title, stageText, legalRef, hash]
+      properties:
+        id: { type: string, maxLength: 128 }
+        title: { type: string, description: 'Short title of the ground' }
+        stageText: { type: string, description: 'Wording block for the podium (Formulierungsbaustein); prefills `RefusalProposal.text`' }
+        legalRef: { $ref: '#/components/schemas/LegalRef' }
+        hash:
+          description: >-
+            SHA-256 as 64 lower-case hex digits over the UTF-8 bytes of the canonical form after RFC 8785
+            (JSON Canonicalization Scheme) of this `RefusalGround` entry without the field `hash` itself
+            (so the definition is not circular). An answer version keeps it as `refusalGroundHash`.
+          allOf: [ { $ref: '#/components/schemas/Sha256Hex' } ]
+    RefusalProposal:
+      type: object
+      description: >-
+        Since 0.4.0 (slice 043a): body of `proposeRefusal`. Closed (`additionalProperties: false`): a
+        refusal carries exactly these fields. A ground on refusal path A is a category error and a
+        `422`. On refusal path B the schema requires neither ground nor justification: their absence is
+        `409` R-GUARD-09 of slice 044, not a `422`. An unknown `refusalGroundId` is a `422` (slice 044).
+      required: [answerKind, text]
+      additionalProperties: false
+      properties:
+        answerKind: { type: string, enum: [refusal_no_claim, refusal_with_ground], description: 'The refusal path; never `answer` (an answer is drafted with `draftAnswer`)' }
+        text: { type: string, minLength: 1, maxLength: 20000, description: 'The wording for the podium; the interface prefills it from `RefusalGround.stageText`' }
+        refusalGroundId: { type: string, maxLength: 128, description: 'The chosen ground (refusal path B only)' }
+        refusalJustification: { type: string, minLength: 1, maxLength: 4000, description: 'The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification`' }
+        sources: { type: array, maxItems: 50, items: { type: string, maxLength: 2000 } }
+      if: { required: [answerKind], properties: { answerKind: { const: refusal_no_claim } } }
+      then: { properties: { refusalGroundId: false } }
+    RefusalApproval:
+      type: object
+      description: 'Since 0.4.0 (slice 043a): body of `approveRefusal`, like the body of `approveQuestion`, but closed'
+      required: [answerVersion]
+      additionalProperties: false
+      properties:
+        answerVersion: { type: integer, minimum: 1 }
     Approval:
       type: object
       required: [answerVersion, approvedAt, approvedBy]
@@ -2840,7 +3243,7 @@ components:
         agendaItemId: { type: string, maxLength: 128 }
         stageAssignment:
           deprecated: true
-          description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives with 0.4.0 (slice 043, ahead of 040): not in 0.3.0, because the unchanged service would accept and silently drop it today (review 023). `Question.seatId` is already declared on the response.'
+          description: 'Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives as the contract line of slice 040 (written by the architect before that slice''s code), not with a contract-only release, because the unchanged service would accept and silently drop it (review 023). `Question.seatId` is already declared on the response.'
           allOf: [ { $ref: '#/components/schemas/StageAssignment' } ]
     AnswerDraft:
       type: object
@@ -2850,6 +3253,7 @@ components:
         sources: { type: array, maxItems: 50, items: { type: string, maxLength: 2000 } }
     StageView:
       type: object
+      description: 'Podium view. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent here, for every reader'
       required: [current, queue, deliveredCount, openCount]
       properties:
         current:
@@ -3043,6 +3447,9 @@ components:
                   properties:
                     personId: false
                     displayName: false
+                # Since 0.4.0 (slice 043a, SG2): the justification of a refusal never leaves the service
+                # through an event read path, for any reader; `maskEvent` does not know the reader.
+                refusalJustification: false
       allOf:
         - if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
           then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
@@ -3067,7 +3474,12 @@ components:
         name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting
         in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads
         remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the
-        `lateEntryReason` in its payload (R-MTG-03, slice 025).
+        `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from
+        slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the
+        fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround`
+        (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash
+        can be recomputed); `answer.refusalJustification` exists only in the stored original, never in
+        `EventRead`. A bound payload schema for `AnswerDrafted` follows with slice 043c.
         Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`,
         `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of
         the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with
