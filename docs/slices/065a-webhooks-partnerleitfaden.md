@@ -1,7 +1,7 @@
 # Scheibe 065a — Ereignisstrom für Nachbarn: signierte Webhooks und Partnerleitfaden (Teil 1 von 065)
 
 **Status:** spec (03.10.2026; gelesen auf `2fc3153`, nach dem Merge von 043a und Spec 037a erneut auf `88fa9be`; überarbeitet nach dem Lesebefund zu `8b66fd5`: 0 blocker, 9 major, Minor und Nits; Teil 1 der geteilten Scheibe 065, Zuschnitt im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 4 AStd (Teil a, neu geschätzt nach dem Lesebefund; Schätzung 065b rund 1,5 AStd; Summe 5,5 statt 2 laut Plan) · Plan 065: 27.11.2026 (W9); für die Freigabe-Demo vorgezogen (Eigentümer 03.10.2026, Plan §11, Punkt 2 „Entwickler“); 043a (Vertrag 0.4.0) ist gemergt; Baustart frühestens nach dem Vertragsschritt von 064 und dem Go zu Eigentümerfrage 1 · Lanes: contract (erster Commit, Architekt); core (seriell, Wahrheitstabelle); service; web-shell (nur zwei Anzeigeschlüssel); infra (nur die drei neuen Skriptdateien); docs-integration; docs-sicherheit; docs-datenschutz (nur DSFA-Vorentwurf, Zeile Webhooks und Empfänger); docs-legal (nur ein Kopfvermerk im Rechtekonzept); docs-plan (nur eine Glossarzeile)
+**Risikoklasse:** hoch · 6–7 AStd (Teil a, neu geschätzt nach Lesebefund und Nachprüfung; Schätzung 065b rund 1,5 AStd; Summe 7,5–8,5 statt 2 laut Plan) · Plan 065: 27.11.2026 (W9); für die Freigabe-Demo vorgezogen (Eigentümer 03.10.2026, Plan §11, Punkt 2 „Entwickler“); 043a (Vertrag 0.4.0) ist gemergt; Baustart frühestens nach dem Vertragsschritt von 064 und dem Go zu Eigentümerfrage 1 · Lanes: contract (erster Commit, Architekt); core (seriell, Wahrheitstabelle); service; web-shell (nur zwei Anzeigeschlüssel); infra (nur die drei neuen Skriptdateien); docs-integration; docs-sicherheit; docs-datenschutz (nur DSFA-Vorentwurf, Zeile 161 und neue Zeile V20); docs-legal (nur ein Kopfvermerk im Rechtekonzept); docs-plan (nur eine Glossarzeile)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code; AGENTS.md R6). Danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (SSRF, Signatur, Secrets, Rechtefilter), **Datenschutz** (was an Dritte geht, SG3, SG8) und **Vertrag** (Webhook-Format, Partnerkompatibilität). Lesebefund der Spec vor dem Bau in eigenem frischem Kontext (Risikoklasse hoch, Plan §11 „Schlankerer Ablauf“ gilt hier nicht). Den Schnellstart im Leitfaden befolgt ein **eigener Agent in frischem Kontext**, nicht der Implementierer (Vorbild 037a, S17). Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** neu **R-PERM-05** (Webhook-Sichtbarkeit für Systemakteure) und **R-ADM-12** (Systemrolle nur für Systemsubjekte, Menschenrolle nie für Systemsubjekte). Beide Nummern sind beim Bau gegen den dann gemergten Stand zu prüfen (nächste freie Nummer; R-ADM-01..11 sind von 040a–040d belegt oder reserviert). Angewandt: R-PERM-01, R-PERM-02, R-PERM-03, R-PERM-04, R-ADM-07. Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R10, R11, R12
 **Quellen-IDs:**
@@ -21,14 +21,14 @@
 Die Planzeile 065 (2 AStd) bündelt drei Dinge: signierte Zustellung mit Rechtefilter, den Sandbox-Mandanten und den
 Leitfaden. Allein die Zustellung berührt Vertrag, Kern (neue Rolle, neues Recht, Wahrheitstabelle), Dienst (ausgehende
 Anfragen mit SSRF-Schutz) und ein Partner-Skript. Der Sandbox-Mandant braucht dazu `HV_MODE=training`, das laut Plan erst
-042 baut, und Änderungen am lokalen Paket aus 037a. Zusammen sind das rund 5,5 AStd. Deshalb wird 065 geteilt, **ein PR je
+042 baut, und Änderungen am lokalen Paket aus 037a. Zusammen sind das rund 7,5–8,5 AStd. Deshalb wird 065 geteilt, **ein PR je
 Spec** (R12). Diese Spec beschreibt Teil a vollständig; 065b steht hier als Zuschnitt, seine Spec schreibt der Architekt
 auf eigenem Zweig, sobald der Bau von 037a gemergt ist (die Spec ist es seit `938ffbe`) und der Eigentümer Frage 3
 beantwortet hat.
 
 | Teil | Inhalt | Klasse · AStd | Wann |
 |---|---|---|---|
-| **065a** (diese Spec) | Vertragsschritt (Rolle `event_subscriber`, Recht `webhook.receive`, Abschnitt `webhooks` mit Liefer- und Signaturformat); Systemrolle als Daten mit Guard R-ADM-12; Sichtbarkeitsregel R-PERM-05 als reine Funktion im Kern; Zustellung im Dienst (Konfiguration, Signatur, Wiederholung, Idempotenzschlüssel, SSRF-Schutz, Grenzen); Referenz-Empfänger `scripts/webhook-receiver.mjs` mit Prüffunktion; Demo-Helfer `scripts/webhook-demo.mjs` (Zuordnung und Erfassung über HTTP); Leitfaden `docs/integration/webhooks.md` mit Schnellstart gegen den Dienst im Demo-Modus; DSFA-Zeile und Kopfvermerk im Rechtekonzept | hoch · 4 | nach dem Vertragsschritt von 064 |
+| **065a** (diese Spec) | Vertragsschritt (Rolle `event_subscriber`, Recht `webhook.receive`, Abschnitt `webhooks` mit Liefer- und Signaturformat); Systemrolle als Daten mit Guard R-ADM-12; Sichtbarkeitsregel R-PERM-05 als reine Funktion im Kern; Zustellung im Dienst (Konfiguration, Signatur, Wiederholung, Idempotenzschlüssel, SSRF-Schutz, Grenzen); Referenz-Empfänger `scripts/webhook-receiver.mjs` mit Prüffunktion; Demo-Helfer `scripts/webhook-demo.mjs` (Zuordnung und Erfassung über HTTP); Leitfaden `docs/integration/webhooks.md` mit Schnellstart gegen den Dienst im Demo-Modus; DSFA-Zeilen, Sperr-CLI für `sys_` und Kopfvermerk im Rechtekonzept | hoch · 6–7 | nach dem Vertragsschritt von 064 |
 | **065b** | Sandbox-Mandant: `HV_MODE` im Konfigurationsschema (nur, was die Sandbox braucht; Banner, Podium-Sperre und Löschprotokoll bleiben 042), Modusmarke in der Datenbank mit Startverweigerung bei Abweichung (Datengrenze), `mode: training` in jeder Lieferung, Webhooks im Modus `training` erlaubt, lokales Paket startet in `training` mit erzeugtem Webhook-Secret, optionalem Empfänger-Container und Rollenzuordnung des Abonnenten in der Befüllung; Leitfadenabschnitt „Sandbox“ und Verweis auf der Installationsseite | hoch · rund 1,5 | nach 065a und dem Bau von 037a |
 
 **Warum so geschnitten.** 065a ist allein vorführbar: Ein Partner startet den Dienst im Demo-Modus (synthetischer Korpus,
@@ -49,8 +49,9 @@ Freigabe-Demo fertig, bleibt der Schnellstart aus 065a die Vorführung für Punk
   `HV_MODE=training` verweigert eine Datenbank ohne Marke `training`; jeder andere Modus verweigert eine Datenbank mit
   Marke `training`. Test: „Dienst `training` gegen Datenbank ohne Marke → Start verweigert“ und umgekehrt.
 - Die Subject-Sperre aus 029b prüft der Zusteller schon in 065a vor jedem Versuch, sobald ein Sitzungsspeicher
-  existiert (Entscheidung 1). Im Paket (OIDC und Postgres) wird diese Prüfung damit wirksam; 065b ergänzt nur den Test
-  gegen den echten Speicher.
+  existiert, und das Sperr-CLI nimmt `sys_`-Kennungen an (Entscheidung 1, Weg 2). Wirksam wird das erst im Paket (OIDC
+  und Postgres); 065b ergänzt den Ende-zu-Ende-Test gegen den echten Speicher und nennt die Sperre auf der
+  Installationsseite als Notabschaltung.
 - Der Empfänger im Paket läuft als eigener Compose-Dienst `webhook-receiver` aus dem Node-Basis-Image (Digest) mit dem
   schreibgeschützt eingehängten `scripts/webhook-receiver.mjs`; Ziel `http://webhook-receiver:9900/hooks`; Secret einmal
   erzeugt in `state.json` wie die übrigen Secrets aus 037a (Entscheidung 7 dort).
@@ -128,12 +129,21 @@ Secret-Wechsel und zeigt die Signaturprüfung in wenigen Zeilen.
   1. **Fachlich, sofort, ohne Neustart:** `revokeRole` der Zuordnung des Systemakteurs. Wirkt beim nächsten Stapel und
      **vor dem nächsten Versuch** (zweite Prüfung, Entscheidung 3); ein schon an den Transport übergebener Versuch läuft
      zu Ende (höchstens 10 s, Entscheidung 7). Test S9.
-  2. **Subject-Sperre aus 029b:** Existiert ein Sitzungsspeicher (Postgres mit OIDC), prüft der Zusteller vor jedem
-     Versuch `isSubjectBlocked(subjectId)`; ein gesperrtes Systemsubjekt erhält nichts, die feste Zeile lautet
-     `HV-Tool API: webhook <id>: system actor blocked; nothing delivered.`. Scheitert die Prüfung selbst, wird nicht
-     zugestellt (fail closed, Wiederholung nach Plan). Die Sperre gilt damit auch für Subjekte, die sich nie anmelden
-     (Befund 13). Ohne Sitzungsspeicher (Demo-Modus in 065a) gibt es keine Sperrliste; dann gelten Weg 1 und 3. Test S9b
-     mit eingespeistem Speicher. Gewählt ist die sicherere Variante: Prüfung schon in 065a, nicht erst in 065b.
+  2. **Subject-Sperre aus 029b, wo ein Sitzungsspeicher existiert:**
+     - Das Sperr-CLI `apps/api/src/auth/subject-block-cli.ts` nimmt heute nur `oidc_…`-Kennungen an. 065a erweitert sein
+       Muster um `^sys_[a-z0-9_]{1,60}$` (sonst unverändert: gleiche Tabelle, gleiche festen Ausgaben ohne Kennung).
+       Test: „CLI sperrt ein `sys_`-Subjekt“ (gegen Postgres wie die übrigen Tests von 029b) und „CLI verweigert eine
+       Kennung, die keinem der beiden Muster folgt“.
+     - Der Zusteller prüft vor jedem Versuch `isSubjectBlocked(subjectId)`, **wo immer** ein Sitzungsspeicher existiert.
+       Ein gesperrtes Systemsubjekt erhält nichts; der Versuch zählt als Fehlschlag mit Wiederholung, die feste Zeile
+       lautet `HV-Tool API: webhook <id>: system actor blocked; nothing delivered.`. Bleibt die Sperre bestehen, wird das
+       Abonnement nach 1 h `suspended (retry_window)` (Entscheidung 7). Scheitert die Prüfung selbst, wird ebenfalls
+       nicht zugestellt (fail closed, gleiche Folge).
+     - **Ehrlich benannt:** Ein Sitzungsspeicher existiert nur mit OIDC-Anmeldung und Postgres. In 065a laufen Webhooks
+       nur mit `HV_DEMO=1`, und Demo-Modus und OIDC schließen sich aus (`schema.ts`). **In 065a gibt es also keinen
+       Sitzungsspeicher, und die Notabschaltung (SP-7) stützt sich auf Weg 1 und Weg 3.** Weg 2 wird mit 065b wirksam
+       (lokales Paket mit OIDC und Postgres im Modus `training`); 065a liefert dafür CLI-Erweiterung, Prüfung im Zusteller
+       und Test S9b mit eingespeistem Speicher.
   3. **Betrieb:** Variable `HV_WEBHOOK_SUBSCRIPTIONS` (oder den Eintrag) entfernen und den Dienst neu starten. Das
      beendet jede Zustellung dieses Abonnements unabhängig von Rechten. Der Leitfaden und die Installationsseite (065b)
      nennen diesen Weg als Notabschaltung.
@@ -273,7 +283,8 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 - Der Körper wird beim ersten Versuch einmal serialisiert; jede Wiederholung sendet **dieselben Bytes**. Ein Körper über
   256 KiB wird nicht gesendet; das Abonnement wird ausgesetzt (`internal`), weil ein Überspringen eine stille Lücke wäre.
 - **Gebundene Nutzlast je Typ (Vertrag):** `WebhookEvent` ist ein `oneOf` mit Diskriminator `type`, ein Schema je Typ aus
-  Entscheidung 4, jedes mit `additionalProperties: false` auf Umschlag und Nutzlast und genau den Schlüsseln der Tabelle.
+  Entscheidung 4, geschlossen auf Umschlag (`unevaluatedProperties: false`) und Nutzlast (`additionalProperties: false`)
+  mit genau den Schlüsseln der Tabelle.
   Damit ist die Nutzlast an Partner vertraglich festgelegt, nicht nur beschrieben.
 
 ### 6. Signatur, Idempotenzschlüssel, Secrets (Standard Webhooks, Fassung 1)
@@ -309,17 +320,25 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 
 ### 7. Zustellung: Zeiger ins Log, Reihenfolge, Wiederholung, Grenzen
 
-- **Zeiger statt Warteschlange.** Je Abonnement hält der Zusteller einen Zeiger (`cursor`, die `seq` des zuletzt
-  abgeschlossenen Ereignisses) und eine Liste von Verweisen auf die noch nicht abgeschlossenen Ereignisse aus dem
-  geprüften Log des Verteilers (Verweise auf dieselben Objekte, die der Verteiler aus `register` und `onBatch` übergibt;
-  keine Kopien, keine Körper). Der **Rückstand** ist `head − cursor`.
-  - `onBatch` hängt nur Verweise an (synchron, ohne `await`, ohne Netz) und prüft die erste Stufe von R-PERM-05 mit der
-    Projektion nach dem Stapel; abgelehnte Ereignisse werden nicht angehängt.
+- **Zeiger statt Warteschlange.** Je Abonnement hält der Zusteller einen Zeiger (`cursor`) und eine Liste offener
+  Verweise auf Ereignisse aus dem geprüften Log des Verteilers (Verweise auf dieselben Objekte, die der Verteiler aus
+  `register` und `onBatch` übergibt; keine Kopien, keine Körper).
+  - **Der Zeiger rückt über jedes entschiedene Ereignis vor, auch über abgelehnte.** Ein Ereignis, das die erste Prüfung
+    ablehnt (fremder Typ, fremder Jahrgang, kein Recht), wird sofort als entschieden verbucht und nie angehängt; ein
+    Ereignis, das die zweite Prüfung vor dem Versuch ablehnt, ebenso.
+  - **Rückstand = Zahl der offenen Verweise** (Ereignisse, die die erste Prüfung bestanden haben und noch nicht zugestellt
+    sind), nicht `head − cursor`. Fremder Verkehr zählt also nie; ein enges Abonnement wird durch Ereignisse, die es
+    nicht abonniert hat, nie ausgesetzt (Test S7b).
+  - `onBatch` prüft die erste Stufe von R-PERM-05 mit der Projektion nach dem Stapel und hängt nur Verweise an
+    (synchron, ohne `await`, ohne Netz).
   - **Körper werden erst gebaut, wenn das Ereignis an der Reihe ist** (Nachlauf ohne Vorbau). Gleichzeitig existiert je
     Abonnement höchstens ein gebauter Körper.
-  - `from: start` hängt beim Start die Verweise des ganzen Logs an (`HubSnapshot.log`); geprüft wird beim Einreihen und
-    vor dem Versuch mit der aktuellen Projektion. Mit dem Korpus (rund 1740 Ereignisse, rund 1075 lieferbar, Befund 10)
-    läuft das ohne Aussetzen durch.
+  - **Herkunft des Logs für `from: start`:** Jedes Abonnement registriert sich erst bei seinem Beginn (unten) als eigene
+    Verbindung beim Verteiler. `hub.register` liefert im selben synchronen Schritt `HubSnapshot.log` (das ganze geprüfte
+    Log dieses Moments) und `HubSnapshot.head`; danach kommen alle weiteren Ereignisse über `onBatch` (lückenlose Übergabe
+    wie in 035b). `from: start` prüft die Verweise aus `HubSnapshot.log` der Reihe nach, `from: head` beginnt bei
+    `HubSnapshot.head`. Vor dem Beginn hält der Zusteller keine Verweise. Mit dem Korpus (rund 1740 Ereignisse, rund 1075
+    lieferbar, Befund 10) läuft das ohne Aussetzen durch.
 - **Je Abonnement streng der Reihe nach, höchstens eine Anfrage gleichzeitig** (Reihenfolge nach `seq`; ein hängendes
   Ereignis hält die folgenden desselben Abonnements an, nie die anderer Abonnements).
 - **Erfolg:** jeder Status 2xx. **Fehlschlag:** jeder andere Status, eine Weiterleitung (3xx wird nie verfolgt),
@@ -330,8 +349,8 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 - **Kein Aufgeben eines einzelnen Ereignisses.** Ein Ereignis wird nie übersprungen. Stattdessen wird das Abonnement
   **ausgesetzt** (`suspended`), wenn:
   - das Ereignis an der Reihe seit mehr als 1 h auf Erfolg wartet (`retry_window`);
-  - der Rückstand 10 000 Ereignisse übersteigt (`backlog`; Verweise sind billig, die Grenze schützt vor einem
-    Empfänger, der dauerhaft nicht nachkommt);
+  - mehr als 10 000 Verweise offen sind (`backlog`; Verweise sind billig, die Grenze schützt vor einem Empfänger, der
+    dauerhaft nicht nachkommt);
   - der Verteiler `reset` oder `unavailable` meldet (`integrity`; Kette nicht mehr geprüft; fail closed);
   - ein Körper 256 KiB übersteigt oder ein unerwarteter Fehler im eigenen Code auftritt (`internal`). Der Zusteller fängt
     **jeden** eigenen Fehler (auch in Zeitgeber-Rückrufen und Promise-Ketten), setzt nur das betroffene Abonnement aus
@@ -339,11 +358,15 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
   Ausgesetzt heißt: Verweise verworfen, keine Anfrage mehr, eine feste Zeile `HV-Tool API: webhook <id> suspended
   (<grund>).` mit Grund aus `{retry_window, backlog, integrity, internal}`. Wieder aufgenommen wird nur durch Neustart des
   Dienstes; der neue Strom hat eine neue `streamId`.
-- **Beginn eines Abonnements:** Ein Abonnement beginnt erst, wenn sein Systemsubjekt **erstmals** eine aktive Zuordnung
-  hat (geprüft bei jedem Stapel). Vorher bewegt sich kein Zeiger, und es wird nichts verworfen. Ab dem Beginn gilt `from`:
-  `head` (Standard) liefert die Ereignisse nach diesem Zeitpunkt, `start` den Nachlauf über das ganze Log ab diesem
-  Zeitpunkt. Ab dem Beginn wird jedes Ereignis, das eine der beiden Prüfungen ablehnt, endgültig übergangen; ein späterer
-  Entzug mit erneuter Zuordnung holt nichts nach (sonst erhielte ein Partner Ereignisse aus einer Zeit ohne Recht).
+- **Beginn eines Abonnements:** Ein Abonnement beginnt erst, wenn sein Systemsubjekt **erstmals in diesem Prozess** eine
+  aktive Zuordnung hat. Geprüft wird beim Start des Zustellers (gleich nach der eigenen Registrierung einer Wächter-
+  Verbindung beim Verteiler, mit `HubSnapshot` als Projektion) und danach bei jedem Stapel dieser Wächter-Verbindung.
+  Besteht die Zuordnung schon beim Start, beginnt das Abonnement sofort. Vorher bewegt sich kein Zeiger, und es wird
+  nichts verworfen. Ab dem Beginn gilt `from` (oben). Ab dem Beginn wird jedes Ereignis, das eine der beiden Prüfungen
+  ablehnt, endgültig übergangen; ein späterer Entzug mit erneuter Zuordnung holt im selben Prozess nichts nach.
+  Begründung: Die Regel gilt innerhalb eines Prozesses, und jede Entscheidung fällt mit den **aktuellen** Rechten; ein
+  Nachholen nach erneuter Zuordnung würde Ereignisse aus der Zeit ohne Recht nachträglich freigeben. Ein Neustart beginnt
+  einen neuen Strom und entscheidet `from: start` wieder mit den dann aktuellen Rechten (benannt im Leitfaden).
 - **Zeitgrenzen je Versuch:** DNS 3 s, Verbindung 3 s, gesamter Versuch bis zum Ende des gelesenen Antwortkörpers 10 s.
   Vom Antwortkörper werden höchstens 4 KiB gelesen und verworfen, nie geloggt.
 - **Grenzen** (feste Konstanten wie in 035b; eine Anhebung ist eine Spec-Änderung): höchstens 5 Abonnements, höchstens
@@ -361,14 +384,15 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 - **Zwei Schlüssel für jedes Ziel:** Der Host der URL muss exakt (ohne Platzhalter, Kleinschreibung) in
   `HV_WEBHOOK_ALLOWED_HOSTS` stehen, **und** jede aufgelöste Adresse muss die Bereichsprüfung bestehen.
 - **Bereichsprüfung, Grundsatz Allowlist für IPv6:** Jede Adresse wird zuerst normalisiert, dann geprüft.
-  1. **Eingebettetes IPv4 wird als IPv4 geprüft:** IPv4-gemappt `::ffff:0:0/96`, IPv4-übersetzt `::ffff:0:0:0/96` und
-     IPv4-kompatibel `::/96` (außer `::` und `::1`). Die eingebettete Adresse durchläuft die IPv4-Regel.
+  1. **Nur IPv4-gemappte Adressen** (`::ffff:0:0/96`, so liefert ein Dual-Stack-Socket IPv4) werden entpackt; die
+     eingebettete Adresse durchläuft die IPv4-Regel. **IPv4-kompatibel `::/96` und IPv4-übersetzt `::ffff:0:0:0/96` sind
+     ohne Ausnahme gesperrt** (in beiden Zielmodi; `::1` bleibt nur in `local` erlaubt), also nicht entpackt.
   2. **IPv4, Zielmodus `public`:** gesperrt sind `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`,
      `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.0.2.0/24`, `192.88.99.0/24`, `192.168.0.0/16`,
      `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`, `224.0.0.0/4`, `240.0.0.0/4` (enthält `255.255.255.255`).
   3. **IPv6, Zielmodus `public`:** erlaubt ist **nur** `2000::/3`, und darin gesperrt `2001::/23` (Protokollzuweisungen
      der IETF, darunter Teredo `2001::/32`), `2001:db8::/32` und `3fff::/20` (Dokumentation) sowie `2002::/16` (6to4).
-     Alles außerhalb von `2000::/3` ist gesperrt, also auch NAT64 `64:ff9b::/96` und `64:ff9b:1::/48`, `100::/64`,
+     Alles außerhalb von `2000::/3` ist gesperrt, also auch `::/96`, `::ffff:0:0:0/96`, NAT64 `64:ff9b::/96` und `64:ff9b:1::/48`, `100::/64`,
      `fc00::/7`, `fe80::/10`, `ff00::/8`, `::/128`, `::1/128`. **Kein Entpacken von NAT64 oder 6to4:** Diese Adressen sind
      ohne Ausnahme gesperrt (sicherere Wahl; ein Partner hinter reinem NAT64 ist in dieser Fassung nicht erreichbar,
      benannt im Leitfaden).
@@ -384,7 +408,8 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
   `autoSelectFamily` auf), sonst `(err, address, family)`. Zusätzlich `autoSelectFamily: false` am Agenten. TLS prüft das
   Zertifikat gegen den Hostnamen (`servername`), wie üblich.
 - **Kein Proxy aus der Umgebung (Befund 11):** Zugestellt wird über `node:http`/`node:https` mit einem **eigenen
-  Agenten je Abonnement** (`new https.Agent({ … })` bzw. `http.Agent`, `keepAlive` erlaubt), nie über den globalen Agenten
+  Agenten je Abonnement** (`new https.Agent({ … })` bzw. `http.Agent`, mit `keepAlive: false`, damit jeder Versuch eine neue Verbindung zur
+  gerade geprüften Adresse aufbaut und keine alte Verbindung zu einer früher aufgelösten Adresse wiederverwendet wird), nie über den globalen Agenten
   und nie über das globale `fetch`. Der Agent wird ohne Proxy-Option angelegt; `HTTP_PROXY`, `HTTPS_PROXY`,
   `NO_PROXY` und `NODE_USE_ENV_PROXY` haben keine Wirkung auf die Zustellung. Test S8b setzt diese Variablen im
   Testprozess und belegt, dass die Verbindung an die geprüfte Adresse geht und ein Lockvogel-Proxy nichts erhält.
@@ -401,10 +426,21 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 - Begründung: Lieferungen tragen Rede- und Fragetexte von Aktionären und pseudonyme Kennungen an Dritte. Dafür braucht
   es DSFA und Auftragsverarbeitung (E14) und eine Entscheidung des Eigentümers. Das ist nicht Teil der Freigabe-Demo und
   keine Frage dieser Spec (Standard „aus“, siehe „Standards“).
-- Der DSFA-Vorentwurf wird im selben PR berichtigt (Befund 12): Zeile 161 und der Eintrag in der Spalte „Empfänger“
-  des Verarbeitungsverzeichnisses nennen künftig: Empfänger sind Partner-Empfänger (Nachbarsysteme), in der Beta nur mit
-  synthetischen Daten (`HV_DEMO=1`, ab 065b `HV_MODE=training`); kein Klarname, kein `personId`, keine Kennung von
-  Beschäftigten; eine Nutzung mit echten Daten braucht E14 und einen Vertrag zur Auftragsverarbeitung mit dem Partner.
+- Der DSFA-Vorentwurf wird im selben PR berichtigt (Befund 12). Das Verarbeitungsverzeichnis hat heute keine Zeile für
+  Webhooks; deshalb zwei Änderungen:
+  - **Zeile 161** (Nachbarsysteme, „Ereignisstrom, Webhooks“): Daten „freigegebene fachliche Ereignisse nach
+    Entscheidung 4, ohne `personId`, ohne Klarnamen, ohne Kennung von Beschäftigten“; Stand „HMAC-signiert; in der Beta
+    nur synthetische Daten (`HV_DEMO=1`, ab 065b `HV_MODE=training`); Empfänger sind Partner-Empfänger
+    (Nachbarsysteme)“.
+  - **Neue Zeile V20** „Zustellung an Nachbarsysteme (Webhooks, 065a)“ in der Spaltenfolge des Verzeichnisses:
+    Datum (Felder) = Rede- und Fragetexte, Kennungen von Wortmeldungen, Redebeiträgen, Fragen und Jahrgang,
+    Verfahrensdaten, Antwortpfad, Fachbereich (Tabelle aus Entscheidung 4); Kategorie Betroffener = Aktionäre und
+    Redner (pseudonym), keine Beschäftigten; Zweck = Information der Nachbarsysteme über den Verlauf; Rechtsgrundlage =
+    offen (E14), in der Beta keine, weil nur synthetische Daten; Empfänger = Partner-Empfänger aus der Konfiguration
+    (Host-Allowlist); Aufbewahrungsklasse = keine im Tool (nur im Speicher), beim Empfänger nach dessen Vertrag;
+    Schutzmaßnahmen = nur synthetische Daten (Startbedingung), HMAC-Signatur, Typ- und Feld-Allowlist, kein `actor`,
+    Rechtefilter R-PERM-05, SSRF-Schutz, Notabschaltung; Echtbetrieb erst nach E14 und mit Vertrag zur
+    Auftragsverarbeitung.
 - Damit gilt in 065a immer `mode: "demo"`. Der Zielmodus `local` ist zusätzlich nur mit `HV_DEMO=1` zulässig (doppelt
   ausgedrückt, damit 065b die Bedingungen getrennt erweitern kann).
 
@@ -498,7 +534,7 @@ Die Spalte „Systembündel“ liest das Datenmerkmal (`isSystemBundle`), nicht 
 | Zeit | **Zeitversatz:** Die Uhr des Dienstes läuft weg, Empfänger lehnen alles ab; oder ein Angreifer setzt einen künftigen Zeitstempel | Zeitstempel aus der injizierten Uhr (R8), Uhrprüfung über NTP (033a, `/readyz` `clock_drift`); Toleranz in beide Richtungen | `/readyz` meldet die Drift; abgelehnte Versuche führen nach 1 h zu `suspended (retry_window)` mit fester Zeile; Test R3 (±299 s gültig, ±301 s ungültig) |
 | Ziel | **SSRF:** Ziel-URL oder DNS zeigt auf interne Adressen (Metadatendienst, Datenbank, Admin-Oberflächen) | Abonnement nur aus Konfiguration; Host-Allowlist; Bereichsprüfung aller aufgelösten Adressen; Verbindung zur geprüften Adresse über einen eigenen Agenten ohne Proxy aus der Umgebung; IPv6 nur `2000::/3` ohne Sonderbereiche; eingebettetes IPv4 als IPv4 geprüft; NAT64 und 6to4 gesperrt; keine Weiterleitung; Metadatenbereiche auch in `local` gesperrt | feste Zeile „target refused“; Test S8 (Bereiche, gemischte Antworten, Rebinding, gemappt, übersetzt, kompatibel, NAT64 /96 und /48, 6to4, Teredo), S8b (Proxy-Variablen gesetzt), S6 (Weiterleitung nicht verfolgt); Mutationsproben M6, M9 |
 | Wiederholung | **Wiederholungssturm:** Ein ausgefallener Empfänger kommt zurück und wird mit Anfragen überflutet, oder viele Abonnements verstärken sich | höchstens eine Anfrage je Abonnement, höchstens 5 Abonnements; exponentieller Abstand mit Zufall und Deckel 300 s; `Retry-After` beachtet und gedeckelt; Aufholen strikt nacheinander | Test S4 (Abstände nach Plan), S5 (`Retry-After`), S7 (Isolation der Abonnements) |
-| Empfänger | **Langsamer Empfänger** (Slowloris, riesiger Antwortkörper, hängende Verbindung) staut Speicher oder Dienst | Zeitgrenzen 3/3/10 s; Antwortkörper höchstens 4 KiB; Zeiger ins Log statt Körper auf Vorrat (je Abonnement höchstens ein gebauter Körper), Rückstand höchstens 10 000, dann `suspended (backlog)`; Einreihen ohne Netz | Test S6, S7, S12 (Schreibpfad wartet nicht); feste Zeile |
+| Empfänger | **Langsamer Empfänger** (Slowloris, riesiger Antwortkörper, hängende Verbindung) staut Speicher oder Dienst | Zeitgrenzen 3/3/10 s; Antwortkörper höchstens 4 KiB; Zeiger ins Log statt Körper auf Vorrat (je Abonnement höchstens ein gebauter Körper), höchstens 10 000 offene Verweise (fremder Verkehr zählt nicht), dann `suspended (backlog)`; Einreihen ohne Netz | Test S6, S7, S12 (Schreibpfad wartet nicht); feste Zeile |
 | Secret | **Wechsel und Leck:** Ein Secret ist bekannt geworden; der Wechsel darf keine Lieferung verlieren | zwei Secrets gleichzeitig, beide signieren; Ablauf im Leitfaden (neu dazu → Partner stellt um → alt entfernen); Secrets nur aus der Umgebung, nie im Log | Partner sieht beide Signaturen; Test S2 (zwei Einträge), R5 (Empfänger mit nur neuem Secret akzeptiert); Test S1 (kein Wert in Fehlersätzen, `ServiceConfig` serialisiert keine Secrets) |
 | Rechte | **Leck über Rechtegrenzen:** Abonnent erhält Entwürfe, Rechtseinschätzungen, Notizen, Personendaten, Arbeitszuordnungen, künftig `protected` | R-PERM-05 Stufen a–f; Typ- und Feld-Allowlist; `maskEvent`; kein `actor`; Prüfung vor jedem Versuch; Systemrolle nicht für Menschen (R-ADM-12) und nicht im Demo-Kopf | Tests D3–D6, S9, S10; Mutationsproben M1, M2, M4, M5 |
 | Rechteverwaltung | **Abfluss durch Administration und Betrieb zusammen:** Eine Person mit `admin.roles.manage` ordnet einem Systemsubjekt die Abonnentenrolle zu, und der Betrieb trägt eine fremde Ziel-URL ein; so fließen Ereignisse an einen Empfänger, den niemand freigegeben hat (AK4, AK8) | zwei getrennte Schlüssel (Zuordnung im Log, Abonnement in der Konfiguration mit Host-Allowlist); Systembündel liest nie mehr als jeder Inhaber von `admin.roles.manage` (Invariante D1b); nur synthetische Daten (Entscheidung 9); Kill-Switch (Entscheidung 1) | **Signal:** jedes `RoleAssigned` mit einem Systembündel steht im Log und im Verlauf mit dem Abzeichen „Administration“ (040a); die Prüfung der Zuordnungen von Systemsubjekten gehört in die Admin-Anleitung (041) und das Runbook (070); Tests D1b, D2 |
@@ -535,14 +571,17 @@ Additiv; kein bestehendes Anfrageschema erhält ein Feld (043a, Regel 1):
     `streamId` `^str_[A-Za-z0-9_-]{22}$`; `previousSeq` `type: [integer, 'null']`, `minimum: 1`; `event` →
     `WebhookEvent`.
   - `WebhookEvent`: `oneOf` über 18 Schemas `WebhookEvent<Typ>` (etwa `WebhookEventQuestionCaptured`) mit
-    `discriminator: { propertyName: type, mapping: … }`. Jedes Schema: Umschlag über `allOf` aus einem gemeinsamen
+    `discriminator: { propertyName: type, mapping: … }`. Jedes Schema ist
+    `allOf: [{ $ref: WebhookEventEnvelope }, { properties: { type: { const: <Typ> }, payload: … } }]` mit
+    **`unevaluatedProperties: false`** auf der Ebene des Typschemas (JSON Schema 2020-12, OpenAPI 3.1). So wird
     `WebhookEventEnvelope` (`required` `[seq, id, type, at, meetingId, subjectId, payload, sourceHash]`, optional
-    `schemaVersion`, `occurredAt`, `recordedAt`, `occurredAtSource`), `type` als `const`, `payload` mit genau den
-    Schlüsseln der Tabelle aus Entscheidung 4 als `properties` (Typen aus den bestehenden Schemas, etwa `Track`,
-    `SpeakerStatus`, `TextSpan`), `required` nur für die im Ereignis immer vorhandenen Schlüssel und
-    `additionalProperties: false`. Weil `allOf` und `additionalProperties: false` zusammen nicht tragen, wiederholt jedes
-    Typschema die Umschlagfelder flach mit `additionalProperties: false` (der Architekt wählt die Form, die Redocly und
-    openapi-typescript ohne neue Meldung annehmen; Vor-dem-Bau-Punkt 4). Typen ohne Nutzlast haben
+    `schemaVersion`, `occurredAt`, `recordedAt`, `occurredAtSource`, selbst ohne `additionalProperties`) von allen 18
+    Zweigen benutzt, und kein Umschlagfeld außerhalb der Liste ist gültig. `payload` hat genau die Schlüssel der Tabelle
+    aus Entscheidung 4 als `properties` (Typen aus den bestehenden Schemas, etwa `Track`, `SpeakerStatus`, `TextSpan`),
+    `required` nur für die im Ereignis immer vorhandenen Schlüssel und `additionalProperties: false`. Kein unbenutztes
+    Schema kommt hinzu (keine neue Meldung `no-unused-components`). Prüft der Ajv der Vertragstests nicht nach 2020-12
+    (`unevaluatedProperties` unbekannt), meldet das Vor-dem-Bau-Punkt 4; dann wiederholt jedes Typschema die
+    Umschlagfelder flach mit `additionalProperties: false`, und `WebhookEventEnvelope` entfällt ganz. Typen ohne Nutzlast haben
     `payload: { type: object, additionalProperties: false, maxProperties: 0 }`.
   - `WebhookEventType`: Enum der 18 Typen aus Entscheidung 4, gleich der Menge der `const`-Werte (Test).
 - **`info.description`, Absatz „Compatibility“:** Das Lieferformat ist über `deliveryVersion` versioniert; Partner
@@ -607,7 +646,9 @@ Dienst (implementierer-backend):
   `isSubjectBlocked` des Sitzungsspeichers, falls vorhanden, Testhaken für Zeitgeber, Zufall und `lookup`)
 - `apps/api/src/server.ts` (nur Weitergabe der Konfiguration)
 - `apps/api/src/actor.ts` (nur die Verweigerung eines Systembündels und jeder `sys_`-Kennung in `parseActorHeader`)
+- `apps/api/src/auth/subject-block-cli.ts` (nur das Kennungsmuster um `sys_` erweitern, Nutzungszeile entsprechend)
 - `apps/api/src/__tests__/webhooks065a.test.ts` (neu)
+- `apps/api/src/__tests__/postgres-subject-block065a.test.ts` (neu, CLI-Tests aus Entscheidung 1, Weg 2)
 - `apps/api/src/__tests__/config034b.test.ts` (nur die neuen Variablen in Drift- und Bekanntheitsprüfung)
 
 Oberfläche (nur, was die Typprüfung erzwingt):
@@ -628,8 +669,8 @@ Dokumente:
 - `docs/integration/README.md` (nur eine Verweiszeile auf `webhooks.md`; anlegen mit genau dieser Zeile und einer
   Überschrift, falls 064 die Datei nicht angelegt hat)
 - `docs/glossar.md` (nur die eine Zeile „Ereignis-Abonnent (Systemakteur)“)
-- `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile 161 „Ereignisstrom, Webhooks“ und der Empfänger-Eintrag dieser
-  Verarbeitung im Verzeichnis ab Zeile 186; Inhalt nach Entscheidung 9)
+- `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile 161 „Ereignisstrom, Webhooks“ und eine **neue Zeile V20** im
+  Verarbeitungsverzeichnis ab Zeile 186, nach V19; Inhalt nach Entscheidung 9)
 - `docs/rollen-und-rechtekonzept.md` (nur ein Kopfvermerk „Scheibe 065a, Systemakteur `event_subscriber`“ im Stil der
   Vermerke zu 025, 026, 028 und 040a: Bündel, nie für Personen (R-ADM-12), Invariante D1b, Abschnitt Systemakteure folgt
   mit 052)
@@ -744,16 +785,22 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
   `suspended (internal)`; ein im Zusteller geworfener Fehler (Testhaken) → nur dieses Abonnement `suspended (internal)`,
   kein unbehandelter Fehler im Prozess; ein zweites Abonnement mit gesundem Empfänger erhält währenddessen alles. Während
   eines Rückstands von 1000 Ereignissen existiert je Abonnement höchstens ein gebauter Körper (Zähler über Testhaken).
+- **S7b** Enges Abonnement in fremdem Verkehr: Abonnement nur auf `QuestionDelivered`, Rückstandsgrenze per Testhaken
+  auf 5; danach 50 Ereignisse anderer Typen und ein Empfänger, der hängt → kein Aussetzen (die 50 Ereignisse sind
+  entschieden und nie angehängt, der Zeiger steht hinter ihnen); erst das sechste offene `QuestionDelivered` führt zu
+  `suspended (backlog)`. Mutationsprobe M14.
 - **S8** SSRF im Zielmodus `public` (eingespeistes `lookup`, kein echtes Netz): Host löst auf eine dieser Adressen auf →
   je verweigert, keine Verbindung: `127.0.0.1`, `10.1.2.3`, `169.254.169.254`, `192.88.99.1`, `100.64.0.1`, `::1`, `::`,
   `::ffff:127.0.0.1` (gemappt), `::ffff:0:7f00:1` (übersetzt), `::7f00:1` (kompatibel), `64:ff9b::a9fe:a9fe` (NAT64 /96),
   `64:ff9b:1::a9fe:a9fe` (NAT64 /48), `2002:7f00:1::1` (6to4), `2001:0:4136:e378::1` (Teredo), `2001:db8::1`,
-  `fc00::1`, `fe80::1`, `ff02::1`. Erlaubt: eine globale IPv4-Adresse aus einem Testbereich, der nicht gesperrt ist,
-  und eine Adresse in `2000::/3` außerhalb der Sonderbereiche (beide nur gegen den Haken am Verbindungsaufbau, kein
-  echtes Netz). Gemischte Antwort (eine öffentliche, eine private Adresse) → verweigert. Rebinding: `lookup` liefert beim
+  `fc00::1`, `fe80::1`, `ff02::1`. Erlaubt (nur gegen den Haken am Verbindungsaufbau, nie echtes Netz; das
+  eingespeiste `lookup` liefert sie, der Haken nimmt die Verbindung an und zeichnet die Zieladresse auf): `1.1.1.1`,
+  `::ffff:1.1.1.1` (gemappt, entpackt) und `2606:4700:4700::1111` (in `2000::/3` außerhalb der Sonderbereiche).
+  `::7f00:1` und `::101:101` (IPv4-kompatibel) sowie `::ffff:0:101:101` (übersetzt) sind verweigert, auch wenn die
+  eingebettete Adresse öffentlich wäre. Gemischte Antwort (eine öffentliche, eine private Adresse) → verweigert. Rebinding: `lookup` liefert beim
   zweiten Aufruf eine andere Adresse → die Verbindung geht an die geprüfte Adresse. Die eigene `lookup`-Funktion liefert
   bei `{ all: true }` ein Feld und sonst die Einzelform (beide Formen direkt getestet). Im Zielmodus `local`:
-  `127.0.0.1` und `::1` erlaubt; `169.254.169.254`, `fe80::1`, `64:ff9b::7f00:1` und `2002:7f00:1::1` verweigert.
+  `127.0.0.1`, `::ffff:127.0.0.1` und `::1` erlaubt; `::7f00:1` verweigert; `169.254.169.254`, `fe80::1`, `64:ff9b::7f00:1` und `2002:7f00:1::1` verweigert.
 - **S8b** Proxy aus der Umgebung: Im Testprozess sind `HTTP_PROXY`, `HTTPS_PROXY` und `NODE_USE_ENV_PROXY=1` gesetzt
   und zeigen auf einen Lockvogel-Proxy auf 127.0.0.1; `NO_PROXY` ist leer. Eine Zustellung an den Empfänger kommt dort an,
   und der Lockvogel-Proxy erhält keine Verbindung. Dazu ein statischer Test: `apps/api/src/webhooks/**` enthält kein
@@ -762,7 +809,11 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
   Abonnenten → beim nächsten Versuch keine Anfrage, Ereignis verworfen, feste Zeile „no active system actor assignment“.
 - **S9b** Subject-Sperre (Kill-Switch Weg 2): mit eingespeistem Sitzungsspeicher, dessen `isSubjectBlocked` für das
   Systemsubjekt `true` liefert → keine Anfrage, feste Zeile „system actor blocked“; wirft `isSubjectBlocked` → keine
-  Anfrage, Wiederholung nach Plan (fail closed); ohne Sitzungsspeicher wird die Prüfung übersprungen.
+  Anfrage, Wiederholung nach Plan (fail closed); bleibt die Sperre 1 h bestehen → `suspended (retry_window)`; ohne
+  Sitzungsspeicher wird die Prüfung übersprungen (in 065a der Normalfall, Entscheidung 1).
+- **S9c** CLI (`postgres-subject-block065a.test.ts`): `subject-block-cli.ts sys_partner_demo` → Zeile in
+  `auth_subject_blocks`, Ausgabe ohne Kennung; `isSubjectBlocked('sys_partner_demo')` ist danach wahr; eine Kennung wie
+  `sys_Partner` oder `partner` → Exit 1 mit Nutzungszeile, keine Zeile.
 - **S10** Leck Ende zu Ende: derselbe Arbeitsgang wie D3 über HTTP; der Empfänger erhält keinen Typ der Liste „Nie
   zugestellt“, und kein roher Körper enthält einen der Schlüssel aus D4 oder den Text der Notiz, des Rückgabegrunds, des
   Entwurfs oder einen `displayName` aus dem Seed (Suche im rohen Körper).
@@ -787,7 +838,8 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
 enthält `webhook.receive`; `webhooks.eventDelivered.post.operationId` ist `webhookEventDelivered`; `WebhookEventType` ist
 gleich den Schlüsseln von `WEBHOOK_EVENT_TYPES`; die `const`-Werte von `type` in den 18 Zweigen von `WebhookEvent` sind
 gleich derselben Menge, und je Typ sind die `payload.properties` genau die Schlüssel aus `WEBHOOK_EVENT_TYPES` (Vertrag
-und Kern stimmen überein); jeder Zweig hat `additionalProperties: false` auf Umschlag und Nutzlast;
+und Kern stimmen überein); jeder Zweig hat `unevaluatedProperties: false` (oder in der Rückfallform `additionalProperties: false`) und
+jede Nutzlast `additionalProperties: false`;
 `WebhookEventDelivery` hat `additionalProperties: false`; `webhookEventDelivered` hat `security: []`; ein mit Ajv
 geprüftes `QuestionCaptured` mit zusätzlichem Nutzlastschlüssel ist ungültig, eines aus D3 ist gültig; das Signaturmuster akzeptiert einen und zwei Einträge des Testvektors und lehnt `v2,…` ab;
 ein `WebhookEvent` mit `payload.pii`, `actor` oder `QuestionWithdrawn.payload.reason` ist ungültig; die
@@ -813,8 +865,10 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 - **M6** Bereichsprüfung prüft nur die erste aufgelöste Adresse → S8 (gemischte Antwort) rot.
 - **M7** `Retry-After` ohne Deckel → S5 rot.
 - **M8** Guard R-ADM-12 entfernt → D2 rot.
-- **M9** Normalisierung entpackt nur `::ffff:`-gemappte Adressen (nicht übersetzt, nicht kompatibel) → S8 rot
-  (`::ffff:0:7f00:1`, `::7f00:1`).
+- **M9** Gemappte Adressen nicht entpackt (wie gewöhnliches IPv6 behandelt) → S8 rot (`::ffff:1.1.1.1` erlaubt,
+  `::ffff:127.0.0.1` in `local` erlaubt).
+- **M13** `::/96` entpackt statt gesperrt → S8 rot (`::101:101`).
+- **M14** Rückstand als `head − cursor` statt als Zahl offener Verweise → S7b rot.
 - **M10** `event.read` aus dem Bündel von admin entfernt (nur im Test) → D1b rot.
 - **M11** `webhook-id` aus `seq` statt aus `event.id` → S11b rot.
 - **M12** Zustellung über das globale `fetch` statt über den eigenen Agenten → S8b rot.
@@ -823,7 +877,7 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` reproduzierbar; `check.mjs` (a)–(d) `ok` mit
    `(c) … 0.4.y -> 0.4.x`.
-2. Tests D1–D8 (mit D1b), S1–S15 (mit S8b, S9b, S11b), Vertragstests und R1–R7 grün; die zwölf Mutationsproben rot
+2. Tests D1–D8 (mit D1b), S1–S15 (mit S7b, S8b, S9b, S9c, S11b), Vertragstests und R1–R7 grün; die vierzehn Mutationsproben rot
    belegt.
 3. Wahrheitstabellen-Diff wie oben, wörtlich im Bericht.
 4. Ein eigener Agent in frischem Kontext befolgt den Schnellstart in `docs/integration/webhooks.md` auf einem frischen
@@ -838,14 +892,17 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 1. **Wofür, für wen:** Ereignisse für Nachbarsysteme; nur synthetische Daten (`mode`); keine Anmeldung nötig, nur ein
    Empfänger.
 2. **Schnellstart (höchstens sieben Schritte, jede Zeile kopierbar, überall `127.0.0.1`, nie `localhost`):**
-   1. Secret erzeugen: `node -e "console.log('whsec_'+require('node:crypto').randomBytes(32).toString('base64'))"` und als
-      `WEBHOOK_SECRET` setzen.
+   1. Secret erzeugen und in **beiden** Terminals (Empfänger und Dienst) als Umgebungsvariable setzen:
+      `export WEBHOOK_SECRET=$(node -e "console.log('whsec_'+require('node:crypto').randomBytes(32).toString('base64'))")`
+      im ersten Terminal, dann denselben Wert im zweiten mit `export WEBHOOK_SECRET=…` (der Leitfaden zeigt beides;
+      das Secret steht nie in einer Datei des Repositoriums).
    2. Empfänger starten: `node scripts/webhook-receiver.mjs --port 9900` (bindet nur an 127.0.0.1).
    3. Dienst im Demo-Modus mit einem Abonnement starten: `pnpm --filter @hv/api dev` mit `HV_WEBHOOK_TARGETS=local`,
       `HV_WEBHOOK_ALLOWED_HOSTS=127.0.0.1`, `HV_WEBHOOK_SECRETS=partner-demo=$WEBHOOK_SECRET` und
       `HV_WEBHOOK_SUBSCRIPTIONS` mit Ziel `http://127.0.0.1:9900/hooks`, Subjekt `sys_partner_demo`, `from: start` und
       den Typen `QuestionCaptured`, `QuestionClassified`, `QuestionStaged`, `QuestionDelivered` (vollständige Zeile im
-      Leitfaden). Der Dienst hört auf `127.0.0.1:8787`.
+      Leitfaden). Der Schnellstart spricht den Dienst unter `http://127.0.0.1:8787` an; auf welcher Schnittstelle der
+      Dienst lauscht, bestimmt der Dienst selbst (Port 8787), nicht der Leitfaden.
    4. Den Systemakteur zuordnen:
       `node scripts/webhook-demo.mjs assign --subject sys_partner_demo --role event_subscriber --admin u-admin:admin`.
       Ab jetzt läuft der Nachlauf über den synthetischen Korpus an.
@@ -900,7 +957,7 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
   (E14), Auftragsverarbeitung mit dem Partner und eine Entscheidung des Eigentümers; das gehört nicht zur Freigabe-Demo.
 - Kein neuer Speicherort: Zeiger und Verweise nur im Speicher, nichts auf Platte, kein Zugriffslog-Eintrag für
   ausgehende Anfragen.
-- Der DSFA-Vorentwurf wird im selben PR berichtigt (Entscheidung 9, Zeile 161 und Empfänger-Eintrag); der Kopfvermerk im
+- Der DSFA-Vorentwurf wird im selben PR berichtigt (Entscheidung 9: Zeile 161 und neue Zeile V20); der Kopfvermerk im
   Rechtekonzept nennt das Systembündel.
 
 ## Qualitätswirkung
@@ -929,7 +986,8 @@ frischen Agenten · Offene Entscheidung: Eigentümerfragen 1–3
 4. **Keine Anfrage an ein ungeprüftes Ziel.** Host-Allowlist und Bereichsprüfung je Versuch (IPv6 nur `2000::/3` ohne
    Sonderbereiche, eingebettetes IPv4 als IPv4, NAT64 und 6to4 gesperrt), Verbindung an die geprüfte Adresse über einen
    eigenen Agenten ohne Proxy aus der Umgebung, keine Weiterleitung (S6, S8, S8b).
-4b. **Abschaltbar ohne Code:** Entzug (S9), Subject-Sperre (S9b), Variable entfernen und neu starten.
+4b. **Abschaltbar ohne Code:** in 065a Entzug (S9) und Variable entfernen mit Neustart; die Subject-Sperre (S9b, S9c)
+   wirkt, wo ein Sitzungsspeicher existiert, also ab 065b.
 5. **Kein Leck über Rechte.** R-PERM-05 zweimal je Ereignis; Typ- und Feld-Allowlist; kein `actor` (D3–D6, S9, S10).
 6. **Kein Einfluss auf den Kernprozess.** Einreihen synchron ohne Netz; Grenzen; Aussetzen statt Absturz (S7, S12).
 7. **Nur synthetische Daten.** Start nur mit `HV_DEMO=1` (S1).
@@ -946,8 +1004,10 @@ frischen Agenten · Offene Entscheidung: Eigentümerfragen 1–3
 
 ## Offene Eigentümerfragen
 
-1. **Teilung, Budget und Reihenfolge (Go nötig).** 065 wird 065a (4 AStd, nach dem Lesebefund neu geschätzt) und 065b (rund
-   1,5 AStd), zusammen 5,5 statt 2 AStd laut Plan, beide hoch. Ohne Go baut 065a nicht; der Architekt schneidet dann neu. Mit Go ergänzt der
+1. **Teilung, Budget und Reihenfolge (Go nötig).** 065 wird 065a (6–7 AStd, nach Lesebefund und Nachprüfung neu geschätzt) und
+   065b (rund 1,5 AStd), zusammen 7,5–8,5 statt 2 AStd laut Plan, beide hoch. Das ist mehr als das Dreifache der
+   Planzeile; der größte Teil liegt in SSRF-Schutz, gebundenem Vertrag und Tests. Als Alternative kann der Eigentümer
+   `from: start` und den Demo-Helfer streichen (rund 1 AStd weniger, dafür ein Schnellstart mit `curl` und ETags). Ohne Go baut 065a nicht; der Architekt schneidet dann neu. Mit Go ergänzt der
    Orchestrator den Teilungsvermerk im Plan-Eintrag 065.
 2. **Was an Partner geht (Standard: Tabelle in Entscheidung 4).** Insbesondere: Gehen Rede- und Fragetexte
    (`ContributionCaptured.text`, `QuestionCaptured.text`) in der Freigabe-Demo an Partner? Standard ja (synthetisch,
@@ -997,7 +1057,7 @@ Missbrauchsfall „Rechteverwaltung“) und die drei Wege der Notabschaltung.
 - Ausgabe von `pnpm contract:lint` und `check.mjs` (Auszug); Typen-Diff für `Role`, `Action`, `webhooks`,
   `WebhookEventDelivery`, `WebhookEvent`, `WebhookEventType`.
 - Wahrheitstabellen-Diff wörtlich.
-- Ergebnis der zwölf Mutationsproben.
+- Ergebnis der vierzehn Mutationsproben.
 - `docs/evidence/065a-schnellstart.txt` (Durchlauf durch einen frischen Agenten, mit Commit-Hash).
 - Schluss von `pnpm gates` mit Commit-Hash.
 - Kein Screenshot: Keine Ansicht ändert sich.
@@ -1058,3 +1118,17 @@ und Nits. Alle in dieser Fassung eingearbeitet, nichts vertagt:
   Leitfaden; Aufwand neu 4 AStd. Nits: Fehler im Zusteller → `internal`; `streamId` aus `crypto.randomBytes`; Secrets am
   ersten `=`; Speicher-Grenze des Referenz-Empfängers im Leitfaden; Kopfzeilen aufgefrischt; Version beim Merge;
   Hinweis an 040c.
+
+**Nachprüfung (03.10.2026, zu `15508c7`):** M1, M2, M5, M6, M7, M8 und die Security-Minor bestätigt. Offen waren drei,
+jetzt eingearbeitet:
+- N1 (M3): Rückstand zählt nur offene Verweise; der Zeiger rückt über jedes entschiedene Ereignis vor, auch abgelehnte
+  (Entscheidung 7); Test S7b, Mutationsprobe M14.
+- N2 (SP-7): Sperr-CLI nimmt `sys_`-Kennungen an (Files allowed, Test S9c); Zusteller prüft die Sperre, wo ein
+  Sitzungsspeicher existiert; ehrlich benannt, dass 065a (Demo-Modus, kein Speicher) sich auf Weg 1 und 3 stützt; eine
+  Sperre führt nach 1 h zu `retry_window`.
+- N3 (M4): neue DSFA-Zeile V20 plus Zeile 161 (Entscheidung 9, Files allowed).
+- Minor: Begründung der Beginnregel (je Prozess, aktuelle Rechte) und Prüfung schon beim Start; Herkunft des Logs
+  (`HubSnapshot.log` bei der Registrierung zum Beginn); konkrete öffentliche Testadressen nur gegen den Haken;
+  `WebhookEventEnvelope` über `allOf` mit `unevaluatedProperties: false` benutzt (Rückfallform benannt); `::/96` und
+  `::ffff:0:0:0/96` ohne Ausnahme gesperrt (M13); Secret in beiden Terminals über die Umgebung; Wortlaut zur
+  Schnittstelle; `keepAlive: false`; Aufwand 6–7 AStd und Eigentümerfrage 1 angepasst.
