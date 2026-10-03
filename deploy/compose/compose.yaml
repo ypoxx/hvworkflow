@@ -96,6 +96,8 @@ services:
   # fill code. Runs before the service starts, because the service keeps a chain cache.
   seed:
     image: hv-tool/seed:local
+    # Locally built, never pulled: the name is not ours on docker.io.
+    pull_policy: build
     build:
       context: ../..
       dockerfile: deploy/docker/api.Dockerfile
@@ -125,6 +127,8 @@ services:
   # `pnpm stack:up -- --recreate api web` (never directly with docker compose: the stored ports would be lost).
   api:
     image: hv-tool/api:local
+    # Locally built, never pulled: the name is not ours on docker.io.
+    pull_policy: build
     build:
       context: ../..
       dockerfile: deploy/docker/api.Dockerfile
@@ -158,6 +162,8 @@ services:
   # nginx with the built interface in HTTP mode and the limits in front of the service (deploy/docker/nginx.conf).
   web:
     image: hv-tool/web:local
+    # Locally built, never pulled: the name is not ours on docker.io.
+    pull_policy: build
     build:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile

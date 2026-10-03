@@ -320,6 +320,13 @@ Stack gesund wird.
       - Das Skript und der CI-Job führen nie `docker compose config` aus. Diese Ausgabe enthielte die Werte aus den
         `env_file`.
       - Kein automatischer Abzug von `docker compose logs` oder `docker inspect` in CI.
+      - **Nachtrag des Orchestrators (03.10.2026, nach dem ersten CI-Lauf):** Scheitert der Start oder der Rauchtest,
+        gibt `stack.mjs` eine Diagnose aus. **Lokal** vollständig: Meldung von `docker compose up`, `ps -a` und die
+        letzten 80 Protokollzeilen jedes nicht gesunden Dienstes, jeder Wert aus `state.json` durch `***` ersetzt.
+        **In CI** (`GITHUB_ACTIONS=true`) nur die Statuszeilen von Compose und die `ps -a`-Zeilen (Dienst, Zustand, Health,
+        Exit-Code), keine Protokolle; einzige Ausnahme sind die festen Sätze `^HV-Tool API: refusing to start: …` des
+        Dienstes, je Satz einmal. Das Init-Skript setzt `log_min_error_statement = panic`, damit ein scheiternder
+        `CREATE ROLE … PASSWORD` nie im Postgres-Protokoll steht. Tests: Schwärzung und CI-Modus in `scripts/stack.test.mjs`.
 12. **Uhrprüfung.**
     - **Standard:** ohne `HV_NTP_SERVERS`. `/readyz` meldet dann `clock: not_configured` (503). Der Rauchtest nimmt genau
       diesen Fall hin und gibt dazu die feste Zeile aus: „Uhrprüfung nicht eingerichtet (erwartet ohne
@@ -600,6 +607,12 @@ Lokal mit dem Daemon aus „Vor dem Bau prüfen“ 1. Im CI-Job `stack-037a` lau
   - Kein Schritt ruft `stack:credentials`, `docker compose config`, `docker compose logs` oder `docker inspect` mit
     Umgebung auf.
   - Kein Pflicht-Check (Eigentümerfrage 2).
+  - **Nachtrag des Orchestrators (03.10.2026):** Gleich nach dem Checkout entfernt ein eigener Schritt einen
+    eingecheckten Screenshot; das Hochladen läuft nur mit `always()` und echter Codeänderung. Nach `stack:login` läuft
+    S16.3 in CI: `stack.mjs down`, `pnpm stack:up` (erwartet „bereits befüllt“, realm.json byte-gleich per Hash),
+    `pnpm stack:login -- --no-screenshot`. Bei einem Fehler gilt der CI-Modus der Diagnose (Entscheidung 11, Nachtrag).
+    Ein Test liest `jobs['stack-037a']` als YAML (nur PR, keine eigenen Rechte, 25 min, keine verbotenen Befehle, genau ein
+    Upload nur des Screenshots, Aktionen per Hash).
 
 ## Akzeptanzkriterium
 
@@ -954,6 +967,31 @@ belegt, der nächste CI-Lauf zeigt sie:
    (Keycloak 26, Hostname v2; `start` bräuchte TLS).
 3. Bekannte Grenze: Eine nie gesunde Probe allein erklärt die 33 s nicht (ungesund erst nach 60 Fehlversuchen); näher liegt
    ein Container, der früh endet. Die Diagnose des nächsten Laufs entscheidet.
+
+**Nachtrag nach CI, Runde 2** (Lauf 37129170181 auf `47e9c14`: Keycloak gesund, die neue Probe wirkt mit dem echten
+Image; `migrate` und `seed` mit 0; der Dienst startet im Kreis mit „HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must
+not be writable by group or accessible by others.“) und Befunde des Reviews:
+- **Ursache belegt:** `COPY --chmod=0700` auf ein Verzeichnis setzt den Modus des Zielverzeichnisses nur auf neuem
+  BuildKit. Lokal (v0.28.1): 0700; mit buildx-Buildern v0.20.2 (Docker 28, CI-Runner) und v0.17.3: 0755, Eigentümer
+  65532. Die Vermutung „Einhängereihenfolge“ ist widerlegt: nur `api` hängt `hv-access-log` ein. **Fix:** die Baustufe
+  legt `/out/hv/access-log` mit 65532 und 0700 an, kopiert wird der Elternordner ohne `--chown`/`--chmod`
+  (Eigentümer und Modus der Quelle). Belegt auf v0.28.1, v0.20.2 und v0.17.3, auch für ein neues benanntes Volume auf
+  v0.20.2. Test „the mode of the access-log volume depends neither on the BuildKit version nor on the mount order“;
+  `probe images` prüft zusätzlich das Volume im laufenden Dienst.
+- Review 1 (S16.3): CI-Schritt `down` → `stack:up` (Hash von realm.json gleich, „bereits befüllt“) →
+  `stack:login -- --no-screenshot`.
+- Review 2: CI-Modus der Diagnose und `log_min_error_statement = panic` im Init-Skript (Entscheidung 11 und S18,
+  Nachtrag des Orchestrators), Test.
+- Review 3: `assertLocalDocker` (erst `DOCKER_HOST`, dann der Kontext) am Anfang von up, down, reset, smoke, probe und
+  login; Test mit `DOCKER_HOST=tcp://…` und leerem `PATH` (kein docker-Aufruf, `reset --yes` löscht nichts).
+- Review 4: `.dockerignore` mit `**/.env`, `**/.env.*`, `!**/.env.example`; S9 erweitert.
+- Review 5: nginx `server_name localhost 127.0.0.1;`, `default_server` mit 421 (DNS-Rebinding); Rauchtest prüft einen
+  fremden Host-Header; Bedrohungsmodell T-G1-S-04 (Hinweis an 074).
+- Review 6: Installationsseite zeigt das Zugriffslog mit dem gepinnten Dienst-Image als 65532, `--network none`, nur lesend.
+- Review 7: `pull_policy: build` für api, seed und web; `migrate` bleibt `never` auf dem gebauten Image (Test).
+- Review 8: eigener Schritt entfernt den eingecheckten Screenshot nach dem Checkout; Upload nur mit Codeänderung.
+- Review 9: S18-Test über `jobs['stack-037a']`; die 031a-Workflow-Tests bleiben grün.
+- stack-login.mjs ohne festen Chromium-Pfad (PW_CHROMIUM_PATH oder Playwrights eigenes Chromium).
 
 **`pnpm gates` (Schluss, Commit `8ac36d4`, sauberer Arbeitsbaum):**
 

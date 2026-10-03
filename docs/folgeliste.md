@@ -421,6 +421,25 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - ~~037a Bau · `scripts/stack.mjs` (Stufe „Stack starten“) · ein nicht ladbares Basis-Image (gesperrter Registry-Host,
   Rate-Limit) zeigt sich nur als Stufenname, ohne das betroffene Image · vor `up` jedes nicht lokal vorhandene Image
   einzeln laden und bei Fehler den Image-Namen (kein Wert) im festen Satz nennen.~~ → erledigt im Nachtrag nach CI zu **037a** (Diagnose mit der Meldung von Compose).
+- 037a Review · `deploy/compose/compose.yaml` · nach einem Neustart von Keycloak meldet der Stack sich gesund, obwohl Dienst
+  und Web kein Ziel mehr haben (Healthchecks laufen im Container, nicht durch den Proxy) · Healthcheck des Webs durch den
+  Proxy auf `/auth/transparency-notice`, `depends_on.restart: true` für api und web, oder `resolver` in nginx.
+- 037a Review · `scripts/stack.mjs` (`stackContext`, `readState`) · `stack:reset` scheitert an einer beschädigten
+  `state.json` (JSON-Fehler), und `assertOutsideRepository` wirft keinen `StackRefusal` (nur der Stufenname erscheint) ·
+  `reset` ohne lesbaren Zustand mit dem leeren Ersatzverzeichnis fahren, die Prüfung in einen festen Satz übersetzen.
+- 037a Review · `scripts/stack.test.mjs` (S10 „formatters … never carry a secret“) · der Test kann nicht scheitern, weil
+  die Formatierer die Secrets gar nicht bekommen · Formatierer mit einem Zustand aufrufen, der die Marker enthält und
+  ausgegeben werden könnte, oder den Test umbenennen.
+- 037a Review · `scripts/stack.mjs` (Rauchtest S12.2) · der Test erkennt nicht, ob die 413 von nginx oder vom Dienst kam ·
+  Körper oder `Server`-Header der Antwort prüfen (nginx-Fehlerseite gegen problem+json des Dienstes).
+- 037a Review · `deploy/docker/nginx.conf` · Präfix-Locations `/v1/` und `/auth/` sowie `location /v1/stream` statt
+  `location = /v1/stream` · exakte Location für den Strom, Präfixe wie der Vite-Proxy dokumentieren.
+- ~~037a Review · `scripts/stack-login.mjs` · fester Chromium-Pfad der Arbeitsumgebung~~ → erledigt in **037a**
+  (`PW_CHROMIUM_PATH` oder Playwrights eigenes Chromium).
+- 037a Review · `deploy/compose/compose.yaml` · keine Ressourcengrenzen (Speicher, CPU, PIDs) für die Dienste ·
+  `mem_limit`, `cpus`, `pids_limit` mit Werten aus einem gemessenen Lauf.
+- 037a Review · `docs/evidence/037a-stack-protokoll.txt` · das Protokoll entstand auf „938ffbe + Arbeitsstand“, nicht auf
+  einem benannten Commit · bei der nächsten Wiederholung (mit erreichbarem quay.io) auf einem benannten Commit neu aufnehmen.
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 

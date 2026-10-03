@@ -68,6 +68,8 @@ Bricht der Befehl ab, nennt er die Stufe, in der es klemmt (etwa „Voraussetzun
 und gegebenenfalls einen festen Satz mit der Abhilfe. Scheitert der Start oder der Rauchtest, folgt eine Diagnose: die
 Meldung von Docker Compose, der Zustand jedes Containers und die letzten 80 Protokollzeilen jedes Dienstes, der nicht
 gesund ist oder mit Fehler endete. Passwörter und Schlüssel aus dem Zustandsverzeichnis sind darin durch `***` ersetzt.
+In GitHub Actions (CI) zeigt die Diagnose nur Statuszeilen und den Zustand der Container, keine Protokolle; einzige
+Ausnahme ist ein fester Satz „HV-Tool API: refusing to start: …“ des Dienstes.
 Weiter in Abschnitt 10.
 
 ## 4. Anmelden
@@ -105,7 +107,8 @@ Zustandsverzeichnis).
 **Automatische Anmeldung mit Screenshot (optional):** `pnpm stack:login` meldet `moderation` in einem Chromium ohne
 Fenster an, prüft die Wortmeldeliste und legt `docs/evidence/037a-stack-angemeldet.png` ab; danach prüft es, dass
 `norole` keine Sitzung bekommt. Braucht `pnpm install` und einmalig
-`pnpm --filter @hv/web exec playwright install chromium`.
+`pnpm --filter @hv/web exec playwright install chromium`; alternativ zeigt `PW_CHROMIUM_PATH` auf ein vorhandenes
+Chromium. `pnpm stack:login -- --no-screenshot` meldet nur an und prüft, ohne Bild.
 
 ## 5. Gesundheit prüfen
 
@@ -114,7 +117,7 @@ pnpm stack:smoke
 ```
 
 Der Rauchtest prüft unter anderem: Sicherheitsheader auf Oberfläche, Dienstantworten und Fehlerseiten (auch 502 bei
-angehaltenem Dienst), die Weiterleitung zum Dienst, die Body-Grenze (413), dass Proben und Metriken über den Webport
+angehaltenem Dienst), die Weiterleitung zum Dienst, die Abweisung fremder Host-Namen (421), die Body-Grenze (413), dass Proben und Metriken über den Webport
 nicht erreichbar sind, die Gesundheit im Container, die Startzeile des Dienstes, die Befüllung, die Datenbankrollen
 und die Anmelde-Discovery von Keycloak. Jede Zeile beginnt mit `PASS` oder `FAIL`.
 
@@ -175,6 +178,8 @@ und das Zustandsverzeichnis; ein direkter Aufruf bricht mit „set by scripts/st
   Container bekommt nur seine eigene Datei. Weitere Starts erzeugen nichts neu.
 - **Ohne root, nur Loopback.** Dienst und Befüllung laufen als Nutzer 65532, Web als 101, mit nur lesbarem
   Dateisystem, ohne Linux-Capabilities und mit `no-new-privileges`. Alle Ports binden `127.0.0.1`.
+- **Nur unter `localhost` und `127.0.0.1`.** nginx beantwortet jeden anderen Host-Namen mit 421. Eine fremde Webseite,
+  deren Name auf `127.0.0.1` zeigt (DNS-Rebinding), erreicht so weder Oberfläche noch Dienst.
 - **Datenbankrollen.** Der Dienst verbindet sich als `hv_runtime` (kein Eigentümer, kein Superuser; darf das
   Ereignislog nicht ändern oder löschen). Migration und Befüllung laufen als `hv_owner`, Eigentümer der Datenbank `hv`,
   aber ohne Superuser-Rechte. Der Superuser `postgres` dient nur der Ersteinrichtung.
@@ -196,8 +201,10 @@ und das Zustandsverzeichnis; ein direkter Aufruf bricht mit „set by scripts/st
   `docs/adr/0013-zwei-protokollebenen.md`). Der Subject-Hash ist ein HMAC mit einem Schlüssel je Installation:
   pseudonym, nicht anonym.
 - **Aufbewahrung:** 30 Tage, ältere Tagesdateien löscht der Dienst selbst.
-- **Ansehen** nur mit Docker-Rechten, etwa
-  `docker run --rm -v hv-tool_hv-access-log:/log:ro alpine ls -l /log`.
+- **Ansehen** nur mit Docker-Rechten, mit dem gebauten Dienst-Image als dessen Nutzer 65532, ohne Netz und nur lesend:
+  `docker run --rm --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "console.log(require('fs').readdirSync('/var/lib/hv/access-log'))"`
+  listet die Tagesdateien; eine Datei zeigt
+  `docker run --rm --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "process.stdout.write(require('fs').readFileSync('/var/lib/hv/access-log/access-JJJJ-MM-TT.jsonl'))"`.
 - `pnpm stack:reset --yes` löscht es mit.
 
 ## 10. Fehlersuche
@@ -214,6 +221,7 @@ und das Zustandsverzeichnis; ein direkter Aufruf bricht mit „set by scripts/st
 | „Der einmalige Schritt migrate (oder seed) endete mit Fehler“ | Protokoll lokal ansehen: `docker compose -p hv-tool logs migrate` (oder `seed`). Hilft nichts: `pnpm stack:reset --yes`, dann `pnpm stack:up`. |
 | Im Protokoll des Dienstes steht „refusing to start“ | Der Satz nennt die Variable und die Regel, nie den Wert. Im Stack setzt das Skript alle Variablen; meist hilft `pnpm stack:up` (schreibt die Dateien neu). |
 | Die Anmeldung springt zurück auf die Anmeldeseite | Browser: Safari kann das Cookie auf `http://localhost` ablehnen; Chromium, Edge oder Firefox nehmen. Cookies für `localhost` erlaubt? Die Adresse muss genau `http://localhost:8480` sein (nicht `127.0.0.1`), weil der Realm nur diese Rücksprungadresse kennt. |
+| Die Seite antwortet mit 421 „Misdirected Request“ | Aufruf über einen anderen Namen als `localhost` oder `127.0.0.1` (etwa den Rechnernamen). Nutzen Sie `http://localhost:8480`. |
 | `/readyz` antwortet 503 | Mit `clock: not_configured` normal (Abschnitt 5). Mit `db` nicht `ok`: Postgres prüfen (`docker compose -p hv-tool ps postgres`). Mit `migrations_pending`: `pnpm stack:up`. |
 | Keycloak wurde neu gestartet, Dienst oder Web haben kein Ziel mehr (502, Anmeldung bricht ab) | `pnpm stack:up -- --recreate api web` (nie direkt mit `docker compose`, sonst gehen die gespeicherten Ports verloren). |
 | „Das Datenbank-Volume … besteht ohne Zustandsverzeichnis“ oder „Das Zustandsverzeichnis besteht, das Datenbank-Volume … aber nicht mehr“ | Zustand und Daten passen nicht mehr zusammen (etwa nach einem händischen `docker volume rm`). `pnpm stack:reset --yes`, dann `pnpm stack:up`. |

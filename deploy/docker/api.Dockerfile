@@ -33,9 +33,9 @@ COPY packages/contract/src packages/contract/src
 COPY packages/contract/openapi.yaml packages/contract/
 # The web manifest was only needed so the frozen lockfile matches the workspace; the web package itself stays out.
 RUN rm -rf apps/web \
- && mkdir -p /out/hv /out/access-log \
- && chmod 0755 /out/hv \
- && chmod 0700 /out/access-log
+ && mkdir -p /out/hv/access-log \
+ && chown 0:0 /out/hv && chmod 0755 /out/hv \
+ && chown 65532:65532 /out/hv/access-log && chmod 0700 /out/hv/access-log
 
 # ---- runtime base: distroless Node 22, user 65532, no shell, no package manager ---------------------------------------
 FROM gcr.io/distroless/nodejs22-debian12:nonroot@sha256:13593b7570658e8477de39e2f4a1dd25db2f836d68a0ba771251572d23bb4f8e AS runtime
@@ -43,9 +43,11 @@ FROM gcr.io/distroless/nodejs22-debian12:nonroot@sha256:13593b7570658e8477de39e2
 ENV TMPDIR=/tmp
 COPY --from=build --chown=0:0 /app /app
 # /var/lib/hv belongs to root (0755); only the access log directory belongs to the service user, with 0700. A new named
-# volume on that path takes over owner and rights, so the check of slice 034b passes.
-COPY --from=build --chown=0:0 /out/hv /var/lib/hv
-COPY --from=build --chown=65532:65532 --chmod=0700 /out/access-log /var/lib/hv/access-log
+# volume on that path takes over owner and rights, so the check of slice 034b passes. The directory is prepared in the
+# build stage and copied as an entry of its parent, without --chown/--chmod, so owner and mode come from the source on
+# every BuildKit version: `COPY --chmod` on a directory leaves the destination directory at 0755 on BuildKit v0.17 and
+# v0.20 (Docker 28, the CI runner), which made the service refuse to start there (Nachtrag nach CI).
+COPY --from=build /out/hv /var/lib/hv
 WORKDIR /app/apps/api
 USER 65532:65532
 

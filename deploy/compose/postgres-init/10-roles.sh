@@ -13,6 +13,8 @@ set -eu
 : "${HV_OWNER_PASSWORD:?missing}" "${HV_RUNTIME_PASSWORD:?missing}"
 
 psql -v ON_ERROR_STOP=1 --quiet --no-psqlrc --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+-- A failing statement must never be echoed to the server log, because the CREATE ROLE lines carry the passwords.
+SET log_min_error_statement = panic;
 \getenv owner_password HV_OWNER_PASSWORD
 \getenv runtime_password HV_RUNTIME_PASSWORD
 CREATE ROLE hv_owner LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB PASSWORD :'owner_password';

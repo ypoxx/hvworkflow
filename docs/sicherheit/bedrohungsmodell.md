@@ -189,6 +189,7 @@ Bauzustands: `docs/slices/037a-lokales-betriebspaket.md`, Abschnitt „Bericht�
 | T-G1-S-02 | Restrisiko nur im lokalen Stack: `hv_session` gilt je Host, nicht je Port; jede andere Anwendung auf `localhost` im selben Browserprofil bekommt das Cookie mitgeschickt. Gegenmaßnahme: eigenes Browserprofil oder Abmelden nach der Demo (Installationsseite §8) | — |
 | T-G1-D-05 (`auth_purge_login_states`) | im lokalen Stack verringert, nicht geschlossen: `hv_owner` ist dort Datenbankeigentümer ohne Superuser (NOSUPERUSER NOCREATEROLE NOCREATEDB), die SECURITY-DEFINER-Funktion läuft mit Eigentümerrechten auf `hv`; in CI unverändert (`POSTGRES_USER: hv_owner` ist Superuser) | Rauchtest S12.7 |
 | T-G2-T-04 / T-Q-T-04 | Befüllung des lokalen Stacks am Rechtepfad vorbei nur in ein leeres Log, nur mit Loopback-Issuer und Compose-Host `postgres`, nur im Image `seed` (das Image `api` enthält kein `/app/scripts`) | `scripts/stack.test.mjs` S8; `probe images` (S14), `probe refusals` (S15) |
+| T-G1-S-04 (neu) | DNS-Rebinding gegen den lokalen Stack: eine fremde Webseite, deren Name auf `127.0.0.1` zeigt, spricht den Webport mit eigenem Host-Namen an. Gegenmaßnahme: nginx beantwortet nur `localhost` und `127.0.0.1`, jeder andere Host-Name trifft den `default_server` mit 421 (mit Sicherheitsheadern); der Dienst selbst prüft den Host nicht. Neu in 037a, in 074 aufzunehmen (Bedrohungsmodell v2) | Rauchtest S12 „Fremder Host-Header 421“, `scripts/stack.test.mjs` › nginx-Host-Regel |
 
 ## 5. STRIDE je Grenze
 
@@ -336,7 +337,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 049 Vorgelesen als Entität | T-G1-R-02 | T-G1-E-05 |
 | 065 Webhooks | T-G3-T-03, T-G3-I-01, T-G3-E-02 | T-G3-D-02 |
 | 066 KI-Port | T-G3-T-02, T-G3-I-02 | T-G3-E-01 |
-| 074 Bedrohungsmodell v2 | Status aller IDs neu bewerten | T-Q-S-02 |
+| 074 Bedrohungsmodell v2 | Status aller IDs neu bewerten; T-G1-S-04 (DNS-Rebinding, neu aus 037a) aufnehmen | T-Q-S-02 |
 
 ---
 

@@ -21,6 +21,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -354,10 +355,20 @@ async function mustDocker(args, options) {
   return result.stdout;
 }
 
-async function prerequisites() {
+/**
+ * Every command that talks to Docker checks first that the daemon is local (R11): DOCKER_HOST before any docker call,
+ * then the endpoint of the current context (read locally, the daemon is not contacted).
+ */
+export async function assertLocalDocker(env = process.env) {
+  const envRefusal = checkDockerHost({ dockerHost: env.DOCKER_HOST });
+  if (envRefusal) throw new StackRefusal(envRefusal);
   const context = await docker(['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'], { timeoutMs: 20_000 });
-  const hostRefusal = checkDockerHost({ dockerHost: process.env.DOCKER_HOST, contextHost: context.stdout.trim() });
-  if (hostRefusal) throw new StackRefusal(hostRefusal);
+  const contextRefusal = checkDockerHost({ contextHost: context.stdout.trim() });
+  if (contextRefusal) throw new StackRefusal(contextRefusal);
+}
+
+async function prerequisites() {
+  await assertLocalDocker();
   const engine = await docker(['version', '--format', '{{.Server.Version}}'], { timeoutMs: 30_000 });
   if (engine.code !== 0) throw new StackRefusal('Docker läuft nicht oder ist für diesen Nutzer nicht erreichbar.');
   const engineRefusal = checkEngineVersion(engine.stdout);
@@ -453,6 +464,20 @@ async function fetchStatus(url, init) {
   return { response, status: response.status, body };
 }
 
+/** fetch cannot set Host; a plain request can (S12, DNS rebinding check). */
+function statusWithHost(port, host) {
+  return new Promise((resolveRequest, rejectRequest) => {
+    const req = httpRequest({ host: '127.0.0.1', port, path: '/', headers: { Host: host }, timeout: 15_000 }, (res) => {
+      res.resume();
+      const headersOk = Object.entries(SECURITY_HEADERS).every(([name, value]) => res.headers[name] === value);
+      res.on('end', () => resolveRequest({ status: res.statusCode, headersOk }));
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', rejectRequest);
+    req.end();
+  });
+}
+
 async function waitService(plan, service, timeoutMs = 120_000) {
   await waitForStack(plan, { timeoutMs, services: [service] });
 }
@@ -485,6 +510,8 @@ export async function smoke({ state, dir, plan, say }) {
   await waitService(plan, 'api');
 
   // 2. proxy paths
+  const rebind = await statusWithHost(state.webPort, 'rebind.example');
+  check('Fremder Host-Header (DNS-Rebinding) 421 am Proxy', rebind.status === 421 && rebind.headersOk);
   const notice = await fetchStatus(`${web}/auth/transparency-notice`);
   check('GET /auth/transparency-notice 200 (Web → Dienst)', notice.status === 200 && headersOnce(notice.response));
   for (const path of ['/healthz', '/readyz', '/metrics']) {
@@ -553,6 +580,10 @@ async function probeImages({ plan, say, check }) {
   const facts = JSON.parse(inside.trim());
   check('Image api ohne /app/scripts', facts.scripts === false);
   check('/var/lib/hv 0755 root, access-log 0700 65532', facts.hv.join() === '755,0' && facts.log.join() === '700,65532');
+  // The live volume, as the running service sees it: owner and mode come from the image, whichever container came first.
+  const { value: volume } = await inApi(plan, "const x = require('fs').statSync('/var/lib/hv/access-log');"
+    + ' console.log(JSON.stringify([(x.mode & 0o777).toString(8), x.uid]));');
+  check('Volume hv-access-log im laufenden Dienst 0700 65532', Array.isArray(volume) && volume.join() === '700,65532');
 }
 
 async function probeRefusals({ check }) {
@@ -665,11 +696,26 @@ export function needsLog(row) {
   return !(row.state === 'running' && row.health === 'healthy');
 }
 
-/** Pure: the text of the diagnostics dump, redacted. `logs` maps a service to its last log lines. */
-export function formatDiagnostics({ rows, logs, composeError, secrets }) {
-  const lines = ['--- Diagnose (Werte aus dem Zustandsverzeichnis geschwärzt) ---'];
+/** Status lines of docker compose that CI may show (owner decision, Nachtrag des Orchestrators). */
+const COMPOSE_STATUS_LINES = [
+  /^\s*(Container|Image|Network|Volume) \S+ \S.*$/,
+  /^\s*dependency failed to start: container \S+ (is unhealthy|exited \(\d+\))\s*$/,
+  /^\s*service "?[\w-]+"? didn't complete successfully: exit \d+\s*$/,
+  /^\s*Error response from daemon: .*$/,
+];
+/** The one log line CI may show: a fixed refusal sentence of our own service (never a value, slice 034b). */
+export const REFUSAL_LINE = /^HV-Tool API: refusing to start: [A-Za-z0-9_ ,.()=<>:'/-]{1,200}$/;
+
+/**
+ * Pure: the text of the diagnostics dump, redacted. `logs` maps a service to its last log lines. In CI (`ci: true`)
+ * only the compose status lines, the ps rows and the distinct refusal sentences of the api appear, no container log.
+ */
+export function formatDiagnostics({ rows, logs, composeError, secrets, ci = false }) {
+  const lines = [ci ? '--- Diagnose (CI: nur Status, keine Protokolle) ---' : '--- Diagnose (Werte aus dem Zustandsverzeichnis geschwärzt) ---'];
   if (composeError && composeError.trim() !== '') {
-    lines.push('docker compose meldete:', ...composeError.trim().split('\n').slice(-40).map((line) => `  ${line}`));
+    const reported = composeError.trim().split('\n')
+      .filter((line) => !ci || COMPOSE_STATUS_LINES.some((pattern) => pattern.test(line))).slice(-40);
+    lines.push('docker compose meldete:', ...reported.map((line) => `  ${line}`));
   }
   lines.push('docker compose ps -a:');
   const seen = new Set(rows.map((row) => row.service));
@@ -678,6 +724,12 @@ export function formatDiagnostics({ rows, logs, composeError, secrets }) {
   }
   for (const name of [...LONG_RUNNING, ...ONE_OFF]) if (!seen.has(name)) lines.push(`  ${name}: nicht angelegt`);
   for (const [service, text] of Object.entries(logs)) {
+    if (ci) {
+      if (service !== 'api') continue;
+      const refusals = [...new Set(String(text).split('\n').map((line) => line.trim()).filter((line) => REFUSAL_LINE.test(line)))];
+      if (refusals.length > 0) lines.push('Startverweigerung api:', ...refusals.map((line) => `  ${line}`));
+      continue;
+    }
     lines.push(`Protokoll ${service} (letzte ${DIAGNOSTIC_LOG_LINES} Zeilen):`);
     lines.push(...String(text).split('\n').filter((line) => line !== '').slice(-DIAGNOSTIC_LOG_LINES).map((line) => `  ${line}`));
   }
@@ -694,13 +746,14 @@ async function printDiagnostics({ plan, state, say, error }) {
       rows = (text.startsWith('[') ? JSON.parse(text) : text.split('\n').filter(Boolean).map((line) => JSON.parse(line)))
         .map((row) => ({ service: row.Service, state: row.State, health: row.Health ?? '', exitCode: row.ExitCode }));
     } catch { rows = []; }
+    const ci = process.env.GITHUB_ACTIONS === 'true';
     const logs = {};
-    for (const row of rows.filter(needsLog)) {
+    for (const row of rows.filter(needsLog).filter((entry) => !ci || entry.service === 'api')) {
       const result = await docker([...plan.compose, 'logs', '--no-color', '--no-log-prefix', '--tail', String(DIAGNOSTIC_LOG_LINES),
         row.service], { env: plan.env, timeoutMs: 30_000 });
       logs[row.service] = `${result.stdout}${result.stderr}`;
     }
-    say(formatDiagnostics({ rows, logs, composeError: error?.dockerStderr, secrets: secretsOf(state) }));
+    say(formatDiagnostics({ rows, logs, composeError: error?.dockerStderr, secrets: secretsOf(state), ci }));
   } catch {
     say('Diagnose nicht möglich.');
   }
@@ -767,6 +820,8 @@ function requireState() {
 }
 
 async function cmdSmoke() {
+  stage = 'Voraussetzungen';
+  await assertLocalDocker();
   stage = 'Zustand';
   const { state, dir } = requireState();
   const say = startOutput({ secrets: secretsOf(state) });
@@ -798,6 +853,8 @@ function stackContext() {
 }
 
 async function cmdDown() {
+  stage = 'Voraussetzungen';
+  await assertLocalDocker();
   stage = 'Stoppen';
   const { state, dir, cleanup } = stackContext();
   try {
@@ -813,6 +870,8 @@ async function cmdReset(args) {
   if (!args.yes) {
     throw new StackRefusal('stack:reset löscht alle lokalen Daten und Passwörter und braucht --yes: pnpm stack:reset --yes');
   }
+  stage = 'Voraussetzungen';
+  await assertLocalDocker();
   stage = 'Zurücksetzen';
   const { state, dir, cleanup } = stackContext();
   try {
@@ -827,6 +886,8 @@ async function cmdReset(args) {
 
 async function cmdProbe(args) {
   if (!PROBES.includes(args.probe)) throw new StackRefusal(`probe nimmt: ${PROBES.join(', ')}.`);
+  stage = 'Voraussetzungen';
+  await assertLocalDocker();
   stage = 'Zustand';
   const { state, dir } = requireState();
   const say = startOutput({ secrets: secretsOf(state) });

@@ -19,7 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   COMPOSE_FILE, DEFAULT_IDP_PORT, DEFAULT_WEB_PORT, ENV_FILES, PROJECT, REALM_NAME, START_LINE, assertPrivateDirectory,
   checkComposeVersion, checkDockerHost, checkDrift, checkEngineVersion, createState, formatCredentials, formatDiagnostics,
-  formatFailure, needsLog, redact,
+  formatFailure, needsLog, redact, REFUSAL_LINE,
   formatSmokeLine, formatUpSummary, parseArgs, readOrCreateState, renderFiles, resolvePorts, secretsOf, startOutput,
   stateDirectory, upPlan, writeStateFiles,
 } from './stack.mjs';
@@ -287,15 +287,50 @@ test('S4 no fixed address, no ipam and no proxy trust for the service (decision 
 
 test('S4 /var/lib/hv root 0755, access-log 65532 0700; the api target copies nothing from scripts/', () => {
   const text = read(API_DOCKERFILE);
-  assert.match(text, /chmod 0755 \/out\/hv\b/);
-  assert.match(text, /COPY --from=build --chown=0:0 \/out\/hv \/var\/lib\/hv\n/);
-  assert.match(text, /COPY --from=build --chown=65532:65532 --chmod=0700 \/out\/access-log \/var\/lib\/hv\/access-log\n/);
+  assert.match(text, /chown 0:0 \/out\/hv && chmod 0755 \/out\/hv\b/);
+  assert.match(text, /chown 65532:65532 \/out\/hv\/access-log && chmod 0700 \/out\/hv\/access-log/);
+  assert.match(text, /^COPY --from=build \/out\/hv \/var\/lib\/hv$/m);
   assert.equal(apiCopiesScripts(text), false);
   assert(lineage(dockerStages(text), 'seed').some((stage) => stage.lines.some((line) => line.includes('scripts/stack-seed.mjs'))));
   const injected = text.replace('FROM runtime AS api\n', 'FROM runtime AS api\nCOPY scripts /app/scripts\n');
   assert.equal(apiCopiesScripts(injected), true, 'an injected COPY scripts in the api target fails');
   const injectedBase = text.replace('ENV TMPDIR=/tmp\n', 'ENV TMPDIR=/tmp\nCOPY scripts/lib /app/scripts/lib\n');
   assert.equal(apiCopiesScripts(injectedBase), true, 'also in a stage the api target builds on');
+});
+
+test('Nachtrag: the mode of the access-log volume depends neither on the BuildKit version nor on the mount order', () => {
+  // COPY --chmod on a directory leaves the destination at 0755 on BuildKit v0.17/v0.20 (CI); the entry is prepared in the
+  // build stage and copied with its parent instead, without --chown/--chmod (owner and mode come from the source).
+  const text = read(API_DOCKERFILE);
+  for (const stage of dockerStages(text)) {
+    for (const line of stage.lines.filter((entry) => /^COPY\s/i.test(entry))) {
+      assert(!/--chmod/.test(line), `no --chmod on COPY: ${line}`);
+      if (/\/var\/lib\/hv/.test(line)) assert(!/--chown/.test(line), `no --chown on the /var/lib/hv copy: ${line}`);
+    }
+  }
+  // Only the service mounts the volume, so no other image can be the first to fill it.
+  const mounts = Object.entries(loadCompose().services)
+    .filter(([, service]) => (service.volumes ?? []).some((volume) => String(volume).startsWith('hv-access-log:')))
+    .map(([name]) => name);
+  assert.deepEqual(mounts, ['api']);
+});
+
+test('Nachtrag: nginx answers only localhost and 127.0.0.1; any other Host gets 421 from the default server', () => {
+  const conf = read('deploy/docker/nginx.conf');
+  const servers = conf.split(/\n    server \{/).slice(1);
+  assert.equal(servers.length, 2);
+  assert.match(servers[0], /listen 8080 default_server;/);
+  assert.match(servers[0], /return 421;/);
+  assert.match(servers[0], /add_header X-Frame-Options "DENY" always;/);
+  assert.match(servers[1], /server_name localhost 127\.0\.0\.1;/);
+  assert.doesNotMatch(servers[1], /default_server/);
+});
+
+test('Nachtrag: api, seed and web are never pulled (pull_policy build); migrate reuses the built api image', () => {
+  const { services } = loadCompose();
+  for (const name of ['api', 'seed', 'web']) assert.equal(services[name].pull_policy, 'build', name);
+  assert.equal(services.migrate.pull_policy, 'never');
+  assert.equal(services.migrate.build, undefined);
 });
 
 // ---- S5 service environment against the real schema -----------------------------------------------------------------
@@ -542,9 +577,11 @@ test('S8 reset without --yes has no effect; --yes and -- --yes are both accepted
 
 test('S9 .dockerignore keeps git, dependencies, env files, evidence, reports and builds out of the context', () => {
   const lines = read('.dockerignore').split('\n').map((line) => line.trim());
-  for (const entry of ['.git', '**/node_modules', '.env', '.env.*', 'docs/evidence', '**/playwright-report', '**/test-results', '**/dist']) {
+  for (const entry of ['.git', '**/node_modules', '.env', '.env.*', '**/.env', '**/.env.*', 'docs/evidence', '**/playwright-report',
+    '**/test-results', '**/dist']) {
     assert(lines.includes(entry), entry);
   }
+  assert.equal(lines.at(lines.indexOf('**/.env.*') + 1), '!**/.env.example', 'only the example file is let back in');
   assert.equal(read('.gitattributes').trim(), '*.sh text eol=lf');
 });
 
@@ -646,4 +683,75 @@ test('Nachtrag: the diagnostics dump shows ps rows and the logs of failed servic
   const tail = formatDiagnostics({ rows: [], logs: { api: long }, secrets });
   assert(tail.includes('log 199') && tail.includes('log 120') && !tail.includes('log 119\n'), 'only the last 80 lines');
   assert.equal(redact('a-b-c', ['b', '']), 'a-***-c');
+});
+
+test('Nachtrag des Orchestrators: in CI the dump shows status and ps rows only, no log line but the api refusal sentence', () => {
+  const state = markedState();
+  const secrets = secretsOf(state);
+  const rows = [
+    { service: 'keycloak', state: 'running', health: 'healthy', exitCode: 0 },
+    { service: 'api', state: 'restarting', health: '', exitCode: 1 },
+    { service: 'seed', state: 'exited', health: '', exitCode: 1 },
+  ];
+  const refusal = 'HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must not be writable by group or accessible by others.';
+  const logs = {
+    api: `HV-Tool API: listening\n${refusal}\nsomething with ${MARKER}-owner\n${refusal}\nHV-Tool API: refusing to start: x ${'y'.repeat(300)}\n`,
+    seed: `seed detail line ${MARKER}-client\n`,
+  };
+  const composeError = [
+    ' Container hv-tool-api-1 Error',
+    'dependency failed to start: container hv-tool-api-1 exited (1)',
+    `free text from somewhere ${MARKER}-admin`,
+  ].join('\n');
+  const dump = formatDiagnostics({ rows, logs, composeError, secrets, ci: true });
+  assert(!dump.includes(MARKER));
+  assert(!dump.includes('seed detail line') && !dump.includes('listening') && !dump.includes('free text'), 'no log line, no free text');
+  assert.equal(dump.split('\n').filter((line) => line.trim() === refusal).length, 1, 'the refusal sentence once');
+  assert(dump.includes('Container hv-tool-api-1 Error') && dump.includes('dependency failed to start'));
+  assert.match(dump, /api: restarting exit=1/);
+  for (const line of dump.split('\n').filter((entry) => entry.startsWith('  HV-Tool'))) assert.match(line.trim(), REFUSAL_LINE);
+  assert.doesNotMatch(`HV-Tool API: refusing to start: ${'y'.repeat(300)}`, REFUSAL_LINE);
+  const local = formatDiagnostics({ rows, logs, composeError, secrets });
+  assert(local.includes('seed detail line ***') && local.includes('free text from somewhere ***'), 'locally the full, redacted dump');
+});
+
+test('Nachtrag: down, reset, smoke, probe, login and up refuse a remote daemon before any docker call', () => {
+  const home = scratch();
+  try {
+    const env = { XDG_STATE_HOME: home, HOME: home };
+    const { state, dir } = readOrCreateState(env);
+    writeStateFiles(dir, state);
+    // An empty PATH: a command that reached the docker binary would fail differently, not with the refusal.
+    const runEnv = { ...env, PATH: '', DOCKER_HOST: 'tcp://10.0.0.1:2376' };
+    const commands = [[STACK, 'down'], [STACK, 'reset', '--yes'], [STACK, 'smoke'], [STACK, 'probe', 'images'],
+      [join(ROOT, 'scripts/stack-login.mjs')], [STACK, 'up']];
+    for (const args of commands) {
+      const run = spawnSync(process.execPath, args, { encoding: 'utf8', env: runEnv, timeout: 30_000 });
+      assert.notEqual(run.status, 0, args.join(' '));
+      assert.match(run.stderr, /entfernter Docker-Daemon/, args.slice(1).join(' ') || 'login');
+    }
+    assert(existsSync(join(dir, 'state.json')), 'reset refused before deleting anything');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('S18 the CI job stack-037a: pull requests only, inherited rights, 25 min, no secret output, one screenshot upload', () => {
+  const workflow = YAML.parse(read('.github/workflows/gates.yml'));
+  const job = workflow.jobs['stack-037a'];
+  assert.equal(job.if, "github.event_name == 'pull_request'");
+  assert.equal(job.permissions, undefined);
+  assert.equal(job['timeout-minutes'], 25);
+  const runs = job.steps.map((step) => step.run ?? '').join('\n');
+  assert.doesNotMatch(runs, /stack:credentials|stack\.mjs credentials|compose\b[^\n]*\bconfig\b|compose\b[^\n]*\blogs\b/);
+  for (const line of runs.split('\n').filter((entry) => /docker\s+inspect/.test(entry))) assert.match(line, /--format/);
+  const uploads = job.steps.filter((step) => String(step.uses ?? '').startsWith('actions/upload-artifact@'));
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].with.path, 'docs/evidence/037a-stack-angemeldet.png');
+  assert.equal(uploads[0].with.name, 'evidence-037a-stack');
+  assert.equal(uploads[0].if, "always() && steps.docsfilter.outputs.code == 'true'");
+  for (const step of job.steps.filter((entry) => entry.uses)) assert.match(step.uses, /^[\w./-]+@[0-9a-f]{40}$/, step.uses);
+  assert.equal(job.steps[1].run, 'rm -f docs/evidence/037a-stack-angemeldet.png', 'the committed screenshot goes right after checkout');
+  assert.match(runs, /node scripts\/stack\.mjs down[^]*pnpm stack:up[^]*bereits befüllt[^]*pnpm stack:login -- --no-screenshot/);
+  assert.deepEqual(Object.keys(workflow.jobs), ['gates', 'stack-037a', 'e2e-http'], 'e2e-http stays the last job (031a tests)');
 });

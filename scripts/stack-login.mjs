@@ -7,18 +7,17 @@
  *   pnpm stack:login [-- --person <key>] [-- --no-screenshot]
  *
  * Needs `pnpm install` (Playwright from apps/web) and a Chromium (`pnpm --filter @hv/web exec playwright install
- * chromium`, or PW_CHROMIUM_PATH). The password comes from the state directory and is never printed; no trace, no
+ * chromium`, or PW_CHROMIUM_PATH for a Chromium of your own). The password comes from the state directory and is never printed; no trace, no
  * video, no report. On a failure only the name of the stage reaches stderr.
  */
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PERSONS } from './lib/demo-persons.mjs';
-import { ROOT, StackRefusal, formatFailure, formatSmokeLine, readState, secretsOf, startOutput } from './stack.mjs';
+import { ROOT, StackRefusal, assertLocalDocker, formatFailure, formatSmokeLine, readState, secretsOf, startOutput } from './stack.mjs';
 
 export const SCREENSHOT = 'docs/evidence/037a-stack-angemeldet.png';
-const PINNED_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 export function parseLoginArgs(argv) {
   const tokens = argv.filter((token) => token !== '--');
@@ -44,6 +43,8 @@ async function signIn(page, person) {
 
 async function main(argv) {
   const args = parseLoginArgs(argv);
+  stage = 'Voraussetzungen';
+  await assertLocalDocker();
   stage = 'Zustand';
   const found = readState();
   if (!found) throw new StackRefusal('Keine Installation gefunden. Zuerst pnpm stack:up.');
@@ -51,7 +52,8 @@ async function main(argv) {
   const say = startOutput({ secrets: secretsOf(state) });
   stage = 'Playwright laden';
   const { chromium } = createRequire(pathToFileURL(join(ROOT, 'apps/web/package.json')))('@playwright/test');
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? (existsSync(PINNED_CHROMIUM) ? PINNED_CHROMIUM : undefined);
+  // PW_CHROMIUM_PATH points at a Chromium of your own; otherwise Playwright's own (`playwright install chromium`).
+  const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
   stage = 'Browser starten';
   const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   try {

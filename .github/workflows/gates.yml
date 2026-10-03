@@ -183,6 +183,9 @@ jobs:
         with:
           fetch-depth: 0 # the documentation filter below diffs against the full history
           persist-credentials: false # nothing later pushes or otherwise needs git write credentials
+      # A committed screenshot must never be uploaded in place of a fresh one, so it goes before anything else runs.
+      - name: Remove a committed sign-in screenshot
+        run: rm -f docs/evidence/037a-stack-angemeldet.png
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: pnpm }
@@ -223,13 +226,26 @@ jobs:
       - name: Sign-in with screenshot (S13)
         if: steps.docsfilter.outputs.code == 'true'
         timeout-minutes: 4
-        # A committed screenshot must never be uploaded in place of a fresh one, so it goes first.
-        run: rm -f docs/evidence/037a-stack-angemeldet.png && pnpm stack:login
+        run: pnpm stack:login
+      # S16.3: stop and start again; the realm is written byte-identical, the fill writes nothing, the sign-in still works.
+      - name: Stop and start again, sign-in after the restart (S16.3)
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 12
+        run: |
+          realm="$HOME/.local/state/hv-tool-stack/realm.json"
+          before=$(sha256sum "$realm" | cut -d' ' -f1)
+          node scripts/stack.mjs down
+          pnpm stack:up | tee "$RUNNER_TEMP/stack-up-2.txt"
+          grep -q '^Befüllung: bereits befüllt\.' "$RUNNER_TEMP/stack-up-2.txt"
+          after=$(sha256sum "$realm" | cut -d' ' -f1)
+          test "$before" = "$after"
+          echo "realm.json byte-identical after down and up; fill: bereits befüllt"
+          pnpm stack:login -- --no-screenshot
       - name: Reset the stack
         if: always() && steps.docsfilter.outputs.code == 'true'
         run: node scripts/stack.mjs reset --yes
       - name: Upload the screenshot of the stack sign-in
-        if: always()
+        if: always() && steps.docsfilter.outputs.code == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: evidence-037a-stack
