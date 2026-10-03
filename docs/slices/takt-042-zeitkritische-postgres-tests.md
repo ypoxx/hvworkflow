@@ -389,4 +389,15 @@ der Cluster `/var/tmp/pgtest`, `hv_t042`, `hv_t042b` und `hv_t042c` wurden dort 
 mark-test-run: wrote /home/user/wt/t042/.claude/state/last-test-run (clean tree) at commit 0620d1b, tree 49655c18667b…
 ```
 
+**Kriterium 3 und 4 erneut auf `0620d1b`** (mit der neuen In-flight-Zusicherung; Arbeitsbaum ohne Abweichung von
+`0620d1b` in `apps/`, Cluster `/var/tmp/pgtest`, `hv_t042`):
+
+- **Kriterium 3** (Test 28, 20 Läufe hintereinander, N = 6 markierte Schleifen `/*takt042*/`, vor jedem Lauf 6 am
+  Leben): **20/20 grün**, `violations 0` in allen Läufen. `quietEnds` je Lauf 21, 20, 21, 22, 20, 20, 20, 20, 21, 21,
+  20, 20, 21, 21, 21, 20, 21, 24, 21, 20 (alle >= 20), `acquire` 21–25. uptime vorher
+  `18:32:16 load average: 3.09, 1.50, 0.63` (Schleifen 30 s alt, der Mittelwert läuft nach), nachher
+  `18:34:29 load average: 7.44, 3.89, 1.65`.
+- **Kriterium 4** (beide Dateien vollständig, ohne Last): `Test Files  2 passed (2)`, `Tests  31 passed (31)`;
+  Test 28 dabei `quietEnds 20, acquire 21, release 21, violations 0`.
+
 ## Review findings
