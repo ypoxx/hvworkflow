@@ -92,15 +92,26 @@ async function findRefusableQuestion(
   await page.getByTestId('answers-filter-status-assigned').click();
   await expect(page.getByTestId('answers-filter-status-assigned')).toHaveAttribute('aria-pressed', 'true');
   const unit = page.getByTestId('answers-filter-unit');
-  if (opts?.unitName !== undefined) await unit.selectOption({ label: opts.unitName });
-  else await unit.selectOption({ index: 0 });
   const rows = page.getByTestId('answers-row');
+  let unitId: string | undefined;
+  if (opts?.unitName !== undefined) [unitId] = await unit.selectOption({ label: opts.unitName });
+  else await unit.selectOption({ index: 0 });
   await expect(rows.first()).toBeVisible();
+  // The unit filter is applied by the service (`listQuestions({ unitId })`), not in the client like the status filter:
+  // in `http` the filtered list arrives after the selection, and until then the rows are the unfiltered ones. Wait
+  // until every row belongs to the chosen unit (CI run 37152696332 picked a `unit-strat` question here).
+  if (unitId !== undefined) {
+    await expect.poll(async () => {
+      const units = await rows.evaluateAll((els) => els.map((el) => el.getAttribute('data-unit')));
+      return units.length > 0 && units.every((value) => value === unitId);
+    }).toBe(true);
+  }
   const exclude = opts?.exclude ?? [];
   for (let i = 0; i < Math.min(await rows.count(), 20); i++) {
     const row = rows.nth(i);
     const number = (await row.getAttribute('data-number')) ?? '';
     if (exclude.includes(number) || (await row.getByTestId('answers-row-refusal').count()) > 0) continue;
+    if (unitId !== undefined) expect(await row.getAttribute('data-unit')).toBe(unitId);
     await row.click();
     // The selected question is read on its own in `http`; its actions are known once its number shows in the detail.
     await expect(page.getByTestId('answers-detail-number')).toHaveText(number);

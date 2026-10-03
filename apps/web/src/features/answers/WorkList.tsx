@@ -163,6 +163,8 @@ function Row({
       data-testid="answers-row"
       data-number={question.number}
       data-status={question.status}
+      // Scheibe 045: lets the e2e wait until a server-side unit filter has landed (the list reloads asynchronously).
+      data-unit={question.unitId ?? ''}
       onClick={() => onSelect(question.id)}
       style={{ height: ROW_HEIGHT, gridTemplateColumns: columns }}
       className={cx(
