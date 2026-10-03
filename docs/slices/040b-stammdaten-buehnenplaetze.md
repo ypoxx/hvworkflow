@@ -422,7 +422,8 @@ Slice: 040b-stammdaten-buehnenplaetze
 Done: Kern mit drei Stammdaten-Ereignissen (ganze Liste, Jahrgang als Subjekt), R-ADM-01/R-ADM-02, Prüfungen
   (masterData.ts), vier HvApi-Methoden mit zwischengespeicherter eingegrenzter Instanz, Classification.seatId,
   counts.byUnit/bySeat, Seed (AR-Büro, vier Plätze), zwei Rechte nur für admin; vier Routen im Dienst; Web-Adapter.
-Evidence: `pnpm gates` grün auf f89ac89 (Schluss unten); Tests 1–16 grün; fünf Mutationsproben rot; kein Screenshot
+Evidence: `pnpm gates` grün auf a5140cc (letzter Code-Stand nach den Review-Befunden; Schluss unten), davor auf
+  f89ac89; Tests 1–16 grün; fünf Mutationsproben rot; kein Screenshot
   (Akzeptanzkriterium 4).
 Open: keine. Bau-Halt Teil 2 (drei Dateien außerhalb „Files allowed“) durch den Nachtrag des Orchestrators gelöst;
   slice-scope warnt deshalb, dass „Files allowed“ von der Merge-Basis abweicht (erwartet).
@@ -525,6 +526,31 @@ slice-scope: 40 changed file(s), all within "docs/slices/040b-stammdaten-buehnen
 ✓ built in 1.43s
 mark-test-run: wrote /home/user/wt/s040b/.claude/state/last-test-run (clean tree) at commit f89ac89, tree d48a8a0ceb20…
 ```
+
+**`pnpm gates` auf dem letzten Code-Stand `a5140cc`** (nach den Review-Befunden; Codex P1 auf #130), mit Postgres
+(`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE=hv_runtime`), Exit 0. Der erste Lauf auf diesem
+Commit scheiterte in `postgres-limits034a.test.ts` (Fall „a COMMIT that is already on its way wins over the timer: 201,
+not 408“, zeitkritisch unter Last, berührt 040b nicht, Folgeliste); der zweite Lauf auf demselben Commit:
+
+```
+packages/domain test:  Test Files  18 passed (18)
+packages/domain test:       Tests  297 passed (297)
+apps/web test:  Test Files  24 passed (24)
+apps/web test:       Tests  488 passed (488)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+apps/api test: operation-coverage: 69 operations in the contract, 64 exercised by tests, 5 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+slice-scope: warning — "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" section differs from its version at the merge-base (88fa9be) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 41 changed file(s), all within "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" list (56 pattern(s)).
+# tests 275
+# pass 275
+# fail 0
+✓ built in 1.28s
+mark-test-run: wrote /home/user/wt/s040b/.claude/state/last-test-run (clean tree) at commit a5140cc, tree cf8d464a7b10…
+```
+
+CI auf `a5140cc`: `gates` und `e2e-http` grün. Danach nur Doku-Commits.
 
 ## Review findings
 
