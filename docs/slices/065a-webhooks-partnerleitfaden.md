@@ -1,9 +1,9 @@
 # Scheibe 065a — Ereignisstrom für Nachbarn: signierte Webhooks und Partnerleitfaden (Teil 1 von 065)
 
 **Status:** spec (03.10.2026; gelesen auf `2fc3153`, nach dem Merge von 043a und Spec 037a erneut auf `88fa9be`; überarbeitet nach dem Lesebefund zu `8b66fd5`: 0 blocker, 9 major, Minor und Nits; Teil 1 der geteilten Scheibe 065, Zuschnitt im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 6–7 AStd (Teil a, neu geschätzt nach Lesebefund und Nachprüfung; Schätzung 065b rund 1,5 AStd; Summe 7,5–8,5 statt 2 laut Plan) · Plan 065: 27.11.2026 (W9); für die Freigabe-Demo vorgezogen (Eigentümer 03.10.2026, Plan §11, Punkt 2 „Entwickler“); 043a (Vertrag 0.4.0) ist gemergt; Baustart frühestens nach dem Vertragsschritt von 064 und dem Go zu Eigentümerfrage 1 · Lanes: contract (erster Commit, Architekt); core (seriell, Wahrheitstabelle); service; web-shell (nur zwei Anzeigeschlüssel); infra (nur die drei neuen Skriptdateien); docs-integration; docs-sicherheit; docs-datenschutz (nur DSFA-Vorentwurf, Zeile 161 und neue Zeile V20); docs-legal (nur ein Kopfvermerk im Rechtekonzept); docs-plan (nur eine Glossarzeile)
+**Risikoklasse:** hoch · 6,25–7,25 AStd (Teil a, neu geschätzt nach Lesebefund, Nachprüfung und Codex auf #128; Schätzung 065b rund 1,5 AStd; Summe 7,75–8,75 statt 2 laut Plan) · Plan 065: 27.11.2026 (W9); für die Freigabe-Demo vorgezogen (Eigentümer 03.10.2026, Plan §11, Punkt 2 „Entwickler“); 043a (Vertrag 0.4.0) ist gemergt; Baustart frühestens nach dem Vertragsschritt von 064 und dem Go zu Eigentümerfrage 1 · Lanes: contract (erster Commit, Architekt); core (seriell, Wahrheitstabelle); service; web-shell (nur zwei Anzeigeschlüssel); infra (nur die drei neuen Skriptdateien); docs-integration; docs-sicherheit; docs-datenschutz (nur DSFA-Vorentwurf, Zeile 161 und neue Zeile V20); docs-legal (nur ein Kopfvermerk im Rechtekonzept); docs-plan (nur eine Glossarzeile)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code; AGENTS.md R6). Danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (SSRF, Signatur, Secrets, Rechtefilter), **Datenschutz** (was an Dritte geht, SG3, SG8) und **Vertrag** (Webhook-Format, Partnerkompatibilität). Lesebefund der Spec vor dem Bau in eigenem frischem Kontext (Risikoklasse hoch, Plan §11 „Schlankerer Ablauf“ gilt hier nicht). Den Schnellstart im Leitfaden befolgt ein **eigener Agent in frischem Kontext**, nicht der Implementierer (Vorbild 037a, S17). Modell nur in `.claude/agents/` (takt-012)
-**Rule ids:** neu **R-PERM-05** (Webhook-Sichtbarkeit für Systemakteure) und **R-ADM-12** (Systemrolle nur für Systemsubjekte, Menschenrolle nie für Systemsubjekte). Beide Nummern sind beim Bau gegen den dann gemergten Stand zu prüfen (nächste freie Nummer; R-ADM-01..11 sind von 040a–040d belegt oder reserviert). Angewandt: R-PERM-01, R-PERM-02, R-PERM-03, R-PERM-04, R-ADM-07. Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R10, R11, R12
+**Rule ids:** neu **R-PERM-05** (Webhook-Sichtbarkeit für Systemakteure), **R-ADM-12** (Systemrolle nur für Systemsubjekte, Menschenrolle nie für Systemsubjekte) und **R-INT-01** (Webhooks nur aus einem Speicher im Prozess, den dieser Prozess aus dem synthetischen Korpus befüllt hat; Art „Guard“, neue Familie „Integration“). Die Nummern sind beim Bau gegen den dann gemergten Stand zu prüfen (nächste freie Nummer; R-ADM-01..11 sind von 040a–040d belegt oder reserviert). Angewandt: R-PERM-01, R-PERM-02, R-PERM-03, R-PERM-04, R-ADM-07. Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R10, R11, R12
 **Quellen-IDs:**
 - `docs/produktplan-beta.md` Eintrag 065 (Zeile 854–859), Eintrag 042 (Zeile 637–642), §5.7 Exit-Kriterien (Zeile 829–833), §11 „Freigabe-Demo“ (Register E57) und Etappe D
 - ADR 0008 (Abschnitt „Ereignisstrom für Nachbarn“, verworfene Alternative „Unsignierte Webhooks“), ADR 0010 (Sandbox = `training`), ADR 0014 mit Ergänzung 035a/035b (R-PERM-04, Verteiler), ADR 0015 (Patch-Stufe, zwei Zyklen für Partner), ADR 0003 (Dienstrolle nur INSERT/SELECT), ADR 0013 (keine Kennzahl je Person)
@@ -21,14 +21,14 @@
 Die Planzeile 065 (2 AStd) bündelt drei Dinge: signierte Zustellung mit Rechtefilter, den Sandbox-Mandanten und den
 Leitfaden. Allein die Zustellung berührt Vertrag, Kern (neue Rolle, neues Recht, Wahrheitstabelle), Dienst (ausgehende
 Anfragen mit SSRF-Schutz) und ein Partner-Skript. Der Sandbox-Mandant braucht dazu `HV_MODE=training`, das laut Plan erst
-042 baut, und Änderungen am lokalen Paket aus 037a. Zusammen sind das rund 7,5–8,5 AStd. Deshalb wird 065 geteilt, **ein PR je
+042 baut, und Änderungen am lokalen Paket aus 037a. Zusammen sind das rund 7,75–8,75 AStd. Deshalb wird 065 geteilt, **ein PR je
 Spec** (R12). Diese Spec beschreibt Teil a vollständig; 065b steht hier als Zuschnitt, seine Spec schreibt der Architekt
 auf eigenem Zweig, sobald der Bau von 037a gemergt ist (die Spec ist es seit `938ffbe`) und der Eigentümer Frage 3
 beantwortet hat.
 
 | Teil | Inhalt | Klasse · AStd | Wann |
 |---|---|---|---|
-| **065a** (diese Spec) | Vertragsschritt (Rolle `event_subscriber`, Recht `webhook.receive`, Abschnitt `webhooks` mit Liefer- und Signaturformat); Systemrolle als Daten mit Guard R-ADM-12; Sichtbarkeitsregel R-PERM-05 als reine Funktion im Kern; Zustellung im Dienst (Konfiguration, Signatur, Wiederholung, Idempotenzschlüssel, SSRF-Schutz, Grenzen); Referenz-Empfänger `scripts/webhook-receiver.mjs` mit Prüffunktion; Demo-Helfer `scripts/webhook-demo.mjs` (Zuordnung und Erfassung über HTTP); Leitfaden `docs/integration/webhooks.md` mit Schnellstart gegen den Dienst im Demo-Modus; DSFA-Zeilen, Sperr-CLI für `sys_` und Kopfvermerk im Rechtekonzept | hoch · 6–7 | nach dem Vertragsschritt von 064 |
+| **065a** (diese Spec) | Vertragsschritt (Rolle `event_subscriber`, Recht `webhook.receive`, Abschnitt `webhooks` mit Liefer- und Signaturformat); Systemrolle als Daten mit Guard R-ADM-12; Sichtbarkeitsregel R-PERM-05 als reine Funktion im Kern; Zustellung im Dienst (Konfiguration, Signatur, Wiederholung, Idempotenzschlüssel, SSRF-Schutz, Grenzen); Referenz-Empfänger `scripts/webhook-receiver.mjs` mit Prüffunktion; Demo-Helfer `scripts/webhook-demo.mjs` (Zuordnung und Erfassung über HTTP); Leitfaden `docs/integration/webhooks.md` mit Schnellstart gegen den Dienst im Demo-Modus; DSFA-Zeilen, Sperr-CLI für `sys_` und Kopfvermerk im Rechtekonzept | hoch · 6,25–7,25 | nach dem Vertragsschritt von 064 |
 | **065b** | Sandbox-Mandant: `HV_MODE` im Konfigurationsschema (nur, was die Sandbox braucht; Banner, Podium-Sperre und Löschprotokoll bleiben 042), Modusmarke in der Datenbank mit Startverweigerung bei Abweichung (Datengrenze), `mode: training` in jeder Lieferung, Webhooks im Modus `training` erlaubt, lokales Paket startet in `training` mit erzeugtem Webhook-Secret, optionalem Empfänger-Container und Rollenzuordnung des Abonnenten in der Befüllung; Leitfadenabschnitt „Sandbox“ und Verweis auf der Installationsseite | hoch · rund 1,5 | nach 065a und dem Bau von 037a |
 
 **Warum so geschnitten.** 065a ist allein vorführbar: Ein Partner startet den Dienst im Demo-Modus (synthetischer Korpus,
@@ -42,8 +42,10 @@ Freigabe-Demo fertig, bleibt der Schnellstart aus 065a die Vorführung für Punk
 
 **Was 065b vorfindet** (Hinweise an 065b, verbindlich für dessen Spec):
 - Der Wert `training` steht schon in `WebhookEventDelivery.mode` (Vertrag aus 065a). 065b braucht keinen Vertragsschritt.
-- Die Startbedingung „Webhooks nur mit synthetischen Daten“ (Entscheidung 9) ist in 065a eine Funktion
-  `webhooksPermitted(config)` in `apps/api/src/webhooks/config.ts`; 065b erweitert sie um `HV_MODE=training`.
+- Die Startbedingung R-INT-01 (Entscheidung 9) ist in 065a eine Funktion `webhooksPermitted(config, seededFromCorpus)`
+  in `apps/api/src/webhooks/config.ts`. 065b erweitert sie ausdrücklich um einen zweiten zulässigen Fall:
+  `HV_MODE=training` mit Postgres, dessen Modusmarke `training` lautet und bei leerem Log geschrieben wurde. Der Fall
+  „JSONL“ bleibt verweigert.
 - Die Datengrenze: Marke `training`/`shadow`/`live` in einer eigenen Tabelle (Migration, Dienstrolle nur INSERT/SELECT,
   ADR 0003), geschrieben nur vom Migrations-CLI bei leerem Ereignislog, geprüft beim Start des Dienstes. Ein Dienst mit
   `HV_MODE=training` verweigert eine Datenbank ohne Marke `training`; jeder andere Modus verweigert eine Datenbank mit
@@ -421,8 +423,30 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
 
 ### 9. Nur synthetische Daten (Datengrenze in 065a)
 
-- Webhooks starten **nur mit `HV_DEMO=1`** (065b ergänzt `HV_MODE=training`). Ohne diese Bedingung verweigert der Dienst
-  den Start, sobald eine Webhook-Variable gesetzt ist (fester Satz: „webhooks require HV_DEMO=1 (synthetic data only)“).
+- **R-INT-01 (Startbedingung auf Ebene des Speichers, neu; Codex P1 auf #128):** Der Zusteller startet nur, wenn
+  **alle** drei Bedingungen gelten; sonst verweigert der Dienst den Start mit einem festen Satz, der die Regel-id nennt
+  („R-INT-01: webhooks require a store seeded in this process from the synthetic corpus“), und es geht keine einzige
+  Anfrage hinaus:
+  1. `HV_DEMO=1` (065b ergänzt `HV_MODE=training`).
+  2. **Speicher nur im Prozess:** keine Persistenz (`persistence: 'none'`, weder `HV_DATABASE_URL` noch `HV_EVENT_LOG`).
+     Ein JSONL-Log oder eine Postgres-Datenbank kann Ereignisse von außerhalb des Prozesses enthalten; ihr Inhalt ist
+     in 065a nicht als synthetisch belegbar. Diese Bedingung prüft schon das Konfigurationsschema (Regel über Variablen,
+     fester Satz mit R-INT-01).
+  3. **In diesem Prozess aus dem Korpus befüllt:** `createApp` hat beim Start den leeren Speicher (`lastSeq() === 0`)
+     mit `seedDemo` aus `packages/domain/src/seed.ts` befüllt (`seedOnStart`), und die Befüllung ist vor dem Start des
+     Zustellers abgeschlossen. `createApp` hält dafür ein internes Merkmal `seededFromCorpus` (wahr nur, wenn der Speicher
+     vor der Befüllung leer war und `seedDemo` ohne Fehler zurückkam); der Zusteller fragt es vor seiner ersten
+     Registrierung beim Verteiler ab. Ist es falsch (Befüllung abgeschaltet, Speicher nicht leer, Befüllung
+     gescheitert): Startverweigerung mit R-INT-01 (Fehler beim Start, wie die übrigen Startfehler von `createApp`).
+- **Warum keine Korpusmarke im Speicher** (der Vorschlag aus Codex P1): Eine Marke beweist nur, dass der Korpus einmal
+  geschrieben wurde, nicht, dass danach nichts anderes in denselben Speicher kam; ein JSONL-Log oder eine Datenbank ließe
+  sich zudem mit Marke kopieren oder fortschreiben. Ein Speicher nur im Prozess, den derselbe Prozess aus dem Korpus
+  befüllt hat, enthält dagegen belegbar nur Korpus plus das, was in diesem Prozess über die Schnittstelle des
+  Demo-Modus geschrieben wurde. Das ist die sicherere Wahl und für den Schnellstart ausreichend. Postgres im Modus
+  `training` kommt mit 065b über die Modusmarke der Datenbank (geschrieben nur bei leerem Log, „Was 065b vorfindet“);
+  065b erweitert R-INT-01 dafür ausdrücklich, statt die Bedingung zu lockern.
+- **Was R-INT-01 nicht ausschließt:** Wer im Demo-Modus über die Schnittstelle selbst echte Texte eingibt, schickt sie
+  mit. Das regelt R11 (keine echten Daten) wie für jede Demo, nicht die Technik; der Leitfaden sagt es.
 - Begründung: Lieferungen tragen Rede- und Fragetexte von Aktionären und pseudonyme Kennungen an Dritte. Dafür braucht
   es DSFA und Auftragsverarbeitung (E14) und eine Entscheidung des Eigentümers. Das ist nicht Teil der Freigabe-Demo und
   keine Frage dieser Spec (Standard „aus“, siehe „Standards“).
@@ -438,7 +462,7 @@ Ein Ereignis je Anfrage: `POST <url>`, `Content-Type: application/json`, `User-A
     Redner (pseudonym), keine Beschäftigten; Zweck = Information der Nachbarsysteme über den Verlauf; Rechtsgrundlage =
     offen (E14), in der Beta keine, weil nur synthetische Daten; Empfänger = Partner-Empfänger aus der Konfiguration
     (Host-Allowlist); Aufbewahrungsklasse = keine im Tool (nur im Speicher), beim Empfänger nach dessen Vertrag;
-    Schutzmaßnahmen = nur synthetische Daten (Startbedingung), HMAC-Signatur, Typ- und Feld-Allowlist, kein `actor`,
+    Schutzmaßnahmen = nur synthetische Daten (Startbedingung R-INT-01), HMAC-Signatur, Typ- und Feld-Allowlist, kein `actor`,
     Rechtefilter R-PERM-05, SSRF-Schutz, Notabschaltung; Echtbetrieb erst nach E14 und mit Vertrag zur
     Auftragsverarbeitung.
 - Damit gilt in 065a immer `mode: "demo"`. Der Zielmodus `local` ist zusätzlich nur mit `HV_DEMO=1` zulässig (doppelt
@@ -538,7 +562,7 @@ Die Spalte „Systembündel“ liest das Datenmerkmal (`isSystemBundle`), nicht 
 | Secret | **Wechsel und Leck:** Ein Secret ist bekannt geworden; der Wechsel darf keine Lieferung verlieren | zwei Secrets gleichzeitig, beide signieren; Ablauf im Leitfaden (neu dazu → Partner stellt um → alt entfernen); Secrets nur aus der Umgebung, nie im Log | Partner sieht beide Signaturen; Test S2 (zwei Einträge), R5 (Empfänger mit nur neuem Secret akzeptiert); Test S1 (kein Wert in Fehlersätzen, `ServiceConfig` serialisiert keine Secrets) |
 | Rechte | **Leck über Rechtegrenzen:** Abonnent erhält Entwürfe, Rechtseinschätzungen, Notizen, Personendaten, Arbeitszuordnungen, künftig `protected` | R-PERM-05 Stufen a–f; Typ- und Feld-Allowlist; `maskEvent`; kein `actor`; Prüfung vor jedem Versuch; Systemrolle nicht für Menschen (R-ADM-12) und nicht im Demo-Kopf | Tests D3–D6, S9, S10; Mutationsproben M1, M2, M4, M5 |
 | Rechteverwaltung | **Abfluss durch Administration und Betrieb zusammen:** Eine Person mit `admin.roles.manage` ordnet einem Systemsubjekt die Abonnentenrolle zu, und der Betrieb trägt eine fremde Ziel-URL ein; so fließen Ereignisse an einen Empfänger, den niemand freigegeben hat (AK4, AK8) | zwei getrennte Schlüssel (Zuordnung im Log, Abonnement in der Konfiguration mit Host-Allowlist); Systembündel liest nie mehr als jeder Inhaber von `admin.roles.manage` (Invariante D1b); nur synthetische Daten (Entscheidung 9); Kill-Switch (Entscheidung 1) | **Signal:** jedes `RoleAssigned` mit einem Systembündel steht im Log und im Verlauf mit dem Abzeichen „Administration“ (040a); die Prüfung der Zuordnungen von Systemsubjekten gehört in die Admin-Anleitung (041) und das Runbook (070); Tests D1b, D2 |
-| Datengrenze | **Sandbox und echte Daten mischen sich:** Webhooks liefern aus einem Bestand mit echten Personen an einen Partner, oder ein Partner hält Demo-Lieferungen für echte | Start nur mit `HV_DEMO=1` (065a), `mode` in jeder Lieferung; 065b: Modusmarke in der Datenbank, Startverweigerung bei Abweichung | Test S1 (ohne `HV_DEMO` → Start verweigert); `mode` im Vertragsschema als Pflichtfeld; 065b mit eigenem Test |
+| Datengrenze | **Sandbox und echte Daten mischen sich:** Webhooks liefern aus einem Bestand mit echten Personen an einen Partner, oder ein Partner hält Demo-Lieferungen für echte | R-INT-01: `HV_DEMO=1`, Speicher nur im Prozess, in diesem Prozess aus dem Korpus befüllt, sonst Startverweigerung (065a); `mode` in jeder Lieferung; 065b: Modusmarke in der Datenbank, Startverweigerung bei Abweichung | Test S1 (ohne `HV_DEMO` → Start verweigert), S16 (JSONL, Postgres, nicht befüllt → verweigert); `mode` im Vertragsschema als Pflichtfeld; 065b mit eigenem Test |
 
 ## Vertragsschritt (Architekt, erster Commit, vor jedem Code; AGENTS.md R6)
 
@@ -626,7 +650,7 @@ Kern (implementierer-backend):
 - `packages/domain/src/types.ts` (nur `Role`, `PERMISSIONS`)
 - `packages/domain/src/permissions.ts` (nur das Bündel `event_subscriber`, das Merkmal `systemActor`, `isSystemBundle`)
 - `packages/domain/src/api.ts` (nur der Guard R-ADM-12 in `assignRole`)
-- `packages/domain/src/rules.ts` (nur R-PERM-05 und R-ADM-12)
+- `packages/domain/src/rules.ts` (nur R-PERM-05, R-ADM-12 und R-INT-01)
 - `packages/domain/src/index.ts` (nur die neuen Exporte)
 - `packages/domain/policy-truth-table.md` (nur erzeugt)
 - `packages/domain/src/__tests__/webhooks065a.test.ts` (neu)
@@ -634,7 +658,7 @@ Kern (implementierer-backend):
 - `packages/domain/src/__tests__/stream035.test.ts` (nur die Zeile `event_subscriber` in `SPEC_TABLE`)
 - `packages/domain/src/__tests__/*.test.ts` darüber hinaus nur dort, wo eine erschöpfende Aufzählung von `Role` oder
   `Permission` den neuen Wert erzwingt (Liste aus Vor-dem-Bau-Punkt 6 im Bericht)
-- `docs/legal-trace.md` (nur die Zeilen R-PERM-05 und R-ADM-12)
+- `docs/legal-trace.md` (nur die Zeilen R-PERM-05, R-ADM-12 und R-INT-01)
 
 Dienst (implementierer-backend):
 
@@ -642,7 +666,8 @@ Dienst (implementierer-backend):
 - `apps/api/src/config/schema.ts`, `apps/api/src/config/appOptions.ts`, `apps/api/src/config/sentences.ts` (nur die vier
   Variablen und ihre Sätze)
 - `apps/api/.env.example` (nur die vier Variablen, auskommentiert, ohne Werte)
-- `apps/api/src/app.ts` (nur Option `webhooks`, Start des Zustellers am Verteiler, Übergabe der Sperrprüfung
+- `apps/api/src/app.ts` (nur Option `webhooks`, Merkmal `seededFromCorpus` und Prüfung R-INT-01 vor dem Start des
+  Zustellers, Start des Zustellers am Verteiler, Übergabe der Sperrprüfung
   `isSubjectBlocked` des Sitzungsspeichers, falls vorhanden, Testhaken für Zeitgeber, Zufall und `lookup`)
 - `apps/api/src/server.ts` (nur Weitergabe der Konfiguration)
 - `apps/api/src/actor.ts` (nur die Verweigerung eines Systembündels und jeder `sys_`-Kennung in `parseActorHeader`)
@@ -699,7 +724,8 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
 2. **Systemakteur aus 064.** Hat 064 schon ein Systemmerkmal, eine Systemrolle oder einen Guard für Systemsubjekte
    eingeführt? Dann nutzt 065a dieses Merkmal und denselben Guard (R-ADM-12 entfällt oder wird derselbe), statt ein
    zweites zu bauen. Im Bericht nennen.
-3. **Regel-ids.** Sind R-PERM-05 und R-ADM-12 frei? Sonst die nächste freie Nummer; Spec, Vertrag und Bericht
+3. **Regel-ids.** Sind R-PERM-05, R-ADM-12 und R-INT-01 frei, und nimmt der Regelregister-Test (`rule-register.test.ts`)
+   die neue Familie `R-INT` an? Wenn nicht: melden, nicht den Test ändern. Sonst die nächste freie Nummer; Spec, Vertrag und Bericht
    gleichziehen.
 4. **Redocly und `webhooks`.** Läuft `pnpm contract:lint` mit dem Abschnitt `webhooks` ohne neue Meldung? Verlangt eine
    Regel eine weitere Antwort oder ein Merkmal, ergänzt der Architekt es im Vertragsschritt. Erzeugt
@@ -769,6 +795,12 @@ bewusst außerhalb von „Files allowed“, damit `slice-scope` die Pfade nicht 
   mehr als 5 Einträge; doppelte ID; unbekannter Ereignistyp; unbekannter Schlüssel; fehlendes, zu kurzes, nicht
   kanonisches Secret; Secret für unbekannte ID → je Verweigerung mit festem Satz. Kein Satz enthält URL, Host, Secret oder
   ID. `JSON.stringify(config)` und `util.inspect(config)` enthalten kein Secret.
+- **S16** R-INT-01 (Speicher): `HV_DEMO=1` mit `HV_EVENT_LOG` auf ein vorhandenes JSONL-Log ohne Korpus und mit
+  Webhook-Variablen → Start verweigert, Satz nennt R-INT-01, der Empfänger erhält nichts; dasselbe mit
+  `HV_DATABASE_URL` (Postgres, auch mit leerer Datenbank) → verweigert; `createApp` mit leerem Speicher im Prozess und
+  `seedOnStart: false` → verweigert; mit nicht leerem Speicher im Prozess (vorher eingespielte Ereignisse) →
+  verweigert; mit leerem Speicher im Prozess und `seedOnStart: true` → Start, `seededFromCorpus` wahr, erste Lieferung
+  aus dem Korpus nach der Zuordnung. Mutationsprobe M15.
 - **S2** Signatur: `sign.ts` erzeugt den Testvektor aus Entscheidung 6 exakt; zwei Secrets → zwei `v1,`-Einträge in der
   Reihenfolge der Konfiguration; `webhook-timestamp` ist die injizierte Uhr.
 - **S3** Glücksfall: Erfassen einer Frage über die API → genau eine Lieferung `QuestionCaptured`; Körper gültig gegen
@@ -869,6 +901,7 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
   `::ffff:127.0.0.1` in `local` erlaubt).
 - **M13** `::/96` entpackt statt gesperrt → S8 rot (`::101:101`).
 - **M14** Rückstand als `head − cursor` statt als Zahl offener Verweise → S7b rot.
+- **M15** Prüfung `seededFromCorpus` entfernt (nur `HV_DEMO=1` geprüft) → S16 rot.
 - **M10** `event.read` aus dem Bündel von admin entfernt (nur im Test) → D1b rot.
 - **M11** `webhook-id` aus `seq` statt aus `event.id` → S11b rot.
 - **M12** Zustellung über das globale `fetch` statt über den eigenen Agenten → S8b rot.
@@ -877,7 +910,7 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` reproduzierbar; `check.mjs` (a)–(d) `ok` mit
    `(c) … 0.4.y -> 0.4.x`.
-2. Tests D1–D8 (mit D1b), S1–S15 (mit S7b, S8b, S9b, S9c, S11b), Vertragstests und R1–R7 grün; die vierzehn Mutationsproben rot
+2. Tests D1–D8 (mit D1b), S1–S16 (mit S7b, S8b, S9b, S9c, S11b), Vertragstests und R1–R7 grün; die fünfzehn Mutationsproben rot
    belegt.
 3. Wahrheitstabellen-Diff wie oben, wörtlich im Bericht.
 4. Ein eigener Agent in frischem Kontext befolgt den Schnellstart in `docs/integration/webhooks.md` auf einem frischen
@@ -892,10 +925,12 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 1. **Wofür, für wen:** Ereignisse für Nachbarsysteme; nur synthetische Daten (`mode`); keine Anmeldung nötig, nur ein
    Empfänger.
 2. **Schnellstart (höchstens sieben Schritte, jede Zeile kopierbar, überall `127.0.0.1`, nie `localhost`):**
-   1. Secret erzeugen und in **beiden** Terminals (Empfänger und Dienst) als Umgebungsvariable setzen:
-      `export WEBHOOK_SECRET=$(node -e "console.log('whsec_'+require('node:crypto').randomBytes(32).toString('base64'))")`
-      im ersten Terminal, dann denselben Wert im zweiten mit `export WEBHOOK_SECRET=…` (der Leitfaden zeigt beides;
-      das Secret steht nie in einer Datei des Repositoriums).
+   1. Secret erzeugen: `node -e "console.log('export WEBHOOK_SECRET=whsec_'+require('node:crypto').randomBytes(32).toString('base64'))"`
+      gibt eine **vollständige** Zeile `export WEBHOOK_SECRET=whsec_…` aus. Diese ausgegebene Zeile unverändert in
+      **beide** Terminals (Empfänger und Dienst) kopieren und ausführen. Kein Platzhalter im Leitfaden; das Secret steht
+      in keiner Datei. Der Name beginnt bewusst nicht mit `HV_`: Der Dienst meldet unbekannte `HV_`-Variablen beim Start
+      (034b), und der Empfänger ist kein Teil des Dienstes. Der Abnahmelauf (Akzeptanzkriterium 4) befolgt genau diese
+      Zeilen.
    2. Empfänger starten: `node scripts/webhook-receiver.mjs --port 9900` (bindet nur an 127.0.0.1).
    3. Dienst im Demo-Modus mit einem Abonnement starten: `pnpm --filter @hv/api dev` mit `HV_WEBHOOK_TARGETS=local`,
       `HV_WEBHOOK_ALLOWED_HOSTS=127.0.0.1`, `HV_WEBHOOK_SECRETS=partner-demo=$WEBHOOK_SECRET` und
@@ -944,8 +979,10 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
    Partner nur hinter NAT64 ist nicht erreichbar), keine Weiterleitung, kein Proxy aus der Umgebung, Secrets nur aus der
    Umgebung, eine Instanz; Notabschaltung (Zuordnung entziehen, Subject sperren, Variable entfernen und neu starten).
    **Datenschutz:** Im Echtbetrieb wären Rede- und Fragetexte personenbezogene Daten von Aktionären; eine Zustellung mit
-   echten Daten braucht DSFA (E14) und einen Vertrag zur Auftragsverarbeitung mit dem Partner. In diesem Stand ist sie
-   technisch ausgeschlossen (nur Demo-Modus).
+   echten Daten braucht DSFA (E14) und einen Vertrag zur Auftragsverarbeitung mit dem Partner. In diesem Stand startet der
+   Zusteller nur mit einem Speicher im Prozess, den derselbe Prozess aus dem synthetischen Korpus befüllt hat (R-INT-01);
+   ein Speicher mit Daten von außerhalb des Prozesses (JSONL, Postgres) wird beim Start verweigert. Was jemand im
+   Demo-Modus selbst über die Schnittstelle eingibt, geht mit; dafür gilt R11 (keine echten Daten).
 8. **Grenzen dieses Stands:** nicht dauerhaft, keine API für Abonnements, nur Demo-Modus; Sandbox über das lokale Paket
    folgt mit 065b.
 
@@ -953,7 +990,8 @@ Muster von `webhook-id` akzeptieren den Testvektor; kein bestehendes Anfragesche
 
 - An einen Empfänger gehen Rede- und Fragetexte, Kennungen von Wortmeldungen, Redebeiträgen und Fragen und Verfahrensdaten,
   nie Klarnamen (SG3) und nie Kennungen von Beschäftigten (SG8, `actor` fällt weg).
-- In 065a nur mit `HV_DEMO=1`, also nur mit dem synthetischen Korpus (R11). Jede Nutzung mit echten Daten braucht DSFA
+- In 065a nur nach R-INT-01: Demo-Modus, Speicher nur im Prozess, in diesem Prozess aus dem synthetischen Korpus befüllt
+  (R11; Eingaben über die Schnittstelle regelt R11). Jede Nutzung mit echten Daten braucht DSFA
   (E14), Auftragsverarbeitung mit dem Partner und eine Entscheidung des Eigentümers; das gehört nicht zur Freigabe-Demo.
 - Kein neuer Speicherort: Zeiger und Verweise nur im Speicher, nichts auf Platte, kein Zugriffslog-Eintrag für
   ausgehende Anfragen.
@@ -990,22 +1028,22 @@ frischen Agenten · Offene Entscheidung: Eigentümerfragen 1–3
    wirkt, wo ein Sitzungsspeicher existiert, also ab 065b.
 5. **Kein Leck über Rechte.** R-PERM-05 zweimal je Ereignis; Typ- und Feld-Allowlist; kein `actor` (D3–D6, S9, S10).
 6. **Kein Einfluss auf den Kernprozess.** Einreihen synchron ohne Netz; Grenzen; Aussetzen statt Absturz (S7, S12).
-7. **Nur synthetische Daten.** Start nur mit `HV_DEMO=1` (S1).
+7. **Nur synthetische Daten.** R-INT-01: `HV_DEMO=1`, Speicher nur im Prozess, aus dem Korpus befüllt (S1, S16).
 
 ## Standards (auf Standard gebaut; Vermerk im CHANGELOG und im Bericht)
 
 | Standard | Quelle | Was 065a daraus baut | Kosten einer späteren Änderung |
 |---|---|---|---|
 | Freigegebene Typen und Felder wie Entscheidung 4 | Architekt; SG1, SG2, SG3, SG8 | `WEBHOOK_EVENT_TYPES`, Vertrags-Enum | ein Typ mehr oder weniger: Tabellenzeile, Enum-Wert (additiv bzw. Streichung nach zwei Zyklen), Test; < 0,5 AStd |
-| Webhooks nur mit synthetischen Daten | E14; R11 | Startbedingung `HV_DEMO=1` (065b: `training`) | Freigabe für echte Daten: Bedingung erweitern < 0,25 AStd, dazu DSFA, Auftragsverarbeitung, dauerhafte Zustellung (Folgeliste) |
+| Webhooks nur mit synthetischen Daten | E14; R11 | R-INT-01: `HV_DEMO=1`, Speicher nur im Prozess, in diesem Prozess aus dem Korpus befüllt (065b: Postgres im Modus `training` über die Modusmarke) | Freigabe für echte Daten: Bedingung erweitern < 0,25 AStd, dazu DSFA, Auftragsverarbeitung, dauerhafte Zustellung (Folgeliste) |
 | Abonnement aus der Konfiguration, Systemakteur über Zuordnung | ADR 0008; T-G3-E-02 | vier Variablen, `sys_`-Subjekt, R-ADM-12 | Abonnement-API: eigene Scheibe mit SSRF-Prüfung je Anlage, ≥ 2 AStd |
 | Standard Webhooks, Fassung 1 | öffentliche Spezifikation | Kopfnamen, `whsec_`, `v1,` | anderes Schema: `sign.ts`, Empfänger, Leitfaden, Vertrag; ≈ 1 AStd plus Partnerumstellung |
 | Nicht dauerhaft, eine Instanz | Freigabe-Demo, Plan §11 „Hosting“ | Zeiger ins Log im Speicher | dauerhafter Stand mit Tabelle und Führung je Abonnement: ≈ 2 AStd (Folgeliste, vor jedem Pilot) |
 
 ## Offene Eigentümerfragen
 
-1. **Teilung, Budget und Reihenfolge (Go nötig).** 065 wird 065a (6–7 AStd, nach Lesebefund und Nachprüfung neu geschätzt) und
-   065b (rund 1,5 AStd), zusammen 7,5–8,5 statt 2 AStd laut Plan, beide hoch. Das ist mehr als das Dreifache der
+1. **Teilung, Budget und Reihenfolge (Go nötig).** 065 wird 065a (6,25–7,25 AStd, nach Lesebefund, Nachprüfung und Codex neu
+   geschätzt) und 065b (rund 1,5 AStd), zusammen 7,75–8,75 statt 2 AStd laut Plan, beide hoch. Das ist mehr als das Dreifache der
    Planzeile; der größte Teil liegt in SSRF-Schutz, gebundenem Vertrag und Tests. Als Alternative kann der Eigentümer
    `from: start` und den Demo-Helfer streichen (rund 1 AStd weniger, dafür ein Schnellstart mit `curl` und ETags). Ohne Go baut 065a nicht; der Architekt schneidet dann neu. Mit Go ergänzt der
    Orchestrator den Teilungsvermerk im Plan-Eintrag 065.
@@ -1057,7 +1095,7 @@ Missbrauchsfall „Rechteverwaltung“) und die drei Wege der Notabschaltung.
 - Ausgabe von `pnpm contract:lint` und `check.mjs` (Auszug); Typen-Diff für `Role`, `Action`, `webhooks`,
   `WebhookEventDelivery`, `WebhookEvent`, `WebhookEventType`.
 - Wahrheitstabellen-Diff wörtlich.
-- Ergebnis der vierzehn Mutationsproben.
+- Ergebnis der fünfzehn Mutationsproben.
 - `docs/evidence/065a-schnellstart.txt` (Durchlauf durch einen frischen Agenten, mit Commit-Hash).
 - Schluss von `pnpm gates` mit Commit-Hash.
 - Kein Screenshot: Keine Ansicht ändert sich.
@@ -1132,3 +1170,12 @@ jetzt eingearbeitet:
   `WebhookEventEnvelope` über `allOf` mit `unevaluatedProperties: false` benutzt (Rückfallform benannt); `::/96` und
   `::ffff:0:0:0/96` ohne Ausnahme gesperrt (M13); Secret in beiden Terminals über die Umgebung; Wortlaut zur
   Schnittstelle; `keepAlive: false`; Aufwand 6–7 AStd und Eigentümerfrage 1 angepasst.
+
+**Codex auf PR #128 (zu `c1ad8f8`):**
+- P1 (Datenschutz, hält den Merge): `HV_DEMO=1` allein belegte die Datengrenze nicht (JSONL oder Postgres mit fremdem
+  Inhalt, `from: start`). Jetzt R-INT-01 auf Ebene des Speichers in 065a: nur Speicher im Prozess, in diesem Prozess
+  aus dem Korpus befüllt, geprüft im Schema und vor dem Start des Zustellers; Tests S16, Mutationsprobe M15; Wortlaut
+  „technisch ausgeschlossen“ durch das tatsächlich Geprüfte ersetzt. Gegen die vorgeschlagene Korpusmarke entschieden,
+  Begründung in Entscheidung 9.
+- P2: Schnellstart Schritt 1 gibt eine vollständige `export`-Zeile aus, die unverändert in beide Terminals kopiert
+  wird; kein Platzhalter mehr.
