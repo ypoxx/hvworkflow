@@ -136,9 +136,14 @@ keinem Oberflächentext.
        gesetzliche Bedingung steht im Titel, 044a §1). Unter der Auswahl der gewählte Titel noch einmal vollständig, das Badge
        **„ungeprüft“** (Tönung warning) **nur bei `legalRef.verified === false`**, und die `citation` klein unter dem Label
        `answers.refusal.ground.citation`.
-  3. **Wortlaut für die Bühne** (`text`, Pflicht, `maxLength` 20000, Label `answers.refusal.text.label`).
-  4. **Begründung (intern)** (`refusalJustification`, Pflicht für beide Arten, R-GUARD-09, `maxLength` 4000, Label
+  3. **Wortlaut für die Bühne** (`text`, Pflicht, höchstens 20000 Codepunkte, Label `answers.refusal.text.label`).
+  4. **Begründung (intern)** (`refusalJustification`, Pflicht für beide Arten, R-GUARD-09, höchstens 4000 Codepunkte, Label
      `answers.refusal.justification.label`). Hilfetext `answers.refusal.justification.help`.
+  - **Längen in Codepunkten (Codex P2, Nachtrag Orchestrator).** Kein natives `maxLength` auf beiden Feldern: es zählt
+    UTF-16-Einheiten und sperrt gültige Eingaben mit Zeichen außerhalb der BMP (Emoji) bei etwa der halben Vertragslänge.
+    Die Grenze prüft eine reine Funktion in `features/answers/refusal.ts` mit `[...value].length`, derselben Zählung wie `codePointLength`
+    in `packages/domain/src/api.ts`; über der Grenze ist Absenden gesperrt. Test 5 deckt die Grenze: 4000 Emoji in der
+    Begründung erlauben Absenden, 4001 sperren es; dasselbe für 20000/20001 im Wortlaut über die reine Funktion.
 - **Vorbefüllen und `fromTemplate` (Lesebefund 1; bindend).** Der Formularzustand trägt `{ kind, groundId, text,
   justification, lastTemplate, fromTemplate }`; `nextRefusalForm` setzt ihn so:
   - **Grund gewählt:** Ist `text` leer oder gleich `lastTemplate`, wird `text = stageText`, `lastTemplate = stageText`,
@@ -502,9 +507,11 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
   dem Schnappschuss und „Verweigerung freigegeben“; kein Begründungssatz auf der Seite.
 - **E6 Eingaben je Akteur (090).** `legal` öffnet den Dialog, tippt Wortlaut und Begründung, Wechsel zu einer Rolle mit und
   einer ohne das Recht und zurück: Dialog geschlossen, kein Feld trägt den alten Text (MutationObserver-Muster aus 090).
-- **E7 Tastatur (D8).** Dialog vollständig mit Tastatur: Tab zur Radiogruppe, Pfeile, Auswahl, Felder, Enter auf Absenden
-  (gegen eine Frage aus `findRefusableQuestion(page, 'legal')`, ohne Absenden: Escape am Ende); Fokus sichtbar; Escape schließt ohne
-  Schreiben.
+- **E7 Tastatur (D8).** Dialog vollständig mit Tastatur gegen eine Frage aus `findRefusableQuestion(page, 'legal')`: Tab zur
+  Radiogruppe, Pfeile, Auswahl, Felder, Tab bis Absenden; **Absenden hat den Fokus und ist aktiv, wird aber nicht ausgelöst**
+  (kein Enter, E7 schreibt nichts). Fokus sichtbar; Escape schließt ohne Schreiben. Das Auslösen per Tastatur ist natives
+  Verhalten eines `<button type="submit">` im Formular; der Absendepfad selbst ist durch E1 und Test 5 belegt (Codex P2,
+  Nachtrag Orchestrator).
 - **E8 axe** ohne serious/critical auf Dialog, Detail und Bühne, de und en (innerhalb von E1).
 - **E9 Eingaben je Frage (Lesebefund 3).** `legal`: Dialog auf Frage X öffnen, Art, Grund, Wortlaut, Begründung setzen,
   Abbrechen mit X; Frage Y wählen, Dialog öffnen → **alle Felder leer, keine Art gewählt, kein Vermerk**; zurück zu X, Dialog
