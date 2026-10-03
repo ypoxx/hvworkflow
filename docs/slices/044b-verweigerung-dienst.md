@@ -684,3 +684,5 @@ Eingearbeitet:
   `delivered`, sonst 404); 19 Wiederholung mit veraltetem `If-Match` in Test 8 (Wiederholung vor 412); 20 Titel von
   contract-043a Test 8; 21 Demo-Fälle der `sources`-Grenzen stehen in 044a Test 6; 23 Typimport `RefusalProposal` in
   Files allowed. Kein neuer Sicherheitspunkt (16 und 17 machen Tests richtig, 18 ergänzt einen Rechtefall).
+
+**Nachtrag des Orchestrators (03.10.2026):** Die falsche Aussage zum Zugriffslog stand in MF-01 (Erkennung, `bedrohungsmodell.md:348`), nicht in MF-06. Der Orchestrator hat sie in MF-01 korrigiert (Sicherheitsposten, nicht Folgeliste); der Abschnitt gilt damit als erlaubt.

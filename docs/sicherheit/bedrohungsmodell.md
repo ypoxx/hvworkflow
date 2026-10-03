@@ -345,7 +345,8 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   und erkennen das nicht (Erkennung: `RoleAssigned` je Subject in `listEvents`, Alarmvorschlag an 085).
 - *Erkennung:* Alarm (085) mit Zielrecht `admin.roles.manage` bei Zuordnung eines Freigabe- oder Rechtsrechts
   nach dem Freeze und bei Zuordnung und Entzug innerhalb eines Tages (Zielvorschlag für 040); die Selbstzuordnung
-  verhindert R-ADM-07 seit 040a, ein verweigerter Versuch steht als 409 mit R-ADM-07 im Zugriffslog (033a); der
+  verhindert R-ADM-07 seit 040a, ein verweigerter Versuch steht im Zugriffslog (033a) als `operationId` mit Status 409 und `seq: null`; die Regel-id
+  R-ADM-07 steht nur im Problem-Body (das Zugriffslog hat genau acht Schlüssel, korrigiert mit 044b); der
   Freeze-Hash im Kopf (041) ändert sich sichtbar.
 - *Nachweis:* 040a: `packages/domain/src/__tests__/admin040a.test.ts` (Test 7 R-ADM-07, Test 8 R-ADM-08),
   `apps/api/src/__tests__/negative.test.ts` (Selbstzuordnung über HTTP → 409 R-ADM-07); geplant in Scheibe 040b
