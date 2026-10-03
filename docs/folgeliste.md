@@ -556,7 +556,36 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 044b Bau (Entscheidung 3) · `packages/domain/src/api.ts` · die übrigen Längenprüfungen des Kerns zählen mit `.length`
   UTF-16-Einheiten statt Code-Punkte wie der Validator: `reason` 500 bei Rückgabe und Rücknahme, `subjectId` und
   `deputyForSubjectId` 128, `Idempotency-Key` 128 (nur strenger, nie großzügiger als der Vertrag) · Takt core: auf
-  `codePointLength` umstellen, wie `checkRefusalProposal` seit 044b.
+  `codePointLength` umstellen, wie `checkRefusalProposal` seit 044b; deckt auch Codex P2 auf #131 (044a, maxLength zählt nach JSON Schema 2020-12 Codepunkte) ab, ein Bündel für alle Kernprüfungen.
 - 044b Bau (Vor-dem-Bau-Punkt 5, Lesebefund nit 22) · Postgres-Pfad · ein einzelnes Surrogat (`"\ud800"`) in einem
   Textfeld besteht Validator und Kern, jsonb lehnt es beim Insert ab, der Dienst antwortet 500 (kein Leck, kein Ereignis,
   gilt für jedes Textfeld) · Takt service: vor dem Insert als 422 abweisen oder im Vertrag ausschließen.
+- Hinweis an 051 (Datenschutz; kein offener Befund, weil es noch keinen Export gibt; aus dem Bau 044a) · die Projektion
+  hält `refusalJustification` im Klartext (aus `payload.pii`) · der Export `exports/record` aus 051 muss die Begründung
+  maskieren wie `maskEvent` je Leser; 051 nimmt einen Negativtest „Begründung nie im Export“ auf (vgl. Hinweis an 051 in
+  `docs/slices/044a-verweigerung-kern.md`).
+
+## Zeitkritische Postgres-Tests (aus takt-042)
+
+- takt-042 Spec (Nicht-Ziele) · `apps/api/src/__tests__/postgres-limits034a.test.ts` („408 in the Postgres path: …“ und
+  T-G2-D-01 „a write that waits longer than lock_timeout …“) · beide werden rot, wenn parallele Prozesse dieselbe
+  Datenbank teilen (datenbankweiter Advisory-Lock 27027/1) · eigener Takt: der 408-Test bekommt einen
+  Synchronisationspunkt „wartet auf die Sperre“ (`pg_locks`), T-G2-D-01 eine eigene Datenbank oder eine ausdrückliche
+  exklusive Vorbedingung; ergänzt den Eintrag „040a Gates-Lauf“ oben.
+- takt-042 Spec (Nicht-Ziele) · `apps/api/src/persistence/migrations.ts:76-84` (`tableExists` in `assertSchemaConsistent`,
+  `Promise.all` auf einem Client) · `pg` warnt „client.query() when the client is already executing a query“ (künftig ein
+  Fehler) · die Abfragen nacheinander oder in einer Abfrage über `information_schema.tables` stellen.
+- takt-042 Review minor (#135) · `apps/api/src/__tests__/postgres-stream035.test.ts` (Test 28) · zählt die Verbindungen von
+  `runtime2` (Sitzungsablage des Tests) nicht mehr mit · die bewusste Verengung im Test kommentieren.
+- takt-042 Review minor (#135) · `postgres-stream035.test.ts`, `postgres-limits034a.test.ts` · die Schwellen von
+  `eventually` (20 s bzw. 15 s) können unter Extremlast knapp werden · Spielraum prüfen, nicht blind verlängern.
+- takt-042 Review minor (#135) · `postgres-limits034a.test.ts` · das Literal `200` (Anfrage-Timer) steht doppelt · eine
+  Konstante für Grenze und `advanceTimersByTime`.
+- takt-042 Review minor (#135) · `postgres-limits034a.test.ts` (Vorprüfungen der 034a-Tests) · Lint-Hinweis
+  `unicorn/prefer-string-starts-ends-with` · `startsWith`/`endsWith` verwenden.
+
+## Skripte
+
+- 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
+  Buchstaben (043a, 044a, 064a …) fallen aus der Prüfung; eine zu niedrig eingestufte Teil-Spec fällt nicht auf · Muster
+  um `[a-z]?` erweitern und Teil-Specs gegen den Plan-Eintrag der Stammscheibe prüfen (ergänzt den Eintrag takt-021 Codex P1).
