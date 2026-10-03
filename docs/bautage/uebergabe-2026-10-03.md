@@ -4,12 +4,13 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `8705a1c` (takt-042).
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `c0db7f5` (Scheibe 045, #139).
 - **Gebaut und gemergt heute, alle auf Standard (Go des Eigentümers 03.10.2026):**
   - 043a (#125 `88fa9be`, Vertrag 0.4.0);
   - 040b (#130 `6146251`, Vertrag 0.4.1);
   - 044a (#131 `83bc7e2`, Vertrag 0.4.2);
-  - 044b (#134 `799cca5`).
+  - 044b (#134 `799cca5`);
+  - 045 (#139 `c0db7f5`, ersetzt #138; Spec #137 `5cbe438`).
 
   Die Specs stehen auf „angenommen“. Vor jeder echten Nutzung folgt die Rechtsprüfung (ADR 0012, Katalog, alle `legalRef`
   ungeprüft).
@@ -22,7 +23,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
 ## Nächste Schritte
 
 1. **037a** nach der S17-Entscheidung mergen oder S17 mit erreichbarer Registry wiederholen.
-2. **Kette der Oberfläche für die Freigabe-Demo:** 045, 048, 053, 054, 055, 059, 046, 060, 061 und 041 in der
+2. **Kette der Oberfläche für die Freigabe-Demo:** 045 ist gemergt, als Nächstes **048**, dann 053, 054, 055, 059, 046, 060, 061 und 041 in der
    zugeschnittenen Form (ohne Jahrgang anlegen und ohne Freeze; der Jahrgang kommt aus dem Seed). Für Oberflächenscheiben
    mittleren Risikos gibt es keinen gesonderten Lesebefund der Spec, nur ein Review nach dem Bau (Entscheidung D vom
    03.10.2026). Sicherheits-, Rechts- und Datenschutzbefunde bleiben Pflicht.
@@ -34,6 +35,12 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
      044 sowie die Verschiebung „Export markiert Verweigerungen“ nach 051 (Spec 044a, Files allowed; Go zu
      Eigentümerfrage 2 liegt seit 03.10.2026 vor);
    - Register: E14, E15, E25 und S6 sind in diesem Doku-PR nachgezogen.
+
+## Offene Reste im Remote
+
+- Zwei veraltete Remote-Branches: `claude/slice-045` und `claude/slice-045-verweigerung-oberflaeche` (beide identisch auf
+  `42fc573`, enthalten den alten Gitleaks-Befund). Das Löschen ist durch den Hook gesperrt; der Eigentümer kann sie von
+  Hand löschen.
 
 ## Eigentümerentscheidungen (offen)
 
@@ -51,6 +58,11 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
    Pflicht-Check, E55 und die übrigen dort genannten Punkte.
 
 ## Betrieb der Bauumgebung (berichtigt)
+
+- **Weiterer Neustart der Maschine gegen 21:22:** Der System-Cluster war aus, die Gates liefen rot (32 Fehler in
+  `postgres-takt033`). Vor jedem Gates-Lauf `pg_lsclusters` prüfen und bei Bedarf `pg_ctlcluster 16 main start`.
+- **Bauauftrag an Implementierer:** Testkonstanten nie `SECRET`, `TOKEN`, `KEY` oder `PASSWORD` nennen, wenn ein Literal
+  zugewiesen wird (Gitleaks scannt jeden Commit, Korrekturcommits helfen nicht).
 
 - **Welcher Postgres läuft, ist vor jedem Gates-Lauf zu prüfen** (`ps aux | grep postgres` oder `pg_ctl status` für beide
   Datenverzeichnisse): Es gibt zwei Cluster, den System-Cluster `/var/lib/postgresql/16/main` und `/var/tmp/pgtest/data`,
