@@ -1299,7 +1299,7 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 (B1–B18, Generalprobe, beta-1 am 12.03.2027) bleibt unverändert dahinter. Die Freigabe-Demo zeigt drei Personen, wie das
 Endprodukt aussieht:
 
-1. **Verantwortliche Person:** Die Oberfläche ist vollständig; Bedienbarkeit und UX sind beurteilbar. Scheiben: 043a, 040b, 044a und 044b, 045, 048, 053, 054, 055, 059, 046, 060, 061, 041.
+1. **Verantwortliche Person:** Die Oberfläche ist vollständig; Bedienbarkeit und UX sind beurteilbar. Scheiben: 043a, 040b, 044a und 044b, 045, 048, 053, 054, 055, 059, 046, 060, 061, 041 (für die Freigabe-Demo zugeschnitten, siehe unten).
 2. **Entwickler:** gut dokumentiert, leicht erweiterbar, Partnerschnittstellen mit wenigen Schritten lauffähig und prüfbar; Demodaten aus der Partnerschnittstelle sind in der Demo sichtbar. Scheiben: 064, 065, 066, 075, dazu ein Demoszenario, in dem ein Beispieltranskript über die Schnittstelle eingespielt wird und in der Oberfläche erscheint.
 3. **Betrieb:** gut dokumentiert, leicht zu installieren, robust. Scheiben: Kern von 037 als lokales Paket (ein Befehl startet Dienst, Web, Postgres und Keycloak über Compose, dazu eine Installationsseite), 038 (Sicherung und Wiederherstellung vorgeführt), 070 (Runbook v1), 071 (Lasttest mit veröffentlichten Zahlen).
 
@@ -1308,6 +1308,9 @@ Endprodukt aussieht:
 - **Hosting:** Die Netlify-Demo (im Prozess) bleibt die Vorführung für Punkt 1 und 2. Punkt 3 zeigt das lokal startbare Paket. Es gibt vorerst keinen gehosteten Server; ein späterer Deploy braucht das ausdrückliche Go des Eigentümers (Regel 11).
 - **040a angenommen** (Eigentümer 03.10.2026, nachträglich, nach Erklärung): kein Superadmin; der Rollenwechsler der Demo deckt Vorführungen ab. Die Abweichung ist damit erledigt.
 - **Go zum Bau auf Standard:** 043a, 040b und 044a (mit 044b) werden auf den Standardantworten gebaut, ohne auf Recht zu warten. Jede betroffene Stelle trägt „auf Standard gebaut (Go des Eigentümers 03.10.2026)". Die Rechtsprüfung kommt vor jeder echten Nutzung. Das beantwortet 043a Fragen 1, 2 und 5 mit dem Standard, die 040-Teilung und das Budget für 040b, und 044a Fragen 1, 2 und 3b mit dem Standard (3b = Go; Untergründe folgen in 044c vor jedem Pilot). **040c und 040d sind zurückgestellt.**
+- **Folgen der Zurückstellung (Orchestrator, aus Codex auf #123):**
+  - **041 wird für die Freigabe-Demo zugeschnitten:** Admin-Oberfläche auf den vorhandenen Schnittstellen und 040b, also Fachbereiche, TOPs, Bühnenplätze, Personen und Rollen mit Ablauf, Rollenkarten-Vorschau und Anleitung. Der Jahrgang kommt aus dem Seed. Jahrgang anlegen, Freeze mit Hash-Anzeige und der Playwright-Ablauf „Jahrgang anlegen → Freeze → Änderung abgelehnt" folgen mit 040c/040d; der Plan-Eintrag 041 bleibt dafür bestehen.
+  - **Reihenfolge in der Lane core:** 044a baut seriell direkt nach 040b. Werden 040c und 040d später gebaut, setzen sie auf 044a auf; die Reihenfolge a → b → c → d innerhalb von 040 bleibt erhalten. Die Spec 044a ist entsprechend angepasst.
 - **Schlankerer Ablauf** für Oberflächenscheiben mittleren Risikos: kein gesonderter Lesebefund der Spec vor dem Bau, ein Review nach dem Bau. Sicherheits-, Rechts- und Datenschutzbefunde bleiben Pflicht und werden nie vertagt. Kern- und Rechtescheiben (Risikoklasse hoch) bleiben unverändert (AGENTS.md Regel 3). Register: E57.
 
 **Zielpfad Beta-2 (Entscheidung des Eigentümers, 26.09.2026).** Weg vom Demo-Zustand zu einer betriebsfähigen Lösung.

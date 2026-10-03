@@ -25,7 +25,9 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   „auf Standard gebaut (Go des Eigentümers 03.10.2026)"; Rechtsprüfung vor jeder echten Nutzung. 043a Fragen 1, 2, 5 und
   044a Fragen 1, 2, 3b mit dem Standard (3b = Go, 044c folgt vor jedem Pilot). 040c und 040d sind zurückgestellt.
 - **Nächste Schritte:**
-  - Bau 043a (läuft), dann 040b, dann 044a und 044b, dann die Kette der Oberfläche: 045, 048, 053, 054, 055, 059, 046, 060, 061, 041.
+  - Bau 043a (läuft), dann 040b, dann 044a und 044b (044a seriell direkt nach 040b in der Lane core; 040c/d setzen später
+    auf 044a auf), dann die Kette der Oberfläche: 045, 048, 053, 054, 055, 059, 046, 060, 061, 041.
+  - 041 ist für die Freigabe-Demo zugeschnitten: ohne Jahrgang anlegen und Freeze (kommen mit 040c/d); Jahrgang aus dem Seed.
   - Parallel: eine Infra-Spec für das lokale Paket (Kern von 037) und die Partnerscheiben 064 bis 066.
   - Danach 038, 070, 071 und 075 samt Demoszenario „Beispieltranskript über die Schnittstelle".
   - Ablauf: Oberflächenscheiben mittleren Risikos ohne gesonderten Lesebefund der Spec, ein Review nach dem Bau (AGENTS.md Regel 3).
