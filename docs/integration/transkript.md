@@ -13,7 +13,7 @@ an das HV-Tool liefern. Vorwissen: HTTP und JSON. Kein Zugang zu echten Daten n√
 
 **Quellen:** Vertrag `packages/contract/openapi.yaml` (Operationen `ingestSpeechSegments`,
 `listMeetingSpeechSegments`), ADR 0008 (Integrationen), ADR 0015 (Versionierung), Spec
-`docs/slices/064a-transkript-ingest-vertrag-kern.md`, Spec `docs/slices/064b-transkript-import-erfassung.md`.
+`docs/slices/064a-transkript-ingest-vertrag-kern.md`, Spec 064b (eigener PR, `docs/slices/064b-transkript-import-erfassung.md` nach dessen Merge).
 
 ## 1. Was die Schnittstelle tut
 

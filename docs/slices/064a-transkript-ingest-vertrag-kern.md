@@ -1,7 +1,7 @@
 # Scheibe 064a — Transkript-Ingest, Teil 1: Vertrag, Kern, Dienst, Partnerleitfaden
 
 **Status:** spec (03.10.2026; gelesen auf `2fc3153`, Vertrag 0.4.0 aus 043a auf `origin/claude/slice-043a-vertrag` `d8fc188` gegengelesen; überarbeitet nach dem Lesebefund zu `bc33df2`: 1 blocker (064b), 8 major, Minor; Teil 1 der geteilten Scheibe 064, Zuschnitt im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 3,5 AStd (Teil a; Summe a+b 6 statt 2,5 laut Plan) · Plan 064: 26.11.2026 (W9); für die Freigabe-Demo (Plan §11, Eigentümer 03.10.2026, Register E57) früher, frühestens nach dem Merge von 043a; den Tag legt der Orchestrator mit `scripts/plan-graph.mjs` fest · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `HvApi` im HTTP-Client, Live-Puffer und der Demo-Export `demoTranscriptSample` mit den Demo-Grenzen in `apps/web/src/api/index.ts`); web-shell (nur ein Aktionsschlüssel); docs-integration; docs-sicherheit; docs-datenschutz; docs-legal (Kopfvermerk Rechtekonzept)
+**Risikoklasse:** hoch · 3,75 AStd (Teil a; Summe a+b 6,25 statt 2,5 laut Plan; 064b als eigener PR) · Plan 064: 26.11.2026 (W9); für die Freigabe-Demo (Plan §11, Eigentümer 03.10.2026, Register E57) früher, frühestens nach dem Merge von 043a; den Tag legt der Orchestrator mit `scripts/plan-graph.mjs` fest · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `HvApi` im HTTP-Client, Live-Puffer und der Demo-Export `demoTranscriptSample` mit den Demo-Grenzen in `apps/web/src/api/index.ts`); web-shell (nur ein Aktionsschlüssel); docs-integration; docs-sicherheit; docs-datenschutz; docs-legal (Kopfvermerk Rechtekonzept)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6) und den Nachtrag in ADR 0008; danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Partnergrenze, neues Schreibrecht, feindliche Eingaben, Idempotenzschlüssel) und **Vertrag** (6.4, Kompatibilität für Partner) sowie **Datenschutz** (Wortlaut von Aktionären aus einem Fremdsystem, DSFA V16). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** neu R-ING-01 (Idempotenz je `segmentId`, Inhalt unveränderlich), R-ING-02 (Ingest nur in laufender HV), R-ING-03 (Form, Länge, Zeichen, Zeitanker und Bezüge eines Segments), R-ING-04 (Übernahme `unconfirmed → adopted`, Zeile einer neuen Segmenttabelle), R-ING-05 (Obergrenzen je HV: Zahl der Abschnitte und Bytes Wortlaut). Angewandt: R-PERM-01, R-PERM-02, R-MTG-03, R-IDEM-01. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R10, R11, R12
 **Quellen-IDs:**
@@ -36,13 +36,13 @@ Datei-Adapter, Recht, Leitfaden und die Nachweise für ADR 0008. Seit dem Plan i
 
 | Teil | Inhalt | Klasse · AStd | Abhängig |
 |---|---|---|---|
-| **064a** (diese Spec) | Vertragszeile 0.4.x; Recht `ingest.write`; Ereignis `SegmentIngested`; Segmenttabelle mit R-ING-04; Übernahme über `captureMeetingContribution` mit `segmentIds`; Alias ohne `segmentIds`; Strom mit Subjektart `segment`; zwei Dienstrouten; `HvApi` in beiden Adaptern; Demo-Export und Demo-Grenzen; Beispielbestand im Seed, Beispieldatei und Beispielskript; Partnerleitfaden mit geprüften Beispielen; Bedrohungsmodell, DSFA, Rechtekonzept | hoch · 3,5 | 043a |
-| **064b** | Oberfläche der Erfassung: Abschnittsliste (neueste zuerst, blätterbar), Import-Dialog (Datei, Zwischenablage, Beispieldatei in der Demo), Datei-Adapter im Browser mit `Retry-After`, Übernahme-Dialog, i18n DE/EN, Glossar, Playwright in beiden Projekten (gemeinsame Datei nach 031b), Screenshots, Demoszenario | hoch · 2,5 | 064a |
+| **064a** (diese Spec) | Vertragszeile 0.4.x; Recht `ingest.write`; Ereignis `SegmentIngested`; Segmenttabelle mit R-ING-04; Übernahme über `captureMeetingContribution` mit `segmentIds`; Alias ohne `segmentIds`; Strom mit Subjektart `segment`; zwei Dienstrouten; `HvApi` in beiden Adaptern; Demo-Export und Demo-Grenzen; Beispielbestand im Seed, Beispieldatei und Beispielskript; Partnerleitfaden mit geprüften Beispielen; Bedrohungsmodell, DSFA, Rechtekonzept | hoch · 3,75 | 043a |
+| **064b** (Spec 064b, eigener PR) | Oberfläche der Erfassung: Abschnittsliste (neueste zuerst, blätterbar), Import-Dialog (Datei, Zwischenablage, Beispieldatei in der Demo), Datei-Adapter im Browser mit `Retry-After`, Übernahme-Dialog, i18n DE/EN, Glossar, Playwright in beiden Projekten (gemeinsame Datei nach 031b), Screenshots, Demoszenario | hoch · 2,5 | 064a |
 
-Aufwand 064a: Vertrag 0,5 · Kern 1,5 (mit Strom-Subjektart, Alias, strengerer Zeichen- und Datumsprüfung,
-Byte-Obergrenze, Datumsprüfung wie Ajv) · Dienst und Postgres-Test 0,5 · HTTP-Client, Live-Puffer und Demo-Export 0,35 ·
+Aufwand 064a: Vertrag 0,5 · Kern 1,6 (mit Grenze je Abschnitt) (mit Strom-Subjektart, Alias, strengerer Zeichen- und Datumsprüfung,
+Byte-Obergrenze, Datumsprüfung wie Ajv) · Dienst und Postgres-Test 0,5 · HTTP-Client mit `retryAfter`, Live-Puffer und Demo-Export 0,5 ·
 Leitfaden mit Skript, Bedrohungsmodell, DSFA 0,4 · Puffer für Review-Nacharbeit 0,25 (die Nachprüfung nannte 5,5 AStd
-für beide Teile knapp). Rund 3,5 AStd; 064a bleibt ein Agententag, ein weiterer Schnitt (etwa Vertrag allein) würde
+für beide Teile knapp). Rund 3,75 AStd; 064a bleibt ein Agententag, ein weiterer Schnitt (etwa Vertrag allein) würde
 eine Vertragsform ohne Abnehmer erzeugen. Die Summe a+b liegt deutlich über der Planzahl; Zuschnitt und Budget brauchen das Go des
 Eigentümers (Eigentümerfrage 2).
 
@@ -233,6 +233,13 @@ Person mit `contribution.capture` in einen Redebeitrag übernommen. Ab dort läu
   - jeder Abschnitt ist `unconfirmed` (sonst **409** R-ING-04);
   - `source` ist `transcript` (sonst 422 R-ING-04);
   - `occurredAt` und `occurredAtSource` fehlen im Body (sonst 422 R-ING-04): Der Kern leitet sie ab.
+- **Grenze Debattenschluss je Abschnitt (R-MTG-03, keine neue Regel-id):** Trägt die HV `debateClosedAt`, prüft der
+  Kern **jeden** ausgewählten Abschnitt: Liegt ein `startedAt` nach `debateClosedAt`, antwortet die Übernahme **409
+  R-MTG-03**, auch mit Grund, und schreibt nichts. Begründung: R-MTG-03 lässt nach dem Schluss nur *frühere* Rede zu;
+  aus dem frühesten Zeitanker allein abgeleitet, könnte eine gemischte Auswahl Rede nach dem Schluss als Nacherfassung
+  einschleusen. R-MTG-03 statt einer neuen R-ING-id, weil es dieselbe Fachregel ist (eine Regel, eine id); der Text der
+  Regel im Register nennt den Fall „jeder übernommene Transkriptabschnitt“. Maßgeblich ist `startedAt` (wer vor dem
+  Schluss zu sprechen begann, sprach rechtmäßig). Test K13b, Mutationsprobe M10.
 - Ableitung: `occurredAt` = frühester `startedAt` der übernommenen Abschnitte, `occurredAtSource: transcript`. Danach
   prüft `resolveMeetingCapture` unverändert R-MTG-03 (nach dem Debattenschluss: Grund nötig, `lateEntry: true`).
 - Der `text` des Redebeitrags kommt aus dem Body, nicht aus den Abschnitten. Die Oberfläche füllt ihn mit dem
@@ -240,7 +247,7 @@ Person mit `contribution.capture` in einen Redebeitrag übernommen. Ab dort läu
   Abschnitte stehen unverändert im Protokoll, `ContributionCaptured` nennt `segmentIds`.
 - Reihenfolge der Prüfungen in `captureInMeeting` **bleibt wie heute** bis einschließlich `If-Match`
   (`api.ts:667-674`): Recht → Wortmeldung → Text → `If-Match` → neu: Segmenttabelle (R-ING-04, auch doppelte Kennung in
-  `segmentIds` → 422) → Ableitung → R-MTG-03 → ein `append` mit `ContributionCaptured` (Nutzlast um `segmentIds`
+  `segmentIds` → 422) → Grenze Debattenschluss je Abschnitt (409 R-MTG-03) → Ableitung → R-MTG-03 → ein `append` mit `ContributionCaptured` (Nutzlast um `segmentIds`
   ergänzt). Ein veralteter Stand antwortet also weiterhin 412 vor jeder Segment- oder R-MTG-03-Prüfung (Test K25). Die Projektion setzt die
   Abschnitte auf `adopted` mit `contributionId` und `adoptedAt`. Der bestehende `Idempotency-Key` der Operation gilt
   unverändert.
@@ -308,6 +315,24 @@ Datenschutzhinweise für Partner (verbindlich: keine echten Transkripte in irgen
 hat, E14), Schnellstart in fünf Schritten aus dem Wurzelverzeichnis des Repositoriums mit curl (`--data-binary`) und
 `jq` (als Voraussetzung genannt) sowie das Beispielskript `docs/integration/beispiele/transkript-einspielen.mjs` (Node
 ohne Abhängigkeiten, `fetch`, setzt die Zeitanker der Beispieldatei auf „jetzt minus Versatz“ und sendet).
+
+### 11. `Retry-After` für den Datei-Import sichtbar machen
+
+Der Datei-Import (Spec 064b, eigener PR) soll bei `429` und `503` die Sekunden aus `Retry-After` warten. In der
+HTTP-Betriebsart wandelt `perform` (`apps/web/src/api/http.ts:203-223`) jeden Fehler in ein `ApiProblem` und verwirft
+die Kopfzeilen; `ApiProblem` (`packages/domain/src/api.ts:53-74`) trägt nichts dazu. 064b darf `apps/web/src/api/**`
+nicht ändern. Deshalb hier:
+
+- `ApiProblem` erhält `readonly retryAfter: number | undefined` (optionaler fünfter Konstruktorparameter; `toProblem()`
+  bleibt unverändert, `retryAfter` ist keine Problem-Details-Eigenschaft, sondern Transportwissen).
+- `perform` setzt es bei Status `429` oder `503` aus der Kopfzeile `Retry-After`, wenn sie eine ganze Zahl von 1 bis 60
+  ist (Vertrag 0.3.10); sonst bleibt es `undefined`. Das gilt für beide Fehlerwege: Problem-Details-Antwort und
+  `genericProblem` (Antwort ohne `application/problem+json`, etwa vom Proxy). Ein Datum statt Sekunden oder ein Wert
+  außerhalb des Bereichs ergibt `undefined`; der Adapter nimmt dann seinen Standard.
+- Im In-Process-Kern gibt es kein `429`/`503`; `retryAfter` bleibt dort `undefined`.
+- Tests in `http.test.ts`: `429` mit Problem-Details und `Retry-After: 7` → `retryAfter` 7; `503` ohne
+  Problem-Details mit `Retry-After: 30` → 30; `429` mit `Retry-After: 0`, `61`, `abc` oder einem HTTP-Datum →
+  `undefined`; `409` mit `Retry-After: 5` → `undefined`. Mutationsprobe M11.
 
 ## Wahrheitstabellen-Diff (vor dem Bau, Leitplanken §4)
 
@@ -390,6 +415,7 @@ Lehre aus 040 und 044a: Für jeden neuen Mechanismus stehen Missbrauch, Abwehr u
 | Erfassende Person erfindet Abschnitte mit selbst gebautem JSON und behauptet `source: whisper` | Gleiches Vertrauen wie bei der manuellen Erfassung (sie darf ohnehin erfassen); `source` ist als Angabe gekennzeichnet; das Ereignis nennt den Akteur; Übernahme bleibt ein eigener, sichtbarer Schritt | Historie zeigt Akteur und `source`; `ContributionCaptured.segmentIds` verknüpft | K15 |
 | Doppelte Übernahme desselben Abschnitts in zwei Redebeiträge | R-ING-04: 409, Abschnitt schon `adopted` | `409` mit R-ING-04 | K12, Mutationsprobe M3 |
 | Übernahme rückdatiert, um R-MTG-03 nach dem Debattenschluss zu umgehen (Abschnitt mit frühem `startedAt`) | `occurredAt` leitet der Kern ab; R-MTG-03 verlangt nach dem Schluss trotzdem einen Grund und setzt `lateEntry: true` | Kennzeichen `lateEntry` am Redebeitrag; Grund im Ereignis | K13 |
+| Gemischte Auswahl: ein Abschnitt vor und einer nach dem Debattenschluss, damit die Rede nach dem Schluss über den frühesten Zeitanker als Nacherfassung mit Grund durchgeht | Jeder Abschnitt wird gegen `debateClosedAt` geprüft; einer danach → 409 R-MTG-03, auch mit Grund | `409` mit R-MTG-03 | K13b, M10 |
 | `source: manual` mit `segmentIds`, um die Herkunft zu verschleiern | 422 R-ING-04 | `422` | K12 |
 | Neues Recht fällt still an admin | admin ist seit 040a eine ausdrückliche Liste | Wahrheitstabellen-Diff | K18, Mutationsprobe M2 |
 
@@ -527,12 +553,12 @@ Kern:
 - `packages/domain/src/types.ts` (nur: `ingest.write` in `PERMISSIONS`, `listSpeechSegments` in `READ_PERMISSIONS`, die Segmenttypen, `segmentIds` an `MeetingContributionCapture` und `Contribution`)
 - `packages/domain/src/permissions.ts` (nur das Bündel `capture`)
 - `packages/domain/src/transitions.ts` (nur `SEGMENT_TRANSITIONS` mit R-ING-04, `resolveSegmentIngest` für R-ING-02/03/05, die Ableitung für die Übernahme)
-- `packages/domain/src/rules.ts` (nur die Einträge R-ING-01..05 und die Aufnahme der Segmenttabelle in das Register)
+- `packages/domain/src/rules.ts` (nur die Einträge R-ING-01..05, die Aufnahme der Segmenttabelle in das Register und der Beschreibungstext von R-MTG-03 um „jeder übernommene Transkriptabschnitt“)
 - `packages/domain/src/events.ts` (nur `SegmentIngested` und `segmentIds` in `ContributionCaptured`)
 - `packages/domain/src/state.ts` (nur die Abschnitte in der Projektion als `Map` mit Index und der Fall `ContributionCaptured` für `segmentIds`)
 - `packages/domain/src/envelope.ts` (nur `SegmentIngested` in `EVENT_TYPES`)
 - `packages/domain/src/stream.ts` (nur: `SegmentIngested` in beiden Zuordnungen, Subjektart `segment` in `SubjectRef`, `collect`, `lookupIn`, `snapshotBefore`, die Segment-Subjekte an `ContributionCaptured`)
-- `packages/domain/src/api.ts` (nur: `HvApi` um `ingestSpeechSegments` und `listSpeechSegments`, ihre Umsetzung, `segmentIds` in `captureInMeeting`, der Alias `captureContribution` mit benannten Feldern, die Option `ingestLimits`, `seedDemo` mit `transcriptSample`)
+- `packages/domain/src/api.ts` (nur: `ApiProblem` um das optionale Feld `retryAfter`; `HvApi` um `ingestSpeechSegments` und `listSpeechSegments`, ihre Umsetzung, `segmentIds` in `captureInMeeting`, der Alias `captureContribution` mit benannten Feldern, die Option `ingestLimits`, `seedDemo` mit `transcriptSample`)
 - `packages/domain/src/seed.ts` (nur `TRANSCRIPT_SEEDED`, `TRANSCRIPT_SAMPLE`, `transcriptSampleBody`, `SeedOptions.transcriptSample` und das Anhängen am Ende von `seedEvents`)
 - `packages/domain/src/index.ts` (nur Exporte)
 - `packages/domain/policy-truth-table.md` (nur regeneriert)
@@ -555,8 +581,8 @@ Dienst:
 
 HTTP-Client, Live-Puffer, Aktionsschlüssel (nur Typprüfung):
 
-- `apps/web/src/api/http.ts` (nur die zwei Methoden)
-- `apps/web/src/api/http.test.ts` (nur Tests der zwei Methoden: Methode, Pfad, Body, CSRF-Kopf)
+- `apps/web/src/api/http.ts` (nur die zwei Methoden und `retryAfter` in `perform` für beide Fehlerwege)
+- `apps/web/src/api/http.test.ts` (nur Tests der zwei Methoden: Methode, Pfad, Body, CSRF-Kopf; und die `retryAfter`-Tests)
 - `apps/web/src/api/liveStore.ts` (nur die Einträge der zwei Methoden in `WRITE_METHODS` und `READ_TOPICS`; `ITEM_READS` nur, falls die Typprüfung die neue Subjektart verlangt)
 - `apps/web/src/api/index.ts` (nur der Export `demoTranscriptSample` und `ingestLimits` für den In-Process-Kern der Demo)
 - `apps/web/src/api/liveStore.test.ts` (nur, falls eine Vollständigkeitsprüfung eine Liste führt)
@@ -647,6 +673,9 @@ Weitere Dateien sind Scope-Befunde.
   `source: manual` mit `segmentIds` → 422 R-ING-04; `occurredAt` im Body mit `segmentIds` → 422 R-ING-04; dieselbe Kennung
   zweimal in `segmentIds` → 422 R-ING-04; Kennung eines Abschnitts einer anderen HV → 422 R-ING-04; als moderation → 403
   R-PERM-01. Jeweils kein Ereignis.
+- K13b. Nach `DebateClosed`: gemischte Auswahl aus einem Abschnitt mit `startedAt` vor und einem mit `startedAt` nach
+  `debateClosedAt`, mit Grund → 409 R-MTG-03, kein Ereignis, beide Abschnitte bleiben `unconfirmed`; nur der Abschnitt
+  davor, mit Grund → 201 `lateEntry: true`; nur der Abschnitt danach, mit Grund → 409 R-MTG-03.
 - K13. Nach `DebateClosed`: Übernahme mit Grund und frühestem `startedAt` ≤ `debateClosedAt` → `lateEntry: true`; ohne
   Grund → 409 R-MTG-03.
 - K14. Atomisierung des übernommenen Redebeitrags mit `captureQuestions` → Einzelfragen wie bisher (Fluss unverändert).
@@ -695,7 +724,7 @@ Weitere Dateien sind Scope-Befunde.
 - H10. Zugriffslog: ein Eintrag mit `operationId` `ingestSpeechSegments` und Status, ohne Wortlaut.
 
 **Web-API** (`http.test.ts`): beide Methoden mit Methode, Pfad über die laufende HV, Body, CSRF-Kopf; kein
-`Idempotency-Key`, kein `If-Match`. `liveStore`: `listSpeechSegments` steht unter Thema `contributions`.
+`Idempotency-Key`, kein `If-Match`. Die `retryAfter`-Fälle aus Entscheidung 11. `liveStore`: `listSpeechSegments` steht unter Thema `contributions`.
 `demoTranscriptSample()` liefert 5 Abschnitte mit Zeitankern vor der aktuellen Zeit.
 
 **Mutationsproben** (im Bericht mit dem Ergebnis „rot“ belegt, danach zurückgesetzt):
@@ -709,12 +738,14 @@ Weitere Dateien sind Scope-Befunde.
 - M7. Fall `segment` in `collect` entfernt → K16 rot.
 - M8. Alias reicht die Eingabe wieder unverändert weiter → K20 rot.
 - M9. Kern zählt `text.length` statt Codepunkten → K8 (Emoji-Fall) rot.
+- M10. Grenze Debattenschluss nur am frühesten Abschnitt geprüft → K13b rot.
+- M11. `perform` setzt `retryAfter` nur im Problem-Details-Weg → der `503`-Fall ohne Problem-Details rot.
 
 ## Akzeptanzkriterium
 
 1. `pnpm contract:lint` grün ohne neue Meldung; `pnpm contract:types` ergibt den eingecheckten Stand; `check.mjs`
    (a)–(d) `ok`.
-2. K1–K25, H1–H10 und die Web-API-Tests grün; M1–M9 rot belegt.
+2. K1–K25, K13b, H1–H10 und die Web-API-Tests grün; M1–M11 rot belegt.
 3. Die regenerierte Wahrheitstabelle entspricht dem Diff dieser Spec; `docs/legal-trace.md` enthält R-ING-01..05.
 4. Jedes Beispiel in `docs/integration/transkript.md` ist gegen `pnpm --filter @hv/api dev` gelaufen; die Ausgabe steht
    im Bericht.
@@ -809,7 +840,7 @@ Keine blockiert die Spec. Fragen 1 und 2 brauchen vor dem Bau ein ausdrückliche
    die Ansprechperson des Tool-Teams (16.10.2026) abzuwarten, damit die Freigabe-Demo den Partnerweg zeigt. Dazu gehört
    die Pfadabweichung aus Entscheidung 1. Eine abweichende Antwort kostet die Beträge aus „Standards“. Ohne Go baut
    064a frühestens nach dem 16.10.
-2. **Zuschnitt und Budget (Go nötig, Planabweichung).** 064 wird 064a (3,5 AStd) und 064b (2,5 AStd), zusammen 6
+2. **Zuschnitt und Budget (Go nötig, Planabweichung).** 064 wird 064a (3,75 AStd) und 064b (2,5 AStd, eigene Spec und eigener PR nach R12), zusammen 6,25
    statt 2,5 AStd, beide hoch. Die Ingest-Form wandert aus 043c in den ersten Commit von 064a; 043c behält Webhooks,
    `answer-suggestions` und das Schema für Systemakteure. Mit Go ändert der Orchestrator die Plan-Einträge 064 und 043
    (Teilungsvermerk, Lanes `contract`, `web-api`) und den Kalender.
@@ -821,7 +852,8 @@ Keine blockiert die Spec. Fragen 1 und 2 brauchen vor dem Bau ein ausdrückliche
 
 ## Hinweise an Folgescheiben
 
-**064b:**
+**064b (Spec 064b, eigener PR):**
+- Der Import-Adapter liest bei `429`/`503` `problem.retryAfter` (Entscheidung 11); fehlt es, wartet er 2 Sekunden.
 - Import-Knopf nur bei `ingest.write` in den Listen-`_actions`; „Übernehmen“ nur bei `contribution.capture` in den
   Abschnitts-`_actions`.
 - Die Übernahme ruft `captureMeetingContribution` (kanonisch) mit `segmentIds` und `source: transcript`, ohne
