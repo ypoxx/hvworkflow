@@ -1,7 +1,7 @@
 # Scheibe 044b — Verweigerungspfad A und B, Teil 2: Dienst und HTTP-Nachweis
 
-**Status:** spec (03.10.2026; gelesen auf `83bc7e2`, Merge von 044a #131; Standard zum Zugriffslog nach Vorgabe des Orchestrators umgestellt: kein neuer Schlüssel; Teil 2 der geteilten Scheibe 044, Zuschnitt in `docs/slices/044a-verweigerung-kern.md`, Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 1,65 AStd (Teilungstabelle 044a: 1; Begründung im Abschnitt „Aufwand“) · Plan 044: 06.11.2026 (W6), tatsächlich direkt nach 044a in der Lane service; **muss vor dem 27.11.2026 gemergt sein** (Ablauf der drei Allowlist-Einträge, `packages/contract/scripts/check.mjs` (d)) · Go des Eigentümers zum Zuschnitt (044a, Frage 2) am 03.10.2026, auf Standard gebaut · Lanes: service; contract (nur `allowlist.json`); core (nur die Längenprüfung von `proposeRefusal`); docs-sicherheit
+**Status:** spec (03.10.2026; gelesen auf `83bc7e2`, Merge von 044a #131; Standard zum Zugriffslog nach Vorgabe des Orchestrators umgestellt: kein neuer Schlüssel; Lesebefund zu `66e69e2` eingearbeitet (3 major, Minor und Nits, Abschnitt „Review findings“); Teil 2 der geteilten Scheibe 044, Zuschnitt in `docs/slices/044a-verweigerung-kern.md`, Abschnitt „Teilung und Zuschnitt“)
+**Risikoklasse:** hoch · 2,15 AStd (Spanne 2,0–2,3; Teilungstabelle 044a: 1; Begründung im Abschnitt „Aufwand“) · Plan 044: 06.11.2026 (W6), tatsächlich direkt nach 044a in der Lane service; **muss vor dem 27.11.2026 gemergt sein** (Ablauf der drei Allowlist-Einträge, `packages/contract/scripts/check.mjs` (d)) · Go des Eigentümers zum Zuschnitt (044a, Frage 2) am 03.10.2026, auf Standard gebaut · Lanes: service; contract (nur `allowlist.json`); core (nur die Längenprüfung von `proposeRefusal`); docs-sicherheit
 **Rolle:** implementierer-backend (kein Vertrags- und kein ADR-Schritt). Review in frischem Kontext mit den Perspektiven **Security** (Maskierung über HTTP, Rechte, Erkennung abgewiesener Versuche), **Datenschutz** (Begründung im `pii`-Teil der gespeicherten Zeile, Aufbewahrungsklasse, Zugriffslog ausdrücklich unverändert) und **Vertrag** (Gleichlauf von Validator und Kern, Antwortprüfung, Allowlist und Abdeckungstor). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue. Über HTTP belegt: R-TRANS-15, R-TRANS-16, R-GUARD-03, R-GUARD-04, R-GUARD-06, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-13, R-GUARD-14, R-TRANS-00, R-PERM-01, R-PERM-02, R-IDEM-01 (nur Abgrenzung). Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:**
@@ -10,7 +10,7 @@
 - Spec 035b (Muster einer Dienstscheibe: Allowlist im Commit des ersten Routentests, Postgres-Test, Zugriffslog), Spec 033a (Entscheidung 5: Zugriffslog mit genau acht Schlüsseln), Spec 040b (Muster: Allowlist-Test nach dem Entfernen)
 - ADR 0013 (Ebene 2), ADR 0011 (Hash-Kette), ADR 0009 (`pii`-Umschlag), ADR 0015 (Allowlist mit Ablauf), ADR 0002 (Demo im Prozess)
 - Register E56 (CI-Artefakt als Nachweis; hier nicht berührt), E14 (DSB), E13 (Betriebsvereinbarung)
-- Bedrohungsmodell SG2, T-G1-E-01, T-G1-E-03, T-G1-I-01, T-G1-I-02, T-G1-I-05, T-G1-I-09, MF-07, MF-09; DSFA-Vorentwurf V7, V10
+- Bedrohungsmodell SG2, T-G1-E-01, T-G1-E-03, T-G1-I-01, T-G1-I-02, T-G1-I-05, T-G1-I-09, MF-06, MF-07, MF-09, MF-13; DSFA-Vorentwurf V7, V10
 
 **Depends on:** 044a (gemergt, `83bc7e2`, Vertrag 0.4.2), 035b (Strom-Dienst), 033a (Zugriffslog), 034a (Grenzen)
 **Perspektive:** Security, Datenschutz, Vertrag · **Glossar: neue Begriffe:** nein
@@ -82,14 +82,22 @@ vorgeschlagen, von Recht nicht gelesen).
 
 ### 2. Reihenfolge der Antworten über HTTP (bestehend, hier festgehalten)
 
-Die Middleware-Kette entscheidet in dieser Reihenfolge; die Tests halten sie fest, ändern sie aber nicht:
-1. 401 ohne Akteur (Akteur-Port);
-2. 422 des Validators (Form, Länge, `additionalProperties`, `if`/`then` für Pfad A). **Vor** Recht und Existenz: Ein
-   Nichtberechtigter mit fehlerhaftem Body erhält 422, nicht 403. Das gilt für jede Operation des Dienstes und verrät nichts
-   über die Frage. Die 403- und 404-Tests senden deshalb einen gültigen Body;
-3. im Kern: 422 der Eingabeprüfung (nur, was der Validator nicht prüft: `text` nur aus Leerraum, unbekanntes oder leeres
-   `refusalGroundId`), dann 404 bzw. 403 R-PERM-01, Wiederholung mit Idempotenzschlüssel, 428 ohne `If-Match`, 412 bei
-   veralteter Version, 409 aus Tabelle und Guards.
+Die Middleware-Kette entscheidet in dieser Reihenfolge (`app.ts:465-467`, `api.ts` `transition`); die Tests halten sie fest,
+ändern sie aber nicht:
+1. 413 bei Überschreiten der Body-Grenze (Schicht 6, **vor** dem Akteur);
+2. 401 ohne Akteur (Schicht 7, Akteur-Port);
+3. 429 der Subject-Grenze (Schicht 8; 60 Schreibvorgänge je Subject und Minute, `DEFAULT_LIMITS.writePerSubject`);
+4. 422 des Validators: erst Kopf- und Query-Parameter, dann der Body (Form, Länge, `additionalProperties`, `if`/`then` für
+   Pfad A). **Vor** Recht und Existenz: Ein Nichtberechtigter mit fehlerhaftem Body erhält 422, nicht 403. Das gilt für jede
+   Operation des Dienstes und verrät nichts über die Frage. Die 403- und 404-Tests senden deshalb einen gültigen Body.
+   `If-Match` ist im Vertrag nur `type: string`; der Validator prüft sein Format nicht;
+5. im Kern, `proposeRefusal`: 422 der Eingabeprüfung (nur, was der Validator nicht prüft: `text` nur aus Leerraum,
+   unbekanntes oder leeres `refusalGroundId`) **vor** `transition()`;
+6. in `transition()` (beide Operationen): **zuerst** die Wiederholung mit gleichem Idempotenzschlüssel (die historische
+   Antwort kommt vor 404 und 403, `api.ts:777`), dann 404 bzw. 403 R-PERM-01 (`requireQuestionFor`), dann `checkIfMatch`:
+   428 ohne `If-Match`, 422 bei einem `If-Match`, das nicht `"v<n>"` lautet, 412 bei veralteter Version; zuletzt 409 aus
+   Tabelle und Guards. `approveRefusal` prüft vor `transition()` zusätzlich `answerVersion` als positive ganze Zahl (422;
+   über HTTP fängt das schon der Validator).
 
 **Abweichung zwischen Validator und Kern bei leerer Begründung (bestehend, im Vertrag beschrieben):** `""` ist über HTTP 422
 (`minLength: 1`), in der Demo 409 R-GUARD-09 (044a, Befund 7). `"   "` ist in beiden 409 R-GUARD-09. Die Tests belegen beides.
@@ -144,9 +152,14 @@ erweitert, wird nicht ohne Go des Eigentümers gebaut (Orchestrator, 03.10.2026)
   mit `operationId` `proposeRefusal` bzw. `approveRefusal`, `status` 409 (bzw. 403) und `seq` `null`. Welche Regel griff,
   steht nur im Problem-Body an den Client (`ruleId`) und lässt sich im Vorfall über den Zeitpunkt und den betroffenen Vorgang
   nachvollziehen, nicht aus dem Log allein.
-- **Berichtigung von 044a:** Die Zeilen der Missbrauchstabellen dieser Spec lauten „409 im Zugriffslog (`operationId`,
-  `status`)“. Die Zeilen in 044a („409 mit Regel-id im Zugriffslog“) gelten im Sinne dieses Standards; die Datei 044a wird
-  nicht geändert, der Bericht nennt die Berichtigung.
+- **Berichtigung:** Diese Spec führt keine eigene Missbrauchstabelle; „Wirkung und Risiko“ und die Sicherheits-Checkliste
+  nennen „Zugriffslog: `operationId` + `status`; Regel-id nur im Problem-Body“. Dieselbe falsche Annahme steht an drei Stellen
+  außerhalb dieser Spec:
+  - 044a, Missbrauchstabellen („409 mit Regel-id im Zugriffslog (033a, ab 044b über HTTP)“): gilt im Sinne dieses Standards;
+    die Datei 044a wird nicht geändert, der Bericht nennt die Berichtigung;
+  - Bedrohungsmodell **MF-13**, *Erkennung* („im Dienst steht er ab 044b im Zugriffslog (033a)“): wird berichtigt;
+  - Bedrohungsmodell **MF-06**, *Erkennung* („ein verweigerter Versuch steht als 409 mit R-ADM-07 im Zugriffslog (033a)“):
+    wird ebenso berichtigt (der Fehler stammt aus 040a; das Zugriffslog hatte nie eine Regel-id).
 - **Option** (Eigentümerfrage 1): neunter Schlüssel `ruleId` mit Musterprüfung, für jede Operation; Kosten im Abschnitt
   „Offene Eigentümerfragen“.
 
@@ -193,8 +206,8 @@ Tests im Dienst:
 
 Dokumente:
 
-- `docs/sicherheit/bedrohungsmodell.md` (nur: Stand und Testnamen an SG2, T-G1-E-01, T-G1-E-03, T-G1-I-09, MF-07; Zeile 044 in „Weitere Scheiben mit Sicherheitsbezug“)
-- `docs/folgeliste.md` (nur: Eintrag „übrige Längenprüfungen des Kerns in Code-Punkten“ aus Entscheidung 3 und neue nicht blockierende Befunde des Baus; keine Sicherheits-, Datenschutz- oder Rechtspunkte)
+- `docs/sicherheit/bedrohungsmodell.md` (nur: Stand und Testnamen an SG2, T-G1-E-01, T-G1-E-03, T-G1-I-01, T-G1-I-02, T-G1-I-09, MF-07; T-G1-I-05 um den Hinweis auf die Wiederholung von refusalGroundId im 422; MF-13 Erkennung und Nachweis; MF-06 nur der Satz zum Zugriffslog in Erkennung; Zeile 044 in „Weitere Scheiben mit Sicherheitsbezug“)
+- `docs/folgeliste.md` (nur: Eintrag „übrige Längenprüfungen des Kerns in Code-Punkten“ aus Entscheidung 3, Eintrag „einzelnes Surrogat auf Postgres ergibt 500“ aus Vor-dem-Bau-Punkt 5 und neue nicht blockierende Befunde des Baus; keine Sicherheits-, Datenschutz- oder Rechtspunkte)
 - `docs/slices/044b-verweigerung-dienst.md` (diese Spec: Bericht, Review findings)
 - `docs/produktplan-beta.md` (nur durch den Orchestrator mit dem Merge: Stand-Zeile Etappe C)
 
@@ -220,15 +233,19 @@ Weitere Dateien sind Scope-Befunde.
 3. **Demo-Kopf und Rollenwechsel:** Wie löst der Akteur-Port `X-Actor` (`id:rolle`) auf? Reicht derselbe `id` mit einer
    anderen Rolle für den Fall „S klärt als `legal`, gibt als `approver` frei“ (Test 4, R-GUARD-14), oder muss der Test die
    Rollen über `assignRole`/`revokeRole` setzen? Der Bericht nennt den Weg.
-4. **R-GUARD-11 über HTTP:** Lässt sich `createApp({ persistence })` mit einer In-Memory-Persistenz starten, an die vorher ein
-   `AnswerDrafted` mit veraltetem `refusalGroundHash` angehängt wurde (wie 044a Test 12)? Sonst Befund; der Fall bleibt dann
-   im Kern belegt.
-5. **Einzelne Surrogate auf Postgres:** Antwortet der Postgres-Pfad auf eine Begründung mit einem einzelnen Surrogat
-   (`"\ud800"`) mit 200? jsonb lehnt solche Escapes ab. Ergibt das 500 oder 503: kein Teil dieser Scheibe, Eintrag auf der
-   Folgeliste (Robustheit, besteht für jedes Textfeld); Test 7 läuft dann nur ohne Postgres.
+4. **R-GUARD-11 über HTTP (vom Architekten beantwortet):** `createApp` nimmt `persistence: { load, save }` (Muster
+   `master-data040b.test.ts:56`). Die Ereignisse entstehen wie in 044a Test 12: ein Kern-Store mit Seed, dazu ein direkt
+   angehängtes `AnswerDrafted` mit veraltetem `refusalGroundHash` (der Store stempelt Hash und Kette, die Kette bleibt
+   gültig); `load` übergibt sie der App. Prüft `load` die Kette und lehnt sie ab, oder fehlt der Weg: Befund im Bericht, der
+   Fall bleibt im Kern belegt, kein Ersatz durch Abschwächen.
+5. **Einzelne Surrogate auf Postgres (Lesebefund nit 22, hingenommen):** jsonb lehnt ein einzelnes Surrogat (`"\ud800"`) ab;
+   der Postgres-Pfad antwortet darauf mit 500. Das besteht für jedes Textfeld, ist kein Sicherheits- oder Datenschutzpunkt
+   (kein Leck, kein Ereignis, die Anfrage scheitert ganz) und gehört nicht zu dieser Scheibe. Der Bau legt den Eintrag auf
+   der Folgeliste an; Test 7 prüft einzelne Surrogate nur ohne Postgres.
 6. **Zugriffslog bei Rollback:** Schreibt der Postgres-Pfad bei einer Abweisung innerhalb von `postgresBoundary` genau eine
    Zeile mit `status` 409 und `seq` `null` (Test P4)? Sonst Befund.
-7. **Kennzahl:** Läuft der Seed-Jahrgang (`running`)? Sonst entfällt Test 16; der Bericht vermerkt es.
+7. **Kennzahl (vom Architekten beantwortet):** Der Seed-Jahrgang läuft (`packages/domain/src/seed.ts:415-417`,
+   `MeetingStarted`). Test 16 gilt also; er misst gegen eine Grundlinie, weil Seed-Fragen selbst in `in_review` liegen können.
 8. Weichen Zeilenangaben ab: melden, nicht raten.
 
 ## Tests zuerst (rot, dann grün)
@@ -236,8 +253,36 @@ Weitere Dateien sind Scope-Befunde.
 Ohne Postgres: `apps/api/src/__tests__/refusal044b.test.ts`. `createApp({ demoEnabled: true, clock, accessLog })` mit
 Speichersenke und injizierter Uhr, Seed über `POST /v1/demo/seed`. Alle Aufrufe über `req()` (prüft jede Antwort gegen den
 Vertrag und zählt die Operation für das Abdeckungstor). Akteure über `X-Actor`, dazu lokal `coordination` und zweite
-Personen je Rolle. Nach jedem abgewiesenen Aufruf ist die Zahl der Ereignisse (`GET /v1/events` als admin) unverändert und
-die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Vermerk prüfen, dass kein `detail` sie wiederholt.
+Personen je Rolle.
+
+**Testaufbau (Rate-Limit):** Die Subject-Grenze erlaubt 60 Schreibvorgänge je Subject und Minute. Jeder `it`-Block erhält
+eine **frische App** mit eigenem Seed, oder die injizierte Uhr rückt zwischen Gruppen um mindestens 60 s vor. Die Grenzen
+werden **nicht** über `limits` angehoben. Ein 429 in einem Test ist ein Fehler des Testaufbaus, nie ein erwartetes Ergebnis.
+
+**Kopf und Ereignis-Scan mit Positivkontrolle.** `GET /v1/events` liefert ohne Parameter nur `after=0`, `limit=1000`; der
+Seed hat mehr als 1000 Ereignisse. Deshalb:
+- `headSeq()` blättert als admin mit `after=<zuletzt gesehene seq>&limit=5000` bis zur leeren Seite und gibt die höchste
+  `seq` zurück. **„Kein neues Ereignis“** heißt: `headSeq()` vor und nach dem Aufruf gleich, und die Zugriffslogzeile des
+  Aufrufs hat `seq: null`.
+- `scanEvents(after)` liest als admin alle Ereignisse mit `seq > after` (blätternd). Jeder Scan in Tests 9, 10 und 13 nutzt
+  `after` = `headSeq()` **vor** dem geprüften Schritt.
+- **Positivkontrolle in jedem Scan:** Der gelesene Satz enthält nachweislich das geprüfte Ereignis (`AnswerDrafted` der
+  Verweigerung mit `answer.answerKind` und `subjectId` der Frage bzw. `QuestionLegalCleared` dieser Frage). Fehlt es, ist der
+  Test rot; eine Maskierungsprüfung über eine leere oder falsche Menge besteht nie.
+- **`/stream`:** Der admin-Strom öffnet mit `Last-Event-ID` = Kopf vor dem Schritt (Leser `stream-reader035.ts`). Der Test
+  wartet mit Zeitgrenze auf den `event`-Rahmen mit der `seq` des geprüften Ereignisses; kommt er nicht, ist der Test rot.
+  Für `legal` (ohne `event.read`) muss mindestens ein `change`-Rahmen zu dieser Frage ankommen.
+- `getQuestionHistory` ist je Frage ungeblättert; die Positivkontrolle gilt dort ebenso.
+
+**Antwort-Haken (SG2).** Ein lokaler Wrapper um `req()` in `refusal044b.test.ts` (`helpers.ts` bleibt unverändert) prüft
+**jeden** Rumpf der Tests 1–16 je aufrufendem Akteur: JSON-Antworten, Problem-Rümpfe und jeden SSE-Rahmen aus dem
+Stromleser. Er liest den Rohtext (geklonte Antwort) und verlangt:
+- der **Begründungs-Marker** erscheint nur, wenn der Akteur `legal`, `coordination` oder `approver` ist;
+- der **Vermerk-Marker** (`note`) erscheint nie, für niemanden;
+- der Schlüssel **`legalClearerIds`** erscheint nie;
+- Text-, Begründungs- und Vermerk-Marker stehen in keinem `detail`.
+Jeder Test erzeugt seine Marker eindeutig. Der Haken ersetzt keine gezielte Prüfung, er fängt jeden Pfad, den eine gezielte
+Prüfung vergessen hat.
 
 1. **Montage:**
    - `GET /v1/refusal-grounds` gelingt für alle neun Rollen des Seeds; sieben Einträge; `id` und `hash` gleich
@@ -267,8 +312,8 @@ die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Ver
    - R-GUARD-04: Verweigerung v2 rechtlich freigegeben, `approveRefusal` mit `answerVersion: 1`;
    - R-GUARD-11 (nach Vor-dem-Bau-Punkt 4): App auf vorbereiteter In-Memory-Persistenz mit veraltetem Hash, Rechtsfreigabe,
      `approveRefusal` → 409 R-GUARD-11; `_actions` von `approver` ohne `question.refuse.approve`.
-5. **412 und 428:** beide Operationen mit veraltetem `If-Match` → 412; ohne `If-Match` → 428; jeweils kein Ereignis, `detail`
-   ohne Text.
+5. **412, 428 und fehlerhaftes `If-Match`:** beide Operationen mit veraltetem `If-Match` → 412; ohne `If-Match` → 428; mit
+   `If-Match: abc` → 422 aus dem Kern (nach Recht und Existenz, Abschnitt 2); jeweils kein Ereignis, `detail` ohne Text.
 6. **422 des Validators** (Body), jeweils kein Ereignis, `detail` ohne Wert:
    - `proposeRefusal`: `answerKind` `answer`, unbekannt, keine Zeichenkette; `text` `""`, keine Zeichenkette, 20001
      Zeichen; `refusalJustification` `""`, 4001 Zeichen, keine Zeichenkette; `refusalGroundId` 129 Zeichen, keine
@@ -279,8 +324,11 @@ die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Ver
    **422 des Kerns** über HTTP: `text` nur aus Leerraum; Pfad B mit unbekanntem `refusalGroundId` (`detail` nennt nur die
    id); Pfad B mit `refusalGroundId: ""`.
    **Leere Begründung:** `""` → 422 (Validator), `"   "` → 409 R-GUARD-09 (Abschnitt 2).
-7. **Gleichlauf der Längen (Entscheidung 3):**
-   - `codePointLength` gleich `ucs2length` aus Ajv für: leere Zeichenkette, ASCII, Umlaute, ein Emoji, 4000 Emoji, ein
+7. **Gleichlauf der Längen (Entscheidung 3)**, in `refusal044b.test.ts`; `codePointLength` ist aus
+   `packages/domain/src/api.ts` exportiert (über `@hv/domain`, `index.ts` exportiert `api.js` schon ganz); `ucs2length` wird
+   mit `createRequire(import.meta.url)('ajv/dist/runtime/ucs2length').default` geladen (CommonJS, Standardexport unter
+   `.default`; Ajv ist schon Abhängigkeit von `apps/api`):
+   - `codePointLength` gleich `ucs2length` für: leere Zeichenkette, ASCII, Umlaute, ein Emoji, 4000 Emoji, ein
      einzelnes hohes Surrogat am Ende, ein einzelnes tiefes Surrogat, ein vertauschtes Paar;
    - über HTTP und in der Demo gleich: Begründung aus 4000 Emoji → 200 (heute 422 im Kern: **rot zuerst**); 4001 Emoji → 422;
      `text` aus 20000 Emoji → 200, 20001 → 422; ein Eintrag in `sources` aus 2000 Emoji → 200, 2001 → 422;
@@ -297,26 +345,34 @@ die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Ver
    - `getQuestion`: Begründung vorhanden für `legal`, `coordination`, `approver`; fehlt für admin, `moderation`, `capture`,
      `expert`, `observer` (nach `delivered`); fehlt in der verdrängten Version für `moderation`, vorhanden für `legal`;
    - `listQuestions` und `listMeetingQuestions`: fehlt als admin und `moderation`, vorhanden als `legal`;
-   - `getQuestionHistory` als `legal` und als admin, `listEvents` als admin: kein `payload.pii`, keine
-     `refusalJustification` an irgendeiner Stelle; Schnappschuss `refusalGround` und `toStatus` vorhanden;
-   - **`/stream`** (Leser aus `stream-reader035.ts`): admin erhält die `event`-Nachricht zu `AnswerDrafted` ohne `pii` und
-     ohne Begründung; `legal` (ohne `event.read`) erhält nur `change`-Nachrichten ohne Nutzlast;
+   - `getQuestionHistory` als `legal` und als admin, `scanEvents(Kopf vor dem Vorschlag)` als admin: das `AnswerDrafted` der
+     Verweigerung ist enthalten (Positivkontrolle), ohne `payload.pii` und ohne `refusalJustification` an irgendeiner Stelle;
+     Schnappschuss `refusalGround` und `toStatus` vorhanden;
+   - **`/stream`**: admin erhält den `event`-Rahmen mit der `seq` dieses `AnswerDrafted` (Positivkontrolle mit Zeitgrenze),
+     ohne `pii` und ohne Begründung; `legal` (ohne `event.read`) erhält mindestens einen `change`-Rahmen zu dieser Frage und
+     keinen `event`-Rahmen;
    - `GET /v1/stage` und `GET /v1/meetings/{meetingId}/stage` als `approver`, `moderation` und `podium` (nach `staged`):
      fehlt;
-   - **Schreibantworten:** `returnQuestion` als admin und `deliverQuestion` als `podium` tragen in keiner Version eine
-     Begründung;
+   - **Schreibantworten** (zusätzlich zum Antwort-Haken gezielt): `returnQuestion` als admin, `stageQuestion` als
+     `moderation`, `deliverQuestion` und `closeQuestion` als `podium`, `withdrawQuestion`, `claimQuestion` und
+     `releaseQuestion` durch die Rollen, die sie halten (aus `_actions` gelesen, kein Rollenname im Code der Prüfung), sowie
+     `draftAnswer` und `submitForReview` als `expert` auf Frage B (verdrängte Verweigerung in `answers`): keine Version trägt
+     eine Begründung, außer der Akteur ist `legal`, `coordination` oder `approver`;
    - Suche: `GET /v1/questions?q=<Wort nur aus der Begründung>` als `legal` → 0 Treffer; ein Wort aus `text` → 1 Treffer.
 10. **Vermerk der Rechtsfreigabe:** `clearQuestionLegally` mit `note` (Marker) auf einer Antwort und auf einer Verweigerung.
-    `getQuestionHistory` (`legal`), `listEvents` (admin) und die `event`-Nachricht auf `/stream` (admin) zeigen
-    `QuestionLegalCleared` ohne `note`; `getQuestion` trägt keinen Vermerk; der Marker steht in keiner Antwort.
-11. **`legalClearerIds` nie sichtbar:** Jede Antwort aus Test 4 (R-GUARD-14) und Test 9 wird als Rohtext geprüft: Der
-    Schlüssel `legalClearerIds` kommt nicht vor. Dazu: Die Begründungs-Marker erscheinen in keiner Antwort an einen Leser
-    außerhalb von `legal`, `coordination`, `approver`.
+    Die Antwort von `clearQuestionLegally` selbst (als `legal`) trägt den Vermerk nicht. `getQuestionHistory` (`legal`),
+    `scanEvents(Kopf vor der Rechtsfreigabe)` (admin) und der `event`-Rahmen auf `/stream` (admin) enthalten das
+    `QuestionLegalCleared` dieser Frage (Positivkontrolle) und zeigen es ohne `note`; `getQuestion` trägt keinen Vermerk; der
+    Antwort-Haken findet den Marker in keinem Rumpf.
+11. **Antwort-Haken wirkt:** Ein eigener Fall belegt den Haken selbst: Nach der wiederholten Rechtsfreigabe aus Test 4
+    (zwei Freigebende, also `legalClearerIds` mit zwei Einträgen im Kern) laufen `getQuestion`, `listQuestions`, beide
+    Bühnenrouten, `getQuestionHistory`, `scanEvents` und ein Strom-Rahmen für jede Rolle; der Haken meldet keinen Treffer.
+    Eine Kontrollprobe mit absichtlich eingeschleustem Marker in einem konstruierten Rumpf zeigt, dass der Haken rot wird.
 12. **Antwortprüfung:** Jede Antwort mit einer Verweigerungsversion besteht die Vertragsprüfung von `req()` (Invarianten
     an `AnswerVersion`: Pfad B mit Grund und Hash, Pfad A ohne). Keine Ausnahme in `UNDOCUMENTED_STATUS_EXCEPTIONS`.
 13. **`draftAnswer` mit Verweigerungsfeldern** (Entscheidung 4): Body `{ text, answerKind: 'refusal_with_ground',
     refusalGroundId: 'aktg-131-3-nr1', refusalJustification: <Marker> }` als `expert` → 200; die neue Version trägt kein
-    `answerKind`, kein `refusal*`-Feld; das Ereignis in `listEvents` hat kein `pii`; der Marker steht in keiner Antwort,
+    `answerKind`, kein `refusal*`-Feld; das Ereignis in `scanEvents(Kopf vor dem Entwurf)` (Positivkontrolle: es ist enthalten) hat kein `pii`; der Marker steht in keiner Antwort,
     auch nicht für `legal`; nach Prüfung und Rechtsfreigabe enthält `_actions` von `approver` `question.approve`, nie
     `question.refuse.approve`; `approveRefusal` darauf → 409 R-GUARD-13.
 14. **Ganze Kette über HTTP**, Pfad A und Pfad B: Vorschlag → Rechtsfreigabe → Freigabe → `stageQuestion` (`moderation`) →
@@ -326,9 +382,10 @@ die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Ver
     - 409 aus Test 4 (R-GUARD-08) → Zeile mit `operationId` `approveRefusal`, `status` 409, `seq` `null`; 403 aus Test 3 →
       `operationId` `proposeRefusal`, `status` 403; ein gelungener Vorschlag → `status` 200, `seq` gesetzt;
     - kein Marker aus `text`, Begründung oder Vermerk und keine Regel-id steht in einer Zeile.
-16. **Kennzahl** (nach Vor-dem-Bau-Punkt 7): Vorschlag bei t0; `GET /metrics` mit Token zeigt
-    `hv_questions_in_legal_review_over_10m` bei t0 + 11 min mit 1, bei t0 + 9 min mit 0 (über die injizierte Uhr). Kein
-    neuer Name im Katalog.
+16. **Kennzahl gegen Grundlinie** (Vor-dem-Bau-Punkt 7): zwei Apps mit gleichem Seed und gleicher Uhr; in der Versuchs-App ein
+    Vorschlag bei t0, in der Kontroll-App nichts. `GET /metrics` mit Token: Der Wert von
+    `hv_questions_in_legal_review_over_10m` ist bei t0 + 11 min in der Versuchs-App um genau 1 höher als in der Kontroll-App,
+    bei t0 + 9 min gleich. Kein neuer Name im Katalog.
 
 Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Datenbank je Lauf, wie
 `postgres028.test.ts`; Variablen `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`, `HV_DB_RUNTIME_ROLE`):
@@ -336,7 +393,8 @@ Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Date
 - **P1 Neustart mit Kettenprüfung:** App A: Vorschlag Pfad B (`coordination`) → Rechtsfreigabe (`legal`, mit `note`) →
   Freigabe (`approver`). App B auf derselben Datenbank (Neustart): Die erste Anfrage lädt und prüft die Kette ohne
   Integritätsfehler; `getQuestion` als `legal` zeigt `approved`, Version und Begründung, als admin keine Begründung;
-  `listEvents` als admin ohne `pii` und ohne `note`; `stageQuestion` über App B gelingt (die Kette läuft weiter).
+  `scanEvents` als admin ab dem Kopf vor dem Vorschlag enthält `AnswerDrafted` und `QuestionLegalCleared` dieser Frage
+  (Positivkontrolle), beide ohne `pii` und ohne `note`; `stageQuestion` über App B gelingt (die Kette läuft weiter).
 - **P2 Ablage:** über die Owner-Verbindung: In der Zeile des `AnswerDrafted` steht die Begründung unter
   `envelope->'payload'->'pii'->>'refusalJustification'`, `envelope->'payload'->'answer'` hat keinen Schlüssel
   `refusalJustification`; `envelope->>'retentionClass'` ist `record` für dieses `AnswerDrafted` und für das `QuestionApproved`
@@ -354,8 +412,8 @@ Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Date
 
 1. Eine der drei Routen nicht montiert → Test 1 rot, Abdeckungstor rot.
 2. Ein Allowlist-Eintrag mit `slice` 044 bleibt stehen → Abdeckungstor rot („pre-declared … exercised“).
-3. `proposeRefusal` ohne `guarded(...)`-Validator (nur `postgresBoundary`) → Test 6 rot (unbekanntes Feld, leere Begründung
-   ergeben 409 bzw. 200 statt 422).
+3. Route mit `guarded(undefined)` statt `guarded('proposeRefusal')` (Postgres-Grenze bleibt, kein Validator) → Test 6 rot:
+   ein unbekanntes Feld ergibt 200 statt 422, eine leere Begründung `""` 409 R-GUARD-09 statt 422.
 4. Die Route für `approveRefusal` ruft `approveQuestion` → Test 4 (R-GUARD-12/13) und Test 14 rot.
 5. `writeOptions(c)` in `proposeRefusal` weggelassen → Test 5 und Test 8 rot.
 6. `codePointLength` zurück auf `.length` → Test 7 rot.
@@ -363,7 +421,7 @@ Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Date
 8. Das Entfernen von `note` in `maskEvent` (Kern) gestrichen → Test 10 rot.
 9. `viewQuestion` maskiert mit `can(actor(), p, q)` → Test 9 rot (`approver` ohne mögliche Freigabe).
 10. `getStage` ohne Maskierung → Test 9 (beide Bühnenrouten) rot.
-11. `viewQuestion` lässt `legalClearerIds` stehen → Test 11 rot.
+11. `viewQuestion` lässt `legalClearerIds` stehen → Antwort-Haken (Tests 4, 9, 11) rot.
 12. R-GUARD-14 vor R-GUARD-08 in R-TRANS-16 → Test 4 (Reihenfolge) rot.
 13. `retentionClass: 'record'` in `proposeRefusal` weggelassen → P2 rot.
 14. Begründung in `answer` statt `pii` → P2 und Test 9 rot.
@@ -425,7 +483,14 @@ Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
     `approveRefusal` und `status` 409 sichtbar, ohne Regel-id (Tests 4, 15, P4).
   - **MF-07** (Selbstfreigabe, auch nach Rollenwechsel): R-GUARD-06 und R-GUARD-14 über HTTP, mit wiederholter
     Rechtsfreigabe (Test 4).
-  - **SG2, T-G1-I-01, T-G1-I-02, T-G1-I-09:** Maskierung über HTTP und `/stream` (Tests 9–11).
+  - **SG2, T-G1-I-01, T-G1-I-02, T-G1-I-09:** Maskierung über HTTP und `/stream`, jeder Scan mit Positivkontrolle, jeder
+    Rumpf durch den Antwort-Haken (Tests 9–11).
+  - **MF-13** (Verweigerung ohne Rechtsprüfung oder mit geändertem Grund): über HTTP belegt (Tests 4, 13, 14, P4).
+    *Erkennung* im Bedrohungsmodell wird „Zugriffslog: `operationId` + `status`; Regel-id nur im Problem-Body“; *Nachweis*
+    nennt die Testnamen. **MF-06** erhält dieselbe Berichtigung seines Zugriffslog-Satzes (Entscheidung 5).
+  - **T-G1-I-05** (Echo ungeprüfter Eingaben): Das 422 des Kerns für ein unbekanntes `refusalGroundId` nennt die id, also
+    einen Client-String bis 128 Zeichen. Als JSON im Problem-Rumpf harmlos, nie im Zugriffslog (acht Schlüssel ohne
+    Fehlermeldung, Test 15); der Hinweis kommt in die Zeile T-G1-I-05.
   - **MF-09** (Leistungsauswertung über das Zugriffslog): unverändert; diese Scheibe fügt dem Log nichts hinzu
     (Entscheidung 5).
 - **Invarianten:**
@@ -451,10 +516,10 @@ Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
 |---|---|
 | SC-01 | ja: drei Routen hinter Akteur-Port und `validateOperation`; Rechte, Tabelle und Guards nur im Kern (`can()`); kein Rollenname im Diff (Tor role-literals) |
 | SC-02 | ja: keine neue Aktion, keine Änderung an `ROLE_PERMISSIONS` oder der Wahrheitstabelle |
-| SC-03 | ja: Maskierung auf allen Lesepfaden, im Strom und in Schreibantworten über HTTP belegt (Tests 9–11); `detail` ohne Inhalt (Tests 4–6) |
+| SC-03 | ja: Maskierung auf allen Lesepfaden, im Strom und in Schreibantworten über HTTP belegt (Tests 9–11), jeder Rumpf durch den Antwort-Haken, jeder Ereignis-Scan mit Positivkontrolle; `detail` ohne Inhalt (Tests 4–6) |
 | SC-04 | ja: bestehende Body-Grenze, Rate-Limit und Zeitgrenze gelten unverändert für die drei Routen |
 | SC-05 | ja: kein Geheimnis im Diff; Sitzung und CSRF wie bei `draftAnswer` |
-| SC-06 | ja: T-G1-E-03, MF-07 mit Erkennung (Zugriffslog: `operationId` und `status` 409; Regel-id nur im Problem-Body) |
+| SC-06 | ja: T-G1-E-03, MF-07, MF-13 (und MF-06 berichtigt) mit Erkennung „Zugriffslog: `operationId` + `status`; Regel-id nur im Problem-Body“ |
 | SC-07 | ja: Zeit nur aus der injizierten Uhr (Test 16) |
 | SC-08 | ja: keine neue SQL im Dienst; Postgres-Tests lesen über die Owner-Verbindung nur im Test |
 | SC-09 | nicht anwendbar (kein Nachbarsystem) |
@@ -462,24 +527,26 @@ Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
 | SC-11 | ja: Zugriffslog unverändert (acht Schlüssel, Test 15); keine neue Logzeile |
 | SC-12 | ja: Allowlist-Einträge entfernt, kein Tor und kein CI-Skript geändert |
 | SP-5 | ja: kein Token, keine Begründung, kein Vermerk im Log (Test 15) |
-| SP-6 | ja: SG2, T-G1-E-01, T-G1-E-03, T-G1-I-09, MF-07 mit Testnamen im Bedrohungsmodell |
+| SP-6 | ja: SG2, T-G1-E-01, T-G1-E-03, T-G1-I-01, T-G1-I-02, T-G1-I-05, T-G1-I-09, MF-07, MF-13 mit Testnamen im Bedrohungsmodell; MF-06 Erkennung berichtigt |
 
 ## Aufwand
 
-Ehrlich geschätzt **1,65 AStd** statt 1 aus der Teilungstabelle:
+Ehrlich geschätzt **2,15 AStd** (Spanne 2,0–2,3) statt 1 aus der Teilungstabelle; nach dem Lesebefund um 0,5 AStd höher:
 
 | Teil | AStd |
 |---|---|
 | Montage, Allowlist, umgedrehter Allowlist-Test | 0,15 |
-| Abweisungen über HTTP (401/403/404/409 mit zehn Regel-ids, 412/428, 422 Validator und Kern, Idempotenz) | 0,5 |
-| Maskierung über sieben Lesepfade, Strom, Schreibantworten, Vermerk, `legalClearerIds` | 0,3 |
+| Testaufbau: frische App je `it`, `headSeq`/`scanEvents` mit Positivkontrolle, Antwort-Haken mit Kontrollprobe | 0,3 |
+| Abweisungen über HTTP (401/403/404/409 mit zehn Regel-ids, 412/428/422 `If-Match`, 422 Validator und Kern, Idempotenz) | 0,45 |
+| Maskierung über sieben Lesepfade, Strom, alle Schreibantworten, Vermerk | 0,3 |
 | Postgres P1–P5 | 0,25 |
 | Gleichlauf der Längen (Codex P2) | 0,15 |
-| `draftAnswer`-Fall, Kennzahl | 0,05 |
-| Mutationsproben, `pnpm gates` mit Postgres, CI-Nachweis, Bericht | 0,25 |
+| `draftAnswer`-Fall, Kennzahl gegen Grundlinie | 0,1 |
+| Bedrohungsmodell (MF-13, MF-06, T-G1-I-01/-02/-05, Testnamen) | 0,1 |
+| 14 Mutationsproben, `pnpm gates` mit Postgres, Bericht | 0,35 |
 
-Summe 044a + 044b: 3,25 + 1,65 = 4,9 AStd statt 2,5 laut Plan. Mit der Option `ruleId` aus Eigentümerfrage 1 kämen 0,35 AStd
-hinzu (2,0).
+Summe 044a + 044b: 3,25 + 2,15 = 5,4 AStd statt 2,5 laut Plan. Mit der Option `ruleId` aus Eigentümerfrage 1 kämen 0,35 AStd
+hinzu (2,5).
 
 ## Offene Eigentümerfragen
 
@@ -528,3 +595,25 @@ Touched:
 ```
 
 ## Review findings
+
+**Lesebefund der Spec (03.10.2026, frischer Kontext, zu `66e69e2`):** 0 blocker, 3 major (alle [S]), Minor und Nits.
+Eingearbeitet:
+- Major 1 [S]: `listEvents` liefert ohne Parameter nur 1000 Ereignisse, der Seed hat mehr. `headSeq()` und `scanEvents(after)`
+  blättern; „kein neues Ereignis“ über den Kopf und `seq: null` im Zugriffslog; Positivkontrolle in jedem Scan und auf
+  `/stream` (Abschnitt „Tests zuerst“, Tests 9, 10, 13, P1).
+- Major 2 [S]: Antwort-Haken über alle Rümpfe der Tests 1–16 (JSON, Problem, SSE) je Akteur; gezielte Schreibantworten um
+  `stageQuestion`, `closeQuestion`, `withdrawQuestion`, `claimQuestion`, `releaseQuestion`, `draftAnswer`/`submitForReview`
+  auf verdrängter Verweigerung und die Antwort von `clearQuestionLegally` ergänzt; Test 11 belegt den Haken selbst.
+- Major 3 [S][P]: MF-13 und MF-06 (Zugriffslog-Satz) in den erlaubten Abschnitten des Bedrohungsmodells, Erkennung
+  berichtigt; MF-13 in SC-06/SP-6; T-G1-I-01/-02 zwischen Quellen, „Wirkung und Risiko“ und Files allowed angeglichen;
+  T-G1-I-05 mit dem Hinweis auf die Wiederholung von `refusalGroundId` (bis 128 Zeichen) im 422 (nit 24).
+- Minor 4: frische App je `it` oder Uhr um 60 s vor, Grenzen nicht angehoben. Minor 5: Test 16 gegen Kontroll-App;
+  Vor-dem-Bau-Punkt 7 beantwortet (Seed läuft). Minor 6: Ort von Test 7, Export von `codePointLength`, Import von
+  `ucs2length` über `.default`. Minor 7: Reihenfolge in Abschnitt 2 präzisiert (413, 429, Wiederholung vor 404/403,
+  `If-Match` erst im Kern), Fall `If-Match: abc` → 422 in Test 5. Minor 8: Verweis auf Missbrauchstabellen berichtigt
+  (044b hat keine; 044a, MF-13, MF-06 genannt). Minor 9: Wortlaut von Mutationsprobe 3. Minor 10: Aufwand 2,15 AStd, keine
+  Probe gestrichen. Minor 12: Vor-dem-Bau-Punkt 4 beantwortet. Nit 22: einzelnes Surrogat auf Postgres ergibt 500,
+  hingenommen (kein Sicherheitspunkt), Folgeliste über den Bau.
+- Minor 11, 13–21 und Nit 23: Der Wortlaut dieser Punkte lag dem Architekten beim Einarbeiten nicht vor (nur die Nummern);
+  sie sind **nicht** eingearbeitet und werden nachgereicht, sobald der Text vorliegt. Sind Sicherheits- oder
+  Datenschutzpunkte darunter, gehen sie vor dem Bau in die Spec, nie auf die Folgeliste.
