@@ -698,7 +698,7 @@ question for …“), E4b grün (siehe oben).
 **Grün nach der Änderung:** Vitest `apps/web` 28 Dateien, 555 Tests. Playwright `045-verweigerung.spec.ts` `in-process`
 6 passed; mit `--repeat-each=3` 18 passed (2.2m). Volle Suite `in-process` 139 passed (6.9m), axe ohne serious/critical.
 
-**`pnpm gates`** auf Commit `4259657` (Exit 0; frühere Läufe auf `5b5edc9` und `07162fd`; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
+**`pnpm gates`** auf Commit `4ef8deb` (Exit 0; frühere Läufe auf `5b5edc9`, `07162fd` und `4259657`; `4ef8deb` bringt die Generationsmarke im Katalogladen nach Codex P2; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
 Vitest: domain 393, web 555, api 663 passed), Schluss wörtlich:
 
 ```
@@ -723,7 +723,7 @@ dist/assets/index-CmZtqmhs.js                        690.76 kB │ gzip: 202.20 
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 1.45s
-mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 4259657, tree 71683b025797…
+mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 4ef8deb, tree 358f66eaa121…
 ```
 
 **e2e-http E2 (CI-Lauf 37152696332, Job 111289649056) behoben in `4259657`:** `findRefusableQuestion` las die
