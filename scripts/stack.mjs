@@ -345,7 +345,12 @@ const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)
 
 async function mustDocker(args, options) {
   const result = await docker(args, options);
-  if (result.code !== 0) throw new Error('docker failed');
+  if (result.code !== 0) {
+    // The captured output travels with the error only for the redacted diagnostics; formatFailure never prints it.
+    const error = new Error('docker failed');
+    error.dockerStderr = result.stderr;
+    throw error;
+  }
   return result.stdout;
 }
 
@@ -639,6 +644,68 @@ async function probeApiCrash({ plan, say, check }) {
   await waitService(plan, 'api', 60_000);
 }
 
+
+// ---- diagnostics on a failed start or smoke test (Nachtrag nach CI) ---------------------------------------------------
+
+export const DIAGNOSTIC_LOG_LINES = 80;
+
+/** Replaces every known secret with *** (also the URL-encoded form); the dump never carries a value of state.json. */
+export function redact(text, secrets) {
+  let out = String(text ?? '');
+  for (const secret of secrets) {
+    if (!secret) continue;
+    for (const form of new Set([secret, encodeURIComponent(secret)])) out = out.split(form).join('***');
+  }
+  return out;
+}
+
+/** A row needs its log when a long-running service is not running and healthy, or a one-off did not end with 0. */
+export function needsLog(row) {
+  if (ONE_OFF.includes(row.service)) return !(row.state === 'exited' && row.exitCode === 0);
+  return !(row.state === 'running' && row.health === 'healthy');
+}
+
+/** Pure: the text of the diagnostics dump, redacted. `logs` maps a service to its last log lines. */
+export function formatDiagnostics({ rows, logs, composeError, secrets }) {
+  const lines = ['--- Diagnose (Werte aus dem Zustandsverzeichnis geschwärzt) ---'];
+  if (composeError && composeError.trim() !== '') {
+    lines.push('docker compose meldete:', ...composeError.trim().split('\n').slice(-40).map((line) => `  ${line}`));
+  }
+  lines.push('docker compose ps -a:');
+  const seen = new Set(rows.map((row) => row.service));
+  for (const row of rows) {
+    lines.push(`  ${row.service}: ${row.state}${row.health ? ` ${row.health}` : ''} exit=${row.exitCode}`);
+  }
+  for (const name of [...LONG_RUNNING, ...ONE_OFF]) if (!seen.has(name)) lines.push(`  ${name}: nicht angelegt`);
+  for (const [service, text] of Object.entries(logs)) {
+    lines.push(`Protokoll ${service} (letzte ${DIAGNOSTIC_LOG_LINES} Zeilen):`);
+    lines.push(...String(text).split('\n').filter((line) => line !== '').slice(-DIAGNOSTIC_LOG_LINES).map((line) => `  ${line}`));
+  }
+  lines.push('--- Ende der Diagnose ---');
+  return redact(lines.join('\n'), secrets);
+}
+
+async function printDiagnostics({ plan, state, say, error }) {
+  try {
+    const ps = await docker([...plan.compose, 'ps', '--all', '--format', 'json'], { env: plan.env, timeoutMs: 30_000 });
+    const text = ps.stdout.trim();
+    let rows = [];
+    try {
+      rows = (text.startsWith('[') ? JSON.parse(text) : text.split('\n').filter(Boolean).map((line) => JSON.parse(line)))
+        .map((row) => ({ service: row.Service, state: row.State, health: row.Health ?? '', exitCode: row.ExitCode }));
+    } catch { rows = []; }
+    const logs = {};
+    for (const row of rows.filter(needsLog)) {
+      const result = await docker([...plan.compose, 'logs', '--no-color', '--no-log-prefix', '--tail', String(DIAGNOSTIC_LOG_LINES),
+        row.service], { env: plan.env, timeoutMs: 30_000 });
+      logs[row.service] = `${result.stdout}${result.stderr}`;
+    }
+    say(formatDiagnostics({ rows, logs, composeError: error?.dockerStderr, secrets: secretsOf(state) }));
+  } catch {
+    say('Diagnose nicht möglich.');
+  }
+}
+
 // ---- commands -------------------------------------------------------------------------------------------------------
 
 let stage = 'Start';
@@ -668,17 +735,22 @@ async function cmdUp(args) {
   stage = 'Images bauen';
   const startedAt = Date.now();
   await mustDocker(plan.build, { env: plan.env, inherit: true, timeoutMs: 1_800_000 });
-  stage = 'Stack starten';
-  await mustDocker(plan.up, { env: plan.env, timeoutMs: 1_200_000 });
-  stage = 'Warten auf gesunde Dienste';
-  await waitForStack(plan);
-  say(`Alle Dienste gesund, migrate und seed mit 0 beendet (${Math.round((Date.now() - startedAt) / 1000)} s seit Baubeginn).`);
-  if (!state.started) {
-    state.started = true;
-    saveState(dir, state);
+  try {
+    stage = 'Stack starten';
+    await mustDocker(plan.up, { env: plan.env, timeoutMs: 1_200_000 });
+    stage = 'Warten auf gesunde Dienste';
+    await waitForStack(plan);
+    say(`Alle Dienste gesund, migrate und seed mit 0 beendet (${Math.round((Date.now() - startedAt) / 1000)} s seit Baubeginn).`);
+    if (!state.started) {
+      state.started = true;
+      saveState(dir, state);
+    }
+    stage = 'Rauchtest';
+    await smoke({ state, dir, plan, say });
+  } catch (error) {
+    await printDiagnostics({ plan, state, say, error });
+    throw error;
   }
-  stage = 'Rauchtest';
-  await smoke({ state, dir, plan, say });
   const seedLog = (await docker([...plan.compose, 'logs', '--no-color', '--no-log-prefix', 'seed'], { env: plan.env })).stdout;
   // The last run of the one-off fill decides (a second `up` runs it again, it then writes nothing).
   const lastFill = seedLog.split('\n').filter(Boolean).at(-1) ?? '';
@@ -699,7 +771,13 @@ async function cmdSmoke() {
   const { state, dir } = requireState();
   const say = startOutput({ secrets: secretsOf(state) });
   stage = 'Rauchtest';
-  await smoke({ state, dir, plan: upPlan(parseArgs(['up']), state, dir), say });
+  const plan = upPlan(parseArgs(['up']), state, dir);
+  try {
+    await smoke({ state, dir, plan, say });
+  } catch (error) {
+    await printDiagnostics({ plan, state, say, error });
+    throw error;
+  }
   say('Rauchtest bestanden.');
 }
 

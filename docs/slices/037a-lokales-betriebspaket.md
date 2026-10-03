@@ -934,6 +934,27 @@ mit Lauf-ID, Artefakt-ID und Digest trägt der Orchestrator nach).
 - In CI bleibt `hv_owner` Superuser (Job `gates`); unverändert, Hinweis an 037b steht in der Spec.
 - `docker inspect` auf `migrate` und `seed` zeigt die Eigentümer-URL (Installationsseite §8).
 
+**Nachtrag nach CI** (PR #129, Lauf 37128708706, Job 111219258268 auf `18049f5`: Stufe „Stack starten“ rot nach rund
+33 s, einzige Ausgabe der Stufenname; erster Lauf mit dem echten Keycloak-Image). Minimaler Fix, Ursache noch nicht
+belegt, der nächste CI-Lauf zeigt sie:
+1. **Diagnose bei Fehlern** (`scripts/stack.mjs`): scheitert „Stack starten“, „Warten auf gesunde Dienste“ oder der
+   Rauchtest (auch `stack:smoke`), gibt das Skript die Meldung von `docker compose up`, `docker compose ps -a` (Dienst,
+   Zustand, Health, Exit-Code) und die letzten 80 Protokollzeilen jedes Dienstes aus, der nicht gesund läuft oder nicht
+   mit 0 endete. Jeder Wert aus `state.json` (16 Secrets, auch URL-kodiert) wird durch `***` ersetzt
+   (`formatDiagnostics`, `redact`; Test „Nachtrag: the diagnostics dump …“ in `scripts/stack.test.mjs`). Das weicht
+   bewusst von „nie eine Docker-Meldung“ und „kein automatischer Abzug von `docker compose logs` in CI“ ab (Auftrag des
+   Orchestrators, Fehlersuche); die Maskierung per `::add-mask::` läuft in CI weiterhin vorher. Erledigt damit auch den
+   Folgelisten-Punkt „Image-Name bei Pull-Fehler“.
+2. **Health-Probe von Keycloak** (`deploy/compose/compose.yaml`): Das Image beruht auf UBI micro; bash ist vorhanden, `grep`
+   nach allem, was zu UBI micro bekannt ist, nicht (lokal nicht prüfbar, quay.io gesperrt). Die Probe nutzt jetzt nur
+   bash-Builtins (`/dev/tcp`, `read`, Mustervergleich) und wertet auch eine letzte Zeile ohne Zeilenende aus (der
+   JSON-Körper von `/health/ready`). Lokal gegen einen Testserver geprüft: `"UP"` → 0, `"DOWN"` → 1, kein Server → 1.
+   `start_period` von 20 s auf 60 s (Realm-Import auf einem CI-Runner; ein Erfolg zählt sofort). `KC_HEALTH_ENABLED=true`
+   war schon gesetzt; `start-dev --import-realm` mit `KC_HOSTNAME=http://localhost:<Port>` und `KC_HTTP_PORT` bleibt
+   (Keycloak 26, Hostname v2; `start` bräuchte TLS).
+3. Bekannte Grenze: Eine nie gesunde Probe allein erklärt die 33 s nicht (ungesund erst nach 60 Fehlversuchen); näher liegt
+   ein Container, der früh endet. Die Diagnose des nächsten Laufs entscheidet.
+
 **`pnpm gates` (Schluss, Commit `8ac36d4`, sauberer Arbeitsbaum):**
 
 ```

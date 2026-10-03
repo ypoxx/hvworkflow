@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   COMPOSE_FILE, DEFAULT_IDP_PORT, DEFAULT_WEB_PORT, ENV_FILES, PROJECT, REALM_NAME, START_LINE, assertPrivateDirectory,
-  checkComposeVersion, checkDockerHost, checkDrift, checkEngineVersion, createState, formatCredentials, formatFailure,
+  checkComposeVersion, checkDockerHost, checkDrift, checkEngineVersion, createState, formatCredentials, formatDiagnostics,
+  formatFailure, needsLog, redact,
   formatSmokeLine, formatUpSummary, parseArgs, readOrCreateState, renderFiles, resolvePorts, secretsOf, startOutput,
   stateDirectory, upPlan, writeStateFiles,
 } from './stack.mjs';
@@ -614,4 +615,35 @@ test('S10 the package scripts are exactly the six stack commands, all through no
   assert.deepEqual(stack, ['stack:credentials', 'stack:down', 'stack:login', 'stack:reset', 'stack:smoke', 'stack:up']);
   for (const name of stack) assert.match(scripts[name], /^node scripts\/stack(-login)?\.mjs\b/);
   assert(!execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).split('\n').some((path) => /(^|\/)state\.json$/.test(path)));
+});
+
+// ---- Nachtrag nach CI: diagnostics on a failed start -----------------------------------------------------------------
+
+test('Nachtrag: the diagnostics dump shows ps rows and the logs of failed services, with every state secret redacted', () => {
+  const state = markedState();
+  const secrets = secretsOf(state);
+  const rows = [
+    { service: 'postgres', state: 'running', health: 'healthy', exitCode: 0 },
+    { service: 'keycloak', state: 'running', health: 'unhealthy', exitCode: 0 },
+    { service: 'migrate', state: 'exited', health: '', exitCode: 0 },
+    { service: 'seed', state: 'exited', health: '', exitCode: 1 },
+  ];
+  assert.deepEqual(rows.filter(needsLog).map((row) => row.service), ['keycloak', 'seed']);
+  const logs = {
+    keycloak: `line one\nadmin password ${MARKER}-admin\nclient secret ${encodeURIComponent(`${MARKER}-client`)}\n`,
+    seed: `postgres://hv_owner:${MARKER}-owner@postgres:5432/hv refused\n`,
+  };
+  const dump = formatDiagnostics({ rows, logs, composeError: `dependency failed to start: ${MARKER}-moderation`, secrets });
+  assert(!dump.includes(MARKER), 'no secret of the state appears');
+  assert.match(dump, /keycloak: running unhealthy exit=0/);
+  assert.match(dump, /seed: exited exit=1/);
+  assert.match(dump, /api: nicht angelegt/);
+  assert.match(dump, /Protokoll keycloak/);
+  assert.match(dump, /admin password \*\*\*/);
+  assert.match(dump, /hv_owner:\*\*\*@postgres/);
+  assert.match(dump, /dependency failed to start: \*\*\*/);
+  const long = Array.from({ length: 200 }, (_, i) => `log ${i}`).join('\n');
+  const tail = formatDiagnostics({ rows: [], logs: { api: long }, secrets });
+  assert(tail.includes('log 199') && tail.includes('log 120') && !tail.includes('log 119\n'), 'only the last 80 lines');
+  assert.equal(redact('a-b-c', ['b', '']), 'a-***-c');
 });

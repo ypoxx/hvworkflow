@@ -65,8 +65,10 @@ HV-Stack bereit: http://localhost:8480 – Zugangsdaten der Testpersonen mit pnp
 ```
 
 Bricht der Befehl ab, nennt er die Stufe, in der es klemmt (etwa „Voraussetzungen“ oder „Warten auf gesunde Dienste“),
-und gegebenenfalls einen festen Satz mit der Abhilfe. Passwörter und Docker-Meldungen gibt er nie aus. Weiter in
-Abschnitt 10.
+und gegebenenfalls einen festen Satz mit der Abhilfe. Scheitert der Start oder der Rauchtest, folgt eine Diagnose: die
+Meldung von Docker Compose, der Zustand jedes Containers und die letzten 80 Protokollzeilen jedes Dienstes, der nicht
+gesund ist oder mit Fehler endete. Passwörter und Schlüssel aus dem Zustandsverzeichnis sind darin durch `***` ersetzt.
+Weiter in Abschnitt 10.
 
 ## 4. Anmelden
 

@@ -418,9 +418,9 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 037a Bau · `apps/api/src/persistence/migrations.ts` (über `migrate-cli.ts`) · pg 8.23 meldet bei jedem Migrationslauf
   „DeprecationWarning: Calling client.query() when the client is already executing a query“ (auch im Protokoll des
   Einmaldienstes `migrate`) · Abfragen dort strikt nacheinander awaiten, bevor pg 9 das entfernt.
-- 037a Bau · `scripts/stack.mjs` (Stufe „Stack starten“) · ein nicht ladbares Basis-Image (gesperrter Registry-Host,
+- ~~037a Bau · `scripts/stack.mjs` (Stufe „Stack starten“) · ein nicht ladbares Basis-Image (gesperrter Registry-Host,
   Rate-Limit) zeigt sich nur als Stufenname, ohne das betroffene Image · vor `up` jedes nicht lokal vorhandene Image
-  einzeln laden und bei Fehler den Image-Namen (kein Wert) im festen Satz nennen.
+  einzeln laden und bei Fehler den Image-Namen (kein Wert) im festen Satz nennen.~~ → erledigt im Nachtrag nach CI zu **037a** (Diagnose mit der Meldung von Compose).
 
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
