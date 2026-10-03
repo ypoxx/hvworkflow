@@ -1150,20 +1150,72 @@ Open:
 Touched:
 ```
 
-**Stand Eigentümerfragen 1, 2 und 3b:**
+**Stand Eigentümerfragen 1, 2 und 3b:** Go zu 1, 2 und 3b am 03.10.2026, auf Standard gebaut. Zu 1: ADR 0012 und
+Katalog sind von Recht nicht gelesen; der Vermerk „auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht nicht
+gelesen)“ gilt. Zu 2: Zuschnitt 044a/044b. Zu 3b: Go (Standard), Pfad A ohne Grund und Untergründe, Lücke benannt,
+Zielscheibe 044c.
 
-**Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
-7.
-8.
-9.
-10.
-11.
+**Vor-dem-Bau-Ergebnisse (Architekt)** (03.10.2026, auf Basis `6146251`, nach 043a #125 und 040b #130):
+1. **043a gemergt (`88fa9be`).** Vertrag hat `AnswerKind`, die vier Felder an `AnswerVersion`, `RefusalGround` mit
+   `hash`, `RefusalProposal` (ohne `answer`, `additionalProperties: false`), die drei Operationen, `Action` mit beiden
+   Rechten; `allowlist.json` führt `listRefusalGrounds`, `proposeRefusal`, `approveRefusal` mit `slice` 044 und
+   `expires` 2026-11-27 (neben `createMeeting`/`freezeMeetingConfig` für 040; fünf Einträge). Keine Formabweichung.
+   **Vertragsstand vor diesem Schritt: 0.4.1 (040b), nicht 0.4.0.** Der Vertragsschritt nimmt deshalb **0.4.2**.
+2. **040b gemergt, 040c/040d nicht** (zurückgestellt). admin hält **14** Rechte (040a plus `admin.units.manage`,
+   `admin.seats.manage`), keines davon `question.refuse.*`; `admin040a.test.ts` Test 1/2 rechnet mit
+   `PERMISSIONS.length - 14` und bleibt ohne Änderung gültig. Wahrheitstabelle Abschnitt 1: weiterhin **198 Zeilen**,
+   dieselben 16 Aktionsspalten; die drei Beispielzeilen des Diffs stimmen wörtlich (Zeilen 55, 105, 127). 040b hat
+   einen Abschnitt „Role × Administration“ angefügt (fest `admin.units.manage`, `admin.seats.manage`); er bleibt
+   unverändert, ebenso wie die vier anderen Zusatzabschnitte. `Classification.seatId`, `Meeting.counts.byUnit/bySeat`
+   und R-ADM-01/02 berühren weder Files allowed noch einen Test dieser Spec.
+3. **Regel-ids frei.** In Code und Vertrag belegt: R-TRANS-00..14, R-GUARD-01..07. Keine Spec nach `c000567`
+   (037a, 040b, 064a, 064b, 065a, takt-041) vergibt R-TRANS-15/16 oder R-GUARD-12..14. Es bleibt bei der Spec.
+4. **046 nicht gemergt** (keine Spec im Repositorium). Kein Zusammenspiel zu prüfen.
+5. **Eigentümerfragen:** siehe oben (Go 03.10.2026).
+6. **Live-Puffer:** `READ_TOPICS` ist `satisfies Record<BufferedRead, …>`, `BufferedRead` umfasst jede `get…`/`list…`-
+   Methode von `HvApi` außer `listEvents`. `listRefusalGrounds` **muss** dort stehen (sonst Typfehler); Test (p)
+   (`liveStore.test.ts:661`) leitet die Liste aus `Object.keys(createInProcessApi(…))` ab und verlangt keine
+   Änderung an der Testdatei. Leere Themenliste `[]` ist typgültig (Katalog ist Code-Datum, keine Invalidierung).
+   `proposeRefusal`/`approveRefusal` erzwingt `WRITE_METHODS` ebenfalls per Typ.
+7. **`_actions`- und `note`-Erwartungen:** genaue `_actions`-Listen stehen nur in `api.test.ts:119`, `:262`,
+   `acceptance.test.ts:192` (alle leer oder `observer`, ändern sich nicht) und `idempotency028.test.ts:124`
+   (vergleicht mit `getQuestion`, ändert sich nicht). **Ändern muss sich** die genaue Rechteliste
+   `api.test.ts:671-674` („coordination holds exactly …“: + `question.refuse.propose`). `note` in Ereignissen:
+   `security028.test.ts:84` (prüft nur Namen und `personId`, nicht `note`; bleibt grün), `legal-clearance.test.ts:37`
+   und `limits034a.test.ts:266` (HTTP-Eingaben, nicht Lesepfad). Kein Test erwartet heute `note` in einem `EventRead`.
+8. **`canonicalJson`** (`envelope.ts:73-90`): `null` → `null`, Zeichenketten über `JSON.stringify`, Schlüssel nach
+   Code-Einheiten sortiert, `undefined`-Schlüssel entfallen; für den Wertebereich des Katalogs = RFC 8785. `digest`
+   ist nicht exportiert; `refusalGrounds.ts` rechnet SHA-256 selbst über `@noble/hashes` (wie `envelope.ts:1`),
+   ohne `envelope.ts` zu ändern.
+9. **040d nicht gemergt:** Test 20 entfällt; Übergang an 040d (dessen Schnappschuss enthält dann R-TRANS-15/16).
+10. **`pii` im Reducer** weiter ohne Decodierung (`state.ts:235`, `p.pii?.displayName`); nur `identityPiiCodec`
+    (`store.ts:26`, `envelope.ts:113`). Kein echter Codec.
+11. **Kennzahlentest:** `packages/domain/src/__tests__/indicators033b.test.ts` (passt auf das Muster
+    `indicators*.test.ts` der Files allowed).
+
+**Zeilenverweise, Stand `6146251`** (Befund und Entscheidungen nennen die Zeilen von `c000567`): `types.ts`
+`PERMISSIONS` 33-67 (`question.legal.clear` 54), `READ_PERMISSIONS` 80-90, `AnswerVersion` 258-264, veralteter
+Kommentar 329 (statt 304); `permissions.ts` admin 78-93 (statt 78-91), `expert` 60, `legal` 61; `transitions.ts`
+R-GUARD-06 137-163 (Prüfung 158-162), `LEGAL_GATE_BY_TRACK` 46; `state.ts` `SpeakerRegistered`/`pii` 229-238 (statt 186),
+`AnswerDrafted` 414-424 (statt 357-367), `QuestionReturned` 451-463 (statt 394-406); `indicators.ts` 61-68;
+`api.ts` `viewQuestion` 414-425 (statt 399-410), historische Antwort 589-594 (statt 566-574), Idempotenz je Akteur
+630 (statt 599), `append` 664-680 (statt 642-646; `...e` übernimmt `retentionClass` aus `build`), `questionMatches`
+753-770 (statt 721-737), `SpeakerRegistered` mit `keyId` 1050 (statt 886), veralteter Kommentar 1089 (statt 925),
+`draftAnswer` 1314-1330 (statt 1139-1155), `getStage` 1425-1438 (statt 1250-1264); `stream.ts` `MASKED_KEYS` 176
+(statt 169), `maskEvent` 187-196, Sonderfall `IdempotencyRecorded` 194 (statt 187); `events.ts`
+`QuestionLegalCleared.note` 105 (statt 98); `envelope.ts` `canonicalJson` 73-96, `piiPayload` 97-104, Standard
+`working` 147 (statt 146); `rules.ts` `ruleRegister` 468-476 (statt 435-443), `LegalRef` 36-45 und Kommentar 24-26
+unverändert; `labels.ts` `ACTION_KEYS` 52 unverändert; `QuestionDetail.tsx` (`apps/web/src/features/answers/`)
+`_actions` ab 246.
+
+**Hinweise des Architekten an den Bau:**
+- Der Vertragsschritt (erster Commit) hebt `info.version` auf 0.4.2 und zieht, wie 040b in `58f3600`, die zwei
+  festen Versionszeilen `apps/api/src/__tests__/contract.test.ts:90` und `takt-019-contract.test.ts:8` nach (Files
+  allowed: „dazu die Versionszeilen der Vertragstests“), damit der Commit grün bleibt.
+- Akzeptanzkriterium 4 („`packages/contract/**` ist unverändert“) gilt für die Commits **nach** dem Vertragsschritt;
+  der Vertragscommit selbst ändert `openapi.yaml`, `CHANGELOG.md`, `package.json` und `src/types.ts` (Files allowed,
+  Abschnitt „Vertragsschritt“). Keine Scope-Änderung.
+- `parity.test.ts` zählt heute 522 Schlüssel je Sprache; mit den zwei Aktionsschlüsseln 524.
 
 **Wahrheitstabellen-Diff (wörtlich).**
 
