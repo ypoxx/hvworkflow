@@ -326,8 +326,9 @@ function checkRefusalProposal(input: RefusalProposal): string | null {
     return 'refusalGroundId must be a string of at most 128 characters.';
   }
   const sources = body['sources'];
-  if (sources !== undefined && (!Array.isArray(sources) || sources.some((item) => typeof item !== 'string'))) {
-    return 'sources must be an array of strings.';
+  if (sources !== undefined && (!Array.isArray(sources) || sources.length > 50 ||
+      sources.some((item) => typeof item !== 'string' || item.length > 2000))) {
+    return 'sources must be an array of at most 50 strings of at most 2000 characters.';
   }
   if (kind === 'refusal_no_claim' && groundId !== undefined) return 'Refusal path A carries no refusalGroundId.';
   // The catalogue is readable by everyone, so naming the id reveals nothing about a question.
@@ -458,7 +459,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
    * possible. `stage: true` (getStage) never shows it, whoever reads.
    */
   const viewQuestion = (q: QuestionRecord, source: State = state, view: { stage?: true } = {}): Question => {
-    const { claim, ...record } = q;
+    const { claim, legalClearerIds: _clearers, ...record } = q;
     const readsJustification = view.stage !== true && REFUSAL_JUSTIFICATION_READ.some((p) => can(actor(), p).allow);
     return {
     ...record,

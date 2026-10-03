@@ -546,3 +546,10 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 040b Bau · `apps/api/src/__tests__/postgres-limits034a.test.ts` („a query that hangs past the service timer before the
   COMMIT answers 503“) schlug einmal unter Last (≈ 4,5) im vollen Gates-Lauf fehl, einzeln 3/3 grün · zeitkritisch,
   Spielraum prüfen.
+- 044a Review (nit 9) · Veraltete Zeilenverweise: `citation`s von R-GUARD-04/06 und R-TRANS-03/05/13 nennen
+  `docs/rollen-und-rechtekonzept.md:109, :156, :163` (seit 040a und dem Kopfvermerk 044a verschoben, jetzt :119, :168, :175);
+  dazu der veraltete Kommentar `packages/domain/src/rules.ts:24-26` („No rule in this slice cites 'AktG' … (044)“) ·
+  Doku-Takt core, Regelregister neu erzeugen.
+- 044a Review (nit 10) · Ändert sich der Katalog zwischen erstem Aufruf und Wiederholung von `proposeRefusal` mit
+  gleichem Idempotenzschlüssel, antwortet die Eingabeprüfung (unbekannter Grund, 422) vor der historischen Antwort ·
+  Takt core: Wiederholung vor der Eingabeprüfung erkennen oder dokumentieren.

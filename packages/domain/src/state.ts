@@ -426,6 +426,7 @@ export function reduce(state: State, e: DomainEvent): State {
       q.status = to !== undefined && (QUESTION_STATUSES as readonly string[]).includes(to) ? to : 'answer_drafted';
       delete q.approval; // R-GUARD-04: an approval is bound to a version; a new version voids it
       delete q.legalClearance;
+      delete q.legalClearerIds; // Scheibe 044a: the clearers belong to the voided version
       delete q.returnReason;
       touch(q, e.at);
       break;
@@ -448,6 +449,9 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'QuestionLegalCleared': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;
+      // Scheibe 044a (R-GUARD-14): a repeated clearance of the same version keeps the earlier clearers.
+      const sameVersion = q.legalClearance !== undefined && q.legalClearance.answerVersion === e.payload.answerVersion;
+      q.legalClearerIds = [...new Set([...(sameVersion ? q.legalClearerIds ?? [q.legalClearance!.clearedBy.id] : []), e.actor.id])];
       q.legalClearance = {
         ...(e.payload.answerVersion !== undefined ? { answerVersion: e.payload.answerVersion } : {}),
         clearedAt: e.at,
@@ -465,6 +469,7 @@ export function reduce(state: State, e: DomainEvent): State {
       if (e.payload.toStatus === 'classified') {
         delete q.approval;
         delete q.legalClearance;
+        delete q.legalClearerIds;
       }
       touch(q, e.at);
       break;

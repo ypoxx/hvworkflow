@@ -201,7 +201,7 @@ Rechtsfreigabe ist in keinem Lesepfad mehr sichtbar. **Auf Standard gebaut:** AD
 | Regel | Aktion | von | nach | Guards |
 |---|---|---|---|---|
 | **R-TRANS-15** | `question.refuse.propose` | `classified`, `assigned`, `answer_drafted`, `in_review`, `approved` | `in_review` | R-GUARD-03 (Textpfad), R-GUARD-09 |
-| **R-TRANS-16** | `question.refuse.approve` | `in_review` | `approved` | R-GUARD-01, R-GUARD-13, R-GUARD-04, R-GUARD-06, R-GUARD-14, R-GUARD-08, R-GUARD-11 |
+| **R-TRANS-16** | `question.refuse.approve` | `in_review` | `approved` | R-GUARD-01, R-GUARD-13, R-GUARD-04, R-GUARD-06, R-GUARD-08, R-GUARD-14, R-GUARD-11 (Reihenfolge nach dem Nachtrag des Orchestrators, 03.10.2026) |
 | R-TRANS-04 (geändert) | `question.submit_review` | unverändert | unverändert | + R-GUARD-12 |
 | R-TRANS-05 (geändert) | `question.approve` | unverändert | unverändert | + R-GUARD-12 (vor R-GUARD-04) |
 
@@ -272,6 +272,17 @@ Entscheidungen dazu:
   **drei verschiedene Akteur-ids**. Das schließt den Weg „ein Subject klärt rechtlich als `legal`, verliert die Zuordnung
   und gibt als `approver` frei“. Eine Person mit zwei Subjects bleibt Restrisiko neben MF-01. R-GUARD-14 gilt in 044a nur
   für Verweigerungen; ob die Antwortfreigabe R-TRANS-05 dieselbe Trennung erhält, ist Eigentümerfrage 8.
+
+  **Nachtrag des Orchestrators (03.10.2026, nach dem Review):**
+  - Die Definition bleibt die der Spec: `q.legalClearance !== undefined` und keine Akteur-id, die die aktuelle Version
+    rechtlich freigegeben hat, gleicht `ctx.actor.id`. Die Reihenfolge in R-TRANS-16 wird **R-GUARD-08 vor R-GUARD-14**
+    (Tabelle oben), weil die bisherige Reihenfolge Test 9 widersprach (eine fehlende Rechtsfreigabe soll R-GUARD-08
+    melden). Fällt R-GUARD-08 aus der Zeile, hält R-GUARD-14 die Freigabe ohne Rechtsfreigabe weiter auf.
+  - Mehrfache Rechtsfreigabe (Review-Befund 1, Variante b): Eine wiederholte Rechtsfreigabe derselben Version ersetzte
+    `legalClearance.clearedBy`; S klärte v1, K klärte v1 erneut, S gab nach Rollenwechsel frei. Die Projektion hält deshalb
+    alle Akteur-ids der Rechtsfreigaben der aktuellen Version (`QuestionRecord.legalClearerIds`, intern, nie in einer
+    Ansicht; ein neues `AnswerDrafted` und die Rückgabe nach `classified` leeren sie), und R-GUARD-14 vergleicht mit allen.
+    R-TRANS-13 bleibt unverändert.
 
 Getrennte Guards statt eines, weil `ruleRegister()` (`rules.ts:435-443`) Guards nach Regel-id entdoppelt. Eine id mit
 zwei `check`-Funktionen verlöre eine davon aus Register und Szenariotest.
@@ -1018,6 +1029,10 @@ sind auf Standard gebaut, mit den genannten Kosten.
        gegenüber einem anderen (Gleichbehandlung)? Braucht der Vorschlag einen Hinweis oder eine Prüfung?
      - **(a) Bedeutung von „Begründung“:** interne Rechtseinschätzung für Freigabe und Nachweis, oder der Grund, der dem
        Aktionär im Saal genannt wird? Standard: interne Einschätzung, nur `refuse.*`; was der Aktionär hört, ist `text`.
+     - **Formulierung der Bausteine (Architekten-Stichprobe L3):** Behauptung einer Tatsache oder Verweis auf die Norm,
+       besonders bei Nr. 4 und Nr. 5.
+     - **Nr. 6 (Architekten-Stichprobe L6):** Die Bedingung „nur Kredit-, Finanzdienstleistungs- und Wertpapierinstitute“
+       steht nur im Titel; trägt der Baustein die Institutsbedingung stillschweigend richtig?
      - **(b) Wer verweigert rechtlich:** Ist die Freigabe durch `approver` die Entscheidung des Vorstands über die
        Verweigerung? Wie bei Fragen, die der Aufsichtsratsvorsitzende beantwortet (Bühnenplatz AR)?
    - Ohne Antwort von Recht baut 044a **auf Standard**. Der Vermerk „auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht
@@ -1053,6 +1068,10 @@ sind auf Standard gebaut, mit den genannten Kosten.
    - Alternative b: Vermerk über die Projektion der Frage nur an Halter von `refuse.*` bzw. `question.legal.clear`, rund
      0,5 AStd mit Vertragsbeschreibung.
    - Der Leserkreis der Begründung selbst bleibt Standard aus 043a (Frage 3 dort).
+   - **Offener Unterpunkt (Review, 03.10.2026):** Auch ein Rückgabegrund (`QuestionReturned.reason`, `returnReason`) an einer
+     Verweigerung kann die Begründung zitieren; er ist für alle Leser der Frage und der Historie sichtbar (bestehend, SG2).
+     Standard: keine Codeänderung, Warnhinweis im Rückgabedialog (045); ob er maskiert werden soll, entscheidet der
+     Eigentümer mit Recht.
 5. **Verweigerung auf Podiumsfragen.** Standard: nicht zulässig; vorher auf einen Textpfad umklassifizieren. Alternative:
    eigene Zeile aus `classified` für `podium` mit versionsgebundener Rechtsfreigabe, rund 0,5 AStd mit Tabellen-Diff.
    Recht und Projektleitung.
@@ -1106,6 +1125,10 @@ Pfadangabe, Grundpflicht für Pfad A in R-GUARD-09, DSFA V7 und Rechtekonzept-Ve
 - Historie: Antwortart am Ereignis `AnswerDrafted` sichtbar machen („Verweigerung vorgeschlagen“ statt „Antwortentwurf“);
   das Fehlen des Vermerks der Rechtsfreigabe ist gewollt.
 - Glossarzeile „Verweigerungsgrund“.
+- Rückgabedialog (Review, SG2): Hinweis „keine Begründung in den Rückgabegrund“, weil der Rückgabegrund für alle Leser der
+  Frage sichtbar ist (Eigentümerfrage 4, offener Unterpunkt).
+- Vorbefüllen aus `stageText` (Architekten-Stichprobe L3) nur mit einem sichtbaren Vermerk „Formulierungsbaustein,
+  ungeprüft (E15)“ neben dem Textfeld; der Vermerk gelangt nie in `text`.
 
 **043c:** Das gebundene Nutzlastschema von `AnswerDrafted` nimmt `toStatus` und `refusalGround` auf; `pii` wie bei
 `SpeakerRegistered`; nie `refusalJustification` außerhalb von `pii`.
@@ -1130,7 +1153,10 @@ Begründung zum Grund passt und ob die Bedingung im Titel erfüllt ist.
 **070 (Runbook):** Freeze-Kalender: kein Katalog-Deploy zwischen Freeze und Debattenschluss; Wiederherstellung durch neuen
 Vorschlag.
 
-**073 (Codec):** `payload.pii.refusalJustification` gehört zu den Feldern, die der echte Codec verschlüsselt.
+**073 (Codec):** `payload.pii.refusalJustification` gehört zu den Feldern, die der echte Codec verschlüsselt. Der Reducer
+(`state.ts`, Fall `AnswerDrafted`) liest die Begründung heute ohne Decodierung; mit einem echten Codec muss er
+`pii.refusalJustification` decodieren, und Projektion und Wiederholung (`replayValue` in `api.ts`, historische Antwort)
+müssen einen geschredderten Schlüssel beachten (Begründung fehlt, kein Fehler, keine Rekonstruktion aus anderen Feldern).
 
 **076:** Katalogeinträge prüfen und auf `verified: true` setzen. Jede Änderung eines Eintrags ändert seinen Hash (R-GUARD-11)
 und den Inline-Snapshot aus Test 1.

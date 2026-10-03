@@ -118,7 +118,8 @@ export const REFUSAL_GROUNDS: readonly RefusalGround[] = deepFreeze(
   ENTRIES.map((entry) => ({ ...entry, legalRef: { ...entry.legalRef }, hash: refusalGroundHash(entry) })),
 );
 
-/** A deep copy for readers (`listRefusalGrounds`): a caller never holds a reference into the catalogue. */
+/** A deep copy for readers (`listRefusalGrounds`): a caller never holds a reference into the catalogue.
+ * `structuredClone` copies every level (Node and every target browser), so a later nested field is covered too. */
 export function copyRefusalGrounds(): RefusalGround[] {
-  return REFUSAL_GROUNDS.map((ground) => ({ ...ground, legalRef: { ...ground.legalRef } }));
+  return structuredClone(REFUSAL_GROUNDS) as RefusalGround[];
 }

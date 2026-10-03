@@ -192,7 +192,7 @@ const hasLegalClearance: Guard = {
 // Every refusal rule below is built on the default ("auf Standard gebaut"): ADR 0012 (model A) is
 // proposed and has not been read by Recht (E15). The marker is part of each citation so that
 // docs/legal-trace.md shows it until the legal review (076).
-const ON_DEFAULT = 'Auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht nicht gelesen).';
+const ON_DEFAULT = 'Auf Standard gebaut (Go des Eigentümers 03.10.2026; ADR 0012 vorgeschlagen, von Recht nicht gelesen).';
 
 type LatestVersion = QuestionRecord['answers'][number] | undefined;
 const latestOf = (q: QuestionRecord): LatestVersion => q.answers[q.answers.length - 1];
@@ -307,7 +307,7 @@ const latestIsRefusal: Guard = {
 
 const approverIsNotLegalClearer: Guard = {
   ruleId: 'R-GUARD-14',
-  description: 'The approver of a refusal is not the person who legally cleared it (compared by actor id).',
+  description: 'A refusal is legally cleared, and its approver is none of the actors who legally cleared the current version (compared by actor id).',
   legalRef: {
     source: 'Rechtekonzept',
     citation:
@@ -315,14 +315,20 @@ const approverIsNotLegalClearer: Guard = {
       'Vier-Augen-Prinzip abschalten — auch nicht durch Rollenwechsel innerhalb derselben Sitzung") und :123 (Abschnitt ' +
       '2.4, Zeile `refused`: "Ersteller ≠ Freigeber"). Ableitung: mit R-GUARD-06 sind Erstellerin, rechtlich Freigebende und ' +
       'Freigebende einer Verweigerung drei verschiedene Akteur-ids; ein Rollenwechsel desselben Subjects (Entzug oder Ablauf ' +
-      'der Zuordnung `legal`) hebt die Trennung nicht auf. Ohne Rechtsfreigabe erfüllt; dass sie vorliegt, verlangt ' +
-      'R-GUARD-08 in derselben Zeile. Eine Person mit zwei Subjects erkennt der Guard nicht (Restrisiko neben MF-01). Nur ' +
+      'der Zuordnung `legal`) hebt die Trennung nicht auf. Verglichen wird mit jeder Akteur-id, die die aktuelle Version ' +
+      'rechtlich freigegeben hat (eine wiederholte Rechtsfreigabe verdrängt die frühere nicht); ohne Rechtsfreigabe ' +
+      'falsch. In R-TRANS-16 steht R-GUARD-08 davor (Nachtrag des Orchestrators zu Spec 044a), damit eine fehlende ' +
+      'Rechtsfreigabe als R-GUARD-08 gemeldet wird. Eine Person mit zwei Subjects erkennt der Guard nicht (Restrisiko neben MF-01). Nur ' +
       'für Verweigerungen; für Antworten offen (Eigentümerfrage 8). ' + ON_DEFAULT,
     docVersion: null,
     docHash: null,
     verified: false,
   },
-  check: (q, _payload, ctx) => q.legalClearance === undefined || q.legalClearance.clearedBy.id !== ctx.actor.id,
+  check: (q, _payload, ctx) => {
+    if (q.legalClearance === undefined) return false;
+    const clearers = new Set([q.legalClearance.clearedBy.id, ...(q.legalClearerIds ?? [])]);
+    return !clearers.has(ctx.actor.id);
+  },
 };
 
 const NON_TERMINAL = (['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved', 'staged', 'delivered'] as const) satisfies readonly QuestionStatus[];
@@ -765,7 +771,8 @@ export const TRANSITIONS: readonly Transition[] = [
         'Auskunftsanspruch mit Untergründen; (B) Verweigerung trotz Anspruchs mit Zwangszuordnung zum gesetzlichen ' +
         'Katalog") und :24 (§ 131 Abs. 3 AktG nur für Pfad B genannt). Recht `question.refuse.propose` aus ' +
         'docs/rollen-und-rechtekonzept.md:60. Teilweise: Pfad A ohne Untergründe (Eigentümerfrage 3b, 044c). Ableitung ' +
-        '(Spec 044a): der Vorschlag führt direkt nach `in_review`, weil sein Inhalt schon die Rechtseinschätzung ist; ' +
+        '(Spec 044a): der Vorschlag führt direkt nach `in_review`, weil der Vorschlag selbst eine (vorgeschlagene) ' +
+        'rechtliche Einordnung ist, die erst die Rechtsfreigabe (R-TRANS-13, R-GUARD-08) prüft; ' +
         'nur Textpfade (R-GUARD-03), eine Podiumsfrage wird vorher umklassifiziert (Eigentümerfrage 5); nicht aus ' +
         '`staged` oder `delivered` (vorher R-TRANS-06). Die Verweigerung ist eine Antwortversion mit `answerKind` ' +
         '(ADR 0012 Modell A, kein eigener Zustand); der Zielstatus steht im Ereignis (`toStatus`). Die Begründung liegt ' +
@@ -780,8 +787,8 @@ export const TRANSITIONS: readonly Transition[] = [
     action: 'question.refuse.approve',
     from: ['in_review'],
     to: 'approved',
-    guards: [hasAnswer, latestIsRefusal, approvalIsLatest, approverIsNotCreator, approverIsNotLegalClearer, refusalLegallyCleared, refusalGroundUnchanged],
-    description: 'Approve a refusal (Verweigerung freigeben): exactly the latest refusal version, after its legal clearance, by a third person.',
+    guards: [hasAnswer, latestIsRefusal, approvalIsLatest, approverIsNotCreator, refusalLegallyCleared, approverIsNotLegalClearer, refusalGroundUnchanged],
+    description: 'Approve a refusal (Verweigerung freigeben): exactly the latest refusal version, after its legal clearance, by a third actor.',
     legalRef: {
       source: 'Rechtekonzept',
       citation:

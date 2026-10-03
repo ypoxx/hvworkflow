@@ -321,6 +321,12 @@ export interface QuestionRecord {
   answers: AnswerVersion[];
   approval?: Approval;
   legalClearance?: LegalClearance;
+  /**
+   * Scheibe 044a (review finding 1): every actor id that legally cleared the current version (or, on the
+   * podium track, the question), because a repeated clearance replaces `legalClearance.clearedBy`.
+   * Internal to the projection for R-GUARD-14; never part of a view (`viewQuestion` strips it).
+   */
+  legalClearerIds?: string[];
   returnReason?: string;
   stagePosition?: number;
   deliveredAt?: string;

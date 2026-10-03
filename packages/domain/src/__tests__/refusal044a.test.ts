@@ -321,6 +321,7 @@ describe('Scheibe 044a, Test 5: R-GUARD-09 (409, no event)', () => {
   const cases: [string, RefusalProposal][] = [
     ['path B without ground', { answerKind: 'refusal_with_ground', text: PATH_B.text, refusalJustification: PATH_B.refusalJustification! }],
     ['path B with a blank justification', { ...PATH_B, refusalJustification: '   ' }],
+    ['path B with an empty justification', { ...PATH_B, refusalJustification: '' }],
     ['path B without justification', { answerKind: 'refusal_with_ground', text: PATH_B.text, refusalGroundId: 'aktg-131-3-nr1' }],
     ['path A without justification', { answerKind: 'refusal_no_claim', text: PATH_A.text }],
   ];
@@ -350,6 +351,8 @@ describe('Scheibe 044a, Test 6: 422 (no event)', () => {
     ['ground id not a string', bad({ refusalGroundId: 42 })],
     ['sources not an array of strings', bad({ sources: [1] })],
     ['sources not an array', bad({ sources: 'q1' })],
+    ['sources with 51 items', bad({ sources: Array.from({ length: 51 }, (_, i) => `q${i}`) })],
+    ['a source with 2001 characters', bad({ sources: ['x'.repeat(2001)] })],
     ['path A with a ground', bad({ refusalGroundId: 'aktg-131-3-nr1' }, PATH_A)],
     ['path B with an unknown ground', bad({ refusalGroundId: 'aktg-131-3-nr99' })],
   ];
@@ -371,6 +374,8 @@ describe('Scheibe 044a, Test 6: 422 (no event)', () => {
   it('the limits themselves pass: text 20000, justification 4000', async () => {
     expect((await propose(await assigned(), A.legal, bad({ text: 'x'.repeat(20000) }))).status).toBe('in_review');
     expect((await propose(await assigned(), A.legal, bad({ refusalJustification: 'x'.repeat(4000) }))).status).toBe('in_review');
+    const sources = Array.from({ length: 50 }, (_, i) => (i === 0 ? 'x'.repeat(2000) : `q${i}`));
+    expect((await propose(await assigned(), A.legal, bad({ sources }))).answers[0]!.sources).toEqual(sources);
   });
 });
 
@@ -444,6 +449,32 @@ describe('Scheibe 044a, Test 10: four eyes and separation', () => {
   it('the proposer id in the approver role does not approve: 409 R-GUARD-06', async () => {
     const cleared = await clear(await propose(await assigned(), A.legal));
     expect(await rejected(() => approveRefusal(cleared, { id: 'legal', role: 'approver' }))).toMatchObject({ status: 409, ruleId: 'R-GUARD-06' });
+  });
+
+  it('R-GUARD-14 (review finding 1): a repeated clearance does not hide an earlier clearer', async () => {
+    const proposed = await propose(await assigned(), A.coordination);
+    as(A.admin);
+    const legalGrant = await api.assignRole({ subjectId: 'subject-s', role: 'legal' });
+    const byS = await clear(proposed, { id: 'subject-s', role: 'legal', assignmentScoped: true });
+    const byK = await clear(byS, A.legal2); // the same version cleared again by another person
+    expect(byK.legalClearance?.clearedBy.id).toBe('legal-2');
+    expect(JSON.stringify(byK)).not.toContain('legalClearerIds'); // internal, never in a view
+    as(A.admin);
+    await api.revokeRole(legalGrant.id, 'Rollenwechsel');
+    await api.assignRole({ subjectId: 'subject-s', role: 'approver' });
+    const sessionS: Actor = { id: 'subject-s', role: 'approver', assignmentScoped: true };
+    expect(await rejected(() => approveRefusal(byK, sessionS))).toMatchObject({ status: 409, ruleId: 'R-GUARD-14' });
+    expect(await rejected(() => approveRefusal(byK, { id: 'legal-2', role: 'approver' }))).toMatchObject({ status: 409, ruleId: 'R-GUARD-14' });
+    expect((await approveRefusal(byK, A.approver)).status).toBe('approved');
+  });
+
+  it('R-GUARD-14: a new version resets the clearers', async () => {
+    const proposed = await propose(await assigned(), A.coordination);
+    const cleared = await clear(proposed, { id: 'clearer-x', role: 'legal' });
+    const again = await propose(cleared, A.coordination);
+    const recleared = await clear(again, A.legal2);
+    // `clearer-x` cleared only the displaced version 1; it may approve version 2.
+    expect((await approveRefusal(recleared, { id: 'clearer-x', role: 'approver' })).status).toBe('approved');
   });
 
   for (const variant of ['revoked', 'expired'] as const) {

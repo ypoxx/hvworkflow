@@ -144,6 +144,21 @@ describe('transition table', () => {
     expect(resolveTransition(refusal, 'question.approve', { answerVersion: 1 }, OTHER)).toMatchObject({ ok: false, ruleId: 'R-GUARD-12' });
   });
 
+  it('R-GUARD-14 (Scheibe 044a, Nachtrag des Orchestrators): false without clearance; compares every clearer of the version', () => {
+    const guard = TRANSITIONS.find((t) => t.ruleId === 'R-TRANS-16')!.guards!.find((g) => g.ruleId === 'R-GUARD-14')!;
+    expect(guard.check(question(), undefined, OTHER)).toBe(false);
+    const cleared = question({ legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'k', role: 'legal' } },
+      legalClearerIds: ['s', 'k'] });
+    expect(guard.check(cleared, undefined, { actor: { id: 's', role: 'approver' } })).toBe(false);
+    expect(guard.check(cleared, undefined, { actor: { id: 'k', role: 'approver' } })).toBe(false);
+    expect(guard.check(cleared, undefined, OTHER)).toBe(true);
+  });
+
+  it('R-TRANS-16 (Nachtrag des Orchestrators): R-GUARD-08 stands before R-GUARD-14', () => {
+    const ids = TRANSITIONS.find((t) => t.ruleId === 'R-TRANS-16')!.guards!.map((g) => g.ruleId);
+    expect(ids).toEqual(['R-GUARD-01', 'R-GUARD-13', 'R-GUARD-04', 'R-GUARD-06', 'R-GUARD-08', 'R-GUARD-14', 'R-GUARD-11']);
+  });
+
   it('R-GUARD-12 and R-GUARD-13 (Scheibe 044a) are false without a version', () => {
     const guards = new Map<string, Guard>();
     for (const t of TRANSITIONS) for (const g of t.guards ?? []) guards.set(g.ruleId, g);
