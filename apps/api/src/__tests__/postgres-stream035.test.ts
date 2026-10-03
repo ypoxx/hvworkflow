@@ -39,6 +39,17 @@ const assignments = new Map<string, string>();
 const readers: StreamReader[] = [];
 const track = (reader: StreamReader): StreamReader => { readers.push(reader); return reader; };
 
+/**
+ * Work still in flight on a pg client: a running query and queued ones. `getTransactionStatus()` reflects only the
+ * last ReadyForQuery, so a client returned while its SQL is still on the wire would still report 'I' (takt-042,
+ * Codex P2). These are internal fields of pg 8.23: the public `activeQuery`/`queryQueue` getters are deprecated
+ * aliases of `_activeQuery`/`_queryQueue` that log a warning, so the backing fields are read directly.
+ */
+function inFlight(client: PoolClient): { active: boolean; queued: number } {
+  const internal = client as unknown as { _activeQuery?: unknown; _queryQueue?: readonly unknown[] };
+  return { active: internal._activeQuery != null, queued: internal._queryQueue?.length ?? 0 };
+}
+
 /** Every pool of one test carries the schema as application name: test 28 counts only its own connections. */
 function pool(connectionString: string, max = 10): Pool {
   return new Pool({ connectionString, options: `-c search_path=${schema}`, max, application_name: schema });
@@ -327,8 +338,11 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     }
     // An event-driven invariant instead of sampling (takt-042): every checkout and every return of the stream
     // app's pool lies inside a window, the server reports every returned connection as idle outside a transaction
-    // ('I' from its last ReadyForQuery), and at every quiet window end nothing is checked out. Opening the
+    // ('I' from its last ReadyForQuery) with no query running or queued on the client, and at every quiet window
+    // end nothing is checked out. Opening the
     // streams above uses the pool legitimately without a window, so the listeners start only now.
+    // Only the stream app's `runtime` pool is watched: `runtime2` is the test's own session store, which no window
+    // hook sees and whose use says nothing about the stream app.
     const openWindows = (): number => [...hooks.open.values()].reduce((sum, n) => sum + n, 0);
     const lastWindow = (): string => {
       const w = hooks.windows.at(-1);
@@ -354,6 +368,10 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       if (err) violations.push(`release with error ${err.message}, in ${lastWindow()}`);
       const status = client.getTransactionStatus();
       if (status !== 'I') violations.push(`release with transaction status ${status}, in ${lastWindow()}`);
+      const work = inFlight(client);
+      if (work.active || work.queued !== 0) {
+        violations.push(`release with query in flight (active ${work.active}, queued ${work.queued}), in ${lastWindow()}`);
+      }
     };
     runtime.on('acquire', onAcquire);
     runtime.on('release', onRelease);
