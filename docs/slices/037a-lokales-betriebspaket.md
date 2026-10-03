@@ -821,7 +821,7 @@ Done: Images api (distroless, 65532, ohne scripts/), seed (eigenes Ziel) und web
       Header am Proxy); Compose-Stack mit Postgres (hv_owner ohne Superuser, hv_runtime), Keycloak-Testrealm (einmal
       erzeugt, byte-gleich), migrate und seed; scripts/stack.mjs (up, smoke, credentials, down, reset, probe) mit Secrets
       je Installation außerhalb des Repositoriums; Installationsseite; CI-Job stack-037a; S1–S10 in test:scripts.
-Evidence: pnpm gates grün auf 61d204a (letzter Code-Stand, Schluss im Abschnitt „CI-Job stack-037a“), davor auf 8ac36d4; docs/evidence/037a-stack-protokoll.txt (S11, S12, S14–S16 lokal);
+Evidence: pnpm gates grün auf a34248c (letzter Code-Stand, Nachtrag Runde 4), davor auf 61d204a und 8ac36d4; docs/evidence/037a-stack-protokoll.txt (S11, S12, S14–S16 lokal);
       docs/evidence/037a-stack-angemeldet.png fehlt lokal (quay.io gesperrt) → Rückfall CI-Artefakt evidence-037a-stack (E56)
 Open: S12.3, S13 und die Anmeldung in S16.3 lokal nicht lauffähig (Keycloak-Image von quay.io durch die Egress-Richtlinie
       der Arbeitsumgebung gesperrt) → Nachweis im CI-Job stack-037a; S17 (frischer Agent, Orchestrator); CI-Lauf-ID
@@ -905,7 +905,14 @@ Arbeitsumgebung: Docker-Daemon (vfs, kurze Pfade unter `/tmp`), Registry-Spiegel
 8180; **ohne Freigabe von quay.io kann der Agent die Anmeldung nicht erreichen** und S17 gilt dann nach der Spec als nicht
 erfüllt. Den TLS-prüfenden Proxy behandelt die Installationsseite (§10, `HV_STACK_BUILD_CA`).
 
-**CI-Job `stack-037a` (Nachtrag des Orchestrators, E56):** grün auf dem letzten Code-Stand `61d204a` (PR #129,
+**CI-Job `stack-037a`, Endstand (Nachtrag des Orchestrators, E56):** grün auf `4c495b8` (Code-Stand `a34248c` plus
+S17-Protokoll), Workflow-Lauf 37132707496, alle Proben inklusive der überarbeiteten `postgres-restart`. Rückfall für den
+Screenshot nach E56: Artefakt `evidence-037a-stack`, Lauf-ID 37132707496, Artefakt-ID 11276929026, Digest
+`sha256:abb9bffa4f36c6bd193b205ef29cc1ad188de276a6befe21987c7777e2f19be6`. `pnpm gates` auf `a34248c`: 318/318 Skripttests,
+Web-Build grün, `mark-test-run … at commit a34248c` (Bericht Runde 4). Auf `101cc15` war `postgres-restart` rot (Wettlauf
+in der Probe, Runde 4).
+
+**CI-Job `stack-037a`, früherer Stand (Nachtrag des Orchestrators, E56):** grün auf dem letzten Code-Stand `61d204a` (PR #129,
 Workflow-Lauf 37131208429), mit S11, S12 (inklusive Keycloak-Discovery S12.3 gegen das echte Image), S13 (Anmeldung mit
 Screenshot), S14, S15, S16.1, S16.2 und S16.3 (Anmeldung nach `down`/`up`, Realm-Hash gleich, „bereits befüllt“).
 Rückfall für den Screenshot `docs/evidence/037a-stack-angemeldet.png` nach E56: Artefakt `evidence-037a-stack`,
