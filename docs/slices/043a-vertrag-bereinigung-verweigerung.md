@@ -802,10 +802,20 @@ Architekten, sofern Eigentümerfrage 5 freigegeben ist. Version: die nächste fr
 
 ```
 Slice: 043a-vertrag-bereinigung-verweigerung
-Done:
-Evidence:
-Open:
-Touched:
+Done: Vertrag 0.4.0 (d8fc188, Architekt): kind/requestedMinutes gestrichen, 401/422/409/500 nachgetragen,
+      Verweigerung als Antwortart mit drei vorab erklärten Operationen (Allowlist, slice 044). Web (0f7289a):
+      updateSpeaker sendet reason an den Dienst; die lokale Sperre und ihr JSDoc-Satz entfallen.
+Evidence: `pnpm gates` grün auf 0f7289a mit Postgres (Schluss unten); domain 280, web 484, api 612 Tests grün,
+      operation-coverage 69/60/9 ok, slice-scope ok (15 Dateien). `pnpm --filter @hv/web e2e` (in-process):
+      133 passed. Kein Screenshot (Nachweise: keine sichtbare Oberflächenänderung).
+Open: `http.unsupported` bleibt in shell.de.ts/shell.en.ts als unbenutzter Schlüssel: `parity.test.ts:162-169`
+      pinnt die Gesamtzahl 517, die Datei liegt außerhalb von „Files allowed“ (Folgeliste: Schlüssel streichen und
+      Zahl auf 516 senken, im nächsten Takt web).
+Touched: packages/contract/{openapi.yaml,CHANGELOG.md,package.json,allowlist.json,src/types.ts},
+      apps/api/src/__tests__/{contract-043a,contract,negative,takt-016-contract,takt-019-contract}.test.ts,
+      apps/api/src/__tests__/helpers.ts, docs/entscheidungsregister.md (Architektencommit),
+      apps/web/src/api/http.ts, apps/web/src/api/http.test.ts,
+      docs/slices/043a-vertrag-bereinigung-verweigerung.md
 ```
 
 **Baustart:** auf Standard gebaut, Go des Eigentümers 03.10.2026 (Eigentümerfragen 1, 2 und 5 mit den Standards dieser
@@ -844,12 +854,37 @@ Mit 0.4.0 grün; jede Probe danach zurückgesetzt (Datei byte-gleich):
 - `if`/`then` aus `AnswerVersion` entfernt → Test 6 rot.
 - `refusalJustification: false` aus `EventRead` entfernt → Test 13 rot.
 
-**Typen-Diff (Auszug).**
+**Typen-Diff (Auszug).** `git diff --stat acb7f45..d8fc188 -- packages/contract/src/types.ts`:
+`packages/contract/src/types.ts | 452 +++++++++++++++++++++++++++++++++++++----` (408 insertions, 44 deletions),
+regeneriert mit `pnpm contract:types`; die Hunks stehen im Vertragscommit `d8fc188`.
 
-**`pnpm gates` (Schluss, Commit):**
+**`pnpm gates` (Schluss, Commit):** gelaufen auf `0f7289a` (sauberer Baum), mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime`, Exit 0:
 
 ```
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
+dist/assets/index-D_XXpNDR.js                        647.75 kB │ gzip: 190.56 kB │ map: 2,753.51 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.70s
+mark-test-run: wrote /home/user/wt/s043a/.claude/state/last-test-run (clean tree) at commit 0f7289a, tree 59426ff7dd9a…
 ```
+
+**Web-Commit (Tests zuerst).** Die beiden geänderten Tests in `http.test.ts` waren vor der Code-Änderung rot
+(2 failed, 120 passed: die Sperre antwortete 422 ohne Anfrage), danach grün (122/122).
 
 ## Review findings
 
