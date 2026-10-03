@@ -808,16 +808,41 @@ Open:
 Touched:
 ```
 
-**Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
-7.
+**Baustart:** auf Standard gebaut, Go des Eigentümers 03.10.2026 (Eigentümerfragen 1, 2 und 5 mit den Standards dieser
+Spec beantwortet). Vertragscommit durch den Architekten auf `claude/slice-043a-vertrag`, Basis `acb7f45`.
 
-**Mutationsproben (Ergebnis).**
+**Vor dem Bau prüfen (Ergebnisse, gelesen auf `acb7f45`).**
+1. Integrationszweig auf Vertrag 0.3.12, 66 Operationen, sechs Allowlist-Einträge (alle `slice` 040). 0.4.0 ist frei.
+   Seit `ca94899` gemergt: 040a (`c000567`, Kern und Tests, kein Vertrag), Specs 040a–d und 044a, takt-041 (`a1d9607`,
+   nur `apps/api/package.json` und Lockfile: hono 4.13.7+; kein Einfluss auf Vertrag, Validator oder Tests dieser
+   Scheibe, der volle API-Lauf ist grün). Erwartete Zahl in Akzeptanzkriterium 3: 6 + 3 = 9.
+2. `UNDOCUMENTED_STATUS_EXCEPTIONS` enthielt genau die fünf Lücken (401 auf den 29 Operationen aus `OPERATIONS_0_2`,
+   422 auf `listQuestions`/`returnQuestion`/`withdrawQuestion`, 409 auf `updateSpeaker`). Keine Abweichung.
+3. `registerSpeaker` und `updateSpeaker` schreiben nur benannte Felder (heute `api.ts:870-894` und `909-939`). Kein
+   Blocker.
+4. PATCH mit `{}` antwortet 200 ohne Ereignis und ohne neue Version (takt-015); der Block in `contract.test.ts` sendet
+   jetzt `{}` und bleibt sonst gleich.
+5. `/readyz` fängt Fehler der drei Prüfungen selbst ab (`safeCheck`, Antwort 503 mit Code), `/auth/login` wandelt
+   Fehler des Identitätsanbieters und des Auth-Speichers in 503 um; `/metrics` und die übrigen Routen fangen nicht ab.
+   Eine Ausnahme außerhalb dieser Blöcke erreicht überall `onError` (`app.ts:716`). 500 bleibt auf jeder Operation
+   dokumentiert (Ziel 2), auf `/readyz` und `/auth/login` nur unwahrscheinlicher.
+6. `http.unsupported` wird nur in `apps/web/src/api/http.ts:624` verwendet (dazu die beiden Sprachdateien). Der
+   Schlüssel entfällt mit dem zweiten Commit.
+7. Zeilenangaben: In den Dateien aus „Files allowed“ stimmen alle Angaben (`contract.test.ts:175-186`, die
+   `kind`-Stellen in `negative.test.ts`, `helpers.ts`, `http.ts:27, 44, 621-625`, `http.test.ts:192-196, 311-319`,
+   `shell.de.ts:27`, `shell.en.ts:29`). Abweichend, nur verschoben durch 040a, Inhalt unverändert: `api.ts` (+66 Zeilen:
+   `registerSpeaker` 870, `updateSpeaker` 909, Kommentar 925, Suchtext 733) und `permissions.ts` (`admin` ab Zeile 78).
+   **Inhaltlich überholt durch 040a:** `ROLE_PERMISSIONS.admin` ist keine Ableitung „alle außer einer Liste“ mehr,
+   sondern eine ausdrückliche Liste ohne `question.legal.clear`. Die Regel „nie admin“ bleibt richtig; der Hinweis an
+   044, `question.refuse.*` in eine Ausschlussliste aufzunehmen, ist gegenstandslos (044a sagt das ebenso). Gemeldet,
+   nicht angehalten: keine dieser Stellen liegt in „Files allowed“, der Befund trägt sonst unverändert.
+
+**Mutationsproben (Ergebnis).** Gegen Vertrag 0.3.12 (`acb7f45`) sind 17 von 19 Tests in `contract-043a.test.ts` rot.
+Mit 0.4.0 grün; jede Probe danach zurückgesetzt (Datei byte-gleich):
+- `kind` wieder in `SpeakerRegistration` → Tests 2, 10 und 11 rot.
+- `answerKind` in `AnswerDraft` → Test 10 rot.
+- `if`/`then` aus `AnswerVersion` entfernt → Test 6 rot.
+- `refusalJustification: false` aus `EventRead` entfernt → Test 13 rot.
 
 **Typen-Diff (Auszug).**
 

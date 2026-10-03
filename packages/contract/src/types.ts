@@ -130,7 +130,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change speaker status or round (Redner aufrufen, beenden, zurückziehen) */
+        /**
+         * Change speaker status or round (Redner aufrufen, beenden, zurückziehen)
+         * @description Status changes follow the speaker state table (rule table R-SPK, slice 080). A body without any effective field (for example `{}`, or only a field removed in 0.4.0) writes no event and keeps the version (takt-015). `reason` is required only for `finished → waiting` (R-SPK-05, a follow-up question); since 0.4.0 it is in the contract (slice 043a).
+         */
         patch: operations["updateSpeaker"];
         trace?: never;
     };
@@ -252,7 +255,7 @@ export interface paths {
         /**
          * List questions of the current meeting with filters (alias)
          * @deprecated
-         * @description Alias for `GET /meetings/{meetingId}/questions` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         * @description Alias for `GET /meetings/{meetingId}/questions` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5. `422` for a query parameter outside its schema (since 0.4.0 documented, slice 043a). Masking of `answers[].refusalJustification` and the full-text search as in `listMeetingQuestions`.
          */
         get: operations["listQuestions"];
         put?: never;
@@ -272,7 +275,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Get a question with its answer versions and allowed actions */
+        /**
+         * Get a question with its answer versions and allowed actions
+         * @description Since 0.4.0 (rule from slice 043a, enforced from slice 044): `answers[].refusalJustification` is present only for a reader holding `question.refuse.propose` or `question.refuse.approve` (never through `question.legal.clear`, never an administrator); for every other reader it is absent. `answerKind`, `refusalGroundId`, `refusalGroundHash` and `text` are not masked.
+         */
         get: operations["getQuestion"];
         put?: never;
         post?: never;
@@ -291,7 +297,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Full event history of a question (Vorgangshistorie) */
+        /**
+         * Full event history of a question (Vorgangshistorie)
+         * @description Since 0.4.0 (slice 043a): the `AnswerDrafted` payload of a refusal carries `answer.answerKind`, `answer.refusalGroundId`, `answer.refusalGroundHash` and the snapshot `answer.refusalGround`, but never `answer.refusalJustification`, for any reader (`EventRead`, schema `false`).
+         */
         get: operations["getQuestionHistory"];
         put?: never;
         post?: never;
@@ -576,6 +585,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/refusal-grounds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue of refusal grounds (Verweigerungsgründe) with citation and hash
+         * @description Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044, until then the not-found fallback answers 404). Global, without a meeting: the catalogue is code data (`packages/domain/src/refusalGrounds.ts`, slice 044) and changes only with the legal review (076). Readable for holders of `question.read`, `question.read.delivered` or `stage.read` (R-PERM-02 otherwise), so also for the observer: the catalogue is general content (title, wording for the podium, citation), not a legal assessment of a question; SG2 protects the justification of a single refusal, not the catalogue. Every `legalRef` stays `verified: false` until the legal department has checked it (E15); the interface marks such a ground as unverified. Texts are content in the meeting's content language (`de`, E21), not interface strings.
+         */
+        get: operations["listRefusalGrounds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/{questionId}/refusals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose a refusal (Verweigerung vorschlagen) as a new answer version
+         * @description Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044). Permission `question.refuse.propose` (R-PERM-01 otherwise). Creates a new, immutable answer version with `answerKind` `refusal_no_claim` (refusal path A) or `refusal_with_ground` (refusal path B), written as `AnswerDrafted`; no new event type, because a refusal is technically an answer version (ADR 0012). The answer version keeps `refusalGroundHash`, the `hash` of the chosen catalogue entry at the time of the proposal, and the event payload a snapshot `answer.refusalGround` (`title`, `stageText`, `legalRef`). The status transition follows the transition table of slice 044. A ground on path A is a `422` of the schema; an unknown `refusalGroundId` is a `422`. A missing ground or justification on path B is not a schema error but `409` R-GUARD-09 (slice 044). `refusalJustification` is masked as described in `info.description` ("Refusal").
+         */
+        post: operations["proposeRefusal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/{questionId}/refusal-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a refusal (Verweigerung freigeben) — the approval is bound to the version
+         * @description Since 0.4.0 (slice 043a; pre-declared in `allowlist.json`, served from slice 044). Permission `question.refuse.approve` (R-PERM-01 otherwise). Written as `QuestionApproved`, bound to the answer version. From slice 044 `approveQuestion` on a refusal version is `409`, and `approveRefusal` on an answer version is `409` as well: a refusal never becomes an answer and vice versa (ADR 0012). No fast path past the legal gate (E25).
+         */
+        post: operations["approveRefusal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stage": {
         parameters: {
             query?: never;
@@ -586,7 +659,7 @@ export interface paths {
         /**
          * Podium view (Bühne) of the current meeting — current question, queue, counters (alias)
          * @deprecated
-         * @description Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5.
+         * @description Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5. `StageView` never carries a refusal justification (since 0.4.0, see `getMeetingStage`).
          */
         get: operations["getStage"];
         put?: never;
@@ -606,7 +679,7 @@ export interface paths {
         };
         /**
          * Append-only event feed. Poll with `after` = last seen sequence number.
-         * @description Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no meeting prefix and `lastSeq` stays the global cursor. Permission `event.read`. A `meetingId` filter arrives with 0.4.0 (slice 043, ahead of 035): not in 0.3.0, because the unchanged service would accept the parameter and silently return unfiltered events (review 023).
+         * @description Global feed: `seq` is global and gap-free across meetings (ADR 0011), so this path has no meeting prefix and `lastSeq` stays the global cursor. Permission `event.read`. A `meetingId` filter arrives as the contract line of the slice that serves it, not with a contract-only release, because the unchanged service would accept the parameter and silently return unfiltered events (review 023). Since 0.4.0 (slice 043a): `payload.answer.refusalJustification` is never part of an `EventRead`, for any reader.
          */
         get: operations["listEvents"];
         put?: never;
@@ -654,7 +727,9 @@ export interface paths {
          *     items the reader may read before or after the change (live) or now (catch-up); counter changes
          *     arrive as a topic without ids. The events of one delivery are merged into one `change`. No
          *     message carries a payload, a text or an id the reader may not read; when nothing is visible,
-         *     nothing is sent. Events without a meeting reach only readers with `event.read`.
+         *     nothing is sent. Events without a meeting reach only readers with `event.read`. Since 0.4.0
+         *     (slice 043a): an `event` message is an `EventRead` and never carries
+         *     `payload.answer.refusalJustification`.
          *
          *     **`meetingId` filter.** Since 0.3.12 (takt-040, as served since slice 035b): with a filter a
          *     reader with `event.read` receives every event of that meeting after the cursor exactly once and
@@ -1078,7 +1153,7 @@ export interface paths {
         };
         /**
          * List questions of a meeting with filters
-         * @description Since 0.3.0 (slice 025); canonical form of `GET /questions`. Permissions `question.read` or `question.read.delivered` (R-PERM-03 scope applies, slice 010).
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /questions`. Permissions `question.read` or `question.read.delivered` (R-PERM-03 scope applies, slice 010). Since 0.4.0 (rule from slice 043a, enforced from slice 044): `answers[].refusalJustification` only for holders of `question.refuse.propose` or `question.refuse.approve`, as on `getQuestion`; the full-text search `q` covers answer texts but never a refusal justification, so a hit cannot reveal it.
          */
         get: operations["listMeetingQuestions"];
         put?: never;
@@ -1101,7 +1176,7 @@ export interface paths {
         };
         /**
          * Podium view (Bühne) of a meeting — current question, queue, counters
-         * @description Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a client parameter (slices 040, 047); a `seat` query parameter is a 0.4.0 matter (slice 043).
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a client parameter (slices 040, 047); a `seat` query parameter arrives as the contract line of slices 056/057, not with a contract-only release. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent from `StageView`, for every reader (the podium holds no `question.refuse.*` permission).
          */
         get: operations["getMeetingStage"];
         put?: never;
@@ -1313,11 +1388,11 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06 (slice 025). Administration after the configuration freeze: R-ADM-01..04 (slice 040). */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06 (slice 025). Administration after the configuration freeze: R-ADM-01..04 (slice 040). Speaker state table: R-SPK-00..05 and R-SPK-GUARD-01 (slice 080, documented on `updateSpeaker` since 0.4.0). */
             ruleId?: string;
         };
         /**
-         * @description Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface never branches on a role name; it reads `_actions`. `coordination` (since 0.2.0) is the working name (Arbeitsname) of the role that classifies and assigns; displayed as "Koordination", final name pending register entry E1. Its permission bundle arrives with slice 021; until then the server does not know the role.
+         * @description Roles are only a bundle of permissions (see docs/rollen-und-rechtekonzept.md). The interface never branches on a role name; it reads `_actions`. `coordination` (since 0.2.0) is the working name (Arbeitsname) of the role that classifies and assigns; displayed as "Koordination", final name pending register entry E1. Its permission bundle is built since slice 021 (`ROLE_PERMISSIONS`).
          * @enum {string}
          */
         Role: "moderation" | "capture" | "expert" | "legal" | "approver" | "podium" | "admin" | "observer" | "coordination";
@@ -1342,10 +1417,10 @@ export interface components {
             personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047).
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`.
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
         /**
          * @description Lifecycle of a meeting (Jahrgang): MeetingCreated projects preparation from slice 025, MeetingStarted projects running, MeetingClosed projects closed. DebateClosed does not close the meeting; it records only the end of the general debate. R-MTG in slice 025 checks the transitions. Public actions arrive in later slices.
          * @enum {string}
@@ -1628,20 +1703,9 @@ export interface components {
             /** @description Since 0.3.0 (slice 026, ADR 0009): key into the person table; the clear name is resolved on read for holders of `question.identity.reveal` */
             personId?: string;
             organisation?: string;
-            /**
-             * @deprecated
-             * @description Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
-             * @enum {string}
-             */
-            kind?: "shareholder" | "proxy" | "association";
             round: number;
             position: number;
             status: components["schemas"]["SpeakerStatus"];
-            /**
-             * @deprecated
-             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
-             */
-            requestedMinutes?: number;
             /** Format: date-time */
             speakingStartedAt?: string;
             /** Format: date-time */
@@ -1650,30 +1714,21 @@ export interface components {
             version: number;
             _actions?: components["schemas"]["Action"][];
         };
+        /** @description Body of `registerSpeaker` / `registerMeetingSpeaker`. Since 0.4.0 (slice 043a) without `kind` and `requestedMinutes` (deprecated since 0.2.0, ignored by the core since slice 080); a client that still sends them is not rejected, the values are ignored and never written. */
         SpeakerRegistration: {
             displayName: string;
             organisation?: string;
-            /**
-             * @deprecated
-             * @description Kind of speaker (Art). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15). No longer required since 0.2.0; the enum stays so an out-of-enum value is still a 422.
-             * @enum {string}
-             */
-            kind?: "shareholder" | "proxy" | "association";
             round?: number;
-            /**
-             * @deprecated
-             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
-             */
-            requestedMinutes?: number;
         };
+        /** @description Body of `updateSpeaker`. Since 0.4.0 (slice 043a) without `requestedMinutes` (deprecated since 0.2.0, ignored by the core since slice 080; still not rejected) and with `reason`. */
         SpeakerUpdate: {
             status?: components["schemas"]["SpeakerStatus"];
             round?: number;
             /**
-             * @deprecated
-             * @description Requested speaking time (Redezeit). Deprecated — veraltet seit 0.2.0, entfällt in 080 (Feedback #15).
+             * @description Since 0.4.0 (slice 043a; served since slice 080): why a finished request to speak reopens. Required for `finished → waiting` (R-SPK-05, a follow-up question — Nachfrage); without it that change is `409` R-SPK-GUARD-01. On any other change the reason is dropped and never written. Any other value is a `422`.
+             * @enum {string}
              */
-            requestedMinutes?: number;
+            reason?: "follow_up";
         };
         /** @description Body of `reorderSpeakers` / `reorderMeetingSpeakers` */
         SpeakerOrder: {
@@ -1793,14 +1848,72 @@ export interface components {
          * @enum {string}
          */
         QuestionStatus: "captured" | "classified" | "assigned" | "answer_drafted" | "in_review" | "approved" | "staged" | "delivered" | "closed" | "withdrawn" | "merged";
+        /**
+         * @description Since 0.4.0 (slice 043a, ADR 0012 model A): the kind of an answer version. `answer` — an ordinary answer; `refusal_no_claim` — refusal path A (Verweigerungspfad A, "kein Auskunftsanspruch": the shareholder has no right to the information); `refusal_with_ground` — refusal path B (Verweigerungspfad B, "Verweigerung trotz Anspruchs": refusal despite a right, with a ground from the catalogue, `listRefusalGrounds`). Refusal paths A/B are not the answer tracks A/B/C (`Track`): a refusal can arise on any track. Built on the default ("auf Standard gebaut", slice 043a; owner's go of 03.10.2026); E15 and ADR 0012 stay open.
+         * @enum {string}
+         */
+        AnswerKind: "answer" | "refusal_no_claim" | "refusal_with_ground";
+        /** @description One immutable answer version. Since 0.4.0 (slice 043a, filled from slice 044) a version may be a refusal: `answerKind` (absent = `answer`), `refusalGroundId`, `refusalGroundHash` and `refusalJustification`. Invariants (schema): an answer carries none of the three `refusal*` fields; refusal path B carries `refusalGroundId` and `refusalGroundHash`; refusal path A carries neither. `refusalJustification` is never required, because it is masked (see there). */
         AnswerVersion: {
             version: number;
+            /** @description The wording read out on the podium; for a refusal the refusal wording, prefilled from `RefusalGround.stageText` */
             text: string;
             /** Format: date-time */
             createdAt: string;
             createdBy: components["schemas"]["Actor"];
             /** @description References the answer relies on (publication, catalogue entry, document) */
             sources?: string[];
+            /** @description Since 0.4.0 (slice 043a): the kind of this version; absent means `answer` */
+            answerKind?: components["schemas"]["AnswerKind"];
+            /** @description Since 0.4.0 (slice 043a): `RefusalGround.id` of the chosen ground (refusal path B only) */
+            refusalGroundId?: string;
+            /** @description Since 0.4.0 (slice 043a): `RefusalGround.hash` of the chosen entry at the time of the proposal — the audit path of the catalogue. It proves which wording and which citation the refusal was proposed on; from slice 044 an approval against a changed entry is `409` R-GUARD-11. Not masked: the ground is catalogue data. */
+            refusalGroundHash?: components["schemas"]["Sha256Hex"];
+            /** @description Since 0.4.0 (slice 043a, masking enforced from slice 044): the justification of a refusal, a legal assessment (SG2). Present only for readers holding `question.refuse.propose` or `question.refuse.approve` (never through `question.legal.clear`, never an administrator); absent for every other reader of `Question.answers`, always absent in `StageView`, and never part of an `EventRead`. Never matched by the full-text search `q`. */
+            refusalJustification?: string;
+        } & (unknown & unknown & unknown);
+        /** @description Since 0.4.0 (slice 043a): the trace of a rule or catalogue entry to its legal source, the same form as the domain type `LegalRef` (`packages/domain/src/rules.ts`). `source` names an entry of the closed domain list `LegalSource`; the contract keeps it an open string so that a new source costs no contract cycle. Deliberately wider than today's domain type: `docHash` may be a string and `verified` may be `true`, the values the legal review (slice 076) sets. Until then every entry is `verified: false` (E15) and the interface shows it as unverified. */
+        LegalRef: {
+            /** @description An entry of the domain list `LegalSource` */
+            source: string;
+            /** @description The citation (Normzitat), as content */
+            citation: string;
+            /** @description Version of the cited document, when known */
+            docVersion: string | null;
+            /** @description Hash of the cited document, set by the legal review (076) */
+            docHash: string | null;
+            /** @description `true` only after the legal department has checked the entry (E15, 076) */
+            verified: boolean;
+        };
+        /** @description Since 0.4.0 (slice 043a): one entry of the catalogue of refusal grounds (Verweigerungsgrund), returned by `listRefusalGrounds`. Code data from slice 044, maintained by the legal review (076). Texts are content in the meeting's content language (E21: `de`), not interface strings. */
+        RefusalGround: {
+            id: string;
+            /** @description Short title of the ground */
+            title: string;
+            /** @description Wording block for the podium (Formulierungsbaustein); prefills `RefusalProposal.text` */
+            stageText: string;
+            legalRef: components["schemas"]["LegalRef"];
+            /** @description SHA-256 as 64 lower-case hex digits over the UTF-8 bytes of the canonical form after RFC 8785 (JSON Canonicalization Scheme) of this `RefusalGround` entry without the field `hash` itself (so the definition is not circular). An answer version keeps it as `refusalGroundHash`. */
+            hash: components["schemas"]["Sha256Hex"];
+        };
+        /** @description Since 0.4.0 (slice 043a): body of `proposeRefusal`. Closed (`additionalProperties: false`): a refusal carries exactly these fields. A ground on refusal path A is a category error and a `422`. On refusal path B the schema requires neither ground nor justification: their absence is `409` R-GUARD-09 of slice 044, not a `422`. An unknown `refusalGroundId` is a `422` (slice 044). */
+        RefusalProposal: {
+            /**
+             * @description The refusal path; never `answer` (an answer is drafted with `draftAnswer`)
+             * @enum {string}
+             */
+            answerKind: "refusal_no_claim" | "refusal_with_ground";
+            /** @description The wording for the podium; the interface prefills it from `RefusalGround.stageText` */
+            text: string;
+            /** @description The chosen ground (refusal path B only) */
+            refusalGroundId?: string;
+            /** @description The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification` */
+            refusalJustification?: string;
+            sources?: string[];
+        };
+        /** @description Since 0.4.0 (slice 043a): body of `approveRefusal`, like the body of `approveQuestion`, but closed */
+        RefusalApproval: {
+            answerVersion: number;
         };
         Approval: {
             answerVersion: number;
@@ -1867,7 +1980,7 @@ export interface components {
             agendaItemId?: string;
             /**
              * @deprecated
-             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives with 0.4.0 (slice 043, ahead of 040): not in 0.3.0, because the unchanged service would accept and silently drop it today (review 023). `Question.seatId` is already declared on the response.
+             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives as the contract line of slice 040 (written by the architect before that slice's code), not with a contract-only release, because the unchanged service would accept and silently drop it (review 023). `Question.seatId` is already declared on the response.
              */
             stageAssignment?: components["schemas"]["StageAssignment"];
         };
@@ -1875,6 +1988,7 @@ export interface components {
             text: string;
             sources?: string[];
         };
+        /** @description Podium view. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent here, for every reader */
         StageView: {
             current: components["schemas"]["Question"] | null;
             queue: components["schemas"]["Question"][];
@@ -2000,6 +2114,7 @@ export interface components {
                     } & {
                         [key: string]: unknown;
                     };
+                    refusalJustification?: never;
                 } & {
                     [key: string]: unknown;
                 };
@@ -2007,7 +2122,7 @@ export interface components {
                 [key: string]: unknown;
             };
         } & (unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
+        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed); `answer.refusalJustification` exists only in the stored original, never in `EventRead`. A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
         Event: {
             /** @description Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024). */
             seq: number;
@@ -2066,7 +2181,7 @@ export interface components {
         };
     };
     responses: {
-        /** @description Updated question with new ETag and current `_actions` */
+        /** @description Updated question with new ETag and current `_actions`. Since 0.4.0 (rule from slice 043a, enforced from slice 044): `answers[].refusalJustification` only for holders of `question.refuse.propose` or `question.refuse.approve`, as on `getQuestion`. */
         QuestionUpdated: {
             headers: {
                 ETag: components["headers"]["ETag"];
@@ -2112,7 +2227,7 @@ export interface components {
                 "application/json": components["schemas"]["AgendaItem"];
             };
         };
-        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029), a missing metrics token, or — in the demo — a missing, malformed or unknown `X-Actor`. Documented on every operation new in 0.3.0 that has a non-empty `security` (Codex on 2779e0b: every status the generic layer produces from a contract property is documented, checked for every operation in `apps/api/src/__tests__/contract.test.ts`). On the 29 operations of 0.2 the 401 stays undocumented in 0.3.0; it is one of the five gaps of review 012 point 18 (0.4.0, slice 043) and the reasoned exception in the test helper. */
+        /** @description No valid credential: no session cookie, an expired or blocked session, a wrong audience (slice 029), a missing metrics token, or — in the demo — a missing, malformed or unknown `X-Actor`. Documented on every operation new in 0.3.0 that has a non-empty `security` (Codex on 2779e0b: every status the generic layer produces from a contract property is documented, checked for every operation in `apps/api/src/__tests__/contract.test.ts`). Since 0.4.0 (slice 043a, review 012 point 18) also documented on the 29 operations of 0.2, where it was a reasoned exception in the test helper before. */
         Unauthorized: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
@@ -2206,7 +2321,7 @@ export interface components {
                 };
             };
         };
-        /** @description Validation failed: the request body, a query parameter or a header parameter does not match its contract schema (`validateOperation` in the service), or the body is not valid JSON. Since 0.3.0 documented on every operation with a request body or a parameter that can fail its schema (Codex on 2779e0b), except `listQuestions`, `returnQuestion` and `withdrawQuestion` (review 012 point 18, slice 043). */
+        /** @description Validation failed: the request body, a query parameter or a header parameter does not match its contract schema (`validateOperation` in the service), or the body is not valid JSON. Since 0.3.0 documented on every operation with a request body or a parameter that can fail its schema (Codex on 2779e0b); since 0.4.0 also on `listQuestions`, `returnQuestion` and `withdrawQuestion` (review 012 point 18, slice 043a). */
         Unprocessable: {
             headers: {
                 "X-Server-Time": components["headers"]["X-Server-Time"];
@@ -2273,7 +2388,7 @@ export interface components {
                 };
             };
         };
-        /** @description Since 0.3.11 (slice 035a), `/stream` only, one response for both causes: the service's global limit of open streams is reached, or the persistence is busy or not ready (the causes of `PersistenceBusy`). `Retry-After` is required; `detail` is a fixed sentence per cause, never the limit, a host name or database text. Nothing was opened; the client retries after the given seconds with its cursor. */
+        /** @description Since 0.3.11 (slice 035a), `/stream` only, one response for all three causes: the service's global limit of open streams is reached, migrations are pending, or the persistence is busy at open (the causes of `PersistenceBusy`; wording aligned with `RetryAfter` in 0.4.0, takt-040). `Retry-After` is required; `detail` is a fixed sentence per cause, never the limit, a host name or database text. Nothing was opened; the client retries after the given seconds with its cursor. */
         StreamUnavailable: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
@@ -2284,6 +2399,19 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"] & {
                     /** @constant */
                     status?: 503;
+                };
+            };
+        };
+        /** @description Since 0.4.0 (slice 043a, follow-up list 035b): an internal error. Documented on every operation, inside and outside `/v1`, because the service's global error handler (`onError`) answers any unexpected exception of any route this way. `detail` is exactly one of four fixed sentences: "Event seq N: integrity check failed." (the hash chain of the event log is broken at global sequence number N); "Persistence outcome is unknown." (the service's own timer fired while the events or the COMMIT were on the wire, so the write may have been committed: the client reads the state again before it writes anew, or repeats only with the same `Idempotency-Key`); "Persistence is unavailable." (the persistence failed; nothing was committed); "An unexpected error occurred." (any other exception). None of them carries `Retry-After`. The `seq` in the first sentence is disclosed on purpose: the global sequence number is no secret, every reader receives it anyway as the `id` of the `change` and `cursor` messages on `/stream` (R-PERM-04). Beyond that no `detail` carries a stack trace, connection data or any other internal identifier. */
+        InternalError: {
+            headers: {
+                "X-Server-Time": components["headers"]["X-Server-Time"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"] & {
+                    /** @constant */
+                    status?: 500;
                 };
             };
         };
@@ -2376,10 +2504,12 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2402,10 +2532,12 @@ export interface operations {
                     "application/json": components["schemas"]["AgendaItem"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2428,10 +2560,12 @@ export interface operations {
                     "application/json": components["schemas"]["Unit"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2458,11 +2592,13 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2497,6 +2633,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2506,6 +2643,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2540,6 +2678,7 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2548,6 +2687,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2573,10 +2713,12 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2613,14 +2755,29 @@ export interface operations {
                     "application/json": components["schemas"]["Speaker"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
+            /** @description Since 0.4.0 (slice 043a; served since slice 080): the speaker state table refuses the status change, rule id in `ruleId`. R-SPK-00: no row for this pair, or the same status again. R-SPK-GUARD-01: `finished → waiting` (R-SPK-05) without `reason: follow_up`. */
+            409: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 409;
+                    };
+                };
+            };
             412: components["responses"]["PreconditionFailed"];
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2645,10 +2802,12 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2683,6 +2842,7 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2692,6 +2852,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2717,10 +2878,12 @@ export interface operations {
                     "application/json": components["schemas"]["Contribution"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2759,6 +2922,7 @@ export interface operations {
                     "application/json": components["schemas"]["Question"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2767,6 +2931,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2799,6 +2964,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2831,6 +2997,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2855,10 +3022,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionList"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2884,10 +3054,12 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2912,10 +3084,12 @@ export interface operations {
                     "application/json": components["schemas"]["EventRead"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2942,6 +3116,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2951,6 +3126,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -2979,6 +3155,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -2988,6 +3165,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3014,6 +3192,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3023,6 +3202,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3045,6 +3225,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3054,6 +3235,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3082,6 +3264,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3091,6 +3274,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3127,6 +3311,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3155,14 +3340,17 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3185,6 +3373,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3194,6 +3383,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3216,6 +3406,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3224,6 +3415,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3246,6 +3438,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3255,6 +3448,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3283,14 +3477,17 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3319,6 +3516,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
@@ -3328,6 +3526,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3360,6 +3559,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3392,6 +3592,132 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    listRefusalGrounds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalGround"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    proposeRefusal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated key. A confirmed replay with the same key returns its original business result after current authorization, with current masking and actions. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`SignedInSession.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there — OpenAPI cannot make a header required for one security scheme only, so the document keeps it optional and the service decides); under `demoActor` it is ignored. Declared on every state-changing operation except `logout`, which takes `CsrfTokenRequired`; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+                /** @description Required from 0.3.6 (slice 028) on this write. The value is the ETag of the resource named by the operation; missing yields 428, stale yields 412. `deliverQuestion` remains outside this requirement until its answer-version hash check in slice 049. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefusalProposal"];
+            };
+        };
+        responses: {
+            200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            /** @description From slice 044: the proposal is not allowed now, rule id in `ruleId` — the transition rows of slice 044 for `question.refuse.propose` (R-TRANS-00 when no row allows it from the current status), or R-GUARD-09 (refusal path B without a ground from the catalogue or without a justification). */
+            409: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 409;
+                    };
+                };
+            };
+            412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    approveRefusal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated key. A confirmed replay with the same key returns its original business result after current authorization, with current masking and actions. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`SignedInSession.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there — OpenAPI cannot make a header required for one security scheme only, so the document keeps it optional and the service decides); under `demoActor` it is ignored. Declared on every state-changing operation except `logout`, which takes `CsrfTokenRequired`; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+                /** @description Required from 0.3.6 (slice 028) on this write. The value is the ETag of the resource named by the operation; missing yields 428, stale yields 412. `deliverQuestion` remains outside this requirement until its answer-version hash check in slice 049. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefusalApproval"];
+            };
+        };
+        responses: {
+            200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            /** @description From slice 044: the approval is not allowed now, rule id in `ruleId` — R-GUARD-06 (four eyes: the approver did not create the version, also not through a deputy or a role change), R-GUARD-08 (a refusal is approved only after a legal clearance event `QuestionLegalCleared` for this version), R-GUARD-11 (the catalogue entry changed since the proposal: `refusalGroundHash` no longer equals the current `hash`; propose again), or the transition row of slice 044 for `question.refuse.approve`. */
+            409: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"] & {
+                        /** @constant */
+                        status?: 409;
+                    };
+                };
+            };
+            412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3414,10 +3740,12 @@ export interface operations {
                     "application/json": components["schemas"]["StageView"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3447,10 +3775,12 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3512,6 +3842,7 @@ export interface operations {
                     };
                 };
             };
+            500: components["responses"]["InternalError"];
             503: components["responses"]["StreamUnavailable"];
         };
     };
@@ -3541,6 +3872,7 @@ export interface operations {
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3580,6 +3912,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3611,6 +3944,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3641,6 +3975,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3687,6 +4022,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3720,6 +4056,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3753,6 +4090,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3786,6 +4124,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3816,6 +4155,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3862,6 +4202,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3892,6 +4233,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3938,6 +4280,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -3972,6 +4315,7 @@ export interface operations {
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4014,6 +4358,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4059,6 +4404,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4101,6 +4447,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4136,6 +4483,7 @@ export interface operations {
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4183,6 +4531,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4229,6 +4578,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4261,6 +4611,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4308,6 +4659,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4341,6 +4693,7 @@ export interface operations {
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4371,6 +4724,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };
@@ -4401,6 +4755,7 @@ export interface operations {
             408: components["responses"]["RequestTimeout"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -4459,6 +4814,7 @@ export interface operations {
             };
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             /** @description Sign-in unavailable; clears browser correlation */
             503: {
                 headers: {
@@ -4504,6 +4860,7 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
         };
     };
     getSession: {
@@ -4530,6 +4887,7 @@ export interface operations {
             403: components["responses"]["NoActiveRole"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
         };
     };
     getTransparencyNotice: {
@@ -4554,6 +4912,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
         };
     };
     getHealth: {
@@ -4577,6 +4936,7 @@ export interface operations {
             };
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -4610,6 +4970,7 @@ export interface operations {
             };
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             /** @description Not ready — at least one check is `fail` */
             503: {
                 headers: {
@@ -4663,6 +5024,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             408: components["responses"]["RequestTimeout"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
         };
     };
     seedDemo: {
@@ -4693,11 +5055,13 @@ export interface operations {
                     "application/json": components["schemas"]["Meeting"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             408: components["responses"]["RequestTimeout"];
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["PersistenceBusy"];
         };
     };

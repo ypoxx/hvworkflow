@@ -87,7 +87,7 @@ describe('Scheibe 029b: browser-bound OIDC correlation cookies', () => {
 
 describe('Scheibe 028: mandatory version contract', () => {
   it('requires the 0.3.6 fields and per-operation If-Match without changing array responses', () => {
-    expect(openapiDoc.info.version).toBe('0.3.12');
+    expect(openapiDoc.info.version).toBe('0.4.0');
     const schemas = openapiDoc.components.schemas;
     expect(schemas.Meeting.required).toEqual(expect.arrayContaining(['version', 'speakerListVersion']));
     expect(schemas.Speaker.required).toContain('meetingId');
@@ -175,12 +175,12 @@ describe('contract: the operations the acceptance sentence does not reach', () =
     const patchRes = await req(app, 'PATCH', `/v1/speakers/${first.id}`, {
       actor: ACTOR.moderation,
       headers: { 'If-Match': getRes.headers.get('ETag')! },
-      body: { requestedMinutes: 7 },
+      body: {},
     });
     expect(patchRes.status).toBe(200);
     const updated = await patchRes.json();
     expectValid('updateSpeaker', 200, updated);
-    // Slice 080: the deprecated field is still accepted by the contract (0.3.x) but the core ignores it.
+    // Contract 0.4.0 (slice 043a) removed `requestedMinutes`; an empty body is the no-effect PATCH now.
     expect(updated).not.toHaveProperty('requestedMinutes');
     // takt-015 Ziel 1: no effective field is left after the cut, so no event is written and the
     // version stays the one If-Match named.

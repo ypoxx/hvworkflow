@@ -71,32 +71,15 @@ export const OPERATIONS_0_2: readonly string[] = [
 
 /**
  * Status codes the contract does not document for the given operation, but that the service
- * legitimately returns today. Every entry is a deliberate, reasoned exception (never a silent gap);
- * all of them are the five contract gaps of review 012 point 18, which slice 043 (contract 0.4.0)
- * closes — slice 023 leaves them alone (non-goal). This is the one exception list: the per-response
- * check in `assertMatchesContract` and the response-reconciliation check in `contract.test.ts`
- * (slice 023, goal 5 with the architect's addendum) both read it.
+ * legitimately returns today. Every entry is a deliberate, reasoned exception (never a silent gap).
+ * The five gaps of review 012 point 18 (401 on the 29 operations of 0.2; 422 on `listQuestions`,
+ * `returnQuestion` and `withdrawQuestion`; 409 on `updateSpeaker`) ended with contract 0.4.0
+ * (slice 043a), which documents them; the list is empty since then. Export, type and both checks stay
+ * so a future gap is entered here with its reason instead of being skipped. This is the one exception
+ * list: the per-response check in `assertMatchesContract` and the response-reconciliation check in
+ * `contract.test.ts` (slice 023, goal 5 with the architect's addendum) both read it.
  */
-export const UNDOCUMENTED_STATUS_EXCEPTIONS: Readonly<Record<string, readonly number[]>> = {
-  // The `X-Actor` header is the demo stand-in for authentication (contract security scheme
-  // `demoActor`) and can be missing, malformed or name an unknown role — a 401 in any 0.2 operation.
-  // The contract documents `401` on every operation new in 0.3.0 and on none of the 0.2 ones; there it
-  // stays undocumented until 0.4.0 (slice 043, review 012 point 18).
-  ...Object.fromEntries(OPERATIONS_0_2.map((operationId) => [operationId, [401]])),
-  // GET /v1/questions (listQuestions) rejects an out-of-range `limit` or an out-of-enum `status`
-  // with 422 (`validateOperation`, `apps/api/src/validate.ts`), but the contract's `listQuestions`
-  // does not document it — query-parameter validation errors have no response block there.
-  listQuestions: [401, 422],
-  // POST /v1/questions/{questionId}/returns (returnQuestion) rejects a wrongly-typed `reason` with
-  // 422, but the contract only documents 200/403/404/409/412 for this operation.
-  returnQuestion: [401, 422],
-  // POST /v1/questions/{questionId}/withdrawal (withdrawQuestion) rejects a wrongly-typed `reason`
-  // with 422, but the contract only documents 200/403/404/409/412 for this operation.
-  withdrawQuestion: [401, 422],
-  // PATCH /v1/speakers/{speakerId} (updateSpeaker) answers 409 for a status change the speaker state
-  // table refuses: R-SPK seit 080, im Vertrag ab 0.4.0/043 (not additive in 0.3.x, ADR 0015).
-  updateSpeaker: [401, 409],
-};
+export const UNDOCUMENTED_STATUS_EXCEPTIONS: Readonly<Record<string, readonly number[]>> = {};
 
 function isExceptedStatus(operationId: string, status: number): boolean {
   return UNDOCUMENTED_STATUS_EXCEPTIONS[operationId]?.includes(status) ?? false;
