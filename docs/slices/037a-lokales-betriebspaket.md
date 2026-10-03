@@ -1064,6 +1064,22 @@ Nachprüfung, behoben statt Folgeliste):
   seed) und beide Befehle zum Zugriffslog auf der Installationsseite, dort zusätzlich `--read-only`. Test „every docker
   run of a local image in stack.mjs carries --pull never“ (auch für die Installationsseite).
 
+**Nachtrag nach CI, Runde 4** (Lauf 37132010223, Job 111228809454 auf `101cc15`, nur Doku: `probe postgres-restart`
+rot mit „db zeitweise –, wieder ok nach – s (restart-Befehl 73.8 s)“; auf `850055f` und `61d204a` grün):
+- **Ursache:** Die Probe startete den Beobachter per `docker compose exec` und gab ihm pauschal 1,5 s Vorsprung vor
+  `docker compose restart postgres`. Der Ausfall dauert nur rund 0,6 s (Protokoll S16.1). Braucht der `exec`-Start auf
+  dem Runner länger, liegt der ganze Ausfall vor der ersten Abfrage: kein „nicht ok“, der Beobachter läuft bis zu
+  seiner Frist von 75 s. Die „73.8 s“ waren nicht die Dauer des Neustarts, sondern 75 s minus 1,5 s Vorsprung: die
+  Zeit wurde erst nach dem Ende des Beobachters genommen. Die Vermutung „SIGTERM wartet auf den Pool“ trägt nicht, das
+  Postgres-Image setzt schon `STOPSIGNAL SIGINT`.
+- **Fix Probe:** Der Beobachter meldet `READY` erst nach einem `db ok`; erst dann startet der Host den Neustart, ohne
+  auf ihn zu warten, und der Beobachter fragt alle 50 ms. „Nicht ok“ zählt nur ab dem Neustart, „wieder ok“ wird ab
+  dem Neustart gemessen, der Neustart-Befehl eigens (mit Exit-Code). Ablauf und Bewertung sind rein
+  (`observePostgresRestart`, `evaluatePostgresRestart`) und mit falscher Uhr und falschem Docker getestet.
+- **Fix Compose:** `stop_signal: SIGINT` (ausdrücklich, gleich dem Image) und `stop_grace_period: 30s` für Postgres;
+  davon profitieren auch `stop` und `stack:down` (kein SIGKILL mitten im Schluss-Checkpoint). Test.
+- Installationsseite: Zeile zu `probe postgres-restart` beschreibt den neuen Ablauf.
+
 ## Review findings
 
 **Lesebefund der Spec zu `111b0d9` (03.10.2026, frischer Kontext): 0 blocker, 8 major, Minor.** Alle in dieser Fassung

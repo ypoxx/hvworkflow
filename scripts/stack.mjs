@@ -328,13 +328,13 @@ export function formatCredentials(state) {
 // ---- Docker ---------------------------------------------------------------------------------------------------------
 
 /** Runs docker; output is captured and never printed unless `inherit` (the image build, which holds no value). */
-export function docker(args, { env = {}, inherit = false, timeoutMs = 600_000 } = {}) {
+export function docker(args, { env = {}, inherit = false, timeoutMs = 600_000, onStdout } = {}) {
   return new Promise((resolveRun) => {
     const child = spawn('docker', args, { cwd: ROOT, env: { ...process.env, ...env },
       stdio: inherit ? ['ignore', 'inherit', 'inherit'] : ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
-    child.stdout?.on('data', (chunk) => { if (stdout.length < 4_000_000) stdout += chunk; });
+    child.stdout?.on('data', (chunk) => { if (stdout.length < 4_000_000) stdout += chunk; onStdout?.(stdout); });
     child.stderr?.on('data', (chunk) => { if (stderr.length < 1_000_000) stderr += chunk; });
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
     child.once('error', () => { clearTimeout(timer); resolveRun({ code: 127, stdout, stderr }); });
@@ -615,27 +615,81 @@ async function probeRefusals({ check }) {
     && foreignHost.stderr.trim() === SEED_REFUSALS.database);
 }
 
-/** Polls /readyz inside the container until db was seen not ok and then ok again; prints one JSON line (epoch ms). */
+/**
+ * Polls /readyz inside the container. It first waits for one db ok (the baseline) and prints READY; only then does the
+ * host restart Postgres, so a slow `exec` start can no longer let the whole outage pass unseen (CI run 37132010223:
+ * the old fixed 1.5 s head start). Then it polls every 50 ms until db was seen not ok and ok again and prints one JSON
+ * line with epoch ms.
+ */
 const POSTGRES_WATCH_SCRIPT = `
-const start = Date.now(); let bad = null; let back = null;
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const db = async () => { try { const r = await fetch('http://127.0.0.1:${SERVICE_PORT}/readyz', { signal: AbortSignal.timeout(3000) }); const b = await r.json(); return (b.checks && b.checks.db && (b.checks.db.code || b.checks.db.status)) || 'unknown'; } catch { return 'unreachable'; } };
-(async () => { while (Date.now() - start < 75000) { const s = await db(); if (s !== 'ok' && bad === null) bad = { state: s, at: Date.now() };
-  if (s === 'ok' && bad !== null) { back = Date.now(); break; } await new Promise((r) => setTimeout(r, 200)); }
-  console.log(JSON.stringify({ bad, back })); })();`;
+(async () => { const first = Date.now(); let baseline = false;
+  while (Date.now() - first < 30000) { if (await db() === 'ok') { baseline = true; break; } await pause(100); }
+  if (!baseline) { console.log(JSON.stringify({ baseline })); return; }
+  console.log('READY');
+  const start = Date.now(); let bad = null; let back = null;
+  while (Date.now() - start < 75000) { const s = await db(); if (s !== 'ok' && bad === null) bad = { state: s, at: Date.now() };
+    if (s === 'ok' && bad !== null) { back = Date.now(); break; } await pause(50); }
+  console.log(JSON.stringify({ baseline, bad, back })); })();`;
+
+/**
+ * Pure: judges one Postgres restart. The outage must begin at or after the restart start and db must be ok again
+ * within `limitMs` of the restart start; the restart command itself must succeed.
+ */
+export function evaluatePostgresRestart({ restartAt, value, restartCode, restartMs, limitMs = 60_000 }) {
+  const bad = value?.bad;
+  const back = value?.back;
+  const sawBad = bad !== null && typeof bad === 'object' && typeof bad.at === 'number' && bad.at >= restartAt;
+  const seconds = typeof back === 'number' ? Math.max(0, (back - restartAt) / 1000) : undefined;
+  const ok = restartCode === 0 && sawBad && seconds !== undefined && back - restartAt <= limitMs;
+  return { ok, ...(bad?.state !== undefined ? { state: bad.state } : {}), seconds, restartSeconds: restartMs / 1000, restartCode };
+}
+
+/**
+ * The order of the Postgres probe, with Docker and the clock injected (tested with fakes): start the watcher, wait for
+ * its baseline, start the restart without awaiting it, and await watcher and restart together. Time counts from the
+ * moment the restart starts; the restart command is timed on its own.
+ */
+export async function observePostgresRestart({ startWatch, startRestart, now, limitMs = 60_000 }) {
+  const watch = startWatch();
+  if (!(await watch.ready)) {
+    await watch.done;
+    return { ok: false, reason: 'watcher-not-ready' };
+  }
+  const restartAt = now();
+  const restart = startRestart().then((result) => ({ code: result.code, ms: now() - restartAt }));
+  const [{ value }, { code, ms }] = await Promise.all([watch.done, restart]);
+  return evaluatePostgresRestart({ restartAt, value, restartCode: code, restartMs: ms, limitMs });
+}
+
+function startPostgresWatch(plan) {
+  let signal;
+  const ready = new Promise((resolveReady) => { signal = resolveReady; });
+  const done = docker([...plan.compose, 'exec', '-T', 'api', '/nodejs/bin/node', '-e', POSTGRES_WATCH_SCRIPT], {
+    env: plan.env, timeoutMs: 120_000, onStdout: (text) => { if (text.split('\n').includes('READY')) signal(true); },
+  }).then((result) => {
+    signal(false);
+    const line = result.stdout.trim().split('\n').at(-1) ?? '';
+    try { return { code: result.code, value: JSON.parse(line) }; } catch { return { code: result.code, value: undefined }; }
+  });
+  return { ready, done };
+}
 
 async function probePostgresRestart({ plan, say, check }) {
   const before = await restartCount(plan, 'api');
-  const watch = inApi(plan, POSTGRES_WATCH_SCRIPT, { timeoutMs: 90_000 });
-  await sleep(1_500);
-  const restartAt = Date.now();
-  await mustDocker([...plan.compose, 'restart', 'postgres'], { env: plan.env, timeoutMs: 90_000 });
-  const { value } = await watch;
+  const result = await observePostgresRestart({
+    startWatch: () => startPostgresWatch(plan),
+    startRestart: () => docker([...plan.compose, 'restart', 'postgres'], { env: plan.env, timeoutMs: 90_000 }),
+    now: () => Date.now(),
+  });
   // Container and host share the kernel clock, so the epoch times of the watcher compare with the host's.
-  const seconds = typeof value?.back === 'number' ? Math.max(0, (value.back - restartAt) / 1000) : undefined;
-  say(`Postgres-Neustart: db zeitweise ${value?.bad?.state ?? '–'}, wieder ok nach ${seconds?.toFixed(1) ?? '–'} s`
-    + ` (restart-Befehl ${((Date.now() - restartAt) / 1000).toFixed(1)} s)`);
-  check('Postgres-Neustart: /readyz db zeitweise nicht ok, innerhalb von 60 s wieder ok', value?.bad !== null && value?.bad !== undefined
-    && seconds !== undefined && seconds <= 60);
+  if (result.reason === 'watcher-not-ready') say('Postgres-Neustart: /readyz meldete vorher kein db ok, kein Neustart');
+  else {
+    say(`Postgres-Neustart: db zeitweise ${result.state ?? '–'}, wieder ok nach ${result.seconds?.toFixed(1) ?? '–'} s`
+      + ` (restart-Befehl ${result.restartSeconds.toFixed(1)} s, Exit ${result.restartCode})`);
+  }
+  check('Postgres-Neustart: /readyz db zeitweise nicht ok, innerhalb von 60 s wieder ok', result.ok);
   const after = await restartCount(plan, 'api');
   check(`RestartCount des Dienstes unverändert (${before})`, after === before);
   await waitForStack(plan, { timeoutMs: 120_000, services: ['postgres', 'api'] });

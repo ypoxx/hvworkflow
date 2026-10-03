@@ -32,6 +32,11 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
+    # Fast shutdown (SIGINT; the image's own STOPSIGNAL, stated here so no override can fall back to SIGTERM's smart
+    # shutdown, which waits for the service's open pool connections). restart, stop and down end the connections at
+    # once; the grace period covers the shutdown checkpoint on a slow disk before Docker sends SIGKILL.
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     security_opt:
       - no-new-privileges:true
 
