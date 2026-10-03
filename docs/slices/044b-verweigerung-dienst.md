@@ -650,6 +650,22 @@ Open: Abweichung 1 (Probe 3): guarded(undefined) ergibt 500 statt 200/409, weil 
   Superuser des Images); postgres-takt024 und postgres027 sahen die Sperrwartenden in pg_stat_activity nicht und
   schlugen auch auf 92b3d18 fehl. Lokal GRANT pg_read_all_stats TO hv_owner, danach grün; kein Repo-Eingriff.
   Eigentümerfragen 1 und 2 offen (auf Standard gebaut); E14 (DSB).
+Nachtrag Review (frischer Kontext, kein blocker/major; alle Befunde [S]/[P]/[L], in 84393f8 behoben): Test 15 mit
+  422 für ein unbekanntes refusalGroundId (aktg-GRUND44BX) und Nachweis, dass keine Zugriffslogzeile es enthält
+  (T-G1-I-05); Test 5 hält die Fehlerreihenfolge fest (expert mit unbekanntem Feld → 422 vor 403; veraltetes
+  If-Match auf ungeklärtem Vorschlag → 412 vor 409 R-GUARD-08); Test 11 mit Strom-Kontrolle je Rolle aus
+  ROLE_PERMISSIONS (event.read: event-Rahmen des QuestionLegalCleared; question.read: change-Rahmen mit byK.id;
+  sonst kein Rahmen mit byK.id); Zähler für claim/release; /metrics-Rumpf durch den Antwort-Haken; MF-01 nennt
+  operationId assignRole (Abschnitt MF-01 auf Weisung des Orchestrators, außerhalb der Abschnittsliste der Spec);
+  MF-13 ergänzt (Standard-Log zeigt nur „abgewiesene Freigabe“, Regel nur mit Option aus Eigentümerfrage 1 oder
+  Abgleich über Zeit und Frage). Semgrep (1.177.0, CI-Befehl) auf den geänderten .ts-Dateien: 0 findings.
+  pnpm gates mit hv_t044b auf 84393f8, Exit 0, Schluss der Ausgabe:
+    ✓ built in 1.81s
+    mark-test-run: wrote /home/user/wt/s044b/.claude/state/last-test-run (clean tree) at commit 84393f8, tree fed7320172a8…
+  Aus demselben Lauf: "apps/api test: Tests 663 passed (663)"; "operation-coverage: … 67 exercised by tests, 2
+  pre-declared in allowlist.json" / "ok". Ein vorheriger Lauf auf 84393f8 scheiterte an zwei zeitkritischen Tests in
+  postgres-limits034a (Last > 8 auf 4 Kernen, parallele Läufe; einzeln 21/21 grün; Folgeliste 040b); ohne Änderung
+  wiederholt grün.
 Touched: apps/api/src/app.ts, apps/api/src/__tests__/refusal044b.test.ts (neu),
   apps/api/src/__tests__/postgres-refusal044b.test.ts (neu), apps/api/src/__tests__/contract-043a.test.ts,
   packages/contract/allowlist.json, packages/domain/src/api.ts, packages/domain/src/__tests__/refusal044a.test.ts,
