@@ -1,7 +1,7 @@
 # Scheibe 064a — Transkript-Ingest, Teil 1: Vertrag, Kern, Dienst, Partnerleitfaden
 
 **Status:** spec (03.10.2026; gelesen auf `2fc3153`, Vertrag 0.4.0 aus 043a auf `origin/claude/slice-043a-vertrag` `d8fc188` gegengelesen; überarbeitet nach dem Lesebefund zu `bc33df2`: 1 blocker (064b), 8 major, Minor; Teil 1 der geteilten Scheibe 064, Zuschnitt im Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 3,25 AStd (Teil a; Summe a+b 5,5 statt 2,5 laut Plan) · Plan 064: 26.11.2026 (W9); für die Freigabe-Demo (Plan §11, Eigentümer 03.10.2026, Register E57) früher, frühestens nach dem Merge von 043a; den Tag legt der Orchestrator mit `scripts/plan-graph.mjs` fest · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `HvApi` im HTTP-Client, Live-Puffer und der Demo-Export `demoTranscriptSample` mit den Demo-Grenzen in `apps/web/src/api/index.ts`); web-shell (nur ein Aktionsschlüssel); docs-integration; docs-sicherheit; docs-datenschutz; docs-legal (Kopfvermerk Rechtekonzept)
+**Risikoklasse:** hoch · 3,5 AStd (Teil a; Summe a+b 6 statt 2,5 laut Plan) · Plan 064: 26.11.2026 (W9); für die Freigabe-Demo (Plan §11, Eigentümer 03.10.2026, Register E57) früher, frühestens nach dem Merge von 043a; den Tag legt der Orchestrator mit `scripts/plan-graph.mjs` fest · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `HvApi` im HTTP-Client, Live-Puffer und der Demo-Export `demoTranscriptSample` mit den Demo-Grenzen in `apps/web/src/api/index.ts`); web-shell (nur ein Aktionsschlüssel); docs-integration; docs-sicherheit; docs-datenschutz; docs-legal (Kopfvermerk Rechtekonzept)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6) und den Nachtrag in ADR 0008; danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Partnergrenze, neues Schreibrecht, feindliche Eingaben, Idempotenzschlüssel) und **Vertrag** (6.4, Kompatibilität für Partner) sowie **Datenschutz** (Wortlaut von Aktionären aus einem Fremdsystem, DSFA V16). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** neu R-ING-01 (Idempotenz je `segmentId`, Inhalt unveränderlich), R-ING-02 (Ingest nur in laufender HV), R-ING-03 (Form, Länge, Zeichen, Zeitanker und Bezüge eines Segments), R-ING-04 (Übernahme `unconfirmed → adopted`, Zeile einer neuen Segmenttabelle), R-ING-05 (Obergrenzen je HV: Zahl der Abschnitte und Bytes Wortlaut). Angewandt: R-PERM-01, R-PERM-02, R-MTG-03, R-IDEM-01. Dazu AGENTS.md R2, R4, R5, R6, R7, R8, R10, R11, R12
 **Quellen-IDs:**
@@ -36,12 +36,13 @@ Datei-Adapter, Recht, Leitfaden und die Nachweise für ADR 0008. Seit dem Plan i
 
 | Teil | Inhalt | Klasse · AStd | Abhängig |
 |---|---|---|---|
-| **064a** (diese Spec) | Vertragszeile 0.4.x; Recht `ingest.write`; Ereignis `SegmentIngested`; Segmenttabelle mit R-ING-04; Übernahme über `captureMeetingContribution` mit `segmentIds`; Alias ohne `segmentIds`; Strom mit Subjektart `segment`; zwei Dienstrouten; `HvApi` in beiden Adaptern; Demo-Export und Demo-Grenzen; Beispielbestand im Seed, Beispieldatei und Beispielskript; Partnerleitfaden mit geprüften Beispielen; Bedrohungsmodell, DSFA, Rechtekonzept | hoch · 3,25 | 043a |
-| **064b** | Oberfläche der Erfassung: Abschnittsliste (neueste zuerst, blätterbar), Import-Dialog (Datei, Zwischenablage, Beispieldatei in der Demo), Datei-Adapter im Browser mit `Retry-After`, Übernahme-Dialog, i18n DE/EN, Glossar, Playwright in beiden Projekten (gemeinsame Datei nach 031b), Screenshots, Demoszenario | hoch · 2,25 | 064a |
+| **064a** (diese Spec) | Vertragszeile 0.4.x; Recht `ingest.write`; Ereignis `SegmentIngested`; Segmenttabelle mit R-ING-04; Übernahme über `captureMeetingContribution` mit `segmentIds`; Alias ohne `segmentIds`; Strom mit Subjektart `segment`; zwei Dienstrouten; `HvApi` in beiden Adaptern; Demo-Export und Demo-Grenzen; Beispielbestand im Seed, Beispieldatei und Beispielskript; Partnerleitfaden mit geprüften Beispielen; Bedrohungsmodell, DSFA, Rechtekonzept | hoch · 3,5 | 043a |
+| **064b** | Oberfläche der Erfassung: Abschnittsliste (neueste zuerst, blätterbar), Import-Dialog (Datei, Zwischenablage, Beispieldatei in der Demo), Datei-Adapter im Browser mit `Retry-After`, Übernahme-Dialog, i18n DE/EN, Glossar, Playwright in beiden Projekten (gemeinsame Datei nach 031b), Screenshots, Demoszenario | hoch · 2,5 | 064a |
 
 Aufwand 064a: Vertrag 0,5 · Kern 1,5 (mit Strom-Subjektart, Alias, strengerer Zeichen- und Datumsprüfung,
-Byte-Obergrenze) · Dienst und Postgres-Test 0,5 · HTTP-Client, Live-Puffer und Demo-Export 0,35 · Leitfaden mit Skript,
-Bedrohungsmodell, DSFA 0,4. Rund 3,25 AStd; 064a bleibt ein Agententag, ein weiterer Schnitt (etwa Vertrag allein) würde
+Byte-Obergrenze, Datumsprüfung wie Ajv) · Dienst und Postgres-Test 0,5 · HTTP-Client, Live-Puffer und Demo-Export 0,35 ·
+Leitfaden mit Skript, Bedrohungsmodell, DSFA 0,4 · Puffer für Review-Nacharbeit 0,25 (die Nachprüfung nannte 5,5 AStd
+für beide Teile knapp). Rund 3,5 AStd; 064a bleibt ein Agententag, ein weiterer Schnitt (etwa Vertrag allein) würde
 eine Vertragsform ohne Abnehmer erzeugen. Die Summe a+b liegt deutlich über der Planzahl; Zuschnitt und Budget brauchen das Go des
 Eigentümers (Eigentümerfrage 2).
 
@@ -130,7 +131,9 @@ Person mit `contribution.capture` in einen Redebeitrag übernommen. Ab dort läu
 - **Normalisierung:** keine. Der Wortlaut wird gespeichert, wie er kommt; NFC und NFD derselben Zeichen sind für den
   Inhaltsvergleich (R-ING-01) verschiedene Inhalte. Der Leitfaden empfiehlt NFC.
 - **Zeitanker:** `startedAt` und `endedAt` sind Angaben des Senders (ADR 0011). Form RFC 3339 mit Zeitzone; der Kern
-  prüft mit demselben regulären Ausdruck wie Ajvs `date-time`, nicht mit `Date.parse` (das nimmt Formen an, die der
+  spiegelt die Prüffunktion von Ajvs Format `date-time` (ajv-formats, Modus `full`): Zeitzone Pflicht (`Z` oder
+  `±hh:mm`), Monat 1–12, Tag je Monat einschließlich Schaltjahr, Stunde, Minute und Sekunde im Bereich; nicht nur einen
+  regulären Ausdruck und nicht `Date.parse` (das nimmt Formen an, die der
   Vertrag ablehnt). Keiner liegt nach der Serverzeit (keine Toleranz, wie R-MTG-03; der Leitfaden verweist auf
   `X-Server-Time`). **Keine Untergrenze** (etwa „nicht vor Beginn der HV“): Entscheidung des Architekten, weil die
   Beispieldatei feste Zeitanker trägt und ein Werkzeug Abschnitte auch nach einem Neustart liefert. Ein rückdatierter
@@ -175,11 +178,13 @@ Person mit `contribution.capture` in einen Redebeitrag übernommen. Ab dort läu
   `preparation` und `closed`: **409 R-ING-02**, auch für reine Wiederholungen.
 - Ob ein nach dem Debattenschluss gelieferter Abschnitt noch übernommen werden darf, entscheidet unverändert R-MTG-03 bei
   der Übernahme.
-- **Obergrenzen je HV (R-ING-05):** höchstens 10 000 Abschnitte (`MAX_SEGMENTS_PER_MEETING`) und höchstens 8 MiB
-  Wortlaut in UTF-8-Bytes (`MAX_SEGMENT_TEXT_BYTES_PER_MEETING`). Ein Stapel, der eine Grenze überschreiten würde:
+- **Obergrenzen je HV (R-ING-05):** höchstens 20 000 Abschnitte (`MAX_SEGMENTS_PER_MEETING`) und höchstens 8 MiB
+  Wortlaut in UTF-8-Bytes (`MAX_SEGMENT_TEXT_BYTES_PER_MEETING`). **Die Byte-Grenze ist der bindende Schutz**; die
+  Zahlgrenze fängt nur Fluten winziger Abschnitte ab. Ein Stapel, der eine Grenze überschreiten würde:
   **409 R-ING-05**, nichts geschrieben. Begründung der Werte: ein HV-Tag von 12 Stunden mit Abschnitten von 5 Sekunden
-  ergibt rund 8 600 Abschnitte; 8 MiB sind das Vielfache eines vollständigen Tagesprotokolls. Die frühere Zahl 20 000 hatte
-  keine Grundlage. Das Protokoll wächst nur an; eine Flut bläht Projektion und Speicher auf (T-G3-D-02).
+  ergibt rund 8 600 Abschnitte; 20 000 lassen mehr als das Doppelte Spielraum (kürzere Abschnitte, lange Debatte), weil
+  die Grenze nicht anhebbar ist. 8 MiB sind ein Vielfaches eines vollständigen Tagesprotokolls (rund 100 000 Wörter je
+  Tag ≈ 0,7 MiB). Das Protokoll wächst nur an; eine Flut bläht Projektion und Speicher auf (T-G3-D-02).
 - Beide Werte sind Konstanten im Kern und über eine Option von `createInProcessApi` (`ingestLimits`) absenkbar, nicht
   anhebbar und nicht im Dienst konfigurierbar. **Die Demo im Browser** baut den Kern mit 500 Abschnitten und 512 KiB
   (`apps/web/src/api/index.ts`), weil sie das Protokoll in `localStorage` hält; ein Überlauf dort würde das ganze
@@ -206,7 +211,7 @@ Person mit `contribution.capture` in einen Redebeitrag übernommen. Ab dort läu
 
 - `listMeetingSpeechSegments` antwortet `{ items: SpeechSegment[], total, _actions }`. Filter `status`
   (`unconfirmed | adopted`), `limit` 1–500 (Standard 100), `offset` ≥ 0. **Reihenfolge: neueste zuerst** (`startedAt`
-  absteigend, bei Gleichstand `ingestedAt` absteigend, dann `segmentId`). Ohne Verwerfen-Status (Nicht-Ziele) wächst die
+  absteigend, bei Gleichstand `ingestedAt` absteigend, dann `segmentId` aufsteigend in Codepunkt-Reihenfolge). Ohne Verwerfen-Status (Nicht-Ziele) wächst die
   Liste über den Tag; neueste zuerst hält das Aktuelle auf der ersten Seite, ältere sind über `offset` erreichbar. Der
   Leitfaden nennt Reihenfolge und Blättern.
 - `SpeechSegment`: `segmentId`, `meetingId`, `text`, `startedAt`, `endedAt`, `speakerId?`, `source`, `status`,
@@ -394,7 +399,7 @@ Lehre aus 040 und 044a: Für jeden neuen Mechanismus stehen Missbrauch, Abwehr u
 |---|---|---|---|
 | Übergroßer Body | 413 im Dienst (034a), vor dem Kern | `413` im Zugriffslog | H4 |
 | Stapel mit mehr als 100 Abschnitten oder Text über 4 000 Zeichen | Vertrag (422) **und** Kern (422 R-ING-03), weil die Demo keinen Validator hat | `422` | H4, K8 |
-| Flut über viele kleine Stapel | Quote je Subjekt (034a, `429`, für jede Rolle gleich); R-ING-05 bei 10 000 Abschnitten oder 8 MiB Wortlaut je HV | `429` und `409` R-ING-05 im Zugriffslog | K10 |
+| Flut über viele kleine Stapel | Quote je Subjekt (034a, `429`, für jede Rolle gleich); R-ING-05 bei 20 000 Abschnitten oder 8 MiB Wortlaut je HV | `429` und `409` R-ING-05 im Zugriffslog | K10 |
 | Demo im Browser läuft über den `localStorage` voll | Demo-Grenzen 500 Abschnitte, 512 KiB (Entscheidung 4) | `409` R-ING-05 im Dialog | K10, 064b |
 | Datei mit hunderttausenden Abschnitten im Browser | Grenzen des Datei-Adapters in 064b (Dateigröße, Stapel) | 064b | 064b |
 
@@ -594,14 +599,14 @@ Weitere Dateien sind Scope-Befunde.
 4. **Fingerabdruck und Zählungen:** Läuft `seed-fictitious-names.test.ts` nach dem Anhängen unverändert grün? Wenn
    nicht: anhalten, der Beispielbestand darf den Zufallsstrom nicht berühren. Welche Tests zählen Ereignisse des
    Demokorpus (`seed.test.ts`, `acceptance.test.ts`, e2e)? Liste im Bericht; nur deren Zahlen ziehen nach.
-9. **Alias im Dienst:** Trägt `ContributionCapture` im Vertrag `additionalProperties: false`? Ergebnis im Bericht; die
+5. **Alias im Dienst:** Trägt `ContributionCapture` im Vertrag `additionalProperties: false`? Ergebnis im Bericht; die
    Kopie benannter Felder im Kern gilt in jedem Fall.
-5. **Serialisierung:** Läuft die Idempotenzprüfung im Postgres-Pfad innerhalb der Sperre nach der Validierung
+6. **Serialisierung:** Läuft die Idempotenzprüfung im Postgres-Pfad innerhalb der Sperre nach der Validierung
    (takt-024)? Zeile im Bericht nennen.
-6. **Aktionsschlüssel:** Erzwingt die Typprüfung einen Eintrag für jedes Element von `PERMISSIONS`? Wenn nein, entfallen
+7. **Aktionsschlüssel:** Erzwingt die Typprüfung einen Eintrag für jedes Element von `PERMISSIONS`? Wenn nein, entfallen
    `labels.ts` und `shell.*.ts`.
-7. **Zugriffslog:** Schreibt 033a für die neue Operation `operationId` und Status ohne Body? Zeile im Bericht.
-8. Weichen Zeilenangaben dieser Spec ab: melden; bei inhaltlichem Widerspruch anhalten.
+8. **Zugriffslog:** Schreibt 033a für die neue Operation `operationId` und Status ohne Body? Zeile im Bericht.
+9. Weichen Zeilenangaben dieser Spec ab: melden; bei inhaltlichem Widerspruch anhalten.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -623,7 +628,8 @@ Weitere Dateien sind Scope-Befunde.
 - K8. Prüfungen im Kern (die Demo hat keinen Validator), jede → 422 R-ING-03 und null Ereignisse: leerer Text, nur
   Leerraum, 4 001 Codepunkte, `\u0000`, `\u001B`, `\u007F`, `\u0085`, `\u009F`, U+202A, U+202E, U+2066, U+2069;
   `endedAt` vor `startedAt`; `startedAt` eine Sekunde nach der Uhr; `2026-10-01` und `Oct 1 2026` als Zeitanker (gültig
-  für `Date.parse`, ungültig nach RFC 3339); unbekannte `speakerId`; `speakerId` einer Wortmeldung einer anderen HV;
+  für `Date.parse`, ungültig nach RFC 3339), `2026-02-30T10:00:00Z`, `2026-10-01T10:00:00` ohne Zeitzone,
+  `2026-10-01T24:00:00Z`; unbekannte `speakerId`; `speakerId` einer Wortmeldung einer anderen HV;
   Kennung mit `/`, mit Leerzeichen, mit 129 Zeichen; `source` `Whisper!`; 101 Abschnitte. → 200: Tab, Zeilenumbruch,
   U+200E im Text; 4 000 Emoji (8 000 UTF-16-Einheiten, 4 000 Codepunkte).
 - K9. Abschnitt mit Zusatzfeld `evil` und eigenem `__proto__`-Schlüssel (über `JSON.parse`): die Nutzlast hat genau
@@ -631,7 +637,7 @@ Weitere Dateien sind Scope-Befunde.
   `created`, dann `duplicate`; die Liste zeigt drei Abschnitte.
 - K10. Mit `ingestLimits: { segments: 5 }`: fünf Abschnitte ok; ein Stapel mit einem sechsten → 409 R-ING-05, null
   Ereignisse; reine Wiederholungen der fünf → 200 `duplicate`. Mit `ingestLimits: { textBytes: 100 }`: ein Stapel, der
-  100 Byte UTF-8 überschreiten würde (Umlaute zählen zwei Byte) → 409 R-ING-05. Ohne Option gelten 10 000 und 8 MiB.
+  100 Byte UTF-8 überschreiten würde (Umlaute zählen zwei Byte) → 409 R-ING-05. Ohne Option gelten 20 000 und 8 MiB.
 - K11. Übernahme: `captureMeetingContribution` mit `segmentIds` zweier Abschnitte mit verschiedenen Zeitankern, der
   spätere zuerst genannt, `source: transcript` → Redebeitrag mit
   `source: transcript`, `segmentIds`, `occurredAt` = frühester (nicht erster genannter) `startedAt`, `occurredAtSource: transcript`; die
@@ -803,7 +809,7 @@ Keine blockiert die Spec. Fragen 1 und 2 brauchen vor dem Bau ein ausdrückliche
    die Ansprechperson des Tool-Teams (16.10.2026) abzuwarten, damit die Freigabe-Demo den Partnerweg zeigt. Dazu gehört
    die Pfadabweichung aus Entscheidung 1. Eine abweichende Antwort kostet die Beträge aus „Standards“. Ohne Go baut
    064a frühestens nach dem 16.10.
-2. **Zuschnitt und Budget (Go nötig, Planabweichung).** 064 wird 064a (3,25 AStd) und 064b (2,25 AStd), zusammen 5,5
+2. **Zuschnitt und Budget (Go nötig, Planabweichung).** 064 wird 064a (3,5 AStd) und 064b (2,5 AStd), zusammen 6
    statt 2,5 AStd, beide hoch. Die Ingest-Form wandert aus 043c in den ersten Commit von 064a; 043c behält Webhooks,
    `answer-suggestions` und das Schema für Systemakteure. Mit Go ändert der Orchestrator die Plan-Einträge 064 und 043
    (Teilungsvermerk, Lanes `contract`, `web-api`) und den Kalender.

@@ -1,7 +1,7 @@
 # Scheibe 064b — Transkript-Ingest, Teil 2: Import und Übernahme in der Erfassung, Demoszenario
 
 **Status:** spec (03.10.2026; gelesen auf `2fc3153`; überarbeitet nach dem Lesebefund zu `bc33df2`: Blocker gemeinsame e2e-Datei, major Testzustand, Demo-Export, Liste; Teil 2 der geteilten Scheibe 064, Zuschnitt in Spec 064a)
-**Risikoklasse:** hoch · 2,25 AStd · frühestens nach dem Merge von 064a; für die Freigabe-Demo (Plan §11 Punkt 2, Register E57); den Tag legt der Orchestrator fest · Lanes: web-capture; e2e (nur die eigene Datei und eine Zeile in `playwright.config.ts`); infra (nur die zwei Listen in `scripts/e2e-http-031.test.mjs`); docs-plan (nur Glossarzeilen); docs-integration (nur ein Abschnitt)
+**Risikoklasse:** hoch · 2,5 AStd (mit 0,25 Puffer für Review-Nacharbeit) · frühestens nach dem Merge von 064a; für die Freigabe-Demo (Plan §11 Punkt 2, Register E57); den Tag legt der Orchestrator fest · Lanes: web-capture; e2e (nur die eigene Datei und eine Zeile in `playwright.config.ts`); infra (nur die zwei Listen in `scripts/e2e-http-031.test.mjs`); docs-plan (nur Glossarzeilen); docs-integration (nur ein Abschnitt)
 **Rolle:** implementierer-oberflaeche. Review in frischem Kontext mit den Perspektiven **Security** (fremde Datei im Browser, Anzeige feindlichen Wortlauts) und **Oberfläche/Barrierefreiheit** (6.9). Der schlankere Ablauf aus E57 gilt nicht: Die Klasse ist hoch (Partnereingabe, Leitplanken §4 „externer Datentransfer“; bei unklarer Zuordnung gilt hoch). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue. Angewandt und in der Oberfläche sichtbar: R-ING-01..05 (aus 064a), R-MTG-03, R-PERM-01, R-PERM-02. Dazu AGENTS.md R2, R4, R5, R9, R10, R11, R12
 **Quellen-IDs:** Spec 064a (Entscheidungen 6, 7, 9; „Hinweise an Folgescheiben: 064b“); `docs/produktplan-beta.md` Eintrag 064 (Nachweis „Playwright Import → Redebeitrag → Einzelfragen“), §11 Punkt 2; ADR 0002 (Demo im Browser, gemeinsame e2e-Suite); ADR 0008; Spec 080b (Korpus eine Quelle); Spec 090 (Eingaben je Akteur); Spec 013 (Tastaturpfad); takt-032 (Schreibsperre der Erfassung); `docs/glossar.md`; Bedrohungsmodell T-G3-T-01
@@ -20,7 +20,9 @@ und der Dienst zeigen dasselbe (ADR 0002).
    Komponente `TranscriptPanel.tsx`. Eingeklappt zeigt er die Zahl unbestätigter Abschnitte, ausgeklappt die Liste.
    Keine neue Route, keine Zeile im Feature-Register.
 2. **Liste.** `api.listSpeechSegments({ status: 'unconfirmed', limit: 100 })`, neueste zuerst (Reihenfolge des
-   Dienstes, 064a); „Ältere laden“ holt die nächste Seite über `offset`; der Kopf zeigt `total`. Umschalter „auch
+   Dienstes, 064a); „Ältere laden“ holt die nächste Seite über `offset`; der Kopf zeigt `total`. Kommen während des Blätterns neue
+   Abschnitte an, verschiebt sich `offset`; die Liste führt deshalb Einträge nach `segmentId` zusammen (ein Eintrag je
+   Kennung, keine Doppelanzeige) und lädt die erste Seite bei jedem `change` neu. Umschalter „auch
    übernommene zeigen“ lädt ohne Filter. Liegt der Zeitanker nicht am Tag der HV, zeigt die Zeile das Datum mit. Je Abschnitt: Uhrzeit Anfang–Ende (Europe/Berlin, wie `timeOf` in `ContributionPane.tsx`), Sprecherhinweis
    als Nummer und Name aus der schon geladenen Wortmeldeliste (nur wenn die Wortmeldung dort steht; sonst
    „ohne Zuordnung“), Quelle als Abzeichen, Wortlaut. Der Wortlaut steht in einem eigenen Element mit `dir="auto"` und
@@ -207,9 +209,13 @@ Pfade nicht als erlaubt liest.
   Schlüssel. 100 Abschnitte mit vielen `"` und `\` im Wortlaut → Stapelgröße nach `JSON.stringify` unter 200 000 Byte.
 - U5. Bereich: Wortlaut `<img src=x onerror="window.__pwned=1">` erscheint als Text, kein `img`-Element; Element mit
   `dir="auto"`.
-- U7. Bereich: zweite Seite über „Ältere laden“ hängt die älteren an; Zeitanker an einem anderen Tag zeigt das Datum.
 - U6. Bereich: Listen-`_actions` ohne `ingest.write` → kein Import-Knopf; Abschnitts-`_actions` ohne
-  `contribution.capture` → kein Kästchen.
+  `contribution.capture` → kein Kästchen; Liste antwortet 403 R-PERM-02 (Rolle ohne `contribution.read`, etwa der
+  Beobachter) → Bereich nicht vorhanden. Der Beobachter wird hier geprüft, weil `asRole` und der http-Realm keinen
+  Beobachter kennen (`apps/web/e2e/support/roles.ts:17-25`).
+- U7. Bereich: zweite Seite über „Ältere laden“ hängt die älteren an; ein zwischen den Seiten neu eingetroffener
+  Abschnitt verschiebt `offset`, trotzdem erscheint jede `segmentId` genau einmal; Zeitanker an einem anderen Tag zeigt
+  das Datum.
 
 **Playwright** (`064b-transkript.spec.ts`, Rollen über `asRole`):
 
@@ -225,13 +231,15 @@ Pfade nicht als erlaubt liest.
   - P5. zwei Fragen im übernommenen Wortlaut markieren → zwei Einzelfragen; nach `asRole` Koordination stehen sie zur
     Klassifizierung bereit (Planbeleg „Import → Redebeitrag → Einzelfragen“).
 - P6. „Beispieldatei verwenden“: in `in-process` vorhanden und führt zu „5 neu“; in `http` fehlt der Knopf.
-- P7. (beide) Versammlungsbüro sieht den Bereich, aber keinen Import-Knopf und keine Kästchen; Fachbereich und
-  Beobachter sehen den Bereich nicht.
+- P7. (beide) Versammlungsbüro sieht den Bereich, aber keinen Import-Knopf und keine Kästchen; Fachbereich sieht den
+  Bereich nicht. Nur Rollen, die `asRole` in beiden Projekten kennt; der Beobachter steht in U6.
 - P8. (`in-process`) feindliche Datei mit HTML im Wortlaut → Anzeige als Text, `window.__pwned` bleibt `undefined`;
   Datei mit U+202E im Wortlaut → Meldung mit R-ING-03 und Abschnittsnummer, Liste unverändert; ungültiges JSON →
   Fehlermeldung, Liste unverändert; Datei mit 5 MiB + 1 Byte → abgelehnt.
-- P11. (`in-process`) mehr als die Demo-Grenze (501 Abschnitte, erzeugt im Test) → verständliche Meldung zu R-ING-05,
-  das Demo-Protokoll bleibt ladbar (Seite neu laden, Erfassung erscheint).
+- P11. (`in-process`) mehr als die Demo-Grenze (Datei mit 600 Abschnitten, erzeugt im Test; Stapel zu 100) → die
+  Stapel bis zur Grenze sind gespeichert (Ergebnis nennt die Zahl der neuen Abschnitte bis dahin), der Stapel, der die
+  Grenze überschreiten würde, antwortet 409 R-ING-05 und nichts davon ist gespeichert; die Meldung nennt den Teilstand
+  und dass ein erneuter Import sicher ist; das Demo-Protokoll bleibt ladbar (Seite neu laden, Erfassung erscheint).
 - P9. (`in-process`) Sprache en-US: Bereich, Dialoge und Ergebnis englisch.
 - P10. (`in-process`) axe auf der Erfassung mit offenem Bereich, offenem Import- und Übernahme-Dialog: keine Meldung
   „moderate“ oder höher.
@@ -277,7 +285,7 @@ Ausgelöst:
 - [x] Oberfläche, Barrierefreiheit
 - [x] Dokumentation, Schulung (Glossar, Leitfaden-Abschnitt, Demoszenario)
 
-Perspektiven: Security, Oberfläche · Nachweise: U1–U7, P1–P11, Screenshots · Offene Entscheidung: E3b (Standard)
+Perspektiven: Security, Oberfläche · Nachweise: U1–U7, U4b, P1–P11, Screenshots · Offene Entscheidung: E3b (Standard)
 
 ## Wirkung und Risiko
 
@@ -303,7 +311,7 @@ Perspektiven: Security, Oberfläche · Nachweise: U1–U7, P1–P11, Screenshots
 
 ## Offene Eigentümerfragen
 
-Keine eigene. Es gelten Eigentümerfragen 1 und 2 aus 064a (Bau auf Standard, Zuschnitt und Budget, jetzt 5,5 AStd).
+Keine eigene. Es gelten Eigentümerfragen 1 und 2 aus 064a (Bau auf Standard, Zuschnitt und Budget, jetzt 6 AStd).
 
 ## Hinweise an Folgescheiben
 

@@ -54,7 +54,7 @@ In der Netlify-Demo läuft der Kern im Browser (ADR 0002). Dort zeigt die Erfass
 | Operation | Methode und Pfad | Recht |
 |---|---|---|
 | Abschnitte einspielen | `POST /v1/meetings/{meetingId}/speech-segments` | `ingest.write` |
-| Abschnitte lesen | `GET /v1/meetings/{meetingId}/speech-segments?status=&limit=&offset=` (neueste zuerst; `limit` 1–500, Standard 100; ältere über `offset`, Gesamtzahl in `total`) | `contribution.read` |
+| Abschnitte lesen | `GET /v1/meetings/{meetingId}/speech-segments?status=&limit=&offset=` (neueste zuerst, bei gleichem Zeitanker nach Eingang, dann `segmentId` aufsteigend; `limit` 1–500, Standard 100; ältere über `offset`, Gesamtzahl in `total`) | `contribution.read` |
 | Übernehmen (Erfassung, nicht für Partner) | `POST /v1/meetings/{meetingId}/contributions` mit `segmentIds` | `contribution.capture` |
 
 <!-- 064a: Vertragsversion eintragen; Hinweis auf Pfadabweichung zu E3a (früher genannt: /v1/ingest/speech-segments) -->
@@ -117,7 +117,8 @@ Fehler sind RFC 9457 Problem Details; `detail` nennt Index und Kennung, nie gesp
 - `startedAt` und `endedAt` sind Angaben des Senders (ADR 0011); der Dienst stempelt den Eingang mit seiner Uhr.
 - Kein Zeitanker darf nach der Serverzeit liegen, auch nicht um Sekunden; den Versatz liefert die Kopfzeile
   `X-Server-Time` jeder Antwort.
-- Form RFC 3339 mit Zeitzone (`2026-10-01T08:30:00Z`); ein Datum ohne Uhrzeit wird abgelehnt.
+- Form RFC 3339 mit Zeitzone (`2026-10-01T08:30:00Z`); ein Datum ohne Uhrzeit, ohne Zeitzone oder mit unmöglichem Tag
+  (`2026-02-30`) wird abgelehnt.
 - Eine Untergrenze gibt es nicht; ein Abschnitt aus der Vergangenheit wird angenommen und bleibt unbestätigt.
 - Zeitzonen sind erlaubt; gespeichert wird der Zeitpunkt in UTC.
 
@@ -125,11 +126,17 @@ Fehler sind RFC 9457 Problem Details; `detail` nennt Index und Kennung, nie gesp
 
 <!-- 064a: Werte aus Vertrag und Dienst prüfen -->
 
-- Body höchstens 262 144 Byte; 100 Abschnitte je Stapel; 4 000 Codepunkte je Abschnitt; 10 000 Abschnitte und 8 MiB
-  Wortlaut je HV (in der Demo im Browser 500 Abschnitte und 512 KiB).
+- Body höchstens 262 144 Byte; 100 Abschnitte je Stapel; 4 000 Codepunkte je Abschnitt; 20 000 Abschnitte und 8 MiB
+  Wortlaut je HV (in der Demo im Browser 500 Abschnitte und 512 KiB). Bindend ist meist die Byte-Grenze.
 - Quoten je Subjekt (`429` mit `Retry-After`).
 - Empfehlung: Stapel von höchstens 200 000 Byte, gemessen am serialisierten JSON, nacheinander senden; bei `429` und
   `503` die Sekunden aus `Retry-After` warten.
+- **Bei `409` R-ING-05 (Obergrenze der HV erreicht):** Der abgelehnte Stapel ist ganz ungespeichert, frühere Stapel
+  bleiben gespeichert. Der Partner sendet nicht weiter und wiederholt nicht automatisch, sondern meldet es dem
+  Versammlungsbüro. Das Versammlungsbüro lässt die übrigen Wortbeiträge manuell erfassen (Erfassung ohne Transkript,
+  wie heute) und meldet den Vorfall an den Betrieb (Runbook 070). Die Grenze ist nicht anhebbar.
+- **Nach einem abgebrochenen Import** (Netzfehler, `5xx`, `409`, `422` mitten in einer Datei) ist ein erneuter Import
+  derselben Datei sicher: schon gespeicherte Abschnitte kommen als `duplicate` zurück, nichts wird doppelt gespeichert.
 
 ## 10. In der Oberfläche
 
