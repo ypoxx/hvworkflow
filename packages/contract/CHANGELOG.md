@@ -10,6 +10,78 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.0] - 2026-10-03
+
+The one non-additive step of the 0.4 cycle (ADR 0015, vorgeschlagen): it removes fields deprecated since 0.2.0
+and narrows one request field, so the minor version rises. Everything else in this release is additive. All of it
+is Scheibe 043a (Teil 1 des Vertragspakets 043). Built on the defaults of ADR 0012, E15 and E25: "auf Standard
+gebaut in 043a (Vertragsform), Go des Eigentümers 03.10.2026". The decision register changes no status; the
+status changes come with slice 044. Neither core nor service change with this release; the three new operations
+are pre-declared in `allowlist.json` (slice 044, expiry 2026-11-27) and not served before slice 044.
+
+### Removed
+
+- **`Speaker.kind`, `Speaker.requestedMinutes`, `SpeakerRegistration.kind`, `SpeakerRegistration.requestedMinutes`,
+  `SpeakerUpdate.requestedMinutes`** (Scheibe 043a; deprecated since 0.2.0, Feedback #15; the core has ignored them
+  since Scheibe 080). Removal one cycle after the deprecation, as ADR 0015 requires. No existing schema forbids
+  unknown properties (no `additionalProperties: false` added), so a client that still sends one of the fields is
+  not rejected: the service validator lets the unknown field pass and the core writes only named fields, so the
+  value never reaches the event log. Responses have not carried the fields since 080.
+
+### Changed
+
+- **`SpeakerUpdate.reason`** (Scheibe 043a; served since Scheibe 080): now in the contract as
+  `{ type: string, enum: [follow_up] }`. Required for `finished → waiting` (R-SPK-05; without it `409`
+  R-SPK-GUARD-01), dropped and never written on any other change. A narrowing: before 0.4.0 the validator let any
+  value pass and the core refused or dropped it; now any other value is a `422`. The web client's local block of
+  `reason` in service mode is lifted in the second commit of 043a (`apps/web/src/api/http.ts`).
+- **Descriptions** (Scheibe 043a): `info.description` "Compatibility" (the 0.3.x cycle is closed; 0.4.0 is the
+  non-additive step; within 0.4.x the additive rules stay; a later request field arrives as the contract line of
+  the implementing slice, always optional, a guard enforces a duty with `409`); `Unauthorized` and `Unprocessable`
+  (the five gaps of review 012 point 18 are closed); `StreamUnavailable` (three causes, as `RetryAfter` counts them,
+  takt-040 nit 5); `Classification.stageAssignment` (`seatId` comes with the contract line of 040, not with 0.4.0);
+  `Role` (`coordination` has been built since 021); the `meetingId` filter of `listEvents` and the `seat` parameter
+  of `getMeetingStage` come as contract lines of their implementing slices, not "with 0.4.0"; `Problem.ruleId` names
+  the speaker rules; `updateSpeaker` gets a description.
+
+### Added
+
+- **Documented statuses** (Scheibe 043a, review 012 point 18): `401` (`Unauthorized`) on all 29 operations of 0.2;
+  `422` (`Unprocessable`) on `listQuestions`, `returnQuestion` and `withdrawQuestion`; `409` on `updateSpeaker`
+  with R-SPK-00 (no row) and R-SPK-GUARD-01. All of them were served before; the test helper's exception list
+  `UNDOCUMENTED_STATUS_EXCEPTIONS` is empty now.
+- **`InternalError`** (Scheibe 043a, follow-up list 035b): `500`, `application/problem+json`, documented on every
+  operation, inside and outside `/v1` (`getHealth`, `getReadiness`, `getMetrics`, `/auth/*` included), because the
+  service's global `onError` answers any unexpected exception of any route this way. The description names the four
+  fixed `detail` texts ("Event seq N: integrity check failed.", "Persistence outcome is unknown.", "Persistence is
+  unavailable.", "An unexpected error occurred."); none carries `Retry-After`; the `seq` is disclosed on purpose
+  (every reader receives it as the `id` of `change` and `cursor` messages on `/stream`).
+- **Refusal as a kind of answer** (Scheibe 043a, ADR 0012 model A; behaviour from Scheibe 044):
+  - `AnswerKind` (`answer`, `refusal_no_claim` = refusal path A, `refusal_with_ground` = refusal path B).
+  - Four optional response fields on `AnswerVersion`: `answerKind` (absent = `answer`), `refusalGroundId`,
+    `refusalGroundHash` (`Sha256Hex`, the catalogue entry's `hash` at the proposal — the audit path of the
+    catalogue; an approval against a changed entry is `409` R-GUARD-11 from 044) and `refusalJustification`
+    (a legal assessment, SG2). `required` is unchanged. Invariants as `if`/`then`: an answer carries no `refusal*`
+    field; path B carries ground and hash; path A carries neither.
+  - `LegalRef` (form of the domain type, deliberately wider: `docHash` string, `verified: true` for 076),
+    `RefusalGround` (`hash` = SHA-256 over RFC 8785 of the entry without `hash`), `RefusalProposal` (closed;
+    `answerKind` without `answer`; a ground on path A is a `422`; path B's ground and justification are enforced by
+    the guard R-GUARD-09 of 044 with `409`, not by the schema) and `RefusalApproval` (closed `{ answerVersion }`).
+  - Pre-declared operations (allowlist, slice 044, expiry 2026-11-27): `listRefusalGrounds`
+    (`GET /refusal-grounds`, readable with `question.read`, `question.read.delivered` or `stage.read`),
+    `proposeRefusal` (`POST /questions/{questionId}/refusals`, written as `AnswerDrafted`, no new event type) and
+    `approveRefusal` (`POST /questions/{questionId}/refusal-approvals`, written as `QuestionApproved`; `409` names
+    R-GUARD-06, R-GUARD-08 and R-GUARD-11). Separate operations rather than new fields on `draftAnswer` and
+    `approveQuestion`: those request schemas stay unchanged, so a refusal can never slip in as an answer.
+  - `Action` +2: `question.refuse.propose`, `question.refuse.approve` (identifiers only; granted by slice 044, deny
+    by default until then; never granted to admin).
+  - Masking rule for `refusalJustification`, named at every read path: on `Question.answers` only for holders of
+    `question.refuse.*` (never through `question.legal.clear`, never admin); never in `StageView`; never in
+    `EventRead` (`payload.answer.refusalJustification: false`, for every reader of `getQuestionHistory`,
+    `listEvents` and `/stream`); never matched by the full-text search. The `Event` description names the refusal
+    fields of the `AnswerDrafted` payload and the snapshot `answer.refusalGround`; a bound payload schema follows
+    with 043c.
+
 ## [0.3.12] - 2026-09-30
 
 ### Changed

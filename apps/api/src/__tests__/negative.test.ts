@@ -169,7 +169,7 @@ describe('negative cases and idempotency', () => {
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
       headers: { 'If-Match': await speakerListTag(app) },
-      body: { displayName: 'Leerprobe', kind: 'shareholder' },
+      body: { displayName: 'Leerprobe' },
     });
     const speaker = await speakerRes.json();
     const res = await req(app, 'POST', '/v1/contributions', {
@@ -187,7 +187,7 @@ describe('negative cases and idempotency', () => {
   it('422: registering a speaker without a display name is rejected', async () => {
     const res = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
-      body: { displayName: '  ', kind: 'shareholder' },
+      body: { displayName: '  ' },
     });
     expect(res.status).toBe(422);
     expectValidProblem(await res.json());
@@ -237,21 +237,12 @@ describe('negative cases and idempotency', () => {
     expect(problem.ruleId).toBe('R-SPK-00');
   });
 
-  it('422: an out-of-enum kind or status is rejected, not silently written', async () => {
-    const badKind = await req(app, 'POST', '/v1/speakers', {
-      actor: ACTOR.moderation,
-      body: { displayName: 'Bogus Kind', kind: 'space-alien' },
-    });
-    expect(badKind.status).toBe(422);
-    const badKindProblem = await badKind.json();
-    expectValid('registerSpeaker', 422, badKindProblem, 'application/problem+json');
-    expectValidProblem(badKindProblem);
-    expect(badKindProblem.detail).toContain('kind');
-
+  // Contract 0.4.0 (slice 043a) removed `kind`: an unknown `kind` is ignored now, see contract-043a.test.ts.
+  it('422: an out-of-enum status is rejected, not silently written', async () => {
     const speakerRes = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
       headers: { 'If-Match': await speakerListTag(app) },
-      body: { displayName: 'Fine', kind: 'shareholder' },
+      body: { displayName: 'Fine' },
     });
     const speaker = await speakerRes.json();
     const badStatus = await req(app, 'PATCH', `/v1/speakers/${speaker.id}`, {
@@ -263,7 +254,7 @@ describe('negative cases and idempotency', () => {
     expectValid('updateSpeaker', 422, badStatusProblem, 'application/problem+json');
     expect(badStatusProblem.detail).toContain('status');
 
-    // The server's own listing must never have accepted either bad value onto a stored resource.
+    // The server's own listing must never have accepted the bad value onto a stored resource.
     const listRes = await req(app, 'GET', '/v1/speakers', { actor: ACTOR.admin });
     expectValid('listSpeakers', 200, await listRes.json());
   });
@@ -282,7 +273,7 @@ describe('negative cases and idempotency', () => {
     const res = await req(app, 'POST', '/v1/speakers', {
       actor: ACTOR.moderation,
       headers: { 'Idempotency-Key': 'k'.repeat(129) },
-      body: { displayName: 'Too Long a Key', kind: 'shareholder' },
+      body: { displayName: 'Too Long a Key' },
     });
     expect(res.status).toBe(422);
     expectValidProblem(await res.json());

@@ -190,10 +190,14 @@ describe('HTTP HvApi adapter', () => {
     expect(actual?.init.body ? JSON.parse(actual.init.body as string) : undefined).toEqual(body);
   });
 
-  it('rejects the domain-only speaker reopen reason without a request', async () => {
+  it('sends the speaker reopen reason to the service in one PATCH (contract 0.4.0)', async () => {
     const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
-    await expect(api.updateSpeaker('s', { status: 'waiting', reason: 'follow_up' })).rejects.toMatchObject({ status: 422 });
-    expect(calls).toHaveLength(0);
+    replies.push(json({ id: 's', status: 'waiting' }, 200, { ETag: '"v3"' }));
+    await api.updateSpeaker('s', { status: 'waiting', reason: 'follow_up' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('/v1/speakers/s');
+    expect(calls[0]?.init.method).toBe('PATCH');
+    expect(JSON.parse(calls[0]?.init.body as string)).toEqual({ status: 'waiting', reason: 'follow_up' });
   });
 
   it('emits polling impulses only with a visible confirmed session and stops after unsubscribe', () => {
@@ -308,14 +312,15 @@ describe('HTTP HvApi adapter', () => {
       expect(outcomes).toEqual(['server_error']);
     });
 
-    it('reports local_reject without a CSRF token and for updateSpeaker with a reason, without a request', async () => {
+    it('reports local_reject without a CSRF token, without a request', async () => {
       const outcomes: string[] = [];
       const noSession = createHttpApi({ getCsrfToken: () => undefined, onUnauthorized: vi.fn(), fetcher: request, onWriteSettled: (o) => { outcomes.push(o); } });
       await expect(noSession.closeQuestion('q')).rejects.toMatchObject({ status: 401 });
       const session = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request, onWriteSettled: (o) => { outcomes.push(o); } });
-      await expect(session.updateSpeaker('s', { status: 'waiting', reason: 'follow_up' })).rejects.toMatchObject({ status: 422 });
-      expect(outcomes).toEqual(['local_reject', 'local_reject']);
-      expect(calls).toHaveLength(0);
+      replies.push(json({ id: 's', status: 'waiting' }, 200, { ETag: '"v4"' }));
+      await session.updateSpeaker('s', { status: 'waiting', reason: 'follow_up' });
+      expect(outcomes).toEqual(['local_reject', 'success']);
+      expect(calls).toHaveLength(1);
     });
 
     it('does not report reads, and a throwing hook neither breaks the write nor the listeners', async () => {

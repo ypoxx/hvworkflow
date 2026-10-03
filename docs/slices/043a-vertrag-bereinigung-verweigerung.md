@@ -802,29 +802,89 @@ Architekten, sofern Eigentümerfrage 5 freigegeben ist. Version: die nächste fr
 
 ```
 Slice: 043a-vertrag-bereinigung-verweigerung
-Done:
-Evidence:
-Open:
-Touched:
+Done: Vertrag 0.4.0 (d8fc188, Architekt): kind/requestedMinutes gestrichen, 401/422/409/500 nachgetragen,
+      Verweigerung als Antwortart mit drei vorab erklärten Operationen (Allowlist, slice 044). Web (0f7289a):
+      updateSpeaker sendet reason an den Dienst; die lokale Sperre und ihr JSDoc-Satz entfallen.
+Evidence: `pnpm gates` grün auf 0f7289a mit Postgres (Schluss unten); domain 280, web 484, api 612 Tests grün,
+      operation-coverage 69/60/9 ok, slice-scope ok (15 Dateien). `pnpm --filter @hv/web e2e` (in-process):
+      133 passed. Kein Screenshot (Nachweise: keine sichtbare Oberflächenänderung).
+Open: `http.unsupported` bleibt in shell.de.ts/shell.en.ts als unbenutzter Schlüssel: `parity.test.ts:162-169`
+      pinnt die Gesamtzahl 517, die Datei liegt außerhalb von „Files allowed“ (Folgeliste: Schlüssel streichen und
+      Zahl auf 516 senken, im nächsten Takt web).
+Touched: packages/contract/{openapi.yaml,CHANGELOG.md,package.json,allowlist.json,src/types.ts},
+      apps/api/src/__tests__/{contract-043a,contract,negative,takt-016-contract,takt-019-contract}.test.ts,
+      apps/api/src/__tests__/helpers.ts, docs/entscheidungsregister.md (Architektencommit),
+      apps/web/src/api/http.ts, apps/web/src/api/http.test.ts,
+      docs/slices/043a-vertrag-bereinigung-verweigerung.md
 ```
 
-**Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
-7.
+**Baustart:** auf Standard gebaut, Go des Eigentümers 03.10.2026 (Eigentümerfragen 1, 2 und 5 mit den Standards dieser
+Spec beantwortet). Vertragscommit durch den Architekten auf `claude/slice-043a-vertrag`, Basis `acb7f45`.
 
-**Mutationsproben (Ergebnis).**
+**Vor dem Bau prüfen (Ergebnisse, gelesen auf `acb7f45`).**
+1. Integrationszweig auf Vertrag 0.3.12, 66 Operationen, sechs Allowlist-Einträge (alle `slice` 040). 0.4.0 ist frei.
+   Seit `ca94899` gemergt: 040a (`c000567`, Kern und Tests, kein Vertrag), Specs 040a–d und 044a, takt-041 (`a1d9607`,
+   nur `apps/api/package.json` und Lockfile: hono 4.13.7+; kein Einfluss auf Vertrag, Validator oder Tests dieser
+   Scheibe, der volle API-Lauf ist grün). Erwartete Zahl in Akzeptanzkriterium 3: 6 + 3 = 9.
+2. `UNDOCUMENTED_STATUS_EXCEPTIONS` enthielt genau die fünf Lücken (401 auf den 29 Operationen aus `OPERATIONS_0_2`,
+   422 auf `listQuestions`/`returnQuestion`/`withdrawQuestion`, 409 auf `updateSpeaker`). Keine Abweichung.
+3. `registerSpeaker` und `updateSpeaker` schreiben nur benannte Felder (heute `api.ts:870-894` und `909-939`). Kein
+   Blocker.
+4. PATCH mit `{}` antwortet 200 ohne Ereignis und ohne neue Version (takt-015); der Block in `contract.test.ts` sendet
+   jetzt `{}` und bleibt sonst gleich.
+5. `/readyz` fängt Fehler der drei Prüfungen selbst ab (`safeCheck`, Antwort 503 mit Code), `/auth/login` wandelt
+   Fehler des Identitätsanbieters und des Auth-Speichers in 503 um; `/metrics` und die übrigen Routen fangen nicht ab.
+   Eine Ausnahme außerhalb dieser Blöcke erreicht überall `onError` (`app.ts:716`). 500 bleibt auf jeder Operation
+   dokumentiert (Ziel 2), auf `/readyz` und `/auth/login` nur unwahrscheinlicher.
+6. `http.unsupported` wird nur in `apps/web/src/api/http.ts:624` verwendet (dazu die beiden Sprachdateien). Der
+   Schlüssel entfällt mit dem zweiten Commit.
+7. Zeilenangaben: In den Dateien aus „Files allowed“ stimmen alle Angaben (`contract.test.ts:175-186`, die
+   `kind`-Stellen in `negative.test.ts`, `helpers.ts`, `http.ts:27, 44, 621-625`, `http.test.ts:192-196, 311-319`,
+   `shell.de.ts:27`, `shell.en.ts:29`). Abweichend, nur verschoben durch 040a, Inhalt unverändert: `api.ts` (+66 Zeilen:
+   `registerSpeaker` 870, `updateSpeaker` 909, Kommentar 925, Suchtext 733) und `permissions.ts` (`admin` ab Zeile 78).
+   **Inhaltlich überholt durch 040a:** `ROLE_PERMISSIONS.admin` ist keine Ableitung „alle außer einer Liste“ mehr,
+   sondern eine ausdrückliche Liste ohne `question.legal.clear`. Die Regel „nie admin“ bleibt richtig; der Hinweis an
+   044, `question.refuse.*` in eine Ausschlussliste aufzunehmen, ist gegenstandslos (044a sagt das ebenso). Gemeldet,
+   nicht angehalten: keine dieser Stellen liegt in „Files allowed“, der Befund trägt sonst unverändert.
 
-**Typen-Diff (Auszug).**
+**Mutationsproben (Ergebnis).** Gegen Vertrag 0.3.12 (`acb7f45`) sind 17 von 19 Tests in `contract-043a.test.ts` rot.
+Mit 0.4.0 grün; jede Probe danach zurückgesetzt (Datei byte-gleich):
+- `kind` wieder in `SpeakerRegistration` → Tests 2, 10 und 11 rot.
+- `answerKind` in `AnswerDraft` → Test 10 rot.
+- `if`/`then` aus `AnswerVersion` entfernt → Test 6 rot.
+- `refusalJustification: false` aus `EventRead` entfernt → Test 13 rot.
 
-**`pnpm gates` (Schluss, Commit):**
+**Typen-Diff (Auszug).** `git diff --stat acb7f45..d8fc188 -- packages/contract/src/types.ts`:
+`packages/contract/src/types.ts | 452 +++++++++++++++++++++++++++++++++++++----` (408 insertions, 44 deletions),
+regeneriert mit `pnpm contract:types`; die Hunks stehen im Vertragscommit `d8fc188`.
+
+**`pnpm gates` (Schluss, Commit):** gelaufen auf `0f7289a` (sauberer Baum), mit `TEST_DATABASE_URL`,
+`TEST_RUNTIME_DATABASE_URL` und `HV_DB_RUNTIME_ROLE=hv_runtime`, Exit 0:
 
 ```
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
+dist/assets/index-D_XXpNDR.js                        647.75 kB │ gzip: 190.56 kB │ map: 2,753.51 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.70s
+mark-test-run: wrote /home/user/wt/s043a/.claude/state/last-test-run (clean tree) at commit 0f7289a, tree 59426ff7dd9a…
 ```
+
+**Web-Commit (Tests zuerst).** Die beiden geänderten Tests in `http.test.ts` waren vor der Code-Änderung rot
+(2 failed, 120 passed: die Sperre antwortete 422 ohne Anfrage), danach grün (122/122).
 
 ## Review findings
 

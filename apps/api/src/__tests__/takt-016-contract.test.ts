@@ -5,7 +5,8 @@ describe('takt-016: additive contract bridge for meeting capture', () => {
   const schemas = openapiDoc.components.schemas;
 
   it('declares the patch version and the three typed fields without changing the alias body', () => {
-    expect(openapiDoc.info.version).toMatch(/^0\.3\./);
+    // Version 0.3.x when takt-016 was built; the additive bridge stays in 0.4.0 (slice 043a).
+    expect(openapiDoc.info.version).toMatch(/^0\.(?:3|4)\./);
     expect(schemas.Meeting.properties.debateClosedAt).toMatchObject({ type: 'string', format: 'date-time' });
     expect(schemas.Contribution.properties.lateEntry).toMatchObject({ type: 'boolean' });
     expect(schemas.MeetingContributionCapture.properties.lateEntryReason).toMatchObject({ type: 'string', minLength: 1 });

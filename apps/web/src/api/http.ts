@@ -24,7 +24,7 @@ export interface HttpApiOptions {
   /**
    * Slice 036a: how each own write ended, for the live store (liveStore.ts). `success` after a 2xx, once the ETag
    * is set and before the listeners run; `server_error` for any answer or network failure after sending;
-   * `local_reject` for a write refused here without a request (no CSRF token, the speaker reopen reason).
+   * `local_reject` for a write refused here without a request (no CSRF token).
    */
   onWriteSettled?: (outcome: WriteOutcome) => void;
   /** Slice 036b: every message of the stream, for the live store (`liveStore.onStreamMessage`); `[]` = everything. */
@@ -618,13 +618,7 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     getSpeaker: (speakerId) => read('get', '/speakers/{speakerId}', { params: { speakerId } }),
     registerSpeaker: (input, writeOptions) => write('post', '/speakers', { body: input, write: writeOptions }),
     reorderSpeakers: (round, speakerIds, writeOptions) => write('put', '/speakers/order', { body: { round, speakerIds }, write: writeOptions }),
-    updateSpeaker: (speakerId, input, writeOptions) => {
-      if (input.reason !== undefined) {
-        settled('local_reject');
-        return Promise.reject(new ApiProblem(422, translate(language(), 'http.errorTitle'), translate(language(), 'http.unsupported')));
-      }
-      return write('patch', '/speakers/{speakerId}', { params: { speakerId }, body: input, write: writeOptions });
-    },
+    updateSpeaker: (speakerId, input, writeOptions) => write('patch', '/speakers/{speakerId}', { params: { speakerId }, body: input, write: writeOptions }),
     listContributions: (filter) => read('get', '/contributions', { query: { speakerId: filter?.speakerId } }),
     getContribution: (contributionId) => read('get', '/contributions/{contributionId}', { params: contributionPath(contributionId) }),
     captureContribution: (input, writeOptions) => write('post', '/contributions', { body: input, write: writeOptions }),
