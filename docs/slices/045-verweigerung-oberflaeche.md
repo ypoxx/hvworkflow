@@ -163,15 +163,18 @@ keinem Oberflächentext.
   - `refusal_with_ground`: zusätzlich `refusalGroundId`;
   - Felder getrimmt, optionale Felder nur gesetzt, wenn vorhanden (`exactOptionalPropertyTypes`).
 - **Schreiben über `run` mit `onProblem` (Lesebefund 4).** `run` in `answers/Page.tsx` erhält einen optionalen vierten
-  Parameter `onProblem?: (error: unknown) => boolean`. Er wird im `catch` **vor** der bisherigen Behandlung gerufen; gibt er
+  Parameter `onProblem?: (error: unknown, stillShown: () => boolean) => boolean`. Er wird im `catch` **vor** der bisherigen Behandlung gerufen; gibt er
   `true` zurück, ist die Abweisung behandelt: **kein Toast, kein „Stand veraltet“**; die Sperre fällt und `reload()` läuft wie
   bisher. Alle bisherigen Aufrufer übergeben nichts und verhalten sich unverändert. Der Verweigerungsdialog übergibt:
   - 409 mit `ruleId` R-GUARD-09 → `true`; Meldung im Dialog `answers.refusal.error.guard09` mit Regel-id (`toast.rule`, D5),
     `role="alert"`; Eingaben bleiben. Die Demo meldet so auch eine Begründung, die erst nach Trimmen leer ist;
   - 422 → `true`; Meldung `answers.refusal.error.invalid`, `role="alert"`; Eingaben bleiben. Der Dienst meldet auch eine
     leere Begründung als 422 (044b „Hinweise 045“);
-  - 412 → schließt den Dialog (`setDialog(null)`, nur solange die Frage noch gezeigt wird) und gibt `false` zurück: Es folgt
-    die vorhandene 412-Behandlung („Stand veraltet“ über dem Detail bzw. Toast mit Nummer);
+  - 412 → schließt den Dialog und gibt `false` zurück: Es folgt die vorhandene 412-Behandlung („Stand veraltet“ über dem
+    Detail bzw. Toast mit Nummer). Der Rückruf schließt **nur**, wenn die Frage des Schreibvorgangs noch gezeigt wird: `run`
+    übergibt dem Rückruf dafür ihr `stillShown()` (Signatur `onProblem?: (error: unknown, stillShown: () => boolean) =>
+    boolean`), und der Rückruf ruft `if (stillShown()) setDialog(null)`; dieselbe Prüfung, die `run` heute vor
+    `setDialog(null)` im Erfolgspfad und vor `setStaleFor` macht (010d, Ziel 3);
   - alles andere (403, 409 mit anderer Regel, Netz) → `false`: Toast wie heute; der Dialog bleibt offen.
   Idempotenz, `If-Match` (`etagOf(question.version)`), Sperre gegen Doppelklick und Neulesen laufen wie bei `draftAnswer`.
 - **Nach dem Erfolg** schließt der Dialog (vorhandener Pfad in `run`); der Fokus geht auf die neue Versionskarte
@@ -376,8 +379,11 @@ den Orchestrator unten), `docs/folgeliste.md` außer über das Review.
    und `completed_at`) und die Mehrzeit der neuen Datei schätzen: Zahl der Rollenwechsel × gemessene Wechselzeit (Zeilen
    `[timing] switch to …` im Log) plus rund 1 s je Schreibschritt. **Liegt Ist plus Schätzung über 9 min, anhalten und
    melden**; der Bau ändert den Workflow nicht. Ist und Schätzung stehen im Bericht.
-7. Welcher Einheit die Expert-Testperson in beiden Projekten zugeordnet ist (Seed bzw. Setup 031a) und ob dort eine
-   Textpfad-Frage in `assigned` liegt, die keine Nachfolgedatei nutzt. Fehlt sie im Projekt `http`, anhalten und melden.
+7. Welcher Einheit die Expert-Testperson in beiden Projekten zugeordnet ist (Seed bzw. Setup 031a; Name als Konstante
+   `EXPERT_UNIT` für `findRefusableQuestion`) und ob dort eine Textpfad-Frage in `assigned` liegt, die keine Nachfolgedatei
+   nutzt. Fehlt sie im Projekt `http`, anhalten und melden. Bestätigen, dass `answer.draft` für `expert` auf einer
+   `in_review`-Frage der eigenen Einheit in `_actions` steht, **ohne** vorherige Inanspruchnahme (`question.claim` ist kein
+   Guard von R-TRANS-03); stimmt das nicht, prüft E2 nur Schaltfläche und Begründung und meldet die Abweichung.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -399,7 +405,10 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
    wahr**; Feld geleert → `fromTemplate` falsch; Wechsel zurück mit leerem Feld → erneut vorbefüllt.
 5. `refusal.test.ts`, `refusalProblemKey`: 409 R-GUARD-09 → `guard09`; 422 → `invalid`; 409 R-GUARD-11, 412, 403 →
    `undefined`.
-6. `RefusalDialog.test.tsx` (statisch gerendert wie `Podium.test.tsx`): Absenden gesperrt ohne Art; `refusal_with_ground`
+6. `RefusalDialog.test.tsx` (statisch gerendert wie `Podium.test.tsx`). Weil ein statisches Rendern nichts auswählen kann,
+   erhält `RefusalDialog` eine optionale Eigenschaft **`initialForm?: RefusalForm`** (nur für Tests; die Seite übergibt sie
+   nie, Standard ist das leere Formular; Kommentar am Prop). Die Fälle mit gewähltem Grund, Vorbefüllung und Vermerk rendern
+   mit `initialForm` aus `nextRefusalForm` (also über denselben Zustandsweg wie die Oberfläche). Fälle: Absenden gesperrt ohne Art; `refusal_with_ground`
    ohne Grund gesperrt; ohne Begründung gesperrt; der Vermerk steht außerhalb des `<textarea>` und ist über
    `aria-describedby` verknüpft; Badge und Vermerk bei `verified: false`; **mit einem Katalog `verified: true` weder Badge
    noch Vermerk** (Lesebefund 10); Katalog `loading` → Ladezeile, `failed` → Meldung, und in beiden Fällen ist
@@ -428,10 +437,13 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 **Aufbau und Isolation (Lesebefund 9).**
 - Die Datei ist ein `test.describe.serial('045 …')`-Block. Jeder Test bringt seine Vorbedingung selbst mit; kein Test
   verlässt sich auf den Browser-Zustand eines anderen. Gemeinsam ist nur eine Hilfe in der Datei,
-  `findRefusableQuestion(page, role)`: wechselt per `asRole`, filtert `answers-filter-status-assigned`, wählt die erste
-  Zeile, deren Detail `answer-refuse` zeigt und deren letzte Version keine Verweigerung ist (Muster
-  `021c-rechtsfreigabe.spec.ts`), und gibt die Nummer zurück. Nie eine feste Nummer, nie eine Frage aus
-  Vor-dem-Bau-Punkt 4 (Ausschlussliste in der Datei, mit Quelle).
+  **`findRefusableQuestion(page, role, opts?: { unitName?: string; exclude?: readonly string[] })`** (überall diese eine
+  Signatur): wechselt per `asRole(page, role)`, filtert `answers-filter-status-assigned`; ist `opts.unitName` gesetzt, wählt
+  er zusätzlich im Einheitenfilter `answers-filter-unit` die Einheit mit diesem Namen (die Einheit der Expert-Testperson aus
+  Vor-dem-Bau-Punkt 7, als Konstante in der Datei mit Quelle). Dann wählt er die erste Zeile, deren Detail `answer-refuse`
+  zeigt, deren letzte Version keine Verweigerung ist und deren Nummer nicht in `opts.exclude` und nicht in der
+  Ausschlussliste aus Vor-dem-Bau-Punkt 4 steht (Muster `021c-rechtsfreigabe.spec.ts`), und gibt die Nummer zurück. Nie eine
+  feste Nummer.
 - Im Projekt `in-process` beginnt jeder Test mit frischem Demo-Zustand; `--repeat-each=3` ist damit unabhängig.
 - Im Projekt `http` bleibt die Datenbank über Dateien hinweg bestehen. **Endzustand nach der Datei**, als Kommentar am
   Dateikopf und im Bericht:
@@ -445,22 +457,29 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 **Fälle**
 
 - **E1 Grund aus Katalog, ganzer Weg @screenshot** (ein Test mit `test.step`s). `coordination` öffnet die Frage aus
-  `findRefusableQuestion`: Dialog; Absenden gesperrt ohne Art und bei „Grund aus Katalog“ ohne Grund; Grund wählen →
+  `findRefusableQuestion(page, 'coordination', { unitName: EXPERT_UNIT })` (eigene Einheit der Expert-Testperson, für den
+  Expert-Teil von E2): Dialog; Absenden gesperrt ohne Art und bei „Grund aus Katalog“ ohne Grund; Grund wählen →
   Wortlaut = `stageText`, Vermerk neben dem Feld und **nicht** im Feldwert, Badge „ungeprüft“; Begründung tippen (eindeutiger
   Testsatz); Screenshot Dialog de/en; absenden → Status „in Prüfung“, Versionskarte mit „Verweigerung · Grund aus Katalog“,
-  Grund und Begründung, **Fokus auf der Versionskarte**. `approver`: „Verweigerung freigeben“ fehlt (keine Rechtsfreigabe).
+  Grund und Begründung, **Fokus auf der Versionskarte**. Jetzt der **Expert-Teil von E2** (Status `in_review`, letzte
+  Version die Verweigerung). `approver`: „Verweigerung freigeben“ fehlt (keine Rechtsfreigabe).
   `legal`: rechtlich freigeben. `approver`: „Verweigerung freigeben (Version n)“ vorhanden, „Freigeben“
   fehlt (R-GUARD-12); Begründung im Detail sichtbar; freigeben; Screenshot Detail de/en; Warteschlange der Bühne merken; auf
   die Bühne stellen. `podium`: die Frage erscheint in der Warteschlange mit Badge; Vorschau öffnen → Kennzeichen „Auskunft
   wird verweigert“, Grund, Wortlaut; Screenshot Bühne de/en (Vorschau oder aktuelle Frage, je nachdem, wo sie steht);
   Begründungssatz **nicht** im DOM der Bühne. Abschluss: E4a.
-- **E2 Leserkreis** (im selben Test wie E1, vor E4a). `approver` auf der Bühne: Begründungssatz nicht im DOM; im
-  Beantwortungsdetail derselben Frage sichtbar. `moderation`: Begründungssatz weder im Detail noch in der Historie noch auf
-  der Bühne; keine Schaltfläche „Verweigerung vorschlagen“. `expert`: **nur gegen eine Frage der eigenen Einheit** (E1 wählt
-  dafür über `findRefusableQuestion(page, 'coordination', { unitOf: 'expert' })` eine Frage, die der Einheit der
-  Expert-Testperson zugewiesen ist; Vor-dem-Bau-Punkt 7): zuerst zusichern, dass `expert` die Frage in der Arbeitsliste sieht
-  und ihr Detail öffnet (sonst prüfte der Fall nichts), dann keine Schaltfläche „Verweigerung vorschlagen“, kein
-  Begründungssatz im Detail und in der Historie, und der Antwort-Editor ist da (`answer.draft`) mit `answers.refusal.editorHint`.
+- **E2 Leserkreis** (im selben Test wie E1; zwei Stellen).
+  - **Expert-Teil, zwischen Vorschlag und Rechtsfreigabe** (Nachprüfung N1): Die Frage ist `in_review`, die letzte Version
+    ist die Verweigerung; R-TRANS-03 erlaubt `answer.draft` dort (aus `staged` nicht, transitions.ts:396-398). `expert`:
+    zuerst zusichern, dass die Frage in der Arbeitsliste steht und ihr Detail öffnet (sonst prüfte der Fall nichts), dann
+    keine Schaltfläche „Verweigerung vorschlagen“, kein Begründungssatz im Detail und in der Historie, und der Antwort-Editor
+    ist da mit `answers.refusal.editorHint`. **Nur ansehen, nichts schreiben:** kein Entwurf, kein Inanspruchnehmen.
+    `question.claim` ist **keine** Vorbedingung von `answer.draft` (R-TRANS-03 hat nur den Guard `isTextTrack`; die
+    Inanspruchnahme ist Anwesenheitsanzeige, `api.ts:1251-1277`, und die Oberfläche ruft `claimQuestion` nicht); der Editor
+    steht also allein aus `_actions`, und der Datenbankstand bleibt für die folgenden Schritte unverändert.
+  - **Nach dem Stellen, vor E4a:** `approver` auf der Bühne: Begründungssatz nicht im DOM; im Beantwortungsdetail derselben
+    Frage sichtbar. `moderation`: Begründungssatz weder im Detail noch in der Historie noch auf der Bühne; keine Schaltfläche
+    „Verweigerung vorschlagen“.
   **Nicht als e2e geprüft, weil durch die Wahrheitstabelle belegt** (`packages/domain/policy-truth-table.md`, Abschnitt
   „Role × Verweigerung“): `legal` hält nie `question.approve`, „Freigeben“ fehlt dort also immer; die Zeile aus der ersten
   Fassung entfällt.
@@ -484,7 +503,7 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 - **E6 Eingaben je Akteur (090).** `legal` öffnet den Dialog, tippt Wortlaut und Begründung, Wechsel zu einer Rolle mit und
   einer ohne das Recht und zurück: Dialog geschlossen, kein Feld trägt den alten Text (MutationObserver-Muster aus 090).
 - **E7 Tastatur (D8).** Dialog vollständig mit Tastatur: Tab zur Radiogruppe, Pfeile, Auswahl, Felder, Enter auf Absenden
-  (gegen eine Frage aus `findRefusableQuestion`, ohne Absenden: Escape am Ende); Fokus sichtbar; Escape schließt ohne
+  (gegen eine Frage aus `findRefusableQuestion(page, 'legal')`, ohne Absenden: Escape am Ende); Fokus sichtbar; Escape schließt ohne
   Schreiben.
 - **E8 axe** ohne serious/critical auf Dialog, Detail und Bühne, de und en (innerhalb von E1).
 - **E9 Eingaben je Frage (Lesebefund 3).** `legal`: Dialog auf Frage X öffnen, Art, Grund, Wortlaut, Begründung setzen,
@@ -649,8 +668,12 @@ Folgeliste (Vorgabe des Orchestrators, 03.10.2026). Entscheidungen des Orchestra
 | 15 | minor | Rückgabehinweis nach Begründung im Datensatz | Entscheidung 4 |
 | 16 | nit | Zeilenverweis Paritätstest | Befund: `parity.test.ts:164-171` |
 | 17 | nit | zwei Rollenzeilen ohne Prüfwert (`legal` „Freigeben fehlt“, `expert`) | E2: `expert` gegen eine Frage der eigenen Einheit mit Vorbedingung; `legal`-Zeile als Invariante der Wahrheitstabelle gestrichen; Vor-dem-Bau-Punkt 7 |
+| 18 | nit | Kürzel „(E15)“ | Entscheidung 9 |
+| N1 | major (Nachprüfung) | Expert-Teil von E2 lief auf `staged`, wo R-TRANS-03 kein `answer.draft` erlaubt | Expert-Teil zwischen Vorschlag und Rechtsfreigabe (`in_review`); `question.claim` geprüft: keine Vorbedingung, Expert sieht nur an; E2, Vor-dem-Bau-Punkt 7 |
+| N1a | Nachprüfung | eine Signatur für `findRefusableQuestion` | `findRefusableQuestion(page, role, opts?: { unitName, exclude })`, Einheit über `answers-filter-unit` und `EXPERT_UNIT` |
+| N1b | Nachprüfung | Test 6: wie das statische Rendern einen gewählten Grund erhält | Prop `initialForm` (nur Tests), Zustand aus `nextRefusalForm` |
+| N1c | Nachprüfung | `stillShown` im 412-Pfad von `onProblem` | `run` übergibt `stillShown`; Rückruf schließt nur, wenn die Frage noch gezeigt wird |
 
 **Nachtrag des Orchestrators zu Befund 15 (03.10.2026):** Der Rückgabedialog der Bühne zeigt den Hinweis bei jeder
 Verweigerung (Entscheidung 4, Test 13, E4a); das Restrisiko aus der vorigen Fassung entfällt. Mehraufwand < 0,1 AStd, im
 Aufwand enthalten (Bühne 0,3 → 0,35, Abschluss 0,3 → 0,25; Summe bleibt 3,5 in der Spanne 3,2–4,0).
-| 18 | nit | Kürzel „(E15)“ | Entscheidung 9 |
