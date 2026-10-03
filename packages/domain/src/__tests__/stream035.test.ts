@@ -298,7 +298,7 @@ const ALL_EVENT_TYPES: Record<EventType, true> = {
   QuestionApproved: true, QuestionLegalCleared: true, QuestionReturned: true, QuestionStaged: true,
   QuestionDelivered: true, QuestionClosed: true, QuestionWithdrawn: true, QuestionMerged: true,
   ContributionClaimed: true, ContributionReleased: true, QuestionClaimed: true, QuestionReleased: true,
-  IdempotencyRecorded: true,
+  IdempotencyRecorded: true, AgendaItemsReplaced: true, UnitsReplaced: true, StageSeatsReplaced: true,
 };
 
 describe('R-PERM-04 stream visibility (slice 035a)', () => {

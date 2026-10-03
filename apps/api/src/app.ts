@@ -969,6 +969,25 @@ export function createApp(options: CreateAppOptions = {}): App {
     c.json(await domain.listMeetingAgendaItems(requireParam(c, 'meetingId'))));
   app.get('/v1/meetings/:meetingId/units', guarded('listMeetingUnits'), async (c) =>
     c.json(await domain.listMeetingUnits(requireParam(c, 'meetingId'))));
+  // Scheibe 040b: master data as whole lists. The ETag is the meeting's new version, also on a replay.
+  const masterDataResult = async (c: Context, write: (scoped: HvApi, meetingId: string) => Promise<unknown>): Promise<Response> => {
+    const meetingId = requireParam(c, 'meetingId');
+    const scoped = await meetingDomain(meetingId);
+    const result = await write(scoped, meetingId);
+    const tag = scoped.lastWriteEtag();
+    c.header('ETag', tag ?? etagOf((await scoped.getMeeting()).version ?? 1));
+    return c.json(result);
+  };
+  app.put('/v1/meetings/:meetingId/agenda-items', guarded('replaceMeetingAgendaItems'), (c) => masterDataResult(c, (scoped, meetingId) =>
+    scoped.replaceMeetingAgendaItems(meetingId, getValidatedBody<Parameters<HvApi['replaceMeetingAgendaItems']>[1]>(c), writeOptions(c))));
+  app.put('/v1/meetings/:meetingId/units', guarded('replaceMeetingUnits'), (c) => masterDataResult(c, (scoped, meetingId) =>
+    scoped.replaceMeetingUnits(meetingId, getValidatedBody<Parameters<HvApi['replaceMeetingUnits']>[1]>(c), writeOptions(c))));
+  app.get('/v1/meetings/:meetingId/stage-seats', guarded('listMeetingStageSeats'), async (c) => {
+    const meetingId = requireParam(c, 'meetingId');
+    return c.json(await (await meetingDomain(meetingId)).listMeetingStageSeats(meetingId));
+  });
+  app.put('/v1/meetings/:meetingId/stage-seats', guarded('replaceMeetingStageSeats'), (c) => masterDataResult(c, (scoped, meetingId) =>
+    scoped.replaceMeetingStageSeats(meetingId, getValidatedBody<Parameters<HvApi['replaceMeetingStageSeats']>[1]>(c), writeOptions(c))));
   const agendaResult = async (c: Context, action: 'openAgendaItem' | 'openVoting' | 'closeVoting'): Promise<Response> => {
     const scoped = await meetingDomain(requireParam(c, 'meetingId'));
     const item = await scoped[action](requireParam(c, 'agendaItemId'), writeOptions(c));

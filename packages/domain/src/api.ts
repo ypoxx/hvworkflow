@@ -13,13 +13,15 @@
 import type { DomainEvent, NewEvent, ReadEvent } from './events.js';
 import { ALLOW, deny, extendingScopesFor, hasPermission, hasUnitBoundRead, READ_SCOPES, ROLE_PERMISSIONS, type Decision } from './permissions.js';
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
-import { emptyState, isOnStage, reduce, type State } from './state.js';
+import { emptyState, isOnStage, reduce, sortStageSeats, type State } from './state.js';
+import { checkAgendaItems, checkStageSeats, checkUnits } from './masterData.js';
 import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamMessage, type StreamStates } from './stream.js';
 import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
 import type {
   Actor,
   AgendaItem,
+  AgendaItemInput,
   AnswerDraft,
   Classification,
   Contribution,
@@ -42,9 +44,12 @@ import type {
   SpeakerRecord,
   SpeakerRegistration,
   SpeakerUpdate,
+  StageSeat,
+  StageSeatInput,
   StageView,
   StreamChange,
   Unit,
+  UnitInput,
   WriteOptions,
 } from './types.js';
 import { PERMISSIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
@@ -87,6 +92,15 @@ export interface HvApi {
   listRoleAssignments(filter?: { subjectId?: string; role?: Role }): Promise<RoleAssignment[]>;
   assignRole(input: RoleAssignmentCreate, opts?: WriteOptions): Promise<RoleAssignment>;
   revokeRole(id: string, reason?: string, opts?: WriteOptions): Promise<RoleAssignment>;
+  /**
+   * Scheibe 040b: master data of any meeting (not only the alias) as whole lists. Each write is one
+   * event with the meeting as subject and raises `Meeting.version` (the ETag of the answer).
+   */
+  replaceMeetingAgendaItems(meetingId: string, items: AgendaItemInput[], opts?: WriteOptions): Promise<AgendaItem[]>;
+  replaceMeetingUnits(meetingId: string, items: UnitInput[], opts?: WriteOptions): Promise<Unit[]>;
+  /** Every signed-in actor; `personId` and `deviceId` only for holders of `admin.seats.manage`. */
+  listMeetingStageSeats(meetingId: string): Promise<StageSeat[]>;
+  replaceMeetingStageSeats(meetingId: string, items: StageSeatInput[], opts?: WriteOptions): Promise<StageSeat[]>;
 
   listSpeakers(filter?: { round?: number; status?: Speaker['status'] }): Promise<Speaker[]>;
   getSpeaker(id: string): Promise<Speaker>;
@@ -365,7 +379,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
   });
   const viewMeeting = (meeting: Meeting): Meeting => ({
     ...meeting,
-    counts: { ...meeting.counts, byStatus: { ...meeting.counts.byStatus } },
+    counts: { ...meeting.counts, byStatus: { ...meeting.counts.byStatus },
+      ...(meeting.counts.byUnit !== undefined ? { byUnit: { ...meeting.counts.byUnit } } : {}),
+      ...(meeting.counts.bySeat !== undefined ? { bySeat: { ...meeting.counts.bySeat } } : {}) },
   });
 
   const now = (): string => clock().toISOString();
@@ -493,12 +509,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     claimQuestion: 'question.claim', releaseQuestion: 'question.claim',
     assignRole: 'admin.roles.manage', revokeRole: 'admin.roles.manage',
     AgendaItemOpened: 'agenda.manage', VotingOpened: 'agenda.manage', VotingClosed: 'agenda.manage',
+    replaceMeetingAgendaItems: 'agenda.manage', replaceMeetingUnits: 'admin.units.manage',
+    replaceMeetingStageSeats: 'admin.seats.manage',
   };
   const legacyEventType: Partial<Record<string, DomainEvent['type']>> = {
     registerSpeaker: 'SpeakerRegistered', reorderSpeakers: 'SpeakersReordered', updateSpeaker: 'SpeakerUpdated',
     captureMeetingContribution: 'ContributionCaptured', captureQuestions: 'QuestionCaptured',
     assignRole: 'RoleAssigned', revokeRole: 'RoleRevoked',
     AgendaItemOpened: 'AgendaItemOpened', VotingOpened: 'VotingOpened', VotingClosed: 'VotingClosed',
+    replaceMeetingAgendaItems: 'AgendaItemsReplaced', replaceMeetingUnits: 'UnitsReplaced',
+    replaceMeetingStageSeats: 'StageSeatsReplaced',
     'question.classify': 'QuestionClassified', 'question.assign': 'QuestionAssigned',
     'answer.draft': 'AnswerDrafted', 'question.submit_review': 'QuestionSubmittedForReview',
     'question.approve': 'QuestionApproved', 'question.legal.clear': 'QuestionLegalCleared',
@@ -583,8 +603,19 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       if (!item) throw new ApiProblem(409, 'Conflict', 'Historical agenda result is missing.', 'R-IDEM-01');
       return { ...item };
     }
+    // Scheibe 040b: the list as it stood after the first command; replay requires the operation's
+    // right (authorizeReplay), so the seats come back in full, like the first answer.
+    if (operation === 'replaceMeetingAgendaItems' || operation === 'replaceMeetingUnits' || operation === 'replaceMeetingStageSeats') {
+      if (!historical.meeting) throw new ApiProblem(409, 'Conflict', 'Historical meeting result is missing.', 'R-IDEM-01');
+      lastWriteVersion = historical.meeting.version;
+      if (operation === 'replaceMeetingAgendaItems') return historical.agendaItems.map((item) => ({ ...item }));
+      if (operation === 'replaceMeetingUnits') return historical.units.map((unit) => ({ ...unit }));
+      return historical.stageSeats.map((seat) => ({ ...seat }));
+    }
     throw new ApiProblem(409, 'Conflict', 'Historical command result is unsupported.', 'R-IDEM-01');
   };
+  /** Scheibe 040b: the three whole-list writes; their answer carries the meeting's new version. */
+  const MASTER_DATA_OPERATIONS: ReadonlySet<string> = new Set(['replaceMeetingAgendaItems', 'replaceMeetingUnits', 'replaceMeetingStageSeats']);
   const idempotent = <T>(scope: string, opts: WriteOptions | undefined, run: () => T): T => {
     const key = opts?.idempotencyKey;
     if (key !== undefined && (key.length === 0 || key.length > 128)) {
@@ -625,6 +656,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     }
     if (operation === 'registerSpeaker' || operation === 'reorderSpeakers') lastWriteVersion = state.meeting?.speakerListVersion;
     else if (operation === 'captureQuestions') lastWriteVersion = state.contributions.get(resource)?.version;
+    else if (MASTER_DATA_OPERATIONS.has(operation)) lastWriteVersion = state.meeting?.version;
     else if (typeof result === 'object' && result !== null && 'version' in result && typeof result.version === 'number') lastWriteVersion = result.version;
     else lastWriteVersion = undefined;
     return result;
@@ -767,7 +799,139 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       item.id !== assignment.id && managesRoles(item.role) && isUsable(item, events));
   };
 
-  return {
+  /* ---------- master data (Scheibe 040b) ---------- */
+
+  // A write on another meeting runs on an instance scoped to it, on the same store, because `append`
+  // refuses events of a meeting other than this projection's. One instance per meeting, created once
+  // and kept: each instance subscribes to the store, so one per call would leak listeners.
+  const scopedInstances = new Map<string, HvApi>();
+  const forMeeting = (meetingId: string): HvApi | undefined => {
+    if (options.meetingId === meetingId) return undefined;
+    let scoped = scopedInstances.get(meetingId);
+    if (!scoped) {
+      if (!store.all().some((e) => e.type === 'MeetingCreated' && e.subjectId === meetingId)) {
+        throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
+      }
+      scoped = createInProcessApi({ ...options, meetingId });
+      scopedInstances.set(meetingId, scoped);
+    }
+    return scoped;
+  };
+  /** Runs a write on the scoped instance and carries its ETag over to this one. */
+  const delegated = async <T>(scoped: HvApi, run: (target: HvApi) => Promise<T>): Promise<T> => {
+    lastWriteVersion = undefined;
+    const result = await run(scoped);
+    const tag = scoped.lastWriteEtag();
+    lastWriteVersion = tag === undefined ? undefined : Number(tag.slice(2, -1));
+    return result;
+  };
+  const conflictAdm02 = (what: string): ApiProblem =>
+    new ApiProblem(409, 'Conflict', `${what} is still referenced and cannot be removed.`, 'R-ADM-02');
+  /**
+   * The common frame of the three writes: the operation's right (via `can()`), the meeting, R-ADM-01,
+   * If-Match (optional until contract 0.5), the input check (422), R-ADM-02, then one event.
+   * R-ADM-01 answers 409 only to an actor that still reaches the closed meeting (the demo identity);
+   * a session has lost every assignment of a closed meeting and gets 403 before this point.
+   */
+  const masterDataWrite = <T>(operation: string, meetingId: string, permission: Permission, opts: WriteOptions | undefined,
+    steps: { check: () => string | null; keep: () => void; event: () => Omit<NewEvent, 'id' | 'at' | 'actor'>; result: () => T }): T =>
+    idempotent(`${operation}:${meetingId}`, opts, () => {
+      requirePermission(permission);
+      const meeting = state.meeting;
+      if (!meeting || meeting.id !== meetingId) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
+      if (meeting.status === 'closed') {
+        throw new ApiProblem(409, 'Conflict', 'The configuration of a closed meeting is immutable.', 'R-ADM-01');
+      }
+      checkIfMatch(meeting.version ?? 1, opts);
+      const invalid = steps.check();
+      if (invalid) throw new ApiProblem(422, 'Unprocessable', invalid);
+      steps.keep();
+      append([steps.event()]);
+      return steps.result();
+    });
+  const viewSeat = (seat: StageSeat, full: boolean): StageSeat => {
+    if (full) return { ...seat };
+    const { personId: _personId, deviceId: _deviceId, ...rest } = seat;
+    return rest;
+  };
+
+  const api: HvApi = {
+    async replaceMeetingAgendaItems(meetingId, items, opts) {
+      const scoped = forMeeting(meetingId);
+      if (scoped) return delegated(scoped, (target) => target.replaceMeetingAgendaItems(meetingId, items, opts));
+      return masterDataWrite('replaceMeetingAgendaItems', meetingId, 'agenda.manage', opts, {
+        check: () => checkAgendaItems(items),
+        keep: () => {
+          const kept = new Set(items.map((item) => item.id));
+          for (const old of state.agendaItems) {
+            if (kept.has(old.id)) continue;
+            if (old.openedAt !== undefined || [...state.questions.values()].some((q) => q.agendaItemId === old.id)) {
+              throw conflictAdm02(`Agenda item ${old.id}`);
+            }
+          }
+        },
+        event: () => ({ type: 'AgendaItemsReplaced', subjectId: meetingId, payload: {
+          agendaItems: items.map((item) => ({ id: item.id ?? newId(), number: item.number, title: item.title })) } }),
+        result: () => state.agendaItems.map((item) => ({ ...item })),
+      });
+    },
+    async replaceMeetingUnits(meetingId, items, opts) {
+      const scoped = forMeeting(meetingId);
+      if (scoped) return delegated(scoped, (target) => target.replaceMeetingUnits(meetingId, items, opts));
+      return masterDataWrite('replaceMeetingUnits', meetingId, 'admin.units.manage', opts, {
+        check: () => checkUnits(items),
+        keep: () => {
+          const kept = new Set(items.map((item) => item.id));
+          const nowMs = clock().getTime();
+          for (const old of state.units) {
+            if (kept.has(old.id)) continue;
+            const asked = [...state.questions.values()].some((q) => q.unitId === old.id);
+            // An assignment still in force (neither revoked nor expired) keeps its unit, so removing a
+            // unit cannot push a Fachkraft out of her questions (Missbrauchsfall, Test 3).
+            const assigned = [...state.roleAssignments.values()].some((item) => item.unitId === old.id && !item.revokedAt &&
+              (item.expiresAt === undefined || Date.parse(item.expiresAt) > nowMs));
+            if (asked || assigned) throw conflictAdm02(`Unit ${old.id}`);
+          }
+        },
+        event: () => ({ type: 'UnitsReplaced', subjectId: meetingId, payload: {
+          units: items.map((item) => ({ id: item.id ?? newId(), name: item.name,
+            ...(item.shortName !== undefined ? { shortName: item.shortName } : {}) })) } }),
+        result: () => state.units.map((unit) => ({ ...unit })),
+      });
+    },
+    async listMeetingStageSeats(meetingId) {
+      const source = options.meetingId === meetingId ? state : stateForMeeting(meetingId);
+      if (!source.meeting) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
+      // Master data: every signed-in actor reads the seats. Person and device only with
+      // `admin.seats.manage` in this meeting, decided through `can()`; without an active grant here
+      // the reader gets the masked list, never the full one.
+      const reader = resolveMeetingActor(source, options.actor(), clock);
+      const full = reader !== null && can(reader, 'admin.seats.manage').allow;
+      return source.stageSeats.map((seat) => viewSeat(seat, full));
+    },
+    async replaceMeetingStageSeats(meetingId, items, opts) {
+      const scoped = forMeeting(meetingId);
+      if (scoped) return delegated(scoped, (target) => target.replaceMeetingStageSeats(meetingId, items, opts));
+      return masterDataWrite('replaceMeetingStageSeats', meetingId, 'admin.seats.manage', opts, {
+        check: () => checkStageSeats(items),
+        keep: () => {
+          const kept = new Set(items.map((item) => item.id));
+          for (const old of state.stageSeats) {
+            if (kept.has(old.id)) continue;
+            // `seatId` of a question is explicit or derived from its `stageAssignment` (state.ts).
+            if ([...state.questions.values()].some((q) => q.seatId === old.id)) throw conflictAdm02(`Seat ${old.id}`);
+          }
+        },
+        // `personId` is not checked against `state.persons`: podium members are not in the person
+        // table of the speaker requests; slice 047 resolves device, seat and person.
+        event: () => ({ type: 'StageSeatsReplaced', subjectId: meetingId, payload: {
+          stageSeats: sortStageSeats(items.map((item) => ({ id: item.id ?? newId(), label: item.label,
+            ...(item.position !== undefined ? { position: item.position } : {}),
+            ...(item.personId !== undefined ? { personId: item.personId } : {}),
+            ...(item.deviceId !== undefined ? { deviceId: item.deviceId } : {}) }))) } }),
+        result: () => state.stageSeats.map((seat) => viewSeat(seat, true)),
+      });
+    },
     async listRoleAssignments(filter = {}) {
       requirePermission('admin.roles.manage');
       if (!state.meeting) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
@@ -1120,12 +1284,23 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       if (input.stageAssignment !== undefined && !STAGE_ASSIGNMENTS.includes(input.stageAssignment)) {
         throw new ApiProblem(422, 'Unprocessable', 'stageAssignment is not a known podium assignment.');
       }
+      // Scheibe 040b: a seat must be one of this meeting's seats; sent together with the deprecated
+      // enum both must be equal. `stageAssignment` alone stays unchecked against the list (old clients).
+      if (input.seatId !== undefined) {
+        if (typeof input.seatId !== 'string' || !state.stageSeats.some((seat) => seat.id === input.seatId)) {
+          throw new ApiProblem(422, 'Unprocessable', 'seatId is not a podium seat of this meeting.');
+        }
+        if (input.stageAssignment !== undefined && input.stageAssignment !== input.seatId) {
+          throw new ApiProblem(422, 'Unprocessable', 'seatId and stageAssignment must be equal when both are sent.');
+        }
+      }
       return transition(id, 'question.classify', opts, input, (q) => ({
         type: 'QuestionClassified',
         subjectId: q.id,
         payload: { track: input.track,
           ...(input.agendaItemId !== undefined ? { agendaItemId: input.agendaItemId } : {}),
-          ...(input.stageAssignment !== undefined ? { stageAssignment: input.stageAssignment } : {}) },
+          ...(input.stageAssignment !== undefined ? { stageAssignment: input.stageAssignment } : {}),
+          ...(input.seatId !== undefined ? { seatId: input.seatId } : {}) },
       }));
     },
     async assignQuestion(id, unitId, opts) {
@@ -1317,4 +1492,5 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       });
     },
   };
+  return api;
 }

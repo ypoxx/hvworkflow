@@ -10,6 +10,7 @@ import type {
   QuestionStatus,
   SpeakerReopenReason,
   SpeakerStatus,
+  StageSeat,
   TextSpan,
   Role,
 } from './types.js';
@@ -50,6 +51,8 @@ export type MeetingCreated = Base<
     lifecycleVersion?: 2;
     agendaItems: { id: string; number: number; title: string }[];
     units: { id: string; name: string; shortName?: string }[];
+    /** Scheibe 040b: the seat list (seed; cloning from 040c). Absent in older logs: no seats. */
+    stageSeats?: StageSeat[];
   }
 >;
 export type MeetingStarted = Base<'MeetingStarted', Record<string, never>>;
@@ -88,6 +91,10 @@ export type QuestionCaptured = Base<
   { number: string; contributionId: string; speakerId: string; text: string; span?: TextSpan }
 >;
 export type QuestionClassified = Base<'QuestionClassified', Classification>;
+/** Scheibe 040b: master data as whole lists; `subjectId` is the meeting, every one raises `Meeting.version`. */
+export type AgendaItemsReplaced = Base<'AgendaItemsReplaced', { agendaItems: { id: string; number: number; title: string }[] }>;
+export type UnitsReplaced = Base<'UnitsReplaced', { units: { id: string; name: string; shortName?: string }[] }>;
+export type StageSeatsReplaced = Base<'StageSeatsReplaced', { stageSeats: StageSeat[] }>;
 export type QuestionAssigned = Base<'QuestionAssigned', { unitId: string }>;
 export type AnswerDrafted = Base<
   'AnswerDrafted',
@@ -142,7 +149,10 @@ export type DomainEvent =
   | ContributionReleased
   | QuestionClaimed
   | QuestionReleased
-  | IdempotencyRecorded;
+  | IdempotencyRecorded
+  | AgendaItemsReplaced
+  | UnitsReplaced
+  | StageSeatsReplaced;
 
 export type EventType = DomainEvent['type'];
 

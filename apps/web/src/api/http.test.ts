@@ -148,6 +148,11 @@ describe('HTTP HvApi adapter', () => {
     ['listRoleAssignments', [{ subjectId: 's /1', role: 'admin' }], 'GET', '/v1/meetings/current/role-assignments?subjectId=s+%2F1&role=admin'],
     ['assignRole', [{ subjectId: 's', role: 'admin' }], 'POST', '/v1/meetings/current/role-assignments', { subjectId: 's', role: 'admin' }],
     ['revokeRole', ['ra /1', 'why'], 'POST', '/v1/meetings/current/role-assignments/ra%20%2F1/revocation', { reason: 'why' }],
+    // Scheibe 040b: master data of a named meeting; the body is the whole list.
+    ['replaceMeetingAgendaItems', ['m /1', [{ number: 1, title: 'TOP' }]], 'PUT', '/v1/meetings/m%20%2F1/agenda-items', [{ number: 1, title: 'TOP' }]],
+    ['replaceMeetingUnits', ['m /1', [{ name: 'Fachbereich' }]], 'PUT', '/v1/meetings/m%20%2F1/units', [{ name: 'Fachbereich' }]],
+    ['listMeetingStageSeats', ['m /1'], 'GET', '/v1/meetings/m%20%2F1/stage-seats'],
+    ['replaceMeetingStageSeats', ['m /1', [{ label: 'Platz', position: 1 }]], 'PUT', '/v1/meetings/m%20%2F1/stage-seats', [{ label: 'Platz', position: 1 }]],
     ['getSpeaker', ['s /1'], 'GET', '/v1/speakers/s%20%2F1'],
     ['registerSpeaker', [{ displayName: 'Test' }], 'POST', '/v1/speakers', { displayName: 'Test' }],
     ['reorderSpeakers', [2, ['s1', 's2']], 'PUT', '/v1/speakers/order', { round: 2, speakerIds: ['s1', 's2'] }],

@@ -69,6 +69,10 @@ export const EVENT_TOPICS: Readonly<Record<EventType, readonly StreamTopic[]>> =
   QuestionReleased: ['questions', 'stage'],
   // The question history lists every event whose subjectId is the question (Bauklärung C1).
   IdempotencyRecorded: ['questions'],
+  // Scheibe 040b: master data of the meeting; the counters per unit and seat change with them.
+  AgendaItemsReplaced: ['meeting'],
+  UnitsReplaced: ['meeting'],
+  StageSeatsReplaced: ['meeting'],
 };
 
 const meetingRef = (e: DomainEvent): SubjectRef[] => (e.meetingId !== undefined ? [{ kind: 'meeting', id: e.meetingId }] : []);
@@ -116,6 +120,9 @@ export const EVENT_SUBJECTS: { readonly [T in EventType]: (e: Extract<DomainEven
   QuestionReleased: questionOnly,
   // Resolved against the projection: only a subject that is a question counts (see `lookup`).
   IdempotencyRecorded: questionOnly,
+  AgendaItemsReplaced: meetingRef,
+  UnitsReplaced: meetingRef,
+  StageSeatsReplaced: meetingRef,
 };
 
 /** Events after which a question may leave a reader's read scope (M3): a catch-up then resets. */

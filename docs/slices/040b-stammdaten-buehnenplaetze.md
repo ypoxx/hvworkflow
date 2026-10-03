@@ -227,6 +227,15 @@ Dokumente:
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur neue Zeile „Bühnenplatzliste“ in der Verarbeitungstabelle)
 - `docs/folgeliste.md`
 - `docs/slices/040b-stammdaten-buehnenplaetze.md`
+- **Nachtrag des Orchestrators (03.10.2026, Bau-Halt Teil 2):** drei Folgen von Ziel 6 und dem neuen `MeetingCreated`,
+  die die Vorprüfung nicht gefunden hatte:
+  - `packages/domain/src/__tests__/admin040a.test.ts` (nur `ADMIN_LIST` um `admin.units.manage` und
+    `admin.seats.manage` erweitern, 12 → 14 und Testname);
+  - `packages/domain/src/__tests__/seed-fictitious-names.test.ts` (nur `fingerprintOf`: `stageSeats` und `unit-ar` aus
+    `MeetingCreated` herausnehmen; `PRE_CHANGE_FINGERPRINT` bleibt unverändert und belegt damit die gleiche
+    Fragenverteilung);
+  - `apps/web/src/app/featureRegistry.ts` (nur der Typ `NumericCounter`: `'byUnit' | 'bySeat'` ausschließen; Ausnahme
+    vom Verbot `apps/web/src/app/**` unten, sonst keine Zeile).
 
 Weitere Dateien sind Scope-Befunde.
 

@@ -131,6 +131,11 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
     case 'IdempotencyRecorded':
       // The event label is enough; command keys and claim actors are not repeated in the summary.
       break;
+    case 'AgendaItemsReplaced':
+    case 'UnitsReplaced':
+    case 'StageSeatsReplaced':
+      // Scheibe 040b: the event label is enough; seat labels in the history follow with slice 056.
+      break;
   }
 
   return parts.join(' · ');

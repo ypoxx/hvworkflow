@@ -20,7 +20,7 @@ import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
 
 /** The header and navigation show only the scalar counters; `byStatus` feeds the process strip. */
-export type NumericCounter = Exclude<keyof Meeting['counts'], 'byStatus'>;
+export type NumericCounter = Exclude<keyof Meeting['counts'], 'byStatus' | 'byUnit' | 'bySeat'>;
 
 export interface Feature {
   /** Unique identifier for this feature */

@@ -13,9 +13,11 @@ import type {
   QuestionStatus,
   SpeakerRecord,
   RoleAssignment,
+  StageAssignment,
+  StageSeat,
   Unit,
 } from './types.js';
-import { QUESTION_STATUSES } from './types.js';
+import { QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
 import { computeCoverage } from './coverage.js';
 import { resolveAgendaProgress, resolveMeetingLifecycle } from './transitions.js';
 
@@ -23,6 +25,8 @@ export interface State {
   meeting: Meeting | null;
   agendaItems: AgendaItem[];
   units: Unit[];
+  /** Scheibe 040b: podium seats, sorted by `position`, then `id` (a seat without position last). */
+  stageSeats: StageSeat[];
   speakers: Map<string, SpeakerRecord>;
   persons: Map<string, Person>;
   roleAssignments: Map<string, RoleAssignment>;
@@ -38,6 +42,7 @@ export function emptyState(): State {
     meeting: null,
     agendaItems: [],
     units: [],
+    stageSeats: [],
     speakers: new Map(),
     persons: new Map(),
     roleAssignments: new Map(),
@@ -57,6 +62,12 @@ export function isOnStage(q: Pick<QuestionRecord, 'status'>): boolean {
   return q.status === 'staged';
 }
 
+/** The order of the seat list: by `position`, then `id`; a seat without a position comes last. */
+export function sortStageSeats(seats: readonly StageSeat[]): StageSeat[] {
+  return [...seats].sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 /** Recompute the aggregate counters shown in the header and on the podium. */
 export function refreshCounts(state: State): void {
   if (!state.meeting) return;
@@ -64,11 +75,20 @@ export function refreshCounts(state: State): void {
   let staged = 0;
   let delivered = 0;
   const byStatus = Object.fromEntries(QUESTION_STATUSES.map((s) => [s, 0])) as Record<QuestionStatus, number>;
+  // Scheibe 040b: every unit and every seat of the meeting is a key, also with 0. A question whose
+  // unit or seat is in neither list (an older log) counts under no key.
+  const byUnit: Record<string, number> = Object.fromEntries(state.units.map((unit) => [unit.id, 0]));
+  const bySeat: Record<string, number> = Object.fromEntries(state.stageSeats.map((seat) => [seat.id, 0]));
   for (const q of state.questions.values()) {
     byStatus[q.status] += 1;
-    if (isOnStage(q)) staged++;
-    else if (q.status === 'delivered' || q.status === 'closed') delivered++;
-    if (!['closed', 'withdrawn', 'merged', 'delivered'].includes(q.status)) open++;
+    if (isOnStage(q)) {
+      staged++;
+      if (q.seatId !== undefined && Object.hasOwn(bySeat, q.seatId)) bySeat[q.seatId]! += 1;
+    } else if (q.status === 'delivered' || q.status === 'closed') delivered++;
+    if (!['closed', 'withdrawn', 'merged', 'delivered'].includes(q.status)) {
+      open++;
+      if (q.unitId !== undefined && Object.hasOwn(byUnit, q.unitId)) byUnit[q.unitId]! += 1;
+    }
   }
   state.meeting.counts = {
     speakers: state.speakers.size,
@@ -77,6 +97,8 @@ export function refreshCounts(state: State): void {
     staged,
     delivered,
     byStatus,
+    byUnit,
+    bySeat,
   };
   // The current round is where the microphone is: the round of the speaker talking now, else the
   // lowest round that still has someone waiting, else the last round that was registered.
@@ -137,6 +159,33 @@ export function reduce(state: State, e: DomainEvent): State {
       };
       state.agendaItems = e.payload.agendaItems.map((a) => ({ ...a }));
       state.units = e.payload.units.map((u) => ({ ...u }));
+      state.stageSeats = sortStageSeats((e.payload.stageSeats ?? []).map((seat) => ({ ...seat })));
+      break;
+    }
+    // Scheibe 040b: master data as whole lists. An agenda item that keeps its id keeps its progress.
+    case 'AgendaItemsReplaced': {
+      if (state.meeting?.id !== e.subjectId) break;
+      const previous = new Map(state.agendaItems.map((item) => [item.id, item]));
+      state.agendaItems = e.payload.agendaItems.map((item) => {
+        const old = previous.get(item.id);
+        return { id: item.id, number: item.number, title: item.title,
+          ...(old?.openedAt !== undefined ? { openedAt: old.openedAt } : {}),
+          ...(old?.votingOpenedAt !== undefined ? { votingOpenedAt: old.votingOpenedAt } : {}),
+          ...(old?.votingClosedAt !== undefined ? { votingClosedAt: old.votingClosedAt } : {}) };
+      }).sort((a, b) => a.number - b.number);
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
+      break;
+    }
+    case 'UnitsReplaced': {
+      if (state.meeting?.id !== e.subjectId) break;
+      state.units = e.payload.units.map((unit) => ({ ...unit }));
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
+      break;
+    }
+    case 'StageSeatsReplaced': {
+      if (state.meeting?.id !== e.subjectId) break;
+      state.stageSeats = sortStageSeats(e.payload.stageSeats.map((seat) => ({ ...seat })));
+      state.meeting.version = (state.meeting.version ?? 1) + 1;
       break;
     }
     case 'MeetingStarted': {
@@ -341,7 +390,15 @@ export function reduce(state: State, e: DomainEvent): State {
       q.track = e.payload.track;
       if (e.payload.agendaItemId !== undefined) q.agendaItemId = e.payload.agendaItemId;
       else delete q.agendaItemId;
-      if (e.payload.stageAssignment !== undefined) q.stageAssignment = e.payload.stageAssignment;
+      // Scheibe 040b: `seatId` is the sent seat, otherwise the deprecated enum value; `stageAssignment`
+      // is the sent enum value, otherwise the seat when it is one of the four values. So both never
+      // disagree, and a classification without either removes both.
+      const seatId = e.payload.seatId ?? e.payload.stageAssignment;
+      const stageAssignment = e.payload.stageAssignment ??
+        (seatId !== undefined && (STAGE_ASSIGNMENTS as readonly string[]).includes(seatId) ? seatId as StageAssignment : undefined);
+      if (seatId !== undefined) q.seatId = seatId;
+      else delete q.seatId;
+      if (stageAssignment !== undefined) q.stageAssignment = stageAssignment;
       else delete q.stageAssignment;
       touch(q, e.at);
       break;
