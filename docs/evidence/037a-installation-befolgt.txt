@@ -1,0 +1,99 @@
+S17 – Installationsseite 037a befolgt (docs/betrieb/installation.md)
+
+Commit:  101cc153d45eaab9544de50aef7a3637efbcb16b (Branch claude/slice-037a-betriebspaket, frischer Klon in /home/user/s17/hvworkflow)
+Datum:   03.10.2026
+
+Umgebung:
+- Docker Engine 29.3.1 (vfs-Speichertreiber, selbst gestarteter dockerd), Compose v5.1.1, Node v22.22.2, pnpm 10.33.0.
+- Umgebungsgrenzen: TLS-abfangender Proxy (CA /root/.ccr/ca-bundle.crt); quay.io gesperrt (403), daher kein Keycloak-Image,
+  daher kein laufender Stack, keine Anmeldung, kein Rauchtest. Das sind keine Seitenfehler.
+- Ich habe KEIN "pnpm install" ausgefuehrt (Seite: "Der Befehl braucht kein pnpm install"; fuer stack:login waere es noetig).
+
+Ergebnis je Schritt
+
+Abschnitt 1 (Was Sie bekommen): OK. Nur Beschreibung. Hinweis: Die Ueberschrift sagt "Vier Dienste und zwei einmalige Schritte",
+  die Tabelle fuehrt aber web, api, postgres, keycloak, migrate, seed auf (4 + 2): stimmig.
+
+Abschnitt 2 (Voraussetzungen): OK.
+  Befehle: docker version, docker compose version -> Engine 29.3.1, Compose v5.1.1. Beide erfuellen die Mindestversionen.
+  Unklar (gering): Die Seite nennt "Compose ab 2.20"; Compose v5.x erfuellt das offensichtlich, die Seite sagt aber nicht,
+  dass neuere Hauptversionen (5.x) gemeint sind. Der Check von stack:up akzeptierte sie.
+
+Abschnitt 3 (Ein Befehl: pnpm stack:up): FEHLER in meiner Umgebung, Seite aber hilfreich -> Teilweise OK / NICHT ERREICHBAR (quay.io)
+  a) Erst mit HV_STACK_BUILD_CA=/root/.ccr/ca-bundle.crt (Weg laut Abschnitt 10): Stufe "Images bauen" erfolgreich;
+     "Image hv-tool/web:local / api:local / seed:local Built". Dauer insgesamt ca. 1 min 20 s bis zum Abbruch.
+  b) Danach Stufe "Stack starten": Abbruch:
+       Image quay.io/keycloak/keycloak:26.7.4@sha256:... Error Get "https://quay.io/v2/": Forbidden
+       HV-Stack: Fehler in der Stufe „Stack starten“.
+     Diagnose-Block erschien wie beschrieben (Compose-Meldung, "docker compose ps -a": alle Container "nicht angelegt").
+     -> NICHT ERREICHBAR (quay.io). Die Schlusszeile "HV-Stack bereit: ..." wurde nie erreicht.
+  c) Gegenprobe ohne HV_STACK_BUILD_CA (Build-Cache geleert): Abbruch in Stufe "Images bauen" mit
+       Error: self-signed certificate in certificate chain, code: 'SELF_SIGNED_CERT_IN_CHAIN' (beim corepack-Abruf von pnpm)
+       HV-Stack: Fehler in der Stufe „Images bauen“.
+     Die Fehlerzeile entspricht genau der Zeile in der Fehlersuche-Tabelle, die Abhilfe funktionierte beim ersten Versuch. OK.
+  Unklar/Verbesserung:
+   - Die Abschnitt-3-Beschreibung sagt, bei Abbruch gebe es "gegebenenfalls einen festen Satz mit der Abhilfe". Beim
+     Zertifikatsfehler (c) kam im Tail der Ausgabe KEIN Hinweis auf HV_STACK_BUILD_CA; man muss selbst in Abschnitt 10 suchen.
+     Die Seite verweist zwar am Ende von Abschnitt 3 auf Abschnitt 10, aber ein Hinweis direkt in der Fehlermeldung wuerde helfen.
+   - Der Abschnitt 2 erwaehnt den Firmen-Proxy nicht; wer hinter einem Proxy sitzt, findet die Abhilfe erst in Abschnitt 10.
+   - Jede pnpm-Ausgabe endet mit "WARN Local package.json exists, but node_modules missing, did you mean to install?"
+     und bei Fehlern mit "ELIFECYCLE Command failed". Das verwirrt, widerspricht scheinbar "braucht kein pnpm install";
+     die Seite erklaert das nicht (Hinweis fuer Neulinge: Warnung ignorierbar).
+   - Der Fehlerfall "Basis-Image kann nicht geladen werden" ist in Abschnitt 10 beschrieben (docker pull <name>); quay.io-Sperre
+     (403 Forbidden) fuehrt zu genau diesem Fall. Die Seite sagt nicht, dass die Images aus drei Registries kommen
+     (Docker Hub, quay.io, ggf. gcr) und dass eine Firewall quay.io freigeben muss: fuer Firmennetze relevante Angabe fehlt.
+
+Abschnitt 4 (Anmelden): TEILWEISE.
+  - "pnpm stack:credentials": OK. Listet die Testpersonen (moderation, capture, coordination, expert, legal, approver, podium, ...)
+    mit Rolle und Passwort ("Passwort: [secret]"), nachdem stack:up das Zustandsverzeichnis angelegt hatte (auch beim Abbruch
+    in Stufe "Stack starten" vorhanden). Ausgabe: "Testpersonen (Realm hv-local, Anmeldung unter http://localhost:8480)".
+    Unklar: Die Seite sagt, die letzte Zeile sei der Keycloak-Admin-Zugang; ich habe nur die ersten Zeilen geprueft.
+  - Anmeldung im Browser unter http://localhost:8480: NICHT ERREICHBAR (quay.io), kein Stack.
+  - "pnpm stack:login -- --no-screenshot": FEHLER wie erwartet: "HV-Stack: Fehler in der Stufe „Playwright laden“." (kein pnpm install
+    gelaufen, weil dies laut Seite fuer stack:up nicht noetig ist; fuer stack:login schon, dort steht es). Die Fehlermeldung
+    nennt keinen Hinweis "pnpm install ausfuehren". Verbesserung: Satz mit Abhilfe in der Meldung. Weiter nicht geprueft.
+
+Abschnitt 5 (Gesundheit pruefen: pnpm stack:smoke): NICHT ERREICHBAR (quay.io).
+  Ausgabe ohne laufenden Stack: Diagnose mit "nicht angelegt", "HV-Stack: Fehler in der Stufe „Rauchtest“."
+  Unklar: Die Seite sagt nicht, was zu tun ist, wenn der Stack gar nicht laeuft (Meldung "Stack nicht gestartet, erst pnpm stack:up"
+  waere hilfreicher). "docker compose -p hv-tool ps" lieferte eine leere Liste, wie erwartet bei nicht gestartetem Stack.
+
+Abschnitt 6 (Stoppen/Starten/Aktualisieren/Zuruecksetzen/Deinstallieren): OK soweit erreichbar.
+  - pnpm stack:down -> "HV-Stack gestoppt; die Daten bleiben erhalten. Wieder starten: pnpm stack:up". OK (auch ohne laufenden Stack ohne Fehler).
+  - pnpm stack:reset (ohne --yes) -> "stack:reset löscht alle lokalen Daten und Passwörter und braucht --yes: pnpm stack:reset --yes"
+    und Exit-Code 1, passiert nichts. Wie auf der Seite. OK.
+  - pnpm stack:reset --yes -> "HV-Stack zurückgesetzt: Container, Volumes und Zustandsverzeichnis gelöscht. Neu starten: pnpm stack:up". OK.
+    Danach: kein Docker-Volume mehr, im Zustandsverzeichnis ~/.local/state nur noch das fremde Verzeichnis "pnpm" (hv-tool-stack weg).
+  - docker image rm hv-tool/api:local hv-tool/seed:local hv-tool/web:local -> Untagged/Deleted. OK.
+  - Aktualisieren (git pull + stack:up): nicht ausgefuehrt (kein laufender Stack).
+
+Abschnitt 7 (Robustheit): NICHT ERREICHBAR (quay.io) bis auf eine Probe.
+  - node scripts/stack.mjs probe images ohne laufenden Stack: PASS fuer seed (65532) und web (101), dann Abbruch "Fehler in der Stufe „Probe images“"
+    weil api nicht laeuft. Die Seite sagt nicht, dass fuer die Proben ein laufender Stack Voraussetzung ist ("Jede Probe laeuft gegen den laufenden Stack"
+    steht dort zwar, aber probe images prueft teils auch ohne; Verhalten leicht inkonsistent).
+  - probe postgres-restart, api-crash, refusals: nicht ausgefuehrt (Stack nicht verfuegbar).
+
+Abschnitt 8 (Sicherheit): OK, nur Beschreibung. Zustandsverzeichnis ~/.local/state/hv-tool-stack wurde angelegt und von reset entfernt: stimmt.
+
+Abschnitt 9 (Zugriffslog): NICHT ERREICHBAR (quay.io). Die docker-run-Befehle setzen das Image hv-tool/api:local und das Volume voraus. Nicht ausgefuehrt.
+
+Abschnitt 10 (Fehlersuche): Genutzt, OK.
+  - Zertifikatsfehler -> HV_STACK_BUILD_CA: bestaetigt, funktioniert.
+  - "Stufe Stack starten bricht ab" -> Meldung der Seite passt zur Lage; docker pull <name> nicht eigens ausgefuehrt.
+  Unklar: Tabellenzeile zu quay.io/Firewall/Registry-Sperre fehlt (siehe oben).
+
+Abschnitt 11 (Was fehlt): OK, nur Beschreibung.
+
+Abschluss: stack:reset --yes ausgefuehrt, Images entfernt, dockerd per kill $(cat /tmp/d/run/docker.pid) beendet. Nichts committet.
+
+Zusammenfassung
+Konnte ein Neuling nur mit dieser Seite den Stack installieren und betreiben? In dieser Umgebung nicht abschliessend beantwortbar, weil
+quay.io (Keycloak) gesperrt war: Stack-Start, Anmeldung, Rauchtest, Proben und Zugriffslog blieben unerreichbar. Was erreichbar war, folgt der Seite:
+Voraussetzungspruefung, Image-Bau (mit der in Abschnitt 10 beschriebenen Proxy-Abhilfe erfolgreich beim ersten Versuch), Zugangsdaten-Ausgabe,
+stop/reset/Deinstallation, jeweils mit den auf der Seite genannten Meldungen. Keine sachlich falsche Angabe gefunden.
+Verbesserungsvorschlaege (alle klein):
+ 1. Zertifikatsfehler-Abbruch beim Image-Bau sollte den Hinweis auf HV_STACK_BUILD_CA direkt ausgeben; Proxy-Hinweis schon in Abschnitt 2/3.
+ 2. Seite erwaehnen, dass pnpm "node_modules missing" warnt, ohne dass das ein Fehler ist.
+ 3. Registries nennen (Docker Hub, quay.io) fuer Firmen-Firewalls; Abbruch bei quay.io-Sperre mit eigener Zeile in der Fehlersuche.
+ 4. stack:login ohne pnpm install: Fehlermeldung "Playwright laden" mit Abhilfe versehen.
+ 5. stack:smoke/probe ohne laufenden Stack: klare Meldung statt Diagnoseblock.

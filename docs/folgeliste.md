@@ -415,6 +415,13 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 
 ## Betriebspaket (aus 037a)
 
+- 037a S17 (frischer Agent, 03.10.2026, `docs/evidence/037a-installation-befolgt.txt`) · `docs/betrieb/installation.md`,
+  `scripts/stack.mjs` · fünf kleine Verbesserungen: (1) Zertifikatsabbruch beim Bau nennt `HV_STACK_BUILD_CA` direkt,
+  Proxy-Hinweis schon in §2/§3; (2) pnpm-Warnung „node_modules missing“ als harmlos erklären; (3) Registries nennen
+  (Docker Hub, quay.io) für Firmen-Firewalls, eigene Fehlersuche-Zeile für eine gesperrte Registry; (4) `stack:login` ohne
+  `pnpm install`: Meldung „Playwright laden“ mit Abhilfe; (5) `stack:smoke`/`probe` ohne laufenden Stack: klarer Satz
+  statt Diagnoseblock. Keine sachlich falsche Angabe gefunden.
+
 - 037a Bau · `apps/api/src/persistence/migrations.ts` (über `migrate-cli.ts`) · pg 8.23 meldet bei jedem Migrationslauf
   „DeprecationWarning: Calling client.query() when the client is already executing a query“ (auch im Protokoll des
   Einmaldienstes `migrate`) · Abfragen dort strikt nacheinander awaiten, bevor pg 9 das entfernt.
