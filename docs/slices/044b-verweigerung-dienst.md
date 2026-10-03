@@ -1,15 +1,15 @@
 # Scheibe 044b — Verweigerungspfad A und B, Teil 2: Dienst und HTTP-Nachweis
 
-**Status:** spec (03.10.2026; gelesen auf `83bc7e2`, Merge von 044a #131; Teil 2 der geteilten Scheibe 044, Zuschnitt in `docs/slices/044a-verweigerung-kern.md`, Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 2,0 AStd (Teilungstabelle 044a: 1; Begründung im Abschnitt „Aufwand“) · Plan 044: 06.11.2026 (W6), tatsächlich direkt nach 044a in der Lane service; **muss vor dem 27.11.2026 gemergt sein** (Ablauf der drei Allowlist-Einträge, `packages/contract/scripts/check.mjs` (d)) · Go des Eigentümers zum Zuschnitt (044a, Frage 2) am 03.10.2026, auf Standard gebaut · Lanes: service; contract (nur `allowlist.json`); core (nur die Längenprüfung von `proposeRefusal`); e2e (nur die Schlüsselliste des Zugriffslogs in zwei Skripten); docs-adr (nur Architekt, erster Commit); docs-datenschutz (nur Zeile V10 und Zeile „Technisches Zugriffslog“); docs-sicherheit
-**Rolle:** architekt für den ADR-Nachtrag (erster Commit, nur `docs/adr/0013-zwei-protokollebenen.md`); danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Maskierung über HTTP, Rechte, Zugriffslog), **Datenschutz** (Begründung im `pii`-Teil der gespeicherten Zeile, neue Spalte im Zugriffslog, Aufbewahrungsklasse) und **Vertrag** (Gleichlauf von Validator und Kern, Antwortprüfung, Allowlist und Abdeckungstor). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
+**Status:** spec (03.10.2026; gelesen auf `83bc7e2`, Merge von 044a #131; Standard zum Zugriffslog nach Vorgabe des Orchestrators umgestellt: kein neuer Schlüssel; Teil 2 der geteilten Scheibe 044, Zuschnitt in `docs/slices/044a-verweigerung-kern.md`, Abschnitt „Teilung und Zuschnitt“)
+**Risikoklasse:** hoch · 1,65 AStd (Teilungstabelle 044a: 1; Begründung im Abschnitt „Aufwand“) · Plan 044: 06.11.2026 (W6), tatsächlich direkt nach 044a in der Lane service; **muss vor dem 27.11.2026 gemergt sein** (Ablauf der drei Allowlist-Einträge, `packages/contract/scripts/check.mjs` (d)) · Go des Eigentümers zum Zuschnitt (044a, Frage 2) am 03.10.2026, auf Standard gebaut · Lanes: service; contract (nur `allowlist.json`); core (nur die Längenprüfung von `proposeRefusal`); docs-sicherheit
+**Rolle:** implementierer-backend (kein Vertrags- und kein ADR-Schritt). Review in frischem Kontext mit den Perspektiven **Security** (Maskierung über HTTP, Rechte, Erkennung abgewiesener Versuche), **Datenschutz** (Begründung im `pii`-Teil der gespeicherten Zeile, Aufbewahrungsklasse, Zugriffslog ausdrücklich unverändert) und **Vertrag** (Gleichlauf von Validator und Kern, Antwortprüfung, Allowlist und Abdeckungstor). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue. Über HTTP belegt: R-TRANS-15, R-TRANS-16, R-GUARD-03, R-GUARD-04, R-GUARD-06, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-13, R-GUARD-14, R-TRANS-00, R-PERM-01, R-PERM-02, R-IDEM-01 (nur Abgrenzung). Dazu AGENTS.md R2, R3, R4, R6, R7, R8, R11, R12
 **Quellen-IDs:**
 - `docs/slices/044a-verweigerung-kern.md`: Teilungstabelle (Zeile 044b), „Hinweise an Folgescheiben: 044b“, Missbrauchstabellen (Einträge „044b“), Abweichungen 2–6 des Baus, Review-Runde `44704c9` (Befunde 1, 2, 5), Nachtrag des Orchestrators zu R-GUARD-14
 - Codex-Review PR #131 (P2 „Count refusal lengths as Unicode characters“, `packages/domain/src/api.ts:322`)
 - Spec 035b (Muster einer Dienstscheibe: Allowlist im Commit des ersten Routentests, Postgres-Test, Zugriffslog), Spec 033a (Entscheidung 5: Zugriffslog mit genau acht Schlüsseln), Spec 040b (Muster: Allowlist-Test nach dem Entfernen)
 - ADR 0013 (Ebene 2), ADR 0011 (Hash-Kette), ADR 0009 (`pii`-Umschlag), ADR 0015 (Allowlist mit Ablauf), ADR 0002 (Demo im Prozess)
-- Register E56 (CI-Artefakt als Nachweis), E14 (DSB), E13 (Betriebsvereinbarung)
+- Register E56 (CI-Artefakt als Nachweis; hier nicht berührt), E14 (DSB), E13 (Betriebsvereinbarung)
 - Bedrohungsmodell SG2, T-G1-E-01, T-G1-E-03, T-G1-I-01, T-G1-I-02, T-G1-I-05, T-G1-I-09, MF-07, MF-09; DSFA-Vorentwurf V7, V10
 
 **Depends on:** 044a (gemergt, `83bc7e2`, Vertrag 0.4.2), 035b (Strom-Dienst), 033a (Zugriffslog), 034a (Grenzen)
@@ -132,23 +132,23 @@ Was 044b über HTTP belegt (Test 13): Die Antwort ist 200; die neue Version trä
 das gespeicherte Ereignis hat kein `pii`; `_actions` von `approver` enthält auf dieser Version nie
 `question.refuse.approve`; `approveRefusal` darauf ist 409 R-GUARD-13. Die Variante „422“ ist Eigentümerfrage 2.
 
-### 5. Regel-id im Zugriffslog (auf Standard gebaut, Eigentümerfrage 1)
+### 5. Zugriffslog ohne neuen Schlüssel (auf Standard gebaut, Eigentümerfrage 1)
 
-Die Teilungstabelle von 044a verlangt „Zugriffslog mit Regel-id“. Der Standard baut das so:
-- **Neunter Schlüssel `ruleId`** in jeder Zeile: Zeichenkette oder `null`. Wert ist genau die `ruleId` der Problem-Antwort
-  dieser Anfrage, sonst `null`. Er gilt für **jede** Operation (auch 403 R-AUTH-01, 409 R-IDEM-01), nicht nur für die drei
-  neuen. Eine Sonderregel je Operation wäre eine zweite Wahrheit.
-- **Geschlossener Wortschatz:** Geschrieben wird der Wert nur, wenn er `^R-[A-Z]+-\d{2}$` entspricht; sonst `null`. Regel-ids
-  sind Code-Konstanten des Kerns; kein Client-String kann den Schlüssel füllen (T-G1-I-05).
-- **Weg des Werts:** `problemResponse` bzw. `app.onError` hält die Regel-id im Anfragekontext fest (`noteRuleId`, wie
-  `noteSeq`). `createRequestLog` liest sie im `finally`. Keine Änderung an der Senke, an Aufbewahrung oder Schlüssel.
-- **Datenschutz:** Die Zeile bleibt ohne Nutzdaten. Neu ist, **welche Regel** eine Anfrage eines pseudonymen Subjects
-  abgewiesen hat (etwa R-GUARD-06, Versuch der Selbstfreigabe). Das ist ein Verhaltensdatum über Beschäftigte und fällt unter
-  dasselbe Verfahren „nur zu zweit“ wie `subjectHash` und `seq` (ADR 0013, MF-09). Keine Kennzahl daraus, keine Auswertung je
-  Person.
-- **ADR-Nachtrag (Architekt, erster Commit):** ADR 0013, Ebene 2 nennt `ruleId` mit Zweck (Erkennung abgewiesener Versuche,
-  T-G1-E-03, MF-07) und Grenze (nur Regel-ids, nie Text). Ohne diesen Commit beginnt der Bau nicht.
-- **DSFA:** Zeile „Technisches Zugriffslog“ und V10 nennen `ruleId`.
+Die Teilungstabelle von 044a verlangt „Zugriffslog mit Regel-id“, und die Missbrauchstabellen von 044a nennen „409 mit
+Regel-id im Zugriffslog (033a, ab 044b über HTTP)“. Das Zugriffslog hat aber genau acht Schlüssel (Befund). Ein neunter
+Schlüssel `ruleId` würde die Verhaltensdaten je pseudonymem Subject erweitern (welche Regel einen Versuch abgewiesen hat,
+etwa R-GUARD-06, Versuch der Selbstfreigabe; DSFA V10, MF-09, DSB und Betriebsrat). Ein Standard, der den Datenschutz
+erweitert, wird nicht ohne Go des Eigentümers gebaut (Orchestrator, 03.10.2026). **Der Standard ist deshalb:**
+- **Kein neuer Schlüssel.** Zugriffslog, ADR 0013, DSFA V10 und die vier Prüfstellen der Schlüsselmenge bleiben unverändert.
+- **Erkennung über `operationId` und `status`.** Ein abgewiesener Vorschlag oder eine abgewiesene Freigabe erscheint als Zeile
+  mit `operationId` `proposeRefusal` bzw. `approveRefusal`, `status` 409 (bzw. 403) und `seq` `null`. Welche Regel griff,
+  steht nur im Problem-Body an den Client (`ruleId`) und lässt sich im Vorfall über den Zeitpunkt und den betroffenen Vorgang
+  nachvollziehen, nicht aus dem Log allein.
+- **Berichtigung von 044a:** Die Zeilen der Missbrauchstabellen dieser Spec lauten „409 im Zugriffslog (`operationId`,
+  `status`)“. Die Zeilen in 044a („409 mit Regel-id im Zugriffslog“) gelten im Sinne dieses Standards; die Datei 044a wird
+  nicht geändert, der Bericht nennt die Berichtigung.
+- **Option** (Eigentümerfrage 1): neunter Schlüssel `ruleId` mit Musterprüfung, für jede Operation; Kosten im Abschnitt
+  „Offene Eigentümerfragen“.
 
 ### 6. Nachweise über HTTP aus dem Review von 044a
 
@@ -168,22 +168,16 @@ Die Teilungstabelle von 044a verlangt „Zugriffslog mit Regel-id“. Der Standa
   Kern ist die Zählweise in `checkRefusalProposal`.
 - Keine Oberfläche, kein Screenshot (045).
 - Keine neue Kennzahl, keine Änderung am Kennzahlenkatalog.
-- Keine Änderung an Senke, Aufbewahrung, Schlüssel oder Ablage des Zugriffslogs; kein weiterer Schlüssel außer `ruleId`.
+- Keine Änderung am Zugriffslog: kein neuer Schlüssel (auch nicht `ruleId`, Entscheidung 5), keine Änderung an Senke,
+  Aufbewahrung oder Hash-Schlüssel; keine Änderung an ADR 0013 oder DSFA V10.
 - Keine Umstellung der übrigen Längenprüfungen im Kern (Folgeliste, Entscheidung 3).
 - Kein Export (051), keine Untergründe für Pfad A (044c), kein echter `pii`-Codec (073).
 
 ## Files allowed
 
-Architekt (erster Commit, vor jedem Code):
-
-- `docs/adr/0013-zwei-protokollebenen.md` (nur Nachtrag zu Ebene 2: Schlüssel ruleId, Zweck, Grenze, Verfahren „nur zu zweit“; Entscheidung 5)
-
 Dienst:
 
-- `apps/api/src/app.ts` (nur: die drei Routen; die Regel-id im Anfragekontext festhalten, falls das in app.onError geschieht)
-- `apps/api/src/problem.ts` (nur: die Regel-id im Anfragekontext festhalten, falls das in problemResponse geschieht)
-- `apps/api/src/observability/context.ts` (nur: Feld ruleId und noteRuleId)
-- `apps/api/src/observability/requestLog.ts` (nur: Schlüssel ruleId mit Musterprüfung; Kopfkommentar „nine keys“)
+- `apps/api/src/app.ts` (nur die drei Routen)
 - `packages/contract/allowlist.json` (nur die drei Einträge mit slice 044 entfernen, im Commit des ersten Routentests)
 
 Kern (nur Entscheidung 3):
@@ -195,20 +189,11 @@ Tests im Dienst:
 
 - `apps/api/src/__tests__/refusal044b.test.ts` (neu, ohne Postgres)
 - `apps/api/src/__tests__/postgres-refusal044b.test.ts` (neu, mit Postgres)
-- `apps/api/src/__tests__/access-log033a.test.ts` (nur: Schlüsselliste um ruleId und die neuen Fälle aus Test 15)
-- `apps/api/src/__tests__/stream035.test.ts` (nur die Schlüsselliste der Zugriffslogzeile)
 - `apps/api/src/__tests__/contract-043a.test.ts` (nur die Allowlist-Prüfung in Test 8: die drei Einträge stehen nicht mehr)
-
-Skripte (nur die Schlüsselliste und ihre Meldung „eight keys“):
-
-- `scripts/e2e-http-031.mjs`
-- `scripts/e2e-http-031.test.mjs` (nur, falls eine Vorlage dort die acht Schlüssel führt)
-- `scripts/keycloak-ci-029b.mjs`
 
 Dokumente:
 
-- `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile „Technisches Zugriffslog“ und V10: ruleId)
-- `docs/sicherheit/bedrohungsmodell.md` (nur: Stand und Testnamen an SG2, T-G1-E-01, T-G1-E-03, T-G1-I-05, T-G1-I-09, MF-07, MF-09; Zeile 044 in „Weitere Scheiben mit Sicherheitsbezug“)
+- `docs/sicherheit/bedrohungsmodell.md` (nur: Stand und Testnamen an SG2, T-G1-E-01, T-G1-E-03, T-G1-I-09, MF-07; Zeile 044 in „Weitere Scheiben mit Sicherheitsbezug“)
 - `docs/folgeliste.md` (nur: Eintrag „übrige Längenprüfungen des Kerns in Code-Punkten“ aus Entscheidung 3 und neue nicht blockierende Befunde des Baus; keine Sicherheits-, Datenschutz- oder Rechtspunkte)
 - `docs/slices/044b-verweigerung-dienst.md` (diese Spec: Bericht, Review findings)
 - `docs/produktplan-beta.md` (nur durch den Orchestrator mit dem Merge: Stand-Zeile Etappe C)
@@ -221,15 +206,17 @@ Weitere Dateien sind Scope-Befunde.
 `packages/contract/scripts/**`, `packages/domain/src/**` außer den zwei genannten Dateien (insbesondere `transitions.ts`,
 `permissions.ts`, `stream.ts`, `state.ts`, `refusalGrounds.ts`), `packages/domain/policy-truth-table.md`,
 `apps/api/src/__tests__/helpers.ts`, `apps/api/src/stream/**`, `apps/api/src/persistence/**`, `apps/api/src/limits/**`,
-`apps/api/src/metrics/**`, `apps/api/src/observability/accessLog.ts`, `apps/api/migrations/**`, `apps/web/**`,
-`.github/workflows/**`, `docs/slices/033a-serverzeit-health-zugriffslog.md`. Dieser Abschnitt steht bewusst außerhalb von
+`apps/api/src/metrics/**`, `apps/api/src/observability/**`, `apps/api/src/problem.ts`, `apps/api/migrations/**`,
+`apps/web/**`, `.github/workflows/**`, `scripts/**`, `docs/adr/**`, `docs/datenschutz/**`,
+`docs/slices/033a-serverzeit-health-zugriffslog.md`. Dieser Abschnitt steht bewusst außerhalb von
 „Files allowed“, damit `slice-scope` die Pfade nicht als erlaubt liest.
 
 ## Vor dem Bau prüfen
 
 1. **044a gemergt** (`83bc7e2`) und Vertrag 0.4.2: `HvApi` hat `listRefusalGrounds`, `proposeRefusal`, `approveRefusal`;
    die Allowlist führt die drei Einträge mit `slice` 044. Fehlt etwas: anhalten.
-2. **ADR-Nachtrag** zu 0013 ist der erste Commit des Zweigs (Architekt). Ohne ihn: nicht bauen.
+2. **Eigentümerfrage 1:** Hat der Eigentümer die Option `ruleId` gewählt, wird diese Spec vorher vom Architekten angepasst
+   (ADR-Nachtrag, Dateien, Tests); ohne Antwort gilt der Standard ohne neuen Schlüssel.
 3. **Demo-Kopf und Rollenwechsel:** Wie löst der Akteur-Port `X-Actor` (`id:rolle`) auf? Reicht derselbe `id` mit einer
    anderen Rolle für den Fall „S klärt als `legal`, gibt als `approver` frei“ (Test 4, R-GUARD-14), oder muss der Test die
    Rollen über `assignRole`/`revokeRole` setzen? Der Bericht nennt den Weg.
@@ -239,8 +226,8 @@ Weitere Dateien sind Scope-Befunde.
 5. **Einzelne Surrogate auf Postgres:** Antwortet der Postgres-Pfad auf eine Begründung mit einem einzelnen Surrogat
    (`"\ud800"`) mit 200? jsonb lehnt solche Escapes ab. Ergibt das 500 oder 503: kein Teil dieser Scheibe, Eintrag auf der
    Folgeliste (Robustheit, besteht für jedes Textfeld); Test 7 läuft dann nur ohne Postgres.
-6. **Wo entsteht die Problem-Antwort** bei einem Fehler innerhalb von `postgresBoundary` (Rollback)? Die Regel-id muss auch
-   dort im Kontext landen (Test P4).
+6. **Zugriffslog bei Rollback:** Schreibt der Postgres-Pfad bei einer Abweisung innerhalb von `postgresBoundary` genau eine
+   Zeile mit `status` 409 und `seq` `null` (Test P4)? Sonst Befund.
 7. **Kennzahl:** Läuft der Seed-Jahrgang (`running`)? Sonst entfällt Test 16; der Bericht vermerkt es.
 8. Weichen Zeilenangaben ab: melden, nicht raten.
 
@@ -334,14 +321,11 @@ die Zugriffslogzeile hat `seq: null`. Markertexte in `text`, Begründung und Ver
     `question.refuse.approve`; `approveRefusal` darauf → 409 R-GUARD-13.
 14. **Ganze Kette über HTTP**, Pfad A und Pfad B: Vorschlag → Rechtsfreigabe → Freigabe → `stageQuestion` (`moderation`) →
     `deliverQuestion` (`podium`, `QuestionDelivered.answerVersion` = Verweigerungsversion) → `closeQuestion`.
-15. **Zugriffslog** (Speichersenke; ergänzt in `access-log033a.test.ts`, Fälle der Verweigerung in `refusal044b.test.ts`):
-    - jede Zeile hat genau **neun** Schlüssel (`ruleId` dazu);
-    - 409 aus Test 4 (R-GUARD-08) → Zeile mit `operationId` `approveRefusal`, `status` 409, `ruleId` `R-GUARD-08`,
-      `seq` `null`; 403 → `R-PERM-01`; 409 R-GUARD-09 → `R-GUARD-09`; 403 R-AUTH-01 (CSRF, bestehender Fall) → `R-AUTH-01`;
-    - 200, 401, 404 und 422 des Validators → `ruleId` `null` (soweit die Problem-Antwort keine Regel-id trägt);
-    - ein Client-Kopf `X-Rule-Id: R-GUARD-99` und ein Body-Feld `ruleId` erreichen die Zeile nicht;
-    - ein `ApiProblem` mit einer Regel-id außerhalb des Musters (Testhaken oder konstruierter Fehler) → `null`;
-    - kein Marker aus `text`, Begründung oder Vermerk steht in einer Zeile.
+15. **Zugriffslog unverändert, Erkennung über `operationId` und `status`** (Speichersenke, in `refusal044b.test.ts`):
+    - jede Zeile der Verweigerungsaufrufe hat genau die **acht** Schlüssel aus 033a; kein Schlüssel `ruleId`;
+    - 409 aus Test 4 (R-GUARD-08) → Zeile mit `operationId` `approveRefusal`, `status` 409, `seq` `null`; 403 aus Test 3 →
+      `operationId` `proposeRefusal`, `status` 403; ein gelungener Vorschlag → `status` 200, `seq` gesetzt;
+    - kein Marker aus `text`, Begründung oder Vermerk und keine Regel-id steht in einer Zeile.
 16. **Kennzahl** (nach Vor-dem-Bau-Punkt 7): Vorschlag bei t0; `GET /metrics` mit Token zeigt
     `hv_questions_in_legal_review_over_10m` bei t0 + 11 min mit 1, bei t0 + 9 min mit 0 (über die injizierte Uhr). Kein
     neuer Name im Katalog.
@@ -360,8 +344,8 @@ Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Date
   Zeile mit dieser `source_seq`.
 - **P3 Wiederholung nach Neustart:** derselbe `Idempotency-Key` von `approveRefusal` über App B → historische Antwort, keine
   neue Zeile in `events`.
-- **P4 Abweisung auf Postgres:** `approveRefusal` ohne Rechtsfreigabe → 409 R-GUARD-08, keine neue Zeile, Zugriffslogzeile mit
-  `ruleId` `R-GUARD-08` und `seq` `null`.
+- **P4 Abweisung auf Postgres:** `approveRefusal` ohne Rechtsfreigabe → 409 R-GUARD-08, keine neue Zeile, genau eine
+  Zugriffslogzeile mit `operationId` `approveRefusal`, `status` 409, `seq` `null` und den acht Schlüsseln.
 - **P5 Kette schützt die Begründung:** Die Owner-Verbindung ändert `refusalJustification` in der gespeicherten Zeile. Die
   nächste Anfrage einer frischen App antwortet 500 ohne Inhalt (Integritätsfehler, ADR 0011); die Begründung erscheint in
   keiner Antwort und keiner Logzeile.
@@ -375,8 +359,7 @@ Mit Postgres: `apps/api/src/__tests__/postgres-refusal044b.test.ts` (eigene Date
 4. Die Route für `approveRefusal` ruft `approveQuestion` → Test 4 (R-GUARD-12/13) und Test 14 rot.
 5. `writeOptions(c)` in `proposeRefusal` weggelassen → Test 5 und Test 8 rot.
 6. `codePointLength` zurück auf `.length` → Test 7 rot.
-7. `ruleId` im Zugriffslog nicht gesetzt → Test 15 und P4 rot; Musterprüfung entfernt → Test 15 (Wert außerhalb des Musters)
-   rot.
+7. Die Zugriffslogzeile erhält probeweise einen Schlüssel `ruleId` → Test 15 und P4 (genau acht Schlüssel) rot.
 8. Das Entfernen von `note` in `maskEvent` (Kern) gestrichen → Test 10 rot.
 9. `viewQuestion` maskiert mit `can(actor(), p, q)` → Test 9 rot (`approver` ohne mögliche Freigabe).
 10. `getStage` ohne Maskierung → Test 9 (beide Bühnenrouten) rot.
@@ -395,18 +378,14 @@ prüfen und nicht nur durchreichen.
 2. `allowlist.json` ohne Eintrag mit `slice` 044; `check.mjs` (d) `ok`; das Abdeckungstor meldet `ok` mit zwei vorab
    erklärten Operationen (040). `openapi.yaml` unverändert (`git diff` gegen die Merge-Basis leer für
    `packages/contract/openapi.yaml`).
-3. `git diff` gegen die Merge-Basis zeigt Änderungen nur in „Files allowed“; der erste Commit ist der ADR-Nachtrag des
-   Architekten.
+3. `git diff` gegen die Merge-Basis zeigt Änderungen nur in „Files allowed“; `apps/api/src/observability/**`, ADR 0013 und die
+   DSFA sind unverändert.
 4. `pnpm gates` mit Postgres-Variablen wie in CI grün auf einem sauberen Baucommit, einschließlich `slice-scope` auf
-   `claude/slice-044b-…`; der Schluss der Ausgabe steht einmal im Bericht. Lokal zusätzlich `E2E_HTTP_IDP=none pnpm e2e:http`
-   grün (Schlüsselliste in `e2e-http-031.mjs` ohne Keycloak).
-5. **Keycloak-Teil (E56):** Die Schlüsselprüfung in `scripts/keycloak-ci-029b.mjs` (Job `gates`, Schritt „Keycloak browser
-   login against migrated Postgres“) und in `scripts/e2e-http-031.mjs` (Job `e2e-http`) läuft nur mit Keycloak in der CI. Der
-   Nachweisabschnitt nennt für den letzten Commit der PR je Job die Lauf-ID und die PASS-Zeile des Zugriffslogs aus dem
-   Joblog. Wird ein CI-Artefakt als Nachweis genannt (etwa `evidence-031-http`), stehen Artefaktname, Lauf-ID, Artefakt-ID
-   und Digest dabei (E56). Ein Merge braucht grüne CI auf dem letzten Commit der PR.
-6. DSFA V10 und die Zeile „Technisches Zugriffslog“ nennen `ruleId`; ADR 0013 trägt den Nachtrag; das Bedrohungsmodell nennt
-   die Testnamen.
+   `claude/slice-044b-…`; der Schluss der Ausgabe steht einmal im Bericht.
+5. **Kein Keycloak-only-Test, E56 nicht berührt:** Jeder Test dieser Scheibe läuft lokal (mit Postgres-Variablen). Die Jobs
+   `gates` und `e2e-http` laufen in der PR-CI unverändert grün; ein Merge braucht grüne CI auf dem letzten Commit der PR. Wird
+   die Option aus Eigentümerfrage 1 gewählt, kommt die E56-Angabe hinzu (siehe dort).
+6. Das Bedrohungsmodell nennt die Testnamen.
 7. Gemergt vor dem 27.11.2026.
 
 ## Nachweise
@@ -414,10 +393,10 @@ prüfen und nicht nur durchreichen.
 - Schluss von `pnpm gates` mit Postgres-Variablen und Commit-Hash; Abdeckungszeile („… exercised by tests, 2 pre-declared …“).
 - Testnamen 1–16 und P1–P5, mit „rot zuerst“ (erster Lauf ohne Routen; Test 7 vor der Angleichung).
 - Ergebnis der Mutationsproben.
-- Auszug: eine Zugriffslogzeile eines abgewiesenen `approveRefusal` (neun Schlüssel, `ruleId` R-GUARD-08); eine
+- Auszug: eine Zugriffslogzeile eines abgewiesenen `approveRefusal` (acht Schlüssel, `status` 409, `seq` `null`); eine
   `event`-Nachricht `AnswerDrafted` aus `/stream` als admin (ohne `pii`); das Ergebnis der SQL-Abfrage aus P2 mit
   synthetischer Begründung.
-- CI-Angaben nach Akzeptanzkriterium 5.
+- Grüne PR-CI auf dem letzten Commit (Lauf-ID).
 - **Kein Screenshot:** keine Oberfläche ändert sich (045).
 
 ## Qualitätswirkung
@@ -426,14 +405,14 @@ Reifestufe: pilot · Risikoklasse: hoch
 
 Ausgelöst:
 - [x] Rolle, Recht, Schutzklasse (Rechte über HTTP, Maskierung auf sieben Lesepfaden, Strom und Schreibantworten)
-- [x] personenbezogene oder vertrauliche Daten (Begründung in der gespeicherten Zeile unter `pii`; `ruleId` im Zugriffslog;
-  DSFA V10)
+- [x] personenbezogene oder vertrauliche Daten (Begründung in der gespeicherten Zeile unter `pii`; Zugriffslog bewusst
+  unverändert, Eigentümerfrage 1)
 - [x] Vertrag (drei Operationen bedient, Allowlist leer für 044, Gleichlauf von Validator und Kern bei Längen)
 - [x] Persistenz (Postgres: Neustart, Kette, Ablage, Aufbewahrungsklasse)
 - [ ] Fachregel, Status (keine Änderung, nur Nachweis über HTTP)
 - [ ] Oberfläche
 
-Perspektive(n): Security (6.5), Datenschutz (6.6), Vertrag (6.4) · Nachweise: Tests 1–16, P1–P5, Mutationsproben, CI nach E56 ·
+Perspektive(n): Security (6.5), Datenschutz (6.6), Vertrag (6.4) · Nachweise: Tests 1–16, P1–P5, Mutationsproben ·
 Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
 
 ## Wirkung und Risiko (Leitplanken §4, hoch)
@@ -442,22 +421,20 @@ Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
   Route, Zugriffslog, Strom) wäre eine Umgehung der Oberfläche (T-G1-E-01) oder ein Leck der Begründung (SG2).
 - **Bedrohungen:**
   - **T-G1-E-01** (Umgehung der Oberfläche): Alle Entscheidungen fallen im Kern; die Route reicht nur durch (Tests 3–6, 13).
-  - **T-G1-E-03** (Verweigerung ohne Rechtsprüfung): 409 R-GUARD-08 über HTTP, sichtbar im Zugriffslog mit `ruleId`
-    (Tests 4, 15, P4).
+  - **T-G1-E-03** (Verweigerung ohne Rechtsprüfung): 409 R-GUARD-08 über HTTP; im Zugriffslog als Zeile mit `operationId`
+    `approveRefusal` und `status` 409 sichtbar, ohne Regel-id (Tests 4, 15, P4).
   - **MF-07** (Selbstfreigabe, auch nach Rollenwechsel): R-GUARD-06 und R-GUARD-14 über HTTP, mit wiederholter
     Rechtsfreigabe (Test 4).
   - **SG2, T-G1-I-01, T-G1-I-02, T-G1-I-09:** Maskierung über HTTP und `/stream` (Tests 9–11).
-  - **T-G1-I-05** (Client-Strings im Log): `ruleId` nur aus dem Muster, nie aus Kopf oder Body (Test 15).
-  - **MF-09** (Leistungsauswertung über das Zugriffslog): `ruleId` macht abgewiesene Versuche je `subjectHash` sichtbar.
-    Abwehr wie bisher organisatorisch (nur zu zweit, 30 Tage, keine Auswertungswerkzeuge); technisch mit 047. Restrisiko
-    benannt (Eigentümerfrage 1).
+  - **MF-09** (Leistungsauswertung über das Zugriffslog): unverändert; diese Scheibe fügt dem Log nichts hinzu
+    (Entscheidung 5).
 - **Invarianten:**
   - Keine Verweigerung entsteht über HTTP an `question.refuse.propose` vorbei; keine wird an `question.refuse.approve`,
     R-GUARD-08 oder R-GUARD-14 vorbei freigegeben.
   - Validator und Kern stimmen bei jeder Länge der Verweigerungsfelder überein (Code-Punkte).
   - Kein `EventRead`, keine Bühnenansicht, keine Strom-Nachricht und keine Antwort an Leser ohne `refuse.*` enthält die
     Begründung; kein Lesepfad enthält den Vermerk oder `legalClearerIds`.
-  - Jede Zugriffslogzeile hat genau neun Schlüssel; `ruleId` ist `null` oder eine Regel-id des Kerns.
+  - Jede Zugriffslogzeile hat weiter genau die acht Schlüssel aus 033a.
 - **Fehler- und Wiederherstellungsfall:**
   - Neustart: Zustand aus dem Log, Kette geprüft (P1); Wiederholung nach Neustart ohne Doppelung (P3).
   - Manipulierte Zeile: 500 ohne Inhalt, kein Leck (P5).
@@ -477,19 +454,19 @@ Offene Entscheidung: Eigentümerfragen 1 und 2; E14 (DSB)
 | SC-03 | ja: Maskierung auf allen Lesepfaden, im Strom und in Schreibantworten über HTTP belegt (Tests 9–11); `detail` ohne Inhalt (Tests 4–6) |
 | SC-04 | ja: bestehende Body-Grenze, Rate-Limit und Zeitgrenze gelten unverändert für die drei Routen |
 | SC-05 | ja: kein Geheimnis im Diff; Sitzung und CSRF wie bei `draftAnswer` |
-| SC-06 | ja: T-G1-E-03, MF-07, MF-09 mit Erkennung (Zugriffslog mit `ruleId`) |
+| SC-06 | ja: T-G1-E-03, MF-07 mit Erkennung (Zugriffslog: `operationId` und `status` 409; Regel-id nur im Problem-Body) |
 | SC-07 | ja: Zeit nur aus der injizierten Uhr (Test 16) |
 | SC-08 | ja: keine neue SQL im Dienst; Postgres-Tests lesen über die Owner-Verbindung nur im Test |
 | SC-09 | nicht anwendbar (kein Nachbarsystem) |
 | SC-10 | ja: keine neue Abhängigkeit (`ucs2length` gehört zu Ajv, schon vorhanden) |
-| SC-11 | ja: Zugriffslog mit einem Schlüssel mehr, nur Regel-ids; ADR 0013 und DSFA V10 angepasst |
-| SC-12 | ja: Allowlist-Einträge entfernt, kein Tor geändert; Schlüsselliste in zwei CI-Skripten nachgezogen, nicht gelockert |
+| SC-11 | ja: Zugriffslog unverändert (acht Schlüssel, Test 15); keine neue Logzeile |
+| SC-12 | ja: Allowlist-Einträge entfernt, kein Tor und kein CI-Skript geändert |
 | SP-5 | ja: kein Token, keine Begründung, kein Vermerk im Log (Test 15) |
-| SP-6 | ja: SG2, T-G1-E-01, T-G1-E-03, T-G1-I-05, T-G1-I-09, MF-07, MF-09 mit Testnamen im Bedrohungsmodell |
+| SP-6 | ja: SG2, T-G1-E-01, T-G1-E-03, T-G1-I-09, MF-07 mit Testnamen im Bedrohungsmodell |
 
 ## Aufwand
 
-Ehrlich geschätzt **2,0 AStd** statt 1 aus der Teilungstabelle:
+Ehrlich geschätzt **1,65 AStd** statt 1 aus der Teilungstabelle:
 
 | Teil | AStd |
 |---|---|
@@ -497,25 +474,30 @@ Ehrlich geschätzt **2,0 AStd** statt 1 aus der Teilungstabelle:
 | Abweisungen über HTTP (401/403/404/409 mit zehn Regel-ids, 412/428, 422 Validator und Kern, Idempotenz) | 0,5 |
 | Maskierung über sieben Lesepfade, Strom, Schreibantworten, Vermerk, `legalClearerIds` | 0,3 |
 | Postgres P1–P5 | 0,25 |
-| `ruleId` im Zugriffslog: Kontext, Log, vier Schlüssellisten, ADR-Nachtrag, DSFA (nicht in der Teilungstabelle bewertet; 044a setzte die Regel-id im Log als vorhanden voraus) | 0,35 |
 | Gleichlauf der Längen (Codex P2) | 0,15 |
 | `draftAnswer`-Fall, Kennzahl | 0,05 |
 | Mutationsproben, `pnpm gates` mit Postgres, CI-Nachweis, Bericht | 0,25 |
 
-Summe 044a + 044b: 3,25 + 2,0 = 5,25 AStd statt 2,5 laut Plan. Ohne die Regel-id im Zugriffslog (Eigentümerfrage 1,
-Alternative) 1,65 AStd.
+Summe 044a + 044b: 3,25 + 1,65 = 4,9 AStd statt 2,5 laut Plan. Mit der Option `ruleId` aus Eigentümerfrage 1 kämen 0,35 AStd
+hinzu (2,0).
 
 ## Offene Eigentümerfragen
 
 Keine blockiert den Bau; beide sind auf Standard gebaut.
 
-1. **Regel-id im Zugriffslog (Datenschutz, Betriebsrat; E13, E14).** Neu gegenüber 044a: Das Zugriffslog hat heute genau acht
+1. **Regel-id im Zugriffslog (Datenschutz, Betriebsrat; E13, E14).** Neu gegenüber 044a: Das Zugriffslog hat genau acht
    Schlüssel (033a, ADR 0013, DSFA V10); 044a setzte eine Regel-id dort als vorhanden voraus.
-   - **Standard (gebaut):** neunter Schlüssel `ruleId`, nur Regel-ids des Kerns, für jede Operation; ADR-Nachtrag und DSFA V10.
-     Nutzen: abgewiesene Versuche (fehlende Rechtsfreigabe, Selbstfreigabe) sind im Vorfall nach Regel unterscheidbar.
-     Kosten: 0,35 AStd. Restrisiko: mehr Verhaltensdaten je pseudonymem Subject, unter „nur zu zweit“ (MF-09).
-   - **Alternative:** kein neuer Schlüssel; Erkennung nur über `operationId` und `status` 409 (die Regel-id steht weiter im
-     Problem-Body an den Client). Die Missbrauchstabellen in 044a werden dann berichtigt. Spart 0,35 AStd.
+   - **Standard (gebaut):** kein neuer Schlüssel; Erkennung abgewiesener Versuche über `operationId` und `status` 409, die
+     Regel-id steht nur im Problem-Body an den Client (Entscheidung 5). Kein Eingriff in den Datenschutz.
+   - **Option:** neunter Schlüssel `ruleId` in jeder Zeile, Zeichenkette oder `null`; nur Werte nach `^R-[A-Z]+-\d{2}$`, nie ein
+     Client-String; für jede Operation. Nutzen: abgewiesene Versuche (fehlende Rechtsfreigabe, Selbstfreigabe) sind im Vorfall
+     nach Regel unterscheidbar. Restrisiko: mehr Verhaltensdaten je pseudonymem Subject, unter „nur zu zweit“ (MF-09); braucht
+     DSB und Betriebsrat. Kosten **0,35 AStd**: ADR-0013-Nachtrag des Architekten als erster Commit; DSFA V10 und Zeile
+     „Technisches Zugriffslog“; Anfragekontext und Logzeile; die Schlüsselmenge an vier Stellen
+     (`apps/api/src/__tests__/access-log033a.test.ts`, `apps/api/src/__tests__/stream035.test.ts`, `scripts/e2e-http-031.mjs`,
+     `scripts/keycloak-ci-029b.mjs`). Die beiden Skripte laufen mit Keycloak nur in der CI; der Nachweis folgt dann E56
+     (Lauf-ID und PASS-Zeile je Job, bei einem Artefakt Artefaktname, Lauf-ID, Artefakt-ID und Digest). Als eigener Takt nach
+     044b oder als Anpassung dieser Spec vor dem Bau.
 2. **`draftAnswer` mit Verweigerungsfeldern (Security, Vertrag).** Neu durch den Auftragswortlaut „wird abgewiesen“.
    - **Standard (gebaut, wie 044a):** 200, die Felder werden verworfen, es entsteht eine gewöhnliche Antwort (Entscheidung 4,
      Test 13).
@@ -528,8 +510,8 @@ Keine blockiert den Bau; beide sind auf Standard gebaut.
 
 - **045:** Die Oberfläche unterscheidet 422 (Eingabe; bei leerer Begründung im Dienst) und 409 R-GUARD-09 (leer nach Trimmen).
   Die Demo meldet für `""` 409; die Meldungstexte müssen beide Wege abdecken.
-- **047:** `ruleId` im Zugriffslog gehört zu den Feldern, deren Auswertung zusammen mit der Historie „nur zu zweit“ technisch
-  gesperrt wird.
+- **047:** Wählt der Eigentümer die Option `ruleId` (Frage 1), gehört der Schlüssel zu den Feldern, deren Auswertung zusammen
+  mit der Historie „nur zu zweit“ technisch gesperrt wird.
 - **073 (Codec):** P2 liest die Begründung im Klartext aus `envelope->'payload'->'pii'`; mit einem echten Codec prüft der
   Test den verschlüsselten Wert.
 - **Folgeliste (Takt core):** übrige Längenprüfungen des Kerns in Code-Punkten (Entscheidung 3); ggf. einzelne Surrogate auf
