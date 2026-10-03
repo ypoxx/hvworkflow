@@ -53,15 +53,19 @@ und der Dienst zeigen dasselbe (ADR 0002).
    - **„Beispieldatei verwenden“, nur in der Demo-Betriebsart** (`DEMO_MODE` aus `apps/web/src/api/mode.ts`): holt den
      Body über `demoTranscriptSample()` aus `../../api` (Export der API-Schicht aus 064a; eine Quelle mit Seed und
      `docs/integration/beispiele/transkript-beispiel.json`, 080b). Kein Wert-Import aus `@hv/domain` in
-     `features/**` (Regel `web-features-i18n-domain-types-only`, `scripts/dependency-cruiser.cjs:53-63`). In der HTTP-Betriebsart fehlt der Knopf: Ein Pilot mit
+     `features/**` (Regel `web-features-i18n-domain-types-only`, `scripts/dependency-cruiser.cjs:53-63`). **Der Body wird
+     beim ersten Klick einmal erzeugt und für die Lebensdauer der Seite gemerkt** (Modulvariable in `ImportDialog.tsx`,
+     Codex #127): `demoTranscriptSample()` setzt die Zeitanker auf „jetzt“, und gleiche `segmentId` mit anderen
+     Zeitankern wären nach R-ING-01 ein Konflikt (409) statt „0 neu, 5 bereits vorhanden“. In der HTTP-Betriebsart fehlt der Knopf: Ein Pilot mit
      echten Daten soll keine erfundenen Abschnitte per Klick bekommen.
    - Vor dem Senden zeigt der Dialog eine Vorschau (Zahl der Abschnitte, Zeitraum, Fehler der Vorprüfung). „Einspielen“
      sendet; das Ergebnis lautet „N neu, M bereits vorhanden“.
 6. **Datei-Adapter** (`transcriptImport.ts`, rein, ohne React), das ist der erste Adapter nach E3b:
    - nimmt nur das kanonische Format `{ "segments": [ … ] }`, dasselbe wie der Endpunkt (kein Fremdformat, ADR 0001
      Grenze 3; WebVTT folgt nach E3b, Folgeliste 064a);
-   - lehnt Dateien über 5 MiB ab, bevor er sie liest (`File.size`), und Dateien mit mehr als 5 000 Abschnitten nach dem
-     Parsen;
+   - lehnt Dateien über 5 MiB ab, bevor er sie liest (`File.size`), **eingefügten Text über 5 MiB UTF-8 vor
+     `JSON.parse`** (`new TextEncoder().encode(text).length`; Codex #127, sonst blockiert ein großer Zwischenablage-Inhalt
+     den Tab), und Eingaben mit mehr als 5 000 Abschnitten nach dem Parsen;
    - prüft vor dem Senden nur die Form (Objekt, Feldtypen, Pflichtfelder), damit die Person Fehler mit Abschnittsnummer
      sieht; maßgeblich bleibt die Prüfung im Kern und im Dienst;
    - **kopiert je Abschnitt nur die benannten Felder** (`segmentId`, `text`, `startedAt`, `endedAt`, `speakerId`,
@@ -116,7 +120,7 @@ wie der Dienst.
 **B. Entwickler, lokal gegen den Dienst** (Leitfaden `docs/integration/transkript.md`, Schnellstart):
 
 1. `pnpm install`, dann `pnpm --filter @hv/api dev` (Demo-Modus, Port 8787, Seed mit den 6 Abschnitten).
-2. Laufende HV holen: `curl -s 'http://localhost:8787/v1/meetings?status=running' -H 'X-Actor: u-cap-1:capture'`.
+2. Laufende HV holen und merken: `HV=$(curl -s 'http://localhost:8787/v1/meetings?status=running' -H 'X-Actor: u-cap-1:capture' | jq -r '.[0].id')` (wie im Leitfaden).
 3. Beispielskript aus dem Wurzelverzeichnis: `node docs/integration/beispiele/transkript-einspielen.mjs` (setzt die
    Zeitanker auf „jetzt minus Versatz“) → `"created": 5`. Alternativ die Datei unverändert mit
    `curl -s -X POST "http://localhost:8787/v1/meetings/$HV/speech-segments" -H 'X-Actor: u-cap-1:capture' -H 'Content-Type: application/json' --data-binary @docs/integration/beispiele/transkript-beispiel.json` (Voraussetzung `jq` für Schritt 2).
@@ -204,7 +208,8 @@ Pfade nicht als erlaubt liest.
 
 - U1. Gültige Datei → ein Stapel mit allen Abschnitten; ungültiges JSON, Wurzel ohne `segments`, Abschnitt ohne
   `segmentId`, 5 001 Abschnitte → Fehler mit Abschnittsnummer, kein Aufruf von `HvApi`.
-- U2. Datei über 5 MiB → abgelehnt, ohne `text()` zu lesen.
+- U2. Datei über 5 MiB → abgelehnt, ohne `text()` zu lesen; eingefügter Text mit 5 MiB + 1 Byte UTF-8 → abgelehnt,
+  ohne `JSON.parse` aufzurufen (Spion auf `JSON.parse`).
 - U3. Zerlegung: 250 Abschnitte → Stapel 100/100/50; 100 Abschnitte mit je 3 000 Zeichen „ä“ → mehrere Stapel, keiner
   über 200 000 Byte UTF-8.
 - U4. Senden: zweiter Stapel antwortet 422 mit Index 7 im `detail` → Ablauf hält an, gemeldet wird Abschnitt 107; die
@@ -235,7 +240,9 @@ Pfade nicht als erlaubt liest.
     Redebeitrag mit Quelle „Transkript“ auf dem Tisch; Liste `n`.
   - P5. zwei Fragen im übernommenen Wortlaut markieren → zwei Einzelfragen; nach `asRole` Koordination stehen sie zur
     Klassifizierung bereit (Planbeleg „Import → Redebeitrag → Einzelfragen“).
-- P6. „Beispieldatei verwenden“: in `in-process` vorhanden und führt zu „5 neu“; in `http` fehlt der Knopf.
+- P6. „Beispieldatei verwenden“: in `in-process` vorhanden und führt zu „5 neu“; Dialog schließen, wieder öffnen,
+  noch einmal „Beispieldatei verwenden“ → „0 neu, 5 bereits vorhanden“ (Wiederholung über den Knopf, nicht nur über die
+  feste Datei); in `http` fehlt der Knopf.
 - P7. (beide) Versammlungsbüro sieht den Bereich, aber keinen Import-Knopf und keine Kästchen; Fachbereich sieht den
   Bereich nicht. Nur Rollen, die `asRole` in beiden Projekten kennt; der Beobachter steht in U6.
 - P8. (`in-process`) feindliche Datei mit HTML im Wortlaut → Anzeige als Text, `window.__pwned` bleibt `undefined`;
