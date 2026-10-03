@@ -727,7 +727,7 @@ mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree)
 
 **Projekt `http`:** CI-Lauf `e2e-http` des PR, Lauf-ID: (Platzhalter, trägt der Orchestrator nach).
 
-**Aufwand:** tatsächlich rund 1,2 Stunden Wanduhr des Agenten (19:50–21:00 UTC, 03.10.2026) gegen 3,5 AStd geschätzt;
+**Aufwand:** tatsächlich rund 0,9 Stunden Wanduhr des Agenten (19:50–20:45 UTC, 03.10.2026) gegen 3,5 AStd geschätzt;
 Zuschnitt 045b nicht nötig, nicht geschnitten.
 
 **Design-Kritik D1–D10** (Checkliste `docs/design-prinzipien.md`)
