@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { Permission, Question } from '@hv/domain';
+import { readFileSync } from 'node:fs';
+import type { AnswerVersion, Permission, Question, RefusalGround } from '@hv/domain';
+import { translate } from '../../i18n';
+import type { TKey, TParams } from '../../i18n';
 import { Podium, nextPress } from './Podium';
 import type { DeliverLock } from './lib';
 
@@ -63,5 +66,66 @@ describe('Podium "Vorgelesen, weiter" (takt-039)', () => {
     let started = 0;
     nextPress(q, () => false, () => { started += 1; })();
     expect(started).toBe(0);
+  });
+});
+
+/**
+ * Scheibe 045, Test 7: a refusal on the podium carries one marker per kind, the ground with "ungeprüft",
+ * and the wording that is read out; the justification is never rendered — `Podium.tsx` does not read the
+ * field at all, even if an object carried it.
+ */
+describe('Podium with a refusal (Scheibe 045, Test 7)', () => {
+  const JUSTIFICATION_MARKER = 'interne begruendung fuenfundvierzig';
+  const WORDING = 'Zu dieser Frage gibt der Vorstand keine Auskunft.';
+  const at = '2027-04-20T10:00:00.000Z';
+  const G1 = {
+    id: 'g1', title: 'Titel g1', stageText: 'Baustein.',
+    legalRef: { source: 'AktG', citation: 'Zitat', docVersion: '1', docHash: null, verified: false }, hash: 'h-g1',
+  } as RefusalGround;
+  const de = (key: TKey, params?: TParams) => translate('de', key, params);
+
+  function withAnswer(answer: Partial<AnswerVersion>): Question {
+    return {
+      ...staged('q1', 4, ['question.deliver', 'question.return']),
+      answers: [{ version: 1, text: WORDING, createdAt: at, createdBy: { id: 'u', role: 'legal' }, ...answer }],
+      approval: { answerVersion: 1, approvedAt: at, approvedBy: { id: 'u-appr-1', role: 'approver' } },
+    };
+  }
+  const renderWith = (current: Question): string =>
+    renderToStaticMarkup(
+      <Podium
+        stage={{ current, queue: [], deliveredCount: 0, openCount: 0 }}
+        catalogue={{ status: 'ready', grounds: [G1] }}
+        lock={null}
+        returning={false}
+        onNext={() => true}
+        onReturn={() => undefined}
+      />,
+    );
+
+  it('refusal_no_claim: marker "Kein Auskunftsanspruch" and the wording', () => {
+    const html = renderWith(withAnswer({ answerKind: 'refusal_no_claim' }));
+    expect(html).toContain(de('stage.refusal.marker.noClaim'));
+    expect(html).not.toContain(de('stage.refusal.marker.withGround'));
+    expect(html).toContain(WORDING);
+  });
+
+  it('refusal_with_ground: marker "Auskunft wird verweigert" with the ground and "ungeprüft"', () => {
+    const html = renderWith(withAnswer({ answerKind: 'refusal_with_ground', refusalGroundId: 'g1', refusalGroundHash: 'h-g1' }));
+    expect(html).toContain(de('stage.refusal.marker.withGround'));
+    expect(html).toContain(de('stage.refusal.ground', { title: 'Titel g1' }));
+    expect(html).toContain(de('answers.refusal.ground.unverified'));
+  });
+
+  it('a record with refusalJustification does not render the justification', () => {
+    const html = renderWith(withAnswer({ answerKind: 'refusal_no_claim', refusalJustification: JUSTIFICATION_MARKER }));
+    expect(html).not.toContain(JUSTIFICATION_MARKER);
+    expect(readFileSync(new URL('./Podium.tsx', import.meta.url).pathname, 'utf8')).not.toContain('refusalJustification');
+  });
+
+  it('an ordinary answer carries no marker', () => {
+    const html = renderWith(withAnswer({}));
+    expect(html).not.toContain(de('stage.refusal.marker.noClaim'));
+    expect(html).not.toContain(de('stage.refusal.marker.withGround'));
   });
 });

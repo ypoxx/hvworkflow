@@ -645,11 +645,105 @@ Keine blockiert den Bau.
 
 ```
 Slice: 045-verweigerung-oberflaeche
-Done:
-Evidence:
-Open:
-Touched:
+Done: Verweigerung vorschlagen (Dialog mit Art, Grund, Wortlaut, Begründung; Vorbefüllen, Vermerk neben dem Feld),
+      Versionskarte, Freigabe der Verweigerung, Editor-Hinweis, Arbeitslisten-Badge, Rückgabehinweis (Beantwortung und
+      Bühne), Bühnenkennzeichen je Art, Historie „Verweigerung vorgeschlagen/freigegeben“; 29 Schlüssel je Sprache, Glossar.
+Evidence: siehe „Nachweise des Baus“ unten; docs/evidence/045-{dialog,detail,buehne}-{de,en}.png
+Open: Lauf-ID e2e-http folgt aus dem PR (Platzhalter unten); E4b ist vor der Änderung grün (prüft nur ein Fehlen).
+Touched: siehe Bericht an den Orchestrator (Dateiliste = Files allowed, nichts darüber hinaus)
 ```
+
+### Nachweise des Baus
+
+**Vor-dem-Bau-Prüfungen** (auf `5cbe438`):
+
+1. `listRefusalGrounds()` für `podium` im Projekt `in-process` lesbar: 7 Einträge, alle `verified: false`.
+2. `getQuestionHistory` über HTTP liefert `payload.answer.refusalGround` und `answerKind` (belegt durch
+   `apps/api/src/__tests__/refusal044b.test.ts`, Zeilen 647–656). Kein Halt.
+3. `listQuestions` trägt `answers` je Eintrag: Arbeitslisten-Badge gebaut (am Ende der Textzelle, direkt neben dem Status;
+   die Statusspalte ist 116 px breit und trägt nur ein Badge).
+4. `abnahme.spec.ts` erfasst eigene Fragen, `080-sprecher-zustand.spec.ts` berührt nur Wortmeldungen: keine Ausschlussliste
+   nötig. Im Seed 15 Textpfad-Fragen in `assigned`, alle mit `question.refuse.propose` für `coordination` und `legal`; in
+   der Einheit „Finanzen“ (`unit-fin`) vier. 021c verbraucht eine Frage in `in_review`, nicht `assigned`.
+5. Projekt `http`: neun synthetische Personen mit je eigener id (`scripts/e2e-http-031.mjs`, `PERSONS`); `in-process`:
+   `u-coord-1`, `u-legal-1`, `u-appr-1`, `u-podium` verschieden.
+6. Laufzeit `e2e-http`, Schritt „End-to-end http project …“ der letzten drei grünen Läufe mit echtem Lauf:
+   37144751699 2:57, 37143017388 3:43, 37142695432 3:26 (Ist höchstens 3:43 von 9:00; Gesamtgrenze der Harness 8:00).
+   Die Zeilen `[timing] switch to …` waren nicht lesbar (Log-Download leitet auf einen Blob-Host um, den der
+   verfügbare Client nicht aufruft). Schätzung der Mehrzeit: rund 19 Rollenwechsel × höchstens 3 s + 6 Schreibschritte ×
+   1 s + Navigation und axe rund 60 s ≈ 2–2,5 min; Ist plus Schätzung ≈ 6,2 min < 8 min < 9 min. Kein Halt.
+   Tatsächliche Dauer im PR-Lauf: (folgt aus dem CI-Lauf des PR).
+7. Expert-Testperson: `u-exp-fin` (Demo) bzw. Person `expert` mit `unit-fin` (http); Filtername `Finanzen`
+   (`EXPERT_UNIT`). Auf einer `in_review`-Frage der Einheit nach einem Verweigerungsvorschlag stehen für `expert`
+   `question.claim`, `answer.draft`, `question.read` in `_actions`, ohne vorherige Inanspruchnahme. Kein Halt, E2 wie
+   spezifiziert.
+
+**Abweichungen vom Wortlaut der Spec (Bau):**
+
+- Test 6 rendert `RefusalDialog` statisch; der `Dialog` des Bausatzes rendert über ein Portal, das statisch nicht geht.
+  Der Test ersetzt ihn per `vi.mock` durch einen Rahmen an Ort und Stelle; `RefusalDialog` selbst ist unverändert. Die
+  Meldungen 409/422 rendert der Test über die exportierte Komponente `RefusalProblem` (dieselbe, die der Dialog zeigt).
+- Der Hook nimmt die Lesefunktion als Parameter (`useRefusalGrounds(load)`), damit der Test das API-Modul nicht lädt;
+  die Seiten übergeben `api.listRefusalGrounds`.
+- Rückgabedialog der Bühne: `ReturnTarget` bleibt unverändert (ein bestehender Test pinnt seine Form); der Hinweis wird
+  beim Öffnen aus derselben Frage ermittelt und daneben gehalten.
+- E4b ist vor der Änderung grün: Der Fall sichert nur das Fehlen eines Hinweises zu, den es vor 045 nicht gab.
+
+**Rote Tests vor der Änderung** (Unit, Auszug): `Test Files 8 failed | 1 passed (9)`, `Tests 17 failed | 74 passed (91)`;
+`refusal.test.ts`, `RefusalDialog.test.tsx`, `useRefusalGrounds.test.ts`: „Cannot find module“; Parität „expected 524 to be
+553“. e2e `in-process`, je Fall einzeln gegen den Stand ohne Änderung: E1, E3, E6, E7, E9 rot („No refusable assigned
+question for …“), E4b grün (siehe oben).
+
+**Grün nach der Änderung:** Vitest `apps/web` 28 Dateien, 555 Tests. Playwright `045-verweigerung.spec.ts` `in-process`
+6 passed; mit `--repeat-each=3` 18 passed (2.2m). Volle Suite `in-process` 139 passed (6.9m), axe ohne serious/critical.
+
+**`pnpm gates`** auf Commit `5b5edc9` (Exit 0; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
+Vitest: domain 393, web 555, api 663 passed), Schluss wörtlich:
+
+```
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
+dist/assets/index-Cnc_SFcw.js                        690.65 kB │ gzip: 202.18 kB │ map: 2,885.39 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.48s
+mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 5b5edc9, tree 0d83f1f2bee9…
+```
+
+**Projekt `http`:** CI-Lauf `e2e-http` des PR, Lauf-ID: (Platzhalter, trägt der Orchestrator nach).
+
+**Aufwand:** tatsächlich rund 0,9 Stunden Wanduhr des Agenten (19:50–20:45 UTC, 03.10.2026) gegen 3,5 AStd geschätzt;
+Zuschnitt 045b nicht nötig, nicht geschnitten.
+
+**Design-Kritik D1–D10** (Checkliste `docs/design-prinzipien.md`)
+
+| D | ja/nein | Satz |
+|---|---|---|
+| D1 | ja | Dialog: Titel = Aktion, ein Erklärungssatz, vier Felder in fester Reihenfolge; Versionskarte nennt die Art als Badge neben der Version. |
+| D2 | ja | Im Detail eine primäre Aktion (Rechtsfreigabe, Freigabe bzw. „Verweigerung freigeben“, Prüfung); „Verweigerung vorschlagen“ ist nie primär (Test 9); im Dialog nur Absenden primär. |
+| D3 | ja | Dialog `lg` im Muster D, Felder auf 16-px-Abständen; das Listen-Badge sitzt am Ende der Textzelle, die Spalten bleiben unverändert. |
+| D4 | ja | Danger nur als Badge (Art, Bühnenkennzeichen, Listen- und Warteschlangen-Badge), „ungeprüft“ als Warning-Badge; keine Flächen. |
+| D5 | ja | Grund-id in Mono, Versionen wie bisher in Mono. |
+| D6 | ja | Katalog laden (Zeile in Feldhöhe), Fehler (`role="status"`, „kein Auskunftsanspruch“ bleibt möglich), leer (Platzhalter); Meldungen 409/422 im Dialog mit Regel-id. |
+| D7 | ja | 29 Schlüssel je Sprache (Parität 553), Arten nach Inhalt statt „Pfad A/B“; `pnpm i18n-literals` und `pnpm vocabulary` grün. Katalogtexte deutsch auch in en (E21). |
+| D8 | ja | E7: Dialog per Tab, Leertaste und Pfeilen; Absenden fokussiert, aktiv, `:focus-visible`; Escape schließt ohne Schreiben. |
+| D9 | ja | Je Zeile eine Prüfung der letzten Version (O(1)); keine neue Abfrage je Zeile; nicht eigens gemessen. |
+| D10 | ja | Bühne aus zwei Metern: ein Kennzeichen je Art in 18 px halbfett, Grund darunter, Wortlaut 24 px; ruhige Badges statt Flächen, keine neue Taste. |
 
 ## Review findings
 

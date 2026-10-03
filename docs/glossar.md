@@ -41,6 +41,10 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Podium (Rolle) | Podium | role `podium` | — |
 | Koordination | Coordination | role `coordination` | — |
 | Verweigerung | Refusal | `answerKind: refusal_no_claim \| refusal_with_ground` | — |
+| Verweigerung · kein Auskunftsanspruch | Refusal · no right to information | `answerKind: refusal_no_claim` | „Pfad A“ (ist der Antwortpfad `podium`), „Verweigerungspfad A“ in der Oberfläche |
+| Verweigerung · Grund aus Katalog | Refusal · ground from catalogue | `answerKind: refusal_with_ground` | „Pfad B“ (ist `fast_track`), „Verweigerungspfad B“ in der Oberfläche |
+| Verweigerungsgrund | Refusal ground | `refusalGroundId`, Katalog `packages/domain/src/refusalGrounds.ts` | — |
+| Formulierungsbaustein | Template wording | `stageText`, ungeprüft bis 076 (E15) | — |
 | Antwortbündel | Answer bundle | `AnswerBundle` | — |
 | Bühnenplatz | Podium seat | `StageSeat`, `seatId` (seit Scheibe 040b) | — |
 | Weiterleiten | Forward | `question.submit_review` (Anzeige „Weiterleiten", E5; Weiterleiten zwischen Fachbereichen ab Scheibe 048) | — |

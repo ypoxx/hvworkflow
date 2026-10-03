@@ -228,6 +228,9 @@ export const shellEn: typeof shellDe = {
   'event.QuestionClassified': 'Classified',
   'event.QuestionAssigned': 'Assigned',
   'event.AnswerDrafted': 'Answer draft created',
+  // Scheibe 045: the labels of a proposed and an approved refusal in the history.
+  'event.AnswerDrafted.refusal': 'Refusal proposed',
+  'event.QuestionApproved.refusal': 'Refusal approved',
   'event.QuestionSubmittedForReview': 'Forwarded',
   'event.QuestionApproved': 'Approved',
   'event.QuestionLegalCleared': 'Legally cleared',

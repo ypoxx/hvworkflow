@@ -22,11 +22,15 @@ import {
   cx,
 } from '../../components';
 import { useT } from '../../i18n';
+import { groundStatus, refusalKindOf } from '../answers/refusal';
+import type { RefusalCatalogue } from '../answers/refusal';
 import { approvedAnswer, clockTime, nextButton } from './lib';
 import type { DeliverLock } from './lib';
 
 interface PodiumProps {
   stage: StageView;
+  /** Scheibe 045: the catalogue of refusal grounds, for the ground under the marker (`useRefusalGrounds`). */
+  catalogue?: RefusalCatalogue;
   /** takt-039: the "Vorgelesen, weiter" in flight (Page.tsx), `null` when none is. */
   lock: DeliverLock | null;
   /** A return is being written. */
@@ -111,6 +115,61 @@ function PodiumButton({
   );
 }
 
+const NO_CATALOGUE: RefusalCatalogue = { status: 'loading', grounds: [] };
+
+/**
+ * Scheibe 045 (decision 6): one marker per kind of refusal, danger only as a badge (D4), large enough to
+ * be read from two metres (D10); for "Grund aus Katalog" the ground below it (title, or its id when the
+ * loaded catalogue does not know it) with "ungeprüft". Only the kind, the ground and the wording are read
+ * from the version — never the internal justification, which the stage view does not carry either.
+ */
+function RefusalMarker({
+  question,
+  catalogue,
+  size,
+}: {
+  question: Question;
+  catalogue: RefusalCatalogue;
+  size: 'stage' | 'preview';
+}) {
+  const t = useT();
+  const answer = approvedAnswer(question);
+  const kind = refusalKindOf(answer);
+  if (answer === undefined || kind === 'answer') return null;
+  const status = kind === 'refusal_with_ground' ? groundStatus(answer, catalogue.grounds, catalogue.status) : undefined;
+  const big = size === 'stage' ? 'text-[18px] px-2.5 py-1' : 'text-[14px] px-2 py-0.5';
+  return (
+    <span data-testid="stage-refusal-marker" data-kind={kind} className="flex flex-wrap items-center gap-2">
+      <span className={cx('hv-badge tone-danger font-semibold', big)}>
+        {t(kind === 'refusal_no_claim' ? 'stage.refusal.marker.noClaim' : 'stage.refusal.marker.withGround')}
+      </span>
+      {status !== undefined && (
+        <span
+          data-testid="stage-refusal-ground"
+          className={cx('flex flex-wrap items-center gap-2', size === 'stage' ? 'text-[16px]' : 'text-[14px]')}
+          style={{ color: 'var(--color-stage-text)' }}
+        >
+          {status.entry !== undefined
+            ? t('stage.refusal.ground', { title: status.entry.title })
+            : t('answers.refusal.ground.unknown', { id: answer.refusalGroundId ?? '' })}
+          {status.unverified && <Badge tone="warning">{t('answers.refusal.ground.unverified')}</Badge>}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Scheibe 045: the small badge of a refusal in the queue rows. */
+function RefusalBadge({ question }: { question: Question }) {
+  const t = useT();
+  if (refusalKindOf(approvedAnswer(question)) === 'answer') return null;
+  return (
+    <span data-testid="stage-queue-refusal">
+      <Badge tone="danger">{t('answers.refusal.badge')}</Badge>
+    </span>
+  );
+}
+
 /**
  * "Als Nächstes" (point 7): the first item in the queue reads as its own, larger card — full
  * question text at 18px, clearly secondary to the 28px question on stage (design-prinzipien.md
@@ -120,7 +179,15 @@ function PodiumButton({
  * the question and its released answer — no status change, no write, Escape or the dialog's own
  * close button leave it exactly as it was.
  */
-function NextPreview({ question, onOpen }: { question: Question; onOpen: (q: Question) => void }) {
+function NextPreview({
+  question,
+  catalogue,
+  onOpen,
+}: {
+  question: Question;
+  catalogue: RefusalCatalogue;
+  onOpen: (q: Question) => void;
+}) {
   const t = useT();
   return (
     <button
@@ -139,6 +206,8 @@ function NextPreview({ question, onOpen }: { question: Question; onOpen: (q: Que
           <StageAssignmentBadge assignment={question.stageAssignment} variant="initials" />
         )}
         {question.track !== undefined && <TrackBadge track={question.track} />}
+        {/* Scheibe 045: inside the badge row, so the card keeps its three direct children (003 reads them by index). */}
+        <RefusalMarker question={question} catalogue={catalogue} size="preview" />
       </span>
       <span className="mt-2 block text-[18px] leading-6 font-medium text-ink-900">
         {question.text}
@@ -175,9 +244,10 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
           )}
         </span>
         <span className="min-w-0 flex-1">
-          {question.track !== undefined && (
-            <span className="mb-0.5 flex">
-              <TrackBadge track={question.track} />
+          {(question.track !== undefined || refusalKindOf(approvedAnswer(question)) !== 'answer') && (
+            <span className="mb-0.5 flex gap-1.5">
+              {question.track !== undefined && <TrackBadge track={question.track} />}
+              <RefusalBadge question={question} />
             </span>
           )}
           <span className="line-clamp-2 text-[13px] text-ink-700">{question.text}</span>
@@ -190,7 +260,7 @@ function QueueItem({ question, onOpen }: { question: Question; onOpen: (q: Quest
   );
 }
 
-export function Podium({ stage, lock, returning, onNext, onReturn }: PodiumProps) {
+export function Podium({ stage, catalogue = NO_CATALOGUE, lock, returning, onNext, onReturn }: PodiumProps) {
   const t = useT();
   const current = stage.current;
   // takt-039: drawn and locked by the same rule the handler writes by (`nextButton`, lib.ts).
@@ -296,6 +366,7 @@ export function Podium({ stage, lock, returning, onNext, onReturn }: PodiumProps
                 })}
               </span>
             )}
+            <RefusalMarker question={current} catalogue={catalogue} size="stage" />
           </div>
           <p
             data-testid="stage-answer"
@@ -350,7 +421,15 @@ export function Podium({ stage, lock, returning, onNext, onReturn }: PodiumProps
  * and its released answer, exactly what the podium device will show once the question is actually
  * read, without touching the record: no "vorgelesen", no write, no new event.
  */
-function QueuePreview({ question, onClose }: { question: Question | null; onClose: () => void }) {
+function QueuePreview({
+  question,
+  catalogue,
+  onClose,
+}: {
+  question: Question | null;
+  catalogue: RefusalCatalogue;
+  onClose: () => void;
+}) {
   const t = useT();
   const answer = question !== null ? approvedAnswer(question) : undefined;
   return (
@@ -389,7 +468,10 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
             {question.text}
           </p>
           <div className="border-t border-line pt-3">
-            <span className="hv-label">{t('stage.answer.label')}</span>
+            <span className="flex flex-wrap items-center gap-3">
+              <span className="hv-label">{t('stage.answer.label')}</span>
+              <RefusalMarker question={question} catalogue={catalogue} size="preview" />
+            </span>
             <p
               data-testid="stage-preview-answer"
               className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-600 italic')}
@@ -408,7 +490,7 @@ function QueuePreview({ question, onClose }: { question: Question | null; onClos
   );
 }
 
-export function StageQueue({ stage }: { stage: StageView }) {
+export function StageQueue({ stage, catalogue = NO_CATALOGUE }: { stage: StageView; catalogue?: RefusalCatalogue }) {
   const t = useT();
   const [preview, setPreview] = useState<Question | null>(null);
   const shown = stage.queue.slice(0, 8);
@@ -440,7 +522,7 @@ export function StageQueue({ stage }: { stage: StageView }) {
         </p>
       ) : (
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
-          <NextPreview question={next} onOpen={setPreview} />
+          <NextPreview question={next} catalogue={catalogue} onOpen={setPreview} />
           <ul aria-label={t('stage.queue.label')} className="min-h-0 flex-1 overflow-y-auto">
             {rest.map((question) => (
               <QueueItem key={question.id} question={question} onOpen={setPreview} />
@@ -453,7 +535,7 @@ export function StageQueue({ stage }: { stage: StageView }) {
           )}
         </div>
       )}
-      <QueuePreview question={preview} onClose={() => setPreview(null)} />
+      <QueuePreview question={preview} catalogue={catalogue} onClose={() => setPreview(null)} />
     </div>
   );
 }

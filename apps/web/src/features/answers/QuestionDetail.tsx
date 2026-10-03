@@ -8,8 +8,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, Lock, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
+import type { Ref } from 'react';
 import { Link } from 'react-router';
-import type { DomainEvent, Question, Unit } from '@hv/domain';
+import type { AnswerVersion, DomainEvent, Question, Unit } from '@hv/domain';
 import { TERMINAL_STATUSES } from '@hv/domain';
 import {
   Badge,
@@ -27,6 +28,8 @@ import {
 import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n';
 import { AnswerEditor } from './AnswerEditor';
 import { clockTime, lapsedApproval, latestVersion, sealedApproval, wordDiff } from './lib';
+import { groundStatus, latestIsRefusal, refusalKindOf } from './refusal';
+import type { RefusalCatalogue } from './refusal';
 
 /**
  * "Änderung gegenüber Version n-1" (point 3): a word-level diff, removed words struck through,
@@ -76,12 +79,14 @@ export type DetailAction =
   | { kind: 'draft'; text: string; sources: string }
   | { kind: 'submit_review' }
   | { kind: 'approve'; version: number }
+  | { kind: 'refuse_approve'; version: number }
   | { kind: 'legal_clear'; version?: number }
   | { kind: 'stage' }
   | { kind: 'open-return' }
   | { kind: 'open-assign' }
   | { kind: 'open-merge' }
-  | { kind: 'open-withdraw' };
+  | { kind: 'open-withdraw' }
+  | { kind: 'open-refusal' };
 
 interface QuestionDetailProps {
   question: Question;
@@ -96,10 +101,61 @@ interface QuestionDetailProps {
   busy: boolean;
   /** Bumped by the page after a version was written; the editor then starts empty again. */
   draftResetToken: number;
+  /**
+   * Scheibe 045 (decision 5, Fokusziel 'version'): bumped by the page after a refusal was written for
+   * this question at `version`; the focus then goes to the card of the new latest version once a record
+   * read after the write is shown.
+   */
+  versionFocus: { token: number; version: number };
+  /** Scheibe 045: the catalogue of refusal grounds of this actor (`useRefusalGrounds`). */
+  catalogue: RefusalCatalogue;
   onAction: (action: DetailAction) => void;
 }
 
+/**
+ * Scheibe 045 (decision 5): what a refusal version says beyond its wording — the ground by its title (or
+ * its id, when the loaded catalogue does not know it), "ungeprüft", a ground changed since the proposal
+ * (latest version only; a fact, not a right), and the justification exactly when the record carries it.
+ */
+function RefusalFacts({ answer, latest, catalogue }: { answer: AnswerVersion; latest: boolean; catalogue: RefusalCatalogue }) {
+  const t = useT();
+  const kind = refusalKindOf(answer);
+  const status = kind === 'refusal_with_ground' ? groundStatus(answer, catalogue.grounds, catalogue.status) : undefined;
+  return (
+    <>
+      {status !== undefined && (
+        <p data-testid="answer-refusal-ground" className="mt-2.5 flex flex-wrap items-baseline gap-2 text-[13px] text-ink-800">
+          <span className="hv-label">{t('answers.refusal.ground.label')}</span>
+          {status.entry !== undefined ? (
+            <span>{status.entry.title}</span>
+          ) : (
+            <span>
+              <span className="font-mono text-2xs">{answer.refusalGroundId ?? ''}</span>{' '}
+              <span className="text-ink-600">{t('answers.refusal.ground.unknown', { id: answer.refusalGroundId ?? '' })}</span>
+            </span>
+          )}
+          {status.unverified && <Badge tone="warning">{t('answers.refusal.ground.unverified')}</Badge>}
+        </p>
+      )}
+      {status !== undefined && status.changed && latest && (
+        <p data-testid="answer-refusal-changed" className="mt-2 rounded-md border border-line-strong bg-ink-50 px-3 py-2 text-[13px] text-ink-700">
+          {t('answers.refusal.ground.changed')}
+        </p>
+      )}
+      {answer.refusalJustification !== undefined && (
+        <div data-testid="answer-refusal-justification" className="mt-2.5">
+          <span className="hv-label">{t('answers.refusal.justification.label')}</span>
+          <p className="mt-1 text-[13px] leading-relaxed whitespace-pre-wrap text-ink-800">{answer.refusalJustification}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 function VersionCard({
+  answer,
+  catalogue,
+  headerRef,
   version,
   author,
   at,
@@ -110,6 +166,10 @@ function VersionCard({
   open,
   onToggle,
 }: {
+  answer: AnswerVersion;
+  catalogue: RefusalCatalogue;
+  /** The card header of the latest version: focus target after a refusal was written (Fokusziel 'version'). */
+  headerRef?: Ref<HTMLButtonElement>;
   version: number;
   author: string;
   at: string;
@@ -123,6 +183,7 @@ function VersionCard({
 }) {
   const t = useT();
   const [showDiff, setShowDiff] = useState(false);
+  const kind = refusalKindOf(answer);
   return (
     <div
       data-testid="answer-version"
@@ -133,7 +194,9 @@ function VersionCard({
       )}
     >
       <button
+        ref={headerRef}
         type="button"
+        data-testid="answer-version-toggle"
         aria-expanded={open}
         aria-label={t('answers.version.toggle', { version })}
         onClick={onToggle}
@@ -147,6 +210,12 @@ function VersionCard({
         <Badge tone={latest ? 'accent' : 'neutral'} mono>
           {t('answers.version.label', { version })}
         </Badge>
+        {kind !== 'answer' && (
+          // D4: danger only as a badge.
+          <Badge tone="danger">
+            {t(kind === 'refusal_no_claim' ? 'answers.refusal.kind.noClaim' : 'answers.refusal.kind.withGround')}
+          </Badge>
+        )}
         {latest && <span className="text-2xs text-ink-500">{t('answers.version.latest')}</span>}
         <span className="ml-auto flex items-center gap-3">
           <span className="truncate text-2xs text-ink-500">{author}</span>
@@ -155,7 +224,9 @@ function VersionCard({
       </button>
       {open && (
         <div className="border-t border-line px-3 py-2.5">
+          {kind !== 'answer' && <span className="hv-label">{t('answers.refusal.text.label')}</span>}
           <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-ink-800">{text}</p>
+          {kind !== 'answer' && <RefusalFacts answer={answer} latest={latest} catalogue={catalogue} />}
           {sources !== undefined && sources.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <span className="hv-label">{t('answers.version.sources')}</span>
@@ -196,6 +267,8 @@ export function QuestionDetail({
   units,
   busy,
   draftResetToken,
+  versionFocus,
+  catalogue,
   onAction,
 }: QuestionDetailProps) {
   const t = useT();
@@ -236,7 +309,20 @@ export function QuestionDetail({
    */
   const approvalBlock = useRef<HTMLDivElement>(null);
   const legalClearanceBlock = useRef<HTMLDivElement>(null);
-  const stepTaken = useRef<{ question: Question; target: 'approval' | 'legal' } | null>(null);
+  const latestCard = useRef<HTMLButtonElement>(null);
+  // Scheibe 045: 'version' holds the version the refusal was written against; the card is focused once
+  // a newer record is shown (decision 5, review finding 14).
+  const stepTaken = useRef<
+    { question: Question; target: 'approval' | 'legal' } | { fromVersion: number; target: 'version' } | null
+  >(null);
+  // The page bumps the token in the write's `onDone`. Declared before the focus effect below, so in the
+  // commit that carries a new token the marker is set before that effect reads it.
+  const focusSeen = useRef(versionFocus.token);
+  useEffect(() => {
+    if (focusSeen.current === versionFocus.token) return;
+    focusSeen.current = versionFocus.token;
+    stepTaken.current = { fromVersion: versionFocus.version, target: 'version' };
+  }, [versionFocus]);
 
   const unit = useMemo(
     () => units.find((candidate) => candidate.id === question.unitId),
@@ -253,6 +339,9 @@ export function QuestionDetail({
   const mayAssign = may.includes('question.assign');
   const mayMerge = may.includes('question.merge');
   const mayWithdraw = may.includes('question.withdraw');
+  const mayRefusePropose = may.includes('question.refuse.propose');
+  const mayRefuseApprove = may.includes('question.refuse.approve');
+  const refusalLatest = latestIsRefusal(question);
 
   useEffect(() => {
     const taken = stepTaken.current;
@@ -260,6 +349,13 @@ export function QuestionDetail({
     if (taken.target === 'legal' && question !== taken.question) {
       stepTaken.current = null;
       legalClearanceBlock.current?.focus();
+      return;
+    }
+    if (taken.target === 'version') {
+      if (question.version !== taken.fromVersion) {
+        stepTaken.current = null;
+        latestCard.current?.focus();
+      }
       return;
     }
     const active = document.activeElement;
@@ -270,18 +366,22 @@ export function QuestionDetail({
     }
     // The button kept its focus: the step is settled once a record read after it is shown.
     if (question !== taken.question) stepTaken.current = null;
-  }, [busy, question]);
+  }, [busy, question, versionFocus]);
 
   const dirty = draft.trim() !== '';
   // Exactly one primary action (D2): the step that moves this question on — unless something is
   // written in the editor, then saving it is what the person is doing.
-  const primary: 'draft' | 'legal_clear' | 'approve' | 'submit' | 'stage' | 'none' =
+  // Scheibe 045: approving a refusal stands where approving an answer stands (R-GUARD-12/13 exclude each
+  // other); proposing a refusal is never primary.
+  const primary: 'draft' | 'legal_clear' | 'approve' | 'refuse_approve' | 'submit' | 'stage' | 'none' =
     dirty && mayDraft
       ? 'draft'
       : mayLegalClear
         ? 'legal_clear'
       : mayApprove
         ? 'approve'
+      : mayRefuseApprove
+        ? 'refuse_approve'
         : maySubmit
           ? 'submit'
           : mayStage
@@ -295,7 +395,8 @@ export function QuestionDetail({
   // A question that has come to rest (closed, withdrawn, merged) offers nothing; then the command
   // bar is not empty, it is gone.
   const hasSteps =
-    mayWithdraw || mayMerge || mayAssign || mayReturn || maySubmit || mayLegalClear || mayApprove || mayStage;
+    mayWithdraw || mayMerge || mayAssign || mayReturn || maySubmit || mayLegalClear || mayApprove || mayStage ||
+    mayRefusePropose || mayRefuseApprove;
   /**
    * Point #26 (feedback, slice 020): "Wieso kann ich hier nicht rein?" — a role without any editing
    * action for this question used to leave an empty command bar with no explanation. `_actions`
@@ -358,6 +459,16 @@ export function QuestionDetail({
               </Button>
             )}
             <ToolbarSpacer />
+            {mayRefusePropose && (
+              <Button
+                data-testid="answer-refuse"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => onAction({ kind: 'open-refusal' })}
+              >
+                {actionLabel(t, 'question.refuse.propose')}
+              </Button>
+            )}
             {mayAssign && (
               <Button
                 data-testid="answer-assign"
@@ -417,6 +528,19 @@ export function QuestionDetail({
                 }}
               >
                 {t('answers.approve.label', { version: latest })}
+              </Button>
+            )}
+            {mayRefuseApprove && latest !== undefined && (
+              <Button
+                data-testid="answer-refuse-approve"
+                variant={primary === 'refuse_approve' ? 'primary' : 'secondary'}
+                aria-disabled={busy}
+                onClick={() => {
+                  stepTaken.current = { question, target: 'approval' };
+                  onAction({ kind: 'refuse_approve', version: latest });
+                }}
+              >
+                {t('answers.refusal.approve.label', { version: latest })}
               </Button>
             )}
             {mayStage && (
@@ -579,6 +703,9 @@ export function QuestionDetail({
                 {question.answers.map((answer, index) => (
                   <VersionCard
                     key={answer.version}
+                    answer={answer}
+                    catalogue={catalogue}
+                    {...(answer.version === latest ? { headerRef: latestCard } : {})}
                     version={answer.version}
                     author={answer.createdBy.displayName ?? answer.createdBy.id}
                     at={answer.createdAt}
@@ -600,6 +727,12 @@ export function QuestionDetail({
             )}
           </div>
 
+          {mayDraft && refusalLatest && (
+            // R-TRANS-03 unchanged: a draft over a refusal is allowed; the person learns what it does.
+            <p data-testid="answer-editor-refusal-hint" className="rounded-md border border-line-strong bg-ink-50 px-3 py-2 text-[13px] text-ink-700">
+              {t('answers.refusal.editorHint')}
+            </p>
+          )}
           {mayDraft && (
             <AnswerEditor
               text={draft}

@@ -10,9 +10,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import { etagOf } from '@hv/domain';
-import type { Permission, WriteOptions } from '@hv/domain';
+import type { Permission, RefusalGround, WriteOptions } from '@hv/domain';
 import { api } from '../../api';
 import { useActor } from '../../api/actor';
+import { useRefusalGrounds } from '../../api/useRefusalGrounds';
 import {
   EmptyState,
   Panel,
@@ -27,11 +28,16 @@ import { AssignDialog, MergeDialog, ReasonDialog } from './ActionDialogs';
 import { QuestionDetail } from './QuestionDetail';
 import type { DetailAction } from './QuestionDetail';
 import { WorkList } from './WorkList';
-import { problemStatus, splitSources } from './lib';
+import { settleProblem, splitSources } from './lib';
+import { RefusalDialog } from './RefusalDialog';
+import { carriesJustification, refusalProblemHandler } from './refusal';
 import { EMPTY_FILTERS, useBacklog } from './useBacklog';
 import type { Filters } from './useBacklog';
 
-type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | null;
+type OpenDialog = 'return' | 'assign' | 'merge' | 'withdraw' | 'refusal' | null;
+
+/** Scheibe 045: the catalogue read of this page (stable, so the hook's loader keeps one function). */
+const loadRefusalGrounds = (): Promise<readonly RefusalGround[]> => api.listRefusalGrounds();
 
 /** The question a write was made against, as it was read (takt-008), and by whom (slice 010d). */
 interface WriteLock {
@@ -71,6 +77,9 @@ export function AnswersPage() {
   const writing = useRef<WriteLock | null>(null);
   const busy = lock !== null;
   const [draftResetToken, setDraftResetToken] = useState(0);
+  // Scheibe 045: bumped after a refusal was written; the detail then focuses the new version card.
+  const [versionFocus, setVersionFocus] = useState({ token: 0, version: 0 });
+  const catalogue = useRefusalGrounds(loadRefusalGrounds);
   // A 412 gets its own notice instead of a toast (point 4) — the record moved under this view.
   // Slice 010d, review round 1, finding 1: the notice names the question it is about and stands
   // only above that one — a flag of the page landed above the next question once it had loaded.
@@ -132,6 +141,9 @@ export function AnswersPage() {
       permission: Permission,
       write: (options: WriteOptions) => Promise<unknown>,
       onDone?: () => void,
+      // Scheibe 045 (decision 3): asked first on a refusal; `true` means handled — no toast, no "Stand
+      // veraltet". It gets `stillShown` so that it acts only on the question it was written for.
+      onProblem?: (error: unknown, stillShown: () => boolean) => boolean,
     ): Promise<void> => {
       if (question === null || writing.current !== null) return;
       const taken: WriteLock = {
@@ -173,7 +185,8 @@ export function AnswersPage() {
         // question it is about; once that question is no longer shown, the refusal is still
         // reported, as a toast in the house's words with the question's number (review round 1,
         // finding 2) — the server's own sentence names neither.
-        if (problemStatus(error) === 412) {
+        const outcome = settleProblem(error, onProblem, stillShown);
+        if (outcome === 'stale') {
           if (stillShown()) setStaleFor(taken.id);
           else {
             showToast({
@@ -182,7 +195,7 @@ export function AnswersPage() {
               detail: t('answers.toast.stale.body', step),
             });
           }
-        } else showProblem(error, t('toast.problem'));
+        } else if (outcome === 'toast') showProblem(error, t('toast.problem'));
         // Refused: nothing changed on the record, so nothing to wait for — unlock at once. Slice
         // 010c, Ziel 6 (N2 of takt-008's Nachprüfung): only this write's own lock. Its lock may
         // already have fallen (the page moved on to another question), and a newer write may hold
@@ -228,8 +241,14 @@ export function AnswersPage() {
             api.clearQuestionLegally(id, action.version === undefined ? {} : { answerVersion: action.version }, options),
           );
           break;
+        case 'refuse_approve':
+          void run('question.refuse.approve', (options) => api.approveRefusal(id, action.version, options));
+          break;
         case 'stage':
           void run('question.stage', (options) => api.stageQuestion(id, options));
+          break;
+        case 'open-refusal':
+          setDialog('refusal');
           break;
         case 'open-return':
           setDialog('return');
@@ -321,6 +340,8 @@ export function AnswersPage() {
                   units={backlog.units}
                   busy={busy}
                   draftResetToken={draftResetToken}
+                  versionFocus={versionFocus}
+                  catalogue={catalogue}
                   onAction={onAction}
                 />
               </div>
@@ -342,6 +363,8 @@ export function AnswersPage() {
         reasonTestId="answer-return-reason"
         submitTestId="answer-return-submit"
         busy={busy}
+        // Scheibe 045 (decision 4): only where the record of this question carries a justification.
+        {...(question !== null && carriesJustification(question) ? { note: t('answers.return.refusalWarning') } : {})}
         onSubmit={(reason) => {
           if (question === null) return;
           void run('question.return', (options) =>
@@ -370,6 +393,27 @@ export function AnswersPage() {
           );
         }}
       />
+
+      {/* Scheibe 045 (decision 3): rendered only while open, keyed to actor and question (090) — every
+       * opening starts empty, and a change of either drops every input in the same render. */}
+      {dialog === 'refusal' && question !== null && (
+        <RefusalDialog
+          key={`${actorId}:${question.id}:refusal`}
+          catalogue={catalogue}
+          busy={busy}
+          onClose={() => setDialog(null)}
+          onSubmit={(proposal, report) => {
+            const id = question.id;
+            const writtenAt = question.version;
+            void run(
+              'question.refuse.propose',
+              (options) => api.proposeRefusal(id, proposal, options),
+              () => setVersionFocus((previous) => ({ token: previous.token + 1, version: writtenAt })),
+              refusalProblemHandler(report, () => setDialog(null)),
+            );
+          }}
+        />
+      )}
 
       <AssignDialog
         key={`${actorId}:assign`}

@@ -49,4 +49,8 @@ export const stageEn: typeof stageDe = {
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
   'stage.forbidden.title': 'This role has no read permission for this view',
   'stage.forbidden.body': 'This role may not read the podium.',
+  // Scheibe 045: one marker per kind of refusal on the podium.
+  'stage.refusal.marker.noClaim': 'No right to information',
+  'stage.refusal.marker.withGround': 'Information is refused',
+  'stage.refusal.ground': 'Ground: {title}',
 };

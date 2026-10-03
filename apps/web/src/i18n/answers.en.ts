@@ -103,4 +103,30 @@ export const answersEn: typeof answersDe = {
   // gestalteter Zustand of the whole view — the question stays visible, only its course is
   // missing, exactly where it would stand (the lapsed-approval note).
   'answers.history.forbidden': 'This role may not read the course of this question.',
+  // Scheibe 045: the refusal in the answer view, kinds named by content (never "track A/B").
+  'answers.refusal.body':
+    'The refusal becomes a new version and goes straight to review. It then needs legal clearance and approval by a third person.',
+  'answers.refusal.kind.label': 'Kind of refusal',
+  'answers.refusal.kind.noClaim': 'Refusal · no right to information',
+  'answers.refusal.kind.withGround': 'Refusal · ground from catalogue',
+  'answers.refusal.ground.label': 'Refusal ground',
+  'answers.refusal.ground.placeholder': 'Choose a ground',
+  'answers.refusal.ground.loading': 'Loading the catalogue of grounds …',
+  'answers.refusal.ground.failed':
+    'The catalogue of grounds cannot be read. A refusal with a ground from the catalogue is not possible right now; “no right to information” remains possible.',
+  'answers.refusal.ground.unverified': 'unverified',
+  'answers.refusal.ground.citation': 'Legal reference',
+  'answers.refusal.ground.unknown': 'Ground {id} not in the loaded catalogue',
+  'answers.refusal.ground.changed': 'Ground changed in the catalogue since the proposal; please propose again.',
+  'answers.refusal.text.label': 'Wording for the podium',
+  'answers.refusal.text.marker': 'Template wording, unverified (E15)',
+  'answers.refusal.justification.label': 'Justification (internal)',
+  'answers.refusal.justification.help':
+    'Only what the decision needs; no names of third parties. Visible only to those who may propose or approve refusals; never on the podium.',
+  'answers.refusal.error.guard09': 'Justification missing. With “ground from catalogue” a ground is required too.',
+  'answers.refusal.error.invalid': 'Input rejected: required field empty, text too long or ground not in the catalogue.',
+  'answers.refusal.approve.label': 'Approve refusal (version {version})',
+  'answers.refusal.editorHint': 'A new answer draft supersedes the refusal and needs legal clearance and approval again.',
+  'answers.refusal.badge': 'Refusal',
+  'answers.return.refusalWarning': 'No justification in the return reason: everyone who reads the question can see it.',
 };

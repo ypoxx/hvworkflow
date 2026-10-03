@@ -61,4 +61,7 @@ export const historyDe = {
   // The "Ereignisstrom" tab (`listEvents`) — e.g. observer, who holds no `event.read`.
   'history.stream.forbidden.title': 'In dieser Rolle keine Leseberechtigung für den Ereignisstrom',
   'history.stream.forbidden.body': 'Diese Rolle darf den Ereignisstrom nicht lesen.',
+  // Scheibe 045: the kind of a proposed refusal; the title comes from the snapshot in the event.
+  'history.payload.refusal.noClaim': 'Verweigerung · kein Auskunftsanspruch',
+  'history.payload.refusal.withGround': 'Verweigerung · Grund aus Katalog: {title}',
 };

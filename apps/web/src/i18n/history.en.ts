@@ -63,4 +63,7 @@ export const historyEn: typeof historyDe = {
   // The "Event stream" tab (`listEvents`) — e.g. observer, who holds no `event.read`.
   'history.stream.forbidden.title': 'This role has no read permission for the event stream',
   'history.stream.forbidden.body': 'This role may not read the event stream.',
+  // Scheibe 045: the kind of a proposed refusal; the title comes from the snapshot in the event.
+  'history.payload.refusal.noClaim': 'Refusal · no right to information',
+  'history.payload.refusal.withGround': 'Refusal · ground from catalogue: {title}',
 };
