@@ -650,7 +650,7 @@ Done: Verweigerung vorschlagen (Dialog mit Art, Grund, Wortlaut, Begründung; Vo
       Versionskarte, Freigabe der Verweigerung, Editor-Hinweis, Arbeitslisten-Badge, Rückgabehinweis (Beantwortung und
       Bühne), Bühnenkennzeichen je Art, Historie „Verweigerung vorgeschlagen/freigegeben“; 29 Schlüssel je Sprache, Glossar.
 Evidence: siehe „Nachweise des Baus“ unten; docs/evidence/045-{dialog,detail,buehne}-{de,en}.png
-Open: Lauf-ID e2e-http folgt aus dem PR (Platzhalter unten); E4b ist vor der Änderung grün (prüft nur ein Fehlen).
+Open: E4b ist vor der Änderung grün (prüft nur ein Fehlen).
 Touched: siehe Bericht an den Orchestrator (Dateiliste = Files allowed, nichts darüber hinaus)
 ```
 
@@ -673,7 +673,7 @@ Touched: siehe Bericht an den Orchestrator (Dateiliste = Files allowed, nichts d
    Die Zeilen `[timing] switch to …` waren nicht lesbar (Log-Download leitet auf einen Blob-Host um, den der
    verfügbare Client nicht aufruft). Schätzung der Mehrzeit: rund 19 Rollenwechsel × höchstens 3 s + 6 Schreibschritte ×
    1 s + Navigation und axe rund 60 s ≈ 2–2,5 min; Ist plus Schätzung ≈ 6,2 min < 8 min < 9 min. Kein Halt.
-   Tatsächliche Dauer im PR-Lauf: (folgt aus dem CI-Lauf des PR).
+   Tatsächliche Dauer im PR-Lauf: Schritt „End-to-end http project“ 3:37 (21:07:16–21:10:53 UTC, Lauf 37153923219), unter dem Limit von 9:00.
 7. Expert-Testperson: `u-exp-fin` (Demo) bzw. Person `expert` mit `unit-fin` (http); Filtername `Finanzen`
    (`EXPERT_UNIT`). Auf einer `in_review`-Frage der Einheit nach einem Verweigerungsvorschlag stehen für `expert`
    `question.claim`, `answer.draft`, `question.read` in `_actions`, ohne vorherige Inanspruchnahme. Kein Halt, E2 wie
@@ -734,7 +734,19 @@ erste in Nummernfolge, `unit-fin` hält F-0121, F-0128, F-0135, F-0204). Der Fac
 liest sie nicht, seine Suche fand keine Zeile. Der Test wartet jetzt, bis jede Zeile die gewählte Einheit trägt (neues
 Zeilenattribut `data-unit` in `WorkList.tsx`), und prüft sie an der gewählten Zeile; die Expert-Zusicherungen sind unverändert.
 
-**Projekt `http`:** CI-Lauf `e2e-http` des PR, Lauf-ID: (Platzhalter, trägt der Orchestrator nach).
+**Projekt `http`:** CI-Lauf `e2e-http` auf PR #139, Commit `844126c`, Lauf-ID **37153923219**, Job 111293286346, grün (Nachtrag Orchestrator). Schluss des Logs mit den Fällen von 045:
+
+```
+  ✓  32 [http] › e2e/045-verweigerung.spec.ts:182:3 › … › E1 Grund aus Katalog, ganzer Weg (mit E2, E4a, E5, E8) @screenshot (22.8s)
+  ✓  33 [http] › e2e/045-verweigerung.spec.ts:412:3 › … › E3 Kein Auskunftsanspruch: kein Grund, Wechsel nach Vorbefüllen, eigener Wortlaut (2.6s)
+  ✓  34 [http] › e2e/045-verweigerung.spec.ts:459:3 › … › E4b Kein Hinweis ohne Begründung im Datensatz (schreibt nichts) (1.4s)
+  ✓  35 [http] › e2e/045-verweigerung.spec.ts:497:3 › … › E6 Eingaben je Akteur (090): ein Akteurwechsel schließt den Dialog und verwirft die Eingaben (3.2s)
+  ✓  36 [http] › e2e/045-verweigerung.spec.ts:525:3 › … › E7 Tastatur (D8): der Dialog ganz mit der Tastatur, Absenden fokussiert und aktiv, nicht ausgelöst (1.6s)
+  ✓  37 [http] › e2e/045-verweigerung.spec.ts:560:3 › … › E9 Eingaben je Frage: jede Frage, jedes Öffnen beginnt leer (2.8s)
+  39 passed (3.0m)
+```
+
+Vorher rot auf `7cda112` (Lauf 37153460436) und `42fc573` (Lauf 37152696332, PR #138): E1/E2 fand die Frage des Sachverständigen nicht; Ursache und Behebung im Abschnitt oben (`4259657`).
 
 **Aufwand:** tatsächlich rund 0,9 Stunden Wanduhr des Agenten (19:50–20:45 UTC, 03.10.2026) gegen 3,5 AStd geschätzt;
 Zuschnitt 045b nicht nötig, nicht geschnitten.
