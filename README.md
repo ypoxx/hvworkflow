@@ -68,6 +68,12 @@ pnpm --filter @hv/web e2e        # Playwright: drei Scheiben-Szenarien und der A
 pnpm --filter @hv/api dev        # HTTP-Dienst mit demselben Kern auf :8787 (HV_DEMO=1)
 ```
 
+**Lokaler Betrieb mit Containern.** Mit Docker Engine ab Version 28 und Node 22 startet `pnpm stack:up` den
+vollständigen Betrieb auf dem eigenen Rechner: Dienst, Web im HTTP-Modus hinter nginx, Postgres und Keycloak mit
+synthetischen Testpersonen, nur auf `127.0.0.1`, mit Secrets je Installation. Voraussetzungen, Anmeldung,
+Health-Checks, Stoppen, Aktualisieren, Zurücksetzen und Fehlersuche stehen auf der Installationsseite
+[`docs/betrieb/installation.md`](docs/betrieb/installation.md). Nur lokal, kein Produktivbetrieb.
+
 Aufbau des Repositoriums und Arbeitsregeln für Menschen und Agenten: [`AGENTS.md`](AGENTS.md).
 
 ## Status

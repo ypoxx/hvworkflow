@@ -56,6 +56,9 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.0
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -72,9 +75,6 @@ importers:
       oxlint:
         specifier: ^1.79.0
         version: 1.81.0
-      tsx:
-        specifier: ^4.23.13
-        version: 4.23.13
       typescript:
         specifier: ~6.0.2
         version: 6.0.3

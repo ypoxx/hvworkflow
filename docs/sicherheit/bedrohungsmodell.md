@@ -173,6 +173,24 @@ unter „Nachweis“; der Keycloak-Teil (H4 bis H8) läuft nur im CI-Job `e2e-ht
 - Zuordnung Bedrohung → Test: T-G1-S-02 → H4, H5, H6; T-G1-S-03 → H1, H4, `030-anmeldung.spec.ts`; T-G1-T-05 → H3, H5, H8;
   T-Q-I-01 → `scripts/e2e-http-031.test.mjs`; T-G2-I-02 → Stufe 6 des Harness (Zugriffslog gegen `e2e-texts.ts`).
 
+## Stand Scheibe 037a (lokales Betriebspaket, Container und Compose)
+
+Gilt für die genannten IDs vor den Tabellenzeilen unten, nur für den lokalen Stack (`deploy/`, `scripts/stack.mjs`,
+`docs/betrieb/installation.md`). Pipeline, Push mit Digest, TLS, CSP und Proxy-Vertrauen folgen in 037b. Nachweis des
+Bauzustands: `docs/slices/037a-lokales-betriebspaket.md`, Abschnitt „Bericht“, und `docs/evidence/037a-stack-protokoll.txt`.
+
+| ID | Stand nach 037a | Nachweis |
+|---|---|---|
+| T-G2-E-02 | Rest „Container ohne Root“ für den lokalen Stack geschlossen: Dienst und Befüllung als 65532, Web als 101, `read_only`, `cap_drop: ALL`, `no-new-privileges`; `/var/lib/hv` root 0755, Zugriffslog-Volume 65532 0700 | `scripts/stack.test.mjs` S4; `node scripts/stack.mjs probe images` (S14) |
+| T-Q-S-02 | teilweise: Images lokal gebaut, alle Basis-Images per Tag und Index-Digest gepinnt (Postgres und Keycloak gleich CI), pnpm mit sha512 über corepack, Befüllung in eigenem Image `seed`; Push mit Digest 037b | `scripts/stack.test.mjs` S1, S4, S9 |
+| T-Q-I-01 | teilweise: Secrets des lokalen Stacks je Installation einmal zufällig, außerhalb des Repositoriums (0700/0600), je Dienst nur die eigene Datei, Ausgabe nur über `stack:credentials`, `::add-mask::` vor jeder Ausgabe in CI, nie `docker compose config` in CI; Secrets aus der Plattform 037b | `scripts/stack.test.mjs` S3, S5, S6, S10 |
+| T-Q-I-02 | im Web-Image geschlossen: `.map` → 404 am Proxy, Quelltextkarten zusätzlich aus dem Image entfernt; für das Netlify-Demo offen bis 037b | Rauchtest S12.2 (`pnpm stack:smoke`) |
+| T-G1-D-01 (Proxy-Teil) | Grenzen am Proxy im lokalen Stack: Header- und Body-Timeout 10 s, `send_timeout` 30 s, Keepalive 15 s und 1000, Header-Puffer 4 × 8k, Body bis 257k (413 darüber), Sicherheitsheader `always` auch auf 4xx und 5xx des Proxys, Proben und `/metrics` nicht auf dem Webport; kein Proxy-Vertrauen lokal (`trusted-proxies=none`) | Rauchtest S12.1, S12.2 |
+| T-G1-S-02 | Restrisiko nur im lokalen Stack: `hv_session` gilt je Host, nicht je Port; jede andere Anwendung auf `localhost` im selben Browserprofil bekommt das Cookie mitgeschickt. Gegenmaßnahme: eigenes Browserprofil oder Abmelden nach der Demo (Installationsseite §8) | — |
+| T-G1-D-05 (`auth_purge_login_states`) | im lokalen Stack verringert, nicht geschlossen: `hv_owner` ist dort Datenbankeigentümer ohne Superuser (NOSUPERUSER NOCREATEROLE NOCREATEDB), die SECURITY-DEFINER-Funktion läuft mit Eigentümerrechten auf `hv`; in CI unverändert (`POSTGRES_USER: hv_owner` ist Superuser) | Rauchtest S12.7 |
+| T-G2-T-04 / T-Q-T-04 | Befüllung des lokalen Stacks am Rechtepfad vorbei nur in ein leeres Log, nur mit Loopback-Issuer und Compose-Host `postgres`, nur im Image `seed` (das Image `api` enthält kein `/app/scripts`) | `scripts/stack.test.mjs` S8; `probe images` (S14), `probe refusals` (S15) |
+| T-G1-S-04 (neu) | DNS-Rebinding gegen den lokalen Stack: eine fremde Webseite, deren Name auf `127.0.0.1` zeigt, spricht den Webport mit eigenem Host-Namen an. Gegenmaßnahme: nginx beantwortet nur `localhost` und `127.0.0.1`, jeder andere Host-Name trifft den `default_server` mit 421 (mit Sicherheitsheadern); der Dienst selbst prüft den Host nicht. Neu in 037a, in 074 aufzunehmen (Bedrohungsmodell v2) | Rauchtest S12 „Fremder Host-Header 421“, `scripts/stack.test.mjs` › nginx-Host-Regel |
+
 ## 5. STRIDE je Grenze
 
 ### 5.1 G1 — Oberfläche ↔ Dienst
@@ -299,7 +317,7 @@ der genannten anderen Scheibe.
 | 034a Grenzen, Timeouts, Sicherheitsheader, Aufräumen der Login-Zustände | T-G1-D-01, T-G1-D-05, T-G1-I-06 | T-G1-T-06 (CSP am Dienst), T-G2-D-04, T-G2-D-01, T-G2-I-02, T-G3-D-01, T-G3-D-02, T-G1-D-03 |
 | 034b Konfiguration, CORS-Allowlist, Proxy-Quelle | T-Q-T-04, T-G2-E-02 | T-G1-T-05 (CORS), T-G1-D-05 (Quelle hinter Proxy) |
 | 035 SSE | T-G1-I-09 | T-G1-D-03 (Heartbeat, Ströme je Subject), T-G3-I-01 (Filter nach Leserecht) |
-| 037 Container, Pipeline | T-G2-S-01, T-Q-R-01, T-Q-D-01, T-Q-E-03 | T-Q-S-02, T-Q-I-01, T-Q-I-02, T-Q-I-04, T-Q-D-02, T-G1-T-06 |
+| 037 Container, Pipeline (geteilt: 037a lokales Betriebspaket, 037b Pipeline und Staging) | T-G2-S-01, T-Q-R-01, T-Q-D-01, T-Q-E-03 | T-Q-S-02, T-Q-I-01, T-Q-I-02, T-Q-I-04, T-Q-D-02, T-G1-T-06; 037a: T-G2-E-02, T-G1-D-01 (Proxy-Teil), T-G1-S-02, T-G1-D-05, T-G2-T-04, T-Q-T-04 |
 | 058 Podium offline | — | T-G1-I-08 (Puffer nur eigener Platz), T-G1-R-02 (Absicht mit Gerätezeit), T-G3-I-03 (datenfreier Beacon) |
 | 064 Ingest | T-G3-S-01, T-G3-T-01 | T-G3-D-02, T-G3-R-01 |
 | 067 Aktienregister-Lookup | T-G3-I-05 | T-G1-I-03, T-G3-R-01 |
@@ -319,7 +337,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 049 Vorgelesen als Entität | T-G1-R-02 | T-G1-E-05 |
 | 065 Webhooks | T-G3-T-03, T-G3-I-01, T-G3-E-02 | T-G3-D-02 |
 | 066 KI-Port | T-G3-T-02, T-G3-I-02 | T-G3-E-01 |
-| 074 Bedrohungsmodell v2 | Status aller IDs neu bewerten | T-Q-S-02 |
+| 074 Bedrohungsmodell v2 | Status aller IDs neu bewerten; T-G1-S-04 (DNS-Rebinding, neu aus 037a) aufnehmen | T-Q-S-02 |
 
 ---
 
