@@ -44,6 +44,28 @@ describe('createRefusalGroundsLoader (Test 10)', () => {
     expect(states.at(-1)).toEqual({ actorId: 'u-2', status: 'ready', grounds: G });
   });
 
+  it('A → B → A: a late answer of the first read of A never settles over the second (Codex P2)', async () => {
+    let calls = 0;
+    let rejectFirst: (reason: unknown) => void = () => undefined;
+    const states: RefusalGroundsState[] = [];
+    const loader = createRefusalGroundsLoader(
+      () => {
+        calls += 1;
+        return calls === 1 ? new Promise((_, reject) => { rejectFirst = reject; }) : Promise.resolve(G);
+      },
+      (s) => states.push(s),
+    );
+    loader.follow('u-1');
+    loader.follow('u-2');
+    loader.follow('u-1');
+    await flush();
+    expect(states.at(-1)).toEqual({ actorId: 'u-1', status: 'ready', grounds: G });
+    rejectFirst({ status: 503 });
+    await flush();
+    expect(calls).toBe(3);
+    expect(states.at(-1)).toEqual({ actorId: 'u-1', status: 'ready', grounds: G });
+  });
+
   it('a refused read ends in failed (no toast: the loader has no toast path at all)', async () => {
     const states: RefusalGroundsState[] = [];
     const loader = createRefusalGroundsLoader(() => Promise.reject({ status: 403, ruleId: 'R-PERM-02' }), (s) => states.push(s));

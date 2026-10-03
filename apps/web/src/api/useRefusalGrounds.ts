@@ -28,24 +28,28 @@ const LOADING: RefusalGroundsView = { status: 'loading', grounds: NONE };
 
 /**
  * One read per actor. `follow` with the same id does nothing (a StrictMode double effect included); a
- * new id starts a read whose answer lands only while that id is still the one followed.
+ * new id starts a read whose answer lands only while that read is still the latest one. A generation
+ * token, not the id, decides (Codex P2 on #139): after A → B → A the first read of A must not settle
+ * over the second.
  */
 export function createRefusalGroundsLoader(
   load: () => Promise<readonly RefusalGround[]>,
   onState: (state: RefusalGroundsState) => void,
 ): { follow: (actorId: string) => void } {
   let followed: string | undefined;
+  let generation = 0;
   return {
     follow(actorId) {
       if (actorId === followed) return;
       followed = actorId;
+      const mine = ++generation;
       onState({ actorId, status: 'loading', grounds: NONE });
       load().then(
         (grounds) => {
-          if (followed === actorId) onState({ actorId, status: 'ready', grounds });
+          if (generation === mine) onState({ actorId, status: 'ready', grounds });
         },
         () => {
-          if (followed === actorId) onState({ actorId, status: 'failed', grounds: NONE });
+          if (generation === mine) onState({ actorId, status: 'failed', grounds: NONE });
         },
       );
     },
