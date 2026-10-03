@@ -854,7 +854,7 @@ export interface paths {
         get: operations["listMeetingAgendaItems"];
         /**
          * Set the agenda (Tagesordnung) of a meeting — the whole list
-         * @description Since 0.3.0 (slice 040). Permission `agenda.manage`. The list replaces the agenda; an item that keeps its `id` keeps its progress timestamps and its questions. `409` after the configuration freeze (R-ADM-03, slice 040) or when an item to be removed already has questions.
+         * @description Since 0.3.0 (slice 040), served since 0.4.1 (slice 040b). Permission `agenda.manage`. The list replaces the agenda and emits `AgendaItemsReplaced` (subject: the meeting, whole list); an item that keeps its `id` keeps its progress timestamps and its questions, renaming is always allowed, an item without `id` gets one from the server. The response is sorted by `number`. `422` for a duplicate `id` or `number` or a string that is not well-formed UTF-16 (no lone surrogate). `409` R-ADM-02 (referenced master data stays) when an item to be removed already has a question (`agendaItemId`) or progress (`openedAt`). R-ADM-01 (configuration of a closed meeting is immutable) answers `409` only to an actor that still reaches the closed meeting (the demo identity, operator tools); with a session the service answers `403` first, because every role assignment of a closed meeting has ended (no active assignment). R-ADM-03 (configuration freeze) applies from slice 040d. `If-Match` is optional (pre-declared operation; required from 0.5); when sent, a stale value is `412`. Repeatable with `Idempotency-Key` (R-IDEM-01).
          */
         put: operations["replaceMeetingAgendaItems"];
         post?: never;
@@ -953,7 +953,7 @@ export interface paths {
         get: operations["listMeetingUnits"];
         /**
          * Set the answering units (Fachbereiche) of a meeting — the whole list
-         * @description Since 0.3.0 (slice 040). Permission `admin.units.manage`. A unit that keeps its `id` keeps its assignments; `409` after the configuration freeze (R-ADM-03) or when a unit to be removed still has assigned questions.
+         * @description Since 0.3.0 (slice 040), served since 0.4.1 (slice 040b). Permission `admin.units.manage`. The list replaces the units and emits `UnitsReplaced` (subject: the meeting, whole list); a unit that keeps its `id` keeps its assignments, renaming is always allowed, a unit without `id` gets one from the server. `422` for a duplicate `id` or a string that is not well-formed UTF-16 (no lone surrogate). `409` R-ADM-02 (referenced master data stays) when a unit to be removed is the `unitId` of a question or of an active role assignment (neither revoked nor expired). R-ADM-01 (configuration of a closed meeting is immutable) answers `409` only to an actor that still reaches the closed meeting (the demo identity, operator tools); with a session the service answers `403` first, because every role assignment of a closed meeting has ended (no active assignment). R-ADM-03 (configuration freeze) applies from slice 040d. `If-Match` is optional (pre-declared operation; required from 0.5); when sent, a stale value is `412`. Repeatable with `Idempotency-Key` (R-IDEM-01).
          */
         put: operations["replaceMeetingUnits"];
         post?: never;
@@ -975,12 +975,12 @@ export interface paths {
         };
         /**
          * List the podium seats (Bühnenplätze) of a meeting
-         * @description Since 0.3.0 (slice 040, ADR 0006): the seat list replaces the `StageAssignment` enum; the four enum values become the default seats of the seed. Readable by every signed-in actor (master data); classification sets `seatId` from it.
+         * @description Since 0.3.0 (slice 040, ADR 0006), served since 0.4.1 (slice 040b): the seat list replaces the `StageAssignment` enum; the four enum values become the default seats of the seed. Readable by every signed-in actor (master data); classification sets `seatId` from it. Sorted by `position`, then `id`. `personId` and `deviceId` are present only for holders of `admin.seats.manage`; for every other reader both are absent and the seat is otherwise the same.
          */
         get: operations["listMeetingStageSeats"];
         /**
          * Set the podium seats (Bühnenplätze) of a meeting with person and device per seat
-         * @description Since 0.3.0 (slice 040). Permission `admin.seats.manage`. `personId` and `deviceId` per seat are resolved in the service for the podium filter (ADR 0006: the context never comes from the client). `409` after the configuration freeze (R-ADM-03).
+         * @description Since 0.3.0 (slice 040), served since 0.4.1 (slice 040b). Permission `admin.seats.manage`. The list replaces the seats and emits `StageSeatsReplaced` (subject: the meeting, whole list). `personId` and `deviceId` per seat are resolved in the service for the podium filter (ADR 0006: the context never comes from the client; from slice 047). `personId` is a pseudonymous key (ADR 0009), not checked against the person table of the speaker requests; `deviceId` is a technical id of the podium device. A seat without `id` gets one from the server; renaming is always allowed. `422` for a duplicate `id`, `position` or `deviceId`, for a `personId` or `deviceId` that is not pseudonymous (contains `@` or whitespace) or a string that is not well-formed UTF-16 (no lone surrogate). `409` R-ADM-02 (referenced master data stays) when a seat to be removed is the `seatId` of a question (set explicitly or derived from `stageAssignment`). R-ADM-01 (configuration of a closed meeting is immutable) answers `409` only to an actor that still reaches the closed meeting (the demo identity, operator tools); with a session the service answers `403` first, because every role assignment of a closed meeting has ended (no active assignment). R-ADM-03 (configuration freeze) applies from slice 040d. `If-Match` is optional (pre-declared operation; required from 0.5); when sent, a stale value is `412`. Repeatable with `Idempotency-Key` (R-IDEM-01).
          */
         put: operations["replaceMeetingStageSeats"];
         post?: never;
@@ -1388,7 +1388,7 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06 (slice 025). Administration after the configuration freeze: R-ADM-01..04 (slice 040). Speaker state table: R-SPK-00..05 and R-SPK-GUARD-01 (slice 080, documented on `updateSpeaker` since 0.4.0). */
+            /** @description Rule id from the domain rule tables, e.g. R-TRANS-07. Permission denials: R-PERM-01 write permission missing (Schreibrecht fehlt), R-PERM-02 read permission missing (Leserecht fehlt; since 0.2.0, enforced from slice 010), R-PERM-03 read scope exceeded (Leseumfang überschritten; since 0.2.1, slice 010). Meeting lifecycle and agenda: R-MTG-01..06 (slice 025). Administration: R-ADM-01 configuration of a closed meeting is immutable, R-ADM-02 referenced master data stays (both since 0.4.1, slice 040b); the range R-ADM-01..09 and R-MTG-08/09 belongs to slice 040 (the configuration freeze R-ADM-03 from slice 040d). Speaker state table: R-SPK-00..05 and R-SPK-GUARD-01 (slice 080, documented on `updateSpeaker` since 0.4.0). */
             ruleId?: string;
         };
         /**
@@ -1472,11 +1472,11 @@ export interface components {
                 byStatus?: {
                     [key: string]: number;
                 };
-                /** @description Since 0.3.0 (slice 040): open questions per answering unit, keyed by `unitId` */
+                /** @description Since 0.3.0 (slice 040), projected since 0.4.1 (slice 040b): open questions per answering unit, keyed by `unitId`. Every unit of the meeting is a key, also with 0. A question whose `unitId` is not a unit of the meeting counts under no key, so the sum can be smaller than `open` */
                 byUnit?: {
                     [key: string]: number;
                 };
-                /** @description Since 0.3.0 (slice 040): staged questions per podium seat, keyed by `seatId` */
+                /** @description Since 0.3.0 (slice 040), projected since 0.4.1 (slice 040b): questions on the podium per seat, keyed by `seatId`. Every seat of the meeting is a key, also with 0. A question whose `seatId` is not a seat of the meeting (an older log with a derived `seatId` and no seat list) counts under no key, so the sum can be smaller than `staged`. Aggregates per seat, never a figure per person */
                 bySeat?: {
                     [key: string]: number;
                 };
@@ -1529,7 +1529,7 @@ export interface components {
             name: string;
             shortName?: string;
         };
-        /** @description Since 0.3.0 (slice 040, ADR 0006): a podium seat (Bühnenplatz) of a meeting. Replaces the `StageAssignment` enum; the four enum values are the ids of the default seats in the seed (`supervisory_board_chair`, `ceo`, `cfo`, `board_member`). `personId` and `deviceId` let the service resolve which queue a podium device sees; the client never states its seat. */
+        /** @description Since 0.3.0 (slice 040, ADR 0006): a podium seat (Bühnenplatz) of a meeting. Replaces the `StageAssignment` enum; the four enum values are the ids of the default seats in the seed (`supervisory_board_chair`, `ceo`, `cfo`, `board_member`). `personId` and `deviceId` let the service resolve which queue a podium device sees; the client never states its seat. Since 0.4.1 (slice 040b): `personId` (a key into the person table, ADR 0009) and `deviceId` (a technical id of the podium device) are present only for holders of `admin.seats.manage` (`listMeetingStageSeats`, `replaceMeetingStageSeats`); `EventRead` never carries `personId`. */
         StageSeat: {
             id: string;
             /** @description Display label, e.g. "Vorstandsvorsitz" */
@@ -1950,7 +1950,7 @@ export interface components {
              * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5: use `seatId` (ADR 0006)
              */
             stageAssignment?: components["schemas"]["StageAssignment"];
-            /** @description Since 0.3.0 (slice 040, ADR 0006): the podium seat (Bühnenplatz) that answers; one of `listMeetingStageSeats` */
+            /** @description Since 0.3.0 (slice 040, ADR 0006), set since 0.4.1 (slice 040b): the podium seat (Bühnenplatz) that answers; one of `listMeetingStageSeats`. `Classification.seatId` when classified with it, otherwise the value of `stageAssignment` */
             seatId?: string;
             unitId?: string;
             claim?: components["schemas"]["Claim"];
@@ -1980,9 +1980,11 @@ export interface components {
             agendaItemId?: string;
             /**
              * @deprecated
-             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006). Its successor `Classification.seatId` arrives as the contract line of slice 040 (written by the architect before that slice's code), not with a contract-only release, because the unchanged service would accept and silently drop it (review 023). `Question.seatId` is already declared on the response.
+             * @description Deprecated — veraltet seit 0.3.0, entfällt mit Vertrag 0.5 (ADR 0006): use `seatId` (since 0.4.1, slice 040b). Sent alone it works as before (no check against the seat list), so older clients and logs stay valid; sent together with `seatId` both must be equal, otherwise `422`.
              */
             stageAssignment?: components["schemas"]["StageAssignment"];
+            /** @description Since 0.4.1 (slice 040b, ADR 0006; the contract line of slice 040 under rule 1 of slice 043a): the podium seat (Bühnenplatz) that answers; must be the `id` of a seat of the question's meeting (`listMeetingStageSeats`), otherwise `422`. When `stageAssignment` is sent as well, both must be equal, otherwise `422`. The question then carries this value as `Question.seatId`, and `Question.stageAssignment` only when the value is one of the four `StageAssignment` values. A classification without `seatId` and without `stageAssignment` removes both from the question. */
+            seatId?: string;
         };
         AnswerDraft: {
             text: string;
@@ -2033,6 +2035,32 @@ export interface components {
             unitId?: never;
             expiresAt?: never;
             deputyForSubjectId?: never;
+        };
+        /** @description Since 0.4.1 (slice 040b): payload of `AgendaItemsReplaced` (`replaceMeetingAgendaItems`); the event's `subjectId` is the meeting. The whole agenda after the change, server ids filled in. Progress timestamps are not part of it: an item that keeps its `id` keeps them in the projection. */
+        AgendaItemsReplacedPayload: {
+            agendaItems: {
+                id: string;
+                number: number;
+                title: string;
+            }[];
+        };
+        /** @description Since 0.4.1 (slice 040b): payload of `UnitsReplaced` (`replaceMeetingUnits`); the event's `subjectId` is the meeting. The whole unit list after the change, server ids filled in */
+        UnitsReplacedPayload: {
+            units: components["schemas"]["Unit"][];
+        };
+        /** @description Since 0.4.1 (slice 040b): payload of `StageSeatsReplaced` (`replaceMeetingStageSeats`); the event's `subjectId` is the meeting. The whole seat list after the change, server ids filled in. The stored original keeps `personId` and `deviceId`; `EventRead` removes `personId` from every seat (`StageSeatRead`), and only holders of `event.read` read `deviceId` there. */
+        StageSeatsReplacedPayload: {
+            stageSeats: components["schemas"]["StageSeat"][];
+        };
+        /** @description Since 0.4.1 (slice 040b): a podium seat inside an `EventRead` payload (`StageSeatsReplaced`, `MeetingCreated`). Like `StageSeat`, but `personId` is never present (ADR 0009/0013; the core's `maskEvent` removes it at any depth). */
+        StageSeatRead: {
+            personId?: never;
+        } & components["schemas"]["StageSeat"];
+        /** @description Since 0.4.1 (slice 040b): the part of the `MeetingCreated` payload that `EventRead` binds. The payload stays open otherwise; its optional `stageSeats` (seed, cloning from slice 040c) has the form of `StageSeatsReplacedPayload.stageSeats`, read without `personId`. */
+        MeetingCreatedReadPayload: {
+            stageSeats?: components["schemas"]["StageSeatRead"][];
+        } & {
+            [key: string]: unknown;
         };
         /** @description Since 0.3.0 (slice 024, ADR 0009/0011): the only part of a payload that may carry personal data. `keyId` names the key of the meeting (per Jahrgang) behind the codec port; in the beta the codec is the identity codec, but `keyId` is set from the first event so switching the key on later is an export into a new database, never a change to the log. Every other field of the payload is free of personal data; events carry `personId`, never a clear name. */
         PiiEnvelope: {
@@ -2121,14 +2149,14 @@ export interface components {
             } & {
                 [key: string]: unknown;
             };
-        } & (unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed); `answer.refusalJustification` exists only in the stored original, never in `EventRead`. A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed); `answer.refusalJustification` exists only in the stored original, never in `EventRead`. A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
         Event: {
             /** @description Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024). */
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "MeetingCreated" | "MeetingStarted" | "MeetingClosed" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "ContributionClaimed" | "ContributionReleased" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "QuestionClaimed" | "QuestionReleased" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged" | "AgendaItemOpened" | "VotingOpened" | "VotingClosed" | "DebateClosed" | "RoleAssigned" | "RoleRevoked" | "IdempotencyRecorded" | "ConfigFrozen";
+            type: "MeetingCreated" | "MeetingStarted" | "MeetingClosed" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "ContributionClaimed" | "ContributionReleased" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "QuestionClaimed" | "QuestionReleased" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged" | "AgendaItemOpened" | "VotingOpened" | "VotingClosed" | "DebateClosed" | "RoleAssigned" | "RoleRevoked" | "IdempotencyRecorded" | "ConfigFrozen" | "AgendaItemsReplaced" | "UnitsReplaced" | "StageSeatsReplaced";
             /**
              * Format: date-time
              * @description Recorded time (server clock). Since 0.3.0 the same instant as `recordedAt`, which is the name ADR 0011 gives it; `at` stays for 0.x readers.
