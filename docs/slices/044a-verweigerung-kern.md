@@ -1144,11 +1144,48 @@ slice cites 'AktG' … (044)“). Ein Doku-Takt gleicht sie an.
 
 ```
 Slice: 044a-verweigerung-kern
-Done:
-Evidence:
-Open:
-Touched:
+Done: Katalog (sieben Gründe, Hash, tief eingefroren), zwei Rechte und Leserkreis als Daten, R-TRANS-15/16 mit
+      R-GUARD-08/09/11/12/13/14 (R-GUARD-12 auch an R-TRANS-04/05), proposeRefusal/approveRefusal/listRefusalGrounds in
+      Kern, HTTP-Client und Live-Puffer; Begründung nur in payload.pii, maskiert in Projektion, Bühne, Ereignis-Lesepfad,
+      Suche; Vermerk der Rechtsfreigabe maskiert; Kennzahl der Rechtsprüfung; retentionClass record. Auf Standard gebaut.
+Evidence: pnpm gates grün auf e278899 (Schluss unten, mit Postgres-Variablen, 0 übersprungen); Tests 1–19, 21–28 grün
+      (Test 20 entfällt, 040d nicht gemergt); 18 Mutationsproben rot belegt (unten); kein Screenshot (keine Ansicht ändert sich).
+Open: Test 20 an 040d; HTTP-Montage, Allowlist und HTTP-Proben an 044b (vor 27.11.2026); Pfad A ohne Grund und Untergründe
+      (nicht erfüllt, 044c); Aufbewahrungsklasse der übrigen Antwortereignisse und der Rechtsfreigabe (Eigentümerfrage 9).
+Touched: packages/domain/src/{refusalGrounds.ts (neu), types.ts, permissions.ts, transitions.ts, events.ts, state.ts,
+      indicators.ts, api.ts, stream.ts, index.ts}; packages/domain/src/__tests__/{refusal044a.test.ts (neu),
+      transitions.test.ts, indicators033b.test.ts, api.test.ts}; packages/domain/policy-truth-table.md; docs/legal-trace.md;
+      apps/web/src/api/{http.ts, http.test.ts, liveStore.ts}; apps/web/src/i18n/{labels.ts, shell.de.ts, shell.en.ts,
+      parity.test.ts}; docs/rollen-und-rechtekonzept.md; docs/sicherheit/bedrohungsmodell.md;
+      docs/datenschutz/dsfa-vorentwurf.md; dieser Bericht
 ```
+
+**Abweichungen vom Wortlaut der Spec (Bau, 03.10.2026):**
+1. **R-GUARD-14 ist ohne Rechtsfreigabe erfüllt** (`legalClearance === undefined || clearedBy.id !== actor.id`), statt
+   „`legalClearance !== undefined` und …“. Grund: Mit der wörtlichen Definition und der Reihenfolge der Tabelle
+   (R-GUARD-14 vor R-GUARD-08) antwortete Test 9 mit R-GUARD-14 statt R-GUARD-08, und Mutationsprobe 4 machte den
+   Abschnitt „Role × Verweigerung“ nicht rot (R-GUARD-14 hätte die Zeile „in_review, offen“ weiter gesperrt). Die
+   Konjunktion an R-TRANS-16 ist unverändert: R-GUARD-08 verlangt die Rechtsfreigabe in derselben Zeile; Reihenfolge wie
+   in der Spec. Die `citation` von R-GUARD-14 nennt das.
+2. **Test 7, `podium`:** `proposeRefusal` als `podium` antwortet **404**, nicht 403. `podium` hält weder `question.read`
+   noch `question.refuse.propose`; Festlegung 3 (Scheibe 010, `requireQuestionFor`) meldet dann 404. Bestehendes
+   Verhalten, nicht geändert; der Test prüft 404.
+3. **`approveRefusal`** prüft zusätzlich `answerVersion` als positive ganze Zahl (422), weil R-GUARD-04 ohne Version die
+   Fähigkeitsfrage bejaht und die Demo nicht gegen den Vertrag prüft. Innerhalb „ihre Umsetzung“.
+4. **Test 14, `subscribe` als `legal`:** `legal` hält kein `event.read` und erhält nur Änderungssignale ohne Ereignis;
+   das prüft der Test, und zusätzlich einen Abonnenten mit `event.read` (admin) auf maskierte Ereignisse. Abonnenten
+   laufen als eigene Instanz mit festem Leser, weil `subscribe` den umgeschalteten Demo-Akteur je Zustellung liest.
+5. **Tiefe Kopie** über `copyRefusalGrounds()` (Eintrag und `legalRef` kopiert) statt `structuredClone`; gleiche Wirkung
+   für die Eintragsform, belegt durch Test 19 und Mutationsprobe 17. `index.ts` exportiert das Modul
+   (`REFUSAL_GROUNDS`, Typen, `refusalGroundHash`, `copyRefusalGrounds`).
+6. **`refusalGroundId: ''`** auf Pfad B ist 422 (nicht im Katalog), nicht R-GUARD-09; der Vertrag kennt kein `minLength`.
+7. **Zeilenverweise:** Der Kopfvermerk verschiebt `docs/rollen-und-rechtekonzept.md` um zwei Zeilen; die neuen
+   `citation`s nennen die neuen Zeilen (60, 61, 123, 168-169, 173, 175). Bestehende `citation`s anderer Regeln
+   (R-GUARD-04/06, R-TRANS-03/05/13: :109, :156, :163) waren schon vorher verschoben und bleiben unverändert (außerhalb
+   des Umfangs; Hinweis an den Orchestrator).
+
+**Missbrauchsfälle, Kapazität:** wie in der Spec; drei verschiedene Akteur-ids je Verweigerung (Test 10), mit nur einer
+Juristin blockiert der Weg „`legal` schlägt selbst vor“ (R-GUARD-06), der Weg über die Koordination nicht.
 
 **Stand Eigentümerfragen 1, 2 und 3b:** Go zu 1, 2 und 3b am 03.10.2026, auf Standard gebaut. Zu 1: ADR 0012 und
 Katalog sind von Recht nicht gelesen; der Vermerk „auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht nicht
@@ -1217,39 +1254,132 @@ unverändert; `labels.ts` `ACTION_KEYS` 52 unverändert; `QuestionDetail.tsx` (`
   Abschnitt „Vertragsschritt“). Keine Scope-Änderung.
 - `parity.test.ts` zählt heute 522 Schlüssel je Sprache; mit den zwei Aktionsschlüsseln 524.
 
-**Wahrheitstabellen-Diff (wörtlich).**
-
-**Regelregister (Auszug `docs/legal-trace.md`).**
-
-**Katalog-Hashes (Test 1).**
-
-**Gespeichertes Ereignis und `EventRead` einer Verweigerung (Auszug).**
-
-**Mutationsproben (Ergebnis).**
-1.
-2.
-3.
-4.
-5.
-6.
-7.
-8.
-9.
-10.
-11.
-12.
-13.
-14.
-15.
-16.
-17.
-18.
-
-**Geänderte `_actions`- und `note`-Erwartungen.**
-
-**`pnpm gates` (Schluss, Commit):**
+**Wahrheitstabellen-Diff (wörtlich).** Abschnitt 1: 198 Zeilen, zwei Spalten nach `q.legal.clear`; `q.refuse.propose`
+✓ in genau 10 Zellen (`coordination` und `legal` × `classified`, `assigned`, `answer_drafted`, `in_review`, `approved`,
+nur Textpfad), `q.refuse.approve` in keiner Zeile; keine bestehende Zelle geändert (maschinell verglichen); die übrigen
+fünf Zusatzabschnitte unverändert. Die drei Beispielzeilen der Spec, wörtlich aus `git diff`:
 
 ```
+-| coordination | classified | · | · | ✓ | ✓ | · | · | · | · | · | · | · | · | · | · | ✓ | · |
+-| legal | in_review | · | ✓ | · | · | ✓ | · | · | ✓ | ✓ | · | · | · | · | · | ✓ | · |
+-| approver | in_review | · | · | · | · | · | · | ✓ | · | ✓ | · | · | · | · | · | ✓ | · |
++| coordination | classified | · | · | ✓ | ✓ | · | · | · | · | ✓ | · | · | · | · | · | · | · | ✓ | · |
++| legal | in_review | · | ✓ | · | · | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · | · | · | · | ✓ | · |
++| approver | in_review | · | · | · | · | · | · | ✓ | · | · | · | ✓ | · | · | · | · | · | ✓ | · |
+```
+
+Neuer Abschnitt „Role × Verweigerung“: 27 Zeilen, Zelle für Zelle gleich der Tabelle der Spec (✓ nur: `coordination`
+propose in allen drei Fällen; `expert` answer.draft in allen drei; `legal` propose in allen drei, legal.clear in beiden
+`in_review`-Fällen, answer.draft in allen drei; `approver` refuse.approve nur „in_review, frei“).
+
+**Regelregister (Auszug `docs/legal-trace.md`).** Acht neue Zeilen, alle `geprüft: nein`, jede `citation` endet mit
+„Auf Standard gebaut (ADR 0012 vorgeschlagen, von Recht nicht gelesen).“:
+
+| Regel-ID | Art | Quelle | Fundstelle (Anfang) |
+|---|---|---|---|
+| R-GUARD-08 | Guard | Recherche | docs/anforderungen-recherche.md:63 („Beide brauchen Begründung und Freigabe“); unabhängig von LEGAL_GATE_BY_TRACK |
+| R-GUARD-09 | Guard | Rechtekonzept | docs/rollen-und-rechtekonzept.md:173 und Recherche :63-64; „Nicht erfüllt gegenüber Rechtekonzept §4 (Zeile 173) und Recherche Z.63: Pfad A trägt keinen zugeordneten Grund und keine Untergründe (Vertrag 0.4.0; Eigentümerfrage 3b, Zielscheibe 044c)“ |
+| R-GUARD-11 | Guard | Recherche | docs/anforderungen-recherche.md:64 (Beweislast); Hash der Version = Hash des aktuellen Eintrags |
+| R-GUARD-12 | Guard | Recherche | docs/anforderungen-recherche.md:24 (zwei Rechtsfolgen); ohne Version falsch |
+| R-GUARD-13 | Guard | Recherche | docs/anforderungen-recherche.md:24; ohne Version falsch |
+| R-GUARD-14 | Guard | Rechtekonzept | docs/rollen-und-rechtekonzept.md:168-169 und :123; Restrisiko zwei Subjects, Eigentümerfrage 8 |
+| R-TRANS-15 | Übergang | Recherche | docs/anforderungen-recherche.md:63 und :24; Recht aus Rechtekonzept :60; direkt nach `in_review` |
+| R-TRANS-16 | Übergang | Rechtekonzept | docs/rollen-und-rechtekonzept.md:123 und :61; kein eigener Zustand `refused` (Modell A) |
+
+**Katalog-Hashes (Test 1).** `aktg-131-3-nr1` zusätzlich gegen eine von Hand geschriebene RFC-8785-Zeichenkette geprüft.
+
+```
+aktg-131-3-nr1  4095dbd79a9411f5bdd3b843a8270d85d5f15995750ac439bceaea657bab7bf1
+aktg-131-3-nr2  801e8e0a3efce151cccf7420b04266bce98c82eecec4fca341bc550de3059fc0
+aktg-131-3-nr3  8b8942bbb57949548a6844e8bbfded1f5742aab04d3f794f4777fac9389eee70
+aktg-131-3-nr4  057df1cc86690f588d3479bf50fb956994fa76940a38ea72ef222c080c3515d9
+aktg-131-3-nr5  94a4578749dd45a3bcc7cab51441eb4324a6781187e155f3306fdebf97a64608
+aktg-131-3-nr6  7297fa2a8f1522cfa81f492bde7598ec9ce1807335e44892480e9914360f9a2c
+aktg-131-3-nr7  6983fe609856e5872d6e3f085a4dcdd1b139fc30f2f7c8486acaae216f9f41b1
+```
+
+**Gespeichertes Ereignis und `EventRead` einer Verweigerung (Auszug).** Synthetischer Lauf (Seed, Pfad B, `legal`);
+Titel, Baustein und Zitat gekürzt, Umschlagfelder ausgelassen. Gespeichert:
+
+```
+"payload": {
+  "answer": { "version": 1, "text": "Zu dieser Frage gibt der Vorstand keine Auskunft.",
+    "createdBy": { "id": "legal", "role": "legal" }, "answerKind": "refusal_with_ground",
+    "refusalGroundId": "aktg-131-3-nr1",
+    "refusalGroundHash": "4095dbd79a9411f5bdd3b843a8270d85d5f15995750ac439bceaea657bab7bf1",
+    "refusalGround": { "title": "Nach vernünftiger kaufmännisch…", "stageText": "Zu dieser Frage gibt der Vorst…",
+      "legalRef": { "source": "AktG", "citation": "§ 131 Abs. 3 Satz 1 Nr. 1 AktG. Gliederu…", "docVersion": null,
+        "docHash": null, "verified": false } } },
+  "pii": { "keyId": "hv-2027", "refusalJustification": "Synthetische Begründung." },
+  "toStatus": "in_review" },
+"retentionClass": "record", "legalHold": false
+```
+
+Dasselbe Ereignis als `EventRead` (`maskEvent`): `payload.answer` unverändert mit Schnappschuss, `toStatus: "in_review"`,
+**kein `pii`**, keine `refusalJustification`; `"redacted": true`, `sourceHash` gesetzt.
+
+**Mutationsproben (Ergebnis).** Jede Probe einzeln eingesetzt, Testdateien laufen gelassen, danach zurückgesetzt
+(Diffstat vorher und nachher gleich). „rot“ nennt die rot gewordenen Tests.
+1. `can(actor(), p, q)` in `viewQuestion` → rot: Test 14 „getQuestion … (approver also without clearance)“.
+2. Begründung in `answer` statt `pii`, aus `MASKED_KEYS` entfernt → rot: Test 3 (Pfad B, Ereignis) und Test 14 (Ereignis-Lesepfade).
+3. Begründung im Suchtext → rot: Test 15.
+4. R-GUARD-08 aus R-TRANS-16 → rot: Test 9 (zwei Fälle), Wahrheitstabelle (Abschnitt „Role × Verweigerung“), dazu
+   Test 14/17 (`_actions` des approver ohne Rechtsfreigabe) und „GUARD_SCENARIOS has no stale entry“.
+5. R-GUARD-12 aus R-TRANS-05 → rot: Test 11 (R-GUARD-12), Wahrheitstabelle, Test 17, Regeltest R-TRANS-16.
+6. R-GUARD-11 immer wahr → rot: Test 12 (beide Fälle). Hash ohne Sortierung (`JSON.stringify`) → rot: Test 1 (Hash,
+   Inline-Snapshot) und Test 3 (Nachrechnung).
+7. `question.refuse.propose` an admin → rot: Test 2, Test 17 (admin), Wahrheitstabelle Abschnitt 1, dazu Test 7 und Test 14
+   (admin liest dann die Begründung).
+8. R-GUARD-09 ohne `trim()` → rot: Test 5 (leere Begründung `"   "`).
+9. `getStage` ohne Maskierung → rot: Test 14 (Bühne).
+10. Reducer ignoriert `toStatus` → rot: Test 3 und 29 weitere (Kette, Freigaben); Reducer übernimmt jeden Wert → rot: Test 18 (`bogus`).
+11. Begründungspflicht für Pfad A entfernt → rot: Test 5 (letzter Fall).
+12. R-GUARD-06 aus R-TRANS-16 → rot: Test 10 (zweiter Fall).
+13. R-GUARD-13 aus R-TRANS-16 → rot: Test 11 (zweiter Fall).
+14. R-GUARD-14 aus R-TRANS-16 → rot: Test 10 (R-GUARD-14, Entzug und Ablauf).
+15. Entfernen von `note` gestrichen → rot: Test 24; `note` in `MASKED_KEYS` → rot: Test 24 (Gegenprobe).
+16. `inReviewSince` bei `AnswerDrafted` nicht gesetzt → rot: Test 26.
+17. Nur flach eingefroren → rot: Test 1 (eingefroren); flach kopiert → rot: Test 19.
+18. `retentionClass` in `proposeRefusal` weggelassen → rot: Test 28; in `approveRefusal` weggelassen → rot: Test 28.
+
+**Geänderte `_actions`- und `note`-Erwartungen.** Nur `packages/domain/src/__tests__/api.test.ts` › „coordination holds
+exactly classify, assign and the four read grants of the spec“: + `question.refuse.propose`. Keine andere `_actions`-Liste
+und keine `note`-Erwartung musste sich ändern (wie im Vor-dem-Bau-Punkt 7 vorhergesagt). Weitere bestehende Tests:
+`transitions.test.ts` (Regeltest-Fixture für R-TRANS-16, Szenarien, neuer Abschnitt), `indicators033b.test.ts` (Test 26),
+`parity.test.ts` (522 → 524), `http.test.ts` (drei Methoden, Schreibkopfzeilen).
+
+**Rot vor Grün:** erster Lauf ohne Umsetzung: `refusal044a`/`transitions` rot (Modul fehlt), Test 26 (0 statt 1),
+Koordinationsliste; nach Katalog und Rechten 66 Tests rot (Verhalten); `http.test.ts` 5 rot; danach grün.
+
+**`pnpm gates` (Schluss, Commit):** gelaufen auf `e278899` mit `TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`,
+`HV_DB_RUNTIME_ROLE` (lokales Postgres 16), Exit 0. Auszug der Zusammenfassungen:
+
+```
+packages/domain test:  Test Files  19 passed (19)
+packages/domain test:       Tests  380 passed (380)
+apps/web test:  Test Files  24 passed (24)
+apps/web test:       Tests  493 passed (493)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+vocabulary-check: ok
+slice-scope: 33 changed file(s), all within "docs/slices/044a-verweigerung-kern.md"'s "Files allowed" list (71 pattern(s)).
+metrics-allowlist: 6 metrics, all within the allowlist.
+plan-graph: ok.
+# tests 275
+# pass 275
+# fail 0
+```
+
+Schluss, wörtlich:
+
+```
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.48s
+mark-test-run: wrote /home/user/wt/s044a/.claude/state/last-test-run (clean tree) at commit e278899, tree 54800815c633…
 ```
 
 ## Review findings
