@@ -164,6 +164,8 @@ Stack gesund wird.
      2. Das Ereignislog ist leer. Ist es nicht leer, ist das kein Fehler: Exit 0 mit dem festen Satz „bereits befüllt“,
         es wird nichts geschrieben.
      3. Die Datenbank-URL zeigt auf den Compose-Host `postgres`.
+   - `stack-seed.mjs` lädt `pg` über `createRequire` aus `apps/api/package.json`, wie 031a (`apiRequire`). pnpm hebt `pg`
+     nicht an die Wurzel, ein nackter Import aus `scripts/` fände es nicht.
 4. **Image des Webs** (`deploy/docker/web.Dockerfile`).
    - **Baustufe:** `HV_WEB_MODE=http pnpm --filter @hv/web build`.
    - **Laufzeit:** `nginxinc/nginx-unprivileged` (alpine, Digest, Nutzer 101, Port 8080).
@@ -186,10 +188,15 @@ Stack gesund wird.
        - Jeweils mit `add_header … always` in **jeder** `location`. nginx erbt `add_header` nicht in Blöcke mit eigenem
          `add_header`.
        - `always` sorgt dafür, dass die Header auch auf 4xx und 5xx des Proxys stehen, etwa 502 bei gestopptem Dienst.
-       - Für weitergeleitete Antworten bleiben die Header des Dienstes maßgeblich. nginx setzt dort nur, was fehlt, und
-         dupliziert keine Header des Dienstes (`proxy_hide_header` für dieselben drei, dann `add_header … always`).
+       - Für weitergeleitete Antworten **ersetzt** nginx die drei Header des Dienstes: `proxy_hide_header` für dieselben
+         drei, dann `add_header … always`. So steht jeder genau einmal da. Weil die Werte gleich denen des Dienstes sind
+         (034a), ändert sich nichts. Alle anderen Header des Dienstes reicht nginx unverändert durch.
      - **Keine Quelltextkarten:** `location ~ \.map$ { return 404; }` (T-Q-I-02, die sicherere Wahl). Das Netlify-Demo
        bleibt unverändert; das ist 037b.
+       - nginx prüft Regex-Locations vor einfachen Präfix-Locations. Diese Regex greift deshalb auch für einen Pfad unter
+         `/v1`, der auf `.map` endet. Die Präfix-Locations für `/v1` und `/auth` haben kein `^~`.
+       - Ein Kommentar in `nginx.conf` sagt das ausdrücklich, damit niemand später ein `^~` ergänzt oder die Regex für
+         eine Lücke hält. Der Dienst hat keinen Pfad auf `.map`.
      - **Nicht weitergeleitet:** `/healthz`, `/readyz` und `/metrics` beantwortet nginx auf 8480 mit 404, als exakte
        `location`, damit sie nicht in den Rückfall auf `index.html` fallen. Die Proben laufen im Container
        (Rauchtest S12.4).
@@ -253,6 +260,9 @@ Stack gesund wird.
 8. **Datenbankrollen ohne Superuser für die Anwendung** (Major 2).
    - `POSTGRES_USER` ist ein eigener Bootstrap-Superuser (`postgres`). Sein Passwort steht nur in `postgres.env`, nichts
      anderes nutzt ihn.
+   - **`POSTGRES_DB` ist nicht gesetzt**, oder es ist `postgres`; **`POSTGRES_DB=hv` ist verboten**. Sonst legt der
+     Entrypoint `hv` mit Eigentümer `postgres` an, bevor das Init-Skript läuft. Dann kann `hv_owner` nicht migrieren.
+     S3 prüft das: Die Compose-Datei und `postgres.env` enthalten kein `POSTGRES_DB=hv`.
    - Das Init-Skript (`deploy/compose/postgres-init/10-roles.sh`, SQL als Heredoc, nicht `psql -c`, Passwörter über
      psql-Variablen, nichts ausgegeben) legt an:
      1. `hv_owner` LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB;
@@ -263,8 +273,9 @@ Stack gesund wird.
      und damit Eigentümer des Schemas `public` (Postgres ≥ 15). Damit läuft `REVOKE CREATE ON SCHEMA public FROM PUBLIC`.
    - `migrate` und `seed` verbinden sich als `hv_owner`, der Dienst als `hv_runtime`.
    - **Folge:** Die SECURITY-DEFINER-Funktion `auth_purge_login_states` läuft im Stack mit den Rechten eines Eigentümers
-     ohne Superuser. Damit ist das Restrisiko aus dem Bedrohungsmodell im Stack geschlossen. In CI bleibt es, weil dort
-     `hv_owner` Superuser ist; die Bedrohungsmodell-Zeile sagt das.
+     ohne Superuser. Damit ist das Restrisiko aus dem Bedrohungsmodell (Zeile T-G1-D-05) im Stack **verringert**: Eine
+     Lücke in der Funktion hätte Eigentümerrechte auf `hv`, keine Superuser-Rechte. Geschlossen ist es nicht. In CI
+     bleibt es unverändert, weil dort `hv_owner` Superuser ist; die Zeile T-G1-D-05 sagt das.
 9. **Befüllung wiederverwenden, Umbau benannt** (Major 5).
    - **`PERSONS`** wandert aus `scripts/e2e-http-031.mjs` nach `scripts/lib/demo-persons.mjs`. `e2e-http-031.mjs`
      importiert und re-exportiert es; `scripts/e2e-http-031.test.mjs` bleibt unverändert grün.
@@ -449,6 +460,7 @@ Pfade nicht als erlaubt liest.
   - Jedes `env_file` zeigt ins Zustandsverzeichnis.
   - Dockerfiles ohne `ARG` oder `ENV` mit solchen Namen.
   - Das Init-Skript enthält kein Passwort-Literal und kein `psql -c`.
+  - Weder die Compose-Datei noch die erzeugte `postgres.env` enthält `POSTGRES_DB=hv` (Entscheidung 8). Negativ: ein eingeschleustes `POSTGRES_DB: hv` schlägt fehl.
   - Negativ: ein eingeschleustes `POSTGRES_PASSWORD: x` schlägt fehl.
 - **S4 Härtung und Prozesse.**
   - Image `api`: `USER` 65532, Web 101.
@@ -487,6 +499,9 @@ Pfade nicht als erlaubt liest.
   - Die Versionsprüfung verweigert Engine 27.x und nimmt 28.0 an.
   - Die Issuer-Prüfung von `stack-seed.mjs` verweigert `https://idp.example`, `http://keycloak:8180/…` und
     `http://10.0.0.1/…` und nimmt `http://localhost:8180/…` an.
+  - Die Host-Prüfung der Datenbank-URL von `stack-seed.mjs` nimmt `postgres://hv_owner:x@postgres:5432/hv` an. Sie
+    verweigert `…@localhost:5432/hv`, `…@db.example:5432/hv`, `…@10.0.0.5/hv` und eine URL ohne Host. Der Satz nennt die
+    Regel, nicht die URL.
   - `reset` ohne `--yes` hat keine Wirkung; `--yes` und `-- --yes` werden beide angenommen.
 - **S9 `.dockerignore`.** Enthält mindestens `.git`, `**/node_modules`, `.env`, `.env.*`, `docs/evidence`,
   `**/playwright-report`, `**/test-results` und `**/dist`.
@@ -547,10 +562,14 @@ Lokal mit dem Daemon aus „Vor dem Bau prüfen“ 1. Im CI-Job `stack-037a` lau
 - **S16 Robustheit** (CI: 1 und 2; lokal alle vier).
   1. **Postgres-Neustart.** `docker compose restart postgres`: `/readyz` meldet `db` vorübergehend nicht `ok`, innerhalb
      von 60 s wieder `ok`. Der `RestartCount` des Dienstes bleibt gleich.
-  2. **Absturz des Dienstes.** Im Container ein SIGKILL an den **Node-Kindprozess**, nicht an den Init (über
-     `docker compose exec api` mit dem Node des Images, Prozess über `/proc` gefunden). Danach steigt `RestartCount`, der
-     Dienst ist innerhalb von 60 s wieder gesund und die Ereigniszahl ist unverändert. Dazu: `docker compose stop api`
-     endet in unter 3 s (SIGTERM kommt an).
+  2. **Absturz des Dienstes.** Im Container ein SIGKILL an den **Node-Kindprozess**, nicht an den Init. Das läuft über
+     `docker compose exec api` mit dem Node des Images.
+     - Die Probe sucht über `/proc/*/cmdline` den Prozess mit `apps/api/src/server.ts`. Ihre eigene PID
+       (`process.pid`) und PID 1 schließt sie aus. Genau ein Treffer ist Pflicht, sonst bricht sie ohne Kill ab.
+     - Der Kill beendet den Container und damit auch das `exec`. Ein Exit ungleich 0 oder ein abgerissenes `exec` ist an
+       dieser Stelle **kein** Fehler. Das Ergebnis zählt erst danach: `RestartCount` ist gestiegen, der Dienst ist
+       innerhalb von 60 s wieder gesund und die Ereigniszahl ist unverändert.
+     - Dazu: `docker compose stop api` endet in unter 3 s (SIGTERM kommt an).
   3. **Stoppen und Starten.** `stack:down`, dann `stack:up`:
      - Die Ereigniszahl ist gleich.
      - `realm.json` ist byte-gleich mit dem Stand vor `down` (Hash im Protokoll).
@@ -562,6 +581,12 @@ Lokal mit dem Daemon aus „Vor dem Bau prüfen“ 1. Im CI-Job `stack-037a` lau
   - Nach dem Bau, vor dem Review, startet der Orchestrator einen eigenen Agenten in frischem Kontext. Er bekommt nur
     einen frischen Klon des PR-Zweigs, die Installationsseite und den Auftrag „bis zur Anmeldung kommen und alles
     protokollieren“. Spec, Diff und Bericht bekommt er nicht.
+  - Der Orchestrator stellt in der Umgebung des Agenten einen laufenden Docker-Daemon bereit, wie in „Vor dem Bau
+    prüfen“ 1. Die Seite selbst erklärt nicht, wie man in dieser Arbeitsumgebung einen Daemon startet; sie setzt Docker
+    voraus wie bei jeder Betriebsperson.
+  - Läuft kein Daemon, gilt S17 als **nicht erfüllt**, nicht als übersprungen. Der Agent befolgt die Seite dann bis zur
+    Voraussetzungsprüfung und protokolliert, ob `stack:up` mit dem richtigen Satz abbricht. Der Bericht nennt die Lücke,
+    und S17 wird vor dem Merge mit Daemon wiederholt.
   - Er befolgt die Seite Schritt für Schritt und schreibt `docs/evidence/037a-installation-befolgt.txt`: Befehl, Ergebnis,
     jede Stelle, an der die Seite unklar oder falsch war. Secrets enthält das Protokoll nicht; `stack:credentials` wird
     ausgeführt, die Ausgabe aber als „ausgeführt, 9 Personen“ notiert.
@@ -653,7 +678,7 @@ Auf Deutsch, für eine Betriebsperson ohne Projektwissen. Hauskürzel stehen nur
 
 | Punkt | Festlegung in 037a | Test |
 |---|---|---|
-| **SP-1 Befüllung am Rechtepfad vorbei** | eigenes Image `seed`, nie gepusht, das Image `api` enthält kein `/app/scripts`; `stack-seed.mjs` verweigert ohne Loopback-Issuer, ohne Compose-Datenbank und schreibt nur in ein leeres Log; der Eigentümer hat dabei keine Superuser-Rechte | S4, S8, S14, S15, S16.3 |
+| **SP-1 Befüllung am Rechtepfad vorbei** (T-G2-T-04, T-Q-T-04) | eigenes Image `seed`, nie gepusht, das Image `api` enthält kein `/app/scripts`; `stack-seed.mjs` verweigert ohne Loopback-Issuer, ohne Compose-Datenbank und schreibt nur in ein leeres Log; der Eigentümer hat dabei keine Superuser-Rechte | S4, S8, S14, S15, S16.3 |
 | Datenbankrollen | Bootstrap-Superuser nur in `postgres.env`; `hv_owner` und `hv_runtime` NOSUPERUSER NOCREATEROLE NOCREATEDB; SECURITY DEFINER läuft ohne Superuser; Laufzeitrolle ohne `UPDATE`/`DELETE` am Log | S12.7, Vor dem Bau 8 |
 | Secrets | je Installation einmal zufällig, außerhalb des Repositoriums (0700/0600), je Dienst nur die eigenen; keine Ausgabe außer `stack:credentials`; `::add-mask::` in CI; nie `docker compose config` in CI | S3, S5, S6, S10, S18 |
 | Standardpasswörter | keine, auch der Keycloak-Admin und der Bootstrap-Superuser sind zufällig | S6 |
@@ -703,8 +728,10 @@ Lokal ohne Weitergabe genügt das. Bei Weitergabe prüft 037b die Hinweise.
 - **T-Q-I-02:** im Web-Image geschlossen (`.map` → 404). Für das Netlify-Demo bleibt es offen bis 037b.
 - **T-G1-D-01, Proxy-Teil:** Grenzen am Proxy im lokalen Stack (S12).
 - **T-G1-S-02:** Restrisiko „Cookie auf `localhost` gilt für alle Ports“, nur im lokalen Stack.
-- **SECURITY-DEFINER-Funktion:** Restrisiko im Stack durch den Eigentümer ohne Superuser verringert. In CI bleibt es
-  (`POSTGRES_USER: hv_owner`).
+- **T-G1-D-05 (SECURITY-DEFINER-Funktion `auth_purge_login_states`):** Restrisiko im Stack durch den Eigentümer ohne
+  Superuser verringert, nicht geschlossen. In CI bleibt es unverändert (`POSTGRES_USER: hv_owner`).
+- **T-G2-T-04 und T-Q-T-04:** Nachweis „Befüllung nur in ein leeres Log, nur mit Loopback-Issuer und Compose-Host, nur im
+  Image `seed`“ (S8, S14, S15).
 - **Scheibenübersicht:** Zeile 037 um „037a“.
 
 ## Qualitätswirkung
