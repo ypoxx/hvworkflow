@@ -2,7 +2,9 @@
  * Scheibe 034a, Postgres part: migration 0003 (purge function for login states), its catalog checks,
  * the runtime rights, the purge inside `createLoginState`, and (further below) pool timeouts, the
  * 503/500 mapping and the request timeout of the Postgres boundary. Runs only with the TEST_* variables
- * (CI step "Postgres integration tests" in gates.yml).
+ * (CI step "Postgres integration tests" in gates.yml). Give every test process that runs at the same time a
+ * database of its own: the service's global write lock is an advisory lock and holds for the whole database,
+ * not per schema, so parallel runs on one database queue behind each other's lock (takt-042).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -11,7 +13,7 @@ import { Pool } from 'pg';
 import { createInMemoryEventStore, type DomainEvent, type NewEvent } from '@hv/domain';
 import { createApp, type CreateAppOptions } from '../app.ts';
 import { createAuthStore } from '../auth/store.ts';
-import type { LimitsConfig } from '../limits/config.ts';
+import { DEFAULT_LIMITS, type LimitsConfig } from '../limits/config.ts';
 import { postgresPoolOptions } from '../limits/poolOptions.ts';
 import { createMemorySink } from '../observability/accessLog.ts';
 import { getMigrationStatus, runMigrations } from '../persistence/migrations.ts';
@@ -408,10 +410,29 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
 
   it('a COMMIT that is already on its way wins over the timer: 201, not 408', async () => {
     const pool = runtimePool();
+    // The test decides when the 200 ms request timer fires: fake `setTimeout`/`clearTimeout` during the POST, so
+    // no timer of the request runs out on its own however long the lock wait or the round trips take (takt-042).
+    // The hook advances the fake clock while the boundary is in `committing`, then lets one real macrotask pass
+    // so the middleware's `Promise.race` continues while the transaction is still open.
+    const fired: number[] = [];
     const { app, lines } = build(pool, { limits: { requestTimeoutMs: 200 },
-      testHooks: { at: async (point, run) => { if (point === 'beforeCommit') await run('SELECT pg_sleep(0.6)'); } } });
-    // ETag through an app with default limits, so the read does not run under the 200 ms budget.
-    const res = await postSpeaker(app, await speakerTag(build(pool).app), 'Spät festgeschrieben');
+      testHooks: { at: async (point) => {
+        if (point !== 'beforeCommit') return;
+        const before = vi.getTimerCount();
+        vi.advanceTimersByTime(200);
+        fired.push(before - vi.getTimerCount());
+        await new Promise((resolve) => setImmediate(resolve));
+      } } });
+    // ETag through an app with default limits and real timers, so the read does not run under the 200 ms budget.
+    const tag = await speakerTag(build(pool).app);
+    let res: Response;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      res = await postSpeaker(app, tag, 'Spät festgeschrieben');
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fired).toEqual([1]); // exactly one timer fired in `committing`: the 200 ms request timer
     expect(res.status).toBe(201);
     expect(await eventCount()).toBe(3);
     expect(lines().filter((line) => line.status === 201)).toHaveLength(1);
@@ -453,15 +474,43 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
     expect((await app.request('/v1/meetings', { headers: { 'X-Actor': ACTOR.admin } })).status).toBe(200);
   });
 
+  /**
+   * A hook that lets the test fire the service's own query timer on the hooked statement (takt-042): fake
+   * `setTimeout`/`clearTimeout` only around the call, so `timedQuery` sets its timer on the fake clock before `run`
+   * returns. No `await` lies between `run` and the advance, so the statement provably still hangs when the timer
+   * fires; the counts before, at `queryTimeoutMs - 1` and at `queryTimeoutMs` are collected for the test.
+   */
+  const fireQueryTimerAt = (hooked: 'afterLock' | 'beforeCommit', counts: number[], onReach: () => void) =>
+    async (point: 'afterLock' | 'beforeCommit', run: (sql: string) => Promise<unknown>): Promise<void> => {
+      if (point !== hooked) return;
+      onReach();
+      const q = DEFAULT_LIMITS.queryTimeoutMs;
+      let pending: Promise<unknown>;
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        pending = run('SELECT pg_sleep(1.5)'); // 1.5 s only so the wait in `afterEach` still fits
+        counts.push(vi.getTimerCount());
+        vi.advanceTimersByTime(q - 1);
+        counts.push(vi.getTimerCount());
+        vi.advanceTimersByTime(1);
+        counts.push(vi.getTimerCount());
+      } finally {
+        vi.useRealTimers();
+      }
+      await pending;
+    };
+
   it('a query that hangs past the service timer before the COMMIT answers 503; the connection is destroyed, no event (T-G2-I-02)', async () => {
-    const pool = runtimePool(); // statement_timeout stays at 5 s, above the 200 ms timer of the test
-    // The timer must be far above the fast checks in front of the transaction (about a dozen round trips).
+    // statement_timeout stays at 5 s; the service's query timer keeps its default (6 s) for every query of the
+    // request, and the hook fires it by hand on the statement after the lock.
+    const pool = runtimePool();
     let reached = false;
-    const { app } = build(pool, { limits: { queryTimeoutMs: 500 },
-      testHooks: { at: async (point, run) => { if (point === 'afterLock') { reached = true; await run('SELECT pg_sleep(1.5)'); } } } });
+    const counts: number[] = [];
+    const { app } = build(pool, { testHooks: { at: fireQueryTimerAt('afterLock', counts, () => { reached = true; }) } });
     await app.request('/v1/meetings', { headers: { 'X-Actor': ACTOR.admin } }); // one connection in the pool
     expect(pool.totalCount).toBe(1);
     const res = await register(app, 'Hängt');
+    expect(counts).toEqual([1, 1, 0]); // the timer fired at exactly queryTimeoutMs, on the hooked statement
     expect(res.status).toBe(503);
     expect(res.headers.get('Retry-After')).toBe('2');
     expect((await res.json() as { detail: string }).detail).toBe('Persistence is busy.');
@@ -473,11 +522,12 @@ describe.skipIf(!enabled)('Scheibe 034a: Postgres boundary — timeouts, 503, 50
   it('a COMMIT phase that hangs past the service timer answers 500 "outcome unknown" without Retry-After; the connection is destroyed (N3)', async () => {
     const pool = runtimePool();
     let reached = false;
-    const { app } = build(pool, { limits: { queryTimeoutMs: 500 },
-      testHooks: { at: async (point, run) => { if (point === 'beforeCommit') { reached = true; await run('SELECT pg_sleep(1.5)'); } } } });
+    const counts: number[] = [];
+    const { app } = build(pool, { testHooks: { at: fireQueryTimerAt('beforeCommit', counts, () => { reached = true; }) } });
     await app.request('/v1/meetings', { headers: { 'X-Actor': ACTOR.admin } });
     expect(pool.totalCount).toBe(1);
     const res = await register(app, 'Unklar');
+    expect(counts).toEqual([1, 1, 0]);
     expect(res.status).toBe(500);
     expect(res.headers.get('Retry-After')).toBeNull();
     expect(await res.json()).toMatchObject({ status: 500, detail: 'Persistence outcome is unknown.' });

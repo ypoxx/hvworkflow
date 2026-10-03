@@ -6,7 +6,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { CORPUS_DEMO, SYSTEM_ACTOR, createInMemoryEventStore, createInProcessApi, seedEvents, type NewEvent, type Role } from '@hv/domain';
 import { createApp, type App, type CreateAppOptions } from '../app.ts';
 import { createAuthStore, type AuthStore } from '../auth/store.ts';
@@ -63,8 +63,10 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-interface Hooks { windows: { kind: string; phase: string }[]; open: Map<string, number>; maxOpen: Map<string, number>;
-  appliedHead: number; appliedAt: Map<number, number>; gate?: (() => Promise<void>) | undefined }
+interface Hooks { windows: { kind: string; phase: string; occasion?: string }[]; open: Map<string, number>; maxOpen: Map<string, number>;
+  appliedHead: number; appliedAt: Map<number, number>; gate?: (() => Promise<void>) | undefined;
+  /** Called synchronously when an `end` closes the last open window (test 28). */
+  onQuiet?: (() => void) | undefined }
 function newHooks(): Hooks { return { windows: [], open: new Map(), maxOpen: new Map(), appliedHead: 0, appliedAt: new Map() }; }
 
 function build(db: Pool, hooks: Hooks = newHooks(), streamLimits?: Partial<StreamLimits>, extra: Partial<CreateAppOptions> = {}): App {
@@ -77,11 +79,12 @@ function build(db: Pool, hooks: Hooks = newHooks(), streamLimits?: Partial<Strea
     idGenerator: () => `req-${++id}-${randomUUID().slice(0, 8)}`,
     ...(streamLimits !== undefined ? { streamLimits } : {}),
     testHooks: {
-      streamWindow: (kind, phase) => {
-        hooks.windows.push({ kind, phase });
+      streamWindow: (kind, phase, occasion) => {
+        hooks.windows.push({ kind, phase, ...(occasion !== undefined ? { occasion } : {}) });
         const now = (hooks.open.get(kind) ?? 0) + (phase === 'start' ? 1 : -1);
         hooks.open.set(kind, now);
         hooks.maxOpen.set(kind, Math.max(hooks.maxOpen.get(kind) ?? 0, now));
+        if (phase === 'end' && [...hooks.open.values()].every((n) => n === 0)) hooks.onQuiet?.();
       },
       streamApplied: (head) => { hooks.appliedHead = head; hooks.appliedAt.set(head, performance.now()); },
       streamReloadGate: async () => { if (hooks.gate) await hooks.gate(); },
@@ -322,27 +325,52 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
       const who = i % 2 === 0 ? 'admin' : 'capture';
       track(await mustOpen(app, '/v1/stream', await asSession(who, Math.floor(i / 2) % 3 + 1)));
     }
-    let samples = 0;
-    let busy = 0;
-    const deadline = performance.now() + 4_000;
-    while (performance.now() < deadline) {
-      const quiet = (): boolean => [...hooks.open.values()].every((n) => n === 0);
-      const startsBefore = hooks.windows.length;
-      if (quiet()) {
-        const checkedOut = runtime.totalCount - runtime.idleCount;
-        const rows = (await owner.query<{ n: string }>(`SELECT count(*) AS n FROM pg_stat_activity
-          WHERE usename = $1 AND application_name = $2 AND (state <> 'idle' OR xact_start IS NOT NULL)`, [runtimeRole, schema])).rows;
-        // Only a sample during which no window opened or closed counts (the query itself takes time).
-        if (quiet() && hooks.windows.length === startsBefore) {
-          samples += 1;
-          if (checkedOut !== 0 || Number(rows[0]!.n) !== 0) busy += 1;
-        }
-      }
-      await sleep(15);
+    // An event-driven invariant instead of sampling (takt-042): every checkout and every return of the stream
+    // app's pool lies inside a window, the server reports every returned connection as idle outside a transaction
+    // ('I' from its last ReadyForQuery), and at every quiet window end nothing is checked out. Opening the
+    // streams above uses the pool legitimately without a window, so the listeners start only now.
+    const openWindows = (): number => [...hooks.open.values()].reduce((sum, n) => sum + n, 0);
+    const lastWindow = (): string => {
+      const w = hooks.windows.at(-1);
+      return w === undefined ? 'no window yet' : `${w.kind} ${w.phase}${w.occasion !== undefined ? ` (${w.occasion})` : ''}`;
+    };
+    const violations: string[] = [];
+    let quietEnds = 0;
+    let acquired = 0;
+    let released = 0;
+    const watchedFrom = hooks.windows.length;
+    hooks.onQuiet = () => {
+      quietEnds += 1;
+      const held = runtime.totalCount - runtime.idleCount;
+      if (held !== 0) violations.push(`quiet window end with ${held} connection(s) checked out, after ${lastWindow()}`);
+    };
+    const onAcquire = (): void => {
+      acquired += 1;
+      if (openWindows() === 0) violations.push(`acquire outside a window, after ${lastWindow()}`);
+    };
+    const onRelease = (err: Error | undefined, client: PoolClient): void => {
+      released += 1;
+      if (openWindows() === 0) violations.push(`release outside a window, after ${lastWindow()}`);
+      if (err) violations.push(`release with error ${err.message}, in ${lastWindow()}`);
+      const status = client.getTransactionStatus();
+      if (status !== 'I') violations.push(`release with transaction status ${status}, in ${lastWindow()}`);
+    };
+    runtime.on('acquire', onAcquire);
+    runtime.on('release', onRelease);
+    try {
+      const seen = (kind: string): boolean => hooks.windows.slice(watchedFrom).some((w) => w.kind === kind);
+      // 15 s is the emergency brake only, not a measure.
+      await eventually(() => quietEnds >= 20 && seen('session') && seen('reload'), 15_000,
+        '20 quiet window ends with a session and a reload window');
+    } finally {
+      runtime.off('acquire', onAcquire);
+      runtime.off('release', onRelease);
+      hooks.onQuiet = undefined;
     }
-    console.log(`035b test 28: ${samples} samples between windows, ${busy} with a held connection or transaction; windows seen ${hooks.windows.length}`);
-    expect(samples).toBeGreaterThan(20);
-    expect(busy).toBe(0);
+    console.log(`035b test 28: quietEnds ${quietEnds}, acquire ${acquired}, release ${released}, violations ${violations.length}`);
+    expect(violations).toEqual([]);
+    expect(acquired).toBeGreaterThan(0);
+    expect(quietEnds).toBeGreaterThanOrEqual(20);
     expect(hooks.windows.some((w) => w.kind === 'session')).toBe(true);
   }, 30_000);
 
