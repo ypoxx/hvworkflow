@@ -356,4 +356,37 @@ Nebenbefund, nicht bearbeitet: Lint meldet eine bestehende Warnung `unicorn(pref
 `postgres-limits034a.test.ts` (Test „a request that ran out of time in the pre-checks …“, `/^BEGIN/`), unverändert
 aus der Zeit vor dieser Scheibe; Kandidat für die Folgeliste.
 
+### Nachtrag: Codex P2 (#135), Freigabe mit laufender Abfrage
+
+**Befund:** Gibt der Strom-Code eine Verbindung zurück, während ihr SQL noch läuft, meldet `getTransactionStatus()`
+weiter `I` aus dem letzten ReadyForQuery. Test 28 wäre grün geblieben; die alte `pg_stat_activity`-Sicht hätte den
+Fall in einer Stichprobe sehen können.
+
+**Umbau** (`0620d1b`): Der `release`-Zuhörer hält zusätzlich einen Verstoß „release with query in flight“ fest, wenn
+auf dem Client eine Abfrage läuft oder wartet. Gelesen wird über einen getypten Zugriff `inFlight(client)`.
+Abweichung von der Vorgabe: In pg 8.23 sind die öffentlichen Getter `activeQuery`/`queryQueue` veraltete Aliase, die
+eine Deprecation-Warnung ausgeben. Der Zugriff liest deshalb direkt die Felder dahinter, `_activeQuery`/`_queryQueue`;
+der Kommentar nennt die pg-Version und den Grund. Ein Kommentar begründet außerdem, warum Test 28 nur den Pool
+`runtime` der Strom-App beobachtet und nicht `runtime2` (Review Sonnet, minor 1).
+
+**Gegenprobe** (nicht festgeschrieben, danach zurückgesetzt): Die Probe entnimmt in einem offenen Fenster eine
+Verbindung, startet `SELECT pg_sleep(0.2)` und gibt die Verbindung sofort zurück. Ergebnis in 2 von 2 Läufen rot mit
+genau einem Verstoß, kein Statusverstoß (das ist die Lücke):
+`"release with query in flight (active true, queued 0), in session start (h:8:1)"` bzw.
+`"release with query in flight (active true, queued 0), in reload start"`. Ohne Probe 5/5 grün
+(`quietEnds` 20, `violations 0`).
+
+**Umgebung:** Die Maschine wurde zwischen den Läufen neu gestartet; danach lief der System-Cluster nicht mehr. Es lief
+der Cluster `/var/tmp/pgtest`, `hv_t042`, `hv_t042b` und `hv_t042c` wurden dort neu angelegt (`CREATE DATABASE … OWNER hv_owner`).
+
+**`pnpm gates`** auf `0620d1b` (sauberer Baum, `hv_t042`), Exit 0: `apps/api test: Test Files  42 passed (42)`,
+`Tests  621 passed (621)`; `slice-scope: 3 changed file(s), all within "docs/slices/takt-042-zeitkritische-postgres-tests.md"'s "Files allowed" list (3 pattern(s)).` Schluss:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.48s
+mark-test-run: wrote /home/user/wt/t042/.claude/state/last-test-run (clean tree) at commit 0620d1b, tree 49655c18667b…
+```
+
 ## Review findings
