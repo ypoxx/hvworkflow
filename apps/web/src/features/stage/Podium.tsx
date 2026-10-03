@@ -152,7 +152,12 @@ function RefusalMarker({
           {status.entry !== undefined
             ? t('stage.refusal.ground', { title: status.entry.title })
             : t('answers.refusal.ground.unknown', { id: answer.refusalGroundId ?? '' })}
-          {status.unverified && <Badge tone="warning">{t('answers.refusal.ground.unverified')}</Badge>}
+          {status.unverified && (
+            // E15 must be readable from the lectern: in the stage view the badge matches the marker size.
+            <span data-testid="stage-refusal-unverified" className={cx('hv-badge tone-warning font-semibold', big)}>
+              {t('answers.refusal.ground.unverified')}
+            </span>
+          )}
         </span>
       )}
     </span>

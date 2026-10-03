@@ -2,6 +2,7 @@
 
 **Status:** spec (03.10.2026; gelesen auf `8705a1c`: 043a, 040b, 044a und 044b gemergt, Vertrag 0.4.2; Lesebefund zu `fa340f2` eingearbeitet: 0 blocker, 9 major, 6 minor, 3 nit, Abschnitt „Review findings“; erste Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041 zugeschnitten, Eigentümer 03.10.2026, Register E57)
 **Risikoklasse:** hoch · 3,5 AStd (Spanne 3,2–4,0; Plan 045: 2; Zuschnitt 045b vorbereitet, Abschnitt „Aufwand“) · Plan 045: 09.11.2026 (W7), tatsächlich direkt nach 044b als erste Oberflächenscheibe der Freigabe-Demo · Lanes: web-answers, web-stage, web-history; web-api (nur ein neuer Lese-Hook); e2e (eigene Datei, im Projekt `http` eingereiht); docs (Glossar, Nachweise)
+**Bedrohungsmodell:** berührt SG2 und T-G1-I-01 (Anzeige); keine neue Angriffsfläche, nur Oberfläche, kein neuer Endpunkt (Review 045, SP-6).
 **Rolle:** web-implementer; Review in frischem Kontext mit den Perspektiven **Legal** (Wortlaut, Vermerk „ungeprüft“, Bühne), **Datenschutz** (Begründung nur, wo der Kern sie liefert; Eingaben je Akteur und je Frage) und **UX/Barrierefreiheit** (D1–D10). Lesebefund der Spec vor dem Bau (Klasse hoch, siehe „Warum hoch“); nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue fachliche Regel. Sichtbar gemacht und in der Oberfläche belegt: R-TRANS-15, R-TRANS-16, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-14, R-TRANS-03 (Entwurf über einer Verweigerung), R-TRANS-06 (Rückgabe). Dazu AGENTS.md R2, R3, R4, R6, R9, R10, R12; `docs/design-prinzipien.md` D1–D10
 **Quellen-IDs:** `docs/produktplan-beta.md` §5 Eintrag 045 und §11 „Freigabe-Demo“; `docs/slices/044a-verweigerung-kern.md` §1, §6, §7 und „Hinweise an Folgescheiben: 045“; `docs/slices/044b-verweigerung-dienst.md` „Hinweise an Folgescheiben: 045“; ADR 0012 (vorgeschlagen, von Recht nicht gelesen); Register E15, E21, E25, E56, E57; Rechtekonzept Zeilen 13, 60–61, 173; Glossar Zeilen 19–22 (Antwortpfade A/B/C); Scheiben 021c (Mechanik der Rechtsfreigabe), 010d und 090 (Daten und Eingaben je Akteur), takt-008 (Fokus nach Aktion), 031b (gemeinsame e2e-Dateien)
@@ -778,3 +779,12 @@ Folgeliste (Vorgabe des Orchestrators, 03.10.2026). Entscheidungen des Orchestra
 **Nachtrag des Orchestrators zu Befund 15 (03.10.2026):** Der Rückgabedialog der Bühne zeigt den Hinweis bei jeder
 Verweigerung (Entscheidung 4, Test 13, E4a); das Restrisiko aus der vorigen Fassung entfällt. Mehraufwand < 0,1 AStd, im
 Aufwand enthalten (Bühne 0,3 → 0,35, Abschluss 0,3 → 0,25; Summe bleibt 3,5 in der Spanne 3,2–4,0).
+
+### Review des Baus (frischer Kontext, 03.10.2026, Diff `5cbe438..42fc573`)
+
+0 blocker, 0 major, 6 minor, 5 nit. Datenschutz, Rechte (R4) und Umfang ohne Befund. Eingearbeitet, weil Recht oder
+Sicherheit (nie Folgeliste): Minor 1 (Legal, D10): das Badge „ungeprüft“ auf der Bühne hat jetzt Markergröße
+(`stage-refusal-unverified`, `045-buehne-*.png` neu); Minor 6 (SP-6): Zeile „Bedrohungsmodell“ im Kopf. Übrige Minor 2–5
+(Meldung bei geschlossenem Dialog, Kürzung des Auszugs in der Arbeitsliste, Verdrahtungstest 409/422, Podium-Test für
+Vorschau und Warteschlange) und Nits 7–11 gehen nach Regel 3 auf `docs/folgeliste.md`. Gitleaks: die Testkonstanten
+`SECRET` heißen jetzt `JUSTIFICATION_MARKER` mit Klartext-Marker; der Zweig wurde dafür zu einem Commit zusammengefasst.
