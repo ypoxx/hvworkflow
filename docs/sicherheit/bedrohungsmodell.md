@@ -345,7 +345,7 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   und erkennen das nicht (Erkennung: `RoleAssigned` je Subject in `listEvents`, Alarmvorschlag an 085).
 - *Erkennung:* Alarm (085) mit Zielrecht `admin.roles.manage` bei Zuordnung eines Freigabe- oder Rechtsrechts
   nach dem Freeze und bei Zuordnung und Entzug innerhalb eines Tages (Zielvorschlag für 040); die Selbstzuordnung
-  verhindert R-ADM-07 seit 040a, ein verweigerter Versuch steht im Zugriffslog (033a) als `operationId` mit Status 409 und `seq: null`; die Regel-id
+  verhindert R-ADM-07 seit 040a, ein verweigerter Versuch steht im Zugriffslog (033a) als `operationId` `assignRole` mit Status 409 und `seq: null`; die Regel-id
   R-ADM-07 steht nur im Problem-Body (das Zugriffslog hat genau acht Schlüssel, korrigiert mit 044b); der
   Freeze-Hash im Kopf (041) ändert sich sichtbar.
 - *Nachweis:* 040a: `packages/domain/src/__tests__/admin040a.test.ts` (Test 7 R-ADM-07, Test 8 R-ADM-08),
@@ -439,7 +439,9 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   eingefroren, Leser erhalten eine tiefe Kopie.
 - *Erkennung:* jeder abgewiesene Versuch ist ein 409 mit Regel-id, ohne Ereignis. Zugriffslog (033a): `operationId` +
   `status` (409 bzw. 403, `seq` null); die Regel-id steht nur im Problem-Body an den Client, nicht im Log (044b,
-  Entscheidung 5; ein Schlüssel `ruleId` ist Eigentümerfrage 1 von 044b). Ein Katalog-Deploy während der HV zeigt sich als 409 R-GUARD-11 und an der Build-Kennung (040d);
+  Entscheidung 5; ein Schlüssel `ruleId` ist Eigentümerfrage 1 von 044b). Das Standard-Log zeigt also nur „abgewiesene
+  Freigabe“; welche Regel griff (etwa R-GUARD-08 oder R-GUARD-14), unterscheidet erst die Option aus Eigentümerfrage 1
+  oder ein Abgleich über Zeitpunkt und betroffene Frage. Ein Katalog-Deploy während der HV zeigt sich als 409 R-GUARD-11 und an der Build-Kennung (040d);
   Wiederherstellung durch einen neuen Vorschlag. *Signal und Empfänger:* Zugriffslog, technischer Betrieb; Freeze-Kalender
   des Runbooks (070). *Ausnahme:* keine.
 - *Nachweis:* `packages/domain/src/__tests__/refusal044a.test.ts` (Tests 9–12, 21), Abschnitt „Role × Verweigerung“ in

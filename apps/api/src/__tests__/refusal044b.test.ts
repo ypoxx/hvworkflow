@@ -14,8 +14,8 @@
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  REFUSAL_GROUNDS, SYSTEM_ACTOR, codePointLength, createInMemoryEventStore, createInProcessApi, etagOf, seedEvents,
-  type Actor, type DomainEvent, type NewEvent,
+  REFUSAL_GROUNDS, ROLE_PERMISSIONS, SYSTEM_ACTOR, codePointLength, createInMemoryEventStore, createInProcessApi, etagOf, seedEvents,
+  type Actor, type DomainEvent, type NewEvent, type Role,
 } from '@hv/domain';
 import { createApp, type App, type CreateAppOptions } from '../app.ts';
 import { expectValid } from '../contractSchema.ts';
@@ -471,10 +471,15 @@ describe('Scheibe 044b, Test 5: 412, 428 and a malformed If-Match', () => {
     expect(propose422.detail).toMatch(/If-Match/);
     await rejected(h, 412, undefined, ACT.legal, 'POST', `/v1/questions/${q.id}/refusals`, { headers: { 'If-Match': `"v${q.version - 1}"` }, body: pathB(m) });
     await rejected(h, 428, undefined, ACT.legal, 'POST', `/v1/questions/${q.id}/refusals`, { headers: {}, body: pathB(m) });
+    // The validator's 422 comes before right and existence: a non-holder with a contract-violating body gets 422.
+    await rejected(h, 422, undefined, ACT.expert, 'POST', `/v1/questions/${q.id}/refusals`, { headers: ifMatch(q), body: { ...pathB(m), extra: 1 } });
     // A non-holder with a malformed If-Match still gets 403: the format is checked in the core after the right.
     await rejected(h, 403, 'R-PERM-01', ACT.expert, 'POST', `/v1/questions/${q.id}/refusals`, { headers: { 'If-Match': 'abc' }, body: pathB(m) });
 
-    const c = await cleared(h, await proposed(h, q, ACT.legal, pathB(m)));
+    const uncleared = await proposed(h, q, ACT.legal, pathB(m));
+    // A stale If-Match on an uncleared proposal is 412, before the guards (not 409 R-GUARD-08).
+    await rejected(h, 412, undefined, ACT.approver, 'POST', `/v1/questions/${q.id}/refusal-approvals`, { headers: { 'If-Match': `"v${uncleared.version - 1}"` }, body: { answerVersion: latest(uncleared) } });
+    const c = await cleared(h, uncleared);
     const body = { answerVersion: latest(c) };
     await rejected(h, 412, undefined, ACT.approver, 'POST', `/v1/questions/${c.id}/refusal-approvals`, { headers: { 'If-Match': `"v${c.version - 1}"` }, body });
     await rejected(h, 428, undefined, ACT.approver, 'POST', `/v1/questions/${c.id}/refusal-approvals`, { headers: {}, body });
@@ -699,6 +704,7 @@ describe('Scheibe 044b, Test 9: masking of the justification over HTTP', () => {
     expect((await question(h, b.id, ACT.legal)).answers[0]!.refusalJustification).toBe(`${m.just}: Offenlegung schadet der Gesellschaft.`);
 
     // claim, release and withdraw by every role that holds them (read from `_actions`, no role name in the check).
+    let claims = 0;
     for (const actor of NINE_ROLES) {
       const current = await call(h, actor, 'GET', `/v1/questions/${b.id}`);
       if (current.status !== 200) continue;
@@ -708,7 +714,9 @@ describe('Scheibe 044b, Test 9: masking of the justification over HTTP', () => {
       expect(hasJustification(claimed), actor).toBe(JUSTIFICATION_READERS.has(roleOf(actor)!));
       const released = await ok<Q>(call(h, actor, 'POST', `/v1/questions/${b.id}/release`, { headers: ifMatch(claimed) }));
       expect(hasJustification(released), actor).toBe(JUSTIFICATION_READERS.has(roleOf(actor)!));
+      claims += 1;
     }
+    expect(claims).toBeGreaterThan(0);
     let withdrawals = 0;
     for (const actor of NINE_ROLES) {
       const target = await proposed(h, await assigned(h), ACT.legal, pathB(m));
@@ -753,13 +761,24 @@ describe('Scheibe 044b, Test 11: the response hook works', () => {
     const byS = await cleared(h, p, 's44b:legal', `${m.note} eins`);
     const head = await headSeq(h);
     const byK = await cleared(h, byS, 'k44b:legal', `${m.note} zwei`);
+    const clearedSeq = (await scanEvents(h, head)).find((e) => e.type === 'QuestionLegalCleared' && e.subjectId === byK.id)!.seq;
     for (const actor of NINE_ROLES) {
       for (const path of [`/v1/questions/${byK.id}`, '/v1/questions?limit=2000', '/v1/stage', `/v1/meetings/${h.meetingId}/stage`,
         `/v1/questions/${byK.id}/history`]) {
         expect([200, 403, 404], `${path} ${actor}`).toContain((await call(h, actor, 'GET', path)).status);
       }
+      // Per reader, from the rights as data: event.read gets the event frame of this clearance (positive control),
+      // question.read a change frame naming the question, every other reader no frame naming it.
+      const rights: readonly string[] = ROLE_PERMISSIONS[roleOf(actor) as Role];
       const stream = await openStream(h, actor, head);
-      expect(await stream.nextMessage(5_000), actor).not.toBeNull();
+      if (rights.includes('event.read')) {
+        await stream.until(isEventFrame(clearedSeq), 5_000);
+      } else if (rights.includes('question.read')) {
+        await stream.until((b) => b.event === 'change' && ((b.data as { subjects?: string[] }).subjects ?? []).includes(byK.id), 5_000);
+      } else {
+        const frames = await stream.during(1_500);
+        expect(frames.filter((b) => b.raw.includes(byK.id)), actor).toEqual([]);
+      }
     }
     expect((await scanEvents(h, head)).some((e) => e.type === 'QuestionLegalCleared' && e.subjectId === byK.id)).toBe(true);
   });
@@ -840,14 +859,21 @@ describe('Scheibe 044b, Test 15: access log unchanged, detection by operationId 
     const p = await proposed(h, q, ACT.legal, pathB(m));
     await rejected(h, 409, 'R-GUARD-08', ACT.approver, 'POST', `/v1/questions/${p.id}/refusal-approvals`, { headers: ifMatch(p), body: { answerVersion: latest(p) } });
     await cleared(h, p, ACT.legal2, `${m.note} Würdigung.`);
+    // T-G1-I-05: the core's 422 echoes an unknown ground id in the problem body, never in the access log.
+    const echoed = 'aktg-GRUND44BX';
+    const q2 = await assigned(h);
+    const echo = await rejected(h, 422, undefined, ACT.legal, 'POST', `/v1/questions/${q2.id}/refusals`, { headers: ifMatch(q2), body: { ...pathB(m), refusalGroundId: echoed } });
+    expect(echo.detail).toContain(echoed);
+    expect(h.sink.lines.filter((l) => l.includes(echoed))).toEqual([]);
     const lines = h.lines();
     const refusalLines = lines.filter((l) => l.operationId === 'proposeRefusal' || l.operationId === 'approveRefusal');
-    expect(refusalLines.length).toBe(3);
+    expect(refusalLines.length).toBe(4);
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(EIGHT_KEYS);
     expect(refusalLines).toEqual([
       expect.objectContaining({ operationId: 'proposeRefusal', status: 403, seq: null }),
       expect.objectContaining({ operationId: 'proposeRefusal', status: 200, seq: expect.any(Number) }),
       expect.objectContaining({ operationId: 'approveRefusal', status: 409, seq: null }),
+      expect.objectContaining({ operationId: 'proposeRefusal', status: 422, seq: null }),
     ]);
     for (const raw of h.sink.lines) {
       expect(raw).not.toMatch(RULE_ID);
@@ -870,7 +896,9 @@ describe('Scheibe 044b, Test 16: metric against a baseline', () => {
       h.clock.now = new Date(at);
       const res = await req(h.app, 'GET', '/metrics', { headers: { Authorization: `Bearer ${METRICS_BEARER}` } });
       expect(res.status).toBe(200);
-      const line = (await res.text()).split('\n').find((l) => l.startsWith('hv_questions_in_legal_review_over_10m{'))!;
+      const text = await res.text();
+      hook(undefined, text, 'GET /metrics');
+      const line = text.split('\n').find((l) => l.startsWith('hv_questions_in_legal_review_over_10m{'))!;
       return Number(line.split(' ').at(-1));
     };
     expect(await value(trial, t0 + 9 * 60_000)).toBe(await value(control, t0 + 9 * 60_000));
