@@ -57,6 +57,8 @@ its working directory between calls.
    later bundled pass. Codex reviews once, when the PR goes ready; only P0/P1 or any security, legal or
    privacy finding holds a merge, everything else goes to the list. High-risk or important slices are
    built and reviewed with Opus; low-risk slices may be reviewed with Sonnet. The orchestrator is Opus.
+   **Freigabe-Demo (owner, 03.10.2026):** medium-risk interface slices skip the separate pre-build spec read-through; the one post-build review stays, and security, legal and privacy findings still hold the merge.
+   **Freigabe-Demo (owner, 03.10.2026):** medium-risk interface slices skip the separate pre-build spec read-through; the one post-build review stays, and security, legal and privacy findings still hold the merge.
 4. **Rights are data.** Never compare a role name in interface or server code. The interface renders
    what `_actions` allows; the server decides through `can()` in `packages/domain/src/api.ts`.
    The only places a role name may appear: `ROLE_PERMISSIONS` and the demo role switcher.

@@ -15,27 +15,22 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-09-30.m
   - Lasttest 071 (B11-Nachweis in der ungünstigsten Phase);
   - Produktionsweg für `text/event-stream` (035b Frage 3, Standard: Polling-Rückfall aus 036b, Prüfung beim ersten
     Staging-Deploy).
-- **Stand 01.10.2026:** 040a ist gebaut und gemergt (#118, `c000567`); die Specs 040a bis 040d und 043a sind gemergt;
-  die Spec 044a ist gemergt (#120, `82ee43b`; Teilung 044a/044b vorgeschlagen). Der Bau von 043a und 040b bis 040d wartet auf das Go des Eigentümers.
-  Offene Eigentümerentscheidungen unverändert: 043a Fragen 1, 2 und 5; 040 Teilung und Budget für den Bau von 040b bis
-  040d; Frage 6 (Doku ohne Spec); 040a Fragen 1 und 2a bis 2c; 044a Fragen 1, 2 und 3b vor dem Bau.
-- **Abweichung 040a (offen beim Eigentümer):** Die Spec 040a verlangt zu Frage 1 vor dem ersten Bau ein ausdrückliches Go
-  (`docs/slices/040a-admin-ohne-inhaltsrechte.md`, „Offene Eigentümerfragen“). Der Orchestrator hat 040a ohne dieses Go
-  gebaut und gemergt; er hatte es dem Eigentümer vorher angekündigt (Begründung: Inhalt folgt aus Rechtekonzept §4,
-  schließt eine Sicherheitslücke, 1,5 AStd im Planbudget von 2,5), eine Zustimmung lag aber nicht vor. Der Eigentümer
-  entscheidet nachträglich: annehmen, oder Revert des Squash-Commits `c000567` (ein Commit, nicht ausgeliefert).
-- **Nächste Schritte Zielpfad C:**
-  - Spec 044a ist gemergt. Bau 044a erst nach dem Bau von 043a **und von 040b bis 040d** (gleiche Kern-Lane, die
-    Wahrheitstabelle ist ein Snapshot; 044a baut seriell danach) und nach den Eigentümerfragen 1, 2 und 3b; ADR 0012 und
-    der Verweigerungskatalog gehen vorher an Recht. Die Spec 044b schreibt der Architekt nach dem Go zur Teilung.
-  - **044c (Untergründe für Pfad A, Rechtekonzept §4, Recherche Z.63)** je nach Frage 3b: bei Go eine eigene Scheibe 044c
-    nach der Antwort von Recht und vor dem Pilot (rund 0,75 AStd, additiver Vertragsschritt); bei No-go wartet 044a, bis
-    Recht die Untergründe benennt, dann werden 044a und 044c zusammen gebaut (+0,75 AStd in 044a, Vertragsschritt als
-    erster Commit). In keinem Fall bleibt die Lücke offen (044a, Eigentümerfrage 3b).
-  - Danach die Specs 045 und 041; beide hängen an offenen Antworten (044a, 040) und werden erst danach geschrieben.
-  - Bau 043a und 040b bis 040d erst nach dem Go des Eigentümers. Unbeantwortete Punkte werden auf Standard gebaut und mit
-    Datum vermerkt; spätere Antworten kosten eine Enum-, Tabellen- oder Vertragsänderung.
-  - D (064–066) darf nach dem Bau von 043a parallel zum Rest von C laufen.
+- **Stand 03.10.2026:** 040a ist gebaut und gemergt (#118, `c000567`) und vom Eigentümer am 03.10.2026 nachträglich
+  angenommen. Die Specs 040a bis 040d, 043a und 044a sind gemergt (044a: #120, `82ee43b`). Das nächste Ziel ist die
+  Freigabe-Demo (`docs/produktplan-beta.md` Abschnitt 11, Register E57).
+- **Abweichung 040a (erledigt):** Die Spec 040a verlangte zu Frage 1 vor dem ersten Bau ein ausdrückliches Go; der
+  Orchestrator hatte 040a ohne dieses Go gebaut. Der Eigentümer hat am 03.10.2026 nachträglich angenommen (nach Erklärung;
+  kein Superadmin, der Rollenwechsler der Demo deckt Vorführungen ab). Ein Revert von `c000567` entfällt.
+- **Go zum Bau auf Standard (Eigentümer, 03.10.2026):** 043a, 040b und 044a (mit 044b) ohne Warten auf Recht; Vermerk
+  „auf Standard gebaut (Go des Eigentümers 03.10.2026)"; Rechtsprüfung vor jeder echten Nutzung. 043a Fragen 1, 2, 5 und
+  044a Fragen 1, 2, 3b mit dem Standard (3b = Go, 044c folgt vor jedem Pilot). 040c und 040d sind zurückgestellt.
+- **Nächste Schritte:**
+  - Bau 043a (läuft), dann 040b, dann 044a und 044b, dann die Kette der Oberfläche: 045, 048, 053, 054, 055, 059, 046, 060, 061, 041.
+  - Parallel: eine Infra-Spec für das lokale Paket (Kern von 037) und die Partnerscheiben 064 bis 066.
+  - Danach 038, 070, 071 und 075 samt Demoszenario „Beispieltranskript über die Schnittstelle".
+  - Ablauf: Oberflächenscheiben mittleren Risikos ohne gesonderten Lesebefund der Spec, ein Review nach dem Bau (AGENTS.md Regel 3).
+- **Offene Eigentümerentscheidungen:** Frage 6 (Doku ohne Spec); 040a Fragen 2a bis 2c; der vorgeschlagene Schutz
+  „minimumReleaseAge" bleibt offen.
 - takt-033 ist mit Vorschlag (b) gemergt; die Eigentümerfrage bleibt offen und ist umkehrbar.
 
 ## Eigentümerentscheidungen (offen)
