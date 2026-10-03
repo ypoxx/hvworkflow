@@ -27,6 +27,7 @@ import type { ProcessStripSegment } from '../../components';
 import { statusLabel, trackShortLabel, useT } from '../../i18n';
 import type { Translate } from '../../i18n';
 import { ROW_HEIGHT, excerpt, relativeAge, urgencyLevel } from './lib';
+import { latestIsRefusal } from './refusal';
 import { ALL, EMPTY_FILTERS, isFiltered } from './useBacklog';
 import type { Backlog, Filters, SortOrder } from './useBacklog';
 
@@ -162,6 +163,8 @@ function Row({
       data-testid="answers-row"
       data-number={question.number}
       data-status={question.status}
+      // Scheibe 045: lets the e2e wait until a server-side unit filter has landed (the list reloads asynchronously).
+      data-unit={question.unitId ?? ''}
       onClick={() => onSelect(question.id)}
       style={{ height: ROW_HEIGHT, gridTemplateColumns: columns }}
       className={cx(
@@ -192,6 +195,13 @@ function Row({
           {question.speakerDisplayName ?? t('common.none')}
         </span>
         <span className="truncate text-[13px] text-ink-800">{excerpt(question.text)}</span>
+        {/* Scheibe 045 (decision 5): a row whose latest version is a refusal carries a small badge, at the
+         * end of the text cell right beside the status (the status column holds one badge only). */}
+        {latestIsRefusal(question) && (
+          <span data-testid="answers-row-refusal" className="ml-auto shrink-0">
+            <Badge tone="danger">{t('answers.refusal.badge')}</Badge>
+          </span>
+        )}
       </span>
       <StatusBadge status={question.status} />
       {showTrack && (

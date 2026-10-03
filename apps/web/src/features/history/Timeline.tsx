@@ -6,7 +6,7 @@
  */
 import type { DomainEvent } from '@hv/domain';
 import { EmptyState, Sparkline, cx } from '../../components';
-import { eventTypeLabel, useT } from '../../i18n';
+import { eventLabel, useT } from '../../i18n';
 import { eventSubject, eventSummary } from './eventSummary';
 import type { SummaryContext } from './eventSummary';
 import { clockTime, elapsedSpan, eventGap, historyKpi, isAdministrativeRole } from './lib';
@@ -101,7 +101,7 @@ export function Timeline({
             <div className={cx('min-w-0 pt-1.5', last ? 'pb-1' : 'pb-4')}>
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-[13px] font-medium text-ink-900">
-                  {eventTypeLabel(t, event.type)}
+                  {eventLabel(t, event, context)}
                 </span>
                 <span className="text-2xs text-ink-600">
                   {event.actor.displayName ?? event.actor.id}
@@ -178,7 +178,7 @@ export function EventStream({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] text-ink-900">
-                {eventTypeLabel(t, event.type)}
+                {eventLabel(t, event, context)}
               </span>
               <span className="flex min-w-0 items-baseline gap-1.5">
                 <span className="truncate text-2xs text-ink-600">

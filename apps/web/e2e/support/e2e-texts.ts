@@ -46,6 +46,15 @@ export const H13_SPEAKER_NAME = 'Synthetische Testperson Sigma';
 export const H13_CONTRIBUTION_TEXT = 'Synthetischer Wortlaut für den zweiten Browser im HTTP-Modus.';
 export const H13_QUESTION = 'Synthetische Frage für die Einordnung im zweiten Browser?';
 
+/** Scheibe 045: the refusal. The justification sentences are unique, so a test can prove where they never appear. */
+export const REFUSAL_045_JUSTIFICATION = 'Synthetische Begründung 045: Offenlegung würde der Gesellschaft einen erheblichen Nachteil zufügen.';
+export const REFUSAL_045_NO_CLAIM_JUSTIFICATION = 'Synthetische Begründung 045: kein Bezug zu einem Tagesordnungspunkt erkennbar.';
+export const REFUSAL_045_NO_CLAIM_WORDING = 'Synthetischer Wortlaut 045: Diese Frage betrifft keinen Gegenstand der Tagesordnung.';
+export const REFUSAL_045_RETURN_REASON = 'e2e 045';
+/** Typed into the dialog and never sent (E6, E7, E9). */
+export const REFUSAL_045_UNSENT_WORDING = 'Synthetischer Entwurf 045, nie gesendet.';
+export const REFUSAL_045_UNSENT_JUSTIFICATION = 'Synthetische Begründung 045, nie gesendet.';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -62,4 +71,8 @@ export const WRITTEN_TEXTS: readonly string[] = [
   H13_SPEAKER_NAME,
   H13_CONTRIBUTION_TEXT,
   H13_QUESTION,
+  REFUSAL_045_JUSTIFICATION,
+  REFUSAL_045_NO_CLAIM_JUSTIFICATION,
+  REFUSAL_045_NO_CLAIM_WORDING,
+  REFUSAL_045_RETURN_REASON,
 ];

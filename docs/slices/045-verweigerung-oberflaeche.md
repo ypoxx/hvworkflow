@@ -2,6 +2,7 @@
 
 **Status:** spec (03.10.2026; gelesen auf `8705a1c`: 043a, 040b, 044a und 044b gemergt, Vertrag 0.4.2; Lesebefund zu `fa340f2` eingearbeitet: 0 blocker, 9 major, 6 minor, 3 nit, Abschnitt „Review findings“; erste Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041 zugeschnitten, Eigentümer 03.10.2026, Register E57)
 **Risikoklasse:** hoch · 3,5 AStd (Spanne 3,2–4,0; Plan 045: 2; Zuschnitt 045b vorbereitet, Abschnitt „Aufwand“) · Plan 045: 09.11.2026 (W7), tatsächlich direkt nach 044b als erste Oberflächenscheibe der Freigabe-Demo · Lanes: web-answers, web-stage, web-history; web-api (nur ein neuer Lese-Hook); e2e (eigene Datei, im Projekt `http` eingereiht); docs (Glossar, Nachweise)
+**Bedrohungsmodell:** berührt SG2 und T-G1-I-01 (Anzeige); keine neue Angriffsfläche, nur Oberfläche, kein neuer Endpunkt (Review 045, SP-6).
 **Rolle:** web-implementer; Review in frischem Kontext mit den Perspektiven **Legal** (Wortlaut, Vermerk „ungeprüft“, Bühne), **Datenschutz** (Begründung nur, wo der Kern sie liefert; Eingaben je Akteur und je Frage) und **UX/Barrierefreiheit** (D1–D10). Lesebefund der Spec vor dem Bau (Klasse hoch, siehe „Warum hoch“); nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue fachliche Regel. Sichtbar gemacht und in der Oberfläche belegt: R-TRANS-15, R-TRANS-16, R-GUARD-08, R-GUARD-09, R-GUARD-11, R-GUARD-12, R-GUARD-14, R-TRANS-03 (Entwurf über einer Verweigerung), R-TRANS-06 (Rückgabe). Dazu AGENTS.md R2, R3, R4, R6, R9, R10, R12; `docs/design-prinzipien.md` D1–D10
 **Quellen-IDs:** `docs/produktplan-beta.md` §5 Eintrag 045 und §11 „Freigabe-Demo“; `docs/slices/044a-verweigerung-kern.md` §1, §6, §7 und „Hinweise an Folgescheiben: 045“; `docs/slices/044b-verweigerung-dienst.md` „Hinweise an Folgescheiben: 045“; ADR 0012 (vorgeschlagen, von Recht nicht gelesen); Register E15, E21, E25, E56, E57; Rechtekonzept Zeilen 13, 60–61, 173; Glossar Zeilen 19–22 (Antwortpfade A/B/C); Scheiben 021c (Mechanik der Rechtsfreigabe), 010d und 090 (Daten und Eingaben je Akteur), takt-008 (Fokus nach Aktion), 031b (gemeinsame e2e-Dateien)
@@ -645,11 +646,125 @@ Keine blockiert den Bau.
 
 ```
 Slice: 045-verweigerung-oberflaeche
-Done:
-Evidence:
-Open:
-Touched:
+Done: Verweigerung vorschlagen (Dialog mit Art, Grund, Wortlaut, Begründung; Vorbefüllen, Vermerk neben dem Feld),
+      Versionskarte, Freigabe der Verweigerung, Editor-Hinweis, Arbeitslisten-Badge, Rückgabehinweis (Beantwortung und
+      Bühne), Bühnenkennzeichen je Art, Historie „Verweigerung vorgeschlagen/freigegeben“; 29 Schlüssel je Sprache, Glossar.
+Evidence: siehe „Nachweise des Baus“ unten; docs/evidence/045-{dialog,detail,buehne}-{de,en}.png
+Open: E4b ist vor der Änderung grün (prüft nur ein Fehlen).
+Touched: siehe Bericht an den Orchestrator (Dateiliste = Files allowed, nichts darüber hinaus)
 ```
+
+### Nachweise des Baus
+
+**Vor-dem-Bau-Prüfungen** (auf `5cbe438`):
+
+1. `listRefusalGrounds()` für `podium` im Projekt `in-process` lesbar: 7 Einträge, alle `verified: false`.
+2. `getQuestionHistory` über HTTP liefert `payload.answer.refusalGround` und `answerKind` (belegt durch
+   `apps/api/src/__tests__/refusal044b.test.ts`, Zeilen 647–656). Kein Halt.
+3. `listQuestions` trägt `answers` je Eintrag: Arbeitslisten-Badge gebaut (am Ende der Textzelle, direkt neben dem Status;
+   die Statusspalte ist 116 px breit und trägt nur ein Badge).
+4. `abnahme.spec.ts` erfasst eigene Fragen, `080-sprecher-zustand.spec.ts` berührt nur Wortmeldungen: keine Ausschlussliste
+   nötig. Im Seed 15 Textpfad-Fragen in `assigned`, alle mit `question.refuse.propose` für `coordination` und `legal`; in
+   der Einheit „Finanzen“ (`unit-fin`) vier. 021c verbraucht eine Frage in `in_review`, nicht `assigned`.
+5. Projekt `http`: neun synthetische Personen mit je eigener id (`scripts/e2e-http-031.mjs`, `PERSONS`); `in-process`:
+   `u-coord-1`, `u-legal-1`, `u-appr-1`, `u-podium` verschieden.
+6. Laufzeit `e2e-http`, Schritt „End-to-end http project …“ der letzten drei grünen Läufe mit echtem Lauf:
+   37144751699 2:57, 37143017388 3:43, 37142695432 3:26 (Ist höchstens 3:43 von 9:00; Gesamtgrenze der Harness 8:00).
+   Die Zeilen `[timing] switch to …` waren nicht lesbar (Log-Download leitet auf einen Blob-Host um, den der
+   verfügbare Client nicht aufruft). Schätzung der Mehrzeit: rund 19 Rollenwechsel × höchstens 3 s + 6 Schreibschritte ×
+   1 s + Navigation und axe rund 60 s ≈ 2–2,5 min; Ist plus Schätzung ≈ 6,2 min < 8 min < 9 min. Kein Halt.
+   Tatsächliche Dauer im PR-Lauf: Schritt „End-to-end http project“ 3:37 (21:07:16–21:10:53 UTC, Lauf 37153923219), unter dem Limit von 9:00.
+7. Expert-Testperson: `u-exp-fin` (Demo) bzw. Person `expert` mit `unit-fin` (http); Filtername `Finanzen`
+   (`EXPERT_UNIT`). Auf einer `in_review`-Frage der Einheit nach einem Verweigerungsvorschlag stehen für `expert`
+   `question.claim`, `answer.draft`, `question.read` in `_actions`, ohne vorherige Inanspruchnahme. Kein Halt, E2 wie
+   spezifiziert.
+
+**Abweichungen vom Wortlaut der Spec (Bau):**
+
+- Test 6 rendert `RefusalDialog` statisch; der `Dialog` des Bausatzes rendert über ein Portal, das statisch nicht geht.
+  Der Test ersetzt ihn per `vi.mock` durch einen Rahmen an Ort und Stelle; `RefusalDialog` selbst ist unverändert. Die
+  Meldungen 409/422 rendert der Test über die exportierte Komponente `RefusalProblem` (dieselbe, die der Dialog zeigt).
+- Der Hook nimmt die Lesefunktion als Parameter (`useRefusalGrounds(load)`), damit der Test das API-Modul nicht lädt;
+  die Seiten übergeben `api.listRefusalGrounds`.
+- Rückgabedialog der Bühne: `ReturnTarget` bleibt unverändert (ein bestehender Test pinnt seine Form); der Hinweis wird
+  beim Öffnen aus derselben Frage ermittelt und daneben gehalten.
+- E4b ist vor der Änderung grün: Der Fall sichert nur das Fehlen eines Hinweises zu, den es vor 045 nicht gab.
+
+**Rote Tests vor der Änderung** (Unit, Auszug): `Test Files 8 failed | 1 passed (9)`, `Tests 17 failed | 74 passed (91)`;
+`refusal.test.ts`, `RefusalDialog.test.tsx`, `useRefusalGrounds.test.ts`: „Cannot find module“; Parität „expected 524 to be
+553“. e2e `in-process`, je Fall einzeln gegen den Stand ohne Änderung: E1, E3, E6, E7, E9 rot („No refusable assigned
+question for …“), E4b grün (siehe oben).
+
+**Grün nach der Änderung:** Vitest `apps/web` 28 Dateien, 555 Tests. Playwright `045-verweigerung.spec.ts` `in-process`
+6 passed; mit `--repeat-each=3` 18 passed (2.2m). Volle Suite `in-process` 139 passed (6.9m), axe ohne serious/critical.
+
+**`pnpm gates`** auf Commit `4259657` (Exit 0; frühere Läufe auf `5b5edc9` und `07162fd`; mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t045`;
+Vitest: domain 393, web 555, api 663 passed), Schluss wörtlich:
+
+```
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
+dist/assets/index-CmZtqmhs.js                        690.76 kB │ gzip: 202.20 kB │ map: 2,885.86 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.45s
+mark-test-run: wrote /home/user/wt/s045/.claude/state/last-test-run (clean tree) at commit 4259657, tree 71683b025797…
+```
+
+**e2e-http E2 (CI-Lauf 37152696332, Job 111289649056) behoben in `4259657`:** `findRefusableQuestion` las die
+Arbeitsliste, bevor der Einheitenfilter angekommen war. Der Filter wirkt im Dienst (`listQuestions({ unitId })`), der
+Statusfilter dagegen im Client; in `http` kommt die gefilterte Liste verzögert. Die Schleife nahm deshalb die erste
+verweigerbare `assigned`-Frage der ungefilterten Liste (F-0108, `unit-strat`; Nachweis per Domain-Skript: F-0108 ist die
+erste in Nummernfolge, `unit-fin` hält F-0121, F-0128, F-0135, F-0204). Der Fachbereich ist an `unit-fin` gebunden und
+liest sie nicht, seine Suche fand keine Zeile. Der Test wartet jetzt, bis jede Zeile die gewählte Einheit trägt (neues
+Zeilenattribut `data-unit` in `WorkList.tsx`), und prüft sie an der gewählten Zeile; die Expert-Zusicherungen sind unverändert.
+
+**Projekt `http`:** CI-Lauf `e2e-http` auf PR #139, Commit `844126c`, Lauf-ID **37153923219**, Job 111293286346, grün (Nachtrag Orchestrator). Schluss des Logs mit den Fällen von 045:
+
+```
+  ✓  32 [http] › e2e/045-verweigerung.spec.ts:182:3 › … › E1 Grund aus Katalog, ganzer Weg (mit E2, E4a, E5, E8) @screenshot (22.8s)
+  ✓  33 [http] › e2e/045-verweigerung.spec.ts:412:3 › … › E3 Kein Auskunftsanspruch: kein Grund, Wechsel nach Vorbefüllen, eigener Wortlaut (2.6s)
+  ✓  34 [http] › e2e/045-verweigerung.spec.ts:459:3 › … › E4b Kein Hinweis ohne Begründung im Datensatz (schreibt nichts) (1.4s)
+  ✓  35 [http] › e2e/045-verweigerung.spec.ts:497:3 › … › E6 Eingaben je Akteur (090): ein Akteurwechsel schließt den Dialog und verwirft die Eingaben (3.2s)
+  ✓  36 [http] › e2e/045-verweigerung.spec.ts:525:3 › … › E7 Tastatur (D8): der Dialog ganz mit der Tastatur, Absenden fokussiert und aktiv, nicht ausgelöst (1.6s)
+  ✓  37 [http] › e2e/045-verweigerung.spec.ts:560:3 › … › E9 Eingaben je Frage: jede Frage, jedes Öffnen beginnt leer (2.8s)
+  39 passed (3.0m)
+```
+
+Vorher rot auf `7cda112` (Lauf 37153460436) und `42fc573` (Lauf 37152696332, PR #138): E1/E2 fand die Frage des Sachverständigen nicht; Ursache und Behebung im Abschnitt oben (`4259657`).
+
+**Aufwand:** tatsächlich rund 0,9 Stunden Wanduhr des Agenten (19:50–20:45 UTC, 03.10.2026) gegen 3,5 AStd geschätzt;
+Zuschnitt 045b nicht nötig, nicht geschnitten.
+
+**Design-Kritik D1–D10** (Checkliste `docs/design-prinzipien.md`)
+
+| D | ja/nein | Satz |
+|---|---|---|
+| D1 | ja | Dialog: Titel = Aktion, ein Erklärungssatz, vier Felder in fester Reihenfolge; Versionskarte nennt die Art als Badge neben der Version. |
+| D2 | ja | Im Detail eine primäre Aktion (Rechtsfreigabe, Freigabe bzw. „Verweigerung freigeben“, Prüfung); „Verweigerung vorschlagen“ ist nie primär (Test 9); im Dialog nur Absenden primär. |
+| D3 | ja | Dialog `lg` im Muster D, Felder auf 16-px-Abständen; das Listen-Badge sitzt am Ende der Textzelle, die Spalten bleiben unverändert. |
+| D4 | ja | Danger nur als Badge (Art, Bühnenkennzeichen, Listen- und Warteschlangen-Badge), „ungeprüft“ als Warning-Badge; keine Flächen. |
+| D5 | ja | Grund-id in Mono, Versionen wie bisher in Mono. |
+| D6 | ja | Katalog laden (Zeile in Feldhöhe), Fehler (`role="status"`, „kein Auskunftsanspruch“ bleibt möglich), leer (Platzhalter); Meldungen 409/422 im Dialog mit Regel-id. |
+| D7 | ja | 29 Schlüssel je Sprache (Parität 553), Arten nach Inhalt statt „Pfad A/B“; `pnpm i18n-literals` und `pnpm vocabulary` grün. Katalogtexte deutsch auch in en (E21). |
+| D8 | ja | E7: Dialog per Tab, Leertaste und Pfeilen; Absenden fokussiert, aktiv, `:focus-visible`; Escape schließt ohne Schreiben. |
+| D9 | ja | Je Zeile eine Prüfung der letzten Version (O(1)); keine neue Abfrage je Zeile; nicht eigens gemessen. |
+| D10 | ja | Bühne aus zwei Metern: ein Kennzeichen je Art in 18 px halbfett, Grund darunter, Wortlaut 24 px; ruhige Badges statt Flächen, keine neue Taste. |
 
 ## Review findings
 
@@ -684,3 +799,12 @@ Folgeliste (Vorgabe des Orchestrators, 03.10.2026). Entscheidungen des Orchestra
 **Nachtrag des Orchestrators zu Befund 15 (03.10.2026):** Der Rückgabedialog der Bühne zeigt den Hinweis bei jeder
 Verweigerung (Entscheidung 4, Test 13, E4a); das Restrisiko aus der vorigen Fassung entfällt. Mehraufwand < 0,1 AStd, im
 Aufwand enthalten (Bühne 0,3 → 0,35, Abschluss 0,3 → 0,25; Summe bleibt 3,5 in der Spanne 3,2–4,0).
+
+### Review des Baus (frischer Kontext, 03.10.2026, Diff `5cbe438..42fc573`)
+
+0 blocker, 0 major, 6 minor, 5 nit. Datenschutz, Rechte (R4) und Umfang ohne Befund. Eingearbeitet, weil Recht oder
+Sicherheit (nie Folgeliste): Minor 1 (Legal, D10): das Badge „ungeprüft“ auf der Bühne hat jetzt Markergröße
+(`stage-refusal-unverified`, `045-buehne-*.png` neu); Minor 6 (SP-6): Zeile „Bedrohungsmodell“ im Kopf. Übrige Minor 2–5
+(Meldung bei geschlossenem Dialog, Kürzung des Auszugs in der Arbeitsliste, Verdrahtungstest 409/422, Podium-Test für
+Vorschau und Warteschlange) und Nits 7–11 gehen nach Regel 3 auf `docs/folgeliste.md`. Gitleaks: die Testkonstanten
+`SECRET` heißen jetzt `JUSTIFICATION_MARKER` mit Klartext-Marker; der Zweig wurde dafür zu einem Commit zusammengefasst.
