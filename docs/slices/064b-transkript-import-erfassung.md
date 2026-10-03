@@ -1,7 +1,7 @@
 # Scheibe 064b — Transkript-Ingest, Teil 2: Import und Übernahme in der Erfassung, Demoszenario
 
-**Status:** spec (03.10.2026; gelesen auf `2fc3153`; Teil 2 der geteilten Scheibe 064, Zuschnitt in Spec 064a)
-**Risikoklasse:** hoch · 2 AStd · frühestens nach dem Merge von 064a; für die Freigabe-Demo (Plan §11 Punkt 2, Register E57); den Tag legt der Orchestrator fest · Lanes: web-capture; e2e (nur die eigene Datei und eine Zeile in `playwright.config.ts`); docs-plan (nur Glossarzeilen); docs-integration (nur ein Abschnitt)
+**Status:** spec (03.10.2026; gelesen auf `2fc3153`; überarbeitet nach dem Lesebefund zu `bc33df2`: Blocker gemeinsame e2e-Datei, major Testzustand, Demo-Export, Liste; Teil 2 der geteilten Scheibe 064, Zuschnitt in Spec 064a)
+**Risikoklasse:** hoch · 2,25 AStd · frühestens nach dem Merge von 064a; für die Freigabe-Demo (Plan §11 Punkt 2, Register E57); den Tag legt der Orchestrator fest · Lanes: web-capture; e2e (nur die eigene Datei und eine Zeile in `playwright.config.ts`); infra (nur die zwei Listen in `scripts/e2e-http-031.test.mjs`); docs-plan (nur Glossarzeilen); docs-integration (nur ein Abschnitt)
 **Rolle:** implementierer-oberflaeche. Review in frischem Kontext mit den Perspektiven **Security** (fremde Datei im Browser, Anzeige feindlichen Wortlauts) und **Oberfläche/Barrierefreiheit** (6.9). Der schlankere Ablauf aus E57 gilt nicht: Die Klasse ist hoch (Partnereingabe, Leitplanken §4 „externer Datentransfer“; bei unklarer Zuordnung gilt hoch). Lesebefund der Spec vor dem Bau; nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue. Angewandt und in der Oberfläche sichtbar: R-ING-01..05 (aus 064a), R-MTG-03, R-PERM-01, R-PERM-02. Dazu AGENTS.md R2, R4, R5, R9, R10, R11, R12
 **Quellen-IDs:** Spec 064a (Entscheidungen 6, 7, 9; „Hinweise an Folgescheiben: 064b“); `docs/produktplan-beta.md` Eintrag 064 (Nachweis „Playwright Import → Redebeitrag → Einzelfragen“), §11 Punkt 2; ADR 0002 (Demo im Browser, gemeinsame e2e-Suite); ADR 0008; Spec 080b (Korpus eine Quelle); Spec 090 (Eingaben je Akteur); Spec 013 (Tastaturpfad); takt-032 (Schreibsperre der Erfassung); `docs/glossar.md`; Bedrohungsmodell T-G3-T-01
@@ -19,11 +19,14 @@ und der Dienst zeigen dasselbe (ADR 0002).
 1. **Ort.** Ein einklappbarer Bereich „Transkript“ oben in der linken Hälfte der Erfassung (über dem Redebeitrag), neue
    Komponente `TranscriptPanel.tsx`. Eingeklappt zeigt er die Zahl unbestätigter Abschnitte, ausgeklappt die Liste.
    Keine neue Route, keine Zeile im Feature-Register.
-2. **Liste.** `api.listSpeechSegments({ status: 'unconfirmed' })`; Umschalter „auch übernommene zeigen“ lädt ohne
-   Filter. Je Abschnitt: Uhrzeit Anfang–Ende (Europe/Berlin, wie `timeOf` in `ContributionPane.tsx`), Sprecherhinweis
+2. **Liste.** `api.listSpeechSegments({ status: 'unconfirmed', limit: 100 })`, neueste zuerst (Reihenfolge des
+   Dienstes, 064a); „Ältere laden“ holt die nächste Seite über `offset`; der Kopf zeigt `total`. Umschalter „auch
+   übernommene zeigen“ lädt ohne Filter. Liegt der Zeitanker nicht am Tag der HV, zeigt die Zeile das Datum mit. Je Abschnitt: Uhrzeit Anfang–Ende (Europe/Berlin, wie `timeOf` in `ContributionPane.tsx`), Sprecherhinweis
    als Nummer und Name aus der schon geladenen Wortmeldeliste (nur wenn die Wortmeldung dort steht; sonst
    „ohne Zuordnung“), Quelle als Abzeichen, Wortlaut. Der Wortlaut steht in einem eigenen Element mit `dir="auto"` und
-   `unicode-bidi: isolate`, nur als Text (kein `dangerouslySetInnerHTML`). Neu geladen wird bei `useApiVersion()`.
+   `unicode-bidi: isolate`, nur als Text (kein `dangerouslySetInnerHTML`). Die Isolation ist die zweite Linie; die
+   erste ist die Ablehnung der Bidi-Steuerzeichen im Kern (064a, T-G3-T-04). Neu geladen wird bei `useApiVersion()`;
+   der Live-Puffer verwirft die Liste auf einen `change` mit Thema `contributions` (064a, Subjektart `segment`).
 3. **Rechte als Daten (R4, R5).** Der Knopf „Transkript importieren“ erscheint genau dann, wenn die Listen-`_actions`
    `ingest.write` enthalten. Ein Auswahlkästchen je Abschnitt erscheint genau dann, wenn dessen `_actions`
    `contribution.capture` enthalten. Die Oberfläche liest keinen Status und vergleicht keinen Rollennamen. Antwortet die
@@ -42,9 +45,10 @@ und der Dienst zeigen dasselbe (ADR 0002).
 5. **Import-Dialog** (`ImportDialog.tsx`), drei Wege zu demselben Ablauf:
    - Datei wählen (`accept=".json,application/json"`);
    - JSON in ein Textfeld einfügen (Zwischenablage);
-   - **„Beispieldatei verwenden“, nur in der Demo-Betriebsart** (`DEMO_MODE` aus `apps/web/src/api/mode.ts`): baut den
-     Body mit `transcriptSampleBody(new Date())` aus `@hv/domain` (eine Quelle mit Seed und
-     `docs/integration/beispiele/transkript-beispiel.json`, 080b). In der HTTP-Betriebsart fehlt der Knopf: Ein Pilot mit
+   - **„Beispieldatei verwenden“, nur in der Demo-Betriebsart** (`DEMO_MODE` aus `apps/web/src/api/mode.ts`): holt den
+     Body über `demoTranscriptSample()` aus `../../api` (Export der API-Schicht aus 064a; eine Quelle mit Seed und
+     `docs/integration/beispiele/transkript-beispiel.json`, 080b). Kein Wert-Import aus `@hv/domain` in
+     `features/**` (Regel `web-features-i18n-domain-types-only`, `scripts/dependency-cruiser.cjs:53-63`). In der HTTP-Betriebsart fehlt der Knopf: Ein Pilot mit
      echten Daten soll keine erfundenen Abschnitte per Klick bekommen.
    - Vor dem Senden zeigt der Dialog eine Vorschau (Zahl der Abschnitte, Zeitraum, Fehler der Vorprüfung). „Einspielen“
      sendet; das Ergebnis lautet „N neu, M bereits vorhanden“.
@@ -55,8 +59,13 @@ und der Dienst zeigen dasselbe (ADR 0002).
      Parsen;
    - prüft vor dem Senden nur die Form (Objekt, Feldtypen, Pflichtfelder), damit die Person Fehler mit Abschnittsnummer
      sieht; maßgeblich bleibt die Prüfung im Kern und im Dienst;
-   - zerlegt in Stapel von höchstens 100 Abschnitten und höchstens 200 000 Byte UTF-8 (`TextEncoder`), damit das
-     Body-Limit von 262 144 Byte nie greift;
+   - **kopiert je Abschnitt nur die benannten Felder** (`segmentId`, `text`, `startedAt`, `endedAt`, `speakerId`,
+     `source`) in ein neues Objekt; Zusatzfelder und `__proto__` der Datei gehen nie auf die Leitung;
+   - zerlegt in Stapel von höchstens 100 Abschnitten und höchstens 200 000 Byte UTF-8, **gemessen an
+     `new TextEncoder().encode(JSON.stringify(batch)).length`** (also mit Escapes und Struktur, nicht nur am Wortlaut),
+     damit das Body-Limit von 262 144 Byte nie greift;
+   - wartet bei `429` und `503` die Sekunden aus `Retry-After` (1–60; fehlt der Kopf: 2) und wiederholt denselben
+     Stapel höchstens dreimal; danach hält er an und meldet es. Andere Fehler wiederholt er nicht;
    - sendet die Stapel nacheinander über `api.ingestSpeechSegments`, hält beim ersten Fehler an und meldet die Nummer
      des betroffenen Abschnitts in der Datei (Stapelversatz + Index aus `detail`). Schon gesendete Stapel bleiben
      gespeichert; der Dialog sagt, dass ein erneuter Import sicher ist (Idempotenz je `segmentId`).
@@ -65,6 +74,20 @@ und der Dienst zeigen dasselbe (ADR 0002).
 8. **Tastatur und Barrierefreiheit:** Bereich als `region` mit Überschrift; Liste mit Kästchen und Beschriftung je
    Abschnitt (Uhrzeit und Anfang des Wortlauts); Dialoge über die vorhandene `Dialog`-Komponente (Fokusfalle, Escape);
    Ergebnis des Imports als höfliche Live-Meldung. Kein neues Tastenkürzel.
+
+9. **Gemeinsame e2e-Datei nach 031b.** `064b-transkript.spec.ts` läuft in beiden Projekten und erfüllt deshalb die
+   Regeln, die `scripts/e2e-http-031.test.mjs:302-310` für jede gemeinsame Datei prüft:
+   - `import { test, expect } from './support/http-guard';` (kein `test`/`expect` aus `@playwright/test`);
+   - Nachweise nur über `./support/evidence` (kein Pfad `docs/evidence/` im Code);
+   - Rollenwechsel nur über `asRole` aus `./support/roles` (kein `role-switcher`/`role-option-` im Code).
+   In `SHARED_FILES` und `HTTP_ORDER` (`scripts/e2e-http-031.test.mjs:26-29`, geprüft in Zeile 295 und 417) kommt die
+   Datei an die Stelle ihres Pfades: nach `031-http-betriebsart.spec.ts`, vor `080-sprecher-zustand.spec.ts`. Das
+   Projekt `http` läuft mit einem Worker in dieser Reihenfolge auf **einer** Datenbank; 080 und `abnahme` laufen danach
+   (Vor-dem-Bau-Punkt 6).
+10. **Testzustand.** Im Projekt `in-process` beginnt jeder Test mit frischem Speicher. Der Ablauf Import → Wiederholung
+   → Übernahme → Atomisierung (P2–P5) ist deshalb **ein** Test (`test.describe.serial` mit einer geteilten Seite oder ein
+   einziger `test` mit `test.step`), in beiden Projekten gleich. Jede erwartete Zahl ist relativ zum Stand bei Testbeginn
+   (`vorher + 5`, nicht „11“), weil das Projekt `http` den Stand der Datenbank aus früheren Dateien erbt.
 
 ## Demoszenario (Freigabe-Demo, Plan §11 Punkt 2)
 
@@ -87,7 +110,9 @@ wie der Dienst.
 
 1. `pnpm install`, dann `pnpm --filter @hv/api dev` (Demo-Modus, Port 8787, Seed mit den 6 Abschnitten).
 2. Laufende HV holen: `curl -s 'http://localhost:8787/v1/meetings?status=running' -H 'X-Actor: u-cap-1:capture'`.
-3. Beispieldatei einspielen: `curl -s -X POST "http://localhost:8787/v1/meetings/$HV/speech-segments" -H 'X-Actor: u-cap-1:capture' -H 'Content-Type: application/json' --data @docs/integration/beispiele/transkript-beispiel.json` → `"created": 5`.
+3. Beispielskript aus dem Wurzelverzeichnis: `node docs/integration/beispiele/transkript-einspielen.mjs` (setzt die
+   Zeitanker auf „jetzt minus Versatz“) → `"created": 5`. Alternativ die Datei unverändert mit
+   `curl -s -X POST "http://localhost:8787/v1/meetings/$HV/speech-segments" -H 'X-Actor: u-cap-1:capture' -H 'Content-Type: application/json' --data-binary @docs/integration/beispiele/transkript-beispiel.json` (Voraussetzung `jq` für Schritt 2).
 4. Dasselbe noch einmal → `"duplicates": 5`; mit geändertem Wortlaut → `409` mit `ruleId` `R-ING-01`; mit
    `X-Actor: o-1:observer` → `403`.
 5. Liste lesen: `curl -s "http://localhost:8787/v1/meetings/$HV/speech-segments?status=unconfirmed" -H 'X-Actor: u-cap-1:capture'` → 11 Abschnitte.
@@ -126,6 +151,7 @@ e2e:
 
 - `apps/web/e2e/064b-transkript.spec.ts` (neu)
 - `apps/web/playwright.config.ts` (nur `064b-transkript.spec.ts` in `SHARED_SPECS`)
+- `scripts/e2e-http-031.test.mjs` (nur die Listen `SHARED_FILES` und `HTTP_ORDER`, je ein Eintrag an der Pfadstelle)
 - `apps/web/e2e/support/e2e-texts.ts` (nur neue Einträge, falls die Suite Texte dort bündelt)
 
 Dokumente und Nachweise:
@@ -142,13 +168,14 @@ Weitere Dateien sind Scope-Befunde.
 ## Ausdrücklich nicht erlaubt
 
 `packages/**`, `apps/api/**`, `apps/web/src/api/**`, `apps/web/src/components/**`, `apps/web/src/app/**`,
-`scripts/**`, andere e2e-Dateien. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-scope` die
+`scripts/**` außer den zwei Listen oben (auch nicht `scripts/e2e-http-031.mjs`), andere e2e-Dateien. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“, damit `slice-scope` die
 Pfade nicht als erlaubt liest.
 
 ## Vor dem Bau prüfen
 
-1. **064a gemergt?** `HvApi` hat `ingestSpeechSegments` und `listSpeechSegments`; `transcriptSampleBody` ist aus
-   `@hv/domain` exportiert; die Beispieldatei liegt unter `docs/integration/beispiele/`. Sonst anhalten.
+1. **064a gemergt?** `HvApi` hat `ingestSpeechSegments` und `listSpeechSegments`; `demoTranscriptSample` ist aus
+   `apps/web/src/api/index.ts` exportiert; der Live-Puffer führt `listSpeechSegments` unter `contributions`; die
+   Beispieldatei liegt unter `docs/integration/beispiele/`. Sonst anhalten.
 2. **HTTP-Bootstrap:** Legt der Harness des Projekts `http` (`scripts/e2e-http-031.mjs`, Schritt 3) den Korpus über
    `seedDemo` an, also mit den 6 Abschnitten? Wenn nein, läuft P1 nur im Projekt `in-process`; P2–P5 importieren zuerst
    und laufen in beiden. Ergebnis in den Bericht.
@@ -156,6 +183,13 @@ Pfade nicht als erlaubt liest.
    takt-032)? Im Bericht nennen.
 4. **Dialog:** Trägt `Dialog.tsx` Fokusfalle und Escape? Wenn nein, ist das ein Befund an web-components, kein Umbau hier.
 5. Weichen Zeilenangaben ab: melden.
+6. **Folgedateien im Projekt `http`:** Zählen `080-sprecher-zustand.spec.ts` oder `abnahme.spec.ts` etwas, das 064b in
+   der gemeinsamen Datenbank ändert (Redebeiträge oder Einzelfragen einer Wortmeldung, Versionen oder Status einer
+   Wortmeldung, `counts`, die Zahl der Fragen in einem Status, die Übernahme-Sperre aus takt-032)? Liste im Bericht.
+   Wenn ja: 064b übernimmt auf eine Wortmeldung, die beide Dateien nicht benutzen, und markiert Fragen nur so, dass
+   deren Zählungen gleich bleiben. Geht das nicht, anhalten und melden; die beiden Dateien sind nicht erlaubt.
+7. **Demo-Speicher:** Was tut `saveLog` (`apps/web/src/api/index.ts:56-66`) bei einem vollen `localStorage`? Ergebnis
+   im Bericht; die Demo-Grenzen aus 064a (500 Abschnitte, 512 KiB) halten den Import darunter.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -167,27 +201,37 @@ Pfade nicht als erlaubt liest.
 - U3. Zerlegung: 250 Abschnitte → Stapel 100/100/50; 100 Abschnitte mit je 3 000 Zeichen „ä“ → mehrere Stapel, keiner
   über 200 000 Byte UTF-8.
 - U4. Senden: zweiter Stapel antwortet 422 mit Index 7 im `detail` → Ablauf hält an, gemeldet wird Abschnitt 107; die
-  Summen enthalten nur den ersten Stapel.
+  Summen enthalten nur den ersten Stapel. Erster Stapel antwortet `429` mit `Retry-After: 3`, dann 200 → eine
+  Wiederholung nach 3 s (falsche Uhr im Test), Summen richtig; viermal `503` → Abbruch nach drei Wiederholungen.
+- U4b. Abschnitt mit Zusatzfeld und `__proto__` in der Datei → der gesendete Body hat je Abschnitt genau die benannten
+  Schlüssel. 100 Abschnitte mit vielen `"` und `\` im Wortlaut → Stapelgröße nach `JSON.stringify` unter 200 000 Byte.
 - U5. Bereich: Wortlaut `<img src=x onerror="window.__pwned=1">` erscheint als Text, kein `img`-Element; Element mit
   `dir="auto"`.
+- U7. Bereich: zweite Seite über „Ältere laden“ hängt die älteren an; Zeitanker an einem anderen Tag zeigt das Datum.
 - U6. Bereich: Listen-`_actions` ohne `ingest.write` → kein Import-Knopf; Abschnitts-`_actions` ohne
   `contribution.capture` → kein Kästchen.
 
 **Playwright** (`064b-transkript.spec.ts`, Rollen über `asRole`):
 
 - P1. (beide Projekte, siehe Vor-dem-Bau-Punkt 2) Erfassung sieht 6 unbestätigte Abschnitte, drei mit Sprecherhinweis.
-- P2. (beide) Import über das Dateifeld mit `docs/integration/beispiele/transkript-beispiel.json` → „5 neu, 0 bereits
-  vorhanden“.
-- P3. (beide) derselbe Import erneut → „0 neu, 5 bereits vorhanden“; die Zahl der Abschnitte bleibt.
-- P4. (beide) die 5 Beispielabschnitte auswählen, übernehmen, Wortmeldung bestätigen → Redebeitrag mit Quelle
-  „Transkript“ auf dem Tisch; die 5 Abschnitte stehen nicht mehr unter „unbestätigt“.
-- P5. (beide) zwei Fragen im übernommenen Wortlaut markieren → zwei Einzelfragen; als Koordination stehen sie zur
-  Klassifizierung bereit (Planbeleg „Import → Redebeitrag → Einzelfragen“).
+- P2–P5 sind **ein** serieller Ablauf (Entscheidung 10), in beiden Projekten; `n` = Zahl unbestätigter Abschnitte bei
+  Testbeginn:
+  - P2. Import über das Dateifeld mit `docs/integration/beispiele/transkript-beispiel.json` → „5 neu, 0 bereits
+    vorhanden“, Liste `n + 5`. Der Harness legt je Lauf eine frische Datenbank an (031a), und keine frühere Datei
+    spielt die Beispieldatei ein; deshalb gilt „5 neu“ in beiden Projekten.
+  - P3. derselbe Import erneut → „0 neu, 5 bereits vorhanden“; Liste bleibt `n + 5`.
+  - P4. die 5 Beispielabschnitte auswählen, übernehmen, Wortmeldung bestätigen (Vor-dem-Bau-Punkte 3 und 6) →
+    Redebeitrag mit Quelle „Transkript“ auf dem Tisch; Liste `n`.
+  - P5. zwei Fragen im übernommenen Wortlaut markieren → zwei Einzelfragen; nach `asRole` Koordination stehen sie zur
+    Klassifizierung bereit (Planbeleg „Import → Redebeitrag → Einzelfragen“).
 - P6. „Beispieldatei verwenden“: in `in-process` vorhanden und führt zu „5 neu“; in `http` fehlt der Knopf.
 - P7. (beide) Versammlungsbüro sieht den Bereich, aber keinen Import-Knopf und keine Kästchen; Fachbereich und
   Beobachter sehen den Bereich nicht.
-- P8. (`in-process`) feindliche Datei mit HTML im Wortlaut und U+202E → Anzeige als Text, `window.__pwned` bleibt
-  `undefined`; ungültiges JSON → Fehlermeldung, Liste unverändert; Datei mit 5 MiB + 1 Byte → abgelehnt.
+- P8. (`in-process`) feindliche Datei mit HTML im Wortlaut → Anzeige als Text, `window.__pwned` bleibt `undefined`;
+  Datei mit U+202E im Wortlaut → Meldung mit R-ING-03 und Abschnittsnummer, Liste unverändert; ungültiges JSON →
+  Fehlermeldung, Liste unverändert; Datei mit 5 MiB + 1 Byte → abgelehnt.
+- P11. (`in-process`) mehr als die Demo-Grenze (501 Abschnitte, erzeugt im Test) → verständliche Meldung zu R-ING-05,
+  das Demo-Protokoll bleibt ladbar (Seite neu laden, Erfassung erscheint).
 - P9. (`in-process`) Sprache en-US: Bereich, Dialoge und Ergebnis englisch.
 - P10. (`in-process`) axe auf der Erfassung mit offenem Bereich, offenem Import- und Übernahme-Dialog: keine Meldung
   „moderate“ oder höher.
@@ -198,10 +242,12 @@ Pfade nicht als erlaubt liest.
 - M2. Wortlaut über `dangerouslySetInnerHTML` → U5 und P8 rot.
 - M3. Zerlegung ohne Bytegrenze → U3 rot.
 - M4. Beispielknopf ohne `DEMO_MODE` → P6 im Projekt `http` rot.
+- M5. Größe am Wortlaut statt am `JSON.stringify` des Stapels → U4b rot.
+- M6. `Retry-After` ignoriert (sofortige Wiederholung) → U4 rot.
 
 ## Akzeptanzkriterium
 
-1. U1–U6 und P1–P10 grün in den Projekten, die oben stehen; M1–M4 rot belegt.
+1. U1–U7, U4b und P1–P11 grün in den Projekten, die oben stehen; `node --test scripts/e2e-http-031.test.mjs` grün; M1–M6 rot belegt.
 2. Screenshots in `docs/evidence/`: `064b-abschnitte-de.png` (Bereich mit 6 Abschnitten), `064b-import-ergebnis-de.png`
    („5 neu“), `064b-import-wiederholt-de.png` („5 bereits vorhanden“), `064b-uebernahme-de.png` (Dialog),
    `064b-redebeitrag-fragen-de.png` (Redebeitrag mit Einzelfragen), `064b-abschnitte-en.png`; nur synthetische Daten.
@@ -231,7 +277,7 @@ Ausgelöst:
 - [x] Oberfläche, Barrierefreiheit
 - [x] Dokumentation, Schulung (Glossar, Leitfaden-Abschnitt, Demoszenario)
 
-Perspektiven: Security, Oberfläche · Nachweise: U1–U6, P1–P10, Screenshots · Offene Entscheidung: E3b (Standard)
+Perspektiven: Security, Oberfläche · Nachweise: U1–U7, P1–P11, Screenshots · Offene Entscheidung: E3b (Standard)
 
 ## Wirkung und Risiko
 
@@ -252,10 +298,12 @@ Perspektiven: Security, Oberfläche · Nachweise: U1–U6, P1–P10, Screenshots
 3. Der Beispielknopf hängt an `DEMO_MODE` (P6).
 4. Größen- und Mengengrenzen greifen vor dem Lesen bzw. vor dem Senden (U2, U3).
 5. Kein Wortlaut in `console.*`.
+6. Der Adapter sendet nur benannte Felder (U4b) und wiederholt nur bei `429`/`503` nach `Retry-After` (U4).
+7. Kein Wert-Import aus `@hv/domain` in `features/**` (`pnpm arch` ohne neue Warnung).
 
 ## Offene Eigentümerfragen
 
-Keine eigene. Es gelten Eigentümerfragen 1 und 2 aus 064a (Bau auf Standard, Zuschnitt und Budget).
+Keine eigene. Es gelten Eigentümerfragen 1 und 2 aus 064a (Bau auf Standard, Zuschnitt und Budget, jetzt 5,5 AStd).
 
 ## Hinweise an Folgescheiben
 
@@ -280,6 +328,8 @@ Touched:
 3.
 4.
 5.
+6.
+7.
 
 **Demoszenario A: Schritt → Test.**
 
