@@ -698,7 +698,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Ziel:* Aktion „Auskunft verweigern" im Beantwortungsdetail mit Pflichtauswahl zwischen „Verweigerung · kein Auskunftsanspruch" und „Verweigerung · Grund aus Katalog", Grund und Begründung; „ungeprüft"-Badge am Grund; Bühne zeigt verweigerte Fragen mit Formulierungsbaustein und Kennzeichen; Historie zeigt den Verweigerungsvorschlag und die Freigabe.
   - *Abhängigkeiten:* 044, 036
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
-  - *Nachweise:* Screenshots Verweigerungsdialog und Bühne DE/EN (in-process) und ein grüner Lauf `e2e-http` (Lauf 37153923219); Playwright „Verweigerung · Grund aus Katalog" ohne Grund → Aktion fehlt in `_actions`, die Oberfläche rendert nur, was der Kern erlaubt
+  - *Nachweise:* Screenshots Verweigerungsdialog und Bühne DE/EN (in-process) und ein grüner Lauf `e2e-http` (Lauf 37153923219); „Verweigerung · Grund aus Katalog" ohne Grund → Absenden gesperrt; Meldung R-GUARD-09 bzw. 422 im Dialog (Unit-Ebene, Spec 045 Test 5/6/11); Schaltflächen nur nach `_actions` (`question.refuse.propose`/`.approve`)
   - *Offene Entscheidung:* —
   - *Stand:* gebaut und gemergt am 03.10.2026 (`c0db7f5`, Bauzeit tatsächlich rund 0,9 h gegen 3,5 AStd geplant, PR #139; ersetzt #138, Spec `docs/slices/045-verweigerung-oberflaeche.md`: angenommen)
 - **050 · Verfahrensereignisse: Protokollierungsverlangen, Widerspruch, Anordnungen** — mittel · 1,5 AStd · Kalender 09.11.2026 (W7) · Lanes: core, web-capture
@@ -1327,7 +1327,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
-  *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach 053 bis 061 und 041.
+  *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach in dieser Reihenfolge 053, 054, 055, 059, 046, 060, 061, 041 (Register E57).
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
 Zurückgestellt: 049 (hängt an 085), 047, 056, 058, der Rest von 029 und der Rest von M4–M7 bis nach der zweiten Demo.
