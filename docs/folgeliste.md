@@ -584,6 +584,19 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-042 Review minor (#135) · `postgres-limits034a.test.ts` (Vorprüfungen der 034a-Tests) · Lint-Hinweis
   `unicorn/prefer-string-starts-ends-with` · `startsWith`/`endsWith` verwenden.
 
+## Verweigerung in der Oberfläche (aus 045)
+
+- 045 Review minor M2 · `apps/web/src/features/answers/refusal.ts:195` (`refusalProblemHandler`) · 409/422 werden auch dann im Dialog behandelt, wenn er nicht mehr gezeigt wird · nur bei `stillShown()` im Dialog behandeln, sonst als Hinweis (Toast); einen Fall in Test 11 ergänzen.
+- 045 Review minor M3 · `apps/web/src/features/answers/WorkList.tsx:199` · der Auszug schrumpft neben der Marke auf „W..“ · dem Auszug `min-w-0 flex-1` geben oder die Marke unter den Sprechernamen setzen.
+- 045 Review minor M4 · `apps/web/src/features/answers/RefusalDialog.tsx` · die Verdrahtung `onSubmit` → `refusalProblemHandler` → Hinweis im Dialog ist nicht getestet · Komponententest (Prop `initialProblem` oder jsdom).
+- 045 Review minor M5 · `apps/web/src/features/stage/Podium.test.tsx` · `StageQueue` mit einer Verweigerung als „nächste“ und im Rest ist nicht abgedeckt · Test für Kennzeichen und Marke ergänzen.
+- 045 Review nit N7 · Bühne und Katalogtext · „nicht im geladenen Katalog“ erscheint auch während des Ladens und nach einem Fehler; die Grund-ID steht nicht in Mono auf der Bühne · Text je Ladezustand trennen, ID in Mono.
+- 045 Review nit N8 · Vorbelegung des Dialogs · ein Text nur aus Leerzeichen gilt als leer · Vorbelegung vor dem Vergleich trimmen.
+- 045 Review nit N9 · `RefusalDialog.tsx:123` · die Radiogruppe in einem `fieldset` wird doppelt angesagt · Rolle oder Gruppierung nur einmal setzen.
+- 045 Review nit N10 · `RefusalDialog.tsx` · Absenden ist über der Längengrenze ohne Hinweis gesperrt (D6) · Hinweis mit Zählung zeigen.
+- 045 Review nit N11 · e2e-http E1 · prüft den Zustand „in Prüfung“ nicht direkt · Zustand ausdrücklich zusichern.
+- H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 einmal ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün) · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

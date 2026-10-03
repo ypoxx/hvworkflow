@@ -694,12 +694,13 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Backend; Review in frischem Kontext + Stichprobe des Architekten in eigenem frischem Kontext mit Perspektive Legal
   - *Nachweise:* Test je neuer Regel-ID inkl. Vier-Augen-Negativtest; Wahrheitstabellen-Diff freigegeben; Katalog mit 0 verified sichtbar als „ungeprüft"; pnpm gates
   - *Offene Entscheidung:* E15 Rechtsprüfung des Grundkatalogs (Daten)
-- **045 · Verweigerung in Beantwortung und auf der Bühne** — mittel · 2 AStd · Kalender 09.11.2026 (W7) · Lanes: web-answers, web-stage
-  - *Ziel:* Aktion „Auskunft verweigern" im Beantwortungsdetail mit Pflichtauswahl Pfad A/B, Grund und Begründung; „ungeprüft"-Badge am Grund; Bühne zeigt verweigerte Fragen mit Formulierungsbaustein und Kennzeichen; Historie zeigt den Verweigerungsvorschlag und die Freigabe.
+- **045 · Verweigerung in Beantwortung und auf der Bühne** — hoch · 3,5 AStd · Kalender 09.11.2026 (W7) · Lanes: web-answers, web-stage, web-history
+  - *Ziel:* Aktion „Auskunft verweigern" im Beantwortungsdetail mit Pflichtauswahl zwischen „Verweigerung · kein Auskunftsanspruch" und „Verweigerung · Grund aus Katalog", Grund und Begründung; „ungeprüft"-Badge am Grund; Bühne zeigt verweigerte Fragen mit Formulierungsbaustein und Kennzeichen; Historie zeigt den Verweigerungsvorschlag und die Freigabe.
   - *Abhängigkeiten:* 044, 036
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
-  - *Nachweise:* Screenshots Verweigerungsdialog und Bühne DE/EN; Playwright Pfad B ohne Grund → Aktion fehlt in `_actions`, die Oberfläche rendert nur, was der Kern erlaubt
+  - *Nachweise:* Screenshots Verweigerungsdialog und Bühne DE/EN (in-process) und ein grüner Lauf `e2e-http` (Lauf 37153923219); Playwright „Verweigerung · Grund aus Katalog" ohne Grund → Aktion fehlt in `_actions`, die Oberfläche rendert nur, was der Kern erlaubt
   - *Offene Entscheidung:* —
+  - *Stand:* gebaut und gemergt am 03.10.2026 (`c0db7f5`, Bauzeit tatsächlich rund 0,9 h gegen 3,5 AStd geplant, PR #139; ersetzt #138, Spec `docs/slices/045-verweigerung-oberflaeche.md`: angenommen)
 - **050 · Verfahrensereignisse: Protokollierungsverlangen, Widerspruch, Anordnungen** — mittel · 1,5 AStd · Kalender 09.11.2026 (W7) · Lanes: core, web-capture
   - *Ziel:* ProtocolRequested, ObjectionRaised, ChairOrderRecorded als Ereignisse erster Klasse mit R-PROC-01..03, occurredAt/recordedAt, Notarmarkierung, Recht procedure.record (moderation, capture, legal); Schnellaktionen in der Erfassung; Historie-Filter; Alarm (085) an Inhaber von question.legal.clear bei Widerspruch; Aufnahme in die Niederschrift-Anlage.
   - *Zielbild (089):* Z15 (Widerspruch als eigener Kanal über dem Lagebild, Übergabe an den Notar mit Empfangsvermerk). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
@@ -1326,7 +1327,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
-  *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; Bau 043a läuft, danach 040b und 044a/044b auf Standard (Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; danach 045 und 041.
+  *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach 053 bis 061 und 041.
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
 Zurückgestellt: 049 (hängt an 085), 047, 056, 058, der Rest von 029 und der Rest von M4–M7 bis nach der zweiten Demo.
