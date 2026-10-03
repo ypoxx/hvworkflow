@@ -24,11 +24,11 @@ const ACT = {
   admin: 'adm44b:admin', moderation: 'mod44b:moderation', capture: 'cap44b:capture', coordination: 'coo44b:coordination',
   legal: 'leg44b:legal', approver: 'app44b:approver',
 } as const;
-const SECRET = 'PGBEGRUENDUNG44BX';
+const MARKER = 'PGBEGRUENDUNG44BX';
 const NOTE = 'PGVERMERK44BX';
 const WORDING = 'PGWORTLAUT44BX';
 const PATH_B = { answerKind: 'refusal_with_ground', text: `${WORDING} Zu dieser Frage gibt der Vorstand keine Auskunft.`,
-  refusalGroundId: 'aktg-131-3-nr1', refusalJustification: `${SECRET}: Offenlegung schadet der Gesellschaft.` };
+  refusalGroundId: 'aktg-131-3-nr1', refusalJustification: `${MARKER}: Offenlegung schadet der Gesellschaft.` };
 
 let owner: Pool;
 let runtime: Pool;
@@ -141,9 +141,9 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const b = build();
     const asLegal = await ok<Q>(call(b.app, ACT.legal, 'GET', `/v1/questions/${q.id}`));
     expect(asLegal.status).toBe('approved');
-    expect(asLegal.answers.at(-1)).toMatchObject({ version: 1, refusalJustification: `${SECRET}: Offenlegung schadet der Gesellschaft.` });
+    expect(asLegal.answers.at(-1)).toMatchObject({ version: 1, refusalJustification: `${MARKER}: Offenlegung schadet der Gesellschaft.` });
     const asAdminRes = await call(b.app, ACT.admin, 'GET', `/v1/questions/${q.id}`);
-    expect(await asAdminRes.clone().text()).not.toContain(SECRET);
+    expect(await asAdminRes.clone().text()).not.toContain(MARKER);
     expect('refusalJustification' in ((await asAdminRes.json()) as Q).answers.at(-1)!).toBe(false);
     const events = (await scanEvents(b.app, head)).filter((e) => e.subjectId === q.id);
     const drafted = events.filter((e) => e.type === 'AnswerDrafted');
@@ -153,7 +153,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     for (const e of [...drafted, ...legalCleared]) {
       expect('pii' in e.payload).toBe(false);
       expect('note' in e.payload).toBe(false);
-      expect(JSON.stringify(e)).not.toContain(SECRET);
+      expect(JSON.stringify(e)).not.toContain(MARKER);
       expect(JSON.stringify(e)).not.toContain(NOTE);
     }
     const staged = await ok<Q>(call(b.app, ACT.moderation, 'POST', `/v1/questions/${q.id}/staging`, { headers: ifMatch(asLegal) }));
@@ -172,7 +172,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
               (envelope->'payload'->'answer') ? 'refusalJustification' AS "inAnswer",
               envelope->>'retentionClass' AS retention
          FROM events WHERE seq = $1`, [draftedRow!.seq]);
-    expect(sql.rows[0]).toEqual({ justification: `${SECRET}: Offenlegung schadet der Gesellschaft.`, inAnswer: false, retention: 'record' });
+    expect(sql.rows[0]).toEqual({ justification: `${MARKER}: Offenlegung schadet der Gesellschaft.`, inAnswer: false, retention: 'record' });
     expect(rows.map((r) => r.envelope.retentionClass)).toEqual(['record', 'working', 'record']);
     expect((rows[1]!.envelope.payload as { note?: string }).note).toBe(`${NOTE} Würdigung.`);
     const persons = await owner.query('SELECT 1 FROM persons WHERE source_seq = $1', [draftedRow!.seq]);
@@ -220,7 +220,7 @@ describe.skipIf(databaseUrl === undefined || runtimeUrl === undefined)('Scheibe 
     const body = await res.text();
     const logged = [...fresh.sink.lines, ...errorLog.mock.calls.map((c) => String(c[0]))].join('\n');
     for (const text of [body, logged]) {
-      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain(MARKER);
       expect(text).not.toContain('MANIPULIERT44BX');
       expect(text).not.toContain(WORDING);
     }

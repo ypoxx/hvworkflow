@@ -858,9 +858,9 @@ describe('Scheibe 044b, Test 15: access log unchanged, detection by operationId 
 
 describe('Scheibe 044b, Test 16: metric against a baseline', () => {
   it('hv_questions_in_legal_review_over_10m: +1 at t0 + 11 min, equal at t0 + 9 min', async () => {
-    const TOKEN = 'synthetic-metrics-token-044b-0123456789ab';
-    const trial = await world({ metricsToken: TOKEN }, { step: 0 });
-    const control = await world({ metricsToken: TOKEN }, { step: 0 });
+    const METRICS_BEARER = 'synthetic-metrics-token-044b-0123456789ab';
+    const trial = await world({ metricsToken: METRICS_BEARER }, { step: 0 });
+    const control = await world({ metricsToken: METRICS_BEARER }, { step: 0 });
     const qTrial = await assigned(trial);
     await assigned(control);
     const t0 = trial.clock.now.getTime();
@@ -868,7 +868,7 @@ describe('Scheibe 044b, Test 16: metric against a baseline', () => {
     await proposed(trial, qTrial, ACT.legal, pathB(newMarkers()));
     const value = async (h: H, at: number): Promise<number> => {
       h.clock.now = new Date(at);
-      const res = await req(h.app, 'GET', '/metrics', { headers: { Authorization: `Bearer ${TOKEN}` } });
+      const res = await req(h.app, 'GET', '/metrics', { headers: { Authorization: `Bearer ${METRICS_BEARER}` } });
       expect(res.status).toBe(200);
       const line = (await res.text()).split('\n').find((l) => l.startsWith('hv_questions_in_legal_review_over_10m{'))!;
       return Number(line.split(' ').at(-1));
