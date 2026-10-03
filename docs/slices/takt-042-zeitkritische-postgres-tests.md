@@ -281,4 +281,79 @@ Open: …
 Touched: …
 ```
 
+### Bericht des Baus (03.10.2026)
+
+```
+Slice: takt-042-zeitkritische-postgres-tests
+Done: 034a „COMMIT gewinnt“, T-G2-I-02 und N3 feuern ihren Timer selbst (Vitest-Fake-Timer nur für
+      setTimeout/clearTimeout, aus den testHooks heraus); 035b Test 28 prüft eine ereignisgetriebene Invariante
+      (Pool-acquire/release, getTransactionStatus(), ruhige Fensterenden) statt der Abtastschleife. Kein Produktivcode.
+Evidence: pnpm gates auf 73a16a4 (sauberer Baum, eigene Datenbank hv_t042, Exit 0), Lastläufe 1–3, Gegenproben, s. u.
+Open: keine. 408-Test und T-G2-D-01 bleiben wie in den Nicht-Zielen außerhalb dieser Scheibe.
+Touched: apps/api/src/__tests__/postgres-limits034a.test.ts, apps/api/src/__tests__/postgres-stream035.test.ts,
+         docs/slices/takt-042-zeitkritische-postgres-tests.md
+```
+
+**Umgebung:** Postgres 16.13, 4 Kerne (`nproc`), Last nach Kriterium: N = 6 Node-Leerlaufschleifen. Auf derselben
+Maschine liefen zeitgleich Gates- und Testläufe anderer Agenten, die Grundlast war also höher als die eigenen Schleifen.
+Datenbanken: `hv_t042` (Kriterium 1, 3, 4, 6), `hv_t042`/`hv_t042b`/`hv_t042c` je Prozess (Kriterium 2).
+
+**Kriterium 1** (034a, drei Tests, 20 Läufe hintereinander unter Last, eigene Datenbank): **20/20 grün**, je
+`Tests  3 passed | 18 skipped`. uptime vorher `17:08:03 load average: 1.99, 0.78, 4.05` (Schleifen 20 s alt, der
+1-min-Wert läuft nach); die sechs Schleifen waren um 17:31 noch am Leben (Laufzeit 23 min).
+
+**Kriterium 2** (034a, drei Prozesse gleichzeitig, je eigene Datenbank, 20 Runden unter Last): **60/60 grün**. Vor
+jeder Runde geprüft: 6 Schleifen am Leben. uptime vorher `17:57:28 load average: 8.10, 7.92, 7.86`, nachher
+`18:02:57 load average: 10.96, 10.69, 9.18`. Informativ, **dieselbe** Datenbank, 5 Runden je drei Prozesse: **15/15
+grün** (die Spec erwartet dort keine Garantie, s. Nicht-Ziele).
+
+**Kriterium 3** (035b Test 28, 20 Läufe hintereinander unter Last): **20/20 grün**, vor jedem Lauf 6 Schleifen am
+Leben. Protokollzeilen: `quietEnds` je Lauf 21, 20, 20, 20, 20, 20, 21, 20, 20, 20, 20, 23, 20, 20, 22, 20, 21, 20,
+20, 20 (alle >= 20), `acquire` 20–25, `violations 0` in allen Läufen. uptime vorher `17:43:54 load average: 7.11,
+8.24, 7.88`, nachher `17:46:14 load average: 7.59, 8.06, 7.87`.
+
+Hinweis zur Durchführung: Ein erster Durchgang von Kriterium 2 und 3 lief ebenfalls vollständig grün (60/60, 15/15,
+20/20), zählt aber nicht. Das Treiberskript wartete mit einem argumentlosen `wait` auch auf die Lastschleifen, und die
+Schleifen mit dem Muster aus der Spec (`for(;;){}`) wurden offenbar von einem `pkill -f 'for\(;;\)'` eines anderen
+Agenten mitbeendet. Die gezählten Läufe oben nutzen markierte Schleifen (`node -e 'for(;;){} /*takt042*/'`), warten
+nur auf die Testprozesse und zählen die Schleifen vor jeder Runde.
+
+**Kriterium 4** (beide Dateien vollständig, ohne Last, `hv_t042`): `Test Files  2 passed (2)`,
+`Tests  31 passed (31)`.
+
+**Kriterium 5, Gegenproben** (Mutation nicht festgeschrieben, nach jeder Probe `git checkout`, danach `git status`
+nur mit den zwei beabsichtigten Testdateien, vor dem Bau-Commit):
+
+| Probe | Test | Ergebnis |
+|---|---|---|
+| `if (false && context?.phase === 'committing')` in `createRequestTimeout` | „COMMIT gewinnt“ | rot: `expected 408 to be 201` |
+| `client?.release()` statt `client?.release(discard)` am Ende von `postgresBoundary` | T-G2-I-02 | rot: `expected 1 to be +0` |
+| `false && mustDiscardConnection(error) && phaseIs('committing')` | N3 | rot: `expected 503 to be 500` |
+| `const c = await runtime.connect()` während der Beobachtung, `c.release()` nach dem ersten Verstoß | Test 28 | rot: `"acquire outside a window, after session end (h:7:1)"`, `"release outside a window, after session end (h:7:1)"` |
+| `BEGIN` auf einer vor den Zuhörern entnommenen Verbindung, Rückgabe sobald ein Fenster offen ist | Test 28 | rot: `"release with transaction status T, in reload start"` |
+
+**Kriterium 6, `pnpm gates`** auf `73a16a4` (sauberer Baum, `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf
+`hv_t042`, `HV_DB_RUNTIME_ROLE=hv_runtime`), Exit 0. Daraus: `apps/api test: Test Files  42 passed (42)`,
+`Tests  621 passed (621)`; `slice-scope: 2 changed file(s), all within "docs/slices/takt-042-zeitkritische-postgres-tests.md"'s "Files allowed" list (3 pattern(s)).`
+Schluss der Ausgabe:
+
+```
+dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
+dist/assets/index-B8-sDsGR.js                        671.14 kB │ gzip: 196.99 kB │ map: 2,824.56 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.37s
+mark-test-run: wrote /home/user/wt/t042/.claude/state/last-test-run (clean tree) at commit 73a16a4, tree 73c0b40d16ee…
+```
+
+Nebenbefund, nicht bearbeitet: Lint meldet eine bestehende Warnung `unicorn(prefer-string-starts-ends-with)` in
+`postgres-limits034a.test.ts` (Test „a request that ran out of time in the pre-checks …“, `/^BEGIN/`), unverändert
+aus der Zeit vor dieser Scheibe; Kandidat für die Folgeliste.
+
 ## Review findings
