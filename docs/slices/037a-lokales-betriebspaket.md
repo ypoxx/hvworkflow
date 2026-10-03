@@ -217,7 +217,7 @@ Stack gesund wird.
      - `extra_hosts` für `localhost` (unzuverlässig);
      - TLS mit eigener CA (037b).
    - **Grenze:** Startet Keycloak neu, verlieren Dienst und, über den Namen, nginx ihr Ziel. Die Installationsseite nennt
-     die Abhilfe: `docker compose -p hv-tool up -d --force-recreate api web`. Die Robustheitsproben zielen auf Dienst und
+     die Abhilfe: `pnpm stack:up -- --recreate api web`. Der Neuaufbau läuft immer über `stack.mjs`, weil nur das Skript die gespeicherten Ports aus `state.json` an Compose übergibt; ein direkter `docker compose … up` fiele auf die Standardports zurück (Codex P2 auf #124). Die Robustheitsproben zielen auf Dienst und
      Postgres.
 6. **Ports nur auf Loopback.**
    - Veröffentlicht werden nur `127.0.0.1:<Webport>` (Standard 8480, im Container 8080) und `127.0.0.1:<IdP-Port>`
@@ -297,7 +297,7 @@ Stack gesund wird.
     - `HV_TRUSTED_PROXY_CIDRS` mit Test kommt in 037b, auf dem Host mit echtem Proxy.
 11. **Ein Befehl, ohne npm-Abhängigkeit.** `scripts/stack.mjs` braucht nur Node-Bordmittel und `scripts/lib`, also kein
     `pnpm install`. Aufruf `node scripts/stack.mjs <befehl>`, Kurzformen in `package.json`:
-    - **`pnpm stack:up`:**
+    - **`pnpm stack:up`** (mit `-- --recreate <dienst…>` baut es die genannten Dienste mit den gespeicherten Ports neu auf; S2 prüft, dass dabei eine Port-Überschreibung erhalten bleibt):
       1. Voraussetzungen prüfen: Docker-Daemon lokal, Engine ≥ 28, Compose v2, Ports frei, keine Drift.
       2. Zustand anlegen oder lesen.
       3. Images bauen, Stack starten.
@@ -668,7 +668,7 @@ Auf Deutsch, für eine Betriebsperson ohne Projektwissen. Hauskürzel stehen nur
     - „refusing to start“ im Protokoll: der Satz nennt die Variable;
     - Anmeldung springt zurück: Browser, Cookies, Port;
     - `/readyz` 503;
-    - Keycloak neu gestartet, Dienst und Web haben kein Ziel mehr: `docker compose -p hv-tool up -d --force-recreate api web`;
+    - Keycloak neu gestartet, Dienst und Web haben kein Ziel mehr: `pnpm stack:up -- --recreate api web` (nie direkt mit `docker compose`, sonst gehen gespeicherte Ports verloren);
     - Drift-Meldung: dann `stack:reset`;
     - `docker compose -p hv-tool logs <dienst>`, lokal; das Protokoll enthält keine Secrets, aber Pfade.
 11. **Was bis zum Betrieb auf einem Server fehlt:** TLS, Secrets aus der Plattform, Proxy-Vertrauen, CSP, Alarme, Backup,
