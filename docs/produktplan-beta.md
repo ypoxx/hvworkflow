@@ -1295,6 +1295,24 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 
 ## 11. Sofortige nächste Schritte
 
+**Freigabe-Demo (Entscheidung des Eigentümers, 03.10.2026).** Nächstes Ziel ist die Freigabe-Demo, nicht die Beta. Die Beta
+(B1–B18, Generalprobe, beta-1 am 12.03.2027) bleibt unverändert dahinter. Die Freigabe-Demo zeigt drei Personen, wie das
+Endprodukt aussieht:
+
+1. **Verantwortliche Person:** Die Oberfläche ist vollständig; Bedienbarkeit und UX sind beurteilbar. Scheiben: 043a, 040b, 044a und 044b, 045, 048, 053, 054, 055, 059, 046, 060, 061, 041 (für die Freigabe-Demo zugeschnitten, siehe unten).
+2. **Entwickler:** gut dokumentiert, leicht erweiterbar, Partnerschnittstellen mit wenigen Schritten lauffähig und prüfbar; Demodaten aus der Partnerschnittstelle sind in der Demo sichtbar. Scheiben: 064, 065, 066, 075, dazu ein Demoszenario, in dem ein Beispieltranskript über die Schnittstelle eingespielt wird und in der Oberfläche erscheint.
+3. **Betrieb:** gut dokumentiert, leicht zu installieren, robust. Scheiben: Kern von 037 als lokales Paket (ein Befehl startet Dienst, Web, Postgres und Keycloak über Compose, dazu eine Installationsseite), 038 (Sicherung und Wiederherstellung vorgeführt), 070 (Runbook v1), 071 (Lasttest mit veröffentlichten Zahlen).
+
+- **Nicht in der Freigabe-Demo, im Plan für später:** 040c, 040d, 047, 049, 056, 058, 067, 073, 029 (Rest), 074, 078, DSFA, Betriebsrat.
+- **Rahmen:** rund 24 Scheiben, rund 50 AStd, 45–55 Mio. Token, rund 5–6 Wochen bei einem Bautag je Werktag.
+- **Hosting:** Die Netlify-Demo (im Prozess) bleibt die Vorführung für Punkt 1 und 2. Punkt 3 zeigt das lokal startbare Paket. Es gibt vorerst keinen gehosteten Server; ein späterer Deploy braucht das ausdrückliche Go des Eigentümers (Regel 11).
+- **040a angenommen** (Eigentümer 03.10.2026, nachträglich, nach Erklärung): kein Superadmin; der Rollenwechsler der Demo deckt Vorführungen ab. Die Abweichung ist damit erledigt.
+- **Go zum Bau auf Standard:** 043a, 040b und 044a (mit 044b) werden auf den Standardantworten gebaut, ohne auf Recht zu warten. Jede betroffene Stelle trägt „auf Standard gebaut (Go des Eigentümers 03.10.2026)". Die Rechtsprüfung kommt vor jeder echten Nutzung. Das beantwortet 043a Fragen 1, 2 und 5 mit dem Standard, die 040-Teilung und das Budget für 040b, und 044a Fragen 1, 2 und 3b mit dem Standard (3b = Go; Untergründe folgen in 044c vor jedem Pilot). **040c und 040d sind zurückgestellt.**
+- **Folgen der Zurückstellung (Orchestrator, aus Codex auf #123):**
+  - **041 wird für die Freigabe-Demo zugeschnitten:** Admin-Oberfläche auf den vorhandenen Schnittstellen und 040b, also Fachbereiche, TOPs, Bühnenplätze, Personen und Rollen mit Ablauf, Rollenkarten-Vorschau und Anleitung. Der Jahrgang kommt aus dem Seed. Jahrgang anlegen, Freeze mit Hash-Anzeige und der Playwright-Ablauf „Jahrgang anlegen → Freeze → Änderung abgelehnt" folgen mit 040c/040d; der Plan-Eintrag 041 bleibt dafür bestehen.
+  - **Reihenfolge in der Lane core:** 044a baut seriell direkt nach 040b. Werden 040c und 040d später gebaut, setzen sie auf 044a auf; die Reihenfolge a → b → c → d innerhalb von 040 bleibt erhalten. Die Spec 044a ist entsprechend angepasst.
+- **Schlankerer Ablauf** für Oberflächenscheiben mittleren Risikos: kein gesonderter Lesebefund der Spec vor dem Bau, ein Review nach dem Bau. Sicherheits-, Rechts- und Datenschutzbefunde bleiben Pflicht und werden nie vertagt. Kern- und Rechtescheiben (Risikoklasse hoch) bleiben unverändert (AGENTS.md Regel 3). Register: E57.
+
 **Zielpfad Beta-2 (Entscheidung des Eigentümers, 26.09.2026).** Weg vom Demo-Zustand zu einer betriebsfähigen Lösung.
 Der Product Owner soll in der zweiten Demo ein fast vollständiges Produkt sehen, die Transkript- und die KI-Mannschaft
 sollen in der Beta angebundene, dokumentierte Schnittstellen vorfinden. Reihenfolge in vier Etappen; Abhängigkeiten
@@ -1308,7 +1326,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
-  *Stand 01.10.2026:* Specs 043a und 040a bis 040d gemergt, 040a gebaut (#118, ohne das nach Frage 1 nötige Go, Annahme beim Eigentümer offen); Bau 043a und 040b bis 040d wartet auf das Go des Eigentümers; Spec 044 in Arbeit, danach 045 und 041.
+  *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; Bau 043a läuft, danach 040b und 044a/044b auf Standard (Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; danach 045 und 041.
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
 Zurückgestellt: 049 (hängt an 085), 047, 056, 058, der Rest von 029 und der Rest von M4–M7 bis nach der zweiten Demo.

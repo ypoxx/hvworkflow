@@ -158,7 +158,7 @@ beziehen können.
 |---|---|---|
 | R1 | Keine Scheibe ohne Spec. Die Spec nennt Ziel, Nicht-Ziel, betroffene Regel-IDs, Abnahmekriterium und die Dateien, die berührt werden dürfen. | Fehlerklasse 1 (~42 %) |
 | R2 | Eine Scheibe ist ein Tag Arbeit eines Agenten oder kleiner. Größeres wird geteilt. | kleine Diffs sind prüfbar; Rückbau billig |
-| R3 | Wer implementiert, prüft nicht. Review immer in frischem Kontext (eigener Reviewer-Agent), der nur Spec und Diff sieht; die Unabhängigkeit kommt aus dem Kontext, nicht aus einem anderen Modell. | Verifikationslücke; Selbstbestätigung |
+| R3 | Wer implementiert, prüft nicht. Review immer in frischem Kontext (eigener Reviewer-Agent), der nur Spec und Diff sieht; die Unabhängigkeit kommt aus dem Kontext, nicht aus einem anderen Modell. | Verifikationslücke; Selbstbestätigung. **Freigabe-Demo (Eigentümer, 03.10.2026):** Oberflächenscheiben mittleren Risikos entfallen den gesonderten Lesebefund der Spec vor dem Bau; das eine Review nach dem Bau bleibt. Sicherheits-, Rechts- und Datenschutzbefunde halten den Merge weiter. Kern- und Rechtescheiben (Risikoklasse hoch) bleiben unverändert. |
 | R4 | Abschluss nur mit Beweis: Testausgabe, Lint-Report, bei Oberfläche Screenshot. Behauptungen zählen nicht. | stille Fehler |
 | R5 | Deterministische Tore vor jedem Merge, außerhalb der Agentensitzung (CI). Hooks sind die erste Linie, CI die letzte. | Stop-Hook ist überstimmbar |
 | R6 | Ein starkes Modell plant, baut und prüft; ein günstiges nur reine Mechanik. Modellwahl steht in der Rollendefinition (`.claude/agents/`), nicht in der Spec und nicht im Ermessen des Agenten. | Nacharbeit kostet mehr als der Preisunterschied (Bautag B1) |
