@@ -41,7 +41,8 @@ function seeded() {
   let current: Actor = admin;
   let t = Date.parse('2027-04-20T12:00:00.000Z');
   const api = createInProcessApi({ store, actor: () => current, clock: () => new Date((t += 1000)), seeder: seedEvents });
-  return { store, api, as: (actor: Actor) => { current = actor; } };
+  return { store, api, as: (actor: Actor) => { current = actor; },
+    later: (ms: number): string => new Date(t + ms).toISOString(), advance: (ms: number) => { t += ms; } };
 }
 
 function created(id: string, date: string, extra: Record<string, unknown> = {}): NewEvent {
@@ -57,6 +58,8 @@ describe('Scheibe 040b: master data on the seed', () => {
   let store: EventStore;
   let api: HvApi;
   let as: (actor: Actor) => void;
+  let later: (ms: number) => string;
+  let advance: (ms: number) => void;
   let meetingId: string;
   const questions = async (status: QuestionStatus, where: (q: Question) => boolean = () => true): Promise<Question[]> => {
     as({ id: 'reader-040b', role: roleWith('question.read') });
@@ -66,7 +69,7 @@ describe('Scheibe 040b: master data on the seed', () => {
   };
 
   beforeEach(async () => {
-    ({ store, api, as } = seeded());
+    ({ store, api, as, later, advance } = seeded());
     await api.seedDemo();
     meetingId = (await api.getMeeting()).id;
   });
@@ -134,6 +137,9 @@ describe('Scheibe 040b: master data on the seed', () => {
     expect(await rejection(api.replaceMeetingUnits(meetingId, units.filter((unit) => unit.id !== assigned!.unitId))))
       .toMatchObject({ status: 409, ruleId: 'R-ADM-02' });
     expect(store.lastSeq()).toBe(seq);
+    // Review 040b: a duplicate unit id is 422.
+    expect((await rejection(api.replaceMeetingUnits(meetingId, [...units, { id: units[0]!.id, name: 'Doppelt' }]))).status).toBe(422);
+    expect(store.lastSeq()).toBe(seq);
 
     // unit-ar carries no question in the corpus; an active assignment alone keeps it.
     const unitBoundRole = ROLES.find((role) => ROLE_PERMISSIONS[role].unitBoundRead)!;
@@ -142,7 +148,11 @@ describe('Scheibe 040b: master data on the seed', () => {
     const seqGrant = store.lastSeq();
     expect(await rejection(api.replaceMeetingUnits(meetingId, withoutAr))).toMatchObject({ status: 409, ruleId: 'R-ADM-02' });
     expect(store.lastSeq()).toBe(seqGrant);
+    // Review 040b: a second grant with an expiry keeps the unit only while it is in force.
+    await api.assignRole({ subjectId: 'fachkraft-ar-2', role: unitBoundRole, unitId: 'unit-ar', expiresAt: later(60_000) });
     await api.revokeRole(grant.id);
+    expect(await rejection(api.replaceMeetingUnits(meetingId, withoutAr))).toMatchObject({ status: 409, ruleId: 'R-ADM-02' });
+    advance(120_000);
     const result = await api.replaceMeetingUnits(meetingId, withoutAr);
     expect(result.map((unit) => unit.id)).not.toContain('unit-ar');
   });
@@ -208,6 +218,12 @@ describe('Scheibe 040b: master data on the seed', () => {
     expect(own.seatId).toBe('seat-gast');
     expect(own).not.toHaveProperty('stageAssignment');
     expect(store.all().at(-1)!.payload).toEqual({ track: 'podium', seatId: 'seat-gast' });
+    // Review 040b: R-ADM-02 also keeps a seat referenced by an explicit seatId.
+    as(admin);
+    const seqOwn = store.lastSeq();
+    expect(await rejection(api.replaceMeetingStageSeats(meetingId, seats))).toMatchObject({ status: 409, ruleId: 'R-ADM-02' });
+    expect(store.lastSeq()).toBe(seqOwn);
+    as(coordination);
 
     const ceo = await classify(captured[1]!, { track: 'podium', seatId: 'ceo' });
     expect(ceo).toMatchObject({ seatId: 'ceo', stageAssignment: 'ceo' });
@@ -337,6 +353,11 @@ describe('Scheibe 040b: master data on the seed', () => {
     expect((await rejection(api.replaceMeetingStageSeats(meetingId, [...seats, { label: '\uD800', position: 9 }]))).status).toBe(422);
     expect((await rejection(api.replaceMeetingUnits(meetingId, [...units, { name: 'a\uDC00b' }]))).status).toBe(422);
     expect((await rejection(api.replaceMeetingAgendaItems(meetingId, [...items, { number: 99, title: '\uD800' }]))).status).toBe(422);
+    // Review 040b: also in id, shortName, personId and deviceId.
+    expect((await rejection(api.replaceMeetingUnits(meetingId, [...units, { id: 'u\uD800', name: 'Neu' }]))).status).toBe(422);
+    expect((await rejection(api.replaceMeetingUnits(meetingId, [...units, { name: 'Neu', shortName: '\uDC00' }]))).status).toBe(422);
+    expect((await rejection(api.replaceMeetingStageSeats(meetingId, [...seats, { label: 'Neu', position: 9, personId: 'p\uD800' }]))).status).toBe(422);
+    expect((await rejection(api.replaceMeetingStageSeats(meetingId, [...seats, { label: 'Neu', position: 9, deviceId: 'd\uDC00' }]))).status).toBe(422);
     expect(store.lastSeq()).toBe(seq);
     // A well-formed pair (an emoji) is fine.
     await expect(api.replaceMeetingUnits(meetingId, [...units, { name: 'Fachbereich 😀' }])).resolves.toHaveLength(units.length + 1);
@@ -429,6 +450,24 @@ describe('Scheibe 040b: closed and other meetings', () => {
     const classified = await scoped.classifyQuestion('q-1', { track: 'podium', seatId: 'seat-b' }, { ifMatch: etagOf(1) });
     expect(classified.seatId).toBe('seat-b');
     expect(classified).not.toHaveProperty('stageAssignment');
+  });
+
+  it('Review 040b [S]: per-meeting masking — an admin grant in meeting A reads meeting B masked; after closing A, A is masked too', async () => {
+    const seat = { id: 'ceo', label: 'Vorstandsvorsitz', position: 1, personId: 'p-ceo', deviceId: 'dev-ceo' };
+    const store = createInMemoryEventStore();
+    store.append([created('hv-2027', '2027-04-20', { stageSeats: [seat] }), lifecycle('MeetingStarted', 'hv-2027'),
+      created('hv-2028', '2028-04-20', { stageSeats: [seat] })]);
+    await createInProcessApi({ store, actor: () => admin, meetingId: 'hv-2027', clock: () => new Date(at) })
+      .assignRole({ subjectId: 'session-admin', role: ADMIN_ROLE });
+    const session: Actor = { id: 'session-admin', role: ADMIN_ROLE, assignmentScoped: true };
+    const api = createInProcessApi({ store, actor: () => session, clock: () => new Date(at) });
+    const { personId: _p, deviceId: _d, ...masked } = seat;
+    // (a) the grant counts in its own meeting only.
+    expect(await api.listMeetingStageSeats('hv-2027')).toEqual([seat]);
+    expect(await api.listMeetingStageSeats('hv-2028')).toEqual([masked]);
+    // (b) closing the meeting ends the grant: masked from then on.
+    store.append([lifecycle('MeetingClosed', 'hv-2027')]);
+    expect(await api.listMeetingStageSeats('hv-2027')).toEqual([masked]);
   });
 
   it('a meeting without a seat list (older log) has no seats and still classifies with stageAssignment', async () => {

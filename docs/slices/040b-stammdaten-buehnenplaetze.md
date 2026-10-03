@@ -468,6 +468,24 @@ Touched: packages/domain/src/{types,events,envelope,state,api,permissions,rules,
    (601-609); `subjectId`-Prüfung `api.ts:782-785` (722-723); `sessionActorFromEvents` `actor.ts:86` (104-111);
    `MASKED_KEYS` unverändert `stream.ts:169`.
 
+**Sicherheitsposten (mitigiert, offen bis Vertrag 0.5).** Die Anfrageschemas `AgendaItemInput`, `UnitInput` und
+`StageSeatInput` sind offen (kein `additionalProperties: false`); unbekannte Felder passieren die Vertragsprüfung. Nach
+043a Regel 1 darf eine vorab erklärte Operation jetzt nicht verengt werden. Mitigation (T-G1-T-02): Der Kern baut jedes
+Ereignis nur aus den benannten Feldern (`api.ts`, `event`-Bauer in `replaceMeetingAgendaItems`, `replaceMeetingUnits`,
+`replaceMeetingStageSeats`); ein unbekanntes Feld erreicht das Log nie. Belegt durch Test 1 (jeder Eintrag von
+`AgendaItemsReplaced` hat genau `id`, `number`, `title`), Test 6 (Nutzlast `QuestionClassified` genau
+`{track, seatId}`) und Test 15/16 (gespeicherte Ereignisse gültig gegen `Event`, `EventRead` ohne `personId`). Verengung
+mit Vertrag 0.5. Bewusst nicht in der Folgeliste (Sicherheitsposten).
+
+**Review-Befunde (eingearbeitet).** [S] Maskierung je Jahrgang in `listMeetingStageSeats` mit zuordnungsgebundenem
+Akteur: neuer Kerntest „Review 040b [S]“ ((a) admin-Zuordnung in A, Lesen von B maskiert; (b) A nach `MeetingClosed`
+maskiert). Mutationsprobe `const full = can(options.actor(), 'admin.seats.manage').allow` → rot (nur dieser Test);
+zusätzlich `reader === null || …` → rot. Die vom Review wörtlich genannte Probe `reader !== null && can(options.actor(), …)`
+bleibt grün, weil die Nullprüfung des aufgelösten Akteurs allein schon maskiert. Lückenfälle in Test 3 (doppelte
+Fachbereichs-`id` → 422; abgelaufene Zuordnung: Fachbereich danach entfernbar — der Ablaufzweig sitzt bei den
+Fachbereichen, nicht bei den Plätzen), Test 6 (R-ADM-02 für ausdrückliches `seatId`), Test 13 (einzelnes Surrogat in
+`id`, `shortName`, `personId`, `deviceId`). Übrige Befunde in `docs/folgeliste.md`, Abschnitt 040b.
+
 **Signaturen der neuen `HvApi`-Methoden.**
 
 ```ts
