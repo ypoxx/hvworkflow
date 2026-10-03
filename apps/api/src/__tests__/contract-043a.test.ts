@@ -227,7 +227,7 @@ describe('Scheibe 043a: refusal as a kind of answer (ADR 0012 model A)', () => {
     expect(validSchema('RefusalProposal', { answerKind: 'refusal_no_claim', text: 'x', unknown: true })).toBe(false);
   });
 
-  it('8: the three operations exist with their paths and responses, are pre-declared for 044, approveRefusal is closed', () => {
+  it('8: the three operations exist with their paths and responses, approveRefusal is closed', () => {
     const plus = (operationId: string, extra: string[]) => [...new Set([...documentedStatuses(operationId), ...extra])].sort();
     expect(operations['listRefusalGrounds']).toMatchObject({ path: '/refusal-grounds', method: 'get' });
     expect(documentedStatuses('listRefusalGrounds').sort()).toEqual(['200', '401', '403', '408', '429', '500', '503']);
@@ -253,10 +253,11 @@ describe('Scheibe 043a: refusal as a kind of answer (ADR 0012 model A)', () => {
 
     const allowlist = JSON.parse(readFileSync(new URL('../../../../packages/contract/allowlist.json', import.meta.url), 'utf8')) as
       { operationId: string; slice: string; expires: string }[];
+    // Scheibe 044b serves the three operations: no entry is left in the allowlist, none with slice 044.
     for (const operationId of ['listRefusalGrounds', 'proposeRefusal', 'approveRefusal']) {
-      expect(allowlist.find((entry) => entry.operationId === operationId), operationId)
-        .toMatchObject({ slice: '044', expires: '2026-11-27' });
+      expect(allowlist.find((entry) => entry.operationId === operationId), operationId).toBeUndefined();
     }
+    expect(allowlist.filter((entry) => entry.slice === '044')).toEqual([]);
   });
 
   it('9: Action carries question.refuse.propose and question.refuse.approve', () => {

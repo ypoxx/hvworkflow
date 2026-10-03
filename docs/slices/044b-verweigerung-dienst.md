@@ -596,10 +596,80 @@ Keine blockiert den Bau; beide sind auf Standard gebaut.
 
 ```
 Slice: 044b-verweigerung-dienst
-Done:
-Evidence:
-Open:
-Touched:
+Done: Drei Routen (listRefusalGrounds, proposeRefusal, approveRefusal) reichen an den Kern durch; die drei
+  Allowlist-Einträge mit slice 044 sind entfernt, contract-043a Test 8 umgedreht. checkRefusalProposal zählt alle
+  vier Längen in Code-Punkten (codePointLength, wie Ajv ucs2length). Tests 1–16 über HTTP mit Antwort-Haken und
+  Positivkontrollen, P1–P5 auf Postgres; Bedrohungsmodell und Folgeliste nachgeführt. Auf Standard gebaut
+  (Go des Eigentümers 03.10.2026): Zugriffslog ohne neuen Schlüssel, draftAnswer mit answerKind → 200.
+Evidence: pnpm gates mit TEST_DATABASE_URL/TEST_RUNTIME_DATABASE_URL/HV_DB_RUNTIME_ROLE (eigene Datenbank
+  hv_t044b) auf Baucommit e22b411, Exit 0, Schluss der Ausgabe:
+    ✓ built in 2.39s
+    mark-test-run: wrote /home/user/wt/s044b/.claude/state/last-test-run (clean tree) at commit e22b411, tree 250df7ed9be3…
+  Aus demselben Lauf: "apps/api test: Tests 663 passed (663)" (kein Test übersprungen, Postgres-Tests liefen);
+  "operation-coverage: 69 operations in the contract, 67 exercised by tests, 2 pre-declared in allowlist.json" /
+  "operation-coverage: ok"; "(d) allowlist.json well-formed, 2 pre-declared operation(s), none expired";
+  "slice-scope: 9 changed file(s), all within … "Files allowed" list (11 pattern(s))".
+  Rot zuerst: (1) refusal044b.test.ts ohne Routen 34 rot / 3 grün ("No such route."; die 3 grünen prüfen nur
+  codePointLength und den Haken selbst); (2) nach der Montage nur Test 7 rot (4000 Emoji → 422 "refusalJustification
+  must be a string of at most 4000 characters." aus dem Kern); (3) refusal044a Test 6 mit dem neuen Grenzfall rot
+  (1 von 82); (4) postgres-refusal044b.test.ts P1–P5 rot ohne die Routen. Danach alles grün.
+  Mutationsproben (jede rot, danach zurückgesetzt): 1 Route proposeRefusal nicht montiert → 30 Tests rot, u. a.
+  Test 1; 1b Route listRefusalGrounds nicht montiert (Test 1a übersprungen, damit das Tor überhaupt läuft) →
+  Abdeckungstor FAIL "listRefusalGrounds is neither exercised"; 2 Allowlist-Eintrag proposeRefusal/044 bleibt (Test 8
+  übersprungen) → Abdeckungstor FAIL "pre-declared … but a test exercises it", mit Test 8 → Test 8 rot; 3
+  guarded(undefined) → Test 6 rot (siehe Abweichung 1); 4 approveRefusal-Route ruft approveQuestion → 14 rot, u. a.
+  Test 4 (R-GUARD-12/13, -08, -14) und Test 14; 5 writeOptions weg → 26 rot, u. a. Test 5 und Test 8 (428); 6
+  codePointLength = .length → Test 7 rot (beide Fälle); 7 Zugriffslogzeile mit ruleId → Test 15 und P4 rot; 8
+  note in maskEvent nicht entfernt → Tests 10 und 11 rot; 9 viewQuestion mit can(actor(), p, q) → Test 9 rot; 10
+  getStage ohne { stage: true } → Test 9 rot; 11 legalClearerIds bleibt in viewQuestion → 20 rot (Haken), u. a.
+  Tests 4, 9, 11; 12 R-GUARD-14 vor R-GUARD-08 → Test 4 (Reihenfolge) und Test 15 rot; 13 retentionClass record
+  weg → P2 rot; 14 Begründung in answer statt pii → P2 rot (Test 9 grün, siehe Abweichung 2), 14b dazu
+  refusalJustification aus MASKED_KEYS entfernt → Test 9 rot (listEvents mit answer.refusalJustification) und
+  17 weitere.
+  Auszüge (synthetisch): Zugriffslogzeile eines abgewiesenen approveRefusal:
+    {"v":1,"ts":"2027-04-20T12:00:24.000Z","requestId":"a5b135a6-6d47-4359-b5a1-81ce42965cbb","subjectHash":"KPvwVbUKPk5pkVc4YUeO_Hx3cfg0b44NuU8vTxIq_AM","operationId":"approveRefusal","status":409,"latencyMs":0,"seq":null}
+  /stream als admin, event-Rahmen AnswerDrafted (gekürzt): event: event / id: 307 / data: {"type":"AnswerDrafted",
+    "seq":307,"payload":{"answer":{"version":1,"text":"WORTLAUT1X …","answerKind":"refusal_with_ground",
+    "refusalGroundId":"aktg-131-3-nr1","refusalGroundHash":"4095dbd7…","refusalGround":{…}},"toStatus":"in_review"},
+    "retentionClass":"record","redacted":true,…} — ohne pii, ohne refusalJustification.
+  SQL aus P2: {"justification":"PGBEGRUENDUNG44BX: Offenlegung schadet der Gesellschaft.","inAnswer":false,
+    "retention":"record"}; retentionClass AnswerDrafted record, QuestionLegalCleared working, QuestionApproved record;
+    persons-Zeilen mit dieser source_seq: 0.
+  Kein Screenshot (keine Oberfläche). Grüne PR-CI folgt mit der PR.
+Open: Abweichung 1 (Probe 3): guarded(undefined) ergibt 500 statt 200/409, weil getValidatedBody ohne Validator
+  keinen Rumpf hat; Test 6 ist rot, aber über einen anderen Weg als in der Spec vorhergesagt. Abweichung 2 (Probe
+  14): Test 9 bleibt grün, weil maskEvent refusalJustification als zweite Sicherung überall entfernt (MASKED_KEYS,
+  044a) und viewQuestion je Leser maskiert; kein Leck über HTTP, nur die Ablage (P2) zeigt den Fehler. Probe 14b belegt,
+  dass Test 9 ohne die zweite Sicherung rot wird. Abweichung 3 (Zeilenangabe, Vor-dem-Bau-Punkt 8): der falsche
+  Satz "ein verweigerter Versuch steht als 409 mit R-ADM-07 im Zugriffslog (033a)" steht in MF-01 (Erkennung,
+  bedrohungsmodell.md:348), nicht in MF-06; MF-06 hat keinen Zugriffslog-Satz. MF-01 liegt außerhalb der erlaubten
+  Abschnitte, daher nicht berichtigt; Befund an den Orchestrator. Ebenso nicht geändert (Spec): 044a
+  Missbrauchstabellen ("409 mit Regel-id im Zugriffslog") gelten im Sinne von Entscheidung 5. Abweichung 4: Seed
+  (30 Fragen, seed 7) hat keine Frage in staged; R-TRANS-00 aus staged/delivered baut die Fragen über HTTP auf.
+  Umgebung: hv_owner hatte auf dem lokalen Cluster weder Superuser noch pg_read_all_stats (in CI ist er der
+  Superuser des Images); postgres-takt024 und postgres027 sahen die Sperrwartenden in pg_stat_activity nicht und
+  schlugen auch auf 92b3d18 fehl. Lokal GRANT pg_read_all_stats TO hv_owner, danach grün; kein Repo-Eingriff.
+  Eigentümerfragen 1 und 2 offen (auf Standard gebaut); E14 (DSB).
+Nachtrag Review (frischer Kontext, kein blocker/major; alle Befunde [S]/[P]/[L], in 84393f8 behoben): Test 15 mit
+  422 für ein unbekanntes refusalGroundId (aktg-GRUND44BX) und Nachweis, dass keine Zugriffslogzeile es enthält
+  (T-G1-I-05); Test 5 hält die Fehlerreihenfolge fest (expert mit unbekanntem Feld → 422 vor 403; veraltetes
+  If-Match auf ungeklärtem Vorschlag → 412 vor 409 R-GUARD-08); Test 11 mit Strom-Kontrolle je Rolle aus
+  ROLE_PERMISSIONS (event.read: event-Rahmen des QuestionLegalCleared; question.read: change-Rahmen mit byK.id;
+  sonst kein Rahmen mit byK.id); Zähler für claim/release; /metrics-Rumpf durch den Antwort-Haken; MF-01 nennt
+  operationId assignRole (Abschnitt MF-01 auf Weisung des Orchestrators, außerhalb der Abschnittsliste der Spec);
+  MF-13 ergänzt (Standard-Log zeigt nur „abgewiesene Freigabe“, Regel nur mit Option aus Eigentümerfrage 1 oder
+  Abgleich über Zeit und Frage). Semgrep (1.177.0, CI-Befehl) auf den geänderten .ts-Dateien: 0 findings.
+  pnpm gates mit hv_t044b auf 84393f8, Exit 0, Schluss der Ausgabe:
+    ✓ built in 1.81s
+    mark-test-run: wrote /home/user/wt/s044b/.claude/state/last-test-run (clean tree) at commit 84393f8, tree fed7320172a8…
+  Aus demselben Lauf: "apps/api test: Tests 663 passed (663)"; "operation-coverage: … 67 exercised by tests, 2
+  pre-declared in allowlist.json" / "ok". Ein vorheriger Lauf auf 84393f8 scheiterte an zwei zeitkritischen Tests in
+  postgres-limits034a (Last > 8 auf 4 Kernen, parallele Läufe; einzeln 21/21 grün; Folgeliste 040b); ohne Änderung
+  wiederholt grün.
+Touched: apps/api/src/app.ts, apps/api/src/__tests__/refusal044b.test.ts (neu),
+  apps/api/src/__tests__/postgres-refusal044b.test.ts (neu), apps/api/src/__tests__/contract-043a.test.ts,
+  packages/contract/allowlist.json, packages/domain/src/api.ts, packages/domain/src/__tests__/refusal044a.test.ts,
+  docs/sicherheit/bedrohungsmodell.md, docs/folgeliste.md, docs/slices/044b-verweigerung-dienst.md (Bericht)
 ```
 
 ## Review findings
@@ -630,3 +700,5 @@ Eingearbeitet:
   `delivered`, sonst 404); 19 Wiederholung mit veraltetem `If-Match` in Test 8 (Wiederholung vor 412); 20 Titel von
   contract-043a Test 8; 21 Demo-Fälle der `sources`-Grenzen stehen in 044a Test 6; 23 Typimport `RefusalProposal` in
   Files allowed. Kein neuer Sicherheitspunkt (16 und 17 machen Tests richtig, 18 ergänzt einen Rechtefall).
+
+**Nachtrag des Orchestrators (03.10.2026):** Die falsche Aussage zum Zugriffslog stand in MF-01 (Erkennung, `bedrohungsmodell.md:348`), nicht in MF-06. Der Orchestrator hat sie in MF-01 korrigiert (Sicherheitsposten, nicht Folgeliste); der Abschnitt gilt damit als erlaubt.

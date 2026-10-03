@@ -553,3 +553,10 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 044a Review (nit 10) · Ändert sich der Katalog zwischen erstem Aufruf und Wiederholung von `proposeRefusal` mit
   gleichem Idempotenzschlüssel, antwortet die Eingabeprüfung (unbekannter Grund, 422) vor der historischen Antwort ·
   Takt core: Wiederholung vor der Eingabeprüfung erkennen oder dokumentieren.
+- 044b Bau (Entscheidung 3) · `packages/domain/src/api.ts` · die übrigen Längenprüfungen des Kerns zählen mit `.length`
+  UTF-16-Einheiten statt Code-Punkte wie der Validator: `reason` 500 bei Rückgabe und Rücknahme, `subjectId` und
+  `deputyForSubjectId` 128, `Idempotency-Key` 128 (nur strenger, nie großzügiger als der Vertrag) · Takt core: auf
+  `codePointLength` umstellen, wie `checkRefusalProposal` seit 044b.
+- 044b Bau (Vor-dem-Bau-Punkt 5, Lesebefund nit 22) · Postgres-Pfad · ein einzelnes Surrogat (`"\ud800"`) in einem
+  Textfeld besteht Validator und Kern, jsonb lehnt es beim Insert ab, der Dienst antwortet 500 (kein Leck, kein Ereignis,
+  gilt für jedes Textfeld) · Takt service: vor dem Insert als 422 abweisen oder im Vertrag ausschließen.
