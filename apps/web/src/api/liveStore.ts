@@ -56,6 +56,8 @@ export const READ_TOPICS = {
   getQuestionHistory: ['questions'],
   getStage: ['questions', 'stage'],
   listRoleAssignments: ['roles'],
+  // Scheibe 044a: the catalogue is code data and changes only with a deploy; no topic invalidates it.
+  listRefusalGrounds: [],
 } as const satisfies Record<BufferedRead, readonly StreamTopic[]>;
 
 /** Item reads: invalidated per id (the first argument) where a message names ids. */
@@ -90,6 +92,7 @@ const WRITE_METHODS = {
   claimQuestion: true, releaseQuestion: true, classifyQuestion: true, assignQuestion: true, draftAnswer: true,
   submitForReview: true, approveQuestion: true, clearQuestionLegally: true, returnQuestion: true, stageQuestion: true,
   deliverQuestion: true, closeQuestion: true, withdrawQuestion: true, mergeQuestion: true,
+  proposeRefusal: true, approveRefusal: true,
 } as const satisfies Record<WriteMethodName, true>;
 
 const MAX_ENTRIES = 200;

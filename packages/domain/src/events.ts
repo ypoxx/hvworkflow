@@ -14,6 +14,7 @@ import type {
   TextSpan,
   Role,
 } from './types.js';
+import type { LegalRef } from './rules.js';
 
 interface Base<T extends string, P> {
   seq: number;
@@ -96,9 +97,27 @@ export type AgendaItemsReplaced = Base<'AgendaItemsReplaced', { agendaItems: { i
 export type UnitsReplaced = Base<'UnitsReplaced', { units: { id: string; name: string; shortName?: string }[] }>;
 export type StageSeatsReplaced = Base<'StageSeatsReplaced', { stageSeats: StageSeat[] }>;
 export type QuestionAssigned = Base<'QuestionAssigned', { unitId: string }>;
+/** Scheibe 044a: what a path-B proposal keeps of its catalogue entry (audit path, 043a); never projected. */
+export interface RefusalGroundSnapshot {
+  title: string;
+  stageText: string;
+  legalRef: LegalRef;
+}
+/**
+ * One answer version. Since Scheibe 044a also a refusal proposal: `answer` carries `answerKind`, on
+ * path B the ground, its hash and the snapshot; the justification never stands in `answer` (the type
+ * forbids it) but only in `pii` (ADR 0009, DSFA V7), which every event read path strips. `toStatus` is
+ * the target status the transition table resolved (only written by `proposeRefusal`); without it the
+ * projection keeps `answer_drafted`.
+ */
 export type AnswerDrafted = Base<
   'AnswerDrafted',
-  { answer: AnswerVersion; invalidatedApprovalOfVersion?: number }
+  {
+    answer: Omit<AnswerVersion, 'refusalJustification'> & { refusalGround?: RefusalGroundSnapshot };
+    invalidatedApprovalOfVersion?: number;
+    toStatus?: QuestionStatus;
+    pii?: { keyId: string; refusalJustification: string };
+  }
 >;
 export type QuestionSubmittedForReview = Base<'QuestionSubmittedForReview', { answerVersion: number }>;
 export type QuestionApproved = Base<'QuestionApproved', { answerVersion: number }>;

@@ -56,9 +56,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'speaker.read',
     'history.read',
     'question.identity.reveal',
+    'question.refuse.propose', // Scheibe 044a (E25, ADR 0012; built on the default)
   ],
   expert: unitBound(['answer.draft', 'question.submit_review', 'question.claim', 'question.read', 'history.read']),
-  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.claim', 'question.read', 'history.read', 'question.identity.reveal'],
+  legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.claim', 'question.read', 'history.read', 'question.identity.reveal',
+    'question.refuse.propose'], // Scheibe 044a (E25, ADR 0012; built on the default)
   approver: [
     'question.assign',
     'question.approve',
@@ -68,6 +70,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'stage.read', // holds question.stage
     'history.read',
     'question.identity.reveal',
+    'question.refuse.approve', // Scheibe 044a (E25, ADR 0012; built on the default)
   ],
   podium: ['question.deliver', 'question.return', 'question.close', 'stage.read', 'question.identity.reveal'],
   // Scheibe 040a (Rechtekonzept §4, "Administration: Rechte, keine Inhalte"): an explicit list, no
@@ -93,6 +96,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
   ],
   observer: ['question.read.delivered'],
 };
+
+/**
+ * Scheibe 044a (043a, SG2): who reads the justification of a refusal (`refusalJustification`) in
+ * `Question.answers` — holders of either refusal right, as data. Not `question.legal.clear`, never the
+ * administration (its list above holds neither). `getStage` and every event read path never show it.
+ */
+export const REFUSAL_JUSTIFICATION_READ: readonly Permission[] = ['question.refuse.propose', 'question.refuse.approve'];
 
 export const hasUnitBoundRead = (actor: Actor): boolean => ROLE_PERMISSIONS[actor.role]?.unitBoundRead === true;
 

@@ -173,7 +173,9 @@ const TOPIC_PERMISSIONS: Readonly<Record<StreamTopic, readonly Permission[] | nu
 
 // Nested actors and person blocks may sit anywhere in a payload (approval, clearance, answer
 // versions), so the strip is recursive; `id` and `role` of a nested actor stay visible.
-const MASKED_KEYS: ReadonlySet<string> = new Set(['displayName', 'organisation', 'pii', 'personId']);
+// Scheibe 044a: `refusalJustification` is a second safeguard; the justification is written only into
+// `pii`, which is stripped anyway, but a future writer that put it elsewhere would still be masked.
+const MASKED_KEYS: ReadonlySet<string> = new Set(['displayName', 'organisation', 'pii', 'personId', 'refusalJustification']);
 const maskValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(maskValue);
   if (value !== null && typeof value === 'object') {
@@ -192,6 +194,11 @@ export function maskEvent(event: DomainEvent): ReadEvent {
   const { displayName: _actorName, personId: _actorPerson, ...eventActor } = event.actor;
   const payload = maskValue(event.payload) as Record<string, unknown>;
   if (event.type === 'IdempotencyRecorded') delete visible.idempotencyKey;
+  // Scheibe 044a (SG2): the note of a legal clearance can carry the legal assessment of a refusal, a
+  // side channel of its justification. Removed for every legal clearance and every reader, bound to
+  // this event type only (not a key in MASKED_KEYS, which acts recursively in every payload); the
+  // stored original keeps it (rule 7).
+  if (event.type === 'QuestionLegalCleared') delete payload['note'];
   return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
 }
 

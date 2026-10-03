@@ -181,7 +181,31 @@ describe('HTTP HvApi adapter', () => {
     ['mergeQuestion', ['q /1', 'q2'], 'POST', '/v1/questions/q%20%2F1/merge', { intoQuestionId: 'q2' }],
     ['getStage', [], 'GET', '/v1/stage'],
     ['listEvents', [7, 50], 'GET', '/v1/events?after=7&limit=50'],
+    // Scheibe 044a: the three refusal operations of contract 0.4.0.
+    ['listRefusalGrounds', [], 'GET', '/v1/refusal-grounds'],
+    ['proposeRefusal', ['q /1', { answerKind: 'refusal_no_claim', text: 'T', refusalJustification: 'J' }], 'POST', '/v1/questions/q%20%2F1/refusals',
+      { answerKind: 'refusal_no_claim', text: 'T', refusalJustification: 'J' }],
+    ['approveRefusal', ['q /1', 2], 'POST', '/v1/questions/q%20%2F1/refusal-approvals', { answerVersion: 2 }],
   ];
+
+  it.each([
+    ['proposeRefusal', ['q1', { answerKind: 'refusal_with_ground', text: 'T', refusalGroundId: 'g', refusalJustification: 'J' }]],
+    ['approveRefusal', ['q1', 1]],
+  ] as [keyof HvApi, unknown[]][])('Scheibe 044a: %s sends CSRF, If-Match and an Idempotency-Key like draftAnswer', async (name, args) => {
+    const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
+    replies.push(json({ id: 'q1' }, 200, { ETag: '"v2"' }), json({ id: 'q1' }, 200, { ETag: '"v3"' }));
+    const invoke = api[name] as (...parameters: unknown[]) => Promise<unknown>;
+    await invoke(...args, { ifMatch: '"v1"', idempotencyKey: 'refusal-key' });
+    await invoke(...args);
+    const first = new Headers(calls.at(-2)?.init.headers);
+    expect(first.get('X-CSRF-Token')).toBe('csrf');
+    expect(first.get('If-Match')).toBe('"v1"');
+    expect(first.get('Idempotency-Key')).toBe('refusal-key');
+    const second = new Headers(calls.at(-1)?.init.headers);
+    expect(second.get('X-CSRF-Token')).toBe('csrf');
+    expect(second.get('Idempotency-Key')).toBeTruthy();
+    expect(second.get('Idempotency-Key')).not.toBe('refusal-key');
+  });
 
   it.each(endpointCases)('%s uses its declared route and request body', async (name, args, method, url, body) => {
     const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });

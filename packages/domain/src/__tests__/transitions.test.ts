@@ -9,6 +9,7 @@ import { createInMemoryEventStore } from '../store.js';
 import type { DomainEvent } from '../events.js';
 import { PERMISSIONS, QUESTION_STATUSES, type QuestionRecord, type Role, type Permission, type SpeakerRecord, type SpeakerStatus } from '../types.js';
 import { ROLE_PERMISSIONS, READ_PERMISSION_LIST, READ_SCOPES } from '../permissions.js';
+import { REFUSAL_GROUNDS } from '../refusalGrounds.js';
 
 const ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
 
@@ -39,17 +40,20 @@ describe('transition table', () => {
 
   for (const t of TRANSITIONS) {
     it(`${t.ruleId}: ${t.action} from [${t.from.join(', ')}] — ${t.description}`, () => {
-      // A representative question that satisfies every guard of this row.
+      // A representative question that satisfies every guard of this row. R-TRANS-16 (Scheibe 044a)
+      // approves a refusal: its version is a refusal (R-GUARD-13), legally cleared by `l` (R-GUARD-08).
       const base = question({
         status: t.from[0]!,
         track: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId) ? 'podium' : 'expert_track',
         answers: ['R-TRANS-08', 'R-TRANS-14'].includes(t.ruleId)
           ? []
-          : [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } }],
+          : [{ version: 1, text: 'Antwort', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' },
+            ...(t.ruleId === 'R-TRANS-16' ? { answerKind: 'refusal_no_claim' as const } : {}) }],
         approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
         legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
       });
-      const payload = t.action === 'question.approve' ? { answerVersion: 1 } : t.action === 'question.merge' ? { intoQuestionId: 'q2' } : undefined;
+      const payload = t.action === 'question.approve' || t.action === 'question.refuse.approve' ? { answerVersion: 1 }
+        : t.action === 'question.merge' ? { intoQuestionId: 'q2' } : undefined;
       const r = resolveTransition(base, t.action, payload, OTHER);
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.transition.ruleId).toBe(t.ruleId);
@@ -116,6 +120,52 @@ describe('transition table', () => {
     expect(resolveTransition(q, 'question.stage', undefined, OTHER)).toMatchObject({ ok: false, ruleId: 'R-GUARD-07' });
   });
 
+  it('R-TRANS-15 (Scheibe 044a): a refusal proposal goes to in_review from every working status of a text question', () => {
+    for (const status of ['classified', 'assigned', 'answer_drafted', 'in_review', 'approved'] as const) {
+      const r = resolveTransition(question({ status, track: 'fast_track' }), 'question.refuse.propose',
+        { answerKind: 'refusal_no_claim', text: 't', refusalJustification: 'j' }, OTHER);
+      expect(r.ok && r.to, status).toBe('in_review');
+    }
+    for (const status of ['captured', 'staged', 'delivered'] as const) {
+      expect(resolveTransition(question({ status, track: 'fast_track' }), 'question.refuse.propose', undefined, OTHER)).toMatchObject({ ok: false, ruleId: 'R-TRANS-00' });
+    }
+  });
+
+  it('R-TRANS-16 (Scheibe 044a): a refusal is approved only from in_review, after clearance, by a third person', () => {
+    const refusal = question({
+      status: 'in_review', track: 'expert_track',
+      answers: [{ version: 1, text: 'v1', createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'legal' }, answerKind: 'refusal_no_claim' }],
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } },
+    });
+    expect(resolveTransition(refusal, 'question.refuse.approve', { answerVersion: 1 }, OTHER)).toMatchObject({ ok: true, to: 'approved' });
+    expect(resolveTransition(refusal, 'question.refuse.approve', { answerVersion: 1 }, { actor: { id: 'l', role: 'approver' } })).toMatchObject({ ok: false, ruleId: 'R-GUARD-14' });
+    expect(resolveTransition(refusal, 'question.refuse.approve', { answerVersion: 1 }, { actor: { id: 'e', role: 'approver' } })).toMatchObject({ ok: false, ruleId: 'R-GUARD-06' });
+    expect(resolveTransition({ ...refusal, status: 'answer_drafted' }, 'question.refuse.approve', { answerVersion: 1 }, OTHER)).toMatchObject({ ok: false, ruleId: 'R-TRANS-00' });
+    expect(resolveTransition(refusal, 'question.approve', { answerVersion: 1 }, OTHER)).toMatchObject({ ok: false, ruleId: 'R-GUARD-12' });
+  });
+
+  it('R-GUARD-14 (Scheibe 044a, Nachtrag des Orchestrators): false without clearance; compares every clearer of the version', () => {
+    const guard = TRANSITIONS.find((t) => t.ruleId === 'R-TRANS-16')!.guards!.find((g) => g.ruleId === 'R-GUARD-14')!;
+    expect(guard.check(question(), undefined, OTHER)).toBe(false);
+    const cleared = question({ legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'k', role: 'legal' } },
+      legalClearerIds: ['s', 'k'] });
+    expect(guard.check(cleared, undefined, { actor: { id: 's', role: 'approver' } })).toBe(false);
+    expect(guard.check(cleared, undefined, { actor: { id: 'k', role: 'approver' } })).toBe(false);
+    expect(guard.check(cleared, undefined, OTHER)).toBe(true);
+  });
+
+  it('R-TRANS-16 (Nachtrag des Orchestrators): R-GUARD-08 stands before R-GUARD-14', () => {
+    const ids = TRANSITIONS.find((t) => t.ruleId === 'R-TRANS-16')!.guards!.map((g) => g.ruleId);
+    expect(ids).toEqual(['R-GUARD-01', 'R-GUARD-13', 'R-GUARD-04', 'R-GUARD-06', 'R-GUARD-08', 'R-GUARD-14', 'R-GUARD-11']);
+  });
+
+  it('R-GUARD-12 and R-GUARD-13 (Scheibe 044a) are false without a version', () => {
+    const guards = new Map<string, Guard>();
+    for (const t of TRANSITIONS) for (const g of t.guards ?? []) guards.set(g.ruleId, g);
+    expect(guards.get('R-GUARD-12')!.check(question({ answers: [] }), undefined, OTHER)).toBe(false);
+    expect(guards.get('R-GUARD-13')!.check(question({ answers: [] }), undefined, OTHER)).toBe(false);
+  });
+
   it('R-TRANS-06: a returned podium question goes back to classified, a text question to answer_drafted', () => {
     const podium = resolveTransition(question({ status: 'staged', track: 'podium' }), 'question.return', { reason: 'x' }, OTHER);
     const expert = resolveTransition(question({ status: 'staged', track: 'expert_track' }), 'question.return', { reason: 'x' }, OTHER);
@@ -123,6 +173,15 @@ describe('transition table', () => {
     expect(expert.ok && expert.to).toBe('answer_drafted');
   });
 });
+
+/** Fixture versions for the refusal guards (Scheibe 044a). */
+function answerVersion(version: number): QuestionRecord['answers'][number] {
+  return { version, text: `v${version}`, createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'e', role: 'expert' } };
+}
+function refusalVersion(version: number, answerKind: 'refusal_no_claim' | 'refusal_with_ground', hash?: string): QuestionRecord['answers'][number] {
+  return { version, text: `v${version}`, createdAt: '2027-04-20T09:00:00.000Z', createdBy: { id: 'k', role: 'legal' }, answerKind,
+    ...(answerKind === 'refusal_with_ground' ? { refusalGroundId: 'aktg-131-3-nr1', refusalGroundHash: hash ?? '' } : {}) };
+}
 
 /**
  * Slice 011, Festlegung 3: one generated test per guard, collected from `TRANSITIONS[].guards` (no
@@ -179,6 +238,35 @@ const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?, Tr
       { answerVersion: 1 },
       { actor: { id: 'l', role: 'legal' } },
     ],
+  },
+  // Scheibe 044a: the six refusal guards.
+  'R-GUARD-08': {
+    satisfies: [question({ answers: [refusalVersion(1, 'refusal_no_claim')],
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } } })],
+    violates: [question({ answers: [answerVersion(1), refusalVersion(2, 'refusal_no_claim')],
+      legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } } })],
+  },
+  'R-GUARD-09': {
+    satisfies: [question(), { answerKind: 'refusal_with_ground', text: 't', refusalGroundId: 'aktg-131-3-nr1', refusalJustification: ' j ' }],
+    violates: [question(), { answerKind: 'refusal_with_ground', text: 't', refusalGroundId: 'aktg-131-3-nr1', refusalJustification: '   ' }],
+  },
+  'R-GUARD-11': {
+    satisfies: [question({ answers: [refusalVersion(1, 'refusal_with_ground', REFUSAL_GROUNDS[0]!.hash)] })],
+    violates: [question({ answers: [refusalVersion(1, 'refusal_with_ground', '0'.repeat(64))] })],
+  },
+  'R-GUARD-12': {
+    satisfies: [question({ answers: [refusalVersion(1, 'refusal_no_claim'), answerVersion(2)] })],
+    violates: [question({ answers: [answerVersion(1), refusalVersion(2, 'refusal_no_claim')] })],
+  },
+  'R-GUARD-13': {
+    satisfies: [question({ answers: [answerVersion(1), refusalVersion(2, 'refusal_with_ground', REFUSAL_GROUNDS[0]!.hash)] })],
+    violates: [question({ answers: [refusalVersion(1, 'refusal_no_claim'), { ...answerVersion(2), answerKind: 'answer' }] })],
+  },
+  'R-GUARD-14': {
+    satisfies: [question({ legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } } }),
+      { answerVersion: 1 }, { actor: { id: 'a', role: 'approver' } }],
+    violates: [question({ legalClearance: { answerVersion: 1, clearedAt: '2027-04-20T09:05:00.000Z', clearedBy: { id: 'l', role: 'legal' } } }),
+      { answerVersion: 1 }, { actor: { id: 'l', role: 'approver' } }],
   },
   'R-GUARD-07': {
     satisfies: [question({
@@ -299,6 +387,35 @@ describe('policy truth table (Role × Status × Action, Role × Leserecht)', () 
       '| Role | ' + administration.join(' | ') + ' |', '|---|' + administration.map(() => '---').join('|') + '|');
     for (const role of ROLES) {
       lines.push(`| ${role} | ${administration.map((p) => (can({ id: 'x', role }, p).allow ? '✓' : '·')).join(' | ')} |`);
+    }
+
+    // Scheibe 044a: a refusal as the latest version, which the representative question of the first
+    // table never is. Version 1 an answer by `e`, version 2 a path-B refusal by `l` with the current
+    // hash; "frei" = legally cleared by `k`. Same `can()` decision, actor `x`.
+    const refusalActions: Permission[] = ['question.refuse.propose', 'question.refuse.approve', 'question.approve', 'question.submit_review', 'question.legal.clear', 'answer.draft'];
+    const refusalCases: [string, Partial<QuestionRecord>][] = [
+      ['in_review, frei', { status: 'in_review', legalClearance: { answerVersion: 2, clearedAt: '2027-04-20T09:20:00.000Z', clearedBy: { id: 'k', role: 'legal' } } }],
+      ['in_review, offen', { status: 'in_review' }],
+      ['answer_drafted', { status: 'answer_drafted', legalClearance: { answerVersion: 2, clearedAt: '2027-04-20T09:20:00.000Z', clearedBy: { id: 'k', role: 'legal' } } }],
+    ];
+    lines.push('', '# Policy truth table — Role × Verweigerung', '',
+      'Scheibe 044a: the latest version is a refusal (path B by `l`, current catalogue hash); "frei" = legally',
+      'cleared by `k`, "answer_drafted" = a returned refusal. Built on the default (ADR 0012 proposed, not read by Recht).', '',
+      '| Role | Fall | ' + refusalActions.map((a) => a.replace('question.', 'q.')).join(' | ') + ' |',
+      '|---|---|' + refusalActions.map(() => '---').join('|') + '|');
+    for (const role of ROLES) {
+      for (const [name, overrides] of refusalCases) {
+        const q = question({ track: 'expert_track', answers: [
+          answerVersion(1),
+          { version: 2, text: 'v2', createdAt: '2027-04-20T09:10:00.000Z', createdBy: { id: 'l', role: 'legal' }, answerKind: 'refusal_with_ground',
+            refusalGroundId: 'aktg-131-3-nr1', refusalGroundHash: REFUSAL_GROUNDS.find((g) => g.id === 'aktg-131-3-nr1')!.hash },
+        ], ...overrides });
+        const cells = refusalActions.map((a) => {
+          const payload = a === 'question.approve' || a === 'question.refuse.approve' ? { answerVersion: 2 } : undefined;
+          return can({ id: 'x', role }, a, q, payload).allow ? '✓' : '·';
+        });
+        lines.push(`| ${role} | ${name} | ${cells.join(' | ')} |`);
+      }
     }
 
     await expect(lines.join('\n') + '\n').toMatchFileSnapshot('../../policy-truth-table.md');

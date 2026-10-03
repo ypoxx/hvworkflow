@@ -414,10 +414,19 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'AnswerDrafted': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;
-      q.answers.push({ ...e.payload.answer });
-      q.status = 'answer_drafted';
+      // Scheibe 044a: the snapshot of the catalogue entry stays in the event (audit path); the
+      // justification comes from the `pii` part, read without decoding like `SpeakerRegistered`.
+      const { refusalGround: _snapshot, ...answer } = e.payload.answer;
+      const justification = e.payload.pii?.refusalJustification;
+      q.answers.push({ ...answer, ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
+      // The target status is the one the transition table resolved when the event was written
+      // (`toStatus`, like `QuestionReturned`); only a known status is taken, anything else keeps the
+      // status every answer draft has had.
+      const to = e.payload.toStatus;
+      q.status = to !== undefined && (QUESTION_STATUSES as readonly string[]).includes(to) ? to : 'answer_drafted';
       delete q.approval; // R-GUARD-04: an approval is bound to a version; a new version voids it
       delete q.legalClearance;
+      delete q.legalClearerIds; // Scheibe 044a: the clearers belong to the voided version
       delete q.returnReason;
       touch(q, e.at);
       break;
@@ -440,6 +449,9 @@ export function reduce(state: State, e: DomainEvent): State {
     case 'QuestionLegalCleared': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;
+      // Scheibe 044a (R-GUARD-14): a repeated clearance of the same version keeps the earlier clearers.
+      const sameVersion = q.legalClearance !== undefined && q.legalClearance.answerVersion === e.payload.answerVersion;
+      q.legalClearerIds = [...new Set([...(sameVersion ? q.legalClearerIds ?? [q.legalClearance!.clearedBy.id] : []), e.actor.id])];
       q.legalClearance = {
         ...(e.payload.answerVersion !== undefined ? { answerVersion: e.payload.answerVersion } : {}),
         clearedAt: e.at,
@@ -457,6 +469,7 @@ export function reduce(state: State, e: DomainEvent): State {
       if (e.payload.toStatus === 'classified') {
         delete q.approval;
         delete q.legalClearance;
+        delete q.legalClearerIds;
       }
       touch(q, e.at);
       break;

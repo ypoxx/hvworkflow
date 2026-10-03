@@ -188,6 +188,8 @@ export const shellEn: typeof shellDe = {
   'action.question.submit_review': 'Forward',
   'action.question.approve': 'Approve',
   'action.question.legal.clear': 'Legal clearance',
+  'action.question.refuse.propose': 'Propose refusal',
+  'action.question.refuse.approve': 'Approve refusal',
   'action.question.return': 'Return',
   'action.question.stage': 'Send to the podium',
   'action.question.deliver': 'Read out, next',

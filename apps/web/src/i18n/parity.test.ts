@@ -160,13 +160,14 @@ describe('i18n parity checks', () => {
   // takt-039 (review minor 7): +1 `stage.return.question`, the return dialog names its question.
   // Scheibe 040a: +2 `history.actor.administrative` and `.label`, the badge at an administrative event.
   // Scheibe 040b: +5 keys, two actions (units, seats) and three events (agenda, units, seats replaced).
-  it('(f) Total key count is 522 across all modules and matches de and en', () => {
+  // Scheibe 044a: +2 action keys (propose and approve a refusal), required by ACTION_KEYS; rendered from 045.
+  it('(f) Total key count is 524 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(522);
-    expect(deKeys).toBe(522);
-    expect(enKeys).toBe(522);
+    expect(totalKeys).toBe(524);
+    expect(deKeys).toBe(524);
+    expect(enKeys).toBe(524);
   });
 });
