@@ -307,8 +307,19 @@ export function sessionAssignmentFor(events: readonly DomainEvent[], subjectId: 
   return current[0]?.assignment;
 }
 
+/**
+ * Length in Unicode code points, as JSON Schema 2020-12 and the service's validator (Ajv `ucs2length`) count
+ * `maxLength`: a surrogate pair is one character, a lone surrogate is one as well (Scheibe 044b, Codex P2 on #131).
+ */
+export function codePointLength(s: string): number {
+  let n = 0;
+  for (const _ of s) n += 1;
+  return n;
+}
+
 /** Contract 0.4.0 limits of `RefusalProposal`, checked by the core (Scheibe 044a). A missing ground or
- * justification is not a 422 but R-GUARD-09 (409). Messages never repeat the submitted text. */
+ * justification is not a 422 but R-GUARD-09 (409). Messages never repeat the submitted text. String lengths in
+ * code points like the validator (Scheibe 044b); the number of `sources` stays an array length. */
 const REFUSAL_KINDS: readonly string[] = ['refusal_no_claim', 'refusal_with_ground'];
 function checkRefusalProposal(input: RefusalProposal): string | null {
   const body = input as unknown as Record<string, unknown>;
@@ -316,18 +327,18 @@ function checkRefusalProposal(input: RefusalProposal): string | null {
   if (typeof kind !== 'string' || !REFUSAL_KINDS.includes(kind)) return 'answerKind must be refusal_no_claim or refusal_with_ground.';
   const text = body['text'];
   if (typeof text !== 'string' || text.trim().length === 0) return 'text is required.';
-  if (text.length > 20000) return 'text must not exceed 20000 characters.';
+  if (codePointLength(text) > 20000) return 'text must not exceed 20000 characters.';
   const justification = body['refusalJustification'];
-  if (justification !== undefined && (typeof justification !== 'string' || justification.length > 4000)) {
+  if (justification !== undefined && (typeof justification !== 'string' || codePointLength(justification) > 4000)) {
     return 'refusalJustification must be a string of at most 4000 characters.';
   }
   const groundId = body['refusalGroundId'];
-  if (groundId !== undefined && (typeof groundId !== 'string' || groundId.length > 128)) {
+  if (groundId !== undefined && (typeof groundId !== 'string' || codePointLength(groundId) > 128)) {
     return 'refusalGroundId must be a string of at most 128 characters.';
   }
   const sources = body['sources'];
   if (sources !== undefined && (!Array.isArray(sources) || sources.length > 50 ||
-      sources.some((item) => typeof item !== 'string' || item.length > 2000))) {
+      sources.some((item) => typeof item !== 'string' || codePointLength(item) > 2000))) {
     return 'sources must be an array of at most 50 strings of at most 2000 characters.';
   }
   if (kind === 'refusal_no_claim' && groundId !== undefined) return 'Refusal path A carries no refusalGroundId.';

@@ -355,6 +355,12 @@ describe('Scheibe 044a, Test 6: 422 (no event)', () => {
     ['a source with 2001 characters', bad({ sources: ['x'.repeat(2001)] })],
     ['path A with a ground', bad({ refusalGroundId: 'aktg-131-3-nr1' }, PATH_A)],
     ['path B with an unknown ground', bad({ refusalGroundId: 'aktg-131-3-nr99' })],
+    // Scheibe 044b (Codex P2 on #131): lengths in code points, as the contract's validator counts them.
+    ['text with 20001 emoji', bad({ text: '\u{1F600}'.repeat(20001) })],
+    ['justification with 4001 emoji', bad({ refusalJustification: '\u{1F600}'.repeat(4001) })],
+    ['justification with 4001 lone surrogates', bad({ refusalJustification: '\uD800'.repeat(4001) })],
+    ['ground id with 129 emoji', bad({ refusalGroundId: '\u{1F600}'.repeat(129) })],
+    ['a source with 2001 emoji', bad({ sources: ['\u{1F600}'.repeat(2001)] })],
   ];
   for (const [name, input] of cases) {
     it(name, async () => {
@@ -376,6 +382,16 @@ describe('Scheibe 044a, Test 6: 422 (no event)', () => {
     expect((await propose(await assigned(), A.legal, bad({ refusalJustification: 'x'.repeat(4000) }))).status).toBe('in_review');
     const sources = Array.from({ length: 50 }, (_, i) => (i === 0 ? 'x'.repeat(2000) : `q${i}`));
     expect((await propose(await assigned(), A.legal, bad({ sources }))).answers[0]!.sources).toEqual(sources);
+  });
+
+  it('Scheibe 044b: the limits in code points pass: 20000 / 4000 / 2000 emoji, lone surrogates and a swapped pair count one each', async () => {
+    const emoji = '\u{1F600}';
+    expect((await propose(await assigned(), A.legal, bad({ text: emoji.repeat(20000) }))).status).toBe('in_review');
+    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: emoji.repeat(4000) }))).status).toBe('in_review');
+    expect((await propose(await assigned(), A.legal, bad({ sources: [emoji.repeat(2000)] }))).status).toBe('in_review');
+    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: `${'x'.repeat(3999)}\uD800` }))).status).toBe('in_review');
+    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: `\uDC00${'x'.repeat(3997)}\uDE00\uD83D` }))).status).toBe('in_review');
+    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: '\uD800'.repeat(4000) }))).status).toBe('in_review');
   });
 });
 

@@ -40,6 +40,7 @@ import {
   type QuestionCapture,
   type QuestionFilter,
   type QuestionStatus,
+  type RefusalProposal,
   type Role,
   type RoleAssignmentCreate,
   type Speaker,
@@ -1183,6 +1184,19 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/questions/:questionId/legal-clearances', guarded('clearQuestionLegally'), async (c) => {
     const body = getValidatedBody<LegalClearanceRequest>(c);
     const question = await domain.clearQuestionLegally(requireParam(c, 'questionId'), body, writeOptions(c));
+    return questionResult(c, question);
+  });
+  // Scheibe 044b: refusal paths A and B. The routes only pass through; rights, transition table and guards
+  // decide in the core (`can()`, R-TRANS-15/16), the justification is masked there per reader.
+  app.get('/v1/refusal-grounds', guarded('listRefusalGrounds'), async (c) => c.json(await domain.listRefusalGrounds()));
+  app.post('/v1/questions/:questionId/refusals', guarded('proposeRefusal'), async (c) => {
+    const body = getValidatedBody<RefusalProposal>(c);
+    const question = await domain.proposeRefusal(requireParam(c, 'questionId'), body, writeOptions(c));
+    return questionResult(c, question);
+  });
+  app.post('/v1/questions/:questionId/refusal-approvals', guarded('approveRefusal'), async (c) => {
+    const body = getValidatedBody<{ answerVersion: number }>(c);
+    const question = await domain.approveRefusal(requireParam(c, 'questionId'), body.answerVersion, writeOptions(c));
     return questionResult(c, question);
   });
   app.post('/v1/questions/:questionId/returns', guarded('returnQuestion'), async (c) => {
