@@ -7,6 +7,7 @@
  * decision. Rights come from `_actions` alone (AGENTS.md rule 4).
  */
 import type {
+  DomainEvent,
   EventType,
   Permission,
   QuestionStatus,
@@ -163,4 +164,26 @@ export function roleLabel(t: Translate, role: Role): string {
 
 export function eventTypeLabel(t: Translate, type: EventType): string {
   return t(EVENT_KEYS[type]);
+}
+
+/**
+ * Scheibe 045: the label of one history row. A draft that carries a refusal kind is "Verweigerung
+ * vorgeschlagen"; an approval is "Verweigerung freigegeben" only when the proposal of the same question
+ * and version is among the loaded events (`refusalVersions`, keys `<subjectId>:<version>`, built by the
+ * history page). Without that proof, the ordinary label stands: the event `QuestionApproved` itself
+ * does not say what it approved.
+ */
+export function eventLabel(
+  t: Translate,
+  event: DomainEvent,
+  context: { readonly refusalVersions: ReadonlySet<string> },
+): string {
+  if (event.type === 'AnswerDrafted') {
+    const kind = event.payload.answer.answerKind;
+    if (kind === 'refusal_no_claim' || kind === 'refusal_with_ground') return t('event.AnswerDrafted.refusal');
+  }
+  if (event.type === 'QuestionApproved' && context.refusalVersions.has(`${event.subjectId}:${event.payload.answerVersion}`)) {
+    return t('event.QuestionApproved.refusal');
+  }
+  return eventTypeLabel(t, event.type);
 }

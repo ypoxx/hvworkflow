@@ -2,6 +2,7 @@
 export { getLang, setLang, translate, useLang, useT } from './store';
 export {
   actionLabel,
+  eventLabel,
   eventTypeLabel,
   roleLabel,
   stageAssignmentLabel,

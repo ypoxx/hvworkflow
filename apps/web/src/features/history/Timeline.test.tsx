@@ -31,6 +31,7 @@ const events: DomainEvent[] = [drafted, returned];
 
 const context: SummaryContext = {
   unitNames: new Map(), agendaNumbers: new Map(), questionNumbers: new Map([['q-1', 'F-0001']]), speakerNames: new Map(),
+  refusalVersions: new Set(),
 };
 
 const badges = (html: string): string[] =>

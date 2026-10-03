@@ -16,6 +16,25 @@ export interface SummaryContext {
   agendaNumbers: ReadonlyMap<string, number>;
   questionNumbers: ReadonlyMap<string, string>;
   speakerNames: ReadonlyMap<string, string>;
+  /**
+   * Scheibe 045: `<subjectId>:<version>` of every draft with a refusal kind among the loaded events. An
+   * approval of such a version is labelled "Verweigerung freigegeben" (`eventLabel`); a proposal outside
+   * the loaded window (paging, takt-038) leaves the ordinary label.
+   */
+  refusalVersions: ReadonlySet<string>;
+}
+
+/** Scheibe 045: the keys of `SummaryContext.refusalVersions`, read off the loaded events only. */
+export function refusalVersionsOf(events: readonly DomainEvent[]): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const event of events) {
+    if (event.type !== 'AnswerDrafted') continue;
+    const kind = event.payload.answer.answerKind;
+    if (kind === 'refusal_no_claim' || kind === 'refusal_with_ground') {
+      keys.add(`${event.subjectId}:${event.payload.answer.version}`);
+    }
+  }
+  return keys;
 }
 
 /** The thing the event happened to: a question by its number, a speaker by name. */
@@ -78,6 +97,13 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
       break;
     case 'AnswerDrafted': {
       parts.push(t('history.payload.version', { version: event.payload.answer.version }));
+      // Scheibe 045: the kind of a refusal, and the ground's title from the snapshot in the event (the
+      // catalogue at the time of the proposal, never the current one). `payload.pii` is never read here.
+      const answer = event.payload.answer;
+      if (answer.answerKind === 'refusal_no_claim') parts.push(t('history.payload.refusal.noClaim'));
+      if (answer.answerKind === 'refusal_with_ground') {
+        parts.push(t('history.payload.refusal.withGround', { title: answer.refusalGround?.title ?? answer.refusalGroundId ?? '' }));
+      }
       const sources = event.payload.answer.sources;
       if (sources !== undefined && sources.length > 0) {
         parts.push(t('history.payload.sources', { sources: sources.join('; ') }));

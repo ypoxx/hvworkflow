@@ -101,4 +101,32 @@ export const answersDe = {
   // kein eigener gestalteter Zustand der ganzen Ansicht — die Einzelfrage bleibt sichtbar, nur der
   // Verlauf fehlt, an genau der Stelle, an der er stünde (Freigabe-Erloschen-Hinweis).
   'answers.history.forbidden': 'Diese Rolle darf den Verlauf dieser Einzelfrage nicht lesen.',
+  // Scheibe 045: the refusal (Verweigerung) in the answer view. The kinds are named by content, never
+  // "Pfad A/B" (that names the answer tracks, docs/glossar.md).
+  'answers.refusal.body':
+    'Die Verweigerung wird eine neue Version und geht direkt in die Prüfung. Danach braucht sie die Rechtsfreigabe und die Freigabe durch eine dritte Person.',
+  'answers.refusal.kind.label': 'Art der Verweigerung',
+  'answers.refusal.kind.noClaim': 'Verweigerung · kein Auskunftsanspruch',
+  'answers.refusal.kind.withGround': 'Verweigerung · Grund aus Katalog',
+  'answers.refusal.ground.label': 'Verweigerungsgrund',
+  'answers.refusal.ground.placeholder': 'Grund wählen',
+  'answers.refusal.ground.loading': 'Katalog der Gründe wird geladen …',
+  'answers.refusal.ground.failed':
+    'Katalog der Gründe nicht lesbar. Eine Verweigerung mit Grund aus Katalog ist gerade nicht möglich; „kein Auskunftsanspruch“ bleibt möglich.',
+  'answers.refusal.ground.unverified': 'ungeprüft',
+  'answers.refusal.ground.citation': 'Rechtsbezug',
+  'answers.refusal.ground.unknown': 'Grund {id} nicht im geladenen Katalog',
+  'answers.refusal.ground.changed': 'Grund im Katalog seit dem Vorschlag geändert; bitte neu vorschlagen.',
+  'answers.refusal.text.label': 'Wortlaut für die Bühne',
+  'answers.refusal.text.marker': 'Formulierungsbaustein, ungeprüft (E15)',
+  'answers.refusal.justification.label': 'Begründung (intern)',
+  'answers.refusal.justification.help':
+    'Nur, was für die Entscheidung nötig ist; keine Namen Dritter. Sichtbar nur für alle, die Verweigerungen vorschlagen oder freigeben dürfen; nie auf der Bühne.',
+  'answers.refusal.error.guard09': 'Begründung fehlt. Bei „Grund aus Katalog“ ist auch der Grund Pflicht.',
+  'answers.refusal.error.invalid': 'Eingabe abgewiesen: Pflichtfeld leer, Text zu lang oder Grund nicht im Katalog.',
+  'answers.refusal.approve.label': 'Verweigerung freigeben (Version {version})',
+  'answers.refusal.editorHint':
+    'Ein neuer Antwortentwurf verdrängt die Verweigerung und braucht erneut Rechtsfreigabe und Freigabe.',
+  'answers.refusal.badge': 'Verweigerung',
+  'answers.return.refusalWarning': 'Keine Begründung in den Rückgabegrund: Er ist für alle sichtbar, die die Frage lesen.',
 };

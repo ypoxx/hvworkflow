@@ -225,6 +225,9 @@ export const shellDe = {
   'event.QuestionClassified': 'Klassifiziert',
   'event.QuestionAssigned': 'Zugewiesen',
   'event.AnswerDrafted': 'Antwortentwurf erstellt',
+  // Scheibe 045: the labels of a proposed and an approved refusal in the history.
+  'event.AnswerDrafted.refusal': 'Verweigerung vorgeschlagen',
+  'event.QuestionApproved.refusal': 'Verweigerung freigegeben',
   'event.QuestionSubmittedForReview': 'Weitergeleitet',
   'event.QuestionApproved': 'Freigegeben',
   'event.QuestionLegalCleared': 'Rechtlich freigegeben',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
-import { eventTypeLabel, translate } from '../../i18n';
-import { eventSubject, eventSummary, type SummaryContext } from './eventSummary';
+import type { AnswerDrafted, QuestionApproved, RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
+import { eventLabel, eventTypeLabel, translate } from '../../i18n';
+import { eventSubject, eventSummary, refusalVersionsOf, type SummaryContext } from './eventSummary';
 
 const t = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
   translate('de', key, params);
@@ -22,6 +22,7 @@ function context(speakerNames: ReadonlyMap<string, string>): SummaryContext {
     agendaNumbers: new Map(),
     questionNumbers: new Map(),
     speakerNames,
+    refusalVersions: new Set(),
   };
 }
 
@@ -81,5 +82,76 @@ describe('Scheibe 028: neutrale technische Historie', () => {
       payload: {},
     };
     expect(eventSummary(t, receipt, context(new Map()))).toBe('');
+  });
+});
+
+/**
+ * Scheibe 045, Test 8: a refusal in the history. The proposal names its kind and the ground's title from
+ * the snapshot in the event (the catalogue as it was at the proposal, never the current one); the
+ * approval is called "Verweigerung freigegeben" only when the proposal of the same question and version
+ * is among the loaded events; the justification appears in no summary.
+ */
+describe('Scheibe 045: Verweigerung in der Historie (Test 8)', () => {
+  const SECRET = 'GEHEIME-BEGRUENDUNG-045';
+  const at = '2027-04-20T10:00:00.000Z';
+  const by = { id: 'u-legal-1', role: 'legal' as const };
+  const legalRef = { source: 'AktG' as const, citation: 'Zitat', docVersion: '1', docHash: null, verified: false as const };
+  const withGround: AnswerDrafted = {
+    seq: 5, id: 'event-refusal', type: 'AnswerDrafted', at, actor: by, subjectId: 'q-1',
+    payload: {
+      answer: {
+        version: 2, text: 'Wortlaut.', createdAt: at, createdBy: by, answerKind: 'refusal_with_ground',
+        refusalGroundId: 'g1', refusalGroundHash: 'h-now', refusalGround: { title: 'Titel zum Zeitpunkt des Vorschlags', stageText: 'B.', legalRef },
+      },
+      pii: { keyId: 'hv-2027', refusalJustification: SECRET },
+    },
+  };
+  const noClaim: AnswerDrafted = {
+    ...withGround,
+    id: 'event-noclaim',
+    payload: { answer: { version: 3, text: 'Wortlaut.', createdAt: at, createdBy: by, answerKind: 'refusal_no_claim' }, pii: { keyId: 'hv-2027', refusalJustification: SECRET } },
+  };
+  const approved: QuestionApproved = {
+    seq: 6, id: 'event-approved', type: 'QuestionApproved', at, actor: { id: 'u-appr-1', role: 'approver' }, subjectId: 'q-1',
+    payload: { answerVersion: 2 },
+  };
+  const ctx = (refusalVersions: ReadonlySet<string>): SummaryContext => ({ ...context(new Map()), refusalVersions });
+
+  it('AnswerDrafted refusal_with_ground: "Verweigerung vorgeschlagen" with the title from the snapshot', () => {
+    expect(eventLabel(t, withGround, ctx(new Set()))).toBe('Verweigerung vorgeschlagen');
+    const summary = eventSummary(t, withGround, ctx(new Set()));
+    expect(summary).toBe('Version 2 · Verweigerung · Grund aus Katalog: Titel zum Zeitpunkt des Vorschlags');
+  });
+
+  it('refusal_no_claim without a ground', () => {
+    expect(eventLabel(t, noClaim, ctx(new Set()))).toBe('Verweigerung vorgeschlagen');
+    expect(eventSummary(t, noClaim, ctx(new Set()))).toBe('Version 3 · Verweigerung · kein Auskunftsanspruch');
+  });
+
+  it('an ordinary draft keeps its label', () => {
+    const plain: AnswerDrafted = { ...withGround, payload: { answer: { version: 1, text: 'A.', createdAt: at, createdBy: by } } };
+    expect(eventLabel(t, plain, ctx(new Set()))).toBe(eventTypeLabel(t, 'AnswerDrafted'));
+  });
+
+  it('QuestionApproved with a matching proposal → "Verweigerung freigegeben", without → ordinary label', () => {
+    const refusals = refusalVersionsOf([withGround, approved]);
+    expect(refusals).toEqual(new Set(['q-1:2']));
+    expect(eventLabel(t, approved, ctx(refusals))).toBe('Verweigerung freigegeben');
+    expect(eventLabel(t, approved, ctx(new Set()))).toBe('Freigegeben');
+    expect(eventLabel(t, { ...approved, payload: { answerVersion: 1 } }, ctx(refusals))).toBe('Freigegeben');
+    expect(eventSummary(t, approved, ctx(new Set()))).toBe('Version 2');
+  });
+
+  it('a justification in pii appears in no summary and no label', () => {
+    for (const event of [withGround, noClaim]) {
+      expect(eventSummary(t, event, ctx(new Set()))).not.toContain(SECRET);
+      expect(eventLabel(t, event, ctx(new Set()))).not.toContain(SECRET);
+    }
+  });
+
+  it('English labels', () => {
+    const en = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params);
+    expect(eventLabel(en, withGround, ctx(new Set()))).toBe('Refusal proposed');
+    expect(eventLabel(en, approved, ctx(new Set(['q-1:2'])))).toBe('Refusal approved');
   });
 });

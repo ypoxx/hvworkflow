@@ -9,13 +9,14 @@
  * close in the same breath. Both writes carry the version they read, so a podium that has been
  * away for a minute cannot overwrite a return that happened in the meantime.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Contrast, Lock, Maximize2, Minimize2 } from 'lucide-react';
 import { etagOf } from '@hv/domain';
-import type { Permission, Question, StageView } from '@hv/domain';
+import type { Permission, Question, RefusalGround, StageView } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
+import { useRefusalGrounds } from '../../api/useRefusalGrounds';
 import {
   Button,
   Dialog,
@@ -40,10 +41,13 @@ import {
   returnTargetOf,
   returnWrite,
   stageOnlyByRights,
+  stageReturnNeedsWarning,
 } from './lib';
 import type { DeliverLock, KeyedRead, ReadVerdict, ReturnTarget } from './lib';
 
 const STAGE_ONLY_KEY = 'hv-stage-only-v1';
+/** Scheibe 045: the catalogue read of the podium (stable, so the hook's loader keeps one function). */
+const loadRefusalGrounds = (): Promise<readonly RefusalGround[]> => api.listRefusalGrounds();
 const STAGE_CONTRAST_KEY = 'hv-stage-contrast-v1';
 
 /**
@@ -98,18 +102,22 @@ function Counter({ testId, label, value }: { testId: string; label: string; valu
 function ReturnDialog({
   target,
   busy,
+  note,
   onClose,
   onSubmit,
 }: {
   /** takt-039, minor 7: the question the dialog was opened for; the dialog is open while there is one. */
   target: ReturnTarget | null;
   busy: boolean;
+  /** Scheibe 045 (decision 4): the warning above the field when the question on the podium is a refusal. */
+  note?: string;
   onClose: () => void;
   onSubmit: (reason: string) => void;
 }) {
   const t = useT();
   const [reason, setReason] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
+  const noteId = useId();
   const open = target !== null;
 
   useEffect(() => {
@@ -145,11 +153,22 @@ function ReturnDialog({
       <p data-testid="stage-return-question" className="mb-3 font-mono text-[13px] text-ink-700">
         {target !== null ? t('stage.return.question', { number: target.number }) : null}
       </p>
+      {note !== undefined && (
+        <p
+          id={noteId}
+          role="note"
+          data-testid="stage-return-reason-note"
+          className="mb-3 rounded-md border border-status-in-review-bd bg-status-in-review-bg px-3 py-2 text-[13px] text-status-in-review-fg"
+        >
+          {note}
+        </p>
+      )}
       <label className="block">
         <span className="hv-label">{t('stage.return.reason')}</span>
         <textarea
           ref={ref}
           data-testid="stage-return-reason"
+          {...(note !== undefined ? { 'aria-describedby': noteId } : {})}
           rows={3}
           value={reason}
           placeholder={t('stage.return.placeholder')}
@@ -196,6 +215,9 @@ export function StagePage() {
   // takt-039, review minor 7 (Recht/Audit): the return dialog belongs to the question it was opened for (R or the
   // button), captured then — never to a question the stage draws later. Open while there is one.
   const [returnFor, setReturnFor] = useState<ReturnTarget | null>(null);
+  // Scheibe 045: captured with the target, from the question the dialog was opened on (decision 4).
+  const [returnWarning, setReturnWarning] = useState(false);
+  const catalogue = useRefusalGrounds(loadRefusalGrounds);
   const returnOpen = returnFor !== null;
   // m2 (review round 1): `null` is its own, third state — "not decided yet", never rendered as
   // either layout (see the early return below) — not a silent stand-in for `false` any more.
@@ -493,9 +515,11 @@ export function StagePage() {
         return;
       }
       if (isR) {
-        const target = returnTargetOf(stageRef.current?.current);
-        if (target !== null) {
+        const question = stageRef.current?.current;
+        const target = returnTargetOf(question);
+        if (target !== null && question !== null && question !== undefined) {
           event.preventDefault();
+          setReturnWarning(stageReturnNeedsWarning(question));
           setReturnFor(target);
         }
       }
@@ -606,7 +630,11 @@ export function StagePage() {
       lock={delivering}
       returning={busy}
       onNext={deliver}
-      onReturn={(question) => setReturnFor(returnTargetOf(question))}
+      onReturn={(question) => {
+        setReturnWarning(stageReturnNeedsWarning(question));
+        setReturnFor(returnTargetOf(question));
+      }}
+      catalogue={catalogue}
     />
   );
 
@@ -615,6 +643,7 @@ export function StagePage() {
       key={actorId}
       target={returnFor}
       busy={stageBusy}
+      {...(returnWarning ? { note: t('answers.return.refusalWarning') } : {})}
       onClose={() => setReturnFor(null)}
       onSubmit={(reason) => {
         if (returnFor !== null) void returnAnswer(returnFor, reason);
@@ -643,7 +672,7 @@ export function StagePage() {
           {/* Minor 4 (review round 3): no `!forbidden` guard here — this overlay only renders for
            *  a role that can read the stage (see the condition above). */}
           <aside className="hidden w-72 shrink-0 border-l border-line pl-6 lg:flex lg:min-h-0 lg:flex-col">
-            <StageQueue stage={view} />
+            <StageQueue stage={view} catalogue={catalogue} />
           </aside>
         </div>
         {dialog}
@@ -674,7 +703,7 @@ export function StagePage() {
         {!forbidden && (
           <div className="hidden w-72 shrink-0 lg:block">
             <Panel className="h-full" bodyClassName="flex min-h-0 flex-col">
-              <StageQueue stage={view} />
+              <StageQueue stage={view} catalogue={catalogue} />
             </Panel>
           </div>
         )}

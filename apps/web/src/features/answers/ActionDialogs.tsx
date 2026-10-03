@@ -6,7 +6,7 @@
  * The dialogs only collect input. Whether they are offered at all is decided by `_actions` in the
  * detail view, and what the server does with the input is decided by the transition table.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Unit } from '@hv/domain';
 import { Button, Dialog, cx } from '../../components';
 import { useT } from '../../i18n';
@@ -38,6 +38,7 @@ export function ReasonDialog({
   reasonTestId,
   submitTestId,
   busy,
+  note,
   onSubmit,
 }: {
   open: boolean;
@@ -51,11 +52,17 @@ export function ReasonDialog({
   reasonTestId: string;
   submitTestId: string;
   busy: boolean;
+  /**
+   * Scheibe 045 (decision 4): a note above the field, linked to it — the return dialog warns that the
+   * reason is visible to every reader when the question carries a justification.
+   */
+  note?: string;
   onSubmit: (reason: string) => void;
 }) {
   const t = useT();
   const [reason, setReason] = useState('');
   const ref = useDelayedFocus(open);
+  const noteId = useId();
 
   useEffect(() => {
     if (open) setReason('');
@@ -83,11 +90,22 @@ export function ReasonDialog({
         </>
       }
     >
+      {note !== undefined && (
+        <p
+          id={noteId}
+          role="note"
+          data-testid={`${reasonTestId}-note`}
+          className="mb-3 rounded-md border border-status-in-review-bd bg-status-in-review-bg px-3 py-2 text-[13px] text-status-in-review-fg"
+        >
+          {note}
+        </p>
+      )}
       <label className="block">
         <span className="hv-label">{label}</span>
         <textarea
           ref={ref}
           data-testid={reasonTestId}
+          {...(note !== undefined ? { 'aria-describedby': noteId } : {})}
           rows={3}
           value={reason}
           placeholder={placeholder}
