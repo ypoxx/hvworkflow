@@ -419,11 +419,34 @@ Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Frage 1; 043a-Frage 5 mit 
 
 ```
 Slice: 040b-stammdaten-buehnenplaetze
-Done:
-Evidence:
-Open:
-Touched:
+Done: Kern mit drei Stammdaten-Ereignissen (ganze Liste, Jahrgang als Subjekt), R-ADM-01/R-ADM-02, Prüfungen
+  (masterData.ts), vier HvApi-Methoden mit zwischengespeicherter eingegrenzter Instanz, Classification.seatId,
+  counts.byUnit/bySeat, Seed (AR-Büro, vier Plätze), zwei Rechte nur für admin; vier Routen im Dienst; Web-Adapter.
+Evidence: `pnpm gates` grün auf f89ac89 (Schluss unten); Tests 1–16 grün; fünf Mutationsproben rot; kein Screenshot
+  (Akzeptanzkriterium 4).
+Open: keine. Bau-Halt Teil 2 (drei Dateien außerhalb „Files allowed“) durch den Nachtrag des Orchestrators gelöst;
+  slice-scope warnt deshalb, dass „Files allowed“ von der Merge-Basis abweicht (erwartet).
+Touched: packages/domain/src/{types,events,envelope,state,api,permissions,rules,stream,seed,index,masterData}.ts,
+  packages/domain/src/__tests__/{master-data040b,stream035,transitions,admin040a,seed-fictitious-names}.test.ts,
+  packages/domain/policy-truth-table.md, docs/legal-trace.md, apps/api/src/app.ts,
+  apps/api/src/__tests__/master-data040b.test.ts, apps/web/src/api/{http,http.test,liveStore}.ts,
+  apps/web/src/i18n/{labels,shell.de,shell.en,parity.test}.ts, apps/web/src/features/history/eventSummary.ts,
+  apps/web/src/app/featureRegistry.ts (nur NumericCounter), docs/glossar.md, docs/datenschutz/dsfa-vorentwurf.md
 ```
+
+**Abweichungen (Implementierer):**
+- Ajv-Teil von Test 6 läuft über HTTP in `apps/api/src/__tests__/master-data040b.test.ts` (die Domäne hat kein Ajv);
+  der Kerntest prüft die `if`/`then`-Bedingung von Hand.
+- `GET …/stage-seats` sendet kein ETag (der Vertrag deklariert keins für diese 200); Test 15 prüft das ETag an den drei PUTs.
+- `listMeetingStageSeats` liefert einem Leser ohne aktive Zuordnung in diesem Jahrgang die maskierte Liste statt 403
+  (Stammdaten für alle lesbar); 403 nur ohne Akteur.
+- Domänentyp `counts.byUnit`/`bySeat` optional wie im Vertrag; die Projektion setzt beide immer.
+- `app.ts`: neben den vier Routen ein kleiner Helfer; keine neuen Importe (`Parameters<HvApi[...]>`).
+- Vor-dem-Bau-Punkt 4 ergänzt: Seed-abhängig war `seed-fictitious-names.test.ts` (Fingerabdruck); mit der
+  Rekonstitution in `fingerprintOf` bleibt `PRE_CHANGE_FINGERPRINT` gleich, die Fragenverteilung ist unverändert.
+- Ein erster Gates-Lauf war rot an einem zeitkritischen Postgres-Test (`postgres-limits034a.test.ts`, „query that hangs
+  past the service timer before the COMMIT“, Last 4,5 durch einen parallelen Docker-Stack); einzeln 3/3 grün, der
+  zweite volle Lauf auf demselben Commit grün.
 
 **Vor dem Bau prüfen (Ergebnisse).** Geprüft vom Architekten am 03.10.2026 auf `88fa9be` (Integrationszweig mit 043a).
 1. 040a ist gemergt; `ROLE_PERMISSIONS.admin` ist eine ausdrückliche Liste (`permissions.ts:78-91`). Weiter.
@@ -447,13 +470,42 @@ Touched:
 
 **Signaturen der neuen `HvApi`-Methoden.**
 
-**Wahrheitstabellen-Diff.**
+```ts
+replaceMeetingAgendaItems(meetingId: string, items: AgendaItemInput[], opts?: WriteOptions): Promise<AgendaItem[]>;
+replaceMeetingUnits(meetingId: string, items: UnitInput[], opts?: WriteOptions): Promise<Unit[]>;
+listMeetingStageSeats(meetingId: string): Promise<StageSeat[]>;
+replaceMeetingStageSeats(meetingId: string, items: StageSeatInput[], opts?: WriteOptions): Promise<StageSeat[]>;
+```
 
-**Mutationsproben (Ergebnis).**
+**Wahrheitstabellen-Diff.** Nur der neue Abschnitt „Role × Administration“ am Ende von
+`packages/domain/policy-truth-table.md`, genau wie in der Spec (admin ✓ ✓, alle anderen · ·); sonst keine Zeile geändert.
 
-**`pnpm gates` (Schluss, Commit):**
+**Mutationsproben (Ergebnis).** Jede einzeln eingesetzt, `master-data040b.test.ts` (Kern) ausgeführt, zurückgesetzt:
+1. Maskierung in `listMeetingStageSeats` entfernt (`full = true`) → rot: nur Test 5.
+2. Prüfung der aktiven Rollenzuordnung in R-ADM-02 entfernt → rot: nur Test 3.
+3. `bySeat` zählt alle Fragen statt `isOnStage` → rot: nur Test 7.
+4. Gleichheitsprüfung `seatId`/`stageAssignment` entfernt → rot: nur Test 6.
+5. Eingegrenzte Instanz je Aufruf neu erzeugt → rot: nur Test 12.
+
+**`pnpm gates` (Schluss, Commit):** auf `f89ac89`, mit Postgres (`TEST_DATABASE_URL`, `TEST_RUNTIME_DATABASE_URL`,
+`HV_DB_RUNTIME_ROLE=hv_runtime`), Exit 0; Auszug der Zusammenfassungszeilen in Laufreihenfolge:
 
 ```
+packages/domain test:  Test Files  18 passed (18)
+packages/domain test:       Tests  296 passed (296)
+apps/web test:  Test Files  24 passed (24)
+apps/web test:       Tests  488 passed (488)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+apps/api test: operation-coverage: 69 operations in the contract, 64 exercised by tests, 5 pre-declared in allowlist.json
+apps/api test: operation-coverage: ok — every operationId is exercised by a test or pre-declared in the allowlist.
+slice-scope: warning — "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" section differs from its version at the merge-base (88fa9be) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 40 changed file(s), all within "docs/slices/040b-stammdaten-buehnenplaetze.md"'s "Files allowed" list (56 pattern(s)).
+# tests 275
+# pass 275
+# fail 0
+✓ built in 1.43s
+mark-test-run: wrote /home/user/wt/s040b/.claude/state/last-test-run (clean tree) at commit f89ac89, tree d48a8a0ceb20…
 ```
 
 ## Review findings
