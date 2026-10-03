@@ -55,7 +55,7 @@ ein Mensch (Eigentümerfrage 1).
   `expert_track`). 044a nennt die Verweigerungsarten „Verweigerungspfad A/B“. In der Oberfläche wäre „Pfad A“ doppeldeutig;
   diese Scheibe benennt die Verweigerungsarten deshalb nach Inhalt (Entscheidung 2).
 - **Seed.** Keine Verweigerung im Korpus (044a ließ ihn unverändert). Jede Ansicht dieser Scheibe wird im e2e erst erzeugt.
-- **i18n.** Paritätstest (f): 524 Schlüssel je Sprache (`apps/web/src/i18n/parity.test.ts:105-112`).
+- **i18n.** Paritätstest (f): 524 Schlüssel je Sprache (`apps/web/src/i18n/parity.test.ts:164-171`).
 - **e2e `http`.** Gemeinsame Dateien stehen in `SHARED_SPECS` (`apps/web/playwright.config.ts`); die Reihenfolge pinnt
   `scripts/e2e-http-031.test.mjs:26-29`. Jede Datei beginnt mit dem Datenbankstand ihrer Vorgänger. Der Schritt läuft in
   `.github/workflows/gates.yml:226` mit `timeout-minutes: 9` (Job 15).
@@ -183,14 +183,19 @@ keinem Oberflächentext.
 Trägt **irgendeine Version** im gelesenen Datensatz der Frage, auf die der Dialog wirkt, eine `refusalJustification`
 (`carriesJustification`), zeigt der Rückgabedialog über dem Feld den Hinweis `answers.return.refusalWarning`,
 `role="note"`, mit dem Feld über `aria-describedby` verknüpft. Umsetzung: `ReasonDialog` erhält eine optionale Eigenschaft
-`note`; `stage/Page.tsx` erhält dieselbe Bedingung für ihren Rückgabedialog.
+`note`.
 
-Folgen dieser Bedingung, ausdrücklich gewollt:
-- Wer die Begründung nicht lesen kann (etwa `moderation`), sieht den Hinweis nicht; er kann sie auch nicht weitertragen.
-- **Auf der Bühne erscheint der Hinweis praktisch nie**, weil `getStage` die Begründung für jeden Leser entfernt
-  (044a §6). Das Restrisiko: `approver` kennt die Begründung aus der Beantwortung und gibt auf der Bühne zurück. Benannt unter
-  „Wirkung und Risiko“; Alternative (Hinweis auf der Bühne bei jeder Verweigerung) < 0,1 AStd.
-- Bei einer gewöhnlichen Antwort erscheint der Hinweis nicht (D1: ein Hinweis, der immer steht, wird überlesen).
+**Bühne, andere Regel (Entscheidung des Orchestrators, 03.10.2026):** Der Rückgabedialog in `stage/Page.tsx` zeigt denselben
+Hinweis bei **jeder Verweigerung**, gleich welcher Art: wenn die freigegebene Version (`approvedAnswer`) der Frage, auf die
+er wirkt, `refusalKindOf(...) !== 'answer'` hat. Grund: `getStage` entfernt die Begründung für jeden Leser (044a §6), die
+Regel der Beantwortung griffe dort nie, und wer auf der Bühne zurückgibt (`approver`, `moderation`, `podium`), kann die
+Begründung aus der Beantwortung kennen. Umsetzung als reine Hilfe `stageReturnNeedsWarning(question)` in `stage/lib.ts`.
+
+Folgen, ausdrücklich gewollt:
+- In der Beantwortung sieht den Hinweis nicht, wer die Begründung nicht lesen kann (etwa `moderation`); er kann sie dort
+  auch nicht weitertragen. Auf der Bühne sieht ihn jeder, der bei einer Verweigerung zurückgibt.
+- Bei einer gewöhnlichen Antwort erscheint der Hinweis in keinem der beiden Dialoge (D1: ein Hinweis, der immer steht, wird
+  überlesen).
 Keine Prüfung des Inhalts, keine Maskierung des Rückgabegrunds (Eigentümer mit Recht).
 
 ### 5. Verweigerung im Beantwortungsdetail (`QuestionDetail.tsx`, `WorkList.tsx`)
@@ -371,6 +376,8 @@ den Orchestrator unten), `docs/folgeliste.md` außer über das Review.
    und `completed_at`) und die Mehrzeit der neuen Datei schätzen: Zahl der Rollenwechsel × gemessene Wechselzeit (Zeilen
    `[timing] switch to …` im Log) plus rund 1 s je Schreibschritt. **Liegt Ist plus Schätzung über 9 min, anhalten und
    melden**; der Bau ändert den Workflow nicht. Ist und Schätzung stehen im Bericht.
+7. Welcher Einheit die Expert-Testperson in beiden Projekten zugeordnet ist (Seed bzw. Setup 031a) und ob dort eine
+   Textpfad-Frage in `assigned` liegt, die keine Nachfolgedatei nutzt. Fehlt sie im Projekt `http`, anhalten und melden.
 
 ## Tests zuerst (rot, dann grün)
 
@@ -412,6 +419,9 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
     `settleProblem(error, onProblem)` → `'handled' | 'stale' | 'toast'`): 409 R-GUARD-09 und 422 mit Dialog → `handled`, **kein
     Toast**; 412 → `stale`; 403 → `toast`; ohne `onProblem` unverändertes Verhalten.
 12. `parity.test.ts` (f): 553 je Sprache.
+13. `stage/lib.test.ts`, `stageReturnNeedsWarning`: freigegebene Version `refusal_no_claim` → wahr; `refusal_with_ground` → wahr;
+    jeweils **ohne** `refusalJustification` im Datensatz (wie `getStage` ihn liefert); gewöhnliche Antwort → falsch; Podiumsfrage
+    ohne Version → falsch.
 
 **Playwright, `apps/web/e2e/045-verweigerung.spec.ts`, Projekte `in-process` und `http`**
 
@@ -439,23 +449,36 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
   Wortlaut = `stageText`, Vermerk neben dem Feld und **nicht** im Feldwert, Badge „ungeprüft“; Begründung tippen (eindeutiger
   Testsatz); Screenshot Dialog de/en; absenden → Status „in Prüfung“, Versionskarte mit „Verweigerung · Grund aus Katalog“,
   Grund und Begründung, **Fokus auf der Versionskarte**. `approver`: „Verweigerung freigeben“ fehlt (keine Rechtsfreigabe).
-  `legal`: „Freigeben“ fehlt; rechtlich freigeben. `approver`: „Verweigerung freigeben (Version n)“ vorhanden, „Freigeben“
+  `legal`: rechtlich freigeben. `approver`: „Verweigerung freigeben (Version n)“ vorhanden, „Freigeben“
   fehlt (R-GUARD-12); Begründung im Detail sichtbar; freigeben; Screenshot Detail de/en; Warteschlange der Bühne merken; auf
   die Bühne stellen. `podium`: die Frage erscheint in der Warteschlange mit Badge; Vorschau öffnen → Kennzeichen „Auskunft
   wird verweigert“, Grund, Wortlaut; Screenshot Bühne de/en (Vorschau oder aktuelle Frage, je nachdem, wo sie steht);
   Begründungssatz **nicht** im DOM der Bühne. Abschluss: E4a.
 - **E2 Leserkreis** (im selben Test wie E1, vor E4a). `approver` auf der Bühne: Begründungssatz nicht im DOM; im
   Beantwortungsdetail derselben Frage sichtbar. `moderation`: Begründungssatz weder im Detail noch in der Historie noch auf
-  der Bühne; keine Schaltfläche „Verweigerung vorschlagen“. `expert`: keine Schaltfläche, kein Begründungssatz.
+  der Bühne; keine Schaltfläche „Verweigerung vorschlagen“. `expert`: **nur gegen eine Frage der eigenen Einheit** (E1 wählt
+  dafür über `findRefusableQuestion(page, 'coordination', { unitOf: 'expert' })` eine Frage, die der Einheit der
+  Expert-Testperson zugewiesen ist; Vor-dem-Bau-Punkt 7): zuerst zusichern, dass `expert` die Frage in der Arbeitsliste sieht
+  und ihr Detail öffnet (sonst prüfte der Fall nichts), dann keine Schaltfläche „Verweigerung vorschlagen“, kein
+  Begründungssatz im Detail und in der Historie, und der Antwort-Editor ist da (`answer.draft`) mit `answers.refusal.editorHint`.
+  **Nicht als e2e geprüft, weil durch die Wahrheitstabelle belegt** (`packages/domain/policy-truth-table.md`, Abschnitt
+  „Role × Verweigerung“): `legal` hält nie `question.approve`, „Freigeben“ fehlt dort also immer; die Zeile aus der ersten
+  Fassung entfällt.
 - **E3 Kein Auskunftsanspruch** (eigener Test). Kein Feld Verweigerungsgrund, kein Vorbefüllen, kein Vermerk; Absenden
   gesperrt ohne Wortlaut oder ohne Begründung; **Wechsel nach Vorbefüllen**: erst „Grund aus Katalog“ mit Grund (Baustein im
   Feld), dann „kein Auskunftsanspruch“ → Feld leer, Vermerk weg; erneut mit Baustein, ein Wort anhängen, dann Wechsel →
   Text bleibt, Vermerk bleibt; Feld leeren → Vermerk weg; eigenen Wortlaut tippen, absenden → „Verweigerung · kein
   Auskunftsanspruch“, Bühnenkennzeichen nicht geprüft (bleibt in Prüfung).
-- **E4a Rückgabe mit Hinweis** (Abschluss von E1). `approver` öffnet die gestellte Verweigerung in der Beantwortung,
-  Rückgabe: Hinweis sichtbar; Grund „e2e 045“; zurückgeben → die Frage verlässt die Bühne (Warteschlange gleich der gemerkten).
-- **E4b Kein Hinweis ohne Begründung im Datensatz** (eigener Test, schreibt nichts). Rückgabedialog auf einer gewöhnlichen
-  Antwort (`legal`): kein Hinweis; Abbrechen.
+- **E4a Rückgabe mit Hinweis** (Abschluss von E1).
+  - **Bühne, nur Projekt `in-process`:** `podium` liest die Fragen vor der Verweigerung vor („Vorgelesen, weiter“), bis sie die
+    aktuelle Frage ist; Taste `R` → Hinweis `answers.return.refusalWarning` sichtbar, obwohl die Bühne keine Begründung trägt;
+    Escape, nichts geschrieben. Im Projekt `http` übersprungen (`test.skip` mit Grund im Code): Vorlesen fremder Fragen änderte
+    den Datenbankstand, auf den `080-sprecher-zustand.spec.ts` und `abnahme.spec.ts` bauen. Dort belegt Test 13 die Regel.
+  - **Beantwortung, beide Projekte:** `approver` öffnet die gestellte Verweigerung, Rückgabe: Hinweis sichtbar; Grund
+    „e2e 045“; zurückgeben → die Frage verlässt die Bühne (im Projekt `http` Warteschlange gleich der gemerkten).
+- **E4b Kein Hinweis ohne Begründung im Datensatz** (eigener Test, schreibt nichts). Rückgabedialog der Beantwortung auf einer
+  gewöhnlichen Antwort (`legal`): kein Hinweis; Abbrechen. Im Projekt `in-process` zusätzlich der Rückgabedialog der Bühne
+  (`podium`, Taste `R`) auf der aktuellen, gewöhnlichen Frage: kein Hinweis; Escape.
 - **E5 Historie** (im Test von E1, nach dem Vorschlag und nach der Freigabe). Zeilen „Verweigerung vorgeschlagen“ mit Grund aus
   dem Schnappschuss und „Verweigerung freigegeben“; kein Begründungssatz auf der Seite.
 - **E6 Eingaben je Akteur (090).** `legal` öffnet den Dialog, tippt Wortlaut und Begründung, Wechsel zu einer Rolle mit und
@@ -479,7 +502,7 @@ auf Unit-Ebene belegt (Lesebefund 11).
 
 ## Akzeptanzkriterium
 
-1. Tests 1–12 und E1–E9 vor der Änderung rot (Ausgabe im Bericht), danach grün; E1–E9 im Projekt `in-process` auch mit
+1. Tests 1–13 und E1–E9 vor der Änderung rot (Ausgabe im Bericht), danach grün; E1–E9 im Projekt `in-process` auch mit
    `--repeat-each=3`.
 2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), axe ohne serious/critical. Projekt `http` grün im CI-Lauf
    `e2e-http` des PR.
@@ -521,8 +544,7 @@ sichtbar), E25 (Standard aus 044a)
 | Katalog nicht geladen, Grund wirkt geprüft oder „geändert“ | `groundStatus` ausfallsicher | Test 2, Test 6 |
 | Begründung einer berechtigten Person bleibt nach Wechsel sichtbar | Daten je Akteur (010d), Dialog nur offen montiert mit Schlüssel aus Akteur und Frage | E2, E6, E9 |
 | Begründung auf der Bühne | Kern maskiert; `Podium.tsx` liest das Feld nicht | Test 7, E1, E2 |
-| Begründung im Rückgabegrund | Hinweis, wo die Begründung im Datensatz steht | E4a, E4b |
-| **Restrisiko:** `approver` gibt auf der Bühne zurück und schreibt die aus der Beantwortung bekannte Begründung in den Grund | auf Standard hingenommen (Entscheidung 4); Alternative < 0,1 AStd | — |
+| Begründung im Rückgabegrund | Beantwortung: Hinweis, wo die Begründung im Datensatz steht; Bühne: Hinweis bei jeder Verweigerung | Test 13, E4a, E4b |
 | Fehlermeldung doppelt (Dialog und Toast) | `onProblem` | Test 11 |
 | Oberfläche bietet eine Freigabe an, die der Kern abweist | nur `_actions`; Hinweis bei geändertem Katalog | E1 (vor/nach Rechtsfreigabe), Test 2 |
 | Historie behauptet eine freigegebene Verweigerung ohne Beleg | Bezeichnung nur mit dem Vorschlag im geladenen Log | Test 8 |
@@ -538,11 +560,11 @@ Ehrlich geschätzt **3,5 AStd** (Spanne 3,2–4,0) statt 2 laut Plan; nach dem L
 | Hilfen `refusal.ts` (`groundStatus` ausfallsicher, `nextRefusalForm`), Hook, Unit-Tests 1–5, 10 | 0,5 |
 | `RefusalDialog` mit Vorbefüllen, `fromTemplate`, Vermerk, Katalogzuständen, Sperren; `run` mit `onProblem`, Test 11; Verdrahtung, Fokusziel `'version'` | 0,85 |
 | Versionskarte, Freigabe der Verweigerung, Editor-Hinweis, Arbeitslisten-Badge, Rückgabehinweis | 0,35 |
-| Bühne (zwei Kennzeichen, Vorschau, Warteschlange) mit Test 7 | 0,3 |
+| Bühne (zwei Kennzeichen, Vorschau, Warteschlange, Rückgabehinweis) mit Test 7 und 13 | 0,35 |
 | Historie (`refusalVersions`, `eventLabel`) mit Test 8 | 0,25 |
 | i18n 29 Schlüssel je Sprache, Parität, Glossar | 0,15 |
 | e2e E1–E9 in beiden Projekten, Isolation und Endzustand, Einreihung `http`, Reihenfolge-Pin, Laufzeitmessung | 0,8 |
-| Screenshots, axe, Design-Kritik, `pnpm gates`, Bericht, CI-Nachweis | 0,3 |
+| Screenshots, axe, Design-Kritik, `pnpm gates`, Bericht, CI-Nachweis | 0,25 |
 
 **Zuschnitt 045b (vorbereitet).** Zeichnet sich ab, dass der Bau über 4,0 AStd geht, committet er nach Entscheidung 1–5
 (Katalog, Dialog, Detail, Rückgabe) mit den zugehörigen Unit-Tests und E1 bis zur Freigabe (ohne Bühne), E3, E4b, E6, E7, E9
@@ -559,7 +581,7 @@ einen Zwischenstand und meldet. 045b umfasst dann Bühne (Entscheidung 6, Test 7
 | Vorbefüllen nur bei Grund aus Katalog, nie über Getipptes; unveränderter Baustein fällt beim Wechsel weg | `nextRefusalForm` | < 0,1 AStd |
 | Vermerk bleibt nach Bearbeiten des Bausteins, nur bei `verified === false` | `fromTemplate` | < 0,1 AStd |
 | „Ungeprüft“ auch auf der Bühne | Badge am Grund auf der Bühne | < 0,1 AStd (Eigentümer mit Recht) |
-| Rückgabehinweis nur, wo die Begründung im Datensatz steht | `carriesJustification` | Hinweis bei jeder Verweigerung: < 0,1 AStd |
+| Rückgabehinweis in der Beantwortung nur, wo die Begründung im Datensatz steht; auf der Bühne bei jeder Verweigerung (Orchestrator 03.10.2026) | `carriesJustification`, `stageReturnNeedsWarning` | Beantwortung auch bei jeder Verweigerung: < 0,1 AStd |
 | Kürzel „(E15)“ bleibt im Vermerk | Entscheidung 9 | < 0,1 AStd |
 | Katalogtexte deutsch auch in en (E21) | keine Übersetzung der Inhalte | Katalogfelder je Sprache: Vertrag und Kern, rund 0,5 AStd |
 | „Verweigerung freigegeben“ nur mit Beleg im geladenen Log | `refusalVersions` | Ereignisfeld `answerKind` an `QuestionApproved`: Vertrag und Kern, rund 0,5 AStd |
@@ -625,6 +647,10 @@ Folgeliste (Vorgabe des Orchestrators, 03.10.2026). Entscheidungen des Orchestra
 | 13 | minor | Aufwand | 3,5 AStd (3,2–4,0), Zuschnitt 045b vorbereitet |
 | 14 | minor | Fokusziel `'version'` mit Reihenfolge | Entscheidung 5 |
 | 15 | minor | Rückgabehinweis nach Begründung im Datensatz | Entscheidung 4 |
-| 16 | nit | (Wortlaut des Befunds lag dem Spec-Autor nicht vor) | offen, nachzutragen |
-| 17 | nit | (Wortlaut des Befunds lag dem Spec-Autor nicht vor) | offen, nachzutragen |
+| 16 | nit | Zeilenverweis Paritätstest | Befund: `parity.test.ts:164-171` |
+| 17 | nit | zwei Rollenzeilen ohne Prüfwert (`legal` „Freigeben fehlt“, `expert`) | E2: `expert` gegen eine Frage der eigenen Einheit mit Vorbedingung; `legal`-Zeile als Invariante der Wahrheitstabelle gestrichen; Vor-dem-Bau-Punkt 7 |
+
+**Nachtrag des Orchestrators zu Befund 15 (03.10.2026):** Der Rückgabedialog der Bühne zeigt den Hinweis bei jeder
+Verweigerung (Entscheidung 4, Test 13, E4a); das Restrisiko aus der vorigen Fassung entfällt. Mehraufwand < 0,1 AStd, im
+Aufwand enthalten (Bühne 0,3 → 0,35, Abschluss 0,3 → 0,25; Summe bleibt 3,5 in der Spanne 3,2–4,0).
 | 18 | nit | Kürzel „(E15)“ | Entscheidung 9 |
