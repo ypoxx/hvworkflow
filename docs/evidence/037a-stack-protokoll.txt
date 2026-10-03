@@ -1,6 +1,6 @@
 
 === Kopf
-Slice 037a, lokales Protokoll (ohne Secrets). Datum: 2026-10-03T13:54:07Z. Commit: 938ffbe (+ Arbeitsstand vor dem Bau-Commit)
+Slice 037a, lokales Protokoll (ohne Secrets). Datum: 2026-10-03T13:54:07Z. Commit: 938ffbe + Arbeitsstand vor dem Bau-Commit; Dockerfiles, Compose-Datei und Skripte dieses Laufs sind gleich dem Bau-Commit 8ac36d4 (danach nur Workflow-Reihenfolge und Dokumente geändert)
 Docker Engine 29.3.1, Compose 5.1.1, Node v22.22.2, Storage-Treiber vfs (Arbeitsumgebung)
 WICHTIG: quay.io ist in dieser Arbeitsumgebung durch die Egress-Richtlinie gesperrt (403 auf CONNECT quay.io:443).
 Das Keycloak-Image kann hier nicht geladen werden. Deshalb: stack:up läuft echt bis einschließlich Images bauen und

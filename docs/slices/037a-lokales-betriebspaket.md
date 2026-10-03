@@ -804,40 +804,174 @@ Alles Übrige ist technisch und hier entschieden.
 
 ```
 Slice: 037a-lokales-betriebspaket
-Done:
-Evidence:
-Open:
-Touched:
+Done: Images api (distroless, 65532, ohne scripts/), seed (eigenes Ziel) und web (nginx-unprivileged, 101, Grenzen und
+      Header am Proxy); Compose-Stack mit Postgres (hv_owner ohne Superuser, hv_runtime), Keycloak-Testrealm (einmal
+      erzeugt, byte-gleich), migrate und seed; scripts/stack.mjs (up, smoke, credentials, down, reset, probe) mit Secrets
+      je Installation außerhalb des Repositoriums; Installationsseite; CI-Job stack-037a; S1–S10 in test:scripts.
+Evidence: pnpm gates grün auf 8ac36d4 (Schluss unten); docs/evidence/037a-stack-protokoll.txt (S11, S12, S14–S16 lokal);
+      docs/evidence/037a-stack-angemeldet.png fehlt lokal (quay.io gesperrt) → Rückfall CI-Artefakt evidence-037a-stack (E56)
+Open: S12.3, S13 und die Anmeldung in S16.3 lokal nicht lauffähig (Keycloak-Image von quay.io durch die Egress-Richtlinie
+      der Arbeitsumgebung gesperrt) → Nachweis im CI-Job stack-037a; S17 (frischer Agent, Orchestrator); CI-Lauf-ID
+      (PR öffnet der Orchestrator); Eigentümerfragen 1 und 2
+Touched: .dockerignore, .gitattributes, .github/workflows/gates.yml, README.md, apps/api/package.json, package.json,
+      pnpm-lock.yaml, deploy/compose/compose.yaml, deploy/compose/postgres-init/10-roles.sh, deploy/docker/api.Dockerfile,
+      deploy/docker/nginx.conf, deploy/docker/web.Dockerfile, docs/betrieb/installation.md,
+      docs/evidence/037a-stack-protokoll.txt, docs/folgeliste.md, docs/sicherheit/bedrohungsmodell.md,
+      scripts/e2e-http-031.mjs, scripts/lib/demo-bootstrap.mjs, scripts/lib/demo-persons.mjs, scripts/stack-login.mjs,
+      scripts/stack-seed.mjs, scripts/stack.mjs, scripts/stack.test.mjs, diese Spec
 ```
 
-**Stand Eigentümerfragen 1 und 2:**
+**Stand Eigentümerfragen 1 und 2:** gebaut nach dem Standard beider Fragen (037a mit 4 AStd; CI-Job nur auf PRs, kein
+Pflicht-Check). Das Go zu Frage 1 und der Planvermerk liegen beim Orchestrator.
 
 **Vor dem Bau prüfen (Ergebnisse).**
-1. Daemon lokal:
-2. `--wait` mit einmaligen Diensten:
-3. Health-Probe Keycloak (gewählt):
-4. tsx in der Produktionsinstallation:
-5. Digests (Tag und Digest je Image, pnpm-Hash):
-6. Distroless-Node-Version:
-7. Rechte des neuen Volumes:
-8. Migrationen ohne Superuser (up, down, up):
-9. Signale (Stoppdauer mit und ohne init, RestartCount nach SIGKILL des Kindprozesses):
+1. Daemon lokal: `dockerd --storage-driver=vfs` mit `--data-root`/`--exec-root` unter `/tmp/d`, Engine 29.3.1, Compose
+   5.1.1; `docker run --rm hello-world` lief. Zusätzlich nötig in dieser Umgebung: `--registry-mirror=https://mirror.gcr.io`
+   (Rate-Limit von Docker Hub) und für den Bau das CA-Bündel des TLS-prüfenden Proxys (`HV_STACK_BUILD_CA`, Abweichung 1).
+   **quay.io ist durch die Egress-Richtlinie gesperrt** (403 auf CONNECT): das Keycloak-Image lässt sich hier nicht laden;
+   nicht umgangen (kein Ersatz-Registry).
+2. `--wait` mit einmaligen Diensten: Compose 5.1.1 wertet `migrate` und `seed` mit Exit 0 als Erfolg (`up --wait` Exit 0).
+   `stack.mjs` wartet trotzdem selbst über `docker compose ps --format json` (läuft auch mit älteren Compose-Versionen,
+   erkennt einen Einmaldienst mit Exit ≠ 0 sofort).
+3. Health-Probe Keycloak (gewählt): `bash -c` mit `/dev/tcp/127.0.0.1/9000`, `GET /health/ready`, Treffer auf `"UP"`;
+   `KC_HEALTH_ENABLED=true`. Syntax lokal gegen den Platzhalter geprüft (bash im node-Image); gegen das echte
+   Keycloak-Image nur im CI-Job (quay.io gesperrt).
+4. tsx in der Produktionsinstallation: ja. `pnpm install --frozen-lockfile --prod --filter '@hv/api...'` bringt `tsx`,
+   `@hv/domain` und `@hv/contract` mit; der Loader läuft mit `--read-only` und tmpfs auf `/tmp` (Startzeile und
+   Verweigerungssätze kommen aus kompiliertem TypeScript). Der Manifest von `apps/web` muss in die Baustufe, sonst passt
+   das gefrorene Lockfile nicht; er wird danach gelöscht.
+5. Digests (Index-Digest je Tag, gelesen mit `docker buildx imagetools inspect`):
+   `node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c`,
+   `gcr.io/distroless/nodejs22-debian12:nonroot@sha256:13593b7570658e8477de39e2f4a1dd25db2f836d68a0ba771251572d23bb4f8e`,
+   `nginxinc/nginx-unprivileged:1.30-alpine@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e`;
+   Postgres und Keycloak gleich `gates.yml` und `KEYCLOAK_IMAGE` (S1 erzwingt das). pnpm 10.33.0: `dist.integrity` aus
+   der Registry, hex `sha512.10568bb4…8649319` in `packageManager`.
+6. Distroless-Node-Version: v22.22.0 (erfüllt `engines` `>=22`), `fetch` vorhanden, `process.getuid()` 65532.
+7. Rechte des neuen Volumes: ein neues benanntes Volume auf `/var/lib/hv/access-log` übernimmt 0700 und 65532:65532
+   (erst mit `COPY --chmod=0700` auf ein eigenes Quellverzeichnis; ein COPY auf ein schon vorhandenes Verzeichnis hätte
+   root als Eigentümer gelassen). Der Dienst startet ohne „refusing to start: HV_ACCESS_LOG_DIR“.
+8. Migrationen ohne Superuser (up, down, up): gegen das lokale Postgres 16 mit `p8_owner` NOSUPERUSER NOCREATEROLE
+   NOCREATEDB als Datenbankeigentümer: up, down, up je „Postgres migration … completed.“; Eigentümer von
+   `auth_purge_login_states` danach `p8_owner`, Laufzeitrolle ohne UPDATE/DELETE an `events`. Keine Migration braucht
+   Superuser-Rechte. Im Stack bestätigt durch S12.7.
+9. Signale: `docker stop` mit `--init` 0,15 s (Exit 143), ohne `--init` 10,2 s (SIGKILL, Exit 137). Im Stack:
+   `docker compose stop api` 0,1 s; SIGKILL an den Node-Kindprozess → Container endet, RestartCount 0 → 1, nach 6,3 s
+   wieder gesund (S16.2).
 
-**Images.** Tag, Image-ID, Größe, `User`, Ergebnis „kein /app/scripts“:
+**Images.** (Bau aus 8ac36d4-Stand der Dockerfiles, lokal)
 
-**Startdauer** (`stack:up` aus dem Nichts, mit und ohne Image-Cache):
+| Tag | Image-ID | Größe | `User` | kein `/app/scripts` |
+|---|---|---|---|---|
+| `hv-tool/api:local` | `41708e034ca8` | 172 MB (Ziel ≤ 300) | `65532:65532` | ja (PASS) |
+| `hv-tool/seed:local` | `3fe370498f4c` | 172 MB | `65532:65532` | enthält genau `stack-seed.mjs` und zwei Bibliotheksdateien |
+| `hv-tool/web:local` | `696550806865` | 55 MB (Ziel ≤ 80) | `101` | – |
 
-**Rauchtest (S12), Ausgabe:**
+`docker top`: Dienst nur UID 65532 (auch der Init-Prozess von Docker), Web nur UID 101.
+
+**Startdauer** (`stack:up` aus dem Nichts): ohne Image-Cache (Build-Cache gelöscht, Basis-Images vorhanden) Bau der drei
+Images 36 s, danach Start bis „alle gesund“ 25 s mit dem Keycloak-Platzhalter; mit Image-Cache Bau 2 s, Start 24 s. Die
+Startzeit des echten Keycloak ist hier nicht messbar (quay.io); sie steht im CI-Lauf.
+
+**Rauchtest (S12), Ausgabe:** vollständig in `docs/evidence/037a-stack-protokoll.txt`. Lokal 18 × PASS (S12.1, S12.2,
+S12.4 bis S12.7), dazu die feste Zeile „Uhrprüfung nicht eingerichtet …“; S12.3 (Keycloak-Discovery) FAIL gegen den
+Platzhalter, wie erwartet. Die Prüfung S12.3 steht im Rauchtest zuletzt (Abweichung 3).
 
 **Robustheit (S16), Ausgabe (CI: 1–2, lokal: 1–4):**
+- S16.1: `db` zeitweise `unreachable`, nach 0,6 s wieder `ok`; RestartCount des Dienstes unverändert.
+- S16.2: genau ein Node-Prozess gefunden, RestartCount 0 → 1, nach 6,3 s gesund, 1748 Ereignisse unverändert,
+  `stop api` 0,1 s.
+- S16.3: `stack:down`, `stack:up`: realm.json sha256 `d46a9a620ef60ddf` vorher und nachher gleich, 1748 Ereignisse
+  gleich, `seed`: „HV-Stack-Befüllung: bereits befüllt, nichts geschrieben.“. Die Anmeldung danach ist lokal nicht
+  möglich (kein Keycloak); im CI-Job läuft S16.3 nicht (Spec), die Anmeldung nach `down`/`up` ist damit **offen** bis zu
+  einem Lauf mit erreichbarem quay.io.
+- S16.4: `stack:reset --yes`: keine Volumes `hv-tool_*`, Zustandsverzeichnis weg; folgendes `up`: neue Secrets (Hash der
+  Secret-Liste verschieden), `seed` schreibt neu (1748 Ereignisse).
 
-**Befolgung durch den frischen Agenten (S17):** Befunde und ihre Behebung:
+**Befolgung durch den frischen Agenten (S17):** offen, läuft durch den Orchestrator. Voraussetzungen in dieser
+Arbeitsumgebung: Docker-Daemon (vfs, kurze Pfade unter `/tmp`), Registry-Spiegel `mirror.gcr.io`, freie Ports 8480 und
+8180; **ohne Freigabe von quay.io kann der Agent die Anmeldung nicht erreichen** und S17 gilt dann nach der Spec als nicht
+erfüllt. Den TLS-prüfenden Proxy behandelt die Installationsseite (§10, `HV_STACK_BUILD_CA`).
 
-**CI-Job `stack-037a`:** Lauf-ID, Dauer, Ergebnis:
+**CI-Job `stack-037a`:** offen (läuft erst auf dem PR; Lauf-ID, Dauer, Ergebnis und das Artefakt `evidence-037a-stack`
+mit Lauf-ID, Artefakt-ID und Digest trägt der Orchestrator nach).
 
-**`pnpm gates` (Schluss, Commit):**
+**Abweichungen von der Spec (im Bau entschieden, Review bitte prüfen).**
+1. **Optionale Bau-CA `HV_STACK_BUILD_CA`.** Beide Dockerfiles hängen in der Installationsstufe ein Build-Secret
+   `build_ca` ein (`RUN --mount=type=secret`); ist die Datei nicht leer, setzt der Schritt `NODE_EXTRA_CA_CERTS`. Compose
+   definiert das Secret als `${HV_STACK_STATE_DIR}/build-ca.pem`, `stack.mjs` schreibt die Datei aus
+   `HV_STACK_BUILD_CA` oder leer. Grund: Hinter einem TLS-prüfenden Proxy (diese Umgebung, viele Firmennetze) scheitert
+   sonst `pnpm install` im Bau. Das Secret landet in keiner Schicht; in CI ist die Datei leer.
+2. Die Web-Baustufe löscht die `.map`-Dateien zusätzlich zur 404-Regel in nginx (die Regel bleibt und ist getestet:
+   ohne sie käme `index.html`).
+3. Im Rauchtest steht die Keycloak-Discovery (S12.3) zuletzt, damit die übrigen Prüfungen auch bei einem IdP-Problem
+   berichten.
+4. Compose hat keine Standardports: `${HV_STACK_*:?set by scripts/stack.mjs}`; ein direkter `docker compose up` bricht
+   ab, statt still auf 8480/8180 zurückzufallen (ergänzt Codex P2 auf #124). `migrate` nutzt das Image `api` mit
+   `pull_policy: never`.
+5. Die Proben S14 bis S16.2 sind Unterbefehle `node scripts/stack.mjs probe images|refusals|postgres-restart|api-crash`
+   (kein siebtes Paketskript); CI und Installationsseite §7 rufen sie so auf.
+6. `.dockerignore` schließt mehr aus als das Minimum (`docs`, `.github`, `.claude`, Tests, `apps/web/e2e`, `netlify.toml`).
+7. nginx leitet `/v1/` und `/auth/` (mit Schrägstrich) weiter; das Zugriffsprotokoll von nginx schreibt den Pfad ohne
+   Query (Code und State der Anmeldung bleiben draußen).
+8. Der Keycloak-Admin heißt fest `hv-admin` (Passwort zufällig), damit die Admin-Konsole lesbar bleibt.
+9. `stack-seed.mjs` verweigert zusätzlich eine unvollständige Personenliste und verlangt im Issuer einen ausdrücklichen
+   Port (wie „`http://localhost:<port>/…`“ in Entscheidung 3).
+10. Compose-Mindestversion 2.20. Die Portprüfung entfällt, wenn der Stack schon läuft (die Ports gehören dann ihm).
+11. S7 vergleicht `keycloak-ci.mjs` gegen die Integrationsbasis nur auf einem `claude/slice-037a-…`-Zweig; sonst nur den
+    Arbeitsstand (der Test bleibt in den Gates, spätere Scheiben dürfen die Datei ändern).
+12. Der Job `stack-037a` steht in `gates.yml` zwischen `gates` und `e2e-http`: die Workflow-Tests von 031a (Datei nicht
+    änderbar) lesen `e2e-http` als letzten Job der Datei. Er entfernt vor `stack:login` einen eingecheckten Screenshot,
+    damit nie ein alter hochgeladen wird.
+13. Bedrohungsmodell: neuer Abschnitt „Stand Scheibe 037a“ mit genau den genannten IDs (Muster von 031a und 034b) und
+    Zeile 037 der Scheibenübersicht.
+
+**Sicherheitsrelevante Beobachtungen.**
+- quay.io gesperrt (Egress-Richtlinie), nicht umgangen; S13 und der Screenshot hängen am CI-Job.
+- Der Dienst sendet `Strict-Transport-Security` auch über `http://localhost`; Browser ignorieren das über http, lokal
+  ohne Wirkung. Mit TLS in 037b relevant (HSTS auf `localhost` würde andere lokale Dienste betreffen).
+- Das Image `api` enthält tsx samt esbuild-Binärdatei; im Container läuft ein esbuild-Dienstprozess (UID 65532). Größere
+  Angriffsfläche als ein Bündel, bewusst nach Entscheidung 2; Image-Scan 037b.
+- In CI bleibt `hv_owner` Superuser (Job `gates`); unverändert, Hinweis an 037b steht in der Spec.
+- `docker inspect` auf `migrate` und `seed` zeigt die Eigentümer-URL (Installationsseite §8).
+
+**`pnpm gates` (Schluss, Commit `8ac36d4`, sauberer Arbeitsbaum):**
 
 ```
+1..306
+# tests 306
+# suites 0
+# pass 306
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15666.526821
+
+> @hv/web@0.0.0 build /home/user/wt/s037a/apps/web
+> tsc -b && vite build
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1730 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-DiRcK_jR.css                        42.35 kB │ gzip:   9.10 kB
+dist/assets/index-D_XXpNDR.js                        647.75 kB │ gzip: 190.56 kB │ map: 2,753.79 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.16s
+mark-test-run: wrote /home/user/wt/s037a/.claude/state/last-test-run (clean tree) at commit 8ac36d4, tree 51412fa63644…
 ```
 
 ## Review findings
