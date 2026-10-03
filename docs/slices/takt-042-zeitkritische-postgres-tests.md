@@ -175,8 +175,10 @@ Stichproben:
 **Beweis bleibt, und zwar strenger:** Vorher zählten ein paar Dutzend Stichproben zwischen Fenstern. Jetzt gilt: Jede
 Entnahme und jede Rückgabe der Stream-App liegt in einem Fenster, jede Rückgabe meldet der Server als `I` (keine offene
 Transaktion), und an jedem ruhigen Fensterende ist nichts entnommen. Daraus folgt die Aussage des Testnamens für den
-ganzen Beobachtungszeitraum. Gegenprobe (vom Bau auszuführen): Ein `await runtime.connect()` während der Beobachtung, im
-Test, nicht festgeschrieben, muss den Test mit „acquire outside a window“ rot machen. Ein `BEGIN` auf einer entnommenen
+ganzen Beobachtungszeitraum. Gegenprobe (vom Bau auszuführen): Ein `const c = await runtime.connect()` während der Beobachtung, im
+Test, nicht festgeschrieben, muss den Test mit „acquire outside a window“ rot machen; die Probe gibt `c` nach dem
+Aufzeichnen des Verstoßes mit `c.release()` zurück, sonst hängt `runtime.end()` im `afterEach` und der Lauf endet über
+den Testtimeout statt mit dem kontrollierten Befund (Codex #132). Ein `BEGIN` auf einer entnommenen
 Verbindung und deren Rückgabe in einem Fenster muss ihn mit Status `T` rot machen.
 
 **Prototyp beim Schreiben (nicht festgeschrieben):** Punkte 1 und 2 in dieser Form liefen 20/20 nacheinander unter
