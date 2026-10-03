@@ -1033,6 +1033,18 @@ dist/assets/index-D_XXpNDR.js                        647.75 kB │ gzip: 190.56 
 mark-test-run: wrote /home/user/wt/s037a/.claude/state/last-test-run (clean tree) at commit 8ac36d4, tree 51412fa63644…
 ```
 
+**Nachtrag nach CI, Runde 3** (Lauf auf `850055f` grün, auch `stack-037a`; zwei Sicherheitsbefunde der engen
+Nachprüfung, behoben statt Folgeliste):
+- **Diagnosefilter enger:** Im CI-Modus von `formatDiagnostics` lässt das Muster für Container, Image, Network und Volume
+  nach einem begrenzten Namen nur noch ein bekanntes Compose-Statuswort zu (Creating bis Built, optional ✔/✘ und eine
+  Dauer), keinen freien Text. `dependency failed to start` nennt nur einen begrenzten Containernamen; „Error response
+  from daemon“ hat den Zeichenvorrat und die 200-Zeichen-Grenze von `REFUSAL_LINE`. Test „CI compose lines are
+  verb-bound and daemon errors character-limited“ (Markierung, die kein Secret ist, erscheint nicht; die bekannten
+  Statuszeilen bleiben).
+- **`--pull never`:** jedes `docker run` eines lokal gebauten Images (`probe images`, die Verweigerungsproben von api und
+  seed) und beide Befehle zum Zugriffslog auf der Installationsseite, dort zusätzlich `--read-only`. Test „every docker
+  run of a local image in stack.mjs carries --pull never“ (auch für die Installationsseite).
+
 ## Review findings
 
 **Lesebefund der Spec zu `111b0d9` (03.10.2026, frischer Kontext): 0 blocker, 8 major, Minor.** Alle in dieser Fassung

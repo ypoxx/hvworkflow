@@ -574,7 +574,7 @@ async function probeImages({ plan, say, check }) {
     say(`Prozesse im Container ${service}: UID ${uids.join(', ')}`);
     check(`Container ${service} ohne UID 0`, !uids.includes('0'));
   }
-  const inside = await mustDocker(['run', '--rm', '--network', 'none', '--entrypoint', '/nodejs/bin/node', IMAGES.api, '-e',
+  const inside = await mustDocker(['run', '--rm', '--pull', 'never', '--network', 'none', '--entrypoint', '/nodejs/bin/node', IMAGES.api, '-e',
     "const fs = require('fs'); const s = (p) => { const x = fs.statSync(p); return [(x.mode & 0o777).toString(8), x.uid]; };"
     + " console.log(JSON.stringify({ scripts: fs.existsSync('/app/scripts'), hv: s('/var/lib/hv'), log: s('/var/lib/hv/access-log') }));"]);
   const facts = JSON.parse(inside.trim());
@@ -587,7 +587,7 @@ async function probeImages({ plan, say, check }) {
 }
 
 async function probeRefusals({ check }) {
-  const bare = await docker(['run', '--rm', '--network', 'none', IMAGES.api], { timeoutMs: 120_000 });
+  const bare = await docker(['run', '--rm', '--pull', 'never', '--network', 'none', IMAGES.api], { timeoutMs: 120_000 });
   check('api ohne Umgebung: Exit 1 mit dem Satz zu HV_ACCESS_LOG_DIR, ohne Wert', bare.code === 1
     && bare.stderr.split('\n').includes('HV-Tool API: refusing to start: HV_ACCESS_LOG_DIR must name a writable directory.'));
   const temp = mkdtempSync(join(tmpdir(), 'hv-stack-probe-'));
@@ -596,7 +596,7 @@ async function probeRefusals({ check }) {
     const envFile = join(temp, 'api.env');
     writeFile(envFile, renderFiles(synthetic)['api.env'].replace(/^HV_OIDC_ISSUER=.*$/m,
       `HV_OIDC_ISSUER=http://keycloak:${DEFAULT_IDP_PORT}/realms/${REALM_NAME}`), 0o600);
-    const remote = await docker(['run', '--rm', '--network', 'none', '--env-file', envFile, IMAGES.api], { timeoutMs: 120_000 });
+    const remote = await docker(['run', '--rm', '--pull', 'never', '--network', 'none', '--env-file', envFile, IMAGES.api], { timeoutMs: 120_000 });
     const lines = remote.stderr.trim().split('\n');
     check('api mit Issuer http://keycloak:…: Exit 1 mit dem Satz zu HV_OIDC_ISSUER', remote.code === 1
       && lines.some((line) => line.startsWith('HV-Tool API: refusing to start: HV_OIDC_ISSUER'))
@@ -605,7 +605,7 @@ async function probeRefusals({ check }) {
     rmSync(temp, { recursive: true, force: true });
   }
   const subjects = PERSONS.map((person) => `${person.key}=00000000-0000-4000-8000-000000000000`).join(',');
-  const seedRun = (issuer, url) => docker(['run', '--rm', '--network', 'none', '-e', `STACK_SEED_ISSUER=${issuer}`, '-e',
+  const seedRun = (issuer, url) => docker(['run', '--rm', '--pull', 'never', '--network', 'none', '-e', `STACK_SEED_ISSUER=${issuer}`, '-e',
     `STACK_SEED_DATABASE_URL=${url}`, '-e', `STACK_SEED_SUBJECTS=${subjects}`, IMAGES.seed], { timeoutMs: 120_000 });
   const foreignIssuer = await seedRun('https://idp.example/realms/hv-local', 'postgres://hv_owner:synthetic@postgres:5432/hv');
   check('seed mit fremdem Issuer: Exit 1, fester Satz, ohne Datenbank (Netz none)', foreignIssuer.code === 1
@@ -696,12 +696,16 @@ export function needsLog(row) {
   return !(row.state === 'running' && row.health === 'healthy');
 }
 
+/** The fixed status words docker compose prints after a resource name; nothing else may follow it (slice 037a, Runde 3). */
+const COMPOSE_VERBS = ['Creating', 'Created', 'Starting', 'Started', 'Healthy', 'Error', 'Waiting', 'Exited', 'Running', 'Stopping',
+  'Stopped', 'Removing', 'Removed', 'Recreate', 'Recreated', 'Pulling', 'Pulled', 'Building', 'Built'].join('|');
 /** Status lines of docker compose that CI may show (owner decision, Nachtrag des Orchestrators). */
 const COMPOSE_STATUS_LINES = [
-  /^\s*(Container|Image|Network|Volume) \S+ \S.*$/,
-  /^\s*dependency failed to start: container \S+ (is unhealthy|exited \(\d+\))\s*$/,
+  // Optional TTY mark, resource kind, a bounded name, one verb, an optional duration: no free text can ride along.
+  new RegExp(`^\\s*(?:[✔✘⠿] )?(?:Container|Image|Network|Volume) "?[\\w./:@-]{1,128}"?\\s+(?:${COMPOSE_VERBS})(?:\\s+\\d+(?:\\.\\d+)?s)?\\s*$`),
+  /^\s*dependency failed to start: container [\w.-]{1,128} (is unhealthy|exited \(\d+\))\s*$/,
   /^\s*service "?[\w-]+"? didn't complete successfully: exit \d+\s*$/,
-  /^\s*Error response from daemon: .*$/,
+  /^\s*Error response from daemon: [A-Za-z0-9_ ,.()=<>:'/-]{1,200}$/,
 ];
 /** The one log line CI may show: a fixed refusal sentence of our own service (never a value, slice 034b). */
 export const REFUSAL_LINE = /^HV-Tool API: refusing to start: [A-Za-z0-9_ ,.()=<>:'/-]{1,200}$/;

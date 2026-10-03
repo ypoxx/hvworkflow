@@ -715,6 +715,46 @@ test('Nachtrag des Orchestrators: in CI the dump shows status and ps rows only, 
   assert(local.includes('seed detail line ***') && local.includes('free text from somewhere ***'), 'locally the full, redacted dump');
 });
 
+test('Nachtrag nach CI, Runde 3: CI compose lines are verb-bound and daemon errors character-limited', () => {
+  // A marker that is not a state secret: redaction cannot hide it, only the filter can.
+  const TAIL = 'FREE-TAIL-037a';
+  const known = [
+    ' Container hv-tool-api-1 Error',
+    ' Container hv-tool-postgres-1  Healthy',
+    ' ✔ Container hv-tool-keycloak-1  Started  2.1s',
+    ' Network hv-tool_default  Creating',
+    ' Volume "hv-tool_hv-access-log"  Created',
+    ' Image hv-tool/api:local  Built',
+    'dependency failed to start: container hv-tool-api-1 is unhealthy',
+    'service "migrate" didn\'t complete successfully: exit 1',
+    'Error response from daemon: driver failed programming external connectivity on endpoint hv-tool-web-1',
+  ];
+  const leaking = [
+    ` Container hv-tool-api-1 Error ${TAIL}`,
+    ` Container hv-tool-api-1 says ${TAIL}`,
+    ` Network ${TAIL} Created with password=${TAIL}`,
+    `Error response from daemon: "${TAIL}"`,
+    `Error response from daemon: ${'x'.repeat(201)}`,
+    `dependency failed to start: container hv-tool-api-1 is unhealthy ${TAIL}`,
+  ];
+  const dump = formatDiagnostics({ rows: [], logs: {}, composeError: [...known, ...leaking].join('\n'), secrets: [], ci: true });
+  assert(!dump.includes(TAIL), 'no free-text tail in CI');
+  assert(!dump.includes('x'.repeat(201)), 'daemon lines capped at 200 characters');
+  const shown = dump.split('\n').map((line) => line.trim());
+  for (const line of known) assert(shown.includes(line.trim()), `known status line kept: ${line}`);
+});
+
+test('Nachtrag nach CI, Runde 3: every docker run of a local image in stack.mjs carries --pull never', () => {
+  const source = read('scripts/stack.mjs');
+  const runs = [...source.matchAll(/[dD]ocker\(\[\s*'run'[\s\S]*?\]/g)].map((match) => match[0]).filter((call) => /IMAGES\./.test(call));
+  assert(runs.length >= 4, `found ${runs.length} docker run calls with IMAGES.*`);
+  for (const call of runs) assert.match(call, /'--pull', 'never'/, call);
+  for (const line of read('docs/betrieb/installation.md').split('\n').filter((entry) => /docker run\b.*hv-tool\/\S+:local/.test(entry))) {
+    assert.match(line, /--pull never/, line);
+    assert.match(line, /--read-only/, line);
+  }
+});
+
 test('Nachtrag: down, reset, smoke, probe, login and up refuse a remote daemon before any docker call', () => {
   const home = scratch();
   try {

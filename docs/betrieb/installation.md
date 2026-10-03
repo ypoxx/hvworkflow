@@ -201,10 +201,10 @@ und das Zustandsverzeichnis; ein direkter Aufruf bricht mit „set by scripts/st
   `docs/adr/0013-zwei-protokollebenen.md`). Der Subject-Hash ist ein HMAC mit einem Schlüssel je Installation:
   pseudonym, nicht anonym.
 - **Aufbewahrung:** 30 Tage, ältere Tagesdateien löscht der Dienst selbst.
-- **Ansehen** nur mit Docker-Rechten, mit dem gebauten Dienst-Image als dessen Nutzer 65532, ohne Netz und nur lesend:
-  `docker run --rm --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "console.log(require('fs').readdirSync('/var/lib/hv/access-log'))"`
+- **Ansehen** nur mit Docker-Rechten, mit dem gebauten Dienst-Image als dessen Nutzer 65532, ohne Netz, ohne Registry-Abruf (`--pull never`) und nur lesend:
+  `docker run --rm --pull never --read-only --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "console.log(require('fs').readdirSync('/var/lib/hv/access-log'))"`
   listet die Tagesdateien; eine Datei zeigt
-  `docker run --rm --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "process.stdout.write(require('fs').readFileSync('/var/lib/hv/access-log/access-JJJJ-MM-TT.jsonl'))"`.
+  `docker run --rm --pull never --read-only --network none -v hv-tool_hv-access-log:/var/lib/hv/access-log:ro --entrypoint /nodejs/bin/node hv-tool/api:local -e "process.stdout.write(require('fs').readFileSync('/var/lib/hv/access-log/access-JJJJ-MM-TT.jsonl'))"`.
 - `pnpm stack:reset --yes` löscht es mit.
 
 ## 10. Fehlersuche
