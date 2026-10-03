@@ -44,8 +44,8 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   enthält jetzt Port und Adapterwahl · Kommentar anpassen.
 - 029a R1 minor 4 · `apps/api/src/server.ts:17` · Log-Hinweis wertet `HV_DEMO` selbst aus statt die Wahl aus
   `createApp` zu übernehmen · gewählten Adapternamen zurückgeben und loggen (spätestens mit 029).
-- 029a R1 nit 6 · `packages/contract/openapi.yaml` · 401 für `seedDemo`, `getMeeting`, `registerSpeaker` nicht
-  dokumentiert (Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS`) · 043.
+- ~~029a R1 nit 6 · `packages/contract/openapi.yaml` · 401 für `seedDemo`, `getMeeting`, `registerSpeaker` nicht
+  dokumentiert (Ausnahme `UNDOCUMENTED_STATUS_EXCEPTIONS`) · 043.~~ → erledigt in **043a** (Vertrag 0.4.0, Ausnahmeliste leer).
 
 ## Sprecher und Zustandstabelle (aus 080)
 
@@ -56,8 +56,8 @@ erledigt in takt-015.
   (Regel 4/5) · je Wortmeldung erlaubte Übergänge als Aktionen ausgeben.
 - 080 Spec Nicht-Ziel · `packages/domain/src/transitions.ts` · kein Guard „nur ein Mikrofon offen“ auf R-SPK-01 (die
   Oberfläche beendet die laufende Rede zuerst) · Guard mit Regel-id.
-- 080 → 043 · `packages/contract/openapi.yaml` · `SpeakerUpdate.reason` und 409 für `updateSpeaker` aufnehmen, Ausnahme
-  in `apps/api/src/__tests__/helpers.ts` streichen, `kind`/`requestedMinutes` löschen.
+- ~~080 → 043 · `packages/contract/openapi.yaml` · `SpeakerUpdate.reason` und 409 für `updateSpeaker` aufnehmen, Ausnahme
+  in `apps/api/src/__tests__/helpers.ts` streichen, `kind`/`requestedMinutes` löschen.~~ → erledigt in **043a** (Vertrag 0.4.0).
 - 080b R1 minor · `apps/web/src/api/index.ts` (`STORAGE_KEY` `hv-demo-events-v1`) · ein Browser mit gespeichertem
   Alt-Korpus (800) behält ihn bis „Demo zurücksetzen“ · Schlüssel versionieren (`-v2`).
 - 080b R1 nit · `apps/web/e2e/abnahme.spec.ts:7` · Zitat „bei 800 Fragen im Bestand“ neben CORPUS_DEMO verwirrt ·
@@ -283,8 +283,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - ~~035b Bau · `packages/contract/openapi.yaml` (`components/headers/RetryAfter`) · die Beschreibung nennt nur die Werte
   für 429 und `PersistenceBusy`; `StreamUnavailable` sendet immer 30 (Stromgrenze, Migrationen offen, Persistenz beschäftigt),
   auch die stromeigenen 429 senden 30; im Schema 1–60 · Beschreibung ergänzen.~~ → erledigt in **takt-040** (Vertrag 0.3.12).
-- 035b Bau · `packages/contract/openapi.yaml` · keine Operation dokumentiert 500; ein Öffnen bei verletzter Kette antwortet
-  wie jede Fachanfrage 500 (Test 25 liest es deshalb über `app.request`, nicht über `req()`) · mit 0.4.0 (043) klären.
+- ~~035b Bau · `packages/contract/openapi.yaml` · keine Operation dokumentiert 500; ein Öffnen bei verletzter Kette antwortet
+  wie jede Fachanfrage 500 (Test 25 liest es deshalb über `app.request`, nicht über `req()`) · mit 0.4.0 (043) klären.~~ → erledigt in **043a** (500 `InternalError` an jeder Operation).
 - 035b Bau · `apps/api/src/server.ts:58` · die `serverOptions` sind nicht exportiert; der Test mit echtem Server wiederholt
   die drei Zahlen · bei der nächsten Änderung an `server.ts` als Konstante exportieren und im Test verwenden.
 - 035b Bau · Spec 035b „Befund“ und m5 · `req()` (`helpers.ts`) puffert eine SSE-Antwort nicht und kehrt mit den Köpfen
@@ -308,8 +308,8 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 035b Gates-Lauf · `apps/api/src/__tests__/postgres-limits034a.test.ts` („query hangs past the service timer“, „COMMIT
   phase hangs“) · lokal einmal rot unter Last (Last ≈ 5 auf 4 Kernen, 8983814), allein dreimal grün, in CI bisher grün ·
   Zeitfenster der 034a-Tests unter Last prüfen.
-- takt-040 Review nit 5 · `packages/contract/openapi.yaml` (`components/responses/StreamUnavailable`) · sagt „one response
-  for both causes“, `RetryAfter` zählt drei Ursachen · Zählung bei der nächsten Vertragsänderung angleichen.
+- ~~takt-040 Review nit 5 · `packages/contract/openapi.yaml` (`components/responses/StreamUnavailable`) · sagt „one response
+  for both causes“, `RetryAfter` zählt drei Ursachen · Zählung bei der nächsten Vertragsänderung angleichen.~~ → erledigt in **043a** (Vertrag 0.4.0).
 - 035a Vertrag nit · `packages/contract/openapi.yaml` · `contract:lint` meldet vier `no-unused-components` für die
   `Stream*`-Schemas, die nur über `x-sse-messages` verwendet werden; OpenAPI 3.1 kann SSE-Nachrichten nicht anders
   ausdrücken · hinnehmen, bei 0.4.0 (043) erneut prüfen.
@@ -514,3 +514,16 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 040a Review minor (im Bericht benannt) · Maskierung der Schreibantwort für eine künftige Rolle ohne
   `question.identity.reveal` ist nicht mehr festgehalten (postgres027); beim `api.test` „409 detail“ wechselte die Leserhälfte
   die Operation · beides wieder festhalten.
+
+## Vertrag 0.4.0 (aus 043a)
+
+- 043a · Veraltete Regel-id-Verweise R-TRANS-13..16: ADR 0012:53, Register E5, Plan Zeilen 198, 674, 686, 1083 und
+  Eintrag 069 · die jeweilige Folgespec vergibt die nächste freie Nummer; ein Doku-Takt gleicht die Verweise an.
+- 043a · Veraltete Kommentare im Kern: `packages/domain/src/types.ts:304` („Domain only until contract 0.4.0“) und
+  `packages/domain/src/api.ts` (`registerSpeaker`/`updateSpeaker`, „fields the contract still accepts“) · 044 oder der
+  nächste Takt core.
+- 043a · 034a „→ 043“ (Grenzen der Anfrageschemas im Kern der Demo) · umgelenkt auf „Takt core“.
+- 043a Bau · `apps/web/src/i18n/shell.de.ts`, `shell.en.ts` (`http.unsupported`) · Schlüssel ungenutzt; Streichen
+  braucht `apps/web/src/i18n/parity.test.ts:162-169` (517 → 516) · nächster Takt web.
+- 043a Review nit 6 (Sicherheitshärtung, eingeplant für 044a) · `openapi.yaml` `StageView` · „refusalJustification
+  always absent“ nur in Prosa · in 044a `refusalJustification: false` im Schema oder der Negativtest „getStage als podium“.
