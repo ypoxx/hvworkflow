@@ -1187,7 +1187,8 @@ Touched: packages/domain/src/{refusalGrounds.ts (neu), types.ts, permissions.ts,
 ```
 
 **Abweichungen vom Wortlaut der Spec (Bau, 03.10.2026):**
-1. **R-GUARD-14 ist ohne Rechtsfreigabe erfüllt** (`legalClearance === undefined || clearedBy.id !== actor.id`), statt
+1. **Erledigt durch den Nachtrag des Orchestrators (Abschnitt 4, Review-Runde `44704c9`):** Die Spec-Definition gilt wieder,
+   R-GUARD-08 steht vor R-GUARD-14. Bis `a029228` galt diese Abweichung: **R-GUARD-14 ist ohne Rechtsfreigabe erfüllt** (`legalClearance === undefined || clearedBy.id !== actor.id`), statt
    „`legalClearance !== undefined` und …“. Grund: Mit der wörtlichen Definition und der Reihenfolge der Tabelle
    (R-GUARD-14 vor R-GUARD-08) antwortete Test 9 mit R-GUARD-14 statt R-GUARD-08, und Mutationsprobe 4 machte den
    Abschnitt „Role × Verweigerung“ nicht rot (R-GUARD-14 hätte die Zeile „in_review, offen“ weiter gesperrt). Die
@@ -1201,7 +1202,7 @@ Touched: packages/domain/src/{refusalGrounds.ts (neu), types.ts, permissions.ts,
 4. **Test 14, `subscribe` als `legal`:** `legal` hält kein `event.read` und erhält nur Änderungssignale ohne Ereignis;
    das prüft der Test, und zusätzlich einen Abonnenten mit `event.read` (admin) auf maskierte Ereignisse. Abonnenten
    laufen als eigene Instanz mit festem Leser, weil `subscribe` den umgeschalteten Demo-Akteur je Zustellung liest.
-5. **Tiefe Kopie** über `copyRefusalGrounds()` (Eintrag und `legalRef` kopiert) statt `structuredClone`; gleiche Wirkung
+5. **Erledigt in `44704c9`:** `copyRefusalGrounds()` nutzt jetzt `structuredClone`. Bis dahin: **tiefe Kopie** über `copyRefusalGrounds()` (Eintrag und `legalRef` kopiert) statt `structuredClone`; gleiche Wirkung
    für die Eintragsform, belegt durch Test 19 und Mutationsprobe 17. `index.ts` exportiert das Modul
    (`REFUSAL_GROUNDS`, Typen, `refusalGroundHash`, `copyRefusalGrounds`).
 6. **`refusalGroundId: ''`** auf Pfad B ist 422 (nicht im Katalog), nicht R-GUARD-09; der Vertrag kennt kein `minLength`.
@@ -1209,6 +1210,64 @@ Touched: packages/domain/src/{refusalGrounds.ts (neu), types.ts, permissions.ts,
    `citation`s nennen die neuen Zeilen (60, 61, 123, 168-169, 173, 175). Bestehende `citation`s anderer Regeln
    (R-GUARD-04/06, R-TRANS-03/05/13: :109, :156, :163) waren schon vorher verschoben und bleiben unverändert (außerhalb
    des Umfangs; Hinweis an den Orchestrator).
+
+**Review-Runde (03.10.2026, Commit `44704c9`):** Hauptreview (Legal, Security, Datenschutz) und Stichprobe des
+Architekten (Legal), beide ohne blocker und major. Umgesetzt:
+- Befund 1 (S, L), Mehrfach-Rechtsfreigabe: Die Projektion hält alle Akteur-ids der Rechtsfreigaben der aktuellen Version
+  (`QuestionRecord.legalClearerIds`, intern, `viewQuestion` entfernt das Feld), und R-GUARD-14 vergleicht mit allen.
+  Test 10 „a repeated clearance does not hide an earlier clearer“ und „a new version resets the clearers“.
+  **Umfang:** Das Feld in `types.ts` und die Fälle `QuestionLegalCleared`/`QuestionReturned` in `state.ts` gehen über die
+  engen Klammern der Files allowed hinaus (Pfade erlaubt). Entscheidung des Orchestrators, Variante b.
+- Befund 2 (S): Spec-Definition von R-GUARD-14 wieder, Reihenfolge R-GUARD-08 vor R-GUARD-14 (Nachtrag des Orchestrators).
+  Wahrheitstabelle unverändert, Regelregister neu erzeugt.
+- Befund 3 (P): Hinweis an 073 (decodieren, geschredderter Schlüssel in Projektion und `replayValue`).
+- Befund 4 (L, P): Hinweis an 045 (Rückgabedialog) und offener Unterpunkt in Eigentümerfrage 4. Keine Codeänderung.
+- Befund 5 (S): `sources` höchstens 50 Einträge mit je höchstens 2000 Zeichen (422), Test 6 mit 51 Einträgen, mit 2001 Zeichen
+  und als Grenzfall 50 × (bis 2000) gelingt.
+- Befund 7: Test 5 mit leerer Begründung `''` → 409 R-GUARD-09 (war schon erfüllt, jetzt belegt).
+- Befund 8: `structuredClone` in `copyRefusalGrounds`.
+- Stichprobe L1 bis L6: `ON_DEFAULT` „Auf Standard gebaut (Go des Eigentümers 03.10.2026; ADR 0012 vorgeschlagen, von Recht
+  nicht gelesen).“ und derselbe Wortlaut im Kopfvermerk; Begründung von R-TRANS-15 wie vorgegeben; Hinweis an 045 zum
+  Vermerk „Formulierungsbaustein, ungeprüft (E15)“; Formulierungsfrage (Nr. 4, Nr. 5) und Institutsbedingung (Nr. 6) im
+  Vorabzug an Recht; Kopfvermerk „drei verschiedene Akteur-ids (personengenau nur mit Einzelidentitäten; eine Person mit zwei
+  Subjects bleibt Restrisiko, MF-01)“; R-TRANS-16 „by a third actor“. Katalog unverändert (Hashes gleich).
+- Folgeliste: nit 9 (veraltete Zeilenverweise, `rules.ts:24-26`) und nit 10 (422 vor der Wiederholung bei geändertem Katalog).
+- nit 6 (Test 7, `podium` 404) ist Abweichung 2 oben, benannt.
+
+**Mutationsproben der Review-Runde** (auf `44704c9`, je eingesetzt, gelaufen, zurückgesetzt):
+- 4 neu: R-GUARD-08 aus R-TRANS-16 → rot: Test 9 (beide Fälle; weiter 409 ohne Ereignis, jetzt mit R-GUARD-14 statt
+  R-GUARD-08), Reihenfolge-Test, „GUARD_SCENARIOS has no stale entry“. Die Wahrheitstabelle bleibt gleich: R-GUARD-14 hält die
+  Freigabe ohne Rechtsfreigabe auf, wie der Nachtrag verlangt.
+- 12 und 14 nach der Umstellung erneut: rot wie zuvor (Test 10, zweiter Fall; Test 10, R-GUARD-14, jetzt drei Fälle).
+- 17b mit `structuredClone`: flache Kopie → rot: Test 19.
+- 19 neu: R-GUARD-14 vergleicht nur mit dem letzten Freigebenden → rot: Test 10 „repeated clearance“ und Regeltest R-GUARD-14.
+- 20 und 21 neu: ohne Grenze 50 → rot: Test 6 „51 items“; ohne Grenze 2000 → rot: Test 6 „2001 characters“.
+
+**`pnpm gates` der Review-Runde, Commit `44704c9`** (mit Postgres-Variablen): Lauf 1 rot nur in
+`postgres-limits034a.test.ts` („a COMMIT that is already on its way wins over the timer“, bekannt zeitkritisch); Lauf 2 rot
+nur in `postgres-stream035.test.ts` Test 28 (`busy` 1 statt 0, Leerlauf-Stichprobe); beide Dateien danach einzeln 3/3 grün;
+Lauf 3 grün, Exit 0. Auszug und Schluss von Lauf 3:
+
+```
+packages/domain test:       Tests  387 passed (387)
+apps/web test:       Tests  493 passed (493)
+apps/api test:  Test Files  42 passed (42)
+apps/api test:       Tests  621 passed (621)
+vocabulary-check: ok
+slice-scope: 34 changed file(s), all within "docs/slices/044a-verweigerung-kern.md"'s "Files allowed" list (71 pattern(s)).
+metrics-allowlist: 6 metrics, all within the allowlist.
+plan-graph: ok.
+# tests 275
+# pass 275
+# fail 0
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.55s
+mark-test-run: wrote /home/user/wt/s044a/.claude/state/last-test-run (clean tree) at commit 44704c9, tree db34922c9b18…
+```
 
 **Missbrauchsfälle, Kapazität:** wie in der Spec; drei verschiedene Akteur-ids je Verweigerung (Test 10), mit nur einer
 Juristin blockiert der Weg „`legal` schlägt selbst vor“ (R-GUARD-06), der Weg über die Koordination nicht.
