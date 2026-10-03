@@ -4,6 +4,7 @@
  */
 import { etagOf } from '@hv/domain';
 import type { AnswerVersion, Permission, Question, StageView } from '@hv/domain';
+import { refusalKindOf } from '../answers/refusal';
 
 /** Wall clock of the hall, 24 hours, zero padded — the form an approval is quoted in. */
 export function clockTime(iso: string): string {
@@ -220,4 +221,14 @@ const WORK_ACTIONS: readonly Permission[] = [
  */
 export function stageOnlyByRights(actions: readonly Permission[]): boolean {
   return actions.includes('question.deliver') && !WORK_ACTIONS.some((a) => actions.includes(a));
+}
+
+/**
+ * Scheibe 045 (decision 4, orchestrator 03.10.2026): the podium's return dialog warns at every refusal,
+ * whatever its kind — when the version that may be read out (`approvedAnswer`) is a refusal. `getStage`
+ * strips the justification for every reader (044a §6), so the rule of the answer view (a justification
+ * in the record) would never fire here; whoever returns from the podium may know it from the answer view.
+ */
+export function stageReturnNeedsWarning(question: Question): boolean {
+  return refusalKindOf(approvedAnswer(question)) !== 'answer';
 }

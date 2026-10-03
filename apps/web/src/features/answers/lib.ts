@@ -390,3 +390,18 @@ export function keyBelongsTo(key: string | null, actorId: string): boolean {
   const [owner] = JSON.parse(key) as unknown[];
   return owner === actorId;
 }
+
+/**
+ * Scheibe 045 (decision 3, review finding 4): what `run` (Page.tsx) does with a refused write. An
+ * `onProblem` of the caller is asked first; when it has handled the refusal (the refusal dialog shows its
+ * own message), there is no toast and no "Stand veraltet". Without it, or when it declines, a 412 is
+ * "Stand veraltet" and everything else a toast — unchanged for every other caller.
+ */
+export function settleProblem(
+  error: unknown,
+  onProblem: ((error: unknown, stillShown: () => boolean) => boolean) | undefined,
+  stillShown: () => boolean,
+): 'handled' | 'stale' | 'toast' {
+  if (onProblem?.(error, stillShown) === true) return 'handled';
+  return problemStatus(error) === 412 ? 'stale' : 'toast';
+}

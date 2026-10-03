@@ -47,4 +47,8 @@ export const stageDe = {
   // (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
   'stage.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
   'stage.forbidden.body': 'Diese Rolle darf die Bühne nicht lesen.',
+  // Scheibe 045: one marker per kind of refusal on the podium, readable from two metres.
+  'stage.refusal.marker.noClaim': 'Kein Auskunftsanspruch',
+  'stage.refusal.marker.withGround': 'Auskunft wird verweigert',
+  'stage.refusal.ground': 'Grund: {title}',
 };

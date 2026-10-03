@@ -24,6 +24,7 @@ import {
 } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
 import { EventStream, HistoryKpiLine, Timeline } from './Timeline';
+import { refusalVersionsOf } from './eventSummary';
 import type { SummaryContext } from './eventSummary';
 import {
   RESULT_PAGE_MAX,
@@ -551,8 +552,10 @@ export function HistoryPage() {
       agendaNumbers: new Map(agendaItems.map((item) => [item.id, item.number])),
       questionNumbers: new Map(corpus.map((question) => [question.id, question.number])),
       speakerNames,
+      // Scheibe 045: the refusal drafts among the loaded events of both readings.
+      refusalVersions: refusalVersionsOf([...(history ?? []), ...stream]),
     }),
-    [units, agendaItems, corpus, speakerNames],
+    [units, agendaItems, corpus, speakerNames, history, stream],
   );
 
   const selected = useMemo(

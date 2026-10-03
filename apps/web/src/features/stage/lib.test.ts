@@ -20,6 +20,7 @@ import {
   returnWrite,
   stageOnlyByRights,
   shownQuestion,
+  stageReturnNeedsWarning,
 } from './lib';
 import type { DeliverLock, KeyedRead } from './lib';
 
@@ -272,5 +273,29 @@ describe('stageOnlyByRights (Scheibe 040a, moved from Page.tsx)', () => {
   it('is false without the read-out right', () => {
     expect(stageOnlyByRights([])).toBe(false);
     expect(stageOnlyByRights(['question.return', 'question.stage'])).toBe(false);
+  });
+});
+
+/**
+ * Scheibe 045, Test 13: the podium's return dialog warns at every refusal, whatever its kind — the
+ * stage view never carries the justification (`getStage` strips it for every reader, 044a §6), so the
+ * rule of the answer view would never fire here.
+ */
+describe('stageReturnNeedsWarning (Scheibe 045, Test 13)', () => {
+  const at = '2027-04-20T10:00:00.000Z';
+  const approvedWith = (answerKind?: 'refusal_no_claim' | 'refusal_with_ground'): Question => ({
+    ...staged('qa', 3, ['question.return']),
+    answers: [{ version: 1, text: 'W', createdAt: at, createdBy: { id: 'u', role: 'legal' }, ...(answerKind !== undefined ? { answerKind } : {}) }],
+    approval: { answerVersion: 1, approvedAt: at, approvedBy: { id: 'u-appr-1', role: 'approver' } },
+  });
+  it('approved refusal_no_claim → true, without refusalJustification in the record', () => {
+    expect(stageReturnNeedsWarning(approvedWith('refusal_no_claim'))).toBe(true);
+  });
+  it('approved refusal_with_ground → true', () => {
+    expect(stageReturnNeedsWarning(approvedWith('refusal_with_ground'))).toBe(true);
+  });
+  it('an ordinary answer → false; a podium question without a version → false', () => {
+    expect(stageReturnNeedsWarning(approvedWith())).toBe(false);
+    expect(stageReturnNeedsWarning({ ...staged('qp', 1, ['question.return']), track: 'podium' })).toBe(false);
   });
 });
