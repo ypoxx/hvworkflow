@@ -4,7 +4,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `799cca5` (044b).
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `8705a1c` (takt-042).
 - **Gebaut und gemergt heute, alle auf Standard (Go des Eigentümers 03.10.2026):**
   - 043a (#125 `88fa9be`, Vertrag 0.4.0);
   - 040b (#130 `6146251`, Vertrag 0.4.1);
@@ -13,18 +13,16 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
 
   Die Specs stehen auf „angenommen“. Vor jeder echten Nutzung folgt die Rechtsprüfung (ADR 0012, Katalog, alle `legalRef`
   ungeprüft).
-- **Specs gemergt, Bau offen:** 064a (#126), 064b (#127), 065a (#128), takt-042 (#132).
+- **takt-042** (Spec #132, Bau #135 `8705a1c`): zeitkritische Postgres-Tests deterministisch, gemergt.
+- **Specs gemergt, Bau offen:** 064a (#126), 064b (#127), 065a (#128).
 - **Offene PRs:**
   - **#129 Scheibe 037a** (lokales Betriebspaket), Branch `claude/slice-037a-betriebspaket`: grün, Review und Nachprüfung
     durch, Codex fertig. Der Merge wartet auf die S17-Entscheidung (siehe unten).
-  - **#135 takt-042**, Branch `claude/takt-042-zeitkritische-tests`: CI grün, Review durch, Codex läuft. Mergen, sobald
-    Codex kein P0/P1 und keinen Sicherheits-, Rechts- oder Datenschutzbefund meldet.
 
 ## Nächste Schritte
 
-1. **takt-042 mergen** (#135), nach Codex.
-2. **037a** nach der S17-Entscheidung mergen oder S17 mit erreichbarer Registry wiederholen.
-3. **Kette der Oberfläche für die Freigabe-Demo:** 045, 048, 053, 054, 055, 059, 046, 060, 061 und 041 in der
+1. **037a** nach der S17-Entscheidung mergen oder S17 mit erreichbarer Registry wiederholen.
+2. **Kette der Oberfläche für die Freigabe-Demo:** 045, 048, 053, 054, 055, 059, 046, 060, 061 und 041 in der
    zugeschnittenen Form (ohne Jahrgang anlegen und ohne Freeze; der Jahrgang kommt aus dem Seed). Für Oberflächenscheiben
    mittleren Risikos gibt es keinen gesonderten Lesebefund der Spec, nur ein Review nach dem Bau (Entscheidung D vom
    03.10.2026). Sicherheits-, Rechts- und Datenschutzbefunde bleiben Pflicht.
@@ -54,9 +52,12 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-03.m
 
 ## Betrieb der Bauumgebung (berichtigt)
 
-- **Aktiver Postgres ist der System-Cluster** `/var/lib/postgresql/16/main` auf Port 5432, nicht `/var/tmp/pgtest`. Rollen
-  `hv_owner`/`hv_runtime` (Passwörter nur lokal, Testwerte). Lokal gilt `GRANT pg_read_all_stats TO hv_owner`, damit
-  `postgres-takt024`/`027` wartende Locks sehen. In der CI ist `hv_owner` Superuser.
+- **Welcher Postgres läuft, ist vor jedem Gates-Lauf zu prüfen** (`ps aux | grep postgres` oder `pg_ctl status` für beide
+  Datenverzeichnisse): Es gibt zwei Cluster, den System-Cluster `/var/lib/postgresql/16/main` und `/var/tmp/pgtest/data`,
+  beide auf Port 5432. Bis zum Neustart der Maschine gegen 18:24 lief der System-Cluster (mit `hv_t042*`, `hv_t044b`
+  und dem lokalen `GRANT pg_read_all_stats TO hv_owner`); nach dem Neustart lief keiner, der takt-042-Bau startete
+  `/var/tmp/pgtest` und legte dort `hv_t042*` an; gegen 19:20 lief keiner. Datenbanken und der GRANT gibt es je Cluster
+  getrennt. Rollen `hv_owner`/`hv_runtime` (Testwerte, nur lokal). In der CI ist `hv_owner` Superuser.
 - **Eine Datenbank je parallelem Agenten:** Jeder Agent bekommt eine eigene `TEST_DATABASE_URL`. Der Schreib-Lock
   `27027/1` gilt datenbankweit, gemeinsame Gates-Läufe erzeugen sonst Sperrrennen (takt-042).
 - **Scratchpad und Prozesse:** ein Unterverzeichnis je Agent, markierte Prozessnamen, nie `pkill` nach Muster.
