@@ -392,6 +392,10 @@ Offene Entscheidung: E46 (auf Standard gebaut: Einheit AR-Büro), E7 (Grundlage,
 
 Siehe `docs/slices/040a-admin-ohne-inhaltsrechte.md`, Frage 1; 043a-Frage 5 mit beiden Wegen dort.
 
+**Stand 03.10.2026:** auf Standard gebaut (Go des Eigentümers 03.10.2026, E57): 043a-Frage 5 freigegeben, also Weg
+„mit Go“ (Anfragezeile `Classification.seatId` im Vertragsschritt, Test 6 vollständig); 040-Teilung und Budget für
+040b; E46 (AR-Büro) auf Standard. 040c und 040d sind zurückgestellt.
+
 ## Hinweise an Folgescheiben
 
 - **043a:** Kommt 040b zuerst, erweitert 043a Test 10 um `seatId` und berichtigt `Classification.stageAssignment` nicht
@@ -412,13 +416,25 @@ Open:
 Touched:
 ```
 
-**Vor dem Bau prüfen (Ergebnisse).**
-1.
-2.
-3.
-4.
-5.
-6.
+**Vor dem Bau prüfen (Ergebnisse).** Geprüft vom Architekten am 03.10.2026 auf `88fa9be` (Integrationszweig mit 043a).
+1. 040a ist gemergt; `ROLE_PERMISSIONS.admin` ist eine ausdrückliche Liste (`permissions.ts:78-91`). Weiter.
+2. Vertrag 0.4.0 (043a gemergt), Allowlist 9 Einträge (6 × `slice` 040, 3 × `slice` 044). 040b nimmt nach 043a Regel 1 die
+   nächste freie Patch-Stufe: **0.4.1** (die Spec nennt das selbst: „nach 043a 0.4.1“). Die vier vorab erklärten
+   Operationen sind unverändert vorhanden, dokumentieren 500 `InternalError` schon (043a) und verwenden weiter `IfMatch`
+   (optional). Nach dem Vertragsschritt: 0.4.1, 5 Einträge. 043a-Frage 5 ist freigegeben (E57): `contract-043a.test.ts`
+   Test 10 lautet jetzt `Classification` = `{agendaItemId, seatId, stageAssignment, track}`; Test 1 prüft `^0\.4\.\d+$`.
+   `takt-016-contract.test.ts` prüft schon `^0\.(?:3|4)\.` und bleibt unverändert (Minor-Stufe wechselt nicht).
+3. Ja: `state.ts:344-345` setzt `stageAssignment` aus der Nutzlast oder löscht es. Das Verhalten gilt für beide Felder.
+4. Keine Seed-abhängigen festen Hashes oder Zählungen gefunden, die das neue `MeetingCreated` oder `unit-ar` ändern
+   (gesucht: Fachbereichszahl, Ereignisanzahl, Kettenhash, `counts`-Gleichheit). Der einzige feste Hash
+   (`security028.test.ts:53`) hängt an einem synthetischen Eingabeereignis, nicht am Seed. `contract.test.ts:159` prüft
+   nur `units.length > 0`. Die volle Bestätigung liefert `pnpm gates` des Implementierers.
+5. Ja: Der generische Validator (`apps/api/src/validate.ts`, `requestBodyValidator`) prüft auch Array-Rümpfe; Probe mit
+   Ajv gegen 0.4.1: 200/200/50 Einträge gültig, 201/201/51 ungültig (`maxItems`). Der HTTP-Beleg ist Test 15.
+6. Zeilen verschoben, ohne Folgen für „Files allowed“ oder Verhalten: `operationPermission`/`legacyEventType` jetzt
+   `api.ts:489-497` (Spec 458-476); `store.subscribe` `api.ts:345` (314); Abweisung fremder `meetingId` `api.ts:638`
+   (601-609); `subjectId`-Prüfung `api.ts:782-785` (722-723); `sessionActorFromEvents` `actor.ts:86` (104-111);
+   `MASKED_KEYS` unverändert `stream.ts:169`.
 
 **Signaturen der neuen `HvApi`-Methoden.**
 
