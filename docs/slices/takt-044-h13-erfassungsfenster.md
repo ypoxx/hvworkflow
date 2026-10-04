@@ -83,7 +83,32 @@ klarer Meldung, im CI sichtbar. Laufzeit: höchstens die Zeit bis zur ohnehin ko
 
 ## Bericht
 
-(nach Bau)
+```
+Slice: takt-044-h13-erfassungsfenster
+Done: H13 Schritt 2 registriert vor den Erfassungsanfragen ein Warten auf A's GET /v1/speakers (200), dessen Liste die neue
+      Wortmeldung mit questionCount >= 1 enthält (5 s, Meldung „A hat die Erfassung nicht gelesen“); danach das bestehende
+      quiet(trace, 1_500). Prüfung von Schritt 2 unverändert. Folgeliste-Eintrag H13 als erledigt markiert.
+Evidence: pnpm gates auf ba3193c (Exit 0), Schluss siehe unten; e2e-http (H13) nur im CI-Job des PR, kein Screenshot (Testcode).
+Open: Akzeptanzkriterium 1 (CI-Job e2e-http grün, Tabelle step 2 ohne Sprecher-/Beitragslesen) erst mit dem PR; lokal nicht
+      nachstellbar (H13 läuft nur im Projekt http mit IdP).
+Touched: apps/web/e2e/031-http-betriebsart.spec.ts, docs/folgeliste.md, diese Spec
+```
+
+- Form der Antwort: `packages/contract/openapi.yaml`, `GET /v1/speakers` 200 → `type: array, items: Speaker`; `Speaker.questionCount`
+  ist `integer` und nicht in `required`, daher `(row.questionCount ?? 0) >= 1`. Nur die Array-Form wird behandelt.
+- Registrierung: direkt nach dem `GET /v1/speakers/{id}` des Erfassungskontexts und vor `POST /v1/contributions`; das Versprechen wird
+  sofort zu `true/false` aufgelöst (keine unbehandelte Ablehnung, wenn ein früherer Schritt scheitert) und nach der Antwort von
+  `POST .../questions` abgewartet, vor `quiet(trace, 1_500)`.
+- Prüfung von Schritt 2 (`no speaker or contribution read after a classification`) unverändert.
+
+Schluss von `pnpm gates` auf `ba3193c` (Exit 0):
+
+```
+slice-scope: 3 changed file(s), all within "docs/slices/takt-044-h13-erfassungsfenster.md"'s "Files allowed" list (3 pattern(s)).
+...
+✓ built in 1.51s
+mark-test-run: wrote /home/user/wt/takt044/.claude/state/last-test-run (clean tree) at commit ba3193c, tree 5ad128ea8315…
+```
 
 ## Review findings
 
