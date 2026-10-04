@@ -617,6 +617,13 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   aufnehmen und den Import umstellen.
 - 048 Bau · `packages/domain/src/rules.ts` R-PERM-01 · die Aufzählung der Schreibvorgänge mit Eingabeprüfung vor `can()` nennt seit
   048 `forwardQuestion`, aber nicht `proposeRefusal` (044a prüft ebenso vorher, 422) · Text ergänzen.
+- 048 Review · `packages/domain/src/rules.ts:141` R-PERM-01 · die Liste nennt `proposeRefusal` nicht · ergänzen (doppelt zum Eintrag oben, Review bestätigt).
+- 048 Review · `packages/domain/src/transitions.ts:856` · der Kommentar zu `TRANSITION_ACTIONS` („change the status“) passt nicht zu R-TRANS-13/14/17 · „resolved through the transition table“.
+- 048 Review · Vertrag `QuestionForwardedPayload.fromUnitId` · ohne `minLength: 1` · bei der nächsten Vertragsstufe ergänzen.
+- 048 Review · Präfix `history.forward.reason.*` · liegt im Modul `history`, obwohl 054 die Bezeichnungen im Dialog nutzt · neu entscheiden, wenn 054 `forwardReasonLabel` exportiert.
+- 048 Review · HTTP-Test der Code-Punkt-Grenze von `unitId` · 128 astrale Zeichen (Kern 422 „does not exist“) und 129 (Validator 422) über den Dienst · Test ergänzen.
+- 048 Review · `docs/sicherheit/bedrohungsmodell.md` Zeile 048 · nennt `transitions.test.ts` (R-TRANS-17, R-GUARD-15) nicht · Nachweis ergänzen.
+- 048 Review · Idempotenz-Reihenfolge · `forwardQuestion` und `assignQuestion` prüfen den Fachbereich vor der Wiederholung, eine Wiederholung nach erneutem Weiterleiten und Entfernen antwortet 422 (Test 9b) · Wiederholung vor der Fachbereichsprüfung, für beide Operationen zusammen.
 
 ## Skripte
 

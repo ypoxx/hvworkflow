@@ -245,11 +245,15 @@ Standard gebaut:** E5 ist offen (Eigentümerfrage 1); der Bau beginnt erst nach 
   404, die Liste enthält die Frage nicht mehr. **Eine Wiederholung mit demselben `Idempotency-Key` ist 404** (`authorizeReplay`
   prüft die aktuelle Lesbarkeit); das Ereignis entsteht kein zweites Mal (Test 9). 054 behandelt 404 nach einem Netzfehler
   beim Weiterleiten als „weitergeleitet oder nicht mehr sichtbar“.
-- **Kein Entfernen des Zielfachbereichs nach dem Weiterleiten (Codex P2 auf #141):** Der Zielfachbereich lässt sich nach dem
-  Weiterleiten nicht aus den Stammdaten entfernen, solange eine Frage auf ihn zeigt: `replaceMeetingUnits` antwortet 409
-  R-ADM-02 (`api.ts` ~888). Der früher benannte Fall „Wiederholung antwortet 422 nach Entfernen“ ist über die Schnittstelle
-  nicht herstellbar und wird nicht getestet; Schritt 2 vor der Wiederholungsprüfung bleibt wie bei `assignQuestion`. Test 9b
-  prüft stattdessen den Schutz: Entfernen des Zielfachbereichs nach dem Weiterleiten → 409 R-ADM-02, kein Ereignis.
+- **Entfernen des Zielfachbereichs und Wiederholung mit 422 (Codex P2 auf #141; berichtigt nach dem Review, Entscheidung des
+  Orchestrators 04.10.2026):** Solange eine Frage auf den Zielfachbereich zeigt, lässt er sich nicht aus den Stammdaten entfernen:
+  `replaceMeetingUnits` antwortet 409 R-ADM-02 (`api.ts` ~888, Test 9b, erster Fall). Die Wiederholung mit 422 ist trotzdem
+  herstellbar, über ein erneutes Weiterleiten und danach das Entfernen: (1) Koordination leitet fin → ar mit Schlüssel K1 weiter,
+  (2) ar → hr mit K2, (3) die Administration entfernt `unit-ar` (nichts zeigt mehr darauf, erfolgreich), (4) die Wiederholung von
+  K1 antwortet 422 „Unit unit-ar does not exist.“, ohne Ereignis. **Angenommen und benannt:** Die Prüfung des Fachbereichs
+  (Schritt 2) steht vor der Wiederholungsprüfung, gleich wie bei `assignQuestion`, und der Vertragstext beschreibt den Fall
+  schon. Test 9b, zweiter Fall, hält dieses Verhalten fest. Die Reihenfolge Wiederholung vor Fachbereichsprüfung (für
+  Weiterleiten und Zuweisen zusammen) steht auf der Folgeliste.
 - `operationPermission` und `legacyEventType` in `api.ts` bleiben unverändert: Neue Ereignisse tragen `commandId`, die
   Wiederholung findet sie über `commandOperation`.
 
@@ -852,7 +856,7 @@ der Orchestrator nach. Aufbewahrungsklasse V4 (DSB, Eigentümerfrage 9), E5 offe
 | n3 | nit | Prüfreihenfolge | `requireQuestionFor` → 404 gebunden → 403 → `If-Match` → 409 |
 | n4 | nit | EN-Bezeichnung | „Forward to another answering unit“ (Glossar: answering unit) |
 | n5 | nit | Rücksetzen im Nachholen unbenannt | Abschnitt 6 benennt den Catch-up-Reset |
-| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | Fall über die Schnittstelle nicht herstellbar (R-ADM-02, Codex P2); Test 9b prüft den Schutz |
+| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | Schutz R-ADM-02 (Test 9b); nach dem Review berichtigt: über erneutes Weiterleiten und Entfernen herstellbar, 422 angenommen wie bei `assignQuestion` (Test 9b, zweiter Fall) |
 
 ### Nachprüfung (frischer Kontext, 03.10.2026, Kopf `5efa153`)
 

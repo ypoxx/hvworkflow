@@ -419,6 +419,27 @@ describe('Test 9: idempotency', () => {
     expect(again).toEqual(first);
     expect(forwardEvents(q.id)).toHaveLength(1);
   });
+
+  it('9b: the 422 replay is reachable after a re-forward and the removal of the old target (accepted, as assignQuestion)', async () => {
+    expect((await asActor(A.admin, () => api.listQuestions({ unitId: 'unit-ar' }))).total).toBe(0);
+    const q = await assignedTo('unit-fin');
+    // 1. fin → ar with K1; 2. ar → hr with K2.
+    const first = await forward(q, A.coordination, { unitId: 'unit-ar', reasonCode: 'wrong_unit' }, { idempotencyKey: 'fwd48-k1' });
+    await forward(first, A.coordination, { unitId: 'unit-hr', reasonCode: 'capacity' }, { idempotencyKey: 'fwd48-k2' });
+    // 3. Nothing references unit-ar any more: the administration removes it.
+    const meeting = await asActor(A.admin, () => api.getMeeting());
+    const units = (await asActor(A.admin, () => api.listUnits())).filter((u) => u.id !== 'unit-ar');
+    await asActor(A.admin, () => api.replaceMeetingUnits(meetingId,
+      units.map((u) => ({ id: u.id, name: u.name, ...(u.shortName !== undefined ? { shortName: u.shortName } : {}) })),
+      { ifMatch: etagOf(meeting.version ?? 1) }));
+    const count = forwardEvents(q.id).length;
+    expect(count).toBe(2);
+    // 4. The replay of K1 checks the unit before the replay lookup: 422, no new event.
+    const p = await rejected(() => forward(first, A.coordination, { unitId: 'unit-ar', reasonCode: 'wrong_unit' }, { idempotencyKey: 'fwd48-k1' }));
+    expect(p.status).toBe(422);
+    expect(p.detail).toBe('Unit unit-ar does not exist.');
+    expect(forwardEvents(q.id)).toHaveLength(count);
+  });
 });
 
 /* ---------- 10 ---------- */
@@ -497,6 +518,8 @@ describe('Test 13: stream', () => {
   const deps = { can };
   /** The unit-bound reader as the stream resolves it (assignment context from the projection). */
   const STREAM_FIN: Actor = { id: 'reader-exp48-fin', role: 'expert', assignmentScoped: true, unitId: 'unit-fin' };
+  /** The reader bound to the target unit: the question enters its scope with the forward (T-G1-I-09). */
+  const STREAM_HR: Actor = { id: 'reader-exp48-hr', role: 'expert', assignmentScoped: true, unitId: 'unit-hr' };
   const readers = (actor: Actor) => new Map([[meetingId, actor]]);
   const eventsOf = (messages: readonly StreamMessage[]) => messages.flatMap((m) => (m.kind === 'event' ? [m.event] : []));
 
@@ -516,6 +539,15 @@ describe('Test 13: stream', () => {
     expect(JSON.stringify(live)).not.toContain('reasonCode');
 
     expect(replayMessage(readers(STREAM_FIN), batch, after, deps)).toEqual({ kind: 'reset' });
+
+    // The target unit: live a change that names the question (it is readable after the batch), on catch-up a reset.
+    const liveHr = visibleMessages(readers(STREAM_HR), batch, before, after, deps);
+    expect(eventsOf(liveHr)).toEqual([]);
+    const changeHr = liveHr.find((m) => m.kind === 'change');
+    expect(changeHr?.kind === 'change' ? changeHr.change.subjects : undefined).toContain(q.id);
+    expect(changeHr?.kind === 'change' ? changeHr.change.topics : undefined).toContain('questions');
+    expect(JSON.stringify(liveHr)).not.toContain('reasonCode');
+    expect(replayMessage(readers(STREAM_HR), batch, after, deps)).toEqual({ kind: 'reset' });
 
     const asAdmin = eventsOf(visibleMessages(readers({ id: 'reader-adm48', role: 'admin' }), batch, before, after, deps));
     expect(asAdmin).toHaveLength(1);
