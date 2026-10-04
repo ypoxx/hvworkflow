@@ -636,7 +636,9 @@ Spec) und 053b (Skizze oben, eigene Spec vor dem Bau).
 **Zuschnitt bei Überschreitung (vorbereitet).** Zeichnet sich ab, dass der Bau über 4,0 AStd geht, committet er nach
 Entscheidung 1, 2, 4, 5 und 6 (Route, Seite, Weiterleiten-Dialog, Detail, Schreibtür) mit Tests 4–7, 9, 10 und S2–S7, S9 einen
 Zwischenstand und meldet. Der Rest (Verteilung, Entscheidung 3 und 8, Tests 1–3, 8, 11, S1, S8 für die Verteilung, S10, die
-Steuerungs-Screenshots) folgt als 053c mit denselben „Files allowed“, ohne neue Spec-Runde.
+Steuerungs-Screenshots) folgt als 053c **erst nach einer eigenen Spec** `docs/slices/053c-*.md` (Ziel, Nicht-Ziele, Regel-ids,
+Abnahme, „Files allowed“ als Teilmenge dieser Liste; AGENTS.md Regel 1). Der Orchestrator schreibt sie aus diesem Abschnitt, bevor
+der Rest gebaut wird (Codex P1 auf #144).
 
 ## Standards (auf Standard gebaut)
 
