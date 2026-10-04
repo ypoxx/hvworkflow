@@ -805,12 +805,23 @@ unberührt).
 | D9 | ja | Ohne Recht fehlt die Schaltfläche, ohne Steuerungsrecht die ganze Leiste; Filterwechsel bei 800: p90 3,0 ms. |
 | D10 | ja | Zwei schmale Leisten statt Diagramm oder Kacheln; einziges Symbol ist das der Navigation. |
 
-**Aufwand:** rund 1,0 AStd Bau und Nachweis (15:02–16:05 UTC) gegen 3,4 geschätzt; kein Zuschnitt, 053c entfällt.
+**Aufwand:** rund 0,9 AStd Bau und Nachweis (15:02–15:55 UTC, einschließlich der roten e2e-Läufe und der vollen Suite) gegen
+3,4 geschätzt; kein Zuschnitt, 053c entfällt.
 
 **Projekt `http` (CI `e2e-http` des PR):** Lauf-ID: _offen_ · Job-ID: _offen_ · Dauer des Schritts „End-to-end http
 project …“: _offen_ (Limit 9:00) · Schluss des Logs mit den Fällen aus `053-steuerung.spec.ts`: _offen_.
 
-**`pnpm gates`:** _wird nach dem Lauf eingetragen_
+**`pnpm gates`** auf Commit `55f4270` (sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
+Ausgang 0. Zählerzeilen: `packages/domain` 421 passed (20 Dateien), `apps/web` 628 passed (35), `apps/api` 674 passed (46);
+`vocabulary-check: ok`; `i18n-literal check: 0 literals`; `slice-scope: 40 changed file(s), all within … "Files allowed"`;
+`downgrade-check`, `metrics-allowlist`, `plan-graph` ok. Schluss wörtlich:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.82s
+mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit 55f4270, tree a8fba1589cd3…
+```
 
 ## Review findings
 
