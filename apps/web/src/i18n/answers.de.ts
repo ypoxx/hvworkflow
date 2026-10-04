@@ -129,4 +129,13 @@ export const answersDe = {
     'Ein neuer Antwortentwurf verdrängt die Verweigerung und braucht erneut Rechtsfreigabe und Freigabe.',
   'answers.refusal.badge': 'Verweigerung',
   'answers.return.refusalWarning': 'Keine Begründung in den Rückgabegrund: Er ist für alle sichtbar, die die Frage lesen.',
+  // Scheibe 053: the dialog "An anderen Fachbereich weiterleiten" (built once, reused by 054).
+  'answers.forward.body': 'Nur der Fachbereich wechselt; Status, Antwortversionen, Rechtsfreigabe und Freigabe bleiben.',
+  'answers.forward.readers': 'Der Zielfachbereich liest danach die Einzelfrage mit Rückgabegrund und Historie.',
+  'answers.forward.unit.label': 'Zielfachbereich',
+  'answers.forward.unit.placeholder': 'Fachbereich wählen',
+  'answers.forward.reason.label': 'Grund der Weiterleitung',
+  'answers.forward.error.guard15': 'Die Einzelfrage liegt schon in diesem Fachbereich.',
+  'answers.forward.error.invalid': 'Eingabe abgewiesen: Fachbereich unbekannt oder Grund fehlt.',
+  'answers.forward.gone': '{number}: weitergeleitet oder nicht mehr sichtbar.',
 };

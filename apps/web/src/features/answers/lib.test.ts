@@ -7,7 +7,9 @@
  * here.
  */
 import { describe, expect, it } from 'vitest';
+import type { Question } from '@hv/domain';
 import {
+  applyClientFilters,
   createDetailProblemGate,
   isCurrentLoad,
   isReadForbidden,
@@ -347,5 +349,62 @@ describe('keyBelongsTo (slice 010d)', () => {
 
   it('no load yet (null) belongs to nobody', () => {
     expect(keyBelongsTo(null, 'u-exp-fin')).toBe(false);
+  });
+});
+
+/**
+ * Scheibe 053, Test 8: `applyClientFilters` — the status chip and the order, applied in memory, lifted out of
+ * `useBacklog.ts` without a change of behaviour so that `timing053.test.ts` can measure it. The reference below is
+ * the inline version as it stood in `useBacklog.ts` before the lift, verbatim.
+ */
+describe('applyClientFilters (Scheibe 053, Test 8)', () => {
+  type Row = Pick<Question, 'number' | 'status' | 'createdAt'>;
+  const excerpt: readonly Row[] = [
+    { number: 'F-0211', status: 'captured', createdAt: '2026-06-15T12:10:00.000Z' },
+    { number: 'F-0111', status: 'assigned', createdAt: '2026-06-15T10:00:00.000Z' },
+    { number: 'F-0185', status: 'classified', createdAt: '2026-06-15T11:00:00.000Z' },
+    { number: 'F-0143', status: 'assigned', createdAt: '2026-06-15T10:00:00.000Z' },
+    { number: 'F-0224', status: 'captured', createdAt: '2026-06-15T09:30:00.000Z' },
+    { number: 'F-0121', status: 'assigned', createdAt: '2026-06-15T12:00:00.000Z' },
+  ];
+  const pool = excerpt as unknown as readonly Question[];
+
+  function inline(items: readonly Question[], status: string, sort: 'number' | 'age'): Question[] {
+    const filtered = status === 'all' ? [...items] : items.filter((q) => q.status === status);
+    filtered.sort(
+      sort === 'number'
+        ? (a, b) => a.number.localeCompare(b.number)
+        : (a, b) => a.createdAt.localeCompare(b.createdAt) || a.number.localeCompare(b.number),
+    );
+    return filtered;
+  }
+  const numbers = (items: readonly Question[]): string[] => items.map((q) => q.number);
+
+  it('status "all" keeps every row, ordered by number', () => {
+    expect(numbers(applyClientFilters(pool, 'all', 'number'))).toEqual([
+      'F-0111', 'F-0121', 'F-0143', 'F-0185', 'F-0211', 'F-0224',
+    ]);
+  });
+
+  it('one status keeps only its rows', () => {
+    expect(numbers(applyClientFilters(pool, 'assigned', 'number'))).toEqual(['F-0111', 'F-0121', 'F-0143']);
+    expect(applyClientFilters(pool, 'approved', 'number')).toEqual([]);
+  });
+
+  it('by age: oldest first, equal times by number', () => {
+    expect(numbers(applyClientFilters(pool, 'all', 'age'))).toEqual([
+      'F-0224', 'F-0111', 'F-0143', 'F-0185', 'F-0121', 'F-0211',
+    ]);
+  });
+
+  it('equals the former inline version for every status and order, and leaves its input untouched', () => {
+    const before = numbers(pool);
+    for (const status of ['all', 'captured', 'classified', 'assigned', 'staged'] as const) {
+      for (const sort of ['number', 'age'] as const) {
+        expect(applyClientFilters(pool, status, sort)).toEqual(inline(pool, status, sort));
+      }
+    }
+    expect(numbers(pool)).toEqual(before);
+    expect(applyClientFilters(pool, 'all', 'number')).not.toBe(pool);
   });
 });

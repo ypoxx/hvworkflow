@@ -12,6 +12,8 @@ import { stageDe } from './stage.de';
 import { stageEn } from './stage.en';
 import { historyDe } from './history.de';
 import { historyEn } from './history.en';
+import { steeringDe } from './steering.de';
+import { steeringEn } from './steering.en';
 import { de } from './de';
 import { en } from './en';
 
@@ -56,6 +58,7 @@ const modules: Array<{
   { name: 'answers', de: answersDe as Record<string, string>, en: answersEn as Record<string, string>, prefixes: ['answers'] },
   { name: 'stage', de: stageDe as Record<string, string>, en: stageEn as Record<string, string>, prefixes: ['stage'] },
   { name: 'history', de: historyDe as Record<string, string>, en: historyEn as Record<string, string>, prefixes: ['history'] },
+  { name: 'steering', de: steeringDe as Record<string, string>, en: steeringEn as Record<string, string>, prefixes: ['steering'] },
 ];
 
 describe('i18n parity checks', () => {
@@ -163,13 +166,15 @@ describe('i18n parity checks', () => {
   // Scheibe 044a: +2 action keys (propose and approve a refusal), required by ACTION_KEYS; rendered from 045.
   // Scheibe 045: +29 keys for the refusal (answers 22, stage 3, history 2, shell 2).
   // Scheibe 048: +8 keys for the forward (shell 2: action, event; history 6: unit change, reason, four codes).
-  it('(f) Total key count is 561 across all modules and matches de and en', () => {
+  // Scheibe 053: +25 keys for the steering view (shell 3: nav, page title, description; steering 14; answers 8: the
+  // forward dialog).
+  it('(f) Total key count is 586 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(561);
-    expect(deKeys).toBe(561);
-    expect(enKeys).toBe(561);
+    expect(totalKeys).toBe(586);
+    expect(deKeys).toBe(586);
+    expect(enKeys).toBe(586);
   });
 });

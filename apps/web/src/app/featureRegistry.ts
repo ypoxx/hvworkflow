@@ -9,12 +9,13 @@
  */
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { History, ListOrdered, PencilLine, Presentation, ScrollText } from 'lucide-react';
+import { History, ListOrdered, PencilLine, Presentation, ScrollText, Waypoints } from 'lucide-react';
 import type { Permission } from '@hv/domain';
 import type { Meeting } from '@hv/domain';
 import type { TKey } from '../i18n';
 import { SpeakersPage } from '../features/speakers/Page';
 import { CapturePage } from '../features/capture/Page';
+import { SteeringPage } from '../features/steering/Page';
 import { AnswersPage } from '../features/answers/Page';
 import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
@@ -71,6 +72,20 @@ export const FEATURES: readonly Feature[] = [
     i18nModule: 'capture',
     shortcutKey: 2,
     Component: CapturePage,
+  },
+  {
+    // Scheibe 053: the steering view. `requires` is data, not a role name; until the interface knows the person's
+    // rights (no source yet, owner question 3), the navigation shows it to everyone like every other view. No
+    // shortcut: Alt+6 is reserved for 054.
+    id: 'steering',
+    path: '/steering',
+    labelKey: 'nav.steering',
+    icon: Waypoints,
+    testId: 'nav-steering',
+    helpKey: 'page.steering.description',
+    i18nModule: 'steering',
+    requires: 'question.classify',
+    Component: SteeringPage,
   },
   {
     id: 'answers',

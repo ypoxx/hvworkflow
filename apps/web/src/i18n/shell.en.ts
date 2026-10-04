@@ -45,6 +45,7 @@ export const shellEn: typeof shellDe = {
   'nav.section': 'Process',
   'nav.speakers': 'Requests to speak',
   'nav.capture': 'Capture',
+  'nav.steering': 'Steering',
   'nav.answers': 'Answering',
   'nav.stage': 'Podium',
   'nav.history': 'History & search',
@@ -145,6 +146,9 @@ export const shellEn: typeof shellDe = {
   'page.capture.title': 'Capture',
   'page.capture.description':
     'Capture contributions and atomize them into individual questions, with remaining coverage.',
+  'page.steering.title': 'Steering',
+  'page.steering.description':
+    'Classify, assign and forward to other answering units; distribution per answering unit and podium seat.',
   'page.answers.title': 'Answering',
   'page.answers.description': 'Answer draft, legal clearing and approval per answer track.',
   'page.stage.title': 'Podium',

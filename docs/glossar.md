@@ -53,5 +53,6 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
+| Verteilung | Distribution | `Meeting.counts.byUnit` (offen je Fachbereich), `Meeting.counts.bySeat` (auf der Bühne je Bühnenplatz); Summen aus dem Dienst, nie je Person (Scheibe 053) | „Matrix“ (es sind zwei Randsummen), „Dashboard“ |
 | Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | — |
 | Rechtsfreigabe | Legal clearing | `question.legal.clear` | — |

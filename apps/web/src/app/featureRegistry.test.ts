@@ -58,10 +58,20 @@ describe('featureRegistry', () => {
       expect(visible).toEqual(FEATURES);
     });
 
-    it('returns all routes when granted is an empty set (no route requires permissions)', () => {
+    it('returns all routes but steering when granted is an empty set (no other route requires permissions)', () => {
       const visible = visibleRoutes(FEATURES, new Set());
-      // All current routes have no 'requires' field, so all should be visible
-      expect(visible).toEqual(FEATURES);
+      // Scheibe 053: only `steering` carries a 'requires' field; every other route stays visible.
+      expect(visible).toEqual(FEATURES.filter((f) => f.id !== 'steering'));
+      for (const feature of FEATURES) {
+        if (feature.id !== 'steering') expect(feature.requires).toBeUndefined();
+      }
+    });
+
+    it('Scheibe 053: steering is visible with question.classify, and without a set at all (navigation today)', () => {
+      const granted = new Set<Permission>(['question.classify']);
+      expect(visibleRoutes(FEATURES, granted).map((f) => f.id)).toContain('steering');
+      expect(visibleRoutes(FEATURES, new Set()).map((f) => f.id)).not.toContain('steering');
+      expect(visibleRoutes(FEATURES)).toEqual(FEATURES);
     });
 
     it('filters out routes with unmet permission requirements', () => {
@@ -94,7 +104,7 @@ describe('featureRegistry', () => {
     });
 
     it('preserves route order', () => {
-      const granted = new Set(['speaker.read', 'contribution.read', 'question.read']) as unknown as ReadonlySet<Permission>;
+      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify']) as unknown as ReadonlySet<Permission>;
       const visible = visibleRoutes(FEATURES, granted);
       expect(visible).toEqual(FEATURES);
     });
@@ -121,6 +131,24 @@ describe('featureRegistry', () => {
           expect(feature.shortcutKey).toBeLessThanOrEqual(5);
         }
       }
+    });
+
+    it('Scheibe 053: the steering row sits between capture and answers, requires question.classify, no shortcut', () => {
+      const ids = FEATURES.map((f) => f.id);
+      const steering = FEATURES.find((f) => f.id === 'steering');
+      expect(steering?.path).toBe('/steering');
+      expect(steering?.requires).toBe('question.classify');
+      expect(steering?.shortcutKey).toBeUndefined();
+      expect(steering?.testId).toBe('nav-steering');
+      expect(steering?.labelKey).toBe('nav.steering');
+      expect(steering?.helpKey).toBe('page.steering.description');
+      expect(steering?.i18nModule).toBe('steering');
+      expect(steering?.counter).toBeUndefined();
+      expect(ids.indexOf('steering')).toBe(ids.indexOf('capture') + 1);
+      expect(ids.indexOf('answers')).toBe(ids.indexOf('steering') + 1);
+      // The shortcuts stay Alt+1…5, unique, one per remaining entry.
+      const keys = FEATURES.flatMap((f) => (f.shortcutKey === undefined ? [] : [f.shortcutKey]));
+      expect([...keys].sort()).toEqual([1, 2, 3, 4, 5]);
     });
 
     it('features are in the order they should appear (speakers first, history last)', () => {

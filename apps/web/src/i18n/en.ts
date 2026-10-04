@@ -9,6 +9,7 @@ import { captureEn } from './capture.en';
 import { answersEn } from './answers.en';
 import { stageEn } from './stage.en';
 import { historyEn } from './history.en';
+import { steeringEn } from './steering.en';
 
 export const en: Dictionary = {
   ...shellEn,
@@ -17,4 +18,5 @@ export const en: Dictionary = {
   ...answersEn,
   ...stageEn,
   ...historyEn,
+  ...steeringEn,
 };
