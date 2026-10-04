@@ -504,7 +504,7 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 - `apps/web/src/api/actor.ts` (nur die neue Liste der Demo-Bindungen mit dem einen Eintrag aus Entscheidung 2a)
 - `apps/web/src/api/index.ts` (nur der Bindungsschritt in der Startfunktion der Demo aus Entscheidung 2a)
 - `apps/web/e2e/020-rueckbau-passung.spec.ts` (nur die Rolle des Schritts m3, Entscheidung 2a)
-- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (im Bau ergänzt nach Entscheidung 2a, „Bricht eine weitere Datei …“: nur die Hilfe `answersInReviewAsLegal` filtert auf Finanzen, damit die an die gebundene Fachkraft übergebenen Einzelfragen lesbar bleiben; Bericht)
+- Nachtrag Orchestrator 04.10.2026: `apps/web/e2e/010d-ansichtsdaten.spec.ts` — nur Zeilenwahl im Helfer auf unit-fin (clientseitig, Liste bleibt ungefiltert), weil die Demo-Bindung die Lesbarkeit fremder Einheiten für den Experten entzieht; `apps/web/e2e/020-rueckbau-passung.spec.ts` — zusätzlich `asRole(page,'expert')` vor dem Entwurfsteil.
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile der Fokusansicht, ihr Import, ihr Icon und die Kommentare zum Kürzelbereich)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile, zu `requires` und zum Kürzelbereich)
 - `apps/web/src/i18n/focus.de.ts` (neu), `apps/web/src/i18n/focus.en.ts` (neu)
@@ -529,6 +529,8 @@ den zwei Registerdateien, `apps/web/src/features/{answers,steering,capture,stage
 `apps/web/src/i18n/labels.ts`, fremde e2e-Dateien außer dem einen Schritt in 020 und `apps/web/e2e/support/**` außer `e2e-texts.ts`, `scripts/**` außer dem
 Reihenfolge-Pin, `.github/**`, `docs/produktplan-beta.md` (Hinweise an den Orchestrator unten). Dieser Abschnitt steht bewusst
 außerhalb von „Files allowed“.
+Ausnahme: der Nachtrag des Orchestrators vom 04.10.2026 in „Files allowed“ (010d nur Zeilenwahl im Helfer, 020 zusätzlich
+`asRole(page,'expert')` vor dem Entwurfsteil); sonst bleibt jede fremde e2e-Datei unberührt.
 
 ## Vor dem Bau prüfen
 
@@ -711,6 +713,7 @@ laufen F1–F8 genauso; die Screenshots gehen dort in das Ausgabeverzeichnis (`s
 2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter **unverändert** 001, 003, 010b, 010c, 010d, 013, 021b,
    024, 040a, 045, 053, 090 und abnahme, und 020 mit genau der Änderung aus Entscheidung 2a (Ergebnis je Datei im Bericht);
    axe ohne serious/critical. Projekt `http` grün im CI-Lauf `e2e-http` des PR.
+   Ausnahme von „unverändert“: 010d und 020 nur im Umfang des Nachtrags des Orchestrators vom 04.10.2026 („Files allowed“).
 3. Sechs Screenshots in `docs/evidence/` aus dem Projekt `in-process`: `054-fokus-de.png`, `054-fokus-en.png`,
    `054-schreibmodus-de.png`, `054-schreibmodus-en.png`, `054-weiterleiten-de.png`, `054-weiterleiten-en.png`. Auf dem
    Fokusbild sind die Liste (zweizeiliger Wortlaut, Alter, kein TOP), das Detail mit genau einer primären Aktion und der
@@ -935,8 +938,10 @@ neu, die Tests patchen `api` über `import('/src/api/index.ts')`) und waren im z
 `4f37d07` ohne Änderung: 74 grün.
 **Änderungen nach Entscheidung 2a:** 020 m3 wechselt zu `approver` und vor der Entwurfshälfte zurück zu `expert` (eine
 zusätzliche Zeile `asRole(page, 'expert')`, weil die Entwurfshälfte bisher stillschweigend die Rolle aus m3 weiterverwendete);
-010d: nur die Hilfe `answersInReviewAsLegal` filtert zusätzlich auf Finanzen und wartet, bis jede Zeile `unit-fin` trägt.
-Keine Zusicherung geschwächt. 010d stand nicht in „Files allowed“; die Zeile ist dort mit Begründung ergänzt.
+010d: die Liste bleibt ungefiltert (vollständig, `poolComplete`); die Hilfen wählen clientseitig Zeilen mit
+`data-unit="unit-fin"` (`legalClearableRows`, Dialogfall) und warten, bis der Statusfilter angekommen ist und eine solche Zeile
+dasteht (Review-Nacharbeit; die erste Fassung filterte im Dienst). Keine Zusicherung geschwächt. Freigabe beider Dateien über
+den Nachtrag des Orchestrators in „Files allowed“.
 
 **Rot vor der Änderung** (neue Tests auf `4f37d07` ohne Umsetzung): Vitest „Test Files 7 failed (7), Tests 4 failed |
 13 passed (17)“ (Module `./focus`, `./FocusList`, `./FocusDetail`, `./focus.de` fehlen; Register: „expected 5 to be 6“,

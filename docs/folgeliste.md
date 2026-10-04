@@ -702,6 +702,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Zeilen ergänzen (Lane web-shell).
 - 054 Bau · `apps/web/src/features/focus/Page.tsx` Fokus nach der Übergabe · wird nach der letzten Einzelfrage der Liste (leere
   Liste) verworfen; der Fokus fällt dann auf `body` · Fokusziel im Hinweis `focus-empty` vorsehen.
+- 054 Review 5 · ungespeicherter Text beim Verlassen von `/my` (Navigation weg von der Seite) geht still verloren · mit dem
+  Entwurfspuffer 060.
+- 054 Review 6 · Escape während einer IME-Komposition verlässt den Schreibmodus · `isComposing` auch in `shouldLeaveWriting`.
+- 054 Review 7 · Verweigerungsbadge in Liste (`danger`) und Detail/Steuerung (`warning`) uneinheitlich · einen Ton festlegen.
+- 054 Review 8 · `DEMO_BINDINGS` ohne Grund (`reason`) und bei jedem Start erneut versucht (409 übergangen) · Grund mitgeben,
+  Versuch nur nach dem Säen oder bei fehlender Zuordnung.
 - 054 Bau · e2e F1–F8 als `test.describe.serial` · scheitert ein Fall, laufen die folgenden nicht; die roten Läufe vor dem
   Bau zeigen deshalb nur F1 rot · unabhängige Fälle aus der Serie lösen, wo der Endzustand im Projekt `http` es erlaubt.
 - 054 Bau · `focus054.test.ts` · die Spec nannte für alle Personen außer Podium 230 lesbare Einzelfragen; die Beobachtung liest

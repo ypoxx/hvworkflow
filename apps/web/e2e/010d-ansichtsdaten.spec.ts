@@ -380,11 +380,7 @@ async function expectAbsent(page: Page, testIds: readonly string[]): Promise<voi
   for (const id of testIds) await expect(page.getByTestId(id), id).toHaveCount(0);
 }
 
-/**
- * The Beantwortung with legal, filtered to "in Prüfung" and to Finanzen. Scheibe 054 (decision 2a): the demo expert is
- * bound to Finanzen and reads nothing else, so the questions these tests hand over to the expert come from there; the
- * unit filter works in the service, so the rows are taken only once every one carries the unit (045).
- */
+/** The Beantwortung with legal, filtered to "in Prüfung". */
 async function answersInReviewAsLegal(page: Page): Promise<void> {
   await page.goto('/');
   await waitForCorpus(page);
@@ -392,17 +388,23 @@ async function answersInReviewAsLegal(page: Page): Promise<void> {
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
-  await page.getByTestId('answers-filter-unit').selectOption('unit-fin');
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
+  // Scheibe 054 (decision 2a): the rows handed over to the bound expert are chosen client-side in Finanzen; the list
+  // itself stays unfiltered (complete). Wait until the status chip has landed and a Finanzen row is there.
   await expect.poll(async () => {
-    const units = await page.getByTestId('answers-row').evaluateAll((els) => els.map((el) => el.getAttribute('data-unit')));
-    return units.length > 0 && units.every((unit) => unit === 'unit-fin');
+    const facts = await page.getByTestId('answers-row').evaluateAll((els) =>
+      els.map((el) => [el.getAttribute('data-status'), el.getAttribute('data-unit')]));
+    return facts.length > 0 && facts.every(([status]) => status === 'in_review') && facts.some(([, unit]) => unit === EXPERT_UNIT_ID);
   }).toBe(true);
 }
 
+/** Scheibe 054 (decision 2a): rows of the unit the demo expert is bound to — the only ones the expert reads. */
+const EXPERT_UNIT_ID = 'unit-fin';
+const expertRows = (page: Page): Locator => page.locator(`[data-testid="answers-row"][data-unit="${EXPERT_UNIT_ID}"]`);
+
 /** Seeded legal authors cannot clear their own answers, so choose records with an offered step. */
 async function legalClearableRows(page: Page, count = 1): Promise<Locator[]> {
-  const rows = page.getByTestId('answers-row');
+  const rows = expertRows(page);
   const found: Locator[] = [];
   for (let i = 0; i < await rows.count() && found.length < count; i++) {
     const row = rows.nth(i);
@@ -603,7 +605,7 @@ test('010d Ziel 1: Beantwortung — ein Dialog der vorigen Rolle schließt mit d
   page,
 }) => {
   await answersInReviewAsLegal(page);
-  await page.getByTestId('answers-row').first().click();
+  await expertRows(page).first().click();
   await page.getByTestId('answer-return').click();
   await expect(page.getByTestId('answer-return-reason')).toBeVisible();
 

@@ -513,7 +513,14 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
 
   test('F8 Eingaben je Akteur (schreibt nichts)', async ({ page }) => {
     test.setTimeout(120_000);
-    const { number } = await findMine(page, { status: 'assigned' });
+    // Brings its own precondition: any row of "Meine Fragen" will do (it writes nothing), so it does not depend on F7
+    // leaving an `assigned` question behind in `http`.
+    await asRole(page, 'expert');
+    await toFocus(page);
+    await waitForMine(page);
+    const number = (await rows(page).first().getAttribute('data-number')) ?? '';
+    await row(page, number).click();
+    await expect(detailNumber(page)).toHaveText(number);
     await row(page, number).dblclick();
     await expect(editor(page)).toBeFocused();
     await page.keyboard.type(FOCUS_054_UNSAVED);
