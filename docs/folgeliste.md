@@ -684,6 +684,15 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   `answers.refusal.error.invalid`) · mit einer Regel-id für Eingabeprüfungen nachziehen, falls der Vertrag eine bekommt.
 - 053 Bau · e2e S6 im Projekt `http` · der Akteurwechsel lädt die Seite neu, der offene Dialog fällt dort durch das Neuladen,
   nicht durch den Schlüssel; die Zusicherung „erneut öffnen ist leer“ gilt in beiden Projekten · in-process belegt den Schlüssel.
+- 053 Review 4 · Verteilung · Nullen in Grau 300 haben etwa 1,6:1 Kontrast (Vorgabe D4; axe legt Einzelzeichen unter
+  „incomplete“), und die Bühnenplatzzellen tragen kein `aria-label` · Entscheidung Eigentümer/Gestaltung, Bezeichnung ergänzen.
+- 053 Review 6 · Test der Statusunabhängigkeit · steht in `steering.test.ts` mit Teil-Datensätzen · nach
+  `SteeringDetail.test.tsx` mit echten `Question`-Datensätzen verlegen.
+- 053 Review 7 · e2e `findSteerable` ohne `unitName` · wartet nicht auf die ungefilterte Liste · wie beim Fachbereich auf das
+  Eintreffen warten.
+- 053 Review 8 · Drill-down · „15 offen“ zeigt mit Status „alle“ 24 Zeilen · Voreinstellung „offen“ oder Hinweis, als
+  Eigentümerfrage.
+- 053 Review 9 · `counts.byUnit` · für gebundene Fachkräfte sichtbar (Entwurf 040b) · zur nächsten Datenschutzprüfung.
 
 ## Skripte
 

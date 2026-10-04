@@ -727,8 +727,8 @@ Done: Route /steering mit Registerzeile (requires question.classify, ohne Kürze
       counts.byUnit/bySeat mit Drill-down, Steuerungsdetail nach steeringActions (_actions only); Weiterleiten-Dialog
       einmal in features/answers (für 054); Schreibtür als useWriteDoor herausgelöst, applyClientFilters herausgelöst.
 Evidence: pnpm gates (Commit und Schluss unten), docs/evidence/053-{steuerung,weiterleiten}-{de,en}.png
-Open: Projekt http nur im CI-Lauf e2e-http des PR (Lauf-ID und Dauer unten offen); Folgepunkte in docs/folgeliste.md
-      „Steuerung (aus 053)“.
+Open: keine Blocker; Folgepunkte in docs/folgeliste.md „Steuerung (aus 053)“. Projekt http grün im CI-Lauf
+      37214710167 des PR #145 (unten).
 Touched: siehe Liste unten (nur Files allowed).
 ```
 
@@ -808,19 +808,43 @@ unberührt).
 **Aufwand:** rund 0,9 AStd Bau und Nachweis (15:02–15:55 UTC, einschließlich der roten e2e-Läufe und der vollen Suite) gegen
 3,4 geschätzt; kein Zuschnitt, 053c entfällt.
 
-**Projekt `http` (CI `e2e-http` des PR):** Lauf-ID: _offen_ · Job-ID: _offen_ · Dauer des Schritts „End-to-end http
-project …“: _offen_ (Limit 9:00) · Schluss des Logs mit den Fällen aus `053-steuerung.spec.ts`: _offen_.
+**Projekt `http` (CI `e2e-http` des PR #145):** Lauf-ID **37214710167**, Job-ID **111472763444**, Commit `2a12e0d`. Der
+Schritt „End-to-end http project …“ dauerte **5:04** (15:54:31–15:59:35 UTC) bei einem Limit von 9:00 (Ist vor dem Bau
+höchstens 4:19, Schätzung +1,5 min; tatsächlich +0:45). Das ✘ bei 031 G1 in diesem Lauf ist die beabsichtigte Schutzzeile
+dieses Tests (wiederholt wie in früheren Läufen). Schluss des Logs mit den Fällen aus `053-steuerung.spec.ts`:
 
-**`pnpm gates`** auf Commit `55f4270` (sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
-Ausgang 0. Zählerzeilen: `packages/domain` 421 passed (20 Dateien), `apps/web` 628 passed (35), `apps/api` 674 passed (46);
-`vocabulary-check: ok`; `i18n-literal check: 0 literals`; `slice-scope: 40 changed file(s), all within … "Files allowed"`;
-`downgrade-check`, `metrics-allowlist`, `plan-graph` ok. Schluss wörtlich:
+```
+  ✓  38 [http] › e2e/053-steuerung.spec.ts:195:3 › 053 Steuerungsansicht der Koordination › S1 Verteilung gegen die Zähler, Drill-down gegen die Liste (mit S8) @screenshot (6.4s)
+  ✓  39 [http] › e2e/053-steuerung.spec.ts:260:3 › 053 Steuerungsansicht der Koordination › S2 Klassifizieren (mit S8) (5.3s)
+  ✓  40 [http] › e2e/053-steuerung.spec.ts:286:3 › 053 Steuerungsansicht der Koordination › S3 Zuweisen (3.7s)
+  ✓  41 [http] › e2e/053-steuerung.spec.ts:311:3 › 053 Steuerungsansicht der Koordination › S4 An anderen Fachbereich weiterleiten (mit S8) @screenshot (7.9s)
+  ✓  42 [http] › e2e/053-steuerung.spec.ts:389:3 › 053 Steuerungsansicht der Koordination › S5 Rechte als Daten (schreibt nichts) (6.4s)
+  ✓  43 [http] › e2e/053-steuerung.spec.ts:424:3 › 053 Steuerungsansicht der Koordination › S6 Eingaben je Akteur und je Frage (schreibt nichts) (6.1s)
+  ✓  44 [http] › e2e/053-steuerung.spec.ts:457:3 › 053 Steuerungsansicht der Koordination › S7 Tastatur: Zelle per Tab und Enter, Dialog ganz per Tastatur (schreibt nichts) (3.4s)
+  ✓  45 [http] › e2e/053-steuerung.spec.ts:497:3 › 053 Steuerungsansicht der Koordination › S9 Verweigerung vorschlagen aus der Steuerung (schreibt nichts) (2.2s)
+  ✓  46 [http] › e2e/053-steuerung.spec.ts:511:3 › 053 Steuerungsansicht der Koordination › S10 Zeit (weich): Statusfilter und Drill-down (2.2s)
+  48 passed (4.3m)
+```
+
+**Nacharbeit nach dem Review (Commit `af78c0c`).** (2) `forwardProblemHandler` schließt bei 404 nur, solange die Frage noch
+gezeigt wird; die Meldung erscheint immer (`forward.test.ts`, Fall mit `stillShown = () => false`). (3a) Fokus nach Aktion nur
+aus `body` oder dem Detail (`mayMoveFocus` in `steering.ts`, drei Unit-Fälle; e2e S2b: ein Schreibvorgang außerhalb der Seite
+bei Fokus im Suchfeld lässt den Fokus dort — ohne die Regel rot, mit grün, nur in-process, weil der fremde Schreibvorgang über
+das Demo-Modul geht). (3b) `armFocus` prüft gegen die aktuelle Version (Ref) und fokussiert sofort, wenn der Strom schneller
+war. (3c) Schließen des Klassifizierungsdialogs wirkt nur für eine neue Version innerhalb von 3 s und unter (3a); `onSaved`
+bleibt Folgepunkt. (4) S2 prüft axe auf dem Klassifizierungsdialog auch englisch. e2e 053 in-process mit
+`--repeat-each=3`: `30 passed (1.5m)`.
+
+**`pnpm gates`** auf Commit `af78c0c` (sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
+Ausgang 0 (erster Lauf auf `55f4270`, ebenfalls grün). Zählerzeilen: `packages/domain` 421 passed, `apps/web` 632 passed,
+`apps/api` 674 passed; `vocabulary-check: ok`; `i18n-literal check: 0 literals`; `slice-scope: 40 changed file(s), all
+within … "Files allowed"`. Schluss wörtlich:
 
 ```
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.82s
-mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit 55f4270, tree a8fba1589cd3…
+✓ built in 1.36s
+mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit af78c0c, tree bf1f489c759e…
 ```
 
 ## Review findings
