@@ -913,7 +913,8 @@ Slice: 054-fokusansicht
 Done: Seite /my „Meine Fragen“ (Alt+6, Registerzeile requires answer.draft) mit Liste, Detail und Schreibmodus;
       Aktionen nur aus _actions (focusActions), Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 importiert;
       Demo-Fachkraft über DEMO_BINDINGS/assignRole an Finanzen gebunden (Entscheidung 2a).
-Evidence: Schluss von `pnpm gates` mit Commit im Bericht an den Orchestrator; docs/evidence/054-*.png (sechs Bilder, in-process)
+Evidence: `pnpm gates` grün auf 429ab6e (Schluss unten); docs/evidence/054-*.png (sechs Bilder, in-process);
+          Projekt http: CI-Lauf 37223187826 (unten)
 Open: Projekt http nur im CI-Lauf e2e-http des PR (lokal ohne Keycloak nicht lauffähig); 010d-Hilfe im Bau ergänzt (unten)
 Touched: siehe Liste unten
 ```
@@ -973,6 +974,30 @@ den Nachtrag des Orchestrators in „Files allowed“.
 `apps/web/e2e/020-rueckbau-passung.spec.ts`, `apps/web/e2e/010d-ansichtsdaten.spec.ts`, `apps/web/e2e/support/e2e-texts.ts`,
 `apps/web/playwright.config.ts`, `scripts/e2e-http-031.test.mjs`; `docs/evidence/054-*.png`; `docs/glossar.md`,
 `docs/folgeliste.md`, diese Spec.
+
+### Schluss von `pnpm gates` (Orchestrator, 04.10.2026)
+
+Lauf auf Commit 429ab6e (Code-Stand dieses PR; spätere Commits nur Doku), mit Postgres-Testdatenbank, Ausgang 0.
+Aus demselben Lauf: `packages/domain` Tests 421 passed, `apps/web` Tests 683 passed, `apps/api` Tests 674 passed,
+slice-scope „36 changed file(s), all within … 'Files allowed' list (32 pattern(s))“. Schluss wörtlich:
+
+```
+1..318
+# tests 318
+# suites 0
+# pass 318
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15651.234237
+
+> @hv/web@0.0.0 build /home/user/wt/s054/apps/web
+> tsc -b && vite build
+[… Vite-Ausgabe der Dateigrößen und Warnungen gekürzt …]
+✓ built in 1.71s
+mark-test-run: wrote /home/user/wt/s054/.claude/state/last-test-run (clean tree) at commit 429ab6e, tree 851cdd8c8713…
+```
 
 ### Nachweis Projekt `http` (Orchestrator, 04.10.2026)
 
