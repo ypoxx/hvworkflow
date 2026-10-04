@@ -914,7 +914,7 @@ Done: Seite /my „Meine Fragen“ (Alt+6, Registerzeile requires answer.draft) 
       Aktionen nur aus _actions (focusActions), Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 importiert;
       Demo-Fachkraft über DEMO_BINDINGS/assignRole an Finanzen gebunden (Entscheidung 2a).
 Evidence: `pnpm gates` grün auf 42ea09c (Schluss unten); docs/evidence/054-*.png (sechs Bilder, in-process);
-          Projekt http: CI-Lauf 37223187826 (unten)
+          Projekt http: CI-Lauf 37225467013 (unten)
 Open: Projekt http nur im CI-Lauf e2e-http des PR (lokal ohne Keycloak nicht lauffähig); 010d-Hilfe im Bau ergänzt (unten)
 Touched: siehe Liste unten
 ```
@@ -1002,23 +1002,24 @@ mark-test-run: wrote /home/user/wt/s054/.claude/state/last-test-run (clean tree)
 
 ### Nachweis Projekt `http` (Orchestrator, 04.10.2026)
 
-CI-Lauf `e2e-http` auf PR #149, Commit 429ab6e, Lauf-ID 37223187826, Job-ID 111497461855, grün. Schluss des Logs:
+CI-Lauf `e2e-http` auf PR #149, Commit 656b314 (Code-Stand 42ea09c), Lauf-ID 37225467013, Job-ID 111504094239, grün.
+Schluss des Logs:
 
 ```
-✓  48 [http] › e2e/054-fokusansicht.spec.ts:167:3 › 054 Fokusansicht der Beantworter › F1 Liste, Alt+6, Rechte als Daten @screenshot (3.8s)
-✓  49 [http] › e2e/054-fokusansicht.spec.ts:237:3 › 054 Fokusansicht der Beantworter › F2 Doppelklick → Schreibmodus → speichern @screenshot (4.7s)
-✓  50 [http] › e2e/054-fokusansicht.spec.ts:291:3 › 054 Fokusansicht der Beantworter › F3 Tastatur: Enter, Escape, Dialog über dem Schreibmodus (schreibt nichts) (1.8s)
-✓  51 [http] › e2e/054-fokusansicht.spec.ts:342:3 › 054 Fokusansicht der Beantworter › F4 Weiterleiten → nächste Einzelfrage; Rückgabegrund prominent (6.1s)
-✓  52 [http] › e2e/054-fokusansicht.spec.ts:384:3 › 054 Fokusansicht der Beantworter › F5 An anderen Fachbereich weiterleiten @screenshot (7.2s)
-✓  53 [http] › e2e/054-fokusansicht.spec.ts:446:3 › 054 Fokusansicht der Beantworter › F6 Lesehinweis, Rechte als Daten (schreibt nichts) (2.7s)
-✓  54 [http] › e2e/054-fokusansicht.spec.ts:467:3 › 054 Fokusansicht der Beantworter › F7 Zulauf aus der Steuerung: letzter Weiterleitungsgrund (4.6s)
-✓  55 [http] › e2e/054-fokusansicht.spec.ts:514:3 › 054 Fokusansicht der Beantworter › F8 Eingaben je Akteur (schreibt nichts) (2.7s)
-56 passed (4.9m)
+✓  48 [http] › e2e/054-fokusansicht.spec.ts:167:3 › 054 Fokusansicht der Beantworter › F1 Liste, Alt+6, Rechte als Daten @screenshot (3.4s)
+✓  49 [http] › e2e/054-fokusansicht.spec.ts:237:3 › 054 Fokusansicht der Beantworter › F2 Doppelklick → Schreibmodus → speichern @screenshot (4.0s)
+✓  50 [http] › e2e/054-fokusansicht.spec.ts:291:3 › 054 Fokusansicht der Beantworter › F3 Tastatur: Enter, Escape, Dialog über dem Schreibmodus (schreibt nichts) (1.4s)
+✓  51 [http] › e2e/054-fokusansicht.spec.ts:342:3 › 054 Fokusansicht der Beantworter › F4 Weiterleiten → nächste Einzelfrage; Rückgabegrund prominent (4.5s)
+✓  52 [http] › e2e/054-fokusansicht.spec.ts:384:3 › 054 Fokusansicht der Beantworter › F5 An anderen Fachbereich weiterleiten @screenshot (6.1s)
+✓  53 [http] › e2e/054-fokusansicht.spec.ts:446:3 › 054 Fokusansicht der Beantworter › F6 Lesehinweis, Rechte als Daten (schreibt nichts) (2.5s)
+✓  54 [http] › e2e/054-fokusansicht.spec.ts:467:3 › 054 Fokusansicht der Beantworter › F7 Zulauf aus der Steuerung: letzter Weiterleitungsgrund (3.9s)
+✓  55 [http] › e2e/054-fokusansicht.spec.ts:514:3 › 054 Fokusansicht der Beantworter › F8 Eingaben je Akteur (schreibt nichts) (2.2s)
+56 passed (4.1m)
 ```
 
-Dauer des Schritts „End-to-end http project …“: 18:08:42 bis 18:14:12, rund 5:30 gegen Limit 9:00 und Harness-Grenze 8:00
-(Schätzung vor dem Bau 7:00). Artefakt `evidence-031-http` (ID 11310678890, SHA-256
-f303b8d6b04aa39d5afc4a94623fe8793f92a574aa7af5bc08f307f84ac9edb2), für diese Scheibe nicht nötig.
+Dauer des Schritts „End-to-end http project …“: 18:43:39 bis 18:48:24, rund 4:45 gegen Limit 9:00 und Harness-Grenze 8:00
+(Schätzung vor dem Bau 7:00; der frühere Lauf 37223187826 auf 429ab6e dauerte rund 5:30). Artefakt `evidence-031-http`
+(ID 11312027170, `sha256:84713b81ab9a5fc99905e6135830358c624d286b786f17a0a74388aee736dbf8`), für diese Scheibe nicht nötig.
 
 Nachtrag Fokus (Orchestrator, 04.10.2026): Der CI-Lauf `e2e-http` auf dem Doku-Commit 37d330a (Lauf 37224478746) war rot in
 F4: Nach „Weiterleiten“ blieb der Fokus nicht im Detail. Ursache: Im HTTP-Betrieb kann der Strom die nächste Einzelfrage
