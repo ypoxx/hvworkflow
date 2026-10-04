@@ -913,7 +913,7 @@ Slice: 054-fokusansicht
 Done: Seite /my „Meine Fragen“ (Alt+6, Registerzeile requires answer.draft) mit Liste, Detail und Schreibmodus;
       Aktionen nur aus _actions (focusActions), Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 importiert;
       Demo-Fachkraft über DEMO_BINDINGS/assignRole an Finanzen gebunden (Entscheidung 2a).
-Evidence: `pnpm gates` grün auf 429ab6e (Schluss unten); docs/evidence/054-*.png (sechs Bilder, in-process);
+Evidence: `pnpm gates` grün auf 42ea09c (Schluss unten); docs/evidence/054-*.png (sechs Bilder, in-process);
           Projekt http: CI-Lauf 37223187826 (unten)
 Open: Projekt http nur im CI-Lauf e2e-http des PR (lokal ohne Keycloak nicht lauffähig); 010d-Hilfe im Bau ergänzt (unten)
 Touched: siehe Liste unten
@@ -977,7 +977,8 @@ den Nachtrag des Orchestrators in „Files allowed“.
 
 ### Schluss von `pnpm gates` (Orchestrator, 04.10.2026)
 
-Lauf auf Commit 429ab6e (Code-Stand dieses PR; spätere Commits nur Doku), mit Postgres-Testdatenbank, Ausgang 0.
+Lauf auf Commit 42ea09c (letzter Code-Stand dieses PR, nach dem Fokus-Fix unten; spätere Commits nur Doku), mit
+Postgres-Testdatenbank, Ausgang 0.
 Aus demselben Lauf: `packages/domain` Tests 421 passed, `apps/web` Tests 683 passed, `apps/api` Tests 674 passed,
 slice-scope „36 changed file(s), all within … 'Files allowed' list (32 pattern(s))“. Schluss wörtlich:
 
@@ -990,13 +991,13 @@ slice-scope „36 changed file(s), all within … 'Files allowed' list (32 patte
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 15651.234237
+# duration_ms 15355.545874
 
 > @hv/web@0.0.0 build /home/user/wt/s054/apps/web
 > tsc -b && vite build
 [… Vite-Ausgabe der Dateigrößen und Warnungen gekürzt …]
-✓ built in 1.71s
-mark-test-run: wrote /home/user/wt/s054/.claude/state/last-test-run (clean tree) at commit 429ab6e, tree 851cdd8c8713…
+✓ built in 1.79s
+mark-test-run: wrote /home/user/wt/s054/.claude/state/last-test-run (clean tree) at commit 42ea09c, tree b3478eda6d94…
 ```
 
 ### Nachweis Projekt `http` (Orchestrator, 04.10.2026)
@@ -1018,6 +1019,13 @@ CI-Lauf `e2e-http` auf PR #149, Commit 429ab6e, Lauf-ID 37223187826, Job-ID 1114
 Dauer des Schritts „End-to-end http project …“: 18:08:42 bis 18:14:12, rund 5:30 gegen Limit 9:00 und Harness-Grenze 8:00
 (Schätzung vor dem Bau 7:00). Artefakt `evidence-031-http` (ID 11310678890, SHA-256
 f303b8d6b04aa39d5afc4a94623fe8793f92a574aa7af5bc08f307f84ac9edb2), für diese Scheibe nicht nötig.
+
+Nachtrag Fokus (Orchestrator, 04.10.2026): Der CI-Lauf `e2e-http` auf dem Doku-Commit 37d330a (Lauf 37224478746) war rot in
+F4: Nach „Weiterleiten“ blieb der Fokus nicht im Detail. Ursache: Im HTTP-Betrieb kann der Strom die nächste Einzelfrage
+liefern, bevor der Schreibaufruf antwortet; `handedOver` scharfte den Fokus danach, und es folgte kein Render mehr. 053 hatte
+denselben Fall schon gelöst (Review 053, Minor 3b: `armFocus` ruft `settleFocus` sofort). 42ea09c übernimmt das in
+`features/focus/Page.tsx`. Der Lauf auf 429ab6e war grün, weil die Reihenfolge dort günstig war; der neue PR-Lauf auf dem Kopf ist der
+Nachweis.
 
 Hinweis: PR #148 (gleicher Inhalt) wurde geschlossen, weil gitleaks `generic-api-key` das JSX-Literal des Speichernamens
 in `features/focus/Page.tsx` traf; der Name steht jetzt als Modulkonstante, der Verlauf ist auf einen Commit gekürzt.
