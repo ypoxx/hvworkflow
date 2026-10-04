@@ -1,12 +1,12 @@
 # Scheibe 054 — Fokusansicht der Beantworter
 
-**Status:** spec (04.10.2026; gelesen auf `e0798e1` und auf dem Branch der Scheibe 053, `claude/slice-053-steuerungsansicht` bei `5a6f28b` (PR #145, gebaut, noch nicht gemergt). Diese Spec gilt für den Stand **nach** dem Merge von 053; der Bau beginnt auf der Integration mit 053. Vierte Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; nicht geteilt, Rückfallteilung 054b vorbereitet, Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** mittel · 3,4 AStd (Spanne 2,9–4,0; Plan 054: mittel · 2 AStd; Begründung in „Warum mittel“ und „Aufwand“) · Plan 054: 16.11.2026 (W8), tatsächlich direkt nach 053 als vierte Oberflächenscheibe der Freigabe-Demo · Lanes: web-focus (neu, `apps/web/src/features/focus/**`); web-shell (eine Zeile im Feature-Register mit Alt+6 und drei Shell-Schlüssel); web-api (nur eine neue Testdatei für den Zuschnitt je Akteur); e2e (eigene Datei, im Projekt `http` eingereiht, Texte in `e2e-texts.ts`); docs (zwei Glossarzeilen, Nachweise). **Keine** Änderung in web-answers oder web-steering: Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 werden nur importiert.
+**Status:** spec (04.10.2026; gelesen auf `e0798e1` und auf dem Branch der Scheibe 053 bei `5a6f28b`; 053 ist inzwischen gemergt (`d73f8fa`, PR #145), der Bau beginnt auf der Integration mit 053. Nacharbeit nach Codex P1 auf #147 (04.10.2026, Entscheidungen des Orchestrators): die Demo-Fachkraft wird in dieser Scheibe an Finanzen gebunden (Entscheidung 2a), das Zurückholen nach dem Weiterleiten ist als 054c mit Register E58 eingeplant. Vierte Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; nicht geteilt, Rückfallteilung 054b vorbereitet, Abschnitt „Teilung und Zuschnitt“)
+**Risikoklasse:** mittel · 3,7 AStd (Spanne 3,2–4,3; Plan 054: mittel · 2 AStd; Begründung in „Warum mittel“ und „Aufwand“) · Plan 054: 16.11.2026 (W8), tatsächlich direkt nach 053 als vierte Oberflächenscheibe der Freigabe-Demo · Lanes: web-focus (neu, `apps/web/src/features/focus/**`); web-shell (eine Zeile im Feature-Register mit Alt+6 und drei Shell-Schlüssel); web-api (Bindung der Demo-Fachkraft als Daten in `actor.ts` und ein Schritt im Demo-Start in `index.ts`, dazu eine neue Testdatei für den Zuschnitt je Akteur); e2e (eigene Datei, im Projekt `http` eingereiht, Texte in `e2e-texts.ts`; ein Schritt in `020-rueckbau-passung.spec.ts` wegen der Bindung); docs (zwei Glossarzeilen, Nachweise). **Keine** Änderung in web-answers oder web-steering: Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 werden nur importiert.
 **Bedrohungsmodell:** berührt T-G1-I-01 (Anzeige) und MF-14 (Weiterleiten erweitert den Leserkreis um den Zielfachbereich; Regel und Umfang in 048, Dialog in 053). Keine neue Angriffsfläche: kein neuer Endpunkt, kein neues Recht, kein neues Feld; die Seite bedient drei vorhandene, geprüfte Operationen (`draftAnswer`, `submitForReview`, `forwardQuestion`).
 **Rolle:** implementierer-oberflaeche; Review in frischem Kontext mit den Perspektiven **UX/Barrierefreiheit** (D1–D10, Tastaturpfad Doppelklick/Enter/Escape/Strg+Enter) und **Datenschutz** (Zuschnitt „Meine Fragen“ nur über `_actions` und die Einheitsbindung des Dienstes; Weiterleiten-Dialog unverändert aus 053; Anzeige der Wortmeldung so, wie der Kern sie liefert). Ablauf nach E57 für Oberflächenscheiben mittleren Risikos: kein gesonderter Lesebefund der Spec, ein Review nach dem Bau; Sicherheits-, Rechts- und Datenschutzbefunde werden nie vertagt. Modell nur in `.claude/agents/` (takt-012)
 **Rule ids:** keine neue fachliche Regel. In der Oberfläche bedient und belegt: R-TRANS-03 (Antwortversion anlegen; R-GUARD-03 nur Textpfade), R-TRANS-04 (Weiterleiten zum nächsten Schritt, `question.submit_review`, Anzeige „Weiterleiten“ nach E5), R-TRANS-17 und R-GUARD-15 (An anderen Fachbereich weiterleiten, Dialog aus 053), R-GUARD-04 (Hinweis: eine neue Version hebt eine Freigabe auf), R-PERM-01, R-PERM-02 und R-PERM-03 (über `_actions`, Lesepfade und die Einheitsbindung gebundener Fachkräfte). Dazu AGENTS.md R2, R3, R4, R5, R6, R9, R10, R12; `docs/design-prinzipien.md` D1–D10
 **Quellen-IDs:** `docs/produktplan-beta.md` §5 Eintrag 054 (Zeile 773–779), Eintrag 053 (Zeile 767–772), Eintrag 048 (Zeile 706), Eintrag 082 (Zeile 409), Eintrag 055 (Zeile 787–790, hängt an 054), §11 „Freigabe-Demo“ (Zeile 1317, 1344); `docs/feedback/2026-09-zielbild-oberflaeche.md` Z1 (Zeile 44), Z5 (48), Z7 (50), Z8 (51), Z9 (52), Z2–Z4 (45–47, nach E50/E51); `docs/feedback/2026-09-quickview-projektleitung.md` #24 (Zeile 80), #28 (84), #29 (85), #32 (88); Register E5 (Zeile 39), E50 (85), E51 (86), E57 (92); Specs 053 (Weiterleiten-Dialog Entscheidung 4, Schreibtür Entscheidung 6, Fokus nach Aktion, Nacharbeit `af78c0c`, „Hinweise an Folgescheiben: 054“), 048 („Einheitsbindung“, Zeile 92–97; „Antwort nach dem Weiterleiten aus dem eigenen Bereich“, Zeile 240–246; „Hinweise an Folgescheiben: 054“, Zeile 719–724), 045 (Isolation im e2e, Lehre zum Serverfilter, CI-Lauf 37152696332), 010d und 090 (Daten und Eingaben je Akteur), takt-008 (Fokus nach Aktion, `aria-disabled`); `docs/folgeliste.md` „Steuerung (aus 053)“ (auf dem 053-Branch Zeile 668–695); Glossar Zeilen 50, 51, 54
-**Depends on:** 053 (gebaut, PR #145, **vor dem Bau zu mergen**: `ForwardDialog`, `forward.ts`, `useWriteDoor`, `mayMoveFocus`, Paritätszahl 586), 048 (gemergt `7405efb`, Vertrag 0.4.3), 045 (gemergt `c0db7f5`), 036b (gemergt), 021c (gemergt), 082 (gemergt `c8bcf83`; das Register steht, die Quelle der Rechtemenge fehlt wie in 053, siehe Befund)
+**Depends on:** 053 (gemergt `d73f8fa`, PR #145: `ForwardDialog`, `forward.ts`, `useWriteDoor`, `mayMoveFocus`, Paritätszahl 586), 048 (gemergt `7405efb`, Vertrag 0.4.3), 045 (gemergt `c0db7f5`), 036b (gemergt), 021c (gemergt), 082 (gemergt `c8bcf83`; das Register steht, die Quelle der Rechtemenge fehlt wie in 053, siehe Befund)
 **Perspektive:** UX, Datenschutz · **Glossar: neue Begriffe:** ja (Schreibmodus, Vorlesezeit)
 
 ## Warum mittel
@@ -25,6 +25,12 @@ Auswertungen. 054 ändert keinen davon:
   „Redner 15“ (`api.ts:458-463`), für die Fachkraft also nie mit Klarnamen (Z8). Keine neue Zahl je Person.
 - **Weiterleiten:** Dialog, Fehlerbehandlung (404 „weitergeleitet oder nicht mehr sichtbar“, `stillShown`) und Hinweis zum
   Leserkreis kommen unverändert aus 053; 054 baut keinen zweiten Dialog.
+- **Bindung der Demo-Fachkraft (Entscheidung 2a):** Sie **verengt** Lese- und Schreibrechte der Demo-Person `u-exp-fin` auf
+  Finanzen (vorher alle 230 Einzelfragen, danach 35). Mittel bleibt es, weil kein Recht, keine Zeile in `ROLE_PERMISSIONS`,
+  keine Übergangszeile, kein Vertrag und kein Seed geändert wird: Die Bindung ist eine Rollenzuordnung (`RoleAssigned` mit
+  `unitId`), geschrieben über die vorhandene, geprüfte Operation `assignRole` des Kerns, genau so, wie die Harness die
+  Testperson im Projekt `http` bindet; sie wirkt nur im Demo-Modus. Das Risiko ist Regression in bestehenden in-process-e2e,
+  die die ungebundene Fachkraft voraussetzen; Entscheidung 2a nennt sie.
 
 Verbleibendes Risiko ist Verhalten der Oberfläche: ein ungespeicherter Text, der beim Weiterleiten oder durch einen fremden
 Schreibvorgang verloren geht, und ein Zuschnitt „Meine Fragen“, der zu viel zeigt. Beides deckt diese Spec mit Regeln und
@@ -73,9 +79,13 @@ kein Herabstufungsfall.
   (`assignmentScoped` mit `unitId`) verweigert `can()` jede Aktion und jede Lesung auf einer Einzelfrage eines anderen
   Fachbereichs mit R-PERM-03 (`api.ts:231`). **Im Projekt `http`** ist die Testperson `expert` an `unit-fin` gebunden
   (`scripts/e2e-http-031.test.mjs:71-74`) und liest nur Finanzen. **In-process** ist die Demo-Person `u-exp-fin`
-  („Fachbereich Finanzen“, `apps/web/src/api/actor.ts`) **nicht gebunden**: kein `unitId`, kein `assignmentScoped`; sie liest
-  alle 230 Einzelfragen, und `_actions` gilt für alle Fachbereiche (048 Zeile 97: „Im Demo-Rollenwechsel ist `expert` nicht
-  gebunden und sieht alle Fragen“).
+  („Fachbereich Finanzen“, `apps/web/src/api/actor.ts`) heute **nicht gebunden**: kein `unitId`, kein `assignmentScoped`, und
+  der Seed schreibt kein `RoleAssigned`; sie liest alle 230 Einzelfragen, und `_actions` gilt für alle Fachbereiche (048 Zeile
+  97: „Im Demo-Rollenwechsel ist `expert` nicht gebunden und sieht alle Fragen“). **Woher die Bindung kommt:** Der Kern
+  bindet einen Akteur nur über eine aktive Rollenzuordnung im Ereignisprotokoll (`resolveMeetingActor`, `stream.ts:224-229`,
+  gerufen von `actor()` in `api.ts:447`): Hat die Person eine Zuordnung, wird sie `assignmentScoped` mit deren `unitId`. Ein
+  Demo-Akteur mit eigenem `unitId`/`assignmentScoped` ohne Zuordnung bekäme dagegen 403 R-PERM-01 (`resolveMeetingActor`
+  liefert `null`). Die echte Quelle ist also die Zuordnung, nicht die Akteursdefinition.
 - **`_actions` im Seed `CORPUS_DEMO`** (gemessen auf `5a6f28b` über `createInProcessApi` und `seedDemo`, Liste mit
   `limit: 2000`), Auszug für die Rechte der Beantwortung:
   - `u-exp-fin` (ungebunden): `answer.draft` auf allen Textpfad-Fragen in `classified`, `assigned`, `answer_drafted`,
@@ -119,7 +129,7 @@ Die Planzeile 054 bündelt neun Punkte, das Zielbild fünf weitere. Zuschnitt:
 | Punkt | In 054 | Wohin sonst | Grund |
 |---|---|---|---|
 | Route `/my`, Zeile im Feature-Register, Alt+6 | **ja**: eine Zeile mit `requires: 'answer.draft'`, `shortcutKey: 6` | Ausblenden in der Navigation: Folgepunkt „Quelle der Rechtemenge“ | wie 053; kein Rollenname |
-| Nur eigene Zuweisungen (Einheit/Person) | **ja, enger Standard**: Fachbereich über `_actions` und die Einheitsbindung des Dienstes (Entscheidung 2) | Person: keine Scheibe geplant (Eigentümerfrage 1b); Bindung der Demo-Person: Eigentümerfrage 1a | es gibt keine Zuweisung an eine Person |
+| Nur eigene Zuweisungen (Einheit/Person) | **ja, enger Standard**: Fachbereich über `_actions` und die Einheitsbindung des Dienstes (Entscheidung 2); die Demo-Fachkraft wird an Finanzen gebunden (Entscheidung 2a) | Person: keine Scheibe geplant (Eigentümerfrage 1b) | es gibt keine Zuweisung an eine Person |
 | Keine Filter | **ja** | — | — |
 | Doppelklick öffnet Vollbild-Schreibmodus (Z7, #29) | **ja**, Schreibmodus füllt den Inhaltsbereich (Entscheidung 4) | Kopfzeile und Navigation ausblenden: Eigentümerfrage 9 | `app/**` bleibt unberührt |
 | Enter/Escape-Pfad (D8) | **ja**, dazu Strg+Enter zum Speichern (Entscheidung 5) | Strg+Enter auch für „Weiterleiten“: Eigentümerfrage 3 | ein Tastendruck soll nie an Recht übergeben |
@@ -130,14 +140,16 @@ Die Planzeile 054 bündelt neun Punkte, das Zielbild fünf weitere. Zuschnitt:
 | Z1 älteste oben, Text zweizeilig, Alter in Minuten | **ja** | — | — |
 | Z5 Vorlesezeit (130 Wörter je Minute, Ziel 2 min) | **ja** | 054b, wenn der Bau über 4,0 AStd geht | — |
 | Z8 „Wortmeldung 15“ statt Name | **ja, ohne eigenen Code**: der Kern liefert ohne `question.identity.reveal` „Redner 15“ | — | Maskierung bleibt im Kern |
-| Z9 Strg+Enter, Rückgängig, danach öffnet die nächste Frage | **teilweise**: nächste Frage ja (Entscheidung 6), Strg+Enter nur Speichern, **kein Rückgängig** | Rückgängig: Eigentümerfrage 4 | kein Übergang macht `question.submit_review` für die Fachkraft rückgängig |
+| Z9 Strg+Enter, Rückgängig, danach öffnet die nächste Frage | **teilweise**: nächste Frage ja (Entscheidung 6), Strg+Enter nur Speichern, **kein Rückgängig** | Rückgängig: **054c** (Plan §5, 19.11.2026, Klasse hoch, nach Rechtsblick), Register **E58** | kein Übergang macht `question.submit_review` für die Fachkraft rückgängig; ein neuer Übergang braucht Rechtsblick |
 | Z2–Z4 Erwartungskarte, Zahlenprüfung | nein | nach E50, E51 | Standard dort ist Nichtbau |
 | Verweigerung vorschlagen | nein | Beantwortung | heute hält kein Akteur mit eigenen Einzelfragen das Recht |
 
-**Teilungsentscheidung: keine Teilung.** Geschätzt 3,4 AStd (Abschnitt „Aufwand“), unter der Schwelle von rund 3,5 AStd. Der
+**Teilungsentscheidung: keine Teilung.** Geschätzt 3,7 AStd (Abschnitt „Aufwand“), knapp über der Schwelle von rund 3,5 AStd,
+seit die Bindung der Demo-Fachkraft und ihre Regressionsprüfung dazukamen (+0,3). Der
 Kern der Planzeile (Liste, Schreibmodus mit Doppelklick und Tastaturpfad, Weiterleiten zum nächsten Schritt, An anderen
 Fachbereich weiterleiten) ist nur zusammen prüfbar: der Plan-Nachweis „Doppelklick → Vollbild → speichern“ und die nächste
-Frage nach dem Weiterleiten hängen an derselben Seite.
+Frage nach dem Weiterleiten hängen an derselben Seite, und die Bindung gehört zum Zuschnitt „Meine Fragen“. Will der Orchestrator
+unter 3,5 bleiben, zieht er 054b (unten) vor: dann 054 rund 3,25 und 054b rund 0,45 AStd.
 
 **054b · Vorlesezeit und letzter Weiterleitungsgrund (Rückfallteilung, nur bei Überschreitung).** Zeichnet sich im Bau ab,
 dass er über 4,0 AStd geht, committet er nach den Entscheidungen 1–8 ohne die Vorlesezeit (Entscheidung 7, Teil Z5) und ohne
@@ -198,9 +210,8 @@ Kernschritt geht und nur Daten liest:
 - **Was das heißt, je Projekt (ausdrücklich):**
   - **`http`:** Die an `unit-fin` gebundene Testperson sieht nur Finanzen (der Dienst liefert nichts anderes); auf dem Seed
     7 Einzelfragen.
-  - **in-process:** Die Demo-Person `u-exp-fin` ist **nicht** gebunden und sieht die Arbeit **aller** Fachbereiche: auf dem
-    Seed 40 Einzelfragen. Die Zeile zeigt deshalb den Fachbereich (Kurzname). Das ist eine Grenze der Demo, kein Verhalten
-    der Seite; eine Bindung der Demo-Person ist Eigentümerfrage 1a.
+  - **in-process:** dasselbe, sobald die Demo-Fachkraft nach Entscheidung 2a gebunden ist: 7 Einzelfragen auf dem Seed
+    (ohne Bindung wären es 40 aus allen Fachbereichen). Beide Projekte erzählen damit dieselbe Geschichte.
 - **Daten:** `useBacklog(EMPTY_FILTERS, selectedId)` aus `features/answers` unverändert (ganze Liste, kein Serverfilter, also
   `poolComplete`); die Seite wendet `myQuestions` auf `backlog.items` an. Kein eigener Abruf.
 - **Lesbarkeit und Hinweis (D6, „Lesehinweis bei fehlendem Recht“):**
@@ -212,6 +223,53 @@ Kernschritt geht und nur Daten liest:
     die Rolle.
   - Liste lädt → Gerüst in Listenhöhe, nichts springt; Lesefehler → der gestaltete Fehlerzustand mit „Erneut versuchen“
     (`backlog.listFailed`, `backlog.reload`).
+
+### 2a. Bindung der Demo-Fachkraft an Finanzen (`apps/web/src/api/actor.ts`, `apps/web/src/api/index.ts`)
+
+Codex P1 auf #147: „Meine Fragen“ ist in der Demo nur dann „meine“, wenn die Demo-Fachkraft gebunden ist. Entscheidung des
+Orchestrators (04.10.2026): Bindung in dieser Scheibe, als Daten, verengend, ohne Go des Eigentümers.
+
+- **Mechanismus:** eine Rollenzuordnung im Ereignisprotokoll der Demo, geschrieben über `api.assignRole({ subjectId:
+  'u-exp-fin', role: 'expert', unitId: 'unit-fin' })` als Administration (`admin.roles.manage`). Der Kern löst die Person danach
+  über `resolveMeetingActor` als `assignmentScoped` mit `unitId` `unit-fin` auf; `can()` bindet Lesen, `answer.draft`,
+  `question.submit_review` und `question.forward` an Finanzen (R-PERM-03). Das ist derselbe Weg, auf dem die Harness die
+  Testperson `expert` im Projekt `http` bindet. Kein Code vergleicht dafür eine Rolle.
+- **Daten:** in `apps/web/src/api/actor.ts` (die einzige Oberflächendatei, die Rollennamen nennen darf) eine Liste
+  `DEMO_BINDINGS: readonly RoleAssignmentCreate[]` mit genau diesem einen Eintrag, neben `DEMO_ACTORS`, mit Kommentar
+  (Scheibe 054, Codex P1). `DEMO_ACTORS` bleibt unverändert: ein Akteur mit eigenem `unitId` ohne Zuordnung bekäme 403
+  (Befund).
+- **Schritt im Demo-Start:** in `apps/web/src/api/index.ts`, Funktion `seedIfEmpty`, nach dem Seeden **und** beim Start eines
+  schon gesäten Speichers (damit auch ein vor 054 gesäter Browser gebunden wird): als Administration für jeden Eintrag aus
+  `DEMO_BINDINGS` `assignRole`; die Antwort 409 „An active assignment already exists“ heißt „schon gebunden“ und wird
+  übergangen; die vorige Person wird danach wiederhergestellt (wie heute beim Seeden). Ein anderer Fehler blockiert den Start
+  nicht, wird aber als `console.warn` mit fester Meldung ausgegeben (ohne Inhalte); die Fachkraft bleibt dann ungebunden, und
+  der Bericht nennt es. Nur bei `DEMO_MODE`; im Projekt `http` läuft nichts davon.
+- **Nicht** über den Seed: Ein `RoleAssigned` in `packages/domain/src/seed.ts` änderte den Korpus (Ereigniszahl, Fingerabdruck
+  in `seed-fictitious-names.test.ts`), säte die Zuordnung auch in die Datenbank des Projekts `http` und läge außerhalb der Lane.
+- **Was sich in-process ändert** (gemessen auf `5a6f28b` mit genau dieser Zuordnung): `u-exp-fin` liest 35 statt 230
+  Einzelfragen (nur `unit-fin`: 4 `assigned`, 3 `answer_drafted`, 6 `in_review`, 6 `approved`, 1 `staged`, 6 `delivered`, 9
+  `closed`); `myQuestions` 7 statt 40; bei `CORPUS_LOAD` 131 lesbar, `myQuestions` 21 statt 100. Das Ereignisprotokoll hat ein
+  Ereignis mehr (`RoleAssigned`, 1740 → 1741 auf dem Demo-Seed); Koordination, Recht, Erfassung und alle anderen Personen lesen
+  unverändert 230 und haben 0 eigene Einzelfragen. Die Administration sieht in-process eine Rollenzuordnung.
+- **Regression, vor dem Bau zu prüfen** (alle in-process; keine dieser Dateien läuft im Projekt `http` mit der Demo-Person):
+  - **sicher betroffen:** `apps/web/e2e/020-rueckbau-passung.spec.ts` Schritt „m3“ (Zeile 394–404): die Fachkraft filtert auf
+    `captured` und erwartet den Hinweis „In dieser Rolle nur lesen“; eine gebundene Fachkraft liest keine Einzelfrage ohne
+    Fachbereich, die Liste bleibt leer. **Kleinste Änderung:** dieser eine Schritt wechselt zu `approver` (liest `captured`,
+    hält dort keine Aktion, also derselbe Hinweis; liest auch `closed` für die zweite Hälfte); der Kommentar nennt 054. Der
+    spätere Schritt ab Zeile 468 wechselt ohnehin wieder zu `expert` und nimmt die erste `answer_drafted`-Zeile, die dann in
+    Finanzen liegt. Keine Zusicherung wird geschwächt.
+  - **neu laufen lassen, voraussichtlich unverändert grün** (die Fachkraft nimmt dort die erste Zeile eines Status, die nun in
+    Finanzen liegt, oder liest nur): `003-answers-stage.spec.ts` (Zeile 55, 137: `assigned`, `approved`; Finanzen hat 4 bzw. 6),
+    `010b-lesepfade.spec.ts` (Bühne verweigert wie bisher, Historie mit Treffern aus Finanzen), `010c-lesezustand.spec.ts`,
+    `010d-ansichtsdaten.spec.ts`, `013-tastaturpfad.spec.ts` (013c: erste `assigned`), `045-verweigerung.spec.ts` (E2 liest eine
+    Finanzen-Frage, unverändert), `090-eingaben-je-akteur.spec.ts` (erste `assigned`), `abnahme.spec.ts` (die Koordination
+    weist die eigene Frage dem ersten Fachbereich der Auswahl zu, `unit-fin`, wie im Projekt `http`), dazu
+    `024-ereignis-umschlag.spec.ts` und `040a-administration.spec.ts` wegen des zusätzlichen Ereignisses bzw. der Zuordnung.
+  - Bricht eine weitere Datei, darf der Bau sie nur so ändern wie 020 (eine Zeile wählen, die die gebundene Fachkraft liest,
+    oder für einen reinen Leseschritt eine andere lesende Rolle) und nennt sie im Bericht; braucht es mehr, hält er an und meldet.
+  - Unit-Tests unter `apps/web/src` rufen `seedIfEmpty` nicht (gesucht am 04.10.2026); `packages/**` bleibt unberührt.
+- **Folge für die Planung:** 048 Befund Zeile 97 („im Demo-Rollenwechsel nicht gebunden“) gilt ab 054 nicht mehr
+  (Hinweise an den Orchestrator).
 
 ### 3. Aktionen nur aus `_actions` (`focus.ts`: `focusActions`)
 
@@ -254,12 +312,11 @@ primäre Aktion mit Dialog für Einheit und Grund“ beides zugleich; diese Spec
   `focus.list.label`, `aria-activedescendant` auf die gewählte Zeile (Muster `WorkList.tsx:313-334`, 583-605), Pfeiltasten
   wählen. Wurzel mit `data-testid="focus-list"` und `data-state` = `loading` | `ready` | `failed` (für das Warten im e2e).
   Je Zeile (`role="option"`, `data-testid="focus-row"`, `data-number`, `data-status`, `data-unit`, `data-created`
-  = `createdAt`, `data-returned="true"` bei Rückgabegrund): Nummer in Mono, Statusbadge, Kurzname des Fachbereichs
-  (in-process nötig, Entscheidung 2), Alter mit `relativeAge` (`focus-row-age`, Neuberechnung alle 30 s wie `WorkList`),
+  = `createdAt`, `data-returned="true"` bei Rückgabegrund): Nummer in Mono, Statusbadge, Alter mit `relativeAge` (`focus-row-age`, Neuberechnung alle 30 s wie `WorkList`),
   Kennzeichen „Zurückgegeben“ (`answers.detail.returned`, `focus-row-returned`), Badge `answers.refusal.badge`, wenn
   `latestIsRefusal`; darunter der **Wortlaut über zwei Zeilen** (`line-clamp-2`, `focus-row-text`). **Kein TOP, keine
   Uhrzeit, kein Rednername neben dem Text** (die Wortmeldung steht im Detail). Keine Fensterung (die Liste ist klein; bei 800
-  und ungebundener Demo-Person 100 Zeilen, gemessen auf `5a6f28b`, Test 12); Fuß mit `focus.list.count`. Zeilen tragen `select-none`,
+  und gebundener Demo-Fachkraft 21 Zeilen, gemessen auf `5a6f28b`, Test 12); Fuß mit `focus.list.count`. Zeilen tragen `select-none`,
   damit ein Doppelklick kein Wort markiert.
 - **Auswahl:** Klick wählt; **Doppelklick wählt und öffnet den Schreibmodus**; Enter auf der Liste öffnet den Schreibmodus
   der gewählten Zeile. Beides nur, wenn der gelesene Datensatz der gewählten Einzelfrage `answer.draft` in `_actions` trägt
@@ -336,16 +393,16 @@ primäre Aktion mit Dialog für Einheit und Grund“ beides zugleich; diese Spec
   - die gewählte steht **nicht mehr** in `mine` → die Einzelfrage am gemerkten Index, sonst die letzte; leer → keine.
   Gilt nach eigenem „Weiterleiten“ (die Einzelfrage geht nach `in_review`), nach eigenem „An anderen Fachbereich
   weiterleiten“ aus dem eigenen Bereich (gebunden: nicht mehr lesbar, 048) und nach einem fremden Schreibvorgang.
-- **In-process bleibt eine weitergeleitete Einzelfrage in der Liste** (ungebundene Demo-Person, Entscheidung 2): Fachbereich
-  und Weiterleitungszeile wechseln, die Auswahl bleibt. **Im Projekt `http`** verschwindet sie, und die nächste steht da. Nach
+- **Eine an einen anderen Fachbereich weitergeleitete Einzelfrage verschwindet in beiden Projekten** (die Fachkraft ist
+  gebunden, Entscheidung 2a), und die nächste steht da. Nach
   048 antwortet der Dienst auf das Weiterleiten mit 200 und leerem `_actions`; die folgende Detaillesung ist 404, die
   vollständige Liste enthält die Einzelfrage nicht mehr, also verschluckt `useBacklog` den 404 (`listOmits`). Diese Kette
-  belegt F5 im Projekt `http` (kein Toast „Aktion nicht möglich“); sie wird hier nicht als „kann nicht vorkommen“
+  belegt F5 in beiden Projekten (kein Toast „Aktion nicht möglich“); sie wird hier nicht als „kann nicht vorkommen“
   behauptet, sondern geprüft.
 - **Schreibmodus und Wechsel:** Der Schreibmodus gehört zu einer Einzelfrage. Verlässt sie „Meine Fragen“ oder verliert ihr
   Datensatz `answer.draft`, endet er; war der Text `dirty`, meldet ein Toast `focus.write.gone` mit Nummer („… liegt nicht
   mehr bei Ihnen. Der ungespeicherte Text ist verworfen.“). Nach eigenem erfolgreichen Weiterleiten oder Weiterleiten an
-  einen anderen Fachbereich endet er in jedem Fall (in-process auch dann, wenn die Einzelfrage bleibt). Eigene Übergaben
+  einen anderen Fachbereich endet er in jedem Fall. Eigene Übergaben
   verwerfen nie Text, weil sie mit `dirty` nicht angeboten werden (Entscheidung 3).
 - **Fokus nach Aktion:** nach dem Muster von `steering/Page.tsx:117-155` mit `mayMoveFocus` aus `steering.ts` (importiert,
   nicht kopiert): Nach Weiterleiten oder Weiterleiten an einen anderen Fachbereich geht der Fokus, sobald das Detail der nun
@@ -417,11 +474,13 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 ## Nicht-Ziele
 
 - Keine Änderung an `packages/**`, `apps/api/**`, Seed, Rechten, Übergangstabelle, Wahrheitstabelle, Vertrag.
-- Keine Zuweisung an eine Person, kein Feld dafür, keine Bindung der Demo-Person `u-exp-fin` an einen Fachbereich
-  (`apps/web/src/api/actor.ts` bleibt; Eigentümerfrage 1).
+- Keine Zuweisung an eine Person, kein Feld dafür (Eigentümerfrage 1). Keine Bindung über den Seed, keine weitere Bindung als
+  die eine aus Entscheidung 2a, keine Änderung an `DEMO_ACTORS`.
 - Kein zweiter Weiterleiten-Dialog, keine Änderung an `ForwardDialog.tsx`, `forward.ts`, `useWriteDoor.ts`, `useBacklog.ts`,
   `lib.ts`, `QuestionDetail.tsx`, `AnswerEditor.tsx`, `WorkList.tsx` und an `features/steering/**`.
-- Kein Rückgängig nach dem Weiterleiten (Eigentümerfrage 4); Strg+Enter löst nie „Weiterleiten“ aus (Eigentümerfrage 3).
+- Kein Rückgängig nach dem Weiterleiten und kein neuer Übergang dafür: eingeplant als **054c** „Zurückholen nach Weiterleiten“
+  (Plan §5, 19.11.2026, Klasse hoch, nach Rechtsblick), Entscheidung **E58** im Register (Eigentümerfrage 4). Bis dahin führt
+  der Weg zurück über Zurückgeben durch Recht oder Versammlungsbüro. Strg+Enter löst nie „Weiterleiten“ aus (Eigentümerfrage 3).
 - Keine Filter, keine Suche, keine Sortierwahl, kein TOP, keine Uhrzeit der Erfassung.
 - Keine Verweigerung vorschlagen, keine Freigabe, keine Rechtsfreigabe, kein Zurückgeben auf dieser Seite (die Beantwortung
   bleibt der Ort; 059 baut die Sicht des Legal Clearing).
@@ -442,6 +501,9 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 - `apps/web/src/features/focus/WritingMode.tsx` (neu), `apps/web/src/features/focus/WritingMode.test.tsx` (neu)
 - `apps/web/src/features/focus/focus.ts` (neu), `apps/web/src/features/focus/focus.test.ts` (neu)
 - `apps/web/src/api/focus054.test.ts` (neu)
+- `apps/web/src/api/actor.ts` (nur die neue Liste der Demo-Bindungen mit dem einen Eintrag aus Entscheidung 2a)
+- `apps/web/src/api/index.ts` (nur der Bindungsschritt in der Startfunktion der Demo aus Entscheidung 2a)
+- `apps/web/e2e/020-rueckbau-passung.spec.ts` (nur die Rolle des Schritts m3, Entscheidung 2a)
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile der Fokusansicht, ihr Import, ihr Icon und die Kommentare zum Kürzelbereich)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile, zu `requires` und zum Kürzelbereich)
 - `apps/web/src/i18n/focus.de.ts` (neu), `apps/web/src/i18n/focus.en.ts` (neu)
@@ -459,10 +521,11 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 
 ## Ausdrücklich nicht erlaubt
 
-`packages/**`, `apps/api/**`, `apps/web/src/api/**` außer der neuen Testdatei (also auch nicht `actor.ts`),
+`packages/**` (auch nicht `seed.ts`), `apps/api/**`, `apps/web/src/api/**` außer der neuen Testdatei und den zwei Stellen
+aus Entscheidung 2a,
 `apps/web/src/components/**` (ein fehlendes Bauteil wird in der Ansicht gebaut oder gemeldet), `apps/web/src/app/**` außer
 den zwei Registerdateien, `apps/web/src/features/{answers,steering,capture,stage,history,speakers}/**` (nur Importe daraus),
-`apps/web/src/i18n/labels.ts`, fremde e2e-Dateien und `apps/web/e2e/support/**` außer `e2e-texts.ts`, `scripts/**` außer dem
+`apps/web/src/i18n/labels.ts`, fremde e2e-Dateien außer dem einen Schritt in 020 und `apps/web/e2e/support/**` außer `e2e-texts.ts`, `scripts/**` außer dem
 Reihenfolge-Pin, `.github/**`, `docs/produktplan-beta.md` (Hinweise an den Orchestrator unten). Dieser Abschnitt steht bewusst
 außerhalb von „Files allowed“.
 
@@ -473,14 +536,15 @@ außerhalb von „Files allowed“.
    bei `stillShown()`“ aus `af78c0c`), `apps/web/src/features/answers/useWriteDoor.ts`, `mayMoveFocus` in
    `apps/web/src/features/steering/steering.ts`; Paritätstest (f) bei 586; `SHARED_SPECS` und der Reihenfolge-Pin enthalten
    `053-steuerung.spec.ts`. Weicht eine Signatur ab: anhalten und melden, nicht anpassen.
-2. **Seed, in-process:** `myQuestions` für `u-exp-fin` ergibt 40, für jede andere Demo-Person 0; eine an `unit-fin`
-   gebundene Fachkraft erhält genau die 7 Finanzen-Fragen (Befund). Abweichung: Zahlen in Test 12 und F1 anpassen und im
-   Bericht nennen.
+2. **Seed und Bindung, in-process:** mit der Zuordnung aus Entscheidung 2a ergibt `myQuestions` für `u-exp-fin` 7 (alle
+   `unit-fin`), ohne sie 40; für jede andere Demo-Person 0. Dann die Bindung allein einbauen und die volle in-process-Suite
+   laufen lassen (Regressionsliste in Entscheidung 2a); Ergebnis je Datei im Bericht, rote Fälle vor der Änderung an 020
+   wörtlich. Abweichung der Zahlen: Test 12 und F1 anpassen und im Bericht nennen.
 3. **Seed, `http`:** nach 002, 021b, 021c, 045 und 053 (`HTTP_ORDER`) in Finanzen mindestens **zwei** `assigned` (F2, F5) und
    mindestens **eine** `answer_drafted` ohne Rückgabegrund und ohne Verweigerung als letzter Version (F4); in Operations
    mindestens eine `assigned` (F7). Prüfen über die Endzustände der Dateikopfe und, wo nötig, eine Probe gegen die lokale
    Datenbank. Fehlt eine Vorbedingung: anhalten und melden.
-4. **Historie:** `getQuestionHistory` liefert der Fachkraft (in-process ungebunden, `http` gebunden) das `QuestionForwarded`
+4. **Historie:** `getQuestionHistory` liefert der gebundenen Fachkraft (in beiden Projekten) das `QuestionForwarded`
    einer in ihren Fachbereich weitergeleiteten Einzelfrage mit `fromUnitId` und `reasonCode` (für `lastForward`). Sonst zeigt
    die Seite keine Weiterleitungszeile, und der Bericht nennt es (F7 dann ohne diesen Schritt, Befund in die Folgeliste).
 5. **Konstanten** in der e2e-Datei mit Quelle: `EXPERT_UNIT = 'Finanzen'` / `EXPERT_UNIT_ID = 'unit-fin'`,
@@ -545,10 +609,12 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
     enthält es `focus`; ohne Menge alle (Navigation heute unverändert).
 11. `parity.test.ts` (f): 610 je Sprache; Modul `focus` mit Präfix `focus`.
 12. `apps/web/src/api/focus054.test.ts` (im Ordner `api`, weil nur dort Werte aus `@hv/domain` geladen werden dürfen): sät
-    `CORPUS_DEMO` über `seedEvents` in `createInProcessApi` mit injizierter Uhr und prüft `myQuestions(listQuestions)` für
-    **jede** Person aus `DEMO_ACTORS` (über `id`, nie über die Rolle): `u-exp-fin` 40, alle anderen 0; dazu eine über
-    `assignRole` an `unit-fin` gebundene Fachkraft: genau 7, alle mit `unitId` `unit-fin`. Mit `CORPUS_LOAD` (800) nur
-    ausgewiesen (Log-Zeile `[size] 054 my questions at 800: n`; auf `5a6f28b` 100 für `u-exp-fin`), nicht hart. Hält den Zuschnitt gegen eine spätere Änderung
+    `CORPUS_DEMO` über `seedEvents` in `createInProcessApi` mit injizierter Uhr und wendet `DEMO_BINDINGS` aus `actor.ts` über
+    `assignRole` an (wie der Demo-Start) und prüft `myQuestions(listQuestions)` für **jede** Person aus `DEMO_ACTORS` (über
+    `id`, nie über die Rolle): `u-exp-fin` genau 7, alle mit `unitId` `unit-fin`, und 35 lesbare Einzelfragen; alle anderen 0
+    eigene und 230 lesbare (außer `podium`, das die Liste nicht liest). Kontrolle ohne Bindung: `u-exp-fin` 40 (zeigt, dass die
+    Bindung wirkt). Ein zweiter Lauf von `assignRole` antwortet 409 (der Start darf ihn übergehen). Mit `CORPUS_LOAD` (800) nur
+    ausgewiesen (Log-Zeile `[size] 054 my questions at 800: n`; auf `5a6f28b` 21 gebunden), nicht hart. Hält den Zuschnitt gegen eine spätere Änderung
     der Bündel fest.
 
 **Playwright, `apps/web/e2e/054-fokusansicht.spec.ts`, Projekte `in-process` und `http`**
@@ -557,8 +623,8 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 - `test.describe.serial('054 …')`, `viewport` 1440 × 900. Jeder Test bringt seine Vorbedingung selbst mit; kein Test verlässt
   sich auf den Browser-Zustand eines anderen.
 - Eine Hilfe in der Datei: **`waitForMine(page)`** wartet, bis `focus-list` `data-state="ready"` trägt **oder**
-  `focus-empty` bzw. `focus-forbidden` sichtbar ist, und im Projekt `http` zusätzlich, bis **jede** Zeile `data-unit =
-  unit-fin` trägt (nach dem Akteurwechsel lädt die Seite neu; die Liste kommt verzögert; Lehre aus 045, CI-Lauf 37152696332,
+  `focus-empty` bzw. `focus-forbidden` sichtbar ist, und zusätzlich, bis **jede** Zeile `data-unit =
+  unit-fin` trägt (in beiden Projekten, die Fachkraft ist gebunden) (nach dem Akteurwechsel lädt die Seite neu; die Liste kommt verzögert; Lehre aus 045, CI-Lauf 37152696332,
   und 053 Review 7: auch ohne Serverfilter auf das Eintreffen warten). Erst danach wird eine Zeile gewählt.
 - **`findMine(page, opts: { status: 'assigned' | 'answer_drafted'; exclude?: readonly string[] })`**: wechselt per
   `asRole(page, 'expert')`, öffnet `/my`, `waitForMine`, wählt die erste Zeile mit `data-status = status`, `data-unit =
@@ -584,8 +650,8 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 **Fälle**
 
 - **F1 Liste, Alt+6, Rechte als Daten @screenshot.** `asRole(page, 'expert')` auf `/speakers`, **Alt+6** → URL `/my`,
-  Überschrift „Meine Fragen“; `waitForMine`. Jede Zeile `data-status` ∈ {`assigned`, `answer_drafted`}; im Projekt `http`
-  jede `data-unit = unit-fin`; in-process Zahl der Zeilen gleich der Zahl aus Test 12 (40). `data-created` nicht fallend
+  Überschrift „Meine Fragen“; `waitForMine`. Jede Zeile `data-status` ∈ {`assigned`, `answer_drafted`}; in beiden Projekten
+  jede `data-unit = unit-fin`; in-process genau 7 Zeilen (Test 12), im Projekt `http` mindestens 3. `data-created` nicht fallend
   (Gleichstand nach Nummer). Keine Filterelemente (`answers-filter-*`, `answers-search` fehlen), kein TOP, keine Uhrzeit;
   `focus-row-text` mit berechnetem `-webkit-line-clamp` 2; `focus-row-age` im Muster der `time.*`-Texte. Die erste Zeile ist
   gewählt, das Detail zeigt ihre Nummer. Screenshots `054-fokus-de.png`, `054-fokus-en.png`; axe ohne serious/critical (de,
@@ -616,12 +682,10 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
   `forward-submit` gesperrt, `forward-readers` sichtbar, kein Textfeld. Screenshot `054-weiterleiten-de.png` (leer, wie 053);
   Escape, Sprache en, erneut öffnen (leer), `TARGET_UNIT` und `forward-reason-wrong_unit` wählen, Screenshot
   `054-weiterleiten-en.png`; axe (de, en); absenden → Toast „Übernommen“, dann:
-  - **`http`:** Zeile N nicht mehr in der Liste, Detail zeigt M, **kein** Toast „Aktion nicht möglich“ bzw. „Action not
-    possible“ (der 404 der Detaillesung ist verschluckt, Entscheidung 6);
-  - **in-process:** Zeile N trägt `data-unit = unit-ar`, `focus-detail-unit` zeigt „AR-Büro“, N bleibt gewählt, der
-    Schreibmodus ist zu, `focus-forwarded` nennt „Finanzen“ und „Falscher Fachbereich“.
+  Zeile N nicht mehr in der Liste, Detail zeigt M, **kein** Toast „Aktion nicht möglich“ bzw. „Action not possible“ (der 404
+  der Detaillesung ist verschluckt, Entscheidung 6); gilt in beiden Projekten.
   Danach `asRole(page, 'coordination')`, Historie von N (Suche nach Nummer): Zeile „An anderen Fachbereich weitergeleitet“ mit
-  „Finanzen → AR-Büro“ und „Grund: Falscher Fachbereich“ (die Fachkraft liest N im Projekt `http` nicht mehr).
+  „Finanzen → AR-Büro“ und „Grund: Falscher Fachbereich“ (die Fachkraft liest N nicht mehr).
 - **F6 Lesehinweis, Rechte als Daten (schreibt nichts).** `coordination` auf `/my`: `focus-empty` sichtbar, keine
   `focus-row`; `legal`: ebenso; `podium`: `focus-forbidden` sichtbar, keine Liste. Der Navigationseintrag `nav-focus` ist für
   alle drei sichtbar (Befund; Eigentümerfrage 8): das ist hier Zusicherung, damit eine spätere Quelle der Rechtemenge diesen
@@ -629,8 +693,7 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 - **F7 Zulauf aus der Steuerung: letzter Weiterleitungsgrund.** `coordination` auf `/steering` (053): Statusfilter
   `assigned`, Fachbereichsfilter `SOURCE_UNIT`, warten, bis jede Zeile `data-unit = unit-ops` trägt (Serverfilter), erste Zeile
   N wählen, `steering-forward`, Ziel „Finanzen“, Grund `capacity`, absenden; warten, bis `steering-detail-unit` „Finanzen“
-  zeigt. `asRole(page, 'expert')`, `/my`, `waitForMine`: Zeile N mit `data-unit = unit-fin` (im Projekt `http` neu in der
-  Liste); wählen → `focus-forwarded` nennt „Operations“ und „Auslastung“.
+  zeigt. `asRole(page, 'expert')`, `/my`, `waitForMine`: Zeile N mit `data-unit = unit-fin` (neu in der Liste); wählen → `focus-forwarded` nennt „Operations“ und „Auslastung“.
 - **F8 Eingaben je Akteur (090, schreibt nichts).** Fachkraft öffnet den Schreibmodus auf einer Zeile und tippt
   `FOCUS_054_UNSAVED`; Wechsel zu `coordination` und zurück: `focus-writing` nicht im DOM; dieselbe Zeile wählen, Schreibmodus
   öffnen → das Textfeld enthält `FOCUS_054_UNSAVED` **nicht** (leer bzw. die letzte Version). Im Projekt `http` fällt der
@@ -644,8 +707,9 @@ laufen F1–F8 genauso; die Screenshots gehen dort in das Ausgabeverzeichnis (`s
 
 1. Tests 1–12 und F1–F8 vor der Änderung rot (Ausgabe im Bericht), danach grün; F1–F8 im Projekt `in-process` auch mit
    `--repeat-each=3`.
-2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter **unverändert** 001, 003, 010c, 010d, 013, 021b, 045,
-   053 und 090; axe ohne serious/critical. Projekt `http` grün im CI-Lauf `e2e-http` des PR.
+2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter **unverändert** 001, 003, 010b, 010c, 010d, 013, 021b,
+   024, 040a, 045, 053, 090 und abnahme, und 020 mit genau der Änderung aus Entscheidung 2a (Ergebnis je Datei im Bericht);
+   axe ohne serious/critical. Projekt `http` grün im CI-Lauf `e2e-http` des PR.
 3. Sechs Screenshots in `docs/evidence/` aus dem Projekt `in-process`: `054-fokus-de.png`, `054-fokus-en.png`,
    `054-schreibmodus-de.png`, `054-schreibmodus-en.png`, `054-weiterleiten-de.png`, `054-weiterleiten-en.png`. Auf dem
    Fokusbild sind die Liste (zweizeiliger Wortlaut, Alter, kein TOP), das Detail mit genau einer primären Aktion und der
@@ -691,18 +755,21 @@ laufen F1–F8 genauso; die Screenshots gehen dort in das Ausgabeverzeichnis (`s
 Reifestufe: demo · Risikoklasse: mittel
 Ausgelöst: [x] Fachregel, Status (nur Anzeige und vorhandene Übergänge) [ ] Vertrag, Ereignis, Konfiguration [ ] Persistenz,
 Migration, Nebenläufigkeit (nur der vorhandene `If-Match` der Schreibtür; fremde Version im Schreibmodus nach Entscheidung 4)
-[ ] Rolle, Recht, Identität, Schutzklasse (nur `_actions` und eine Registerzeile als Daten, keine Änderung) [ ]
+[x] Rolle, Recht, Identität, Schutzklasse (nur verengend: eine Rollenzuordnung der Demo-Fachkraft an Finanzen über
+`assignRole`, Entscheidung 2a; sonst nur `_actions` und eine Registerzeile als Daten; kein Recht geändert) [ ]
 personenbezogene oder vertrauliche Daten (keine neue Anzeige; Wortmeldung maskiert wie geliefert; Weiterleiten nach 048/053)
 [ ] Betrieb, Wiederherstellung [ ] Administration [x] Oberfläche, Barrierefreiheit [ ] Nachbarsystem [ ] KI, Agenten [x]
 Dokumentation, Schulung (Glossar)
-Perspektive(n): UX, Datenschutz · Nachweise: oben · Offene Entscheidung: E5 (Standard aus 020/048, hier als Z9 gelesen),
+Perspektive(n): UX, Datenschutz · Nachweise: oben · Offene Entscheidung: E5 (Standard aus 020/048, hier als Z9 gelesen), E58 (Undo → 054c),
 E50 und E51 (ohne Wirkung, Standard Nichtbau)
 
 ## Wirkung und Risiko
 
 | Risiko | Abwehr | Nachweis |
 |---|---|---|
-| „Meine Fragen“ zeigt Einzelfragen anderer Fachbereiche | Zuschnitt nur über `_actions` (beide Rechte) und die Einheitsbindung des Dienstes; in-process ausdrücklich als Grenze der Demo benannt | Test 1, 12; F1 (`http`: jede Zeile `unit-fin`) |
+| „Meine Fragen“ zeigt Einzelfragen anderer Fachbereiche | Zuschnitt nur über `_actions` (beide Rechte) und die Einheitsbindung des Dienstes; Demo-Fachkraft gebunden (Entscheidung 2a) | Test 1, 12; F1 (jede Zeile `unit-fin`) |
+| Bindung der Demo-Fachkraft bricht bestehende in-process-e2e | Regressionsliste, volle Suite vor und nach der Bindung, kleinste Änderung nur in 020 | Vor-dem-Bau-Punkt 2; Akzeptanzkriterium 2 |
+| Ein vor 054 gesäter Browser bleibt ungebunden | Bindungsschritt auch beim Start eines gesäten Speichers, 409 übergangen | Test 12 (zweiter Lauf 409) |
 | Recht oder Koordination sehen fremde Arbeit als eigene | beide Rechte nötig; Hinweis statt Liste | Test 1, 12; F6 |
 | Ungespeicherter Text geht beim Weiterleiten verloren | Übergaben fehlen mit `dirty`; Escape behält Text | Test 2, 6; F3 |
 | Ungespeicherter Text geht durch einen fremden Schreibvorgang verloren | Toast mit Nummer; Entwurfspuffer ist 060 | Test 8; Folgeliste |
@@ -718,7 +785,7 @@ E50 und E51 (ohne Wirkung, Standard Nichtbau)
 
 ## Aufwand
 
-Geschätzt **3,4 AStd** (Spanne 2,9–4,0) statt 2 laut Plan. Der Plan rechnete ohne Zielbild-Punkte Z1, Z5, Z9 und mit einem
+Geschätzt **3,7 AStd** (Spanne 3,2–4,3) statt 2 laut Plan. Der Plan rechnete ohne Zielbild-Punkte Z1, Z5, Z9 und mit einem
 eigenen Weiterleiten-Dialog; der Dialog kommt aus 053 (−0,4 AStd), dafür kommen Schreibmodus mit Entwurfsregeln, nächste
 Einzelfrage, Vorlesezeit, letzte Weiterleitung und der Zuschnittstest dazu:
 
@@ -731,6 +798,7 @@ Einzelfrage, Vorlesezeit, letzte Weiterleitung und der Zuschnittstest dazu:
 | `WritingMode` (Textfeld, Strg+Enter, Escape, Vorlesezeit, Hinweis bei fremder Version), Test 7 | 0,4 |
 | Seite: Schreibtür, Dialog aus 053, Entwurfsspeicher, nächste Einzelfrage, Fokus nach Aktion, 090 | 0,45 |
 | `focus054.test.ts` (Zuschnitt je Demo-Person, gebundene Fachkraft, Größe bei 800) | 0,1 |
+| Bindung der Demo-Fachkraft (`DEMO_BINDINGS`, Startschritt), volle in-process-Suite vor und nach der Bindung, Schritt in 020 | 0,3 |
 | i18n 24 Schlüssel je Sprache, Modul, Parität, zwei Glossarzeilen | 0,15 |
 | e2e F1–F8 in beiden Projekten, Isolation und Endzustand, Einreihung `http`, Reihenfolge-Pin, Texte, Laufzeitprüfung | 0,8 |
 | Screenshots, axe, Design-Kritik, `pnpm gates`, Bericht, CI-Nachweis | 0,25 |
@@ -738,7 +806,7 @@ Einzelfrage, Vorlesezeit, letzte Weiterleitung und der Zuschnittstest dazu:
 053 brauchte für 3,4 geschätzte AStd rund 0,9 (Bericht 053). Die Schätzung bleibt bewusst in den Einheiten des Plans; die
 Schwelle für die Rückfallteilung (4,0 AStd) gilt trotzdem.
 
-**Teilung:** keine (3,4 ≤ rund 3,5). **Zuschnitt bei Überschreitung (vorbereitet):** 054b nach dem Absatz in „Teilung und
+**Teilung:** keine (3,7, knapp über rund 3,5; Begründung in „Teilung und Zuschnitt“). **Zuschnitt bei Überschreitung (vorbereitet):** 054b nach dem Absatz in „Teilung und
 Zuschnitt“, mit eigener Spec `docs/slices/054b-fokus-vorlesezeit.md` vor dem Bau des Rests.
 
 ## Standards (auf Standard gebaut)
@@ -746,7 +814,7 @@ Zuschnitt“, mit eigener Spec `docs/slices/054b-fokus-vorlesezeit.md` vor dem B
 | Standard | Was 054 baut | Kosten einer späteren Änderung |
 |---|---|---|
 | „Meine Fragen“ = `assigned`/`answer_drafted` mit `answer.draft` und `question.forward` | `myQuestions` | `in_review` lesend dazunehmen: < 0,1 AStd |
-| Demo-Person `u-exp-fin` bleibt ungebunden (in-process alle Fachbereiche) | nichts | Bindung an `unit-fin` in der Demo: rund 0,5 AStd, eigene Takt-Scheibe (Eigentümerfrage 1a) |
+| Demo-Fachkraft `u-exp-fin` an Finanzen gebunden | `DEMO_BINDINGS`, Startschritt | wieder ungebunden für die Breite der Demo: < 0,1 AStd (Eintrag entfernen) plus Rücknahme in 020 |
 | Keine Zuweisung an eine Person | nichts | Vertragsfeld, Ereignis, Recht, Anzeige: rund 3 AStd, eigene Scheibe (Eigentümerfrage 1b) |
 | „Weiterleiten“ (`question.submit_review`) primär, „An anderen Fachbereich weiterleiten“ zweite Aktion mit dem Dialog aus 053 | `focusActions` | Rangfolge tauschen: < 0,1 AStd |
 | Strg+Enter speichert nur | `isSaveChord` | auch Weiterleiten ohne ungespeicherten Text: < 0,1 AStd |
@@ -754,7 +822,7 @@ Zuschnitt“, mit eigener Spec `docs/slices/054b-fokus-vorlesezeit.md` vor dem B
 | Schreibmodus vorbelegt mit der letzten Version | `draftBase` | leeres Textfeld wie in der Beantwortung: < 0,1 AStd |
 | Ungespeicherter Text blendet die Übergaben aus | `focusActions` | anbieten mit Rückfrage: rund 0,2 AStd |
 | Nächste Einzelfrage öffnet automatisch | `nextSelection` | leeres Detail statt nächster: < 0,1 AStd |
-| Kein Rückgängig | nichts | „Zurückholen“ als neue Version (R-TRANS-03): rund 0,3 AStd plus Rechtsblick |
+| Kein Rückgängig | nichts | 054c (eigener Übergang mit Guard, Klasse hoch): rund 1,25 AStd nach Rechtsblick (E58) |
 | Alt+6, Navigationseintrag für alle sichtbar | Registerzeile | Quelle der Rechtemenge: Folgepunkt aus 053 (rund 1,0 AStd mit Vertragsschritt) |
 
 ## Offene Eigentümerfragen
@@ -762,18 +830,19 @@ Zuschnitt“, mit eigener Spec `docs/slices/054b-fokus-vorlesezeit.md` vor dem B
 Keine blockiert den Bau; alle mit Standard.
 
 1. **Umfang „nur eigene Zuweisungen (Einheit/Person)“.** Standard: Fachbereich über `_actions` (beide Rechte) und die
-   Einheitsbindung des Dienstes; keine Person. Option a: die Demo-Person `u-exp-fin` in-process an `unit-fin` binden, damit die
-   Demo nur Finanzen zeigt (rund 0,5 AStd, eigene Takt-Scheibe; berührt `actor.ts` und e2e, die die Fachkraft auf fremden
-   Fachbereichen schreiben lassen). Option b: Zuweisung an eine Person (Vertragsfeld, Ereignis, Recht, rund 3 AStd, eigene
+   Einheitsbindung des Dienstes; die Demo-Fachkraft ist an Finanzen **gebunden** (Entscheidung 2a); keine Person. Option a:
+   ungebunden für die Breite der Demo (sie sähe wieder die Arbeit aller Fachbereiche, 40 statt 7; < 0,1 AStd plus Rücknahme in
+   020). Option b: Zuweisung an eine Person (Vertragsfeld, Ereignis, Recht, rund 3 AStd, eigene
    Scheibe, nicht in der Freigabe-Demo). Option c: `in_review` lesend in der Liste lassen (< 0,1 AStd).
 2. **„Weiterleiten“ nach E5.** Standard: „Weiterleiten“ ist der nächste Schritt und primär; „An anderen Fachbereich
    weiterleiten“ ist die zweite Aktion mit dem Dialog aus 053 (wie Z9 und 048). Option: Weiterleiten an einen anderen
    Fachbereich primär, wie die Planzeile wörtlich liest (< 0,1 AStd). Die Antwort zu E5 im Register bleibt erbeten.
 3. **Strg+Enter.** Standard: speichert nur. Option nach Z9: ohne ungespeicherten Text auch „Weiterleiten“ (< 0,1 AStd).
-4. **Rückgängig nach dem Weiterleiten (Z9).** Standard: nicht gebaut; kein Übergang macht `question.submit_review` für die
-   Fachkraft rückgängig (`question.return` halten Recht, Freigabe, Versammlungsbüro, Podium und Administration). Option: „Zurückholen“ als neue
-   Version derselben Antwort (R-TRANS-03 aus `in_review`), rund 0,3 AStd; eine laufende Rechtsfreigabe verfiele dann
-   (Rechtsblick nötig).
+4. **Rückgängig nach dem Weiterleiten (Z9) → Register E58.** Standard: kein Undo in 054; kein Übergang macht
+   `question.submit_review` für die Fachkraft rückgängig (`question.return` halten Recht, Freigabe, Versammlungsbüro, Podium
+   und Administration). Ein Zurückholen kommt nur mit **054c** nach Rechtsblick (eigene Übergangszeile mit Guard „noch keine
+   Rechtsfreigabe“, Klasse hoch, rund 1,25 AStd, Plan §5 19.11.2026); bis dahin geht der Weg zurück über Zurückgeben durch Recht
+   oder Versammlungsbüro bzw. eine Weiterleitung durch die Koordination. Fällig 13.11.2026; ohne Antwort wird 054c nicht gebaut.
 5. **Nächste Einzelfrage.** Standard: öffnet automatisch, auch wenn ein fremder Schreibvorgang die gewählte entfernt (mit
    Toast nur bei ungespeichertem Text). Option: leeres Detail und Hinweis (< 0,1 AStd).
 6. **Vorbelegung des Schreibmodus.** Standard: letzte Version (außer Verweigerung). Option: leer wie die Beantwortung
@@ -800,17 +869,22 @@ Keine blockiert den Bau; alle mit Standard.
   - Abhängigkeit **082** ist erfüllt; „Alt+6 über das Feature-Register“ ist baubar, das Ausblenden nach Recht nicht, solange die
     **Quelle der Rechtemenge** fehlt (wie 053; Folgepunkt dort, betrifft auch 059 und 061).
   - Abhängigkeiten „036, 021c, 048, 082“ → „053, 048, 036, 021c, 082“ (053 liefert Dialog, Schreibtür und Fokusregel).
-  - „Rückgängig“ aus Z9 braucht einen Übergang, den der Kern nicht hat; als Eigentümerfrage führen.
-  - Aufwand 2 → 3,4 AStd; Lanes „web-focus“ → zusätzlich web-shell, web-api (nur Test), e2e, docs; Nachweise zusätzlich „grüner
+  - „Rückgängig“ aus Z9 braucht einen Übergang, den der Kern nicht hat: mit dieser Nacharbeit als **054c** im Plan (§5, nach
+    056, 19.11.2026, Lanes core, web-focus; `plan-graph --strict` grün) und als **E58** im Register eingetragen; die
+    „Offene Entscheidung“ von Eintrag 054 verweist darauf. 054c steht noch nicht in der Sammel-Abhängigkeitsliste der Beta
+    (Plan Zeile ~954); das bleibt dem Doku-Durchgang.
+  - Aufwand 2 → 3,7 AStd; Lanes „web-focus“ → zusätzlich web-shell, web-api (Demo-Bindung und Test), e2e, docs; Nachweise zusätzlich „grüner
     Lauf `e2e-http`“.
   - „TOP und Erfassungszeit ausgeblendet“ und Z1 „Alter in Minuten“ widersprechen sich nur scheinbar; diese Spec zeigt das Alter
     relativ und keine Uhrzeit.
+- **Spec 048, Befund Zeile 97** („Im Demo-Rollenwechsel ist `expert` nicht gebunden“) gilt ab 054 nicht mehr; die Demo bindet
+  die Fachkraft wie die Harness im Projekt `http`.
 - **Plan-Eintrag 048 (Zeile 706):** „Der Dialog „Weiterleiten“ mit Einheit und Grund entsteht in der Fokusansicht (054)“ ist
   überholt; er entstand in 053 (`features/answers/ForwardDialog.tsx`).
 - **Laufzeit `e2e-http`:** mit 053 höchstens 5:04, mit 054 geschätzt rund 6,8 min bei 8:00 Harness-Grenze. Ab 055 sollte jede
   Spec mit gemeinsamen Dateien die Grenze ausdrücklich rechnen; eine Anhebung der Grenze oder eine Aufteilung des Jobs ist eine
   eigene Takt-Scheibe (`.github/**`, `scripts/**`).
-- Folgeliste (Einträge legt der Bau an): Bindung der Demo-Person (Eigentümerfrage 1a); Entwurfstext beim Verlassen von „Meine
+- Folgeliste (Einträge legt der Bau an): Entwurfstext beim Verlassen von „Meine
   Fragen“ durch fremden Schreibvorgang (060 Entwurfspuffer); Shortcut-Liste kennt Strg+Enter und Escape des Schreibmodus nicht
   (`ShortcutsDialog.tsx`, Lane web-shell).
 
