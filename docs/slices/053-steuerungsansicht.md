@@ -835,7 +835,7 @@ war. (3c) Schließen des Klassifizierungsdialogs wirkt nur für eine neue Versio
 bleibt Folgepunkt. (4) S2 prüft axe auf dem Klassifizierungsdialog auch englisch. e2e 053 in-process mit
 `--repeat-each=3`: `30 passed (1.5m)`.
 
-**`pnpm gates`** auf Commit `af78c0c` (sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
+**`pnpm gates`** auf Commit `58028e6` (zuvor `af78c0c`; `58028e6` bringt die Fehleranzeige der Sitzleiste nach Codex P2; sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
 Ausgang 0 (erster Lauf auf `55f4270`, ebenfalls grün). Zählerzeilen: `packages/domain` 421 passed, `apps/web` 632 passed,
 `apps/api` 674 passed; `vocabulary-check: ok`; `i18n-literal check: 0 literals`; `slice-scope: 40 changed file(s), all
 within … "Files allowed"`. Schluss wörtlich:
@@ -844,7 +844,7 @@ within … "Files allowed"`. Schluss wörtlich:
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 ✓ built in 1.36s
-mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit af78c0c, tree bf1f489c759e…
+mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit 58028e6, tree eeb9e714614c…
 ```
 
 ## Review findings
