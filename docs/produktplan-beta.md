@@ -776,7 +776,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Abhängigkeiten:* 036, 021c, 048, 082
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots inkl. Weiterleiten-Dialog; Playwright Doppelklick → Vollbild → speichern; axe grün
-  - *Offene Entscheidung:* —
+  - *Offene Entscheidung:* Undo nach Weiterleiten → 054c (Eigentümerfrage E58)
 - **061 · Leitstand mit fachlichen Kennzahlen** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-cockpit
   - *Ziel:* Route /cockpit (Recht cockpit.read, Standard coordination, moderation, admin; eine Zeile im Feature-Register 082): Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, „Fragen ohne Endstatus" vor Debattenschluss; Drill-down auf Liste; Platz für den Kanarienfrage-Status (gefüllt durch 086); Werte aus /metrics oder Projektion; keine personenbezogenen Kennzahlen (Negativtest, Allowlist).
   - *Zielbild (089):* Z10–Z13. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
@@ -804,6 +804,12 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik in frischem Kontext (nicht die Sitzung, die die Spec schrieb); Review
   - *Nachweise:* Test podium auf Platz ceo sieht keine cfo-Fragen im Standard; Playwright Vorblättern ohne Zustandsänderung, Korrektur zeigt Streifen; Screenshots je Einstellung; Bündelgröße; Zeitbudget Bühnenwechsel p90 < 150 ms
   - *Offene Entscheidung:* E7 (Standardwert own)
+- **054c · Zurückholen nach Weiterleiten (Undo, Z9)** — hoch · 1,25 AStd · Kalender 19.11.2026 (W8) · Lanes: core, web-focus
+  - *Ziel:* Die Fachkraft holt eine eben weitergeleitete Einzelfrage (`question.submit_review`, `in_review`) zurück, solange das Legal Clearing sie nicht bearbeitet hat: eigene Zeile in der Übergangstabelle mit Regel-id und Guard (nur der letzte Schritt, nur ohne Rechtsfreigabe, nur die Person oder Einheit, die weitergeleitet hat), Ereignis im Protokoll, Recht als Daten, Schaltfläche „Zurückholen“ in der Fokusansicht aus `_actions`. Herausgeschnitten aus 054 (Zielbild Z9 „Rückgängig“), weil der Kern dafür keinen Übergang hat; Bau erst nach Rechtsblick und Antwort auf E58. Bis dahin geht der Weg zurück über Zurückgeben durch Recht oder Versammlungsbüro.
+  - *Abhängigkeiten:* 054
+  - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review mit Perspektive Legal
+  - *Nachweise:* Test je Regelzeile und Guard (zurückholen nach Rechtsfreigabe → 409); Wahrheitstabellen-Diff; Playwright Weiterleiten → Zurückholen in der Fokusansicht
+  - *Offene Entscheidung:* E58
 - **057 · Antwortbündel** — mittel · 2 AStd · Kalender 20.11.2026 (W8) · Lanes: core, web-steering
   - *Ziel:* Entität AnswerBundle (Antwortbündel, getrennt von der bestehenden Runde `Speaker.round`) mit Ereignissen BundleAssembled/BundleClosed, Recht round.assemble (coordination), Strategie-Feld (manual | by_seat), Steuerungsansicht „Bündel zusammenstellen" (Zielgröße 20), Bühne filtert optional nach Bündel (zweite Sortierstrategie); Zähler je Bündel; ohne Bündel bleibt die Bühne je Gerät voll nutzbar.
   - *Abhängigkeiten:* 056, 053

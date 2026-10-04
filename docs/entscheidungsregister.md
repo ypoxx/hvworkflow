@@ -1,7 +1,7 @@
 # Entscheidungsregister
 
 **Stand:** 23.09.2026 — Prüfpunkt 0, durch den Umsetzer vorgezogen (im Plan auf den 25.09.2026 datiert):
-Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen · E50–E54 ergänzt am 25.09.2026 mit Scheibe 089 · E55 ergänzt am 29.09.2026 mit Spec 034a · E56 ergänzt am 30.09.2026 (Antwort des Eigentümers) · E57 ergänzt am 03.10.2026 (Freigabe-Demo) · E5 Vermerk am 04.10.2026 (Go zum Bau von 048 auf Standard) ·
+Plan und Standardannahmen freigegeben, E23 und E48 entschieden, E47 offen · E50–E54 ergänzt am 25.09.2026 mit Scheibe 089 · E55 ergänzt am 29.09.2026 mit Spec 034a · E56 ergänzt am 30.09.2026 (Antwort des Eigentümers) · E57 ergänzt am 03.10.2026 (Freigabe-Demo) · E5 Vermerk am 04.10.2026 (Go zum Bau von 048 auf Standard) · E58 ergänzt am 04.10.2026 mit Spec 054 (Codex P1) ·
 **Herkunft:** Produktplan Beta (`docs/produktplan-beta.md`) Abschnitte 3, 4, 7, 10 und 11; Leitplanken
 (`docs/qualitaetsleitplanken-produktreife.md`) Abschnitt 11 · **Rang:** Ab dieser Scheibe führt dieses
 Register die offenen Entscheidungen (Leitplanken 11); Plan Abschnitt 10 bleibt die Herkunft der Zeilen.
@@ -27,7 +27,7 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 
 ---
 
-## 1. Register E1–E57
+## 1. Register E1–E58
 
 | Nr. | Entscheidung | Standardannahme | Eigentümer | Fällig | Rückfalltrigger | Kosten bei Änderung | Betroffene Scheibe(n) | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -90,6 +90,7 @@ Datum oder die Scheibe, ab der ohne Antwort der Standard im Code steht oder der 
 | E55 | Stufe einer Vertragsänderung, die Anfrageschemas einschränkt (`maxLength`/`maxItems` in 034a; gleiche Frage wie bei 0.3.4/0.3.6, Bautag 27.–29.09.2026; ADR 0015 nennt nur additive Änderungen als Patch) | Patch-Stufe, weil jede Grenze weit über realen Eingaben liegt und der Dienst bisher unbegrenzt annahm (Sicherheitskorrektur, SP-2); der CHANGELOG nennt die Einschränkung unter „Changed“ | Eigentümer | 27.10.2026 (vor 034a) | 27.10.2026 / 034a: ohne Antwort Patch-Stufe | Minor-Stufe statt Patch: Versionsnummer, CHANGELOG, zwei Versionsaussagen, unter 0,25 AStd | 034a, 043, 077 | offen (034a gebaut mit Standard Patch-Stufe, Vertrag 0.3.10; Bestätigung oder Minor-Stufe durch den Eigentümer steht aus) |
 | E56 | Bildnachweis für Tests, die nur gegen Keycloak im CI-Job `e2e-http` laufen (AGENTS.md R2; Codex P1 auf #82 und #87; der R11-Hook sperrt dem Agenten den Download von CI-Artefakten) | Das CI-Artefakt genügt als Screenshot-Nachweis, wenn der Nachweisabschnitt der Scheibe Artefaktname, Lauf-ID, Artefakt-ID und Digest nennt | Eigentümer | 30.09.2026 | — | Rückkehr zum committeten PNG: der Eigentümer lädt das Artefakt herunter und committet, Minuten je Scheibe | takt-030, takt-033b, 031b | beantwortet am 30.09.2026: Artefakt-Nachweis erlaubt (AGENTS.md R2 ergänzt) |
 | E57 | Nächstes Ziel: Freigabe-Demo statt Beta (Zielpfad in `docs/produktplan-beta.md` Abschnitt 11): Oberfläche vollständig für die verantwortliche Person, dokumentierte und prüfbare Partnerschnittstellen für Entwickler, lokal startbares Paket mit Betriebsnachweisen für den Betrieb; dazu 040a angenommen, Go auf Standard für 043a, 040b, 044a/044b, 040c und 040d zurückgestellt, schlankerer Ablauf für Oberflächenscheiben mittleren Risikos (AGENTS.md R3) | Entscheidung: Beta B1–B18, Generalprobe und beta-1 (12.03.2027) bleiben unverändert dahinter; rund 24 Scheiben, rund 50 AStd, 45–55 Mio. Token, rund 5–6 Wochen; Netlify-Demo (im Prozess) für Punkte 1 und 2, Punkt 3 mit dem lokalen Paket; kein gehosteter Server, ein späterer Deploy braucht das ausdrückliche Go (R11) | Eigentümer | 03.10.2026 | — | Rückkehr zum Beta-Zielpfad: die Reihenfolge ändert sich, kein Code | 043a, 040a, 040b, 044a, 044b, 044c, 037, 038, 064, 065, 066, 070, 071, 075 | entschieden am 03.10.2026 von Eigentümer; 043a Fragen 1, 2 und 5, 040 Teilung und Budget für 040b, 044a Fragen 1, 2 und 3b auf Standard gebaut (Go des Eigentümers 03.10.2026), Rechtsprüfung vor jeder echten Nutzung |
+| E58 | Undo nach Weiterleiten (Zielbild Z9 „Rückgängig“; Spec 054, Codex P1 auf #147): darf die Fachkraft eine eben an das Legal Clearing weitergeleitete Einzelfrage selbst zurückholen? | Kein Undo in 054. Ein Zurückholen kommt nur mit 054c nach Rechtsblick (eigene Zeile in der Übergangstabelle mit Guard „noch keine Rechtsfreigabe“); bis dahin geht der Weg zurück über Zurückgeben durch Recht oder Versammlungsbüro (`question.return`, R-TRANS-06) bzw. eine Weiterleitung durch die Koordination | Projektleitung, Recht | 13.11.2026 (vor 054c) | 19.11.2026 / 054c: ohne Antwort wird 054c nicht gebaut, der Standard (kein Undo) bleibt | 054c: rund 1,25 AStd (Übergang, Guard, Ereignis, Recht, Schaltfläche, Wahrheitstabellen-Diff); ein Nein kostet nichts | 054, 054c | offen |
 
 ---
 
