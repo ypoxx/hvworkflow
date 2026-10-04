@@ -1893,6 +1893,8 @@ export interface components {
             refusalGroundHash?: components["schemas"]["Sha256Hex"];
             /** @description Since 0.4.0 (slice 043a, masking enforced from slice 044): the justification of a refusal, a legal assessment (SG2). Present only for readers holding `question.refuse.propose` or `question.refuse.approve` (never through `question.legal.clear`, never an administrator); absent for every other reader of `Question.answers`, always absent in `StageView`, and never part of an `EventRead`. Never matched by the full-text search `q`. */
             refusalJustification?: string;
+            /** @description Since 0.4.4 (slice 055, ADR 0005): the answer as a normalised block document, on every version. For a version without a stored document (before 0.4.4, refusals) derived from `text`: one paragraph per non-empty line, without marks. Never masked, never personal data in the sense of `PiiEnvelope` (the same content as `text`). */
+            body?: components["schemas"]["AnswerBody"];
         } & (unknown & unknown & unknown);
         /** @description Since 0.4.0 (slice 043a): the trace of a rule or catalogue entry to its legal source, the same form as the domain type `LegalRef` (`packages/domain/src/rules.ts`). `source` names an entry of the closed domain list `LegalSource`; the contract keeps it an open string so that a new source costs no contract cycle. Deliberately wider than today's domain type: `docHash` may be a string and `verified` may be `true`, the values the legal review (slice 076) sets. Until then every entry is `verified: false` (E15) and the interface shows it as unverified. */
         LegalRef: {
@@ -1925,11 +1927,11 @@ export interface components {
              * @enum {string}
              */
             answerKind: "refusal_no_claim" | "refusal_with_ground";
-            /** @description The wording for the podium; the interface prefills it from `RefusalGround.stageText` */
+            /** @description The wording for the podium; the interface prefills it from `RefusalGround.stageText`. Since 0.4.4 (slice 055) the service removes control and format characters (`Cc` except tab, line feed, carriage return; every `Cf`) and applies NFC before trimming; a lone surrogate is `422`. */
             text: string;
             /** @description The chosen ground (refusal path B only) */
             refusalGroundId?: string;
-            /** @description The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification` */
+            /** @description The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification`. Since 0.4.4 (slice 055) the same character filter as `text` applies before the checks; a justification that is empty afterwards counts as missing, a lone surrogate is `422`. */
             refusalJustification?: string;
             sources?: string[];
         };
@@ -2009,8 +2011,58 @@ export interface components {
             seatId?: string;
         };
         AnswerDraft: {
+            /** @description The answer wording. Since 0.4.4 (slice 055) the service removes control and format characters (Unicode `Cc` except tab, line feed and carriage return, every `Cf`) and applies NFC before trimming; a lone surrogate is `422`. With `body` this field must still meet its form but is neither checked nor stored (see `body`). */
             text: string;
             sources?: string[];
+            /** @description Since 0.4.4 (slice 055, ADR 0005): the answer as an open block document. With `body` the service normalises it (`AnswerBodyInput`) and stores as `text` the plain-text projection of the normalised document; the submitted `text` stays required (0.4.x is additive), must meet its form and is then neither checked nor stored. Without `body` as before (with the character filter of `text`). A retry with the same `Idempotency-Key` returns the first result, also with a different `body` (R-IDEM-01). */
+            body?: components["schemas"]["AnswerBodyInput"];
+        };
+        /**
+         * @description Since 0.4.4 (slice 055): a mark of the house format after ADR 0005; no font choice (E6). A new mark is additive; a mark that is later withdrawn stays described here as a value (stored events keep it) and is removed when a version is read.
+         * @enum {string}
+         */
+        AnswerMark: "bold" | "italic" | "highlight";
+        /** @description Since 0.4.4 (slice 055): one run of text with its marks, part of the stored form `AnswerBody` */
+        AnswerInline: {
+            text: string;
+            marks?: components["schemas"]["AnswerMark"][];
+        };
+        /** @description Since 0.4.4 (slice 055): a paragraph of the stored form `AnswerBody` */
+        AnswerParagraph: {
+            /** @constant */
+            type: "paragraph";
+            content: components["schemas"]["AnswerInline"][];
+        };
+        /** @description Since 0.4.4 (slice 055): a bulleted list of the stored form `AnswerBody`; no numbering, no nesting (E6) */
+        AnswerList: {
+            /** @constant */
+            type: "list";
+            items: components["schemas"]["AnswerInline"][][];
+        };
+        /** @description Since 0.4.4 (slice 055): one block of the stored form; `type` separates the two kinds */
+        AnswerBlock: components["schemas"]["AnswerParagraph"] | components["schemas"]["AnswerList"];
+        /** @description Since 0.4.4 (slice 055, ADR 0005): the normalised stored form of an answer version. `text` of the version is its plain-text projection: the runs of a paragraph or list item joined, the items of a list separated by one line feed, the blocks by two line feeds, the whole in NFC, no bullet characters. The structural limits follow from the text limit of 20000 code points and never apply on their own, so every valid version has a valid document. `language` is the content language of the wording (E21: only `de`). */
+        AnswerBody: {
+            /** @enum {string} */
+            language: "de";
+            blocks: components["schemas"]["AnswerBlock"][];
+        };
+        /** @description Since 0.4.4 (slice 055): one run of the open input form; marks are open strings */
+        AnswerInlineInput: {
+            text: string;
+            marks?: string[];
+        };
+        /** @description Since 0.4.4 (slice 055): one block of the open input form; the block type is an open string */
+        AnswerBlockInput: {
+            type: string;
+            content?: components["schemas"]["AnswerInlineInput"][];
+            items?: components["schemas"]["AnswerInlineInput"][][];
+        };
+        /** @description Since 0.4.4 (slice 055, ADR 0005): the open input form of an answer document (`AnswerDraft.body`). The core applies the whitelist (rules N1 to N10 of ADR 0005): an unknown block type becomes paragraphs, an unknown mark is dropped and its text stays; control and format characters are removed. `422` when no text remains, the plain-text projection exceeds 20000 code points or a lone surrogate occurs. */
+        AnswerBodyInput: {
+            /** @enum {string} */
+            language?: "de";
+            blocks: components["schemas"]["AnswerBlockInput"][];
         };
         /** @description Podium view. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent here, for every reader */
         StageView: {
@@ -2184,6 +2236,7 @@ export interface components {
                         [key: string]: unknown;
                     };
                     refusalJustification?: never;
+                    body?: components["schemas"]["AnswerBody"];
                 } & {
                     [key: string]: unknown;
                 };
@@ -2191,7 +2244,7 @@ export interface components {
                 [key: string]: unknown;
             };
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the justification in `answer`): the justification of a refusal is never written into `answer`; it stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId` (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The same payload carries `toStatus`, the target status taken from the transition table (a value of `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before, and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass` `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now. Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
+        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the justification in `answer`): the justification of a refusal is never written into `answer`; it stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId` (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The same payload carries `toStatus`, the target status taken from the transition table (a value of `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before, and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass` `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now. Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). Since 0.4.4 (slice 055) `AnswerDrafted.answer.body` is the stored form `AnswerBody` (a `draftAnswer` with `body`). A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
         Event: {
             /** @description Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024). */
             seq: number;

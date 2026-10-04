@@ -265,7 +265,8 @@ describe('Scheibe 043a: refusal as a kind of answer (ADR 0012 model A)', () => {
   });
 
   it('10: no silent widening of an existing request schema (rule 1 of the split)', () => {
-    expect(sortedKeys(schemas.AnswerDraft.properties)).toEqual(['sources', 'text']);
+    // Vertragszeile von 055, 0.4.4: `body` is the contract line of slice 055, written with that slice's core.
+    expect(sortedKeys(schemas.AnswerDraft.properties)).toEqual(['body', 'sources', 'text']);
     expect(sortedKeys(requestBodySchemaOf('approveQuestion')['properties'])).toEqual(['answerVersion']);
     // `seatId` is the contract line of slice 040b (0.4.1), written with that slice's implementation.
     expect(sortedKeys(schemas.Classification.properties)).toEqual(['agendaItemId', 'seatId', 'stageAssignment', 'track']);

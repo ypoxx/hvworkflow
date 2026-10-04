@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.4.3
+  version: 0.4.4
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -3192,6 +3192,13 @@ components:
             `question.refuse.approve` (never through `question.legal.clear`, never an administrator);
             absent for every other reader of `Question.answers`, always absent in `StageView`, and never
             part of an `EventRead`. Never matched by the full-text search `q`.
+        body:
+          description: >-
+            Since 0.4.4 (slice 055, ADR 0005): the answer as a normalised block document, on every version.
+            For a version without a stored document (before 0.4.4, refusals) derived from `text`: one paragraph
+            per non-empty line, without marks. Never masked, never personal data in the sense of `PiiEnvelope`
+            (the same content as `text`).
+          allOf: [ { $ref: '#/components/schemas/AnswerBody' } ]
       # Refusal invariants (slice 043a). Each branch defines the properties it names, so a `required`
       # always refers to a property of its own sub-schema.
       allOf:
@@ -3258,9 +3265,9 @@ components:
       additionalProperties: false
       properties:
         answerKind: { type: string, enum: [refusal_no_claim, refusal_with_ground], description: 'The refusal path; never `answer` (an answer is drafted with `draftAnswer`)' }
-        text: { type: string, minLength: 1, maxLength: 20000, description: 'The wording for the podium; the interface prefills it from `RefusalGround.stageText`' }
+        text: { type: string, minLength: 1, maxLength: 20000, description: 'The wording for the podium; the interface prefills it from `RefusalGround.stageText`. Since 0.4.4 (slice 055) the service removes control and format characters (`Cc` except tab, line feed, carriage return; every `Cf`) and applies NFC before trimming; a lone surrogate is `422`.' }
         refusalGroundId: { type: string, maxLength: 128, description: 'The chosen ground (refusal path B only)' }
-        refusalJustification: { type: string, minLength: 1, maxLength: 4000, description: 'The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification`' }
+        refusalJustification: { type: string, minLength: 1, maxLength: 4000, description: 'The justification, a legal assessment (SG2); masked on every read path as described on `AnswerVersion.refusalJustification`. Since 0.4.4 (slice 055) the same character filter as `text` applies before the checks; a justification that is empty afterwards counts as missing, a lone surrogate is `422`.' }
         sources: { type: array, maxItems: 50, items: { type: string, maxLength: 2000 } }
       if: { required: [answerKind], properties: { answerKind: { const: refusal_no_claim } } }
       then: { properties: { refusalGroundId: false } }
@@ -3367,8 +3374,111 @@ components:
       type: object
       required: [text]
       properties:
-        text: { type: string, minLength: 1, maxLength: 20000 }
+        text:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: >-
+            The answer wording. Since 0.4.4 (slice 055) the service removes control and format characters
+            (Unicode `Cc` except tab, line feed and carriage return, every `Cf`) and applies NFC before trimming;
+            a lone surrogate is `422`. With `body` this field must still meet its form but is neither checked
+            nor stored (see `body`).
         sources: { type: array, maxItems: 50, items: { type: string, maxLength: 2000 } }
+        body:
+          description: >-
+            Since 0.4.4 (slice 055, ADR 0005): the answer as an open block document. With `body` the service
+            normalises it (`AnswerBodyInput`) and stores as `text` the plain-text projection of the normalised
+            document; the submitted `text` stays required (0.4.x is additive), must meet its form and is then
+            neither checked nor stored. Without `body` as before (with the character filter of `text`). A retry
+            with the same `Idempotency-Key` returns the first result, also with a different `body` (R-IDEM-01).
+          allOf: [ { $ref: '#/components/schemas/AnswerBodyInput' } ]
+    AnswerMark:
+      type: string
+      description: >-
+        Since 0.4.4 (slice 055): a mark of the house format after ADR 0005; no font choice (E6). A new mark is
+        additive; a mark that is later withdrawn stays described here as a value (stored events keep it) and is
+        removed when a version is read.
+      enum: [bold, italic, highlight]
+    AnswerInline:
+      type: object
+      description: 'Since 0.4.4 (slice 055): one run of text with its marks, part of the stored form `AnswerBody`'
+      required: [text]
+      additionalProperties: false
+      properties:
+        text: { type: string, minLength: 1, maxLength: 20000 }
+        marks: { type: array, uniqueItems: true, maxItems: 3, items: { $ref: '#/components/schemas/AnswerMark' } }
+    AnswerParagraph:
+      type: object
+      description: 'Since 0.4.4 (slice 055): a paragraph of the stored form `AnswerBody`'
+      required: [type, content]
+      additionalProperties: false
+      properties:
+        type: { type: string, const: paragraph }
+        content: { type: array, minItems: 1, maxItems: 20000, items: { $ref: '#/components/schemas/AnswerInline' } }
+    AnswerList:
+      type: object
+      description: 'Since 0.4.4 (slice 055): a bulleted list of the stored form `AnswerBody`; no numbering, no nesting (E6)'
+      required: [type, items]
+      additionalProperties: false
+      properties:
+        type: { type: string, const: list }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: { type: array, minItems: 1, maxItems: 20000, items: { $ref: '#/components/schemas/AnswerInline' } }
+    AnswerBlock:
+      description: 'Since 0.4.4 (slice 055): one block of the stored form; `type` separates the two kinds'
+      oneOf:
+        - { $ref: '#/components/schemas/AnswerParagraph' }
+        - { $ref: '#/components/schemas/AnswerList' }
+    AnswerBody:
+      type: object
+      description: >-
+        Since 0.4.4 (slice 055, ADR 0005): the normalised stored form of an answer version. `text` of the
+        version is its plain-text projection: the runs of a paragraph or list item joined, the items of a list
+        separated by one line feed, the blocks by two line feeds, the whole in NFC, no bullet characters. The
+        structural limits follow from the text limit of 20000 code points and never apply on their own, so
+        every valid version has a valid document. `language` is the content language of the wording (E21:
+        only `de`).
+      required: [language, blocks]
+      additionalProperties: false
+      properties:
+        language: { type: string, enum: [de] }
+        blocks: { type: array, minItems: 1, maxItems: 10000, items: { $ref: '#/components/schemas/AnswerBlock' } }
+    AnswerInlineInput:
+      type: object
+      description: 'Since 0.4.4 (slice 055): one run of the open input form; marks are open strings'
+      required: [text]
+      additionalProperties: false
+      properties:
+        text: { type: string, minLength: 0, maxLength: 20000 }
+        marks: { type: array, maxItems: 16, items: { type: string, minLength: 1, maxLength: 32 } }
+    AnswerBlockInput:
+      type: object
+      description: 'Since 0.4.4 (slice 055): one block of the open input form; the block type is an open string'
+      required: [type]
+      additionalProperties: false
+      properties:
+        type: { type: string, minLength: 1, maxLength: 32 }
+        content: { type: array, maxItems: 2000, items: { $ref: '#/components/schemas/AnswerInlineInput' } }
+        items:
+          type: array
+          maxItems: 1000
+          items: { type: array, maxItems: 2000, items: { $ref: '#/components/schemas/AnswerInlineInput' } }
+    AnswerBodyInput:
+      type: object
+      description: >-
+        Since 0.4.4 (slice 055, ADR 0005): the open input form of an answer document (`AnswerDraft.body`).
+        The core applies the whitelist (rules N1 to N10 of ADR 0005): an unknown block type becomes
+        paragraphs, an unknown mark is dropped and its text stays; control and format characters are removed.
+        `422` when no text remains, the plain-text projection exceeds 20000 code points or a lone surrogate
+        occurs.
+      required: [blocks]
+      additionalProperties: false
+      properties:
+        language: { type: string, enum: [de] }
+        blocks: { type: array, minItems: 1, maxItems: 2000, items: { $ref: '#/components/schemas/AnswerBlockInput' } }
     StageView:
       type: object
       description: 'Podium view. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent here, for every reader'
@@ -3659,6 +3769,8 @@ components:
                 # Since 0.4.0 (slice 043a, SG2): the justification of a refusal never leaves the service
                 # through an event read path, for any reader; `maskEvent` does not know the reader.
                 refusalJustification: false
+                # Since 0.4.4 (slice 055): the stored document is the closed stored form.
+                body: { $ref: '#/components/schemas/AnswerBody' }
       allOf:
         - if: { required: [type], properties: { type: { const: QuestionLegalCleared } } }
           then: { properties: { payload: { $ref: '#/components/schemas/QuestionLegalClearedPayload' } } }
@@ -3724,8 +3836,9 @@ components:
         and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of
         `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass`
         `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now.
-        Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). A bound
-        payload schema for `AnswerDrafted` follows with slice 043c.
+        Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). Since 0.4.4
+        (slice 055) `AnswerDrafted.answer.body` is the stored form `AnswerBody` (a `draftAnswer` with `body`).
+        A bound payload schema for `AnswerDrafted` follows with slice 043c.
         Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`,
         `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of
         the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with
