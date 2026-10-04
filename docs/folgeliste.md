@@ -659,6 +659,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 048 Review · HTTP-Test der Code-Punkt-Grenze von `unitId` · 128 astrale Zeichen (Kern 422 „does not exist“) und 129 (Validator 422) über den Dienst · Test ergänzen.
 - 048 Review · `docs/sicherheit/bedrohungsmodell.md` Zeile 048 · nennt `transitions.test.ts` (R-TRANS-17, R-GUARD-15) nicht · Nachweis ergänzen.
 - 048 Review · Idempotenz-Reihenfolge · `forwardQuestion` und `assignQuestion` prüfen den Fachbereich vor der Wiederholung, eine Wiederholung nach erneutem Weiterleiten und Entfernen antwortet 422 (Test 9b) · Wiederholung vor der Fachbereichsprüfung, für beide Operationen zusammen.
+- 048 Spec-Nachprüfung N4 · Abschnitt „Warum hoch“ und Checkliste · `legalClearance.clearedBy` (Akteur-id und Rolle der Rechtsfreigabe in der Sicht) nicht ausdrücklich genannt · beim nächsten Anfassen der Spec benennen.
+- 048 Spec-Nachprüfung N5 · Abschnitt 6 · nennt nicht, dass `QuestionForwarded` in `SCOPE_EXIT_EVENTS` Inhaber von `stage.read` zum Neuaufsetzen des Nachlaufs zwingt (`stream.ts:412`) · ergänzen.
+- 048 Spec-Nachprüfung N7 · „Entscheidung 4“ · der Unterpunkt (Code gegen Anspruch) ist nicht benannt · ergänzen.
+- 048 Spec-Nachprüfung N8 · Verweis auf `Event.type` · Zeilen `openapi.yaml:3676-3711` statt 3675-3710 · berichtigen.
+- 048 Lesebefund m2 · bereits oben („`_actions` einer gebundenen Fachkraft ohne Einheit“) · kein zweiter Eintrag.
 
 ## Skripte
 

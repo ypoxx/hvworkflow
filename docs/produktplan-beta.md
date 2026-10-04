@@ -610,12 +610,19 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* Unit-Tests des Store-Reducers; Playwright zweiter Browser sieht Änderung < 2 s; Netztrace im Bericht
   - *Offene Entscheidung:* —
-- **037 · Container, Pipeline, drei Umgebungen, Betriebsauswertung, Freeze-Regel** — hoch · 2,5 AStd · Kalender 30.10.2026 (W5) · Lanes: infra
+- **037 · Container, Pipeline, drei Umgebungen, Betriebsauswertung, Freeze-Regel (Teil a: lokales Betriebspaket)** — hoch · 4 AStd · Kalender 30.10.2026 (W5) · Lanes: infra
   - *Ziel:* Dockerfile für apps/api (distroless, non-root), Alarm auf den Füllstand des Zugriffslog-Datenträgers und auf Schreibfehler der Senke (033a), Zugriff auf die Zugriffslog-Senke nur für benannte Betriebspersonen mit Plattformprotokoll (technische Zwei-Personen-Kontrolle der Senke bleibt Restrisiko, ADR 0013), ausgehend UDP/123 nur zu den konfigurierten NTP-Servern (033a), Prüfung des Konfigurationsschemas aus 034b beim Start im Image, Secrets nur aus der Plattform, CSP und Sicherheitsheader in netlify.toml, Betriebsauswertung je Umgebung (plattformnativ oder Prometheus/Grafana im Container-Stack) mit Alarmversand an die benannte Beobachterin, Härtungs-Checkliste des gemieteten Hosts (SSH-Schlüssel, Updates, Firewall, verschlüsselte Backups), CI-Job build+push Image mit Digest, Deploy nach Staging-synthetisch nur über Approval-Environment (Eigentümer-Go), Health-Smoke nach Deploy (/readyz 200 sonst Rollback), Freeze-Kalender als Pipeline-Regel, Umgebungsdefinitionen demo / staging-synthetic / rehearsal (Übungsmandant mit eigener DB); Eigentümer-Checkliste Secrets (< 2 h) in docs/betrieb/; Nachweise für ADR 0007. Staging-synthetisch mit Anmeldung, sobald der Host steht (Rückfalltrigger 30.10.).
   - *Abhängigkeiten:* 033b, 034b
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Betrieb/Security; Eigentümer führt Secrets-Checkliste aus
   - *Nachweise:* Image-Digest und Staging-URL im Bericht; Testalarm kommt bei der Beobachterin an; Pipeline-Protokoll mit Approval-Schritt; Deploy im Freeze-Fenster → abgelehnt (Test); CSP-Report ohne Verstoß in e2e gegen den Produktions-Build (aus 034 übernommen)
   - *Offene Entscheidung:* E10 Hosting — Container und Pipeline sind neutral; Rückfall gemieteter Host ab 30.10.
+  - *Stand:* Teil 1 (037a, lokales Betriebspaket) gebaut und gemergt am 04.10.2026 (`5d89ad7`, PR #129; S17 vom Eigentümer so angenommen); Teil 037b offen
+- **037b · Pipeline, drei Umgebungen, Betriebsauswertung, Freeze-Regel (Teil b von 037)** — hoch · 2 AStd · Kalender 02.11.2026 (W6) · Lanes: infra
+  - *Ziel:* der in 037a zurückgestellte Teil von 037: Pipeline mit Approval-Schritt und Freeze-Regel, drei Umgebungen, Alarme und Betriebsauswertung; Zuschnitt im Abschnitt „Teilung und Zuschnitt“ von `docs/slices/037a-lokales-betriebspaket.md`. Deployment nur nach ausdrücklichem Go des Eigentümers (Regel 11).
+  - *Abhängigkeiten:* 037
+  - *Rolle:* Implementierer-Backend; Review mit Perspektive Betrieb/Security
+  - *Nachweise:* wie Planzeile 037, soweit nicht durch 037a erbracht
+  - *Offene Entscheidung:* E10 Hosting
 - **038 · Backup, Restore, Rebuild-Drill, Jahrgangs-Export, RPO/RTO/SLO** — hoch · 2 AStd · Kalender 02.11.2026 (W6) · Lanes: persist, docs-betrieb
   - *Ziel:* tägliches Backup plus WAL/PITR dokumentiert, Restore-Skript, Drill: Backup → neue DB → Dienst startet → Hash-Kette verifiziert → Projektion identisch; RPO 0 für Ereignisse, RTO 15 min, SLO p90 < 300 ms für Listen- und Bühnenaufrufe im Fenster der Probe; Exportskript „Jahrgang als Archiv" (JSONL + Hash-Liste); nightly Restore-Test.
   - *Abhängigkeiten:* 027, 037
@@ -682,12 +689,6 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review
   - *Nachweise:* Test Empfänger ohne Zielrecht erhält nichts; Test Quittung als Ereignis; Playwright zweiter Browser sieht Alarm < 2 s; Screenshot DE/EN
   - *Offene Entscheidung:* Zusatzkanal E-Mail oder Push (Nach-Beta)
-- **048 · Weiterleiten zwischen Fachbereichen, Auskunftsschuldner, Inhaltssprache** — mittel · 1,5 AStd · Kalender 05.11.2026 (W6) · Lanes: core
-  - *Ziel:* R-TRANS-13 forward aus assigned | answer_drafted | in_review an andere Einheit (coordination, expert der aktuellen Einheit), Antwortversion bleibt, Ereignis QuestionForwarded mit Grund; Feld accountable (Auskunftsschuldner, genau eine Person oder Funktion, RACI-Accountable) getrennt vom Bühnenplatz (Sprecher), Standard = Bühnenplatz; Feld language (Standard de) reserviert ohne Kopplungslogik; der Dialog „Weiterleiten" mit Einheit und Grund entsteht in der Fokusansicht (054); eine Umbenennung von Ereignis oder Operation nur nach Antwort auf Frage 6 (E5).
-  - *Abhängigkeiten:* 021c, 043, 040
-  - *Rolle:* Implementierer-Backend; Review
-  - *Nachweise:* Test je Regelzeile; Wahrheitstabellen-Diff
-  - *Offene Entscheidung:* E5 Bedeutung „Weiterleiten" (beides gebaut)
 - **044 · Verweigerungspfad A und B im Kern** — hoch · 2,5 AStd · Kalender 06.11.2026 (W6) · Lanes: core
   - *Ziel:* answerKind refusal_no_claim (Pfad A) und refusal_with_ground (Pfad B, Pflichtauswahl aus packages/domain/src/refusalGrounds.ts mit legalRef und verified:false, Begründung Pflicht) als Antwortart durch in_review → approved → staged → delivered; Guards R-GUARD-08 „Verweigerung nur mit Rechtsfreigabe-Ereignis" und Vier-Augen gelten; Rechte question.refuse.propose (legal, coordination) und question.refuse.approve (approver); Grundpflicht als Guard R-GUARD-09 (Pfad B ohne refusalGroundId oder Begründung → 409; `_actions` enthält die Verweigerung erst, wenn der Guard erfüllbar ist); Formulierungsbaustein für die Bühne aus dem Katalog; Export markiert Verweigerungen; Nachweise für ADR 0012 (liegt seit 011 bei Recht, sonst Vermerk „auf Standard gebaut"). Höchstes rechtliches Risiko: Implementierer-Backend baut, Review in frischem Kontext mit Perspektive Legal, Architekt prüft stichprobenartig; der Wahrheitstabellen-Diff steht vor der Implementierung im Spec.
   - *Abhängigkeiten:* 021c, 011, 043
@@ -701,6 +702,19 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Nachweise:* Screenshots Verweigerungsdialog und Bühne DE/EN (in-process) und ein grüner Lauf `e2e-http` (Lauf 37153923219); „Verweigerung · Grund aus Katalog" ohne Grund → Absenden gesperrt; Meldung R-GUARD-09 bzw. 422 im Dialog (Unit-Ebene, Spec 045 Test 5/6/11); Schaltflächen nur nach `_actions` (`question.refuse.propose`/`.approve`)
   - *Offene Entscheidung:* —
   - *Stand:* gebaut und gemergt am 03.10.2026 (`c0db7f5`, Bauzeit tatsächlich rund 0,9 h gegen 3,5 AStd geplant, PR #139; ersetzt #138, Spec `docs/slices/045-verweigerung-oberflaeche.md`: angenommen)
+- **048 · Weiterleiten an einen anderen Fachbereich (048b: Auskunftsschuldner; 055: Inhaltssprache)** — hoch · 3,0 AStd · Kalender 12.11.2026 (W7) · Lanes: contract, core, service, web-api, web-shell, web-history, docs-plan, docs-legal, docs-sicherheit, docs-datenschutz
+  - *Ziel:* R-TRANS-17 (Weiterleiten an einen anderen Fachbereich, aus assigned | answer_drafted | in_review, Antwortversion bleibt) mit R-GUARD-15 (Ziel ist ein anderer Fachbereich), Ereignis QuestionForwarded mit geschlossenem Grundcode (kein Freitext); Recht question.forward an die Einheitsbindung gebunden; Vertrag, Kern, Dienst und Historie. Das Feld accountable (Auskunftsschuldner, genau eine Person oder Funktion) entfällt hier und wird 048b (Skizze); die Inhaltssprache (Feld language, E21) gehört zu 055. Der Dialog „Weiterleiten“ mit Einheit und Grund entsteht in der Fokusansicht (054); eine Umbenennung von Ereignis oder Operation nur nach Antwort auf Frage 6 (E5). Spec `docs/slices/048-weiterleiten-fachbereich.md`.
+  - *Abhängigkeiten:* 044, 040
+  - *Rolle:* Implementierer-Backend; Review in frischem Kontext mit Perspektiven Security und Datenschutz
+  - *Nachweise:* Test je Regelzeile; Wahrheitstabellen-Diff; Strom-Test für die Zieleinheit; pnpm gates
+  - *Offene Entscheidung:* E5 Bedeutung „Weiterleiten“ (beides gebaut; inhaltlich offen)
+  - *Stand:* gebaut und gemergt am 04.10.2026 (`7405efb`, PR #142; Bauzeit tatsächlich rund 0,4 h gegen 3,0 AStd geplant; Spec: angenommen)
+- **048b · Auskunftsschuldner als Funktion (Bühnenplatz)** — mittel · 1,25 AStd · Kalender 16.11.2026 (W8) · Lanes: contract, core, service
+  - *Ziel:* Feld `accountableSeatId` (Auskunftsschuldner als Funktion, nicht als Person; Standard = Bühnenplatz der Frage), Skizze im Abschnitt „Teilung und Zuschnitt“ von `docs/slices/048-weiterleiten-fachbereich.md`; eigene Spec vor dem Bau; „Person“ statt Funktion nur auf Antwort des Eigentümers (dann Klasse hoch, rund +1 AStd).
+  - *Abhängigkeiten:* 048
+  - *Rolle:* Implementierer-Backend; Review
+  - *Nachweise:* Test je Regelzeile; Vertragsschritt
+  - *Offene Entscheidung:* Eigentümerfrage 6 aus Spec 048 (Funktion oder Person)
 - **050 · Verfahrensereignisse: Protokollierungsverlangen, Widerspruch, Anordnungen** — mittel · 1,5 AStd · Kalender 09.11.2026 (W7) · Lanes: core, web-capture
   - *Ziel:* ProtocolRequested, ObjectionRaised, ChairOrderRecorded als Ereignisse erster Klasse mit R-PROC-01..03, occurredAt/recordedAt, Notarmarkierung, Recht procedure.record (moderation, capture, legal); Schnellaktionen in der Erfassung; Historie-Filter; Alarm (085) an Inhaber von question.legal.clear bei Widerspruch; Aufnahme in die Niederschrift-Anlage.
   - *Zielbild (089):* Z15 (Widerspruch als eigener Kanal über dem Lagebild, Übergabe an den Notar mit Empfangsvermerk). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
@@ -720,7 +734,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Datenschutz/Legal
   - *Nachweise:* Test Export ohne Recht 403, Export erzeugt Ereignis; Snapshot-Test des HTML gegen Seed; Screenshot Druckansicht; Test Notiz fehlt
   - *Offene Entscheidung:* E19 Notarzugang (lesend über Export)
-- **049 · Vorgelesen als Entität mit Abweichungsvermerk (Soll-Ist)** — hoch · 2 AStd · Kalender 12.11.2026 (W7) · Lanes: core, web-stage
+- **049 · Vorgelesen als Entität mit Abweichungsvermerk (Soll-Ist)** — hoch · 2 AStd · Kalender 13.11.2026 (W7) · Lanes: core, web-stage
   - *Ziel:* Delivery {questionId, answerVersion, versionHash, seat, personId, deviceId, recordedAt, occurredAt mit Quelle, mode: as_approved | deviation, deviationNote, idempotencyKey}; „Vorgelesen" ist von If-Match auf der Frage ausgenommen und prüft den Versions-Hash; passt er nach Wiederverbindung nicht, entsteht ein Vermerk DeliveryConflict statt eines stillen Fehlers; Mehrfach-Delivery erlaubt (Nachfrage, Korrektur); Bühne fragt „Vorgelesen wie freigegeben" (Leertaste) oder „mit Abweichung" (A + Pflichttext); Historie zeigt Soll-Ist-Vermerk; Alarm (085) an Inhaber von question.legal.clear bei deviation.
   - *Abhängigkeiten:* 021c, 043, 085
   - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review mit Perspektive Legal
@@ -1162,8 +1176,8 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 3 | 12.10.–16.10. | Bau | **022**, **084**, **023**, **024**, **025**, **026** | **Prüfpunkt 2** (16.10.); Entscheidungsstunde; Ansprechperson Tool-Team (E3a) bis 16.10. |
 | 4 | 19.10.–23.10. | Bau | **027**, **028**, **029b**, **030**, **043** | Vertrag 0.4.0 (043); 029 erst nach Fortführungsentscheidung |
 | 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034a**, **034b**, **031a**, **031b**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
-| 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **048**, **088**, **044** | Restore-Drill auf Staging (038) |
-| 7 | 09.11.–13.11. | Bau | **045**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
+| 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **088**, **044** | Restore-Drill auf Staging (038) |
+| 7 | 09.11.–13.11. | Bau | **045**, **048**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
 | 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **060**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
 | 9 | 23.11.–27.11. | Bau | **058**, **059**, **070**, **062**, **068**, **064**, **065** | IdP-Client, technischer Betreiber, Geräteantwort bis 27.11. (E11, E26, E33) |
 | 10 | 30.11.–04.12. | Bau | **067**, **069**, **081**, **071**, **086**, **072**, **073** | Funktionsumfang gebaut (02.12.); erster Last- und Chaos-Lauf auf Staging |
@@ -1247,7 +1261,7 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 | E3a | Vertragsform der Transkript-Segmente | segmentId, text, startedAt, endedAt, speakerId optional, source | 043 (23.10.2026); Formänderung ein Vertragszyklus, 1 AStd plus Allowlist | Tool-Team, Projektleitung | Welche Felder liefert das Tool je Segment? Ansprechperson bis 16.10. |
 | E3b | Adapter des Transkriptionstools (Frage 4) | Datei-/Zwischenablage-Import im Browser mit der Sitzung der erfassenden Person | 064 (26.11.2026); Push-Adapter 1,5–3 AStd | Projektleitung, Tool-Team | Wie heißt das Tool, wie kommen Texte heraus (Schnittstelle, Datei, Kopieren), erkennt es die sprechende Person? |
 | E4 | Notiz-/Rückfragefeld je Frage (Frage 5) | Feld im Vertrag, Konfiguration notes=off | 046 (28.10.2026); Einschalten Konfiguration | Projektleitung | Soll es je Frage ein Notiz- oder Rückfragefeld geben, das Teams ersetzt, oder bleibt das bewusst außerhalb (auch aus Mitbestimmungsgründen)? |
-| E5 | Bedeutung „Weiterleiten" (Frage 6) | Anzeige „Weiterleiten" für den nächsten Schritt (020) plus Weiterleiten an eine andere Einheit (048); Ereignisnamen unverändert | 020 (02.10.2026, nur Anzeige), 048 (05.11.2026); Zeile entfernen 0,5 AStd | Projektleitung | Nur zum nächsten Schritt oder auch an eine Kollegin oder einen anderen Fachbereich? |
+| E5 | Bedeutung „Weiterleiten" (Frage 6) | Anzeige „Weiterleiten" für den nächsten Schritt (020) plus Weiterleiten an eine andere Einheit (048); Ereignisnamen unverändert | 020 (02.10.2026, nur Anzeige), 048 (04.10.2026 (gebaut)); Zeile entfernen 0,5 AStd | Projektleitung | Nur zum nächsten Schritt oder auch an eine Kollegin oder einen anderen Fachbereich? |
 | E6 | Formatierungsumfang (Frage 7) | Absatz, Liste, fett, kursiv, Hervorhebung; keine Schriftwahl | 043 (23.10.2026), 055 (18.11.2026); Marke ergänzen < 1 AStd, entfernen über Renderer-Whitelist | Projektleitung | Reichen fett, kursiv, Hervorhebung und Aufzählung? Ist Schriftwahl bewusst nicht gewünscht, weil das Hausformat gilt? |
 | E7 | Podium sieht nur eigene Fragen (Frage 8) | podiumVisibility=own als Meeting-Konfiguration; Bühnenplätze je Jahrgang | 047 (10.11.2026); Standardwert Minuten, Rechtseinschränkung eine Tabellenzeile | Projektleitung, Vorstand | Sieht ein Vorstandsmitglied nur seine eigenen Fragen oder alle mit Markierung der eigenen? |
 | E8 | Rollenzuweisung UI oder IdP-Gruppen (Frage 9) | Tabelle im Tool mit optionaler Einheit, IdP-Gruppen als Vorschlag | 026 (16.10.2026); Sync-Adapter < 1,5 AStd | Konzern-IT, Projektleitung | Wie ist die angekündigte Aufteilung der bis zu 50 Personen, und gibt es Gruppen im IdP, die als Vorschlag dienen können? |
@@ -1327,6 +1341,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
+  *Stand 04.10.2026:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette ist 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
   *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach in dieser Reihenfolge 053, 054, 055, 059, 046, 060, 061, 041 (Register E57).
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
