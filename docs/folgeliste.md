@@ -445,7 +445,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   (`PW_CHROMIUM_PATH` oder Playwrights eigenes Chromium).
 - 037a Review · `deploy/compose/compose.yaml` · keine Ressourcengrenzen (Speicher, CPU, PIDs) für die Dienste ·
   `mem_limit`, `cpus`, `pids_limit` mit Werten aus einem gemessenen Lauf.
-- 037a Nachweis (PR #148, Lauf 37222611650) · Sonde `postgres-restart` in `scripts/stack.mjs` · der Neustart dauerte 0,4 s, der Watcher sah weder den schlechten noch den wiederhergestellten Zustand; die Sonde belegt damit nichts · Beobachtung vor dem Neustart dichter takten oder den Neustart künstlich verlängern, Wartezeit gehört zu 037b.
+- 037a Nachweis (PR #148, Lauf 37222611650) · Sonde `postgres-restart` in `scripts/stack.mjs` · der Neustart dauerte 0,4 s, der Watcher sah weder den schlechten noch den wiederhergestellten Zustand; die Sonde belegt damit nichts · Beobachtung vor dem Neustart dichter takten oder den Neustart künstlich verlängern, Wartezeit gehört zu 037b. **Zum zweiten Mal rot** (PR #154, Lauf 37239065778; Wiederholung grün, nicht Ursache der Scheibe) · die Zeitlücke der Sonde ist damit kein Zufall mehr → **eigener Takt vor 037b** (Neustart verlängern oder Beobachtung dichter takten).
 - 037a Review · `docs/evidence/037a-stack-protokoll.txt` · das Protokoll entstand auf „938ffbe + Arbeitsstand“, nicht auf
   einem benannten Commit · bei der nächsten Wiederholung (mit erreichbarem quay.io) auf einem benannten Commit neu aufnehmen.
 
@@ -632,6 +632,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 045 Review nit N10 · `RefusalDialog.tsx` · Absenden ist über der Längengrenze ohne Hinweis gesperrt (D6) · Hinweis mit Zählung zeigen.
 - 045 Review nit N11 · e2e-http E1 · prüft den Zustand „in Prüfung“ nicht direkt · Zustand ausdrücklich zusichern.
 - ~~H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün), ein zweites Mal rot auf PR #149 (Lauf 37224478746); zwei Fälle, also kein Zufall mehr · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).~~ → erledigt in **takt-044** (Schritt 2 wartet vor `quiet` auf A's `GET /v1/speakers` mit der erfassten Einzelfrage; dritter Fall: Lauf 37235698670 auf #153).
+- takt-044 Review minor · `apps/web/e2e/031-http-betriebsart.spec.ts` (H13 Schritt 2) · die 5-s-Frist des Wartens auf A's `GET /v1/speakers` beginnt bei der Registrierung und umfasst die drei Erfassungsanfragen · scheitert der Schritt je an der Frist, die Frist erst nach dem Fragen-POST neu starten.
 
 ## Weiterleiten an einen anderen Fachbereich (aus 048)
 

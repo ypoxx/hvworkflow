@@ -73,3 +73,37 @@ als Funktion), Aufbewahrungsklasse für den DSB, 053 Fragen 1 bis 8, 054 Fragen 
 - Gitleaks-Lehre: Speichernamen als Modulkonstanten führen, nie als JSX-Literal; lokal steht kein Gitleaks bereit.
 - Fokus-Lehre: Wer Muster aus 053 wiederverwendet, übernimmt `armFocus` und `settleFocus` mit. Ein grüner Lauf `e2e-http`
   beweist nicht, dass kein Wettlauf besteht.
+
+## Nacht 04.10.2026
+
+**Stand:** Integrationsbranch Kopf `4da0165` (Scheibe 055, #152). Gemergt in der Nacht: Spec 055 (#151 `ea3eb9a`), takt-043
+(#153 `6fbd2a0`), takt-044 (#154 `d7020da`), Scheibe 055 (#152 `4da0165`). Die Specs stehen auf „angenommen“.
+
+- **Spec 055 (Klasse hoch, geteilt in 055 und 055b):** Der Plan führte 055 als mittel; die Spec stuft wegen Vertrag,
+  Ereignisform und Freigabebindung hoch ein (Hochstufung, kein Fall für `downgrade-check`). Lesebefund vor dem Bau mit einem
+  Blocker (B1) und Majors M1 bis M4, darunter zwei Sicherheitsmajors; eingearbeitet, Nachprüfung, Codex P1 und P2 auf #151
+  ebenfalls eingearbeitet. Teil a (Vertrag 0.4.4, Kern, Dienst) ist 055, Renderer und Editor sind 055b (Entwurf in der Spec 055).
+- **055 gebaut (Opus), geprüft und gemergt:** Das Review lief in frischem Kontext. Codex P1 auf #152 (das projizierte `body`
+  und die `sources` waren dasselbe Objekt wie in der Projektion) behoben in `514b564`; die Voraussetzung für 055b ist damit
+  erledigt. Plan, Register und Spec-Berichte sind nachgezogen (Plan: 055 hoch, neuer Eintrag 055b, E57-Kette 055 → 055b → 059;
+  056, 059 und 081 hängen an 055b, 066 an 055). Weil 055b vor 056 liegen muss, steht 055b im Plan am 18.11.2026 und 060 am
+  23.11.2026, sonst schlägt `plan-graph --strict` an (Spurkonflikt).
+- **F4-Fokus-Wettlauf trat erneut auf:** Diagnose mit zwei Ursachen (die Übergabe zählte, bevor die Liste sie hielt; der
+  Fokus wurde nach einer Ablehnung nicht entschärft) → takt-043 (#153 `6fbd2a0`). CI `e2e-http` auf `91e3129` grün
+  (56 passed, 4,8 min), auf `89ff15d` erneut grün.
+- **H13 war dreimal rot:** Diagnose: Zeitabhängigkeit des Tests (ein später Lesezugriff aus dem Erfassungsschritt fiel in das
+  Klassifizierungsfenster) → takt-044 (#154 `d7020da`). Review-Minor (die 5-s-Frist beginnt bei der Registrierung) steht auf
+  der Folgeliste.
+- **Trojan-Source-Lehre:** Steuer- und Formatzeichen (Bidi, Zeichen der Klasse Cf) gehören in Quelldateien nur als
+  `\u`-Escapes, nie als sichtbare oder unsichtbare Rohzeichen. Kandidat für ein Gate (nicht beauftragt).
+- **Lokaler Postgres war nach den Neustarts aus:** vor jedem Gates-Lauf `pg_lsclusters` prüfen, dann
+  `pg_ctlcluster 16 main start`. Die Stack-Sonde `postgres-restart` (stack-037a) war zum zweiten Mal rot (PR #154,
+  Lauf 37239065778); eigener Takt vor 037b (Folgeliste).
+
+**Nächster Schritt:** Spec 055b (Voraussetzung Aliasing erledigt), dann 059, 046, 060, 061, 041 (Plan Abschnitt 11,
+Register E57); Takt für die Stack-Sonde. Betrieb: 037b, 038, 070, 071. Entwickler: 064, 065, 066, 075.
+
+**Offene Eigentümerfragen:** E5 inhaltlich, E58 (Undo nach Weiterleiten, 054c), 048b (Auskunftsschuldner als Funktion),
+Aufbewahrungsklasse für den DSB, 053 Fragen 1 bis 8, 054 Fragen 1 bis 10, Kontrast Grau 300 (053 D4), 055 Fragen 1 bis 6
+(E6-Umfang und nummerierte Listen; behält eine reine Formatänderung die Freigabe; 422 bei Abweichung zwischen `text` und
+`body`; E21; Teilung und Budget; Risikoklasse), Vorschlag `minimumReleaseAge` (Sicherheit, takt-041).
