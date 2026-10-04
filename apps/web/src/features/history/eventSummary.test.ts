@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AnswerDrafted, QuestionApproved, RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
+import type { AnswerDrafted, QuestionApproved, QuestionForwarded, RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
 import { eventLabel, eventTypeLabel, translate } from '../../i18n';
 import { eventSubject, eventSummary, refusalVersionsOf, type SummaryContext } from './eventSummary';
 
@@ -153,5 +153,50 @@ describe('Scheibe 045: Verweigerung in der Historie (Test 8)', () => {
     const en = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params);
     expect(eventLabel(en, withGround, ctx(new Set()))).toBe('Refusal proposed');
     expect(eventLabel(en, approved, ctx(new Set(['q-1:2'])))).toBe('Refusal approved');
+  });
+});
+
+describe('Scheibe 048, W1: history row of a forward to another answering unit', () => {
+  const forwarded: QuestionForwarded = {
+    seq: 9, id: 'event-forwarded', type: 'QuestionForwarded', at: '2027-04-20T10:30:00.000Z',
+    actor: { id: 'u-coord-1', role: 'coordination' }, subjectId: 'q-1',
+    payload: { unitId: 'unit-hr', fromUnitId: 'unit-fin', reasonCode: 'expertise_elsewhere' },
+  };
+  const units: SummaryContext = {
+    ...context(new Map()),
+    unitNames: new Map([['unit-fin', 'Finanzen und Controlling'], ['unit-hr', 'Personal und Vergütung']]),
+  };
+  const en = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params);
+
+  it('with fromUnitId: both unit names and the label of the code (de and en)', () => {
+    expect(eventLabel(t, forwarded, units)).toBe('An anderen Fachbereich weitergeleitet');
+    expect(eventSummary(t, forwarded, units))
+      .toBe('Fachbereich: Finanzen und Controlling → Personal und Vergütung · Grund: Fachwissen liegt in einem anderen Fachbereich');
+    expect(eventLabel(en, forwarded, units)).toBe('Forwarded to another answering unit');
+    expect(eventSummary(en, forwarded, units))
+      .toBe('Answering unit: Finanzen und Controlling → Personal und Vergütung · Reason: Expertise lies with another answering unit');
+  });
+
+  it('without fromUnitId: only the target; every code has a label in both languages', () => {
+    const noFrom: QuestionForwarded = { ...forwarded, payload: { unitId: 'unit-hr', reasonCode: 'wrong_unit' } };
+    expect(eventSummary(t, noFrom, units)).toBe('Fachbereich: Personal und Vergütung · Grund: Falscher Fachbereich');
+    expect(eventSummary(en, noFrom, units)).toBe('Answering unit: Personal und Vergütung · Reason: Wrong answering unit');
+    const labels: [QuestionForwarded['payload']['reasonCode'], string, string][] = [
+      ['wrong_unit', 'Falscher Fachbereich', 'Wrong answering unit'],
+      ['expertise_elsewhere', 'Fachwissen liegt in einem anderen Fachbereich', 'Expertise lies with another answering unit'],
+      ['capacity', 'Auslastung', 'Workload'],
+      ['other', 'Sonstiges', 'Other'],
+    ];
+    for (const [reasonCode, de, english] of labels) {
+      const event: QuestionForwarded = { ...forwarded, payload: { ...forwarded.payload, reasonCode } };
+      expect(eventSummary(t, event, units)).toContain(`Grund: ${de}`);
+      expect(eventSummary(en, event, units)).toContain(`Reason: ${english}`);
+    }
+  });
+
+  it('an unknown code (a later contract stage) stays the code, never a crash; an unknown unit stays its id', () => {
+    const future = { ...forwarded, payload: { unitId: 'unit-new', fromUnitId: 'unit-fin', reasonCode: 'reorganisation' } } as unknown as QuestionForwarded;
+    expect(eventSummary(t, future, units)).toBe('Fachbereich: Finanzen und Controlling → unit-new · Grund: reorganisation');
+    expect(eventSummary(en, future, units)).toBe('Answering unit: Finanzen und Controlling → unit-new · Reason: reorganisation');
   });
 });

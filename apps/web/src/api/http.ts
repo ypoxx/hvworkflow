@@ -639,6 +639,8 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     getQuestionHistory: (questionId) => read('get', '/questions/{questionId}/history', { params: questionPath(questionId) }),
     classifyQuestion: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/classification', { params: questionPath(questionId), body: input, write: writeOptions }),
     assignQuestion: (questionId, unitId, writeOptions) => write('post', '/questions/{questionId}/assignment', { params: questionPath(questionId), body: { unitId }, write: writeOptions }),
+    // Scheibe 048: forward to another answering unit with a closed reason code (contract 0.4.3).
+    forwardQuestion: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/forwards', { params: questionPath(questionId), body: input, write: writeOptions }),
     draftAnswer: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/answers', { params: questionPath(questionId), body: input, write: writeOptions }),
     submitForReview: (questionId, writeOptions) => write('post', '/questions/{questionId}/review-submissions', { params: questionPath(questionId), write: writeOptions }),
     approveQuestion: (questionId, answerVersion, writeOptions) => write('post', '/questions/{questionId}/approvals', { params: questionPath(questionId), body: { answerVersion }, write: writeOptions }),

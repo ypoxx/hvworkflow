@@ -7,7 +7,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   'AgendaItemOpened', 'VotingOpened', 'VotingClosed',
   'SpeakerRegistered', 'SpeakersReordered', 'SpeakerUpdated',
   'RoleAssigned', 'RoleRevoked',
-  'ContributionCaptured', 'QuestionCaptured', 'QuestionClassified', 'QuestionAssigned',
+  'ContributionCaptured', 'QuestionCaptured', 'QuestionClassified', 'QuestionAssigned', 'QuestionForwarded',
   'AnswerDrafted', 'QuestionSubmittedForReview', 'QuestionApproved', 'QuestionLegalCleared',
   'QuestionReturned', 'QuestionStaged', 'QuestionDelivered', 'QuestionClosed',
   'QuestionWithdrawn', 'QuestionMerged',

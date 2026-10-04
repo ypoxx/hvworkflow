@@ -403,6 +403,7 @@ Kern:
 - `packages/domain/src/__tests__/forward048.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur Eintrag R-GUARD-15 in GUARD_SCENARIOS)
 - `packages/domain/src/__tests__/stream035.test.ts` (nur QuestionForwarded in den Erwartungen zu EVENT_TOPICS, EVENT_SUBJECTS und SCOPE_EXIT_EVENTS)
+- `packages/domain/src/__tests__/api.test.ts` (**Scope-Befund des Baus, 04.10.2026, Freigabe durch den Orchestrator offen:** nur die Erwartung „coordination holds exactly …“ um `question.forward` ergänzt; die Spec nannte die Datei nicht, obwohl Entscheidung 1 diese Erwartung zwingend ändert; 044a hatte sie für dieselbe Erwartung genannt)
 
 Dienst:
 

@@ -57,8 +57,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'history.read',
     'question.identity.reveal',
     'question.refuse.propose', // Scheibe 044a (E25, ADR 0012; built on the default)
+    'question.forward', // Scheibe 048 (E5 open, built on the default): to another answering unit
   ],
-  expert: unitBound(['answer.draft', 'question.submit_review', 'question.claim', 'question.read', 'history.read']),
+  // Scheibe 048: `question.forward` inside the unit-bound bundle, so a bound expert forwards only
+  // questions of her own unit (R-PERM-03 in `can()`); no rule of its own.
+  expert: unitBound(['answer.draft', 'question.submit_review', 'question.claim', 'question.read', 'history.read', 'question.forward']),
   legal: ['answer.draft', 'question.legal.clear', 'question.return', 'question.claim', 'question.read', 'history.read', 'question.identity.reveal',
     'question.refuse.propose'], // Scheibe 044a (E25, ADR 0012; built on the default)
   approver: [

@@ -53,6 +53,7 @@ export const EVENT_TOPICS: Readonly<Record<EventType, readonly StreamTopic[]>> =
   QuestionCaptured: ['meeting', 'speakers', 'contributions', 'questions', 'stage'],
   QuestionClassified: ['meeting', 'questions', 'stage'],
   QuestionAssigned: ['meeting', 'questions', 'stage'],
+  QuestionForwarded: ['meeting', 'questions', 'stage'], // Scheibe 048: counts.byUnit changes
   AnswerDrafted: ['meeting', 'questions', 'stage'],
   QuestionSubmittedForReview: ['meeting', 'questions', 'stage'],
   QuestionApproved: ['meeting', 'questions', 'stage'],
@@ -104,6 +105,7 @@ export const EVENT_SUBJECTS: { readonly [T in EventType]: (e: Extract<DomainEven
     { kind: 'speaker', id: e.payload.speakerId }, ...meetingRef(e)],
   QuestionClassified: questionStatus,
   QuestionAssigned: questionStatus,
+  QuestionForwarded: questionStatus,
   AnswerDrafted: questionStatus,
   QuestionSubmittedForReview: questionStatus,
   QuestionApproved: questionStatus,
@@ -128,6 +130,8 @@ export const EVENT_SUBJECTS: { readonly [T in EventType]: (e: Extract<DomainEven
 /** Events after which a question may leave a reader's read scope (M3): a catch-up then resets. */
 export const SCOPE_EXIT_EVENTS: ReadonlySet<EventType> = new Set<EventType>([
   'QuestionAssigned', 'QuestionDelivered', 'QuestionReturned', 'QuestionWithdrawn', 'QuestionMerged', 'QuestionClosed',
+  // Scheibe 048: after a forward the question leaves the read scope of the old unit's experts.
+  'QuestionForwarded',
 ]);
 /** Events that put a question on the stage: for a `stage.read` reader a catch-up resets on them too. */
 export const STAGE_ENTRY_EVENTS: ReadonlySet<EventType> = new Set<EventType>(['QuestionStaged']);

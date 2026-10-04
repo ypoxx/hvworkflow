@@ -32,6 +32,7 @@ import {
   type AnswerDraft,
   type Classification,
   type ContributionCapture,
+  type ForwardRequest,
   type HvApi,
   type LegalClearanceRequest,
   type MeetingContributionCapture,
@@ -1165,6 +1166,13 @@ export function createApp(options: CreateAppOptions = {}): App {
   app.post('/v1/questions/:questionId/assignment', guarded('assignQuestion'), async (c) => {
     const body = getValidatedBody<{ unitId: string }>(c);
     const question = await domain.assignQuestion(requireParam(c, 'questionId'), body.unitId, writeOptions(c));
+    return questionResult(c, question);
+  });
+  // Scheibe 048: forward to another answering unit. The route only passes through; rights (unit binding
+  // included), the row R-TRANS-17 and the guards decide in the core.
+  app.post('/v1/questions/:questionId/forwards', guarded('forwardQuestion'), async (c) => {
+    const body = getValidatedBody<ForwardRequest>(c);
+    const question = await domain.forwardQuestion(requireParam(c, 'questionId'), body, writeOptions(c));
     return questionResult(c, question);
   });
   app.post('/v1/questions/:questionId/answers', guarded('draftAnswer'), async (c) => {

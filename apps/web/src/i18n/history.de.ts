@@ -64,4 +64,12 @@ export const historyDe = {
   // Scheibe 045: the kind of a proposed refusal; the title comes from the snapshot in the event.
   'history.payload.refusal.noClaim': 'Verweigerung · kein Auskunftsanspruch',
   'history.payload.refusal.withGround': 'Verweigerung · Grund aus Katalog: {title}',
+  // Scheibe 048: a forward to another answering unit — the change of unit and the closed reason code.
+  // "Grund", not "Begründung" (`history.payload.reason`), which is the house word of the refusal.
+  'history.payload.unitChange': 'Fachbereich: {from} → {to}',
+  'history.payload.forwardReason': 'Grund: {reason}',
+  'history.forward.reason.wrong_unit': 'Falscher Fachbereich',
+  'history.forward.reason.expertise_elsewhere': 'Fachwissen liegt in einem anderen Fachbereich',
+  'history.forward.reason.capacity': 'Auslastung',
+  'history.forward.reason.other': 'Sonstiges',
 };

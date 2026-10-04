@@ -9,6 +9,7 @@
 import type {
   DomainEvent,
   EventType,
+  ForwardReasonCode,
   Permission,
   QuestionStatus,
   Role,
@@ -64,6 +65,7 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'question.capture': 'action.question.capture',
   'question.classify': 'action.question.classify',
   'question.assign': 'action.question.assign',
+  'question.forward': 'action.question.forward',
   'answer.draft': 'action.answer.draft',
   'question.submit_review': 'action.question.submit_review',
   'question.approve': 'action.question.approve',
@@ -119,6 +121,7 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   QuestionCaptured: 'event.QuestionCaptured',
   QuestionClassified: 'event.QuestionClassified',
   QuestionAssigned: 'event.QuestionAssigned',
+  QuestionForwarded: 'event.QuestionForwarded',
   AnswerDrafted: 'event.AnswerDrafted',
   QuestionSubmittedForReview: 'event.QuestionSubmittedForReview',
   QuestionApproved: 'event.QuestionApproved',
@@ -164,6 +167,22 @@ export function roleLabel(t: Translate, role: Role): string {
 
 export function eventTypeLabel(t: Translate, type: EventType): string {
   return t(EVENT_KEYS[type]);
+}
+
+/**
+ * Scheibe 048: the reason codes of a forward to another answering unit (Grund der Weiterleitung). One
+ * map for the history row and, from 054, the forward dialog.
+ */
+const FORWARD_REASON_KEYS: Readonly<Record<ForwardReasonCode, TKey>> = {
+  wrong_unit: 'history.forward.reason.wrong_unit',
+  expertise_elsewhere: 'history.forward.reason.expertise_elsewhere',
+  capacity: 'history.forward.reason.capacity',
+  other: 'history.forward.reason.other',
+};
+
+/** The label of a reason code; a code this build does not know (a later contract stage) stays the code. */
+export function forwardReasonLabel(t: Translate, code: string): string {
+  return Object.hasOwn(FORWARD_REASON_KEYS, code) ? t(FORWARD_REASON_KEYS[code as ForwardReasonCode]) : code;
 }
 
 /**

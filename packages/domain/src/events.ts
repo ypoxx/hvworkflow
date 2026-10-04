@@ -7,6 +7,7 @@ import type {
   Actor,
   AnswerVersion,
   Classification,
+  ForwardReasonCode,
   QuestionStatus,
   SpeakerReopenReason,
   SpeakerStatus,
@@ -97,6 +98,12 @@ export type AgendaItemsReplaced = Base<'AgendaItemsReplaced', { agendaItems: { i
 export type UnitsReplaced = Base<'UnitsReplaced', { units: { id: string; name: string; shortName?: string }[] }>;
 export type StageSeatsReplaced = Base<'StageSeatsReplaced', { stageSeats: StageSeat[] }>;
 export type QuestionAssigned = Base<'QuestionAssigned', { unitId: string }>;
+/**
+ * Scheibe 048: forwarded to another answering unit. Only the unit changes (R-TRANS-17); the status
+ * stays, so the event carries none. `fromUnitId` is absent when the question had no unit. The reason
+ * is a closed code without personal data; it stands only here, never in the projection.
+ */
+export type QuestionForwarded = Base<'QuestionForwarded', { unitId: string; fromUnitId?: string; reasonCode: ForwardReasonCode }>;
 /** Scheibe 044a: what a path-B proposal keeps of its catalogue entry (audit path, 043a); never projected. */
 export interface RefusalGroundSnapshot {
   title: string;
@@ -154,6 +161,7 @@ export type DomainEvent =
   | QuestionCaptured
   | QuestionClassified
   | QuestionAssigned
+  | QuestionForwarded
   | AnswerDrafted
   | QuestionSubmittedForReview
   | QuestionApproved

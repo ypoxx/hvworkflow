@@ -411,6 +411,16 @@ export function reduce(state: State, e: DomainEvent): State {
       touch(q, e.at);
       break;
     }
+    case 'QuestionForwarded': {
+      // Scheibe 048 (R-TRANS-17): only the unit changes. Status, answers, approval, legal clearance,
+      // return reason, seat and the claim stay: the claim is a soft lock that blocks no permitted write
+      // and expires by itself; clearing it would act on someone else's work (Lesebefund M2).
+      const q = state.questions.get(e.subjectId);
+      if (!q) break;
+      q.unitId = e.payload.unitId;
+      touch(q, e.at);
+      break;
+    }
     case 'AnswerDrafted': {
       const q = state.questions.get(e.subjectId);
       if (!q) break;

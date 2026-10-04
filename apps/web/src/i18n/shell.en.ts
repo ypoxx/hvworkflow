@@ -184,6 +184,8 @@ export const shellEn: typeof shellDe = {
   'action.question.capture': 'Capture a question',
   'action.question.classify': 'Classify',
   'action.question.assign': 'Assign',
+  // Scheibe 048: not "Forward" alone — that stays the next step (question.submit_review, Z9).
+  'action.question.forward': 'Forward to another answering unit',
   'action.answer.draft': 'Draft an answer',
   'action.question.submit_review': 'Forward',
   'action.question.approve': 'Approve',
@@ -227,6 +229,7 @@ export const shellEn: typeof shellDe = {
   'event.QuestionCaptured': 'Question captured',
   'event.QuestionClassified': 'Classified',
   'event.QuestionAssigned': 'Assigned',
+  'event.QuestionForwarded': 'Forwarded to another answering unit',
   'event.AnswerDrafted': 'Answer draft created',
   // Scheibe 045: the labels of a proposed and an approved refusal in the history.
   'event.AnswerDrafted.refusal': 'Refusal proposed',

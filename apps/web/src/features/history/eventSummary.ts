@@ -9,6 +9,8 @@
 import type { DomainEvent } from '@hv/domain';
 import { roleLabel, stageAssignmentLabel, statusLabel, trackLabel } from '../../i18n';
 import type { Translate } from '../../i18n';
+// Not re-exported by the i18n entry point (outside this slice's files); a label helper, not a dictionary.
+import { forwardReasonLabel } from '../../i18n/labels';
 import { excerpt } from './lib';
 
 export interface SummaryContext {
@@ -95,6 +97,16 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
     case 'QuestionAssigned':
       parts.push(t('history.payload.unit', { unit: unit(event.payload.unitId) }));
       break;
+    case 'QuestionForwarded': {
+      // Scheibe 048: from where to where, and the closed reason code by its label (an unknown code of a
+      // later contract stage stays the code). A question without a previous unit names only the target.
+      const from = event.payload.fromUnitId;
+      parts.push(from !== undefined
+        ? t('history.payload.unitChange', { from: unit(from), to: unit(event.payload.unitId) })
+        : t('history.payload.unit', { unit: unit(event.payload.unitId) }));
+      parts.push(t('history.payload.forwardReason', { reason: forwardReasonLabel(t, event.payload.reasonCode) }));
+      break;
+    }
     case 'AnswerDrafted': {
       parts.push(t('history.payload.version', { version: event.payload.answer.version }));
       // Scheibe 045: the kind of a refusal, and the ground's title from the snapshot in the event (the
