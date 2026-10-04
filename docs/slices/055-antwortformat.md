@@ -172,6 +172,12 @@ Zwei Funktionen mit denselben Regeln, aber verschiedenem Vertrag (Lesebefund M2)
   Strukturgrenze der Speicherform** (10 000 Blöcke, 10 000 Punkte, 20 000 Läufe), liefert sie `null`, und die Projektion nimmt L
   (Nachprüfung Minor 2); überschreitet auch L eine Grenze (nur bei einem gespeicherten Text über 20 000 Code-Punkten denkbar),
   liefert L ebenfalls `null`, und die Version trägt kein `body`.
+- **Kein verlustbehaftetes Lesen (Codex P1 auf #151, Nachtrag Orchestrator 04.10.2026):** Die Projektion vergleicht nach der
+  Lesevariante `answerPlainText(ergebnis)` mit dem gespeicherten `text` der Version. Weichen sie ab (ein Block, ein Punkt oder
+  ein Lauf ist beim Lesen weggefallen oder hat Text verloren), gilt das Ergebnis als unbrauchbar: die Projektion nimmt L aus dem
+  gespeicherten `text`. Eine gestrichene Marke ändert den Klartext nicht und löst den Rückfall nicht aus. So zeigt das Podium nie
+  weniger Wortlaut als der gespeicherte, gegebenenfalls freigegebene `text` (Entscheidung 7). Für gültige Daten aus der
+  Schreibvariante sind beide gleich, weil `text` = P(gespeichertes `body`) und die Lesevariante auf solchen Daten nichts entfernt.
 
 **Reihenfolge innerhalb eines Absatzes bzw. Listenpunkts (fest, Lesebefund M3):** N1 und N2 wählen Blöcke und Marken; dann
 (1) Zeichen abbilden und entfernen (N3), (2) Leerraum (N4), (3) Läufe (N5), (4) **NFC je fertigem Lauf**, (5) erneute
@@ -247,7 +253,9 @@ einsames Ersatzzeichen ist 422. Ort (`pii`), Maskierung und Leserkreis der Begr�
   `\n\n` getrennt; **auf das Ganze NFC** (Lesebefund M3: an einer Laufgrenze kann ein zerlegtes Zeichen stehen, das erst im
   verbundenen Text zusammengesetzt wird; der Klartext dient Suche und Diff und soll durchgehend NFC sein). Kein
   Aufzählungszeichen im Klartext (die Vorlesezeit in 054 zählt Wörter; ein Zeichen wäre ein Wort).
-- **L** `answerBodyFromText(text)`: Zeilen (`\r?\n`), jede nicht leere Zeile ein Absatz mit einem Lauf ohne Marke,
+- **L** `answerBodyFromText(text)`: Zeilen getrennt an `\r\n`, `\r` und `\n` (Codex P2 auf #151: ein einzelnes `\r` ist ein
+  Zeilenende, das `sanitizeAnswerText` erhält; sonst machte N3 daraus ein Leerzeichen und die Zeile ginge in der Darstellung
+  verloren), jede nicht leere Zeile ein Absatz mit einem Lauf ohne Marke,
   `language: de`, danach durch die **Lesevariante** (N3–N7). Wirft nie; ein Text nur aus Leerraum liefert `null`, und die
   Projektion lässt `body` weg (kommt nur bei kaputten Altdaten vor; der Kern nimmt keinen leeren Text an). Wegen N9 ergibt
   jeder gültige Text ein gültiges Dokument.
@@ -553,6 +561,9 @@ K7. **Alte Ereignisse lesbar, Projektion wirft nie:** von Hand angehängt (a) ei
     L, Nachprüfung Minor 2); in einer dritten `blocks` als Objekt. Die Projektion wirft für keinen; jede Version hat eine gültige Speicherform
     (bzw. bei (e) zweite und dritte Version `body` aus L), die gestrichene Marke fehlt, `language` ist `de`, `text` ist jeweils das
     gespeicherte, es entsteht keine neue Version und keine Freigabe geht verloren.
+    (f) Codex P1 auf #151: ein gespeichertes `body` mit einem gültigen und einem unbrauchbaren Block (anderer Klartext als der
+    gespeicherte `text`) → die Projektion zeigt `body` = L(`text`), kein Wort fehlt; (g) Codex P2: ein Altereignis ohne `body`
+    mit `text` "a\rb" → zwei Absätze.
 K8. **Verweigerung:** `proposeRefusal` schreibt kein `body`; die Version trägt `body` aus L; `refusalJustification` steht
     nicht im `body`.
 K9. **Suche:** `q` findet ein Wort aus einem fett ausgezeichneten Lauf (über `text`).
@@ -881,6 +892,8 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 | Nachprüfung NB1: `refusal044a.test.ts:392-394` erwartet angenommene einsame Ersatzzeichen in der Begründung | Datei mit nur diesen Zeilen in „Files allowed“ (jetzt 422, Kommentar „055, Entscheidung 2a“); Aussage „keine weiteren Tests“ im Vertragsschritt berichtigt; K12 erweitert; zweite Suche ohne weiteren Fund (`refusal044b.test.ts:562` prüft nur die Zählung) |
 | Nachprüfung Minor 1: Reihenfolge Länge, Filter, Leerprüfung offen | 2a: Längen roh wie der Validator, dann Ersatzzeichen 422, Filter, Leerprüfung (422 bzw. 409 R-GUARD-09) |
 | Nachprüfung Minor 2: Lesevariante über einer Strukturgrenze | liefert `null`, L greift; K7 (e) mit 12 000 Blöcken |
+| Codex P1 (#151): Lesevariante verwirft nur den kaputten Block, das Podium zeigte weniger als `text` | Vergleich P(Ergebnis) mit gespeichertem `text`; bei Abweichung L (Entscheidung 2, Nachtrag); K7 (f) |
+| Codex P2 (#151): L trennt nicht an einzelnem `\r` | L trennt an `\r\n`, `\r`, `\n`; K7 (g) |
 | Nachprüfung Minor 3: „Byte für Byte“ zu weit | „ohne Steuer- und Formatzeichen und bereits in NFC“ in 2a, Entscheidung 4 und K1 |
 | Nachtrag Orchestrator (04.10.2026) [Security]: Begründung einer Verweigerung ungefiltert | `sanitizeAnswerText` auch auf `pii.refusalJustification` in `proposeRefusal`, vor R-GUARD-09; K12 erweitert; Maskierung unverändert |
 
