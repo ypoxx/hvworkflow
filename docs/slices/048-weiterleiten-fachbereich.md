@@ -95,6 +95,9 @@ Klasse hoch. Getrennt bleibt das Weiterleiten von dieser Entscheidung unabhängi
   `assignRole` an, `unitId` ist optional) liest gar nichts: `hasPermission` verweigert ihr `question.read` mit R-PERM-03
   (`permissions.ts:160`), also endet jede Aktion in `transition()` mit 404, auch auf einer Frage ohne Fachbereich (Test 8c).
   Im Demo-Rollenwechsel ist `expert` nicht gebunden und sieht alle Fragen, wie heute beim Antwortentwurf.
+  *Orchestrator-Vermerk 04.10.2026 (nach Scheibe 054, #149 `cc97005`):* Der Satz „`expert` ist im Demo-Rollenwechsel nicht
+  gebunden“ gilt seit 054 nicht mehr; die Demo-Fachkraft ist dort an Finanzen gebunden (Entscheidung 2a der Spec 054) und
+  sieht nur Fragen ihres Fachbereichs. Der Spec-Text oben bleibt als Stand des Baus von 048 stehen.
 - **Prüfreihenfolge in `transition()`** (`api.ts:787-799`): `requireQuestionFor` (404 für unbekannte id bzw. ohne Lese- und
   Operationsrecht) → 404 für eine gebundene Fachkraft, die die Frage nicht lesen darf → 403 aus `can()` ohne Frage → `If-Match`
   → 409 aus Tabelle und Guards.

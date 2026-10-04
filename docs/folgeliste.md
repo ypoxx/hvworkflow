@@ -445,6 +445,7 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
   (`PW_CHROMIUM_PATH` oder Playwrights eigenes Chromium).
 - 037a Review · `deploy/compose/compose.yaml` · keine Ressourcengrenzen (Speicher, CPU, PIDs) für die Dienste ·
   `mem_limit`, `cpus`, `pids_limit` mit Werten aus einem gemessenen Lauf.
+- 037a Nachweis (PR #148, Lauf 37222611650) · Sonde `postgres-restart` in `scripts/stack.mjs` · der Neustart dauerte 0,4 s, der Watcher sah weder den schlechten noch den wiederhergestellten Zustand; die Sonde belegt damit nichts · Beobachtung vor dem Neustart dichter takten oder den Neustart künstlich verlängern, Wartezeit gehört zu 037b.
 - 037a Review · `docs/evidence/037a-stack-protokoll.txt` · das Protokoll entstand auf „938ffbe + Arbeitsstand“, nicht auf
   einem benannten Commit · bei der nächsten Wiederholung (mit erreichbarem quay.io) auf einem benannten Commit neu aufnehmen.
 
@@ -630,7 +631,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 045 Review nit N9 · `RefusalDialog.tsx:123` · die Radiogruppe in einem `fieldset` wird doppelt angesagt · Rolle oder Gruppierung nur einmal setzen.
 - 045 Review nit N10 · `RefusalDialog.tsx` · Absenden ist über der Längengrenze ohne Hinweis gesperrt (D6) · Hinweis mit Zählung zeigen.
 - 045 Review nit N11 · e2e-http E1 · prüft den Zustand „in Prüfung“ nicht direkt · Zustand ausdrücklich zusichern.
-- H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 einmal ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün) · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).
+- H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün), ein zweites Mal rot auf PR #149 (Lauf 37224478746); zwei Fälle, also kein Zufall mehr · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).
 
 ## Weiterleiten an einen anderen Fachbereich (aus 048)
 
@@ -712,9 +713,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Bau zeigen deshalb nur F1 rot · unabhängige Fälle aus der Serie lösen, wo der Endzustand im Projekt `http` es erlaubt.
 - 054 Bau · `focus054.test.ts` · die Spec nannte für alle Personen außer Podium 230 lesbare Einzelfragen; die Beobachtung liest
   nach 010 nur Vorgelesenes (130) · Zahl in der Spec berichtigt im Bericht.
+- 054 Nachprüfung minor · `apps/web/src/features/focus/Page.tsx` (`handedOver` ruft `settleFocus` synchron) · der Aufruf läuft vor dem Commit von React; bei derselben Einzelfrage mit neuerer Version kann das Fokusziel noch im Schreibmodus liegen und mit ihm verschwinden · `queueMicrotask` oder nur dann, wenn `writingId` schon `null` war.
 
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
   Buchstaben (043a, 044a, 064a …) fallen aus der Prüfung; eine zu niedrig eingestufte Teil-Spec fällt nicht auf · Muster
   um `[a-z]?` erweitern und Teil-Specs gegen den Plan-Eintrag der Stammscheibe prüfen (ergänzt den Eintrag takt-021 Codex P1).
+- Vorschlag (04.10.2026, #148 geschlossen wegen eines Gitleaks-Fehlalarms in einem Commit) · Ablauf vor dem Push · lokaler Gitleaks-Lauf über die Commits des Zweigs; das Programm fehlt im Container · Bereitstellung klären (Binärdatei im Bauabbild oder Pre-push-Skript), bis dahin gilt die Regel: Speichernamen als Modulkonstanten, nie als JSX-Literal.
