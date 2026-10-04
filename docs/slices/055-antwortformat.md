@@ -231,8 +231,10 @@ Ersatzzeichen → 422; `\p{Cc}` außer Tab, Zeilenumbruch, Wagenrücklauf entfer
 wie bisher. Leerraum wird **nicht** auf U+0020 abgebildet (die Zeilen eines Klartexts bleiben Zeilen). Bleibt nichts, 422
 „Answer text is required.“ Für einen Text ohne solche Zeichen (der Normalfall, der ganze Seed) ist das Ereignis Byte für Byte
 wie vor 055. Alte Ereignisse werden nicht umgeschrieben und ihr `text` beim Lesen nicht gefiltert (R7, Bindung der Freigabe);
-nur das daraus hergeleitete `body` läuft durch die Lesevariante. Die Begründung einer Verweigerung (`pii`) bleibt in 055
-ungefiltert (Hinweise an den Orchestrator).
+nur das daraus hergeleitete `body` läuft durch die Lesevariante. Auch die Begründung einer Verweigerung (`pii.refusalJustification`)
+läuft in `proposeRefusal` durch `sanitizeAnswerText` (Entscheidung des Orchestrators, 04.10.2026), **vor** den bestehenden
+Prüfungen: Eine Begründung, die danach leer ist, gilt wie eine leere (Pfad B: 409 R-GUARD-09, wie heute bei „   “); ein
+einsames Ersatzzeichen ist 422. Ort (`pii`), Maskierung und Leserkreis der Begründung bleiben unverändert.
 
 ### 3. Klartextprojektion P und Herleitung alter Versionen L
 
@@ -332,8 +334,8 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
 
 - **Version:** nächste freie Patch-Stufe beim Merge (heute 0.4.4). `info.version`, `packages/contract/package.json`, Abschnitt
   `## [0.4.4]` in `CHANGELOG.md` mit `### Added`, einem `### Changed` für die Verengung (Nit 1: `draftAnswer` und
-  `proposeRefusal` entfernen Steuer- und Formatzeichen aus `text`; ein einsames Ersatzzeichen ist 422) und dem Vermerk „auf
-  Standard gebaut (E6, E21 offen)“. Die Beschreibungen von `AnswerDraft.text` und `RefusalProposal.text` sagen das in einem Satz.
+  `proposeRefusal` entfernen Steuer- und Formatzeichen aus `text`, `proposeRefusal` auch aus `refusalJustification`; ein einsames Ersatzzeichen ist 422) und dem Vermerk „auf
+  Standard gebaut (E6, E21 offen)“. Die Beschreibungen von `AnswerDraft.text`, `RefusalProposal.text` und `RefusalProposal.refusalJustification` sagen das in einem Satz.
 - **`AnswerMark`:** `type: string`, `enum: [bold, italic, highlight]`, Beschreibung: Hausformat nach ADR 0005, keine Schriftwahl
   (E6); eine neue Marke ist additiv, eine gestrichene bleibt als Wert beschrieben stehen und wird beim Lesen entfernt.
 - **`AnswerInline`:** geschlossen, `required: [text]`, `text` 1..20000, `marks` Array von `AnswerMark`, `uniqueItems`, ≤ 3.
@@ -397,7 +399,7 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
 
 Vertrag (erster Commit, Architekt):
 
-- `packages/contract/openapi.yaml` (nur die neun Schemas aus dem Vertragsschritt, AnswerDraft.body, AnswerVersion.body, die Beschreibungen von AnswerDraft.text und RefusalProposal.text, die Eigenschaft body unter EventRead.payload.answer, der Halbsatz in der Beschreibung von Event, info.version)
+- `packages/contract/openapi.yaml` (nur die neun Schemas aus dem Vertragsschritt, AnswerDraft.body, AnswerVersion.body, die Beschreibungen von AnswerDraft.text, RefusalProposal.text und RefusalProposal.refusalJustification, die Eigenschaft body unter EventRead.payload.answer, der Halbsatz in der Beschreibung von Event, info.version)
 - `packages/contract/src/types.ts` (nur regeneriert)
 - `packages/contract/CHANGELOG.md` (nur Abschnitt 0.4.4)
 - `packages/contract/package.json` (nur Version)
@@ -543,8 +545,10 @@ K9. **Suche:** `q` findet ein Wort aus einem fett ausgezeichneten Lauf (über `t
 K10. **Seed:** `CORPUS_DEMO` enthält kein Ereignis mit `answer.body`; jede gesäte Version trägt `body` aus L.
 K11. **Zeichenfilter im Klartext (M1):** `draftAnswer` ohne `body` mit `text` = `"Umsatz\u202E stieg\u200B um 3 %"` → im
     Ereignis `"Umsatz stieg um 3 %"`; `text` nur aus U+200B → 422, kein Ereignis; einsames Ersatzzeichen → 422.
-K12. **Zeichenfilter in `proposeRefusal`:** derselbe Text als Verweigerungswortlaut → gefiltert im Ereignis; die Begründung
-    (`pii`) bleibt unberührt.
+K12. **Zeichenfilter in `proposeRefusal`:** derselbe Text als Verweigerungswortlaut → gefiltert im Ereignis. Begründung mit
+    U+202E und U+200B (Pfad B) → in `pii.refusalJustification` gefiltert gespeichert; eine Begründung nur aus U+200B → 409
+    R-GUARD-09, kein Ereignis. Die Begründung erscheint weiterhin in keiner Ereignislesung, keinem Strom, keiner `StageView` und
+    für keinen Leser ohne die Verweigerungsrechte; die bestehenden Maskierungstests aus 044a/044b bleiben unverändert grün.
 K13. **Goldener Test der Herleitung (Lesebefund Minor 9, Recht):** drei feste alte Ereignisse als Testdaten (einzeilig;
     mehrzeilig mit Leerzeilen und Leerzeichen am Zeilenende; mit geschütztem Leerzeichen und Tab) ergeben ein wörtlich im Test
     stehendes `body`; der Wortlaut (Zeichenfolge ohne Leerraum) von `answerPlainText(body)` ist gleich dem des gespeicherten
@@ -620,7 +624,7 @@ Whitelist), E21 (Standard nur `de`, keine Kopplung)
 | Mitgesendeter `text` weicht vom Dokument ab | `body` gewinnt, Vertrag sagt es | K2 |
 | Bidi- oder Null-Breiten-Zeichen zeigen anderen Text als gesucht | N3 | Test 1c |
 | Ereignisse werden zu groß | Grenzen N9, Körpergrenze 256 KiB | Test 1i; H6 |
-| Steuer- oder Formatzeichen im Klartext neuer Versionen (Trojan Source) | Zeichenfilter 2a in `draftAnswer` und `proposeRefusal` | 4a, K11, K12 |
+| Steuer- oder Formatzeichen im Klartext neuer Versionen oder in der Begründung einer Verweigerung (Trojan Source) | Zeichenfilter 2a in `draftAnswer` und `proposeRefusal` (Wortlaut und Begründung) | 4a, K11, K12 |
 | Projektion wirft an einem alten oder kaputten Ereignis, der Jahrgang wird unlesbar | Lesevariante ohne 422, Strukturgrenzen aus der Textgrenze | K7 (a–e), Test 1i |
 | Bühne zeigt einen anderen Wortlaut als den freigegebenen | Herleitung ändert nur Gliederung und Auszeichnung, goldener Test | K13 |
 | Problem-Meldung in Rumpfgröße (DoS) | `describeErrors` begrenzt | H2 |
@@ -797,10 +801,9 @@ mit eigener Spec (rund 0,4 AStd); im äußersten Fall Plan §8.6 Punkt 8 (Editor
   Blockdokument (055)“.
 - **043c (Partnerschnittstellen, Webhooks):** die gebundene Nutzlast von `AnswerDrafted` muss `answer.body` (Speicherform)
   enthalten, sonst bekommen Nachbarn formatierte Antworten nur als Klartext; in der 043c-Planzeile vermerken.
-- **Begründung einer Verweigerung (`pii.refusalJustification`):** bleibt in 055 ohne Zeichenfilter (Auftrag M1 nannte nur
-  `text`). Sie wird Recht und Freigabe angezeigt; dieselbe Bidi-Lücke besteht dort. Als Sicherheitspunkt nicht in die
-  Folgeliste, sondern zur Entscheidung: in 055 mitnehmen (< 0,1 AStd, eine Zeile in `proposeRefusal`, ein Testfall) oder eigene
-  Takt-Scheibe.
+- **Begründung einer Verweigerung (`pii.refusalJustification`):** entschieden am 04.10.2026: in 055 mitgenommen (Entscheidung
+  2a, K12; < 0,1 AStd, im Aufwand enthalten). Der CHANGELOG-Abschnitt `### Changed` und die Beschreibung von
+  `RefusalProposal.refusalJustification` nennen den Filter.
 - **§8.6 Punkt 8** („055 Editor auf Klartext mit Absätzen“) meint künftig **055b**; 055 wird nie gestrichen (Kern und Vertrag).
 - **Register E21:** Zielscheibe „Nach-Beta“ bleibt für die Kopplung; ergänzen „Feld `language` (nur `de`) im Blockdokument ab
   055“. **E6:** Zusatzfrage nummerierte Listen (Eigentümerfrage 1). Kein neuer Registereintrag nötig.
@@ -837,7 +840,7 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 | Befund | Umsetzung |
 |---|---|
 | **B1** `contract-043a.test.ts` Test 10 pinnt die Schlüssel von `AnswerDraft` und wird rot | In „Files allowed“ (nur Test 10, Kommentar „Vertragszeile von 055, 0.4.4“); Suche nach weiteren Tests mit festgehaltenen Schlüsseln von `AnswerDraft`, `AnswerVersion`, `EventRead.payload.answer`: keine weiteren auf `cc97005` (Vertragsschritt, letzter Punkt von „Tore“) |
-| **M1** [Security] Zeichenfilter wirkte nur im Dokument, `text` neuer Versionen blieb ungefiltert; Kopfzeile zum Bedrohungsmodell behauptete mehr | Entscheidung 2a: `sanitizeAnswerText` (Cc außer Tab/LF/CR, alle Cf, NFC, Ersatzzeichen 422) in `draftAnswer` ohne `body` und in `proposeRefusal`; K1 jetzt „unverändert für Text ohne N3-Zeichen“; neue Fälle 4a, K11, K12; `api.ts` in „Files allowed“ auf beide Operationen erweitert; Kopfzeile „Bedrohungsmodell“ berichtigt (neue gegen alte Ereignisse) |
+| **M1** [Security] Zeichenfilter wirkte nur im Dokument, `text` neuer Versionen blieb ohne Filter; Kopfzeile zum Bedrohungsmodell behauptete mehr | Entscheidung 2a: `sanitizeAnswerText` (Cc außer Tab/LF/CR, alle Cf, NFC, Ersatzzeichen 422) in `draftAnswer` ohne `body` und in `proposeRefusal`; K1 jetzt „unverändert für Text ohne N3-Zeichen“; neue Fälle 4a, K11, K12; `api.ts` in „Files allowed“ auf beide Operationen erweitert; Kopfzeile „Bedrohungsmodell“ berichtigt (neue gegen alte Ereignisse) |
 | **M2** Eine Normalisierung, die 422 werfen kann, lief auch in der Projektion; Strukturgrenzen hätten alte Texte unlesbar gemacht | Schreib- und Lesevariante getrennt (Entscheidung 2); Lesevariante nur N1–N7, wirft nie; Strukturgrenzen aus der Textgrenze abgeleitet (10 000 Blöcke, 10 000 Punkte, 20 000 Läufe), gewählt statt „L führt Zeilen zusammen“, Begründung bei N9; K7 mit 600-Zeilen-Text und gespeichertem `language: 'en'` |
 | **M3** Reihenfolge von NFC und Leerraum offen, Idempotenz an Laufgrenzen nicht gesichert | Feste Reihenfolge (Zeichen → N4 → N5 → NFC je Lauf → Leerprüfung → N6/N7); NFC auch in P über das Ganze; Generator mit kombinierenden Zeichen, zerlegten Umlauten, Hangul-Jamo; exakte Fälle in Test 1c |
 | **M4** [Security] N3 als Aufzählung einzelner Zeichen lückenhaft | N3 nach Kategorien (`\p{White_Space}` → U+0020, `\p{Cc}` und alle `\p{Cf}` entfernt, `\p{Cs}` 422 wie 040b bzw. U+FFFD beim Lesen); je Klasse ein Fall in 1c; Zerfall von ZWJ-Emoji dokumentiert |
@@ -860,9 +863,7 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 | Nit 5 Schlüssel des Dokuments gegen `MASKED_KEYS` | Invariante unter Entscheidung 2, Prüfung in Test 3 |
 | Nit 6 ZWJ | dokumentiert bei N3, Fall in 1c, Standardzeile |
 | Zeilenverweis `proposeRefusal` | `api.ts:1517` |
-
-Offen zur Entscheidung des Orchestrators (Sicherheit, nicht Folgeliste): Zeichenfilter auch für die Begründung einer
-Verweigerung (Hinweise an den Orchestrator).
+| Nachtrag Orchestrator (04.10.2026) [Security]: Begründung einer Verweigerung ungefiltert | `sanitizeAnswerText` auch auf `pii.refusalJustification` in `proposeRefusal`, vor R-GUARD-09; K12 erweitert; Maskierung unverändert |
 
 ## Bericht (nach Bau ausfüllen)
 
