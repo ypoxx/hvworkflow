@@ -14,6 +14,8 @@ import { historyDe } from './history.de';
 import { historyEn } from './history.en';
 import { steeringDe } from './steering.de';
 import { steeringEn } from './steering.en';
+import { focusDe } from './focus.de';
+import { focusEn } from './focus.en';
 import { de } from './de';
 import { en } from './en';
 
@@ -59,6 +61,7 @@ const modules: Array<{
   { name: 'stage', de: stageDe as Record<string, string>, en: stageEn as Record<string, string>, prefixes: ['stage'] },
   { name: 'history', de: historyDe as Record<string, string>, en: historyEn as Record<string, string>, prefixes: ['history'] },
   { name: 'steering', de: steeringDe as Record<string, string>, en: steeringEn as Record<string, string>, prefixes: ['steering'] },
+  { name: 'focus', de: focusDe as Record<string, string>, en: focusEn as Record<string, string>, prefixes: ['focus'] },
 ];
 
 describe('i18n parity checks', () => {
@@ -168,13 +171,14 @@ describe('i18n parity checks', () => {
   // Scheibe 048: +8 keys for the forward (shell 2: action, event; history 6: unit change, reason, four codes).
   // Scheibe 053: +25 keys for the steering view (shell 3: nav, page title, description; steering 14; answers 8: the
   // forward dialog).
-  it('(f) Total key count is 586 across all modules and matches de and en', () => {
+  // Scheibe 054: +24 keys for the focus view (shell 3: nav, page title, description; focus 21).
+  it('(f) Total key count is 610 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(586);
-    expect(deKeys).toBe(586);
-    expect(enKeys).toBe(586);
+    expect(totalKeys).toBe(610);
+    expect(deKeys).toBe(610);
+    expect(enKeys).toBe(610);
   });
 });

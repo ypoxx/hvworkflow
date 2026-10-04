@@ -4,7 +4,7 @@
  * interface file that may mention role names (AGENTS.md rule 4) — everything else reads `_actions`.
  */
 import { useSyncExternalStore } from 'react';
-import type { Actor, Role } from '@hv/domain';
+import type { Actor, Role, RoleAssignmentCreate } from '@hv/domain';
 import { DEMO_MODE } from './mode';
 
 const STORAGE_KEY = 'hv-demo-actor-v1';
@@ -20,6 +20,17 @@ export const DEMO_ACTORS: readonly Actor[] = [
   { id: 'u-podium', role: 'podium', displayName: 'Podium' },
   { id: 'u-admin', role: 'admin', displayName: 'Administration' },
   { id: 'u-obs', role: 'observer', displayName: 'Beobachtung' },
+];
+
+/**
+ * Scheibe 054 (decision 2a, Codex P1 on #147): the role assignments the demo writes at start-up, so that "Meine Fragen"
+ * is the person's own unit in the demo too. The core binds an actor only through an active assignment in the event log
+ * (`resolveMeetingActor`); `DEMO_ACTORS` stays as it is, because an actor with its own `unitId` but no assignment would
+ * be refused (403 R-PERM-01). It narrows only: the expert persona then reads and writes Finanzen alone (R-PERM-03),
+ * the same way the harness binds the expert test person in the `http` project. Demo mode only.
+ */
+export const DEMO_BINDINGS: readonly RoleAssignmentCreate[] = [
+  { subjectId: 'u-exp-fin', role: 'expert', unitId: 'unit-fin' },
 ];
 
 function load(): Actor {

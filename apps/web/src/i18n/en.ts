@@ -10,6 +10,7 @@ import { answersEn } from './answers.en';
 import { stageEn } from './stage.en';
 import { historyEn } from './history.en';
 import { steeringEn } from './steering.en';
+import { focusEn } from './focus.en';
 
 export const en: Dictionary = {
   ...shellEn,
@@ -19,4 +20,5 @@ export const en: Dictionary = {
   ...stageEn,
   ...historyEn,
   ...steeringEn,
+  ...focusEn,
 };

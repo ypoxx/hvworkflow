@@ -504,6 +504,7 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 - `apps/web/src/api/actor.ts` (nur die neue Liste der Demo-Bindungen mit dem einen Eintrag aus Entscheidung 2a)
 - `apps/web/src/api/index.ts` (nur der Bindungsschritt in der Startfunktion der Demo aus Entscheidung 2a)
 - `apps/web/e2e/020-rueckbau-passung.spec.ts` (nur die Rolle des Schritts m3, Entscheidung 2a)
+- Nachtrag Orchestrator 04.10.2026: `apps/web/e2e/010d-ansichtsdaten.spec.ts` — nur Zeilenwahl im Helfer auf unit-fin (clientseitig, Liste bleibt ungefiltert), weil die Demo-Bindung die Lesbarkeit fremder Einheiten für den Experten entzieht; `apps/web/e2e/020-rueckbau-passung.spec.ts` — zusätzlich `asRole(page,'expert')` vor dem Entwurfsteil.
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile der Fokusansicht, ihr Import, ihr Icon und die Kommentare zum Kürzelbereich)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile, zu `requires` und zum Kürzelbereich)
 - `apps/web/src/i18n/focus.de.ts` (neu), `apps/web/src/i18n/focus.en.ts` (neu)
@@ -528,6 +529,8 @@ den zwei Registerdateien, `apps/web/src/features/{answers,steering,capture,stage
 `apps/web/src/i18n/labels.ts`, fremde e2e-Dateien außer dem einen Schritt in 020 und `apps/web/e2e/support/**` außer `e2e-texts.ts`, `scripts/**` außer dem
 Reihenfolge-Pin, `.github/**`, `docs/produktplan-beta.md` (Hinweise an den Orchestrator unten). Dieser Abschnitt steht bewusst
 außerhalb von „Files allowed“.
+Ausnahme: der Nachtrag des Orchestrators vom 04.10.2026 in „Files allowed“ (010d nur Zeilenwahl im Helfer, 020 zusätzlich
+`asRole(page,'expert')` vor dem Entwurfsteil); sonst bleibt jede fremde e2e-Datei unberührt.
 
 ## Vor dem Bau prüfen
 
@@ -710,6 +713,7 @@ laufen F1–F8 genauso; die Screenshots gehen dort in das Ausgabeverzeichnis (`s
 2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter **unverändert** 001, 003, 010b, 010c, 010d, 013, 021b,
    024, 040a, 045, 053, 090 und abnahme, und 020 mit genau der Änderung aus Entscheidung 2a (Ergebnis je Datei im Bericht);
    axe ohne serious/critical. Projekt `http` grün im CI-Lauf `e2e-http` des PR.
+   Ausnahme von „unverändert“: 010d und 020 nur im Umfang des Nachtrags des Orchestrators vom 04.10.2026 („Files allowed“).
 3. Sechs Screenshots in `docs/evidence/` aus dem Projekt `in-process`: `054-fokus-de.png`, `054-fokus-en.png`,
    `054-schreibmodus-de.png`, `054-schreibmodus-en.png`, `054-weiterleiten-de.png`, `054-weiterleiten-en.png`. Auf dem
    Fokusbild sind die Liste (zweizeiliger Wortlaut, Alter, kein TOP), das Detail mit genau einer primären Aktion und der
@@ -906,12 +910,136 @@ Keine blockiert den Bau; alle mit Standard.
 
 ```
 Slice: 054-fokusansicht
-Done:
-Evidence:
-Open:
-Touched:
+Done: Seite /my „Meine Fragen“ (Alt+6, Registerzeile requires answer.draft) mit Liste, Detail und Schreibmodus;
+      Aktionen nur aus _actions (focusActions), Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 importiert;
+      Demo-Fachkraft über DEMO_BINDINGS/assignRole an Finanzen gebunden (Entscheidung 2a).
+Evidence: `pnpm gates` grün auf 42ea09c (Schluss unten); docs/evidence/054-*.png (sechs Bilder, in-process);
+          Projekt http: CI-Lauf 37225467013 (unten)
+Open: Projekt http nur im CI-Lauf e2e-http des PR (lokal ohne Keycloak nicht lauffähig); 010d-Hilfe im Bau ergänzt (unten)
+Touched: siehe Liste unten
 ```
+
+**Vor dem Bau.** (1) 053 gemergt, Signaturen wie im Befund (`ForwardDialog`, `forwardProblemHandler(show, close, gone)`,
+`useWriteDoor`, `mayMoveFocus`), Parität 586. (2) Zahlen bestätigt durch Test 12: gebunden 7 (alle `unit-fin`), 35 lesbar;
+ohne Bindung 40; jede andere Person 0 eigene. **Abweichung:** die Beobachtung liest 130, nicht 230 (nur Vorgelesenes seit
+010); Test 12 nennt das. Bei 800: `[size] 054 my questions at 800: 21`. (3) Projekt `http`, aus den Dateikopfen: nach 045
+liegen in Finanzen mindestens zwei `assigned` (vier im Seed, E1 nimmt eine, E3 im ungünstigsten Fall eine zweite) und drei
+`answer_drafted` ohne Rückgabegrund; F2 und F5 brauchen zwei `assigned`, F8 findet danach die von F7 zugeleitete; 053 S4
+lässt in Operations weitere `assigned` (F7). (4) Die Historie liefert der gebundenen Fachkraft das `QuestionForwarded`
+(in-process belegt durch F7). (6) Laufzeit „End-to-end http project“: 37216387775 (`ba23e67`) 5:20, 37214710167 (`2a12e0d`)
+5:04, 37215934378 (`5a6f28b`) 4:11; Ist höchstens 5:20, Schätzung +1,7 min ≈ 7:00 < 8:00 (Harness) < 9:00 (Schritt).
+In-process dauert die Datei 37 s.
+
+**Bindung allein, volle in-process-Suite** (vor jeder Änderung an 020/010d): rot waren 020 „points 1–9“ (m3:
+`answers-filter-status-captured` nicht klickbar, die gebundene Fachkraft liest keine Einzelfrage ohne Fachbereich) und fünf
+Fälle in 010d (Zeilen 542, 571, 593, 786, 803: die Rechtsseite wählt die erste Einzelfrage `in_review` über alle Fachbereiche,
+die Fachkraft liest sie danach nicht; 786/803 wörtlich „failed: Question fr-0007m does not exist.“). Ein erster Lauf zeigte
+weitere rote Fälle (013h, 028, 053 S2b, 090 R1, takt-037); sie kamen von Quelländerungen während des Laufs (Vite lud Module
+neu, die Tests patchen `api` über `import('/src/api/index.ts')`) und waren im zweiten Lauf grün; dieselben Dateien auf
+`4f37d07` ohne Änderung: 74 grün.
+**Änderungen nach Entscheidung 2a:** 020 m3 wechselt zu `approver` und vor der Entwurfshälfte zurück zu `expert` (eine
+zusätzliche Zeile `asRole(page, 'expert')`, weil die Entwurfshälfte bisher stillschweigend die Rolle aus m3 weiterverwendete);
+010d: die Liste bleibt ungefiltert (vollständig, `poolComplete`); die Hilfen wählen clientseitig Zeilen mit
+`data-unit="unit-fin"` (`legalClearableRows`, Dialogfall) und warten, bis der Statusfilter angekommen ist und eine solche Zeile
+dasteht (Review-Nacharbeit; die erste Fassung filterte im Dienst). Keine Zusicherung geschwächt. Freigabe beider Dateien über
+den Nachtrag des Orchestrators in „Files allowed“.
+
+**Rot vor der Änderung** (neue Tests auf `4f37d07` ohne Umsetzung): Vitest „Test Files 7 failed (7), Tests 4 failed |
+13 passed (17)“ (Module `./focus`, `./FocusList`, `./FocusDetail`, `./focus.de` fehlen; Register: „expected 5 to be 6“,
+„expected [ 1, 2, 3, 4, 5 ] to deeply equal [ 1, 2, 3, 4, 5, 6 ]“, „expected undefined to be '/my'“). Playwright: F1 rot
+(`expect(page).toHaveURL(expected) failed` nach Alt+6); F2–F8 liefen in der Serie danach nicht.
+**Grün danach:** Vitest der Scheibe 41 + 4 Fälle; Playwright in-process 157 bestanden (149 vorher + 8), `054` mit
+`--repeat-each=3` 24 bestanden; axe ohne serious/critical auf Seite, Schreibmodus und Dialog, je de und en.
+
+**Endzustand im Projekt `http`** wie im Dateikopf von `054-fokusansicht.spec.ts` (F2, F4, F5, F7 schreiben; F1, F3, F6, F8 nicht).
+
+**Design-Kritik D1–D10**
+
+| D | erfüllt | Satz |
+|---|---|---|
+| D1 | ja | Links die Liste, älteste oben; rechts eine Einzelfrage, Rückgabegrund zuerst, genau ein nächster Schritt (Bild 054-fokus). |
+| D2 | ja | `focusActions` liefert höchstens eine primäre; „An anderen Fachbereich weiterleiten“ ist nur allein primär (Test 2, 6, 7). |
+| D3 | ja | Zeilen mit zwei Textzeilen gleicher Höhe, Liste und Detail fluchten; Schreibmodus 24/20 px Innenabstand, Textfeld füllt die Höhe. |
+| D4 | ja | Farbe nur in Badges und der Tönung des Rückgabegrunds; „Länger als zwei Minuten.“ als Text. |
+| D5 | ja | Nummern in Mono, Vorlesezeit „m:ss“, Regel-id im Dialog aus 053. |
+| D6 | ja | Laden (Gerüst), Fehler mit „Erneut versuchen“, `focus-empty`, `focus-forbidden`, `focus.latest.none`. |
+| D7 | ja | 24 Schlüssel je Sprache, Parität 610; „Weiterleiten“ nur für den nächsten Schritt. |
+| D8 | ja | Alt+6, Pfeile, Enter, Strg+Enter, Escape (auch im Dialog nur der Dialog), Fokus nach Aktion (F2–F4). |
+| D9 | ja | Nur „Entwurf speichern“ wird gesperrt angezeigt; ungespeicherter Text blendet die Übergaben aus (F3). |
+| D10 | ja | Keine Filterleiste, keine Kacheln; der Schreibmodus zeigt Frage, Rückgabegrund, Textfeld, Belege, Vorlesezeit, Aktionen. |
+
+**Touched:** `apps/web/src/features/focus/{Page,FocusList,FocusDetail,WritingMode}.tsx`, `focus.ts` und die vier Testdateien;
+`apps/web/src/api/{actor.ts,index.ts,focus054.test.ts}`; `apps/web/src/app/featureRegistry{,.test}.ts`;
+`apps/web/src/i18n/{focus.de,focus.en,de,en,shell.de,shell.en,parity.test}.ts`; `apps/web/e2e/054-fokusansicht.spec.ts`,
+`apps/web/e2e/020-rueckbau-passung.spec.ts`, `apps/web/e2e/010d-ansichtsdaten.spec.ts`, `apps/web/e2e/support/e2e-texts.ts`,
+`apps/web/playwright.config.ts`, `scripts/e2e-http-031.test.mjs`; `docs/evidence/054-*.png`; `docs/glossar.md`,
+`docs/folgeliste.md`, diese Spec.
+
+### Schluss von `pnpm gates` (Orchestrator, 04.10.2026)
+
+Lauf auf Commit 42ea09c (letzter Code-Stand dieses PR, nach dem Fokus-Fix unten; spätere Commits nur Doku), mit
+Postgres-Testdatenbank, Ausgang 0.
+Aus demselben Lauf: `packages/domain` Tests 421 passed, `apps/web` Tests 683 passed, `apps/api` Tests 674 passed,
+slice-scope „36 changed file(s), all within … 'Files allowed' list (32 pattern(s))“. Schluss wörtlich:
+
+```
+1..318
+# tests 318
+# suites 0
+# pass 318
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15355.545874
+
+> @hv/web@0.0.0 build /home/user/wt/s054/apps/web
+> tsc -b && vite build
+[… Vite-Ausgabe der Dateigrößen und Warnungen gekürzt …]
+✓ built in 1.79s
+mark-test-run: wrote /home/user/wt/s054/.claude/state/last-test-run (clean tree) at commit 42ea09c, tree b3478eda6d94…
+```
+
+### Nachweis Projekt `http` (Orchestrator, 04.10.2026)
+
+CI-Lauf `e2e-http` auf PR #149, Commit 656b314 (Code-Stand 42ea09c), Lauf-ID 37225467013, Job-ID 111504094239, grün.
+Schluss des Logs:
+
+```
+✓  48 [http] › e2e/054-fokusansicht.spec.ts:167:3 › 054 Fokusansicht der Beantworter › F1 Liste, Alt+6, Rechte als Daten @screenshot (3.4s)
+✓  49 [http] › e2e/054-fokusansicht.spec.ts:237:3 › 054 Fokusansicht der Beantworter › F2 Doppelklick → Schreibmodus → speichern @screenshot (4.0s)
+✓  50 [http] › e2e/054-fokusansicht.spec.ts:291:3 › 054 Fokusansicht der Beantworter › F3 Tastatur: Enter, Escape, Dialog über dem Schreibmodus (schreibt nichts) (1.4s)
+✓  51 [http] › e2e/054-fokusansicht.spec.ts:342:3 › 054 Fokusansicht der Beantworter › F4 Weiterleiten → nächste Einzelfrage; Rückgabegrund prominent (4.5s)
+✓  52 [http] › e2e/054-fokusansicht.spec.ts:384:3 › 054 Fokusansicht der Beantworter › F5 An anderen Fachbereich weiterleiten @screenshot (6.1s)
+✓  53 [http] › e2e/054-fokusansicht.spec.ts:446:3 › 054 Fokusansicht der Beantworter › F6 Lesehinweis, Rechte als Daten (schreibt nichts) (2.5s)
+✓  54 [http] › e2e/054-fokusansicht.spec.ts:467:3 › 054 Fokusansicht der Beantworter › F7 Zulauf aus der Steuerung: letzter Weiterleitungsgrund (3.9s)
+✓  55 [http] › e2e/054-fokusansicht.spec.ts:514:3 › 054 Fokusansicht der Beantworter › F8 Eingaben je Akteur (schreibt nichts) (2.2s)
+56 passed (4.1m)
+```
+
+Dauer des Schritts „End-to-end http project …“: 18:43:39 bis 18:48:24, rund 4:45 gegen Limit 9:00 und Harness-Grenze 8:00
+(Schätzung vor dem Bau 7:00; der frühere Lauf 37223187826 auf 429ab6e dauerte rund 5:30). Artefakt `evidence-031-http`
+(ID 11312027170, `sha256:84713b81ab9a5fc99905e6135830358c624d286b786f17a0a74388aee736dbf8`), für diese Scheibe nicht nötig.
+
+Nachtrag Fokus (Orchestrator, 04.10.2026): Der CI-Lauf `e2e-http` auf dem Doku-Commit 37d330a (Lauf 37224478746) war rot in
+F4: Nach „Weiterleiten“ blieb der Fokus nicht im Detail. Ursache: Im HTTP-Betrieb kann der Strom die nächste Einzelfrage
+liefern, bevor der Schreibaufruf antwortet; `handedOver` scharfte den Fokus danach, und es folgte kein Render mehr. 053 hatte
+denselben Fall schon gelöst (Review 053, Minor 3b: `armFocus` ruft `settleFocus` sofort). 42ea09c übernimmt das in
+`features/focus/Page.tsx`. Der Lauf auf 429ab6e war grün, weil die Reihenfolge dort günstig war; der neue PR-Lauf auf dem Kopf ist der
+Nachweis.
+
+Hinweis: PR #148 (gleicher Inhalt) wurde geschlossen, weil gitleaks `generic-api-key` das JSX-Literal des Speichernamens
+in `features/focus/Page.tsx` traf; der Name steht jetzt als Modulkonstante, der Verlauf ist auf einen Commit gekürzt.
 
 ## Review findings
 
-(nach dem Review)
+Review in frischem Kontext (Opus, schlanker Modus) auf 42b0f61: ein Major, keine Sicherheits-, Rechts- oder
+Datenschutzbefunde.
+
+- **Major 1 (behoben):** 010d mit Server-Filter auf unit-fin und eigenmächtig erweiterte Files allowed. Jetzt clientseitige
+  Zeilenwahl, Liste ungefiltert; Nachtrag des Orchestrators in Files allowed, „Ausdrücklich nicht erlaubt“ und AK 2.
+  Enge Nachprüfung auf 8f1f287: behoben, kein neuer Blocker oder Major (010d, 020, 054 in-process: 38 passed).
+- **Minor 2 (bestätigt im Nachtrag):** zusätzliches `asRole(page,'expert')` in 020.
+- **Minor 3 (erledigt):** Nachweis `http` oben.
+- **Minor 4 (behoben):** F8 bringt seine Vorbedingung selbst mit.
+- **Minor 5–8, Nit 9:** in `docs/folgeliste.md` („054 Review 5“ bis „054 Review 8“; 9 stand schon dort).
