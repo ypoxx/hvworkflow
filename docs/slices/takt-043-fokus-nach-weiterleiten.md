@@ -175,10 +175,39 @@ Etwa 1 AStd: Auslagerung und Tests etwa 0,5 AStd, Seite etwa 0,25 AStd, Gates, e
 
 ```
 Slice: takt-043-fokus-nach-weiterleiten
-Done: …
-Evidence: rot vorher (A, C, nicht fertig), pnpm gates auf <commit> (…), CI e2e-http Lauf <id> mit 054 F4 grün
-Open: …
-Touched: …
+Done: focusDue/disarmFocus/PendingFocus in focus.ts; the handed-over question counts only once the settled list keeps
+      it (U1). Page.tsx arms the focus before run() for both hand-overs and disarms on a refusal through a wrapper
+      around onProblem (U2); settleFocus has empty deps and reads listSettled from shownNow. Test 10 (12 cases).
+Evidence: rot vorher (unten), pnpm gates auf ad6c94c (unten), in-process 054 --repeat-each=3: 24 passed (1.4m);
+      CI e2e-http: offen (PR noch nicht da)
+Open: CI e2e-http-Lauf mit 054 F4 grün (Akzeptanzkriterium 5) steht aus; erst danach fertig.
+Touched: apps/web/src/features/focus/Page.tsx, apps/web/src/features/focus/focus.ts,
+      apps/web/src/features/focus/focus.test.ts, docs/slices/takt-043-fokus-nach-weiterleiten.md
+```
+
+Rot vorher (Test 10 gegen die verhaltensgleiche Auslagerung der alten Bedingung in `focusDue`):
+
+```
+     × A: the detail of X v4 before the list: wait until Y stands there 9ms
+     × A with a settled but older list: X v4 over the row X v3 still waits 2ms
+     × C: the stream ahead; the write answers on X v4 (call from handedOver): no move before Y 1ms
+     × E: as A, the move is due at the first Y (whether it happens is mayMoveFocus, steering.test.ts) 2ms
+     × empty: the last question left: clear once the list is settled 1ms
+     × not settled: X v4 in the list while it still loads: wait 1ms
+AssertionError: expected [ 'wait', 'move', 'wait', 'wait' ] to deeply equal [ 'wait', 'wait', 'wait', 'move' ]
+      Tests  6 failed | 27 passed (33)
+```
+
+Nach der Korrektur: `Tests  33 passed (33)`. D und „Ablehnung“ waren vorher schon grün (wie die Spec erwartet).
+
+`pnpm gates` auf ad6c94c (exit 0), Schluss:
+
+```
+apps/web test:  Test Files  40 passed (40)
+apps/web test:       Tests  695 passed (695)
+slice-scope: 4 changed file(s), all within "docs/slices/takt-043-fokus-nach-weiterleiten.md"'s "Files allowed" list (5 pattern(s)).
+✓ built in 1.51s
+mark-test-run: wrote /home/user/wt/takt043/.claude/state/last-test-run (clean tree) at commit ad6c94c, tree 5b6466db2186…
 ```
 
 ## Review findings
