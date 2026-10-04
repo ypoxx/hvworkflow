@@ -697,6 +697,15 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 
 ## Fokusansicht (aus 054)
 
+- takt-043 Review minor 1 · `features/focus/Page.tsx` (und gleich in 053 `features/steering/Page.tsx`) · „An anderen Fachbereich
+  weiterleiten“ in Reihenfolge D (Strom vor der POST-Antwort): der Dialog wechselt auf die nächste Einzelfrage und bleibt offen,
+  weil `stillShown()` falsch ist · Dialog der Schreibtür schließen, sobald die Auswahl die Frage verlässt, für die er geöffnet wurde
+  (eigene Scheibe, beide Seiten).
+- takt-043 Review minor 2 · `focus.test.ts` Test 10 · die realistischen Zwischenstände (X v4 gewählt mit mine [Y]; X v4 gezeigt
+  bei selectedId Y) fehlen; heute `question: null` · Schritte `shown(X4,'q-x',[Y])` und `shown(X4,'q-y',[Y])` mit `wait` ergänzen.
+- takt-043 Review nit 3 · `Page.tsx` · `armHandOver` vor `run`; kehrt `run` früh zurück (Schreiben läuft), bleibt der Fokus
+  scharf bis zur nächsten Bewegung · heute durch busy/aria-disabled verhindert; bei Änderung an `useWriteDoor` erst nach Annahme
+  scharf machen.
 - 054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
   mit Toast `focus.write.gone` · Entwurfspuffer mit 060.
 - 054 Bau · `apps/web/src/app/ShortcutsDialog.tsx` · die Kürzelliste kennt Strg+Enter und Escape des Schreibmodus nicht ·
