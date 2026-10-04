@@ -217,13 +217,18 @@ export function FocusPage() {
     settleFocus();
   });
 
-  /** After "Weiterleiten" or forwarding to another unit: the writing mode ends in any case, and the focus is armed. */
+  /**
+   * After "Weiterleiten" or forwarding to another unit: the writing mode ends in any case, and the focus is armed. As in
+   * 053 (review minor 3b): the stream can deliver the next question before the write answers, and no later render
+   * follows, so the focus is due at once (CI e2e-http on #149, F4).
+   */
   const handedOver = useCallback(
     (question: Question) => () => {
       setWritingId(null);
       pendingFocus.current = { id: question.id, version: question.version };
+      settleFocus();
     },
-    [],
+    [settleFocus],
   );
 
   const updateDraft = useCallback((key: string, patch: Partial<Pick<FocusDraft, 'text' | 'sources'>>) => {
