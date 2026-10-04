@@ -19,6 +19,7 @@ import type {
 } from './types.js';
 import { QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
 import { computeCoverage } from './coverage.js';
+import { projectAnswerBody } from './answerFormat.js';
 import { resolveAgendaProgress, resolveMeetingLifecycle } from './transitions.js';
 
 export interface State {
@@ -426,9 +427,14 @@ export function reduce(state: State, e: DomainEvent): State {
       if (!q) break;
       // Scheibe 044a: the snapshot of the catalogue entry stays in the event (audit path); the
       // justification comes from the `pii` part, read without decoding like `SpeakerRegistered`.
-      const { refusalGround: _snapshot, ...answer } = e.payload.answer;
+      const { refusalGround: _snapshot, body: stored, ...answer } = e.payload.answer;
       const justification = e.payload.pii?.refusalJustification;
-      q.answers.push({ ...answer, ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
+      // Scheibe 055 (ADR 0005, decision 5): every version gets a document. A stored one runs through the whitelist
+      // again (read variant, never throws), unless that lost wording against the stored `text` (Codex P1); otherwise,
+      // and for versions before 0.4.4 and refusals, it is derived from `text` (L). `text` is never recomputed.
+      const body = projectAnswerBody(stored, answer.text);
+      q.answers.push({ ...answer, ...(body !== undefined ? { body } : {}),
+        ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
       // The target status is the one the transition table resolved when the event was written
       // (`toStatus`, like `QuestionReturned`); only a known status is taken, anything else keeps the
       // status every answer draft has had.

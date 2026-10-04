@@ -901,10 +901,18 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 
 ```
 Slice: 055-antwortformat
-Done:
-Evidence:
-Open:
-Touched:
+Done: Vertrag 0.4.4 als erster Commit (neun Schemas, AnswerDraft.body, AnswerVersion.body, EventRead-Bindung, ADR 0005);
+      answerFormat.ts mit Schreib- und Lesevariante (N1–N10), P, L (CR LF/CR/LF), verlustfreier Projektion (Codex P1) und
+      sanitizeAnswerText (2a) in draftAnswer und proposeRefusal; Projektion gibt jeder Version body; describeErrors begrenzt.
+Evidence: Commits und Schluss von `pnpm gates` im Bericht an den Orchestrator (PR); rote Läufe vor der Änderung dort.
+      Vor dem Bau: Basis ea3eb9a (054 gemergt, Vertrag 0.4.3 -> 0.4.4); oneOf/const-Probe: Absatz mit items und Liste mit
+      content abgelehnt, Meldung ohne Text; R-IDEM-01 mit anderem body liefert das erste Ergebnis (Test in answerDraft055);
+      Rumpf an der Grenze 101 405 Byte (ASCII) bzw. 161 405 Byte (Emoji), über 256 KiB 413; CORPUS_LOAD-Projektion
+      (6 329 Ereignisse, 685 Antwortversionen) Median aus 10 Läufen vorher 229,6–232,7 ms, nachher 226,3–251,5 ms
+      (Mittel rund +2 %), L allein rund 5 ms: kein Memo; Validator-Meldung ungebremst 2 000 Fehler / 128 888 Byte, jetzt
+      höchstens 20 Einzelfehler plus Restzahl (kein bestehender Test erwartete mehr als 20).
+Open: e2e-http-Lauf des PR (Dauer) erst im CI; 055 nicht vor 055b in eine geteilte Umgebung (Entscheidung 10).
+Touched: siehe Bericht an den Orchestrator.
 ```
 
 ## Review findings

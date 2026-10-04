@@ -16,6 +16,7 @@ import { copyRefusalGrounds, REFUSAL_GROUNDS, type RefusalGround } from './refus
 import { resolveAgendaProgress, resolveMeetingCapture, resolveSpeakerTransition, resolveTransition, TRANSITION_ACTIONS } from './transitions.js';
 import { emptyState, isOnStage, reduce, sortStageSeats, type State } from './state.js';
 import { checkAgendaItems, checkStageSeats, checkUnits } from './masterData.js';
+import { AnswerFormatError, answerPlainText, codePointLength, normalizeAnswerBodyForWrite, sanitizeAnswerText, ANSWER_TEXT_MAX_LENGTH } from './answerFormat.js';
 import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamMessage, type StreamStates } from './stream.js';
 import { CORPUS_DEMO } from './seed.js';
 import type { EventStore } from './store.js';
@@ -314,15 +315,8 @@ export function sessionAssignmentFor(events: readonly DomainEvent[], subjectId: 
   return current[0]?.assignment;
 }
 
-/**
- * Length in Unicode code points, as JSON Schema 2020-12 and the service's validator (Ajv `ucs2length`) count
- * `maxLength`: a surrogate pair is one character, a lone surrogate is one as well (Scheibe 044b, Codex P2 on #131).
- */
-export function codePointLength(s: string): number {
-  let n = 0;
-  for (const _ of s) n += 1;
-  return n;
-}
+// Scheibe 055 (Lesebefund Minor 4): `codePointLength` moved to answerFormat.ts; exported here unchanged.
+export { codePointLength };
 
 /** Contract 0.4.0 limits of `RefusalProposal`, checked by the core (Scheibe 044a). A missing ground or
  * justification is not a 422 but R-GUARD-09 (409). Messages never repeat the submitted text. String lengths in
@@ -1401,17 +1395,43 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       }));
     },
     async draftAnswer(id, input, opts) {
-      if (!input.text?.trim()) throw new ApiProblem(422, 'Unprocessable', 'Answer text is required.');
+      // Scheibe 055 (ADR 0005, decisions 2, 2a and 4): form, character filter and normalisation before any
+      // transition, so a 422 comes before 403/404/409 as with the validator and no event is written.
+      const raw = input as unknown as Record<string, unknown>;
+      const submitted = raw['text'];
+      let text: string;
+      let body: ReturnType<typeof normalizeAnswerBodyForWrite> | undefined;
+      try {
+        if (raw['body'] !== undefined) {
+          // With `body` the document wins: `text` must meet its contract form but is neither checked nor stored.
+          if (typeof submitted !== 'string' || submitted.length === 0 || codePointLength(submitted) > ANSWER_TEXT_MAX_LENGTH) {
+            throw new AnswerFormatError(`text must be a string of 1 to ${ANSWER_TEXT_MAX_LENGTH} characters.`);
+          }
+          body = normalizeAnswerBodyForWrite(raw['body']);
+          text = answerPlainText(body);
+        } else {
+          if (typeof submitted !== 'string' || !submitted.trim()) throw new AnswerFormatError('Answer text is required.');
+          if (codePointLength(submitted) > ANSWER_TEXT_MAX_LENGTH) {
+            throw new AnswerFormatError(`text must not exceed ${ANSWER_TEXT_MAX_LENGTH} characters.`);
+          }
+          text = sanitizeAnswerText(submitted);
+          if (!text) throw new AnswerFormatError('Answer text is required.');
+        }
+      } catch (e) {
+        if (e instanceof AnswerFormatError) throw new ApiProblem(422, 'Unprocessable', e.message);
+        throw e;
+      }
       return transition(id, 'answer.draft', opts, input, (q) => ({
         type: 'AnswerDrafted',
         subjectId: q.id,
         payload: {
           answer: {
             version: q.answers.length + 1,
-            text: input.text.trim(),
+            text,
             createdAt: now(),
             createdBy: { id: actor().id, role: actor().role },
             ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
+            ...(body !== undefined ? { body } : {}),
           },
           ...(q.approval ? { invalidatedApprovalOfVersion: q.approval.answerVersion } : {}),
         },
@@ -1520,7 +1540,20 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // 0.4.0 limits itself, before any transition. No message repeats a submitted text.
       const invalid = checkRefusalProposal(input);
       if (invalid) throw new ApiProblem(422, 'Unprocessable', invalid);
-      return transition(id, 'question.refuse.propose', opts, input, (q, to) => {
+      // Scheibe 055, decision 2a: after the limits on the raw values, the character filter on wording and
+      // justification; an empty wording is a 422 as before, an empty justification reaches R-GUARD-09 (409).
+      let wording: string;
+      let justification: string | undefined;
+      try {
+        wording = sanitizeAnswerText(input.text);
+        justification = input.refusalJustification === undefined ? undefined : sanitizeAnswerText(input.refusalJustification, 'refusalJustification');
+      } catch (e) {
+        if (e instanceof AnswerFormatError) throw new ApiProblem(422, 'Unprocessable', e.message);
+        throw e;
+      }
+      if (!wording) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
+      const proposal: RefusalProposal = { ...input, text: wording, ...(justification !== undefined ? { refusalJustification: justification } : {}) };
+      return transition(id, 'question.refuse.propose', opts, proposal, (q, to) => {
         const ground = input.answerKind === 'refusal_with_ground'
           ? REFUSAL_GROUNDS.find((entry) => entry.id === input.refusalGroundId) : undefined;
         return {
@@ -1531,7 +1564,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           payload: {
             answer: {
               version: q.answers.length + 1,
-              text: input.text.trim(),
+              text: wording,
               createdAt: now(),
               createdBy: { id: actor().id, role: actor().role },
               ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
@@ -1542,7 +1575,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             // The justification only in the marked PII part (ADR 0009): codec, key custody and
             // crypto-shredding per meeting apply, and every event read path strips it. R-GUARD-09 has
             // already ensured it is a non-blank string.
-            pii: { keyId: state.meeting?.id ?? '', refusalJustification: (input.refusalJustification ?? '').trim() },
+            pii: { keyId: state.meeting?.id ?? '', refusalJustification: justification ?? '' },
             ...(q.approval ? { invalidatedApprovalOfVersion: q.approval.answerVersion } : {}),
             toStatus: to,
           },

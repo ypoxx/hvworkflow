@@ -201,10 +201,15 @@ export function expectValidProblem(body: unknown): void {
   }
 }
 
-/** Turn Ajv errors into one readable sentence for a problem `detail` (path + message per error). */
+/** At most this many single errors in a problem `detail` (Scheibe 055, Lesebefund Minor 6: no answer in body size). */
+const MAX_DESCRIBED_ERRORS = 20;
+
+/** Turn Ajv errors into one readable sentence for a problem `detail` (path + message per error, at most 20, then the rest count). */
 export function describeErrors(errors: ErrorObject[] | null | undefined): string {
   if (!errors || errors.length === 0) return 'Validation failed.';
-  return errors.map((e) => `${e.instancePath || '(root)'} ${e.message ?? 'is invalid'}`.trim()).join('; ');
+  const described = errors.slice(0, MAX_DESCRIBED_ERRORS).map((e) => `${e.instancePath || '(root)'} ${e.message ?? 'is invalid'}`.trim());
+  const rest = errors.length - described.length;
+  return [...described, ...(rest > 0 ? [`and ${rest} more`] : [])].join('; ');
 }
 
 // ---- request bodies ---------------------------------------------------------------------------

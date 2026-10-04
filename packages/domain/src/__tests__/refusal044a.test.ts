@@ -389,9 +389,11 @@ describe('Scheibe 044a, Test 6: 422 (no event)', () => {
     expect((await propose(await assigned(), A.legal, bad({ text: emoji.repeat(20000) }))).status).toBe('in_review');
     expect((await propose(await assigned(), A.legal, bad({ refusalJustification: emoji.repeat(4000) }))).status).toBe('in_review');
     expect((await propose(await assigned(), A.legal, bad({ sources: [emoji.repeat(2000)] }))).status).toBe('in_review');
-    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: `${'x'.repeat(3999)}\uD800` }))).status).toBe('in_review');
-    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: `\uDC00${'x'.repeat(3997)}\uDE00\uD83D` }))).status).toBe('in_review');
-    expect((await propose(await assigned(), A.legal, bad({ refusalJustification: '\uD800'.repeat(4000) }))).status).toBe('in_review');
+    // 055, Entscheidung 2a: a lone surrogate in the justification is 422 now (the count in code points is unchanged).
+    for (const justification of [`${'x'.repeat(3999)}\uD800`, `\uDC00${'x'.repeat(3997)}\uDE00\uD83D`, '\uD800'.repeat(4000)]) {
+      const q = await assigned();
+      expect((await rejected(() => propose(q, A.legal, bad({ refusalJustification: justification })))).status).toBe(422);
+    }
   });
 });
 
