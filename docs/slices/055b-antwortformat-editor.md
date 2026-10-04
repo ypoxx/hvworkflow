@@ -7,14 +7,17 @@ sechste Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 
 Einfügen und die Bildnachweise; die Word-spezifische Listenerkennung und das Rückgängigmachen eines Einfügens folgen als
 **055c** (eigene Spec, Hinweise an den Orchestrator). Auf Standard gebaut (E6 Whitelist, E21 nur `de`); keine
 Eigentümerfrage blockiert.
-**Risikoklasse:** mittel · 3,9 AStd (Spanne 3,4–4,5; Plan-Notiz in 055: mittel · 3,6 AStd; Begründung in „Warum mittel“ und
+**Risikoklasse:** mittel · 4,0 AStd (3,95; Spanne 3,4–4,5; Plan-Notiz in 055: mittel · 3,6 AStd; Begründung in „Warum mittel“ und
 „Aufwand“) · Plan 055: 18.11.2026 (W8), tatsächlich direkt nach 055 · Lanes: web-components (Renderer); web-answers (Editor,
 Walker, Beantwortung); web-focus (Schreibmodus, Detail); web-stage (zwei Stellen); web-history (ein Block); web-api (nur
 Wiederausgabe der Kernfunktionen als Vorschau); e2e (eigene Datei, im Projekt `http` eingereiht; Zusicherungen in 054 und 090
 auf das neue Feld umgestellt); docs (Glossar, Bedrohungsmodell, Nachweise); scripts (eine Semgrep-Regel). **Kein** Vertrag,
 **kein** Kern, **kein** Dienst.
 **Bedrohungsmodell:** schließt die zweite Hälfte von T-G1-T-06 (Skripteinschleusung über Antworttext; „Einfügen aus Word“):
-Darstellung nur über React-Elemente aus der geschlossenen Speicherform, Einfügen über ein inertes Dokument ohne HTML-Senke.
+Darstellung nur über React-Elemente aus der geschlossenen Speicherform, Einfügen über ein mit `DOMParser` erzeugtes Dokument
+ohne HTML-Senke; dass dabei **kein Nachladen** (Bild, Rahmen, Stilblatt, Medien) geschieht, ist nicht behauptet, sondern durch
+den Pflichttest A2b nachgewiesen, mit Rückfall auf `text/plain` (Entscheidung 5, Codex P1 auf #156). Die Web-Seite hat heute
+**keine** CSP (037b); das ist eine Vorbedingungsfrage an den Orchestrator, keine Änderung dieser Scheibe.
 Keine neue Operation, kein neues Recht, kein neuer Leserkreis (der Antwortblock der Historie zeigt, was dieselbe Person in
 der Beantwortung schon liest).
 **Rolle:** implementierer-oberflaeche; Review in frischem Kontext mit den Perspektiven **Security** (Einfügen, Senken,
@@ -238,12 +241,34 @@ SC-10-Prüfung vor (Eigentümerfrage 2); ohne Antwort keine Bibliothek.
 ### 5. Einfügen und Ablegen (`domToBody.ts`, Aufruf im Feld)
 
 - `paste` und `drop` werden immer abgefangen (`preventDefault`). Liegt `text/html` vor, wird es mit
-  `new DOMParser().parseFromString(html, 'text/html')` gelesen: ein **inertes** Dokument ohne Browsing-Kontext (keine Skripte,
-  keine Ladevorgänge). Der Walker (Entscheidung 6) macht daraus `AnswerBodyInput`; `bodyToDom` erzeugt daraus **neue** Knoten
-  im lebenden Dokument (nur `createElement` für `p`, `ul`, `li`, `b`, `i`, `span` und `createTextNode`, Stil nur die eine
-  Hintergrundfarbe). **Kein Knoten des geparsten Dokuments gelangt ins lebende** (kein `importNode`, `adoptNode`, kein Anhängen
-  fremder Knoten); keine Senke `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `execCommand('insertHTML')`,
-  `document.write`, `createContextualFragment` (Semgrep-Regel, Entscheidung 10). `DOMParser` steht nur in `domToBody.ts`.
+  `new DOMParser().parseFromString(html, 'text/html')` gelesen. Der Walker (Entscheidung 6) macht daraus `AnswerBodyInput`;
+  `bodyToDom` erzeugt daraus **neue** Knoten im lebenden Dokument (nur `createElement` für `p`, `ul`, `li`, `b`, `i`, `span`
+  und `createTextNode`, Stil nur die eine Hintergrundfarbe); keine Senke `innerHTML`, `outerHTML`, `insertAdjacentHTML`,
+  `execCommand('insertHTML')`, `document.write`, `createContextualFragment` (Semgrep-Regel, Entscheidung 10). `DOMParser`
+  steht nur in `domToBody.ts`.
+- **Kein Nachladen beim Einfügen — Mechanismus, Nachweis, Rückfall (Codex P1 auf #156, Security).**
+  - *Mechanismus (Erwartung, nicht Behauptung):* Nach der HTML-Spezifikation hat ein von `DOMParser` erzeugtes Dokument keinen
+    Browsing-Kontext und ist nicht „fully active“; Skripte laufen dort nicht, und die Abrufschritte für `img`, `iframe`,
+    `link rel=stylesheet`, `video poster`, `object`, SVG-`image`, `@import` und Hintergrundbilder sollten nicht starten. Diese
+    Spec stützt die Sicherheit **nicht** auf diese Erwartung: Ob ein Browser dennoch abruft (Vorladescanner, eigenwillige
+    Implementierung), weist allein der Pflichttest **A2b** nach, in einem echten Browser.
+  - *Verteidigung in der Tiefe 1:* **Kein Knoten des geparsten Dokuments gelangt ins lebende** — kein `importNode`, kein
+    `adoptNode`, kein `append`/`insertBefore`/`replaceWith` mit einem fremden Knoten, kein Klonen fremder Knoten. Der Walker
+    **liest** nur Textdaten (`data`) sowie Tag-Namen und das Attribut `style` für die drei Marken; kein anderes Attribut wird
+    gelesen (kein `src`, `href`, `srcset`, `poster`, `data`, `background`), und nichts Gelesenes wird zu einem Attribut eines
+    neuen Knotens außer der einen festen Hintergrundfarbe aus dem Token. Ein Knoten im lebenden Dokument mit URL-Attribut kann
+    so nicht entstehen (Test 2 (j), A2b).
+  - *Verteidigung in der Tiefe 2, CSP:* Gelesen (nur lesend) auf `4da0165`/`f24dbea`: Die Web-Seite hat **keine**
+    Content-Security-Policy — weder in `netlify.toml` (`[[headers]]` setzt nur `X-Frame-Options`, `X-Content-Type-Options`,
+    `Referrer-Policy`), noch in `deploy/docker/nginx.conf` (Zeile 3: „No CSP here: it comes in 037b“), noch als `<meta>` in
+    `apps/web/index.html`. Die CSP `default-src 'none'` in `apps/api/src/limits/middleware.ts:25` gilt nur für die
+    JSON-Antworten des Dienstes, nicht für das Dokument der Oberfläche. Es gibt also heute **keine** Schranke für
+    `img-src`/`frame-src`/`connect-src` auf `'self'`. Diese Scheibe ändert keine Auslieferungskonfiguration; die Frage geht als
+    Vorbedingung an den Orchestrator (Hinweise an den Orchestrator). Bis 037b ist A2b die einzige Prüfung, deshalb Pflicht.
+  - *Rückfall (verbindlich):* Zeigt A2b in irgendeinem Lauf **eine** Anfrage an den Wächter-Host, stellt der Bau das Einfügen
+    auf **nur `text/plain`** um (`text/html` wird nicht mehr gelesen, `DOMParser` entfällt; Auszeichnung aus Word geht verloren,
+    der Wortlaut bleibt), meldet es im Bericht und an den Orchestrator und hält für alles Weitere an. **Keine andere
+    Umgehung** (kein Entfernen von Attributen per Zeichenkette, kein Sandbox-Rahmen, kein eigener Parser, keine Ausnahme).
 - Nur `text/plain`: eine Zeile (getrennt an CR LF, CR, LF) je Absatz. Nur Dateien oder Bilder: nichts wird eingefügt.
 - Die neuen Knoten ersetzen die Auswahl; danach baut das Feld seinen **ganzen** Inhalt einmal aus dem Walker neu auf
   (`bodyToDom`), damit keine verschachtelten Blöcke stehen bleiben, und setzt den Caret an das Ende des Eingefügten (Position
@@ -361,6 +386,8 @@ SC-10-Prüfung vor (Eigentümerfrage 2); ohne Antwort keine Bibliothek.
   `el.innerHTML = x` meldet die Regel (Ausgabe im Bericht), danach gelöscht.
 - Keine Ereignisnutzlast im Renderer (Entscheidung 1); keine fremden Knoten im lebenden Dokument (Entscheidung 5); kein
   Attribut aus Daten außer dem geprüften `lang`; kein `href`, kein `src`.
+- **Kein Nachladen beim Einfügen** ist eine nachgewiesene, keine angenommene Eigenschaft: Pflichttest A2b, verbindlicher
+  Rückfall auf `text/plain` (Entscheidung 5). Die fehlende CSP der Web-Seite bleibt bei 037b (Vorbedingungsfrage).
 - **Trojan-Source-Lehre:** Steuer-, Format- und unsichtbare Zeichen (auch U+00A0, U+200B, U+202E, U+FEFF) stehen in Quell-,
   Test- und e2e-Dateien nur als `\u`-Escape oder HTML-Entität, nie roh. Akzeptanzkriterium 7 prüft das mit einer Suche.
 - Die Word-Probe ist synthetisch (kein echtes Dokument, keine echten Namen, keine Unternehmensdaten; R11).
@@ -445,8 +472,9 @@ Sonstiges:
 - `scripts/semgrep/rules.yml` (nur die Regel `no-html-sink`)
 - `docs/evidence/055b-*.png`
 - `docs/glossar.md` (nur die drei Zeilen aus Entscheidung 9)
-- `docs/sicherheit/bedrohungsmodell.md` (nur die Zelle von T-G1-T-06 für die zweite Hälfte und eine Zeile 055b unter „Weitere
-  Scheiben mit Sicherheitsbezug“)
+- `docs/sicherheit/bedrohungsmodell.md` (nur die Zelle von T-G1-T-06 für die zweite Hälfte — Renderer, Einfügen ohne Senke,
+  „kein Nachladen beim Einfügen, nachgewiesen durch A2b, Rückfall `text/plain`; CSP der Web-Seite weiter geplant in 037b“ —
+  und eine Zeile 055b unter „Weitere Scheiben mit Sicherheitsbezug“)
 - `docs/folgeliste.md` (nur nicht blockierende Befunde des Baus und des Reviews)
 - `docs/slices/055b-antwortformat-editor.md` (diese Spec: Bericht, Review findings)
 
@@ -484,6 +512,9 @@ Register (Hinweise an den Orchestrator). Muss eine dieser Dateien sich ändern: 
    ausgeführtem Schritt neu lesen (`gh api repos/ypoxx/hvworkflow/actions/runs/<id>/jobs`). Schätzung der Mehrzeit: ein
    Rollenwechsel, Schreiben, Neuladen, Prüfen ≈ **0:25–0:40**. Liegt Ist plus Schätzung über **6:30** (Plan Zeile 781), im
    Bericht und an den Orchestrator melden; über **8:00** anhalten. Der Bau ändert weder Workflow noch Harness.
+7a. **CSP (nur lesend, Ergebnis steht schon in Entscheidung 5):** neu lesen, ob `netlify.toml`, `deploy/docker/nginx.conf`
+   oder `apps/web/index.html` inzwischen eine CSP für die Web-Seite setzen; Ergebnis im Bericht. Keine Änderung daran in
+   dieser Scheibe.
 8. **Kontrast:** `<mark>` mit den beiden Tokens auf hellem Grund und in `.stage-contrast` ≥ 4,5:1 (axe misst mit; Wert im
    Bericht).
 
@@ -511,7 +542,10 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
    `title`, `meta`, `xml`, `noscript`, `iframe`, `svg`, `img`, Kommentar, bedingtem Kommentar, `display:none`,
    `visibility:hidden`, `mso-hide:all`, `mso-list:Ignore`; Link → nur Text; (h) Text bleibt roh (U+00A0, U+200B als Escape
    bleiben im Lauf); (i) `domToBodyInput(bodyToDom(b))` nach der Lesevariante gleich `b` für fünf feste Dokumente; `bodyToDom`
-   erzeugt nur `p`, `ul`, `li`, `b`, `i`, `span` und Textknoten (Aufzeichnung der Fabrikaufrufe).
+   erzeugt nur `p`, `ul`, `li`, `b`, `i`, `span` und Textknoten (Aufzeichnung der Fabrikaufrufe); (j) der Walker ruft auf den
+   Testknoten `getAttribute` nur mit `style` auf (Aufzeichnung; ein Testknoten mit `src`, `href`, `srcset`, `poster`, `data`,
+   `background` wird gelesen, ohne dass eines davon abgefragt wird), und kein Knoten der Eingabe erscheint in der Ausgabe von
+   `bodyToDom` (Identitätsvergleich).
 3. **`editorCommands.test.ts`:** `formatChord` für Strg und Cmd, mit und ohne Umschalt, Groß- und Kleinbuchstabe; `null` mit
    Alt, mit AltGr, während einer Komposition, für Enter; `'blocked'` für Strg+U. `allowedInputType`: die Allowlist aus
    Entscheidung 4 ja, `formatUnderline`, `formatSetInlineTextDirection`, `insertLink`, `insertFromPaste`, `insertFromDrop`,
@@ -556,6 +590,22 @@ Viewport 1440 × 900)
   Textknoten und kein `img`, `style`, `script`; der unterstrichene Text steht als Text da; verborgener Text und
   Aufzählungszeichen fehlen; Caret am Ende des Eingefügten. Gleiche Prüfung für ein `drop`-Ereignis mit derselben Probe und
   für nur `text/plain` (drei Zeilen → drei Absätze). Speichern; `focus-latest` zeigt nur `strong`, `em`, `mark`, `p`.
+- **A2b Einfügen lädt nichts nach (Pflicht, Codex P1 auf #156):** echter Browser, Projekt `in-process`. Vor dem Einfügen
+  `context.route` auf einen eindeutigen Wächter-Host (z. B. `http://sentinel-055b.invalid/<Zufallspfad>`, Konstante in
+  `word-sample-055b.ts`, ohne die Wörter KEY, TOKEN, SECRET, PASSWORD) mit Abbruch jeder Anfrage, dazu `page.on('request')`
+  und `context.on('request')` (auch Anfragen aus Rahmen und Workern), die jede URL mit dem Wächter-Host zählen. Die Probe
+  `SENTINEL_SAMPLE_055B` enthält, alles auf den Wächter zeigend: `<img src>`, `<img srcset>`, `<picture><source srcset>`,
+  `<iframe src>`, `<link rel=stylesheet href>`, `<link rel=preload href>`, `<video poster>` mit `<source src>`, `<audio src>`,
+  `<object data>`, `<embed src>`, `<svg><image href>` und `xlink:href`, `<style>@import url(…)</style>`, `style="background-image:url(…)"`,
+  `<body background>`, `<table background>`, `<td background>`, `<input type=image src>`, `<meta http-equiv=refresh>`,
+  `<base href>` und dazwischen fetten Text. Einfügen über `paste` und getrennt über `drop`. Ruhezustand an einem beobachtbaren
+  Ereignis, **nicht** mit einer bloßen Wartezeit: nach `expect.poll` auf den neuen Inhalt des Felds (der fette Text steht im
+  Feld) zusätzlich `page.waitForLoadState('networkidle')` und ein `requestAnimationFrame`-Doppel im Seitenkontext; danach
+  speichern, bis `focus-latest` die Version zeigt (Renderer läuft einmal), erneut `networkidle`. Erwartung: **null**
+  Anfragen an den Wächter-Host während und nach dem Einfügen; im Feld kein Element mit `src`, `href`, `srcset`, `poster`,
+  `data`, `background`. Ein Kontrollfall im selben Test (ein absichtlich ins **lebende** Dokument gesetztes `img` mit
+  Wächter-URL über `page.evaluate` nach dem Einfügen) zählt genau eine Anfrage und belegt, dass die Zählung greift. Läuft
+  auch mit `--repeat-each=3`. Ist A2b rot: Rückfall aus Entscheidung 5, keine andere Umgehung.
 - **A3 Walker gegen echtes DOM:** über den Entwicklungsserver `domToBody.ts` laden (Muster `API_MODULE` in 090), die Proben aus
   `word-sample-055b.ts` (Word, Google Docs mit `<b style="font-weight:normal">`, Browserkopie einer Webseite, LibreOffice) mit
   `DOMParser` lesen und `domToBodyInput` gegen wörtlich im Test stehende Eingabeformen prüfen. Kein Screenshot.
@@ -577,8 +627,11 @@ Viewport 1440 × 900)
 
 ## Akzeptanzkriterium
 
-1. Tests 1–10 und A1–A6, H1 vor der Änderung rot (Ausgabe im Bericht), danach grün; A1–A6 im Projekt `in-process` auch mit
-   `--repeat-each=3`.
+1. Tests 1–10 und A1–A6, A2b, H1 vor der Änderung rot (Ausgabe im Bericht), danach grün; A1–A6 und A2b im Projekt
+   `in-process` auch mit `--repeat-each=3`.
+1a. **A2b grün** (null Anfragen an den Wächter-Host, Kontrollfall zählt eine). Ist A2b nicht grün zu bekommen, gilt der
+   Rückfall aus Entscheidung 5 (nur `text/plain`), A2b läuft dann gegen das umgestellte Einfügen und ist grün, und der Bericht
+   nennt die Umstellung; ein Merge mit rotem A2b ist ausgeschlossen.
 2. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter **unverändert** 001, 003, 010b, 010c, 010d, 013 (außer
    der einen Zahl, falls Vor-dem-Bau-Punkt 6 sie verlangt), 020, 021b, 021c, 024, 040a, 045, 053, abnahme, und 054 sowie 090 nur
    mit den Umstellungen aus „Files allowed“ (Ergebnis je Datei im Bericht); axe ohne serious/critical. Projekt `http` grün im
@@ -642,7 +695,8 @@ Whitelist, keine nummerierte Liste), E21 (Standard nur `de`)
 
 | Risiko | Abwehr | Nachweis |
 |---|---|---|
-| Skript aus Daten oder aus der Zwischenablage wird ausgeführt | Renderer nur mit React-Elementen; Einfügen über inertes `DOMParser`-Dokument, nur neu erzeugte Knoten; Semgrep `no-html-sink` | Test 1 (d), 2 (g); A2 (Marker); Akzeptanz 4 |
+| Skript aus Daten oder aus der Zwischenablage wird ausgeführt | Renderer nur mit React-Elementen; Einfügen über `DOMParser`-Dokument, nur neu erzeugte Knoten; Semgrep `no-html-sink` | Test 1 (d), 2 (g); A2 (Marker); Akzeptanz 4 |
+| Eingefügtes HTML lädt Bild, Rahmen, Stilblatt oder Medien nach (Verfolgung, Datenabfluss über die Adresse; Codex P1 auf #156) | kein fremder Knoten im lebenden Dokument, Walker liest keine URL-Attribute; Nachweis statt Annahme; Rückfall `text/plain`; CSP der Web-Seite fehlt (037b, Vorbedingungsfrage) | Test 2 (j); A2b; Akzeptanz 1a |
 | Renderer zeigt eine ungeprüfte Ereignisnutzlast | Quelle nur `Question.answers[n]`; Quelltextsuche | Test 1 (h); Review |
 | Beantwortung (Freigabe) und Bühne zeigen dieselbe Version verschieden | ein Renderer für alle Stellen | Test 6; A4 |
 | Feld zeigt Auszeichnung, die beim Speichern verschwindet | Allowlist für `beforeinput`, Strg+U verhindert, `bodyToDom` kennt nur die Whitelist | Test 3; A1, A2 |
@@ -657,7 +711,7 @@ Whitelist, keine nummerierte Liste), E21 (Standard nur `de`)
 
 ## Aufwand
 
-Geschätzt **3,9 AStd** (Spanne 3,4–4,5) nach dem Umzug von Word-Listen und einstufigem Rückgängig nach 055c (rund 0,5 AStd).
+Geschätzt **4,0 AStd** (3,95; Spanne 3,4–4,5; +0,05 für A2b nach Codex P1 auf #156) nach dem Umzug von Word-Listen und einstufigem Rückgängig nach 055c (rund 0,5 AStd).
 Die Plan-Notiz in 055 rechnete 3,6 AStd mit Word-Listen; sie kannte die Umstellung von 054/090 und die Folge eines Einfügens
 ohne HTML-Senke für das Rückgängig noch nicht.
 
@@ -672,13 +726,13 @@ ohne HTML-Senke für das Rückgängig noch nicht.
 | Wiederausgabe und Test 5 | 0,05 |
 | i18n (9 Schlüssel je Sprache), Parität, Glossar | 0,1 |
 | Semgrep-Regel und Probe | 0,1 |
-| e2e A1–A6 und H1, sechs Bilder, axe | 0,5 |
+| e2e A1–A6, A2b und H1, sechs Bilder, axe | 0,55 |
 | Umstellung 054/090 (013 nach Bedarf), volle Suite `in-process` | 0,2 |
 | Vor-dem-Bau-Prüfungen 2–8 | 0,15 |
 | `pnpm gates`, Bericht, CI-Nachweis | 0,2 |
 
 **055c** (Word-Listen ohne `ul`/`ol`, einstufiges Rückgängig eines Einfügens) rund **0,5 AStd**, Klasse mittel. Zusammen
-055b + 055c rund **4,4 AStd** statt 3,6.
+055b + 055c rund **4,5 AStd** statt 3,6.
 
 ## Standards (auf Standard gebaut)
 
@@ -713,7 +767,7 @@ Keine blockiert den Bau; alle mit Standard.
    Schreibmodus (rund 0,2 AStd; ändert die Erwartungen in 090 und 010d).
 5. **Historie.** Standard: die letzte Version. Option: zusätzlich die freigegebene, wenn sie nicht die letzte ist
    (rund 0,15 AStd).
-6. **Teilung und Budget.** Standard: 055b 3,9 AStd, 055c 0,5 AStd (zusammen 4,4 statt 3,6). Go zu Zuschnitt und Budget
+6. **Teilung und Budget.** Standard: 055b 4,0 AStd, 055c 0,5 AStd (zusammen 4,5 statt 3,6). Go zu Zuschnitt und Budget
    erbeten; 055c ist für die Freigabe-Demo nicht zwingend.
 7. **Risikoklasse.** Standard: mittel. Anheben auf hoch kostet einen Lesebefund der Spec vor dem Bau (rund 0,3 AStd).
 8. **Rückgängig nach Einfügen.** Standard in 055b: nur Schutz vor einem verfälschten Stand (Entscheidung 5); ein einstufiges
@@ -722,7 +776,7 @@ Keine blockiert den Bau; alle mit Standard.
 ## Hinweise an den Orchestrator
 
 - **Plan §5 (paralleler Doku-Durchgang, nicht Teil dieser Spec):** neuer Eintrag **055b** „Antwortformat: Renderer und
-  Editor“ — mittel · **3,9 AStd** (statt der 3,6 aus der 055-Notiz) · nach 055 · Lanes web-components, web-answers, web-focus,
+  Editor“ — mittel · **4,0 AStd** (3,95; vorher 3,9, +0,05 für A2b nach Codex P1 auf #156; die 055-Notiz sagte 3,6) · nach 055 · Lanes web-components, web-answers, web-focus,
   web-stage, web-history, web-api, e2e, docs, scripts (eine Semgrep-Regel) · Abhängigkeiten 055, 054, takt-043 · Nachweise:
   sechs Screenshots (Editor, Bühne, Historie; de/en), grüner Lauf `e2e-http` · Offene Entscheidung E6. `plan-graph --strict`
   danach prüfen.
@@ -738,6 +792,13 @@ Keine blockiert den Bau; alle mit Standard.
   Schwelle für den Takt „Grenze anheben oder Job teilen“ bei etwa 6:30: **fällig unmittelbar nach 055b, vor 059**, weil 059
   und 060 eigene Fälle im Projekt `http` mitbringen.
 - **Abhängigkeiten in §5** (aus 055 übernommen, noch offen): 056, 059, 081 hängen an **055b**; 066 an **055**.
+- **Vorbedingungsfrage CSP (Codex P1 auf #156, Security):** Die Web-Seite hat in keiner Auslieferung eine
+  Content-Security-Policy (`netlify.toml` nur drei Kopfzeilen; `deploy/docker/nginx.conf:3` „No CSP here: it comes in 037b“;
+  kein `<meta>` in `apps/web/index.html`; `default-src 'none'` in `apps/api/src/limits/middleware.ts:25` gilt nur für die
+  Dienstantworten). Frage: Soll 055b (mit formatiertem Einfügen) erst nach einer CSP der Web-Seite mit `img-src`, `frame-src`,
+  `media-src`, `object-src`, `connect-src` auf `'self'` (037b) in eine geteilte Umgebung, oder genügt bis dahin der Nachweis
+  A2b mit verbindlichem Rückfall auf `text/plain`? Standard der Spec: A2b genügt für den Merge; die Auslieferung bleibt ohnehin
+  an das Go des Eigentümers gebunden. 055b ändert keine Auslieferungskonfiguration.
 - **Glossar:** 055b bringt die Zeilen „Hausformat“, „Hervorhebung“, „Auszeichnung“ selbst mit (Files allowed).
 - **Grenze `features` → `@hv/domain`:** 055b lädt Werte nur über `apps/web/src/api/answerFormat.ts`; keine neue Warnung von
   `web-features-i18n-domain-types-only`. Der Bericht nennt die Zahl der Warnungen vorher und nachher.
@@ -757,6 +818,12 @@ Keine blockiert den Bau; alle mit Standard.
   Whitelist, `lang`); ob das oder ein Serialisierer auf derselben Whitelist dient, entscheidet 051.
 - **049 (Vorgelesen mit `versionHash`):** unverändert über die gespeicherte Nutzlast (055).
 - **064/066 (Ingest, KI-Vorschläge):** ein Vorschlag kann über `bodyToDom` ins Feld; er bleibt Eingabeform bis zum Speichern.
+
+## Lesebefunde und Codex-Befunde zur Spec
+
+| Befund | Umsetzung |
+|---|---|
+| **Codex P1 auf #156 (Security):** Die Spec behauptete, ein `DOMParser`-Dokument lade nichts nach; eingefügtes `text/html` mit `<img src>`, `<iframe src>` u. a. könnte dennoch Abrufe auslösen, und der Marker-Test in A2 sähe das nicht. | Behauptung entfernt; Mechanismus als Erwartung nach HTML-Spezifikation beschrieben (kein Browsing-Kontext, nicht „fully active“), nicht als Tatsache (Entscheidung 5). Verteidigung in der Tiefe: kein fremder Knoten im lebenden Dokument, Walker liest keine URL-Attribute (Test 2 (j)). CSP gelesen: Die Web-Seite hat keine (netlify.toml, nginx.conf, index.html); Vorbedingungsfrage an den Orchestrator, keine Konfigurationsänderung. Pflichttest A2b (echter Browser, Wächter-Host, null Anfragen, Kontrollfall, Ruhezustand an beobachtbaren Ereignissen) und Akzeptanzkriterium 1a. Verbindlicher Rückfall: eine Anfrage → nur `text/plain`, keine andere Umgehung. Bedrohungsmodell T-G1-T-06 und Kopfzeile nachgezogen; Aufwand +0,05 AStd. Sicherheitsbefund, nicht in die Folgeliste. |
 
 ## Bericht (nach Bau ausfüllen)
 
