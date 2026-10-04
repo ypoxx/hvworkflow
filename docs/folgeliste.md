@@ -631,7 +631,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 045 Review nit N9 · `RefusalDialog.tsx:123` · die Radiogruppe in einem `fieldset` wird doppelt angesagt · Rolle oder Gruppierung nur einmal setzen.
 - 045 Review nit N10 · `RefusalDialog.tsx` · Absenden ist über der Längengrenze ohne Hinweis gesperrt (D6) · Hinweis mit Zählung zeigen.
 - 045 Review nit N11 · e2e-http E1 · prüft den Zustand „in Prüfung“ nicht direkt · Zustand ausdrücklich zusichern.
-- H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün), ein zweites Mal rot auf PR #149 (Lauf 37224478746); zwei Fälle, also kein Zufall mehr · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).
+- ~~H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün), ein zweites Mal rot auf PR #149 (Lauf 37224478746); zwei Fälle, also kein Zufall mehr · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).~~ → erledigt in **takt-044** (Schritt 2 wartet vor `quiet` auf A's `GET /v1/speakers` mit der erfassten Einzelfrage; dritter Fall: Lauf 37235698670 auf #153).
 
 ## Weiterleiten an einen anderen Fachbereich (aus 048)
 
