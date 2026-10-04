@@ -126,7 +126,7 @@ describe('Scheibe 055, Test 1: N1–N9, one case each with the exact stored form
   });
 
   it('ADR-0005-N3 c: White_Space becomes U+0020 (tab, LF, U+0085, U+00A0, U+2028, U+3000)', () => {
-    for (const ws of ['\t', '\n', '\u0085', ' ', ' ', '　']) {
+    for (const ws of ['\t', '\n', '\u0085', '\u00A0', '\u2028', '\u3000']) {
       expect(write({ blocks: [para({ text: `a${ws}b` })] }), JSON.stringify(ws)).toEqual(body(P({ text: 'a b' })));
     }
   });
@@ -138,7 +138,7 @@ describe('Scheibe 055, Test 1: N1–N9, one case each with the exact stored form
   });
 
   it('ADR-0005-N3 c: Cf removed (U+00AD, U+200B, U+200D, U+202E, U+2066, U+FEFF, U+E0041)', () => {
-    for (const cf of ['­', '​', '‍', '‮', '⁦', '﻿', '\u{E0041}']) {
+    for (const cf of ['\u00AD', '\u200B', '\u200D', '\u202E', '\u2066', '\uFEFF', '\u{E0041}']) {
       expect(write({ blocks: [para({ text: `a${cf}b` })] }), JSON.stringify(cf)).toEqual(body(P({ text: 'ab' })));
     }
   });
@@ -148,21 +148,21 @@ describe('Scheibe 055, Test 1: N1–N9, one case each with the exact stored form
     const e = writeError(input);
     expect(e.status).toBe(422);
     expect(e.message).not.toContain('a\uD800b');
-    expect(read(input)).toEqual(body(P({ text: 'a�b' })));
+    expect(read(input)).toEqual(body(P({ text: 'a\uFFFDb' })));
   });
 
   it('ADR-0005-N3 c: NFC exact; a combining mark at a run boundary stays split, P composes', () => {
-    expect(write({ blocks: [para({ text: 'ä' })] })).toEqual(body(P({ text: 'ä' })));
-    expect(write({ blocks: [para({ text: '가' })] })).toEqual(body(P({ text: '가' })));
-    const split = write({ blocks: [para({ text: 'e', marks: ['bold'] }, { text: '́x' })] });
-    expect(split).toEqual(body(P({ text: 'e', marks: ['bold'] }, { text: '́x' })));
+    expect(write({ blocks: [para({ text: 'a\u0308' })] })).toEqual(body(P({ text: 'ä' })));
+    expect(write({ blocks: [para({ text: '\u1100\u1161' })] })).toEqual(body(P({ text: '\uAC00' })));
+    const split = write({ blocks: [para({ text: 'e', marks: ['bold'] }, { text: '\u0301x' })] });
+    expect(split).toEqual(body(P({ text: 'e', marks: ['bold'] }, { text: '\u0301x' })));
     expect(answerPlainText(split)).toBe('éx');
   });
 
   it('ADR-0005-N3 c: a family emoji joined with ZWJ becomes three emoji (documented, Nit 6); variation selectors stay', () => {
-    expect(write({ blocks: [para({ text: '\u{1F468}‍\u{1F469}‍\u{1F467}' })] }))
+    expect(write({ blocks: [para({ text: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}' })] }))
       .toEqual(body(P({ text: '\u{1F468}\u{1F469}\u{1F467}' })));
-    expect(write({ blocks: [para({ text: '❤️' })] })).toEqual(body(P({ text: '❤️' })));
+    expect(write({ blocks: [para({ text: '❤\uFE0F' })] })).toEqual(body(P({ text: '❤\uFE0F' })));
   });
 
   it('ADR-0005-N4 d: white space across run boundaries, the space stays in the earlier run', () => {
@@ -183,7 +183,7 @@ describe('Scheibe 055, Test 1: N1–N9, one case each with the exact stored form
   });
 
   it('ADR-0005-N6 f: empty paragraphs, empty items and an empty list fall away', () => {
-    expect(write({ blocks: [para(), para({ text: ' ​ ' }), para({ text: 'Text' }),
+    expect(write({ blocks: [para(), para({ text: ' \u200B ' }), para({ text: 'Text' }),
       { type: 'list', items: [[], [{ text: '' }], [{ text: 'Punkt' }]] }, { type: 'list', items: [[{ text: '\t' }]] }] }))
       .toEqual(body(P({ text: 'Text' }), { type: 'list', items: [[{ text: 'Punkt' }]] }));
   });
@@ -223,11 +223,28 @@ describe('Scheibe 055, Test 1: N1–N9, one case each with the exact stored form
     expect(() => read({ language: 'de', blocks: Array.from({ length: 12000 }, () => ({ type: 'paragraph', content: [{ text: 'x' }] })) })).not.toThrow();
   });
 
+  it('ADR-0005-N9 i (review 055, finding 2): the read variant gives null above each structural limit of the stored form', () => {
+    const paragraphs = (n: number) => ({ language: 'de', blocks: Array.from({ length: n }, () => ({ type: 'paragraph', content: [{ text: 'x' }] })) });
+    expect(read(paragraphs(10000))).not.toBeNull();
+    expect(read(paragraphs(10001))).toBeNull();
+    expect(read(paragraphs(12000))).toBeNull();
+    const list = (n: number) => ({ language: 'de', blocks: [{ type: 'list', items: Array.from({ length: n }, () => [{ text: 'x' }]) }] });
+    expect(read(list(10000))).not.toBeNull();
+    expect(read(list(10001))).toBeNull();
+    // Alternating marks, so N5 does not merge the runs.
+    const runs = (n: number) => ({ language: 'de', blocks: [{ type: 'paragraph',
+      content: Array.from({ length: n }, (_, i) => (i % 2 === 0 ? { text: 'x', marks: ['bold'] } : { text: 'y' })) }] });
+    expect(read(runs(20000))).not.toBeNull();
+    expect(read(runs(20001))).toBeNull();
+    expect(read({ language: 'de', blocks: [para({ text: 'z'.repeat(20000) })] })).not.toBeNull();
+    expect(read({ language: 'de', blocks: [para({ text: 'z'.repeat(20001) })] })).toBeNull();
+  });
+
   it('ADR-0005-N10: nothing left after N1–N7 is 422 "Answer text is required."', () => {
-    const e = writeError({ blocks: [para({ text: ' ​\u0000 ' }), { type: 'list', items: [[]] }] });
+    const e = writeError({ blocks: [para({ text: ' \u200B\u0000 ' }), { type: 'list', items: [[]] }] });
     expect(e.status).toBe(422);
     expect(e.message).toBe('Answer text is required.');
-    expect(read({ language: 'de', blocks: [para({ text: '​' })] })).toBeNull();
+    expect(read({ language: 'de', blocks: [para({ text: '\u200B' })] })).toBeNull();
   });
 });
 
@@ -307,7 +324,7 @@ describe('Scheibe 055, Test 3: no open string in the output', () => {
 describe('Scheibe 055, Test 4: ADR-0005-P and ADR-0005-L', () => {
   it('P: paragraphs with \\n\\n, items with \\n, no bullet, result in NFC', () => {
     const doc = body(P({ text: 'Erster ' }, { text: 'Absatz', marks: ['bold'] }), { type: 'list', items: [[{ text: 'eins' }], [{ text: 'zwei' }]] },
-      P({ text: 'e' }, { text: '́', marks: ['italic'] }));
+      P({ text: 'e' }, { text: '\u0301', marks: ['italic'] }));
     expect(answerPlainText(doc)).toBe('Erster Absatz\n\neins\nzwei\n\né');
   });
 
@@ -316,7 +333,7 @@ describe('Scheibe 055, Test 4: ADR-0005-P and ADR-0005-L', () => {
   });
 
   it('L: only white space gives null; lines split at CR LF, CR and LF (Codex P2)', () => {
-    expect(answerBodyFromText(' \n\t\r\n ')).toBeNull();
+    expect(answerBodyFromText(' \n\t\r\n\u00A0')).toBeNull();
     expect(answerBodyFromText('a\r\nb\rc\nd')).toEqual(body(P({ text: 'a' }), P({ text: 'b' }), P({ text: 'c' }), P({ text: 'd' })));
   });
 
@@ -335,15 +352,43 @@ describe('Scheibe 055, Test 4: ADR-0005-P and ADR-0005-L', () => {
   });
 });
 
+describe('Scheibe 055, Test 4b: golden test of P on fixed stored bodies (review 055, finding 4, Recht)', () => {
+  // P is frozen for stored versions (ADR 0005): a change to P changes the plain text that search, diff and reading
+  // time see for every stored version and needs a versioned P. These bodies and their plain texts stand here literally.
+  const golden: [AnswerBody, string][] = [
+    [body(P({ text: 'Der Vorstand ' }, { text: 'bestätigt', marks: ['bold'] }, { text: ' die Zahl.' })), 'Der Vorstand bestätigt die Zahl.'],
+    [body(P({ text: 'Erstens:' }), { type: 'list', items: [[{ text: 'Umsatz ', marks: ['italic'] }, { text: '+3 %' }], [{ text: 'Marge', marks: ['highlight'] }]] },
+      P({ text: 'Schluss.' })), 'Erstens:\n\nUmsatz +3 %\nMarge\n\nSchluss.'],
+    // The run-boundary NFC case: e (bold) + U+0301 (plain) stays two runs, P composes to U+00E9.
+    [body(P({ text: 'Caf' }, { text: 'e', marks: ['bold'] }, { text: '\u0301 au lait' })), 'Caf\u00E9 au lait'],
+    [body({ type: 'list', items: [[{ text: 'a' }]] }, { type: 'list' as const, items: [[{ text: 'b' }]] }), 'a\n\nb'],
+  ];
+  it('each fixed body gives its literal plain text', () => {
+    for (const [doc, text] of golden) expect(answerPlainText(doc)).toBe(text);
+  });
+});
+
 describe('Scheibe 055, Test 4a: sanitizeAnswerText (decision 2a)', () => {
   it('removes U+202E, U+200B, U+0007; keeps \\n and tab; NFC; trim', () => {
-    expect(sanitizeAnswerText('  Um‮satz​\u0007\n\tstieg ä  ')).toBe('Umsatz\n\tstieg ä');
+    expect(sanitizeAnswerText('  Um\u202Esatz\u200B\u0007\n\tstieg a\u0308  ')).toBe('Umsatz\n\tstieg ä');
     expect(sanitizeAnswerText('a\r\nb\rc')).toBe('a\r\nb\rc');
   });
 
   it('a lone surrogate is an error; only U+200B gives an empty string', () => {
     expect(() => sanitizeAnswerText('a\uD800')).toThrow(AnswerFormatError);
-    expect(sanitizeAnswerText('​')).toBe('');
+    expect(sanitizeAnswerText('\u200B')).toBe('');
+  });
+
+  it('review 055, finding 3: VT, FF and NEL become line feeds, so words never merge; U+2028 and U+2029 stay', () => {
+    expect(sanitizeAnswerText('Umsatz\u0085stieg')).toBe('Umsatz\nstieg');
+    expect(sanitizeAnswerText('Umsatz\u0085stieg').split(/\s+/u)).toEqual(['Umsatz', 'stieg']);
+    expect(sanitizeAnswerText('a\u000Bb\u000Cc')).toBe('a\nb\nc');
+    expect(sanitizeAnswerText('a\u2028b\u2029c')).toBe('a\u2028b\u2029c');
+    // No white-space character is deleted without replacement in the text path.
+    const allWhiteSpace = Array.from({ length: 0x3001 }, (_, cp) => String.fromCodePoint(cp)).filter((c) => /\p{White_Space}/u.test(c));
+    for (const ws of allWhiteSpace) {
+      expect(sanitizeAnswerText(`a${ws}b`), `U+${ws.codePointAt(0)!.toString(16)}`).toHaveLength(3);
+    }
   });
 
   it('a text without such characters is returned as the same string', () => {

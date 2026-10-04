@@ -39,9 +39,10 @@ offen)".
 ### Changed
 
 - **`draftAnswer`** and **`proposeRefusal`** (Scheibe 055, ADR 0005 decision 2a): the service removes control and
-  format characters (Unicode `Cc` except tab, line feed, carriage return; every `Cf`) from `text` and applies NFC
-  before trimming; `proposeRefusal` does the same with `refusalJustification` before its checks (empty afterwards
-  counts as missing, `409` R-GUARD-09 on path B). A lone surrogate in any of these fields is now `422`. The length
+  format characters (Unicode `Cc` except tab, line feed, carriage return, where vertical tab, form feed and next
+  line become a line feed; every `Cf`) from `text` and from each entry of `sources` and applies NFC before trimming;
+  `proposeRefusal` does the same with `refusalJustification` before its checks (empty afterwards counts as missing,
+  `409` R-GUARD-09 on path B). A lone surrogate in any of these fields is now `422`. The length
   limits still apply to the raw value. A text without such characters and already in NFC is stored exactly as
   before.
 

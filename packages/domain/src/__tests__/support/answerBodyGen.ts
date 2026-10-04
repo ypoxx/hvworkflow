@@ -30,11 +30,11 @@ const BLOCK_TYPES = ['paragraph', 'paragraph', 'list', 'list', 'heading', 'quote
 const MARKS = ['bold', 'italic', 'highlight', 'bold', 'underline', 'strike', 'font-family:Arial', 'x'];
 const PIECES = [
   'Umsatz', 'stieg', 'um', '3 %', 'Größe', 'Ä', 'ß', 'Vorstand', '<script>alert(1)</script>', '<b onclick=x>',
-  ' ', '  ', '\t', '\n', '\r\n', '\u0085', ' ', ' ', ' ', '　', ' ',
+  ' ', '  ', '\t', '\n', '\r\n', '\u0085', '\u00A0', '\u2028', '\u2029', '\u3000', '\u2003',
   '\u0000', '\u001B', '\u007F', '\u009B', '\u0007',
-  '­', '​', '‌', '‍', '‎', '‪', '‮', '⁠', '⁦', '⁩', '﻿', '\u{E0041}',
-  'ä', 'ö', '́', '̈', 'e', 'ᄀ', 'ᅡ', 'ᆨ', '가',
-  '\u{1F600}', '\u{1F468}‍\u{1F469}‍\u{1F467}', '️', '',
+  '\u00AD', '\u200B', '\u200C', '\u200D', '\u200E', '\u202A', '\u202E', '\u2060', '\u2066', '\u2069', '\uFEFF', '\u{E0041}',
+  'a\u0308', 'o\u0308', '\u0301', '\u0308', 'e', '\u1100', '\u1161', '\u11A8', '\u1100\u1161',
+  '\u{1F600}', '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', '\uFE0F', '',
 ];
 const BROKEN = ['\uD800', '\uDC00', '\uDBFF'];
 

@@ -38,8 +38,9 @@ und `\p{Cf}` entfernen, Leerraum zusammenfassen, Läufe zusammenführen, NFC je 
 benachbarte Listen zusammenführen; idempotent. Klartextprojektion P: Läufe aneinander, Punkte mit
 `\n`, Blöcke mit `\n\n`, NFC über das Ganze. Herleitung L für Versionen ohne Dokument: eine nicht leere
 Zeile (getrennt an CR LF, CR, LF) je Absatz ohne Marke. Auch `text` neuer Versionen und die Begründung
-einer Verweigerung verlieren `\p{Cc}` (außer Tab, LF, CR) und `\p{Cf}` und kommen in NFC an; alte
-Ereignisse bleiben, wie sie sind (R7).
+einer Verweigerung verlieren `\p{Cc}` (außer Tab, LF, CR; VT, FF und NEL werden LF) und `\p{Cf}` und
+kommen in NFC an; alte Ereignisse bleiben, wie sie sind (R7). P ist für gespeicherte Versionen eingefroren
+(goldener Test): eine Änderung an P braucht ein versioniertes P, nie eine stille Neuberechnung.
 
 ## Konsequenzen
 

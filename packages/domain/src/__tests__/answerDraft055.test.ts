@@ -135,7 +135,7 @@ describe('Scheibe 055, K3: forbidden mark removed over the API (ADR 0005, demo p
 describe('Scheibe 055, K4: negative cases before 403/409, no event', () => {
   it('ADR-0005-N10: body without text after N6 is 422 "Answer text is required.", status unchanged', async () => {
     const q = await assigned();
-    const p = await rejected(() => draft(q, { text: 'x', body: { blocks: [{ type: 'paragraph', content: [{ text: ' ​ ' }] }] } } as AnswerDraft));
+    const p = await rejected(() => draft(q, { text: 'x', body: { blocks: [{ type: 'paragraph', content: [{ text: ' \u200B ' }] }] } } as AnswerDraft));
     expect(p.status).toBe(422);
     expect(p.detail).toBe('Answer text is required.');
     expect((await questionOf(q.id)).status).toBe('assigned');
@@ -235,32 +235,50 @@ describe('Scheibe 055, K7: old events readable, the projection never throws', ()
   it('e: the strictest case (unknown block type, mark as number, empty runs, Cf, lone surrogate); 12000 blocks fall back to L; blocks as an object fall back to L', async () => {
     const q = await assigned();
     const big = Array.from({ length: 12000 }, (_, i) => ({ type: 'paragraph', content: [{ text: `${i % 10}` }] }));
+    const bigList = Array.from({ length: 10001 }, (_, i) => [{ text: `${i % 10}` }]);
     store.append([
-      old(q, 1, { text: 'Zitat a�b', body: { language: 'de', blocks: [
-        { type: 'blockquote', content: [{ text: '' }, { text: 'Zi​tat', marks: [7, 'italic'] }, { text: ' a\uD800b' }] }] } }),
+      old(q, 1, { text: 'Zitat a\uFFFDb', body: { language: 'de', blocks: [
+        { type: 'blockquote', content: [{ text: '' }, { text: 'Zi\u200Btat', marks: [7, 'italic'] }, { text: ' a\uD800b' }] }] } }),
       old(q, 2, { text: 'Kurz.', body: { language: 'de', blocks: big } }),
       old(q, 3, { text: 'Objekt statt Liste.', body: { language: 'de', blocks: { 0: { type: 'paragraph' } } } }),
+      // Review 055, finding 2: stored text equal to P of the stored body, so only the structural limit rejects it
+      // (not the lossless check); L of that text exceeds the limit as well, so the version carries no body.
+      old(q, 4, { text: big.map((b) => b.content[0]!.text).join('\n\n'), body: { language: 'de', blocks: big } }),
+      old(q, 5, { text: bigList.map((item) => item[0]!.text).join('\n'), body: { language: 'de', blocks: [{ type: 'list', items: bigList }] } }),
     ]);
     for (const reader of [api, rebuilt()]) {
       const got = await reader.getQuestion(q.id);
-      expect(got.answers[0]!.body).toEqual(doc(P({ text: 'Zitat', marks: ['italic'] }, { text: ' a�b' })));
-      expect(got.answers[0]!.text).toBe('Zitat a�b');
+      expect(got.answers[0]!.body).toEqual(doc(P({ text: 'Zitat', marks: ['italic'] }, { text: ' a\uFFFDb' })));
+      expect(got.answers[0]!.text).toBe('Zitat a\uFFFDb');
       expect(got.answers[1]!.body).toEqual(doc(P({ text: 'Kurz.' })));
       expect(got.answers[2]!.body).toEqual(doc(P({ text: 'Objekt statt Liste.' })));
+      expect(got.answers[3]!.version).toBe(4);
+      expect(got.answers[3]!.body).toBeUndefined();
+      expect(got.answers[3]!.text).toHaveLength(12000 + 2 * 11999);
+      expect(got.answers[4]!.body).toBeUndefined();
     }
   });
 
-  it('no new version and no approval lost by reading a withdrawn mark', async () => {
-    const q = await draft(await assigned(), { text: 'Antwort.' });
+  it('review 055, finding 5: an approved version whose stored body carries a withdrawn mark keeps its approval; no new version; the mark is gone', async () => {
+    const q = await assigned();
+    store.append([old(q, 1, { text: 'Fett und unterstrichen', body: { language: 'de', blocks: [
+      { type: 'paragraph', content: [{ text: 'Fett', marks: ['bold'] }, { text: ' und unterstrichen', marks: ['underline'] }] }] } })]);
+    const drafted = await questionOf(q.id);
+    expect(drafted.status).toBe('answer_drafted');
     as(A.expert);
-    const submitted = await api.submitForReview(q.id, { ifMatch: etagOf(q.version) });
+    const submitted = await api.submitForReview(q.id, { ifMatch: etagOf(drafted.version) });
     as(A.approver);
-    await api.approveQuestion(q.id, 1, { ifMatch: etagOf(submitted.version) });
+    const approved = await api.approveQuestion(q.id, 1, { ifMatch: etagOf(submitted.version) });
+    expect(approved.approval?.answerVersion).toBe(1);
     const seq = store.lastSeq();
-    const got = await rebuilt().getQuestion(q.id);
-    expect(got.approval?.answerVersion).toBe(1);
-    expect(got.answers).toHaveLength(1);
-    expect(got.answers[0]!.body).toEqual(doc(P({ text: 'Antwort.' })));
+    for (const reader of [api, rebuilt()]) {
+      const got = await reader.getQuestion(q.id);
+      expect(got.status).toBe('approved');
+      expect(got.approval?.answerVersion).toBe(1);
+      expect(got.answers).toHaveLength(1);
+      expect(got.answers[0]!.body).toEqual(doc(P({ text: 'Fett', marks: ['bold'] }, { text: ' und unterstrichen' })));
+      expect(JSON.stringify(got.answers[0]!.body)).not.toContain('underline');
+    }
     expect(store.lastSeq()).toBe(seq);
   });
 
@@ -323,18 +341,31 @@ describe('Scheibe 055, K10: seed', () => {
 
 describe('Scheibe 055, K11: character filter in the plain text (M1, decision 2a)', () => {
   it('draftAnswer without body removes U+202E and U+200B; only U+200B is 422; a lone surrogate is 422', async () => {
-    const q = await draft(await assigned(), { text: 'Umsatz‮ stieg​ um 3 %' });
+    const q = await draft(await assigned(), { text: 'Umsatz\u202E stieg\u200B um 3 %' });
     expect(answerPayload(lastEvent(q.id, 'AnswerDrafted'))['text']).toBe('Umsatz stieg um 3 %');
-    const p = await rejected(() => draft(q, { text: '​' }));
+    const p = await rejected(() => draft(q, { text: '\u200B' }));
     expect(p.status).toBe(422);
     expect(p.detail).toBe('Answer text is required.');
     expect((await rejected(() => draft(q, { text: 'a\uD800' }))).status).toBe(422);
   });
 });
 
+describe('Scheibe 055, review finding 7: character filter on sources', () => {
+  it('draftAnswer and proposeRefusal store sources without control and format characters; a lone surrogate is 422', async () => {
+    const q = await draft(await assigned(), { text: 'Antwort.', sources: ['GB\u202E 2026\u200B', 'S.\u000B12'] });
+    expect(answerPayload(lastEvent(q.id, 'AnswerDrafted'))['sources']).toEqual(['GB 2026', 'S.\n12']);
+    expect((await rejected(() => draft(q, { text: 'Antwort.', sources: ['a\uD800'] }))).status).toBe(422);
+    const r = await assigned();
+    as(A.legal);
+    const refused = await api.proposeRefusal(r.id, { answerKind: 'refusal_no_claim', text: 'Keine Auskunft.', refusalJustification: 'Kein Bezug.',
+      sources: ['Satzung\u2066 \u00A7 5'] }, { ifMatch: etagOf(r.version) });
+    expect(answerPayload(lastEvent(refused.id, 'AnswerDrafted'))['sources']).toEqual(['Satzung \u00A7 5']);
+  });
+});
+
 describe('Scheibe 055, K12: character filter in proposeRefusal (wording and justification)', () => {
-  const base: RefusalProposal = { answerKind: 'refusal_with_ground', text: 'Umsatz‮ stieg​ um 3 %', refusalGroundId: 'aktg-131-3-nr1',
-    refusalJustification: 'Grund‮ mit​ Zeichen' };
+  const base: RefusalProposal = { answerKind: 'refusal_with_ground', text: 'Umsatz\u202E stieg\u200B um 3 %', refusalGroundId: 'aktg-131-3-nr1',
+    refusalJustification: 'Grund\u202E mit\u200B Zeichen' };
   const propose = async (input: RefusalProposal): Promise<Question> => {
     const q = await assigned();
     as(A.legal);
@@ -351,16 +382,16 @@ describe('Scheibe 055, K12: character filter in proposeRefusal (wording and just
   it('a justification of only U+200B is 409 R-GUARD-09; a lone surrogate is 422; no event', async () => {
     const q = await assigned();
     as(A.legal);
-    const blank = await rejected(() => api.proposeRefusal(q.id, { ...base, refusalJustification: '​' }, { ifMatch: etagOf(q.version) }));
+    const blank = await rejected(() => api.proposeRefusal(q.id, { ...base, refusalJustification: '\u200B' }, { ifMatch: etagOf(q.version) }));
     expect(blank.status).toBe(409);
     expect(blank.ruleId).toBe('R-GUARD-09');
     expect((await rejected(() => api.proposeRefusal(q.id, { ...base, refusalJustification: 'a\uD800' }, { ifMatch: etagOf(q.version) }))).status).toBe(422);
     expect((await rejected(() => api.proposeRefusal(q.id, { ...base, text: 'a\uDC00' }, { ifMatch: etagOf(q.version) }))).status).toBe(422);
-    expect((await rejected(() => api.proposeRefusal(q.id, { ...base, text: '​‮' }, { ifMatch: etagOf(q.version) }))).status).toBe(422);
+    expect((await rejected(() => api.proposeRefusal(q.id, { ...base, text: '\u200B\u202E' }, { ifMatch: etagOf(q.version) }))).status).toBe(422);
   });
 
   it('4000 raw code points with format characters pass (length before the filter)', async () => {
-    const got = await propose({ ...base, refusalJustification: `${'x'.repeat(3990)}${'​'.repeat(10)}` });
+    const got = await propose({ ...base, refusalJustification: `${'x'.repeat(3990)}${'\u200B'.repeat(10)}` });
     expect((lastEvent(got.id, 'AnswerDrafted').payload as { pii: { refusalJustification: string } }).pii.refusalJustification).toBe('x'.repeat(3990));
     expect(got.status).toBe('in_review');
   });
@@ -371,7 +402,7 @@ describe('Scheibe 055, K13: golden test of the derivation ADR-0005-L (Lesebefund
     ['Der Vorstand bestätigt die Zahl von 4,2 Mio. EUR.', doc(P({ text: 'Der Vorstand bestätigt die Zahl von 4,2 Mio. EUR.' }))],
     ['Erster Satz.  \n\nZweiter Absatz mit Leerzeichen am Ende.   \nDritte Zeile.\n',
       doc(P({ text: 'Erster Satz.' }), P({ text: 'Zweiter Absatz mit Leerzeichen am Ende.' }), P({ text: 'Dritte Zeile.' }))],
-    ['3 %\tWachstum im Segment B.', doc(P({ text: '3 % Wachstum im Segment B.' }))],
+    ['3\u00A0%\tWachstum im Segment\u00A0B.', doc(P({ text: '3 % Wachstum im Segment B.' }))],
   ];
   it('three fixed old events give a literal body; the wording without white space equals the stored text', async () => {
     const q = await assigned();

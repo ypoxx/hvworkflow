@@ -717,7 +717,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 
 ## Antwortformat (aus 055)
 
-- 055 Bau · `packages/domain/src/state.ts` (Fall `AnswerDrafted`) · `body` einer Version ist in jeder Sicht dasselbe Objekt wie in
+- **Voraussetzung 055b** · 055 Bau und Review · `packages/domain/src/state.ts` (Fall `AnswerDrafted`) · `body` einer Version ist in jeder Sicht dasselbe Objekt wie in
   der Projektion (wie schon `sources`); ein Aufrufer im Browser, der es verändert, veränderte die Projektion · beim Ausgeben in
   `viewQuestion` flach kopieren oder einfrieren, gemeinsam für `sources` und `body`.
 - 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil

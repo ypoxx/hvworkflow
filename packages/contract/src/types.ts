@@ -2014,7 +2014,7 @@ export interface components {
             /** @description The answer wording. Since 0.4.4 (slice 055) the service removes control and format characters (Unicode `Cc` except tab, line feed and carriage return, every `Cf`) and applies NFC before trimming; a lone surrogate is `422`. With `body` this field must still meet its form but is neither checked nor stored (see `body`). */
             text: string;
             sources?: string[];
-            /** @description Since 0.4.4 (slice 055, ADR 0005): the answer as an open block document. With `body` the service normalises it (`AnswerBodyInput`) and stores as `text` the plain-text projection of the normalised document; the submitted `text` stays required (0.4.x is additive), must meet its form and is then neither checked nor stored. Without `body` as before (with the character filter of `text`). A retry with the same `Idempotency-Key` returns the first result, also with a different `body` (R-IDEM-01). */
+            /** @description Since 0.4.4 (slice 055, ADR 0005): the answer as an open block document. With `body` the service normalises it (`AnswerBodyInput`) and stores as `text` the plain-text projection of the normalised document; the submitted `text` stays required (0.4.x is additive), must meet its form and is then neither checked nor stored. Without `body` as before (with the character filter of `text`). A retry with the same `Idempotency-Key` returns the first result for a valid `body`, also when it differs from the first (R-IDEM-01). */
             body?: components["schemas"]["AnswerBodyInput"];
         };
         /**

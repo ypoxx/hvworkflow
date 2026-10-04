@@ -1401,6 +1401,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       const submitted = raw['text'];
       let text: string;
       let body: ReturnType<typeof normalizeAnswerBodyForWrite> | undefined;
+      let sources: string[] | undefined;
       try {
         if (raw['body'] !== undefined) {
           // With `body` the document wins: `text` must meet its contract form but is neither checked nor stored.
@@ -1417,6 +1418,9 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           text = sanitizeAnswerText(submitted);
           if (!text) throw new AnswerFormatError('Answer text is required.');
         }
+        // Review 055, finding 7: the sources are shown next to the answer, so they get the same filter. The demo does
+        // not validate against the contract (034a); a non-string stays as it was, as before.
+        sources = input.sources?.map((source) => (typeof source === 'string' ? sanitizeAnswerText(source, 'sources') : source));
       } catch (e) {
         if (e instanceof AnswerFormatError) throw new ApiProblem(422, 'Unprocessable', e.message);
         throw e;
@@ -1430,7 +1434,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
             text,
             createdAt: now(),
             createdBy: { id: actor().id, role: actor().role },
-            ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
+            ...(sources !== undefined ? { sources } : {}),
             ...(body !== undefined ? { body } : {}),
           },
           ...(q.approval ? { invalidatedApprovalOfVersion: q.approval.answerVersion } : {}),
@@ -1544,15 +1548,18 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       // justification; an empty wording is a 422 as before, an empty justification reaches R-GUARD-09 (409).
       let wording: string;
       let justification: string | undefined;
+      let sources: string[] | undefined;
       try {
         wording = sanitizeAnswerText(input.text);
         justification = input.refusalJustification === undefined ? undefined : sanitizeAnswerText(input.refusalJustification, 'refusalJustification');
+        sources = input.sources?.map((source) => sanitizeAnswerText(source, 'sources'));
       } catch (e) {
         if (e instanceof AnswerFormatError) throw new ApiProblem(422, 'Unprocessable', e.message);
         throw e;
       }
       if (!wording) throw new ApiProblem(422, 'Unprocessable', 'text is required.');
-      const proposal: RefusalProposal = { ...input, text: wording, ...(justification !== undefined ? { refusalJustification: justification } : {}) };
+      const proposal: RefusalProposal = { ...input, text: wording, ...(justification !== undefined ? { refusalJustification: justification } : {}),
+        ...(sources !== undefined ? { sources } : {}) };
       return transition(id, 'question.refuse.propose', opts, proposal, (q, to) => {
         const ground = input.answerKind === 'refusal_with_ground'
           ? REFUSAL_GROUNDS.find((entry) => entry.id === input.refusalGroundId) : undefined;
@@ -1567,7 +1574,7 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
               text: wording,
               createdAt: now(),
               createdBy: { id: actor().id, role: actor().role },
-              ...(input.sources !== undefined ? { sources: [...input.sources] } : {}),
+              ...(sources !== undefined ? { sources } : {}),
               answerKind: input.answerKind,
               ...(ground !== undefined ? { refusalGroundId: ground.id, refusalGroundHash: ground.hash,
                 refusalGround: { title: ground.title, stageText: ground.stageText, legalRef: { ...ground.legalRef } } } : {}),

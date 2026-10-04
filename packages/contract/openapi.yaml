@@ -3390,7 +3390,8 @@ components:
             normalises it (`AnswerBodyInput`) and stores as `text` the plain-text projection of the normalised
             document; the submitted `text` stays required (0.4.x is additive), must meet its form and is then
             neither checked nor stored. Without `body` as before (with the character filter of `text`). A retry
-            with the same `Idempotency-Key` returns the first result, also with a different `body` (R-IDEM-01).
+            with the same `Idempotency-Key` returns the first result for a valid `body`, also when it differs
+            from the first (R-IDEM-01).
           allOf: [ { $ref: '#/components/schemas/AnswerBodyInput' } ]
     AnswerMark:
       type: string

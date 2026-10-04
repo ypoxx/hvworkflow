@@ -148,7 +148,7 @@ function normalizeRuns(raw: readonly unknown[], lenient: boolean): Run[] {
   const runs: Run[] = [];
   for (const item of raw) {
     if (!isObject(item) || typeof item['text'] !== 'string') continue;
-    const text = (lenient ? item['text'].replace(LONE_SURROGATE, '�') : item['text'])
+    const text = (lenient ? item['text'].replace(LONE_SURROGATE, '\uFFFD') : item['text'])
       .replace(WHITE_SPACE, ' ')
       .replace(CONTROL_OR_FORMAT, '');
     runs.push({ text, marks: canonicalMarks(item['marks']) });
@@ -273,15 +273,19 @@ export function projectAnswerBody(stored: unknown, text: unknown): AnswerBody | 
   return (typeof text === 'string' ? answerBodyFromText(text) : null) ?? undefined;
 }
 
+/** The control characters that are white space (VT, FF, NEL): line breaks, so removing them never merges two words. */
+const TEXT_CONTROL_BREAK = /(?=\p{Cc})(?![\t\n\r])\p{White_Space}/gu;
 const TEXT_CONTROL_OR_FORMAT = /\p{Cf}|(?![\t\n\r])\p{Cc}/gu;
 
 /**
- * Decision 2a: the character filter of plain text (`draftAnswer` without body, `proposeRefusal` for wording and
- * justification). Removes `\p{Cc}` except tab, LF and CR, and every `\p{Cf}`; NFC; trim. White space is not mapped,
- * the lines stay lines. A lone surrogate throws (422). A text without such characters and already in NFC comes back
- * as the same string apart from the trim.
+ * Decision 2a: the character filter of plain text (`draftAnswer` without body, `proposeRefusal` for wording,
+ * justification and sources, `draftAnswer` for sources). VT, FF and NEL become LF (review 055, finding 3: every
+ * `\p{Cc}` with `White_Space` is a separator and is replaced, not deleted); then `\p{Cc}` except tab, LF and CR and
+ * every `\p{Cf}` are removed; NFC; trim. U+2028 and U+2029 (`Zl`, `Zp`) and all other white space stay as they are,
+ * the lines stay lines; no white-space character is deleted without replacement. A lone surrogate throws (422). A text
+ * without such characters and already in NFC comes back as the same string apart from the trim.
  */
 export function sanitizeAnswerText(text: string, field = 'text'): string {
   if (!isWellFormed(text)) throw new AnswerFormatError(`${field} must be well-formed UTF-16 (no lone surrogate).`);
-  return text.replace(TEXT_CONTROL_OR_FORMAT, '').normalize('NFC').trim();
+  return text.replace(TEXT_CONTROL_BREAK, '\n').replace(TEXT_CONTROL_OR_FORMAT, '').normalize('NFC').trim();
 }
