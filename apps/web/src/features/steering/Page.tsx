@@ -43,7 +43,8 @@ const NO_SEATS: readonly StageSeat[] = [];
 /**
  * The seats of the meeting, for the distribution and the detail. Master data, readable by every signed-in actor
  * (masked, 040b); read again with every change of the log, keeping the last list on screen meanwhile (principle 8).
- * A failure is a state of the strip, never a toast.
+ * A failure is a state of the strip, never a toast, also after an earlier success: the seat strip must never pair
+ * fresh counts with stale master data (Codex P2 on #145).
  */
 function useStageSeats(meetingId: string | undefined): SeatRead {
   const version = useApiVersion();
@@ -57,7 +58,7 @@ function useStageSeats(meetingId: string | undefined): SeatRead {
         if (!cancelled) setRead({ status: 'ready', seats });
       })
       .catch(() => {
-        if (!cancelled) setRead((previous) => (previous.status === 'ready' ? previous : { status: 'failed', seats: NO_SEATS }));
+        if (!cancelled) setRead({ status: 'failed', seats: NO_SEATS });
       });
     return () => {
       cancelled = true;
