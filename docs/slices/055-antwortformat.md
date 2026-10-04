@@ -6,15 +6,18 @@ Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 
 Klartextprojektion, Lesbarkeit alter Versionen) auf dem Branch `claude/slice-055-antwortformat`; **Teil b** (Renderer und
 Editor in der Oberfläche) folgt als **055b** mit eigener Spec `docs/slices/055b-antwortformat-editor.md`, die der Orchestrator
 aus dem Abschnitt „055b — Entwurf“ unten schreibt. Auf Standard gebaut (E6 Whitelist; E21 nur `de`); keine Eigentümerfrage
-blockiert. Klasse hoch: Lesebefund der Spec vor dem Bau.
-**Risikoklasse:** hoch · 2,65 AStd (Spanne 2,3–3,2; Plan 055: mittel · 3 AStd für alle drei Teile; 055b dazu 3,6 AStd, Klasse
+blockiert. Klasse hoch: Lesebefund der Spec vor dem Bau auf `0a8d5c1` erledigt (Urteil „erst nachbessern“), eingearbeitet am
+04.10.2026, Abschnitt „Lesebefunde und Umsetzung“.
+**Risikoklasse:** hoch · 3,1 AStd (Spanne 2,7–3,6; Plan 055: mittel · 3 AStd für alle drei Teile; 055b dazu 3,6 AStd, Klasse
 mittel; Begründung in „Warum hoch“ und „Aufwand“) · Plan 055: 18.11.2026 (W8), tatsächlich direkt nach 054 als fünfte
-Oberflächenscheibe der Freigabe-Demo · Lanes: contract (erster Commit, Architekt); core; service (nur Tests); web-api (nur
+Oberflächenscheibe der Freigabe-Demo · Lanes: contract (erster Commit, Architekt); core; service (Tests und die Begrenzung der Validator-Meldung); web-api (nur
 Typzwang in `http.ts`); docs-sicherheit (eine Zeile); docs-adr (ein Absatz in ADR 0005, Architekt). **Keine** Änderung an
 `apps/web/src/features/**`, `apps/web/src/components/**` oder an e2e-Dateien.
 **Bedrohungsmodell:** berührt T-G1-T-06 (Skripteinschleusung über Antworttext; ab 055 formatierte Antworten mit „Einfügen
-aus Word“). Teil a schließt die Hälfte im Kern: Was ins Ereignisprotokoll kommt, ist nur noch die geschlossene Speicherform
-(zwei Blockarten, drei Marken, reiner Text in Textläufen, Steuer- und Bidi-Zeichen entfernt). Die andere Hälfte (Renderer
+aus Word“). Teil a schließt die Hälfte im Kern: **Neue** `AnswerDrafted`-Ereignisse tragen nur noch die geschlossene
+Speicherform (zwei Blockarten, drei Marken, reiner Text in Textläufen) und in `text` wie im Dokument keine Steuer- oder
+Formatzeichen (`\p{Cc}`, `\p{Cf}`, Entscheidung 2 und 2a). **Alte** Ereignisse bleiben, wie sie sind (R7); ihr hergeleitetes
+Dokument läuft beim Lesen durch die Whitelist, ihr `text` nicht. Die andere Hälfte (Renderer
 ohne `innerHTML`, Einfügen über einen inerten Parser) schließt 055b. Keine neue Operation, kein neues Recht, kein neuer
 Leserkreis.
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6) und den Absatz in ADR 0005; danach
@@ -79,7 +82,7 @@ stuft nie herab.
 - **Körpergrenze** des Dienstes 256 KiB (`apps/api/src/limits/config.ts:14`, 413).
 - **Kern.** `AnswerVersion` (`types.ts:277-292`) und `AnswerDraft` (`types.ts:411-414`) ohne Format. `draftAnswer`
   (`api.ts:1404`) trimmt `text`, schreibt `AnswerDrafted { answer: { version, text, createdAt, createdBy, sources? },
-  invalidatedApprovalOfVersion? }`. `proposeRefusal` (`api.ts:1514`) schreibt ebenfalls `AnswerDrafted`, mit Klartext.
+  invalidatedApprovalOfVersion? }`. `proposeRefusal` (`api.ts:1517`) schreibt ebenfalls `AnswerDrafted`, mit Klartext.
   `submitForReview` und `forwardQuestion` tragen **keinen Text** (nur `answerVersion` bzw. `unitId`/`reasonCode`).
 - **Projektion** (`state.ts:424-445`): `q.answers.push({ ...answer, ... })` aus der Nutzlast; jede neue Version löscht
   Freigabe, Rechtsfreigabe, Freigebende und Rückgabegrund (R-GUARD-04).
@@ -116,7 +119,7 @@ Die Planzeile bündelt Vertrag, Kern, Editor, Renderer und Nachweise. Zuschnitt:
 | Nachweise ADR 0005: „verbotene Marke wird entfernt“, Idempotenz | **ja** (Kern, Dienst) | — | — |
 | Nachweise ADR 0005: Screenshots Bühne und Historie mit Format | nein | **ja** | brauchen Renderer und Editor |
 
-**Teilungsentscheidung: zwei Scheiben.** Zusammen rund 6,25 AStd (Teil a 2,65, Teil b 3,6) statt 3 laut Plan, und die Planzeile
+**Teilungsentscheidung: zwei Scheiben.** Zusammen rund 6,7 AStd (Teil a 3,1, Teil b 3,6) statt 3 laut Plan, und die Planzeile
 mischt einen Hochrisiko-Kern (Vertrag, Ereignisform, Freigabebindung) mit einer Oberflächenscheibe. Getrennt bekommt der Kern
 seinen Lesebefund und ein Review mit Vertrags- und Freigabeblick, die Oberfläche ein Review mit UX- und Sicherheitsblick
 (Einfügen). Die Reihenfolge ist zwingend: 055b sendet `body` erst, wenn der Vertrag es kennt (R6).
@@ -156,64 +159,119 @@ entfernt“ gilt im Projekt `in-process` und über HTTP. Die offene Eingabe erre
 Verworfen: geschlossene Enums schon in der Eingabe. Dann müsste der Editor die Whitelist anwenden (Geschäftsregel in der
 Oberfläche, ADR 0001), und eine unbekannte Marke wäre über HTTP ein 422 statt Klartext — gegen ADR 0005.
 
-### 2. Normalisierung (rein, ohne Uhr, ohne I/O; `normalizeAnswerBody(input): AnswerBody | null`)
+### 2. Normalisierung: Schreibvariante und Lesevariante (rein, ohne Uhr, ohne I/O)
 
-Reihenfolge fest, jede Regel mit Testfall (Test 1):
+Zwei Funktionen mit denselben Regeln, aber verschiedenem Vertrag (Lesebefund M2):
+
+- **Schreibvariante** `normalizeAnswerBodyForWrite(input): AnswerBody` — für `draftAnswer`. Gestaltprüfung
+  (`checkAnswerBodyInput`), dann N1–N10; darf **422** werfen (Gestalt, einsames Ersatzzeichen, N8, N9, kein Text übrig).
+- **Lesevariante** `normalizeAnswerBodyForRead(stored: unknown): AnswerBody | null` — für die Projektion. Nur N1–N7 (ohne
+  Gestaltprüfung im Sinne von 422, ohne N8 und N9), **wirft nie**: Unbrauchbares (kein Objekt, `blocks` kein Array, Block ohne
+  Text) fällt weg; ein einsames Ersatzzeichen wird U+FFFD; `language` wird immer `de` (der einzige Wert der Speicherform; ein
+  gespeichertes anderes kann es aus der Schreibvariante nicht geben). Bleibt nichts, liefert sie `null`, und die Projektion
+  nimmt L.
+
+**Reihenfolge innerhalb eines Absatzes bzw. Listenpunkts (fest, Lesebefund M3):** N1 und N2 wählen Blöcke und Marken; dann
+(1) Zeichen abbilden und entfernen (N3), (2) Leerraum (N4), (3) Läufe (N5), (4) **NFC je fertigem Lauf**, (5) erneute
+Leerprüfung (ein Lauf, der jetzt leer ist, fällt weg; danach N5 noch einmal), (6) leere Blöcke (N6), (7) Listen zusammenführen
+(N7). N8–N10 nur in der Schreibvariante bzw. als Eigenschaft.
 
 - **N1 Blockarten.** Jeder Eingabeblock liefert Stücke: `content` (falls da) als ein Stück, jedes Element von `items` (falls
   da) als ein Stück. Ist `type` `list`, werden alle Stücke Listenpunkte einer Liste; **jede andere Blockart** (auch `heading`,
   `quote`, `table`, `paragraph` mit `items`) wird zu je einem Absatz je Stück. Nichts geht verloren, nichts wird erfunden.
 - **N2 Marken.** Nur `bold`, `italic`, `highlight` bleiben; jede andere Marke fällt weg, ihr Text bleibt. Doppelte Marken
   einmal; Reihenfolge kanonisch `bold`, `italic`, `highlight`.
-- **N3 Zeichen.** Unicode NFC. Entfernt: C0- und C1-Steuerzeichen außer Tab, Zeilenumbruch, Wagenrücklauf; Null-Breiten-Zeichen
-  U+200B–U+200D, U+2060, U+FEFF; weiches Trennzeichen U+00AD; Bidi-Steuerzeichen U+202A–U+202E und U+2066–U+2069 (Trojan
-  Source). Tab, Zeilenumbruch, Wagenrücklauf und geschütztes Leerzeichen U+00A0 werden Leerzeichen.
-- **N4 Leerraum.** Innerhalb eines Absatzes bzw. Listenpunkts wird jede Folge von Leerzeichen **über Laufgrenzen hinweg** zu
-  einem Leerzeichen; Leerraum am Anfang und Ende des Absatzes bzw. Punkts fällt weg (auch wenn er in einem eigenen Lauf steht).
+- **N3 Zeichen, nach Unicode-Kategorien (Lesebefund M4).** In dieser Reihenfolge: jedes Zeichen mit `\p{White_Space}` (auch
+  Tab, Zeilenumbruch, Wagenrücklauf, U+0085, U+00A0, U+2028, U+2029, U+3000) wird U+0020; danach wird jedes verbleibende
+  `\p{Cc}` entfernt und **jedes** `\p{Cf}` entfernt (darunter U+00AD, U+200B–U+200F, U+202A–U+202E, U+2060–U+2064,
+  U+2066–U+2069, U+FEFF, die Tag-Zeichen U+E0001–U+E007F). Ein einsames Ersatzzeichen (`\p{Cs}`, nicht wohlgeformtes UTF-16)
+  ist in der Schreibvariante ein **422** wie in 040b (`isWellFormed`, `packages/domain/src/masterData.ts:20`), in der
+  Lesevariante U+FFFD. **Bewusste Folge:** Mit U+200D (ZWJ) fällt auch die Verbindung zusammengesetzter Emoji weg
+  („Familie“ wird drei Einzel-Emoji); Variantenselektoren (`\p{Mn}`) bleiben. In Antworten des Vorstands ist das hinnehmbar;
+  die Alternative (ZWJ nur zwischen Emoji erlauben) kostet rund 0,2 AStd.
+- **N4 Leerraum.** Innerhalb eines Absatzes bzw. Punkts wird jede Folge von Leerzeichen **über Laufgrenzen hinweg** zu einem
+  Leerzeichen. **Grenzregel (Lesebefund Minor 8):** Das verbleibende Leerzeichen gehört zu dem Lauf, in dem die Folge
+  **beginnt** (dem früheren); in späteren Läufen fällt es weg. Ein Lauf, der danach nur aus Leerzeichen besteht, **verliert
+  seine Marken** (eine Marke auf Leerraum ist unsichtbar und würde die Idempotenz stören). Leerraum am Anfang und Ende des
+  Absatzes bzw. Punkts fällt weg, auch wenn er in einem eigenen Lauf steht.
 - **N5 Läufe.** Leere Läufe fallen weg; benachbarte Läufe mit gleicher Markenmenge werden zusammengeführt.
+- **NFC** je fertigem Lauf (Schritt 4). Läufe werden über NFC nicht zusammengezogen: Ein kombinierendes Zeichen am Anfang eines
+  Laufs mit anderen Marken als der Basisbuchstabe davor bleibt zerlegt. Das ist stabil (eine zweite Normalisierung ändert
+  nichts) und kommt nur bei Auszeichnung mitten in einem Buchstaben vor.
 - **N6 Leere Blöcke.** Ein Absatz ohne Text fällt weg; ein leerer Listenpunkt fällt weg; eine Liste ohne Punkte fällt weg.
   Damit sind Folgen leerer Absätze („leere Blöcke zusammenführen“) aufgelöst.
 - **N7 Listen zusammenführen.** Unmittelbar benachbarte Listen werden eine Liste.
-- **N8 Sprache.** Fehlt `language`, gilt `de`. Ein anderer Wert ist ein 422 (Entscheidung 4), kein stiller Wechsel.
-- **N9 Grenzen der Speicherform** (nach N1–N8): höchstens 500 Blöcke, 200 Punkte je Liste, 500 Läufe je Absatz bzw. Punkt; die
-  Klartextprojektion (P) höchstens 20 000 Code-Punkte, wie `AnswerDraft.text`. Überschreitung → 422.
-- **N10 Idempotenz.** `normalize(normalize(x))` ist tief gleich `normalize(x)` für jede gültige Eingabe; die Speicherform ist
-  ein Fixpunkt. Bleibt nach N1–N7 kein Block, liefert die Funktion `null` (→ 422 „Answer text is required.“).
+- **N8 Sprache (nur Schreiben).** Fehlt `language`, gilt `de`. Ein anderer Wert ist ein 422 (Entscheidung 8), kein stiller Wechsel.
+- **N9 Grenze (nur Schreiben).** Die Klartextprojektion (P) hat höchstens 20 000 Code-Punkte, wie `AnswerDraft.text`; sonst 422.
+  **Strukturgrenzen der Speicherform folgen daraus und können nie allein greifen** (Lesebefund M2): jeder Absatz, Punkt und
+  Lauf trägt mindestens ein Zeichen, Blöcke sind durch mindestens ein Trennzeichen getrennt. Daher im Vertrag: höchstens
+  **10 000 Blöcke**, **10 000 Punkte je Liste**, **20 000 Läufe** je Absatz bzw. Punkt. Gewählt statt „L führt Zeilen zusammen“,
+  weil so **jeder gültige Text** (≤ 20 000 Code-Punkte, also ≤ 10 000 nicht leere Zeilen) über L ein gültiges Dokument ergibt
+  und die Zeilenstruktur alter, schon freigegebener Antworten erhalten bleibt (Recht: die Darstellung soll dem freigegebenen
+  Wortlaut so nah wie möglich bleiben).
+- **N10 Idempotenz.** `normalize(normalize(x))` ist tief gleich `normalize(x)` für jede gültige Eingabe, in beiden Varianten;
+  die Speicherform ist ein Fixpunkt beider. Bleibt nach N1–N7 kein Block, wirft die Schreibvariante 422 „Answer text is
+  required.“
 
-Dazu eine reine Gestaltprüfung `checkAnswerBodyInput(input): string | undefined` im Gleichlauf mit dem Vertragsschema (Typen,
+Dazu die Gestaltprüfung `checkAnswerBodyInput(input): string | undefined` im Gleichlauf mit dem Vertragsschema (Typen,
 Pflichtfelder, Größen der Eingabeform), damit die Demo dieselben 422 liefert wie der Validator (Muster `checkRefusalProposal`,
-044a). Keine Meldung wiederholt eingegebenen Text.
+044a). Keine Meldung wiederholt eingegebenen Text. `codePointLength` zieht aus `api.ts` nach `answerFormat.ts` um; `api.ts`
+exportiert es unverändert weiter (Lesebefund Minor 4).
+
+**Invariante zu Schlüsselnamen (Nit 5):** Das Blockdokument benutzt nur die Schlüssel `language`, `blocks`, `type`,
+`content`, `items`, `text`, `marks`. Keiner davon darf je einer der Schlüssel sein, die `maskValue` rekursiv entfernt
+(`MASKED_KEYS` in `stream.ts:182`: Anzeigename, Organisation, `pii`, `personId`, Begründung); sonst verschwände ein Teil des
+Dokuments still aus `EventRead`. Test 3 prüft das gegen die Konstante.
+
+### 2a. Zeichenfilter auch für `text` (Lesebefund M1, Security)
+
+Neue Ereignisse tragen auch im Klartext keine Steuer- oder Formatzeichen mehr, nicht nur im Dokument. `sanitizeAnswerText`
+(in `answerFormat.ts`) wendet auf `text` **ohne** `body` in `draftAnswer` und auf `text` in `proposeRefusal` an: einsames
+Ersatzzeichen → 422; `\p{Cc}` außer Tab, Zeilenumbruch, Wagenrücklauf entfernen; jedes `\p{Cf}` entfernen; NFC; danach `trim`
+wie bisher. Leerraum wird **nicht** auf U+0020 abgebildet (die Zeilen eines Klartexts bleiben Zeilen). Bleibt nichts, 422
+„Answer text is required.“ Für einen Text ohne solche Zeichen (der Normalfall, der ganze Seed) ist das Ereignis Byte für Byte
+wie vor 055. Alte Ereignisse werden nicht umgeschrieben und ihr `text` beim Lesen nicht gefiltert (R7, Bindung der Freigabe);
+nur das daraus hergeleitete `body` läuft durch die Lesevariante. Die Begründung einer Verweigerung (`pii`) bleibt in 055
+ungefiltert (Hinweise an den Orchestrator).
 
 ### 3. Klartextprojektion P und Herleitung alter Versionen L
 
 - **P** `answerPlainText(body)`: Läufe eines Absatzes bzw. Punkts aneinander; Punkte einer Liste mit `\n` getrennt; Blöcke mit
-  `\n\n` getrennt. Kein Aufzählungszeichen im Klartext (die Vorlesezeit in 054 zählt Wörter; ein Zeichen wäre ein Wort).
-- **L** `answerBodyFromText(text)`: Zeilen (`\r?\n`) getrimmt, leere verworfen, jede übrige Zeile ein Absatz mit einem
-  Lauf ohne Marke, `language: de`, danach durch `normalizeAnswerBody` (so gelten N3–N6 auch hier). Ein Text aus Leerraum liefert
-  ein leeres Dokument nicht: `null` und die Projektion lässt `body` weg (kommt nur bei Altdaten mit kaputtem Text vor; der Kern
-  nimmt keinen leeren Text an).
+  `\n\n` getrennt; **auf das Ganze NFC** (Lesebefund M3: an einer Laufgrenze kann ein zerlegtes Zeichen stehen, das erst im
+  verbundenen Text zusammengesetzt wird; der Klartext dient Suche und Diff und soll durchgehend NFC sein). Kein
+  Aufzählungszeichen im Klartext (die Vorlesezeit in 054 zählt Wörter; ein Zeichen wäre ein Wort).
+- **L** `answerBodyFromText(text)`: Zeilen (`\r?\n`), jede nicht leere Zeile ein Absatz mit einem Lauf ohne Marke,
+  `language: de`, danach durch die **Lesevariante** (N3–N7). Wirft nie; ein Text nur aus Leerraum liefert `null`, und die
+  Projektion lässt `body` weg (kommt nur bei kaputten Altdaten vor; der Kern nimmt keinen leeren Text an). Wegen N9 ergibt
+  jeder gültige Text ein gültiges Dokument.
 - Handgetippte Zeichen wie „- “ am Zeilenanfang werden **nicht** als Liste gedeutet (keine Heuristik im Kern).
 
 ### 4. `draftAnswer` mit `body` (`api.ts`, R-TRANS-03)
 
-- **Ohne `body`:** unverändert, Byte für Byte (`text.trim()`, kein `body` im Ereignis). Bestehende Clients, Tests, Seed und
-  Lastkorpus bleiben gleich.
-- **Mit `body`:** Gestaltprüfung (422), `normalizeAnswerBody` (422 bei `null` oder N8/N9), dann `text = answerPlainText(body)`.
-  Das Ereignis trägt `answer.text` **und** `answer.body` (Speicherform). Der mitgesendete `text` bleibt im Vertrag Pflicht
-  (0.4.x ist additiv, ADR 0015; 043a Regel 1) und muss nicht leer sein, **wird aber nicht gespeichert**: Mit `body` gewinnt
-  das Blockdokument, die Beschreibung des Vertrags sagt das (Eigentümerfrage 3).
+- **Ohne `body`:** wie bisher, nur mit dem Zeichenfilter aus 2a; kein `body` im Ereignis. Für Text ohne N3-Zeichen Byte für
+  Byte wie vor 055; bestehende Clients, Tests, Seed und Lastkorpus bleiben gleich.
+- **Mit `body`:** Schreibvariante (422 bei Gestalt, Ersatzzeichen, N8, N9, nichts übrig), dann `text = answerPlainText(body)`.
+  Das Ereignis trägt `answer.text` **und** `answer.body` (Speicherform). **Der mitgesendete `text`** bleibt im Vertrag Pflicht
+  (0.4.x ist additiv, ADR 0015; 043a Regel 1) und muss die Vertragsform erfüllen (mindestens ein Zeichen, höchstens 20 000);
+  **sein Inhalt wird mit `body` weder geprüft noch gespeichert**, auch ein `text: " "` ist dann zulässig (Lesebefund Minor 1).
+  Mit `body` gewinnt das Blockdokument; die Beschreibung des Vertrags sagt das (Eigentümerfrage 3). 055b sendet als `text`
+  `answerPlainText(normalize(input))`, damit ein Leser des Rumpfs ohne `body` denselben Text sieht.
 - Die Reihenfolge der Prüfungen folgt dem Muster 048/044a: Gestalt und Normalisierung **vor** `transition(...)`, damit ein
   422 vor 403/404/409 kommt wie beim Validator, und kein Ereignis entsteht.
+- **Idempotenz (Nit 3):** Eine Wiederholung mit demselben Idempotenzschlüssel und anderem `body` liefert das erste Ergebnis
+  (R-IDEM-01, unverändert); der Vertrag sagt das in einem Satz an `AnswerDraft.body`.
 
 ### 5. Projektion: alte Ereignisse lesbar, Whitelist auch beim Lesen (`state.ts`)
 
 Im Fall `AnswerDrafted` bekommt jede Version `body`:
-`normalizeAnswerBody(payload.answer.body) ?? answerBodyFromText(payload.answer.text)` — gespeicherte Bodies laufen beim
-Lesen noch einmal durch die Whitelist. Für heutige Ereignisse ist das wegen N10 keine Änderung. Wird später eine Marke aus
-`ANSWER_MARKS` gestrichen, verschwindet sie beim Lesen, **ohne** dass eine neue Version entsteht (ADR 0005 „Risiko“: keine
-Freigabe darf dadurch zurückgesetzt werden). `text` wird nie neu berechnet: Was gespeichert ist, bleibt der Klartext der
-Version (Suche, Diff, Vorlesezeit bleiben stabil). Verweigerungen (`proposeRefusal`) und alle Versionen von vor 055 bekommen
-ihr `body` aus L.
+`normalizeAnswerBodyForRead(payload.answer.body) ?? answerBodyFromText(payload.answer.text)` — gespeicherte Bodies laufen
+beim Lesen noch einmal durch die Whitelist; die Projektion **wirft nie** (sonst wäre ein Jahrgang wegen eines Ereignisses
+unlesbar). Für heutige Ereignisse ist das wegen N10 keine Änderung. Wird später eine Marke aus `ANSWER_MARKS` gestrichen,
+verschwindet sie beim Lesen, **ohne** dass eine neue Version entsteht (ADR 0005 „Risiko“: keine Freigabe darf dadurch
+zurückgesetzt werden). `text` wird nie neu berechnet: Was gespeichert ist, bleibt der Klartext der Version (Suche, Diff,
+Vorlesezeit bleiben stabil). Verweigerungen (`proposeRefusal`) und alle Versionen von vor 055 bekommen ihr `body` aus L.
+Kosten: L läuft beim Aufbau der Projektion für jede alte Version; Vor-dem-Bau-Punkt 7 misst das am Lastkorpus, bei
+Überschreitung wird `body` je Ereignis-id gemerkt (Memo in der Projektion, kein Ereignis).
 
 ### 6. „Beim Weiterleiten“ (#31, Planzeile)
 
@@ -227,7 +285,9 @@ K6). Ungespeicherter Text wird nie weitergeleitet; 054 blendet die Übergaben da
 
 Der Kern vergleicht nicht mit der Vorversion; jeder erfolgreiche `draftAnswer` ist eine neue Version und hebt eine Freigabe auf
 (`invalidatedApprovalOfVersion`, unverändert). Das gilt auch, wenn sich nur eine Marke ändert und `text` gleich bleibt. Die
-Freigabe deckt damit genau das, was das Podium sieht (Hervorhebung auf der Bühne ist Lesehilfe beim Vorlesen). Ob eine
+Freigabe deckt die **gespeicherte Version** (Klartext und, falls vorhanden, Dokument im Ereignis); was Bühne und Historie
+zeigen, leitet sich daraus deterministisch ab (L für alte Versionen, Whitelist beim Lesen) und ändert den Wortlaut nie, nur
+seine Gliederung in Absätze und die Auszeichnung (Lesebefund Minor 9). K13 hält diese Herleitung für feste alte Ereignisse fest. Ob eine
 Version „wirklich“ geändert ist, entscheidet die Oberfläche vor dem Senden (055b: Vergleich auf der Eingabeform, nicht auf dem
 Klartext). Option: Formatänderung ohne Freigabeverlust (Eigentümerfrage 2; braucht eine Regel „gleicher Klartext“ im Guard,
 Klasse hoch, rund 0,5 AStd, nur mit Rechtsblick).
@@ -246,15 +306,23 @@ Keine Routenänderung (Befund). Der Validator prüft `AnswerDraft.body` gegen `A
 `StageView`, `QuestionUpdated`) tragen `AnswerVersion.body` aus der Projektion. `EventRead` bindet `payload.answer.body` an die
 geschlossene Speicherform (Vertragsschritt). Persistenz: `payload` ist JSON; keine Migration, keine Spalte. Ereignisse mit
 `body` sind größer (Text doppelt, plus Struktur; bei 20 000 Zeichen grob 2–3 ×); die 256-KiB-Grenze bleibt die Schranke der
-Anfrage.
+Anfrage. Die Problem-Meldung des Validators wird begrenzt (höchstens 20 Einzelfehler und die Restzahl), damit ein Rumpf mit
+Tausenden fehlerhaften Läufen keine Antwort in Rumpfgröße erzeugt (Lesebefund Minor 6, Security/DoS): `describeErrors` in
+`contractSchema.ts`, sonst nichts dort.
 
 ### 10. Datenschutz und Sicherheit
 
 - `body` ist derselbe Inhalt wie `text`, keine neue Datenklasse, kein `pii`-Teil (ADR 0009 wie bisher für `text`); Maskierung,
   Zugriffslog, Aufbewahrung unverändert. Kein Datenschutz erweiternder Standard.
-- Ins Protokoll kommt nur die geschlossene Speicherform (N1, N2, N3); offene Zeichenketten der Eingabe nie (Test 3).
-- Bidi- und Null-Breiten-Zeichen fallen weg (N3): Sie könnten auf Bühne und in der Freigabe einen anderen Text zeigen als den,
-  der gesucht und verglichen wird.
+- In neue Ereignisse kommt nur die geschlossene Speicherform (N1, N2, N3); offene Zeichenketten der Eingabe nie (Test 3).
+- Bidi-, Null-Breiten- und alle anderen `\p{Cf}`-Zeichen fallen in Dokument **und** `text` neuer Versionen weg (N3, 2a): Sie
+  könnten auf Bühne und in der Freigabe einen anderen Text zeigen als den, der gesucht und verglichen wird. Einsame
+  Ersatzzeichen sind ein 422.
+- 055b rendert ausschließlich `Question.answers[n].body` (Projektion, Lesevariante), **nie** `payload.answer.body` aus einem
+  Ereignis oder Strom (Lesebefund Minor 2, Security): Nur die Projektion garantiert die Whitelist auch für alte Ereignisse.
+- Keine Auslieferung von 055 in eine geteilte Umgebung (Probe, Pilot) vor 055b (Lesebefund Minor 10, Recht): Ohne Renderer
+  zeigt die Oberfläche formatierte Versionen nur als Klartext, und eine Freigabe in der Beantwortung sähe nicht, was die Bühne
+  später zeigt. Der Bericht nennt das in einer Zeile. Ausgerollt wird ohnehin nur aus der Pipeline nach Go des Eigentümers.
 - Kein HTML in Vertrag oder Kern; der Kern sieht nie Markup. Einfügen und Darstellung sind 055b.
 
 ## Vertragsschritt (Architekt, erster Commit, vor jedem Code; AGENTS.md R6)
@@ -263,34 +331,47 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
 `Event.type`, kein neues Pflichtfeld in einer Anfrage.
 
 - **Version:** nächste freie Patch-Stufe beim Merge (heute 0.4.4). `info.version`, `packages/contract/package.json`, Abschnitt
-  `## [0.4.4]` in `CHANGELOG.md` mit `### Added` und dem Vermerk „auf Standard gebaut (E6, E21 offen)“.
+  `## [0.4.4]` in `CHANGELOG.md` mit `### Added`, einem `### Changed` für die Verengung (Nit 1: `draftAnswer` und
+  `proposeRefusal` entfernen Steuer- und Formatzeichen aus `text`; ein einsames Ersatzzeichen ist 422) und dem Vermerk „auf
+  Standard gebaut (E6, E21 offen)“. Die Beschreibungen von `AnswerDraft.text` und `RefusalProposal.text` sagen das in einem Satz.
 - **`AnswerMark`:** `type: string`, `enum: [bold, italic, highlight]`, Beschreibung: Hausformat nach ADR 0005, keine Schriftwahl
   (E6); eine neue Marke ist additiv, eine gestrichene bleibt als Wert beschrieben stehen und wird beim Lesen entfernt.
 - **`AnswerInline`:** geschlossen, `required: [text]`, `text` 1..20000, `marks` Array von `AnswerMark`, `uniqueItems`, ≤ 3.
-- **`AnswerParagraph`:** geschlossen, `required: [type, content]`, `type: { const: paragraph }`, `content` 1..500 × `AnswerInline`.
-- **`AnswerList`:** geschlossen, `required: [type, items]`, `type: { const: list }`, `items` 1..200, jedes 1..500 × `AnswerInline`.
+- **`AnswerParagraph`:** geschlossen, `required: [type, content]`, `type: { const: paragraph }`, `content` 1..20000 × `AnswerInline`.
+- **`AnswerList`:** geschlossen, `required: [type, items]`, `type: { const: list }`, `items` 1..10000, jedes 1..20000 × `AnswerInline`.
 - **`AnswerBlock`:** `oneOf` aus beiden (die `const` trennt sie).
-- **`AnswerBody`:** geschlossen, `required: [language, blocks]`, `language: { enum: [de] }` (E21), `blocks` 1..500 × `AnswerBlock`.
-  Beschreibung: die normalisierte Speicherform; `text` der Version ist ihre Klartextprojektion (Regel P in Prosa).
+- **`AnswerBody`:** geschlossen, `required: [language, blocks]`, `language: { enum: [de] }` (E21), `blocks` 1..10000 × `AnswerBlock`.
+  Beschreibung: die normalisierte Speicherform; `text` der Version ist ihre Klartextprojektion (Regel P in Prosa). Die
+  Strukturgrenzen folgen aus der Textgrenze 20 000 (N9) und greifen nie allein; so hat jede gültige Version ein gültiges Dokument.
 - **`AnswerInlineInput`:** geschlossen, `required: [text]`, `text` 0..20000, `marks` Array von Strings 1..32, ≤ 16.
 - **`AnswerBlockInput`:** geschlossen, `required: [type]`, `type` String 1..32, `content` ≤ 2000 × `AnswerInlineInput`,
   `items` ≤ 1000 × (≤ 2000 × `AnswerInlineInput`).
 - **`AnswerBodyInput`:** geschlossen, `required: [blocks]`, `language: { enum: [de] }` optional, `blocks` 1..2000 ×
   `AnswerBlockInput`. Beschreibung: offene Eingabe; der Kern wendet die Whitelist an (N1–N10, ADR 0005), unbekannte Blockarten
-  werden Absätze, unbekannte Marken entfallen, ihr Text bleibt; 422, wenn danach kein Text bleibt oder eine Grenze der
-  Speicherform überschritten ist.
+  werden Absätze, unbekannte Marken entfallen, ihr Text bleibt; Steuer- und Formatzeichen fallen weg; 422, wenn danach kein Text
+  bleibt, der Klartext 20 000 Code-Punkte übersteigt oder ein einsames Ersatzzeichen vorkommt.
 - **`AnswerDraft.body`:** optional, `$ref: AnswerBodyInput`. Beschreibung: mit `body` speichert der Dienst als `text` die
-  Klartextprojektion des normalisierten Dokuments; der mitgesendete `text` bleibt Pflicht (0.4.x additiv) und wird dann nicht
-  gespeichert. Ohne `body` unverändert.
+  Klartextprojektion des normalisierten Dokuments; der mitgesendete `text` bleibt Pflicht (0.4.x additiv), muss seine
+  Vertragsform erfüllen und wird dann weder geprüft noch gespeichert. Ohne `body` wie bisher (mit dem Zeichenfilter). Eine
+  Wiederholung mit demselben Idempotenzschlüssel liefert das erste Ergebnis, auch bei anderem `body` (R-IDEM-01).
 - **`AnswerVersion.body`:** optional, `$ref: AnswerBody`. Beschreibung: ab 0.4.4 an jeder Version; für Versionen ohne
-  gespeichertes Dokument (vor 0.4.4, Verweigerungen) aus `text` hergeleitet, eine Zeile je Absatz, ohne Marken; nie maskiert,
+  gespeichertes Dokument (vor 0.4.4, Verweigerungen) aus `text` hergeleitet, eine nicht leere Zeile je Absatz, ohne Marken; nie maskiert,
   nie Personendaten im Sinne von `PiiEnvelope` (derselbe Inhalt wie `text`).
-- **`EventRead.payload.answer.properties.body`:** `$ref: AnswerBody` — der Lesepfad ist geschlossen.
-- **ADR 0005:** ein Absatz „Eingabe- und Speicherform“ (Entscheidung 1) unter „Entscheidung“, Status bleibt „vorgeschlagen“
-  (Annahme an Prüfpunkt 5).
+- **`EventRead.payload.answer.properties.body`:** `$ref: AnswerBody` — der Lesepfad ist geschlossen. Dazu ein Halbsatz in der
+  Beschreibung von `Event` (Liste der Nutzlasten je Ereignisart): `AnswerDrafted.answer.body` ist die Speicherform ab 0.4.4.
+  Hinweis: `EventRead` gibt die gespeicherte Nutzlast wieder; ein später gestrichener Enum-Wert bleibt deshalb im Vertrag
+  beschrieben (siehe `AnswerMark`).
+- **ADR 0005:** ein Absatz „Eingabe- und Speicherform“ (Entscheidungen 1, 2, 2a) unter „Entscheidung“, eine Zeile unter
+  „Risiko“ (Lesevariante wirft nie; gestrichene Marke bleibt als Enum-Wert beschrieben) und eine Zeile unter „Nachweis“
+  (055 Kern und Dienst, 055b Bilder); Status bleibt „vorgeschlagen“ (Annahme an Prüfpunkt 5).
 - **Typen:** `pnpm contract:types` regeneriert `packages/contract/src/types.ts`; ein zweiter Lauf ergibt keinen Diff.
 - **Tore:** `pnpm contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`, (c) mit `0.4.3 -> 0.4.4`. Die Versionszeilen in
   `contract.test.ts:90` und `takt-019-contract.test.ts:8` ziehen nach (Zahl der Operationen unverändert).
+  `contract-043a.test.ts` Test 10 (`no silent widening`, Zeile 268) pinnt die Schlüssel von `AnswerDraft` auf `['sources',
+  'text']`; er bekommt `body` mit dem Kommentar „Vertragszeile von 055, 0.4.4“ (Lesebefund B1). Weitere Tests, die Schlüssel
+  von `AnswerDraft`, `AnswerVersion` oder `EventRead.payload.answer` festhalten, gibt es auf `cc97005` nicht (gesucht in
+  `apps/api/src/__tests__`, `packages/*/src`, `scripts`); Test 6 dort prüft nur `AnswerVersion.required` (bleibt gleich), Test
+  13 nur das Verbot von `refusalJustification` (bleibt gleich). Findet der Bau doch einen, hält er an und meldet.
 - **Rücknahme nach dem Merge** ist teuer: Ein Feld oder einen Enum-Wert zu streichen, ist brechend (0.5.0, ADR 0015), und
   Ereignisse mit `body` bleiben für immer im Protokoll (R7). Deshalb Lesebefund vor dem Bau.
 - Ist beim Baustart schon eine andere 0.4.x-Stufe gemergt, nimmt dieser Schritt die nächste.
@@ -301,7 +382,8 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
   `Podium.tsx`, Historie, i18n, e2e-Dateien (alles 055b). Kein Screenshot.
 - Kein HTML in Vertrag oder Kern, kein Markdown, keine Schriftwahl, keine Schriftgröße, keine Farbe außer der einen Marke
   `highlight`, keine nummerierte Liste, keine verschachtelte Liste, keine Überschrift, keine Tabelle, kein Link (E6).
-- Kein `body` für `proposeRefusal` (Verweigerungen bleiben Klartext, `body` aus L; Folgeliste, rund 0,3 AStd).
+- Kein `body` für `proposeRefusal` (Verweigerungen bleiben Klartext mit Zeichenfilter, `body` aus L; Folgeliste, rund 0,3 AStd).
+- Keine Auslieferung in eine geteilte Umgebung vor 055b (Entscheidung 10).
 - Kein Neuschreiben alter Ereignisse, keine Migration, kein Upcast; L wirkt nur in der Projektion.
 - Keine Neuberechnung von `text` beim Lesen; keine Änderung an Suche, Diff, Vorlesezeit.
 - Keine DE/EN-Kopplung, kein zweiter Sprachwert, kein `language` an `Question` (E21).
@@ -315,29 +397,32 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
 
 Vertrag (erster Commit, Architekt):
 
-- `packages/contract/openapi.yaml` (nur die neun Schemas aus dem Vertragsschritt, AnswerDraft.body, AnswerVersion.body, die Eigenschaft body unter EventRead.payload.answer, info.version)
+- `packages/contract/openapi.yaml` (nur die neun Schemas aus dem Vertragsschritt, AnswerDraft.body, AnswerVersion.body, die Beschreibungen von AnswerDraft.text und RefusalProposal.text, die Eigenschaft body unter EventRead.payload.answer, der Halbsatz in der Beschreibung von Event, info.version)
 - `packages/contract/src/types.ts` (nur regeneriert)
 - `packages/contract/CHANGELOG.md` (nur Abschnitt 0.4.4)
 - `packages/contract/package.json` (nur Version)
-- `docs/adr/0005-antwortformat.md` (nur der Absatz „Eingabe- und Speicherform“)
+- `docs/adr/0005-antwortformat.md` (nur der Absatz „Eingabe- und Speicherform“, je eine Zeile unter Risiko und Nachweis)
 
 Kern:
 
 - `packages/domain/src/answerFormat.ts` (neu)
 - `packages/domain/src/types.ts` (nur AnswerVersion.body, AnswerDraft.body und die Typen des Blockdokuments, falls nicht in answerFormat.ts)
-- `packages/domain/src/api.ts` (nur draftAnswer)
+- `packages/domain/src/api.ts` (nur draftAnswer, proposeRefusal und die Weiterausgabe von codePointLength aus answerFormat.ts)
 - `packages/domain/src/state.ts` (nur der Fall AnswerDrafted)
 - `packages/domain/src/events.ts` (nur Kommentar und Typ der Nutzlast von AnswerDrafted, falls der Typzwang es verlangt)
 - `packages/domain/src/index.ts` (nur die Exporte aus answerFormat.ts)
 - `packages/domain/src/__tests__/answerFormat055.test.ts` (neu)
 - `packages/domain/src/__tests__/answerDraft055.test.ts` (neu)
+- `packages/domain/src/__tests__/support/answerBodyGen.ts` (neu, gesäter Generator für Test 2 und H5)
 
-Dienst (nur Tests):
+Dienst (Tests und eine Begrenzung):
 
 - `apps/api/src/__tests__/answerFormat055.test.ts` (neu, ohne Postgres)
 - `apps/api/src/__tests__/postgres-answerFormat055.test.ts` (neu, mit Postgres)
 - `apps/api/src/__tests__/contract.test.ts` (nur Versionszeile)
 - `apps/api/src/__tests__/takt-019-contract.test.ts` (nur Versionszeile)
+- `apps/api/src/__tests__/contract-043a.test.ts` (nur Test 10: body in der Schlüsselliste von AnswerDraft, Kommentar „Vertragszeile von 055, 0.4.4“)
+- `apps/api/src/contractSchema.ts` (nur die Begrenzung in describeErrors: höchstens 20 Einzelfehler und die Restzahl)
 
 Oberfläche (nur Typzwang):
 
@@ -353,7 +438,8 @@ Dokumente:
 ## Ausdrücklich nicht erlaubt
 
 `apps/web/src/features/**`, `apps/web/src/components/**`, `apps/web/src/i18n/**`, `apps/web/e2e/**`, `apps/api/src/app.ts`
-und jede andere Datei unter `apps/api/src` außer den genannten Tests, `packages/domain/src/seed.ts`, `transitions.ts`,
+und jede andere Datei unter `apps/api/src` außer den genannten Tests und der einen Begrenzung in `contractSchema.ts`,
+`packages/domain/src/masterData.ts` (nur importiert: `isWellFormed`), `packages/domain/src/seed.ts`, `transitions.ts`,
 `permissions.ts`, `rules.ts`, `stream.ts`, `envelope.ts`, `policy-truth-table.md`, `docs/legal-trace.md`, `scripts/**`,
 `.github/**`, `package.json` und Lockfile (keine Abhängigkeit), `docs/produktplan-beta.md` und das Register (Hinweise an den
 Orchestrator), `docs/glossar.md`. Stellt der Bau fest, dass eine dieser Dateien sich ändern muss: anhalten und melden.
@@ -371,11 +457,17 @@ Orchestrator), `docs/glossar.md`. Stellt der Bau fest, dass eine dieser Dateien 
    sie mit dem geladenen Vertragsschema (Muster 044b), damit kein 422 nur in einer Betriebsart auftritt.
 5. **Idempotenz (R-IDEM-01):** Eine Wiederholung mit demselben Schlüssel und **anderem** `body` liefert das erste Ergebnis
    (heutiges Verhalten für `text`). Bestätigen, im Bericht nennen; keine Änderung.
-6. **Größe:** Ein `body` an der Grenze (20 000 Code-Punkte Klartext in 500 Läufen mit Marken) passt unter 256 KiB; ein
+6. **Größe:** Ein `body` an der Grenze (20 000 Code-Punkte Klartext in 2 000 Läufen mit Marken) passt unter 256 KiB; ein
    Rumpf darüber ist 413 vor dem Validator. Messwert der Rumpfgröße im Bericht.
-7. **Seed unverändert:** `CORPUS_DEMO` und `CORPUS_LOAD` erzeugen keine Ereignisse mit `body`; der Fingerabdrucktest des
-   Lastkorpus bleibt grün ohne Änderung.
-8. **Laufzeit `e2e-http`:** Teil a fügt keine e2e-Datei hinzu; der PR-Lauf muss in derselben Spanne bleiben (zuletzt 4:45 bis
+7. **Seed unverändert und Kosten der Projektion (Lesebefund Minor 7):** `CORPUS_DEMO` und `CORPUS_LOAD` erzeugen keine
+   Ereignisse mit `body`; der Fingerabdrucktest des Lastkorpus bleibt grün ohne Änderung. Den vollständigen Aufbau der
+   Projektion aus `CORPUS_LOAD` (800) **vor und nach** der Änderung messen (Median aus 10 Läufen, Werte im Bericht);
+   `apps/web/src/api/timing053.test.ts` (p90 < 150 ms) und `apps/web/src/api/focus054.test.ts` bleiben grün ohne Änderung.
+   Mehr als 10 % oder 50 ms Mehrzeit: `body` je Ereignis-id merken (Entscheidung 5), erneut messen.
+8. **Validator-Meldung:** Mit 2 001 fehlerhaften Läufen ist die heutige Problem-Meldung so lang wie viele Einzelfehler
+   (`describeErrors` ohne Grenze, `allErrors: true`). Messen, dann begrenzen; bestehende Tests, die eine vollständige Meldung
+   erwarten, nennen (keiner erwartet mehr als 20 Fehler, sonst anhalten).
+9. **Laufzeit `e2e-http`:** Teil a fügt keine e2e-Datei hinzu; der PR-Lauf muss in derselben Spanne bleiben (zuletzt 4:45 bis
    5:30). Dauer im Bericht. Eine Mehrzeit über 0:30 ohne Ursache ist ein Befund.
 
 ## Tests zuerst (rot, dann grün)
@@ -388,21 +480,35 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
    a) `heading` mit Text → Absatz; `table` mit `items` → ein Absatz je Punkt; `list` mit `content` und `items` → eine Liste;
    b) **verbotene Marke wird entfernt** (ADR 0005): `underline`, `strike`, `font-family:Arial` fallen weg, der Text bleibt
    wörtlich; `['italic', 'bold', 'bold']` → `['bold', 'italic']`;
-   c) NFC (zerlegtes „ä“ → „ä“); U+200B, U+FEFF, U+00AD, U+202E, U+2066 entfernt; U+00A0, Tab, `\n` → Leerzeichen; C0/C1 entfernt;
-   d) Leerraum über Laufgrenzen: `"Hallo "` + **`" Welt "`** + `"  "` → `"Hallo "` + **`"Welt"`**;
+   c) je Klasse ein Fall (Lesebefund M4): `\p{White_Space}` (Tab, `\n`, U+0085, U+00A0, U+2028, U+3000) → U+0020; `\p{Cc}`
+   (U+0000, U+001B, U+007F, U+009B) entfernt; `\p{Cf}` (U+00AD, U+200B, U+200D, U+202E, U+2066, U+FEFF, U+E0041) entfernt;
+   einsames Ersatzzeichen (U+D800 allein) → Schreibvariante 422, Lesevariante U+FFFD; **NFC exakt:** Lauf `"a\u0308"` →
+   `"ä"` (U+00E4); Hangul-Jamo `"\u1100\u1161"` → `"가"`; Lauf `"e"` (fett) gefolgt von Lauf `"\u0301x"` (ohne Marke) bleibt
+   zwei Läufe, der zweite beginnt mit U+0301 (dokumentierte Ausnahme), und `answerPlainText` liefert `"éx"` (NFC über das Ganze);
+   Familien-Emoji mit ZWJ wird drei Emoji (dokumentiert, Nit 6);
+   d) Leerraum über Laufgrenzen (Grenzregel N4): `"Hallo "` + **`" Welt "`** + `"  "` → `"Hallo "` + **`"Welt"`**;
+   `"a"` + **`" "`** + `"b"` → `"a b"` als **ein** Lauf (Leerlauf verliert die Marke, dann N5); `"a "` + *`" b"`* →
+   `"a "` + *`"b"`*;
    e) leere Läufe weg, gleiche Marken zusammengeführt; f) leere Absätze, leere Punkte, leere Liste weg; g) zwei benachbarte
-   Listen → eine, durch einen Absatz getrennte bleiben zwei; h) `language` fehlt → `de`; i) Grenzen der Speicherform: 501
-   Blöcke, 201 Punkte, 501 Läufe, 20 001 Code-Punkte Klartext (mit Ersatzpaaren gezählt) → Fehler; 500/200/500/20 000 → ok.
-2. **N10 Idempotenz**, eigenschaftsbasiert mit eigenem gesätem Generator (keine Abhängigkeit; fester Startwert im Test, 500
-   Fälle, zufällige Blockarten, Marken, Steuerzeichen, Leerraum, leere Läufe): `normalize(normalize(x))` tief gleich
+   Listen → eine, durch einen Absatz getrennte bleiben zwei; h) `language` fehlt → `de`; i) Grenze N9: 20 001 Code-Punkte
+   Klartext (mit Ersatzpaaren gezählt) → 422, 20 000 → ok; 10 000 Absätze aus je einem Zeichen über die
+   **Lesevariante** bzw. L → ok und gegen den Vertrag gültig (H5); die Schreibvariante nimmt höchstens 2 000 Eingabeblöcke (Grenze
+   der Eingabeform), 2 000 → ok; die Lesevariante wirft für keinen dieser Fälle.
+2. **N10 Idempotenz**, eigenschaftsbasiert mit eigenem gesätem Generator (`__tests__/support/answerBodyGen.ts`, keine
+   Abhängigkeit; fester Startwert im Test, 500 Fälle, zufällige Blockarten, Marken, Steuer- und Formatzeichen, Leerraum aller
+   Arten, leere Läufe, **kombinierende Zeichen, zerlegte Umlaute, Hangul-Jamo, Ersatzpaare** über Laufgrenzen verteilt), für
+   **beide** Varianten: `normalize(normalize(x))` tief gleich
    `normalize(x)`; jede Ausgabe besteht eine Strukturprüfung im Test und enthält nur Werte aus den Whitelists (die
    Prüfung gegen das Vertragsschema mit Ajv macht H5, weil der Kern das Schema nicht lädt). Dazu: `normalize(answerBodyFromText(answerPlainText(b)))` ist gültig; `answerPlainText(normalize(x))` enthält
    keines der entfernten Zeichen aus N3.
 3. **Keine offene Zeichenkette in der Ausgabe:** für jede Eingabe aus Test 2 ist jede Blockart in `{paragraph, list}` und jede
    Marke in `ANSWER_MARKS`; ein Text wie `<script>alert(1)</script>` oder `<b onclick=…>` bleibt **wörtlicher Text** in einem
-   Lauf (kein Markup im Kern, die Darstellung escapt in 055b).
-4. **P und L:** Absätze `\n\n`, Punkte `\n`, kein Aufzählungszeichen; L: drei Zeilen mit Leerzeile → drei Absätze ohne Marken,
-   `language: de`; nur Leerraum → `null`.
+   Lauf (kein Markup im Kern, die Darstellung escapt in 055b). Kein Schlüssel des Blockdokuments ist in `MASKED_KEYS`
+   (`stream.ts:182`); der Test liest die Konstante oder deren Export und schlägt fehl, sobald sich beide überschneiden (Nit 5).
+4. **P und L:** Absätze `\n\n`, Punkte `\n`, kein Aufzählungszeichen, Ergebnis NFC; L: drei Zeilen mit Leerzeile → drei
+   Absätze ohne Marken, `language: de`; nur Leerraum → `null`; 10 000 Zeilen aus je einem Zeichen → 10 000 Absätze, wirft nicht.
+4a. **`sanitizeAnswerText`:** U+202E, U+200B, U+0007 entfernt, `\n` und Tab bleiben, NFC, `trim`; einsames Ersatzzeichen → Fehler;
+   nur U+200B → leer (→ 422 im Aufrufer); Text ohne solche Zeichen → identisch (gleiche Zeichenkette).
 5. **`checkAnswerBodyInput`:** fehlendes `blocks`, `blocks: []`, Block ohne `type`, `type` 33 Zeichen, Marke als Zahl, 17
    Marken, zusätzlicher Schlüssel, `language: 'en'` → je eine Meldung ohne Text der Eingabe; gültige Eingabe → `undefined`.
 6. **Gleichlauf** mit dem Vertragsschema: die Grenzen in `answerFormat.ts` (Längen, Anzahlen, Enums) gleich den Werten aus
@@ -411,10 +517,11 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 
 **Kern, `answerDraft055.test.ts` (über `createInProcessApi` mit injizierter Uhr)**
 
-K1. **Ohne `body` unverändert:** Ereignis gleich wie vor 055 (Schlüssel der Nutzlast genau `answer`, ggf.
+K1. **Ohne `body` unverändert für Text ohne N3-Zeichen:** Ereignis gleich wie vor 055 (Schlüssel der Nutzlast genau `answer`, ggf.
     `invalidatedApprovalOfVersion`; `answer` ohne `body`); die Version in `Question` trägt `body` aus L.
 K2. **Mit `body`:** Ereignis trägt `answer.text = answerPlainText(normalized)` und `answer.body` (Speicherform); ein
-    abweichender mitgesendeter `text` steht **nicht** im Ereignis; `Question.answers[n].body` gleich der Speicherform.
+    abweichender mitgesendeter `text` steht **nicht** im Ereignis; `Question.answers[n].body` gleich der Speicherform. Auch
+    `text: " "` mit gültigem `body` → 200 (Lesebefund Minor 1).
 K3. **Verbotene Marke über die API entfernt** (ADR 0005, Demo-Pfad): `marks: ['underline']` → Lauf ohne Marke, Text gleich.
 K4. **Negativ:** `body` ohne Text nach N6 → 422 „Answer text is required.“, **kein** Ereignis, Status unverändert; N9-Grenze →
     422; `language: 'en'` → 422; jeweils vor 403/409: ein Akteur ohne `answer.draft` mit ungültigem `body` bekommt 422 (wie der
@@ -423,21 +530,33 @@ K5. **Freigabe (R-GUARD-04):** freigegebene Version 1, neue Version 2 mit gleich
     → `invalidatedApprovalOfVersion: 1`, `approval` weg, Status `answer_drafted`.
 K6. **Weiterleiten:** nach `draftAnswer` mit `body` und `submitForReview` bzw. `forwardQuestion` ist die letzte Version
     unverändert (gleiches `body`, gleiches `text`); beide Ereignisse tragen kein `body`.
-K7. **Alte Ereignisse lesbar:** ein von Hand angehängtes `AnswerDrafted` ohne `body` (Form vor 055) und ein `AnswerDrafted`
-    mit `body`, das eine **nicht mehr erlaubte Marke** und einen leeren Absatz enthält (simuliert „Marke gestrichen“): die
-    Projektion liefert für beide gültige Speicherformen, die gestrichene Marke fehlt, `text` ist das gespeicherte, es entsteht
-    keine neue Version und keine Freigabe geht verloren.
+K7. **Alte Ereignisse lesbar, Projektion wirft nie:** von Hand angehängt (a) ein `AnswerDrafted` ohne `body` (Form vor 055);
+    (b) ein reines Text-Ereignis mit **600 Zeilen**; (c) ein `body` mit einer **nicht mehr erlaubten Marke** und einem leeren
+    Absatz (simuliert „Marke gestrichen“); (d) ein gespeichertes `body` mit `language: 'en'`; (e) **der strengste Fall** (Nit 2):
+    ein `body` mit unbekannter Blockart, Marke als Zahl, leeren Läufen, `\p{Cf}`-Zeichen, einsamem Ersatzzeichen, 12 000 Blöcken
+    und `blocks` als Objekt in einer zweiten Version. Die Projektion wirft für keinen; jede Version hat eine gültige Speicherform
+    (bzw. bei (e) zweite Version `body` aus L), die gestrichene Marke fehlt, `language` ist `de`, `text` ist jeweils das
+    gespeicherte, es entsteht keine neue Version und keine Freigabe geht verloren.
 K8. **Verweigerung:** `proposeRefusal` schreibt kein `body`; die Version trägt `body` aus L; `refusalJustification` steht
     nicht im `body`.
 K9. **Suche:** `q` findet ein Wort aus einem fett ausgezeichneten Lauf (über `text`).
 K10. **Seed:** `CORPUS_DEMO` enthält kein Ereignis mit `answer.body`; jede gesäte Version trägt `body` aus L.
+K11. **Zeichenfilter im Klartext (M1):** `draftAnswer` ohne `body` mit `text` = `"Umsatz\u202E stieg\u200B um 3 %"` → im
+    Ereignis `"Umsatz stieg um 3 %"`; `text` nur aus U+200B → 422, kein Ereignis; einsames Ersatzzeichen → 422.
+K12. **Zeichenfilter in `proposeRefusal`:** derselbe Text als Verweigerungswortlaut → gefiltert im Ereignis; die Begründung
+    (`pii`) bleibt unberührt.
+K13. **Goldener Test der Herleitung (Lesebefund Minor 9, Recht):** drei feste alte Ereignisse als Testdaten (einzeilig;
+    mehrzeilig mit Leerzeilen und Leerzeichen am Zeilenende; mit geschütztem Leerzeichen und Tab) ergeben ein wörtlich im Test
+    stehendes `body`; der Wortlaut (Zeichenfolge ohne Leerraum) von `answerPlainText(body)` ist gleich dem des gespeicherten
+    `text`. Eine Änderung an L macht diesen Test rot und braucht einen Rechtsblick.
 
 **Dienst, `apps/api/src/__tests__/answerFormat055.test.ts` (ohne Postgres)**
 
 H1. `POST /v1/questions/{id}/answers` mit gültigem `body` → 200; `Question.answers[n].body` validiert gegen `AnswerBody`; die
     Antwort validiert gegen den Vertrag.
 H2. Validator-422: `blocks` fehlt, Marke 33 Zeichen, zusätzlicher Schlüssel im Lauf, `language: 'en'`, 2001 Blöcke; die
-    Meldung enthält keinen eingegebenen Text.
+    Meldung enthält keinen eingegebenen Text. **Begrenzt (Minor 6):** ein Rumpf mit 2 000 fehlerhaften Läufen liefert eine
+    Problem-Meldung mit höchstens 20 Einzelfehlern und der Restzahl, `detail` unter 4 KiB.
 H3. Unbekannte Blockart und Marke über HTTP → 200, Speicherform wie in K3 (gleiches Verhalten wie die Demo).
 H4. `getQuestionHistory` und `listEvents`: `AnswerDrafted` mit `payload.answer.body` validiert gegen `EventRead` (geschlossener
     Lesepfad); ein `AnswerDrafted` von vor 055 validiert ebenfalls.
@@ -455,7 +574,7 @@ P2. Gesäte Versionen (Form vor 055) nach Neustart mit `body` aus L; kein Ereign
 
 ## Akzeptanzkriterium
 
-1. Tests 1–6, K1–K10, H1–H6, P1–P2 und der `http.test.ts`-Fall vor der Änderung rot (Ausgabe im Bericht), danach grün.
+1. Tests 1–6 mit 4a, K1–K13, H1–H6, P1–P2, Test 10 in `contract-043a.test.ts` und der `http.test.ts`-Fall vor der Änderung rot (Ausgabe im Bericht), danach grün.
 2. Vertragsschritt als **erster** Commit, vor jedem Code; `pnpm contract:types` ohne Diff beim zweiten Lauf; `check.mjs`
    meldet `0.4.3 -> 0.4.4`.
 3. `policy-truth-table.md` und `docs/legal-trace.md` ohne Diff (kein Recht, keine Regel geändert).
@@ -463,6 +582,8 @@ P2. Gesäte Versionen (Form vor 055) nach Neustart mit `body` aus L; kein Ereign
    im CI-Lauf `e2e-http` des PR, Dauer in der bisherigen Spanne.
 5. `git diff` zeigt keine Datei unter `apps/web/src/features`, `apps/web/src/components`, `apps/web/e2e`, kein `seed.ts`, keine
    Änderung an `package.json` oder Lockfile. `pnpm slice-scope` grün auf `claude/slice-055-antwortformat`.
+5a. Messwerte aus Vor-dem-Bau-Punkt 7 im Bericht; `timing053.test.ts` und `focus054.test.ts` grün ohne Änderung.
+5b. Der Bericht enthält die Zeile „055 nicht vor 055b in eine geteilte Umgebung“ (Entscheidung 10).
 6. `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
 
 ## Nachweise
@@ -499,25 +620,31 @@ Whitelist), E21 (Standard nur `de`, keine Kopplung)
 | Mitgesendeter `text` weicht vom Dokument ab | `body` gewinnt, Vertrag sagt es | K2 |
 | Bidi- oder Null-Breiten-Zeichen zeigen anderen Text als gesucht | N3 | Test 1c |
 | Ereignisse werden zu groß | Grenzen N9, Körpergrenze 256 KiB | Test 1i; H6 |
+| Steuer- oder Formatzeichen im Klartext neuer Versionen (Trojan Source) | Zeichenfilter 2a in `draftAnswer` und `proposeRefusal` | 4a, K11, K12 |
+| Projektion wirft an einem alten oder kaputten Ereignis, der Jahrgang wird unlesbar | Lesevariante ohne 422, Strukturgrenzen aus der Textgrenze | K7 (a–e), Test 1i |
+| Bühne zeigt einen anderen Wortlaut als den freigegebenen | Herleitung ändert nur Gliederung und Auszeichnung, goldener Test | K13 |
+| Problem-Meldung in Rumpfgröße (DoS) | `describeErrors` begrenzt | H2 |
+| Projektion wird am Lastkorpus langsamer | Messung vor und nach, Memo bei Überschreitung | Vor-dem-Bau-Punkt 7 |
 | Vertragsänderung lässt sich nicht zurücknehmen | Lesebefund vor dem Bau, additive Stufe | Vor-dem-Bau-Punkt 2 |
 
 ## Aufwand
 
-Geschätzt **2,65 AStd** (Spanne 2,3–3,2) für Teil a. Der Plan rechnete 3 AStd für Vertrag, Kern, Editor und Renderer zusammen
+Geschätzt **3,1 AStd** (Spanne 2,7–3,6) für Teil a, nach den Lesebefunden (vorher 2,65). Der Plan rechnete 3 AStd für Vertrag, Kern, Editor und Renderer zusammen
 und setzte den Vertrag aus 043b voraus, der nie kam.
 
 | Teil | AStd |
 |---|---|
 | Vertragsschritt: neun Schemas, zwei Felder, Bindung `EventRead`, ADR-Absatz, CHANGELOG, Typen, Versionszeilen | 0,5 |
-| `answerFormat.ts`: N1–N10, P, L, Gestaltprüfung; Tests 1–5 mit gesätem Generator | 0,8 |
-| `draftAnswer`, Projektion, Exporte; Tests K1–K10 | 0,45 |
-| Dienst: H1–H6 (mit Test 6), Postgres P1–P2 | 0,5 |
+| `answerFormat.ts`: Schreib- und Lesevariante, N1–N10 nach Kategorien, P, L, Gestaltprüfung, `sanitizeAnswerText`; Tests 1–5, 4a mit gesätem Generator | 1,05 |
+| `draftAnswer`, `proposeRefusal`, Projektion, Exporte; Tests K1–K13 | 0,6 |
+| Dienst: H1–H6 (mit Test 6), Begrenzung `describeErrors`, Test 10 in 043a, Postgres P1–P2 | 0,55 |
+| Messung der Projektion am Lastkorpus (vorher, nachher, ggf. Memo) | 0,1 |
 | `http.ts`-Typzwang, ein Test | 0,1 |
 | Bedrohungsmodell, Folgeliste | 0,1 |
 | `pnpm gates`, volle in-process-Suite, Bericht, CI-Nachweis | 0,2 |
 
 **055b** (Renderer und Editor) geschätzt **3,6 AStd** (Spanne 3,1–4,2), Klasse mittel, Abschnitt „055b — Entwurf“. Zusammen
-**6,25 AStd** statt 3.
+rund **6,7 AStd** statt 3.
 
 ## Standards (auf Standard gebaut)
 
@@ -531,6 +658,9 @@ und setzte den Vertrag aus 043b voraus, der nie kam.
 | `language` nur `de`, im Blockdokument (E21) | Enum `[de]` | zweiter Wert additiv rund 0,2 AStd; Kopplung DE/EN Nach-Beta |
 | Gespeicherte Bodies laufen beim Lesen durch die Whitelist | Projektion | nur rohe Wiedergabe: < 0,1 AStd (nicht empfohlen) |
 | Verweigerung ohne `body` | nichts | `RefusalProposal.body`: rund 0,3 AStd |
+| Strukturgrenzen aus der Textgrenze (10 000 Blöcke), L behält jede Zeile | Vertrag, N9 | L führt Zeilen zusammen: rund 0,2 AStd, ändert die Darstellung alter Versionen (Rechtsblick) |
+| ZWJ und alle `\p{Cf}` entfernt (zusammengesetzte Emoji zerfallen) | N3 | ZWJ zwischen Emoji erlauben: rund 0,2 AStd |
+| Zeichenfilter auch für `text` neuer Versionen | 2a | — (Sicherheitsstandard, nicht abwählbar ohne Security-Review) |
 
 ## Offene Eigentümerfragen
 
@@ -547,7 +677,7 @@ Keine blockiert den Bau; alle mit Standard.
 4. **Inhaltssprache (E21).** Standard: 055 trägt `language` nur mit `de` im Blockdokument, Abnehmer ist das `lang`-Attribut
    des Renderers (055b). Option: abtrennen und erst mit einer Entscheidung zu E21 bauen (spart < 0,1 AStd; der Renderer setzt
    dann `lang="de"` fest).
-5. **Teilung und Aufwand.** Standard: 055 (Teil a, hoch, 2,65 AStd) vor 055b (mittel, 3,6 AStd); zusammen 6,25 statt 3 AStd.
+5. **Teilung und Aufwand.** Standard: 055 (Teil a, hoch, 3,1 AStd) vor 055b (mittel, 3,6 AStd); zusammen rund 6,7 statt 3 AStd.
    Go des Eigentümers zu Zuschnitt und Budget erbeten.
 6. **Risikoklasse.** Standard: hoch (Vertrag, Ereignisform, Freigabebindung). Herabstufen entscheidet nur der Eigentümer; dann
    entfiele der Lesebefund (rund 0,3 AStd).
@@ -570,7 +700,9 @@ andere wird Text.
    `bold` (`<strong>`), `italic` (`<em>`), `highlight` (`<mark>` mit vorhandenem Tönungs-Token, Kontrast ≥ 4,5:1 auch auf der
    Bühne, axe); unbekannte Blockart → Absatz, unbekannte Marke → Text (eigene, engere Whitelist, ADR 0005 „Risiko“). **Nur
    Textknoten**, kein `innerHTML`, kein `dangerouslySetInnerHTML`. Setzt `lang` aus `body.language`. Keine Schriftfamilie, keine
-   Größe: erbt von der Ansicht (#31). Ohne `body` (alter Dienst) Rückfall auf `text` mit `whitespace-pre-wrap` wie heute.
+   Größe: erbt von der Ansicht (#31). Ohne `body` (alter Dienst) Rückfall auf `text` mit `whitespace-pre-wrap` wie heute. **Quelle ist ausschließlich
+   `Question.answers[n].body`** (Projektion mit Lesevariante), nie `payload.answer.body` aus Historie, Ereignisstrom oder
+   `StageView`-fremden Quellen (Lesebefund Minor 2, Security).
    Einsatz: `stage-answer` und `stage-preview-answer` (aus `<p>` wird ein Block-Element; bestehende Zusicherungen in 003, 020,
    045 prüfen; keine schwächen), Versionen in `QuestionDetail`, `focus-latest`, und **neu in der Historie** ein Block „Antwort,
    Version n“ über der Zeitleiste der gewählten Einzelfrage (die Historie zeigt heute keinen Antworttext). Für den Export
@@ -596,7 +728,9 @@ andere wird Text.
 5. **Tastenkürzel:** Strg/Cmd+B, Strg/Cmd+I, Strg/Cmd+Umschalt+H (Hervorhebung), Strg/Cmd+Umschalt+L (Aufzählung, wie Word);
    Vor-dem-Bau-Prüfung in Chromium, Firefox und WebKit auf Kollision mit Browserkürzeln, mit Strg+Enter (054), Alt+Q, Alt+1…6,
    `?` und AltGr-Eingaben deutscher Tastaturen (kein Strg+Alt). Strg+Enter speichert weiter nur (054 Eigentümerfrage 3).
-6. **Ungespeichert und Basis:** `dirty` vergleicht die Eingabeform des Editors mit der Eingabeform, die aus dem Rendern der
+6. **Senden:** `draftAnswer` mit `body` (Eingabeform) und `text = answerPlainText(normalize(input))` aus der Wiederausgabe in
+   `apps/web/src/api/` (Lesebefund Minor 1), damit `text` im Rumpf auch ohne `body` lesbar bleibt.
+6a. **Ungespeichert und Basis:** `dirty` vergleicht die Eingabeform des Editors mit der Eingabeform, die aus dem Rendern der
    letzten Version zurückgelesen wird (eine reine Markenänderung ist eine Änderung, Entscheidung 7 oben); `draftBase`,
    `isDirty`, `writingOutcome` und der Hinweis bei fremder neuer Version (054 Entscheidung 4) vergleichen Bodies, nicht Text.
    Vorlesezeit und Leerprüfung auf der Klartextprojektion des normalisierten Entwurfs: `normalizeAnswerBody` und
@@ -638,7 +772,7 @@ mit eigener Spec (rund 0,4 AStd); im äußersten Fall Plan §8.6 Punkt 8 (Editor
 ## Hinweise an den Orchestrator
 
 - **Plan-Eintrag 055 (§5, Zeile 787–793)** stimmt nicht mehr; nicht Teil dieser Spec (paralleler Doku-Durchgang):
-  - Klasse **mittel → hoch** (Vertrag, Ereignisform, Freigabebindung; „Warum hoch“); Aufwand **3 → 2,65 AStd** für 055; Lanes
+  - Klasse **mittel → hoch** (Vertrag, Ereignisform, Freigabebindung; „Warum hoch“); Aufwand **3 → 3,1 AStd** für 055 (055b 3,6; zusammen rund 6,7); Lanes
     „core, web-components“ → „contract, core, service, docs-adr, docs-sicherheit“; Abhängigkeiten **„043, 054“ → „054, 048“**
     (043b gibt es nicht; 055 bringt seinen Vertragsschritt selbst, wie 048).
   - **Neuer Eintrag 055b** „Antwortformat: Renderer und Editor“ — mittel · 3,6 AStd · nach 055 · Lanes web-components,
@@ -651,8 +785,22 @@ mit eigener Spec (rund 0,4 AStd); im äußersten Fall Plan §8.6 Punkt 8 (Editor
     Vorschlag: „Normalisierung bei jeder Schreiboperation mit Antwortinhalt; Weiterleiten trägt keinen Inhalt“.
   - „Renderer-Komponente für Bühne, Historie, Export“: Export gibt es noch nicht; Vorschlag: „Bühne, Historie, Beantwortung,
     Fokus; Export (051/052) auf derselben Whitelist“.
-- **Freigabe-Demo-Kette (E57):** 045 → 048 → 053 → 054 → **055 → 055b** → 059 → … . 059 (Sicht der Rechtsfreigabe) zeigt
-  Antworten und sollte nach 055b kommen; Abhängigkeit 059 → 055b ergänzen.
+- **Freigabe-Demo-Kette (E57):** 045 → 048 → 053 → 054 → **055 → 055b** → 059 → 046 → 060 → 061 → 041 im Register und in §11
+  („Stand“-Absätze) nachziehen.
+- **Abhängigkeiten in §5 (Lesebefund Minor 11):** 056 (Bühne je Gerät, Zeile 803 „049, 047, 055, 036“), 059
+  (Rechtsfreigabe-Sicht, Zeile 828 „045, 047, 055, 082“) und 081 (Niederschrift-Anlage, Zeile 895) zeigen formatierte Antworten
+  und hängen an **055b**, nicht nur an 055; 066 (KI-Port, Zeile 859 „055, 043“) hängt an **055** (Eingabeform, Normalisierung),
+  nicht an 055b.
+- **Zeile 675 (Eintrag 043, Ziel):** nennt „accountable“, „language“ und das Antwortformat als Teil von 043; ergänzen: Antwortformat
+  und `language` kommen mit 055 (0.4.4), `accountable` mit 048b.
+- **Zeile 1002 (Nach-Beta-Tabelle, „DE/EN-Kopplung der Antworttexte“):** „Feld language (048)“ → „Feld `language` im
+  Blockdokument (055)“.
+- **043c (Partnerschnittstellen, Webhooks):** die gebundene Nutzlast von `AnswerDrafted` muss `answer.body` (Speicherform)
+  enthalten, sonst bekommen Nachbarn formatierte Antworten nur als Klartext; in der 043c-Planzeile vermerken.
+- **Begründung einer Verweigerung (`pii.refusalJustification`):** bleibt in 055 ohne Zeichenfilter (Auftrag M1 nannte nur
+  `text`). Sie wird Recht und Freigabe angezeigt; dieselbe Bidi-Lücke besteht dort. Als Sicherheitspunkt nicht in die
+  Folgeliste, sondern zur Entscheidung: in 055 mitnehmen (< 0,1 AStd, eine Zeile in `proposeRefusal`, ein Testfall) oder eigene
+  Takt-Scheibe.
 - **§8.6 Punkt 8** („055 Editor auf Klartext mit Absätzen“) meint künftig **055b**; 055 wird nie gestrichen (Kern und Vertrag).
 - **Register E21:** Zielscheibe „Nach-Beta“ bleibt für die Kopplung; ergänzen „Feld `language` (nur `de`) im Blockdokument ab
   055“. **E6:** Zusatzfrage nummerierte Listen (Eigentümerfrage 1). Kein neuer Registereintrag nötig.
@@ -667,16 +815,54 @@ mit eigener Spec (rund 0,4 AStd); im äußersten Fall Plan §8.6 Punkt 8 (Editor
 
 ## Hinweise an Folgescheiben
 
-- **055b:** Abschnitt oben; baut nur auf der Speicherform auf, nie auf der Eingabeform beim Lesen.
+- **055b:** Abschnitt oben; baut nur auf der Speicherform auf, nie auf der Eingabeform beim Lesen; rendert nur
+  `Question.answers[n].body`.
 - **051/052 (Export, Niederschrift-Anlage):** formatierte Antworten über dieselbe Whitelist; Escape aller Texte; `lang` aus
   `body.language`; der Hash einer Version bleibt über das gespeicherte Ereignis definiert, nicht über eine Darstellung.
-- **049 (Vorgelesen mit `versionHash`):** der Hash deckt `body` mit, weil er über die Version im Ereignis gebildet wird; eine
+- **049 (Vorgelesen mit `versionHash`):** der Hash wird über die **gespeicherte Nutzlast** der Version gebildet, nicht über die
+  Projektion (deren `body` kann bei alten Versionen aus L stammen und sich mit der Whitelist verengen; Nit 4); er deckt so
+  ein gespeichertes `body` mit; eine
   reine Formatänderung ergibt einen anderen Hash (Entscheidung 7).
 - **056 (Bühne je Gerät, eigenes Bundle):** der Renderer aus 055b muss ohne den übrigen Client laufen (keine Abhängigkeit über
   `components/index.ts` hinaus).
 - **059 (Rechtsfreigabe-Sicht):** zeigt Versionen über den Renderer; Zahlenprüfung (E51) arbeitet auf `text`.
 - **060 (Entwurfspuffer):** puffert die Eingabeform des Editors, nicht HTML.
 - **064/066 (Ingest, KI-Vorschläge):** Vorschläge für Antworten kommen als `AnswerBodyInput` oder Klartext; der Kern normalisiert.
+
+## Lesebefunde und Umsetzung
+
+Lesung der Spec in frischem Kontext auf `0a8d5c1`, Urteil „erst nachbessern“; Entscheidungen des Orchestrators vom 04.10.2026.
+Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
+
+| Befund | Umsetzung |
+|---|---|
+| **B1** `contract-043a.test.ts` Test 10 pinnt die Schlüssel von `AnswerDraft` und wird rot | In „Files allowed“ (nur Test 10, Kommentar „Vertragszeile von 055, 0.4.4“); Suche nach weiteren Tests mit festgehaltenen Schlüsseln von `AnswerDraft`, `AnswerVersion`, `EventRead.payload.answer`: keine weiteren auf `cc97005` (Vertragsschritt, letzter Punkt von „Tore“) |
+| **M1** [Security] Zeichenfilter wirkte nur im Dokument, `text` neuer Versionen blieb ungefiltert; Kopfzeile zum Bedrohungsmodell behauptete mehr | Entscheidung 2a: `sanitizeAnswerText` (Cc außer Tab/LF/CR, alle Cf, NFC, Ersatzzeichen 422) in `draftAnswer` ohne `body` und in `proposeRefusal`; K1 jetzt „unverändert für Text ohne N3-Zeichen“; neue Fälle 4a, K11, K12; `api.ts` in „Files allowed“ auf beide Operationen erweitert; Kopfzeile „Bedrohungsmodell“ berichtigt (neue gegen alte Ereignisse) |
+| **M2** Eine Normalisierung, die 422 werfen kann, lief auch in der Projektion; Strukturgrenzen hätten alte Texte unlesbar gemacht | Schreib- und Lesevariante getrennt (Entscheidung 2); Lesevariante nur N1–N7, wirft nie; Strukturgrenzen aus der Textgrenze abgeleitet (10 000 Blöcke, 10 000 Punkte, 20 000 Läufe), gewählt statt „L führt Zeilen zusammen“, Begründung bei N9; K7 mit 600-Zeilen-Text und gespeichertem `language: 'en'` |
+| **M3** Reihenfolge von NFC und Leerraum offen, Idempotenz an Laufgrenzen nicht gesichert | Feste Reihenfolge (Zeichen → N4 → N5 → NFC je Lauf → Leerprüfung → N6/N7); NFC auch in P über das Ganze; Generator mit kombinierenden Zeichen, zerlegten Umlauten, Hangul-Jamo; exakte Fälle in Test 1c |
+| **M4** [Security] N3 als Aufzählung einzelner Zeichen lückenhaft | N3 nach Kategorien (`\p{White_Space}` → U+0020, `\p{Cc}` und alle `\p{Cf}` entfernt, `\p{Cs}` 422 wie 040b bzw. U+FFFD beim Lesen); je Klasse ein Fall in 1c; Zerfall von ZWJ-Emoji dokumentiert |
+| Minor 1 Wortlaut zu `text` neben `body` missverständlich | Entscheidung 4 neu gefasst; K2 mit `text: " "`; 055b sendet `answerPlainText(normalize(input))` |
+| Minor 2 [Security] Quelle des Renderers offen | 055b rendert nur `Question.answers[n].body`, nie eine Ereignisnutzlast (Entscheidung 10, 055b-Entwurf Punkt 1, Hinweise an Folgescheiben) |
+| Minor 3 „Files allowed“ deckte Event-Beschreibung und ADR-Zeilen nicht | ergänzt (Halbsatz in `Event`, Beschreibungen der beiden `text`, ADR-Absatz plus Zeilen unter Risiko und Nachweis) |
+| Minor 4 `codePointLength` doppelt | zieht nach `answerFormat.ts`, `api.ts` exportiert weiter |
+| Minor 5 Generator ohne Ort | `packages/domain/src/__tests__/support/answerBodyGen.ts` in „Files allowed“ |
+| Minor 6 [Security, DoS] unbegrenzte Validator-Meldung | `describeErrors` auf 20 Einzelfehler plus Restzahl begrenzt (nur diese Stelle in `contractSchema.ts` erlaubt); H2 prüft die Grenze; nicht in die Folgeliste |
+| Minor 7 Kosten von L beim Aufbau der Projektion | Vor-dem-Bau-Punkt 7: Messung am Lastkorpus vorher/nachher, `timing053` und `focus054` grün, Memo bei Überschreitung |
+| Minor 8 Grenzregel von N4 fehlte | Leerzeichen bleibt im früheren Lauf, Leerlauf verliert Marken; Fälle in 1d |
+| Minor 9 [Recht] „Freigabe deckt, was das Podium sieht“ ungenau | Entscheidung 7 neu gefasst (Freigabe deckt die gespeicherte Version, Darstellung ändert den Wortlaut nie); goldener Test K13 |
+| Minor 10 [Recht] Teil a allein in einer geteilten Umgebung | keine Auslieferung vor 055b (Entscheidung 10, Nicht-Ziele, Akzeptanzkriterium 5b) |
+| Minor 11 Plan- und Registerfolgen unvollständig | „Hinweise an den Orchestrator“: 056/059/081 → 055b, 066 → 055, Zeilen 675 und 1002, E57-Kette, 043c-Nutzlast mit `body` |
+| Minor 12 Aufwand zu knapp | 3,1 AStd (2,7–3,6), zusammen rund 6,7 |
+| Nit 1 CHANGELOG verschweigt die Verengung | `### Changed` im Abschnitt 0.4.4 |
+| Nit 2 K7 ohne strengsten Fall | K7 (e) |
+| Nit 3 Idempotenzschlüssel bei anderem `body` | Satz in Entscheidung 4 und an `AnswerDraft.body` |
+| Nit 4 `versionHash` | über die gespeicherte Nutzlast (Hinweise an Folgescheiben, 049) |
+| Nit 5 Schlüssel des Dokuments gegen `MASKED_KEYS` | Invariante unter Entscheidung 2, Prüfung in Test 3 |
+| Nit 6 ZWJ | dokumentiert bei N3, Fall in 1c, Standardzeile |
+| Zeilenverweis `proposeRefusal` | `api.ts:1517` |
+
+Offen zur Entscheidung des Orchestrators (Sicherheit, nicht Folgeliste): Zeichenfilter auch für die Begründung einer
+Verweigerung (Hinweise an den Orchestrator).
 
 ## Bericht (nach Bau ausfüllen)
 
@@ -690,4 +876,5 @@ Touched:
 
 ## Review findings
 
-(Lesebefund der Spec vor dem Bau und Review nach dem Bau in frischem Kontext; Einträge hier.)
+Lesebefund der Spec vor dem Bau (frischer Kontext, auf `0a8d5c1`): „erst nachbessern“; 1 blocker, 4 major, 12 minor, 6 nit, alle
+eingearbeitet, siehe „Lesebefunde und Umsetzung“. Review nach dem Bau: Einträge hier.
