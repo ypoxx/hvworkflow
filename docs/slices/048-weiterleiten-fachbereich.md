@@ -245,9 +245,11 @@ Standard gebaut:** E5 ist offen (Eigentümerfrage 1); der Bau beginnt erst nach 
   404, die Liste enthält die Frage nicht mehr. **Eine Wiederholung mit demselben `Idempotency-Key` ist 404** (`authorizeReplay`
   prüft die aktuelle Lesbarkeit); das Ereignis entsteht kein zweites Mal (Test 9). 054 behandelt 404 nach einem Netzfehler
   beim Weiterleiten als „weitergeleitet oder nicht mehr sichtbar“.
-- **Wiederholung nach Entfernen des Zielfachbereichs:** Schritt 2 läuft vor `transition()` und damit vor der
-  Wiederholungsprüfung. Hat die Administration den Zielfachbereich inzwischen aus den Stammdaten entfernt (040b), antwortet
-  eine Wiederholung mit 422 statt mit dem gespeicherten Ergebnis. Wie bei `assignQuestion`; hingenommen, benannt (Test 9b).
+- **Kein Entfernen des Zielfachbereichs nach dem Weiterleiten (Codex P2 auf #141):** Der Zielfachbereich lässt sich nach dem
+  Weiterleiten nicht aus den Stammdaten entfernen, solange eine Frage auf ihn zeigt: `replaceMeetingUnits` antwortet 409
+  R-ADM-02 (`api.ts` ~888). Der früher benannte Fall „Wiederholung antwortet 422 nach Entfernen“ ist über die Schnittstelle
+  nicht herstellbar und wird nicht getestet; Schritt 2 vor der Wiederholungsprüfung bleibt wie bei `assignQuestion`. Test 9b
+  prüft stattdessen den Schutz: Entfernen des Zielfachbereichs nach dem Weiterleiten → 409 R-ADM-02, kein Ereignis.
 - `operationPermission` und `legacyEventType` in `api.ts` bleiben unverändert: Neue Ereignisse tragen `commandId`, die
   Wiederholung findet sie über `commandOperation`.
 
@@ -492,8 +494,9 @@ Weitere Dateien sind Scope-Befunde.
    - (c) Gebundene Fachkraft **ohne** Einheit auf einer Frage ohne Fachbereich (Fast Track, Entwurf aus `classified`, ohne
      Zuweisung): Weiterleiten 404, kein Ereignis. Keine Änderung an `assignRole` nötig.
 9. **Idempotenz.** Koordination wiederholt mit gleichem Schlüssel: gleiche Antwort, ein Ereignis. Die gebundene Fachkraft aus
-   Test 8a wiederholt nach dem Weiterleiten: 404, weiterhin genau ein Ereignis. **9b:** Nach Entfernen des Zielfachbereichs aus
-   den Stammdaten ist die Wiederholung der Koordination 422, weiterhin ein Ereignis (benannte Grenze).
+   Test 8a wiederholt nach dem Weiterleiten: 404, weiterhin genau ein Ereignis. **9b:** Die Administration versucht, den
+   Zielfachbereich nach dem Weiterleiten aus den Stammdaten zu entfernen: 409 R-ADM-02, kein Ereignis; die Wiederholung der
+   Koordination liefert danach das gespeicherte Ergebnis (Codex P2 auf #141).
 10. **If-Match.** Ohne: 428; veraltet: 412; kein Ereignis.
 11. **Claim bleibt.** Fachkraft A (`unit-fin`) hält einen Claim; die Koordination leitet in `assigned` weiter: `claim` steht
     unverändert in Projektion und Ansicht; die Fachkraft `unit-hr` kann sofort entwerfen (kein Schreibvorgang gesperrt), ihr
@@ -752,7 +755,7 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
 | n3 | nit | Prüfreihenfolge | `requireQuestionFor` → 404 gebunden → 403 → `If-Match` → 409 |
 | n4 | nit | EN-Bezeichnung | „Forward to another answering unit“ (Glossar: answering unit) |
 | n5 | nit | Rücksetzen im Nachholen unbenannt | Abschnitt 6 benennt den Catch-up-Reset |
-| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | 422 benannt, Test 9b |
+| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | Fall über die Schnittstelle nicht herstellbar (R-ADM-02, Codex P2); Test 9b prüft den Schutz |
 
 ### Nachprüfung (frischer Kontext, 03.10.2026, Kopf `5efa153`)
 
