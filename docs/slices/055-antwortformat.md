@@ -1,6 +1,6 @@
 # Scheibe 055 — Antwortformat: Normalisierung im Kern, Editor, einheitlicher Renderer
 
-**Status:** spec (04.10.2026; gelesen auf `cc97005`, Integration mit 053 und 054, Vertrag 0.4.3). Fünfte Scheibe der
+**Status:** angenommen (gemergt `4da0165`, PR #152; Spec als #151 `ea3eb9a`). Spec-Stand 04.10.2026; gelesen auf `cc97005`, Integration mit 053 und 054, Vertrag 0.4.3). Fünfte Scheibe der
 Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041 (Register E57). **Geteilt**
 (Abschnitt „Teilung und Zuschnitt“): **diese Spec baut Teil a** (Vertrag, Kern, Dienst: Blockdokument, Normalisierung,
 Klartextprojektion, Lesbarkeit alter Versionen) auf dem Branch `claude/slice-055-antwortformat`; **Teil b** (Renderer und
@@ -970,3 +970,7 @@ Mehrzeit, kein Memo. Maschine: Container mit 4 vCPU auf geteiltem Host, Node 22.
 
 Lesebefund der Spec vor dem Bau (frischer Kontext, auf `0a8d5c1`): „erst nachbessern“; 1 blocker, 4 major, 12 minor, 6 nit, alle
 eingearbeitet, siehe „Lesebefunde und Umsetzung“. Review nach dem Bau: Einträge hier.
+
+Codex P1 (#152): Das projizierte `body` und die `sources` einer Version waren in jeder Sicht dasselbe Objekt wie in der
+Projektion und damit veränderbar; behoben in `514b564` (`body` tief eingefroren, `sources` kopiert und eingefroren, Test in
+`answerDraft055.test.ts`). Die Voraussetzung für 055b (Aliasing) ist damit erledigt; Eintrag in `docs/folgeliste.md`.
