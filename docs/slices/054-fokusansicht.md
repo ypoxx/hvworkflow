@@ -974,6 +974,38 @@ den Nachtrag des Orchestrators in „Files allowed“.
 `apps/web/playwright.config.ts`, `scripts/e2e-http-031.test.mjs`; `docs/evidence/054-*.png`; `docs/glossar.md`,
 `docs/folgeliste.md`, diese Spec.
 
+### Nachweis Projekt `http` (Orchestrator, 04.10.2026)
+
+CI-Lauf `e2e-http` auf PR #149, Commit 429ab6e, Lauf-ID 37223187826, Job-ID 111497461855, grün. Schluss des Logs:
+
+```
+✓  48 [http] › e2e/054-fokusansicht.spec.ts:167:3 › 054 Fokusansicht der Beantworter › F1 Liste, Alt+6, Rechte als Daten @screenshot (3.8s)
+✓  49 [http] › e2e/054-fokusansicht.spec.ts:237:3 › 054 Fokusansicht der Beantworter › F2 Doppelklick → Schreibmodus → speichern @screenshot (4.7s)
+✓  50 [http] › e2e/054-fokusansicht.spec.ts:291:3 › 054 Fokusansicht der Beantworter › F3 Tastatur: Enter, Escape, Dialog über dem Schreibmodus (schreibt nichts) (1.8s)
+✓  51 [http] › e2e/054-fokusansicht.spec.ts:342:3 › 054 Fokusansicht der Beantworter › F4 Weiterleiten → nächste Einzelfrage; Rückgabegrund prominent (6.1s)
+✓  52 [http] › e2e/054-fokusansicht.spec.ts:384:3 › 054 Fokusansicht der Beantworter › F5 An anderen Fachbereich weiterleiten @screenshot (7.2s)
+✓  53 [http] › e2e/054-fokusansicht.spec.ts:446:3 › 054 Fokusansicht der Beantworter › F6 Lesehinweis, Rechte als Daten (schreibt nichts) (2.7s)
+✓  54 [http] › e2e/054-fokusansicht.spec.ts:467:3 › 054 Fokusansicht der Beantworter › F7 Zulauf aus der Steuerung: letzter Weiterleitungsgrund (4.6s)
+✓  55 [http] › e2e/054-fokusansicht.spec.ts:514:3 › 054 Fokusansicht der Beantworter › F8 Eingaben je Akteur (schreibt nichts) (2.7s)
+56 passed (4.9m)
+```
+
+Dauer des Schritts „End-to-end http project …“: 18:08:42 bis 18:14:12, rund 5:30 gegen Limit 9:00 und Harness-Grenze 8:00
+(Schätzung vor dem Bau 7:00). Artefakt `evidence-031-http` (ID 11310678890, SHA-256
+f303b8d6b04aa39d5afc4a94623fe8793f92a574aa7af5bc08f307f84ac9edb2), für diese Scheibe nicht nötig.
+
+Hinweis: PR #148 (gleicher Inhalt) wurde geschlossen, weil gitleaks `generic-api-key` das JSX-Literal des Speichernamens
+in `features/focus/Page.tsx` traf; der Name steht jetzt als Modulkonstante, der Verlauf ist auf einen Commit gekürzt.
+
 ## Review findings
 
-(nach dem Review)
+Review in frischem Kontext (Opus, schlanker Modus) auf 42b0f61: ein Major, keine Sicherheits-, Rechts- oder
+Datenschutzbefunde.
+
+- **Major 1 (behoben):** 010d mit Server-Filter auf unit-fin und eigenmächtig erweiterte Files allowed. Jetzt clientseitige
+  Zeilenwahl, Liste ungefiltert; Nachtrag des Orchestrators in Files allowed, „Ausdrücklich nicht erlaubt“ und AK 2.
+  Enge Nachprüfung auf 8f1f287: behoben, kein neuer Blocker oder Major (010d, 020, 054 in-process: 38 passed).
+- **Minor 2 (bestätigt im Nachtrag):** zusätzliches `asRole(page,'expert')` in 020.
+- **Minor 3 (erledigt):** Nachweis `http` oben.
+- **Minor 4 (behoben):** F8 bringt seine Vorbedingung selbst mit.
+- **Minor 5–8, Nit 9:** in `docs/folgeliste.md` („054 Review 5“ bis „054 Review 8“; 9 stand schon dort).
