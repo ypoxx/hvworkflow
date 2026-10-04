@@ -1,0 +1,447 @@
+
+=== Kopf
+Slice 037a, lokales Protokoll (ohne Secrets). Datum: 2026-10-03T13:54:07Z. Commit: 938ffbe + Arbeitsstand vor dem Bau-Commit; Dockerfiles, Compose-Datei und Skripte dieses Laufs sind gleich dem Bau-Commit 8ac36d4 (danach nur Workflow-Reihenfolge und Dokumente geändert)
+Docker Engine 29.3.1, Compose 5.1.1, Node v22.22.2, Storage-Treiber vfs (Arbeitsumgebung)
+WICHTIG: quay.io ist in dieser Arbeitsumgebung durch die Egress-Richtlinie gesperrt (403 auf CONNECT quay.io:443).
+Das Keycloak-Image kann hier nicht geladen werden. Deshalb: stack:up läuft echt bis einschließlich Images bauen und
+bricht in der Stufe 'Stack starten' am Pull von Keycloak ab. Danach startet derselbe Compose-Stack mit einem
+nicht versionierten Platzhalter für den Dienst keycloak (node:22-bookworm-slim, nur Netz-Namensraum und /health/ready
+auf 9000, KEIN Realm). S12.3 (Keycloak-Discovery) und S13 (Anmeldung, Screenshot) schlagen deshalb lokal ehrlich fehl
+bzw. entfallen; sie laufen im CI-Job stack-037a. Alle übrigen Prüfungen laufen gegen die echten Images.
+Bauumgebung: HV_STACK_BUILD_CA zeigt auf das CA-Bündel des TLS-prüfenden Proxys dieser Umgebung (nur Baustufe).
+Docker-Daemon mit --registry-mirror=https://mirror.gcr.io (Rate-Limit von Docker Hub).
+BuildKit-Fortschrittszeilen der drei Bauläufe sind gekürzt (538 Zeilen entfernt); erhalten sind die Zeilen mit Image-ID und Namen.
+
+=== Ausgangslage: stack:reset --yes, Images und Build-Cache gelöscht (Start ohne Image-Cache)
+$ node scripts/stack.mjs reset --yes
+HV-Stack zurückgesetzt: Container, Volumes und Zustandsverzeichnis gelöscht. Neu starten: pnpm stack:up
+[exit 0, 9.1 s]
+$ docker image rm -f hv-tool/api:local hv-tool/seed:local hv-tool/web:local
+Untagged: hv-tool/api:local
+Deleted: sha256:c7e6f9a9f7f16350ae4d5a12f971cd4e4fa4c8d1d62e0894fa01f89b0b1a56e3
+Untagged: hv-tool/seed:local
+Deleted: sha256:e732bc2dedba9fb208869ace9807b56f9f4ff6ce2929c3d4918cda20ae737fed
+Untagged: hv-tool/web:local
+Deleted: sha256:92eaf2c817339fe2aeba1e95c391334070481276f07cef5afbcf103d23f18c7c
+[exit 0, 0.0 s]
+$ docker builder prune -af   [Ausgabe unterdrückt]
+
+=== S11 Start aus dem Nichts: pnpm stack:up (ohne Image-Cache)
+$ node scripts/stack.mjs up
+Zustandsverzeichnis: /root/.local/state/hv-tool-stack
+ Image hv-tool/web:local Building 
+ Image hv-tool/seed:local Building 
+ Image hv-tool/api:local Building 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#46 writing image sha256:41708e034ca8a7f2718247dee6b6440ce116fed84779f9d312473e86ce7d4ecf done
+#46 naming to docker.io/hv-tool/api:local done
+
+
+
+
+
+#51 writing image sha256:3fe370498f4cd31845a5e839c6f2f3f143cc95f871f821a109472a7c6a33f996 done
+#51 naming to docker.io/hv-tool/seed:local done
+
+
+
+
+#54 writing image sha256:696550806865c5d539c6bd621ee67084c622305041087f48ed18fb16be228a99 done
+#54 naming to docker.io/hv-tool/web:local done
+
+ Image hv-tool/seed:local Built 
+ Image hv-tool/web:local Built 
+ Image hv-tool/api:local Built 
+HV-Stack: Fehler in der Stufe „Stack starten“.
+[exit 1, 36.4 s]
+$ docker compose -p hv-tool -f deploy/compose/compose.yaml -f <scratchpad>/kc-placeholder.yaml up --detach --wait   (Keycloak-Platzhalter, siehe Kopf)
+[exit 0, 24.9 s]
+api: running healthy exit=0
+keycloak: running healthy exit=0
+migrate: exited  exit=0
+postgres: running healthy exit=0
+seed: exited  exit=0
+web: running healthy exit=0
+$ docker image ls --format {{.Repository}}:{{.Tag}} {{.ID}} {{.Size}} --filter reference=hv-tool/*
+hv-tool/web:local 696550806865 54.9MB
+hv-tool/seed:local 3fe370498f4c 172MB
+hv-tool/api:local 41708e034ca8 172MB
+[exit 0, 0.0 s]
+
+=== S12 Rauchtest: pnpm stack:smoke
+$ node scripts/stack.mjs smoke
+PASS Header einmal auf GET / (200, text/html)
+PASS Header einmal auf GET /v1/meetings ohne Sitzung (Antwort des Dienstes, 401)
+PASS Header einmal auf einer Datei unter /assets/
+PASS Header einmal auf 502 bei angehaltenem Dienst
+PASS GET /auth/transparency-notice 200 (Web → Dienst)
+PASS GET /healthz auf dem Webport 404, nicht index.html
+PASS GET /readyz auf dem Webport 404, nicht index.html
+PASS GET /metrics auf dem Webport 404, nicht index.html
+PASS Quelltextkarte (.map) 404
+PASS Body von 300 KB 413 am Proxy
+PASS /healthz im Container 200
+PASS /readyz im Container: db und migrations ok
+Uhrprüfung nicht eingerichtet (erwartet ohne HV_STACK_NTP_SERVERS); Datenbank und Migrationen bereit.
+PASS Startzeile des Dienstes genau wie erwartet, kein "refusing to start", keine unbekannte Variable
+PASS Ereignislog befüllt (1748 Ereignisse)
+PASS hv_owner und hv_runtime: kein Superuser, kein CREATEROLE, kein CREATEDB
+PASS hv_runtime ohne UPDATE und DELETE am Ereignislog
+PASS Eigentümer von auth_purge_login_states ist hv_owner
+FAIL Keycloak-Discovery 200, issuer wie konfiguriert
+HV-Stack: Fehler in der Stufe „Rauchtest“.
+Rauchtest fehlgeschlagen: Keycloak-Discovery 200, issuer wie konfiguriert
+[exit 1, 11.8 s]
+
+=== S14 Nicht root, kein Befüllungscode
+$ node scripts/stack.mjs probe images
+Image hv-tool/api:local: User 65532:65532, ID 41708e034ca8, 172 MB
+PASS Image api läuft als 65532:65532
+Image hv-tool/seed:local: User 65532:65532, ID 3fe370498f4c, 172 MB
+PASS Image seed läuft als 65532:65532
+Image hv-tool/web:local: User 101, ID 696550806865, 55 MB
+PASS Image web läuft als 101
+Prozesse im Container api: UID 65532
+PASS Container api ohne UID 0
+Prozesse im Container web: UID 101
+PASS Container web ohne UID 0
+PASS Image api ohne /app/scripts
+PASS /var/lib/hv 0755 root, access-log 0700 65532
+[exit 0, 1.7 s]
+
+=== S15 Schema und Befüllung verweigern außerhalb von Loopback
+$ node scripts/stack.mjs probe refusals
+PASS api ohne Umgebung: Exit 1 mit dem Satz zu HV_ACCESS_LOG_DIR, ohne Wert
+PASS api mit Issuer http://keycloak:…: Exit 1 mit dem Satz zu HV_OIDC_ISSUER
+PASS seed mit fremdem Issuer: Exit 1, fester Satz, ohne Datenbank (Netz none)
+PASS seed mit fremdem Datenbank-Host: Exit 1, fester Satz
+[exit 0, 8.0 s]
+
+=== S16.1 Postgres-Neustart
+$ node scripts/stack.mjs probe postgres-restart
+Postgres-Neustart: db zeitweise unreachable, wieder ok nach 0.6 s (restart-Befehl 0.7 s)
+PASS Postgres-Neustart: /readyz db zeitweise nicht ok, innerhalb von 60 s wieder ok
+PASS RestartCount des Dienstes unverändert (0)
+[exit 0, 8.8 s]
+
+=== S16.2 Absturz des Dienstes
+$ node scripts/stack.mjs probe api-crash
+PASS genau ein Node-Prozess des Dienstes gefunden
+PASS RestartCount gestiegen (0 → 1)
+Dienst nach dem Absturz wieder gesund nach 6.3 s
+PASS Ereigniszahl unverändert (1748)
+PASS docker compose stop api in unter 3 s (0.1 s, SIGTERM kommt an)
+[exit 0, 16.5 s]
+
+=== S16.3 Stoppen und Starten (mit Image-Cache)
+Vorher: Ereignisse 1748, realm.json sha256 d46a9a620ef60ddf
+$ node scripts/stack.mjs down
+HV-Stack gestoppt; die Daten bleiben erhalten. Wieder starten: pnpm stack:up
+[exit 0, 7.9 s]
+$ node scripts/stack.mjs up
+Zustandsverzeichnis: /root/.local/state/hv-tool-stack
+ Image hv-tool/seed:local Building 
+ Image hv-tool/api:local Building 
+ Image hv-tool/web:local Building 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#34 writing image sha256:41708e034ca8a7f2718247dee6b6440ce116fed84779f9d312473e86ce7d4ecf done
+#34 naming to docker.io/hv-tool/api:local done
+
+#35 writing image sha256:3fe370498f4cd31845a5e839c6f2f3f143cc95f871f821a109472a7c6a33f996 done
+#35 naming to docker.io/hv-tool/seed:local done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#54 writing image sha256:696550806865c5d539c6bd621ee67084c622305041087f48ed18fb16be228a99 done
+#54 naming to docker.io/hv-tool/web:local done
+
+ Image hv-tool/web:local Built 
+ Image hv-tool/api:local Built 
+ Image hv-tool/seed:local Built 
+HV-Stack: Fehler in der Stufe „Stack starten“.
+[exit 1, 2.3 s]
+realm.json sha256 nach dem Schreiben durch stack:up: d46a9a620ef60ddf (vorher d46a9a620ef60ddf; gleich: ja)
+$ docker compose -p hv-tool -f deploy/compose/compose.yaml -f <scratchpad>/kc-placeholder.yaml up --detach --wait   (Keycloak-Platzhalter, siehe Kopf)
+[exit 0, 23.5 s]
+api: running healthy exit=0
+keycloak: running healthy exit=0
+migrate: exited  exit=0
+postgres: running healthy exit=0
+seed: exited  exit=0
+web: running healthy exit=0
+Nachher: Ereignisse 1748 (gleich: ja); letzte Zeile von seed: HV-Stack-Befüllung: bereits befüllt, nichts geschrieben.
+$ node scripts/stack.mjs smoke
+PASS Header einmal auf GET / (200, text/html)
+PASS Header einmal auf GET /v1/meetings ohne Sitzung (Antwort des Dienstes, 401)
+PASS Header einmal auf einer Datei unter /assets/
+PASS Header einmal auf 502 bei angehaltenem Dienst
+PASS GET /auth/transparency-notice 200 (Web → Dienst)
+PASS GET /healthz auf dem Webport 404, nicht index.html
+PASS GET /readyz auf dem Webport 404, nicht index.html
+PASS GET /metrics auf dem Webport 404, nicht index.html
+PASS Quelltextkarte (.map) 404
+PASS Body von 300 KB 413 am Proxy
+PASS /healthz im Container 200
+PASS /readyz im Container: db und migrations ok
+Uhrprüfung nicht eingerichtet (erwartet ohne HV_STACK_NTP_SERVERS); Datenbank und Migrationen bereit.
+PASS Startzeile des Dienstes genau wie erwartet, kein "refusing to start", keine unbekannte Variable
+PASS Ereignislog befüllt (1748 Ereignisse)
+PASS hv_owner und hv_runtime: kein Superuser, kein CREATEROLE, kein CREATEDB
+PASS hv_runtime ohne UPDATE und DELETE am Ereignislog
+PASS Eigentümer von auth_purge_login_states ist hv_owner
+FAIL Keycloak-Discovery 200, issuer wie konfiguriert
+HV-Stack: Fehler in der Stufe „Rauchtest“.
+Rauchtest fehlgeschlagen: Keycloak-Discovery 200, issuer wie konfiguriert
+[exit 1, 9.6 s]
+
+=== S16.4 Zurücksetzen
+$ node scripts/stack.mjs reset --yes
+HV-Stack zurückgesetzt: Container, Volumes und Zustandsverzeichnis gelöscht. Neu starten: pnpm stack:up
+[exit 0, 10.6 s]
+Volumes hv-tool_*: (leer erwartet); Zustandsverzeichnis vorhanden: nein
+$ node scripts/stack.mjs up
+Zustandsverzeichnis: /root/.local/state/hv-tool-stack
+ Image hv-tool/api:local Building 
+ Image hv-tool/web:local Building 
+ Image hv-tool/seed:local Building 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#33 writing image sha256:41708e034ca8a7f2718247dee6b6440ce116fed84779f9d312473e86ce7d4ecf done
+#33 naming to docker.io/hv-tool/api:local done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#69 writing image sha256:696550806865c5d539c6bd621ee67084c622305041087f48ed18fb16be228a99 done
+#69 naming to docker.io/hv-tool/web:local done
+
+#70 writing image sha256:3fe370498f4cd31845a5e839c6f2f3f143cc95f871f821a109472a7c6a33f996 done
+#70 naming to docker.io/hv-tool/seed:local done
+
+
+
+ Image hv-tool/seed:local Built 
+ Image hv-tool/web:local Built 
+ Image hv-tool/api:local Built 
+HV-Stack: Fehler in der Stufe „Stack starten“.
+[exit 1, 2.5 s]
+$ docker compose -p hv-tool -f deploy/compose/compose.yaml -f <scratchpad>/kc-placeholder.yaml up --detach --wait   (Keycloak-Platzhalter, siehe Kopf)
+[exit 0, 23.4 s]
+api: running healthy exit=0
+keycloak: running healthy exit=0
+migrate: exited  exit=0
+postgres: running healthy exit=0
+seed: exited  exit=0
+web: running healthy exit=0
+Neue Secrets: ja; Ereignisse 1748; letzte Zeile von seed: HV-Stack-Befüllung: Demo-Korpus und neun Testpersonen geschrieben.
+$ node scripts/stack.mjs smoke
+PASS Header einmal auf GET / (200, text/html)
+PASS Header einmal auf GET /v1/meetings ohne Sitzung (Antwort des Dienstes, 401)
+PASS Header einmal auf einer Datei unter /assets/
+PASS Header einmal auf 502 bei angehaltenem Dienst
+PASS GET /auth/transparency-notice 200 (Web → Dienst)
+PASS GET /healthz auf dem Webport 404, nicht index.html
+PASS GET /readyz auf dem Webport 404, nicht index.html
+PASS GET /metrics auf dem Webport 404, nicht index.html
+PASS Quelltextkarte (.map) 404
+PASS Body von 300 KB 413 am Proxy
+PASS /healthz im Container 200
+PASS /readyz im Container: db und migrations ok
+Uhrprüfung nicht eingerichtet (erwartet ohne HV_STACK_NTP_SERVERS); Datenbank und Migrationen bereit.
+PASS Startzeile des Dienstes genau wie erwartet, kein "refusing to start", keine unbekannte Variable
+PASS Ereignislog befüllt (1748 Ereignisse)
+PASS hv_owner und hv_runtime: kein Superuser, kein CREATEROLE, kein CREATEDB
+PASS hv_runtime ohne UPDATE und DELETE am Ereignislog
+PASS Eigentümer von auth_purge_login_states ist hv_owner
+FAIL Keycloak-Discovery 200, issuer wie konfiguriert
+HV-Stack: Fehler in der Stufe „Rauchtest“.
+Rauchtest fehlgeschlagen: Keycloak-Discovery 200, issuer wie konfiguriert
+[exit 1, 9.7 s]
+Ende: 2026-10-03T13:58:44Z
+
+=== S13 Anmeldung mit Screenshot (lokal nicht möglich, siehe Kopf)
+$ node scripts/stack-login.mjs
+HV-Stack: Fehler in der Stufe „Anmeldung moderation“.
+[exit 1, 31.0 s]   (Playwright und Chromium starten; ohne echten Keycloak gibt es kein Anmeldeformular. S13 läuft im CI-Job stack-037a.)
+
+=== stack:credentials (nur Form geprüft, Werte nicht protokolliert)
+Kopfzeile: Testpersonen (Realm hv-local, Anmeldung unter http://localhost:8480):
+ausgeführt, 9 Personen, eine Zeile Keycloak-Admin

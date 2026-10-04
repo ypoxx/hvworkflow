@@ -413,6 +413,41 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - takt-038 Review nit 9 · `docs/evidence/takt-038-historie-weitere.png` · zeigt den Zustand nach dem Klick, nicht den Knopf
   selbst · bei Gelegenheit ein zweites Bild vor dem Klick.
 
+## Betriebspaket (aus 037a)
+
+- 037a S17 (frischer Agent, 03.10.2026, `docs/evidence/037a-installation-befolgt.txt`) · `docs/betrieb/installation.md`,
+  `scripts/stack.mjs` · fünf kleine Verbesserungen: (1) Zertifikatsabbruch beim Bau nennt `HV_STACK_BUILD_CA` direkt,
+  Proxy-Hinweis schon in §2/§3; (2) pnpm-Warnung „node_modules missing“ als harmlos erklären; (3) Registries nennen
+  (Docker Hub, quay.io) für Firmen-Firewalls, eigene Fehlersuche-Zeile für eine gesperrte Registry; (4) `stack:login` ohne
+  `pnpm install`: Meldung „Playwright laden“ mit Abhilfe; (5) `stack:smoke`/`probe` ohne laufenden Stack: klarer Satz
+  statt Diagnoseblock. Keine sachlich falsche Angabe gefunden.
+
+- 037a Bau · `apps/api/src/persistence/migrations.ts` (über `migrate-cli.ts`) · pg 8.23 meldet bei jedem Migrationslauf
+  „DeprecationWarning: Calling client.query() when the client is already executing a query“ (auch im Protokoll des
+  Einmaldienstes `migrate`) · Abfragen dort strikt nacheinander awaiten, bevor pg 9 das entfernt.
+- ~~037a Bau · `scripts/stack.mjs` (Stufe „Stack starten“) · ein nicht ladbares Basis-Image (gesperrter Registry-Host,
+  Rate-Limit) zeigt sich nur als Stufenname, ohne das betroffene Image · vor `up` jedes nicht lokal vorhandene Image
+  einzeln laden und bei Fehler den Image-Namen (kein Wert) im festen Satz nennen.~~ → erledigt im Nachtrag nach CI zu **037a** (Diagnose mit der Meldung von Compose).
+- 037a Review · `deploy/compose/compose.yaml` · nach einem Neustart von Keycloak meldet der Stack sich gesund, obwohl Dienst
+  und Web kein Ziel mehr haben (Healthchecks laufen im Container, nicht durch den Proxy) · Healthcheck des Webs durch den
+  Proxy auf `/auth/transparency-notice`, `depends_on.restart: true` für api und web, oder `resolver` in nginx.
+- 037a Review · `scripts/stack.mjs` (`stackContext`, `readState`) · `stack:reset` scheitert an einer beschädigten
+  `state.json` (JSON-Fehler), und `assertOutsideRepository` wirft keinen `StackRefusal` (nur der Stufenname erscheint) ·
+  `reset` ohne lesbaren Zustand mit dem leeren Ersatzverzeichnis fahren, die Prüfung in einen festen Satz übersetzen.
+- 037a Review · `scripts/stack.test.mjs` (S10 „formatters … never carry a secret“) · der Test kann nicht scheitern, weil
+  die Formatierer die Secrets gar nicht bekommen · Formatierer mit einem Zustand aufrufen, der die Marker enthält und
+  ausgegeben werden könnte, oder den Test umbenennen.
+- 037a Review · `scripts/stack.mjs` (Rauchtest S12.2) · der Test erkennt nicht, ob die 413 von nginx oder vom Dienst kam ·
+  Körper oder `Server`-Header der Antwort prüfen (nginx-Fehlerseite gegen problem+json des Dienstes).
+- 037a Review · `deploy/docker/nginx.conf` · Präfix-Locations `/v1/` und `/auth/` sowie `location /v1/stream` statt
+  `location = /v1/stream` · exakte Location für den Strom, Präfixe wie der Vite-Proxy dokumentieren.
+- ~~037a Review · `scripts/stack-login.mjs` · fester Chromium-Pfad der Arbeitsumgebung~~ → erledigt in **037a**
+  (`PW_CHROMIUM_PATH` oder Playwrights eigenes Chromium).
+- 037a Review · `deploy/compose/compose.yaml` · keine Ressourcengrenzen (Speicher, CPU, PIDs) für die Dienste ·
+  `mem_limit`, `cpus`, `pids_limit` mit Werten aus einem gemessenen Lauf.
+- 037a Review · `docs/evidence/037a-stack-protokoll.txt` · das Protokoll entstand auf „938ffbe + Arbeitsstand“, nicht auf
+  einem benannten Commit · bei der nächsten Wiederholung (mit erreichbarem quay.io) auf einem benannten Commit neu aufnehmen.
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
