@@ -32,3 +32,14 @@ export function steeringActions(actions: readonly Permission[]): SteeringActions
   const secondary = has('question.refuse.propose') ? [...rest, 'refuse' as const] : rest;
   return primary === undefined ? { secondary } : { primary, secondary };
 }
+
+/**
+ * Review 053, minor 3a: may the page move the focus to the detail after a write? Only when the person is not
+ * working elsewhere: the focus is on nothing (the body — e.g. the closed dialog took it along) or already inside
+ * the detail. Never out of the search field or another control because a version arrived. DOM-free on purpose:
+ * `active` is `document.activeElement`, `detail` the detail's root.
+ */
+export function mayMoveFocus<N>(active: N | null, body: N, detail: { contains(node: N): boolean } | null): boolean {
+  if (active === null || active === body) return true;
+  return detail !== null && detail.contains(active);
+}

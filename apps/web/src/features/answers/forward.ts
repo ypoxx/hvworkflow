@@ -63,7 +63,8 @@ export function forwardProblemKey(error: unknown): ForwardProblem | undefined {
 
 /**
  * The `onProblem` of the forward dialog for the write door (`useWriteDoor`), after `refusalProblemHandler` (045):
- * `guard15` and `invalid` are shown in the dialog and handled (inputs stay); `gone` closes the dialog and reports
+ * `guard15` and `invalid` are shown in the dialog and handled (inputs stay); `gone` closes the dialog (while its
+ * question is still shown) and reports
  * (`gone`, a toast with the number), handled — no "Stand veraltet"; a 412 closes the dialog while its question is
  * still shown and leaves the notice to the door; everything else goes on to the toast with the dialog left open.
  */
@@ -75,7 +76,9 @@ export function forwardProblemHandler(
   return (error, stillShown) => {
     const key = forwardProblemKey(error);
     if (key === 'gone') {
-      close();
+      // Only the dialog of the question still on screen closes (review 053, minor 2); the toast names the number
+      // wherever the person is by now.
+      if (stillShown()) close();
       gone();
       return true;
     }

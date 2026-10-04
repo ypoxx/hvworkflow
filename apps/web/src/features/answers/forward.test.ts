@@ -101,6 +101,14 @@ describe('forwardProblemHandler', () => {
     expect(show).not.toHaveBeenCalled();
   });
 
+  it('gone (404) for a question no longer shown: the dialog stays, the toast still appears', () => {
+    const { show, close, gone, handle } = setup();
+    expect(handle(problem(404), () => false)).toBe(true);
+    expect(close).not.toHaveBeenCalled();
+    expect(gone).toHaveBeenCalledTimes(1);
+    expect(show).not.toHaveBeenCalled();
+  });
+
   it('412: closes only while its question is still shown, and is not handled', () => {
     const shown = setup();
     expect(shown.handle(problem(412), () => true)).toBe(false);

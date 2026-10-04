@@ -32,6 +32,7 @@ import { ClassifyDialog } from '../capture/ClassifyDialog';
 import { DistributionPanel } from './DistributionPanel';
 import type { SeatRead } from './DistributionPanel';
 import { SteeringDetail } from './SteeringDetail';
+import { mayMoveFocus } from './steering';
 import type { SteeringAction } from './steering';
 
 /** Scheibe 045: the catalogue read of this page (stable, so the hook's loader keeps one function). */
@@ -69,7 +70,12 @@ function useStageSeats(meetingId: string | undefined): SeatRead {
 interface PendingFocus {
   id: string;
   version: number;
+  /** Classify only (review 053, minor 3c): the moment after which a new version no longer counts as its own write. */
+  until?: number;
 }
+
+/** How long after the classify dialog closed a new version still counts as its own save (`performance.now()` ms). */
+const CLASSIFY_FOCUS_WINDOW_MS = 3000;
 
 export function SteeringPage() {
   const t = useT();
@@ -102,29 +108,59 @@ export function SteeringPage() {
 
   /**
    * takt-008: after a write from this page the focus goes to the primary action of the detail, or to its number
-   * when there is none — once the new version is on screen. Only for the question the write was made against.
+   * when there is none — once the new version is on screen. Only for the question the write was made against, and
+   * only while the person is not working elsewhere (`mayMoveFocus`, review 053 minor 3a).
    */
-  // A ref, not state: arming it renders nothing; the effect acts when the question on screen changes. It falls with
-  // a change of actor or selection, so it never moves the focus for another person or another question.
+  // Refs, not state: arming renders nothing; the effect acts when the question on screen changes. The pending focus
+  // falls with a change of actor or selection, so it never moves the focus for another person or another question.
   const pendingFocus = useRef<PendingFocus | null>(null);
+  const questionNow = useRef(question);
+  const detailRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     pendingFocus.current = null;
   }, [actorId, selectedId]);
-  const detailRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const pending = pendingFocus.current;
-    if (pending === null || question === null || question.id !== pending.id || question.version === pending.version) return;
-    pendingFocus.current = null;
+
+  const focusDetail = useCallback(() => {
     const root = detailRef.current;
+    if (!mayMoveFocus<Node>(document.activeElement, document.body, root)) return;
     const target =
       root?.querySelector<HTMLElement>('[data-primary="true"]') ??
       root?.querySelector<HTMLElement>('[data-testid="steering-detail-number"]');
     target?.focus();
-  }, [question]);
+  }, []);
 
+  /** The pending focus is due when the question on screen is a newer version of the one written against. */
+  const settleFocus = useCallback((): void => {
+    const pending = pendingFocus.current;
+    const current = questionNow.current;
+    if (pending === null || current === null || current.id !== pending.id || current.version <= pending.version) return;
+    pendingFocus.current = null;
+    if (pending.until !== undefined && performance.now() > pending.until) return;
+    focusDetail();
+  }, [focusDetail]);
+
+  useEffect(() => {
+    questionNow.current = question;
+    settleFocus();
+  }, [question, settleFocus]);
+
+  // Review 053, minor 3b: the stream can deliver the new version before the write answers; then it is due at once.
   const armFocus = useCallback(() => {
-    if (question !== null) pendingFocus.current = { id: question.id, version: question.version };
-  }, [question]);
+    if (question === null) return;
+    pendingFocus.current = { id: question.id, version: question.version };
+    settleFocus();
+  }, [question, settleFocus]);
+
+  /**
+   * Review 053, minor 3c: the unchanged `ClassifyDialog` closes the same way on Cancel and after saving. So the close
+   * arms only for a version that arrives shortly after it (its own write answers before it closes); a cancel arms
+   * nothing that a later write of someone else could use. `onSaved` stays on the follow-up list.
+   */
+  const armFocusAfterClassify = useCallback(() => {
+    if (question === null) return;
+    pendingFocus.current = { id: question.id, version: question.version, until: performance.now() + CLASSIFY_FOCUS_WINDOW_MS };
+    settleFocus();
+  }, [question, settleFocus]);
 
   const onAction = useCallback((action: SteeringAction) => setDialog(action), [setDialog]);
 
@@ -219,8 +255,8 @@ export function SteeringPage() {
           key={`${actorId}:${question.id}:classify`}
           question={question}
           onClose={() => {
-            // Its own write path closes it on success too; the focus moves only if a new version arrives.
-            armFocus();
+            // Its own write path closes it on success too; the focus moves only if a new version arrives shortly.
+            armFocusAfterClassify();
             setDialog(null);
           }}
           onProblem={reload}

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Permission, Question, QuestionStatus } from '@hv/domain';
-import { steeringActions } from './steering';
+import { mayMoveFocus, steeringActions } from './steering';
 
 const list = (...actions: Permission[]): readonly Permission[] => actions;
 
@@ -52,5 +52,26 @@ describe('steeringActions (Test 4)', () => {
     expect(results[1]).toEqual(results[0]);
     expect(results[2]).toEqual(results[0]);
     expect(results[0]).toEqual({ primary: 'forward', secondary: ['refuse'] });
+  });
+});
+
+describe('mayMoveFocus (review 053, minor 3a)', () => {
+  const body = { id: 'body' };
+  const search = { id: 'search' };
+  const inDetail = { id: 'primary' };
+  const detail = { contains: (node: { id: string }) => node === inDetail };
+
+  it('moves from nothing: the body, or no active element (the closed dialog took the focus along)', () => {
+    expect(mayMoveFocus(body, body, detail)).toBe(true);
+    expect(mayMoveFocus(null, body, detail)).toBe(true);
+  });
+
+  it('moves within the detail', () => {
+    expect(mayMoveFocus(inDetail, body, detail)).toBe(true);
+  });
+
+  it('never pulls the focus out of the search field or another control', () => {
+    expect(mayMoveFocus(search, body, detail)).toBe(false);
+    expect(mayMoveFocus(search, body, null)).toBe(false);
   });
 });

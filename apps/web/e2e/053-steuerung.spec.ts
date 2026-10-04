@@ -13,6 +13,7 @@
  *   - S3: one `classified` text-track question without a unit is `assigned` to "Operations";
  *   - S4: one `assigned` question of "Operations" lies with "AR-Büro", status `assigned`, with one `QuestionForwarded`
  *     (reason `expertise_elsewhere`);
+ *   - (S2b runs in-process only and writes nothing in `http`);
  *   - no question of "Finanzen" (the unit of the expert test person) is touched; the podium is unchanged; S1, S5–S10
  *     write nothing.
  * `080-sprecher-zustand.spec.ts` touches only speakers; `abnahme.spec.ts` captures and classifies its own questions and
@@ -264,11 +265,25 @@ test.describe.serial('053 Steuerungsansicht der Koordination', () => {
     const noneBefore = await countOf(noUnitCell(page));
     const seatsBefore = await page.getByTestId('steering-seat-cell').evaluateAll((els) => els.map((el) => el.getAttribute('data-count')));
 
-    await page.getByTestId('steering-classify').click();
-    await page.getByTestId('classify-track-expert_track').click();
-    await page.getByTestId('classify-stage').selectOption('cfo');
+    const fillClassify = async (): Promise<void> => {
+      await page.getByTestId('steering-classify').click();
+      await page.getByTestId('classify-track-expert_track').click();
+      await page.getByTestId('classify-stage').selectOption('cfo');
+    };
+    await fillClassify();
     await clearToasts(page);
     await checkAxe(page, '053 classify dialog DE');
+    // S8 in English too: the language toggle is behind the backdrop — close, switch, open again.
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toHaveCount(0);
+    await setLang(page, 'en');
+    await fillClassify();
+    await clearToasts(page);
+    await checkAxe(page, '053 classify dialog EN');
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toHaveCount(0);
+    await setLang(page, 'de');
+    await fillClassify();
     await page.getByTestId('classify-save').click();
     await expect(dialog(page)).toHaveCount(0);
 
@@ -281,6 +296,39 @@ test.describe.serial('053 Steuerungsansicht der Koordination', () => {
     expect(await page.getByTestId('steering-seat-cell').evaluateAll((els) => els.map((el) => el.getAttribute('data-count')))).toEqual(seatsBefore);
     // takt-008: the focus goes to the primary action of the new version.
     await expect(detail(page).locator('[data-primary="true"]')).toBeFocused();
+  });
+
+  test('S2b Fokus bleibt, wo die Person arbeitet: fremder Schreibvorgang bei Fokus im Suchfeld (schreibt eine Zuweisung)', async ({ page }) => {
+    // Review 053, minor 3a/3c. In-process only: the write that does not come from this page is made through the demo's
+    // own HvApi module, which only the dev server serves; in `http` this file must not leave an extra write behind.
+    test.skip(isHttp(), 'the foreign write goes through the demo module of the dev server');
+    test.setTimeout(120_000);
+    const number = await findSteerable(page, 'coordination', { status: 'classified', button: 'steering-assign' });
+    // A cancelled classify dialog arms nothing a later write could use (3c) …
+    await page.getByTestId('steering-classify').click();
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toHaveCount(0);
+    // … and a version that arrives while the person types in the search field leaves the focus there (3a).
+    const search = page.getByTestId('answers-search');
+    await search.focus();
+    await expect(search).toBeFocused();
+    const outcome = await page.evaluate(async ([url, wanted, unitId]) => {
+      const mod = (await import(/* @vite-ignore */ url!)) as {
+        api: {
+          listQuestions: (f: { q: string; limit: number }) => Promise<{ items: { id: string; number: string; version: number }[] }>;
+          assignQuestion: (id: string, unit: string, o: { ifMatch: string }) => Promise<unknown>;
+        };
+      };
+      const found = (await mod.api.listQuestions({ q: wanted!, limit: 50 })).items.find((item) => item.number === wanted);
+      if (found === undefined) return 'not found';
+      await mod.api.assignQuestion(found.id, unitId!, { ifMatch: `"v${found.version}"` });
+      return 'written';
+    }, ['/src/api/index.ts', number, SOURCE_UNIT_ID]);
+    expect(outcome).toBe('written');
+    await expect(page.getByTestId('steering-detail-unit')).toHaveText(SOURCE_UNIT);
+    await expect(detail(page)).toContainText('zugewiesen');
+    await expect(search).toBeFocused();
   });
 
   test('S3 Zuweisen', async ({ page }) => {
