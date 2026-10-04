@@ -1,6 +1,6 @@
 # Scheibe 048 — Weiterleiten an einen anderen Fachbereich (Vertrag, Kern, Dienst)
 
-**Status:** spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Bau beginnt erst nach Antwort auf E5 (fällig 09.10.2026) oder ausdrücklichem Go des Eigentümers.**
+**Status:** spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Go des Eigentümers zum Bau am 04.10.2026 erteilt** (Bau auf den Standards dieser Spec; E5 bleibt im Register offen, Standard „beides bauen“). Ursprünglich: Bau erst nach Antwort auf E5 oder ausdrücklichem Go.
 **Risikoklasse:** hoch · 3,0 AStd (Spanne 2,5–3,75; Plan 048: mittel · 1,5 AStd für alle drei Themen der Planzeile; Begründung in „Warum hoch“ und „Aufwand“) · Plan 048: 05.11.2026 (W6), tatsächlich direkt nach 045 und nach der Antwort auf E5 · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `http.ts` und `liveStore.ts`); web-shell (nur Aktions- und Ereignisschlüssel); web-history (nur die Zusammenfassung des neuen Ereignisses und die Bezeichnungen der Gründe); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz (nur Zeile V4); docs (Glossar)
 **Bedrohungsmodell:** berührt T-G1-E-01 (Schreibvorgang ohne Oberfläche), T-G1-I-01 (Leserkreis wächst um die Zieleinheit, Umfang in „Warum hoch“), T-G1-I-09 (Strom: Frage verlässt den Lesebereich); neuer Missbrauchsfall MF-14 (Abschnitt „Missbrauchsfälle“)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6); danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Einheitsbindung, neues Recht, Strom, Antwort nach dem Verlassen des eigenen Bereichs), **Datenschutz** (geschlossener Grundcode, erweiterter Leserkreis, keine Person als Ziel) und **Vertrag** (neue Operation, Validator und Kern im Gleichlauf, Abdeckungstor). Lesebefund der Spec vor dem Bau erledigt (Klasse hoch); nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
@@ -446,7 +446,7 @@ Weitere Dateien sind Scope-Befunde.
 
 ## Vor dem Bau prüfen
 
-1. **E5 beantwortet oder ausdrückliches Go des Eigentümers.** Ohne beides: nicht beginnen (Rücknahme nach dem Merge ist
+1. **E5 beantwortet oder ausdrückliches Go des Eigentümers** (erfüllt: Go am 04.10.2026). Ohne beides: nicht beginnen (Rücknahme nach dem Merge ist
    brechend, Vertragsschritt). Lautet die Antwort „nur zum nächsten Schritt“, entfällt diese Scheibe; der Architekt legt das
    im Register ab.
 2. 045 gemergt (`c0db7f5`) und Vertrag 0.4.2; `PERMISSIONS` enthält `question.forward` nicht; R-TRANS-17 und R-GUARD-15 sind
