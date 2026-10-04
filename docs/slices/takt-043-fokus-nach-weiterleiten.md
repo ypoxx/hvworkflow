@@ -211,3 +211,12 @@ mark-test-run: wrote /home/user/wt/takt043/.claude/state/last-test-run (clean tr
 ```
 
 ## Review findings
+
+Review in frischem Kontext (Opus, schlanker Modus) auf e8a1609: kein Blocker, kein Major; eigener Gates-Lauf grün.
+
+- Minor 1 (vorbestehend): Weiterleiten an einen anderen Fachbereich in Reihenfolge D lässt den Dialog für die nächste Einzelfrage
+  offen; `mayMoveFocus` verhindert dann richtig die Bewegung. Das Ziel „in jeder der Reihenfolgen A–E“ gilt für den Dialogweg in D
+  daher nicht; Ursache ist die Lebensdauer des Dialogs (Nicht-Ziel). → `docs/folgeliste.md`.
+- Minor 2: Zwischenstände in Test 10 realistischer abbilden. → `docs/folgeliste.md`.
+- Nit 3: Fokus bleibt scharf, wenn `run` früh zurückkehrt (heute durch busy verhindert). → `docs/folgeliste.md`.
+- Nit 4, 5: Verhalten notiert, keine Änderung.
