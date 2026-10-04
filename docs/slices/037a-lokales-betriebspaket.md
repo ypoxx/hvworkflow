@@ -900,7 +900,7 @@ Platzhalter, wie erwartet. Die Prüfung S12.3 steht im Rauchtest zuletzt (Abweic
 - S16.4: `stack:reset --yes`: keine Volumes `hv-tool_*`, Zustandsverzeichnis weg; folgendes `up`: neue Secrets (Hash der
   Secret-Liste verschieden), `seed` schreibt neu (1748 Ereignisse).
 
-**Befolgung durch den frischen Agenten (S17):** offen, läuft durch den Orchestrator. Voraussetzungen in dieser
+**Befolgung durch den frischen Agenten (S17):** vom Eigentümer am 04.10.2026 **so angenommen**, wie sie ist (Protokoll `docs/evidence/037a-installation-befolgt.txt`; die Anmeldung ist durch den CI-Job `stack-037a` belegt, weil quay.io in dieser Arbeitsumgebung gesperrt ist). Ursprünglicher Stand: offen, läuft durch den Orchestrator. Voraussetzungen in dieser
 Arbeitsumgebung: Docker-Daemon (vfs, kurze Pfade unter `/tmp`), Registry-Spiegel `mirror.gcr.io`, freie Ports 8480 und
 8180; **ohne Freigabe von quay.io kann der Agent die Anmeldung nicht erreichen** und S17 gilt dann nach der Spec als nicht
 erfüllt. Den TLS-prüfenden Proxy behandelt die Installationsseite (§10, `HV_STACK_BUILD_CA`).
