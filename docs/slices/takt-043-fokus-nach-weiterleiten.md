@@ -99,6 +99,7 @@ aus Punkt 1 um. Der Bau darf sich daran orientieren, die Entscheidung gehört ab
 - `apps/web/src/features/focus/focus.test.ts`
 - `docs/folgeliste.md` (nur, wenn etwas zurückgestellt wird)
 - `docs/slices/takt-043-fokus-nach-weiterleiten.md`
+- Nachtrag Orchestrator 04.10.2026 (Codex P1 auf #153): `docs/evidence/takt-043-fokus-nach-weiterleiten.png`
 
 ## Ausdrücklich nicht erlaubt
 
@@ -153,8 +154,12 @@ Dafür ist F4 im CI-Job `e2e-http` der Beweis.
 
 - Ausgabe „rot vorher“ der neuen Unit-Fälle (gegen die verhaltensgleiche Auslagerung).
 - Schluss von `pnpm gates` mit Commit-sha.
-- CI `e2e-http`: Lauf-ID, in der 054 F4 grün ist (Name des Laufs und Commit). Kein Screenshot: Die Scheibe ändert keine
-  Darstellung, der Fokus wird im e2e geprüft.
+- CI `e2e-http`: Lauf-ID, in der 054 F4 grün ist (Name des Laufs und Commit).
+- Bildnachweis (Nachtrag Codex P1 auf #153, AGENTS.md R2): `docs/evidence/takt-043-fokus-nach-weiterleiten.png` — `/my`
+  als Fachbereich, Deutsch, Viewport 1440×900 wie die 054-Bilder, unmittelbar nach „Weiterleiten“ (per Tastatur
+  ausgelöst): die nächste Einzelfrage im Detail, der Fokusring auf ihrer primären Aktion „Weiterleiten“. Erzeugt mit
+  einem nicht festgeschriebenen Playwright-Test gegen das Projekt `in-process` (Ablauf wie F4; die Bestätigungen per
+  CSS ausgeblendet, weil Schließen den Fokus verschieben würde); keine e2e-Datei geändert.
 
 ## Wirkung und Risiko (Leitplanken §4, mittel)
 
