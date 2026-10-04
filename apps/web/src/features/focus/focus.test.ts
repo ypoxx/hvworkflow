@@ -1,5 +1,5 @@
 /**
- * Scheibe 054, Tests 1–4, 8 and 9: the pure helpers of the focus view. `myQuestions` reads `_actions` within the fixed
+ * Scheibe 054, Tests 1–4, 8 and 9, and takt-043 Test 10: the pure helpers of the focus view. `myQuestions` reads `_actions` within the fixed
  * slice of statuses; `focusActions` reads only the list of rights and the two states of the interface — the same list
  * yields the same result in every status (R5), shown with real `Question` records (lesson of 053 review 6).
  */
@@ -7,8 +7,10 @@ import { describe, expect, it } from 'vitest';
 import type { AnswerVersion, DomainEvent, Permission, Question, QuestionStatus } from '@hv/domain';
 import {
   FOCUS_STATUSES,
+  disarmFocus,
   draftBase,
   focusActions,
+  focusDue,
   formatReading,
   isDirty,
   isSaveChord,
@@ -20,7 +22,7 @@ import {
   shouldLeaveWriting,
   writingOutcome,
 } from './focus';
-import type { FocusDraft } from './focus';
+import type { FocusDraft, PendingFocus, ShownForFocus } from './focus';
 
 const EXPERT: Permission[] = ['answer.draft', 'question.submit_review', 'question.claim', 'question.read', 'history.read', 'question.forward'];
 
@@ -205,5 +207,85 @@ describe('Test 9: shouldLeaveWriting', () => {
     expect(shouldLeaveWriting({ key: 'Enter', defaultPrevented: false, dialogOpen: false })).toBe(false);
     expect(shouldLeaveWriting({ key: 'Escape', defaultPrevented: true, dialogOpen: false })).toBe(false);
     expect(shouldLeaveWriting({ key: 'Escape', defaultPrevented: false, dialogOpen: true })).toBe(false);
+  });
+});
+
+describe('Test 10: focusDue and disarmFocus (takt-043)', () => {
+  // X was handed over in version 3; Y is the next of "Meine Fragen". Only id and version matter to the decision.
+  const X3 = { id: 'q-x', version: 3 };
+  const X4 = { id: 'q-x', version: 4 };
+  const Y = { id: 'q-y', version: 1 };
+  const shown = (question: ShownForFocus['question'], selectedId: string | null, mine: ShownForFocus['mine'], listSettled = true): ShownForFocus =>
+    ({ question, selectedId, mine, listSettled });
+
+  /** Sends the shown states through `focusDue` in order and drops the pending focus on `clear` and `move`, as the page does. */
+  function replay(start: PendingFocus | null, states: readonly ShownForFocus[]): string[] {
+    let pending = start;
+    return states.map((state) => {
+      const due = focusDue(pending, state);
+      if (due !== 'wait') pending = null;
+      return due;
+    });
+  }
+
+  // HTTP mode: the detail read and the list read answer separately; the detail can show X v4 while the old list holds X.
+  const orderA = [
+    shown(X3, 'q-x', [X3, Y]),
+    shown(X4, 'q-x', [X3, Y], false),
+    shown(null, 'q-y', [Y]),
+    shown(Y, 'q-y', [Y]),
+  ];
+
+  it('A: the detail of X v4 before the list: wait until Y stands there', () => {
+    expect(replay(X3, orderA)).toEqual(['wait', 'wait', 'wait', 'move']);
+  });
+
+  it('A with a settled but older list: X v4 over the row X v3 still waits', () => {
+    expect(focusDue(X3, shown(X4, 'q-x', [X3, Y], true))).toBe('wait');
+  });
+
+  it('B: the list first, then Y', () => {
+    expect(replay(X3, [shown(X3, 'q-x', [X3, Y]), shown(null, 'q-y', [Y]), shown(Y, 'q-y', [Y])])).toEqual(['wait', 'wait', 'move']);
+  });
+
+  it('C: the stream ahead; the write answers on X v4 (call from handedOver): no move before Y', () => {
+    const states = [orderA[0]!, orderA[1]!, orderA[1]!, orderA[2]!, orderA[3]!];
+    expect(replay(X3, states)).toEqual(['wait', 'wait', 'wait', 'wait', 'move']);
+  });
+
+  it('D: the whole refresh before the write answers: one move at the first Y, the call from handedOver waits', () => {
+    const states = [shown(X3, 'q-x', [X3, Y]), shown(null, 'q-y', [Y]), shown(Y, 'q-y', [Y]), shown(Y, 'q-y', [Y])];
+    expect(replay(X3, states)).toEqual(['wait', 'wait', 'move', 'wait']);
+  });
+
+  it('E: as A, the move is due at the first Y (whether it happens is mayMoveFocus, steering.test.ts)', () => {
+    expect(replay(X3, orderA).indexOf('move')).toBe(3);
+  });
+
+  it('empty: the last question left: clear once the list is settled', () => {
+    expect(replay(X3, [shown(X3, 'q-x', [X3]), shown(X4, 'q-x', [X3], false), shown(null, null, [])])).toEqual(['wait', 'wait', 'clear']);
+  });
+
+  it('empty, not settled: wait', () => {
+    expect(focusDue(X3, shown(null, null, [], false))).toBe('wait');
+  });
+
+  it('stays: X v4 still in "Meine Fragen" with a settled list: move', () => {
+    expect(focusDue(X3, shown(X4, 'q-x', [X4, Y], true))).toBe('move');
+  });
+
+  it('not settled: X v4 in the list while it still loads: wait', () => {
+    expect(focusDue(X3, shown(X4, 'q-x', [X4, Y], false))).toBe('wait');
+  });
+
+  it('actor change: nothing pending (the page drops it), so Y does not move the focus', () => {
+    expect(focusDue(null, shown(Y, 'q-y', [Y]))).toBe('wait');
+  });
+
+  it('refusal: disarmFocus drops exactly its own pending focus', () => {
+    expect(disarmFocus(X3, X3)).toBeNull();
+    expect(disarmFocus(X3, { id: 'q-x', version: 2 })).toEqual(X3);
+    expect(disarmFocus({ id: 'q-y', version: 1 }, X3)).toEqual({ id: 'q-y', version: 1 });
+    expect(disarmFocus(null, X3)).toBeNull();
   });
 });

@@ -27,8 +27,8 @@ import { FocusDetail } from './FocusDetail';
 import { FocusList } from './FocusList';
 import type { FocusListState } from './FocusList';
 import { WritingMode } from './WritingMode';
-import { draftKey, isDirty, myQuestions, newDraft, nextSelection, writingOutcome } from './focus';
-import type { FocusAction, FocusDraft } from './focus';
+import { disarmFocus, draftKey, focusDue, isDirty, myQuestions, newDraft, nextSelection, writingOutcome } from './focus';
+import type { FocusAction, FocusDraft, PendingFocus, ShownForFocus } from './focus';
 
 // Browser-storage name of the split position. A module constant, not a JSX literal: gitleaks' generic-api-key rule
 // flags `storageKey="…"` lines once the value's entropy passes its threshold (054, CI on #148).
@@ -36,12 +36,6 @@ const FOCUS_SPLIT_STORAGE = 'hv-focus-split-v1';
 
 /** The only dialog of this page: forwarding to another answering unit (053). */
 type FocusDialog = 'forward';
-
-/** The question a hand-over was made against, to move the focus once the next one is on screen (takt-008). */
-interface PendingFocus {
-  id: string;
-  version: number;
-}
 
 type Drafts = Readonly<Record<string, FocusDraft>>;
 const NO_DRAFTS: Drafts = {};
@@ -179,29 +173,24 @@ export function FocusPage() {
 
   /**
    * takt-008, as in the steering view: after a hand-over the focus goes to the primary action of the question now
-   * shown, or to its number — once the detail shows another question or a newer version, and only while the person is
-   * not working elsewhere (`mayMoveFocus`). Saving does not move the focus (who saves with Ctrl+Enter writes on).
+   * shown, or to its number — once `focusDue` says so (takt-043), and only while the person is not working elsewhere
+   * (`mayMoveFocus`). Saving does not move the focus (who saves with Ctrl+Enter writes on).
    */
   const pendingFocus = useRef<PendingFocus | null>(null);
-  const shownNow = useRef<{ question: Question | null; selectedId: string | null; mine: readonly Question[] }>({
-    question: null,
-    selectedId: null,
-    mine: [],
-  });
+  const shownNow = useRef<ShownForFocus>({ question: null, selectedId: null, mine: [], listSettled: false });
   useEffect(() => {
     pendingFocus.current = null;
   }, [actorId]);
 
+  // Everything from the ref, nothing from the closure (empty list of dependencies): `handedOver` and `run` hold the
+  // callback of the render of the click, whose `listSettled` may be stale (takt-043).
   const settleFocus = useCallback((): void => {
-    const pending = pendingFocus.current;
-    const { question, selectedId: chosen, mine: list } = shownNow.current;
-    if (pending === null) return;
-    if (list.length === 0 && listSettled) {
+    const due = focusDue(pendingFocus.current, shownNow.current);
+    if (due === 'wait') return;
+    if (due === 'clear') {
       pendingFocus.current = null;
       return;
     }
-    if (question === null || question.id !== chosen || !list.some((entry) => entry.id === question.id)) return;
-    if (question.id === pending.id && question.version <= pending.version) return;
     const root = detailRef.current;
     if (root === null) return;
     pendingFocus.current = null;
@@ -210,26 +199,35 @@ export function FocusPage() {
       root.querySelector<HTMLElement>('[data-primary="true"]') ??
       root.querySelector<HTMLElement>('[data-testid="focus-detail-number"]');
     target?.focus();
-  }, [listSettled]);
+  }, []);
 
   useEffect(() => {
-    shownNow.current = { question: selected, selectedId, mine };
+    shownNow.current = { question: selected, selectedId, mine, listSettled };
     settleFocus();
   });
 
   /**
-   * After "Weiterleiten" or forwarding to another unit: the writing mode ends in any case, and the focus is armed. As in
-   * 053 (review minor 3b): the stream can deliver the next question before the write answers, and no later render
-   * follows, so the focus is due at once (CI e2e-http on #149, F4).
+   * takt-043 (U2): the focus is armed when a hand-over is sent, not when it answers — the stream can carry the whole
+   * change (list, selection, the next question's detail) before the write answers, and then the write door no longer
+   * calls `onDone`. A refusal drops exactly this pending focus and then answers as the handler it wraps did.
    */
-  const handedOver = useCallback(
-    (question: Question) => () => {
-      setWritingId(null);
-      pendingFocus.current = { id: question.id, version: question.version };
-      settleFocus();
-    },
-    [settleFocus],
+  const armHandOver = useCallback((question: Question) => {
+    pendingFocus.current = { id: question.id, version: question.version };
+  }, []);
+  const disarmOnProblem = useCallback(
+    (question: Question, next?: (error: unknown, stillShown: () => boolean) => boolean) =>
+      (error: unknown, stillShown: () => boolean): boolean => {
+        pendingFocus.current = disarmFocus(pendingFocus.current, question);
+        return next !== undefined ? next(error, stillShown) : false;
+      },
+    [],
   );
+
+  /** After "Weiterleiten" or forwarding to another unit: the writing mode ends in any case, and the focus may be due. */
+  const handedOver = useCallback(() => {
+    setWritingId(null);
+    settleFocus();
+  }, [settleFocus]);
 
   const updateDraft = useCallback((key: string, patch: Partial<Pick<FocusDraft, 'text' | 'sources'>>) => {
     setDrafts((previous) => {
@@ -272,9 +270,10 @@ export function FocusPage() {
   const submit = useCallback(
     (question: Question) => {
       const id = question.id;
-      void run('question.submit_review', (options) => api.submitForReview(id, options), handedOver(question));
+      armHandOver(question);
+      void run('question.submit_review', (options) => api.submitForReview(id, options), handedOver, disarmOnProblem(question));
     },
-    [run, handedOver],
+    [run, handedOver, armHandOver, disarmOnProblem],
   );
 
   const onDetailAction = useCallback(
@@ -297,14 +296,18 @@ export function FocusPage() {
         onSubmit={(request, report) => {
           const id = selected.id;
           const number = selected.number;
+          armHandOver(selected);
           void run(
             'question.forward',
             (options) => api.forwardQuestion(id, request, options),
-            handedOver(selected),
-            forwardProblemHandler(
-              report,
-              () => setDialog(null),
-              () => showToast({ tone: 'neutral', title: t('answers.forward.gone', { number }) }),
+            handedOver,
+            disarmOnProblem(
+              selected,
+              forwardProblemHandler(
+                report,
+                () => setDialog(null),
+                () => showToast({ tone: 'neutral', title: t('answers.forward.gone', { number }) }),
+              ),
             ),
           );
         }}
