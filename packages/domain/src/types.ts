@@ -4,6 +4,7 @@
  * German house terms are given in parentheses so that the code stays readable for the people who
  * run the general meeting (docs/glossar.md).
  */
+import type { AnswerBody, AnswerBodyInput } from './answerFormat.js';
 
 /** Roles are only bundles of permissions. Nothing in the domain branches on a role name. */
 export type Role =
@@ -291,6 +292,11 @@ export interface AnswerVersion {
    * `REFUSAL_JUSTIFICATION_READ` (permissions.ts).
    */
   refusalJustification?: string;
+  /**
+   * Scheibe 055 (ADR 0005, contract 0.4.4): the normalised block document. In the projection on every version: the
+   * stored one through the read variant, or derived from `text` (L) for versions without one.
+   */
+  body?: AnswerBody;
 }
 
 export interface Approval {
@@ -411,6 +417,8 @@ export interface StageSeatInput {
 export interface AnswerDraft {
   text: string;
   sources?: string[];
+  /** Scheibe 055: the open input form; with it the core stores the plain-text projection as `text`. */
+  body?: AnswerBodyInput;
 }
 /** Scheibe 044a: body of `proposeRefusal` (contract `RefusalProposal`, closed). */
 export interface RefusalProposal {

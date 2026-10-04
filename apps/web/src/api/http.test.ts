@@ -170,6 +170,9 @@ describe('HTTP HvApi adapter', () => {
     ['classifyQuestion', ['q /1', { track: 'standard' }], 'POST', '/v1/questions/q%20%2F1/classification', { track: 'standard' }],
     ['assignQuestion', ['q /1', 'u'], 'POST', '/v1/questions/q%20%2F1/assignment', { unitId: 'u' }],
     ['draftAnswer', ['q /1', { text: 'Answer' }], 'POST', '/v1/questions/q%20%2F1/answers', { text: 'Answer' }],
+    // Scheibe 055 (contract 0.4.4): the open input form passes through unchanged; the core normalises.
+    ['draftAnswer', ['q /1', { text: 'x', body: { blocks: [{ type: 'heading', content: [{ text: 'A', marks: ['underline'] }] }] } }], 'POST',
+      '/v1/questions/q%20%2F1/answers', { text: 'x', body: { blocks: [{ type: 'heading', content: [{ text: 'A', marks: ['underline'] }] }] } }],
     ['submitForReview', ['q /1'], 'POST', '/v1/questions/q%20%2F1/review-submissions'],
     ['approveQuestion', ['q /1', 3], 'POST', '/v1/questions/q%20%2F1/approvals', { answerVersion: 3 }],
     ['clearQuestionLegally', ['q /1', { note: 'Legal' }], 'POST', '/v1/questions/q%20%2F1/legal-clearances', { note: 'Legal' }],

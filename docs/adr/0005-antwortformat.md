@@ -24,6 +24,24 @@ Standardannahme aus Plan 3 („Formatierungsumfang") und Plan 4 (Zeile 0005):
 - **Reserviertes Feld `language`** (Standard `de`); keine DE/EN-Kopplung freigegebener Antworten in
   der Beta (E21).
 
+**Eingabe- und Speicherform (Scheibe 055, Vertrag 0.4.4).** Zwei Formen im Vertrag: Die
+**Eingabeform** `AnswerBodyInput` (nur in `AnswerDraft.body`) trägt Blockart und Marke als
+begrenzte Zeichenketten; der Editor wendet die Whitelist nicht an. Die **Speicherform** `AnswerBody`
+(in `AnswerVersion.body`, im Ereignis, in `EventRead`) ist geschlossen: `paragraph`, `list`; Marken als
+Enum `AnswerMark`; `language` nur `de`. Der Kern normalisiert in einer **Schreibvariante** (darf 422
+werfen: Gestalt, einsames Ersatzzeichen, andere Sprache, Klartext über 20 000 Code-Punkte, kein Text
+übrig) und einer **Lesevariante** für die Projektion (wirft nie; Unbrauchbares fällt weg, ein einsames
+Ersatzzeichen wird U+FFFD; weicht ihr Klartext vom gespeicherten `text` ab oder überschreitet sie eine
+Strukturgrenze, nimmt die Projektion die Herleitung L aus `text`). Regeln N1–N10: Blockarten auf
+Absatz/Liste abbilden, Marken filtern und kanonisch ordnen, `\p{White_Space}` → Leerzeichen, `\p{Cc}`
+und `\p{Cf}` entfernen, Leerraum zusammenfassen, Läufe zusammenführen, NFC je Lauf, leere Blöcke weg,
+benachbarte Listen zusammenführen; idempotent. Klartextprojektion P: Läufe aneinander, Punkte mit
+`\n`, Blöcke mit `\n\n`, NFC über das Ganze. Herleitung L für Versionen ohne Dokument: eine nicht leere
+Zeile (getrennt an CR LF, CR, LF) je Absatz ohne Marke. Auch `text` neuer Versionen und die Begründung
+einer Verweigerung verlieren `\p{Cc}` (außer Tab, LF, CR; VT, FF und NEL werden LF) und `\p{Cf}` und
+kommen in NFC an; alte Ereignisse bleiben, wie sie sind (R7). P ist für gespeicherte Versionen eingefroren
+(goldener Test): eine Änderung an P braucht ein versioniertes P, nie eine stille Neuberechnung.
+
 ## Konsequenzen
 
 **Positiv.** Einfügen aus Word wird auf die Whitelist normalisiert; eine unbekannte Marke wird
@@ -36,6 +54,9 @@ Vertragsänderung (043). Ein Blockdokument ist im Ereignis größer als reiner T
 **Risiko.** Wird eine Marke später entfernt, dürfen bestehende Versionen nicht neu geschrieben
 werden — eine neue Version würde Freigaben zurücksetzen (R-TRANS-03). Der Renderer verengt seine
 Whitelist stattdessen.
+Ab 055: Die Lesevariante der Normalisierung wirft nie und verengt gespeicherte Dokumente beim Lesen;
+eine gestrichene Marke bleibt im Vertrag als Enum-Wert beschrieben, weil `EventRead` die gespeicherte
+Nutzlast wiedergibt.
 
 ## Kosten bei Änderung
 
@@ -62,6 +83,8 @@ Whitelist stattdessen.
 Scheibe **055** (Plan 4): Test „verbotene Marke wird entfernt", Idempotenz der Normalisierung;
 Screenshots Bühne und Historie mit Format; `pnpm gates` und e2e. Vertragsform (Blockdokument plus
 `text`) in 043.
+Geteilt: **055** (Vertrag 0.4.4, Kern, Dienst: verbotene Marke entfernt, Idempotenz, Lesbarkeit alter
+Versionen), **055b** (Renderer, Editor, Screenshots Bühne und Historie mit Format).
 
 ## Offene Registerzeilen
 

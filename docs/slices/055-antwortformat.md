@@ -901,11 +901,70 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 
 ```
 Slice: 055-antwortformat
-Done:
-Evidence:
-Open:
-Touched:
+Done: Vertrag 0.4.4 als erster Commit (neun Schemas, AnswerDraft.body, AnswerVersion.body, EventRead-Bindung, ADR 0005);
+      answerFormat.ts mit Schreib- und Lesevariante (N1–N10), P, L (CR LF/CR/LF), verlustfreier Projektion (Codex P1) und
+      sanitizeAnswerText (2a, VT/FF/NEL werden LF) in draftAnswer und proposeRefusal (Text, Begründung, Quellen);
+      Projektion gibt jeder Version body; describeErrors auf 20 Einzelfehler plus Restzahl begrenzt.
+Evidence: Commits d68d90e (Vertrag), 8b40294 (Kern, Dienst), 8f25c09 (Review-Fixes); `pnpm gates` auf 8f25c09, Exit 0,
+      Schluss unten. Playwright in-process 157 passed (7.5m) auf 8b40294, keine e2e-Datei berührt.
+      timing053.test.ts und focus054.test.ts grün ohne Änderung (in `pnpm gates`, apps/web 684 passed).
+      Projekt http: CI-Lauf `e2e-http` auf PR #152, Commit 914297b (nach Merge des Integrationszweigs mit takt-043),
+      Lauf 37239067336, Job 111543918354, grün: „56 passed (4.9m)“; Schritt „End-to-end http project …“ 22:12:33 bis
+      22:18:08, rund 5:35 gegen Limit 9:00 und Harness-Grenze 8:00 (055 fügt keine e2e-Datei hinzu). Artefakt
+      `evidence-031-http` (ID 11316579253, `sha256:f5fbe6c3dd10f21c774da3e52928515f890991c0027c87ae460798edaeaefae2`).
+      Vorher rot auf 0097ea5 nur wegen 054 F4 (Fokus-Rennen, behoben in takt-043, #153), nicht wegen 055.
+Open: 055 nicht vor 055b in eine geteilte Umgebung (Entscheidung 10).
+Touched: siehe Liste unten.
 ```
+
+**Schluss von `pnpm gates` auf `8f25c09`** (domain 490, web 684, api 691 Tests grün; `contract gate: ok`, `(c) … 0.4.3 ->
+0.4.4`; slice-scope 24 Dateien innerhalb „Files allowed“):
+
+```
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.61s
+mark-test-run: wrote /home/user/wt/s055/.claude/state/last-test-run (clean tree) at commit 8f25c09, tree 2161e1189224…
+```
+
+**Rot vor der Änderung:**
+
+- Kern (mit Platzhalter-`answerFormat.ts`, das jede Funktion mit „not implemented“ abbricht): alle 66 Fälle der Scheibe rot
+  (`answerFormat055` Tests 1–5 und 4a, `answerDraft055` K1–K13 und R-IDEM, `refusal044a` Ersatzzeichen-Fall). Drei Fälle
+  (K5, leerer `text` mit `body`, K7-Freigabe) prüften zunächst nur Bestehendes und waren grün; sie bekamen body- und
+  Längenzusicherungen, danach alle rot. Auszug: `× … ADR-0005-N1 a: heading becomes a paragraph …`, `× … ADR-0005-N2 b:
+  forbidden mark is removed …`, `× … R-TRANS-03: the event is the pre-055 form (no body) …`.
+- Dienst `answerFormat055` mit Platzhalter: 10 rot, 7 grün (die fünf Validatorfälle von H2 und H6 wurden mit dem
+  Vertragscommit grün); gegen die `openapi.yaml` von `ea3eb9a` scheitert die Datei ganz („can't resolve reference
+  openapi#/components/schemas/AnswerBody“). Postgres P1 und P2 rot.
+- Vertragstests vor dem Vertragsschritt: Versionszeilen „expected '0.4.3' to be '0.4.4'“, 043a Test 10 „expected [ 'sources',
+  'text' ] to deeply equal [ 'body', 'sources', 'text' ]“.
+- Der Fall in `http.test.ts` konnte vor der Änderung nicht rot sein (`http.ts` sendet die Eingabe schon unverändert; in der
+  Folgeliste).
+- Review-Fixes: Mutanten, die in `exceedsStructure` die Block-, Punkt- oder Laufprüfung oder in `sanitizeAnswerText` die
+  Abbildung VT/FF/NEL entfernen, machen je 1–2 Fälle rot.
+
+**Vor dem Bau:** Basis `ea3eb9a` (054 gemergt, Vertrag 0.4.3 -> 0.4.4). oneOf/const-Probe: Absatz mit `items` und Liste mit
+`content` abgelehnt, Meldung ohne Text; saubere Vereinigung ohne Diskriminator. R-IDEM-01 mit anderem gültigem `body` liefert
+das erste Ergebnis (Test in `answerDraft055`). Rumpf an der Grenze 101 405 Byte (ASCII) bzw. 161 405 Byte (Emoji), über
+256 KiB 413. Validator-Meldung ungebremst 2 000 Fehler / 128 888 Byte; kein bestehender Test erwartete mehr als 20.
+**Projektion `CORPUS_LOAD`** (6 329 Ereignisse, 685 Antwortversionen; voller `reduce`, Median aus 10 Läufen nach 5
+Aufwärmläufen, abwechselnd mit `state.ts` von `ea3eb9a` und dem neuen): vorher **237,9 ms**, nachher **226,4 ms** (alle drei
+Paare: vorher 242,6 / 232,3 / 237,9, nachher 229,3 / 225,5 / 226,4); L allein rund 5 ms für alle 685 Versionen. Keine messbare
+Mehrzeit, kein Memo. Maschine: Container mit 4 vCPU auf geteiltem Host, Node 22.22.2, vitest 4.1.11; Streuung ±10 ms.
+
+**Touched:** `packages/contract/openapi.yaml`, `packages/contract/src/types.ts`, `packages/contract/CHANGELOG.md`,
+`packages/contract/package.json`, `docs/adr/0005-antwortformat.md`, `packages/domain/src/answerFormat.ts` (neu),
+`packages/domain/src/types.ts`, `packages/domain/src/api.ts`, `packages/domain/src/state.ts`, `packages/domain/src/index.ts`,
+`packages/domain/src/__tests__/answerFormat055.test.ts`, `packages/domain/src/__tests__/answerDraft055.test.ts`,
+`packages/domain/src/__tests__/support/answerBodyGen.ts`, `packages/domain/src/__tests__/refusal044a.test.ts`,
+`apps/api/src/contractSchema.ts`, `apps/api/src/__tests__/answerFormat055.test.ts`,
+`apps/api/src/__tests__/postgres-answerFormat055.test.ts`, `apps/api/src/__tests__/contract.test.ts`,
+`apps/api/src/__tests__/takt-019-contract.test.ts`, `apps/api/src/__tests__/contract-043a.test.ts`,
+`apps/web/src/api/http.test.ts`, `docs/sicherheit/bedrohungsmodell.md`, `docs/folgeliste.md`,
+`docs/slices/055-antwortformat.md`. Nicht berührt: `events.ts`, `http.ts`, `features/**`, `components/**`, e2e, Seed,
+`policy-truth-table.md`, `docs/legal-trace.md`.
 
 ## Review findings
 

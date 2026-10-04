@@ -10,6 +10,42 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.4] - 2026-10-04
+
+Additive patch step of the 0.4 cycle, after 0.4.3 of slice 048. The contract step of Scheibe 055 (Antwortformat,
+part a: contract, core, service), written by the architect as the first commit of that slice, before its core code
+(AGENTS.md rule 6). Nine new schemas, two new optional fields and one binding on the read path; no new operation,
+no new `Action`, no new `Event.type`, no new required field in a request. The contract form "block document plus
+`text`" that 043a assigned to 043b, which was never written. Built on the defaults: "auf Standard gebaut (E6, E21
+offen)".
+
+### Added
+
+- **`AnswerBodyInput`**, **`AnswerBlockInput`**, **`AnswerInlineInput`** (Scheibe 055): the open input form of an
+  answer document. Block type and mark are bounded strings, not enums: the core applies the whitelist (ADR 0005,
+  rules N1 to N10), so an unknown mark becomes plain text over HTTP and in the demo alike instead of a `422`.
+- **`AnswerBody`**, **`AnswerBlock`**, **`AnswerParagraph`**, **`AnswerList`**, **`AnswerInline`**,
+  **`AnswerMark`** (Scheibe 055): the closed, normalised stored form. Blocks `paragraph` and `list`, marks `bold`,
+  `italic`, `highlight`, `language` only `de` (E21). The structural limits (10000 blocks, 10000 items, 20000 runs)
+  follow from the text limit of 20000 code points.
+- **`AnswerDraft.body`** (Scheibe 055): optional `AnswerBodyInput`. With it the service stores as `text` the
+  plain-text projection of the normalised document; the submitted `text` stays required and is then neither
+  checked nor stored.
+- **`AnswerVersion.body`** (Scheibe 055): optional `AnswerBody`, on every version from 0.4.4; derived from `text`
+  for versions without a stored document (before 0.4.4, refusals).
+- **`EventRead.payload.answer.body`** (Scheibe 055): bound to the closed `AnswerBody`; the `Event` description
+  names `AnswerDrafted.answer.body` as the stored form.
+
+### Changed
+
+- **`draftAnswer`** and **`proposeRefusal`** (Scheibe 055, ADR 0005 decision 2a): the service removes control and
+  format characters (Unicode `Cc` except tab, line feed, carriage return, where vertical tab, form feed and next
+  line become a line feed; every `Cf`) from `text` and from each entry of `sources` and applies NFC before trimming;
+  `proposeRefusal` does the same with `refusalJustification` before its checks (empty afterwards counts as missing,
+  `409` R-GUARD-09 on path B). A lone surrogate in any of these fields is now `422`. The length
+  limits still apply to the raw value. A text without such characters and already in NFC is stored exactly as
+  before.
+
 ## [0.4.3] - 2026-10-04
 
 Additive patch step of the 0.4 cycle, after 0.4.2 of slice 044a/044b. The contract step of Scheibe 048

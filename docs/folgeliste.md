@@ -724,6 +724,14 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   nach 010 nur Vorgelesenes (130) · Zahl in der Spec berichtigt im Bericht.
 - 054 Nachprüfung minor · `apps/web/src/features/focus/Page.tsx` (`handedOver` ruft `settleFocus` synchron) · der Aufruf läuft vor dem Commit von React; bei derselben Einzelfrage mit neuerer Version kann das Fokusziel noch im Schreibmodus liegen und mit ihm verschwinden · `queueMicrotask` oder nur dann, wenn `writingId` schon `null` war.
 
+## Antwortformat (aus 055)
+
+- ~~**Voraussetzung 055b**~~ **erledigt in 055 (Codex P1 auf #152)** · `packages/domain/src/state.ts` (Fall `AnswerDrafted`) · `body`
+  einer Version war in jeder Sicht dasselbe Objekt wie in der Projektion (wie `sources`) · jetzt tief eingefroren (`body`) bzw.
+  kopiert und eingefroren (`sources`); Test in `answerDraft055.test.ts`.
+- 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil
+  `http.ts` die Eingabe schon unverändert sendet und `endpointCases` untypisiert ist · bei 055b einen typisierten Fall ergänzen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

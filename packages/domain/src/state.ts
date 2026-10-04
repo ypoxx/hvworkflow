@@ -19,6 +19,16 @@ import type {
 } from './types.js';
 import { QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
 import { computeCoverage } from './coverage.js';
+import { projectAnswerBody } from './answerFormat.js';
+
+/** Freezes a plain JSON value and everything inside it (Codex P1 on #152); returns the same value. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const item of Object.values(value)) deepFreeze(item);
+    Object.freeze(value);
+  }
+  return value;
+}
 import { resolveAgendaProgress, resolveMeetingLifecycle } from './transitions.js';
 
 export interface State {
@@ -426,9 +436,20 @@ export function reduce(state: State, e: DomainEvent): State {
       if (!q) break;
       // Scheibe 044a: the snapshot of the catalogue entry stays in the event (audit path); the
       // justification comes from the `pii` part, read without decoding like `SpeakerRegistered`.
-      const { refusalGround: _snapshot, ...answer } = e.payload.answer;
+      const { refusalGround: _snapshot, body: stored, ...answer } = e.payload.answer;
       const justification = e.payload.pii?.refusalJustification;
-      q.answers.push({ ...answer, ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
+      // Scheibe 055 (ADR 0005, decision 5): every version gets a document. A stored one runs through the whitelist
+      // again (read variant, never throws), unless that lost wording against the stored `text` (Codex P1); otherwise,
+      // and for versions before 0.4.4 and refusals, it is derived from `text` (L). `text` is never recomputed.
+      const body = projectAnswerBody(stored, answer.text);
+      // Codex P1 on #152: `viewQuestion` copies an answer only shallowly, so in the in-process path a reader would hold
+      // the projection's own nested objects. Deep-frozen, a mutation by a client can never change what later reads and
+      // the podium show without an event (and without voiding an approval). `sources` is copied first, so the frozen
+      // array is the projection's, not the stored event payload's.
+      q.answers.push({ ...answer,
+        ...(answer.sources !== undefined ? { sources: Object.freeze([...answer.sources]) as string[] } : {}),
+        ...(body !== undefined ? { body: deepFreeze(body) } : {}),
+        ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
       // The target status is the one the transition table resolved when the event was written
       // (`toStatus`, like `QuestionReturned`); only a known status is taken, anything else keeps the
       // status every answer draft has had.
