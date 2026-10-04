@@ -655,6 +655,14 @@ test.describe('H13 @idp: a second browser sees a change in under 2 s (slice 036b
       // Step 2: a question of its own (capture, third context), then coordination classifies exactly that one.
       const captureCsrf = await csrfOf(captureApi);
       const speaker = (await (await captureApi.get(`/v1/speakers/${created.id}`)).json()) as { version: number };
+      // takt-044: the capture invalidates A's speaker list; that read must land before the classification window opens.
+      // Registered before the writes so that a fast delivery is not missed (`quiet` alone measures from A's last read).
+      // Settled to a boolean at once, so an earlier failing step leaves no unhandled rejection behind.
+      const captureSeenInA = a.waitForResponse(async (candidate) => {
+        if (candidate.request().method() !== 'GET' || new URL(candidate.url()).pathname !== '/v1/speakers' || candidate.status() !== 200) return false;
+        const rows = (await candidate.json()) as { id: string; questionCount?: number }[];
+        return rows.some((row) => row.id === created.id && (row.questionCount ?? 0) >= 1);
+      }, { timeout: 5_000 }).then(() => true, () => false);
       const contribution = await captureApi.post('/v1/contributions', {
         headers: writeHeaders(captureCsrf, `"v${speaker.version}"`),
         data: JSON.stringify({ speakerId: created.id, text: H13_CONTRIBUTION_TEXT, source: 'manual' }),
@@ -667,6 +675,7 @@ test.describe('H13 @idp: a second browser sees a change in under 2 s (slice 036b
       });
       expect(captured.status()).toBe(201);
       const question = ((await captured.json()) as { id: string; version: number }[])[0]!;
+      if (!(await captureSeenInA)) throw new Error('A hat die Erfassung nicht gelesen');
       await quiet(trace, 1_500);
 
       const classifyStart = Date.now();
