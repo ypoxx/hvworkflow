@@ -229,3 +229,39 @@ export function writingOutcome(draft: FocusDraft, question: Pick<Question, 'id' 
   if (draft.rebase) return { kind: 'keep' };
   return { kind: 'notice', draft: { ...draft, rebase: true } };
 }
+
+/** The question a hand-over was made against, to move the focus once the next one is on screen (takt-008, takt-043). */
+export interface PendingFocus {
+  id: string;
+  version: number;
+}
+
+/** What the page shows at one moment, as far as the focus after a hand-over is concerned. */
+export interface ShownForFocus {
+  question: Pick<Question, 'id' | 'version'> | null;
+  selectedId: string | null;
+  mine: readonly Pick<Question, 'id' | 'version'>[];
+  listSettled: boolean;
+}
+
+/**
+ * takt-043: whether the focus armed by a hand-over is due now (`move`), no longer has a target (`clear`), or must wait.
+ * The DOM part (detail root, `mayMoveFocus`, the target) stays with the page.
+ */
+export function focusDue(pending: PendingFocus | null, shown: ShownForFocus): 'wait' | 'clear' | 'move' {
+  if (pending === null) return 'wait';
+  const { question, selectedId, mine, listSettled } = shown;
+  if (mine.length === 0 && listSettled) return 'clear';
+  if (question === null || question.id !== selectedId) return 'wait';
+  const row = mine.find((entry) => entry.id === question.id);
+  if (row === undefined) return 'wait';
+  if (question.id !== pending.id) return 'move';
+  // The handed-over question itself counts only once the settled list agrees that it stays: in HTTP mode the detail
+  // read can bring its new version (already out of "Meine Fragen") before the list read drops it (A, C).
+  return question.version > pending.version && listSettled && row.version >= question.version ? 'move' : 'wait';
+}
+
+/** takt-043: a refused hand-over drops its own pending focus, and only that one (a later one stays). */
+export function disarmFocus(pending: PendingFocus | null, question: Pick<Question, 'id' | 'version'>): PendingFocus | null {
+  return pending !== null && pending.id === question.id && pending.version === question.version ? null : pending;
+}
