@@ -20,6 +20,15 @@ import type {
 import { QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
 import { computeCoverage } from './coverage.js';
 import { projectAnswerBody } from './answerFormat.js';
+
+/** Freezes a plain JSON value and everything inside it (Codex P1 on #152); returns the same value. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const item of Object.values(value)) deepFreeze(item);
+    Object.freeze(value);
+  }
+  return value;
+}
 import { resolveAgendaProgress, resolveMeetingLifecycle } from './transitions.js';
 
 export interface State {
@@ -433,7 +442,13 @@ export function reduce(state: State, e: DomainEvent): State {
       // again (read variant, never throws), unless that lost wording against the stored `text` (Codex P1); otherwise,
       // and for versions before 0.4.4 and refusals, it is derived from `text` (L). `text` is never recomputed.
       const body = projectAnswerBody(stored, answer.text);
-      q.answers.push({ ...answer, ...(body !== undefined ? { body } : {}),
+      // Codex P1 on #152: `viewQuestion` copies an answer only shallowly, so in the in-process path a reader would hold
+      // the projection's own nested objects. Deep-frozen, a mutation by a client can never change what later reads and
+      // the podium show without an event (and without voiding an approval). `sources` is copied first, so the frozen
+      // array is the projection's, not the stored event payload's.
+      q.answers.push({ ...answer,
+        ...(answer.sources !== undefined ? { sources: Object.freeze([...answer.sources]) as string[] } : {}),
+        ...(body !== undefined ? { body: deepFreeze(body) } : {}),
         ...(typeof justification === 'string' ? { refusalJustification: justification } : {}) });
       // The target status is the one the transition table resolved when the event was written
       // (`toStatus`, like `QuestionReturned`); only a known status is taken, anything else keeps the

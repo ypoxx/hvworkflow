@@ -726,9 +726,9 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 
 ## Antwortformat (aus 055)
 
-- **Voraussetzung 055b** · 055 Bau und Review · `packages/domain/src/state.ts` (Fall `AnswerDrafted`) · `body` einer Version ist in jeder Sicht dasselbe Objekt wie in
-  der Projektion (wie schon `sources`); ein Aufrufer im Browser, der es verändert, veränderte die Projektion · beim Ausgeben in
-  `viewQuestion` flach kopieren oder einfrieren, gemeinsam für `sources` und `body`.
+- ~~**Voraussetzung 055b**~~ **erledigt in 055 (Codex P1 auf #152)** · `packages/domain/src/state.ts` (Fall `AnswerDrafted`) · `body`
+  einer Version war in jeder Sicht dasselbe Objekt wie in der Projektion (wie `sources`) · jetzt tief eingefroren (`body`) bzw.
+  kopiert und eingefroren (`sources`); Test in `answerDraft055.test.ts`.
 - 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil
   `http.ts` die Eingabe schon unverändert sendet und `endpointCases` untypisiert ist · bei 055b einen typisierten Fall ergänzen.
 

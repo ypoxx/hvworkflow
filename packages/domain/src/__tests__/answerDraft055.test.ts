@@ -184,6 +184,31 @@ describe('Scheibe 055, K5: R-GUARD-04, a format change alone is a new version', 
   });
 });
 
+describe('Scheibe 055, Codex P1 on #152: the projected body and sources cannot be changed by a reader', () => {
+  it('body is deeply frozen (document, blocks, items, runs, marks); a mutation throws in strict mode and a second read is unchanged', async () => {
+    const q = await draft(await assigned(), { text: 'x', body: FORMATTED, sources: ['GB 2026'] } as AnswerDraft);
+    const got = await questionOf(q.id);
+    const doc0 = got.answers[0]!.body!;
+    const paragraph = doc0.blocks[0]!;
+    const list = doc0.blocks[1]!;
+    if (paragraph.type !== 'paragraph' || list.type !== 'list') throw new Error('unexpected block types');
+    const boldRun = paragraph.content[1]!;
+    for (const part of [doc0, doc0.blocks, paragraph, paragraph.content, boldRun, boldRun.marks, list, list.items, list.items[0], list.items[0]![0]]) {
+      expect(Object.isFrozen(part)).toBe(true);
+    }
+    expect(Object.isFrozen(got.answers[0]!.sources)).toBe(true);
+    expect(() => { (boldRun as { text: string }).text = 'GEÄNDERT'; }).toThrow(TypeError);
+    expect(() => { boldRun.marks!.push('italic'); }).toThrow(TypeError);
+    expect(() => { doc0.blocks.pop(); }).toThrow(TypeError);
+    expect(() => { got.answers[0]!.sources!.push('Fremd'); }).toThrow(TypeError);
+    const again = await questionOf(q.id);
+    expect(again.answers[0]!.body).toEqual(FORMATTED_STORED);
+    expect(again.answers[0]!.sources).toEqual(['GB 2026']);
+    // The stored event keeps its own, unfrozen payload: the projection never freezes the log.
+    expect(Object.isFrozen(answerPayload(lastEvent(q.id, 'AnswerDrafted'))['sources'])).toBe(false);
+  });
+});
+
 describe('Scheibe 055, K6: forwarding carries no content (decision 6)', () => {
   it('after draftAnswer with body, submitForReview and forwardQuestion leave the latest version unchanged; neither event carries body', async () => {
     const drafted = await draft(await assigned(), { text: 'x', body: FORMATTED } as AnswerDraft);
