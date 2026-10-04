@@ -1194,8 +1194,8 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034a**, **034b**, **031a**, **031b**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
 | 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **088**, **044** | Restore-Drill auf Staging (038) |
 | 7 | 09.11.–13.11. | Bau | **045**, **048**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
-| 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **055b**, **060**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
-| 9 | 23.11.–27.11. | Bau | **058**, **059**, **070**, **062**, **068**, **064**, **065** | IdP-Client, technischer Betreiber, Geräteantwort bis 27.11. (E11, E26, E33) |
+| 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **055b**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
+| 9 | 23.11.–27.11. | Bau | **060**, **058**, **059**, **070**, **062**, **068**, **064**, **065** | IdP-Client, technischer Betreiber, Geräteantwort bis 27.11. (E11, E26, E33) |
 | 10 | 30.11.–04.12. | Bau | **067**, **069**, **081**, **071**, **086**, **072**, **073** | Funktionsumfang gebaut (02.12.); erster Last- und Chaos-Lauf auf Staging |
 | 11 | 07.12.–11.12. | Anpassung | **075**, **063** · Anpassungen und Kleinänderungen | **Prüfpunkt 5** mit Feedback-Runde 3 auf Staging (11.12.); Einladungen zur Generalprobe versandt (11.12.) |
 | 12 | 14.12.–18.12. | Anpassung | Anpassungen und Kleinänderungen | Pentest spätestens bestellt (15.12., E32) |
