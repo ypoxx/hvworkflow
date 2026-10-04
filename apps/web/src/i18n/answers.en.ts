@@ -129,4 +129,13 @@ export const answersEn: typeof answersDe = {
   'answers.refusal.editorHint': 'A new answer draft supersedes the refusal and needs legal clearance and approval again.',
   'answers.refusal.badge': 'Refusal',
   'answers.return.refusalWarning': 'No justification in the return reason: everyone who reads the question can see it.',
+  // Scheibe 053: the dialog "Forward to another answering unit" (built once, reused by 054).
+  'answers.forward.body': 'Only the answering unit changes; status, answer versions, legal clearance and approval stay.',
+  'answers.forward.readers': 'Afterwards the target answering unit reads the question with its return reason and history.',
+  'answers.forward.unit.label': 'Target answering unit',
+  'answers.forward.unit.placeholder': 'Choose an answering unit',
+  'answers.forward.reason.label': 'Reason for forwarding',
+  'answers.forward.error.guard15': 'The question is already with this answering unit.',
+  'answers.forward.error.invalid': 'Input rejected: unknown answering unit or reason missing.',
+  'answers.forward.gone': '{number}: forwarded or no longer visible.',
 };

@@ -1,6 +1,6 @@
 # Scheibe 053 — Steuerungsansicht der Koordination
 
-**Status:** spec (04.10.2026; gelesen auf `7405efb`: 043a, 040b, 044a, 044b, 045 und 048 gemergt, Vertrag 0.4.3; dritte Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; zugeschnitten ohne 047, Teil 053b für die Mehrfachauswahl skizziert, Abschnitt „Teilung und Zuschnitt“)
+**Status:** gebaut (04.10.2026, Bau auf `e0798e1`; Review offen) · spec (04.10.2026; gelesen auf `7405efb`: 043a, 040b, 044a, 044b, 045 und 048 gemergt, Vertrag 0.4.3; dritte Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; zugeschnitten ohne 047, Teil 053b für die Mehrfachauswahl skizziert, Abschnitt „Teilung und Zuschnitt“)
 **Risikoklasse:** mittel · 3,4 AStd (Spanne 3,0–4,0; Plan 053: mittel · 2,5 AStd inklusive Mehrfachauswahl, die hier nach 053b geht; Begründung in „Warum mittel“ und „Aufwand“) · Plan 053: 13.11.2026 (W7), tatsächlich direkt nach 048 als dritte Oberflächenscheibe der Freigabe-Demo · Lanes: web-steering (neu, `apps/web/src/features/steering/**`); web-answers (gemeinsamer Weiterleiten-Dialog, Herauslösen der Schreibtür und eines reinen Listenfilters, ohne Verhaltensänderung); web-shell (eine Zeile im Feature-Register und drei Shell-Schlüssel); web-api (nur eine neue Testdatei für die Zeitmessung); e2e (eigene Datei, im Projekt `http` eingereiht); docs (eine Glossarzeile, Nachweise)
 **Bedrohungsmodell:** berührt T-G1-I-01 (Anzeige) und MF-14 (Weiterleiten erweitert den Leserkreis um den Zielfachbereich; Regel und Umfang in 048). Keine neue Angriffsfläche: kein neuer Endpunkt, kein neues Recht, kein neues Feld; die Oberfläche macht eine vorhandene, geprüfte Operation erstmals bedienbar.
 **Rolle:** implementierer-oberflaeche; Review in frischem Kontext mit den Perspektiven **UX/Barrierefreiheit** (D1–D10, Tastatur) und **Datenschutz** (Weiterleiten-Dialog: geschlossener Code, kein Freitext, keine Vorauswahl des Ziels, Hinweis auf den Leserkreis; Verteilung nur als Summen). Ablauf nach E57 für Oberflächenscheiben mittleren Risikos: kein gesonderter Lesebefund der Spec, ein Review nach dem Bau; Sicherheits-, Rechts- und Datenschutzbefunde werden nie vertagt. Modell nur in `.claude/agents/` (takt-012)
@@ -723,10 +723,128 @@ Keine blockiert den Bau; alle mit Standard.
 
 ```
 Slice: 053-steuerungsansicht
-Done: …
-Evidence: …, docs/evidence/053-{steuerung,weiterleiten}-{de,en}.png
-Open: …
-Touched: …
+Done: Route /steering mit Registerzeile (requires question.classify, ohne Kürzel), Verteilung als zwei Leisten aus
+      counts.byUnit/bySeat mit Drill-down, Steuerungsdetail nach steeringActions (_actions only); Weiterleiten-Dialog
+      einmal in features/answers (für 054); Schreibtür als useWriteDoor herausgelöst, applyClientFilters herausgelöst.
+Evidence: pnpm gates (Commit und Schluss unten), docs/evidence/053-{steuerung,weiterleiten}-{de,en}.png
+Open: keine Blocker; Folgepunkte in docs/folgeliste.md „Steuerung (aus 053)“. Projekt http grün im CI-Lauf
+      37214710167 des PR #145 (unten).
+Touched: siehe Liste unten (nur Files allowed).
+```
+
+**Vor dem Bau geprüft (auf `e0798e1`).**
+
+1. 048 gemergt, Vertrag 0.4.3; `forwardQuestion` in `http.ts:643` und in `WRITE_METHODS` (`liveStore.ts:95`);
+   `forwardReasonLabel` exportiert aus `i18n/labels.ts:184` (nicht über `i18n/index.ts`). Erfüllt.
+2. `listQuestions` liefert `_actions` je Listeneintrag: in-process 230 von 230 Einträgen (Probe als `coordination`); im
+   Projekt `http` dieselbe Projektion über den Kern. Erfüllt.
+3. `listMeetingStageSeats` für `coordination` lesbar, maskiert mit `label` und `position` (vier Plätze des Seeds). Erfüllt.
+4. Seed wie im Befund: 5 `captured`, 7 `classified` (alle mit `question.assign`, kein Fachbereich), 4 `assigned` in
+   Operations, `byUnit.unit-ar` 0; 55 Einzelfragen mit `question.forward`, 12 mit `question.classify`. Im Projekt `http`
+   vor 053: 002 klassifiziert eine erfasste Frage, 045 E1 schreibt in „Finanzen“, E3 auf die erste `assigned`-Zeile; „AR-Büro“
+   berührt keine Datei davor. Konstanten unverändert. Erfüllt.
+5. Kurznamen im Filter (`shortName`): „Operations“, „AR-Büro“, „Finanzen“; keine Konstante SECRET/TOKEN/KEY/PASSWORD.
+6. Laufzeit `e2e-http`, Schritt „End-to-end http project …“, neu gelesen: 37208636753 **4:17** (14:17:14–14:21:31),
+   37207858473 **4:19** (14:04:29–14:08:48), 37205371922 **3:05** (13:23:00–13:26:05); keine neueren grünen Läufe mit
+   ausgeführtem Schritt (37211058692, 37210581999, 37210459297, 37209874556: Schritt übersprungen). Ist höchstens 4:19,
+   Schätzung +1,5 min ≈ 5,8 min < 8:00. Kein Halt. Tatsächliche Dauer im PR-Lauf: offen (unten).
+7. `featureRegistry.test.ts`: „preserves route order“ gab eine Menge ohne `question.classify` vor und hätte `steering`
+   verloren; die Menge trägt jetzt `question.classify` (Erwartung zu `requires`, erlaubt). `001-shell.spec.ts` zählt nicht.
+
+**Tests zuerst (rot).** Unit, vor der Umsetzung (`vitest run` der zehn neuen bzw. geänderten Dateien): `Test Files 10 failed
+(10)`, `Tests 7 failed | 52 passed (59)` — sieben neue Dateien ohne Modul (`Cannot find module './forward'`, `./steering`,
+`./distribution`, `./DistributionPanel`, `./SteeringDetail`, `./ForwardDialog`, `./steering.de`), dazu
+`applyClientFilters is not a function` (lib.test.ts ×4, timing053.test.ts) und die zwei Registertests
+(`expected undefined to be '/steering'`). e2e, Implementierung beiseitegelegt (`git stash -u`), nur die neue Datei, je Fall
+einzeln (`-g`), Projekt `in-process`: S1, S2, S3, S4, S5, S6, S7, S9, S10 je `1 failed` (`nav-steering` fehlt).
+
+**Grün.** Unit: `Test Files 35 passed (35)`, `Tests 628 passed (628)` (apps/web). e2e `053-steuerung.spec.ts`
+in-process: `9 passed`; mit `--repeat-each=3`: `27 passed (1.3m)`. Volle Suite in-process: **`148 passed (6.9m)`**, darunter
+unverändert 003 (1), 010c (29), 010d (26), 013 (9), 021b (1), 021c (1), 045 (6), 090 (20) — keine Zusicherung angepasst
+(Nachweis für Entscheidung 6). axe ohne serious/critical auf Seite, Weiterleiten-Dialog (de, en) und
+Klassifizierungsdialog.
+
+**Zeitmessung (Test 11, 800 Einzelfragen, In-Process-Pfad):** `[timing] 053 in-process filter p90 3.0 ms (D9 100 ms:
+within); median 0.9 ms, max 8.5 ms, 30 runs after 5 warm-up, 800 questions` — p90 < 150 ms hart erfüllt, auch unter 100 ms
+(D9). Browser weich bei 230 (S10): Statusfilter 97–150 ms, Drill-down 102–136 ms über vier Läufe, Grenze 1500 ms.
+
+**Endzustand im Projekt `http`** wie im Dateikopf von `053-steuerung.spec.ts` (S2, S3, S4 schreiben; nie „Finanzen“, Bühne
+unberührt).
+
+**Abweichungen von der Spec.**
+
+- S4 Screenshots: Das deutsche Dialogbild entsteht direkt nach dem Öffnen (leer), nicht nach der Wahl, weil
+  Akzeptanzkriterium 3 „Hinweis zum Leserkreis und keine Vorauswahl“ auf dem Bild verlangt; das englische Bild zeigt den
+  Dialog mit gewähltem Ziel und Grund. axe läuft auf dem gefüllten deutschen und englischen Dialog.
+- Fokus nach Klassifizieren: `ClassifyDialog` (unverändert) meldet nur `onClose`; die Seite merkt sich beim Schließen die
+  gelesene Version und setzt den Fokus, sobald eine neuere eintrifft (verworfen bei Akteur- oder Auswahlwechsel). Folgepunkt
+  `onSaved` in der Folgeliste.
+- Fokus nach Aktion über eine Abfrage im Detail (`[data-primary="true"]`, sonst `steering-detail-number`), nicht über
+  Refs: `Button` des Bausatzes reicht keinen `ref` im Typ durch, und `components/**` ist nicht erlaubt.
+- Zielfachbereich und aktueller Fachbereich im Dialog mit Kurznamen (`shortName ?? name`), wie Filter, Detail und Historie;
+  die Spec nennt für den Dialog keinen Namen.
+- `ForwardProblem` zeigt die Regel-id nur bei R-GUARD-15; der Kern setzt bei 422 keine (wie 045).
+- Mitbenutzt über die Liste hinaus: `answers.detail.actions` (Beschriftung der Aktionsleiste), `answers.stale.banner`,
+  `toast.rule`, `answers.detail.loading`. Schlüsselzahl unverändert 25.
+- Test 3 prüft „Fehler“ je Leiste: ein Lesefehler der Bühnenplätze lässt die Fachbereichsleiste stehen.
+- Die Prüfskripte `i18n-literals` lesen auch Testdateien; die Tests vergleichen Texte deshalb über kleine Hilfen statt über
+  `>Text<` in regulären Ausdrücken.
+
+**Design-Kritik D1–D10.**
+
+| D | erfüllt | Satz |
+|---|---|---|
+| D1 | ja | Titel und ein Satz, darunter die Verteilung, links die Liste, rechts eine Einzelfrage mit ihrem nächsten Schritt (053-steuerung-de.png). |
+| D2 | ja | Im Detail genau eine primäre Aktion aus `steeringActions`, „Verweigerung vorschlagen“ nie primär; im Dialog nur Absenden primär (Test 4, 7; S1–S4). |
+| D3 | ja | Zellen gleicher Höhe (32 px) im 8-px-Raster, Leiste mit 16 px Innenabstand, Kanten fluchten mit Liste und Detail. |
+| D4 | ja | Keine Farbflächen, keine Balkenfarben; Null in Grau 300; nur die aktive Zelle zart getönt wie die Filterchips. |
+| D5 | ja | Zahlen, Nummern und Platz-ids in Mono, Zahlen rechtsbündig; Dialogmeldung mit R-GUARD-15. |
+| D6 | ja | Laden, Fehler, leer der Verteilung; leeres Detail; `steering-forbidden` für Rollen ohne Leserecht (Test 3, S5). |
+| D7 | ja | 25 Schlüssel je Sprache (586), Hausvokabular, „An anderen Fachbereich weiterleiten“, kein Rollenname in Texten. |
+| D8 | ja | Zelle per Tab und Enter, Dialog ganz per Tastatur bis zum aktiven Absenden, Escape ohne Schreiben, Fokus nach Aktion (S7, S2–S4). |
+| D9 | ja | Ohne Recht fehlt die Schaltfläche, ohne Steuerungsrecht die ganze Leiste; Filterwechsel bei 800: p90 3,0 ms. |
+| D10 | ja | Zwei schmale Leisten statt Diagramm oder Kacheln; einziges Symbol ist das der Navigation. |
+
+**Aufwand:** rund 0,9 AStd Bau und Nachweis (15:02–15:55 UTC, einschließlich der roten e2e-Läufe und der vollen Suite) gegen
+3,4 geschätzt; kein Zuschnitt, 053c entfällt.
+
+**Projekt `http` (CI `e2e-http` des PR #145):** Lauf-ID **37214710167**, Job-ID **111472763444**, Commit `2a12e0d`. Der
+Schritt „End-to-end http project …“ dauerte **5:04** (15:54:31–15:59:35 UTC) bei einem Limit von 9:00 (Ist vor dem Bau
+höchstens 4:19, Schätzung +1,5 min; tatsächlich +0:45). Das ✘ bei 031 G1 in diesem Lauf ist die beabsichtigte Schutzzeile
+dieses Tests (wiederholt wie in früheren Läufen). Schluss des Logs mit den Fällen aus `053-steuerung.spec.ts`:
+
+```
+  ✓  38 [http] › e2e/053-steuerung.spec.ts:195:3 › 053 Steuerungsansicht der Koordination › S1 Verteilung gegen die Zähler, Drill-down gegen die Liste (mit S8) @screenshot (6.4s)
+  ✓  39 [http] › e2e/053-steuerung.spec.ts:260:3 › 053 Steuerungsansicht der Koordination › S2 Klassifizieren (mit S8) (5.3s)
+  ✓  40 [http] › e2e/053-steuerung.spec.ts:286:3 › 053 Steuerungsansicht der Koordination › S3 Zuweisen (3.7s)
+  ✓  41 [http] › e2e/053-steuerung.spec.ts:311:3 › 053 Steuerungsansicht der Koordination › S4 An anderen Fachbereich weiterleiten (mit S8) @screenshot (7.9s)
+  ✓  42 [http] › e2e/053-steuerung.spec.ts:389:3 › 053 Steuerungsansicht der Koordination › S5 Rechte als Daten (schreibt nichts) (6.4s)
+  ✓  43 [http] › e2e/053-steuerung.spec.ts:424:3 › 053 Steuerungsansicht der Koordination › S6 Eingaben je Akteur und je Frage (schreibt nichts) (6.1s)
+  ✓  44 [http] › e2e/053-steuerung.spec.ts:457:3 › 053 Steuerungsansicht der Koordination › S7 Tastatur: Zelle per Tab und Enter, Dialog ganz per Tastatur (schreibt nichts) (3.4s)
+  ✓  45 [http] › e2e/053-steuerung.spec.ts:497:3 › 053 Steuerungsansicht der Koordination › S9 Verweigerung vorschlagen aus der Steuerung (schreibt nichts) (2.2s)
+  ✓  46 [http] › e2e/053-steuerung.spec.ts:511:3 › 053 Steuerungsansicht der Koordination › S10 Zeit (weich): Statusfilter und Drill-down (2.2s)
+  48 passed (4.3m)
+```
+
+**Nacharbeit nach dem Review (Commit `af78c0c`).** (2) `forwardProblemHandler` schließt bei 404 nur, solange die Frage noch
+gezeigt wird; die Meldung erscheint immer (`forward.test.ts`, Fall mit `stillShown = () => false`). (3a) Fokus nach Aktion nur
+aus `body` oder dem Detail (`mayMoveFocus` in `steering.ts`, drei Unit-Fälle; e2e S2b: ein Schreibvorgang außerhalb der Seite
+bei Fokus im Suchfeld lässt den Fokus dort — ohne die Regel rot, mit grün, nur in-process, weil der fremde Schreibvorgang über
+das Demo-Modul geht). (3b) `armFocus` prüft gegen die aktuelle Version (Ref) und fokussiert sofort, wenn der Strom schneller
+war. (3c) Schließen des Klassifizierungsdialogs wirkt nur für eine neue Version innerhalb von 3 s und unter (3a); `onSaved`
+bleibt Folgepunkt. (4) S2 prüft axe auf dem Klassifizierungsdialog auch englisch. e2e 053 in-process mit
+`--repeat-each=3`: `30 passed (1.5m)`.
+
+**`pnpm gates`** auf Commit `58028e6` (zuvor `af78c0c`; `58028e6` bringt die Fehleranzeige der Sitzleiste nach Codex P2; sauberer Baum, mit `TEST_DATABASE_URL` auf die lokale Postgres-Datenbank `hv_t053`),
+Ausgang 0 (erster Lauf auf `55f4270`, ebenfalls grün). Zählerzeilen: `packages/domain` 421 passed, `apps/web` 632 passed,
+`apps/api` 674 passed; `vocabulary-check: ok`; `i18n-literal check: 0 literals`; `slice-scope: 40 changed file(s), all
+within … "Files allowed"`. Schluss wörtlich:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.36s
+mark-test-run: wrote /home/user/wt/s053/.claude/state/last-test-run (clean tree) at commit 58028e6, tree eeb9e714614c…
 ```
 
 ## Review findings

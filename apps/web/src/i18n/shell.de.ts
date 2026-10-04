@@ -43,6 +43,7 @@ export const shellDe = {
   'nav.section': 'Ablauf',
   'nav.speakers': 'Wortmeldungen',
   'nav.capture': 'Erfassung',
+  'nav.steering': 'Steuerung',
   'nav.answers': 'Beantwortung',
   'nav.stage': 'Bühne',
   'nav.history': 'Historie & Suche',
@@ -142,6 +143,9 @@ export const shellDe = {
   'page.capture.title': 'Erfassung',
   'page.capture.description':
     'Redebeiträge erfassen und in Einzelfragen zerlegen, mit Restabdeckung.',
+  'page.steering.title': 'Steuerung',
+  'page.steering.description':
+    'Klassifizieren, zuweisen und an andere Fachbereiche weiterleiten; Verteilung je Fachbereich und Bühnenplatz.',
   'page.answers.title': 'Beantwortung',
   'page.answers.description': 'Antwortentwurf, Legal Clearing und Freigabe je Antwortpfad.',
   'page.stage.title': 'Bühne',

@@ -17,6 +17,7 @@ import { showProblem } from '../../components';
 import { getLang, translate } from '../../i18n';
 import {
   LIST_LIMIT,
+  applyClientFilters,
   createDetailProblemGate,
   NO_VERDICT,
   isCurrentLoad,
@@ -408,16 +409,11 @@ export function useBacklog(filters: Filters, selectedId: string | null): Backlog
     return next;
   }, [pool]);
 
-  const items = useMemo(() => {
-    const filtered =
-      filters.status === ALL ? [...pool] : pool.filter((q) => q.status === filters.status);
-    filtered.sort(
-      filters.sort === 'number'
-        ? (a, b) => a.number.localeCompare(b.number)
-        : (a, b) => a.createdAt.localeCompare(b.createdAt) || a.number.localeCompare(b.number),
-    );
-    return filtered;
-  }, [pool, filters.status, filters.sort]);
+  // Scheibe 053: the same in-memory step, lifted into `applyClientFilters` (lib.ts) so that it can be measured.
+  const items = useMemo(
+    () => applyClientFilters(pool, filters.status, filters.sort),
+    [pool, filters.status, filters.sort],
+  );
 
   return {
     items,

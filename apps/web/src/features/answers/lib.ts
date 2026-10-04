@@ -2,7 +2,7 @@
  * Small helpers of the answer backlog (Beantwortung). They live in the feature, not in the component
  * kit: the kit owns look and behaviour, not the wording of an age or the shape of a refused call.
  */
-import type { Approval, DomainEvent, Question } from '@hv/domain';
+import type { Approval, DomainEvent, Question, QuestionStatus } from '@hv/domain';
 import type { Translate } from '../../i18n';
 
 /** One fetch per version carries the whole corpus; filtering and windowing happen in the client. */
@@ -10,6 +10,25 @@ export const LIST_LIMIT = 2000;
 
 /** Row height of the work list. Fixed, because the windowing arithmetic depends on it. */
 export const ROW_HEIGHT = 36;
+
+/**
+ * Scheibe 053: the status chip and the order, applied in memory to the list the service returned — lifted out of
+ * `useBacklog.ts` unchanged, so that the steering view's timing test (`api/timing053.test.ts`) measures the very code
+ * the work list runs. Returns a new array; the input stays as it is.
+ */
+export function applyClientFilters(
+  pool: readonly Question[],
+  status: QuestionStatus | 'all',
+  sort: 'number' | 'age',
+): Question[] {
+  const filtered = status === 'all' ? [...pool] : pool.filter((q) => q.status === status);
+  filtered.sort(
+    sort === 'number'
+      ? (a, b) => a.number.localeCompare(b.number)
+      : (a, b) => a.createdAt.localeCompare(b.createdAt) || a.number.localeCompare(b.number),
+  );
+  return filtered;
+}
 
 /** How long a question has been in the house, in the house wording ("vor 12 min"). */
 export function relativeAge(t: Translate, iso: string, now: number): string {

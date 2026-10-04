@@ -665,6 +665,35 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 048 Spec-Nachprüfung N8 · Verweis auf `Event.type` · Zeilen `openapi.yaml:3676-3711` statt 3675-3710 · berichtigen.
 - 048 Lesebefund m2 · bereits oben („`_actions` einer gebundenen Fachkraft ohne Einheit“) · kein zweiter Eintrag.
 
+## Steuerung (aus 053)
+
+- 053 Hinweis Orchestrator · Quelle der Rechtemenge · `visibleRoutes` wird nirgends mit einer Menge gerufen, `/steering` steht
+  deshalb für jede Rolle in der Navigation (S5 sichert das bewusst zu) · Vertragsfeld `permissions` an `GET /auth/me` und
+  In-Process-Ableitung aus `can()`, eigene Scheibe (Eigentümerfrage 3A; betrifft auch 054, 059, 061).
+- 053 Hinweis Orchestrator · Klassifizieren über das Enum `STAGE_ASSIGNMENTS` · ein Bühnenplatz, den die Administration mit
+  anderer id anlegt, ist im Dialog nicht wählbar · Dialog auf die Bühnenplätze der Stammdaten mit `seatId` (Eigentümerfrage 6).
+- 053 Hinweis Orchestrator · `AssignDialog` wählt den aktuellen oder ersten Fachbereich vor · beim Zuweisen erweitert das den
+  Leserkreis per Standard wie beim Weiterleiten · Vorauswahl mit Datenschutzblick prüfen (Eigentümerfrage 2).
+- 053 Bau · `apps/web/src/features/steering/Page.tsx` Fokus nach Klassifizieren · `ClassifyDialog` meldet keinen Erfolg, nur
+  `onClose`; die Seite merkt sich deshalb bei jedem Schließen die gelesene Version und setzt den Fokus, sobald eine neuere kommt
+  (nach Abbrechen auch bei einem fremden Schreibvorgang auf derselben Frage, bis zur nächsten Auswahl) · `onSaved` in
+  `ClassifyDialog` (Lane capture), dann nur nach Erfolg.
+- 053 Bau · `scripts/e2e-http-031.test.mjs` · der Testtitel „lists the seven files“ stimmt seit 045 nicht (jetzt neun); 053
+  durfte nur `SHARED_FILES` und `HTTP_ORDER` ändern · Titel ohne Zahl.
+- 053 Bau · `ForwardProblem` · die Meldung zu 422 trägt keine Regel-id, weil der Kern bei 422 keine setzt (wie 045 bei
+  `answers.refusal.error.invalid`) · mit einer Regel-id für Eingabeprüfungen nachziehen, falls der Vertrag eine bekommt.
+- 053 Bau · e2e S6 im Projekt `http` · der Akteurwechsel lädt die Seite neu, der offene Dialog fällt dort durch das Neuladen,
+  nicht durch den Schlüssel; die Zusicherung „erneut öffnen ist leer“ gilt in beiden Projekten · in-process belegt den Schlüssel.
+- 053 Review 4 · Verteilung · Nullen in Grau 300 haben etwa 1,6:1 Kontrast (Vorgabe D4; axe legt Einzelzeichen unter
+  „incomplete“), und die Bühnenplatzzellen tragen kein `aria-label` · Entscheidung Eigentümer/Gestaltung, Bezeichnung ergänzen.
+- 053 Review 6 · Test der Statusunabhängigkeit · steht in `steering.test.ts` mit Teil-Datensätzen · nach
+  `SteeringDetail.test.tsx` mit echten `Question`-Datensätzen verlegen.
+- 053 Review 7 · e2e `findSteerable` ohne `unitName` · wartet nicht auf die ungefilterte Liste · wie beim Fachbereich auf das
+  Eintreffen warten.
+- 053 Review 8 · Drill-down · „15 offen“ zeigt mit Status „alle“ 24 Zeilen · Voreinstellung „offen“ oder Hinweis, als
+  Eigentümerfrage.
+- 053 Review 9 · `counts.byUnit` · für gebundene Fachkräfte sichtbar (Entwurf 040b) · zur nächsten Datenschutzprüfung.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
