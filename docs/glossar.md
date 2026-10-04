@@ -52,6 +52,8 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Grund der Weiterleitung | Reason for forwarding | `reasonCode`: `wrong_unit` (Falscher Fachbereich), `expertise_elsewhere` (Fachwissen liegt in einem anderen Fachbereich), `capacity` (Auslastung), `other` (Sonstiges); geschlossener Code, kein Freitext (Scheibe 048) | Begründung (Hauswort der Verweigerung) |
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
+| Schreibmodus | Writing mode | `apps/web/src/features/focus/WritingMode.tsx`; Frage oben, Antwort groß, Liste ausgeblendet (Scheibe 054) | „Vollbild“ als Name der Funktion (es bleibt die Shell), „Editor“ in Texten |
+| Vorlesezeit | Reading time | `readingSeconds` (130 Wörter je Minute, Ziel zwei Minuten, Scheibe 054) | — |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
 | Verteilung | Distribution | `Meeting.counts.byUnit` (offen je Fachbereich), `Meeting.counts.bySeat` (auf der Bühne je Bühnenplatz); Summen aus dem Dienst, nie je Person (Scheibe 053) | „Matrix“ (es sind zwei Randsummen), „Dashboard“ |
 | Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | — |

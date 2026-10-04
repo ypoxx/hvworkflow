@@ -47,6 +47,7 @@ export const shellEn: typeof shellDe = {
   'nav.capture': 'Capture',
   'nav.steering': 'Steering',
   'nav.answers': 'Answering',
+  'nav.focus': 'My questions',
   'nav.stage': 'Podium',
   'nav.history': 'History & search',
   // --- 005 design system ---
@@ -151,6 +152,8 @@ export const shellEn: typeof shellDe = {
     'Classify, assign and forward to other answering units; distribution per answering unit and podium seat.',
   'page.answers.title': 'Answering',
   'page.answers.description': 'Answer draft, legal clearing and approval per answer track.',
+  'page.focus.title': 'My questions',
+  'page.focus.description': 'The questions whose answer you may draft and forward, oldest first.',
   'page.stage.title': 'Podium',
   'page.stage.description': 'Podium view: read out the approved answer and close it.',
   'page.history.title': 'History & search',

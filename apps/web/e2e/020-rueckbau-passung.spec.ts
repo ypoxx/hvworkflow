@@ -391,7 +391,9 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
    * shows the read-only hint on a question it may read but not touch (`captured`, before
    * assignment), and still reaches `closed` afterwards for the "at rest" half below.
    * ========================================================================================= */
-  await asRole(page, 'expert'); // question.read on every status, but no editing action before assignment
+  // Scheibe 054 (decision 2a): the demo expert is bound to Finanzen and no longer reads a question without a unit, so
+  // this read-only step goes to the approver — it reads `captured` (and `closed` below) and holds no action there.
+  await asRole(page, 'approver'); // question.read on every status, but no editing action on a captured question
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   // m3 (review round 1): the hint is suppressed for a question at rest (delivered/terminal) — the
@@ -417,7 +419,9 @@ test('020: Rückbau und Passung — points 1–9, axe on the five views', async 
   await page.getByTestId('answers-search').fill('');
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
 
-  // Still `expert` from point #26 above — the drafting half needs no role switch.
+  // Scheibe 054 (decision 2a): back to `expert` for the drafting half (point #26 above read as the approver); the
+  // first `answer_drafted` row the bound expert reads lies in Finanzen.
+  await asRole(page, 'expert');
   await page.getByTestId('answers-filter-status-answer_drafted').click();
   await expect(page.getByTestId('answers-row').first()).toHaveAttribute('data-status', 'answer_drafted');
   await page.getByTestId('answers-row').first().click();
