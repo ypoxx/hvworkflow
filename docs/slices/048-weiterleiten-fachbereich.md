@@ -1,6 +1,6 @@
 # Scheibe 048 — Weiterleiten an einen anderen Fachbereich (Vertrag, Kern, Dienst)
 
-**Status:** gebaut (04.10.2026, Bau `85bbd75` auf Vertrag `fb5cbde`, `pnpm gates` grün; Review offen) · Spec: spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Go des Eigentümers zum Bau am 04.10.2026 erteilt** (Bau auf den Standards dieser Spec; E5 bleibt im Register offen, Standard „beides bauen“). Ursprünglich: Bau erst nach Antwort auf E5 oder ausdrücklichem Go.
+**Status:** gebaut (04.10.2026, Bau `85bbd75` auf Vertrag `fb5cbde`; Review ohne blocker/major, Befunde in `789c745`, `pnpm gates` grün auf `789c745`) · Spec: spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Go des Eigentümers zum Bau am 04.10.2026 erteilt** (Bau auf den Standards dieser Spec; E5 bleibt im Register offen, Standard „beides bauen“). Ursprünglich: Bau erst nach Antwort auf E5 oder ausdrücklichem Go.
 **Risikoklasse:** hoch · 3,0 AStd (Spanne 2,5–3,75; Plan 048: mittel · 1,5 AStd für alle drei Themen der Planzeile; Begründung in „Warum hoch“ und „Aufwand“) · Plan 048: 05.11.2026 (W6), tatsächlich direkt nach 045 und nach der Antwort auf E5 · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `http.ts` und `liveStore.ts`); web-shell (nur Aktions- und Ereignisschlüssel); web-history (nur die Zusammenfassung des neuen Ereignisses und die Bezeichnungen der Gründe); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz (nur Zeile V4); docs (Glossar)
 **Bedrohungsmodell:** berührt T-G1-E-01 (Schreibvorgang ohne Oberfläche), T-G1-I-01 (Leserkreis wächst um die Zieleinheit, Umfang in „Warum hoch“), T-G1-I-09 (Strom: Frage verlässt den Lesebereich); neuer Missbrauchsfall MF-14 (Abschnitt „Missbrauchsfälle“)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6); danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Einheitsbindung, neues Recht, Strom, Antwort nach dem Verlassen des eigenen Bereichs), **Datenschutz** (geschlossener Grundcode, erweiterter Leserkreis, keine Person als Ziel) und **Vertrag** (neue Operation, Validator und Kern im Gleichlauf, Abdeckungstor). Lesebefund der Spec vor dem Bau erledigt (Klasse hoch); nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
@@ -807,6 +807,41 @@ Davor in derselben Ausgabe: `packages/domain` `Tests  420 passed (420)`, `apps/w
 allowlist.json … ok`, `vocabulary-check: ok`, `i18n-literal check: 0 literals`, `slice-scope: 41 changed file(s), all within …`
 (mit der Warnung, dass „Files allowed“ von der Merge-Basis abweicht: Abweichung 1), `plan-graph: ok`, Skripttests `# pass 275`,
 `# fail 0`. `contract:lint`: die 12 bestehenden Warnungen, keine neue.
+
+**Nach dem Review (04.10.2026, Befunde 1–3, Commit `789c745`).** Test 13 um den Leser der Zieleinheit (`STREAM_HR`) ergänzt: live
+ein `change` mit der Frage-id, Nachholen über das Weiterleiten ein `reset`. **Mutationsprobe:** `lookupIn([before, after])` in
+`visibleMessages` auf `[before]` verkürzt → Test 13 rot (`1 failed`, die Zusicherung der Frage-id für `unit-hr`), zurückgenommen.
+Test 9b um den Fall „erneut weiterleiten, alten Zielfachbereich entfernen, K1 wiederholen“ ergänzt: 422 „Unit unit-ar does not
+exist.“, kein Ereignis (Abschnitt 5 berichtigt). Sieben Review-Punkte auf der Folgeliste.
+
+**`pnpm gates`** grün auf `789c745` (sauberer Baum, Postgres-Variablen auf `hv_t048`; domain `Tests  421 passed (421)`, web
+`561 passed (561)`, api `674 passed (674)` ohne `skipped`, `operation-coverage … ok`, `slice-scope: 41 changed file(s), all within …`,
+Skripttests `# pass 275`, `# fail 0`); Schluss wörtlich:
+
+```
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
+dist/assets/index-Bkvmlj0W.js                        694.96 kB │ gzip: 203.19 kB │ map: 2,898.26 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.50s
+mark-test-run: wrote /home/user/wt/s048/.claude/state/last-test-run (clean tree) at commit 789c745, tree 5a87db061d30…
+```
 
 **Abweichungen von der Spec.**
 1. **Scope-Befund `packages/domain/src/__tests__/api.test.ts`.** Die Erwartung „coordination holds exactly …“ (`api.test.ts:671`)
