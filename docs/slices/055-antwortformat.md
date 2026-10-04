@@ -168,8 +168,10 @@ Zwei Funktionen mit denselben Regeln, aber verschiedenem Vertrag (Lesebefund M2)
 - **Lesevariante** `normalizeAnswerBodyForRead(stored: unknown): AnswerBody | null` — für die Projektion. Nur N1–N7 (ohne
   Gestaltprüfung im Sinne von 422, ohne N8 und N9), **wirft nie**: Unbrauchbares (kein Objekt, `blocks` kein Array, Block ohne
   Text) fällt weg; ein einsames Ersatzzeichen wird U+FFFD; `language` wird immer `de` (der einzige Wert der Speicherform; ein
-  gespeichertes anderes kann es aus der Schreibvariante nicht geben). Bleibt nichts, liefert sie `null`, und die Projektion
-  nimmt L.
+  gespeichertes anderes kann es aus der Schreibvariante nicht geben). Bleibt nichts **oder überschreitet das Ergebnis eine
+  Strukturgrenze der Speicherform** (10 000 Blöcke, 10 000 Punkte, 20 000 Läufe), liefert sie `null`, und die Projektion nimmt L
+  (Nachprüfung Minor 2); überschreitet auch L eine Grenze (nur bei einem gespeicherten Text über 20 000 Code-Punkten denkbar),
+  liefert L ebenfalls `null`, und die Version trägt kein `body`.
 
 **Reihenfolge innerhalb eines Absatzes bzw. Listenpunkts (fest, Lesebefund M3):** N1 und N2 wählen Blöcke und Marken; dann
 (1) Zeichen abbilden und entfernen (N3), (2) Leerraum (N4), (3) Läufe (N5), (4) **NFC je fertigem Lauf**, (5) erneute
@@ -226,11 +228,14 @@ Dokuments still aus `EventRead`. Test 3 prüft das gegen die Konstante.
 ### 2a. Zeichenfilter auch für `text` (Lesebefund M1, Security)
 
 Neue Ereignisse tragen auch im Klartext keine Steuer- oder Formatzeichen mehr, nicht nur im Dokument. `sanitizeAnswerText`
-(in `answerFormat.ts`) wendet auf `text` **ohne** `body` in `draftAnswer` und auf `text` in `proposeRefusal` an: einsames
-Ersatzzeichen → 422; `\p{Cc}` außer Tab, Zeilenumbruch, Wagenrücklauf entfernen; jedes `\p{Cf}` entfernen; NFC; danach `trim`
-wie bisher. Leerraum wird **nicht** auf U+0020 abgebildet (die Zeilen eines Klartexts bleiben Zeilen). Bleibt nichts, 422
-„Answer text is required.“ Für einen Text ohne solche Zeichen (der Normalfall, der ganze Seed) ist das Ereignis Byte für Byte
-wie vor 055. Alte Ereignisse werden nicht umgeschrieben und ihr `text` beim Lesen nicht gefiltert (R7, Bindung der Freigabe);
+(in `answerFormat.ts`) wendet auf `text` **ohne** `body` in `draftAnswer` und auf `text` in `proposeRefusal` an: `\p{Cc}`
+außer Tab, Zeilenumbruch, Wagenrücklauf entfernen; jedes `\p{Cf}` entfernen; NFC; danach `trim` wie bisher. Leerraum wird
+**nicht** auf U+0020 abgebildet (die Zeilen eines Klartexts bleiben Zeilen). **Reihenfolge (Nachprüfung Minor 1):** (1) Form
+und Längen auf der **rohen** Eingabe, wie der Validator (422; die Grenzen 20 000 bzw. 4 000 Code-Punkte gelten also vor dem
+Filter); (2) einsames Ersatzzeichen → 422; (3) Filter, NFC, `trim`; (4) Leerprüfung auf dem gefilterten Wert: leerer
+Antworttext → 422 „Answer text is required.“, leerer Verweigerungswortlaut → 422 wie heute bei leerem `text`, leere Begründung
+auf Pfad B → 409 R-GUARD-09 wie heute bei „   “. Für einen Text **ohne Steuer- und Formatzeichen und bereits in NFC** (der
+Normalfall, der ganze Seed) ist das Ereignis Byte für Byte wie vor 055 (Nachprüfung Minor 3). Alte Ereignisse werden nicht umgeschrieben und ihr `text` beim Lesen nicht gefiltert (R7, Bindung der Freigabe);
 nur das daraus hergeleitete `body` läuft durch die Lesevariante. Auch die Begründung einer Verweigerung (`pii.refusalJustification`)
 läuft in `proposeRefusal` durch `sanitizeAnswerText` (Entscheidung des Orchestrators, 04.10.2026), **vor** den bestehenden
 Prüfungen: Eine Begründung, die danach leer ist, gilt wie eine leere (Pfad B: 409 R-GUARD-09, wie heute bei „   “); ein
@@ -250,8 +255,8 @@ einsames Ersatzzeichen ist 422. Ort (`pii`), Maskierung und Leserkreis der Begr�
 
 ### 4. `draftAnswer` mit `body` (`api.ts`, R-TRANS-03)
 
-- **Ohne `body`:** wie bisher, nur mit dem Zeichenfilter aus 2a; kein `body` im Ereignis. Für Text ohne N3-Zeichen Byte für
-  Byte wie vor 055; bestehende Clients, Tests, Seed und Lastkorpus bleiben gleich.
+- **Ohne `body`:** wie bisher, nur mit dem Zeichenfilter aus 2a; kein `body` im Ereignis. Für Text ohne Steuer- und
+  Formatzeichen und bereits in NFC Byte für Byte wie vor 055; bestehende Clients, Tests, Seed und Lastkorpus bleiben gleich.
 - **Mit `body`:** Schreibvariante (422 bei Gestalt, Ersatzzeichen, N8, N9, nichts übrig), dann `text = answerPlainText(body)`.
   Das Ereignis trägt `answer.text` **und** `answer.body` (Speicherform). **Der mitgesendete `text`** bleibt im Vertrag Pflicht
   (0.4.x ist additiv, ADR 0015; 043a Regel 1) und muss die Vertragsform erfüllen (mindestens ein Zeichen, höchstens 20 000);
@@ -373,7 +378,14 @@ Additiv: neue Schemas, zwei optionale Felder, eine Bindung im Lesepfad; keine ne
   'text']`; er bekommt `body` mit dem Kommentar „Vertragszeile von 055, 0.4.4“ (Lesebefund B1). Weitere Tests, die Schlüssel
   von `AnswerDraft`, `AnswerVersion` oder `EventRead.payload.answer` festhalten, gibt es auf `cc97005` nicht (gesucht in
   `apps/api/src/__tests__`, `packages/*/src`, `scripts`); Test 6 dort prüft nur `AnswerVersion.required` (bleibt gleich), Test
-  13 nur das Verbot von `refusalJustification` (bleibt gleich). Findet der Bau doch einen, hält er an und meldet.
+  13 nur das Verbot von `refusalJustification` (bleibt gleich). **Durch 2a berührt (Nachprüfung NB1):**
+  `packages/domain/src/__tests__/refusal044a.test.ts:392-394` erwartet, dass eine Begründung mit einsamen Ersatzzeichen
+  angenommen wird (`in_review`); mit 2a ist das 422. Diese drei Zeilen werden auf 422 umgestellt (Kommentar „055, Entscheidung
+  2a“); die Emoji-Fälle 388–391 und der Längenfall 361 (4 001 Ersatzzeichen, 422 schon über die Länge) bleiben. Zweite Suche
+  nach Tests, die einsame Ersatzzeichen, Steuer- oder Formatzeichen in `AnswerDraft.text`, `RefusalProposal.text` oder
+  `refusalJustification` als angenommen erwarten (`packages/domain/src/__tests__`, `apps/api/src/__tests__`, `apps/web/src`):
+  keine weitere. `refusal044b.test.ts:562` prüft nur `codePointLength` gegen Ajv und bleibt gleich (die Funktion zählt weiter
+  einsame Ersatzzeichen; sie wird nur verschoben). Findet der Bau doch einen, hält er an und meldet.
 - **Rücknahme nach dem Merge** ist teuer: Ein Feld oder einen Enum-Wert zu streichen, ist brechend (0.5.0, ADR 0015), und
   Ereignisse mit `body` bleiben für immer im Protokoll (R7). Deshalb Lesebefund vor dem Bau.
 - Ist beim Baustart schon eine andere 0.4.x-Stufe gemergt, nimmt dieser Schritt die nächste.
@@ -416,6 +428,7 @@ Kern:
 - `packages/domain/src/__tests__/answerFormat055.test.ts` (neu)
 - `packages/domain/src/__tests__/answerDraft055.test.ts` (neu)
 - `packages/domain/src/__tests__/support/answerBodyGen.ts` (neu, gesäter Generator für Test 2 und H5)
+- `packages/domain/src/__tests__/refusal044a.test.ts` (nur Zeilen 392–394: einsames Ersatzzeichen in der Begründung jetzt 422, Kommentar „055, Entscheidung 2a“; die Emoji-Fälle 388–391 bleiben)
 
 Dienst (Tests und eine Begrenzung):
 
@@ -519,7 +532,7 @@ Jeder Test steht vor der Änderung und ist rot (Ausgabe im Bericht), danach grü
 
 **Kern, `answerDraft055.test.ts` (über `createInProcessApi` mit injizierter Uhr)**
 
-K1. **Ohne `body` unverändert für Text ohne N3-Zeichen:** Ereignis gleich wie vor 055 (Schlüssel der Nutzlast genau `answer`, ggf.
+K1. **Ohne `body` unverändert für Text ohne Steuer- und Formatzeichen und bereits in NFC:** Ereignis gleich wie vor 055 (Schlüssel der Nutzlast genau `answer`, ggf.
     `invalidatedApprovalOfVersion`; `answer` ohne `body`); die Version in `Question` trägt `body` aus L.
 K2. **Mit `body`:** Ereignis trägt `answer.text = answerPlainText(normalized)` und `answer.body` (Speicherform); ein
     abweichender mitgesendeter `text` steht **nicht** im Ereignis; `Question.answers[n].body` gleich der Speicherform. Auch
@@ -535,9 +548,10 @@ K6. **Weiterleiten:** nach `draftAnswer` mit `body` und `submitForReview` bzw. `
 K7. **Alte Ereignisse lesbar, Projektion wirft nie:** von Hand angehängt (a) ein `AnswerDrafted` ohne `body` (Form vor 055);
     (b) ein reines Text-Ereignis mit **600 Zeilen**; (c) ein `body` mit einer **nicht mehr erlaubten Marke** und einem leeren
     Absatz (simuliert „Marke gestrichen“); (d) ein gespeichertes `body` mit `language: 'en'`; (e) **der strengste Fall** (Nit 2):
-    ein `body` mit unbekannter Blockart, Marke als Zahl, leeren Läufen, `\p{Cf}`-Zeichen, einsamem Ersatzzeichen, 12 000 Blöcken
-    und `blocks` als Objekt in einer zweiten Version. Die Projektion wirft für keinen; jede Version hat eine gültige Speicherform
-    (bzw. bei (e) zweite Version `body` aus L), die gestrichene Marke fehlt, `language` ist `de`, `text` ist jeweils das
+    ein `body` mit unbekannter Blockart, Marke als Zahl, leeren Läufen, `\p{Cf}`-Zeichen und einsamem Ersatzzeichen; in einer
+    zweiten Version ein `body` mit 12 000 nicht leeren Blöcken (Lesevariante liefert `null` wegen der Strukturgrenze, `body` aus
+    L, Nachprüfung Minor 2); in einer dritten `blocks` als Objekt. Die Projektion wirft für keinen; jede Version hat eine gültige Speicherform
+    (bzw. bei (e) zweite und dritte Version `body` aus L), die gestrichene Marke fehlt, `language` ist `de`, `text` ist jeweils das
     gespeicherte, es entsteht keine neue Version und keine Freigabe geht verloren.
 K8. **Verweigerung:** `proposeRefusal` schreibt kein `body`; die Version trägt `body` aus L; `refusalJustification` steht
     nicht im `body`.
@@ -547,7 +561,8 @@ K11. **Zeichenfilter im Klartext (M1):** `draftAnswer` ohne `body` mit `text` = 
     Ereignis `"Umsatz stieg um 3 %"`; `text` nur aus U+200B → 422, kein Ereignis; einsames Ersatzzeichen → 422.
 K12. **Zeichenfilter in `proposeRefusal`:** derselbe Text als Verweigerungswortlaut → gefiltert im Ereignis. Begründung mit
     U+202E und U+200B (Pfad B) → in `pii.refusalJustification` gefiltert gespeichert; eine Begründung nur aus U+200B → 409
-    R-GUARD-09, kein Ereignis. Die Begründung erscheint weiterhin in keiner Ereignislesung, keinem Strom, keiner `StageView` und
+    R-GUARD-09, kein Ereignis; eine Begründung mit einsamem Ersatzzeichen → 422, kein Ereignis (vorher angenommen; die drei Zeilen
+    `refusal044a.test.ts:392-394` ziehen nach, NB1); 4 000 Code-Punkte roh mit Formatzeichen → angenommen (Länge vor dem Filter). Die Begründung erscheint weiterhin in keiner Ereignislesung, keinem Strom, keiner `StageView` und
     für keinen Leser ohne die Verweigerungsrechte; die bestehenden Maskierungstests aus 044a/044b bleiben unverändert grün.
 K13. **Goldener Test der Herleitung (Lesebefund Minor 9, Recht):** drei feste alte Ereignisse als Testdaten (einzeilig;
     mehrzeilig mit Leerzeilen und Leerzeichen am Zeilenende; mit geschütztem Leerzeichen und Tab) ergeben ein wörtlich im Test
@@ -863,6 +878,10 @@ Eingearbeitet im Commit „Spec 055: Befunde der Lesung eingearbeitet“.
 | Nit 5 Schlüssel des Dokuments gegen `MASKED_KEYS` | Invariante unter Entscheidung 2, Prüfung in Test 3 |
 | Nit 6 ZWJ | dokumentiert bei N3, Fall in 1c, Standardzeile |
 | Zeilenverweis `proposeRefusal` | `api.ts:1517` |
+| Nachprüfung NB1: `refusal044a.test.ts:392-394` erwartet angenommene einsame Ersatzzeichen in der Begründung | Datei mit nur diesen Zeilen in „Files allowed“ (jetzt 422, Kommentar „055, Entscheidung 2a“); Aussage „keine weiteren Tests“ im Vertragsschritt berichtigt; K12 erweitert; zweite Suche ohne weiteren Fund (`refusal044b.test.ts:562` prüft nur die Zählung) |
+| Nachprüfung Minor 1: Reihenfolge Länge, Filter, Leerprüfung offen | 2a: Längen roh wie der Validator, dann Ersatzzeichen 422, Filter, Leerprüfung (422 bzw. 409 R-GUARD-09) |
+| Nachprüfung Minor 2: Lesevariante über einer Strukturgrenze | liefert `null`, L greift; K7 (e) mit 12 000 Blöcken |
+| Nachprüfung Minor 3: „Byte für Byte“ zu weit | „ohne Steuer- und Formatzeichen und bereits in NFC“ in 2a, Entscheidung 4 und K1 |
 | Nachtrag Orchestrator (04.10.2026) [Security]: Begründung einer Verweigerung ungefiltert | `sanitizeAnswerText` auch auf `pii.refusalJustification` in `proposeRefusal`, vor R-GUARD-09; K12 erweitert; Maskierung unverändert |
 
 ## Bericht (nach Bau ausfüllen)
