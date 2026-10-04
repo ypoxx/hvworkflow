@@ -279,6 +279,11 @@ const GUARD_SCENARIOS: Record<string, { satisfies: [QuestionRecord, unknown?, Tr
       approval: { answerVersion: 1, approvedAt: '2027-04-20T09:10:00.000Z', approvedBy: OTHER.actor },
     })],
   },
+  // Scheibe 048: the target is another answering unit; a question without a unit may go to any unit.
+  'R-GUARD-15': {
+    satisfies: [question({ status: 'assigned', track: 'expert_track', unitId: 'unit-fin' }), { unitId: 'unit-hr' }],
+    violates: [question({ status: 'assigned', track: 'expert_track', unitId: 'unit-fin' }), { unitId: 'unit-fin' }],
+  },
 };
 
 describe('guards (one generated test each, Festlegung 3 of slice 011)', () => {

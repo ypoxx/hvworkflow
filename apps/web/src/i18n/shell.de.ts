@@ -181,6 +181,8 @@ export const shellDe = {
   'action.question.capture': 'Einzelfrage erfassen',
   'action.question.classify': 'Klassifizieren',
   'action.question.assign': 'Zuweisen',
+  // Scheibe 048: not "Weiterleiten" alone — that stays the next step (question.submit_review, Z9).
+  'action.question.forward': 'An anderen Fachbereich weiterleiten',
   'action.answer.draft': 'Antwort entwerfen',
   'action.question.submit_review': 'Weiterleiten',
   'action.question.approve': 'Freigeben',
@@ -224,6 +226,7 @@ export const shellDe = {
   'event.QuestionCaptured': 'Einzelfrage erfasst',
   'event.QuestionClassified': 'Klassifiziert',
   'event.QuestionAssigned': 'Zugewiesen',
+  'event.QuestionForwarded': 'An anderen Fachbereich weitergeleitet',
   'event.AnswerDrafted': 'Antwortentwurf erstellt',
   // Scheibe 045: the labels of a proposed and an approved refusal in the history.
   'event.AnswerDrafted.refusal': 'Verweigerung vorgeschlagen',

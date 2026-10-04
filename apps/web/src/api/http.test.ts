@@ -186,12 +186,16 @@ describe('HTTP HvApi adapter', () => {
     ['proposeRefusal', ['q /1', { answerKind: 'refusal_no_claim', text: 'T', refusalJustification: 'J' }], 'POST', '/v1/questions/q%20%2F1/refusals',
       { answerKind: 'refusal_no_claim', text: 'T', refusalJustification: 'J' }],
     ['approveRefusal', ['q /1', 2], 'POST', '/v1/questions/q%20%2F1/refusal-approvals', { answerVersion: 2 }],
+    // Scheibe 048: forward to another answering unit (contract 0.4.3).
+    ['forwardQuestion', ['q /1', { unitId: 'unit-hr', reasonCode: 'capacity' }], 'POST', '/v1/questions/q%20%2F1/forwards',
+      { unitId: 'unit-hr', reasonCode: 'capacity' }],
   ];
 
   it.each([
     ['proposeRefusal', ['q1', { answerKind: 'refusal_with_ground', text: 'T', refusalGroundId: 'g', refusalJustification: 'J' }]],
     ['approveRefusal', ['q1', 1]],
-  ] as [keyof HvApi, unknown[]][])('Scheibe 044a: %s sends CSRF, If-Match and an Idempotency-Key like draftAnswer', async (name, args) => {
+    ['forwardQuestion', ['q1', { unitId: 'unit-hr', reasonCode: 'wrong_unit' }]], // Scheibe 048, W2
+  ] as [keyof HvApi, unknown[]][])('Scheibe 044a/048: %s sends CSRF, If-Match and an Idempotency-Key like draftAnswer', async (name, args) => {
     const api = createHttpApi({ getCsrfToken: () => 'csrf', onUnauthorized: vi.fn(), fetcher: request });
     replies.push(json({ id: 'q1' }, 200, { ETag: '"v2"' }), json({ id: 'q1' }, 200, { ETag: '"v3"' }));
     const invoke = api[name] as (...parameters: unknown[]) => Promise<unknown>;

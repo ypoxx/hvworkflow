@@ -294,7 +294,7 @@ const ALL_EVENT_TYPES: Record<EventType, true> = {
   MeetingCreated: true, MeetingStarted: true, MeetingClosed: true, DebateClosed: true, AgendaItemOpened: true,
   VotingOpened: true, VotingClosed: true, SpeakerRegistered: true, RoleAssigned: true, RoleRevoked: true,
   SpeakersReordered: true, SpeakerUpdated: true, ContributionCaptured: true, QuestionCaptured: true,
-  QuestionClassified: true, QuestionAssigned: true, AnswerDrafted: true, QuestionSubmittedForReview: true,
+  QuestionClassified: true, QuestionAssigned: true, QuestionForwarded: true, AnswerDrafted: true, QuestionSubmittedForReview: true,
   QuestionApproved: true, QuestionLegalCleared: true, QuestionReturned: true, QuestionStaged: true,
   QuestionDelivered: true, QuestionClosed: true, QuestionWithdrawn: true, QuestionMerged: true,
   ContributionClaimed: true, ContributionReleased: true, QuestionClaimed: true, QuestionReleased: true,
@@ -312,7 +312,7 @@ describe('R-PERM-04 stream visibility (slice 035a)', () => {
     }
     for (const type of SCOPE_EXIT_EVENTS) expect(types).toContain(type);
     expect([...SCOPE_EXIT_EVENTS].sort()).toEqual(
-      ['QuestionAssigned', 'QuestionClosed', 'QuestionDelivered', 'QuestionMerged', 'QuestionReturned', 'QuestionWithdrawn']);
+      ['QuestionAssigned', 'QuestionClosed', 'QuestionDelivered', 'QuestionForwarded', 'QuestionMerged', 'QuestionReturned', 'QuestionWithdrawn']);
   });
 
   describe('2/2b: topics and subjects are not too narrow', () => {

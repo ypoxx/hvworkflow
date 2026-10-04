@@ -47,7 +47,9 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Formulierungsbaustein | Template wording | `stageText`, ungeprüft bis 076 (E15) | — |
 | Antwortbündel | Answer bundle | `AnswerBundle` | — |
 | Bühnenplatz | Podium seat | `StageSeat`, `seatId` (seit Scheibe 040b) | — |
-| Weiterleiten | Forward | `question.submit_review` (Anzeige „Weiterleiten", E5; Weiterleiten zwischen Fachbereichen ab Scheibe 048) | — |
+| Weiterleiten | Forward | `question.submit_review` (Anzeige „Weiterleiten", E5: nächster Schritt; an einen anderen Fachbereich siehe die nächste Zeile, Scheibe 048) | — |
+| An anderen Fachbereich weiterleiten | Forward to another answering unit | `question.forward`, `forwardQuestion`, Ereignis `QuestionForwarded` (Scheibe 048; Status bleibt, nur der Fachbereich wechselt) | „Weiterleiten“ allein, Reassign, Ticket weitergeben |
+| Grund der Weiterleitung | Reason for forwarding | `reasonCode`: `wrong_unit` (Falscher Fachbereich), `expertise_elsewhere` (Fachwissen liegt in einem anderen Fachbereich), `capacity` (Auslastung), `other` (Sonstiges); geschlossener Code, kein Freitext (Scheibe 048) | Begründung (Hauswort der Verweigerung) |
 | Vertraulichkeitsstufe | Confidentiality level | `confidentiality: internal \| restricted \| protected` (ab Scheibe 047) | — |
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |

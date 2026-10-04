@@ -162,13 +162,14 @@ describe('i18n parity checks', () => {
   // Scheibe 040b: +5 keys, two actions (units, seats) and three events (agenda, units, seats replaced).
   // Scheibe 044a: +2 action keys (propose and approve a refusal), required by ACTION_KEYS; rendered from 045.
   // Scheibe 045: +29 keys for the refusal (answers 22, stage 3, history 2, shell 2).
-  it('(f) Total key count is 553 across all modules and matches de and en', () => {
+  // Scheibe 048: +8 keys for the forward (shell 2: action, event; history 6: unit change, reason, four codes).
+  it('(f) Total key count is 561 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(553);
-    expect(deKeys).toBe(553);
-    expect(enKeys).toBe(553);
+    expect(totalKeys).toBe(561);
+    expect(deKeys).toBe(561);
+    expect(enKeys).toBe(561);
   });
 });

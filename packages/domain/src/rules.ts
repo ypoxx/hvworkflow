@@ -138,7 +138,8 @@ const OTHER_RULES: readonly RuleEntry[] = [
       'response. This holds once the input checks before transition() have passed: some writes check ' +
       'their input first and answer 422 before can() runs, also for an actor without the write ' +
       'permission: classifyQuestion (track, agenda item, stage assignment), assignQuestion (unit), ' +
-      'draftAnswer (empty text), returnQuestion and withdrawQuestion (empty reason). The other writes ' +
+      'draftAnswer (empty text), returnQuestion and withdrawQuestion (empty reason), forwardQuestion ' +
+      '(unit and reason code, Scheibe 048). The other writes ' +
       'check the permission first.',
     legalRef: {
       source: 'Rechtekonzept',

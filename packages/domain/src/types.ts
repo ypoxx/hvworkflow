@@ -48,6 +48,10 @@ export const PERMISSIONS = [
   'question.claim',
   'question.classify',
   'question.assign',
+  // Scheibe 048 (E5 open, built on the default): forward to another answering unit (An anderen
+  // Fachbereich weiterleiten). Right after the assignment: the order is the column order of the
+  // policy truth table.
+  'question.forward',
   'answer.draft',
   'question.submit_review',
   'question.approve',
@@ -416,6 +420,20 @@ export interface RefusalProposal {
   refusalJustification?: string;
   sources?: string[];
 }
+/**
+ * Scheibe 048: why a question is forwarded to another answering unit (Grund der Weiterleitung). A closed
+ * code, never free text: payload fields outside `pii` carry no personal data (contract invariant since
+ * slice 026), and the log cannot forget a text (hash chain, R7).
+ */
+export const FORWARD_REASON_CODES = ['wrong_unit', 'expertise_elsewhere', 'capacity', 'other'] as const;
+export type ForwardReasonCode = (typeof FORWARD_REASON_CODES)[number];
+
+/** Scheibe 048: body of `forwardQuestion` (contract `ForwardRequest`, closed). */
+export interface ForwardRequest {
+  unitId: string;
+  reasonCode: ForwardReasonCode;
+}
+
 export interface LegalClearanceRequest {
   answerVersion?: number;
   note?: string;

@@ -348,6 +348,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions/{questionId}/forwards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forward a question to another answering unit (An anderen Fachbereich weiterleiten)
+         * @description Since 0.4.3 (slice 048, row R-TRANS-17; built on the default, "auf Standard gebaut", E5 open). Moves the question to another answering unit (Fachbereich) of the meeting with a closed reason code (`ForwardReasonCode`, no free text). Only the unit changes: status, answer versions, legal clearing (Rechtsfreigabe), approval and claim stay as they are. Writes exactly one `QuestionForwarded` event `{ unitId, fromUnitId?, reasonCode }` without personal data; the reason code appears in the question history, never in `Question` or `StageView`. Granted through `question.forward` in `ROLE_PERMISSIONS`; a holder bound to a unit acts only on questions of that unit. `409`: R-TRANS-00 (only from `assigned`, `answer_drafted`, `in_review`), R-GUARD-03 (text tracks only), R-GUARD-15 (the target is the current unit). `422`: form, length and an unknown reason code (validator and core), an unknown unit (core, also on a replay after the unit was removed from the master data). `404` also for a holder bound to a unit that does not hold the question; after forwarding a question out of the own unit, a replay with the same `Idempotency-Key` is a `404`.
+         */
+        post: operations["forwardQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/questions/{questionId}/answers": {
         parameters: {
             query?: never;
@@ -1417,10 +1439,10 @@ export interface components {
             personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`.
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`. Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin. It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich".
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.forward" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
         /**
          * @description Lifecycle of a meeting (Jahrgang): MeetingCreated projects preparation from slice 025, MeetingStarted projects running, MeetingClosed projects closed. DebateClosed does not close the meeting; it records only the end of the general debate. R-MTG in slice 025 checks the transitions. Public actions arrive in later slices.
          * @enum {string}
@@ -2006,6 +2028,25 @@ export interface components {
             /** @description Optional remark of the clearing lawyer (Anmerkung). Since 0.4.2 (slice 044a): only in the stored original; absent from every `EventRead`, for every reader (see `EventRead`) */
             note?: string;
         };
+        /**
+         * @description Since 0.4.3 (slice 048): the reason for forwarding a question to another answering unit, as a closed code. Deliberately no free text and no personal data, also not for `other` (owner question 5 of spec 048), so the payload of `QuestionForwarded` keeps the envelope invariant "new payload fields outside `pii` are free of personal data". `wrong_unit`: the question was assigned to the wrong unit. `expertise_elsewhere`: the expertise for the answer lies with another unit. `capacity`: the unit cannot answer in time. `other`: any other reason.
+         * @enum {string}
+         */
+        ForwardReasonCode: "wrong_unit" | "expertise_elsewhere" | "capacity" | "other";
+        /** @description Since 0.4.3 (slice 048): body of `forwardQuestion`. Closed (`additionalProperties: false`): the target unit and a reason code, nothing else */
+        ForwardRequest: {
+            /** @description The target answering unit (Fachbereich) of the meeting; never a person */
+            unitId: string;
+            reasonCode: components["schemas"]["ForwardReasonCode"];
+        };
+        /** @description Since 0.4.3 (slice 048): payload of `QuestionForwarded`, written by `forwardQuestion`; the event's `subjectId` is the question. Free of personal data, unmasked in `EventRead`, never part of `Question`. Closed, so no free text can join the reason on the read path. `fromUnitId` is absent when the question had no unit before. The status is not in the payload: it stays, the transition table says so. */
+        QuestionForwardedPayload: {
+            /** @description The answering unit the question was forwarded to */
+            unitId: string;
+            /** @description The answering unit that held the question before */
+            fromUnitId?: string;
+            reasonCode: components["schemas"]["ForwardReasonCode"];
+        };
         /** @description Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event's `subjectId` is the meeting. `number` is required (Codex round 5) because it is there for readers without the master data — an optional copy would fail exactly them */
         AgendaItemEventPayload: {
             agendaItemId: string;
@@ -2149,14 +2190,14 @@ export interface components {
             } & {
                 [key: string]: unknown;
             };
-        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
         /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the justification in `answer`): the justification of a refusal is never written into `answer`; it stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId` (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The same payload carries `toStatus`, the target status taken from the transition table (a value of `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before, and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass` `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now. Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). A bound payload schema for `AnswerDrafted` follows with slice 043c. Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
         Event: {
             /** @description Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024). */
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "MeetingCreated" | "MeetingStarted" | "MeetingClosed" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "ContributionClaimed" | "ContributionReleased" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "QuestionClaimed" | "QuestionReleased" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged" | "AgendaItemOpened" | "VotingOpened" | "VotingClosed" | "DebateClosed" | "RoleAssigned" | "RoleRevoked" | "IdempotencyRecorded" | "ConfigFrozen" | "AgendaItemsReplaced" | "UnitsReplaced" | "StageSeatsReplaced";
+            type: "MeetingCreated" | "MeetingStarted" | "MeetingClosed" | "SpeakerRegistered" | "SpeakersReordered" | "SpeakerUpdated" | "ContributionCaptured" | "ContributionClaimed" | "ContributionReleased" | "QuestionCaptured" | "QuestionClassified" | "QuestionAssigned" | "QuestionForwarded" | "QuestionClaimed" | "QuestionReleased" | "AnswerDrafted" | "QuestionSubmittedForReview" | "QuestionLegalCleared" | "QuestionApproved" | "QuestionReturned" | "QuestionStaged" | "QuestionDelivered" | "QuestionClosed" | "QuestionWithdrawn" | "QuestionMerged" | "AgendaItemOpened" | "VotingOpened" | "VotingClosed" | "DebateClosed" | "RoleAssigned" | "RoleRevoked" | "IdempotencyRecorded" | "ConfigFrozen" | "AgendaItemsReplaced" | "UnitsReplaced" | "StageSeatsReplaced";
             /**
              * Format: date-time
              * @description Recorded time (server clock). Since 0.3.0 the same instant as `recordedAt`, which is the name ADR 0011 gives it; `at` stays for 0.x readers.
@@ -3179,6 +3220,43 @@ export interface operations {
                 "application/json": {
                     unitId: string;
                 };
+            };
+        };
+        responses: {
+            200: components["responses"]["QuestionUpdated"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    forwardQuestion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated key. A confirmed replay with the same key returns its original business result after current authorization, with current masking and actions. Keys survive a restart from slice 028 (persisted in the event envelope, `Event.idempotencyKey`). */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Since 0.3.0 (slice 029, ADR 0004): the CSRF token from `GET /auth/me` (`SignedInSession.csrfToken`), sent on every state-changing call made under the `session` scheme — the double-submit pattern: a cross-site form cannot add a custom request header, and a script from another origin forces a CORS preflight, so the header's presence plus the value check proves the request came from the application. The name `X-CSRF-Token` is the convention most frameworks and the OWASP cheat sheet use, so no client library needs configuration. Optional in 0.3.0 (the `session` scheme is not live); under `session` a missing or wrong token is 403 from slice 029 (rule id defined there — OpenAPI cannot make a header required for one security scheme only, so the document keeps it optional and the service decides); under `demoActor` it is ignored. Declared on every state-changing operation except `logout`, which takes `CsrfTokenRequired`; not on `seedDemo` (demo only). */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+                /** @description Required from 0.3.6 (slice 028) on this write. The value is the ETag of the resource named by the operation; missing yields 428, stale yields 412. `deliverQuestion` remains outside this requirement until its answer-version hash check in slice 049. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
+            path: {
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardRequest"];
             };
         };
         responses: {

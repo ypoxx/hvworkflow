@@ -1,6 +1,6 @@
 # Scheibe 048 — Weiterleiten an einen anderen Fachbereich (Vertrag, Kern, Dienst)
 
-**Status:** spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Go des Eigentümers zum Bau am 04.10.2026 erteilt** (Bau auf den Standards dieser Spec; E5 bleibt im Register offen, Standard „beides bauen“). Ursprünglich: Bau erst nach Antwort auf E5 oder ausdrücklichem Go.
+**Status:** gebaut (04.10.2026, Bau `85bbd75` auf Vertrag `fb5cbde`; Review ohne blocker/major, Befunde in `789c745`, `pnpm gates` grün auf `789c745`) · Spec: spec (03.10.2026; gelesen auf `3556d64`: 043a, 040b, 044a, 044b und 045 gemergt, Vertrag 0.4.2; Lesebefund zu `888d629` eingearbeitet: 0 blocker, 3 major, 11 minor, 6 nit, Abschnitt „Review findings“; erster Teil der geteilten Planzeile 048, Zuschnitt im Abschnitt „Teilung und Zuschnitt“; zweite Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; auf Standard gebaut, E5 offen). **Go des Eigentümers zum Bau am 04.10.2026 erteilt** (Bau auf den Standards dieser Spec; E5 bleibt im Register offen, Standard „beides bauen“). Ursprünglich: Bau erst nach Antwort auf E5 oder ausdrücklichem Go.
 **Risikoklasse:** hoch · 3,0 AStd (Spanne 2,5–3,75; Plan 048: mittel · 1,5 AStd für alle drei Themen der Planzeile; Begründung in „Warum hoch“ und „Aufwand“) · Plan 048: 05.11.2026 (W6), tatsächlich direkt nach 045 und nach der Antwort auf E5 · Lanes: contract (erster Commit, Architekt); core; service; web-api (nur `http.ts` und `liveStore.ts`); web-shell (nur Aktions- und Ereignisschlüssel); web-history (nur die Zusammenfassung des neuen Ereignisses und die Bezeichnungen der Gründe); docs-legal (Kopfvermerk Rechtekonzept); docs-sicherheit; docs-datenschutz (nur Zeile V4); docs (Glossar)
 **Bedrohungsmodell:** berührt T-G1-E-01 (Schreibvorgang ohne Oberfläche), T-G1-I-01 (Leserkreis wächst um die Zieleinheit, Umfang in „Warum hoch“), T-G1-I-09 (Strom: Frage verlässt den Lesebereich); neuer Missbrauchsfall MF-14 (Abschnitt „Missbrauchsfälle“)
 **Rolle:** architect für den Vertragsschritt (erster Commit, vor jedem Code, AGENTS.md R6); danach implementierer-backend. Review in frischem Kontext mit den Perspektiven **Security** (Einheitsbindung, neues Recht, Strom, Antwort nach dem Verlassen des eigenen Bereichs), **Datenschutz** (geschlossener Grundcode, erweiterter Leserkreis, keine Person als Ziel) und **Vertrag** (neue Operation, Validator und Kern im Gleichlauf, Abdeckungstor). Lesebefund der Spec vor dem Bau erledigt (Klasse hoch); nie gebündelt. Modell nur in `.claude/agents/` (takt-012)
@@ -245,11 +245,15 @@ Standard gebaut:** E5 ist offen (Eigentümerfrage 1); der Bau beginnt erst nach 
   404, die Liste enthält die Frage nicht mehr. **Eine Wiederholung mit demselben `Idempotency-Key` ist 404** (`authorizeReplay`
   prüft die aktuelle Lesbarkeit); das Ereignis entsteht kein zweites Mal (Test 9). 054 behandelt 404 nach einem Netzfehler
   beim Weiterleiten als „weitergeleitet oder nicht mehr sichtbar“.
-- **Kein Entfernen des Zielfachbereichs nach dem Weiterleiten (Codex P2 auf #141):** Der Zielfachbereich lässt sich nach dem
-  Weiterleiten nicht aus den Stammdaten entfernen, solange eine Frage auf ihn zeigt: `replaceMeetingUnits` antwortet 409
-  R-ADM-02 (`api.ts` ~888). Der früher benannte Fall „Wiederholung antwortet 422 nach Entfernen“ ist über die Schnittstelle
-  nicht herstellbar und wird nicht getestet; Schritt 2 vor der Wiederholungsprüfung bleibt wie bei `assignQuestion`. Test 9b
-  prüft stattdessen den Schutz: Entfernen des Zielfachbereichs nach dem Weiterleiten → 409 R-ADM-02, kein Ereignis.
+- **Entfernen des Zielfachbereichs und Wiederholung mit 422 (Codex P2 auf #141; berichtigt nach dem Review, Entscheidung des
+  Orchestrators 04.10.2026):** Solange eine Frage auf den Zielfachbereich zeigt, lässt er sich nicht aus den Stammdaten entfernen:
+  `replaceMeetingUnits` antwortet 409 R-ADM-02 (`api.ts` ~888, Test 9b, erster Fall). Die Wiederholung mit 422 ist trotzdem
+  herstellbar, über ein erneutes Weiterleiten und danach das Entfernen: (1) Koordination leitet fin → ar mit Schlüssel K1 weiter,
+  (2) ar → hr mit K2, (3) die Administration entfernt `unit-ar` (nichts zeigt mehr darauf, erfolgreich), (4) die Wiederholung von
+  K1 antwortet 422 „Unit unit-ar does not exist.“, ohne Ereignis. **Angenommen und benannt:** Die Prüfung des Fachbereichs
+  (Schritt 2) steht vor der Wiederholungsprüfung, gleich wie bei `assignQuestion`, und der Vertragstext beschreibt den Fall
+  schon. Test 9b, zweiter Fall, hält dieses Verhalten fest. Die Reihenfolge Wiederholung vor Fachbereichsprüfung (für
+  Weiterleiten und Zuweisen zusammen) steht auf der Folgeliste.
 - `operationPermission` und `legacyEventType` in `api.ts` bleiben unverändert: Neue Ereignisse tragen `commandId`, die
   Wiederholung findet sie über `commandOperation`.
 
@@ -403,6 +407,7 @@ Kern:
 - `packages/domain/src/__tests__/forward048.test.ts` (neu)
 - `packages/domain/src/__tests__/transitions.test.ts` (nur Eintrag R-GUARD-15 in GUARD_SCENARIOS)
 - `packages/domain/src/__tests__/stream035.test.ts` (nur QuestionForwarded in den Erwartungen zu EVENT_TOPICS, EVENT_SUBJECTS und SCOPE_EXIT_EVENTS)
+- `packages/domain/src/__tests__/api.test.ts` (**Scope-Befund des Baus, 04.10.2026, vom Orchestrator freigegeben (Nachtrag):** nur die Erwartung „coordination holds exactly …“ um `question.forward` ergänzt; die Spec nannte die Datei nicht, obwohl Entscheidung 1 diese Erwartung zwingend ändert; 044a hatte sie für dieselbe Erwartung genannt)
 
 Dienst:
 
@@ -410,7 +415,7 @@ Dienst:
 - `apps/api/src/__tests__/forward048.test.ts` (neu, ohne Postgres)
 - `apps/api/src/__tests__/postgres-forward048.test.ts` (neu, mit Postgres)
 - `apps/api/src/__tests__/contract.test.ts` (nur Versionszeile, forwardQuestion in der If-Match-Liste und eine Kopfprüfung)
-- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur Versionszeile)
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (Versionszeile und, Nachtrag des Orchestrators 04.10.2026, die Zahl der Operationen 69 → 70 samt Kommentar; der Vertragsschritt erzwingt sie)
 
 Oberfläche (nur Typzwang und Historie):
 
@@ -728,6 +733,137 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
 
 ## Bericht (nach Bau ausfüllen)
 
+**Gebaut am 04.10.2026** auf `claude/slice-048-weiterleiten` (implementierer-backend, Opus), Vertragsschritt `fb5cbde`, Bau
+`85bbd75`. Risikoklasse hoch, auf Standard gebaut (E5 offen; Go des Eigentümers 04.10.2026).
+
+**Vor dem Bau geprüft.** (1) Go des Eigentümers 04.10.2026 erteilt. (2) 045 gemergt (`c0db7f5`), Vertrag vor `fb5cbde` 0.4.2;
+`PERMISSIONS` ohne `question.forward`; R-TRANS-17 und R-GUARD-15 frei (belegt bis R-TRANS-16 bzw. R-GUARD-14, R-GUARD-10
+reserviert). (3) Gebundene Fachkräfte im Kern über `assignRole` ohne Hilfsarbeit (auch ohne `unitId`), über HTTP über
+`POST /v1/meetings/{meetingId}/role-assignments` mit Subject-ids, die im Seed nicht vorkommen (H8). (4) `eventSummary.ts` hat keinen
+`default`-Zweig, aber auch keine `never`-Prüfung: die Typprüfung erzwingt den neuen Fall nicht; W1 belegt ihn (Folgeliste). (5) Die
+Zeilenangaben der Spec stimmten an den geprüften Stellen (`api.ts` `transition()`, `assignQuestion`, `authorizeReplay`,
+`state.ts` `QuestionAssigned`, `stream.ts`-Tabellen, `labels.ts`, `liveStore.ts` `WRITE_METHODS`, `parity.test.ts:165`).
+
+**Rot vor der Änderung.** Kern `forward048.test.ts`: `Tests  25 failed (25)` (`api.forwardQuestion is not a function`). Dienst
+`forward048.test.ts` ohne Route: `Tests  8 failed | 1 passed (9)` (H2 grün: 401 entsteht vor dem Routing). Postgres ohne Route:
+`Tests  2 failed (2)`. W1 gegen das alte `eventSummary.ts`: `Tests  3 failed | 10 passed (13)`. W2 vor `http.ts`:
+`Tests  2 failed | 131 passed (133)`.
+
+**Mutationsproben** (je einzeln angewendet, Test gelaufen, zurückgenommen):
+
+| Probe | Ergebnis |
+|---|---|
+| R-GUARD-15 aus R-TRANS-17 entfernt | Test 4 rot (`1 failed`) |
+| `to: 'assigned'` statt `(q) => q.status` | Test 2 rot (`2 failed`: `answer_drafted`, `in_review`); erst nach einer Ergänzung, siehe Abweichung 2 |
+| `delete q.claim` im Reduzierer | Test 11 rot (`2 failed`) |
+| `QuestionForwarded` aus `SCOPE_EXIT_EVENTS` | Test 13 rot (`1 failed`) |
+| `question.forward` an admin | Test 1 rot (`1 failed`) |
+
+**Wahrheitstabelle.** Kopfzeile und die sechs Zeilen sind wörtlich die des Diffs oben; maschinell geprüft: 198 Zeilen ändern sich
+nur um die neue Spalte `q.forward` (zwischen `q.assign` und `answer.draft`), sechs ✓, **0 andere Zellen**. `legal-trace.md`: zwei neue
+Zeilen R-GUARD-15 und R-TRANS-17, dazu der Text von R-PERM-01 (`forwardQuestion` in der Aufzählung der Schreibvorgänge mit
+Eingabeprüfung vor `can()`).
+
+**Postgres.** P1–P2 laufen in `pnpm gates` mit `TEST_DATABASE_URL`/`TEST_RUNTIME_DATABASE_URL` auf `hv_t048` (Summe `apps/api`
+`674 passed (674)`, kein `skipped`); einzeln: `✓ P1 the forward survives a restart …`, `✓ P2 a rejected forward writes no row …`.
+
+**Auszug** (`/v1/events` als admin; Zugriffslogzeile eines abgewiesenen Weiterleitens wie H9, `latencyMs` kommt von der
+vorgestellten Testuhr):
+
+```
+{"id":"e6f97e85-83d5-4f0e-9095-30c1113e9969","type":"QuestionForwarded","at":"2027-04-20T12:01:00.000Z","subjectId":"0002be84-a86c-4897-ae63-3d62a8f9583d","seq":307,"actor":{"id":"coo48","role":"coordination"},"payload":{"unitId":"unit-hr","fromUnitId":"unit-fin","reasonCode":"expertise_elsewhere"},"schemaVersion":2,"meetingId":"hv-2027","recordedAt":"2027-04-20T12:01:00.000Z","occurredAt":"2027-04-20T12:01:00.000Z","occurredAtSource":"server","retentionClass":"working","legalHold":false,"redacted":true,"sourceHash":"65648e354217a9c8fb437999b8dd7366bc2f051a84d972c0191d7a457456e642"}
+{"v":1,"ts":"2027-04-20T12:01:09.000Z","requestId":"248186c8-1187-45f7-8f3a-7956d55ad4a5","subjectHash":"YVGiOjD8Hnb7sigzuTKTw_v5_NFQoDrOqssw8QHHh0I","operationId":"forwardQuestion","status":409,"latencyMs":6000,"seq":null}
+```
+
+**`pnpm gates`** grün auf `85bbd75` (sauberer Baum, Postgres-Variablen gesetzt); Schluss wörtlich:
+
+```
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
+dist/assets/index-Bkvmlj0W.js                        694.96 kB │ gzip: 203.19 kB │ map: 2,898.26 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.93s
+mark-test-run: wrote /home/user/wt/s048/.claude/state/last-test-run (clean tree) at commit 85bbd75, tree 33eb3ea4bada…
+```
+
+Davor in derselben Ausgabe: `packages/domain` `Tests  420 passed (420)`, `apps/web` `Tests  561 passed (561)`, `apps/api`
+`Tests  674 passed (674)`, `operation-coverage: 70 operations in the contract, 68 exercised by tests, 2 pre-declared in
+allowlist.json … ok`, `vocabulary-check: ok`, `i18n-literal check: 0 literals`, `slice-scope: 41 changed file(s), all within …`
+(mit der Warnung, dass „Files allowed“ von der Merge-Basis abweicht: Abweichung 1), `plan-graph: ok`, Skripttests `# pass 275`,
+`# fail 0`. `contract:lint`: die 12 bestehenden Warnungen, keine neue.
+
+**Nach dem Review (04.10.2026, Befunde 1–3, Commit `789c745`).** Test 13 um den Leser der Zieleinheit (`STREAM_HR`) ergänzt: live
+ein `change` mit der Frage-id, Nachholen über das Weiterleiten ein `reset`. **Mutationsprobe:** `lookupIn([before, after])` in
+`visibleMessages` auf `[before]` verkürzt → Test 13 rot (`1 failed`, die Zusicherung der Frage-id für `unit-hr`), zurückgenommen.
+Test 9b um den Fall „erneut weiterleiten, alten Zielfachbereich entfernen, K1 wiederholen“ ergänzt: 422 „Unit unit-ar does not
+exist.“, kein Ereignis (Abschnitt 5 berichtigt). Sieben Review-Punkte auf der Folgeliste.
+
+**`pnpm gates`** grün auf `789c745` (sauberer Baum, Postgres-Variablen auf `hv_t048`; domain `Tests  421 passed (421)`, web
+`561 passed (561)`, api `674 passed (674)` ohne `skipped`, `operation-coverage … ok`, `slice-scope: 41 changed file(s), all within …`,
+Skripttests `# pass 275`, `# fail 0`); Schluss wörtlich:
+
+```
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 1735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        0.43 kB │ gzip:   0.27 kB
+dist/assets/jetbrains-mono-latin-ext-DIC32ArD.woff2   11.62 kB
+dist/assets/jetbrains-mono-latin-6fWv1k7M.woff2       31.43 kB
+dist/assets/inter-latin-Dx4kXJAl.woff2                48.25 kB
+dist/assets/inter-latin-ext-DO1Apj_S.woff2            85.06 kB
+dist/assets/index-JmpNnxN2.css                        42.52 kB │ gzip:   9.13 kB
+dist/assets/index-Bkvmlj0W.js                        694.96 kB │ gzip: 203.19 kB │ map: 2,898.26 kB
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.50s
+mark-test-run: wrote /home/user/wt/s048/.claude/state/last-test-run (clean tree) at commit 789c745, tree 5a87db061d30…
+```
+
+**Abweichungen von der Spec.**
+1. **Scope-Befund `packages/domain/src/__tests__/api.test.ts`.** Die Erwartung „coordination holds exactly …“ (`api.test.ts:671`)
+   listet das Bündel der Koordination genau; Entscheidung 1 ändert es zwingend. Die Spec nannte die Datei nicht (044a hatte sie für
+   dieselbe Erwartung genannt). Eine Zeile ergänzt, die Datei unter „Files allowed“ als Scope-Befund mit offener Freigabe des
+   Orchestrators eingetragen, damit `slice-scope` die Abweichung sichtbar meldet statt zu scheitern.
+2. **Test 2 prüft zusätzlich die Tabelle.** Die Probe `to: 'assigned'` blieb zunächst grün: Der Reduzierer liest, wie die Spec
+   verlangt, keinen Zielstatus aus dem Ereignis, also war das `to` der Zeile unbeobachtbar. Test 2 sichert nun zusätzlich, dass
+   `resolveTransition` für R-TRANS-17 den aktuellen Status liefert (R5: die Tabelle sagt „Status bleibt“).
+3. **Schlüssel der Grundcodes heißen `history.forward.reason.*`** statt `forward.reason.*`: Der Paritätstest (d) verlangt im Modul
+   `history` das Präfix `history`, und `parity.test.ts` war nur für die Zahl freigegeben. Zahl und Texte wie in der Spec (561).
+4. `forwardReasonLabel` liegt in `labels.ts`, wird aber nicht über `i18n/index.ts` exportiert (nicht in „Files allowed“);
+   `eventSummary.ts` importiert direkt aus `i18n/labels` (Folgeliste, mit 054).
+5. Test 6 prüft zusätzlich eine Zahl als `unitId` und Freitext als `reasonCode`; H4 prüft jede Validator-Abweisung auch als
+   `approver` (422 vor 403).
+
+**Offen.** Kein Screenshot (Spec: keine Ansicht vor 054). PR-CI (`gates`, `e2e-http`) läuft erst mit dem PR; Lauf-ID für P1–P2 trägt
+der Orchestrator nach. Aufbewahrungsklasse V4 (DSB, Eigentümerfrage 9), E5 offen.
+
+**Aufwand.** Rund 0,4 AStd Agentenzeit für Kern, Dienst, Oberfläche, Doku und Gates (13:41–14:05 UTC) gegen geschätzte 3,0 AStd
+(Spanne 2,5–3,75; ohne den bereits erledigten Vertragsschritt 0,45 AStd: 2,55).
+
 ## Review findings
 
 ### Lesebefund der Spec (frischer Kontext, 03.10.2026, zu `888d629`)
@@ -755,7 +891,7 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
 | n3 | nit | Prüfreihenfolge | `requireQuestionFor` → 404 gebunden → 403 → `If-Match` → 409 |
 | n4 | nit | EN-Bezeichnung | „Forward to another answering unit“ (Glossar: answering unit) |
 | n5 | nit | Rücksetzen im Nachholen unbenannt | Abschnitt 6 benennt den Catch-up-Reset |
-| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | Fall über die Schnittstelle nicht herstellbar (R-ADM-02, Codex P2); Test 9b prüft den Schutz |
+| n6 | nit | Wiederholung nach Entfernen des Fachbereichs | Schutz R-ADM-02 (Test 9b); nach dem Review berichtigt: über erneutes Weiterleiten und Entfernen herstellbar, 422 angenommen wie bei `assignQuestion` (Test 9b, zweiter Fall) |
 
 ### Nachprüfung (frischer Kontext, 03.10.2026, Kopf `5efa153`)
 

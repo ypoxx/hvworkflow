@@ -334,6 +334,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 028 Idempotenz, If-Match | T-G1-T-03, T-G1-D-02 | — |
 | 040 Administration im Kern (040a: Inhaltsrechte, R-ADM-07, R-ADM-08; Rest 040b–d) | T-G1-E-04 (Inhaltsteil mit 040a; Override 040d) | MF-01 |
 | 044 Verweigerung (044a Kern: Rechte, R-GUARD-08/-09/-11/-12/-13/-14, Maskierung der Begründung und des Vermerks; 044b Dienst und HTTP-Probe, gebaut: `refusal044b.test.ts` Tests 1–16, `postgres-refusal044b.test.ts` P1–P5; Zugriffslog unverändert) | SG2 für Verweigerungen; T-G1-E-03 für Verweigerungen (R-GUARD-08) | T-G1-E-02, T-G1-E-04, T-G1-I-01, T-G1-I-02, T-G1-I-04, T-G1-I-09, MF-01, MF-07 |
+| 048 An anderen Fachbereich weiterleiten (Recht `question.forward` für `coordination` und `expert`, R-TRANS-17, R-GUARD-15, Ereignis `QuestionForwarded` mit geschlossenem Grundcode; gebaut: `packages/domain/src/__tests__/forward048.test.ts` Tests 1–15, `apps/api/src/__tests__/forward048.test.ts` H1–H9, `postgres-forward048.test.ts` P1–P2; Zugriffslog unverändert) | — (MF-14 neu) | T-G1-E-01, T-G1-I-01 (Leserkreis wächst um die Zieleinheit), T-G1-I-09 (Strom: `QuestionForwarded` in `SCOPE_EXIT_EVENTS`), MF-01 |
 | 047 Attributrechte | T-G1-I-04, T-G1-E-05 | T-G1-I-01 |
 | 049 Vorgelesen als Entität | T-G1-R-02 | T-G1-E-05 |
 | 065 Webhooks | T-G3-T-03, T-G3-I-01, T-G3-E-02 | T-G3-D-02 |
@@ -465,6 +466,26 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Nachweis:* `packages/domain/src/__tests__/refusal044a.test.ts` (Tests 9–12, 21), Abschnitt „Role × Verweigerung“ in
   `packages/domain/policy-truth-table.md`; über HTTP seit 044b: `apps/api/src/__tests__/refusal044b.test.ts` Tests 4, 13,
   14 und 15, auf Postgres `postgres-refusal044b.test.ts` P4.
+
+**MF-14 Weiterleiten als Umweg, Abschieben oder Offenlegung** (048; verwandt T-G1-I-01, MF-01)
+- *Ablauf:* eine Fachkraft leitet eine Frage eines fremden Fachbereichs weiter, oder eine gebundene Fachkraft ohne Einheit eine Frage
+  ohne Fachbereich; jemand leitet weiter, um die Rechtsprüfung zu umgehen oder eine Freigabe aufzuheben; Fragen wandern hin und her, um
+  eine Antwort zu verzögern; jemand leitet weiter, damit mehr Personen lesen (Need-to-know, Recherche `:95`); Personendaten gelangen
+  über den Grund ins Protokoll.
+- *Verhindert durch:* Einheitsbindung in `can()` (R-PERM-03; 404, auch für eine gebundene Fachkraft ohne Einheit, weil
+  `hasPermission` ihr `question.read` verweigert); Status bleibt, nicht aus `approved`, `staged`, `delivered`, Rechtsfreigabe und
+  Freigabe unberührt (R-TRANS-17); Ziel ist ein Fachbereich des Jahrgangs (422) und ein anderer als der aktuelle (R-GUARD-15); nur
+  Koordination und die zuständige Fachkraft halten `question.forward`; die Begründung einer Verweigerung bleibt für die Zieleinheit
+  maskiert; der Grund ist ein geschlossener Code, vom Validator und vom Kern geprüft, kein Freitext. Der Claim bleibt (er sperrt keinen
+  erlaubten Schreibvorgang und läuft nach zehn Minuten ab).
+- *Erkennung:* Historie der Frage (jede Weiterleitung mit alter und neuer Einheit und Code); Zugriffslog (033a): `operationId`
+  `forwardQuestion` mit `status` 404/403/409/422 und `seq` null, die Regel-id nur im Problem-Body. Hin und Her hat keine technische
+  Grenze (Standard); Leitstand (061): Alter der ältesten offenen Frage; Zähler „Weiterleitungen je Frage“ (aggregiert, nie je Person) auf
+  der Folgeliste. *Signal und Empfänger:* Historie für Koordination und Freigabe; Zugriffslog, technischer Betrieb.
+- *Restrisiko:* der erweiterte Leserkreis (Rückgabegrund, ganze Historie, Versionen mit Ersteller, laufender Claim, offener
+  Verweigerungsvorschlag ohne Begründung) ist gewollt; eine Attributregel für vertrauliche Fragen folgt mit 047.
+- *Nachweis:* `packages/domain/src/__tests__/forward048.test.ts` Tests 2, 3, 6, 7, 8a–8c, 11, 13; über HTTP
+  `apps/api/src/__tests__/forward048.test.ts` H3, H4, H8, H9; auf Postgres `postgres-forward048.test.ts` P2.
 
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.

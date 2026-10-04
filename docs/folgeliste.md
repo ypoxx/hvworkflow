@@ -632,6 +632,34 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 045 Review nit N11 · e2e-http E1 · prüft den Zustand „in Prüfung“ nicht direkt · Zustand ausdrücklich zusichern.
 - H13 (`031-http-betriebsart.spec.ts:684`, 036b) · Zeitabhängigkeit: ein später Sprecher-Lesezugriff aus dem Erfassungsschritt fiel in PR #139 einmal ins Klassifizierungsfenster (Lauf 37155605584, Wiederholung grün) · in Schritt 2 vor `quiet(trace, 1_500)` auf den Sprecher-Lesezugriff von A warten (eigener Takt).
 
+## Weiterleiten an einen anderen Fachbereich (aus 048)
+
+- 048 Hinweis Orchestrator · `apps/api/src/metrics/catalog.json` · die Quelle von `hv_open_questions` nennt nur „QuestionAssigned“;
+  die Kennzahl folgt `QuestionForwarded` schon über die Projektion · Quellentext um `QuestionForwarded` ergänzen.
+- 048 Hinweis Orchestrator · Leitstand (061) · kein Zähler „Weiterleitungen je Frage“ (Hin und Her, MF-14) · aggregiert je Frage
+  anzeigen, nie je Person.
+- 048 Hinweis Orchestrator · `docs/rollen-und-rechtekonzept.md` §2.1 (Zeile 62) und §2.4 (Zeile 119–122) · `question.forward` steht dort
+  für das allgemeine Weiterleiten mit rechteabhängigem Zielstatus; im Code heißt es seit 048 nur „an einen anderen Fachbereich“ · mit
+  052 auf `question.assign`, `question.submit_review`, `question.return` umschreiben.
+- 048 Hinweis Orchestrator · `_actions` einer gebundenen Fachkraft ohne Einheit · auf einer Frage ohne Fachbereich steht theoretisch
+  `question.forward`, obwohl sie die Frage nie lesen kann (ohne Wirkung, jeder Versuch 404, Test 8c) · `actionsFor` für gebundene Leser
+  ohne Leserecht leer lassen.
+- 048 Bau · `apps/web/src/features/history/eventSummary.ts` · der Kopfkommentar sagt, ein neuer Ereignistyp lasse die Datei nicht
+  übersetzen; der `switch` hat weder `default` noch eine `never`-Prüfung, die Typprüfung erzwingt den Fall also nicht (W1 belegt
+  `QuestionForwarded` trotzdem) · `const _exhaustive: never = event` nach dem `switch` oder Kommentar berichtigen.
+- 048 Bau · `apps/web/src/i18n/index.ts` · `forwardReasonLabel` (labels.ts) ist nicht über den Einstiegspunkt exportiert, weil
+  `index.ts` außerhalb der Files allowed lag; `eventSummary.ts` importiert direkt aus `i18n/labels` · mit 054 (Dialog) in `index.ts`
+  aufnehmen und den Import umstellen.
+- 048 Bau · `packages/domain/src/rules.ts` R-PERM-01 · die Aufzählung der Schreibvorgänge mit Eingabeprüfung vor `can()` nennt seit
+  048 `forwardQuestion`, aber nicht `proposeRefusal` (044a prüft ebenso vorher, 422) · Text ergänzen.
+- 048 Review · `packages/domain/src/rules.ts:141` R-PERM-01 · die Liste nennt `proposeRefusal` nicht · ergänzen (doppelt zum Eintrag oben, Review bestätigt).
+- 048 Review · `packages/domain/src/transitions.ts:856` · der Kommentar zu `TRANSITION_ACTIONS` („change the status“) passt nicht zu R-TRANS-13/14/17 · „resolved through the transition table“.
+- 048 Review · Vertrag `QuestionForwardedPayload.fromUnitId` · ohne `minLength: 1` · bei der nächsten Vertragsstufe ergänzen.
+- 048 Review · Präfix `history.forward.reason.*` · liegt im Modul `history`, obwohl 054 die Bezeichnungen im Dialog nutzt · neu entscheiden, wenn 054 `forwardReasonLabel` exportiert.
+- 048 Review · HTTP-Test der Code-Punkt-Grenze von `unitId` · 128 astrale Zeichen (Kern 422 „does not exist“) und 129 (Validator 422) über den Dienst · Test ergänzen.
+- 048 Review · `docs/sicherheit/bedrohungsmodell.md` Zeile 048 · nennt `transitions.test.ts` (R-TRANS-17, R-GUARD-15) nicht · Nachweis ergänzen.
+- 048 Review · Idempotenz-Reihenfolge · `forwardQuestion` und `assignQuestion` prüfen den Fachbereich vor der Wiederholung, eine Wiederholung nach erneutem Weiterleiten und Entfernen antwortet 422 (Test 9b) · Wiederholung vor der Fachbereichsprüfung, für beide Operationen zusammen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

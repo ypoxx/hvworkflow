@@ -87,7 +87,7 @@ describe('Scheibe 029b: browser-bound OIDC correlation cookies', () => {
 
 describe('Scheibe 028: mandatory version contract', () => {
   it('requires the 0.3.6 fields and per-operation If-Match without changing array responses', () => {
-    expect(openapiDoc.info.version).toBe('0.4.2');
+    expect(openapiDoc.info.version).toBe('0.4.3');
     const schemas = openapiDoc.components.schemas;
     expect(schemas.Meeting.required).toEqual(expect.arrayContaining(['version', 'speakerListVersion']));
     expect(schemas.Speaker.required).toContain('meetingId');
@@ -104,7 +104,7 @@ describe('Scheibe 028: mandatory version contract', () => {
       'claimContribution', 'releaseContribution', 'classifyQuestion', 'assignQuestion',
       'draftAnswer', 'submitForReview', 'approveQuestion', 'clearQuestionLegally',
       'returnQuestion', 'stageQuestion', 'closeQuestion', 'withdrawQuestion', 'mergeQuestion',
-      'claimQuestion', 'releaseQuestion',
+      'claimQuestion', 'releaseQuestion', 'forwardQuestion',
     ]) {
       const op = operations[operationId]!;
       const definition = openapiDoc.paths[op.path][op.method];
@@ -115,6 +115,15 @@ describe('Scheibe 028: mandatory version contract', () => {
       }), operationId).toBe(true);
       expect(definition.responses['428'], operationId).toBeDefined();
     }
+    // Slice 048: forwardQuestion carries the same three write headers as the refusal operations.
+    const forward = operations['forwardQuestion']!;
+    const forwardHeaders = (openapiDoc.paths[forward.path][forward.method].parameters ?? [])
+      .map((candidate: { $ref?: string; name?: string; in?: string }) =>
+        candidate.$ref ? resolvePointer(candidate.$ref) as { name: string; in: string } : candidate)
+      .filter((parameter: { in?: string }) => parameter.in === 'header')
+      .map((parameter: { name?: string }) => parameter.name)
+      .sort();
+    expect(forwardHeaders).toEqual(['Idempotency-Key', 'If-Match', 'X-CSRF-Token']);
     const delivery = operations['deliverQuestion']!;
     const deliveryParams = openapiDoc.paths[delivery.path][delivery.method].parameters ?? [];
     expect(deliveryParams.some((candidate: { $ref?: string; name?: string; required?: boolean }) => {

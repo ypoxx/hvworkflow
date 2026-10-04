@@ -92,7 +92,7 @@ const WRITE_METHODS = {
   claimQuestion: true, releaseQuestion: true, classifyQuestion: true, assignQuestion: true, draftAnswer: true,
   submitForReview: true, approveQuestion: true, clearQuestionLegally: true, returnQuestion: true, stageQuestion: true,
   deliverQuestion: true, closeQuestion: true, withdrawQuestion: true, mergeQuestion: true,
-  proposeRefusal: true, approveRefusal: true,
+  proposeRefusal: true, approveRefusal: true, forwardQuestion: true,
 } as const satisfies Record<WriteMethodName, true>;
 
 const MAX_ENTRIES = 200;

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.4.2
+  version: 0.4.3
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -597,6 +597,44 @@ paths:
               required: [unitId]
               properties:
                 unitId: { type: string, maxLength: 128 }
+      responses:
+        '200': { $ref: '#/components/responses/QuestionUpdated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
+  /questions/{questionId}/forwards:
+    parameters: [ { $ref: '#/components/parameters/QuestionId' } ]
+    post:
+      tags: [questions]
+      operationId: forwardQuestion
+      summary: Forward a question to another answering unit (An anderen Fachbereich weiterleiten)
+      description: >
+        Since 0.4.3 (slice 048, row R-TRANS-17; built on the default, "auf Standard gebaut", E5 open).
+        Moves the question to another answering unit (Fachbereich) of the meeting with a closed reason
+        code (`ForwardReasonCode`, no free text). Only the unit changes: status, answer versions, legal
+        clearing (Rechtsfreigabe), approval and claim stay as they are. Writes exactly one
+        `QuestionForwarded` event `{ unitId, fromUnitId?, reasonCode }` without personal data; the
+        reason code appears in the question history, never in `Question` or `StageView`. Granted
+        through `question.forward` in `ROLE_PERMISSIONS`; a holder bound to a unit acts only on
+        questions of that unit. `409`: R-TRANS-00 (only from `assigned`, `answer_drafted`,
+        `in_review`), R-GUARD-03 (text tracks only), R-GUARD-15 (the target is the current unit).
+        `422`: form, length and an unknown reason code (validator and core), an unknown unit (core,
+        also on a replay after the unit was removed from the master data). `404` also for a holder
+        bound to a unit that does not hold the question; after forwarding a question out of the own
+        unit, a replay with the same `Idempotency-Key` is a `404`.
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ForwardRequest' } } }
       responses:
         '200': { $ref: '#/components/responses/QuestionUpdated' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -2572,6 +2610,9 @@ components:
         `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice
         043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on
         `Question.answers`.
+        Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with
+        a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin.
+        It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich".
       enum:
         - speaker.register
         - speaker.reorder
@@ -2583,6 +2624,7 @@ components:
         - question.capture
         - question.classify
         - question.assign
+        - question.forward
         - question.claim
         - answer.draft
         - question.submit_review
@@ -3353,6 +3395,38 @@ components:
           description: Same value as the event's `subjectId`, repeated so the payload is self-contained for neighbouring systems
         answerVersion: { type: integer, minimum: 1, description: The answer version the clearing is bound to }
         note: { type: string, description: 'Optional remark of the clearing lawyer (Anmerkung). Since 0.4.2 (slice 044a): only in the stored original; absent from every `EventRead`, for every reader (see `EventRead`)' }
+    ForwardReasonCode:
+      type: string
+      description: >-
+        Since 0.4.3 (slice 048): the reason for forwarding a question to another answering unit, as a
+        closed code. Deliberately no free text and no personal data, also not for `other` (owner
+        question 5 of spec 048), so the payload of `QuestionForwarded` keeps the envelope invariant
+        "new payload fields outside `pii` are free of personal data". `wrong_unit`: the question was
+        assigned to the wrong unit. `expertise_elsewhere`: the expertise for the answer lies with
+        another unit. `capacity`: the unit cannot answer in time. `other`: any other reason.
+      enum: [wrong_unit, expertise_elsewhere, capacity, other]
+    ForwardRequest:
+      type: object
+      description: 'Since 0.4.3 (slice 048): body of `forwardQuestion`. Closed (`additionalProperties: false`): the target unit and a reason code, nothing else'
+      required: [unitId, reasonCode]
+      additionalProperties: false
+      properties:
+        unitId: { type: string, minLength: 1, maxLength: 128, description: 'The target answering unit (Fachbereich) of the meeting; never a person' }
+        reasonCode: { $ref: '#/components/schemas/ForwardReasonCode' }
+    QuestionForwardedPayload:
+      type: object
+      description: >-
+        Since 0.4.3 (slice 048): payload of `QuestionForwarded`, written by `forwardQuestion`; the
+        event's `subjectId` is the question. Free of personal data, unmasked in `EventRead`, never part
+        of `Question`. Closed, so no free text can join the reason on the read path. `fromUnitId` is
+        absent when the question had no unit before. The status is not in the payload: it stays, the
+        transition table says so.
+      required: [unitId, reasonCode]
+      additionalProperties: false
+      properties:
+        unitId: { type: string, minLength: 1, maxLength: 128, description: 'The answering unit the question was forwarded to' }
+        fromUnitId: { type: string, maxLength: 128, description: 'The answering unit that held the question before' }
+        reasonCode: { $ref: '#/components/schemas/ForwardReasonCode' }
     AgendaItemEventPayload:
       type: object
       description: 'Since 0.3.0 (slice 025): payload of `AgendaItemOpened`, `VotingOpened` and `VotingClosed`; the event''s `subjectId` is the meeting. `number` is required (Codex round 5) because it is there for readers without the master data — an optional copy would fail exactly them'
@@ -3615,6 +3689,10 @@ components:
                 properties: { stageSeats: { items: { $ref: '#/components/schemas/StageSeatRead' } } }
         - if: { required: [type], properties: { type: { const: MeetingCreated } } }
           then: { properties: { payload: { $ref: '#/components/schemas/MeetingCreatedReadPayload' } } }
+        # Since 0.4.3 (slice 048): the forward payload is closed on the read path, so "no free text
+        # with the reason code" is contract, not prose.
+        - if: { required: [type], properties: { type: { const: QuestionForwarded } } }
+          then: { properties: { payload: { $ref: '#/components/schemas/QuestionForwardedPayload' } } }
     Event:
       type: object
       description: >
@@ -3686,6 +3764,7 @@ components:
             - QuestionCaptured
             - QuestionClassified
             - QuestionAssigned
+            - QuestionForwarded
             - QuestionClaimed
             - QuestionReleased
             - AnswerDrafted

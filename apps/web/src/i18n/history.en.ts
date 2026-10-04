@@ -66,4 +66,11 @@ export const historyEn: typeof historyDe = {
   // Scheibe 045: the kind of a proposed refusal; the title comes from the snapshot in the event.
   'history.payload.refusal.noClaim': 'Refusal · no right to information',
   'history.payload.refusal.withGround': 'Refusal · ground from catalogue: {title}',
+  // Scheibe 048: a forward to another answering unit — the change of unit and the closed reason code.
+  'history.payload.unitChange': 'Answering unit: {from} → {to}',
+  'history.payload.forwardReason': 'Reason: {reason}',
+  'history.forward.reason.wrong_unit': 'Wrong answering unit',
+  'history.forward.reason.expertise_elsewhere': 'Expertise lies with another answering unit',
+  'history.forward.reason.capacity': 'Workload',
+  'history.forward.reason.other': 'Other',
 };

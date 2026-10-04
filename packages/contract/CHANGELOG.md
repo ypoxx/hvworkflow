@@ -10,6 +10,30 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.3] - 2026-10-04
+
+Additive patch step of the 0.4 cycle, after 0.4.2 of slice 044a/044b. The contract step of Scheibe 048
+(Weiterleiten an einen anderen Fachbereich), written by the architect as the first commit of that slice, before
+its core code (AGENTS.md rule 6). **One new operation**; no existing request schema is widened or narrowed, no
+field becomes required. A deviation from the cut of 043a (043b was never written and no longer carries
+`forward`), not rule 1 of 043a. No allowlist entry: route and route test follow in the same pull request.
+Built on the defaults: "auf Standard gebaut (E5 offen)" (owner's go to build on 04.10.2026).
+
+### Added
+
+- **`forwardQuestion`** (Scheibe 048): `POST /questions/{questionId}/forwards` with `Idempotency-Key`,
+  `X-CSRF-Token` and required `If-Match`, responses as `assignQuestion`. Moves a question to another answering
+  unit with a reason code; status, answer versions, legal clearing, approval and claim stay (row R-TRANS-17).
+  `409` R-TRANS-00, R-GUARD-03, R-GUARD-15; `422` for form, length, unknown reason code and unknown unit.
+- **`ForwardRequest`** (Scheibe 048): closed body `{ unitId, reasonCode }`, `unitId` 1 to 128 characters.
+- **`ForwardReasonCode`** (Scheibe 048): closed enum `wrong_unit`, `expertise_elsewhere`, `capacity`, `other`;
+  no free text, no personal data.
+- **`QuestionForwardedPayload`** (Scheibe 048): closed payload `{ unitId, fromUnitId?, reasonCode }`, bound in
+  `EventRead` to `type: QuestionForwarded` with `if`/`then`.
+- **`Action`** (Scheibe 048): `question.forward`, after `question.assign`; granted by slice 048 to coordination
+  and expert, never to admin.
+- **`Event.type`** (Scheibe 048): `QuestionForwarded`, after `QuestionAssigned`.
+
 ## [0.4.2] - 2026-10-03
 
 Additive patch step of the 0.4 cycle (rule 1 of slice 043a: the next free patch level, after 0.4.1 of slice

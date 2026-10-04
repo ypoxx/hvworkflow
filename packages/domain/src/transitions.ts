@@ -331,6 +331,30 @@ const approverIsNotLegalClearer: Guard = {
   },
 };
 
+/** Scheibe 048: the closing note of its legal references (E5 open, owner's go 04.10.2026). */
+const ON_DEFAULT_048 = 'Auf Standard gebaut (E5 offen).';
+
+const forwardTargetIsOtherUnit: Guard = {
+  ruleId: 'R-GUARD-15',
+  description: 'The forward target is another answering unit than the current one.',
+  legalRef: {
+    source: 'Prozess',
+    citation:
+      'Ableitung (Spec 048): ein Weiterleiten an denselben Fachbereich ändert nichts und schriebe nur einen Grund ohne ' +
+      'Wirkung ins Protokoll. Eine Frage ohne Fachbereich darf an jeden Fachbereich gehen. Nicht belegt. ' + ON_DEFAULT_048,
+    docVersion: null,
+    docHash: null,
+    verified: false,
+  },
+  check: (q, payload) => {
+    // Without a payload this is the capability question behind `_actions` and the truth table: yes,
+    // as soon as the meeting has a second unit (the known limit with exactly one unit is accepted).
+    if (payload === undefined) return true;
+    const unitId = (payload as { unitId?: unknown }).unitId;
+    return typeof unitId === 'string' && unitId !== q.unitId;
+  },
+};
+
 const NON_TERMINAL = (['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved', 'staged', 'delivered'] as const) satisfies readonly QuestionStatus[];
 
 export const TRANSITIONS: readonly Transition[] = [
@@ -798,6 +822,30 @@ export const TRANSITIONS: readonly Transition[] = [
         'die Bühne nach `delivered`); Grund und Begründung prüft R-GUARD-09 schon beim Vorschlag, für Pfad A ohne Grund ' +
         '(nicht erfüllt, Eigentümerfrage 3b). Die Freigabe ist an die Version gebunden (R-GUARD-04, ' +
         'docs/rollen-und-rechtekonzept.md:175). ' + ON_DEFAULT,
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-TRANS-17',
+    action: 'question.forward',
+    from: ['assigned', 'answer_drafted', 'in_review'],
+    // The status stays: forwarding changes who answers, not how far the answer is (Spec 048, Entscheidung 2).
+    to: (q) => q.status,
+    guards: [isTextTrack, forwardTargetIsOtherUnit],
+    description:
+      'Forward to another answering unit (An anderen Fachbereich weiterleiten) with a reason code. Status, answer versions, legal clearance, approval and claim stay; only the unit changes.',
+    legalRef: {
+      source: 'Recherche',
+      citation:
+        'docs/anforderungen-recherche.md:220 ("[MUSS] … Mehrfachzuweisung mit einem federführenden Bereich, jedes Umrouten ' +
+        'mit Historie") und docs/ist-analyse-und-schnittstellen.md:82 (Weiterleitung über einen Button). Teilweise: keine ' +
+        'Mehrfachzuweisung, kein federführender Bereich, genau eine Einheit (`unitId`); jedes Weiterleiten steht als eigenes ' +
+        'Ereignis `QuestionForwarded` mit alter und neuer Einheit und Grundcode in der Historie. Ableitung (Spec 048): der ' +
+        'Status bleibt (auch aus `in_review`, so entsteht kein Weg um das Rechtstor); nicht aus `approved`, `staged` oder ' +
+        '`delivered` (eine freigegebene Antwort gehört keinem Fachbereich mehr, vorher R-TRANS-06); nicht aus `captured` ' +
+        'oder `classified` (dort R-TRANS-02); der Grund ist ein geschlossener Code ohne Freitext. ' + ON_DEFAULT_048,
       docVersion: null,
       docHash: null,
       verified: false,

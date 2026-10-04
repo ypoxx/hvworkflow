@@ -42,6 +42,7 @@ import type {
   QuestionStatus,
   ReadMethod,
   RefusalProposal,
+  ForwardRequest,
   Speaker,
   SpeakerRecord,
   SpeakerRegistration,
@@ -54,7 +55,7 @@ import type {
   UnitInput,
   WriteOptions,
 } from './types.js';
-import { PERMISSIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
+import { FORWARD_REASON_CODES, PERMISSIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
 
 /** RFC 9457-shaped error. The HTTP adapter maps it 1:1 to a problem+json response. */
 export class ApiProblem extends Error {
@@ -127,6 +128,12 @@ export interface HvApi {
   getQuestionHistory(id: string): Promise<ReadEvent[]>;
   classifyQuestion(id: string, input: Classification, opts?: WriteOptions): Promise<Question>;
   assignQuestion(id: string, unitId: string, opts?: WriteOptions): Promise<Question>;
+  /**
+   * Scheibe 048: forward to another answering unit with a closed reason code (R-TRANS-17, R-GUARD-15).
+   * Only the unit changes. A bound expert who forwards out of her own unit gets this one answer with
+   * empty `_actions`; a later read or a replay with the same key is 404.
+   */
+  forwardQuestion(id: string, input: ForwardRequest, opts?: WriteOptions): Promise<Question>;
   draftAnswer(id: string, input: AnswerDraft, opts?: WriteOptions): Promise<Question>;
   submitForReview(id: string, opts?: WriteOptions): Promise<Question>;
   approveQuestion(id: string, answerVersion: number, opts?: WriteOptions): Promise<Question>;
@@ -1369,6 +1376,28 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         type: 'QuestionAssigned',
         subjectId: q.id,
         payload: { unitId },
+      }));
+    },
+    async forwardQuestion(id, input, opts) {
+      // Scheibe 048: the demo does not validate against the contract (034a), so the core checks the
+      // closed `ForwardRequest` itself, before any transition, like `proposeRefusal`. The length counts
+      // code points like the validator (044b). No message repeats a submitted reason.
+      const body = input as unknown as Record<string, unknown>;
+      const unitId = body['unitId'];
+      const reasonCode = body['reasonCode'];
+      if (typeof unitId !== 'string' || unitId.length === 0 || codePointLength(unitId) > 128) {
+        throw new ApiProblem(422, 'Unprocessable', 'unitId must be a string of 1 to 128 characters.');
+      }
+      if (typeof reasonCode !== 'string' || !(FORWARD_REASON_CODES as readonly string[]).includes(reasonCode)) {
+        throw new ApiProblem(422, 'Unprocessable', `reasonCode must be one of ${FORWARD_REASON_CODES.join(', ')}.`);
+      }
+      // Master data, readable by every signed-in actor: naming the unit id reveals nothing (as assignQuestion).
+      if (!state.units.some((u) => u.id === unitId)) throw new ApiProblem(422, 'Unprocessable', `Unit ${unitId} does not exist.`);
+      const code = reasonCode as ForwardRequest['reasonCode'];
+      return transition(id, 'question.forward', opts, { unitId }, (q) => ({
+        type: 'QuestionForwarded',
+        subjectId: q.id,
+        payload: { unitId, ...(q.unitId !== undefined ? { fromUnitId: q.unitId } : {}), reasonCode: code },
       }));
     },
     async draftAnswer(id, input, opts) {
