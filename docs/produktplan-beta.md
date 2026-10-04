@@ -239,7 +239,7 @@ Drei Umgebungen: Demo (Netlify, In-Process, Taktfläche), Staging-synthetisch (A
 | 0002 | Ergänzung: Demo-Betriebsart bleibt bis beta-1 Taktfläche, besteht dieselbe e2e-Suite, Reset-Banner statt Upcaster, localStorage-Adapter bleibt Wegwerfcode; Ende nach beta-1 durch Eigentümerentscheid | 015, 031b | Prüfpunkt 1 (Ergänzung), Eigentümer |
 | 0003 Persistenz | Postgres-Ereignistabelle nur anhängend (INSERT/SELECT-Grant, `seq` global mit Advisory-Lock), Projektion rebuildbar, Snapshot optional, JSONL als Dev-Adapter, Rebuild < 5 min als Generalprobe-Pflicht, eine Datenhaltung mit PITR, keine zweite Zone in der Beta | 027 | Prüfpunkt 3 |
 | 0004 Identität | Interne Beta: OIDC-BFF im Dienst (Authorization Code serverseitig, HttpOnly-Sitzung, JWKS), Rollenzuordnung als Ereignisse je Jahrgang mit Ablauf und optionaler Einheit, IdP-Gruppen als Vorschlag, Sitzung 14 h, X-Actor nur bei HV_DEMO=1 und nie mit OIDC-Issuer; spätere Ergänzung: Notfallkonten nur bei IdP-Ausfall mit Alarmereignis (029); Subject-Sperrliste bereits in 029b | 029b; Ergänzung 029 nach Fortführungsentscheidung | Prüfpunkt 3 für 029b; 029 später |
-| 0005 Antwortformat | Blockdokument mit Whitelist (paragraph, list; bold, italic, highlight), Normalisierung in der Domäne, Klartextprojektion für Suche und Diff, ein Renderer für Bühne, Historie, Export, reserviertes Feld `language` | 055 | Prüfpunkt 5 |
+| 0005 Antwortformat | Blockdokument mit Whitelist (paragraph, list; bold, italic, highlight), Normalisierung in der Domäne, Klartextprojektion für Suche und Diff, ein Renderer für Bühne, Historie, Export, reserviertes Feld `language` | 055, 055b | Prüfpunkt 5 |
 | 0006 Bühne je Gerät und Antwortbündel | Warteschlange je Bühnenplatz als Filter in `getStage`, Sortierstrategie als Daten, Vorblättern ohne Zustandswechsel, Geräteeinstellungen im Browser (legitime Per-Viewer-Bequemlichkeit), Einfrieren beim Öffnen mit Hinweisstreifen, eigenes Podium-Bundle; offline nur Absichtswarteschlange für „Vorgelesen", Status bleibt staged bis zur Anwendung im Dienst; Antwortbündel als Entität mit `strategy`, getrennt von `Speaker.round` | 056, 058 | Prüfpunkt 5 |
 | 0007 Deployment, Hosting, Umgebungen | Zwei Artefakte, managed Postgres, Konfigurationsschema, Secrets nur aus der Plattform, Deploy nur aus der Pipeline nach Go, drei Umgebungen mit Betriebsauswertung, Freeze-Regel in der Pipeline, Orientierung Telekom-Großkundenstandard, gemieteter Host als Rückfall mit Härtungs-Checkliste | 037 | Prüfpunkt 3 |
 | 0008 Integrationen | Ein kanonischer Vertrag je Nachbarsystem, ein Adapter je Fremdsystem, Systemakteure mit eigenem Recht, Segmente unveränderlich mit `speakerId` optional, KI löst nie einen Statuswechsel aus, HMAC-Webhooks, Sandbox-Mandant, /v1-Kompatibilität über zwei Vertragszyklen | 064, 065 | Prüfpunkt 5 |
@@ -672,7 +672,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
 - Prüfpunkt 4 am 20.11.2026 mit Sicherheitsreview des Architekten.
 
 - **043 · Vertragspaket 0.4.0 Domäne** — mittel · 2 AStd · Kalender 23.10.2026 (W4) · Lanes: contract
-  - *Ziel:* eine serielle Vertragsänderung nach den Antworten aus Feedback-Runde 2 (09.10.) und der Entscheidungsstunde am 16.10.; unbeantwortete Punkte als Standard mit Vermerk: answerKind und refusalGroundId auf AnswerVersion, Grundkatalog-Endpunkt, parentQuestionId/relation, note (hinter Konfiguration), confidentiality, deferred/correctionOpen/followUp-Kennzeichen, forward-Operation, accountable (Auskunftsschuldner) und language auf Question, Delivery-Entität mit versionHash, mode/deviationNote, AnswerBundle, getStage-Filter (seat, bundleId, strategy), Verfahrensereignis-Operationen, Export-Operationen (record.json, record.html), Antwortformat-Schema (Blockdokument + text), ingest/speech-segments (Form nach E3a), answer-suggestions, Aktienregister-Lookup, Ereignisstrom-Abonnement/Webhooks, Vorabfragen-Quelle, Papier-Quelle; Rechte question.refuse.propose/approve, question.forward, round.assemble, procedure.record, export.dossier, question.identity.reveal, ingest.write, agenda.manage, debate.close, cockpit.read; NotificationRaised/NotificationAcknowledged; RemainderListConfirmed; Systemakteur canary mit Kennzeichen synthetic; Prüfliste je Pfad als Daten; CHANGELOG 0.4.0.
+  - *Ziel:* eine serielle Vertragsänderung nach den Antworten aus Feedback-Runde 2 (09.10.) und der Entscheidungsstunde am 16.10.; unbeantwortete Punkte als Standard mit Vermerk: answerKind und refusalGroundId auf AnswerVersion, Grundkatalog-Endpunkt, parentQuestionId/relation, note (hinter Konfiguration), confidentiality, deferred/correctionOpen/followUp-Kennzeichen, forward-Operation, accountable (Auskunftsschuldner) auf Question (048b; `language` kommt mit 055 in das gespeicherte Blockdokument, nicht an Question, Entscheidung 8 der Spec 055), Delivery-Entität mit versionHash, mode/deviationNote, AnswerBundle, getStage-Filter (seat, bundleId, strategy), Verfahrensereignis-Operationen, Export-Operationen (record.json, record.html), Antwortformat-Schema (Blockdokument + text; kommt mit 055, Vertrag 0.4.4), ingest/speech-segments (Form nach E3a), answer-suggestions, Aktienregister-Lookup, Ereignisstrom-Abonnement/Webhooks, Vorabfragen-Quelle, Papier-Quelle; Rechte question.refuse.propose/approve, question.forward, round.assemble, procedure.record, export.dossier, question.identity.reveal, ingest.write, agenda.manage, debate.close, cockpit.read; NotificationRaised/NotificationAcknowledged; RemainderListConfirmed; Systemakteur canary mit Kennzeichen synthetic; Prüfliste je Pfad als Daten; CHANGELOG 0.4.0.
   - *Abhängigkeiten:* 023, 014
   - *Rolle:* Architekt; Review
   - *Nachweise:* contract:lint, Typen-Diff, CHANGELOG, Allowlist mit Ablauf
@@ -786,14 +786,22 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Review mit Perspektive Datenschutz
   - *Nachweise:* Test keine Kennzahl je subject; Screenshot; axe grün
   - *Offene Entscheidung:* —
-- **055 · Antwortformat: Normalisierung im Kern, Editor, einheitlicher Renderer** — mittel · 3 AStd · Kalender 18.11.2026 (W8) · Lanes: core, web-components
-  - *Ziel:* AnswerVersion.body als Blockdokument (paragraph, list; bold, italic, highlight) plus text (Klartextprojektion); Normalisierung in der Domäne (Whitelist, leere Blöcke zusammenführen, idempotent); Editor mit Tastenkürzeln und Einfügen aus Word (Normalisierung beim Speichern und Weiterleiten); Renderer-Komponente für Bühne, Historie, Export; Diff auf der Klartextprojektion; Nachweise für ADR 0005.
-  - *Zielbild (089):* Z6. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
-  - *Abhängigkeiten:* 043, 054
-  - *Rolle:* Implementierer-Backend (Normalisierung) + Implementierer-Oberfläche (Editor, Renderer); Design-Kritik; Review
-  - *Nachweise:* Test verbotene Marke wird entfernt, Idempotenz der Normalisierung; Screenshots Bühne und Historie mit Format; pnpm gates + e2e
-  - *Offene Entscheidung:* E6 Formatumfang (Whitelist ist ein Enum)
-- **060 · Entwurfspuffer, Präsenz und Merge-Ansicht** — mittel · 2 AStd · Kalender 18.11.2026 (W8) · Lanes: web-answers, web-focus
+- **055 · Antwortformat: Normalisierung im Kern und Vertrag** — hoch · 3,1 AStd · Kalender 18.11.2026 (W8) · Lanes: contract, core, service, docs-adr, docs-sicherheit
+  - *Ziel:* AnswerVersion.body als Blockdokument (paragraph, list; bold, italic, highlight; Feld `language`, nur `de`, im Blockdokument) plus text (Klartextprojektion); Normalisierung in der Domäne (Whitelist, leere Blöcke zusammenführen, idempotent) bei jeder Schreiboperation mit Antwortinhalt, Weiterleiten trägt keinen Inhalt; Lesbarkeit alter Versionen; Zeichenfilter auch für `text` und die Begründung einer Verweigerung; Nachweise für ADR 0005. Spec `docs/slices/055-antwortformat.md` (Klasse hoch: Vertrag, Ereignisform, Freigabebindung; Hochstufung, kein Fall für `downgrade-check`).
+  - *Zielbild (089):* Z6 (Editor und Renderer bei 055b). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
+  - *Abhängigkeiten:* 054, 048
+  - *Rolle:* Architekt (Vertragsschritt) + Implementierer-Backend (Normalisierung); Review mit Perspektiven Vertrag, Security, Recht
+  - *Nachweise:* Test verbotene Marke wird entfernt, Idempotenz der Normalisierung; pnpm gates + e2e-http grün
+  - *Offene Entscheidung:* E6 Formatumfang (Whitelist ist ein Enum; Zusatzfrage nummerierte Listen)
+  - *Stand:* gebaut und gemergt am 04.10.2026 (Planzeitpunkt 18.11.2026, tatsächlich vorgezogen; `4da0165`, PR #152; Spec als #151 `ea3eb9a`, `docs/slices/055-antwortformat.md`: angenommen). Codex P1 (projiziertes `body` und `sources` geteilt) behoben in `514b564`.
+- **055b · Antwortformat: Renderer und Editor** — mittel · 3,6 AStd · Kalender 18.11.2026 (W8) · Lanes: web-components, web-focus, web-answers, web-stage, web-history, web-api, e2e, docs
+  - *Ziel:* ein Renderer (nur Textknoten, kein innerHTML) für Bühne, Historie, Beantwortung und Fokus; Export (051/052) auf derselben Whitelist; Editor mit Werkzeugleiste und Tastenkürzeln in Fokus und Beantwortung; Einfügen aus Word über einen inerten Parser; Diff auf der Klartextprojektion. Entwurf im Abschnitt „055b — Entwurf“ der Spec 055; eigene Spec `docs/slices/055b-antwortformat-editor.md` folgt nach dem Merge von 055.
+  - *Zielbild (089):* Z6. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`.
+  - *Abhängigkeiten:* 055
+  - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review mit Perspektiven Security und UX/Barrierefreiheit
+  - *Nachweise:* Screenshots Bühne, Historie und Editor (de/en) mit Format; axe grün; grüner Lauf `e2e-http` (Mehrzeit höchstens 0:40); pnpm gates
+  - *Offene Entscheidung:* E6 Formatumfang
+- **060 · Entwurfspuffer, Präsenz und Merge-Ansicht** — mittel · 2 AStd · Kalender 23.11.2026 (W9) · Lanes: web-answers, web-focus
   - *Ziel:* lokaler Entwurfspuffer je Frage (IndexedDB, Wiederherstellung nach Reload, Playwright kappt die Verbindung beim Tippen), Präsenzanzeige „wird bearbeitet von" über Claim aus 028 (weiche Sperre), 412-Merge-Ansicht mit beiden Texten, Doppelklickschutz; auch in der Erfassung für laufende Atomisierung.
   - *Abhängigkeiten:* 028, 036, 054
   - *Rolle:* Implementierer-Oberfläche; Review
@@ -802,7 +810,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
 - **056 · Bühne je Gerät mit eigenem Bundle** — hoch · 3 AStd · Kalender 19.11.2026 (W8) · Lanes: web-stage, infra
   - *Ziel:* StageView je Bühnenplatz über getStage-Filter aus 047 mit Sortierstrategie (Standard stagePosition), eigener Reihenfolge und Fortschritt; Vorblättern ohne Vorgelesen; Anzeigeeinstellungen je Gerät (Schriftgröße, Zeilenabstand, Gewicht, Kontrast, „alle mit Markierung" nur wenn podiumVisibility=all_marked) in localStorage; Inhalt beim Öffnen eingefroren mit Hinweisstreifen bei Korrektur; Tastaturhandler an die Ansicht und Gerätekennung gebunden; eigenes minimales Podium-Bundle (< 150 kB gzip) mit Größen-Tor; 200 %-Zoom-Screenshot; Nachweise für ADR 0006.
   - *Zielbild (089):* Z16 (Vorschau und „noch n" gibt es seit 020), Z17, Z19, Z22; Halten, Klicker-Taste und Rückgängig-Taste aus Z18 nur nach E52, dann mit Anpassung von Designprinzip 7 und 10; Z19 mit dem vorhandenen Umschalter „Kontrast" (im Prototyp „Saallicht"); Z20 nach E53 (der Kontrastmodus ist gebaut, offen ist nur der Standardwert). Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
-  - *Abhängigkeiten:* 049, 047, 055, 036
+  - *Abhängigkeiten:* 049, 047, 055b, 036
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik in frischem Kontext (nicht die Sitzung, die die Spec schrieb); Review
   - *Nachweise:* Test podium auf Platz ceo sieht keine cfo-Fragen im Standard; Playwright Vorblättern ohne Zustandsänderung, Korrektur zeigt Streifen; Screenshots je Einstellung; Bündelgröße; Zeitbudget Bühnenwechsel p90 < 150 ms
   - *Offene Entscheidung:* E7 (Standardwert own)
@@ -827,7 +835,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E33 Geräteklasse
 - **059 · Rechtsfreigabe-Sicht** — mittel · 2 AStd · Kalender 24.11.2026 (W9) · Lanes: web-clearing, core
   - *Ziel:* Route /clearing (legal, approver): Redline-Diff zwischen Versionen (Klartextprojektion), Prüfliste als Daten je Antwortpfad mit Guard im Kern (R-GUARD-10: Rechtsfreigabe erst bei vollständiger Prüfliste, `_actions` enthält legal.clear erst dann), fünf Aktionen (Rechtsfreigabe erteilen, Freigeben, Zurück mit Grund, Verweigerung vorschlagen, Weiterleiten), Vier-Augen-Hinweis, Vertraulichkeitsstufe und Insider-Kennzeichen setzen; Tastaturpfad; die Route kommt als eine Zeile ins Feature-Register (082).
-  - *Abhängigkeiten:* 045, 047, 055, 082
+  - *Abhängigkeiten:* 045, 047, 055b, 082
   - *Rolle:* Implementierer-Backend (Guard) + Implementierer-Oberfläche; Design-Kritik; Review mit Perspektive Legal
   - *Nachweise:* Screenshots; Test Prüfliste unvollständig → 409 R-GUARD-10; Playwright Aktion fehlt, bis die Liste vollständig ist; axe grün
   - *Offene Entscheidung:* —
@@ -894,7 +902,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* —
 - **081 · Niederschrift-Anlage vollständig** — mittel · 2 AStd · Kalender 01.12.2026 (W10) · Lanes: service, web-history
   - *Ziel:* Das Gerüst aus 051 wird vollständig: Vorgelesen-Quittungen mit Soll-Ist (049), Verfahrensereignisse (050), bestätigte Restantenliste (087), Papier- und Vorabquelle mit lateEntry (068), formatierte Antworten über den einen Renderer (055), Klarnamen nach Recht über das Aufdecken-Ereignis (067); Hash-Liste und Log-Hash über alles. Quellen: Recherche Z.74, Z.78, Z.103; B12.
-  - *Abhängigkeiten:* 051, 049, 050, 055, 067, 087, 068
+  - *Abhängigkeiten:* 051, 049, 050, 055b, 067, 087, 068
   - *Rolle:* Implementierer-Backend; Review mit Perspektive Legal/Datenschutz
   - *Nachweise:* Snapshot-Test HTML und JSON gegen Seed mit allen Abschnitten; Test Notiz fehlt; Test Export ohne Recht 403; Screenshot Druckansicht
   - *Offene Entscheidung:* E19 Notarzugang (lesend über Export)
@@ -1001,7 +1009,7 @@ Jeder Eintrag hat einen Eigentümer und das Attribut, das die Beta reserviert, d
 | Aktienregister-Push-Adapter, Legitimation und Vollmachtsketten | Ist §6.4, Recherche Z.204 | Konzern-IT | nach Beta | Port RegistryLookup (067) |
 | Rollen-Chat, Souffleur-Kanal | Recherche Z.253, Z.261 | Projektleitung | nach Beta | Notizfeld (046) |
 | Deutsche Suchqualität, Cluster als Standardansicht | Recherche Z.304, Z.393 | Umsetzer | nach Beta | Klartextprojektion (055) |
-| DE/EN-Kopplung der Antworttexte | Recherche Z.234 | Projektleitung | nach Beta | Feld language (048) |
+| DE/EN-Kopplung der Antworttexte | Recherche Z.234 | Projektleitung | nach Beta | Feld `language` im Blockdokument (055) |
 | SAML, zweite Zone, zweiter Netzweg, externes Monitoring | Recherche Z.311-316 | Konzern-IT | vor Produktion | Auth-Port, ADR 0007 |
 | Zustandsreform Haupt-/Unterzustand | ADR 0012 | Umsetzer | nach Beta | Kennzeichen statt Zustände |
 | Simulationsmodus für Rechteänderungen (Wahrheitstabellen-Diff ohne Anwendung) | Gegenlese zu 077 | Umsetzer | nach Beta | Wahrheitstabellen-Generator |
@@ -1186,8 +1194,8 @@ Die Obergrenze je Meilenstein ist sein Planwert; die Stoppregel greift bei 25 % 
 | 5 | 26.10.–30.10. | Bau | **033a**, **033b**, **032**, **034a**, **034b**, **031a**, **031b**, **035**, **046**, **036**, **085**, **037** | Rückfalltrigger Hosting (30.10., E10); erster Deploy auf Staging-synthetisch |
 | 6 | 02.11.–06.11. | Bau | **038**, **040**, **041**, **042**, **088**, **044** | Restore-Drill auf Staging (038) |
 | 7 | 09.11.–13.11. | Bau | **045**, **048**, **050**, **047**, **051**, **083**, **049**, **052**, **053** | **Prüfpunkt 3** (13.11.); DSFA-Vorentwurf beim DSB (13.11., E14); Rechtekonzept und Regelregister an Recht (052) |
-| 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **060**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
-| 9 | 23.11.–27.11. | Bau | **058**, **059**, **070**, **062**, **068**, **064**, **065** | IdP-Client, technischer Betreiber, Geräteantwort bis 27.11. (E11, E26, E33) |
+| 8 | 16.11.–20.11. | Bau | **054**, **061**, **087**, **055**, **055b**, **056**, **057**, **066** | **Prüfpunkt 4** (20.11.); Zulieferungen an Betriebsrat und DSB übergeben (083) |
+| 9 | 23.11.–27.11. | Bau | **060**, **058**, **059**, **070**, **062**, **068**, **064**, **065** | IdP-Client, technischer Betreiber, Geräteantwort bis 27.11. (E11, E26, E33) |
 | 10 | 30.11.–04.12. | Bau | **067**, **069**, **081**, **071**, **086**, **072**, **073** | Funktionsumfang gebaut (02.12.); erster Last- und Chaos-Lauf auf Staging |
 | 11 | 07.12.–11.12. | Anpassung | **075**, **063** · Anpassungen und Kleinänderungen | **Prüfpunkt 5** mit Feedback-Runde 3 auf Staging (11.12.); Einladungen zur Generalprobe versandt (11.12.) |
 | 12 | 14.12.–18.12. | Anpassung | Anpassungen und Kleinänderungen | Pentest spätestens bestellt (15.12., E32) |
@@ -1225,7 +1233,7 @@ Verzug entsteht hier vor allem aus zwei Quellen: Nutzungsgrenzen der Modelle und
 5. 057 Antwortbündel (die Bühne je Gerät funktioniert ohne; E2 vermerkt dann „Podium blättert ohne Bündel").
 6. 060 Präsenz und Merge-Ansicht (Entwurfspuffer für B9 bleibt).
 7. 062 Onboarding und Kontexthilfe (Login-Check bleibt).
-8. 055 Editor auf Klartext mit Absätzen (Normalisierung und Renderer bleiben).
+8. 055b Editor auf Klartext mit Absätzen (Normalisierung und Renderer bleiben; 055 mit Kern und Vertrag wird nie gestrichen).
 9. 041 Admin-Oberfläche durch ein Seed-Skript für die Probe ersetzen.
 10. 067 Aktienregister-Port (Pseudonymanzeige aus 026 bleibt).
 
@@ -1322,7 +1330,7 @@ Vollständiges Register in docs/entscheidungsregister.md (Scheibe 014) mit Spalt
 (B1–B18, Generalprobe, beta-1 am 12.03.2027) bleibt unverändert dahinter. Die Freigabe-Demo zeigt drei Personen, wie das
 Endprodukt aussieht:
 
-1. **Verantwortliche Person:** Die Oberfläche ist vollständig; Bedienbarkeit und UX sind beurteilbar. Scheiben: 043a, 040b, 044a und 044b, 045, 048, 053, 054, 055, 059, 046, 060, 061, 041 (für die Freigabe-Demo zugeschnitten, siehe unten).
+1. **Verantwortliche Person:** Die Oberfläche ist vollständig; Bedienbarkeit und UX sind beurteilbar. Scheiben: 043a, 040b, 044a und 044b, 045, 048, 053, 054, 055, 055b, 059, 046, 060, 061, 041 (für die Freigabe-Demo zugeschnitten, siehe unten).
 2. **Entwickler:** gut dokumentiert, leicht erweiterbar, Partnerschnittstellen mit wenigen Schritten lauffähig und prüfbar; Demodaten aus der Partnerschnittstelle sind in der Demo sichtbar. Scheiben: 064, 065, 066, 075, dazu ein Demoszenario, in dem ein Beispieltranskript über die Schnittstelle eingespielt wird und in der Oberfläche erscheint.
 3. **Betrieb:** gut dokumentiert, leicht zu installieren, robust. Scheiben: Kern von 037 als lokales Paket (ein Befehl startet Dienst, Web, Postgres und Keycloak über Compose, dazu eine Installationsseite), 038 (Sicherung und Wiederherstellung vorgeführt), 070 (Runbook v1), 071 (Lasttest mit veröffentlichten Zahlen).
 
@@ -1347,8 +1355,9 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **B Mehrbenutzer:** 029b (einfache Anmeldung, Beta-Teil von 029), 030, 035, 036.
   *Stand 30.09.2026 (abends):* **Etappe B erledigt:** 029b, 030 (Codex, nachgeprüft; takt-023 Rollenverlust, Vertrag 0.3.8), 031 (031a, 031b), 035a (Domäne und Vertrag 0.3.11), 035b (Dienst `GET /v1/stream`), 036a (Live-Store), 036b (Strom-Client, Verbindungsanzeige, zweiter Browser), takt-038 (Historie paginiert), takt-040 (Vertrag 0.3.12); 035 und 036 sind je in a/b geteilt. Offen aus B nur der Lasttest 071 (B11-Nachweis in der ungünstigsten Phase) und der Produktionsweg für `text/event-stream` (035b Frage 3).
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
-  aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
-  zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
+  aufgenommen), dann 048, 053, 054, 055, 055b, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
+  zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055b).
+  *Stand 04.10.2026 nachts:* 055 (#152 `4da0165`, Spec #151 `ea3eb9a`; Klasse hoch, geteilt in 055 und 055b) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055b, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57: 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → 060 → 061 → 041). Takt-Scheiben der Nacht: takt-043 (Fokus nach Weiterleiten, #153 `6fbd2a0`, behebt das Fokus-Rennen F4 in `e2e-http`) und takt-044 (H13: Erfassungsfenster, #154 `d7020da`, Zeitabhängigkeit des Tests). Offen: eigener Takt für die Sonde `postgres-restart` des Stack-Jobs (vor 037b).
   *Stand 04.10.2026 abends:* 053 (#145 `d73f8fa`) und 054 (#149 `cc97005`, Spec #147 `4f37d07`) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57). 054c (Zurückholen, E58) hängt an 054 und wartet auf Rechtsblick.
   *Stand 04.10.2026 mittags:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette war 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
   *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach in dieser Reihenfolge 053, 054, 055, 059, 046, 060, 061, 041 (Register E57).

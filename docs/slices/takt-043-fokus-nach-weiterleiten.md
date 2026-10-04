@@ -1,6 +1,6 @@
 # takt-043 — Fokus nach „Weiterleiten“ im HTTP-Betrieb (054 F4)
 
-**Status:** spec · **Risikoklasse:** mittel (Interface-Verhalten: Fokus nach einer Übergabe; keine Rechte, kein Status,
+**Status:** angenommen (gemergt `6fbd2a0`, PR #153) · **Risikoklasse:** mittel (Interface-Verhalten: Fokus nach einer Übergabe; keine Rechte, kein Status,
 kein Vertrag, keine Persistenz, kein Betrieb; Leitplanken §4) · ca. 1 AStd · **Lanes:** web
 **Rolle:** builder; ein Review in frischem Kontext (Lean-Modus, AGENTS.md R3; kein Durchlesen nötig), Modell nur in
 `.claude/agents/` (takt-012)
@@ -214,6 +214,12 @@ slice-scope: 4 changed file(s), all within "docs/slices/takt-043-fokus-nach-weit
 ✓ built in 1.51s
 mark-test-run: wrote /home/user/wt/takt043/.claude/state/last-test-run (clean tree) at commit ad6c94c, tree 5b6466db2186…
 ```
+
+## Nachweis CI (nach dem Bau)
+
+- `e2e-http` auf `91e3129`: Job 111537701339, „56 passed (4.8m)“; 054 F4 und H13 grün.
+- Auf `89ff15d` erneut grün.
+- Status: angenommen, gemergt als `6fbd2a0` (#153). Das offene Akzeptanzkriterium 5 (CI-Lauf mit F4 grün) ist damit erfüllt.
 
 ## Review findings
 

@@ -1,6 +1,6 @@
 # takt-044 — H13: Klassifizierungsfenster erst nach dem Erfassungs-Lesezugriff öffnen
 
-**Status:** spec · **Risikoklasse:** niedrig (nur Testcode in einer e2e-Datei, kein Produktivcode, kein Vertrag, keine Persistenz)
+**Status:** angenommen (gemergt `d7020da`, PR #154) · **Risikoklasse:** niedrig (nur Testcode in einer e2e-Datei, kein Produktivcode, kein Vertrag, keine Persistenz)
 **Rolle:** builder; Review in frischem Kontext (Perspektive: beweist H13 noch, dass nur berührte Schlüssel gelesen werden?)
 **Regeln:** AGENTS.md R1, R2, R3, R12; 036b (H13: zweiter Browser sieht eine Änderung in unter 2 s und liest nur berührte Schlüssel)
 **Quellen-IDs:** `docs/folgeliste.md` (H13-Eintrag, 036b); CI-Läufe 37155605584 (#139), 37224478746 (#149), 37235698670 (#153)
@@ -110,6 +110,18 @@ slice-scope: 3 changed file(s), all within "docs/slices/takt-044-h13-erfassungsf
 mark-test-run: wrote /home/user/wt/takt044/.claude/state/last-test-run (clean tree) at commit ba3193c, tree 5ad128ea8315…
 ```
 
+## Nachweis CI (nach dem Bau)
+
+- `e2e-http`, Lauf 37236866412 auf `5bcdee9`: H13 grün; die Tabelle von Schritt 2 enthält nur `GET /v1/meeting` (+276 ms), kein
+  Sprecher- oder Beitragslesen.
+- Auf `0505ce3`: alle 56 Fälle grün.
+- Die Sonde `postgres-restart` des Stack-Jobs (stack-037a) war dort rot (bekannte Lücke beim Neustart von Postgres, nicht
+  Ursache dieser Scheibe); Wiederholung grün. Eintrag in `docs/folgeliste.md`.
+- Status: angenommen, gemergt als `d7020da` (#154). Akzeptanzkriterium 1 damit erfüllt.
+
 ## Review findings
 
-(nach Review)
+Review in frischem Kontext: kein Blocker, kein Major.
+
+- Minor: Die 5-s-Frist des Wartens beginnt bei der Registrierung und umfasst die drei Erfassungsanfragen. → `docs/folgeliste.md`
+  (bei Rot die Frist nach dem Fragen-POST neu starten).
