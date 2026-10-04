@@ -4,7 +4,7 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-04.m
 
 ## Stand
 
-- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf `7405efb` (Scheibe 048, #142).
+- Integrationsbranch `claude/dax-shareholder-meeting-workflow-0s934z`, Kopf bei Redaktionsschluss des Vormittags `7405efb` (Scheibe 048, #142); Stand am Abend im Abschnitt „Abend 04.10.2026“.
 - **Gemergt heute:** Spec 048 (#141 `e2e1432`), Scheibe 037a (#129 `5d89ad7`, S17 vom Eigentümer so angenommen),
   Scheibe 048 (#142 `7405efb`, auf Standard, Go des Eigentümers 04.10.2026). Die Specs stehen auf „angenommen“.
 - **Specs gemergt, Bau offen:** 064a (#126), 064b (#127), 065a (#128).
@@ -41,3 +41,35 @@ Für die nächste Orchestrator-Sitzung. Tagesbericht: `docs/bautage/2026-10-04.m
 - Weiter wie in `docs/bautage/uebergabe-2026-10-03.md`: je paralleler Agent eine eigene `TEST_DATABASE_URL`, ein
   Scratchpad-Unterverzeichnis je Agent, Testkonstanten nie `SECRET`, `TOKEN`, `KEY` oder `PASSWORD` nennen, nach e2e nie
   `git add -A`, quay.io ist gesperrt (Keycloak-Tests nur in der PR-CI, Nachweis nach E56).
+
+## Abend 04.10.2026
+
+**Stand:** Integrationsbranch Kopf `cc97005` (Scheibe 054, #149). Spec 054 gemergt als #147 (`4f37d07`), Scheibe 053 als #145
+(`d73f8fa`). Die Specs 053 und 054 stehen auf „angenommen“.
+
+- **054 gebaut und geprüft:** Das Review fand ein Major (Testumfang von 010d); behoben, vom Orchestrator in der Spec
+  nachgetragen. Minor und Nit gingen auf die Folgeliste (Abschnitt „Fokusansicht (aus 054)“).
+- **#148 geschlossen:** Gitleaks meldete in einem Commit einen Fehlalarm (ein Speichername als Zuweisung in einer
+  JSX-Zeile). Ein Force-Push ist gesperrt, deshalb wurde der Zweig zu einem Commit zusammengefasst und als #149 neu eröffnet.
+- **CI `e2e-http` fand einen Fokus-Wettlauf in F4:** Der Strom war dem Schreibvorgang voraus; das Muster aus 053 wurde
+  übernommen (`42ea09c`). Danach grün und gemergt als `cc97005` (#149).
+- **Codex P1 auf #149** (Gates-Ausgabe fehlte in der Spec) behoben.
+- **Laufzeit `e2e-http`** nach 054: 5:30 (Lauf 37223187826) und 4:45 (Lauf 37225467013) gegen die Harness-Grenze 8:00. Der
+  Takt (Grenze anheben oder Job teilen) ist fällig, bevor der Schritt etwa 6:30 erreicht.
+- **Folgeliste ergänzt:** 037a-Sonde `postgres-restart` (Neustart 0,4 s, Watcher sah nichts; Lauf 37222611650, PR #148) für
+  037b; H13 ein zweites Mal rot (PR #149, Lauf 37224478746); Fokus-Fix in 054 (`queueMicrotask`); Vorschlag lokaler
+  Gitleaks-Lauf vor dem Push. Die Aussage in Spec 048 „expert im Demo-Rollenwechsel nicht gebunden“ ist seit 054 überholt
+  (Vermerk dort).
+
+**Nächster Schritt:** Spec 055, dann 059, 046, 060, 061, 041 (Plan Abschnitt 11, Register E57). Betrieb: 037b, 038, 070, 071.
+Entwickler: 064, 065, 066, 075.
+
+**Offene Eigentümerfragen (unverändert):** E5 inhaltlich, E58 (Undo nach Weiterleiten, 054c), 048b (Auskunftsschuldner
+als Funktion), Aufbewahrungsklasse für den DSB, 053 Fragen 1 bis 8, 054 Fragen 1 bis 10, Kontrast Grau 300 (053 D4).
+
+**Umgebung und Lehren:**
+
+- Der lokale Postgres fällt bei Neustarts des Containers aus: `pg_ctlcluster 16 main start`, vorher `pg_lsclusters` prüfen.
+- Gitleaks-Lehre: Speichernamen als Modulkonstanten führen, nie als JSX-Literal; lokal steht kein Gitleaks bereit.
+- Fokus-Lehre: Wer Muster aus 053 wiederverwendet, übernimmt `armFocus` und `settleFocus` mit. Ein grüner Lauf `e2e-http`
+  beweist nicht, dass kein Wettlauf besteht.

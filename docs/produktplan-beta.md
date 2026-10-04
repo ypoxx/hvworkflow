@@ -770,6 +770,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots DE/EN; Playwright Matrix-Zahlen gegen counts; Zeitmessung Filterwechsel p90 < 150 ms bei 800 (Tor) mit Ausweis gegen D9 100 ms; axe grün
   - *Offene Entscheidung:* E1 Rollenname (nur i18n)
+  - *Stand:* gebaut und gemergt am 04.10.2026 (`d73f8fa`, PR #145; Spec `docs/slices/053-steuerungsansicht.md`: angenommen)
 - **054 · Fokusansicht der Beantworter** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-focus
   - *Ziel:* Route /my: nur eigene Zuweisungen (Einheit/Person), keine Filter, Doppelklick öffnet Vollbild-Schreibmodus, Enter/Escape-Pfad, Lesehinweis bei fehlendem Recht, TOP und Erfassungszeit ausgeblendet, Rückgabegrund prominent, „Weiterleiten" als primäre Aktion mit Dialog für Einheit und Grund (Übergang aus 048); Alt+6 über das Feature-Register (082).
   - *Zielbild (089):* Z1, Z5, Z7, Z8, Z9 (Weiterleiten nach E5 zum nächsten Schritt; die Übergabe an einen anderen Fachbereich bleibt die zweite Aktion im Dialog); Z2–Z4 und das Treffer-Kennzeichen erst nach E50 und E51. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
@@ -777,6 +778,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots inkl. Weiterleiten-Dialog; Playwright Doppelklick → Vollbild → speichern; axe grün
   - *Offene Entscheidung:* Undo nach Weiterleiten → 054c (Eigentümerfrage E58)
+  - *Stand:* gebaut und gemergt am 04.10.2026 (`cc97005`, PR #149; Spec als #147 `4f37d07`, `docs/slices/054-fokusansicht.md`: angenommen). Laufzeit des Schritts „End-to-end http project“ in `e2e-http` nach 054 gemessen: 5:30 (Lauf 37223187826) und 4:45 (Lauf 37225467013) gegen die Harness-Grenze 8:00 (`TOTAL_MS`); der Takt „Grenze anheben oder Job teilen“ ist fällig, bevor der Schritt etwa 6:30 erreicht, nicht zwingend vor 055 (frühere Annahme: rund 6,8 von 8:00 min nach 054, vor 055/059).
 - **061 · Leitstand mit fachlichen Kennzahlen** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-cockpit
   - *Ziel:* Route /cockpit (Recht cockpit.read, Standard coordination, moderation, admin; eine Zeile im Feature-Register 082): Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, „Fragen ohne Endstatus" vor Debattenschluss; Drill-down auf Liste; Platz für den Kanarienfrage-Status (gefüllt durch 086); Werte aus /metrics oder Projektion; keine personenbezogenen Kennzahlen (Negativtest, Allowlist).
   - *Zielbild (089):* Z10–Z13. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`, Bild `docs/zielbild/` und `docs/evidence/089-*.png`; Gestaltungsreferenz, nicht Spec: die Spec übernimmt die Punkte als Text, Maßstab bleibt D1–D10; Namen und neue Begriffe nach der README dort.
@@ -957,7 +959,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 054c, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —
@@ -1347,7 +1349,8 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055).
-  *Stand 04.10.2026:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette ist 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
+  *Stand 04.10.2026 abends:* 053 (#145 `d73f8fa`) und 054 (#149 `cc97005`, Spec #147 `4f37d07`) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57). 054c (Zurückholen, E58) hängt an 054 und wartet auf Rechtsblick.
+  *Stand 04.10.2026 mittags:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette war 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
   *Stand 03.10.2026:* Specs 043a, 040a bis 040d und 044a gemergt; 040a gebaut (#118 `c000567`) und vom Eigentümer am 03.10.2026 nachträglich angenommen; 043a, 040b, 044a, 044b und 045 gebaut und gemergt (045 als #139 `c0db7f5`; alle auf Standard, Go des Eigentümers 03.10.2026); 040c und 040d zurückgestellt; nächste Scheibe der Oberflächenkette ist 048, danach in dieser Reihenfolge 053, 054, 055, 059, 046, 060, 061, 041 (Register E57).
 - **D Partner:** 064, 065, 066 mit Partnerleitfaden und Sandbox-Mandant; nach 043 parallel zu C möglich.
 
