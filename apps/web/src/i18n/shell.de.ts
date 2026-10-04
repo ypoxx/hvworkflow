@@ -45,6 +45,7 @@ export const shellDe = {
   'nav.capture': 'Erfassung',
   'nav.steering': 'Steuerung',
   'nav.answers': 'Beantwortung',
+  'nav.focus': 'Meine Fragen',
   'nav.stage': 'Bühne',
   'nav.history': 'Historie & Suche',
   // --- 005 design system ---
@@ -148,6 +149,9 @@ export const shellDe = {
     'Klassifizieren, zuweisen und an andere Fachbereiche weiterleiten; Verteilung je Fachbereich und Bühnenplatz.',
   'page.answers.title': 'Beantwortung',
   'page.answers.description': 'Antwortentwurf, Legal Clearing und Freigabe je Antwortpfad.',
+  'page.focus.title': 'Meine Fragen',
+  'page.focus.description':
+    'Die Einzelfragen, deren Antwort Sie entwerfen und weiterleiten dürfen, die älteste zuerst.',
   'page.stage.title': 'Bühne',
   'page.stage.description': 'Podiumsansicht: freigegebene Antwort vorlesen und abschließen.',
   'page.history.title': 'Historie & Suche',

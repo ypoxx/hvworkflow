@@ -3,13 +3,13 @@
  *
  * This single source of truth drives the router, navigation, keyboard shortcuts,
  * and help text. Each feature is identified by a unique id, has a path, navigation
- * label and icon, optional keyboard shortcuts (Alt+1…5) and help text, and an
+ * label and icon, optional keyboard shortcuts (Alt+1…6) and help text, and an
  * optional permission requirement. The visibility of a route can be filtered by
  * `visibleRoutes()` based on granted permissions.
  */
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { History, ListOrdered, PencilLine, Presentation, ScrollText, Waypoints } from 'lucide-react';
+import { Focus, History, ListOrdered, PencilLine, Presentation, ScrollText, Waypoints } from 'lucide-react';
 import type { Permission } from '@hv/domain';
 import type { Meeting } from '@hv/domain';
 import type { TKey } from '../i18n';
@@ -17,6 +17,7 @@ import { SpeakersPage } from '../features/speakers/Page';
 import { CapturePage } from '../features/capture/Page';
 import { SteeringPage } from '../features/steering/Page';
 import { AnswersPage } from '../features/answers/Page';
+import { FocusPage } from '../features/focus/Page';
 import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
 
@@ -42,7 +43,7 @@ export interface Feature {
   i18nModule: string;
   /** Permission required to access this feature, if any; undefined means no restriction */
   requires?: Permission;
-  /** The Alt+1…5 keyboard shortcut to navigate here, 1-indexed */
+  /** The Alt+1…6 keyboard shortcut to navigate here, 1-indexed */
   shortcutKey?: number;
   /** The React component to render when this feature is active */
   Component: ComponentType;
@@ -100,6 +101,21 @@ export const FEATURES: readonly Feature[] = [
     Component: AnswersPage,
   },
   {
+    // Scheibe 054: the focus view ("Meine Fragen"), right after the shared Beantwortung. `requires` is data, not a role
+    // name; until the interface knows the person's rights (no source yet, as for steering), the navigation shows it to
+    // everyone. No counter: a count per person would need a source of its own.
+    id: 'focus',
+    path: '/my',
+    labelKey: 'nav.focus',
+    icon: Focus,
+    testId: 'nav-focus',
+    helpKey: 'page.focus.description',
+    i18nModule: 'focus',
+    requires: 'answer.draft',
+    shortcutKey: 6,
+    Component: FocusPage,
+  },
+  {
     id: 'stage',
     path: '/stage',
     labelKey: 'nav.stage',
@@ -149,7 +165,7 @@ export function visibleRoutes(
 
 /**
  * Get the minimum and maximum shortcut keys from the feature registry.
- * Used to label the navigation shortcuts row in the shortcuts dialog as "Alt 1…5".
+ * Used to label the navigation shortcuts row in the shortcuts dialog as "Alt 1…6".
  */
 export function getNavigationShortcutRange(): { min: number; max: number } {
   const shortcuts = FEATURES
@@ -175,7 +191,7 @@ export function getNavigationShortcutRange(): { min: number; max: number } {
 /**
  * Verify that the feature registry is well-formed:
  * - All paths are unique
- * - All shortcut keys (1…5) are unique
+ * - All shortcut keys (1…6) are unique
  * - All labelKeys and helpKeys exist in both DE and en-US
  *
  * This should be a test, but because the invariants are static data with no async,

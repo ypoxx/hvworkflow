@@ -694,6 +694,19 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Eigentümerfrage.
 - 053 Review 9 · `counts.byUnit` · für gebundene Fachkräfte sichtbar (Entwurf 040b) · zur nächsten Datenschutzprüfung.
 
+## Fokusansicht (aus 054)
+
+- 054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
+  mit Toast `focus.write.gone` · Entwurfspuffer mit 060.
+- 054 Bau · `apps/web/src/app/ShortcutsDialog.tsx` · die Kürzelliste kennt Strg+Enter und Escape des Schreibmodus nicht ·
+  Zeilen ergänzen (Lane web-shell).
+- 054 Bau · `apps/web/src/features/focus/Page.tsx` Fokus nach der Übergabe · wird nach der letzten Einzelfrage der Liste (leere
+  Liste) verworfen; der Fokus fällt dann auf `body` · Fokusziel im Hinweis `focus-empty` vorsehen.
+- 054 Bau · e2e F1–F8 als `test.describe.serial` · scheitert ein Fall, laufen die folgenden nicht; die roten Läufe vor dem
+  Bau zeigen deshalb nur F1 rot · unabhängige Fälle aus der Serie lösen, wo der Endzustand im Projekt `http` es erlaubt.
+- 054 Bau · `focus054.test.ts` · die Spec nannte für alle Personen außer Podium 230 lesbare Einzelfragen; die Beobachtung liest
+  nach 010 nur Vorgelesenes (130) · Zahl in der Spec berichtigt im Bericht.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

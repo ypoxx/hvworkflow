@@ -15,7 +15,7 @@ import {
   type HvApi,
   type EventStore,
 } from '@hv/domain';
-import { getActor, setActor, setSessionActor, DEMO_ACTORS } from './actor';
+import { getActor, setActor, setSessionActor, DEMO_ACTORS, DEMO_BINDINGS } from './actor';
 import { createSessionAuth } from './auth';
 import { connection } from './connection';
 import { createHttpApi, followSessionActor, getHttpSession, logoutHttpSession, type HttpApi } from './http';
@@ -154,14 +154,33 @@ export function isSeeded(): boolean {
 export async function seedIfEmpty(): Promise<void> {
   if (!DEMO_MODE) return;
   if (startupError) throw startupError;
-  if (isSeeded()) return;
+  const seeded = isSeeded();
   const before = getActor();
   const admin = DEMO_ACTORS.find((a) => a.id === 'u-admin')!;
   setActor(admin);
   try {
-    await api.seedDemo({ questions: CORPUS_DEMO.questions, roundSizes: CORPUS_DEMO.roundSizes, seed: CORPUS_DEMO.seed });
+    if (!seeded) {
+      await api.seedDemo({ questions: CORPUS_DEMO.questions, roundSizes: CORPUS_DEMO.roundSizes, seed: CORPUS_DEMO.seed });
+    }
+    await bindDemoActors();
   } finally {
     setActor(before);
+  }
+}
+
+/**
+ * Scheibe 054 (decision 2a): write the demo's role assignments (`DEMO_BINDINGS`) as the administration, on a fresh seed
+ * and on the start of a log seeded before 054. A 409 means "already bound" and is passed over; any other refusal does
+ * not block the start — the persona then stays unbound, and a fixed message (without content) says so.
+ */
+async function bindDemoActors(): Promise<void> {
+  for (const binding of DEMO_BINDINGS) {
+    try {
+      await api.assignRole(binding);
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status: unknown }).status : undefined;
+      if (status !== 409) console.warn('Demo role binding could not be written; the persona stays unbound.');
+    }
   }
 }
 

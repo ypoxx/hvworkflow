@@ -13,7 +13,7 @@ describe('featureRegistry', () => {
       expect(paths.size).toBe(FEATURES.length);
     });
 
-    it('all shortcut keys (1-5) are unique', () => {
+    it('all shortcut keys (1-6) are unique', () => {
       const shortcuts = new Set<number>();
       for (const feature of FEATURES) {
         if (feature.shortcutKey !== undefined) {
@@ -42,12 +42,12 @@ describe('featureRegistry', () => {
       expect(result).toBeUndefined();
     });
 
-    it('navigation shortcut range collapses to "Alt 1…5" label for the shortcuts dialog', () => {
+    it('navigation shortcut range collapses to "Alt 1…6" label for the shortcuts dialog', () => {
       const range = getNavigationShortcutRange();
-      // All current features have shortcuts 1-5, so min=1 and max=5
+      // Scheibe 054: the shortcuts run 1-6 (focus took Alt+6), so min=1 and max=6
       expect(range.min).toBe(1);
-      expect(range.max).toBe(5);
-      // When rendered as keys ['Alt', '1', '…', '5'], this displays as "Alt 1 … 5"
+      expect(range.max).toBe(6);
+      // When rendered as keys ['Alt', '1', '…', '6'], this displays as "Alt 1 … 6"
       // which formats correctly in the dialog
     });
   });
@@ -58,13 +58,21 @@ describe('featureRegistry', () => {
       expect(visible).toEqual(FEATURES);
     });
 
-    it('returns all routes but steering when granted is an empty set (no other route requires permissions)', () => {
+    it('returns all routes but steering and focus when granted is an empty set (no other route requires permissions)', () => {
       const visible = visibleRoutes(FEATURES, new Set());
-      // Scheibe 053: only `steering` carries a 'requires' field; every other route stays visible.
-      expect(visible).toEqual(FEATURES.filter((f) => f.id !== 'steering'));
+      // Scheibe 053/054: only `steering` and `focus` carry a 'requires' field; every other route stays visible.
+      const gated = ['steering', 'focus'];
+      expect(visible).toEqual(FEATURES.filter((f) => !gated.includes(f.id)));
       for (const feature of FEATURES) {
-        if (feature.id !== 'steering') expect(feature.requires).toBeUndefined();
+        if (!gated.includes(feature.id)) expect(feature.requires).toBeUndefined();
       }
+    });
+
+    it('Scheibe 054: focus is visible with answer.draft, hidden without it, and visible without a set at all (navigation today)', () => {
+      const granted = new Set<Permission>(['answer.draft']);
+      expect(visibleRoutes(FEATURES, granted).map((f) => f.id)).toContain('focus');
+      expect(visibleRoutes(FEATURES, new Set()).map((f) => f.id)).not.toContain('focus');
+      expect(visibleRoutes(FEATURES)).toEqual(FEATURES);
     });
 
     it('Scheibe 053: steering is visible with question.classify, and without a set at all (navigation today)', () => {
@@ -104,7 +112,7 @@ describe('featureRegistry', () => {
     });
 
     it('preserves route order', () => {
-      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify']) as unknown as ReadonlySet<Permission>;
+      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify', 'answer.draft']) as unknown as ReadonlySet<Permission>;
       const visible = visibleRoutes(FEATURES, granted);
       expect(visible).toEqual(FEATURES);
     });
@@ -124,11 +132,11 @@ describe('featureRegistry', () => {
       }
     });
 
-    it('each feature with a shortcutKey has a number from 1 to 5', () => {
+    it('each feature with a shortcutKey has a number from 1 to 6', () => {
       for (const feature of FEATURES) {
         if (feature.shortcutKey !== undefined) {
           expect(feature.shortcutKey).toBeGreaterThanOrEqual(1);
-          expect(feature.shortcutKey).toBeLessThanOrEqual(5);
+          expect(feature.shortcutKey).toBeLessThanOrEqual(6);
         }
       }
     });
@@ -146,9 +154,24 @@ describe('featureRegistry', () => {
       expect(steering?.counter).toBeUndefined();
       expect(ids.indexOf('steering')).toBe(ids.indexOf('capture') + 1);
       expect(ids.indexOf('answers')).toBe(ids.indexOf('steering') + 1);
-      // The shortcuts stay Alt+1…5, unique, one per remaining entry.
+      // Scheibe 054: the shortcuts are Alt+1…6, unique, one per remaining entry.
       const keys = FEATURES.flatMap((f) => (f.shortcutKey === undefined ? [] : [f.shortcutKey]));
-      expect([...keys].sort()).toEqual([1, 2, 3, 4, 5]);
+      expect([...keys].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    });
+
+    it('Scheibe 054: the focus row sits right after answers, path /my, requires answer.draft, Alt+6, no counter', () => {
+      const ids = FEATURES.map((f) => f.id);
+      const focus = FEATURES.find((f) => f.id === 'focus');
+      expect(focus?.path).toBe('/my');
+      expect(focus?.requires).toBe('answer.draft');
+      expect(focus?.shortcutKey).toBe(6);
+      expect(focus?.testId).toBe('nav-focus');
+      expect(focus?.labelKey).toBe('nav.focus');
+      expect(focus?.helpKey).toBe('page.focus.description');
+      expect(focus?.i18nModule).toBe('focus');
+      expect(focus?.counter).toBeUndefined();
+      expect(ids.indexOf('focus')).toBe(ids.indexOf('answers') + 1);
+      expect(ids[ids.length - 1]).toBe('history');
     });
 
     it('features are in the order they should appear (speakers first, history last)', () => {

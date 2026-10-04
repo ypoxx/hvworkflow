@@ -380,7 +380,11 @@ async function expectAbsent(page: Page, testIds: readonly string[]): Promise<voi
   for (const id of testIds) await expect(page.getByTestId(id), id).toHaveCount(0);
 }
 
-/** The Beantwortung with legal, filtered to "in Prüfung". */
+/**
+ * The Beantwortung with legal, filtered to "in Prüfung" and to Finanzen. Scheibe 054 (decision 2a): the demo expert is
+ * bound to Finanzen and reads nothing else, so the questions these tests hand over to the expert come from there; the
+ * unit filter works in the service, so the rows are taken only once every one carries the unit (045).
+ */
 async function answersInReviewAsLegal(page: Page): Promise<void> {
   await page.goto('/');
   await waitForCorpus(page);
@@ -388,7 +392,12 @@ async function answersInReviewAsLegal(page: Page): Promise<void> {
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   await page.getByTestId('answers-filter-status-in_review').click();
+  await page.getByTestId('answers-filter-unit').selectOption('unit-fin');
   await expect(page.getByTestId('answers-row').first()).toBeVisible();
+  await expect.poll(async () => {
+    const units = await page.getByTestId('answers-row').evaluateAll((els) => els.map((el) => el.getAttribute('data-unit')));
+    return units.length > 0 && units.every((unit) => unit === 'unit-fin');
+  }).toBe(true);
 }
 
 /** Seeded legal authors cannot clear their own answers, so choose records with an offered step. */

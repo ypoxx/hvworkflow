@@ -55,6 +55,11 @@ export const REFUSAL_045_RETURN_REASON = 'e2e 045';
 export const REFUSAL_045_UNSENT_WORDING = 'Synthetischer Entwurf 045, nie gesendet.';
 export const REFUSAL_045_UNSENT_JUSTIFICATION = 'Synthetische Begründung 045, nie gesendet.';
 
+/** Scheibe 054: the focus view. The answer is saved (F2); the unsaved text is typed and never sent (F3, F8). */
+export const FOCUS_054_ANSWER = 'Synthetische Antwort 054: Die Rückstellungen sind im Konzernanhang im Einzelnen erläutert.';
+export const FOCUS_054_UNSAVED = 'Synthetischer Zusatz 054, nie gespeichert.';
+export const FOCUS_054_RETURN_REASON = 'e2e 054';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -75,4 +80,7 @@ export const WRITTEN_TEXTS: readonly string[] = [
   REFUSAL_045_NO_CLAIM_JUSTIFICATION,
   REFUSAL_045_NO_CLAIM_WORDING,
   REFUSAL_045_RETURN_REASON,
+  FOCUS_054_ANSWER,
+  FOCUS_054_UNSAVED,
+  FOCUS_054_RETURN_REASON,
 ];

@@ -504,6 +504,7 @@ Summe: shell 3, focus 21 = **24**. Mitbenutzt, nicht neu: `action.question.submi
 - `apps/web/src/api/actor.ts` (nur die neue Liste der Demo-Bindungen mit dem einen Eintrag aus Entscheidung 2a)
 - `apps/web/src/api/index.ts` (nur der Bindungsschritt in der Startfunktion der Demo aus Entscheidung 2a)
 - `apps/web/e2e/020-rueckbau-passung.spec.ts` (nur die Rolle des Schritts m3, Entscheidung 2a)
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts` (im Bau ergänzt nach Entscheidung 2a, „Bricht eine weitere Datei …“: nur die Hilfe `answersInReviewAsLegal` filtert auf Finanzen, damit die an die gebundene Fachkraft übergebenen Einzelfragen lesbar bleiben; Bericht)
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile der Fokusansicht, ihr Import, ihr Icon und die Kommentare zum Kürzelbereich)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile, zu `requires` und zum Kürzelbereich)
 - `apps/web/src/i18n/focus.de.ts` (neu), `apps/web/src/i18n/focus.en.ts` (neu)
@@ -906,11 +907,67 @@ Keine blockiert den Bau; alle mit Standard.
 
 ```
 Slice: 054-fokusansicht
-Done:
-Evidence:
-Open:
-Touched:
+Done: Seite /my „Meine Fragen“ (Alt+6, Registerzeile requires answer.draft) mit Liste, Detail und Schreibmodus;
+      Aktionen nur aus _actions (focusActions), Weiterleiten-Dialog, Schreibtür und Fokusregel aus 053 importiert;
+      Demo-Fachkraft über DEMO_BINDINGS/assignRole an Finanzen gebunden (Entscheidung 2a).
+Evidence: Schluss von `pnpm gates` mit Commit im Bericht an den Orchestrator; docs/evidence/054-*.png (sechs Bilder, in-process)
+Open: Projekt http nur im CI-Lauf e2e-http des PR (lokal ohne Keycloak nicht lauffähig); 010d-Hilfe im Bau ergänzt (unten)
+Touched: siehe Liste unten
 ```
+
+**Vor dem Bau.** (1) 053 gemergt, Signaturen wie im Befund (`ForwardDialog`, `forwardProblemHandler(show, close, gone)`,
+`useWriteDoor`, `mayMoveFocus`), Parität 586. (2) Zahlen bestätigt durch Test 12: gebunden 7 (alle `unit-fin`), 35 lesbar;
+ohne Bindung 40; jede andere Person 0 eigene. **Abweichung:** die Beobachtung liest 130, nicht 230 (nur Vorgelesenes seit
+010); Test 12 nennt das. Bei 800: `[size] 054 my questions at 800: 21`. (3) Projekt `http`, aus den Dateikopfen: nach 045
+liegen in Finanzen mindestens zwei `assigned` (vier im Seed, E1 nimmt eine, E3 im ungünstigsten Fall eine zweite) und drei
+`answer_drafted` ohne Rückgabegrund; F2 und F5 brauchen zwei `assigned`, F8 findet danach die von F7 zugeleitete; 053 S4
+lässt in Operations weitere `assigned` (F7). (4) Die Historie liefert der gebundenen Fachkraft das `QuestionForwarded`
+(in-process belegt durch F7). (6) Laufzeit „End-to-end http project“: 37216387775 (`ba23e67`) 5:20, 37214710167 (`2a12e0d`)
+5:04, 37215934378 (`5a6f28b`) 4:11; Ist höchstens 5:20, Schätzung +1,7 min ≈ 7:00 < 8:00 (Harness) < 9:00 (Schritt).
+In-process dauert die Datei 37 s.
+
+**Bindung allein, volle in-process-Suite** (vor jeder Änderung an 020/010d): rot waren 020 „points 1–9“ (m3:
+`answers-filter-status-captured` nicht klickbar, die gebundene Fachkraft liest keine Einzelfrage ohne Fachbereich) und fünf
+Fälle in 010d (Zeilen 542, 571, 593, 786, 803: die Rechtsseite wählt die erste Einzelfrage `in_review` über alle Fachbereiche,
+die Fachkraft liest sie danach nicht; 786/803 wörtlich „failed: Question fr-0007m does not exist.“). Ein erster Lauf zeigte
+weitere rote Fälle (013h, 028, 053 S2b, 090 R1, takt-037); sie kamen von Quelländerungen während des Laufs (Vite lud Module
+neu, die Tests patchen `api` über `import('/src/api/index.ts')`) und waren im zweiten Lauf grün; dieselben Dateien auf
+`4f37d07` ohne Änderung: 74 grün.
+**Änderungen nach Entscheidung 2a:** 020 m3 wechselt zu `approver` und vor der Entwurfshälfte zurück zu `expert` (eine
+zusätzliche Zeile `asRole(page, 'expert')`, weil die Entwurfshälfte bisher stillschweigend die Rolle aus m3 weiterverwendete);
+010d: nur die Hilfe `answersInReviewAsLegal` filtert zusätzlich auf Finanzen und wartet, bis jede Zeile `unit-fin` trägt.
+Keine Zusicherung geschwächt. 010d stand nicht in „Files allowed“; die Zeile ist dort mit Begründung ergänzt.
+
+**Rot vor der Änderung** (neue Tests auf `4f37d07` ohne Umsetzung): Vitest „Test Files 7 failed (7), Tests 4 failed |
+13 passed (17)“ (Module `./focus`, `./FocusList`, `./FocusDetail`, `./focus.de` fehlen; Register: „expected 5 to be 6“,
+„expected [ 1, 2, 3, 4, 5 ] to deeply equal [ 1, 2, 3, 4, 5, 6 ]“, „expected undefined to be '/my'“). Playwright: F1 rot
+(`expect(page).toHaveURL(expected) failed` nach Alt+6); F2–F8 liefen in der Serie danach nicht.
+**Grün danach:** Vitest der Scheibe 41 + 4 Fälle; Playwright in-process 157 bestanden (149 vorher + 8), `054` mit
+`--repeat-each=3` 24 bestanden; axe ohne serious/critical auf Seite, Schreibmodus und Dialog, je de und en.
+
+**Endzustand im Projekt `http`** wie im Dateikopf von `054-fokusansicht.spec.ts` (F2, F4, F5, F7 schreiben; F1, F3, F6, F8 nicht).
+
+**Design-Kritik D1–D10**
+
+| D | erfüllt | Satz |
+|---|---|---|
+| D1 | ja | Links die Liste, älteste oben; rechts eine Einzelfrage, Rückgabegrund zuerst, genau ein nächster Schritt (Bild 054-fokus). |
+| D2 | ja | `focusActions` liefert höchstens eine primäre; „An anderen Fachbereich weiterleiten“ ist nur allein primär (Test 2, 6, 7). |
+| D3 | ja | Zeilen mit zwei Textzeilen gleicher Höhe, Liste und Detail fluchten; Schreibmodus 24/20 px Innenabstand, Textfeld füllt die Höhe. |
+| D4 | ja | Farbe nur in Badges und der Tönung des Rückgabegrunds; „Länger als zwei Minuten.“ als Text. |
+| D5 | ja | Nummern in Mono, Vorlesezeit „m:ss“, Regel-id im Dialog aus 053. |
+| D6 | ja | Laden (Gerüst), Fehler mit „Erneut versuchen“, `focus-empty`, `focus-forbidden`, `focus.latest.none`. |
+| D7 | ja | 24 Schlüssel je Sprache, Parität 610; „Weiterleiten“ nur für den nächsten Schritt. |
+| D8 | ja | Alt+6, Pfeile, Enter, Strg+Enter, Escape (auch im Dialog nur der Dialog), Fokus nach Aktion (F2–F4). |
+| D9 | ja | Nur „Entwurf speichern“ wird gesperrt angezeigt; ungespeicherter Text blendet die Übergaben aus (F3). |
+| D10 | ja | Keine Filterleiste, keine Kacheln; der Schreibmodus zeigt Frage, Rückgabegrund, Textfeld, Belege, Vorlesezeit, Aktionen. |
+
+**Touched:** `apps/web/src/features/focus/{Page,FocusList,FocusDetail,WritingMode}.tsx`, `focus.ts` und die vier Testdateien;
+`apps/web/src/api/{actor.ts,index.ts,focus054.test.ts}`; `apps/web/src/app/featureRegistry{,.test}.ts`;
+`apps/web/src/i18n/{focus.de,focus.en,de,en,shell.de,shell.en,parity.test}.ts`; `apps/web/e2e/054-fokusansicht.spec.ts`,
+`apps/web/e2e/020-rueckbau-passung.spec.ts`, `apps/web/e2e/010d-ansichtsdaten.spec.ts`, `apps/web/e2e/support/e2e-texts.ts`,
+`apps/web/playwright.config.ts`, `scripts/e2e-http-031.test.mjs`; `docs/evidence/054-*.png`; `docs/glossar.md`,
+`docs/folgeliste.md`, diese Spec.
 
 ## Review findings
 
