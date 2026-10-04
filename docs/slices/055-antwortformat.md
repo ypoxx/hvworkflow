@@ -908,8 +908,12 @@ Done: Vertrag 0.4.4 als erster Commit (neun Schemas, AnswerDraft.body, AnswerVer
 Evidence: Commits d68d90e (Vertrag), 8b40294 (Kern, Dienst), 8f25c09 (Review-Fixes); `pnpm gates` auf 8f25c09, Exit 0,
       Schluss unten. Playwright in-process 157 passed (7.5m) auf 8b40294, keine e2e-Datei berührt.
       timing053.test.ts und focus054.test.ts grün ohne Änderung (in `pnpm gates`, apps/web 684 passed).
-Open: e2e-http-Lauf des PR (Dauer) erst im CI; Review nach dem Fix in frischem Kontext;
-      055 nicht vor 055b in eine geteilte Umgebung (Entscheidung 10).
+      Projekt http: CI-Lauf `e2e-http` auf PR #152, Commit 914297b (nach Merge des Integrationszweigs mit takt-043),
+      Lauf 37239067336, Job 111543918354, grün: „56 passed (4.9m)“; Schritt „End-to-end http project …“ 22:12:33 bis
+      22:18:08, rund 5:35 gegen Limit 9:00 und Harness-Grenze 8:00 (055 fügt keine e2e-Datei hinzu). Artefakt
+      `evidence-031-http` (ID 11316579253, `sha256:f5fbe6c3dd10f21c774da3e52928515f890991c0027c87ae460798edaeaefae2`).
+      Vorher rot auf 0097ea5 nur wegen 054 F4 (Fokus-Rennen, behoben in takt-043, #153), nicht wegen 055.
+Open: 055 nicht vor 055b in eine geteilte Umgebung (Entscheidung 10).
 Touched: siehe Liste unten.
 ```
 
