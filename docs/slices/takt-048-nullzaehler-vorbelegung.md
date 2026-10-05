@@ -296,15 +296,86 @@ Slice: takt-048-nullzaehler-vorbelegung
 Done: Nullzähler der Verteilung in Grau 600 (6,26:1 auf der Zelle, 5,63:1 aktiv). Beantwortung beginnt mit der letzten
       Antwortversion (leer bei Verweigerung), Speichern nur bei Änderung, Basis nach dem Speichern = Gesendetes, Hinweis bei
       fremder neuerer Version; Helfer aus focus.ts, Abgleich in answers/draft.ts.
-Evidence: pnpm gates auf <commit> (Exit 0), Schluss siehe unten; docs/evidence/takt-048-nullzaehler-{de,en}.png,
-      docs/evidence/takt-048-vorbelegung-{de,en}.png; e2e-Lauf der berührten Dateien
-Open: <…>
-Touched: <Dateiliste>
+Evidence: pnpm gates auf f15442d (Exit 0), Schluss siehe unten; docs/evidence/takt-048-nullzaehler-{de,en}.png,
+      docs/evidence/takt-048-vorbelegung-{de,en}.png; e2e-Lauf der berührten Dateien (in-process) 68 bestanden, 1 übersprungen
+      (055b H1, nur http); Gegenprobe 003, 021c, 040a, 045, 053, 054, abnahme: 29 bestanden
+Open: Befund Umfang: apps/web/src/i18n/parity.test.ts (Schlüsselzahl 619→620) fehlte in „Files allowed“; ohne die Zeile
+      scheitert pnpm gates am neuen Schlüssel. In e76aa67 ergänzt (Liste und Datei, nur diese Zeile), slice-scope meldet
+      die geänderte Liste als Warnung. CI des PR (einschließlich e2e-http) steht aus (nicht gepusht).
+Touched: apps/web/src/features/steering/DistributionPanel.tsx, DistributionPanel.test.tsx,
+      apps/web/src/features/answers/QuestionDetail.tsx, QuestionDetail.test.tsx, AnswerEditor.tsx, draft.ts (neu),
+      draft.test.ts (neu), apps/web/src/i18n/answers.de.ts, answers.en.ts, parity.test.ts (Befund oben),
+      apps/web/e2e/takt-048-nullzaehler-vorbelegung.spec.ts (neu), 010d-ansichtsdaten.spec.ts (N1-Erwartung),
+      055b-antwortformat.spec.ts (A4), 013-tastaturpfad.spec.ts (zwei Kommentare), docs/evidence/takt-048-*.png (4),
+      docs/folgeliste.md, diese Spec
+```
+
+**Commits:** `029c448` (Bau), `e76aa67` (Schlüsselzahl, Befund), `f15442d` (Markierung `i18n-ok` im Testmuster, von
+`pnpm i18n-literals` verlangt), danach dieser Bericht (nur Doku).
+
+**Rot vorher (auf `8ba5a97`, Tests vor der Änderung):**
+
+- U1: `AssertionError: expected '<span class="min-w-5 text-right font-…' to contain 'text-ink-600'`
+- U3/U4/U5 (`draft.test.ts`): `Error: Cannot find module './draft'` (die Datei gab es noch nicht)
+- U6: `AssertionError: expected '<section class="flex min-h-0 flex-col…' not to contain 'answer-editor-placeholder'`
+- N1: `expect(locator).toHaveCSS(expected) failed · Expected: "rgb(99, 96, 91)" · Received: "rgb(203, 199, 192)"`
+- V1, V2, V6: `Expected: "DerBestätigungsvermerkbenennt…" · Received: ""` (Feld leer statt letzter Version)
+- V3: `Expected: "Gespeichert048." …` (Feld war leer, nur der angehängte Text stand darin)
+- V4: `Expected: "AufBasisdesJahresschlusskurses…" · Received: ""`
+- V5 war vorher schon grün (eine Verweigerung begann auch vorher leer; der Fall sichert das neue Verhalten ab).
+
+**Grün nachher:** Einheit `DistributionPanel`, `answers/`, `focus/` 15 Dateien, 251 Tests bestanden; e2e
+`takt-048-nullzaehler-vorbelegung.spec.ts` 7 von 7 bestanden, zusammen mit 010d, 013, 055b, 090: 68 bestanden, 1 übersprungen.
+090 und der Akteurwechsel-Test in 055b (A6) blieben unverändert grün.
+
+**Akteurwechsel-Reset (Ziel 2):** Zwei Wege, beide vorhanden. In der Demo greift zuerst der bestehende: `useBacklog` hält
+den gewählten Datensatz je Akteur (010d Ziel 1), beim Wechsel ist `question` kurz `null`, das Detail wird abgebaut und beim
+Wiederaufbau aus dem Datensatz neu vorbelegt (`startDraft`). Der neue Vergleich `useActor().id` im Render von
+`QuestionDetail` greift, wenn das Detail beim Wechsel stehen bleibt (der Datensatz des neuen Akteurs ist schon da); er legt
+einen neuen Entwurf mit `generation + 1` an. Welcher Weg in V6 zuerst griff, ist nicht einzeln gemessen; V6 belegt das
+Ergebnis (Feld = letzte Version, angehängter Text nirgends in `#main`).
+
+**Abhängigkeitswarnungen (`pnpm arch`):** vorher 14 (Quellstand `8ba5a97`), nachher 14; die neuen Importe
+`answers → focus/focus.ts` und `answers → api/actor.ts` lösen keine Warnung aus.
+
+**Folgeliste:** 055b-Sammeleintrag „Vorbelegen der Beantwortung“ als erledigt markiert; neu: Helfer aus `focus.ts` nach
+`answers/` verschieben; Kern-Guard „wortgleiche Version“ (Frage 1); doppelte Quellen-Normalisierung in `draft.ts`; Abschnitt
+„Kontrast der Nullzähler“ mit `ProcessStrip.tsx` und `SpeakerRow.tsx` (Frage 2).
+
+**Abweichungen von der Spec, benannt:**
+
+- Die primäre Aktion im Status „Entwurf“ heißt in der Oberfläche „Weiterleiten“ / „Forward“ (`question.submit_review`,
+  E5), nicht „Zur Prüfung“; geprüft ist der Knopf `answer-submit-review`.
+- `draft.ts` hat zusätzlich `startDraft` (für U2) und `discard`: „Verwerfen“ stellt die Basis her und zieht, wenn der
+  Hinweis stand, gleich auf die neuere Version nach, damit das Feld nach „Verwerfen“ nie eine überholte Version zeigt.
+- U6 prüft den Feldinhalt über das Fehlen des Platzhalters und von `aria-placeholder`: das Feld schreibt seinen Inhalt in
+  einem Effekt, im statischen Rendern steht er nicht.
+- `normalSources` steht in `draft.ts` ein zweites Mal (in `focus.ts` nicht exportiert, `focus/**` gesperrt); Folgeliste.
+
+**Schluss von `pnpm gates` auf `f15442d` (Exit 0):**
+
+```
+> @hv/web@0.0.0 build /home/user/wt/takt048/apps/web
+> tsc -b && vite build
+...
+✓ built in 2.45s
+mark-test-run: wrote /home/user/wt/takt048/.claude/state/last-test-run (clean tree) at commit f15442d, tree 112328d00a71…
 ```
 
 ## Design-Kritik
 
-(vom Implementierer vor dem Review auszufüllen: Tabelle D1–D10, ja/nein, Beleg)
+| D | erfüllt | Beleg |
+|---|---|---|
+| D1 | ja | Das Feld zeigt den Stand, an dem weitergeschrieben wird; „Verwerfen“ erscheint erst mit einer Änderung, der Hinweis bei fremder Version steht direkt über dem Feld. |
+| D2 | ja | Unverändert bleibt die Vorgangsaktion primär („Weiterleiten“ in V1, Screenshot); erst eine Änderung macht „Entwurf speichern“ primär (V2, U6). Ohne anderen Schritt bleibt Speichern primär, aber gesperrt. |
+| D3 | ja | Kein neues Layout; der Hinweis nutzt `StaleBanner` wie die Fokusansicht und das „Stand veraltet“. |
+| D4 | ja | Null tritt in Grau 600 zurück (6,26:1, aktiv 5,63:1, gegen rund 16:1 für Werte > 0), keine Farbfläche; N1 mit axe `color-contrast` in beiden Sprachen grün, keine neue Ausnahme. |
+| D5 | ja | Zahl der Zelle weiter Mono und rechtsbündig. |
+| D6 | ja | Ohne Version und über einer Verweigerung: leeres Feld mit Platzhalter und Hinweis (U6, V5). |
+| D7 | ja | Ein neuer Schlüssel `answers.editor.rebase` in de und en, Hausvokabular („Antwortversion“); `pnpm vocabulary` und `pnpm i18n-literals` grün. |
+| D8 | ja | Nach dem Speichern bleibt der Fokus sichtbar auf dem gesperrten Knopf, ein zweites Enter ruft `draftAnswer` nicht (V3); Enter auf dem unveränderten Entwurf schreibt nichts (V4). |
+| D9 | ja | Der Abgleich ist ein Vergleich je neuem Datensatz der gezeigten Frage (`sameBody`), keine Listenarbeit. |
+| D10 | ja | Keine neue Bedienfläche; weniger Speichern-Angebote als vorher, nichts Neues zu lernen. |
 
 ## Review findings
 
