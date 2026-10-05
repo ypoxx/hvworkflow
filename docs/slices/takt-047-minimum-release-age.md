@@ -260,4 +260,25 @@ Gruen nach der Korrektur: `# pass 24`, `# fail 0`. `pnpm gates` auf `17d57fd` (s
 mark-test-run: wrote /home/user/wt/takt047/.claude/state/last-test-run (clean tree) at commit 17d57fd, tree 17c2537cf6e6…
 ```
 
+### Nachbesserung 2: quoted Schluessel
+
+Jedes Top-Level-Vorkommen von `minimumReleaseAge` und `minimumReleaseAgeExclude`, auch in einfachen oder doppelten Anfuehrungszeichen, zaehlt zu "genau einmal"; die quoted Form ist ausserdem ein eigener Fehler ("quoted key not allowed").
+
+Rot auf dem Parser davor (`node --test scripts/release-age.test.mjs`):
+
+```
+not ok 24 - red: quoted duplicate or quoted-only keys
+  error: 'expected an error matching /minimumReleaseAge must occur exactly once, found 2/, got []'
+# pass 24
+# fail 1
+```
+
+Gruen danach: `# pass 25`, `# fail 0`. Letzter Code-Commit, auf dem `pnpm gates` lief: `d05cb60` (sauberer Baum), Exit 0, `pnpm test:scripts` `# pass 343`, `# fail 0`, Schluss:
+
+```
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.86s
+mark-test-run: wrote /home/user/wt/takt047/.claude/state/last-test-run (clean tree) at commit d05cb60, tree a8fa8092a396…
+```
+
 ## Review findings
