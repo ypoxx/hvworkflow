@@ -183,10 +183,18 @@ Lauf-ID, Job-ID und Annotationstext aus Kriterium 3.
 
 ```
 Slice: takt-046-e2e-http-laufzeit
-Done: …
-Evidence: Test rot/grün, pnpm gates auf <commit> (…), CI-Lauf <run-id>, Job <job-id>, Annotation „031a duration: …“
-Open: …
-Touched: …
+Done: Test zuerst erweitert (Grenzen aus dem Workflow gelesen, WARN_MS, formatDuration, Quelltext-Test zum finally);
+      danach Harness (TOTAL_MS 720_000, WARN_MS 390_000, formatDuration, Phasenzeiten, Ausgabe im finally von main) und
+      Workflow (Schritt 14, Job 20, Chromium 4, Kommentar) umgesetzt.
+Evidence: Test rot vor der Umsetzung: `node --test scripts/e2e-http-031.test.mjs` -> `# tests 1 / # fail 1`,
+      `SyntaxError: The requested module './e2e-http-031.mjs' does not provide an export named 'formatDuration'`.
+      Grün danach: `# tests 43 / # pass 43 / # fail 0`.
+      `pnpm gates` exit 0 auf Commit 546f67c, Schluss:
+      `mark-test-run: wrote .../.claude/state/last-test-run (clean tree) at commit 546f67c, tree 5ab9010e2ef5…`
+      CI-Lauf, Job-ID und Annotation: noch offen (kein Push in diesem Auftrag).
+Open: Akzeptanzkriterium 3 (CI auf dem PR, Annotation) und optional 4 (lokaler Lauf) stehen aus.
+Touched: .github/workflows/gates.yml, scripts/e2e-http-031.mjs, scripts/e2e-http-031.test.mjs,
+      docs/slices/takt-046-e2e-http-laufzeit.md
 ```
 
 ## Review findings
