@@ -834,8 +834,8 @@ Done: Renderer AnswerText (eine Komponente für Bühne, Vorschau, Beantwortung, 
       AnswerBodyEditor mit Werkzeugleiste, Kürzeln und Einfügen/Ablegen ohne HTML-Senke (Walker domToBody,
       editorCommands), Entwurf als Eingabeform in Fokus und Beantwortung, Semgrep-Regel no-html-sink.
 Evidence: Schluss von `pnpm gates` im Bericht an den Orchestrator (Commit dort genannt), docs/evidence/055b-*.png (6),
-      CI-Lauf e2e-http steht aus (kein Push in diesem Bau).
-Open: H1 (http) nur im CI-Lauf e2e-http; Firefox/WebKit nicht geprüft (Folgeliste).
+      CI-Lauf e2e-http grün (Lauf 37251657065, unten).
+Open: Firefox/WebKit nicht geprüft (Folgeliste); CSP der Webseite fehlt (037b, Eigentümerfrage vor geteilter Umgebung).
 Touched: siehe Bericht an den Orchestrator.
 ```
 
@@ -938,7 +938,16 @@ gates exit=0
 Wächterprobe (`<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face src`). Volle Suite
 `in-process` auf `c0ccbc7`: 163 passed, 0 failed, 1 skipped (H1).
 
-**CI `e2e-http`:** _Platzhalter — Lauf-ID, Job-ID, Commit, Logzeile H1 und Dauer des Schritts trägt der Orchestrator ein._
+**CI `e2e-http` (Orchestrator, 05.10.2026):** PR #157, Commit e25adda (Code-Stand c0ccbc7), Lauf 37251657065, Job 111580365445, grün:
+
+```
+✓  62 [http] › e2e/055b-antwortformat.spec.ts:687:3 › 055b http › H1 formatierte Version über den Dienst, nach dem Neuladen gleich (2.5s)
+57 passed (3.5m)
+```
+
+Schritt „End-to-end http project …“ 01:30:51 bis 01:34:57, rund 4:06 gegen Limit 9:00 und Harness-Grenze 8:00. Artefakt
+`evidence-031-http` (ID 11321147001, `sha256:86f433cad5ae653fdca4f6c2b43664dc3f421b47582a3326bb21bbd73683aada`). Vorher grün
+auch auf 27b5566 (Lauf 37249410736, H1 3.9s, Schritt rund 5:45).
 
 **Rot vor der Änderung:**
 
