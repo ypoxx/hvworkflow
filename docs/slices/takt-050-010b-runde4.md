@@ -1,6 +1,6 @@
 # takt-050 — 010b Runde 4 (B): „Resulting promise was garbage collected“ beim Laden der App-Module im Test
 
-**Status:** spec · **Risikoklasse:** niedrig (nur e2e-Testcode, kein Produktivcode, kein Vertrag, keine Rechte, keine
+**Status:** gebaut · **Risikoklasse:** niedrig (nur e2e-Testcode, kein Produktivcode, kein Vertrag, keine Rechte, keine
 Persistenz, kein Betrieb; Leitplanken §4) · ca. 2,5 AStd · 05.10.2026 · **Lanes:** web (e2e)
 **Rolle:** builder; ein Review in frischem Kontext (Lean-Modus, AGENTS.md R3; Perspektive: Test-Determinismus), Modell nur
 in `.claude/agents/` (takt-012)
@@ -240,17 +240,40 @@ Ausgaben.
 ```
 Slice: takt-050-010b-runde4
 Done: Neue Hilfe apps/web/e2e/support/app-modules.ts (loadAppModules: ein synchrones evaluate, Import-Promise an window,
-      Zustand per expect.poll, benannte loading-Meldung); 010b lädt die App-Module einmal je Test, alle 14 Evaluates
-      synchron, R4B scharf machen + setActor in einem synchronen Schritt, R4A zweigeteilt mit Ausgang an window.
-      Neuer Test takt-050-seitenmodule.spec.ts (T1 Ursache per CDP-GC, T2 Prinzip, T3 Gutfall, T4 hängender Import);
-      Folgelisteneinträge.
-Evidence: pnpm gates grün auf Commit <hash> (sauberer Baum; slice-scope: <n> Dateien in Files allowed). Ende:
-        <wörtlich>
-      T1–T4: <Ausgabe>. (c1) <Ausgabe, rot mit CI-Meldung>. (c2) <Ausgabe, rot mit loading-Meldung>.
-      rg (Akzeptanz 2): <drei Ergebnisse>.
-      Runde 4 --repeat-each=40, zwei Läufe gleichzeitig (E2E_PORT …/…): <n>/<n> + <n>/<n>.
-      010b + takt-050 --repeat-each=3: <Zählung>. Belastungskopie R4B mit collectGarbage: <n>/30.
-Open: CI auf dem PR (gates) steht aus; Beobachtung über die nächsten CI-Läufe (Akzeptanz 5).
+      Zustand per expect.poll, benannte loading-Meldung); 010b lädt die App-Module einmal je Test (10 Tests, dazu
+      switchActor), alle 14 Evaluates synchron, R4B scharf machen + setActor in einem synchronen Schritt, R4A
+      zweigeteilt mit Ausgang an window (__speakerListVersion, __writes). Neuer Test takt-050-seitenmodule.spec.ts
+      (T1 Ursache per CDP-GC, T2 Prinzip, T3 Gutfall, T4 hängender Import); Folgelisteneinträge, 010c-Eintrag erledigt.
+Evidence: pnpm gates grün auf Commit 3d6c698 (sauberer Baum; slice-scope: 5 Dateien in Files allowed). Ende:
+        dist/assets/index-CPbsjZGL.js                        764.46 kB │ gzip: 224.13 kB │ map: 3,162.87 kB
+        ✓ built in 2.61s
+        mark-test-run: wrote /home/user/wt/takt050/.claude/state/last-test-run (clean tree) at commit 3d6c698, tree 2fbbdfdfa22d…
+      Skripttests darin (einschließlich scripts/e2e-http-031.test.mjs): # pass 352, # fail 0.
+      Tests zuerst: ohne Hilfe rot ("Cannot find module …/e2e/support/app-modules"), danach
+        ✓ T1 Ursache … endet mit "garbage collected" (308ms)
+        ✓ T2 Prinzip … (226ms)
+        ✓ T3 Hilfe, Gutfall … (1.8s)
+        ✓ T4 Hilfe, hängender Import … in unter 5 s (2.4s)
+        4 passed (8.6s)
+      T1 war zuerst nicht deterministisch (3/20 „not settled within 5000 ms“: die Bereinigung lief, bevor das Evaluate in
+      der Seite angekommen war). Abhilfe im Test: das Evaluate setzt zuerst eine Marke an window, der Test fragt sie ab und
+      bereinigt erst dann. Danach T1 --repeat-each=40 --workers=2: 40 passed; ganze Datei --repeat-each=10: 40 passed.
+      (c1) altes R4B, zweites Evaluate mit `await new Promise(() => {})` vor dem Import, parallel collectGarbage:
+        ✘ Runde 4 (B) … (2.9s)
+        Error: page.evaluate: Resulting promise was garbage collected.
+          > 835 |   await Promise.all([gcProbe, page.evaluate(async (url) => {
+      (c2) neues R4B mit loadAppModules(page, ['/takt-050-haengt.ts', API_MODULE, ACTOR_MODULE], { timeoutMs: 2_000 }):
+        ✘ Runde 4 (B) … (3.8s)
+        Error: app modules /takt-050-haengt.ts, /src/api/index.ts, /src/api/actor.ts not ready; state 'loading' means
+        the dynamic import never settled (takt-050, support/app-modules.ts)
+        Expected: "ready"  Received: "loading"
+      rg (Akzeptanz 2): `import\(` keine Zeile (rc=1); `page\.evaluate\(\s*async` (-U) keine Zeile (rc=1);
+        `page\.evaluate -A2 | rg Promise`: :77 (expectNoErrorToast), :116 (settle), :552 (`const fail = () =>
+        Promise.reject(…)` im Rumpf eines Evaluate, das undefined zurückgibt; keine Promise-Rückgabe).
+      Runde 4 --repeat-each=40, zwei Läufe gleichzeitig (E2E_PORT 4261/4262): 80/80 + 80/80 = 160/160.
+      010b + takt-050 --repeat-each=3: 84/84. Belastungskopie R4B mit 2–4 collectGarbage während des Wechsels: 30/30.
+      Überschriebene docs/evidence/010b-* nach jedem Lauf zurückgesetzt; nichts darunter festgeschrieben.
+Open: CI auf dem PR (gates) steht aus; Beobachtung über die nächsten CI-Läufe (Akzeptanz 5). Nicht gepusht.
 Touched: apps/web/e2e/support/app-modules.ts (neu), apps/web/e2e/takt-050-seitenmodule.spec.ts (neu),
       apps/web/e2e/010b-lesepfade.spec.ts, docs/folgeliste.md, docs/slices/takt-050-010b-runde4.md
 ```
