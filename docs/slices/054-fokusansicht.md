@@ -859,6 +859,9 @@ Keine blockiert den Bau; alle mit Standard.
 10. **Risikoklasse.** Standard: mittel wie im Plan. Hochstufen darf der Eigentümer jederzeit; dann kommt ein Lesebefund vor
     dem Bau hinzu (rund 0,3 AStd).
 
+- Entschieden 05.10.2026: Frage 4 (E58): kein Undo nach dem Weiterleiten; 054c entfällt und wird nicht gebaut.
+- Entschieden 05.10.2026: Fragen 1 bis 3 und 5 bis 10: Standard wie gebaut angenommen; Frage 2 folgt E5 (Bedeutung wie gebaut, E5 geschlossen); Frage 8: Navigation mit 089b.
+
 ## Hinweise an den Orchestrator
 
 - **Plan-Eintrag 054 (§5, Zeile 773–779)** stimmt in mehreren Punkten nicht mit dem Stand überein; nicht Teil dieser Spec:
