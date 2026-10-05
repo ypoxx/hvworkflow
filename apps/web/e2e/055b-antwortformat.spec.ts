@@ -525,13 +525,22 @@ test.describe('055b in-process', () => {
       await expect(row).toHaveAttribute('data-number', number);
       await row.click();
       await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
-      await expect(page.getByTestId('answer-editor-placeholder')).toBeVisible();
+      // takt-048: the field starts with version 1 (no placeholder); everything is selected before the paste replaces it.
+      const field = page.getByTestId('answer-editor');
+      await expect(page.getByTestId('answer-editor-placeholder')).toHaveCount(0);
+      await expect(field.locator('ul > li')).toHaveCount(2);
+      await expect(field.locator('li i')).toHaveCount(0);
+      await field.focus();
+      await page.keyboard.press('Control+A');
       await transfer(page, 'answer-editor', { 'text/html': FORMAT_HTML_MORE, 'text/plain': FORMAT_PLAIN }, 'paste');
-      await expect(page.getByTestId('answer-editor').locator('li i')).toHaveText('Erster');
+      await expect(field.locator('li i')).toHaveText('Erster');
+      await expect(field.locator('ul > li')).toHaveCount(2);
       await page.getByTestId('answer-submit-draft').click();
       const second = page.locator('[data-testid="answer-version"][data-version="2"]');
       await expect(second).toBeVisible();
-      await expect(page.getByTestId('answer-editor')).toHaveText('');
+      // After saving the field shows version 2 (its base is what was sent) and saving is locked.
+      await expect(field.locator('li i')).toHaveText('Erster');
+      await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
       await second.getByTestId('answer-diff-toggle').click();
       await expect(second.getByTestId('answer-diff-format-only')).toBeVisible();
       await expect(second.getByTestId('answer-diff')).toHaveCount(0);

@@ -62,6 +62,7 @@ export const answersDe = {
   'answers.editor.save': 'Entwurf speichern',
   'answers.editor.discard': 'Eingabe verwerfen',
   'answers.editor.hint': 'Eine neue Version hebt eine bestehende Freigabe auf.',
+  'answers.editor.rebase': 'Inzwischen liegt eine neuere Antwortversion vor. Ihr Text ist nicht gespeichert.',
   'answers.format.toolbar': 'Hausformat',
   'answers.format.bold': 'Fett',
   'answers.format.italic': 'Kursiv',

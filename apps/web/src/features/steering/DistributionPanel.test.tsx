@@ -134,6 +134,37 @@ describe('DistributionPanel (Test 3)', () => {
     expect(tags(html, 'steering-unit-cell')).toHaveLength(0);
   });
 
+  /**
+   * takt-048 (053 addendum to D4, decided 05.10.2026): a zero steps back in grey 600 (6.26:1 on the cell, 5.63:1 on the
+   * active cell), no longer in grey 300 (1.68:1); a count above zero stays ink 900.
+   */
+  it('U1: a zero shows its number in text-ink-600, in every kind of cell and when active; above zero text-ink-900', () => {
+    const zeroNone = meeting({ open: 24, byUnit: { 'unit-fin': 9, 'unit-ops': 15, 'unit-ar': 0 }, bySeat: { ceo: 3, cfo: 1, 'seat-x': 0 } });
+    const countSpan = (cell: string): string => cell.match(/<span[^>]*font-mono tabular-nums[^>]*>\d+<\/span>/)?.[0] ?? '';
+    for (const active of ['all', 'unit-ar']) {
+      const html = render(zeroNone, READY, UNITS, active);
+      const zeros = [
+        cellText(html, 'steering-unit-cell', 'data-unit', 'unit-ar'),
+        cellText(html, 'steering-unit-none', 'data-count', '0'),
+        cellText(html, 'steering-seat-cell', 'data-seat', 'seat-x'),
+      ];
+      for (const cell of zeros) {
+        const span = countSpan(cell);
+        expect(span).toContain('>0<');
+        expect(span).toContain('text-ink-600');
+        expect(span).not.toContain('text-ink-300');
+      }
+      expect(html).not.toMatch(/font-mono tabular-nums[^"]*text-ink-300/);
+      for (const cell of [
+        cellText(html, 'steering-unit-cell', 'data-unit', 'unit-ops'),
+        cellText(html, 'steering-seat-cell', 'data-seat', 'ceo'),
+      ]) {
+        expect(countSpan(cell)).toContain('text-ink-900');
+      }
+    }
+    expect(render(zeroNone, READY, UNITS, 'unit-ar')).toMatch(/data-unit="unit-ar"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-unit="unit-ar"/);
+  });
+
   it('names no person: neither person nor device of a seat reaches the markup', () => {
     const html = render(FULL);
     expect(html).not.toContain('person-4711');
