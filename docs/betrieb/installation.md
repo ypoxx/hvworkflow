@@ -153,7 +153,7 @@ Jede Probe läuft gegen den laufenden Stack und endet mit `PASS`-Zeilen oder ein
 
 | Befehl | Was passiert | Erwartetes Ergebnis |
 |---|---|---|
-| `node scripts/stack.mjs probe postgres-restart` | Wartet, bis `/readyz` im Container `db` `ok` meldet, startet dann Postgres neu (schneller Stopp, SIGINT) und beobachtet `/readyz` ab diesem Moment | `db` ist kurz nicht `ok`, nach wenigen Sekunden (höchstens 60 s ab dem Neustart) wieder `ok`; der Dienst wird nicht neu gestartet (RestartCount gleich) |
+| `node scripts/stack.mjs probe postgres-restart` | Wartet, bis `/readyz` im Container `db` `ok` meldet, stoppt dann Postgres (`docker stop`, schneller Stopp, SIGINT), wartet, bis `/readyz` den Ausfall meldet (höchstens 45 s), und startet Postgres wieder. Bricht die Probe selbst ab (Strg-C), bleibt Postgres gestoppt; `pnpm stack:up` startet es wieder | `db` ist nicht `ok`, solange Postgres gestoppt ist, und höchstens 60 s nach dem Start wieder `ok`; der Dienst wird nicht neu gestartet (RestartCount gleich) |
 | `node scripts/stack.mjs probe api-crash` | Beendet den Node-Prozess des Dienstes hart (SIGKILL) | Docker startet den Dienst neu (RestartCount steigt), er ist binnen 60 s wieder gesund, die Zahl der Ereignisse ist unverändert; `docker compose stop api` endet in unter 3 s |
 | `node scripts/stack.mjs probe images` | Prüft Images und laufende Prozesse | Dienst und Befüllung laufen als Nutzer 65532, Web als 101, kein Prozess als root; das Image `api` enthält keinen Befüllungscode |
 | `node scripts/stack.mjs probe refusals` | Startet Dienst und Befüllung mit falscher Einrichtung, ohne Netz | Beide verweigern mit einem festen Satz ohne Werte |

@@ -19,7 +19,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   COMPOSE_FILE, DEFAULT_IDP_PORT, DEFAULT_WEB_PORT, ENV_FILES, PROJECT, REALM_NAME, START_LINE, assertPrivateDirectory,
   checkComposeVersion, checkDockerHost, checkDrift, checkEngineVersion, createState, formatCredentials, formatDiagnostics,
-  formatFailure, needsLog, redact, REFUSAL_LINE, evaluatePostgresRestart, observePostgresRestart,
+  formatFailure, needsLog, redact, REFUSAL_LINE, evaluatePostgresRestart, observePostgresRestart, parseWatchOutput,
+  formatPostgresRestart,
   formatSmokeLine, formatUpSummary, parseArgs, readOrCreateState, renderFiles, resolvePorts, secretsOf, startOutput,
   stateDirectory, upPlan, writeStateFiles,
 } from './stack.mjs';
@@ -802,58 +803,186 @@ test('Nachtrag nach CI, Runde 4: postgres stops fast (SIGINT) with a grace perio
   assert.equal(postgres.stop_grace_period, '30s');
 });
 
-/** A fake clock and a fake watcher/restart pair: the probe's order and timing without Docker. */
-function fakeRestartWorld({ readyAfter = 4_000, watchReady = true, outage = [300, 900], restartTakes = 1_200, restartCode = 0 } = {}) {
-  let clock = 1_000_000;
-  const log = [];
-  const tick = (ms) => new Promise((resolveTick) => setImmediate(() => { clock += ms; resolveTick(); }));
-  let restartAt;
-  let restartBegan;
-  const began = new Promise((resolveBegan) => { restartBegan = resolveBegan; });
-  const startWatch = () => {
-    log.push('watch');
-    const ready = tick(readyAfter).then(() => { log.push(`ready:${watchReady}`); return watchReady; });
-    const done = ready.then(async (ok) => {
-      if (!ok) return { code: 1, value: { baseline: false } };
-      // The watcher keeps polling until the restart has begun, then sees the outage relative to the restart start.
-      await began;
-      const value = outage === null ? { baseline: true, bad: null, back: null }
-        : { baseline: true, bad: { state: 'unreachable', at: restartAt + outage[0] }, back: restartAt + outage[1] };
-      await tick(outage === null ? 75_000 : outage[1]);
-      return { code: 0, value };
-    });
-    return { ready, done };
+/**
+ * takt-045: a fake clock that only moves when every pending promise has settled. Timers fire in time order, one per
+ * macrotask turn, so the fakes below never wait on the wall clock.
+ */
+function fakeClock(start = 1_000_000) {
+  let clock = start;
+  let seq = 0;
+  let running = false;
+  const timers = [];
+  const pump = () => {
+    if (timers.length === 0) { running = false; return; }
+    timers.sort((a, b) => a.at - b.at || a.seq - b.seq);
+    const next = timers.shift();
+    clock = Math.max(clock, next.at);
+    next.fire();
+    setImmediate(pump);
   };
-  const startRestart = () => { restartAt = clock; log.push('restart'); restartBegan(); return tick(restartTakes).then(() => ({ code: restartCode })); };
-  return { startWatch, startRestart, now: () => clock, log };
+  const delay = (ms) => new Promise((resolveDelay) => {
+    timers.push({ at: clock + ms, seq: seq++, fire: resolveDelay });
+    if (!running) { running = true; setImmediate(pump); }
+  });
+  return { now: () => clock, delay };
 }
 
-test('Nachtrag nach CI, Runde 4: the restart starts only after the watcher saw db ok, and time counts from the restart', async () => {
-  const slowExec = fakeRestartWorld({ readyAfter: 9_000 });
-  const result = await observePostgresRestart(slowExec);
-  assert.deepEqual(slowExec.log, ['watch', 'ready:true', 'restart'], 'a slow exec start delays the restart, never the watcher');
-  assert.equal(result.ok, true);
+/**
+ * takt-045: a fake Postgres over the fake clock and a fake watcher that reads its state only at its own poll times.
+ * The world offers both the old interface (`startRestart`, an outage of 100 ms starting 50 ms after the call) and the
+ * new one (`stopPostgres`, `startPostgres`, `delay`), so the same test runs against the old and the new probe.
+ */
+function fakePostgresWorld({
+  readyAfter = 4_000, watchReady = true, pollMs = 250, deadlineMs = 120_000, stopTakes = 100, stopCode = 0,
+  stopStops = true, stopThrows = false, startTakes = 300, startCode = 0, recoverAfter = 600,
+} = {}) {
+  const { now, delay } = fakeClock();
+  const log = [];
+  const outages = [];
+  const starts = [];
+  const pgOk = (t) => !outages.some((outage) => t >= outage.from && t < outage.to);
+  let signalDown;
+  const startWatch = () => {
+    log.push('watch');
+    const down = new Promise((resolveDown) => { signalDown = resolveDown; });
+    const ready = delay(readyAfter).then(() => { if (watchReady) log.push('ready'); return watchReady; });
+    const done = ready.then(async (ok) => {
+      if (!ok) return { code: 0, value: { baseline: false } };
+      // The first poll after READY lies one full period later: a 100 ms window right after READY falls between polls.
+      const begin = now();
+      let bad = null;
+      let back = null;
+      let samples = 0;
+      while (now() - begin < deadlineMs) {
+        await delay(pollMs);
+        const at = now();
+        samples += 1;
+        if (!pgOk(at) && bad === null) { bad = { state: 'unreachable', at }; log.push('down'); signalDown(bad); }
+        if (pgOk(at) && bad !== null) { back = at; log.push('back'); break; }
+      }
+      return { code: 0, value: { baseline: true, bad, back, samples, maxGapMs: pollMs } };
+    });
+    return { ready, down, done };
+  };
+  const startRestart = () => {
+    log.push('restart');
+    const at = now();
+    outages.push({ from: at + 50, to: at + 150 });
+    return delay(240).then(() => ({ code: 0 }));
+  };
+  const stopPostgres = () => {
+    log.push('stop');
+    if (stopThrows) return Promise.reject(new Error('stop exploded'));
+    if (stopStops) outages.push({ from: now() + 20, to: Number.POSITIVE_INFINITY });
+    return delay(stopTakes).then(() => ({ code: stopCode }));
+  };
+  const startPostgres = () => {
+    log.push('start');
+    const at = now();
+    starts.push(at);
+    for (const outage of outages) if (outage.to === Number.POSITIVE_INFINITY) outage.to = at + recoverAfter;
+    return delay(startTakes).then(() => ({ code: startCode }));
+  };
+  return { startWatch, startRestart, stopPostgres, startPostgres, now, delay, log, starts };
+}
+
+test('takt-045 Test 1: a watcher polling every 250 ms still sees the outage, because Postgres stays stopped until DOWN', async () => {
+  const world = fakePostgresWorld();
+  const result = await observePostgresRestart(world);
+  assert.equal(result.ok, true, 'the outage is seen regardless of the poll period');
   assert.equal(result.state, 'unreachable');
-  assert.equal(result.seconds, 0.9, 'back again measured from the restart start, not from the watcher start');
-  assert.equal(result.restartSeconds, 1.2, 'the restart command is timed on its own, not with the watcher');
-
-  const notReady = fakeRestartWorld({ watchReady: false });
-  const refused = await observePostgresRestart(notReady);
-  assert(!notReady.log.includes('restart'), 'no restart without a baseline');
-  assert.equal(refused.ok, false);
-  assert.equal(refused.reason, 'watcher-not-ready');
-
-  assert.equal((await observePostgresRestart(fakeRestartWorld({ outage: null }))).ok, false, 'never seen not ok fails');
-  assert.equal((await observePostgresRestart(fakeRestartWorld({ outage: [500, 61_000] }))).ok, false, 'back after 61 s fails');
-  assert.equal((await observePostgresRestart(fakeRestartWorld({ restartCode: 1 }))).ok, false, 'a failed restart command fails');
+  assert.deepEqual(world.log, ['watch', 'ready', 'stop', 'down', 'start', 'back']);
 });
 
-test('Nachtrag nach CI, Runde 4: the evaluation rejects an outage seen before the restart and a missing return', () => {
-  const restartAt = 5_000;
-  const base = { restartAt, restartCode: 0, restartMs: 800, limitMs: 60_000 };
-  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_100 }, back: 65_000 } }).ok, true);
-  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_100 }, back: 65_001 } }).ok, false);
-  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 4_999 }, back: 6_000 } }).ok, false);
-  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_100 }, back: null } }).ok, false);
-  assert.equal(evaluatePostgresRestart({ ...base, value: undefined }).ok, false);
+test('takt-045 Test 2: a slow exec start delays the stop, never the watcher; times count from stop and from start', async () => {
+  const world = fakePostgresWorld({ readyAfter: 9_000, stopTakes: 400, startTakes: 300 });
+  const result = await observePostgresRestart(world);
+  assert.deepEqual(world.log, ['watch', 'ready', 'stop', 'down', 'start', 'back']);
+  assert.equal(result.ok, true);
+  assert.equal(result.noticedSeconds, 0.25, 'noticed 250 ms after the stop, not after the watcher start');
+  assert.equal(result.seconds, 0.6, 'back again measured from the start, not from the stop or the watcher start');
+  assert.equal(result.stopSeconds, 0.4, 'the stop command is timed on its own');
+  assert.equal(result.startSeconds, 0.3, 'the start command is timed on its own');
+  assert.equal(result.watcherCode, 0);
+  assert.equal(result.finalLine, true);
+  assert.equal(result.samples, 4);
+  assert.equal(result.maxGapMs, 250);
+  assert.equal(formatPostgresRestart(result), 'Postgres-Neustart: db unreachable 0.3 s nach dem Stopp, wieder ok 0.6 s nach dem '
+    + 'Start (stop 0.4 s, Exit 0; start 0.3 s, Exit 0; Beobachter Exit 0, Schlusszeile ja, 4 Abfragen, größte Lücke 250 ms)');
+});
+
+test('takt-045 Test 3: without a baseline there is neither a stop nor a start', async () => {
+  const world = fakePostgresWorld({ watchReady: false });
+  const result = await observePostgresRestart(world);
+  assert.deepEqual(world.log, ['watch']);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'watcher-not-ready');
+  assert.match(formatPostgresRestart(result), /kein db ok, kein Stopp/);
+});
+
+test('takt-045 Test 4: when DOWN never comes, Postgres is started exactly once after downWaitMs', async () => {
+  const world = fakePostgresWorld({ stopStops: false });
+  const result = await observePostgresRestart(world);
+  assert.equal(world.starts.length, 1);
+  assert.equal(world.log.filter((entry) => entry === 'start').length, 1);
+  assert(world.starts[0] - 1_004_000 >= 45_000, 'the start waits for downWaitMs from the stop');
+  assert(world.starts[0] - 1_004_000 < 46_000, 'and not longer');
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'outage-not-seen');
+});
+
+test('takt-045 Test 5: failing commands fail the probe; Postgres is started even when the stop fails or throws', async () => {
+  const stopFails = fakePostgresWorld({ stopCode: 1, stopStops: false });
+  const stopResult = await observePostgresRestart(stopFails);
+  assert.equal(stopFails.starts.length, 1, 'started after a failed stop');
+  assert.equal(stopResult.ok, false);
+  assert.equal(stopResult.stopCode, 1);
+
+  const startFails = fakePostgresWorld({ startCode: 1 });
+  const startResult = await observePostgresRestart(startFails);
+  assert.equal(startResult.ok, false);
+  assert.equal(startResult.startCode, 1);
+
+  const stopThrows = fakePostgresWorld({ stopThrows: true });
+  await assert.rejects(observePostgresRestart(stopThrows), /stop exploded/);
+  assert.equal(stopThrows.starts.length, 1, 'started after a throwing stop');
+});
+
+test('takt-045 Test 6: back exactly 60 000 ms after the start passes, 60 001 ms fails', () => {
+  const base = { stopAt: 5_000, startAt: 6_000, stopCode: 0, startCode: 0, stopMs: 400, startMs: 300, limitMs: 60_000 };
+  const bad = { state: 'timeout', at: 5_500 };
+  assert.equal(evaluatePostgresRestart({ ...base, value: { bad, back: 66_000 } }).ok, true);
+  assert.equal(evaluatePostgresRestart({ ...base, value: { bad, back: 66_001 } }).ok, false);
+});
+
+test('takt-045 Test 7: the evaluation rejects an outage outside the stopped time, a return before the start and none', () => {
+  const base = { stopAt: 5_000, startAt: 6_000, stopCode: 0, startCode: 0, stopMs: 400, startMs: 300, limitMs: 60_000 };
+  const good = evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_500 }, back: 7_000 } });
+  assert.equal(good.ok, true);
+  assert.equal(good.noticedSeconds, 0.5);
+  assert.equal(good.seconds, 1);
+  const before = evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 4_999 }, back: 7_000 } });
+  assert.equal(before.ok, false);
+  assert.equal(before.reason, 'outage-not-seen');
+  const afterStart = evaluatePostgresRestart({ ...base, value: { bad: { state: 'starting', at: 6_001 }, back: 7_000 } });
+  assert.equal(afterStart.ok, false, 'a not ok only after the start does not prove the outage was noticed');
+  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_500 }, back: 5_999 } }).ok, false);
+  assert.equal(evaluatePostgresRestart({ ...base, value: { bad: { state: 'timeout', at: 5_500 }, back: null } }).ok, false);
+  const missing = evaluatePostgresRestart({ ...base, value: undefined });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.reason, 'outage-not-seen');
+});
+
+test('takt-045 Test 8: parseWatchOutput reads READY, DOWN and the final line and never throws', () => {
+  assert.deepEqual(parseWatchOutput('READY\n'), { ready: true, down: undefined, final: undefined });
+  assert.deepEqual(parseWatchOutput('READY\nDOWN {"state":"unreachable","at":1000}\n'),
+    { ready: true, down: { state: 'unreachable', at: 1000 }, final: undefined });
+  const final = { baseline: true, bad: { state: 'unreachable', at: 1000 }, back: 2000, samples: 7, maxGapMs: 140 };
+  assert.deepEqual(parseWatchOutput(`READY\nDOWN {"state":"unreachable","at":1000}\n${JSON.stringify(final)}\n`),
+    { ready: true, down: { state: 'unreachable', at: 1000 }, final });
+  assert.deepEqual(parseWatchOutput(`READY\nDOWN {"state":"unreachable","at":1000}\n(node:7) Warning: something\n${JSON.stringify(final)}\n`),
+    { ready: true, down: { state: 'unreachable', at: 1000 }, final });
+  assert.deepEqual(parseWatchOutput('READY\nDOWN {"state":"unreachable","at":1000}\n{"baseline":true,"bad":{"sta'),
+    { ready: true, down: { state: 'unreachable', at: 1000 }, final: undefined });
+  assert.deepEqual(parseWatchOutput(''), { ready: false, down: undefined, final: undefined });
 });
