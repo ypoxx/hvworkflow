@@ -207,6 +207,9 @@ Evidence: pnpm gates grün auf Commit eda84c3 (sauberer Baum; slice-scope: 6 Dat
       pass 346 / fail 0, einschließlich scripts/e2e-http-031.test.mjs). Ende:
         ✓ built in 2.39s
         mark-test-run: wrote /home/user/wt/takt049/.claude/state/last-test-run (clean tree) at commit eda84c3, tree 0805bd029fb8…
+      Nachlauf nach dem Merge des Integrationszweigs (Codex P1 auf #163): pnpm gates grün auf 968d7cc (sauberer Baum). Ende:
+        ✓ built in 3.80s
+        mark-test-run: wrote /home/user/wt/takt049/.claude/state/last-test-run (clean tree) at commit 968d7cc, tree 147ce0aad18c…
       T1/T2: takt-049-fokus-warten.spec.ts --project=in-process: 11 passed (8.1s).
       T1 roh (ohne Abfangen, lokal, nicht festgeschrieben): "TimeoutError: locator.getAttribute: Timeout 2000ms exceeded.
         Call log: - waiting for getByTestId('focus-list')".
