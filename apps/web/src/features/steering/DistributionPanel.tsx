@@ -19,10 +19,14 @@ export interface SeatRead {
 
 const CELL = 'inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-2xs';
 
-/** The number of a cell: mono, right-aligned, a zero in grey 300 like the process strip (D4, D5). */
+/**
+ * The number of a cell: mono, right-aligned (D5). A zero steps back in grey 600, without a coloured area (D4); decided
+ * 05.10.2026 (053 addendum to D4, takt-048): grey 300 measured 1.68:1, grey 600 holds 6.26:1 on the cell and 5.63:1 on
+ * the active cell (WCAG 1.4.3), grey 500 would fail (3.54:1 active).
+ */
 function Count({ value }: { value: number }) {
   return (
-    <span className={cx('min-w-5 text-right font-mono tabular-nums', value === 0 ? 'text-ink-300' : 'text-ink-900')}>{value}</span>
+    <span className={cx('min-w-5 text-right font-mono tabular-nums', value === 0 ? 'text-ink-600' : 'text-ink-900')}>{value}</span>
   );
 }
 
