@@ -712,6 +712,10 @@ Keine blockiert den Bau; alle mit Standard.
 6. **Risikoklasse.** Standard: hoch (Vertrag, Ereignisform, Freigabebindung). Herabstufen entscheidet nur der Eigentümer; dann
    entfiele der Lesebefund (rund 0,3 AStd).
 
+- Entschieden 05.10.2026: Frage 1 (E6): Whitelist bleibt; nummerierte Listen **ja** (rund 0,75 AStd), Umfang in Scheibe 055c; voraussichtlich Vertrags- und Kernänderung, Klasse von 055c kann auf hoch steigen, Spec-Entscheidung nötig.
+- Entschieden 05.10.2026: Frage 2: eine reine Formatänderung ist eine neue Version und hebt die Freigabe auf (Standard bestätigt). Ein kurzer Rechtsblick ist empfohlen und noch nicht erfolgt.
+- Entschieden 05.10.2026: Fragen 3 bis 6: Standard wie gebaut angenommen.
+
 ## 055b — Entwurf für die eigene Spec (nicht Teil der Files allowed dieser Spec)
 
 Der Orchestrator schreibt daraus `docs/slices/055b-antwortformat-editor.md` (AGENTS.md R1), nach dem Merge von 055. Klasse

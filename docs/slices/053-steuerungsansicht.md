@@ -682,6 +682,10 @@ Keine blockiert den Bau; alle mit Standard.
 8. **Risikoklasse.** Standard: mittel wie im Plan (Begründung „Warum mittel“). Hochstufen darf der Eigentümer jederzeit;
    dann kommt ein Lesebefund vor dem Bau hinzu (rund 0,3 AStd).
 
+- Entschieden 05.10.2026: Frage 3: Option A (rechtebasierte Navigation über eine Rechtemenge an `GET /auth/me`) als eigene Scheibe 089b nach der Freigabe-Demo, niedrige Priorität, nach 041.
+- Entschieden 05.10.2026: Zusatz zu D4: Zählerzellen mit 0 von Grau 300 auf Grau 600 (Barrierefreiheit), umgesetzt in takt-048.
+- Entschieden 05.10.2026: Fragen 1, 2, 4, 5, 6, 7, 8 (und Frage 3 nur wie oben): Standard wie gebaut angenommen; Eigentümerwort „Alles ok. Und ich folge alle deinen Empfehlungen.“
+
 ## Hinweise an den Orchestrator
 
 - **Plan-Eintrag 053 (§5, Zeile 753–758)** stimmt in mehreren Punkten nicht mit dem Stand überein; nicht Teil dieser Spec:

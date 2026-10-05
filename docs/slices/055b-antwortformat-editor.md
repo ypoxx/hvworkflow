@@ -774,6 +774,11 @@ Keine blockiert den Bau; alle mit Standard.
 8. **Rückgängig nach Einfügen.** Standard in 055b: nur Schutz vor einem verfälschten Stand (Entscheidung 5); ein einstufiges
    Rückgängig bringt 055c. Reicht das für die Demo?
 
+- Entschieden 05.10.2026: Frage 1: nummerierte Listen ja, Umfang in 055c (siehe Spec 055, Frage 1).
+- Entschieden 05.10.2026: Frage 4: Beantwortung wird mit der letzten Version vorbelegt (wie der Schreibmodus der Fokusansicht), Umsetzung in takt-048.
+- Entschieden 05.10.2026: Fragen 2, 3, 5, 6, 7, 8: Standard wie gebaut angenommen (Budget 055b 4,0 AStd).
+- Entschieden 05.10.2026: Rollout von 055/055b in eine geteilte Umgebung erst nach der CSP der Webseite (037b); Deployment nur auf ausdrückliches Go des Eigentümers.
+
 ## Hinweise an den Orchestrator
 
 - **Plan §5 (paralleler Doku-Durchgang, nicht Teil dieser Spec):** neuer Eintrag **055b** „Antwortformat: Renderer und
