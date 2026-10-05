@@ -1,47 +1,46 @@
-# Scheibe 060 — Entwurfspuffer, Präsenz und Fassungsvergleich
+# Scheibe 060 — Entwurfspuffer der Antwortansichten und Fassungsvergleich
 
-**Status:** spec (05.10.2026; gelesen auf `c5990c8`: 028, 036a, 036b, 054, 055b, 090 und takt-048 gemergt, Vertrag 0.4.4).
-Achte Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → **060** → 061 → 041
-(Register E57). Nicht geteilt; Rückfallteilung 060b (Erfassung) vorbereitet, Abschnitt „Teilung und Zuschnitt“. Auf Standard
-gebaut; keine Eigentümerfrage blockiert. **Lesebefund der Spec vor dem Bau** (Klasse hoch, Leitplanken §4).
-**Risikoklasse:** hoch · 3,8 AStd · Kalender 23.11.2026 (W9), vorgezogen · Lanes: web-api, web-components, web-answers, web-focus, web-capture, i18n, e2e, docs-sicherheit, docs-datenschutz
+**Status:** spec, Fassung 2 (05.10.2026; gelesen auf `c5990c8`: 028, 036a, 036b, 054, 055b, 090 und takt-048 gemergt, Vertrag
+0.4.4). Fassung 1 (`a3a2dae`) hatte im Lesebefund 2 blocker, 10 major, 13 minor, 4 nit; diese Fassung arbeitet ihn ein
+(Abschnitt „Lesebefund zu Fassung 1“) und setzt die Teilung des Orchestrators um. Achte Scheibe der Oberflächenkette der
+Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → **060** → 061 → 041 (Register E57). **Geteilt:** 060 baut den
+Puffer der Antwortansichten und den Fassungsvergleich; Präsenz und Übernahmen gehen in **060b**, der Puffer der Erfassung in
+**060c** (beide skizziert, Abschnitt „Teilung und Zuschnitt“). Auf Standard gebaut; keine Eigentümerfrage blockiert 060.
+**Lesebefund der Fassung 2 vor dem Bau** (Klasse hoch, Leitplanken §4).
+**Risikoklasse:** hoch · 3,2 AStd · Kalender 23.11.2026 (W9), vorgezogen · Lanes: web-api, web-components, web-answers, web-focus, i18n, e2e, docs-sicherheit, docs-datenschutz
 **Rolle:** implementierer-oberflaeche; Design-Kritik (D1–D10) in frischem Kontext vor dem Review (nicht die Sitzung, die
-diese Spec schrieb, nicht die bauende); ein Review in frischem Kontext mit den Perspektiven **Datenschutz** (Gerätespeicher,
-Präsenz von Beschäftigten), **Security** (unveröffentlichte Antworten im Browserspeicher, T-G1-I-08) und **UX/Barrierefreiheit**
-(Vergleich, Präsenz, Fokus); Modell nur in `.claude/agents/` (takt-012). Nie gebündelt.
-**Rule ids:** AGENTS.md R1–R4, R6, R7, R9–R12; R-CLAIM-01 und R-CLAIM-02 (Übernahme, weiche Sperre, 028); R-TRANS-03 und
-R-GUARD-04 (eine neue Version hebt Freigabe und Rechtsfreigabe auf); 090 (Eingaben gehören dem Akteur); 010d Ziel 1/3
-(Ausgang eines Schreibens nur auf der gezeigten Frage); takt-008 (Sperre bis der Datensatz nachgezogen hat, Fokus bleibt);
-takt-048 Entscheidungen 2, 6, 7 (Vorbelegung, Basis nach dem Speichern, Hinweis bei fremder Version; Entscheidung 7 wird hier
-geändert, Entscheidung 13); 054 (Entwurf je Akteur und Einzelfrage, `writingOutcome`); 055b Entscheidung 7 (`generation`);
-ADR 0002, ADR 0009 (keine `personId` in Lesepfaden), ADR 0013 (Person nur über die Übernahme sichtbar), ADR 0014 (Strom);
-DSFA-Vorentwurf V5 („Entwurfsspeicherung ohne Personenauswertung (060)“); Bedrohungsmodell T-G1-I-08.
+diese Spec schrieb, nicht die bauende); ein Review in frischem Kontext mit den Perspektiven **Datenschutz** und **Security**
+(unveröffentlichte Antworten im Browserspeicher, T-G1-I-08) und **UX/Barrierefreiheit** (Vergleich, Fokus); Modell nur in
+`.claude/agents/` (takt-012). Nie gebündelt.
+**Rule ids:** AGENTS.md R1–R4, R6, R7, R9–R12; R-TRANS-03 und R-GUARD-04 (eine neue Version hebt Freigabe und
+Rechtsfreigabe auf); 090 (Eingaben gehören dem Akteur); 010d Ziel 1/3 (Ausgang eines Schreibens nur auf der gezeigten Frage);
+takt-008 (Sperre bis der Datensatz nachgezogen hat, Fokus bleibt); takt-048 Entscheidungen 2, 6, 7 (Vorbelegung, Basis nach dem
+Speichern, Hinweis bei fremder Version; Entscheidung 7 wird hier geändert, Entscheidung 12); 054 (Entwurf je Akteur und
+Einzelfrage, `writingOutcome`); 055b Entscheidung 7 (`generation`) und der Renderer `AnswerText` (nur Textknoten); ADR 0002,
+ADR 0005 (Antwortformat, Whitelist), ADR 0009; DSFA-Vorentwurf V5 („Entwurfsspeicherung ohne Personenauswertung (060)“);
+Bedrohungsmodell T-G1-I-08; Reviewer-Checkliste Sicherheit SC-06.
 **Quellen-IDs:** Plan §5 Eintrag 060; `docs/agentische-entwicklung-plan.md` §5.3 Zeile „Fehlerpfad (Konflikt 412 in der
 Oberfläche)“ (geplant in Scheibe 060); `docs/folgeliste.md` 054 Bau (`focus.write.gone`) und 054 Review 5; Hinweise an 060 in
-054, 055, 055b, takt-048; Register E13, E14, E33, E36.
-**Depends on:** 028 (gemergt), 036a/036b (gemergt), 054 (gemergt); gelesen gegen 055b und takt-048 (gemergt).
-**Perspektive:** Datenschutz, Security, UX · **Glossar: neue Begriffe:** ja (Entscheidung 15)
+054, 055, 055b, takt-048; Register E13, E14, E33, E36; Lesebefund zu `a3a2dae` mit Entscheidungen des Orchestrators (05.10.2026).
+**Depends on:** 054 (gemergt), 036a/036b (gemergt, Strom und Live-Speicher für die Live-Version); gelesen gegen 055b und takt-048
+(gemergt). 028 ist nach der Teilung keine Voraussetzung mehr (Übernahmen in 060b).
+**Perspektive:** Datenschutz, Security, UX · **Glossar: neue Begriffe:** ja (Entscheidung 14)
 
 ## Warum hoch (Plan: mittel)
 
-Der Plan führt 060 als mittel. Diese Spec stuft hoch (Hochstufen braucht keine Freigabe, Leitplanken §4; „ist die Zuordnung
-unklar, gilt hoch“). Zwei Auslöser der Klasse hoch liegen vor, keiner davon ist eine Vertragsänderung:
+Der Plan führt 060 als mittel. Diese Spec stuft hoch (Hochstufen braucht keine Freigabe, Leitplanken §4). Auslöser:
+**personenbezogene und vertrauliche Daten an einem neuen Ort.** Der Puffer legt unveröffentlichte Antwortentwürfe (Inhalt mit
+Aktionärsbezug, DSFA V5) über das Neuladen hinaus im Speicher des Geräts ab — das Szenario T-G1-I-08 („Browserspeicher zeigt
+unveröffentlichte Antworten“); die DSFA nennt 060 ausdrücklich als Maßnahmenträger für V5. Die Löschregeln entscheiden, ob ein
+Entwurf am selben Gerät einer anderen Person erscheint (090).
 
-1. **Personenbezogene und vertrauliche Daten an einem neuen Ort.** Der Puffer legt unveröffentlichte Antwortentwürfe und
-   unbestätigte Wortlaute von Redebeiträgen (Inhalt mit Aktionärsbezug, DSFA V2/V5) über das Neuladen hinaus im Speicher des
-   Geräts ab. Das ist genau das Szenario T-G1-I-08 („Browserspeicher zeigt unveröffentlichte Antworten“). Die DSFA nennt 060
-   ausdrücklich als Maßnahmenträger für V5.
-2. **Präsenz von Beschäftigten.** „Wird gerade bearbeitet“ zeigt, dass eine bestimmte Person gerade an einer Einzelfrage
-   arbeitet, und jede Übernahme ist ein Ereignis mit `personId` im Log (028). Mehr Übernahmen heißen mehr Verhaltensdaten;
-   Mitbestimmung (E13, E36) und Auswertungsverbot je Person (6.6) sind berührt.
+Nicht ausgelöst: Rechte, Rollen, Übergänge, Vertrag, Ereignisform, Dienst, Persistenz des Dienstes, Präsenz (060b).
+**Wahrheitstabellen-Diff: keiner** (kein neues Recht, keine neue Operation, kein neuer Aufruf des Dienstes).
 
-Nicht ausgelöst: Rechte, Rollen, Übergänge, Vertrag, Ereignisform, Dienst, Persistenz des Dienstes. **Wahrheitstabellen-Diff:
-keiner** (kein neues Recht, keine neue Operation; die Oberfläche ruft die vorhandenen `claimQuestion`, `releaseQuestion`,
-`claimContribution`, `releaseContribution` nur, wenn `_actions` das Recht enthält).
-
-Folgen der Klasse: Positiv- und Negativtest je Auslöser (Puffer: schreibt/liest nur den eigenen Akteur, löscht bei Abmelden,
-fremdem Akteur, Ablauf; Präsenz: zeigt fremde, nicht eigene oder abgelaufene Übernahme, nie einen Namen), ein Fehler- und
-Wiederherstellungsfall (Verbindungsabbruch beim Tippen, Neuladen, nicht verfügbarer Speicher), Lesebefund vor dem Bau.
+Folgen der Klasse: Positiv- und Negativtest je Auslöser (schreibt/liest nur den eigenen Akteur; löscht bei Abmelden, ohne Rolle,
+bei entzogenem Strom, bei anderem bestätigtem Akteur, nach Ablauf; nimmt keinen manipulierten Eintrag an), ein Fehler- und
+Wiederherstellungsfall (Verbindungsabbruch beim Tippen mit erneuter Anmeldung, Neuladen, nicht verfügbarer Speicher),
+Missbrauchsfall nach SC-06, Lesebefund vor dem Bau.
 
 ## Befund (Ist-Stand, gelesen auf `c5990c8`)
 
@@ -50,41 +49,50 @@ Wiederherstellungsfall (Verbindungsabbruch beim Tippen, Neuladen, nicht verfügb
   `body: AnswerBodyInput | null`, `sources`, Basis `baseVersion`/`baseBody`/`baseSources`, `rebase`, `generation`) nur im
   Speicher der Seite. Neuladen, Schließen des Tabs, Verlassen von `/my` oder ein fremder Schreibvorgang, der die Frage aus
   „Meine Fragen“ nimmt, verwerfen ungespeicherten Text (Toast `focus.write.gone`; Folgeliste 054 Bau und 054 Review 5).
+- **Wo ein Entwurf entsteht** (Stellen, an denen Entscheidung 5 greifen muss): `QuestionDetail` beim Aufbau (`startDraft`), beim
+  Akteurwechsel und beim Neuaufbau im Render-Abgleich (`startDraft(…, generation + 1)`), nach „Neu laden“ des Bands
+  (`startDraft`), nach „Verwerfen“ (`discard`); `focus/Page.tsx` beim ersten Anzeigen einer Frage (`newDraft`) und nach „Neu
+  laden“ im Schreibmodus (`newDraft(…, generation + 1)`).
 - **Fremde neuere Version:** `writingOutcome`/`onRecord` setzen `rebase`; über dem Feld steht `StaleBanner` (`focus-rebase`,
   `answer-editor-rebase`), dessen „Neu laden“ den eigenen Text **kommentarlos verwirft**; Speichern bleibt möglich und legt
   den eigenen Text über die fremde Version (takt-048 Entscheidung 7). Einen Vergleich beider Texte gibt es nicht.
-- **412:** `useWriteDoor` sendet `If-Match` aus dem beim Klick gezeigten Datensatz; ein 412 zeigt „Stand veraltet“
-  (`answers.stale.banner`), lädt neu und lässt den Entwurf stehen. Ob danach eine neue Antwortversion da ist, sagt niemand;
-  der 412-Pfad ist in der Oberfläche ungetestet (Tor-Zeile „geplant in Scheibe 060“).
-- **Übernahme (028):** `claimQuestion`/`releaseQuestion` und `claimContribution`/`releaseContribution` gibt es im Vertrag und
-  im Kern; `Claim` trägt `actorId`, `claimedAt`, `expiresAt` (10 Minuten, der Inhaber verlängert durch erneutes Übernehmen,
-  R-CLAIM-01; nur der Inhaber gibt zurück, R-CLAIM-02). `viewClaim` gibt seit takt-027 keine `personId` aus. Jede Übernahme
-  und Rückgabe erhöht `version` (`touch`). Die Übernahme sperrt keinen Schreibvorgang (Kommentar in `state.ts`). **Keine
-  Ansicht ruft sie heute auf.** Der Live-Speicher (036a N7) beendet einen Eintrag mit Übernahme zu `claim.expiresAt` und weckt
-  die Ansichten; der Strom (036b) trägt `QuestionClaimed`/`QuestionReleased`.
-- **Rechte:** `question.claim` halten Fachbereich (einheitsgebunden) und Recht; `contribution.claim` hält die Erfassung. Beide
-  stehen in `_actions` der jeweiligen Ressource, wenn `can()` zustimmt.
-- **Erfassung:** `ContributionPane` hält `draft` (Wortlaut eines neuen Redebeitrags, je Wortmeldung) und `free` (freie
-  Einzelfrage, je Redebeitrag) im Komponentenzustand; Akteurwechsel leert beide (090). 412 auf `captureQuestions` lässt die
-  freie Eingabe stehen und zeigt `capture-stale-banner` (028, e2e `028-konflikte.spec.ts`).
-- **Doppelklick:** Schreibtür (`writing`-Ref plus `aria-disabled`, takt-008) und `submitting`-Refs der Erfassung verhindern ein
-  zweites Senden; ein e2e mit echtem Doppelklick auf „Entwurf speichern“ fehlt.
-- **Speicherschlüssel:** Die vorhandenen Konstanten `STORAGE_KEY` (Demo-Log, Persona) und zwei `*_KEY`-Konstanten mit
-  `hv-…-v1`-Literal lösten in takt-021 den gitleaks-Fehlalarm `generic-api-key` aus (Allowlist in `scripts/gitleaks.toml`
-  nur für genau diese zwei Zeilen).
+- **412:** `useWriteDoor.run(permission, write, onDone, onProblem)` sendet `If-Match` aus dem beim Klick gezeigten Datensatz.
+  `onProblem` wird bei einer Ablehnung zuerst gefragt; `false` lässt das Standardverhalten laufen (Band „Stand veraltet“
+  `answers.stale.banner`, Neuladen, Entwurf bleibt). Ob danach eine neue Antwortversion da ist, sagt niemand; der 412-Pfad ist
+  in der Oberfläche ungetestet (Tor-Zeile „geplant in Scheibe 060“).
+- **Sitzung:** `api/auth.ts` kennt die Zustände `signedIn`, `noRole`, `signedOut`; `api/index.ts` meldet einen anderen
+  bestätigten Akteur über `onActorChange`, ein Streamende über `onStreamEnd(reason)` mit `session`, `forbidden`,
+  `roles_changed`, `unauthorized`. Nach einem Neuladen im HTTP-Betrieb kennt die Seite die id des vorigen Akteurs nicht mehr.
+- **Demo:** `seedIfEmpty` wechselt bei **jedem** Start zur Administration und zurück (`setActor`); ein Löschen in `setActor`
+  würde bei jedem Start alles löschen (Blocker 1 des Lesebefunds).
+- **Antwortformat:** `normalizeAnswerBodyForRead` (Kern, über `previewAnswer` in `api/answerFormat.ts`) wirft nie und lässt
+  Unbrauchbares fallen; `ANSWER_MARKS` ist die geschlossene Markenmenge, `ANSWER_TEXT_MAX_LENGTH` 20 000; Quellen im Vertrag
+  höchstens 50 zu je 2 000 Zeichen. `bodyToDom` (Eingabeform → Feld) und `AnswerText` (Speicherform → Anzeige) sind die
+  vorhandenen Wege ohne HTML-Senke (055b).
+- **Speicherschlüssel:** zwei `*_KEY`-Konstanten mit `hv-…-v1`-Literal lösten in takt-021 den gitleaks-Fehlalarm
+  `generic-api-key` aus (Allowlist in `scripts/gitleaks.toml` nur für genau diese zwei Zeilen).
 
 ## Teilung und Zuschnitt
 
-Eine Scheibe, zwei Teile in dieser Reihenfolge, je ein Commit:
+Entscheidung des Orchestrators nach dem Lesebefund (major 10, blocker 2), jetzt geteilt:
 
-- **Teil A — Beantwortung und Fokusansicht** (rund 3,1 AStd): Puffermodul, Präsenz, Fassungsvergleich, 412-Einordnung,
-  Doppelklicktests, Löschregeln, Doku-Zeilen.
-- **Teil B — Erfassung** (rund 0,7 AStd): Puffer der zwei Textfelder, Übernahme des Redebeitrags während der Atomisierung,
-  Präsenzzeile.
+- **060 (diese Spec):** lokaler Entwurfspuffer der Antwortansichten (Fokusansicht, Beantwortung), Wiederherstellen,
+  Fassungsvergleich bei 412 und Live-Version, Doppelklicktests, Löschregeln, Doku-Zeilen. Keine Übernahme, keine
+  Präsenzzeile, kein Puffer der Erfassung.
+- **060b — Präsenz über die Übernahme (Skizze, Bau erst nach Antwort des Eigentümers auf Frage 1).** Inhalt aus Fassung 1
+  Entscheidung 8: Präsenzzeile „Wird gerade von einer anderen Person bearbeitet · seit HH:MM“ ohne Namen aus `Claim`
+  (`actorId`, `claimedAt`, `expiresAt`, kein Vertragsschritt), Übernahme bei erster Änderung nur mit `question.claim` in
+  `_actions`, Verlängern ohne Herzschlag, Rückgabe beim Verlassen, Wartesperre des Speicherns bis der Datensatz die eigene
+  Übernahme zeigt, Übernahme des Redebeitrags in der Erfassung; minor 4–6 des Lesebefunds gehören dorthin. **Vorfrage:** jede
+  Übernahme, Verlängerung und Rückgabe schreibt `QuestionClaimed`/`QuestionReleased`, und Zeitleiste der Historie und
+  Ereignistabelle zeigen diese mit Akteur und Zeit — die Präsenz erzeugt damit ein **benanntes Tätigkeitsprotokoll**
+  (E13, E36). Optionen siehe Eigentümerfrage 1. Klasse hoch.
+- **060c — Puffer der Erfassung (Skizze).** Inhalt aus Fassung 1 Teil B: Puffer für `capture-text` (Wortlaut eines neuen
+  Redebeitrags, je Wortmeldung) und `capture-free-input` (freie Einzelfrage, je Redebeitrag) auf dem Modul dieser Scheibe
+  (`kind` erweitert), ohne Vergleich (keine Vorgängerversion). Verbatimer Wortlaut des Redebeitrags: DSFA V2/V3 kommen mit 060c,
+  nicht hier. Klasse hoch.
 
-**Rückfallteilung:** Liegt der Bau nach Teil A über 3,4 AStd, endet die Scheibe mit Teil A; Teil B wird 060b (eigene kurze
-Spec aus diesem Abschnitt und Entscheidung 12, gleiche Klasse, Plan-Zeile beim Orchestrator). Der Bericht nennt, welcher Fall
-eintrat.
+Plan-Zeilen für 060b und 060c setzt der Orchestrator.
 
 ## Ziel und Entscheidungen vor Bau
 
@@ -92,90 +100,120 @@ Keine Entscheidung bleibt dem Implementierer überlassen.
 
 ### 1. Ort, Form und Konstanten des Puffers
 
-- Ein Modul `apps/web/src/api/draftBuffer.ts` (Ein-/Ausgabe gehört an die Tür der Oberfläche, nicht in ein Feature). Es hat
-  einen **reinen Kern** (Eintrag bilden und prüfen, Kennung bilden, Ablauf, Eigentümerregel) und einen dünnen
-  **IndexedDB-Adapter** hinter einer Schnittstelle `BufferStore` (`getAll`, `put`, `delete`, `clear`). Für Einheitstests gibt
-  es einen Speicher im Arbeitsspeicher derselben Schnittstelle; **keine neue Abhängigkeit** (kein `fake-indexeddb`).
-- Uhr injiziert: `createDraftBuffer({ store, now })`; verdrahtet in `api/index.ts` mit der Wanduhr des Browsers.
+- Ein Modul `apps/web/src/api/draftBuffer.ts` mit einem **reinen Kern** (Eintrag bilden und prüfen, Kennung bilden, Ablauf,
+  Eigentümerregel, Momentaufnahme) und einem dünnen **IndexedDB-Adapter** hinter der Schnittstelle `BufferStore` (`getAll`,
+  `put`, `delete`, `clear`; jede Methode löst erst nach `transaction.oncomplete` auf). Für Einheitstests gibt es einen Speicher im
+  Arbeitsspeicher derselben Schnittstelle; **keine neue Abhängigkeit**.
+- Uhr injiziert: `createDraftBuffer({ store, now })`; verdrahtet in `api/index.ts`. Das Modul importiert **nicht** `mode.ts`,
+  `http.ts`, `actor.ts` oder `auth.ts`: es kennt weder Betriebsart noch Sitzung; `index.ts` ruft es an den Löschstellen auf.
 - Eine Datenbank, ein Objektspeicher, Schemanummer: Modulkonstanten **`BUFFER_DATABASE`**, **`BUFFER_OBJECT_STORE`**,
   **`BUFFER_SCHEMA`**. Die Namen enden **nie** auf `KEY`/`Key` und enthalten weder `token`, `secret`, `auth` noch `api`
-  (gitleaks `generic-api-key`, takt-021); keine neue Allowlist-Zeile. Die Kennung eines Eintrags wird von einer Funktion
-  `entryId(meetingId, ownerId, kind, subjectId)` gebildet, nie als Literal geschrieben.
+  (gitleaks `generic-api-key`, takt-021); keine neue Allowlist-Zeile. Die Kennung eines Eintrags bildet die Funktion
+  `entryId(meetingId, ownerId, questionId)`, nie ein Literal.
 - Die e2e-Datei importiert die drei Konstanten aus dem Modul (kein zweites Literal). Das Modul greift beim Import nicht auf
-  `indexedDB` zu (erst beim ersten Öffnen), damit der Import im Test-Prozess gefahrlos ist.
+  `indexedDB` zu.
 
-### 2. Was ein Eintrag enthält (und nur das)
-
-Whitelist, geprüft beim Schreiben und beim Lesen (`sanitizeEntry`; unbekannte Felder fallen weg, ein Eintrag mit falscher
-Schemanummer oder falscher Form wird gelöscht, ohne Ausnahme nach oben):
+### 2. Was ein Eintrag enthält, und wie er beim Lesen geprüft wird
 
 | Feld | Inhalt |
 |---|---|
 | `id` | aus `entryId(…)` |
 | `schema` | `BUFFER_SCHEMA` |
 | `ownerId` | Akteur-id (`useActor().id`); nötig für die Trennung je Akteur, nie Name, Rolle oder `personId` |
-| `meetingId` | Versammlung der Frage bzw. des Redebeitrags |
-| `kind` | `answer` (Beantwortung und Schreibmodus teilen ihn) · `contribution` (neuer Redebeitrag, je Wortmeldung) · `free_question` (freie Einzelfrage, je Redebeitrag) |
-| `subjectId` | Frage-, Wortmelde- bzw. Redebeitrags-id |
-| `body`, `sources`, `baseVersion`, `baseBody`, `baseSources` | nur `answer`: die Felder des `FocusDraft` (Eingabeform, nie DOM oder HTML, 055b) |
-| `text` | nur `contribution`, `free_question` |
+| `meetingId` | `question.meetingId` (Vertrag: Pflicht ab 0.3.6). Fehlt sie am Datensatz, wird für diese Frage nicht gepuffert (kein Rückfall auf einen anderen Wert) |
+| `questionId` | Frage-id |
+| `body`, `sources`, `baseVersion`, `baseBody`, `baseSources` | die Felder des `FocusDraft` (Eingabeform, nie DOM oder HTML, 055b) |
 | `changedAt` | Wanduhr des Geräts beim letzten Schreiben; nur für Ablauf und die Zeile „gesichert · HH:MM:SS“ |
 
 Nicht gespeichert: Fragetext, Fragenummer, Rednername, Anzeigename, Rolle, Status, `generation`, `rebase`, `key` des
-`FocusDraft`. Keine Zählung, kein Verlauf, keine zweite Fassung: je Kennung genau ein Eintrag, der jüngste Stand.
+`FocusDraft`. Je Kennung genau ein Eintrag, der jüngste Stand; kein Verlauf.
+
+**`sanitizeEntry` (beim Schreiben und beim Lesen; ein abgelehnter Eintrag wird gelöscht, keine Ausnahme nach oben):**
+
+- Schemanummer gleich, `id` gleich `entryId(meetingId, ownerId, questionId)`, alle Zeichenketten-Felder Zeichenketten,
+  `baseVersion` ganze Zahl ≥ 0, `changedAt` gültige Zeit nicht in der Zukunft (mehr als 5 min Vorlauf → abgelehnt).
+- `body` (Eingabeform) und `baseBody` (Speicherform) **strukturell**: Objekt mit `blocks`-Array; jeder Block `paragraph` oder
+  `list` mit Läufen bzw. Listenpunkten aus Läufen; jeder Lauf mit `text` als Zeichenkette und `marks` nur aus `ANSWER_MARKS`;
+  keine anderen Schlüssel. Danach läuft `body` durch `previewAnswer` und `baseBody` durch `normalizeAnswerBodyForRead`; ist
+  das Ergebnis `null`, obwohl Text da war, wird abgelehnt.
+- Obergrenzen: Klartext von `body` höchstens `ANSWER_TEXT_MAX_LENGTH`; `sources` und `baseSources` höchstens 50 Einträge zu je
+  2 000 Zeichen (Vertragsgrenzen), zusammen höchstens 110 000 Zeichen; serialisiert höchstens 256 KiB je Eintrag (sonst nicht
+  geschrieben, Zeile `draft-unavailable`).
+- **Einzige Wege eines wiederhergestellten Inhalts:** `body` ins Feld nur über `bodyToDom` (Neuaufbau mit `generation + 1`),
+  Anzeige im Vergleich nur über `AnswerText`; keine andere Senke, kein `innerHTML`, kein `dangerouslySetInnerHTML`.
 
 ### 3. Geltungsbereich: je Versammlung und je Akteur
 
 Ein Eintrag wird nur für denselben `ownerId` **und** dieselbe `meetingId` wiederhergestellt. Mehrere Tabs desselben Akteurs
-teilen den Eintrag; es gilt der jüngste Schreibvorgang, es gibt keinen Abgleich zwischen Tabs (Nicht-Ziel).
+teilen den Eintrag; es gilt der jüngste Schreibvorgang, kein Abgleich zwischen Tabs (Nicht-Ziel).
 
-### 4. Wann geschrieben und wann gelöscht wird
+### 4. Schreiben und Löschen: nur auf Eingabe der Person
 
-- **Schreiben:** nur ein **veränderter** Entwurf (`isDirty` bzw. nicht leerer Text), entprellt 400 ms nach der letzten
-  Eingabe, sofort bei `pagehide` und bei `visibilitychange` → `hidden`. Ein unveränderter Entwurf löscht seinen Eintrag.
-- **Löschen eines Eintrags:** erfolgreiches Speichern, das den Entwurf unverändert hinterlässt (Basis = Gesendetes,
-  takt-048 Entscheidung 6); „Verwerfen“; „Version n übernehmen“ im Vergleich; erfolgreicher Redebeitrag bzw. erfolgreiche
-  freie Einzelfrage.
-- **Ablauf (Entscheidung, Eigentümerfrage 2):** **14 Stunden** nach `changedAt` (die Höchstdauer einer Sitzung, DSFA V11).
-  Abgelaufene Einträge werden beim ersten Öffnen des Puffers einer Seite gelöscht und nie wiederhergestellt.
-- **Alles eines Geräts löschen:** ausdrückliches Abmelden (der `signOut`-Weg in `api/index.ts`), Demo-Reset (`resetDemo`).
-- **Alle Einträge anderer Akteure löschen** (Eigentümerregel, 090): sobald ein Akteur bestätigt ist, dessen id sich von der
-  vorigen unterscheidet — im HTTP-Betrieb in `onActorChange` (anderes Subject nach Anmeldung), in der Demo beim Personawechsel
-  (`setActor`). Folge in der Demo: Wechsel zu B und zurück zu A findet keinen Puffer (wie takt-048 V6, das Feld zeigt den
-  Datensatz).
-- **Alle Einträge des Akteurs löschen** bei Streamende mit `roles_changed` (die Rechte der Person änderten sich).
-- **Nicht gelöscht** wird bei 401, Sitzungsablauf oder kurzem Netzverlust, solange danach derselbe Akteur bestätigt wird: genau
-  dann ist der Puffer am wertvollsten.
-- **Frage verlässt das Schreiben** (`writingOutcome` → `end`, z. B. weitergeleitet, übergeben): der Eintrag bleibt bis Ablauf;
-  kommt die Frage zurück, gilt Entscheidung 5. Der Toast `focus.write.gone` sagt das (Entscheidung 14) statt „verworfen“.
+- **Schreiben** nur als Folge einer **Eingabe der Person** in Feld oder Quellen (`onBody`, `onSources`), entprellt 400 ms, und nur
+  für einen veränderten Entwurf (`isDirty`). Wird ein Entwurf durch Eingabe wieder unverändert, wird sein Eintrag gelöscht.
+- **Kein Flush bei `pagehide`/`visibilitychange`** (nicht zuverlässig testbar, IndexedDB-Transaktionen beim Entladen werden
+  abgebrochen). Folge: die letzten höchstens 400 ms Eingabe vor einem harten Neuladen können fehlen; die Zeile „gesichert“ sagt
+  ehrlich, welcher Stand liegt (Entscheidung 6).
+- **Löschen eines Eintrags** nur als Folge einer **Handlung der Person**: erfolgreiches Speichern, das den Entwurf unverändert
+  hinterlässt (Basis = Gesendetes, takt-048 Entscheidung 6); „Verwerfen“; „Version n übernehmen“ im Vergleich.
+- **Programmatische Neuaufbauten löschen nie:** Akteurwechsel (090), stiller Neuaufbau bei fremder Version über unverändertem
+  Entwurf (`reseed`), `startDraft`/`newDraft` beim Aufbau, `writingOutcome` → `end`, Abbau der Komponente. Was der Puffer
+  über andere Akteure weiß, regeln allein die Löschstellen unten.
+- **Frage verlässt das Schreiben** (`writingOutcome` → `end`, z. B. weitergeleitet, zur Prüfung gegeben): vor dem Abbau wird der
+  jüngste Stand sofort geschrieben (die Entprellung wird nicht abgewartet); erst nach `oncomplete` sagt der Toast
+  `focus.write.goneKept` „… bleibt auf diesem Gerät bis {time} erhalten“. Scheitert das Schreiben oder ist der Puffer nicht
+  verfügbar, bleibt der heutige Toast `focus.write.gone` („… ist verworfen“). Der Eintrag bleibt bis Ablauf; kommt die Frage
+  zurück, gilt Entscheidung 5.
+- **Ablauf:** **14 Stunden** nach `changedAt` (Höchstdauer einer Sitzung, DSFA V11; Eigentümerfrage 2). Abgelaufene Einträge
+  werden beim Laden der Momentaufnahme gelöscht und nie wiederhergestellt.
 
-### 5. Wiederherstellen und Vorrang
+**Löschstellen** (in `api/index.ts`, über Funktionen des Moduls; jede wartet auf `oncomplete`):
 
-- Der Puffer wird je Seite **einmal** beim Aufbau für Akteur gelesen (`getAll`, gefiltert nach `ownerId`, abgelaufene gelöscht)
-  und als Momentaufnahme im Modul gehalten; Wiederherstellen ist danach synchron. Bis die Antwort da ist (höchstens 300 ms),
-  zeigt das Antwortfeld den vorhandenen Ladezustand; danach geht es ohne Puffer weiter (Entscheidung 9). So springt das Feld
-  nicht von der Vorbelegung auf den gepufferten Text (D8).
-- **Vorrang:** ein passender Eintrag geht der Vorbelegung aus takt-048 vor. Neue reine Funktion in `answers/draft.ts`:
-  `restoreDraft(entry, actorId, question)` baut den `FocusDraft` aus dem Eintrag (`generation` 0) und gleicht ihn sofort mit
-  `onRecord` gegen den aktuellen Datensatz ab:
-  - neuere Version, die dasselbe sagt wie der Puffer → Basis nachziehen, Entwurf unverändert, Eintrag löschen;
-  - neuere Version über verändertem Puffer → `rebase` steht (Entscheidung 7);
-  - Puffer sagt dasselbe wie seine Basis → keine Wiederherstellung, Eintrag löschen;
-  - Frage ohne `answer.draft` in `_actions` → keine Wiederherstellung, Eintrag bleibt (Entscheidung 4).
-- Nach einer Wiederherstellung steht unter der Überschrift des Felds die Zeile **„Ungespeicherter Entwurf von HH:MM
-  wiederhergestellt“** (`draft-restored`, `text-ink-600`, Uhrzeit Mono) mit „Verwerfen“ wie heute.
-- Erfassung: `contribution` füllt `capture-text` beim Öffnen des Formulars derselben Wortmeldung, `free_question` füllt
-  `capture-free-input` beim Anzeigen desselben Redebeitrags; dieselbe Zeile, sonst unverändert.
+| Anlass | Wirkung | Ort |
+|---|---|---|
+| Momentaufnahme für einen **bestätigten** Akteur geladen (Start, neue Anmeldung, Neuladen) | `purgeOthers(actorId)`: alle Einträge anderer `ownerId` gelöscht; idempotent. Deckt den HTTP-Neuladefall ab, in dem die vorige id unbekannt ist | Modul, beim Laden |
+| ausdrückliches Abmelden | `store.clear()` **bevor** die Abmeldeanfrage gesendet wird | `signOut` in `index.ts` |
+| Zustand `noRole` (angemeldet ohne Rolle) | `store.clear()` | `onActorChange(undefined)` mit Zustand `noRole` |
+| Streamende `forbidden` | `store.clear()` | `onStreamEnd` |
+| Streamende `roles_changed` | kein Sofortlöschen; Merker „nachprüfen“: liest eine Ansicht danach eine Frage mit Eintrag, deren `_actions` kein `answer.draft` mehr trägt, wird der Eintrag gelöscht (Absicht: löschen, wo Entwerfen nicht mehr angeboten wird; ohne `roles_changed` bleibt er, Entscheidung 4) | Modul plus Antwortansichten |
+| Demo-Reset | `await store.clear()`, erst nach `oncomplete` `location.reload()` | `resetDemo` in `index.ts` |
+| 401, Sitzungsablauf, Streamende `session`/`unauthorized`, Netzverlust | **nichts**; nach erneuter Anmeldung desselben Akteurs wird wiederhergestellt; ein anderer Akteur löst `purgeOthers` aus | — |
+
+**Nicht in `setActor`** (Blocker 1): der Wechsel in `seedIfEmpty` zur Administration und zurück läuft vor dem Laden der
+Momentaufnahme und löst nichts aus. In der Demo greift `purgeOthers` beim Laden für die bestätigte Persona: Wechsel zu B lädt die
+Momentaufnahme für B und löscht die Einträge von A; zurück bei A ist nichts mehr da (wie takt-048 V6). Die Momentaufnahme lädt neu
+bei jedem Wechsel der Akteur-id (Vergleich über `id`, R4), nicht bei einem gleichen Akteur aus einer Auffrischung.
+
+### 5. Momentaufnahme und Wiederherstellen
+
+- Die Momentaufnahme ist ein Speicher im Modul: einmal je bestätigtem Akteur geladen (`getAll`, Ablauf, `sanitizeEntry`,
+  `purgeOthers`), danach **write-through**: jedes `put` und `delete` ändert zuerst die Momentaufnahme und dann den Speicher; eine
+  scheiternde Transaktion setzt den Eintrag der Momentaufnahme zurück und schaltet den Puffer ab (Entscheidung 8). Lesen ist
+  danach synchron (`entryFor(meetingId, questionId)`).
+- **Wo immer ein Entwurf entsteht** (Liste im Befund), wird zuerst `restoreDraft(entry, actorId, question, generation)` aus
+  `answers/draft.ts` gefragt; ohne passenden Eintrag gilt die Vorbelegung aus takt-048. Ausnahme: nach „Verwerfen“ und „Version n
+  übernehmen“ gibt es keinen Eintrag mehr (Entscheidung 4).
+- **Späte Momentaufnahme:** Ist sie beim Entstehen des Entwurfs noch nicht geladen, und der Entwurf ist bei ihrer Ankunft noch
+  unverändert, ersetzt der wiederhergestellte Entwurf ihn mit `generation + 1` (ein Neuaufbau des Felds, keine Zusammenführung).
+  Hat die Person schon getippt, bleibt ihr Text; der nächste Schreibvorgang überschreibt den Eintrag.
+- `restoreDraft` gleicht den Eintrag sofort mit `onRecord` gegen den aktuellen Datensatz ab:
+  - neuere Version, die dasselbe sagt wie der Eintrag → Basis nachgezogen, Entwurf unverändert, Eintrag gelöscht (Folge der
+    Wiederherstellung, kein programmatischer Neuaufbau eines Entwurfs der Person);
+  - neuere Version über verändertem Eintrag → `rebase` steht (Entscheidung 7);
+  - Eintrag sagt dasselbe wie seine Basis → keine Wiederherstellung, Eintrag gelöscht;
+  - Frage ohne `answer.draft` in `_actions` → keine Wiederherstellung, Eintrag bleibt (außer nach `roles_changed`, Entscheidung 4).
+- Nach einer Wiederherstellung steht unter der Überschrift des Felds **„Ungespeicherter Entwurf von HH:MM wiederhergestellt“**
+  (`draft-restored`, `text-ink-600`, Uhrzeit Mono) mit „Verwerfen“ wie heute.
 
 ### 6. Zeile „auf diesem Gerät gesichert“
 
-Solange ein veränderter Entwurf gepuffert ist, steht neben der Speichern-Schaltfläche (Beantwortung, Schreibmodus) bzw. unter
-dem Feld (Erfassung) leise **„Auf diesem Gerät gesichert · HH:MM:SS“** (`draft-kept`, `text-2xs text-ink-600`, Zeit Mono,
-`aria-live` aus: kein Ansagen bei jedem Tastendruck). Ist der Puffer nicht verfügbar, steht dort einmal **„Keine Sicherung auf
-diesem Gerät möglich“** (`draft-unavailable`). Ohne Änderung keine Zeile. Die Zeile ist zugleich das Warte-Signal der e2e vor
-einem Neuladen.
+Solange ein veränderter Entwurf gepuffert ist, steht neben der Speichern-Schaltfläche (Beantwortung, Schreibmodus) leise
+**„Auf diesem Gerät gesichert · HH:MM:SS“** (`draft-kept`, `text-2xs text-ink-600`, Zeit Mono, kein `aria-live`). Die Zeit ist
+das `changedAt` des Eintrags und erscheint **erst nach `oncomplete`** der Transaktion, nie beim Absenden. Ist der Puffer nicht
+verfügbar, steht dort einmal **„Keine Sicherung auf diesem Gerät möglich“** (`draft-unavailable`). Ohne Änderung keine Zeile. Die
+Zeile ist zugleich das Warte-Signal der e2e vor einem Neuladen.
 
-### 7. Fassungsvergleich (412- und Live-Fall)
+### 7. Fassungsvergleich (412 und Live-Version)
 
 Der Begriff in der Oberfläche ist **„Fassungen vergleichen“**, nie „Zusammenführen“/„Merge“ (das Hauswort „Zusammengeführt“
 gehört dem Zusammenführen von Einzelfragen, Glossar).
@@ -183,133 +221,96 @@ gehört dem Zusammenführen von Einzelfragen, Glossar).
 **Wann er öffnet:**
 
 1. **Live:** Kommt eine fremde neuere Version über verändertem Text (`rebase` wird wahr), bleibt das Feld, wie es ist (kein
-   Fokuswechsel, keine Verdrängung beim Tippen). Das vorhandene Band (`answer-editor-rebase`, `focus-rebase`) trägt statt
-   „Neu laden“ die Schaltfläche **„Vergleichen“** (neue optionale Beschriftung an `StaleBanner`). Das alte „Neu laden“, das
-   den Text kommentarlos verwarf, entfällt.
-2. **Speichern bei stehendem Band:** „Entwurf speichern“ bzw. Strg+Enter sendet **nicht**, sondern öffnet den Vergleich.
-   (Änderung gegenüber takt-048 Entscheidung 7: dort blieb Speichern bei sichtbarem Hinweis möglich.)
-3. **412 auf das eigene Speichern:** Nach dem Neuladen ordnet die neue reine Funktion `conflictAfterRefusal(draft, question)`
-   in `answers/draft.ts` ein:
-   - neuere Antwortversion, die etwas anderes sagt als der Entwurf → Vergleich öffnet sofort (die Person hat gerade gehandelt,
-     der Fokus darf wandern); das Band „Stand veraltet“ der Seite entfällt dann (ein Hinweis, nicht zwei);
-   - neuere Version, die dasselbe sagt → still nachziehen (wie `onRecord`), kein Vergleich, Entwurf unverändert;
-   - keine neuere Antwortversion (der Datensatz bewegte sich anders, etwa durch eine Übernahme) → das vorhandene „Stand
-     veraltet“ bleibt, der Entwurf bleibt, ein zweiter Klick speichert gegen den neuen Stand.
+   Fokuswechsel). Das vorhandene Band (`answer-editor-rebase`, `focus-rebase`) trägt statt „Neu laden“ die Schaltfläche
+   **„Vergleichen“** (neue optionale Beschriftung an `StaleBanner`). Das alte „Neu laden“, das den Text kommentarlos verwarf,
+   entfällt.
+2. **Speichern bei stehendem Band:** „Entwurf speichern“ bzw. Strg+Enter sendet **nicht**, sondern öffnet den Vergleich
+   (ersetzt takt-048 Entscheidung 7). In `WritingMode` heißt das: `canSave` bleibt wie heute (`mayDraft && dirty && text !== ''
+   && !busy`), die Speicheraktion prüft zuerst `rebase` und öffnet dann den Vergleich; in `QuestionDetail` ebenso vor `onAction`.
+3. **412 auf das eigene Speichern, ohne Änderung an `useWriteDoor`:** Beide Seiten übergeben beim Speichern `onProblem` an `run`.
+   Bei 412 merkt sich die Ansicht `refused = { questionId, version }` (Frage und Datensatzversion beim Klick) und gibt `false`
+   zurück (Standardverhalten: Neuladen, Band). **Zum Zeitpunkt des 412** wird mit dem gezeigten Datensatz eingeordnet, **und
+   erneut beim nächsten Datensatz derselben Frage** mit `version > refused.version` (der neu geladene); die reine Funktion
+   `conflictAfterRefusal(draft, question)` in `answers/draft.ts` sagt:
+   - neuere Antwortversion, die etwas anderes sagt als der Entwurf → `compare`: Vergleich öffnet sofort (die Person hat gehandelt,
+     der Fokus darf wandern), das Band „Stand veraltet“ der Seite wird über `clearStale` ausgeblendet (ein Hinweis, nicht zwei);
+   - neuere Version, die dasselbe sagt → `rebase-silent`: still nachziehen (wie `onRecord`), kein Vergleich;
+   - keine neuere Antwortversion (der Datensatz bewegte sich anders) → `retry`: das vorhandene „Stand veraltet“ bleibt, der
+     Entwurf bleibt, ein zweiter Klick speichert gegen den neuen Stand.
+   `refused` fällt nach der Einordnung oder bei Wechsel der gezeigten Frage oder des Akteurs (010d Ziel 3).
 
-**Was er zeigt** (neue Komponente `features/answers/CompareVersions.tsx`, in Beantwortung und Schreibmodus an der Stelle des
-Felds, im selben Rahmen):
+**Was er zeigt** (neue Komponente `features/answers/CompareVersions.tsx`, in Beantwortung und Schreibmodus an der Stelle des Felds,
+im selben Rahmen):
 
-- Überschrift „Fassungen vergleichen“ (`compare-title`, fokussierbar mit `tabIndex=-1`), ein Satz: „Während Sie geschrieben
-  haben, wurde Version {n} gespeichert. Wählen Sie, womit Sie weiterarbeiten.“
-- Zwei gleich breite Spalten nebeneinander (ab 1024 px; darunter untereinander): links **„Ihre Fassung · nicht gespeichert“**
-  (`compare-mine`), rechts **„Version {n} · {Autor} · {HH:MM}“** (`compare-theirs`; Version und Zeit Mono, Autor wie in der
-  Versionsliste der Beantwortung). Beide über `AnswerText` (055b, nur Textknoten) mit ihren Quellen darunter. Text ist
-  markierbar, damit man Teile hinüberkopieren kann.
-- Darunter ein geschlossenes `<details>` „Unterschiede Wort für Wort“ mit dem vorhandenen Wortdiff (`wordDiff` aus
-  `answers/lib.ts`, Klartextprojektion, Version n → Ihre Fassung), gleiche Darstellung wie „Änderung gegenüber Version n-1“.
-- Keine neue Farbe, kein neues Token: neutraler Rahmen (`border-line-strong`, `bg-sunken`), keine Bernsteinfläche im Vergleich
-  selbst (der Konflikt ist mit dem Band schon gesagt, D4).
+- Überschrift „Fassungen vergleichen“ (`compare-title`, `tabIndex=-1`), ein Satz: „Während Sie geschrieben haben, wurde Version
+  {n} gespeichert. Wählen Sie, womit Sie weiterarbeiten.“
+- Zwei gleich breite Spalten (ab 1024 px; darunter untereinander): links **„Ihre Fassung · nicht gespeichert“** (`compare-mine`),
+  rechts **„Version {n} · {Autor} · {HH:MM}“** (`compare-theirs`; Version und Zeit Mono, Autor wie in der Versionsliste der
+  Beantwortung). Beide nur über `AnswerText`, Quellen darunter. Text markierbar (Teile hinüberkopieren).
+- **Rechte Spalte folgt Live-Aktualisierungen:** kommt während des offenen Vergleichs Version n+1, zeigt die rechte Spalte n+1
+  (Überschrift und Satz mit der neuen Nummer); der Fokus bleibt, wo er ist; eine höfliche Live-Region an der Überschrift der
+  rechten Spalte sagt die neue Nummer einmal an.
+- Ein geschlossenes `<details>` „Unterschiede Wort für Wort“ mit `wordDiff` (`answers/lib.ts`, Klartext, Version n → Ihre
+  Fassung), Darstellung wie „Änderung gegenüber Version n-1“.
+- Keine neue Farbe, kein Token: neutraler Rahmen (`border-line-strong`, `bg-sunken`), keine Bernsteinfläche im Vergleich (D4).
 
-**Entscheidungen in der Ansicht** (genau eine primäre Aktion, D2):
+**Entscheidungen** (genau eine primäre Aktion, D2; alle lokal, keine Schreiboperation):
 
-- **„Mit meiner Fassung weiter“** (primär, `compare-keep-mine`): Basis wird Version n (`draftBase(question)`), `rebase` falsch,
-  Text bleibt, Feld neu aufgebaut (`generation + 1`), Fokus ans Ende des Felds. Speichern legt dann Version n+1 an; Version n
-  bleibt in der Versionsliste. Der Hinweis `answers.editor.hint` (Freigabe erlischt) steht wie heute, wenn eine Freigabe besteht.
-- **„Version {n} übernehmen“** (sekundär, `compare-take-theirs`) mit dem Satz darunter „Ihre Fassung wird dabei verworfen.“:
-  Entwurf = Version n (`generation + 1`), Puffer-Eintrag gelöscht, Fokus ins Feld.
-- **„Zurück zum Text“** (Geisterknopf, `compare-back`) und **Escape**: zurück zum Feld ohne Entscheidung; das Band bleibt, ein
-  erneutes Speichern öffnet den Vergleich wieder.
-- Keine Schreiboperation in der Ansicht selbst; alle drei Wege sind lokal und wiederholbar.
+- **„Mit meiner Fassung weiter“** (primär, `compare-keep-mine`): Basis wird **die Version, die die rechte Spalte gerade zeigt**
+  (`shownVersion`, nicht neu aus dem Datensatz gelesen), `rebase` falsch, Text bleibt, Feld neu aufgebaut (`generation + 1`),
+  Fokus ans Ende des Felds. Danach sofort `onRecord` gegen den aktuellen Datensatz: ist dort inzwischen n+1, steht `rebase`
+  wieder (Band, kein stilles Überschreiben). Reine Funktion `keepMine(draft, shownVersion, question)` in `answers/draft.ts`.
+  Speichern legt dann die nächste Version an; Version n bleibt in der Versionsliste; `answers.editor.hint` steht wie heute.
+- **„Version {n} übernehmen“** (sekundär, `compare-take-theirs`) mit dem Satz „Ihre Fassung wird dabei verworfen.“: Entwurf =
+  gezeigte Version (`generation + 1`), Eintrag gelöscht, Fokus ins Feld; danach `onRecord` wie oben.
+- **„Zurück zum Text“** (Geisterknopf, `compare-back`) und **Escape**: zurück zum Feld ohne Entscheidung; das Band bleibt. Der
+  Tastaturhandler ruft `preventDefault()`, damit das Escape nicht zusätzlich den Schreibmodus verlässt (`shouldLeaveWriting`
+  prüft `defaultPrevented`).
 
-**Fokus:** Öffnet der Vergleich durch eine Handlung der Person (Klick „Vergleichen“, Speichern, 412 nach eigenem Speichern),
-geht der Fokus auf `compare-title`; nie durch eine Live-Aktualisierung (6.9). Nach jeder Entscheidung liegt der Fokus im Feld.
+**Fokus:** Öffnet der Vergleich durch eine Handlung der Person (Klick „Vergleichen“, Speichern, 412 nach eigenem Speichern), geht
+der Fokus auf `compare-title`; nie durch eine Live-Aktualisierung (6.9). Nach jeder Entscheidung liegt der Fokus im Feld.
 
-### 8. Präsenz „wird gerade bearbeitet“ über die Übernahme
+### 8. Ausfall und Grenzen
 
-**Kein Vertragsschritt.** `Claim` trägt mit `actorId`, `claimedAt`, `expiresAt` genau, was eine neutrale Präsenzanzeige braucht:
-ob eine **andere** Person übernommen hat und seit wann; der Ablauf kommt vom Dienst, der Live-Speicher weckt zum Ablauf. Einen
-**Namen** trägt der Vertrag nicht, und `actorId` ist im HTTP-Betrieb ein technisches Subject, das nicht angezeigt wird. Ein Name
-bräuchte ein neues Feld (`Claim.displayName`, aufgelöst wie `Actor.displayName`) — Vertragsänderung, Klasse hoch, eigene
-Scheibe, Eigentümerfrage 1. Standard: ohne Namen.
-
-**Anzeige** (neue Komponente `components/PresenceLine.tsx`, `presence-line`): Ist `claim` vorhanden, nicht abgelaufen (der
-Dienst liefert abgelaufene nicht aus; die Komponente prüft zusätzlich gegen die Wanduhr) und `claim.actorId !== useActor().id`,
-steht über dem Antwortfeld bzw. im Kopf des Redebeitrags eine Zeile: Symbol `PencilLine` (lucide, 14 px, `aria-hidden`) und
-**„Wird gerade von einer anderen Person bearbeitet · seit HH:MM“** (`text-[13px] text-ink-700`, Zeit Mono). Neutral, keine
-Warnfarbe: die Sperre ist weich, Schreiben bleibt erlaubt (R-CLAIM-01 sperrt nur die zweite Übernahme). Eigene Übernahme:
-keine Zeile. Orte: `QuestionDetail` (über dem Feld; auch wenn das Feld nicht angeboten wird, weil die Person nur liest),
-`FocusDetail`, `WritingMode`, `ContributionPane` (Kopf). Nicht in Listen (Eigentümerfrage 6).
-
-**Wann die Oberfläche übernimmt** (neuer Haken `api/useClaim.ts` mit reinem Kern `api/presence.ts`; gilt für Frage und
-Redebeitrag gleich):
-
-- Nur wenn `_actions` der Ressource `question.claim` bzw. `contribution.claim` enthält (R4).
-- **Erste Änderung**, nicht das Öffnen: Frage — der Entwurf wird zum ersten Mal verändert (auch nach Wiederherstellung, sobald
-  getippt wird); Redebeitrag — erste Eingabe in `capture-free-input` oder Beginn einer Markierung in `ContributionText`
-  (Eigentümerfrage 5).
-- **Verlängern** nur, wenn die eigene Übernahme in weniger als 3 Minuten abläuft **und** seit der letzten Übernahme getippt
-  wurde; kein Zeitgeber, kein Herzschlag. Ein Schreibender erzeugt so höchstens eine Übernahme je rund 7 Minuten Tippen.
-- **Zurückgeben**, wenn die Person die Frage bzw. den Redebeitrag verlässt (andere Auswahl, Schreibmodus geschlossen, Seite
-  gewechselt), bei „Verwerfen“ und bei „Version n übernehmen“. Nur solange der aktuelle Akteur der ist, der übernommen hat (nach
-  einem Akteurwechsel kein Versuch, R-CLAIM-02); kein Versuch beim Entladen der Seite (kein `sendBeacon`, kein `keepalive`):
-  der Ablauf nach 10 Minuten räumt auf. Speichern gibt nicht zurück (die Person schreibt meist weiter).
-- **Leise:** nicht über die Schreibtür (`run` zeigt Erfolgstoasts und sperrt die Schaltflächen), sondern direkt über `HvApi` mit
-  `ifMatch: etagOf(version)` des gezeigten Datensatzes. 409 R-CLAIM-01 (andere Person hält) → kein Toast, die Präsenzzeile
-  zeigt es; 409 R-CLAIM-02, 412, 428, Netzfehler → kein Toast, nächster Versuch frühestens bei der nächsten Eingabe nach 30 s.
-  Höchstens eine Übernahme bzw. Rückgabe je Ansicht unterwegs (Ref).
-- **Speichern wartet auf die eigene Übernahme:** Weil eine Übernahme `version` erhöht, würde ein Speichern, das während einer
-  laufenden Übernahme abgeschickt wird, am eigenen 412 scheitern. Solange eine eigene Übernahme unterwegs ist **und** bis der
-  gezeigte Datensatz ihre Version zeigt, ist Speichern gesperrt (`canSave` erhält `claimPending`; `aria-disabled`, Fokus
-  bleibt, takt-008). Scheitert die Übernahme, fällt die Sperre sofort. Dasselbe gilt in der Erfassung für `captureQuestions`.
-
-### 9. Ausfall und Grenzen des Puffers
-
-- IndexedDB fehlt, ist gesperrt, das Kontingent ist voll oder ein Vorgang scheitert → der Puffer schaltet sich für die Seite
-  ab, keine Ausnahme erreicht die Ansicht, Zeile `draft-unavailable` (Entscheidung 6). Kein Rückfall auf `localStorage`.
-- Ein Eintrag ist höchstens so groß wie der Entwurf; Einträge über 256 KiB serialisiert werden nicht geschrieben (Zeile
-  `draft-unavailable`), damit ein eingefügtes Riesendokument das Kontingent nicht füllt.
+- IndexedDB fehlt, ist gesperrt, das Kontingent ist voll, ein Vorgang scheitert oder ein Eintrag ist zu groß → der Puffer schaltet
+  sich für die Seite ab, keine Ausnahme erreicht eine Ansicht, Zeile `draft-unavailable`. Kein Rückfall auf `localStorage`.
 - **Synchronisiert nie:** kein Netzaufruf mit Pufferinhalt, kein `BroadcastChannel`, kein `storage`-Ereignis, kein Service
-  Worker; das Modul importiert nichts aus `http.ts`.
+  Worker.
 
-### 10. Doppelklickschutz
+### 9. Doppelklickschutz
 
 - Speichern (Beantwortung, Schreibmodus, Strg+Enter mit Tastenwiederholung) bleibt über die Schreibtür geschützt; neu ist der
   Nachweis mit echtem Doppelklick in beiden Projekten (genau eine neue Version).
-- Vergleich: die Entscheidungen sind lokal und schließen die Ansicht; ein zweiter Klick trifft das Feld und bewirkt nichts.
-- Übernahme/Rückgabe: höchstens eine unterwegs je Ansicht (Entscheidung 8).
-- Erfassung: „Redebeitrag erfassen“ per Doppelklick und Enter doppelt in der freien Eingabe legen genau einen Redebeitrag bzw.
-  eine Einzelfrage an (vorhandene Refs; neu ist der Nachweis).
+- Vergleich: die Entscheidungen schließen die Ansicht; ein zweiter Klick trifft das Feld und bewirkt nichts (Nachweis).
 
-### 11. Akteurwechsel und Abmelden (090)
+### 10. Akteurwechsel (090)
 
-Zusätzlich zu Entscheidung 4: die Momentaufnahme im Modul wird beim Akteurwechsel verworfen und für den neuen Akteur neu
-gelesen; die vorhandenen Rücksetzungen (090, 010d, takt-048) bleiben. Ein Entwurf des vorigen Akteurs erscheint nie, weder aus
-dem Speicher der Seite noch aus dem Puffer. Nach ausdrücklichem Abmelden ist der Objektspeicher leer.
+Die Momentaufnahme wird bei jeder neuen Akteur-id neu geladen (Entscheidung 4); die vorhandenen Rücksetzungen (090, 010d,
+takt-048) bleiben. Ein Entwurf des vorigen Akteurs erscheint nie, weder aus dem Speicher der Seite noch aus dem Puffer.
 
-### 12. Erfassung (Teil B)
+### 11. Restrisiko Aufbewahrung
 
-- Puffer für `capture-text` (`kind` `contribution`, `subjectId` = Wortmeldung) und `capture-free-input` (`free_question`,
-  `subjectId` = Redebeitrag), Regeln wie oben; Wiederherstellung nach Entscheidung 5.
-- Übernahme des Redebeitrags während der Atomisierung nach Entscheidung 8; Präsenzzeile im Kopf von `ContributionPane`.
-- **Kein Fassungsvergleich in der Erfassung:** eine freie Einzelfrage und ein neuer Redebeitrag haben keine Vorgängerversion,
-  gegen die man vergleichen könnte; das 412-Verhalten aus 028 (Eingabe bleibt, Band, neu laden) bleibt unverändert.
+Innerhalb von 14 Stunden liegt ein ungespeicherter Entwurf im Klartext auf dem Gerät, auch nachdem die Person es ohne Abmelden
+verlassen hat (Sitzungsablauf löscht nicht, Entscheidung 4). Das steht als Restrisiko in T-G1-I-08 und in DSFA V5; Begrenzung
+durch Abmelden, Geräterichtlinie (E33) und Sitzungssperre (029); Entscheidung über Dauer und Verschlüsselung beim Eigentümer
+(Fragen 2 und 3).
 
-### 13. Änderung an takt-048 und 054
+### 12. Änderung an takt-048 und 054
 
-- takt-048 Entscheidung 7 („Speichern bei sichtbarem Hinweis möglich“) wird ersetzt durch Entscheidung 7 Punkt 2 dieser Spec.
+- takt-048 Entscheidung 7 („Speichern bei sichtbarem Hinweis möglich“) wird ersetzt durch Entscheidung 7 Punkt 2.
 - takt-048 „Später: ein gepufferter Entwurf aus 060 geht der Vorbelegung vor“ ist Entscheidung 5.
-- 054 `focus.write.gone`: der Text bleibt erhalten (Entscheidung 4), der Toast sagt es.
+- 054 `focus.write.gone`: bleibt als Rückfall; neu `focus.write.goneKept` (Entscheidung 4).
 
-### 14. Texte (i18n, de und en-US)
+### 13. Texte (i18n, de und en-US)
 
-Neue Schlüssel (14), Wortlaut verbindlich, Hausvokabular:
+Neue Schlüssel (14), Wortlaut verbindlich, Hausvokabular. Die Shell-Schlüssel tragen das vorhandene Präfix `common` (Test (d) in
+`parity.test.ts` kennt kein Präfix `draft`; die Präfixliste bleibt unverändert).
 
 | Schlüssel | de | en |
 |---|---|---|
-| `common.presence.other` (shell) | Wird gerade von einer anderen Person bearbeitet · seit {time} | Being edited by someone else · since {time} |
-| `common.draft.kept` (shell) | Auf diesem Gerät gesichert · {time} | Kept on this device · {time} |
-| `common.draft.restored` (shell) | Ungespeicherter Entwurf von {time} wiederhergestellt | Unsaved draft from {time} restored |
-| `common.draft.unavailable` (shell) | Keine Sicherung auf diesem Gerät möglich | Cannot keep a copy on this device |
+| `common.draft.kept` | Auf diesem Gerät gesichert · {time} | Kept on this device · {time} |
+| `common.draft.restored` | Ungespeicherter Entwurf von {time} wiederhergestellt | Unsaved draft from {time} restored |
+| `common.draft.unavailable` | Keine Sicherung auf diesem Gerät möglich | Cannot keep a copy on this device |
 | `answers.editor.compare` | Vergleichen | Compare |
 | `answers.compare.title` | Fassungen vergleichen | Compare versions |
 | `answers.compare.intro` | Während Sie geschrieben haben, wurde Version {version} gespeichert. Wählen Sie, womit Sie weiterarbeiten. | Version {version} was saved while you were writing. Choose what to continue with. |
@@ -320,93 +321,84 @@ Neue Schlüssel (14), Wortlaut verbindlich, Hausvokabular:
 | `answers.compare.takeTheirsHint` | Ihre Fassung wird dabei verworfen. | Your text will be discarded. |
 | `answers.compare.back` | Zurück zum Text | Back to the text |
 | `answers.compare.diff` | Unterschiede Wort für Wort | Word-by-word differences |
+| `focus.write.goneKept` | {number} liegt nicht mehr bei Ihnen. Ihr ungespeicherter Text bleibt auf diesem Gerät bis {time} erhalten. | {number} is no longer with you. Your unsaved text stays on this device until {time}. |
 
-Geänderter Wortlaut (kein neuer Schlüssel): `focus.write.gone` → „{number} liegt nicht mehr bei Ihnen. Ihr ungespeicherter Text
-bleibt auf diesem Gerät bis {time} erhalten.“ / „{number} is no longer with you. Your unsaved text stays on this device until
-{time}.“ Schlüsselzahl in `parity.test.ts` (f): 621 → 635. Die Präsenzzeile in der Erfassung nutzt `common.presence.other`. Die Schlüssel der Shell tragen das vorhandene Präfix `common` (Test (d) in `parity.test.ts` kennt kein Präfix `presence` oder `draft`; die Präfixliste bleibt unverändert).
+`focus.write.gone` bleibt unverändert (Rückfall). Schlüsselzahl in `parity.test.ts` (f): 621 → 635.
 
-### 15. Glossar
+### 14. Glossar
 
-Drei Zeilen: „Fassungen vergleichen | Compare versions | `CompareVersions`, `conflictAfterRefusal` | Merge, Zusammenführen (gehört
-den Einzelfragen)“; „Auf diesem Gerät gesichert | Kept on this device | `draftBuffer` (IndexedDB, je Akteur und Versammlung) |
-Cache, Autosave“; „Übernahme (weiche Sperre), wird gerade bearbeitet | Claim, being edited | `Claim`, `claimQuestion`,
-`claimContribution`, `PresenceLine` | Sperre, Lock (sie sperrt nichts), Checkout“.
+Zwei Zeilen: „Fassungen vergleichen | Compare versions | `CompareVersions`, `conflictAfterRefusal`, `keepMine` | Merge,
+Zusammenführen (gehört den Einzelfragen)“; „Auf diesem Gerät gesichert | Kept on this device | `draftBuffer` (IndexedDB, je
+Akteur und Versammlung) | Cache, Autosave“. Die Zeile zur Übernahme kommt mit 060b.
 
 ## Nicht-Ziele
 
-- Kein Vertrag, kein Kern, kein Dienst, keine Ereignisänderung; kein Name in der Präsenz (Eigentümerfrage 1); keine Änderung an
-  R-CLAIM-01/02, an der Dauer der Übernahme, an Rechten, Übergängen, Seed.
-- Keine Präsenz in Listen (Fokusliste, Arbeitsliste, Steuerung) und keine Liste „wer arbeitet woran“ (Eigentümerfrage 6;
-  Auswertungsverbot je Person).
+- Keine Übernahme, keine Präsenzzeile, keine Wartesperre (060b); kein Puffer der Erfassung (060c).
+- Kein Vertrag, kein Kern, kein Dienst, keine Ereignisänderung; keine Änderung an Rechten, Übergängen, Seed.
 - Kein Abgleich zwischen Tabs oder Geräten, kein Service Worker, kein Offline-Schreiben mit Warteschlange (058 für die Bühne).
-- Keine Verschlüsselung des Puffers (Eigentümerfrage 3); kein Ausschluss geschützter Fragen, weil es die Vertraulichkeitsstufe
-  an der Frage noch nicht gibt (Hinweis an 047, Eigentümerfrage 4).
-- Kein Puffer für Begründungsfelder (Verweigerung, Rückgabe, Bühne), Dialoge, Suche, Registrierung; nur Antwortentwurf, neuer
-  Redebeitrag, freie Einzelfrage.
-- Keine Änderung an `useWriteDoor` und an der Fokuslogik nach Übergaben (takt-043, takt-049).
+- Keine Verschlüsselung (Eigentümerfrage 3); kein Ausschluss geschützter Fragen, weil es die Vertraulichkeitsstufe an der Frage
+  noch nicht gibt (Hinweis an 047, Eigentümerfrage 4).
+- Kein Puffer für Begründungsfelder, Dialoge, Suche, Registrierung.
+- Keine Änderung an `useWriteDoor`, `focus.ts` und an der Fokuslogik nach Übergaben (takt-043, takt-049).
 - Kein Kern-Guard „wortgleiche Version“ (takt-048 Frage 1 bleibt offen).
 
 ## Files allowed
 
-Teil A — Tür, Puffer, Präsenz:
+Tür und Puffer:
 
 - `apps/web/src/api/draftBuffer.ts` (neu), `apps/web/src/api/draftBuffer.test.ts` (neu)
-- `apps/web/src/api/presence.ts` (neu), `apps/web/src/api/presence.test.ts` (neu)
-- `apps/web/src/api/useClaim.ts` (neu)
-- `apps/web/src/api/index.ts` (nur: Puffer verdrahten; Löschen beim Abmelden, bei anderem bestätigtem Akteur, bei Streamende
-  wegen geänderter Rechte und im Demo-Reset)
-- `apps/web/src/api/actor.ts` (nur: Löschen der Einträge anderer Akteure beim Personawechsel der Demo; kein neuer Rollenname)
+- `apps/web/src/api/index.ts` (nur: Puffer verdrahten, Laden der Momentaufnahme bei bestätigtem Akteur, die Löschstellen aus
+  Entscheidung 4)
 
-Teil A — Komponenten:
+Komponenten:
 
-- `apps/web/src/components/PresenceLine.tsx` (neu), `apps/web/src/components/DraftNote.tsx` (neu, Zeilen „gesichert“,
-  „wiederhergestellt“, „nicht möglich“), `apps/web/src/components/PresenceLine.test.tsx` (neu, prüft beide Komponenten)
+- `apps/web/src/components/DraftNote.tsx` (neu, Zeilen „gesichert“, „wiederhergestellt“, „nicht möglich“),
+  `apps/web/src/components/DraftNote.test.tsx` (neu)
 - `apps/web/src/components/StaleBanner.tsx` (nur eine optionale Beschriftung der Schaltfläche)
 - `apps/web/src/components/index.ts` (nur die Exporte)
 
-Teil A — Beantwortung und Fokusansicht:
+Beantwortung und Fokusansicht:
 
 - `apps/web/src/features/answers/CompareVersions.tsx` (neu), `apps/web/src/features/answers/CompareVersions.test.tsx` (neu)
 - `apps/web/src/features/answers/draft.ts`, `apps/web/src/features/answers/draft.test.ts`
 - `apps/web/src/features/answers/QuestionDetail.tsx`, `apps/web/src/features/answers/QuestionDetail.test.tsx`
 - `apps/web/src/features/answers/AnswerEditor.tsx`
-- `apps/web/src/features/answers/Page.tsx` (nur: das Band „Stand veraltet“ entfällt, solange das Detail den Vergleich zeigt)
-- `apps/web/src/features/focus/Page.tsx` (nur Entwurf, Puffer, Übernahme, Vergleich; Fokuslogik aus takt-043 unverändert)
+- `apps/web/src/features/answers/Page.tsx` (nur: onProblem beim Speichern weiterreichen und das Band „Stand veraltet“ ausblenden,
+  solange das Detail den Vergleich zeigt)
+- `apps/web/src/features/focus/Page.tsx` (nur Entwurf, Puffer, onProblem, Vergleich, Toast beim Verlassen; Fokuslogik aus
+  takt-043 unverändert)
 - `apps/web/src/features/focus/WritingMode.tsx`, `apps/web/src/features/focus/WritingMode.test.tsx`
-- `apps/web/src/features/focus/FocusDetail.tsx`, `apps/web/src/features/focus/FocusDetail.test.tsx` (nur die Präsenzzeile)
-
-Teil B — Erfassung:
-
-- `apps/web/src/features/capture/ContributionPane.tsx`, `apps/web/src/features/capture/ContributionPane.test.tsx`
-- `apps/web/src/features/capture/Page.tsx` (nur Übernahme des Redebeitrags, Wartesperre, Präsenz)
-- `apps/web/src/features/capture/ContributionText.tsx` (nur der Aufruf „Markierung beginnt“ für die Übernahme)
 
 Sprache:
 
 - `apps/web/src/i18n/shell.de.ts`, `apps/web/src/i18n/shell.en.ts`, `apps/web/src/i18n/answers.de.ts`,
-  `apps/web/src/i18n/answers.en.ts`, `apps/web/src/i18n/focus.de.ts`, `apps/web/src/i18n/focus.en.ts` (nur die Schlüssel und
-  der geänderte Wortlaut aus Entscheidung 14)
+  `apps/web/src/i18n/answers.en.ts`, `apps/web/src/i18n/focus.de.ts`, `apps/web/src/i18n/focus.en.ts` (nur die Schlüssel aus
+  Entscheidung 13)
 - `apps/web/src/i18n/parity.test.ts` (nur die Zahl in (f) und ihr Kommentar)
 
 e2e:
 
 - `apps/web/e2e/060-entwurfspuffer-praesenz.spec.ts` (neu, in beiden Projekten)
 - `apps/web/e2e/support/e2e-texts.ts` (nur die Konstanten dieser Scheibe und ihre Einträge in der Liste der geschriebenen Texte)
-- `apps/web/e2e/support/roles.ts` (nur ein neuer Helfer für einen zweiten Browserkontext mit eigener Anmeldung bzw. Persona)
+- `apps/web/e2e/support/roles.ts` (nur ein neuer Helfer für einen zweiten Browserkontext mit eigener Anmeldung, für E8)
 - `apps/web/playwright.config.ts` (nur die Liste der geteilten Dateien: die neue Datei nach 055b)
 - `scripts/e2e-http-031.test.mjs` (nur die beiden Dateilisten: die neue Datei zwischen 055b und 080)
-- `apps/web/e2e/054-fokusansicht.spec.ts`, `apps/web/e2e/takt-048-nullzaehler-vorbelegung.spec.ts`,
-  `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (nur falls rot durch Entscheidung 4, 5 oder 7; keine Zusicherung entfällt oder
-  wird schwächer; der Bericht nennt Datei und Zeile)
+- Bestehende Dateien mit Antwortansichten, **nur falls rot durch Entscheidung 4, 5 oder 7; keine Zusicherung entfällt oder wird
+  schwächer; der Bericht nennt Datei, Zeile und Ursache**: `apps/web/e2e/003-answers-stage.spec.ts`,
+  `apps/web/e2e/010d-ansichtsdaten.spec.ts`, `apps/web/e2e/013-tastaturpfad.spec.ts`,
+  `apps/web/e2e/021c-rechtsfreigabe.spec.ts`, `apps/web/e2e/040a-administration.spec.ts`,
+  `apps/web/e2e/045-verweigerung.spec.ts`, `apps/web/e2e/054-fokusansicht.spec.ts`, `apps/web/e2e/055b-antwortformat.spec.ts`,
+  `apps/web/e2e/090-eingaben-je-akteur.spec.ts`, `apps/web/e2e/abnahme.spec.ts`,
+  `apps/web/e2e/takt-048-nullzaehler-vorbelegung.spec.ts`
 
 Nachweise und Doku:
 
 - `docs/evidence/060-*.png`
-- `docs/glossar.md` (nur die drei Zeilen aus Entscheidung 15)
+- `docs/glossar.md` (nur die zwei Zeilen aus Entscheidung 14)
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V5, Spalte Maßnahmen: je Akteur und Versammlung, nur der Entwurf, 14 h,
-  Löschen bei Abmelden und fremdem Akteur, keine Synchronisierung, keine Auswertung; Präsenz ohne Namen)
-- `docs/sicherheit/bedrohungsmodell.md` (nur die Zelle Gegenmaßnahme von T-G1-I-08 und eine Zeile 060 unter „Weitere Scheiben
-  mit Sicherheitsbezug“)
+  Löschstellen, keine Synchronisierung, keine Auswertung, Restrisiko aus Entscheidung 11; V2/V3 kommen mit 060c)
+- `docs/sicherheit/bedrohungsmodell.md` (nur: Zelle Gegenmaßnahme von T-G1-I-08 mit Restrisiko; eine Zeile 060 unter „Weitere
+  Scheiben mit Sicherheitsbezug“; der neue Missbrauchsfall MF-15 aus „Wirkung und Risiko“)
 - `docs/agentische-entwicklung-plan.md` (nur die Zeile „Fehlerpfad (Konflikt 412 in der Oberfläche)“ in §5.3: Werkzeug die neue
   e2e-Datei, Stand „läuft (CI: End-to-end acceptance scenario)“)
 - `docs/folgeliste.md` (054 Bau „focus.write.gone“ und 054 Review 5 als erledigt; neue nicht blockierende Befunde)
@@ -415,138 +407,137 @@ Nachweise und Doku:
 ## Ausdrücklich nicht erlaubt
 
 Alles unter packages, apps/api, die Vertragsdatei und ihre Typen; der Rest von apps/web/src/api außer den genannten Dateien
-(auch nicht http.ts, liveStore.ts, connection.ts); useWriteDoor.ts; focus.ts; styles und neue Tokens; app-Ordner der Shell;
-features steering, speakers, stage, history; RefusalDialog, ForwardDialog, ActionDialogs; labels.ts; scripts außer der einen
-Testdatei; gitleaks.toml (keine neue Allowlist); semgrep-Regeln; Workflows; package.json und Lockfile (keine Abhängigkeit);
-axe-exceptions.json (keine neue Ausnahme); docs/produktplan-beta.md und das Entscheidungsregister (Hinweise an den
-Orchestrator). Muss eine dieser Dateien sich ändern: anhalten und melden.
+(auch nicht actor.ts, auth.ts, http.ts, liveStore.ts, connection.ts, mode.ts); useWriteDoor.ts; focus.ts; FocusDetail; die
+Erfassung (features capture); styles und neue Tokens; app-Ordner der Shell; features steering, speakers, stage, history;
+RefusalDialog, ForwardDialog, ActionDialogs; labels.ts; scripts außer der einen Testdatei; gitleaks.toml (keine neue
+Allowlist); semgrep-Regeln; Workflows; package.json und Lockfile; axe-exceptions.json (keine neue Ausnahme);
+docs/produktplan-beta.md und das Entscheidungsregister (Hinweise an den Orchestrator). Muss eine dieser Dateien sich ändern:
+anhalten und melden.
 
 ## Vor dem Bau prüfen
 
-1. `claimQuestion` und `claimContribution` erhöhen `version`, der Strom trägt `QuestionClaimed`/`ContributionClaimed`, der
-   Live-Speicher aktualisiert den gezeigten Datensatz nach einer eigenen Übernahme in beiden Betriebsarten (Grundlage der
-   Wartesperre, Entscheidung 8).
-2. Der Live-Speicher weckt die Ansicht zu `claim.expiresAt` (036a N7): die Präsenzzeile verschwindet ohne Ereignis.
-3. In der Demo zeigt `_actions` einer Finanzen-Frage im Status „Entwurf“ für Recht und Fachbereich `answer.draft` und
-   `question.claim`; die e2e wählt Fragen über `_actions`, nie über den Rollennamen im Code der Oberfläche.
-4. Im HTTP-Harness gibt es Anmeldezustände für Fachbereich und Recht (zweiter Kontext, Entscheidung 8); es gibt nur eine Person
-   der Erfassung, deshalb ist die Präsenz der Erfassung nur mit Einheits- und Komponententests belegt.
-5. IndexedDB ist im festgelegten Chromium (headless) verfügbar; `context.setOffline(true)` lässt IndexedDB unberührt.
-6. Das Band „Stand veraltet“ der Beantwortung lässt sich aus dem Detail heraus ausblenden, ohne `useWriteDoor` zu ändern
-   (`clearStale` über die Seite).
-7. Die Laufzeit des Schritts `e2e-http` (takt-046): Mehrzeit dieser Datei höchstens 0:50; liegt sie darüber, Fall E7 nur im
-   Projekt in-process und Befund an den Orchestrator.
+1. Die Zustände `noRole` und das Streamende `forbidden` erreichen `api/index.ts` an genau einer Stelle (`onActorChange`,
+   `onStreamEnd`); `signOut` lässt sich so ordnen, dass `store.clear()` vor der Abmeldeanfrage abgeschlossen ist.
+2. In der Demo bestätigt `seedIfEmpty` die Persona erst nach dem Zurückwechseln; das Laden der Momentaufnahme hängt am
+   bestätigten Akteur nach dem Start, nicht an `setActor`.
+3. `run(…, onProblem)` erreicht in beiden Seiten den Speicherweg; in `answers/Page.tsx` liegt er im Fall `draft` von `onAction`.
+4. IndexedDB ist im festgelegten Chromium (headless) verfügbar; `context.setOffline(true)` lässt IndexedDB unberührt;
+   Playwright-Kontexte beginnen je Test mit leerem IndexedDB (der Puffer leckt nicht zwischen Tests; `storageState` des
+   HTTP-Projekts enthält kein IndexedDB).
+5. Im HTTP-Harness gibt es Anmeldezustände für Fachbereich und Recht (zweiter Kontext für E8).
+6. Laufzeit `e2e-http` (takt-046): Mehrzeit dieser Datei höchstens 0:45; liegt sie darüber, Befund an den Orchestrator.
 
 ## Tests zuerst (rot, dann grün)
 
 Einheit (vitest, ohne jsdom, statisches Rendern wie heute):
 
-- **U1 `draftBuffer.test.ts`** (Speicher im Arbeitsspeicher, feste Uhr): `entryId` trennt Versammlung, Akteur, Art, Subjekt;
-  `sanitizeEntry` lässt nur die Felder aus Entscheidung 2 durch (ein zusätzliches Feld `questionText`, `displayName`, `number`
-  fällt weg) und löscht einen Eintrag mit fremder Schemanummer oder kaputter Form ohne Ausnahme; Ablauf an der Grenze
-  (13:59:59 bleibt, 14:00:00 gelöscht); Lesen nur eigener Einträge derselben Versammlung (Negativ: fremder Akteur, fremde
-  Versammlung → nichts); `purgeOthers(actorId)` löscht alle anderen, `purgeAll` alles; ein scheiternder Speicher schaltet ab
-  (`status: 'unavailable'`) und wirft nicht; Eintrag über 256 KiB wird nicht geschrieben; ein Quelltexttest stellt sicher, dass
-  das Modul weder `fetch`, `BroadcastChannel`, `sendBeacon`, `serviceWorker` noch `localStorage` nennt und nichts aus
-  `http.ts` importiert; die drei Konstanten enden nicht auf `KEY`/`Key`.
-- **U2 `draft.test.ts`, `restoreDraft`:** Puffer vor Vorbelegung; Puffer gleich Basis → keine Wiederherstellung; neuere Version
-  gleich Puffer → Basis nachgezogen, unverändert; neuere Version über verändertem Puffer → `rebase`; ohne `answer.draft` → keine
-  Wiederherstellung; Eintrag eines anderen Akteurs → nie verwendet.
-- **U3 `draft.test.ts`, `conflictAfterRefusal`:** neuere abweichende Version → `compare`; neuere gleiche → still nachziehen;
-  keine neuere Version → `retry`; Verweigerung als neueste Version → `compare` mit leerer rechter Spalte und Hinweis wie heute.
-- **U4 `presence.test.ts`:** fremde, laufende Übernahme → Zeile mit `claimedAt`; eigene → keine; abgelaufen (Wanduhr) → keine;
-  ohne → keine; die Ausgabe enthält nie `actorId`. Übernahmeplan: erste Änderung mit Recht → übernehmen; ohne Recht in
-  `_actions` → nie; zweite Änderung bei laufender eigener → nichts; Restzeit unter 3 min mit Eingabe → verlängern, ohne Eingabe
-  → nichts; nach 409/412/Netzfehler → frühestens nach 30 s; Rückgabe nur, wenn der aktuelle Akteur der Übernehmende ist.
+- **U1 `draftBuffer.test.ts`** (Speicher im Arbeitsspeicher, feste Uhr):
+  - `entryId` trennt Versammlung, Akteur, Frage;
+  - `sanitizeEntry`: zusätzliche Felder (`questionText`, `displayName`, `number`) fallen weg; **manipulierter Eintrag** abgelehnt
+    und gelöscht: Block vom Typ `heading`, Lauf mit `text` als Zahl, Marke `script`, Schlüssel `html` im Lauf, 51 Quellen, Quelle
+    mit 2 001 Zeichen, Klartext über 20 000, `id` passt nicht zu den Feldern, `changedAt` in der Zukunft, fremde Schemanummer;
+    ein gültiger Eintrag geht unverändert durch `previewAnswer`/`normalizeAnswerBodyForRead`;
+  - Ablauf an der Grenze (13:59:59 bleibt, 14:00:00 gelöscht);
+  - Laden für Akteur A löscht alle Einträge von B (`purgeOthers`), zweimal geladen bleibt gleich (idempotent); Lesen nur eigener
+    Einträge derselben Versammlung (Negativ: fremder Akteur, fremde Versammlung → nichts);
+  - **write-through:** nach `put` liefert `entryFor` sofort den neuen Stand, nach `delete` nichts; eine scheiternde Transaktion
+    setzt die Momentaufnahme zurück und schaltet ab (`status: 'unavailable'`), ohne zu werfen;
+  - `kept`-Zeit erst nach `oncomplete` (ein Speicher, der verzögert abschließt, zeigt vorher keine Zeit);
+  - `clear` leert Speicher und Momentaufnahme; Eintrag über 256 KiB wird nicht geschrieben;
+  - Quelltexttest: das Modul nennt weder `fetch`, `BroadcastChannel`, `sendBeacon`, `serviceWorker`, `localStorage`, `innerHTML`
+    noch importiert es `mode`, `http`, `actor`, `auth`; die drei Konstanten enden nicht auf `KEY`/`Key`.
+- **U2 `draft.test.ts`, `restoreDraft`:** Eintrag vor Vorbelegung; Eintrag gleich Basis → keine Wiederherstellung, löschen;
+  neuere Version gleich Eintrag → Basis nachgezogen, unverändert; neuere Version über verändertem Eintrag → `rebase`; ohne
+  `answer.draft` → keine Wiederherstellung, bleibt; nach `roles_changed` ohne `answer.draft` → löschen; Eintrag eines anderen
+  Akteurs → nie verwendet; späte Momentaufnahme über unverändertem Entwurf → `generation + 1`, über verändertem → keine Änderung.
+- **U3 `draft.test.ts`, `conflictAfterRefusal`:** neuere abweichende Version → `compare`; neuere gleiche → `rebase-silent`; keine
+  neuere → `retry`; Verweigerung als neueste Version → `compare` mit leerer rechter Spalte und Hinweis wie heute.
+- **U4 `draft.test.ts`, `keepMine`:** Basis = gezeigte Version n, nicht die des Datensatzes; Datensatz schon bei n+1 → nach dem
+  folgenden `onRecord` steht `rebase` wieder; Datensatz bei n → `rebase` falsch, Entwurf verändert gegenüber n.
 - **U5 `CompareVersions.test.tsx`:** beide Spalten, Version und Zeit in Mono, genau eine primäre Schaltfläche, Hinweis unter
-  „übernehmen“, `compare-title` mit `tabIndex=-1`, Diff geschlossen; Texte aus dem Wörterbuch (de und en).
+  „übernehmen“, `compare-title` mit `tabIndex=-1`, Diff geschlossen; rechte Spalte rendert die übergebene neuere Version
+  (Nummer im Satz folgt); Texte aus dem Wörterbuch (de und en); kein `dangerouslySetInnerHTML`.
 - **U6 `QuestionDetail.test.tsx`:** mit `rebase` ruft Speichern `onAction` nicht und zeigt den Vergleich; Band trägt
-  „Vergleichen“; fremde Übernahme → `presence-line` ohne id; eigene → keine; `claimPending` → Speichern `aria-disabled`;
-  wiederhergestellter Entwurf → `draft-restored`.
-- **U7 `WritingMode.test.tsx`, `FocusDetail.test.tsx`:** dieselben Aussagen für Schreibmodus (Strg+Enter bei `rebase` öffnet den
-  Vergleich) und Präsenz im Detail.
-- **U8 `ContributionPane.test.tsx`:** wiederhergestellter Text in `capture-text` und `capture-free-input`; fremde Übernahme des
-  Redebeitrags → `presence-line`; Akteurwechsel leert weiter (090).
-- **U9 `PresenceLine.test.tsx`:** Präsenzzeile und `DraftNote` in allen Zuständen, Zeit in Mono, kein `aria-live` an
-  `draft-kept`.
-- **U10 `parity.test.ts`:** 635 Schlüssel in de und en.
+  „Vergleichen“; wiederhergestellter Entwurf → `draft-restored`; Eingabe ruft den Puffer, programmatischer Neuaufbau nicht.
+- **U7 `WritingMode.test.tsx`:** Strg+Enter bei `rebase` öffnet den Vergleich statt zu speichern; `canSave` unverändert; Escape im
+  Vergleich setzt `defaultPrevented` und verlässt den Schreibmodus nicht.
+- **U8 `DraftNote.test.tsx`:** die drei Zustände, Zeit in Mono, kein `aria-live` an `draft-kept`.
+- **U9 `parity.test.ts`:** 635 Schlüssel in de und en.
 
-e2e `060-entwurfspuffer-praesenz.spec.ts` (Rolle über `asRole`, Belege über `support/evidence.ts`, axe über `support/axe.ts`
-ohne neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und http):
+e2e `060-entwurfspuffer-praesenz.spec.ts` (Rolle über `asRole`, Belege über `support/evidence.ts`, axe über `support/axe.ts` ohne
+neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und http):
 
-- **E1 Neuladen (beide):** Beantwortung, Frage mit Version; Text anhängen; warten auf `draft-kept`; `page.reload()` → Feld mit
-  dem angehängten Text, `draft-restored` sichtbar, Speichern offen; speichern → eine Version mehr; erneut neu laden → Feld =
-  neue Version, kein `draft-restored`. Screenshots `060-wiederhergestellt-de.png`/`-en.png`, axe.
+- **E1 Neuladen (beide):** Beantwortung, Frage mit Version; Text anhängen; warten auf `draft-kept`; `page.reload()` → Feld mit dem
+  angehängten Text, `draft-restored` sichtbar, Speichern offen; speichern → eine Version mehr; erneut neu laden → Feld = neue
+  Version, kein `draft-restored`. Screenshots `060-wiederhergestellt-de.png`/`-en.png`, axe.
 - **E2 Schreibmodus und neuer Tab (beide):** `/my`, Schreibmodus, tippen, `draft-kept`; Tab schließen, neue Seite im selben
   Kontext → Schreibmodus der Frage zeigt den Text und `draft-restored`.
-- **E3 Verbindungsabbruch beim Tippen (beide; Kern des Plans):** tippen, mitten im Wort `context.setOffline(true)`, weiter
-  tippen; `draft-kept` aktualisiert sich weiter. Nur http: Speichern offline → Ablehnung als Toast, Text bleibt, Sperre löst
-  sich. `context.setOffline(false)`, `page.reload()` → vollständiger Text inklusive des offline Getippten; speichern → genau eine
-  neue Version (in-process über einen Zähler um `draftAnswer`, http über die Zahl der Versionen im gelesenen Datensatz).
-- **E4 Inhalt des Eintrags (in-process):** über `page.evaluate` den Objektspeicher (Konstanten aus dem Modul importiert) lesen:
-  genau die Felder aus Entscheidung 2; weder Fragetext noch Fragenummer noch ein Anzeigename kommen im serialisierten Eintrag vor.
-- **E5 Akteurwechsel und Abmelden (beide):** in-process: tippen, `draft-kept`, Rolle wechseln → Objektspeicher ohne Eintrag des
-  vorigen Akteurs; zurück, neu laden → Feld = Datensatz, kein `draft-restored`, der Text nirgends in `#main`. http: tippen,
-  `draft-kept`, abmelden → Objektspeicher leer; als andere Person anmelden (Cookie-Wechsel über `asRole`) nach einem Eintrag →
+- **E3 Verbindungsabbruch beim Tippen (beide; Kern des Plans):** tippen, mitten im Wort `context.setOffline(true)`, weiter tippen;
+  `draft-kept` aktualisiert sich weiter. Nur http: Speichern offline → Ablehnung als Toast, Text bleibt, Sperre löst sich; danach
+  **erneute Anmeldung** derselben Person (Sitzungscookie entfernt, Anmeldung über den Harness-Weg) → nach dem Laden ist der Text
+  wiederhergestellt (Sitzungsverlust löscht nicht). `context.setOffline(false)`, `page.reload()` → vollständiger Text inklusive
+  des offline Getippten; speichern → genau eine neue Version (in-process über einen Zähler um `draftAnswer`, http über die Zahl der
+  Versionen im gelesenen Datensatz).
+- **E4 Inhalt des Eintrags (in-process):** über `page.evaluate` den Objektspeicher lesen (Konstanten aus dem Modul importiert):
+  genau die Felder aus Entscheidung 2; weder Fragetext noch Fragenummer noch ein Anzeigename im serialisierten Eintrag. Danach
+  einen manipulierten Eintrag (Block `heading`, Lauf mit Schlüssel `html`) hineinschreiben, neu laden → kein
+  `draft-restored`, Feld = Datensatz, Eintrag gelöscht.
+- **E5 Akteurwechsel, Abmelden, ohne Rolle (beide):** in-process: tippen, `draft-kept`, Rolle wechseln → kein Eintrag des vorigen
+  Akteurs; zurück, neu laden → Feld = Datensatz, kein `draft-restored`, der Text nirgends in `#main`; zusätzlich: Neuladen ohne
+  Wechsel behält den Eintrag (der Start mit `seedIfEmpty` löscht nichts). http: tippen, `draft-kept`, abmelden → Objektspeicher
+  leer (geprüft vor dem nächsten Laden); Eintrag anlegen, Cookie-Wechsel zu einer anderen Person über `asRole`, neu laden →
   Einträge der vorigen Person gelöscht.
-- **E6 Präsenz (beide):** in-process: Recht tippt in der Beantwortung auf einer Finanzen-Frage (Übernahme), Wechsel zum
-  Fachbereich, dieselbe Frage → `presence-line` „seit HH:MM“; der Fachbereich tippt und speichert trotzdem (eine Version mehr).
-  http: zweiter Kontext als Recht tippt, der Fachbereich sieht die Zeile über den Strom ohne Neuladen; nach Rückgabe (Recht
-  verlässt die Frage) verschwindet sie. Screenshots `060-praesenz-de.png`/`-en.png`, axe.
-- **E7 Fassungsvergleich nach 412 (in-process):** Muster aus `028-konflikte.spec.ts`: `api.draftAnswer` wird für den ersten
-  Aufruf so umwickelt, dass er zuerst eine abweichende Version derselben Frage schreibt (gleicher Akteur, „zweites Fenster“) und
-  dann 412 wirft. Speichern → Vergleich öffnet, Fokus auf `compare-title`, kein „Stand veraltet“-Band; linke Spalte = eigener
-  Text, rechte = neue Version. „Version n übernehmen“ → Feld = Version n, Puffer leer. Zweiter Durchgang: „Mit meiner Fassung
-  weiter“ → Feld = eigener Text, speichern → Version n+1 mit eigenem Text. Escape kehrt ohne Entscheidung zurück. Screenshots
-  `060-vergleich-de.png`/`-en.png`, axe.
-- **E8 Live-Vergleich (http):** zweiter Kontext als Recht speichert eine Version, während der Fachbereich verändert hat → Band
-  mit „Vergleichen“, Fokus bleibt im Feld; Speichern → Vergleich, **keine** neue Version (Zahl der Versionen unverändert).
-- **E9 Doppelklick (beide):** Doppelklick auf „Entwurf speichern“ → genau eine neue Version, Fokus auf dem Knopf; Doppelklick auf
+- **E6 Fassungsvergleich nach 412 (in-process):** Muster aus `028-konflikte.spec.ts`: `api.draftAnswer` wird für den ersten Aufruf
+  so umwickelt, dass er zuerst eine abweichende Version derselben Frage schreibt (gleicher Akteur, „zweites Fenster“) und dann 412
+  wirft. Speichern → Vergleich öffnet, Fokus auf `compare-title`, kein „Stand veraltet“-Band; links eigener Text, rechts neue
+  Version. „Version n übernehmen“ → Feld = Version n, Eintrag gelöscht. Zweiter Durchgang: „Mit meiner Fassung weiter“ → Feld =
+  eigener Text, speichern → nächste Version mit eigenem Text. Escape kehrt ohne Entscheidung zurück und lässt den Schreibmodus
+  offen (im Schreibmodus geprüft). Screenshots `060-vergleich-de.png`/`-en.png`, axe.
+- **E7 Live-Vergleich (http):** zweiter Kontext als Recht speichert eine Version, während der Fachbereich verändert hat → Band mit
+  „Vergleichen“, Fokus bleibt im Feld; Speichern → Vergleich, **keine** neue Version; zweiter Kontext speichert noch eine Version
+  → rechte Spalte zeigt sie, Fokus unverändert; „Mit meiner Fassung weiter“ → kein Band (Basis = jüngste gezeigte).
+- **E8 Doppelklick (beide):** Doppelklick auf „Entwurf speichern“ → genau eine neue Version, Fokus auf dem Knopf; Doppelklick auf
   „Mit meiner Fassung weiter“ → kein Schreiben, Text einmal im Feld.
-- **E10 Erfassung (beide; Teil B):** Wortlaut eines neuen Redebeitrags tippen, `draft-kept`, neu laden → `capture-text` trägt
-  ihn; freie Einzelfrage tippen, neu laden → `capture-free-input` trägt sie; erste Eingabe in der freien Eingabe → der gelesene
-  Redebeitrag trägt `claim.actorId` des eigenen Akteurs (in-process über `api.getContribution`); Doppelklick auf „Redebeitrag
-  erfassen“ → genau ein Redebeitrag.
+- **E9 Verlassen mit Text (in-process):** im Schreibmodus tippen, `draft-kept`; die Frage über die Schreibtür eines anderen Schritts
+  aus „Meine Fragen“ nehmen (Muster 054 F-Fälle) → Toast mit `focus.write.goneKept`; die Frage zurückholen (Rückgabe durch eine
+  berechtigte Rolle) → Text wiederhergestellt oder, bei neuerer Version, Band „Vergleichen“.
 
 ## Akzeptanzkriterium
 
-1. U1–U10 und E1–E10 grün; rot vor der Änderung mindestens U1–U4 (Modul fehlt), U6, E1, E3, E7 (Bericht nennt Commit und
-   Fehlerzeile); Fälle aus 054, takt-048 und 090 grün, angepasste Zeilen benannt.
-2. **Puffer je Akteur und Versammlung:** E4 und E5 belegen: nur Entwurfsfelder, kein Eintrag eines anderen Akteurs nach dem
-   Wechsel, leerer Speicher nach dem Abmelden; U1 belegt Ablauf nach 14 h und „synchronisiert nie“.
-3. **Präsenz ohne Namen und ohne id:** E6 und U4; keine Präsenz bei eigener oder abgelaufener Übernahme; keine neue Kennzahl,
-   kein Eintrag im Auswertungskatalog.
-4. **Kein stilles Überschreiben:** E7, E8, U6, U7: bei neuerer fremder Version entsteht ohne ausdrückliche Wahl im Vergleich
-   keine Version.
-5. Keine neue axe-Ausnahme; axe grün auf den drei Zuständen in de und en; sechs Screenshots unter `docs/evidence/`
-   (`060-wiederhergestellt-*`, `060-praesenz-*`, `060-vergleich-*`, je de und en).
-6. Kein Vertrags-, Kern- oder Dienstdiff; `pnpm role-literals`, `pnpm vocabulary`, `pnpm i18n-literals` grün; kein neuer
-   gitleaks-Befund (die Konstantennamen aus Entscheidung 1; im CI-Schritt nachgewiesen).
-7. Design-Kritik D1–D10 als Tabelle im Bericht, vor dem Review, in frischem Kontext.
-8. `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich); `pnpm --filter @hv/web e2e` für die berührten Dateien grün; CI des
-   PR grün einschließlich `e2e-http`; für die nur in http laufenden Fälle (E3 Speichern offline, E5 Abmelden, E6 zweiter Kontext,
-   E8) nennt der Nachweis Artefaktname, Run-id, Artefakt-id und Digest (AGENTS.md R2, E56).
+1. U1–U9 und E1–E9 grün; rot vor der Änderung mindestens U1–U4 (Modul bzw. Funktionen fehlen), U6, E1, E3, E6 (Bericht nennt
+   Commit und Fehlerzeile); die gelisteten bestehenden e2e-Dateien grün, angepasste Zeilen benannt.
+2. **Puffer je Akteur und Versammlung:** E4 und E5 belegen nur Entwurfsfelder, kein Eintrag eines anderen Akteurs nach dem Wechsel,
+  leerer Speicher nach dem Abmelden, kein Löschen beim Demo-Start; U1 belegt Ablauf nach 14 h, `purgeOthers`, write-through,
+  Ablehnung manipulierter Einträge und „synchronisiert nie“.
+3. **Kein stilles Überschreiben:** E6, E7, U3, U4, U6, U7: bei neuerer fremder Version entsteht ohne ausdrückliche Wahl im
+   Vergleich keine Version.
+4. Keine neue axe-Ausnahme; axe grün auf den Zuständen „wiederhergestellt“ und „Vergleich“ in de und en; vier Screenshots unter
+   `docs/evidence/` (`060-wiederhergestellt-*`, `060-vergleich-*`, je de und en).
+5. Kein Vertrags-, Kern- oder Dienstdiff; kein Aufruf von `claimQuestion`/`releaseQuestion`; `pnpm role-literals`,
+   `pnpm vocabulary`, `pnpm i18n-literals` grün; kein neuer gitleaks-Befund im CI-Schritt.
+6. Design-Kritik D1–D10 als Tabelle im Bericht, vor dem Review, in frischem Kontext.
+7. `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich); `pnpm --filter @hv/web e2e` für die berührten Dateien grün; CI des PR
+   grün einschließlich `e2e-http`; für die nur in http laufenden Teile (E3 Speichern offline und erneute Anmeldung, E5 Abmelden und
+   Personenwechsel, E7) nennt der Nachweis Artefaktname, Run-id, Artefakt-id und Digest (AGENTS.md R2, E56).
 
 ## Nachweise
 
 - `docs/evidence/060-wiederhergestellt-de.png`, `docs/evidence/060-wiederhergestellt-en.png` (Feld mit wiederhergestelltem Text,
   Zeile „wiederhergestellt“, Speichern offen)
-- `docs/evidence/060-praesenz-de.png`, `docs/evidence/060-praesenz-en.png` (Präsenzzeile über dem Feld, „seit HH:MM“)
 - `docs/evidence/060-vergleich-de.png`, `docs/evidence/060-vergleich-en.png` (beide Spalten, primär „Mit meiner Fassung weiter“)
-- CI-Artefakt des Laufs `e2e-http` für E3/E5/E6/E8 (Angaben wie im Akzeptanzkriterium 8)
+- CI-Artefakt des Laufs `e2e-http` für E3/E5/E7 (Angaben wie im Akzeptanzkriterium 7)
 
 ## Design-Kritik (Pflicht vor dem Review)
 
-In frischem Kontext gegen `docs/design-prinzipien.md`, Ergebnis als Tabelle D1–D10 im Bericht. Mindestens zu prüfen:
+In frischem Kontext gegen `docs/design-prinzipien.md`, Ergebnis als Tabelle D1–D10 im Bericht. Mindestens:
 
 - **D1:** Versteht man den Vergleich in 30 Sekunden — welche Fassung ist meine, welche neu, was passiert bei jeder Wahl?
-- **D2:** genau eine primäre Aktion im Vergleich; im Feld bleibt die Regel aus takt-048 (Vorgangsaktion primär, solange
-  unverändert).
-- **D4:** Präsenz neutral (keine Warnfarbe), Bernstein nur im Konfliktband; keine neue Farbe.
+- **D2:** genau eine primäre Aktion im Vergleich; im Feld bleibt die Regel aus takt-048.
+- **D4:** Bernstein nur im Konfliktband; keine neue Farbe.
 - **D5:** Uhrzeiten und Versionsnummern in Mono.
-- **D6:** Zustände Puffer nicht verfügbar, offline, wiederhergestellt, Präsenz abgelaufen gestaltet.
-- **D8:** Vergleich per Tastatur vollständig bedienbar, Fokus auf der Überschrift nur bei eigener Handlung, Escape zurück, keine
-  Fokusverschiebung durch Live-Aktualisierung; 200 % Zoom (Spalten untereinander).
+- **D6:** Zustände Puffer nicht verfügbar, offline, wiederhergestellt, Vergleich mit live nachgezogener Version gestaltet.
+- **D8:** Vergleich per Tastatur vollständig bedienbar, Fokus auf der Überschrift nur bei eigener Handlung, Escape zurück ohne den
+  Schreibmodus zu verlassen, keine Fokusverschiebung durch Live-Aktualisierung; 200 % Zoom (Spalten untereinander).
 - **D10:** ruhig: keine Animation außer den vorhandenen 120 ms, keine Toastflut (die Zeile „gesichert“ ist kein Toast).
 
 Ein Blocker der Kritik wird vor dem Review behoben; minor und nit gehen in die Folgeliste (Lean-Modus).
@@ -554,87 +545,134 @@ Ein Blocker der Kritik wird vor dem Review behoben; minor und nit gehen in die F
 ## Qualitätswirkung
 
 Reifestufe: pilot · Risikoklasse: hoch
-Ausgelöst: [x] personenbezogene oder vertrauliche Daten (Gerätespeicher, Präsenz) [x] Oberfläche, Barrierefreiheit
-[x] Nebenläufigkeit (412, Übernahme, Live-Version) [ ] Fachregel, Status [ ] Vertrag, Ereignis [ ] Rolle, Recht
+Ausgelöst: [x] personenbezogene oder vertrauliche Daten (Gerätespeicher) [x] Oberfläche, Barrierefreiheit [x] Nebenläufigkeit
+(412, Live-Version) [ ] Fachregel, Status [ ] Vertrag, Ereignis [ ] Rolle, Recht
 Perspektive(n) und Rolle: Datenschutz und Security (Reviewer), UX (Design-Kritik) · Nachweise: siehe Akzeptanzkriterium ·
-Offene Entscheidung: E36/E13 für den Namen (Standard: ohne), E33 für Geräterichtlinie (Standard: lokaler Speicher wird nicht
-gelöscht; der Ablauf von 14 h gilt trotzdem)
+Offene Entscheidung: E33 Geräterichtlinie (Standard: lokaler Speicher wird nicht gelöscht; der Ablauf von 14 h gilt trotzdem);
+Eigentümerfragen 2–4
 
 ## Wirkung und Risiko
 
 | Risiko | Abfang | Beleg |
 |---|---|---|
-| Entwurf einer Person erscheint bei einer anderen am selben Gerät | Kennung je Akteur, Löschen fremder Einträge bei Bestätigung eines anderen Akteurs, Löschen bei Abmelden | U1, E5 |
-| Unveröffentlichte Antwort bleibt lange auf dem Gerät (T-G1-I-08) | 14 h Ablauf, Löschen nach Speichern/Verwerfen/Abmelden; nur der Entwurf | U1, E4 |
-| Puffer stellt veralteten Text über eine neuere Version | `restoreDraft` gleicht sofort mit `onRecord` ab, sonst Band und Vergleich | U2, E7 |
-| Stilles Überschreiben einer fremden Version | Speichern bei `rebase` öffnet den Vergleich; 412 mit neuer Version öffnet ihn | U3, U6, E7, E8 |
-| Eigenes 412 durch die eigene Übernahme | Wartesperre bis der Datensatz die Übernahme zeigt | U4, U6, E1 (kein Band) |
-| Präsenz wird zur Verhaltenskontrolle | ohne Namen, ohne id, nur „seit“, kein Herzschlag, keine Liste, keine Kennzahl | U4, E6 |
+| Entwurf einer Person erscheint bei einer anderen am selben Gerät | Kennung je Akteur; `purgeOthers` bei jedem Laden für einen bestätigten Akteur (auch nach Neuladen); Löschen bei Abmelden, ohne Rolle, bei `forbidden` | U1, E5 |
+| Demo löscht bei jedem Start (Wechsel in `seedIfEmpty`) | kein Löschen in `setActor`; Löschen nur beim Laden für den bestätigten Akteur | E5 |
+| Unveröffentlichte Antwort bleibt auf dem Gerät (T-G1-I-08) | 14 h Ablauf, Löschen nach Speichern/Verwerfen/Abmelden; nur der Entwurf; Restrisiko benannt (Entscheidung 11) | U1, E4 |
+| Manipulierter Eintrag als Einschleusung (Gerätezugriff oder XSS an anderer Stelle) | `sanitizeEntry` strukturell, Normalisierung, Obergrenzen; nur `bodyToDom` und `AnswerText` als Wege | U1, E4 |
+| Puffer stellt veralteten Text über eine neuere Version | `restoreDraft` gleicht mit `onRecord` ab, sonst Band und Vergleich | U2, E6 |
+| Stilles Überschreiben einer fremden Version | Speichern bei `rebase` öffnet den Vergleich; 412 mit neuer Version öffnet ihn; `keepMine` prüft erneut | U3, U4, U6, E6, E7 |
+| „gesichert“ zeigt einen Stand, der nicht liegt | Zeit erst nach `oncomplete`; kein Flush beim Entladen versprochen | U1 |
 | Fehlalarm gitleaks | Konstantennamen ohne `KEY`, Kennung aus Funktion | U1, CI |
 | Speicher voll oder gesperrt | Abschalten mit Zeile, keine Ausnahme | U1 |
 
-Missbrauchsfall (Leitplanken 6.5): Eine Person mit Gerätezugriff liest den Objektspeicher einer anderen. Erkennung: keine im
-Werkzeug; Begrenzung durch Löschregeln und Ablauf; der Rest gehört zur Geräterichtlinie (E33) und zum Sperren einer Sitzung
-(029). Betriebswirkung: keine (kein Dienst, keine Konfiguration); Doku-Wirkung: DSFA V5, Bedrohungsmodell T-G1-I-08, Glossar,
+**Missbrauchsfall MF-15 „Entwurf aus dem Gerätespeicher lesen oder einschleusen“** (neu im Bedrohungsmodell, SC-06):
+- *Ablauf:* eine Person mit Zugriff auf ein nicht abgemeldetes oder nach Sitzungsablauf verlassenes Gerät liest über die
+  Entwicklerwerkzeuge des Browsers den Objektspeicher und damit unveröffentlichte Entwürfe der vorigen Person; oder sie schreibt
+  einen präparierten Eintrag, der bei der nächsten Anmeldung derselben Person als „ihr“ Entwurf erscheint.
+- *Verhindert bzw. begrenzt durch:* Ablauf 14 h; Löschen bei Abmelden, ohne Rolle, `forbidden`, anderem Akteur; `sanitizeEntry`
+  und die zwei Renderwege (keine Skriptausführung); ein präparierter, gültiger Text erscheint nur als ungespeicherter Entwurf mit
+  der Zeile „wiederhergestellt“ und wird nie ohne Speichern der Person zu einer Version.
+- *Erkennung und Empfänger:* im Werkzeug kein Signal (der Browserspeicher liegt außerhalb des Dienstes; ein Zähler je Person
+  wäre unzulässig, ADR 0013). Organisatorisches Signal: Meldung eines unbeaufsichtigten oder verlorenen Geräts an das
+  Versammlungsbüro, Empfänger Konzern-IT nach Geräterichtlinie (E33). Technischer Rest: ein abgelehnter Eintrag wird ohne Inhalt
+  verworfen; kein Log mit Pufferinhalt.
+
+Betriebswirkung: keine (kein Dienst, keine Konfiguration). Doku-Wirkung: DSFA V5, Bedrohungsmodell T-G1-I-08 und MF-15, Glossar,
 Tor-Zeile 412.
 
 ## Aufwand
 
-3,8 AStd (Plan: 2 AStd, ohne Klasse hoch und ohne Erfassung im Detail gerechnet): Puffermodul mit Kern, Adapter und U1 0,6;
-Beantwortung und Fokusansicht (Wiederherstellen, Schreiben, Löschen) 0,5; Übernahme, Präsenz, Wartesperre 0,5; Vergleich und
-412-Einordnung 0,6; Löschwege in Tür und Demo 0,15; Erfassung 0,45 (Rest von Teil B in e2e); e2e beider Projekte 0,7;
-Screenshots, axe, Doku-Zeilen, Design-Kritik und Bericht 0,3.
+**3,2 AStd** (Fassung 1: 3,8 mit Präsenz und Erfassung; Plan: 2 AStd ohne Klasse hoch):
 
-## Offene Eigentümerfragen (blockieren nicht; Standard gilt)
+| Teil | AStd |
+|---|---|
+| Puffermodul: Kern, `sanitizeEntry` strukturell, Momentaufnahme mit write-through, Löschregeln, Adapter, U1 | 0,8 |
+| Antwortansichten: Wiederherstellen an allen Entstehungsstellen, Schreiben nur auf Eingabe, Löschen, Toast beim Verlassen, U2, U6 | 0,6 |
+| Fassungsvergleich, 412-Einordnung über `onProblem`, Live-Spalte, `keepMine`, Escape, U3–U5, U7 | 0,7 |
+| Löschstellen in `index.ts` (Abmelden, `noRole`, `forbidden`, `roles_changed`, Demo-Reset) | 0,15 |
+| e2e beider Projekte E1–E9, Prüfung der gelisteten Dateien | 0,65 |
+| Screenshots, axe, Doku-Zeilen (DSFA, Bedrohungsmodell, Glossar, Tor-Zeile), Design-Kritik, Bericht | 0,3 |
 
-1. **Name in der Präsenz?** Standard: **ohne Namen** („eine andere Person“). Option: `Claim.displayName`, aufgelöst wie
-   `Actor.displayName` — Vertragsänderung (AGENTS.md R6), Klasse hoch, eigene Scheibe 060c, rund 0,8 AStd, nach Klärung E36/E13
-   mit dem Betriebsrat.
-2. **Aufbewahrung im Puffer?** Standard: **14 Stunden** nach der letzten Änderung. Optionen: bis zum Schließen der Versammlung;
-   24 Stunden.
-3. **Puffer verschlüsseln?** Standard: **nein** (der Schlüssel läge auf demselben Gerät; Schutz kommt aus Geräterichtlinie E33 und
-   Sitzungssperre 029). Option: AES-GCM über WebCrypto mit nicht exportierbarem Schlüssel je Sitzung, +0,5 AStd.
-4. **Geschützte Fragen vom Puffer ausnehmen?** Standard: **ja, sobald die Vertraulichkeitsstufe an der Frage steht** (047 setzt es
-   um); heute nicht anwendbar.
-5. **Wann übernehmen?** Standard: **bei der ersten Änderung**. Option: schon beim Öffnen des Schreibmodus bzw. beim Fokus ins Feld
-   (mehr Übernahmen, Präsenz auch ohne Tippen).
-6. **Präsenz auch in Listen** (Fokusliste, Arbeitsliste)? Standard: **nein**, Folgeliste; eine Liste „wer arbeitet woran“ nur nach
-   E13.
+060b (Präsenz) schätzt nach heutigem Stand rund 1,0 AStd, 060c (Erfassung) rund 0,7 AStd; beide neu zu schätzen in ihrer Spec.
+
+## Offene Eigentümerfragen
+
+1. **(für 060b, blockiert 060b)** **Präsenz erzeugt ein benanntes Tätigkeitsprotokoll.** Jede Übernahme, Verlängerung und Rückgabe
+   schreibt `QuestionClaimed`/`QuestionReleased`; Zeitleiste der Historie und Ereignistabelle zeigen sie mit Akteur und Zeit. Wer
+   `history.read` hat, sieht damit, wer wann an welcher Frage geschrieben hat (E13, E36). Optionen: (a) die Historienansichten
+   blenden Übernahme-Ereignisse aus oder fassen sie zusammen („in Bearbeitung von … bis …“ ohne Einzelzeiten), das Log bleibt
+   unverändert (Regel 7); (b) hinnehmen und dem Betriebsrat so vorlegen; (c) Präsenz nicht bauen. Kein Standard für den Bau: 060b
+   startet erst nach der Antwort. Ein Name in der Präsenz (Vertragsfeld `Claim.displayName`) wäre eine weitere Frage in 060b.
+2. **Aufbewahrung im Puffer?** Standard: **14 Stunden** nach der letzten Änderung, Restrisiko wie Entscheidung 11. Optionen: bis
+   zum Schließen der Versammlung; 24 Stunden; kürzer (z. B. 2 Stunden, dann verliert eine lange Unterbrechung den Text).
+3. **Puffer verschlüsseln?** Standard: **nein** (der Schlüssel läge auf demselben Gerät; Schutz kommt aus E33 und 029). Option:
+   AES-GCM über WebCrypto mit nicht exportierbarem Schlüssel je Sitzung, +0,5 AStd (der Text wäre nach Sitzungsende nicht mehr
+   lesbar, also auch nicht wiederherstellbar).
+4. **Geschützte Fragen vom Puffer ausnehmen?** Standard: **ja, sobald die Vertraulichkeitsstufe an der Frage steht** (047); heute
+   nicht anwendbar.
+
+## Lesebefund zu Fassung 1 (`a3a2dae`) und was sich änderte
+
+| Befund | Änderung in Fassung 2 |
+|---|---|
+| Blocker 1 (Löschen in `setActor` löscht bei jedem Demo-Start) | Entscheidung 4: kein Löschen in `setActor`; `purgeOthers` beim Laden der Momentaufnahme für einen bestätigten Akteur; `actor.ts` nicht mehr erlaubt; E5 prüft „Neuladen löscht nichts“ |
+| Blocker 2 und major 10 (Umfang, Präsenz als Tätigkeitsprotokoll) | geteilt: Präsenz und Übernahmen nach 060b mit Eigentümerfrage 1 (E13/E36), Erfassung nach 060c |
+| major 1 (HTTP-Neuladen kennt die vorige id nicht; `noRole`, `forbidden`) | `purgeOthers` beim Laden; Löschen bei `noRole` und `forbidden` (Tabelle Entscheidung 4) |
+| major 3 (Momentaufnahme veraltet nach Schreiben) | write-through bei jedem `put`/`delete`, Rücksetzen bei Fehler; U1 |
+| major 4 (Wartesperre wegen eigener Übernahme) | entfällt mit 060b |
+| major 5 („Mit meiner Fassung weiter“ auf welche Basis) | Basis = in der Spalte gezeigte Version, danach `onRecord`; rechte Spalte folgt live ohne Fokuswechsel; `keepMine`, U4, E7 |
+| major 6 (`sanitizeEntry` zu schwach) | strukturelle Prüfung, Normalisierung, Obergrenzen, nur `bodyToDom`/`AnswerText`; U1 und E4 mit manipuliertem Eintrag |
+| major 7 (wer schreibt/löscht; Wiederherstellen nur beim Aufbau) | nur Eingabe bzw. Handlung der Person schreibt/löscht; programmatische Neuaufbauten nie; Wiederherstellen an allen Entstehungsstellen, späte Momentaufnahme mit `generation + 1` |
+| major 8 (betroffene e2e-Dateien) | Liste in Files allowed mit „nur falls rot, keine Zusicherung schwächer“ |
+| major 9 (DSFA) | nur V5; V2/V3 mit 060c |
+| minor 1 (412-Einordnung) | beim 412 und beim nächsten Datensatz, über `onProblem`, ohne `useWriteDoor` |
+| minor 2 (Reihenfolge Abmelden, Demo-Reset) | `store.clear()` vor der Abmeldeanfrage; Reset wartet auf `oncomplete`; `clear` statt Einzellöschungen |
+| minor 3 (Restrisiko Aufbewahrung) | Entscheidung 11, T-G1-I-08, DSFA V5, Eigentümerfrage 2 |
+| minor 4–5 (Präsenz; laut Orchestrator „4–6“, Überschneidung mit 6) | nach 060b |
+| minor 6 (Missbrauchsfall nach SC-06) | MF-15 mit Erkennung und Empfänger |
+| minor 7 („gesichert“ vor dem Abschluss; `pagehide`-Flush ungetestet; E3 ohne erneute Anmeldung) | Zeit erst nach `oncomplete`; Flush beim Entladen gestrichen; E3 mit erneuter Anmeldung |
+| minor 8 (Escape verlässt zusätzlich den Schreibmodus) | `preventDefault()` im Vergleich; U7, E6 |
+| minor 9 (Quelle von `meetingId`) | `question.meetingId`, ohne sie kein Puffer |
+| minor 10 (`canSave` im Schreibmodus) | `canSave` unverändert, Speicheraktion prüft `rebase` zuerst |
+| minor 11 (`focus.write.gone` ohne Rückfall; Text vor dem Abbau) | `focus.write.goneKept` nur nach erfolgreichem Schreiben, sonst der alte Toast; sofortiges Schreiben vor dem Abbau; E9 |
+| minor 12 (`draftBuffer.ts` importiert `mode.ts`) | Modul ohne `mode`/`http`/`actor`/`auth`; Quelltexttest |
+| minor 13 (Absicht bei `roles_changed`) | löschen nur, wo Entwerfen nicht mehr angeboten wird (Merker „nachprüfen“) |
+| nit 1–4 | Wortlaut der Nits lag dem Spec-Autor nicht vor (nur die Zusammenfassung des Orchestrators); mit der Teilung bereinigt: Kennung ohne `kind`, Präsenz-Schlüssel und -Glossarzeile entfernt, Schlüsselzahl 635 neu begründet, vier statt sechs Screenshots. Ein nicht erfasster Nit geht beim Lesebefund der Fassung 2 als offen zurück |
 
 ## Hinweise an den Orchestrator
 
-- Plan §5 Eintrag 060 führt „mittel · 2 AStd“; diese Spec stuft auf **hoch · 3,8 AStd** (Begründung „Warum hoch“). Plan-Zeile
-  angleichen; Lane web-capture, web-api und web-components ergänzen. Lesebefund vor dem Bau einplanen (Klasse hoch).
-- Eigentümerfragen 1–6 ins Register (1 an E36/E13, 2 und 3 an E14/DSB, 4 an 047).
-- `e2e-http`: die neue Datei kommt in die geteilte Liste nach 055b; Mehrzeit höchstens 0:50 (Vor dem Bau 7).
-- Rückfallteilung 060b nur, wenn der Bericht sie meldet.
+- Plan §5 Eintrag 060 führt „mittel · 2 AStd“; diese Spec führt **hoch · 3,2 AStd** (Begründung „Warum hoch“). Plan-Zeile angleichen;
+  Lanes web-api und web-components ergänzen; Plan-Zeilen 060b (Präsenz, hoch, nach Eigentümerfrage 1) und 060c (Erfassung, hoch)
+  anlegen. Lesebefund der Fassung 2 vor dem Bau.
+- Eigentümerfragen ins Register (1 an E13/E36, 2 und 3 an E14/DSB, 4 an 047).
+- `e2e-http`: die neue Datei kommt in die geteilte Liste nach 055b; Mehrzeit höchstens 0:45.
 
 ## Hinweise an Folgescheiben
 
-- **047 (Vertraulichkeit):** `draftBuffer` erhält eine Ausnahme für `protected` (Eigentümerfrage 4), eine Zeile in `restoreDraft`
-  und beim Schreiben.
-- **058 (Podium offline):** nutzt nicht diesen Puffer (andere Daten, andere Löschregeln), kann aber den Adapter `BufferStore` als
-  Muster nehmen; eigener Datenbankname.
-- **059 (Rechtsfreigabe-Sicht):** `CompareVersions` ist für den Redline-Vergleich nicht gedacht (dort zwei gespeicherte
-  Versionen), kann aber dessen Spaltenlayout teilen.
-- **029 (Sitzungssperre):** eine Sperre des Bildschirms löscht den Puffer nicht; ein gesperrtes Subject (401 ohne Rückkehr) wird
-  über den nächsten bestätigten Akteur bereinigt.
+- **060b (Präsenz):** Fassung 1 Entscheidung 8 ist der Entwurf; der Eintrag dieses Puffers bleibt unberührt; eine Übernahme
+  erhöht `version`, daher die Wartesperre vor dem Speichern; die Vergleichsansicht dieser Scheibe deckt das 412 einer fremden
+  Übernahme bereits ab (`retry`).
+- **060c (Erfassung):** erweitert `entryId` um eine Art (`contribution`, `free_question`) mit neuer `BUFFER_SCHEMA`-Nummer; alte
+  Einträge fallen über `sanitizeEntry` weg; DSFA V2/V3.
+- **047 (Vertraulichkeit):** Ausnahme für `protected` in `restoreDraft` und beim Schreiben (Eigentümerfrage 4).
+- **058 (Podium offline):** eigener Datenbankname; `BufferStore` als Muster.
+- **029 (Sitzungssperre):** eine Bildschirmsperre löscht den Puffer nicht; ein gesperrtes Subject wird über den nächsten bestätigten
+  Akteur bereinigt.
 
 ## Bericht (nach Bau ausfüllen)
 
 ```
 Slice: 060-entwurfspuffer-praesenz
-Done: <Puffer je Akteur und Versammlung (IndexedDB, 14 h, Löschregeln), Wiederherstellen nach Neuladen und Verbindungsabbruch;
-      Präsenz über die Übernahme ohne Namen; Fassungsvergleich bei 412 und Live-Version; Doppelklick belegt; Erfassung (Teil B)
-      gebaut oder als 060b abgespalten>
-Evidence: pnpm gates auf <commit> (Exit 0), Schluss unten; docs/evidence/060-{wiederhergestellt,praesenz,vergleich}-{de,en}.png;
+Done: <Puffer der Antwortansichten je Akteur und Versammlung (IndexedDB, 14 h, Löschstellen), Wiederherstellen nach Neuladen,
+      Verbindungsabbruch und erneuter Anmeldung; Fassungsvergleich bei 412 und Live-Version; Doppelklick belegt>
+Evidence: pnpm gates auf <commit> (Exit 0), Schluss unten; docs/evidence/060-{wiederhergestellt,vergleich}-{de,en}.png;
       e2e in-process <n bestanden>; CI e2e-http Run <id>, Artefakt <name>/<id>, Digest <sha256>
-Open: <Rückfallteilung ja/nein; Laufzeit e2e-http vorher/nachher; Befunde>
+Open: <Laufzeit e2e-http vorher/nachher; Befunde>
 Touched: <Dateiliste>
 ```
 
-Zusätzlich: rot vorher (Commit, Fehlerzeilen), Design-Kritik-Tabelle D1–D10, Zahl der Übernahme-Ereignisse in E6 (erwartet: eine
-Übernahme, eine Rückgabe je Durchgang), angepasste Zeilen in 054/takt-048/090 falls nötig, Folgeliste-Einträge.
+Zusätzlich: rot vorher (Commit, Fehlerzeilen), Design-Kritik-Tabelle D1–D10, angepasste Zeilen in den gelisteten e2e-Dateien
+falls nötig, Folgeliste-Einträge.
 
 ## Review findings
 
