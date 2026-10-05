@@ -6,8 +6,8 @@ Orchestrators eingearbeitet, Abschnitt „Nacharbeit nach Lesebefund“; neunte 
 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; Wunsch des Eigentümers vom 05.10.2026: „061 soll
 richtig geil werden“; Prognosen Z11 und Flussbild Z12 als 061b skizziert; Bau in zwei Teilen auf dieser einen Spec, Abschnitt
 „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 4,9 AStd (Spanne 4,3–5,5; Plan 061: mittel · 2 AStd, mit Zielbild +1,75; Begründung in „Warum hoch“ und
-„Aufwand“; gebaut in Teil A ≈ 2,0 und Teil B ≈ 2,9, je unter einem Agententag) · Plan 061: 16.11.2026 (W8), tatsächlich nach 060 in
+**Risikoklasse:** hoch · 5,0 AStd (Spanne 4,4–5,6; Plan 061: mittel · 2 AStd, mit Zielbild +1,75; Begründung in „Warum hoch“ und
+„Aufwand“; gebaut in Teil A ≈ 2,3 und Teil B ≈ 2,7, je unter einem Agententag) · Plan 061: 16.11.2026 (W8), tatsächlich nach 060 in
 der Kette der Freigabe-Demo · Lanes: contract (Rechtebezeichner `cockpit.read` im Enum `Action`, Operation `getMeetingCockpit`,
 Schemas, Vertrag 0.4.x); core (neue Datei `cockpit.ts`, ein Recht in drei Bündeln, eine Lesemethode); service (eine Route);
 docs-sicherheit und Kennzahlenkatalog (Bericht „Leitstand“ im Auswertungskatalog, Regel (g) im Allowlist-Tor, MF-17); web-api
@@ -103,7 +103,10 @@ Diff vor dem Bau (unten), nie gebündelt.
   `history.read`, keines davon ist ein `unitBound`-Bündel; expert ist `unitBound` (R-PERM-03). Die Liste der Administration ist an
   **zwei** Stellen gepinnt: `admin040a.test.ts:42-43` (Menge und Länge 14) und `forward048.test.ts:149-152` (genaue Reihenfolge).
   `READ_PERMISSIONS` (`types.ts:90-103`); `api.test.ts:538` prüft, dass jeder Eintrag eine `HvApi`-Methode nennt; `stream.ts:159-173`
-  leitet daraus die Stromthemen ab. `policy-truth-table.md` enthält nur Aktionen an Einzelfragen.
+  leitet daraus die Stromthemen ab. `policy-truth-table.md` ist generiert (`transitions.test.ts:426`) und enthält neben Rolle × Status
+  × Aktion weitere Tabellen, darunter **„Role × Leserecht“** (Zeile 208–223, Spalten aus den Leserechten); `api.test.ts` pinnt das
+  Bündel der Koordination in einer Zeile. `ACTION_KEYS` in `apps/web/src/i18n/labels.ts:54` ist `Record<Permission, TKey>`: ein neues
+  Recht kompiliert im Web erst mit seinem Eintrag und dem Schlüssel `action.<recht>` in beiden Sprachen.
 - **Vertragsversion an vier Stellen:** `openapi.yaml` `info.version`, `packages/contract/package.json` (`"version": "0.4.4"`),
   `apps/api/src/__tests__/takt-019-contract.test.ts:8,11` (Version und **70** Operationen), `apps/api/src/__tests__/contract.test.ts:90`
   (Version). Antwort `503 PersistenceBusy` ist für Lesungen über Postgres üblich (`openapi.yaml:108`, `:182`).
@@ -205,12 +208,14 @@ Zoom): eine Spalte, Stationen als zwei Reihen zu drei, kein waagrechtes Scrollen
 | Druckansicht, Schwellen je Jahrgang | nein | Folgeliste; 041 nach Eigentümerfrage 1 | — |
 
 **Bau in zwei Teilen auf dieser Spec (vom Orchestrator angenommen 05.10.2026, kein Planknoten 061a).** Die überarbeitete Scheibe liegt
-mit 4,9 AStd über einem Agententag und über dem Doppelten der Planzeit. Statt einer zweiten Spec wird sie in zwei PRs gebaut, die
+mit 5,0 AStd über einem Agententag und über dem Doppelten der Planzeit. Statt einer zweiten Spec wird sie in zwei PRs gebaut, die
 beide diese Spec und ihre „Files allowed“ nutzen (`slice-scope` erkennt `claude/slice-061-…`):
 
-- **Teil A „Kern“** (Branch `claude/slice-061-kern`, ≈ 2,0 AStd, hoch): Vertragsschritt, `cockpit.ts`, Recht, `getCockpit`, Route,
-  Bericht im Katalog, Regel (g) im Tor, Generator, MF-17, DSFA V15; Tests K1–K12, A1–A7, G1–G3. Merge vor Teil B.
-- **Teil B „Oberfläche“** (Branch `claude/slice-061-oberflaeche`, ≈ 2,9 AStd): Web-API, Seite, Liste, Faden, i18n, Register, Glossar,
+- **Teil A „Kern“** (Branch `claude/slice-061-kern`, ≈ 2,3 AStd, hoch): Vertragsschritt, `cockpit.ts`, Recht, `getCockpit`, Route,
+  Bericht im Katalog, Regel (g) im Tor, Generator, MF-17, DSFA V15, dazu der kleinste Web-Adapter (HTTP-Route, Pufferausschluss und
+  Durchreichung, `ACTION_KEYS`-Eintrag mit `action.cockpit.read`, Paritätszahl), damit Teil A allein durch `pnpm gates` kommt; Tests
+  K1–K12, A1–A7, G1–G3, L1. Merge vor Teil B.
+- **Teil B „Oberfläche“** (Branch `claude/slice-061-oberflaeche`, ≈ 2,7 AStd): Wiederausgabe `api/cockpit.ts`, Seite, Liste, Faden, i18n, Register, Glossar,
   Zielbild-Status; Tests W1–W11, S1–S8; Screenshots; Design-Kritik.
 
 **Skizze 061b „Leitstand: Flussbild und Prognosen“** (eigene Spec vor dem Bau, AGENTS.md R1): Flussbild als SVG aus Tokens (Punkt je
@@ -231,7 +236,10 @@ Zahlen); Prognose „im Legal Clearing abgebaut ca. HH:MM bei n Rechtsfreigaben 
 | capture, expert, legal, approver, podium, observer | · | · | Deny by default; Eigentümerfrage 6 |
 
 `PERMISSIONS`: `cockpit.read` nach `event.read` (Leserechte stehen zusammen). `READ_PERMISSIONS`: `getCockpit: ['cockpit.read']`.
-`policy-truth-table.md` bleibt **unverändert** (nur Aktionen an Einzelfragen). Stromthemen bleiben unverändert. **Invarianten,
+**Diff der Wahrheitstabelle (die Rechteentscheidung, Festlegung 4 der Spec 010):** `policy-truth-table.md` wird neu erzeugt; die
+Tabelle „Role × Leserecht“ bekommt die Spalte `cockpit.read` mit ✓ bei moderation, coordination, admin und · sonst; alle übrigen
+Tabellen, darunter Rolle × Status × Aktion, bleiben Zeile für Zeile gleich. Dieser Diff ist die Rechteentscheidung dieser Scheibe; der
+Review prüft ihn gegen die Tabelle oben. Stromthemen bleiben unverändert. **Invarianten,
 als Test (K1):** jeder Inhaber von `cockpit.read` hält `question.read` **ungebunden** (sein Bündel ist kein `unitBound`-Bündel) und
 damit auch das Thema `questions`. Ein späteres gebundenes oder auf Schutzklassen beschränktes Bündel mit `cockpit.read` ist eine
 Spec-Entscheidung: Die Aggregate wären dann Zahlen über Einzelfragen, die der Leser nicht lesen darf (Hinweis an 047).
@@ -394,8 +402,10 @@ kein Antworttext. Ohne `history.read` nur die aktuelle Station aus der Referenz.
 
 ### 7. Live
 
-**Standard:** `getCockpit` wird **nicht gepuffert** (`BufferedRead = Exclude<ReadMethodName, 'listEvents' | 'getCockpit'>`; kein
-Eintrag in `READ_TOPICS`): eine zeitabhängige Lesung, deren Wert ohne Ereignis altert. Die Seite liest neu, wenn `useApiVersion()`
+**Standard:** `getCockpit` wird **nicht gepuffert**: `BufferedRead = Exclude<ReadMethodName, 'listEvents' | 'getCockpit'>`, kein
+Eintrag in `READ_TOPICS`, und im Live-Store neben `listEvents` die Durchreichung `getCockpit: () => adapter.getCockpit()` — eine
+zeitabhängige Lesung, deren Wert ohne Ereignis altert. Ein Unit-Test (L1, Teil A) prüft, dass `api.getCockpit` im Live-Store existiert
+und bei zwei Aufrufen zweimal den Adapter ruft. Die Seite liest neu, wenn `useApiVersion()`
 zählt (Strom oder Takt), und **alle 15 s** über ein `setInterval` (Anstoß, keine Zeitquelle; pausiert, solange das Dokument
 verborgen ist). Keine Fokusverschiebung, keine Layoutänderung (feste Mindesthöhen, `tabular-nums`), keine Animation. **Eine einzige
 höfliche Ansage** (`aria-live="polite"`, sonst stumm): wenn eine Kennzahl neu in „kritisch“ wechselt („Leitstand: älteste offene
@@ -417,10 +427,14 @@ Liste.
 - **E13 (offen), weiter gefasst:** Ein Fachbereich mit genau einer Person macht dessen Rückstand faktisch zu einer Zahl je Person.
   Dasselbe gilt für **Rollengruppen**: Die Stationen „im Legal Clearing“ (Gruppe Legal Clearing, im Seed zwei Personen), „erfasst“
   (Gruppe Erfassung) und „freigegeben“ (Freigabe) zeigen Bestände, deren Abbau einer kleinen Gruppe zuzurechnen ist; „Legal Clearing
-  über 10 min“ ist eine Wartezeit vor genau dieser Gruppe. Der Leitstand zeigt **Bestände und Wartezeiten, keine Durchsätze** (kein
-  „erledigt je Zeit“); der Durchsatz (Z11) ist an 061b und einen Katalogeintrag gebunden. Keine Unterdrückung im Code; die
+  über 10 min“ ist eine Wartezeit vor genau dieser Gruppe. Der **Zulauf** (Erfassungen je 5 min, mit den elf früheren Fenstern) ist
+  ehrlich eingestuft: er ist die Arbeitsmenge der **Gruppe Erfassung**, nach oben begrenzt durch das Redetempo im Saal (E13). Der
+  Leitstand zeigt **Bestände, Wartezeiten und Zulauf; keinen Erledigungsdurchsatz (erledigt je Zeit je Station)**; ein solcher
+  Durchsatz (Z11) ist an 061b und einen Katalogeintrag gebunden. Keine Unterdrückung im Code; die
   Mindestzahl ist im Bericht als Feld `minimumGroupSize` vorgesehen (Standard `null` = nicht festgelegt, Eigentümerfrage 5); DSFA V15
-  nennt den Leitstand als Empfänger und beide Fälle (Fachbereich, Rollengruppe).
+  nennt den Leitstand als Empfänger, beide Fälle (Fachbereich, Rollengruppe) und den Zulauf als Zahl der Gruppe Erfassung, und
+  **berichtigt** dort die bisherige Angabe „Mindestfallzahl im Code“: eine Mindestzahl gibt es im Code noch nicht, sie ist als
+  Feld `minimumGroupSize` vorbereitet und hängt an E13.
 
 ### 8a. Security: Referenzen nur, was der Leser lesen darf
 
@@ -434,18 +448,20 @@ und `oldestOpen.ageSeconds` gleich, `items` enthält nur lesbare Referenzen (die
 
 **Standard:** Der Leitstand wird als **Bericht** (eine Ansicht, die Kennzahlen zeigt) in derselben einzigen Quelle geführt wie die
 Familien: `catalog.json` bekommt ein Feld `reports` (Liste), Eintrag `id: "leitstand"`, `spec: "061"`, `operationId:
-"getMeetingCockpit"`, `permission: "cockpit.read"`, `aggregation` (Jahrgang, Status, Fachbereich; Referenzen je Einzelfrage ohne
-Person), `minimumGroupSize: null`, `fields` (je Feld des Schemas `Cockpit`: Pfad, Quelle = Katalogfamilie oder `Meeting.counts`-Feld
-nach dem Abschnitt „Kennzahlen-Allowlist“, `personalReference`). Im Kern spiegelt `COCKPIT_REPORT` in `cockpit.ts` denselben
+"getMeetingCockpit"`, `permission: "cockpit.read"`, `aggregation` als **strukturierte Liste** `["meeting", "status", "unit"]`
+mit Kennzeichen `questionReferences: true` (Referenzen je Einzelfrage; kein Freitext, damit die Begriffsprüfung der Regel (g) nicht an
+Wörtern wie „ohne Person“ anschlägt), `minimumGroupSize: null`, `fields` (je **Blattpfad** des Schemas `Cockpit`: Pfad, Quelle =
+Katalogfamilie, `Meeting.counts`-Feld, `derived:` oder `meta:` nach dem Abschnitt „Kennzahlen-Allowlist“, `personalReference`). Im Kern spiegelt `COCKPIT_REPORT` in `cockpit.ts` denselben
 Deskriptor (Aggregationsstufe, Mindestzahl, Felder); Test A6 hält beide gleich. Technisch möglich, geprüft: `renderMetrics` iteriert
 nur `catalog.metrics` (Prometheus-Ausgabe unberührt, A5), das Tor lehnt unbekannte Schlüssel der obersten Ebene nicht ab.
 
 - **Generator** `scripts/auswertungskatalog.mjs`: neuer Abschnitt „## Berichte (Oberfläche)“ je Bericht mit Zweck, Recht,
   Operation, Aggregation, Mindestzahl, Feldtabelle; JSON-Ausgabe mit `reports`. Test G1 in `auswertungskatalog.test.mjs`.
 - **Tor** `scripts/metrics-allowlist-check.mjs`, neue Regel **(g)**: jeder Bericht hat eine `id` nach `^[a-z0-9-]+$`, eine `spec`,
-  deren Abschnitt „## Kennzahlen-Allowlist“ die `id` in Backticks nennt; kein Feldpfad und keine `aggregation` enthält einen
-  Personenbegriff (gleiche Liste wie (c)); jede `fields[].source` ist eine Familie aus `metrics`, ein Feld `Meeting.counts.*` oder
-  `derived:` mit Begründung. Fehlt `reports`, ist das kein Fehler (Rückwärtsverträglichkeit). Tests G2, G3 mit Fixtures.
+  deren Abschnitt „## Kennzahlen-Allowlist“ die `id` in Backticks nennt; `aggregation` ist eine Liste aus `meeting`, `status`, `unit`, `seat`
+  (geschlossene Menge) plus das boolesche `questionReferences`; kein Feldpfad enthält einen Personenbegriff (gleiche Liste wie (c));
+  jede `fields[].source` ist eine Familie aus `metrics`, ein Feld `Meeting.counts.*`, `derived:` mit Begründung oder `meta:`
+  (Stammdaten der Antwort ohne Kennzahl). Fehlt `reports`, ist das kein Fehler (Rückwärtsverträglichkeit). Tests G2, G3 mit Fixtures.
 
 ### 9. Platz für die Kanarienfrage (086)
 
@@ -483,27 +499,28 @@ Inhalt 086); **Engpass** (Kennzeichen an der Station Legal Clearing ab Stufe erh
 
 ## Kennzahlen-Allowlist
 
-Bericht `leitstand` (Entscheidung 8b). Keine neue Familie; jedes Feld von `Cockpit` hat eine Quelle im Katalog oder in
-`Meeting.counts`:
+Bericht `leitstand` (Entscheidung 8b). Keine neue Familie; jeder **Blattpfad** von `Cockpit` hat eine Quelle (Familie, `Meeting.counts`,
+`derived:` oder `meta:`); die Feldliste von `COCKPIT_REPORT` und A7 vergleichen genau diese Blattpfade:
 
 | Feld | Quelle | Personenbezug |
 |---|---|---|
 | `oldestOpen.ageSeconds` | Familie `hv_open_question_oldest_age_seconds` | keiner |
 | `openByUnit`, `openUnassigned` | Familie `hv_open_questions` (Label `unit_id`; `unassigned`) | E13: Fachbereich mit einer Person |
-| `inflow.last5m`, `inflow.bins[11]` | Familie `hv_questions_captured_last_5m` | keiner |
-| `inflow.bins[0..10]` | dieselbe Definition, frühere Fenster (Zeitreihe derselben Familie, `derived:`) | keiner |
+| `inflow.last5m`, `inflow.bins[11]` | Familie `hv_questions_captured_last_5m` | E13: Gruppe Erfassung, begrenzt durch Redetempo |
+| `inflow.bins[0..10]` | dieselbe Definition, frühere Fenster (Zeitreihe derselben Familie, `derived:`) | E13: Gruppe Erfassung, begrenzt durch Redetempo (Eigentümerfrage 5: ggf. entfallen) |
+| `inflow.binSeconds` | `meta:` (Konstante 300) | keiner |
 | `legalReview.over10m` | Familie `hv_questions_in_legal_review_over_10m` | E13: Rollengruppe Legal Clearing |
 | `totals.captured` | `Meeting.counts.questions` | keiner |
 | `totals.open` | `Meeting.counts.open` | keiner |
 | `totals.staged` | `Meeting.counts.staged` | keiner |
-| `totals.answered` | `Meeting.counts.byStatus.delivered` + `.closed` (`derived:`) | keiner |
+| `totals.answered` | `Meeting.counts.delivered` (zählt delivered und closed) | keiner |
 | `openByStatus.*` | `Meeting.counts.byStatus` | E13: Rollengruppen Erfassung, Legal Clearing, Freigabe |
-| `oldestOpen.items`, `legalReview.items` | Referenzen je Einzelfrage (`derived:` aus der Projektion, gefiltert nach `can()`), keine Kennzahl | keiner (kein Redner, kein Akteur) |
-| `meetingId`, `asOf`, `meetingStatus`, `debateClosedAt` | Stammdaten | keiner |
+| `oldestOpen.items[].{id,number,status,unitId,ageSeconds,statusAgeSeconds}`, `legalReview.items[].{id,number,status,unitId,ageSeconds,statusAgeSeconds,reviewAgeSeconds}` | Referenzen je Einzelfrage (`derived:` aus der Projektion, gefiltert nach `can()`), keine Kennzahl | keiner (kein Redner, kein Akteur) |
+| `meetingId`, `asOf`, `meetingStatus`, `debateClosedAt` | `meta:` | keiner |
 
 ## Nicht-Ziele
 
-- Keine Prognosen (Z11), kein Flussbild mit Punkt je Einzelfrage (Z12): 061b. Kein Durchsatz („erledigt je Zeit“).
+- Keine Prognosen (Z11), kein Flussbild mit Punkt je Einzelfrage (Z12): 061b. Kein Erledigungsdurchsatz (erledigt je Zeit je Station).
 - **Keine neue Kennzahlfamilie**, keine Änderung an `/metrics` oder `prometheus.ts`; `catalog.json` bekommt nur den Bericht.
 - Keine Schwellen je Jahrgang, keine Konfiguration, keine Alarme (085), kein Inhalt der Kanarienfrage (086), keine Restantenliste
   (087), kein Debattenschluss, kein Schreiben.
@@ -529,7 +546,9 @@ Teil A — Kern, Dienst, Katalog (implementierer-backend):
 - `packages/domain/src/permissions.ts` (nur `cockpit.read` in den Bündeln moderation, coordination, admin)
 - `packages/domain/src/api.ts` (nur `getCockpit` in `HvApi` und seine Umsetzung)
 - `packages/domain/src/index.ts` (nur Exporte aus `cockpit.ts`)
-- `packages/domain/src/__tests__/admin040a.test.ts` (nur die Liste der Administration 14 → 15)
+- `packages/domain/src/__tests__/admin040a.test.ts` (nur die Liste der Administration 14 → 15, der Testtitel „fourteen“ und Zeile 48 `PERMISSIONS.length - 14`)
+- `packages/domain/src/__tests__/api.test.ts` (nur die Zeile mit dem Bündel der Koordination)
+- `packages/domain/policy-truth-table.md` (nur neu erzeugt: Spalte `cockpit.read` in der Tabelle „Role × Leserecht“)
 - `packages/domain/src/__tests__/forward048.test.ts` (nur die Zeile der Administrationsliste)
 - `apps/api/src/app.ts` (nur die Route `GET /v1/meetings/:meetingId/cockpit`)
 - `apps/api/src/__tests__/cockpit061.test.ts` (neu)
@@ -542,19 +561,25 @@ Teil A — Kern, Dienst, Katalog (implementierer-backend):
 - `docs/sicherheit/bedrohungsmodell.md` (nur eine Zeile 061 in „Weitere Scheiben mit Sicherheitsbezug“, Verweis in der Zeile T-G2-D-03 und der neue Missbrauchsfall MF-17)
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V15)
 
+Teil A — Web-Adapter, damit Teil A allein durch `pnpm gates` kommt (implementierer-backend):
+- `apps/web/src/api/http.ts` (nur die Route `getCockpit`)
+- `apps/web/src/api/liveStore.ts` (nur `getCockpit` im Ausschluss von `BufferedRead` und die Durchreichung neben `listEvents`)
+- `apps/web/src/api/http.test.ts` (nur die Zeile der Routentabelle für `getCockpit`)
+- `apps/web/src/api/liveStore061.test.ts` (neu, Test L1)
+- `apps/web/src/i18n/labels.ts` (nur der Eintrag `cockpit.read` in `ACTION_KEYS`)
+- `apps/web/src/i18n/{shell.de,shell.en}.ts` (nur `action.cockpit.read`)
+- `apps/web/src/i18n/parity.test.ts` (nur die Gesamtzahl +1 und ihr Kommentar)
+
 Teil B — Oberfläche (implementierer-oberflaeche):
 - `apps/web/src/features/cockpit/**` (neu)
 - `apps/web/src/api/cockpit.ts` (neu: Wiederausgabe von `cockpitLevel`, `COCKPIT_THRESHOLDS`, `statusTrail` und der Typen für die Ansicht)
-- `apps/web/src/api/http.ts` (nur die Route `getCockpit`)
-- `apps/web/src/api/liveStore.ts` (nur `getCockpit` im Ausschluss von `BufferedRead`)
-- `apps/web/src/api/http.test.ts` (nur die Zeile der Routentabelle für `getCockpit`)
 - `apps/web/src/api/cockpit061.test.ts` (neu)
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile `cockpit`, ihr Import und ihr Symbol)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile)
 - `apps/web/src/i18n/cockpit.de.ts` (neu), `apps/web/src/i18n/cockpit.en.ts` (neu)
 - `apps/web/src/i18n/{de,en}.ts` (nur das Modul `cockpit`)
-- `apps/web/src/i18n/{shell.de,shell.en}.ts` (nur `nav.cockpit`, `page.cockpit.*`)
-- `apps/web/src/i18n/parity.test.ts` (nur Modul `cockpit` und die Gesamtzahl)
+- `apps/web/src/i18n/{shell.de,shell.en}.ts` (in Teil B nur `nav.cockpit`, `page.cockpit.*`)
+- `apps/web/src/i18n/parity.test.ts` (in Teil B nur Modul `cockpit` und die Gesamtzahl)
 - `apps/web/e2e/061-leitstand.spec.ts` (neu)
 - `apps/web/playwright.config.ts` (nur `SHARED_SPECS`)
 - `scripts/e2e-http-031.test.mjs` (nur `SHARED_FILES` und `HTTP_ORDER`: die neue Datei zwischen 055b und 080)
@@ -569,7 +594,8 @@ Beide Teile:
 ## Ausdrücklich nicht erlaubt
 
 `apps/web/src/components`, `apps/web/src/styles`, `apps/web/src/app` außer den zwei Registerdateien, die übrigen Feature-Ordner,
-`apps/api/src/metrics/prometheus.ts`, die Familien in `catalog.json`, `scripts/` außer den genannten Dateien, die Wahrheitstabelle,
+`apps/api/src/metrics/prometheus.ts`, die Familien in `catalog.json`, `scripts/` außer den genannten Dateien, die Wahrheitstabelle außer
+der neu erzeugten Spalte `cockpit.read` in „Role × Leserecht“, `apps/web/src/i18n/labels.ts` außer dem einen Eintrag,
 `docs/produktplan-beta.md`, `.github`. Fehlt etwas: anhalten und melden. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“.
 
 ## Vor dem Bau prüfen
@@ -631,13 +657,19 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 - **A5** `/metrics` unverändert (früher K3b): Ausgabe von `renderMetrics` für den Seed mit fester Uhr gleich `metrics-golden-061.txt`
   (rot, wenn ein Refactoring die Ausgabe ändert; die Rot-Probe steht im Bericht).
 - **A6** Bericht: `catalog.json` `reports[leitstand]` gleich `COCKPIT_REPORT` (Felder, Aggregation, Mindestzahl, Recht, Operation).
-- **A7** Allowlist aus dem Vertrag (früher Teil von K7): die Menge der Pfade, die das Schema `Cockpit` mit Unterschemas erlaubt, ist
+- **A7** Allowlist aus dem Vertrag (früher Teil von K7): die Menge der **Blattpfade** (etwa `inflow.binSeconds`,
+  `legalReview.items[].reviewAgeSeconds`), die das Schema `Cockpit` mit Unterschemas erlaubt, ist
   gleich der Feldliste von `COCKPIT_REPORT`, und jede tatsächliche Antwort (Seed, alle drei Inhaber) enthält nur solche Pfade.
 - **G1** Generator schreibt den Abschnitt „Berichte (Oberfläche)“ mit `leitstand` und `reports` ins JSON.
 - **G2** Tor grün mit dem echten Katalog und für einen Katalog ohne `reports`; **G3** rot für die Fixtures
   `report-person-field.json` (Feldpfad mit `actor`), `report-no-spec-section.json`, `report-bad-source.json`, `report-bad-id.json`.
 
-**Web** (`apps/web/src/api/cockpit061.test.ts`, `apps/web/src/features/cockpit/*.test.ts(x)`):
+**Web-Adapter, Teil A** (`apps/web/src/api/liveStore061.test.ts`):
+
+- **L1** `api.getCockpit` existiert im Live-Store, wird nicht gepuffert (zwei Aufrufe ⇒ zwei Adapteraufrufe) und gibt die Antwort
+  des Adapters unverändert weiter; `READ_TOPICS` hat keinen Eintrag `getCockpit` (Typprüfung).
+
+**Web, Teil B** (`apps/web/src/api/cockpit061.test.ts`, `apps/web/src/features/cockpit/*.test.ts(x)`):
 
 - **W1** Stufen: ruhig ohne Badge; erhöht/kritisch mit Symbol, Wort und Schwelle aus `COCKPIT_THRESHOLDS`; „Engpass“ an der Station
   Legal Clearing genau ab erhöht; zugängliche Namen aller Kennzahlen, Stationsspalten und Fachbereichszeilen nach dem einen Muster aus Entscheidung 4.
@@ -678,17 +710,18 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 
 1. Nachprüfung liegt vor; Vertragsschritt als erster Commit von Teil A, Golden als eigener Commit vor jeder Änderung an
    `indicators.ts`.
-2. Teil A: K1–K12, A1–A7, G1–G3 vor der Änderung rot (Ausgabe im Bericht), danach grün; `pnpm gates` grün auf dem Branch von Teil A.
+2. Teil A: K1–K12, A1–A7, G1–G3, L1 vor der Änderung rot (Ausgabe im Bericht), danach grün; `pnpm gates` grün auf dem Branch von Teil A.
 3. Teil B: W1–W11 rot, dann grün; S1–S8 `in-process` grün, auch mit `--repeat-each=3`; S1–S4, S6, S7 im Projekt `http` grün im CI-Lauf
    `e2e-http` des PR; volle Suite `in-process` grün, darunter unverändert 001, 013, 053, 054; axe ohne serious/critical.
 4. Sechs Screenshots nach S8; auf dem Hauptbild sind Hauptlesung mit Stufe und Schwelle, vier Karten, Zulauf mit Achse, Stationen mit
    Zahlen, Rückstand mit Schwellenstrich und die Kanarienzeile lesbar.
 5. `pnpm role-literals`, `i18n-literals`, `vocabulary`, `now-check`, `metrics-allowlist` grün; Parität mit neuer Zahl;
-   `policy-truth-table.md` unverändert; `/metrics` unverändert (A5); Artefakt `auswertungskatalog` des PR-Laufs enthält den Bericht.
+   `policy-truth-table.md` nur um die Spalte `cockpit.read` in „Role × Leserecht“ geändert (Diff im Bericht, Rechteentscheidung);
+   `/metrics` unverändert (A5); Artefakt `auswertungskatalog` des PR-Laufs enthält den Bericht.
 6. Keine neue Abhängigkeit in einer `package.json` (takt-047).
 7. `pnpm slice-scope` grün auf beiden Branches; `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
 8. Design-Kritik in frischem Kontext ohne Blocker (Tabelle unten), mit Vergleich zu `089-lagebild.png` und Prüfung der benannten
-   Ausnahmen (44-px-Hauptzahl, 11-px-Achse, leerer Zustand ohne Aktion).
+   Ausnahmen (44-px-Hauptzahl, 11-px-Achse, 3-px-Statustönung als Oberkante der Stationen, leerer Zustand ohne Aktion).
 
 ## Nachweise
 
@@ -706,7 +739,7 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 |---|---|---|
 | D1 | In 30 s klar: links oben die älteste offene Einzelfrage, rechts drei Karten und der Zulauf, darunter Stationen mit Engpass und Rückstand; Titel und ein Satz. | Screenshot, Design-Kritik |
 | D2 | Genau eine primäre Schaltfläche („Faden öffnen“); leerer Zustand ohne Aktion als benannte Ausnahme. | S1, W4 |
-| D3 | 12-Spalten-Raster, 8-px-Raster, Unterkanten Hauptlesung/Zulauf fluchten, Karten gleich hoch; benannte Ausnahmen: Hauptzahl 44 px (40 px an der Wand), Achse 11 px; Kartenzahlen 28 px, Stationen 20 px. | Screenshot |
+| D3 | 12-Spalten-Raster, 8-px-Raster, Unterkanten Hauptlesung/Zulauf fluchten, Karten gleich hoch; benannte Ausnahmen: Hauptzahl 44 px (40 px an der Wand), Achse 11 px, 3-px-Statustönung der Stationen (D4); Kartenzahlen 28 px, Stationen 20 px. | Screenshot |
 | D4 | Ruhe ohne Farbe; Farbe nur bei Stufe als Badge oder Balkenfüllung, Statustönung der Stationen nur als 3-px-Kante; Zulauf einfarbig; keine Verläufe, keine Schatten. | W1–W3 |
 | D5 | Alle Zahlen, Nummern, Zeiten Mono, rechtsbündig, `tabular-nums`; Fehler mit Regel-id. | W3, W4 |
 | D6 | Laden, leer, Fehler, Lesezustand, leere Liste, Referenz nicht lesbar gestaltet; Verbindungszustand nur in der Kopfzeile (nicht doppelt). | W4, S4 |
@@ -720,7 +753,7 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 | Risiko | Abwehr | Nachweis |
 |---|---|---|
 | Kennzahl je Person (Feld, Schlüssel, Faden mit Akteur) | Schema `additionalProperties: false`, Allowlist aus dem Vertrag, Bericht im Katalog mit Tor-Regel (g), Faden ohne Akteure | K7, A6, A7, G3, W5, S6 |
-| Leistungskontrolle kleiner Gruppen (E13) | nur Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` vorgesehen; MF-17 | Kennzahlen-Allowlist, Bedrohungsmodell |
+| Leistungskontrolle kleiner Gruppen (E13) | nur Bestände, Wartezeiten und Zulauf, kein Erledigungsdurchsatz; `minimumGroupSize` vorgesehen; MF-17 | Kennzahlen-Allowlist, Bedrohungsmodell |
 | Referenz auf eine Einzelfrage, die der Leser nicht lesen darf | Filter nach `can(actor, 'question.read', q)`; Inhaber ungebunden (K1) | K1, K12 |
 | Zwei Definitionen (Leitstand ≠ `/metrics`) | gemeinsame Hilfen, Gleichheitstest, Golden | K3, A5 |
 | Recht ohne Prüfung | `READ_PERMISSIONS`; 403 statt Teildaten | K2, A2, S4 |
@@ -732,10 +765,10 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 | `e2e-http` zu lang | nur Lesen, Messung vor dem Bau | Vor-dem-Bau-Punkt 6 |
 
 **Missbrauchsfall MF-17 „Leistungsauswertung über den Leitstand“** (061; verwandt MF-09), Text für das Bedrohungsmodell:
-- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“ oder den
-  Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit einzelner Beschäftigter; Screenshots oder
+- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“, den Zulauf
+  (Arbeitsmenge der Erfassung) oder den Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit einzelner Beschäftigter; Screenshots oder
   Mitschriften der Wand ersetzen eine Auswertung.
-- *Verhindert durch:* nur Bestände und Wartezeiten, kein Durchsatz, kein Akteur, keine Zahl je Person (Allowlist, Tor-Regel (g));
+- *Verhindert durch:* nur Bestände, Wartezeiten und Zulauf, kein Erledigungsdurchsatz (erledigt je Zeit je Station), kein Akteur, keine Zahl je Person (Allowlist, Tor-Regel (g));
   Inhaberkreis auf drei Rollen; Mindestzahl über E13 vorbereitet (`minimumGroupSize`); organisatorisch die Betriebsvereinbarung.
 - *Erkennung, Signal und Empfänger:* jede Lesung steht im Zugriffslog mit `operationId` `getMeetingCockpit` und `subjectHash`
   (033a); auffällige Lesemuster außerhalb des HV-Fensters prüft der Datenschutz im Verfahren zu zweit (ADR 0013); Empfänger DSB und
@@ -745,7 +778,8 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 
 ## Aufwand
 
-Geschätzt **4,9 AStd** (Spanne 4,3–5,5), erste Fassung 3,9. Plan: 2 AStd, mit Zielbild 3,75. Mehraufwand gegenüber der ersten
+Geschätzt **5,0 AStd** (Spanne 4,4–5,6), erste Fassung 3,9, zweite 4,9; die Nachprüfung verschiebt den Web-Adapter nach Teil A
+(+0,15 in A, −0,1 in B) und ergänzt L1, die Spalte der Wahrheitstabelle und die strukturierte Aggregation (+0,05). Plan: 2 AStd, mit Zielbild 3,75. Mehraufwand gegenüber der ersten
 Fassung rund 1,0 AStd: Bericht im Katalog mit Generator und Tor-Regel (0,35), Filter nach `can()` und schärferes K1 (0,05), Golden
 (0,05), MF-17 und Zeilen (0,05), getrennte Schemas und Grenzen (0,05), weitere Testpins (0,05), Stationen über die volle Breite,
 vierte Karte, Schwellenbadges, Achse, Schwellenstrich, Ansage (0,4). Differenz an Prüfpunkt 2 und die Budgettabelle (Plan 6.5).
@@ -756,15 +790,16 @@ vierte Karte, Schwellenbadges, Achse, Schwellenstrich, Ansage (0,4). Differenz a
 | **A** Kern: `cockpit.ts` (Faltung, `computeCockpit`, `statusTrail`, Schwellen, Stufen, `COCKPIT_REPORT`), Hilfen mit `indicators.ts`, Recht, `getCockpit` mit `can()`-Filter, K1–K12 | 0,85 |
 | **A** Dienst: Route, Golden, A1–A7 | 0,35 |
 | **A** Katalog: `reports`, Generator, Tor-Regel (g), Fixtures, G1–G3; MF-17, DSFA V15 | 0,4 |
-| **B** Web-API: Route, Pufferausschluss, Wiederausgabe, Tests | 0,1 |
+| **A** Web-Adapter: HTTP-Route, Pufferausschluss und Durchreichung, `ACTION_KEYS`, `action.cockpit.read`, Parität, L1; Wahrheitstabelle neu erzeugt | 0,15 |
+| **B** Wiederausgabe `api/cockpit.ts` | 0,05 |
 | **B** Seite: Gerüst, Zustände, Hauptlesung, vier Karten, Zulauf mit Achse, Stationen mit Engpass, Rückstand mit Strich, Kanarienzeile, Live, Ansage | 1,05 |
 | **B** Liste, waagrechter Faden, URL-Zustand, Tastaturpfad | 0,45 |
 | **B** i18n, Registerzeile, Glossar, Zielbild-Status | 0,15 |
 | **B** Web-Tests W1–W11 | 0,35 |
 | **B** e2e S1–S8, axe, sechs Screenshots, Einreihung `http` | 0,5 |
-| beide: `pnpm gates`, Berichte, CI-Nachweise | 0,3 |
+| beide: `pnpm gates`, Berichte, CI-Nachweise (je 0,15) | 0,3 |
 
-Teil A ≈ 2,0 AStd, Teil B ≈ 2,9 AStd. **Zuschnitt bei Überschreitung in Teil B:** über 3,2 AStd committet Teil B ohne Faden (K9 bleibt in
+Teil A ≈ 2,3 AStd (2,15 + 0,15), Teil B ≈ 2,7 AStd (2,55 + 0,15). **Zuschnitt bei Überschreitung in Teil B:** über 3,0 AStd committet Teil B ohne Faden (K9 bleibt in
 A grün; W6 und der Faden-Teil von S3 entfallen) und meldet; der Faden geht an 061b.
 
 ## Standards (auf Standard gebaut)
@@ -790,15 +825,17 @@ Keine blockiert den Bau; alle mit Standard.
 3. **061b vor der Freigabe-Demo?** *Standard:* eigene Spec direkt nach 061, Bau vor der Demo nur mit Budget an Prüfpunkt 2.
 4. **Navigation.** *Standard:* letzter Eintrag, kein Kürzel. Alternative: erster Eintrag, Alt+7.
 5. **E13, kleine Fachbereiche und Rollengruppen** (Legal Clearing, Erfassung, Freigabe). *Standard:* keine Unterdrückung, nur
-   Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` bleibt `null`, bis die Betriebsvereinbarung eine Zahl nennt. Frage:
-   welche Mindestgröße, und gilt sie auch für Stationen, die einer Rollengruppe entsprechen?
+   Bestände, Wartezeiten und Zulauf, kein Erledigungsdurchsatz; `minimumGroupSize` bleibt `null`, bis die Betriebsvereinbarung eine
+   Zahl nennt. Fragen: welche Mindestgröße, und gilt sie auch für Stationen, die einer Rollengruppe entsprechen? Option: die elf
+   früheren Fenster des Zulaufs streichen und nur `last5m` zeigen (weniger Zeitverlauf der Gruppe Erfassung, Verlust der Säulen in
+   der Demo); Standard: Säulen bleiben.
 6. **Weitere Inhaber** (etwa approver). *Standard:* nein.
 7. **Fragetext in Listen.** *Standard:* nein, nur im Faden.
 
 ## Hinweise an den Orchestrator
 
 - **Planzeile 061** nachziehen: Klasse **hoch**, Lanes `contract, core, service, docs-sicherheit, web-api, web-cockpit, web-shell,
-  e2e, docs`, Aufwand 4,9 AStd (Teil A 2,0, Teil B 2,9), Nachweise um Rechte-Diff, Gleichheit mit 033b, Golden, Bericht im
+  e2e, docs`, Aufwand 5,0 AStd (Teil A 2,3, Teil B 2,7), Nachweise um Rechte-Diff, Gleichheit mit 033b, Golden, Bericht im
   Auswertungskatalog, Negativtest und Allowlist ergänzen; Rolle „Architekt (Vertragsschritt) + Implementierer-Backend +
   Implementierer-Oberfläche“; Bau in zwei PRs auf dieser Spec (vom Orchestrator angenommen 05.10.2026; **kein** Planknoten 061a).
 - **Neue Planzeile 061b** „Leitstand: Flussbild und Prognosen“ (hoch; Abhängigkeit 061).
@@ -881,4 +918,22 @@ Tabelle mit Vergleich zu `docs/evidence/089-lagebild.png` und Urteil zu den bena
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
   Demo; eingearbeitet nach den Entscheidungen des Orchestrators, Tabelle „Nacharbeit nach Lesebefund“. Nachprüfung der Blocker und
   major-Punkte offen. Zweite Nacharbeit (Orchestrator, 05.10.2026): MF-17 statt MF-15, Kleinbefunde n21, n22, n23, n25 im Wortlaut
-eingearbeitet, Bau in zwei PRs angenommen.
+eingearbeitet, Bau in zwei PRs angenommen. Nachprüfung auf `a4575f6`: 3 Blocker, 1 major, 8 minor neu, alle eingearbeitet (Tabelle
+„Nachprüfung“ unten).
+
+### Nachprüfung (auf `a4575f6`, 05.10.2026)
+
+| Nr. | Befund | Änderung |
+|---|---|---|
+| N1 | Wahrheitstabelle und `api.test.ts` nicht erlaubt | beide eng in „Files allowed“; Diff der Tabelle „Role × Leserecht“ als Rechteentscheidung (Festlegung 4); Rechte-Diff, „nicht erlaubt“ und Akzeptanz 5 korrigiert |
+| N2 | Teil A allein nicht grün | kleinster Web-Adapter nach Teil A (Route, Pufferausschluss und Durchreichung, `ACTION_KEYS`, `action.cockpit.read`, Parität, Routenzeile) |
+| N3 | Durchreichung im Live-Store | Entscheidung 7 und Files allowed nennen sie; Test L1 |
+| N4 | Zulauf ehrlich einstufen | Zeilen der Allowlist „E13, Gruppe Erfassung, begrenzt durch Redetempo“; DSFA V15, MF-17, Invariante „Bestände, Wartezeiten und Zulauf; kein Erledigungsdurchsatz (erledigt je Zeit je Station)“; Eigentümerfrage 5 mit der Option, die elf früheren Fenster zu streichen |
+| m1 | `aggregation` als Freitext | strukturierte Liste `["meeting","status","unit"]` plus `questionReferences`, geschlossene Menge in Regel (g) |
+| m2 | Quelle der Stammfelder | Quellform `meta:` |
+| m3 | Blattpfade | Allowlist und A7 auf Blattpfaden |
+| m4 | `totals.answered` | aus `Meeting.counts.delivered` |
+| m5 | V15 „Mindestfallzahl im Code“ | die Änderung an V15 berichtigt die Angabe |
+| m6 | 3-px-Statustönung | als benannte Ausnahme in D3/D4 und Akzeptanz 8 |
+| m7 | `admin040a.test.ts` | auch Testtitel „fourteen“ und Zeile 48 erlaubt |
+| m8 | Aufwand | 5,0 AStd, Teil A 2,3, Teil B 2,7 |
