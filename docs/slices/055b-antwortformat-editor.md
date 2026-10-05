@@ -1061,9 +1061,13 @@ Kein Treffer (Exit 1 von `grep` = nichts gefunden) über alle 45 berührten Text
 
 Review nach dem Bau (frischer Kontext, Security, UX/Barrierefreiheit, Recht/Freigabe; 05.10.2026): kein Blocker, kein Major.
 In der Scheibe behoben (`c0ccbc7`): 1 (Security/Integrität: Caret des Einfügens über den eingefügten Knoten statt Textsuche,
-alte Wächterzeichen U+E055/U+E05B aus Feld und Einfügung entfernt; Einheitstest der Wiedergabe), 2 (Security: Wächterprobe
+Wächterzeichen U+E055/U+E05B werden nicht mehr gesucht und, nach Codex P2 auf #157 (`1e0ee7c`), auch nicht mehr entfernt, weil der Kern Zeichen aus dem Privatbereich zulässt; Einheitstest der Wiedergabe), 2 (Security: Wächterprobe
 A2b um `<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face` erweitert, A2b grün),
 3 (Security: Semgrep `no-html-sink` erweitert, pfadgebundene Regeln für `execCommand` und `DOMParser`, Bedrohungsmodell
 angeglichen), 4 (Nachweise oben), 5 (Security/Daten: Feld der Beantwortung aus dem Entwurf gebaut; Test), 6 (D1: Vordergrund
 der Hervorhebung im Feld wie auf der Bühne), 8 (HTML ohne Text fällt auf `text/plain` zurück; Test). In die Folgeliste:
 Minor 7 (e2e für den Schutz des Rückgängig), Nits 9–11.
+
+**Codex auf #157 (Orchestrator, 05.10.2026):** P2 — das Entfernen von U+E055/U+E05B beim Einfügen hätte zulässige Zeichen
+aus gespeicherten (auch freigegebenen) Fassungen gelöscht. Behoben in `1e0ee7c`: Caret nur über die Identität des eigenen leeren
+Knotens, keine Zeichen werden entfernt; Tests (a) bis (c) in `domToBody.test.ts`, vorher (a) und (b) rot.
