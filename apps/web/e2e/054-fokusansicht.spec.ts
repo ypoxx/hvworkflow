@@ -28,6 +28,7 @@ import { CORPUS_DEMO } from '@hv/domain';
 import { checkAxe } from './support/axe';
 import { FOCUS_054_ANSWER, FOCUS_054_RETURN_REASON, FOCUS_054_UNSAVED } from './support/e2e-texts';
 import { evidence } from './support/evidence';
+import { waitForMine } from './support/focus-list';
 import { expect, test } from './support/http-guard';
 import { asRole } from './support/roles';
 
@@ -87,22 +88,6 @@ async function toFocus(page: Page): Promise<void> {
 }
 
 /**
- * The list has landed for the acting person: it is ready (or the page says there is nothing, or nothing to read), and
- * every row carries the expert's unit. After a switch of person the list arrives later than the page (lesson of 045,
- * CI run 37152696332, and 053 review 7): rows are taken only after this.
- */
-async function waitForMine(page: Page): Promise<void> {
-  await expect.poll(async () => {
-    if (await page.getByTestId('focus-forbidden').isVisible()) return true;
-    if (await page.getByTestId('focus-empty').isVisible()) return true;
-    const list = page.getByTestId('focus-list');
-    if ((await list.count()) === 0 || (await list.getAttribute('data-state')) !== 'ready') return false;
-    const units = await rows(page).evaluateAll((els) => els.map((el) => el.getAttribute('data-unit')));
-    return units.length > 0 && units.every((unit) => unit === EXPERT_UNIT_ID);
-  }, { timeout: 15_000 }).toBe(true);
-}
-
-/**
  * The one finder of this file: as the expert, on `/my`, the first row in `status` of the expert's unit without a return
  * reason, without a refusal badge and not excluded; it is chosen and its detail shown. Returns its number and the number
  * of the question that stands there once it has left the list (the next row, else the previous).
@@ -113,7 +98,7 @@ async function findMine(
 ): Promise<{ number: string; next: string | undefined }> {
   await asRole(page, 'expert');
   await toFocus(page);
-  await waitForMine(page);
+  await waitForMine(page, EXPERT_UNIT_ID);
   const all = await rows(page).evaluateAll((els) => els.map((el) => el.getAttribute('data-number') ?? ''));
   const exclude = opts.exclude ?? [];
   const candidates = page.locator(
@@ -171,7 +156,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await page.keyboard.press('Alt+6');
     await expect(page).toHaveURL(/\/my$/);
     await expect(pageTitle(page)).toHaveText('Meine Fragen');
-    await waitForMine(page);
+    await waitForMine(page, EXPERT_UNIT_ID);
 
     await test.step('every row is mine: assigned or drafted, Finanzen, oldest first', async () => {
       const facts = await rows(page).evaluateAll((els) =>
@@ -293,7 +278,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await asRole(page, 'expert');
     await page.keyboard.press('Alt+6');
     await expect(page).toHaveURL(/\/my$/);
-    await waitForMine(page);
+    await waitForMine(page, EXPERT_UNIT_ID);
     const list = page.getByTestId('focus-list');
 
     await pageTitle(page).click();
@@ -368,7 +353,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await test.step('back with the expert: marked in the list, the return reason first in the detail', async () => {
       await asRole(page, 'expert');
       await toFocus(page);
-      await waitForMine(page);
+      await waitForMine(page, EXPERT_UNIT_ID);
       await expect(row(page, number).getByTestId('focus-row-returned')).toBeVisible();
       await row(page, number).click();
       await expect(detailNumber(page)).toHaveText(number);
@@ -449,7 +434,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
       await test.step(`${role}: the notice, no rows`, async () => {
         await asRole(page, role);
         await toFocus(page);
-        await waitForMine(page);
+        await waitForMine(page, EXPERT_UNIT_ID);
         await expect(page.getByTestId('focus-empty')).toBeVisible();
         await expect(rows(page)).toHaveCount(0);
         await expect(page.getByTestId('nav-focus')).toBeVisible();
@@ -501,7 +486,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await test.step('the expert finds it among "Meine Fragen" with where it came from and why', async () => {
       await asRole(page, 'expert');
       await toFocus(page);
-      await waitForMine(page);
+      await waitForMine(page, EXPERT_UNIT_ID);
       await expect(row(page, number)).toHaveAttribute('data-unit', EXPERT_UNIT_ID);
       await row(page, number).click();
       await expect(detailNumber(page)).toHaveText(number);
@@ -517,7 +502,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     // leaving an `assigned` question behind in `http`.
     await asRole(page, 'expert');
     await toFocus(page);
-    await waitForMine(page);
+    await waitForMine(page, EXPERT_UNIT_ID);
     const number = (await rows(page).first().getAttribute('data-number')) ?? '';
     await row(page, number).click();
     await expect(detailNumber(page)).toHaveText(number);
@@ -529,7 +514,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await asRole(page, 'coordination');
     await asRole(page, 'expert');
     await toFocus(page);
-    await waitForMine(page);
+    await waitForMine(page, EXPERT_UNIT_ID);
     await expect(page.getByTestId('focus-writing')).toHaveCount(0);
     await row(page, number).click();
     await expect(detailNumber(page)).toHaveText(number);

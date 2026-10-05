@@ -16,6 +16,7 @@ import { CORPUS_DEMO } from '@hv/domain';
 import { checkAxe } from './support/axe';
 import { FORMAT_055B_HTTP_ANSWER } from './support/e2e-texts';
 import { evidence } from './support/evidence';
+import { readFocusList } from './support/focus-list';
 import { expect, test } from './support/http-guard';
 import { asRole } from './support/roles';
 import {
@@ -66,15 +67,15 @@ async function setLang(page: Page, lang: 'de' | 'en'): Promise<void> {
 }
 
 const editor = (page: Page): Locator => page.getByTestId('focus-editor');
-const rows = (page: Page): Locator => page.getByTestId('focus-row');
 
-/** As in 054: the list has landed for the expert (ready, every row of Finanzen). */
+/**
+ * As in 054, but stricter: the list has landed for the expert (ready, every row of Finanzen; no notice). One atomic read
+ * per poll (takt-049): no locator action that waits for an element inside the callback.
+ */
 async function waitForMine(page: Page): Promise<void> {
   await expect.poll(async () => {
-    const list = page.getByTestId('focus-list');
-    if ((await list.count()) === 0 || (await list.getAttribute('data-state')) !== 'ready') return false;
-    const units = await rows(page).evaluateAll((els) => els.map((el) => el.getAttribute('data-unit')));
-    return units.length > 0 && units.every((unit) => unit === EXPERT_UNIT_ID);
+    const { listState, units } = await readFocusList(page);
+    return listState === 'ready' && units.length > 0 && units.every((unit) => unit === EXPERT_UNIT_ID);
   }, { timeout: 15_000 }).toBe(true);
 }
 
