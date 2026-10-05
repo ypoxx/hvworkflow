@@ -205,13 +205,20 @@ bei jedem Wechsel der Akteur-id (Vergleich über `id`, R4), nicht bei einem glei
 - Nach einer Wiederherstellung steht unter der Überschrift des Felds **„Ungespeicherter Entwurf von HH:MM wiederhergestellt“**
   (`draft-restored`, `text-ink-600`, Uhrzeit Mono) mit „Verwerfen“ wie heute.
 
-### 6. Zeile „auf diesem Gerät gesichert“
+### 6. Zeile „in diesem Browser zwischengespeichert“
 
 Solange ein veränderter Entwurf gepuffert ist, steht neben der Speichern-Schaltfläche (Beantwortung, Schreibmodus) leise
-**„Auf diesem Gerät gesichert · HH:MM:SS“** (`draft-kept`, `text-2xs text-ink-600`, Zeit Mono, kein `aria-live`). Die Zeit ist
+**„In diesem Browser zwischengespeichert · HH:MM:SS“** (`draft-kept`, `text-2xs text-ink-600`, Zeit Mono, kein `aria-live`). Die Zeit ist
 das `changedAt` des Eintrags und erscheint **erst nach `oncomplete`** der Transaktion, nie beim Absenden. Ist der Puffer nicht
 verfügbar, steht dort einmal **„Keine Sicherung auf diesem Gerät möglich“** (`draft-unavailable`). Ohne Änderung keine Zeile. Die
 Zeile ist zugleich das Warte-Signal der e2e vor einem Neuladen.
+
+**Wortlaut statt Erkennung (nit N4):** In einem privaten Fenster verwirft der Browser IndexedDB beim Schließen des Fensters;
+„auf diesem Gerät gesichert“ hätte das überzeichnet. Der Wortlaut sagt deshalb „in diesem Browser zwischengespeichert“ (vorläufig,
+an den Browser gebunden), und die Hilfe der Zeile (`title` und `aria-describedby` auf einen versteckten Satz, neuer
+Schlüssel `common.draft.keptHelp`, Entscheidung 13) sagt: „Bleibt beim Neuladen erhalten. In einem privaten
+Fenster endet die Kopie mit dem Fenster.“ Ein privates Fenster wird **nicht** erkannt (keine verlässliche Schnittstelle; Erkennungstricks
+über Kontingent oder Speicher-APIs wären Gerätemerkmale).
 
 ### 7. Fassungsvergleich (412 und Live-Version)
 
@@ -246,12 +253,15 @@ im selben Rahmen):
   {n} gespeichert. Wählen Sie, womit Sie weiterarbeiten.“
 - Zwei gleich breite Spalten (ab 1024 px; darunter untereinander): links **„Ihre Fassung · nicht gespeichert“** (`compare-mine`),
   rechts **„Version {n} · {Autor} · {HH:MM}“** (`compare-theirs`; Version und Zeit Mono, Autor wie in der Versionsliste der
-  Beantwortung). Beide nur über `AnswerText`, Quellen darunter. Text markierbar (Teile hinüberkopieren).
+  Beantwortung). Beide nur über `AnswerText`, Quellen darunter. **`AnswerText` erwartet die Speicherform:** die linke Spalte
+  bekommt `previewAnswer(draft.body)` (der Entwurf hält die offene Eingabeform), die rechte `answerBodyOf(version)` (nit N1). Text markierbar (Teile hinüberkopieren).
 - **Rechte Spalte folgt Live-Aktualisierungen:** kommt während des offenen Vergleichs Version n+1, zeigt die rechte Spalte n+1
   (Überschrift und Satz mit der neuen Nummer); der Fokus bleibt, wo er ist; eine höfliche Live-Region an der Überschrift der
   rechten Spalte sagt die neue Nummer einmal an.
 - Ein geschlossenes `<details>` „Unterschiede Wort für Wort“ mit `wordDiff` (`answers/lib.ts`, Klartext, Version n → Ihre
-  Fassung), Darstellung wie „Änderung gegenüber Version n-1“.
+  Fassung), Darstellung wie „Änderung gegenüber Version n-1“. `wordDiff` braucht Speicher in der Größenordnung n·m; er wird **erst
+  berechnet, wenn das `<details>` geöffnet wird** (Zustand am `toggle`-Ereignis), und nur solange es offen ist neu, wenn sich eine
+  Seite ändert (nit N2).
 - Keine neue Farbe, kein Token: neutraler Rahmen (`border-line-strong`, `bg-sunken`), keine Bernsteinfläche im Vergleich (D4).
 
 **Entscheidungen** (genau eine primäre Aktion, D2; alle lokal, keine Schreiboperation):
@@ -303,12 +313,13 @@ durch Abmelden, Geräterichtlinie (E33) und Sitzungssperre (029); Entscheidung �
 
 ### 13. Texte (i18n, de und en-US)
 
-Neue Schlüssel (14), Wortlaut verbindlich, Hausvokabular. Die Shell-Schlüssel tragen das vorhandene Präfix `common` (Test (d) in
+Neue Schlüssel (15), Wortlaut verbindlich, Hausvokabular. Die Shell-Schlüssel tragen das vorhandene Präfix `common` (Test (d) in
 `parity.test.ts` kennt kein Präfix `draft`; die Präfixliste bleibt unverändert).
 
 | Schlüssel | de | en |
 |---|---|---|
-| `common.draft.kept` | Auf diesem Gerät gesichert · {time} | Kept on this device · {time} |
+| `common.draft.kept` | In diesem Browser zwischengespeichert · {time} | Saved in this browser for now · {time} |
+| `common.draft.keptHelp` | Bleibt beim Neuladen erhalten. In einem privaten Fenster endet die Kopie mit dem Fenster. | Survives a reload. In a private window the copy ends when the window closes. |
 | `common.draft.restored` | Ungespeicherter Entwurf von {time} wiederhergestellt | Unsaved draft from {time} restored |
 | `common.draft.unavailable` | Keine Sicherung auf diesem Gerät möglich | Cannot keep a copy on this device |
 | `answers.editor.compare` | Vergleichen | Compare |
@@ -323,12 +334,12 @@ Neue Schlüssel (14), Wortlaut verbindlich, Hausvokabular. Die Shell-Schlüssel 
 | `answers.compare.diff` | Unterschiede Wort für Wort | Word-by-word differences |
 | `focus.write.goneKept` | {number} liegt nicht mehr bei Ihnen. Ihr ungespeicherter Text bleibt auf diesem Gerät bis {time} erhalten. | {number} is no longer with you. Your unsaved text stays on this device until {time}. |
 
-`focus.write.gone` bleibt unverändert (Rückfall). Schlüsselzahl in `parity.test.ts` (f): 621 → 635.
+`focus.write.gone` bleibt unverändert (Rückfall). Schlüsselzahl in `parity.test.ts` (f): 621 → 636.
 
 ### 14. Glossar
 
 Zwei Zeilen: „Fassungen vergleichen | Compare versions | `CompareVersions`, `conflictAfterRefusal`, `keepMine` | Merge,
-Zusammenführen (gehört den Einzelfragen)“; „Auf diesem Gerät gesichert | Kept on this device | `draftBuffer` (IndexedDB, je
+Zusammenführen (gehört den Einzelfragen)“; „In diesem Browser zwischengespeichert | Saved in this browser for now | `draftBuffer` (IndexedDB, je
 Akteur und Versammlung) | Cache, Autosave“. Die Zeile zur Übernahme kommt mit 060b.
 
 ## Nicht-Ziele
@@ -398,7 +409,7 @@ Nachweise und Doku:
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V5, Spalte Maßnahmen: je Akteur und Versammlung, nur der Entwurf, 14 h,
   Löschstellen, keine Synchronisierung, keine Auswertung, Restrisiko aus Entscheidung 11; V2/V3 kommen mit 060c)
 - `docs/sicherheit/bedrohungsmodell.md` (nur: Zelle Gegenmaßnahme von T-G1-I-08 mit Restrisiko; eine Zeile 060 unter „Weitere
-  Scheiben mit Sicherheitsbezug“; der neue Missbrauchsfall MF-15 aus „Wirkung und Risiko“)
+  Scheiben mit Sicherheitsbezug“; der neue Missbrauchsfall MF-16 aus „Wirkung und Risiko“)
 - `docs/agentische-entwicklung-plan.md` (nur die Zeile „Fehlerpfad (Konflikt 412 in der Oberfläche)“ in §5.3: Werkzeug die neue
   e2e-Datei, Stand „läuft (CI: End-to-end acceptance scenario)“)
 - `docs/folgeliste.md` (054 Bau „focus.write.gone“ und 054 Review 5 als erledigt; neue nicht blockierende Befunde)
@@ -444,7 +455,9 @@ Einheit (vitest, ohne jsdom, statisches Rendern wie heute):
     setzt die Momentaufnahme zurück und schaltet ab (`status: 'unavailable'`), ohne zu werfen;
   - `kept`-Zeit erst nach `oncomplete` (ein Speicher, der verzögert abschließt, zeigt vorher keine Zeit);
   - `clear` leert Speicher und Momentaufnahme; Eintrag über 256 KiB wird nicht geschrieben;
-  - Quelltexttest: das Modul nennt weder `fetch`, `BroadcastChannel`, `sendBeacon`, `serviceWorker`, `localStorage`, `innerHTML`
+  - Quelltexttest **auf dem Code ohne Kommentare** (Block- und Zeilenkommentare werden vor der Prüfung entfernt, damit ein
+    Satz wie „kein localStorage“ im Kommentar nicht trifft; nit N3): das Modul nennt weder `fetch`, `BroadcastChannel`,
+    `sendBeacon`, `serviceWorker`, `localStorage`, `innerHTML`
     noch importiert es `mode`, `http`, `actor`, `auth`; die drei Konstanten enden nicht auf `KEY`/`Key`.
 - **U2 `draft.test.ts`, `restoreDraft`:** Eintrag vor Vorbelegung; Eintrag gleich Basis → keine Wiederherstellung, löschen;
   neuere Version gleich Eintrag → Basis nachgezogen, unverändert; neuere Version über verändertem Eintrag → `rebase`; ohne
@@ -456,13 +469,16 @@ Einheit (vitest, ohne jsdom, statisches Rendern wie heute):
   folgenden `onRecord` steht `rebase` wieder; Datensatz bei n → `rebase` falsch, Entwurf verändert gegenüber n.
 - **U5 `CompareVersions.test.tsx`:** beide Spalten, Version und Zeit in Mono, genau eine primäre Schaltfläche, Hinweis unter
   „übernehmen“, `compare-title` mit `tabIndex=-1`, Diff geschlossen; rechte Spalte rendert die übergebene neuere Version
-  (Nummer im Satz folgt); Texte aus dem Wörterbuch (de und en); kein `dangerouslySetInnerHTML`.
+  (Nummer im Satz folgt); Texte aus dem Wörterbuch (de und en); kein `dangerouslySetInnerHTML`; die linke Spalte rendert einen
+  Entwurf mit Eingabeform (Lauf ohne `marks`, leerer Absatz) über `previewAnswer` korrekt (N1); geschlossenes `<details>` →
+  `wordDiff` nicht aufgerufen (Spion), geöffnet → einmal (N2).
 - **U6 `QuestionDetail.test.tsx`:** mit `rebase` ruft Speichern `onAction` nicht und zeigt den Vergleich; Band trägt
   „Vergleichen“; wiederhergestellter Entwurf → `draft-restored`; Eingabe ruft den Puffer, programmatischer Neuaufbau nicht.
 - **U7 `WritingMode.test.tsx`:** Strg+Enter bei `rebase` öffnet den Vergleich statt zu speichern; `canSave` unverändert; Escape im
   Vergleich setzt `defaultPrevented` und verlässt den Schreibmodus nicht.
-- **U8 `DraftNote.test.tsx`:** die drei Zustände, Zeit in Mono, kein `aria-live` an `draft-kept`.
-- **U9 `parity.test.ts`:** 635 Schlüssel in de und en.
+- **U8 `DraftNote.test.tsx`:** die drei Zustände, Zeit in Mono, kein `aria-live` an `draft-kept`; `draft-kept` trägt die Hilfe
+  `common.draft.keptHelp` über `aria-describedby` (N4).
+- **U9 `parity.test.ts`:** 636 Schlüssel in de und en.
 
 e2e `060-entwurfspuffer-praesenz.spec.ts` (Rolle über `asRole`, Belege über `support/evidence.ts`, axe über `support/axe.ts` ohne
 neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und http):
@@ -565,7 +581,7 @@ Eigentümerfragen 2–4
 | Fehlalarm gitleaks | Konstantennamen ohne `KEY`, Kennung aus Funktion | U1, CI |
 | Speicher voll oder gesperrt | Abschalten mit Zeile, keine Ausnahme | U1 |
 
-**Missbrauchsfall MF-15 „Entwurf aus dem Gerätespeicher lesen oder einschleusen“** (neu im Bedrohungsmodell, SC-06):
+**Missbrauchsfall MF-16 „Entwurf aus dem Gerätespeicher lesen oder einschleusen“** (neu im Bedrohungsmodell, SC-06):
 - *Ablauf:* eine Person mit Zugriff auf ein nicht abgemeldetes oder nach Sitzungsablauf verlassenes Gerät liest über die
   Entwicklerwerkzeuge des Browsers den Objektspeicher und damit unveröffentlichte Entwürfe der vorigen Person; oder sie schreibt
   einen präparierten Eintrag, der bei der nächsten Anmeldung derselben Person als „ihr“ Entwurf erscheint.
@@ -577,7 +593,7 @@ Eigentümerfragen 2–4
   Versammlungsbüro, Empfänger Konzern-IT nach Geräterichtlinie (E33). Technischer Rest: ein abgelehnter Eintrag wird ohne Inhalt
   verworfen; kein Log mit Pufferinhalt.
 
-Betriebswirkung: keine (kein Dienst, keine Konfiguration). Doku-Wirkung: DSFA V5, Bedrohungsmodell T-G1-I-08 und MF-15, Glossar,
+Betriebswirkung: keine (kein Dienst, keine Konfiguration). Doku-Wirkung: DSFA V5, Bedrohungsmodell T-G1-I-08 und MF-16, Glossar,
 Tor-Zeile 412.
 
 ## Aufwand
@@ -629,7 +645,7 @@ Tor-Zeile 412.
 | minor 2 (Reihenfolge Abmelden, Demo-Reset) | `store.clear()` vor der Abmeldeanfrage; Reset wartet auf `oncomplete`; `clear` statt Einzellöschungen |
 | minor 3 (Restrisiko Aufbewahrung) | Entscheidung 11, T-G1-I-08, DSFA V5, Eigentümerfrage 2 |
 | minor 4–5 (Präsenz; laut Orchestrator „4–6“, Überschneidung mit 6) | nach 060b |
-| minor 6 (Missbrauchsfall nach SC-06) | MF-15 mit Erkennung und Empfänger |
+| minor 6 (Missbrauchsfall nach SC-06) | MF-16 mit Erkennung und Empfänger |
 | minor 7 („gesichert“ vor dem Abschluss; `pagehide`-Flush ungetestet; E3 ohne erneute Anmeldung) | Zeit erst nach `oncomplete`; Flush beim Entladen gestrichen; E3 mit erneuter Anmeldung |
 | minor 8 (Escape verlässt zusätzlich den Schreibmodus) | `preventDefault()` im Vergleich; U7, E6 |
 | minor 9 (Quelle von `meetingId`) | `question.meetingId`, ohne sie kein Puffer |
@@ -637,7 +653,11 @@ Tor-Zeile 412.
 | minor 11 (`focus.write.gone` ohne Rückfall; Text vor dem Abbau) | `focus.write.goneKept` nur nach erfolgreichem Schreiben, sonst der alte Toast; sofortiges Schreiben vor dem Abbau; E9 |
 | minor 12 (`draftBuffer.ts` importiert `mode.ts`) | Modul ohne `mode`/`http`/`actor`/`auth`; Quelltexttest |
 | minor 13 (Absicht bei `roles_changed`) | löschen nur, wo Entwerfen nicht mehr angeboten wird (Merker „nachprüfen“) |
-| nit 1–4 | Wortlaut der Nits lag dem Spec-Autor nicht vor (nur die Zusammenfassung des Orchestrators); mit der Teilung bereinigt: Kennung ohne `kind`, Präsenz-Schlüssel und -Glossarzeile entfernt, Schlüsselzahl 635 neu begründet, vier statt sechs Screenshots. Ein nicht erfasster Nit geht beim Lesebefund der Fassung 2 als offen zurück |
+| nit N1 (`AnswerText` erwartet Speicherform, der Entwurf hält Eingabeform) | linke Spalte über `previewAnswer(draft.body)`, rechte über `answerBodyOf`; U5 |
+| nit N2 (`wordDiff` O(n·m) im Speicher) | erst beim Öffnen des `<details>` berechnet; U5 mit Spion |
+| nit N3 (Quelltexttest trifft Wörter in Kommentaren) | Prüfung auf Code ohne Kommentare; U1 |
+| nit N4 (privates Fenster: „auf diesem Gerät gesichert“ überzeichnet) | Wortlaut „in diesem Browser zwischengespeichert“ plus Hilfesatz, keine Erkennung; Schlüssel 15, Zahl 636; Glossar; U8 |
+| Nachtrag (Orchestrator) | MF-15 ist durch Spec 046 belegt; der Missbrauchsfall heißt MF-16 (nächste freie Nummer, geprüft über alle Zweige) |
 
 ## Hinweise an den Orchestrator
 
