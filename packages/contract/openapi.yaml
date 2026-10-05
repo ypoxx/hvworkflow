@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.4.4
+  version: 0.4.5
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -408,6 +408,16 @@ paths:
       tags: [questions]
       operationId: captureQuestions
       summary: Atomise a speech into individual questions (Einzelfragen erfassen)
+      description: >-
+        Since 0.4.5 (slice 046): each item may name a referenced question (Bezugsfrage) of the same
+        meeting with `parentQuestionId` and `relation` (both or neither). The referenced question must
+        exist in the meeting of the capture and be readable for the caller (R-LINK-01); otherwise `422`
+        with `ruleId` `R-LINK-01` and one message for an unknown id, a question of another meeting and
+        an unreadable question alike, without the id. All or nothing: if one item fails, no event is
+        written for any item. One commit appends, per item, `QuestionCaptured` and, for an item with a
+        reference, directly after it `QuestionLinked` (same command). A reference arises only with the
+        capture and never changes (R-LINK-02). `parentAnswerVersion` is derived by the service, never
+        sent. Built on the defaults ("auf Standard gebaut (Spec 046)").
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }, { $ref: '#/components/parameters/IfMatchRequired' } ]
       requestBody:
         required: true
@@ -506,6 +516,7 @@ paths:
         - { $ref: '#/components/parameters/ContributionIdFilter' }
         - { $ref: '#/components/parameters/AgendaItemIdFilter' }
         - { $ref: '#/components/parameters/FullTextFilter' }
+        - { $ref: '#/components/parameters/ParentQuestionIdFilter' }
         - { $ref: '#/components/parameters/QuestionLimit' }
         - { $ref: '#/components/parameters/QuestionOffset' }
       responses:
@@ -1093,7 +1104,8 @@ paths:
       description: >-
         Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0,
         entfällt mit Vertrag 0.5. `StageView` never carries a refusal justification (since 0.4.0, see
-        `getMeetingStage`).
+        `getMeetingStage`). Since 0.4.5 (slice 046): questions of the stage view carry neither
+        `parentQuestionId` nor `parentAnswerVersion`.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1790,6 +1802,7 @@ paths:
         - { $ref: '#/components/parameters/ContributionIdFilter' }
         - { $ref: '#/components/parameters/AgendaItemIdFilter' }
         - { $ref: '#/components/parameters/FullTextFilter' }
+        - { $ref: '#/components/parameters/ParentQuestionIdFilter' }
         - { $ref: '#/components/parameters/QuestionLimit' }
         - { $ref: '#/components/parameters/QuestionOffset' }
       responses:
@@ -1814,7 +1827,8 @@ paths:
         client parameter (slices 040, 047); a `seat` query parameter arrives as the contract line of
         slices 056/057, not with a contract-only release. Since 0.4.0 (slice 043a, enforced from slice
         044): `answers[].refusalJustification` is always absent from `StageView`, for every reader
-        (the podium holds no `question.refuse.*` permission).
+        (the podium holds no `question.refuse.*` permission). Since 0.4.5 (slice 046): questions of the
+        stage view carry neither `parentQuestionId` nor `parentAnswerVersion`, for every reader.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/StageView' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -2266,6 +2280,14 @@ components:
     ContributionIdFilter: { name: contributionId, in: query, schema: { type: string } }
     AgendaItemIdFilter: { name: agendaItemId, in: query, schema: { type: string } }
     FullTextFilter: { name: q, in: query, description: Full-text search over question and answer text, schema: { type: string, maxLength: 200 } }
+    ParentQuestionIdFilter:
+      name: parentQuestionId
+      in: query
+      description: >-
+        Since 0.4.5 (slice 046): the direct follow-up questions and clarifications of this referenced
+        question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of
+        whether the referenced question itself is readable; the returned views are masked as `Question`.
+      schema: { type: string, minLength: 1, maxLength: 128 }
     QuestionLimit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 2000, default: 500 } }
     QuestionOffset: { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
   headers:
@@ -3326,6 +3348,9 @@ components:
         stagePosition: { type: integer }
         deliveredAt: { type: string, format: date-time }
         mergedIntoId: { type: string }
+        parentQuestionId: { type: string, description: 'Since 0.4.5 (slice 046): the referenced question (Bezugsfrage) of a follow-up question or clarification, same meeting. Present only when the reader may read the referenced question; never in the stage view; never its number or text' }
+        relation: { $ref: '#/components/schemas/QuestionRelation' }
+        parentAnswerVersion: { type: integer, minimum: 1, description: 'Since 0.4.5 (slice 046): the answer version of the parent that had last been read out (`QuestionDelivered.answerVersion`) when this question was captured; absent if the parent had not been read out with a version by then; never changes afterwards. Masked like `parentQuestionId`' }
         version: { type: integer, description: 'Optimistic-locking counter, also the ETag' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -3333,6 +3358,12 @@ components:
           type: array
           description: Actions the calling actor may perform on this question right now
           items: { $ref: '#/components/schemas/Action' }
+      # Since 0.4.5 (slice 046): bound in one direction only. `relation` may stand alone (the reader
+      # may not read the referenced question, so its id is masked); an id never comes without its
+      # relation, an answer version never without the id.
+      dependentRequired:
+        parentQuestionId: [relation]
+        parentAnswerVersion: [parentQuestionId]
       # Codex round 5: the deprecated enum and its successor never disagree. The four enum values are
       # the ids of the default seats, so when both are present they are the same string; a question on
       # any other seat carries `seatId` only. The service sets `seatId` since 0.4.1 (slice 040b).
@@ -3349,6 +3380,27 @@ components:
       properties:
         text: { type: string, minLength: 1, maxLength: 4000 }
         span: { $ref: '#/components/schemas/TextSpan' }
+        parentQuestionId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: >-
+            Since 0.4.5 (slice 046): the referenced question (Bezugsfrage) of the same meeting; must be
+            readable for the caller (R-LINK-01). Immutable once captured (R-LINK-02). The service derives
+            `parentAnswerVersion`; the client never sends it.
+        relation: { $ref: '#/components/schemas/QuestionRelation' }
+      # Since 0.4.5 (slice 046): both or neither (this is the input, not a view).
+      dependentRequired:
+        parentQuestionId: [relation]
+        relation: [parentQuestionId]
+    QuestionRelation:
+      type: string
+      description: >-
+        Since 0.4.5 (slice 046): how a question relates to its referenced question, as a closed code
+        without free text. `follow_up` (Nachfrage): the speaker asks further about a given or announced
+        answer (right to ask follow-up questions). `clarification` (Klarstellung): the speaker asks for
+        an answer or question to be clarified.
+      enum: [follow_up, clarification]
     Classification:
       type: object
       required: [track]
@@ -3524,6 +3576,16 @@ components:
       properties:
         unitId: { type: string, minLength: 1, maxLength: 128, description: 'The target answering unit (Fachbereich) of the meeting; never a person' }
         reasonCode: { $ref: '#/components/schemas/ForwardReasonCode' }
+    QuestionLinkedPayload:
+      type: object
+      description: >-
+        Since 0.4.5 (slice 046): read payload of `QuestionLinked` in `EventRead`. Closed: the relation
+        only. The stored original also carries `parentQuestionId` and, when the parent had been read out
+        with a version, `parentAnswerVersion`; every event read path removes both, for every reader.
+      required: [relation]
+      additionalProperties: false
+      properties:
+        relation: { $ref: '#/components/schemas/QuestionRelation' }
     QuestionForwardedPayload:
       type: object
       description: >-
@@ -3720,7 +3782,11 @@ components:
         clearance, not only for refusals, because the remark can carry the legal assessment behind a
         refusal. The removal is bound to that event type, not to the key: a `note` in another payload
         is not affected, so the schema carries no `note: false`. The stored original keeps the remark
-        under the hash chain (rule 7). Built on the default ("auf Standard gebaut").
+        under the hash chain (rule 7). Built on the default ("auf Standard gebaut"). Since 0.4.5 (slice
+        046): `payload.parentQuestionId` and `payload.parentAnswerVersion` of a `QuestionLinked` are absent
+        from every event read path, for every reader; the read payload is `QuestionLinkedPayload`
+        (`relation` only). A reader who may read the referenced question reads the reference on the
+        `Question` view.
       required: [seq, id, type, at, actor, subjectId, payload, redacted, sourceHash]
       additionalProperties: false
       properties:
@@ -3806,6 +3872,9 @@ components:
         # with the reason code" is contract, not prose.
         - if: { required: [type], properties: { type: { const: QuestionForwarded } } }
           then: { properties: { payload: { $ref: '#/components/schemas/QuestionForwardedPayload' } } }
+        # Since 0.4.5 (slice 046): the read payload of a link carries the relation only.
+        - if: { required: [type], properties: { type: { const: QuestionLinked } } }
+          then: { properties: { payload: { $ref: '#/components/schemas/QuestionLinkedPayload' } } }
     Event:
       type: object
       description: >
@@ -3839,7 +3908,11 @@ components:
         `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now.
         Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). Since 0.4.4
         (slice 055) `AnswerDrafted.answer.body` is the stored form `AnswerBody` (a `draftAnswer` with `body`).
-        A bound payload schema for `AnswerDrafted` follows with slice 043c.
+        A bound payload schema for `AnswerDrafted` follows with slice 043c. Since 0.4.5 (slice 046)
+        `QuestionLinked` (subject: the new question) stores `{ parentQuestionId, relation,
+        parentAnswerVersion? }`, written directly after the `QuestionCaptured` of the same question in the
+        same command; like `QuestionLegalCleared.note`, `parentQuestionId` and `parentAnswerVersion` stand
+        only in the stored original (`EventRead` carries `QuestionLinkedPayload`).
         Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`,
         `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of
         the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with
@@ -3876,6 +3949,7 @@ components:
             - ContributionClaimed
             - ContributionReleased
             - QuestionCaptured
+            - QuestionLinked
             - QuestionClassified
             - QuestionAssigned
             - QuestionForwarded

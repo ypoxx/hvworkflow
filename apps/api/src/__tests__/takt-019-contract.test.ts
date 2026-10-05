@@ -5,7 +5,7 @@ describe('takt-019: additive meeting lifecycle contract', () => {
   const schemas = openapiDoc.components.schemas;
 
   it('declares the new patch without changing the operation surface', () => {
-    expect(openapiDoc.info.version).toBe('0.4.4');
+    expect(openapiDoc.info.version).toBe('0.4.5');
     // 66 operations up to 0.3.12; contract 0.4.0 (slice 043a) pre-declares three refusal operations;
     // contract 0.4.3 (slice 048) adds forwardQuestion.
     expect(Object.keys(operations)).toHaveLength(70);
