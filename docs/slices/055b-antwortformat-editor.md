@@ -466,6 +466,7 @@ e2e:
   den Textinhalt lesen; Aufrufe und Erwartungen bleiben)
 - `apps/web/e2e/013-tastaturpfad.spec.ts` (nur falls Vor-dem-Bau-Punkt 6 es verlangt: die Höchstzahl der Tabulatorschritte zu
   `answer-editor` in Zeile 400 um eins)
+- Nachtrag Orchestrator 05.10.2026: `apps/web/e2e/010d-ansichtsdaten.spec.ts` — nur die zwei `toHaveValue`-Prüfungen auf `answer-editor` (Z. 885, 1052) werden `toHaveText`, weil das Feld jetzt `contenteditable` ist
 
 Sonstiges:
 
@@ -834,8 +835,7 @@ Done: Renderer AnswerText (eine Komponente für Bühne, Vorschau, Beantwortung, 
       editorCommands), Entwurf als Eingabeform in Fokus und Beantwortung, Semgrep-Regel no-html-sink.
 Evidence: Schluss von `pnpm gates` im Bericht an den Orchestrator (Commit dort genannt), docs/evidence/055b-*.png (6),
       CI-Lauf e2e-http steht aus (kein Push in diesem Bau).
-Open: 010d-ansichtsdaten.spec.ts:885 und :1052 (toHaveValue auf answer-editor) liegen außerhalb der erlaubten Dateien,
-      siehe „Abweichungen und offene Punkte“.
+Open: H1 (http) nur im CI-Lauf e2e-http; Firefox/WebKit nicht geprüft (Folgeliste).
 Touched: siehe Bericht an den Orchestrator.
 ```
 
@@ -891,11 +891,10 @@ Touched: siehe Bericht an den Orchestrator.
 2. **`initial` hat den Typ `AnswerBodyInput | null`** statt `AnswerBody | null`: der Schreibmodus baut ein ungespeichertes
    Feld nach dem Zurückkehren („Entwurf fortsetzen“) aus der Eingabeform des Entwurfs auf; die Speicherform ist darin
    enthalten.
-3. **`010d-ansichtsdaten.spec.ts:885` und `:1052`** prüfen `answer-editor` mit `toHaveValue`, das Playwright für ein
-   `contenteditable`-Feld nicht kennt („Not an input element“); die Spec nennt 010d nur für `fill`/`focus` (868/1026). Die
-   Datei liegt außerhalb der erlaubten Dateien: **nicht geändert, gemeldet.** Nötige Umstellung (wie in 054): zweimal
-   `toHaveValue` → `toHaveText`. Mit dieser Umstellung (geprüft an einer nicht eingecheckten Kopie) sind beide Fälle grün.
-4. Der Platzhalter des Felds ist ein echter `<span>` und wird von axe gemessen; `ink-400` (2,48:1) fiel durch, daher `ink-600`.
+3. **`010d-ansichtsdaten.spec.ts:885` und `:1052`** prüften `answer-editor` mit `toHaveValue`, das Playwright für ein
+   `contenteditable`-Feld nicht kennt („Not an input element“). Zunächst gemeldet; nach Go des Orchestrators (Nachtrag in
+   „Files allowed“, 05.10.2026) nur diese zwei Prüfungen auf `toHaveText` umgestellt, wie in 054; sonst nichts an 010d.
+4. **Farbe des Platzhalters:** Der Platzhalter des Felds ist ein echter `<span>` und wird von axe gemessen; `ink-400` (2,48:1) fiel durch (003, 013h, 020, 090), daher `ink-600`.
 5. Firefox/WebKit nicht geprüft (Punkt 2 und 4), Folgeliste.
 
 055 und 055b sind zusammen auslieferbar; Ausrollen nur nach Go des Eigentümers.

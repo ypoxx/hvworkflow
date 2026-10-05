@@ -882,7 +882,7 @@ test('010d Ziel 3: Beantwortung — Erfolg eines Entwurfs auf A nach dem Wechsel
   await expect(toasts(page)).toHaveCount(1);
   await page.waitForTimeout(300);
   await settle(page);
-  await expect(editor).toHaveValue('Entwurf zu B, noch nicht gespeichert.');
+  await expect(editor).toHaveText('Entwurf zu B, noch nicht gespeichert.');
 });
 
 test('010d Ziel 3: Beantwortung — 412 auf A nach einem Rollenwechsel, A bleibt gezeigt: kein "Stand veraltet" der vorigen Rolle', async ({
@@ -1049,7 +1049,7 @@ test('010d Runde 2 (N1): Beantwortung — Entwurf auf A gelingt, während B läd
   await expect(page.getByTestId('answer-version')).toHaveCount(versionsBefore + 1);
   await settle(page);
   // Saved is saved: the editor is empty, and Enter on its button saves nothing twice.
-  await expect(editor).toHaveValue('');
+  await expect(editor).toHaveText('');
   await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
 });
 
