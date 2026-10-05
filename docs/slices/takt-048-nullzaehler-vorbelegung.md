@@ -160,8 +160,8 @@ Teil 2:
 - `apps/web/src/features/answers/QuestionDetail.test.tsx`
 - `apps/web/src/features/answers/AnswerEditor.tsx`
 - `apps/web/src/features/answers/draft.ts` (neu), `apps/web/src/features/answers/draft.test.ts` (neu)
-- `apps/web/src/i18n/answers.de.ts`, `apps/web/src/i18n/answers.en.ts` (nur der neue Schlüssel answers.editor.rebase)
-- `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl-Sperre 619→620 und ihr Kommentar; Bauklärung: der neue
+- `apps/web/src/i18n/answers.de.ts`, `apps/web/src/i18n/answers.en.ts` (nur die neuen Schlüssel answers.editor.rebase und, Nachtrag des Orchestrators nach der Design-Kritik, answers.editor.startsFrom)
+- `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl-Sperre 619→621 und ihr Kommentar; Nachtrag des Orchestrators 05.10.2026; Bauklärung: der neue
   Schlüssel scheitert sonst an `pnpm gates`, Vorbild takt-038/takt-039; im Bericht als Befund genannt)
 
 Tests und Nachweise:
@@ -399,7 +399,7 @@ mark-test-run: wrote /home/user/wt/takt048/.claude/state/last-test-run (clean tr
 | D4 | ja | Null tritt in Grau 600 zurück (6,26:1, aktiv 5,63:1, gegen rund 16:1 für Werte > 0), keine Farbfläche; N1 mit axe `color-contrast` in beiden Sprachen grün, keine neue Ausnahme. |
 | D5 | ja | Zahl der Zelle weiter Mono und rechtsbündig. |
 | D6 | ja | Ohne Version und über einer Verweigerung: leeres Feld mit Platzhalter und Hinweis (U6, V5). |
-| D7 | ja | Ein neuer Schlüssel `answers.editor.rebase` in de und en, Hausvokabular („Antwortversion“); `pnpm vocabulary` und `pnpm i18n-literals` grün. |
+| D7 | ja | Zwei neue Schlüssel `answers.editor.rebase` und `answers.editor.startsFrom` in de und en, Hausvokabular („Antwortversion“); `pnpm vocabulary` und `pnpm i18n-literals` grün. |
 | D8 | ja | Nach dem Speichern bleibt der Fokus sichtbar auf dem gesperrten Knopf, ein zweites Enter ruft `draftAnswer` nicht (V3); Enter auf dem unveränderten Entwurf schreibt nichts (V4). |
 | D9 | ja | Der Abgleich ist ein Vergleich je neuem Datensatz der gezeigten Frage (`sameBody`), keine Listenarbeit. |
 | D10 | ja | Keine neue Bedienfläche; weniger Speichern-Angebote als vorher, nichts Neues zu lernen. |
