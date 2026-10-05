@@ -749,8 +749,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055b Review Minor 7 · `apps/web/e2e/055b-antwortformat.spec.ts` · der Schutz des Rückgängig nach einem Einfügen
   (`UndoBudget`) ist nur als Einheitstest belegt, kein e2e-Fall tippt, fügt ein und drückt Strg+Z/Strg+Umschalt+Z · einen
   Fall in Chromium ergänzen (zusammen mit 055c, das das einstufige Rückgängig bringt).
-- 055b Review Nits 9–11 · laut Review (Wortlaut beim Orchestrator; dem Bau nicht im Einzelnen übergeben) · Sammelgang ·
-  beim Abarbeiten aus dem Reviewbericht übernehmen.
+- 055b Review Nit 9 · `AnswerBodyEditor.tsx:373-374` · `aria-placeholder` steht in der Oberflächensprache auf einem Element mit `lang="de"`;
+  ein englischer Platzhalter wird deutsch ausgesprochen · Platzhalter nur im `aria-hidden`-Span plus `aria-describedby` ohne `lang`.
+- 055b Review Nit 10 · Spec-Kopf und `answers.format.keys` · Kürzelhinweis nennt nur Strg/Ctrl, nicht Cmd auf macOS · Text ergänzen.
+- 055b Review Nit 11 · `054-fokusansicht.spec.ts` · `toHaveText` normalisiert Leerraum (etwas lockerer als `toHaveValue`); H1 prüft
+  `aria-disabled` direkt nach Strg+Enter mit wenig Aussagekraft (Neuladen deckt es) · bei Gelegenheit schärfen.
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 
