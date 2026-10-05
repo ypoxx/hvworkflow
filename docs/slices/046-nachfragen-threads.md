@@ -139,7 +139,9 @@ Standard gebaut:** die Entscheidungen unten tragen ihren Standard; offene Punkte
   - `clarification` = **Klarstellung**: Der Redner bittet, eine Antwort oder Frage klarzustellen (Verständnisfrage).
   - Bezeichnungen nach Eigentümerfrage 4; die Codes stehen fest (Vertrag).
 - `QuestionRecord` (Projektion, ungemaskt): optional `parentQuestionId: string`, `relation: QuestionRelation` und
-  `parentAnswerVersion: number` (Entscheidung 2a).
+  `parentAnswerVersion: number` (Entscheidung 2a); dazu das **interne** Feld `deliveredAnswerVersion?: number` (zuletzt
+  vorgelesene Antwortversion, Entscheidung 2a), das wie `legalClearerIds` nie in einer Ansicht steht (`viewQuestion` entfernt
+  es).
 - `Question` (Ansicht, je Leser gemaskt, Entscheidung 7): dieselben drei Felder, aber `parentQuestionId` und
   `parentAnswerVersion` **nur, wenn die lesende Person die Bezugsfrage lesen darf**; `relation` darf allein stehen. Deshalb
   bindet der Vertrag nur in eine Richtung: `dependentRequired: { parentQuestionId: [relation], parentAnswerVersion:
@@ -171,16 +173,27 @@ Standard gebaut:** die Entscheidungen unten tragen ihren Standard; offene Punkte
 - Eine Bezugsfrage aus demselben Redebeitrag oder vom selben Redner ist zulässig (Recherche `:70`: „über alle Antworten,
   nicht nur über die eigene Frage“, und umgekehrt).
 
-### 2a. `parentAnswerVersion` — auf welche Antwort sich die Nachfrage bezieht (Lesebefund M6, Legal)
+### 2a. `parentAnswerVersion` — auf welche vorgelesene Antwort sich die Nachfrage bezieht (Lesebefund M6, Nachprüfung, Legal)
 
-- Der Kern schreibt beim Erfassen in `QuestionLinked` die **Nummer der letzten Antwortversion der Bezugsfrage zu diesem
-  Zeitpunkt** (`parent.answers.at(-1)?.version`); hat die Bezugsfrage keine Version (Podiumspfad, noch kein Entwurf), fehlt
-  das Feld. Kein Wert vom Client, keine Uhr, keine Personendaten: eine ganze Zahl ≥ 1.
-- Zweck: Die Recherche verlangt die „harte Verknüpfung zur Ursprungs**antwort**“ (`:256`), nicht nur zur Frage. Wird die
-  Antwort der Bezugsfrage später neu gefasst (neue Version, Korrektur in 046c), bleibt belegt, auf welchen Stand sich die
-  Nachfrage bezog. Ob diese Version freigegeben oder vorgelesen war, liest man aus der Historie der Bezugsfrage; die Scheibe
-  bewertet das nicht (kein Statuskriterium, Standard 2).
-- Projektion und Ansicht wie `parentQuestionId`, also gemaskt nach Entscheidung 7.
+- **Bedeutung:** die **zuletzt vorgelesene Antwortversion der Bezugsfrage zum Zeitpunkt der Erfassung**, also das, was der
+  Aktionär im Saal gehört hat (Entscheidung Orchestrator, Variante a). Quelle ist `QuestionDelivered.answerVersion`
+  (`events.ts:137`). Wurde die Bezugsfrage noch nie vorgelesen, oder wurde sie ohne Version vorgelesen (Podiumspfad ohne
+  Antwortversion), **fehlt** das Feld. Ein neuerer Entwurf, eine neuere Freigabe oder eine noch nicht vorgelesene
+  Korrektur ändert den Wert nicht.
+- **Wie der Kern ihn erhält (gewählt: Projektionsfeld, nicht Protokollsuche):** Der Reduzierer pflegt am `QuestionRecord`
+  das interne Feld `deliveredAnswerVersion` im Fall `QuestionDelivered`: trägt das Ereignis `answerVersion`, wird sie
+  übernommen; ohne `answerVersion` bleibt der bisherige Wert. Eine Rückgabe (R-TRANS-06), ein Zurückziehen oder eine neue
+  Version löschen ihn nicht (das Vorlesen bleibt eine Tatsache). `captureQuestions` liest beim Erfassen
+  `parent.deliveredAnswerVersion` aus derselben Projektion, in der es R-LINK-01 prüft, und schreibt den Wert in
+  `QuestionLinked`. Das ist billiger als eine Suche im Protokoll (O(1), keine zweite Lesestelle) und beim Neuaufbau der
+  Projektion von selbst richtig, weil derselbe Reduzierer ihn erzeugt.
+- Kein Wert vom Client, keine Uhr, keine Personendaten: eine ganze Zahl ≥ 1. Der Wert im Ereignis ist maßgeblich und bleibt,
+  auch wenn die Bezugsfrage später erneut vorgelesen wird.
+- Zweck: Die Recherche verlangt die „harte Verknüpfung zur Ursprungs**antwort**“ (`:256`). Wird die Antwort der Bezugsfrage
+  später neu gefasst oder korrigiert (046c) und erneut vorgelesen, bleibt belegt, auf welche gehörte Fassung sich die
+  Nachfrage bezog.
+- Projektion und Ansicht wie `parentQuestionId`, also gemaskt nach Entscheidung 7; `deliveredAnswerVersion` selbst steht nie
+  in einer Ansicht.
 
 ### 3. R-LINK-01 — Bezugsfrage im selben Jahrgang und lesbar (`rules.ts`, Art `Guard`)
 
@@ -215,9 +228,11 @@ Standard gebaut:** die Entscheidungen unten tragen ihren Standard; offene Punkte
   - (b) sie noch keinen Bezug hat,
   - (c) die Bezugsfrage in derselben Projektion existiert,
   - (d) Bezugsfrage und Frage verschieden sind,
-  - (e) die Frage noch auf dem Stand ihrer Erfassung steht: seit ihrem `QuestionCaptured` wurde kein anderes Ereignis auf sie
-    angewendet (`version === 1`), und tragen beide Ereignisse eine `commandId`, ist sie gleich (Lesebefund M4: ein später
-    angehängter Bezug könnte sonst einen Zyklus bilden),
+  - (e) das **unmittelbar zuvor in dieser Projektion reduzierte Ereignis** das `QuestionCaptured` derselben Frage ist (der
+    Reduzierer merkt sich Typ und `subjectId` des zuletzt angewendeten Ereignisses des Jahrgangs); tragen beide eine
+    `commandId`, muss sie gleich sein. Damit ist die Bezugsfrage vor dem Kind erfasst, und ein später angehängter Bezug, auch
+    auf eine unberührte Frage ohne `commandId`, bleibt ohne Wirkung (Lesebefund M4, Nachprüfung Minor 2: `version === 1`
+    allein genügte nicht),
   - (f) `relation` in `QUESTION_RELATIONS` liegt und `parentAnswerVersion`, falls vorhanden, eine ganze Zahl ≥ 1 ist.
   Sonst lässt er das Ereignis ohne Wirkung (kein Wurf: Laden und Kettenprüfung eines gespeicherten Protokolls dürfen daran
   nicht scheitern, R7).
@@ -237,7 +252,7 @@ Standard gebaut:** die Entscheidungen unten tragen ihren Standard; offene Punkte
 export type QuestionLinked = Base<'QuestionLinked', {
   parentQuestionId: string;
   relation: QuestionRelation;
-  /** Latest answer version of the parent at capture; absent when it had none (derived by the core). */
+  /** Last delivered answer version of the parent at capture (QuestionDelivered.answerVersion); absent if none. */
   parentAnswerVersion?: number;
 }>;
 ```
@@ -246,6 +261,9 @@ export type QuestionLinked = Base<'QuestionLinked', {
   `QuestionCaptured`.
 - **Gespeicherte Nutzlast genau** `{ parentQuestionId, relation, parentAnswerVersion? }`; kein `pii`-Teil, kein Freitext,
   keine Nummer, kein Wortlaut. Die Invariante des Umschlags (Personendaten nur im `pii`-Teil, seit 026) bleibt gewahrt.
+- **Wiederholung:** Im Wiederholungspfad (`replayValue`, `api.ts:641-647`) maskiert `viewQuestion(question, historical)`
+  und prüft die Lesbarkeit der Bezugsfrage in `source` = `historical`, also in derselben Projektion wie das Kind, nicht in
+  `state` (Nachprüfung Minor 4).
 - **Gelesene Nutzlast** (`EventRead`, jeder Ereignis-Lesepfad: `getQuestionHistory`, `listEvents`, Strom-Nachricht `event`):
   nur `{ relation }`. `parentQuestionId` und `parentAnswerVersion` entfernt die bestehende statische Maskierung
   (`stream.ts`, Muster `QuestionLegalCleared.note`, an den Ereignistyp gebunden) für jeden Leser; das gespeicherte Original
@@ -265,6 +283,7 @@ export type QuestionLinked = Base<'QuestionLinked', {
 - **Die Bezugsfrage bleibt unberührt:** keine Version, kein `updatedAt`, kein Zähler. Wer gerade die Antwort der
   Bezugsfrage bearbeitet, bekommt durch eine neue Nachfrage keinen 412 (Entscheidung „Eltern-ETag stabil“, Test 1).
   Redebeitrag und Wortmeldung bleiben ebenso unberührt.
+- Fall `QuestionDelivered`: zusätzlich `deliveredAnswerVersion` nach Entscheidung 2a (intern, nie in einer Ansicht).
 - Keine Liste der Kinder an der Bezugsfrage in der Projektion; die Kinder liefert der Filter (Entscheidung 7).
 - Zähler (`counts`), Kennzahlen und Restabdeckung ändern sich nicht. Eine „Nachfragequote“ ist Nicht-Ziel.
 
@@ -344,7 +363,8 @@ export type QuestionLinked = Base<'QuestionLinked', {
 - **Block „Bezug“** im Detail einer Frage, über der Zeitleiste und unter dem Antwortblock (`ThreadBlock.tsx`):
   - Zeile **Bezugsfrage**, wenn die Frage eine `relation` hat:
     - mit `parentQuestionId`: „Nachfrage zu F-0012“ (bzw. „Klarstellung zu …“), Auszug, Status-Badge und, falls
-      `parentAnswerVersion` steht, „bezieht sich auf Antwortversion 2“ (Mono); ein Klick öffnet die Bezugsfrage;
+      `parentAnswerVersion` steht, „bezieht sich auf die vorgelesene Antwortversion 2“ (Zahl in Mono; fehlt das Feld, fehlt
+      der Zusatz ganz); ein Klick öffnet die Bezugsfrage;
     - ohne `parentQuestionId` (gemaskt): „Nachfrage zu einer nicht sichtbaren Frage“, ohne Nummer, ohne Link, ohne Abruf
       (Lesebefund 8: der Block ruft nie eine id ab, die die Ansicht nicht geliefert hat).
   - Liste **„Nachfragen und Klarstellungen (n)“** aus `listQuestions({ parentQuestionId: id })`: je Zeile Nummer, Art, Auszug,
@@ -388,7 +408,9 @@ Additiv; keine neue Operation; kein Feld wird Pflicht; kein bestehendes Anfrages
   `relation: { $ref: QuestionRelation }`, `dependentRequired: { parentQuestionId: [relation], relation: [parentQuestionId] }`;
   Beschreibung: Bezugsfrage desselben Jahrgangs, R-LINK-01, unveränderlich (R-LINK-02), `parentAnswerVersion` leitet der
   Dienst ab.
-- **`Question`:** `parentQuestionId` (string), `relation` (QuestionRelation), `parentAnswerVersion` (integer, `minimum: 1`);
+- **`Question`:** `parentQuestionId` (string), `relation` (QuestionRelation), `parentAnswerVersion` (integer, `minimum: 1`;
+  Beschreibung: „the answer version of the parent that had last been read out (`QuestionDelivered.answerVersion`) when this
+  question was captured; absent if the parent had not been read out with a version by then; never changes afterwards“);
   **`dependentRequired: { parentQuestionId: [relation], parentAnswerVersion: [parentQuestionId] }`**, nicht umgekehrt:
   `relation` darf allein stehen. Beschreibung: „Since 0.4.5 (slice 046)“; `parentQuestionId` und `parentAnswerVersion` nur,
   wenn der Leser die Bezugsfrage lesen darf, nie in der Bühnenansicht; nie Nummer oder Wortlaut der Bezugsfrage.
@@ -409,7 +431,11 @@ Additiv; keine neue Operation; kein Feld wird Pflicht; kein bestehendes Anfrages
 - **Tore:** `pnpm contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`, (c) mit `0.4.4 -> 0.4.5`; Versionszeilen in
   `contract.test.ts` und `takt-019-contract.test.ts`; Zahl der Operationen unverändert 71.
 - **Rücknahme nach dem Merge** ist brechend (Enum-Wert, Ereignistyp; 0.5.0 nach ADR 0015); `QuestionLinked` bleibt in
-  `EVENT_TYPES`. Deshalb der Lesebefund vor dem Bau.
+  `EVENT_TYPES`. Ebenso fest sind das **geschlossene** Leseschema `QuestionLinkedPayload` (`additionalProperties: false`,
+  nur `relation`) und die Bindung `parentAnswerVersion` ⇒ `parentQuestionId` in `Question`: Ein späteres Lockern (etwa die
+  Bezugs-id im Ereignis für berechtigte Leser oder `parentAnswerVersion` ohne id) ist für Clients, die das geschlossene
+  Schema prüfen, eine Änderung der Antwortform und wird nach ADR 0015 als eigene Vertragsstufe mit CHANGELOG-Eintrag und
+  Übergangsfrist behandelt, nie als stiller Patch. Deshalb der Lesebefund vor dem Bau.
 
 ## Nicht-Ziele
 
@@ -443,12 +469,12 @@ Vertrag (erster Commit, Architekt):
 
 Kern:
 
-- `packages/domain/src/types.ts` (nur QUESTION_RELATIONS, QuestionRelation, QuestionRecord, QuestionCapture, QuestionFilter)
+- `packages/domain/src/types.ts` (nur QUESTION_RELATIONS, QuestionRelation, QuestionRecord mit dem internen Feld deliveredAnswerVersion, QuestionCapture, QuestionFilter)
 - `packages/domain/src/events.ts` (nur QuestionLinked, die Union und die Leseform von QuestionLinked in ReadEvent)
 - `packages/domain/src/envelope.ts` (nur EVENT_TYPES)
-- `packages/domain/src/state.ts` (nur der Fall QuestionLinked)
+- `packages/domain/src/state.ts` (nur der Fall QuestionLinked, deliveredAnswerVersion im Fall QuestionDelivered und das Merkfeld des zuletzt reduzierten Ereignisses für Regel e)
 - `packages/domain/src/stream.ts` (nur EVENT_TOPICS, EVENT_SUBJECTS und die an den Typ QuestionLinked gebundene Entfernung in maskEvent)
-- `packages/domain/src/api.ts` (nur captureQuestions, questionMatches, die Maskierung in viewQuestion und in getStage und, falls Vor-dem-Bau-Punkt 3 es verlangt, die Wiederholungszuordnung von captureQuestions)
+- `packages/domain/src/api.ts` (nur captureQuestions, questionMatches, die Maskierung in viewQuestion (einschließlich Entfernen von deliveredAnswerVersion) und in getStage und, falls Vor-dem-Bau-Punkt 3 es verlangt, die Wiederholungszuordnung von captureQuestions)
 - `packages/domain/src/rules.ts` (nur R-LINK-01 und R-LINK-02)
 - `docs/legal-trace.md` (generiert)
 - `packages/domain/src/__tests__/link046.test.ts` (neu)
@@ -545,15 +571,21 @@ apps/web/src/api/liveStore.ts, .github/workflows, docs/adr.
 `capture`; zweiter Jahrgang wie in `meeting025.test.ts:88-160`; gebundene Fachkräfte über `assignRole` wie in
 `forward048.test.ts`):
 
-1. **Erfassung mit Nachfrage.** Ein Aufruf mit einer Einzelfrage und Bezug `follow_up` auf eine Seed-Frage mit zwei
-   Antwortversionen: genau ein `QuestionCaptured` und unmittelbar danach (nächste `seq`, dieselbe `commandId`) genau ein
-   `QuestionLinked`; gespeicherte Nutzlast genau `parentQuestionId`, `relation`, `parentAnswerVersion: 2`; kein `pii`;
+1. **Erfassung mit Nachfrage.** Ein Aufruf mit einer Einzelfrage und Bezug `follow_up` auf eine Bezugsfrage, deren Version 1
+   vorgelesen wurde und die danach zurückgegeben wurde und einen **neueren Entwurf** Version 2 trägt: genau ein
+   `QuestionCaptured` und unmittelbar danach (nächste `seq`, dieselbe `commandId`) genau ein `QuestionLinked`; gespeicherte
+   Nutzlast genau `parentQuestionId`, `relation`, `parentAnswerVersion: 1` (die vorgelesene, nicht die neueste); kein `pii`;
    `meetingId` gleich; Ansicht (als Erfassung) mit allen drei Feldern, Version 2. Danach unverändert gegenüber vorher:
    Version und `updatedAt` der Bezugsfrage (Eltern-ETag stabil), Version der Wortmeldung, `speakerListVersion`; die Version
    des Redebeitrags steigt nur um die eine Einzelfrage (wie ohne Bezug), also bleibt das `ETag` der Antwort gleich dem eines
    Aufrufs ohne Bezug (Lesebefund 9).
-2. **Ohne Antwortversion.** Bezugsfrage ohne Version (Podiumsfrage in `classified`): `parentAnswerVersion` fehlt in Nutzlast
-   und Ansicht.
+2. **`parentAnswerVersion` nach Vorlesestand** (Nachprüfung, Legal):
+   - Bezugsfrage nie vorgelesen (mit freigegebener Version 1 in `approved` oder `staged`): Feld fehlt in Nutzlast und Ansicht.
+   - Podiumsfrage ohne Antwortversion vorgelesen (`QuestionDelivered` ohne `answerVersion`): Feld fehlt.
+   - Korrektur und zweites Vorlesen: Version 1 vorgelesen, zurückgegeben, Version 2 freigegeben und vorgelesen. Eine Nachfrage,
+     erfasst zwischen den beiden Vorlesungen, trägt 1; eine danach erfasste trägt 2; die erste behält 1.
+   - `deliveredAnswerVersion` steht in keiner Ansicht (`getQuestion`, Liste, Bühne) der Bezugsfrage; nach Neuaufbau der
+     Projektion aus dem Protokoll gleich.
 3. **Gemischter Aufruf und ohne Bezug.** Drei Einzelfragen, zwei mit Bezug (`follow_up`, `clarification`), eine ohne:
    Reihenfolge Captured(1), Linked(1), Captured(2), Linked(2), Captured(3); die dritte Ansicht hat keinen der drei Schlüssel
    (fehlend, nicht `undefined`). Ein Aufruf ganz ohne Bezug: Ereignisse und Antwort gleich dem Verhalten vor der Scheibe.
@@ -568,7 +600,9 @@ apps/web/src/api/liveStore.ts, .github/workflows, docs/adr.
    (a) zweiter Bezug für dasselbe Kind; (b) Bezugsfrage eines anderen Jahrgangs; (c) Bezug auf sich selbst; (d) unbekannte
    Frage; (e) **später Bezug**: ein `QuestionLinked` für eine ältere Frage A auf eine jüngere Frage B, die selbst schon auf A
    zeigt (Zyklus), angehängt nach einem weiteren Ereignis auf A und mit anderer `commandId`; (e2) dasselbe für eine Frage
-   ohne Bezug, aber mit `version > 1`; (f) Relation `'duplicate'`; (f2) `parentAnswerVersion: 0`. Laden mit Kettenprüfung
+   ohne Bezug, aber mit `version > 1`; (e3) eine **unberührte** ältere Frage A (Version 1, kein weiteres Ereignis, ohne
+   `commandId`) und ein später angehängtes `QuestionLinked` A → B, wobei B schon auf A zeigt: nicht unmittelbar nach dem
+   `QuestionCaptured` von A, also ohne Wirkung, kein Zyklus; (f) Relation `'duplicate'`; (f2) `parentAnswerVersion: 0`. Laden mit Kettenprüfung
    gelingt; die Projektion hält jeweils den ersten bzw. keinen Bezug; kein Zyklus entsteht; nichts wirft.
 7. **Kette.** Nachfrage auf eine Nachfrage ist erlaubt; der Filter auf die oberste Frage liefert nur die direkte Nachfrage.
 8. **Filter je Kind.**
@@ -581,7 +615,8 @@ apps/web/src/api/liveStore.ts, .github/workflows, docs/adr.
      ohne den Schlüssel liefert alle Fragen wie heute.
 9. **Maskierung der Ansicht** (Lesebefund B1):
    - **Beobachtung:** vorgelesene Nachfrage zu einer nicht vorgelesenen Bezugsfrage: `relation` ja, `parentQuestionId` und
-     `parentAnswerVersion` fehlen; nach dem Vorlesen der Bezugsfrage erscheinen beide.
+     `parentAnswerVersion` fehlen; nach dem Vorlesen der Bezugsfrage erscheint `parentQuestionId` (`parentAnswerVersion` nur,
+     wenn die Bezugsfrage schon bei der Erfassung vorgelesen war).
    - **Gebundene Fachkraft, anderer Fachbereich:** wie in Test 8; `getQuestion(kind)` ohne die beiden Felder; die id der
      Bezugsfrage steht nirgends in der Antwort (Suche im serialisierten JSON).
    - **Podium und Bühne:** `getStage` mit einer Nachfrage auf der Bühne, gelesen als Podium **und** als Moderation (hat
@@ -598,7 +633,8 @@ apps/web/src/api/liveStore.ts, .github/workflows, docs/adr.
     Podium, Beobachtung: wie heute. Kein Ereignis.
 14. **Zusammenführen und Zurückziehen danach.** Bezugsfrage nach dem Bezug zusammengeführt bzw. zurückgezogen: das Kind behält
     den Bezug; eine zusammengeführte oder zurückgezogene Frage kann Bezugsfrage einer neuen Erfassung sein (kein
-    Statuskriterium, Standard 2). Neue Antwortversion der Bezugsfrage nach dem Bezug: `parentAnswerVersion` des Kinds bleibt.
+    Statuskriterium, Standard 2). Neue Antwortversion oder neues Vorlesen der Bezugsfrage nach dem Bezug: `parentAnswerVersion`
+    des Kinds bleibt.
 15. **Strom** (T-G1-I-09, Lesebefund M2). `EVENT_TOPICS.QuestionLinked` ist `['questions']`; `EVENT_SUBJECTS.QuestionLinked`
     nennt **nur** das Kind; nicht in `SCOPE_EXIT_EVENTS`. Ein Abonnent, der die Bezugsfrage, aber nicht das Kind lesen darf
     (gebundene Fachkraft der Bezugsfrage, Kind in anderem Fachbereich), erhält **kein** Änderungssignal mit dem Kind oder der
@@ -643,7 +679,8 @@ ausgeführt):
   Einzelfragen werden ohne Bezug gesendet; der Chip steht danach noch (Lesebefund M7).
 - **W4** `QuestionCard.test.tsx`: Badge „Nachfrage zu F-…“/„Klarstellung zu F-…“; ohne `parentQuestionId` oder bei 404 nur
   „Nachfrage“/„Klarstellung“ ohne Abruf bzw. ohne Nummer; ohne `relation` kein Badge.
-- **W5** `ThreadBlock.test.tsx` und `eventSummary.test.ts`: Bezugsfrage mit Antwortversion und Kinder; ohne `parentQuestionId`
+- **W5** `ThreadBlock.test.tsx` und `eventSummary.test.ts`: Bezugsfrage mit „bezieht sich auf die vorgelesene
+  Antwortversion N“ nur bei vorhandenem Feld (ohne Feld kein Zusatz) und Kinder; ohne `parentQuestionId`
   die Zeile „nicht sichtbare Frage“ **ohne** Abruf; ohne Relation und ohne Kinder kein Block; Ladezustand ohne Höhensprung;
   Fehler; Zusammenfassung von `QuestionLinked` aus `{ relation }`, beide Relationen, unbekannter Code; DE und EN.
 - **W6** `http.test.ts`: `listQuestions` sendet `parentQuestionId`; `captureQuestions` reicht beide Felder im Rumpf durch.
@@ -670,15 +707,16 @@ ausgeführt):
 
 **Mutationsproben** (je einmal lokal rot belegen, dann zurücknehmen):
 1. R-LINK-01 auslassen (Test 5 und H3 rot).
-2. Im Reduzierer Regel (e) auslassen (Test 6e rot).
+2. Im Reduzierer Regel (e) auf `version === 1` zurückstellen (Test 6e3 rot).
 3. `touch` auch für die Bezugsfrage (Test 1 rot).
 4. Bezugsfrage zu `EVENT_SUBJECTS.QuestionLinked` **hinzufügen** (Test 15 rot).
 5. Maskierung in `viewQuestion` auslassen (Test 9 rot); Entfernung in `maskEvent` auslassen (Test 10 rot).
 6. Chip nach Erfolg nicht zurücksetzen (W3 rot).
+7. `parentAnswerVersion` aus der neuesten statt der vorgelesenen Version (Test 1 und 2 rot).
 
 ## Akzeptanzkriterium
 
-1. Tests 1–17, H1–H7, P1–P2, W1–W7 und E1–E3 vor der Änderung rot (Ausgabe im Bericht), danach grün; die sechs
+1. Tests 1–17, H1–H7, P1–P2, W1–W7 und E1–E3 vor der Änderung rot (Ausgabe im Bericht), danach grün; die sieben
    Mutationsproben rot belegt.
 2. `packages/domain/policy-truth-table.md` unverändert; `docs/legal-trace.md` um genau zwei Zeilen (R-LINK-01, R-LINK-02).
 3. Vertrag 0.4.5 (oder die nächste freie Stufe): `contract:lint` ohne neue Meldung; `check.mjs` (a)–(d) `ok`; Zahl der
@@ -774,7 +812,8 @@ und aus Klasse hoch für alle vier Teile. Gemessene Bauzeiten der letzten Scheib
 9. **Notizfeld bleibt aus** (E4); kein Schalter in 046.
 10. **Maskierung:** Bezugs-id und Antwortversion nur für Leser der Bezugsfrage; nie auf der Bühne; in allen Ereignis-Lesepfaden
     für jeden Leser entfernt (Entscheidung Orchestrator zu Lesebefund B1, Variante a).
-11. **`parentAnswerVersion`** vom Kern abgeleitet, ohne Personendaten (Entscheidung Orchestrator zu Lesebefund M6).
+11. **`parentAnswerVersion`** = zuletzt vorgelesene Antwortversion der Bezugsfrage bei der Erfassung, vom Kern aus dem internen
+    Projektionsfeld `deliveredAnswerVersion` abgeleitet, ohne Personendaten (Entscheidung Orchestrator zu M6 und zur Nachprüfung).
 
 ## Offene Eigentümerfragen
 
@@ -881,7 +920,7 @@ Done: <drei Zeilen>
 Evidence: <Schluss von `pnpm gates` mit Commit-Hash>, docs/evidence/046-erfassung-de.png, docs/evidence/046-erfassung-en.png,
           docs/evidence/046-historie-de.png, docs/evidence/046-historie-en.png; PR-CI gates und e2e-http: Lauf-ID
 Rot vor Grün: <Testausgabe vor der Änderung>
-Mutationsproben: <sechs Ergebnisse>
+Mutationsproben: <sieben Ergebnisse>
 Vertrag: <Version, check.mjs (a)–(d)>
 Laufzeit e2e-http: <Dauer vorher/nachher>
 Vor-dem-Bau-Punkte: <Ergebnis je Punkt 1–9, Punkt 8 mit den Folgen für 053, 054, 055b, 080, abnahme>
@@ -920,3 +959,12 @@ Entscheidungen des Orchestrators eingearbeitet im Folgecommit; je Befund:
 | 20 | nit | nicht zur Umsetzung beauftragt (Entscheidung des Orchestrators) | — |
 | 21 | nit | Aufwand | Punktschätzung 3,0 AStd (Spanne 2,5–3,75), Teilungssumme 9,25 |
 | 22 | nit | Zeile in `labels.ts` | `labels.ts:105` (`EVENT_KEYS`) |
+
+### Nachprüfung (frischer Kontext, 05.10.2026, zu `8c6f527`): Punkte 1, 2, 3, 5, 7 erledigt; 1 major, 3 minor
+
+| Nr. | Klasse | Befund (kurz) | Umsetzung |
+|---|---|---|---|
+| N1 | major (legal) | `parentAnswerVersion` war die neueste Version, nicht das Gehörte | Variante a: zuletzt vorgelesene Version bei Erfassung aus `QuestionDelivered.answerVersion`; internes Projektionsfeld `deliveredAnswerVersion` (billiger als Protokollsuche), Files allowed `state.ts`/`types.ts`/`api.ts`; Entscheidung 2a, Vertragsbeschreibung, Oberfläche „bezieht sich auf die vorgelesene Antwortversion N“ nur bei vorhandenem Feld; Tests 1, 2, 14, W5, Mutationsprobe 7 |
+| N2 | minor | Regel (e) mit `version === 1` zu schwach | Regel (e): unmittelbar zuvor reduziertes Ereignis ist das `QuestionCaptured` derselben Frage; Test 6e3; Mutationsprobe 2 |
+| N3 | minor | Rücknahme: geschlossenes Leseschema und Bindung fehlen | Vertragsschritt, Absatz „Rücknahme nach dem Merge“ mit ADR-0015-Behandlung |
+| N4 | minor | Lesbarkeit der Bezugsfrage im Wiederholungspfad | Entscheidung 5: Prüfung in `source` = `historical` |
