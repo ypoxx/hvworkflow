@@ -57,6 +57,13 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 - 010b Runde 4 (Lauf 37347756649, Job 111890560965, Commit `d17bcbf`, 05.10.2026) · `apps/web/e2e/010b-lesepfade.spec.ts:802` (Runde 4 B,
   Bühne, Rollenwechsel bei „Nur Bühne“) · `page.evaluate: Resulting promise was garbage collected`, bisher einmalig · **in Arbeit als
   takt-050** (nicht offen); `evaluate` nicht über Navigation oder Rollenwechsel hinweg offen halten.
+- takt-050 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/app-modules.ts:74-81` (mit #165) · die Pollmeldung nennt immer
+  „state 'loading' means the dynamic import never settled“, auch bei Zustand `failed: …` · neutral formulieren oder bei `failed` früh
+  mit dem Fehlertext abbrechen.
+- takt-050 Review minor · `apps/web/e2e/support/app-modules.ts:52-56` · nach `failed` startet ein zweiter Aufruf von `loadAppModules`
+  einen neuen Import (impliziter Neuversuch über Aufrufe) · einen Satz Kommentar oder `failed` festhalten.
+- takt-050 Review nit · `apps/web/e2e/010b-lesepfade.spec.ts:809` (R4A) · der Poll auf `expect.any(Number)` zeigt ein `failed: …` nur als
+  Zeitüberschreitung (der empfangene Wert steht in der Meldung).
 
 
 ## Dienst: Anmeldung (vor oder mit 029)
