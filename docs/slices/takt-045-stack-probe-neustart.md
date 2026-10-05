@@ -1,6 +1,6 @@
 # takt-045 — Stack-Probe `postgres-restart` ohne Wettlauf (stop, Ausfall gesehen, start)
 
-**Status:** spec · **Risikoklasse:** mittel (Verhaltensänderung eines Betriebswerkzeugs: die Sonde hält Postgres im lokalen
+**Status:** gebaut · **Risikoklasse:** mittel (Verhaltensänderung eines Betriebswerkzeugs: die Sonde hält Postgres im lokalen
 Stack jetzt bewusst gestoppt, bis der Dienst den Ausfall gemeldet hat. Leitplanken §4: nicht „niedrig“, weil „niedrig“
 Betrieb ausschließt; kein Hoch-Auslöser: nur lokaler Stack und CI-Job, kein Deployment, keine Produktivpersistenz, keine
 Secrets, kein Produktivcode) · ca. 3 AStd · **Lanes:** ops (Skript `scripts/stack.mjs`)
@@ -288,10 +288,15 @@ Evidence: pnpm gates auf abf970c (Code-Commit, sauberer Baum), Schluss der Ausga
             # pass 1
             # fail 0
           node --test scripts/stack.test.mjs: tests 49, pass 49, fail 0.
-          CI stack-037a drei Versuche (Lauf-ID, Job-IDs, Protokollzeile S16.1): offen, trägt der Orchestrator nach.
-Open: Kriterium 3 (CI stack-037a, drei grüne Versuche, Protokollzeile S16.1) – erst nach Push/PR möglich, nicht vom
-      Builder. Lokal kein Docker: der Beobachter wurde nur gegen ein nachgestelltes /readyz (Node-HTTP) ausgeführt
-      (READY, DOWN, Schlusszeile mit samples/maxGapMs gelesen), nicht gegen den echten Stack.
+          CI stack-037a (Nachtrag des Orchestrators), Lauf 37336299795 auf bb78ea0, drei Versuche grün:
+            Job 111851827346 (15:54): „db unreachable 0.1 s nach dem Stopp, wieder ok 0.2 s nach dem Start (stop 0.1 s,
+              Exit 0; start 0.1 s, Exit 0; Beobachter Exit 0, Schlusszeile ja, 6 Abfragen, größte Lücke 79 ms)“;
+              „Dienst api nach dem Postgres-Neustart: Zustand running, RestartCount 0“.
+            Job 111858795467 (16:09): dieselbe Zeile, 6 Abfragen, größte Lücke 79 ms; running, RestartCount 0.
+            Job 111867335068 (16:28): dieselbe Zeile, 5 Abfragen, größte Lücke 70 ms; running, RestartCount 0.
+          Der Schritt S16.1 dauert jeweils unter 1 s (vorher bis 75 s).
+Open: Kriterium 4 und 5 erfüllt; Review (Opus): kein Blocker, kein Major; vier Minors und drei Nits in die Folgeliste.
+      Lokal kein Docker beim Bau; der echte Stack ist durch die drei CI-Läufe belegt.
 Touched: scripts/stack.mjs, scripts/stack.test.mjs, docs/betrieb/installation.md, docs/folgeliste.md,
          docs/slices/037a-lokales-betriebspaket.md, docs/slices/takt-045-stack-probe-neustart.md
 ```
