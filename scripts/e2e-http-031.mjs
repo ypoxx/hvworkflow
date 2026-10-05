@@ -290,13 +290,28 @@ function endGroup(child, signal) {
 }
 
 async function main() {
-  const startedAt = Date.now();
-  // Entry times of the main stages (fixed names, takt-046); the last one ends at the finally block.
-  const marks = [];
-  const enter = (name) => marks.push([name, Date.now()]);
   stage = 'tsx loader check';
   if (!loaderIsActive()) { console.error(LOADER_HINT); process.exitCode = 1; return; }
   if (process.argv.includes('--check')) { await check(); return; }
+  const startedAt = Date.now();
+  // Entry times of the main stages (fixed names, takt-046); the last one ends when run() settles.
+  const marks = [];
+  try {
+    await run({ startedAt, enter: (name) => marks.push([name, Date.now()]) });
+  } finally {
+    // Outside run(), so setup failures and a throwing cleanup still print the line (Codex P2 on #159);
+    // guarded, so the duration output can never replace the original error.
+    try {
+      const end = Date.now();
+      const stages = marks.map(([name, from], index) => [name, (marks[index + 1]?.[1] ?? end) - from]);
+      const { line, annotation } = formatDuration({ totalMs: end - startedAt, limitMs: TOTAL_MS, warnMs: WARN_MS, stages });
+      say(line);
+      say(annotation);
+    } catch {}
+  }
+}
+
+async function run({ startedAt, enter }) {
   const ownerBase = process.env.TEST_DATABASE_URL;
   const runtimeBase = process.env.TEST_RUNTIME_DATABASE_URL;
   const runtimeRole = process.env.HV_DB_RUNTIME_ROLE;
@@ -427,11 +442,6 @@ async function main() {
     if (containerStarted) await removeKeycloak(container).catch(() => {});
     if (databaseCreated) await dropDatabase(ownerBase, databaseName).catch(() => {});
     await rm(temp, { recursive: true, force: true });
-    const end = Date.now();
-    const stages = marks.map(([name, from], index) => [name, (marks[index + 1]?.[1] ?? end) - from]);
-    const { line, annotation } = formatDuration({ totalMs: end - startedAt, limitMs: TOTAL_MS, warnMs: WARN_MS, stages });
-    say(line);
-    say(annotation);
   }
 }
 

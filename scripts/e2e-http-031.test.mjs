@@ -552,11 +552,22 @@ test('harness: the duration line reports total, limit, threshold and stages; the
   assert(formatDuration({ totalMs: 600_000, limitMs: 720_000, warnMs: 390_000, stages }).line.includes('total 10:00 of'));
 });
 
-test('harness: formatDuration is called in the finally of main, with the four fields only', () => {
+test('harness: formatDuration is called in the finally of main around run(), guarded, with the four fields only', () => {
   const source = readFileSync(HARNESS, 'utf8');
-  const main = source.slice(source.indexOf('async function main()'), source.indexOf('function collect('));
-  assert.match(main, /finally \{[^]*formatDuration\(\{ totalMs: [^}]*\}\)/);
+  const main = source.slice(source.indexOf('async function main()'), source.indexOf('async function run('));
+  assert.match(main, /await run\([^]*\} finally \{\s*(?:\/\/[^\n]*\n\s*)*try \{[^]*formatDuration\(\{ totalMs: [^}]*\}\)[^]*\} catch \{\}/);
+  const run = source.slice(source.indexOf('async function run('), source.indexOf('function collect('));
+  assert.doesNotMatch(run, /formatDuration/);
   assert.match(source, /export function formatDuration\(\{ totalMs, limitMs, warnMs, stages \}\)/);
+});
+
+test('harness: a setup failure (missing database variables) still prints the duration line and annotation', () => {
+  const result = spawnSync(process.execPath, ['--import', LOADER, HARNESS], {
+    cwd: ROOT, encoding: 'utf8', timeout: 30_000, env: baseEnv });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /^031a duration: total 0:0\d of limit 12:00, warning above 6:30; stages: $/m);
+  assert.match(result.stdout, /^::notice title=e2e-http duration::031a duration: /m);
+  assert.equal(result.stderr, '031a e2e http harness failed during tsx loader check.\n');
 });
 
 test('harness: without the tsx loader it says so with a fixed sentence', () => {
