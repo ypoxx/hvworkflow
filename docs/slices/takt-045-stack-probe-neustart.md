@@ -265,9 +265,33 @@ Doku und Bericht etwa 1 AStd.
 
 ```
 Slice: takt-045-stack-probe-neustart
-Done: …
-Evidence: pnpm gates auf <commit> (…), Test 1 rot auf altem stack.mjs / grün auf neuem, CI stack-037a drei Versuche
-          (Lauf-ID, Job-IDs, Protokollzeile S16.1)
-Open: …
-Touched: …
+Done: probe postgres-restart stoppt Postgres (docker stop auf die Compose-Container-ID), wartet auf DOWN des
+      Beobachters (höchstens 45 s) und startet es genau einmal (finally); Bewertung über [stopAt, startAt] und 60 s
+      ab dem Start. parseWatchOutput liest READY/DOWN/Schlusszeile; Protokoll nennt Beobachter-Exit, Schlusszeile,
+      samples, maxGapMs sowie Zustand und RestartCount von api vor der ersten roten Prüfung. Tests 1–8 zuerst.
+Evidence: pnpm gates auf abf970c (Code-Commit, sauberer Baum), Schluss der Ausgabe:
+            slice-scope: 6 changed file(s), all within "docs/slices/takt-045-stack-probe-neustart.md"'s "Files allowed" list (6 pattern(s)).
+            # pass 324
+            # fail 0
+            ✓ built in 2.90s
+            mark-test-run: wrote /home/user/wt/takt045/.claude/state/last-test-run (clean tree) at commit abf970c, tree 2930ef402650…
+          Test 1 rot auf altem stack.mjs (byte-gleich mit f4e0278; aus der Testdatei nur die zwei dort fehlenden
+          Importe parseWatchOutput/formatPostgresRestart entfernt, Test 1 nutzt sie nicht):
+            not ok 1 - takt-045 Test 1: a watcher polling every 250 ms still sees the outage, because Postgres stays stopped until DOWN
+              error: |-
+                the outage is seen regardless of the poll period
+                false !== true
+            # pass 0
+            # fail 1
+          Test 1 grün auf neuem stack.mjs (node --test --test-name-pattern "takt-045 Test 1" scripts/stack.test.mjs):
+            ok 1 - takt-045 Test 1: a watcher polling every 250 ms still sees the outage, because Postgres stays stopped until DOWN
+            # pass 1
+            # fail 0
+          node --test scripts/stack.test.mjs: tests 49, pass 49, fail 0.
+          CI stack-037a drei Versuche (Lauf-ID, Job-IDs, Protokollzeile S16.1): offen, trägt der Orchestrator nach.
+Open: Kriterium 3 (CI stack-037a, drei grüne Versuche, Protokollzeile S16.1) – erst nach Push/PR möglich, nicht vom
+      Builder. Lokal kein Docker: der Beobachter wurde nur gegen ein nachgestelltes /readyz (Node-HTTP) ausgeführt
+      (READY, DOWN, Schlusszeile mit samples/maxGapMs gelesen), nicht gegen den echten Stack.
+Touched: scripts/stack.mjs, scripts/stack.test.mjs, docs/betrieb/installation.md, docs/folgeliste.md,
+         docs/slices/037a-lokales-betriebspaket.md, docs/slices/takt-045-stack-probe-neustart.md
 ```
