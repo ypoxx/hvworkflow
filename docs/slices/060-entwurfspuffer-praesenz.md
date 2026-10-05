@@ -7,7 +7,7 @@ Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → *
 Puffer der Antwortansichten und den Fassungsvergleich; Präsenz und Übernahmen gehen in **060b**, der Puffer der Erfassung in
 **060c** (beide skizziert, Abschnitt „Teilung und Zuschnitt“). Auf Standard gebaut; keine Eigentümerfrage blockiert 060.
 **Lesebefund der Fassung 2 vor dem Bau** (Klasse hoch, Leitplanken §4).
-**Risikoklasse:** hoch · 3,2 AStd · Kalender 23.11.2026 (W9), vorgezogen · Lanes: web-api, web-components, web-answers, web-focus, i18n, e2e, docs-sicherheit, docs-datenschutz
+**Risikoklasse:** hoch · 3,5 AStd · Kalender 23.11.2026 (W9), vorgezogen · Lanes: web-api, web-components, web-answers, web-focus, i18n, e2e, docs-sicherheit, docs-datenschutz
 **Rolle:** implementierer-oberflaeche; Design-Kritik (D1–D10) in frischem Kontext vor dem Review (nicht die Sitzung, die
 diese Spec schrieb, nicht die bauende); ein Review in frischem Kontext mit den Perspektiven **Datenschutz** und **Security**
 (unveröffentlichte Antworten im Browserspeicher, T-G1-I-08) und **UX/Barrierefreiheit** (Vergleich, Fokus); Modell nur in
@@ -122,22 +122,28 @@ Keine Entscheidung bleibt dem Implementierer überlassen.
 | `ownerId` | Akteur-id (`useActor().id`); nötig für die Trennung je Akteur, nie Name, Rolle oder `personId` |
 | `meetingId` | `question.meetingId` (Vertrag: Pflicht ab 0.3.6). Fehlt sie am Datensatz, wird für diese Frage nicht gepuffert (kein Rückfall auf einen anderen Wert) |
 | `questionId` | Frage-id |
-| `body`, `sources`, `baseVersion`, `baseBody`, `baseSources` | die Felder des `FocusDraft` (Eingabeform, nie DOM oder HTML, 055b) |
+| `body`, `sources` | Eingabeform des Felds und die Quellenzeile des `FocusDraft` (nie DOM oder HTML, 055b) |
+| `baseVersion` | Nummer der Antwortversion, von der der Entwurf ausging (0 ohne Version) |
 | `changedAt` | Wanduhr des Geräts beim letzten Schreiben; nur für Ablauf und die Zeile „gesichert · HH:MM:SS“ |
 
 Nicht gespeichert: Fragetext, Fragenummer, Rednername, Anzeigename, Rolle, Status, `generation`, `rebase`, `key` des
-`FocusDraft`. Je Kennung genau ein Eintrag, der jüngste Stand; kein Verlauf.
+`FocusDraft` und **die Basis selbst** (`baseBody`, `baseSources`): sie kommt beim Wiederherstellen immer aus dem Datensatz
+(Entscheidung 5, Re-Check major 2). Je Kennung genau ein Eintrag, der jüngste Stand; kein Verlauf.
 
 **`sanitizeEntry` (beim Schreiben und beim Lesen; ein abgelehnter Eintrag wird gelöscht, keine Ausnahme nach oben):**
 
 - Schemanummer gleich, `id` gleich `entryId(meetingId, ownerId, questionId)`, alle Zeichenketten-Felder Zeichenketten,
   `baseVersion` ganze Zahl ≥ 0, `changedAt` gültige Zeit nicht in der Zukunft (mehr als 5 min Vorlauf → abgelehnt).
-- `body` (Eingabeform) und `baseBody` (Speicherform) **strukturell**: Objekt mit `blocks`-Array; jeder Block `paragraph` oder
-  `list` mit Läufen bzw. Listenpunkten aus Läufen; jeder Lauf mit `text` als Zeichenkette und `marks` nur aus `ANSWER_MARKS`;
-  keine anderen Schlüssel. Danach läuft `body` durch `previewAnswer` und `baseBody` durch `normalizeAnswerBodyForRead`; ist
-  das Ergebnis `null`, obwohl Text da war, wird abgelehnt.
-- Obergrenzen: Klartext von `body` höchstens `ANSWER_TEXT_MAX_LENGTH`; `sources` und `baseSources` höchstens 50 Einträge zu je
-  2 000 Zeichen (Vertragsgrenzen), zusammen höchstens 110 000 Zeichen; serialisiert höchstens 256 KiB je Eintrag (sonst nicht
+- `body` ist die **offene Eingabeform** des Felds (sie kann Überschrift, Zitat, Tabelle, Unterstreichung, Durchstreichung,
+  `content`/`items`, `language` tragen, die erst die Normalisierung abbildet oder verwirft). Geprüft wird sie deshalb mit der
+  Funktion des Kerns **`checkAnswerBodyInput`** (dieselben Formen und Grenzen wie das Vertragsschema `AnswerBodyInput` und der
+  422 des Dienstes; über `@hv/domain`, wie `answerFormat.ts` es schon tut), nicht mit einer eigenen, engeren Regel: ein Entwurf,
+  den der Dienst annehmen würde, wird nie abgelehnt. Gibt die Prüfung einen Fehler zurück, wird abgelehnt; danach läuft `body`
+  durch `previewAnswer`; ist das Ergebnis `null`, obwohl Text da war, wird abgelehnt. `body: null` (leeres Feld) ist erlaubt.
+- Obergrenzen: Klartext von `body` höchstens `ANSWER_TEXT_MAX_LENGTH`; `sources` ist im `FocusDraft` **eine Zeichenkette**, beim
+  Speichern an `;` getrennt (`splitSources`). Für die Grenze gilt dieselbe Teilungsregel: an `;` trennen, jeden Teil trimmen,
+  leere Teile verwerfen; dann höchstens 50 Teile zu je 2 000 Zeichen (Vertragsgrenzen) und die ganze Zeichenkette höchstens
+  102 000 Zeichen; serialisiert höchstens 256 KiB je Eintrag (sonst nicht
   geschrieben, Zeile `draft-unavailable`).
 - **Einzige Wege eines wiederhergestellten Inhalts:** `body` ins Feld nur über `bodyToDom` (Neuaufbau mit `generation + 1`),
   Anzeige im Vergleich nur über `AnswerText`; keine andere Senke, kein `innerHTML`, kein `dangerouslySetInnerHTML`.
@@ -167,20 +173,31 @@ teilen den Eintrag; es gilt der jüngste Schreibvorgang, kein Abgleich zwischen 
 - **Ablauf:** **14 Stunden** nach `changedAt` (Höchstdauer einer Sitzung, DSFA V11; Eigentümerfrage 2). Abgelaufene Einträge
   werden beim Laden der Momentaufnahme gelöscht und nie wiederhergestellt.
 
-**Löschstellen** (in `api/index.ts`, über Funktionen des Moduls; jede wartet auf `oncomplete`):
+**Wem der Puffer gehört (Re-Check major 1):** `createDraftBuffer({ store, now, getActor })` erhält `getActor` injiziert, wie der
+Live-Speicher. Bei **jedem** Zugriff (`entryFor`, `put`, `delete`) vergleicht das Modul `getActor().id` mit dem `ownerId`, für
+den die Momentaufnahme geladen ist; weicht er ab (oder ist noch keine geladen), lädt es neu und ruft `purgeOthers(neue id)`,
+bevor es antwortet (bis dahin: kein Eintrag, Schreiben wartet). Wirft `getActor` (kein bestätigter Akteur), antwortet das Modul
+ohne Eintrag und schreibt nicht. Das deckt den Personawechsel der Demo (Rollenumschalter → `setActor`) ab, ohne `actor.ts` oder
+`RoleSwitcher` zu berühren. Erstes Laden: in der Demo am **Ende** von `seedIfEmpty` (nach dem Zurückwechseln), im HTTP-Betrieb
+in `onActorChange(actor)` mit einem Akteur.
+
+**Löschstellen** (in `api/index.ts`, über Funktionen des Moduls; jede wartet auf `oncomplete`). Die Verdrahtung steht in einer
+exportierten, testbaren Funktion `wireDraftBuffer({ buffer, sessionAuth, onStreamEnd })` in `api/draftBuffer.ts` (ohne Import
+von `auth`/`http`: sie bekommt die Hooks als Parameter), die `index.ts` einmal aufruft:
 
 | Anlass | Wirkung | Ort |
 |---|---|---|
 | Momentaufnahme für einen **bestätigten** Akteur geladen (Start, neue Anmeldung, Neuladen) | `purgeOthers(actorId)`: alle Einträge anderer `ownerId` gelöscht; idempotent. Deckt den HTTP-Neuladefall ab, in dem die vorige id unbekannt ist | Modul, beim Laden |
-| ausdrückliches Abmelden | `store.clear()` **bevor** die Abmeldeanfrage gesendet wird | `signOut` in `index.ts` |
-| Zustand `noRole` (angemeldet ohne Rolle) | `store.clear()` | `onActorChange(undefined)` mit Zustand `noRole` |
+| ausdrückliches Abmelden | `store.clear()` **bevor** die Abmeldeanfrage gesendet wird, begrenzt auf 1 s und mit `catch`: ein hängender oder scheiternder Speicher blockiert das Abmelden nie (danach geht die Anfrage trotzdem; der nächste Start räumt über `purgeOthers` bzw. Ablauf auf) | `signOut` in `index.ts` |
+| Zustand `noRole` (angemeldet ohne Rolle) | `store.clear()`. Erkannt über `sessionAuth.subscribe(() => sessionAuth.getState().kind === 'noRole' && clear())`, **nicht** über `onActorChange(undefined)` (derselbe Rückruf kommt bei 401 und Abmelden, der Zustand wird erst danach veröffentlicht) | `wireDraftBuffer` |
 | Streamende `forbidden` | `store.clear()` | `onStreamEnd` |
-| Streamende `roles_changed` | kein Sofortlöschen; Merker „nachprüfen“: liest eine Ansicht danach eine Frage mit Eintrag, deren `_actions` kein `answer.draft` mehr trägt, wird der Eintrag gelöscht (Absicht: löschen, wo Entwerfen nicht mehr angeboten wird; ohne `roles_changed` bleibt er, Entscheidung 4) | Modul plus Antwortansichten |
+| Streamende `roles_changed` | kein Sofortlöschen; Merker „nachprüfen“: liest eine Ansicht danach eine Frage mit Eintrag, deren `_actions` kein `answer.draft` mehr trägt, wird der Eintrag gelöscht (Absicht: löschen, wo Entwerfen nicht mehr angeboten wird; ohne `roles_changed` bleibt er, Entscheidung 4). **Lebensdauer des Merkers:** nur im Arbeitsspeicher des Moduls (nicht persistiert), gesetzt beim Streamende, zurückgesetzt beim Neuladen der Seite, beim Laden für eine andere Akteur-id und bei `clear()`; er bleibt sonst bis zum Ende der Seite gesetzt (jede spätere Lesung prüft). Ein Neuladen vor der Prüfung lässt den Eintrag stehen; er läuft spätestens nach 14 h ab | Modul plus Antwortansichten |
 | Demo-Reset | `await store.clear()`, erst nach `oncomplete` `location.reload()` | `resetDemo` in `index.ts` |
 | 401, Sitzungsablauf, Streamende `session`/`unauthorized`, Netzverlust | **nichts**; nach erneuter Anmeldung desselben Akteurs wird wiederhergestellt; ein anderer Akteur löst `purgeOthers` aus | — |
 
-**Nicht in `setActor`** (Blocker 1): der Wechsel in `seedIfEmpty` zur Administration und zurück läuft vor dem Laden der
-Momentaufnahme und löst nichts aus. In der Demo greift `purgeOthers` beim Laden für die bestätigte Persona: Wechsel zu B lädt die
+**Nicht in `setActor`** (Blocker 1): der Wechsel in `seedIfEmpty` zur Administration und zurück läuft vor dem ersten Laden
+(am Ende von `seedIfEmpty`) und ohne Zugriff auf den Puffer, löst also nichts aus. Danach greift `purgeOthers` beim ersten Zugriff
+nach einem Personawechsel: Wechsel zu B lädt die
 Momentaufnahme für B und löscht die Einträge von A; zurück bei A ist nichts mehr da (wie takt-048 V6). Die Momentaufnahme lädt neu
 bei jedem Wechsel der Akteur-id (Vergleich über `id`, R4), nicht bei einem gleichen Akteur aus einer Auffrischung.
 
@@ -188,7 +205,8 @@ bei jedem Wechsel der Akteur-id (Vergleich über `id`, R4), nicht bei einem glei
 
 - Die Momentaufnahme ist ein Speicher im Modul: einmal je bestätigtem Akteur geladen (`getAll`, Ablauf, `sanitizeEntry`,
   `purgeOthers`), danach **write-through**: jedes `put` und `delete` ändert zuerst die Momentaufnahme und dann den Speicher; eine
-  scheiternde Transaktion setzt den Eintrag der Momentaufnahme zurück und schaltet den Puffer ab (Entscheidung 8). Lesen ist
+  scheiternde Transaktion setzt den Eintrag der Momentaufnahme **nur dann** auf den Vorzustand zurück, wenn die Momentaufnahme noch
+  den gescheiterten Wert hält (ein inzwischen neuerer Schreibvorgang bleibt stehen), und schaltet den Puffer ab (Entscheidung 8). Lesen ist
   danach synchron (`entryFor(meetingId, questionId)`).
 - **Wo immer ein Entwurf entsteht** (Liste im Befund), wird zuerst `restoreDraft(entry, actorId, question, generation)` aus
   `answers/draft.ts` gefragt; ohne passenden Eintrag gilt die Vorbelegung aus takt-048. Ausnahme: nach „Verwerfen“ und „Version n
@@ -196,7 +214,14 @@ bei jedem Wechsel der Akteur-id (Vergleich über `id`, R4), nicht bei einem glei
 - **Späte Momentaufnahme:** Ist sie beim Entstehen des Entwurfs noch nicht geladen, und der Entwurf ist bei ihrer Ankunft noch
   unverändert, ersetzt der wiederhergestellte Entwurf ihn mit `generation + 1` (ein Neuaufbau des Felds, keine Zusammenführung).
   Hat die Person schon getippt, bleibt ihr Text; der nächste Schreibvorgang überschreibt den Eintrag.
-- `restoreDraft` gleicht den Eintrag sofort mit `onRecord` gegen den aktuellen Datensatz ab:
+- **Basis aus dem Datensatz, nie aus dem Eintrag (Re-Check major 2):** `restoreDraft` nimmt `baseBody` und `baseSources` aus der
+  Antwortversion `entry.baseVersion` **des Datensatzes**, nach derselben Regel wie `draftBase` (neue reine Funktion
+  `baseAt(question, version)`: Dokument über `answerBodyOf`, Quellen über `joinSources`, leer bei einer Verweigerung, leer bei
+  Version 0). Liegt `entry.baseVersion` über der neuesten Antwortversion oder gibt es diese Version im Datensatz nicht, wird der
+  Eintrag **abgelehnt und gelöscht** (keine Wiederherstellung, Vorbelegung aus takt-048). So kann ein manipulierter oder veralteter
+  Eintrag weder die Sperre „unverändert nicht speichern“ (takt-048 Entscheidung 4) umgehen noch eine Basis vortäuschen, gegen die
+  eine neuere Version still überschrieben würde.
+- Danach gleicht `restoreDraft` den Entwurf sofort mit `onRecord` gegen den aktuellen Datensatz ab:
   - neuere Version, die dasselbe sagt wie der Eintrag → Basis nachgezogen, Entwurf unverändert, Eintrag gelöscht (Folge der
     Wiederherstellung, kein programmatischer Neuaufbau eines Entwurfs der Person);
   - neuere Version über verändertem Eintrag → `rebase` steht (Entscheidung 7);
@@ -391,7 +416,7 @@ e2e:
 
 - `apps/web/e2e/060-entwurfspuffer-praesenz.spec.ts` (neu, in beiden Projekten)
 - `apps/web/e2e/support/e2e-texts.ts` (nur die Konstanten dieser Scheibe und ihre Einträge in der Liste der geschriebenen Texte)
-- `apps/web/e2e/support/roles.ts` (nur ein neuer Helfer für einen zweiten Browserkontext mit eigener Anmeldung, für E8)
+- `apps/web/e2e/support/roles.ts` (nur ein neuer Helfer für einen zweiten Browserkontext mit eigener Anmeldung, für E7)
 - `apps/web/playwright.config.ts` (nur die Liste der geteilten Dateien: die neue Datei nach 055b)
 - `scripts/e2e-http-031.test.mjs` (nur die beiden Dateilisten: die neue Datei zwischen 055b und 080)
 - Bestehende Dateien mit Antwortansichten, **nur falls rot durch Entscheidung 4, 5 oder 7; keine Zusicherung entfällt oder wird
@@ -427,15 +452,17 @@ anhalten und melden.
 
 ## Vor dem Bau prüfen
 
-1. Die Zustände `noRole` und das Streamende `forbidden` erreichen `api/index.ts` an genau einer Stelle (`onActorChange`,
-   `onStreamEnd`); `signOut` lässt sich so ordnen, dass `store.clear()` vor der Abmeldeanfrage abgeschlossen ist.
-2. In der Demo bestätigt `seedIfEmpty` die Persona erst nach dem Zurückwechseln; das Laden der Momentaufnahme hängt am
+1. `sessionAuth.subscribe` und `getState()` melden den Zustand `noRole` nach seiner Veröffentlichung; das Streamende `forbidden`
+   erreicht `onStreamEnd` in `api/index.ts`; `signOut` lässt sich so ordnen, dass `store.clear()` (mit Zeitgrenze) vor der
+   Abmeldeanfrage abgeschlossen ist.
+2. In der Demo bestätigt `seedIfEmpty` die Persona erst nach dem Zurückwechseln (erstes Laden am Ende von `seedIfEmpty`); das Laden der Momentaufnahme hängt am
    bestätigten Akteur nach dem Start, nicht an `setActor`.
 3. `run(…, onProblem)` erreicht in beiden Seiten den Speicherweg; in `answers/Page.tsx` liegt er im Fall `draft` von `onAction`.
 4. IndexedDB ist im festgelegten Chromium (headless) verfügbar; `context.setOffline(true)` lässt IndexedDB unberührt;
    Playwright-Kontexte beginnen je Test mit leerem IndexedDB (der Puffer leckt nicht zwischen Tests; `storageState` des
    HTTP-Projekts enthält kein IndexedDB).
-5. Im HTTP-Harness gibt es Anmeldezustände für Fachbereich und Recht (zweiter Kontext für E8).
+5. Im HTTP-Harness gibt es Anmeldezustände für Fachbereich und Recht (zweiter Kontext für E7). Die Antwortform „keine aktive
+   Rolle“ von `/auth/me` und das `end`-Ereignis des Stroms sind aus 030 bzw. 036b als Doubles nachbildbar (E5b).
 6. Laufzeit `e2e-http` (takt-046): Mehrzeit dieser Datei höchstens 0:45; liegt sie darüber, Befund an den Orchestrator.
 
 ## Tests zuerst (rot, dann grün)
@@ -444,15 +471,24 @@ Einheit (vitest, ohne jsdom, statisches Rendern wie heute):
 
 - **U1 `draftBuffer.test.ts`** (Speicher im Arbeitsspeicher, feste Uhr):
   - `entryId` trennt Versammlung, Akteur, Frage;
-  - `sanitizeEntry`: zusätzliche Felder (`questionText`, `displayName`, `number`) fallen weg; **manipulierter Eintrag** abgelehnt
-    und gelöscht: Block vom Typ `heading`, Lauf mit `text` als Zahl, Marke `script`, Schlüssel `html` im Lauf, 51 Quellen, Quelle
-    mit 2 001 Zeichen, Klartext über 20 000, `id` passt nicht zu den Feldern, `changedAt` in der Zukunft, fremde Schemanummer;
-    ein gültiger Eintrag geht unverändert durch `previewAnswer`/`normalizeAnswerBodyForRead`;
+  - `sanitizeEntry`: zusätzliche Felder (`questionText`, `displayName`, `number`, `baseBody`, `baseSources`) fallen weg;
+    **legitime Eingabeform wird angenommen** (Überschrift, Zitat, Tabelle, Unterstreichung, Durchstreichung, `content`/`items`,
+    `language: 'de'`, `body: null`); **manipulierter Eintrag** abgelehnt und gelöscht, wenn `checkAnswerBodyInput` ablehnt (z. B.
+    Blocktyp `script`, Lauf mit `text` als Zahl, Schlüssel `html` im Block, `language: 'xx'`), ferner bei 51 Quellteilen, einem Teil
+    mit 2 001 Zeichen (Teilung an `;` wie `splitSources`; leere Teile zählen nicht), Klartext über 20 000, `id` passt nicht zu den
+    Feldern, `baseVersion` keine ganze Zahl ≥ 0, `changedAt` in der Zukunft, fremde Schemanummer;
   - Ablauf an der Grenze (13:59:59 bleibt, 14:00:00 gelöscht);
   - Laden für Akteur A löscht alle Einträge von B (`purgeOthers`), zweimal geladen bleibt gleich (idempotent); Lesen nur eigener
     Einträge derselben Versammlung (Negativ: fremder Akteur, fremde Versammlung → nichts);
   - **write-through:** nach `put` liefert `entryFor` sofort den neuen Stand, nach `delete` nichts; eine scheiternde Transaktion
-    setzt die Momentaufnahme zurück und schaltet ab (`status: 'unavailable'`), ohne zu werfen;
+    setzt die Momentaufnahme zurück und schaltet ab (`status: 'unavailable'`), ohne zu werfen; scheitert `put` A, während schon
+    `put` B auf derselben Kennung in der Momentaufnahme steht, bleibt B stehen;
+  - **Eigentümer über `getActor`:** wechselt `getActor().id` von A zu B, liefert der nächste Zugriff nichts von A und A ist im
+    Speicher gelöscht; wirft `getActor`, liefert der Zugriff nichts und schreibt nicht; gleiche id → kein Neuladen;
+  - **`wireDraftBuffer`** (Doppel für `sessionAuth` und `onStreamEnd`): Zustand `noRole` → `clear`; Streamende `forbidden` →
+    `clear`; Streamende `unauthorized` und `session` (401) → nichts gelöscht; `roles_changed` → Merker gesetzt, nichts gelöscht,
+    Merker fällt beim Laden für eine andere id und bei `clear`; Abmelden → `clear` ist abgeschlossen, **bevor** die Abmeldeanfrage
+    des Doppels aufgerufen wird; ein `clear`, das nie abschließt oder wirft, hält das Abmelden höchstens 1 s auf;
   - `kept`-Zeit erst nach `oncomplete` (ein Speicher, der verzögert abschließt, zeigt vorher keine Zeit);
   - `clear` leert Speicher und Momentaufnahme; Eintrag über 256 KiB wird nicht geschrieben;
   - Quelltexttest **auf dem Code ohne Kommentare** (Block- und Zeilenkommentare werden vor der Prüfung entfernt, damit ein
@@ -460,7 +496,12 @@ Einheit (vitest, ohne jsdom, statisches Rendern wie heute):
     `sendBeacon`, `serviceWorker`, `localStorage`, `innerHTML`
     noch importiert es `mode`, `http`, `actor`, `auth`; die drei Konstanten enden nicht auf `KEY`/`Key`.
 - **U2 `draft.test.ts`, `restoreDraft`:** Eintrag vor Vorbelegung; Eintrag gleich Basis → keine Wiederherstellung, löschen;
-  neuere Version gleich Eintrag → Basis nachgezogen, unverändert; neuere Version über verändertem Eintrag → `rebase`; ohne
+  neuere Version gleich Eintrag → Basis nachgezogen, unverändert; neuere Version über verändertem Eintrag → `rebase`;
+  **Basis aus dem Datensatz:** Eintrag mit `baseVersion` 1 und dem Wortlaut von Version 1, Datensatz mit Version 1 → keine
+  Wiederherstellung, und ein Entwurf mit demselben Wortlaut bleibt für `canSave` gesperrt (die takt-048-Sperre greift); ein
+  manipulierter Eintrag, dessen Text von Version 1 abweicht, wird mit der Basis aus Version 1 (nicht aus dem Eintrag)
+  wiederhergestellt und ist verändert; `baseVersion` über der neuesten Version (Zukunft) → abgelehnt und gelöscht; `baseVersion`
+  bei einer Verweigerung → Basis leer wie `draftBase`; ohne
   `answer.draft` → keine Wiederherstellung, bleibt; nach `roles_changed` ohne `answer.draft` → löschen; Eintrag eines anderen
   Akteurs → nie verwendet; späte Momentaufnahme über unverändertem Entwurf → `generation + 1`, über verändertem → keine Änderung.
 - **U3 `draft.test.ts`, `conflictAfterRefusal`:** neuere abweichende Version → `compare`; neuere gleiche → `rebase-silent`; keine
@@ -496,13 +537,21 @@ neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und htt
   Versionen im gelesenen Datensatz).
 - **E4 Inhalt des Eintrags (in-process):** über `page.evaluate` den Objektspeicher lesen (Konstanten aus dem Modul importiert):
   genau die Felder aus Entscheidung 2; weder Fragetext noch Fragenummer noch ein Anzeigename im serialisierten Eintrag. Danach
-  einen manipulierten Eintrag (Block `heading`, Lauf mit Schlüssel `html`) hineinschreiben, neu laden → kein
-  `draft-restored`, Feld = Datensatz, Eintrag gelöscht.
-- **E5 Akteurwechsel, Abmelden, ohne Rolle (beide):** in-process: tippen, `draft-kept`, Rolle wechseln → kein Eintrag des vorigen
-  Akteurs; zurück, neu laden → Feld = Datensatz, kein `draft-restored`, der Text nirgends in `#main`; zusätzlich: Neuladen ohne
-  Wechsel behält den Eintrag (der Start mit `seedIfEmpty` löscht nichts). http: tippen, `draft-kept`, abmelden → Objektspeicher
-  leer (geprüft vor dem nächsten Laden); Eintrag anlegen, Cookie-Wechsel zu einer anderen Person über `asRole`, neu laden →
-  Einträge der vorigen Person gelöscht.
+  einen manipulierten Eintrag (Blocktyp `script`, Schlüssel `html` im Block) hineinschreiben, neu laden → kein
+  `draft-restored`, Feld = Datensatz, Eintrag gelöscht. Variante: gültiger Eintrag mit `baseVersion` = neueste Version + 5 → neu
+  laden → kein `draft-restored`, Eintrag gelöscht. Variante: Eintrag mit dem unveränderten Wortlaut der neuesten Version →
+  Speichern bleibt `aria-disabled`.
+- **E5 Akteurwechsel und Abmelden (beide):** in-process: tippen, `draft-kept`, über den Rollenumschalter wechseln → beim ersten
+  Zugriff kein Eintrag des vorigen Akteurs mehr im Objektspeicher; zurück, neu laden → Feld = Datensatz, kein `draft-restored`,
+  der Text nirgends in `#main`; zusätzlich: Neuladen ohne Wechsel behält den Eintrag (der Start mit `seedIfEmpty` löscht nichts).
+  http: tippen, `draft-kept`, abmelden → Objektspeicher leer (geprüft vor dem nächsten Laden); Eintrag anlegen, Cookie-Wechsel zu
+  einer anderen Person über `asRole`, neu laden → Einträge der vorigen Person gelöscht.
+- **E5b Ohne Rolle und entzogener Strom (http, mit `page.route`-Doubles nach dem Muster aus 030 und 036b m5):** Ein Rollenverlust
+  mitten in der Sitzung lässt sich im Harness nicht echt erzeugen (031 H7: kein Test schreibt Rollenereignisse am Dienst vorbei).
+  (a) Eintrag anlegen, dann beantwortet ein Double `GET /auth/me` mit der Antwort „keine aktive Rolle“, Seite neu prüfen lassen →
+  Seite „Keine aktive Rolle“, Objektspeicher leer. (b) Eintrag anlegen, ein Double des Stroms sendet `end` mit `forbidden` →
+  Objektspeicher leer. (c) Gegenprobe: ein Double beantwortet einen Lesevorgang mit 401, danach erneute Anmeldung derselben Person
+  → Eintrag noch da. Läuft nur in `e2e-http`; der Nachweis nennt das CI-Artefakt (E56).
 - **E6 Fassungsvergleich nach 412 (in-process):** Muster aus `028-konflikte.spec.ts`: `api.draftAnswer` wird für den ersten Aufruf
   so umwickelt, dass er zuerst eine abweichende Version derselben Frage schreibt (gleicher Akteur, „zweites Fenster“) und dann 412
   wirft. Speichern → Vergleich öffnet, Fokus auf `compare-title`, kein „Stand veraltet“-Band; links eigener Text, rechts neue
@@ -520,7 +569,7 @@ neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und htt
 
 ## Akzeptanzkriterium
 
-1. U1–U9 und E1–E9 grün; rot vor der Änderung mindestens U1–U4 (Modul bzw. Funktionen fehlen), U6, E1, E3, E6 (Bericht nennt
+1. U1–U9 und E1–E9 mit E5b grün; rot vor der Änderung mindestens U1–U4 (Modul bzw. Funktionen fehlen), U6, E1, E3, E6 (Bericht nennt
    Commit und Fehlerzeile); die gelisteten bestehenden e2e-Dateien grün, angepasste Zeilen benannt.
 2. **Puffer je Akteur und Versammlung:** E4 und E5 belegen nur Entwurfsfelder, kein Eintrag eines anderen Akteurs nach dem Wechsel,
   leerer Speicher nach dem Abmelden, kein Löschen beim Demo-Start; U1 belegt Ablauf nach 14 h, `purgeOthers`, write-through,
@@ -534,14 +583,14 @@ neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und htt
 6. Design-Kritik D1–D10 als Tabelle im Bericht, vor dem Review, in frischem Kontext.
 7. `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich); `pnpm --filter @hv/web e2e` für die berührten Dateien grün; CI des PR
    grün einschließlich `e2e-http`; für die nur in http laufenden Teile (E3 Speichern offline und erneute Anmeldung, E5 Abmelden und
-   Personenwechsel, E7) nennt der Nachweis Artefaktname, Run-id, Artefakt-id und Digest (AGENTS.md R2, E56).
+   Personenwechsel, E5b, E7) nennt der Nachweis Artefaktname, Run-id, Artefakt-id und Digest (AGENTS.md R2, E56).
 
 ## Nachweise
 
 - `docs/evidence/060-wiederhergestellt-de.png`, `docs/evidence/060-wiederhergestellt-en.png` (Feld mit wiederhergestelltem Text,
   Zeile „wiederhergestellt“, Speichern offen)
 - `docs/evidence/060-vergleich-de.png`, `docs/evidence/060-vergleich-en.png` (beide Spalten, primär „Mit meiner Fassung weiter“)
-- CI-Artefakt des Laufs `e2e-http` für E3/E5/E7 (Angaben wie im Akzeptanzkriterium 7)
+- CI-Artefakt des Laufs `e2e-http` für E3/E5/E5b/E7 (Angaben wie im Akzeptanzkriterium 7)
 
 ## Design-Kritik (Pflicht vor dem Review)
 
@@ -598,15 +647,16 @@ Tor-Zeile 412.
 
 ## Aufwand
 
-**3,2 AStd** (Fassung 1: 3,8 mit Präsenz und Erfassung; Plan: 2 AStd ohne Klasse hoch):
+**3,5 AStd** (Fassung 2: 3,2; der Re-Check brachte die testbare Verdrahtung, den Eigentümer über `getActor`, die Basis aus dem
+Datensatz und E5b; Fassung 1: 3,8 mit Präsenz und Erfassung; Plan: 2 AStd ohne Klasse hoch):
 
 | Teil | AStd |
 |---|---|
-| Puffermodul: Kern, `sanitizeEntry` strukturell, Momentaufnahme mit write-through, Löschregeln, Adapter, U1 | 0,8 |
-| Antwortansichten: Wiederherstellen an allen Entstehungsstellen, Schreiben nur auf Eingabe, Löschen, Toast beim Verlassen, U2, U6 | 0,6 |
+| Puffermodul: Kern, `sanitizeEntry` mit `checkAnswerBodyInput`, Momentaufnahme mit write-through, Eigentümer über `getActor`, Adapter, U1 | 0,9 |
+| Antwortansichten: Wiederherstellen an allen Entstehungsstellen mit `baseAt` (Basis aus dem Datensatz), Schreiben nur auf Eingabe, Löschen, Toast beim Verlassen, U2, U6 | 0,6 |
 | Fassungsvergleich, 412-Einordnung über `onProblem`, Live-Spalte, `keepMine`, Escape, U3–U5, U7 | 0,7 |
-| Löschstellen in `index.ts` (Abmelden, `noRole`, `forbidden`, `roles_changed`, Demo-Reset) | 0,15 |
-| e2e beider Projekte E1–E9, Prüfung der gelisteten Dateien | 0,65 |
+| `wireDraftBuffer` mit Einheitstests und Einbau in `index.ts` (Abmelden mit Zeitgrenze, `noRole` über `subscribe`, `forbidden`, `roles_changed`, Demo-Reset, erstes Laden) | 0,3 |
+| e2e beider Projekte E1–E9 mit E5b (Doubles), Prüfung der gelisteten Dateien | 0,75 |
 | Screenshots, axe, Doku-Zeilen (DSFA, Bedrohungsmodell, Glossar, Tor-Zeile), Design-Kritik, Bericht | 0,3 |
 
 060b (Präsenz) schätzt nach heutigem Stand rund 1,0 AStd, 060c (Erfassung) rund 0,7 AStd; beide neu zu schätzen in ihrer Spec.
@@ -658,10 +708,18 @@ Tor-Zeile 412.
 | nit N3 (Quelltexttest trifft Wörter in Kommentaren) | Prüfung auf Code ohne Kommentare; U1 |
 | nit N4 (privates Fenster: „auf diesem Gerät gesichert“ überzeichnet) | Wortlaut „in diesem Browser zwischengespeichert“ plus Hilfesatz, keine Erkennung; Schlüssel 15, Zahl 636; Glossar; U8 |
 | Nachtrag (Orchestrator) | MF-15 ist durch Spec 046 belegt; der Missbrauchsfall heißt MF-16 (nächste freie Nummer, geprüft über alle Zweige) |
+| Re-Check major 1 (Löschverdrahtung nicht erkennbar und ungetestet) | `noRole` über `sessionAuth.subscribe`/`getState`; `getActor` in `createDraftBuffer` injiziert, Neuladen und `purgeOthers` bei abweichender id (deckt den Rollenumschalter ab, ohne `actor.ts`); erstes Laden am Ende von `seedIfEmpty` bzw. in `onActorChange(actor)`; exportierte `wireDraftBuffer` mit Einheitstests (U1); E5b mit Doubles; E5 Titel und Inhalt berichtigt |
+| Re-Check major 2 (Basis aus dem Eintrag umgeht Sperre und Abgleich) | Basis nur noch aus dem Datensatz bei `entry.baseVersion` (`baseAt`); `baseBody`/`baseSources` nicht mehr gespeichert; Eintrag mit zukünftiger oder fehlender Version abgelehnt und gelöscht; U2, E4-Varianten |
+| Re-Check minor 1 (Prüfung lehnt legitime Eingabeform ab) | `checkAnswerBodyInput` des Kerns statt eigener Regel; U1 mit legitimer Eingabeform |
+| Re-Check minor 2 (Quellen sind eine Zeichenkette) | Teilungsregel wie `splitSources` für die Grenze benannt |
+| Re-Check minor 3 (Rücksetzen überschreibt neueren Wert) | Rücksetzen nur, wenn die Momentaufnahme noch den gescheiterten Wert hält; U1 |
+| Re-Check minor 4 (Lebensdauer des Merkers `roles_changed`) | nur im Arbeitsspeicher; gesetzt beim Streamende; zurück bei Neuladen, anderer id, `clear` |
+| Re-Check minor 5 (Abmelden darf nicht hängen) | `clear` vor der Anfrage mit 1 s Grenze und `catch`; U1 |
+| Re-Check minor 6 (zweiter Kontext gehört zu E7) | Files allowed und Vor dem Bau 5 auf E7 berichtigt |
 
 ## Hinweise an den Orchestrator
 
-- Plan §5 Eintrag 060 führt „mittel · 2 AStd“; diese Spec führt **hoch · 3,2 AStd** (Begründung „Warum hoch“). Plan-Zeile angleichen;
+- Plan §5 Eintrag 060 führt „mittel · 2 AStd“; diese Spec führt **hoch · 3,5 AStd** (Begründung „Warum hoch“). Plan-Zeile angleichen;
   Lanes web-api und web-components ergänzen; Plan-Zeilen 060b (Präsenz, hoch, nach Eigentümerfrage 1) und 060c (Erfassung, hoch)
   anlegen. Lesebefund der Fassung 2 vor dem Bau.
 - Eigentümerfragen ins Register (1 an E13/E36, 2 und 3 an E14/DSB, 4 an 047).
