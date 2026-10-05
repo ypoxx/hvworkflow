@@ -10,12 +10,12 @@ richtig geil werden“; Prognosen Z11 und Flussbild Z12 als 061b skizziert; Bau 
 „Aufwand“; gebaut in Teil A ≈ 2,0 und Teil B ≈ 2,9, je unter einem Agententag) · Plan 061: 16.11.2026 (W8), tatsächlich nach 060 in
 der Kette der Freigabe-Demo · Lanes: contract (Rechtebezeichner `cockpit.read` im Enum `Action`, Operation `getMeetingCockpit`,
 Schemas, Vertrag 0.4.x); core (neue Datei `cockpit.ts`, ein Recht in drei Bündeln, eine Lesemethode); service (eine Route);
-docs-sicherheit und Kennzahlenkatalog (Bericht „Leitstand“ im Auswertungskatalog, Regel (g) im Allowlist-Tor, MF-15); web-api
+docs-sicherheit und Kennzahlenkatalog (Bericht „Leitstand“ im Auswertungskatalog, Regel (g) im Allowlist-Tor, MF-17); web-api
 (eine HTTP-Route, Ausschluss aus dem Puffer, Wiederausgabe der Kernhilfen); web-cockpit (neu, `apps/web/src/features/cockpit/**`);
 web-shell (eine Zeile im Feature-Register, drei Shell-Schlüssel); e2e (eigene Datei, im Projekt `http` eingereiht); docs (Glossar,
 DSFA-Zeile V15, Status im Zielbild). Die Planzeile nennt nur web-cockpit; die zusätzlichen Lanes folgen aus dem Befund (Hinweise an
 den Orchestrator).
-**Bedrohungsmodell:** neue Leseoperation mit eigenem Recht (R-PERM-02); neuer Missbrauchsfall **MF-15** „Leistungsauswertung über
+**Bedrohungsmodell:** neue Leseoperation mit eigenem Recht (R-PERM-02); neuer Missbrauchsfall **MF-17** „Leistungsauswertung über
 den Leitstand“ (verwandt MF-09); berührt T-G1-I-01 (Anzeige), **T-G2-D-03** (Vollscan des Logs je Aufruf, hier je Leitstand-Lesung)
 und den Risikopunkt der DSFA „Vorgangshistorie wird zur Leistungskontrolle“ (Abschnitt 4). Der Leitstand zeigt Aggregate je
 Jahrgang, Status und Fachbereich, nie je Person; Referenzen auf Einzelfragen nur, soweit der Leser sie nach `can()` lesen darf;
@@ -53,7 +53,7 @@ Ausgelöst: [ ] Fachregel, Status (nur Anzeige; Statusverlauf über `reduce` der
 Nebenläufigkeit (nur Lesen) [x] Rolle, Recht, Identität, Schutzklasse (neues Recht `cockpit.read` in drei Bündeln; Referenzen über
 `can()`) [x] personenbezogene oder vertrauliche Daten (Auswertung; Bericht im Auswertungskatalog, Negativtest, Allowlist aus dem
 Vertrag) [x] Betrieb, Wiederherstellung (Lagebild am HV-Tag, Rechenzeit bei 800, T-G2-D-03) [ ] Administration [x] Oberfläche,
-Barrierefreiheit [ ] Nachbarsystem [ ] KI, Agenten [x] Dokumentation, Schulung (Glossar, DSFA V15, MF-15)
+Barrierefreiheit [ ] Nachbarsystem [ ] KI, Agenten [x] Dokumentation, Schulung (Glossar, DSFA V15, MF-17)
 Perspektive(n): Datenschutz, Security, Vertrag, UX · Nachweise: Abschnitt „Nachweise“ · Offene Entscheidung: E13 (Mindest-
 Aggregationsschwelle für Fachbereiche **und Rollengruppen**, Standard: keine Unterdrückung wie in 033b, Mindestzahl im Bericht als
 Feld vorgesehen), Eigentümerfragen unten (alle mit Standard)
@@ -120,7 +120,7 @@ Diff vor dem Bau (unten), nie gebündelt.
 - **i18n:** Paritätstest (f) **621**. **e2e:** `SHARED_SPECS` und Reihenfolge-Pin (002, 021b, 021c, (030, 031), 045, 053, 054, 055b,
   080, abnahme); Harness 12:00, Warnschwelle 6:30 (takt-046); Personen im Projekt `http` ohne admin und observer.
 - **Bedrohungsmodell:** T-G2-D-03 (Vollscan je Aufruf; für `/metrics` mit 10-s-Zwischenspeicher behandelt); MF-09 (Leistungs-
-  auswertung über das Zugriffslog); höchste Nummer MF-14.
+  auswertung über das Zugriffslog); höchste Nummer auf dem Integrationszweig MF-14; MF-15 belegt die Spec 046, MF-16 die Spec 060 (Branches `claude/slice-046-nachfragen-threads`, `claude/slice-060-entwurfspuffer-praesenz`, gelesen 05.10.2026), daher **MF-17**.
 - **Zielbild.** Lagebild = Leitstand (061) + Steuerung (053). Z10–Z13 wie in der Quelle. Der Prototyp zeigt Namen von Rednern im
   Faden und in der Rednerwand; das übernimmt 061 **nicht**.
 
@@ -204,12 +204,12 @@ Zoom): eine Spalte, Stationen als zwei Reihen zu drei, kein waagrechtes Scrollen
 | Flussbild mit Punkt je Einzelfrage (Z12) | nein | **061b** | rund 1 AStd |
 | Druckansicht, Schwellen je Jahrgang | nein | Folgeliste; 041 nach Eigentümerfrage 1 | — |
 
-**Bau in zwei Teilen auf dieser Spec (Standard; Entscheidung des Orchestrators bei Abweichung).** Die überarbeitete Scheibe liegt
+**Bau in zwei Teilen auf dieser Spec (vom Orchestrator angenommen 05.10.2026, kein Planknoten 061a).** Die überarbeitete Scheibe liegt
 mit 4,9 AStd über einem Agententag und über dem Doppelten der Planzeit. Statt einer zweiten Spec wird sie in zwei PRs gebaut, die
 beide diese Spec und ihre „Files allowed“ nutzen (`slice-scope` erkennt `claude/slice-061-…`):
 
 - **Teil A „Kern“** (Branch `claude/slice-061-kern`, ≈ 2,0 AStd, hoch): Vertragsschritt, `cockpit.ts`, Recht, `getCockpit`, Route,
-  Bericht im Katalog, Regel (g) im Tor, Generator, MF-15, DSFA V15; Tests K1–K12, A1–A7, G1–G3. Merge vor Teil B.
+  Bericht im Katalog, Regel (g) im Tor, Generator, MF-17, DSFA V15; Tests K1–K12, A1–A7, G1–G3. Merge vor Teil B.
 - **Teil B „Oberfläche“** (Branch `claude/slice-061-oberflaeche`, ≈ 2,9 AStd): Web-API, Seite, Liste, Faden, i18n, Register, Glossar,
   Zielbild-Status; Tests W1–W11, S1–S8; Screenshots; Design-Kritik.
 
@@ -331,7 +331,9 @@ kommt aus `COCKPIT_THRESHOLDS`, nie als Literal. **„Engpass“** an der Spalte
 Stufe „Legal Clearing über 10 min“ mindestens erhöht ist (gleiche Tönung wie dessen Badge). **Darstellung:** ruhig = keine
 Markierung (D4); erhöht = Badge `--color-tone-warning-*` mit `TriangleAlert`; kritisch = Badge `--color-tone-danger-*` mit
 `OctagonAlert`. Zahlen bleiben Grau 900; Balken im Rückstand in der Füllfarbe der Stufe, sonst Grau 400. Jede Stufe ist ohne Farbe
-lesbar (Symbol, Wort, Schwelle); der zugängliche Name jeder Kennzahl enthält Stufe und Schwelle.
+lesbar (Symbol, Wort, Schwelle). **Ein Muster für zugängliche Namen** jeder anklickbaren Kennzahl, Stationsspalte und
+Fachbereichszeile: „Liste öffnen: {Beschriftung}, {Zahl}[, {Stufe} · {Schwelle}]“, etwa „Liste öffnen: Im Legal Clearing über 10 min,
+6, erhöht · ab 3“; ruhig ohne Zusatz.
 
 ### 5. Karten, Stationen, Rückstand, Zulauf
 
@@ -397,8 +399,9 @@ Eintrag in `READ_TOPICS`): eine zeitabhängige Lesung, deren Wert ohne Ereignis 
 zählt (Strom oder Takt), und **alle 15 s** über ein `setInterval` (Anstoß, keine Zeitquelle; pausiert, solange das Dokument
 verborgen ist). Keine Fokusverschiebung, keine Layoutänderung (feste Mindesthöhen, `tabular-nums`), keine Animation. **Eine einzige
 höfliche Ansage** (`aria-live="polite"`, sonst stumm): wenn eine Kennzahl neu in „kritisch“ wechselt („Leitstand: älteste offene
-Einzelfrage kritisch, über 45 min“); keine Ansage bei jedem Wert. Verbindung unterbrochen (`reconnecting`, `offline`) ⇒ „Stand
-HH:MM:SS · Verbindung unterbrochen“ in Warnton als Text. Verschwindet die fokussierte Zeile, geht der Fokus auf die Überschrift der
+Einzelfrage kritisch, über 45 min“); keine Ansage bei jedem Wert. Den Verbindungszustand (Phasen `connecting`, `live`, `reconnecting`, `polling`, `offline` aus
+`useConnectionState`, `connection.ts:113`) zeigt schon die Kopfzeile (`app/ConnectionStatus.tsx`); der Leitstand **wiederholt ihn
+nicht**, „Stand HH:MM:SS“ bleibt neutral und sagt, wie alt die Zahlen sind. Verschwindet die fokussierte Zeile, geht der Fokus auf die Überschrift der
 Liste.
 
 ### 8. Datenschutz: nichts je Person
@@ -456,7 +459,7 @@ nur `catalog.metrics` (Prometheus-Ausgabe unberührt, A5), das Tor lehnt unbekan
 
 ### 11. Tastaturpfad (D8)
 
-**Standard:** Tab: „Faden öffnen“ → „Danach die ältesten“ → vier Karten (Name „Liste öffnen: Ohne Endstatus, 47“) → Stationsspalten →
+**Standard:** Tab: „Faden öffnen“ → „Danach die ältesten“ → vier Karten (Namen nach dem Muster aus Entscheidung 4, etwa „Liste öffnen: Ohne Endstatus, 47“) → Stationsspalten →
 Fachbereichszeilen → Liste (Pfeil auf/ab, Enter öffnet den Faden) → Faden (Schließen). Escape schließt erst den Faden, dann die
 Liste; Fokus zurück zum Auslöser. Kein neues globales Kürzel.
 
@@ -536,7 +539,7 @@ Teil A — Kern, Dienst, Katalog (implementierer-backend):
 - `scripts/auswertungskatalog.mjs` (nur der Abschnitt Berichte), `scripts/auswertungskatalog.test.mjs` (nur Test G1)
 - `scripts/metrics-allowlist-check.mjs` (nur Regel (g)), `scripts/metrics-allowlist-check.test.mjs` (nur Tests G2, G3)
 - `scripts/fixtures/metrics-allowlist/report-*.json` (neu)
-- `docs/sicherheit/bedrohungsmodell.md` (nur eine Zeile 061 in „Weitere Scheiben mit Sicherheitsbezug“, Verweis in der Zeile T-G2-D-03 und der neue Missbrauchsfall MF-15)
+- `docs/sicherheit/bedrohungsmodell.md` (nur eine Zeile 061 in „Weitere Scheiben mit Sicherheitsbezug“, Verweis in der Zeile T-G2-D-03 und der neue Missbrauchsfall MF-17)
 - `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V15)
 
 Teil B — Oberfläche (implementierer-oberflaeche):
@@ -594,7 +597,8 @@ Beide Teile:
 - **K2 Verweigerung.** `getCockpit` für jede übrige Rolle (datengetrieben) und für eine gebundene Fachkraft: 403 R-PERM-02, keine
   Teildaten.
 - **K3 Gleichheit mit 033b** (laufender Jahrgang; Seed und Grenzfall-Liste: Erfassung 300/301 s, Eintritt ins Legal Clearing 600/601 s,
-  Rückgabe nach `in_review`, neuer Verweigerungsvorschlag): `oldestOpen.ageSeconds`, `openByUnit` + `openUnassigned`,
+  ein **eigens gebautes Altereignis** `QuestionReturned` mit `toStatus: in_review` — über die API nicht erzeugbar, weil
+R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verweigerungsvorschlag): `oldestOpen.ageSeconds`, `openByUnit` + `openUnassigned`,
   `inflow.last5m`, `legalReview.over10m` gleich `computeIndicators`.
 - **K4 Zulauf.** 12 Fächer, disjunkt, `bins[11] === last5m`, Summe = Erfassungen mit Alter ≤ 3600 s; Grenzen 300/600/3600 s.
 - **K5 Älteste und Verweildauer.** Höchstens 4 Referenzen, älteste zuerst, Gleichstand nach `number`; `items[0].ageSeconds ===
@@ -636,7 +640,7 @@ Beide Teile:
 **Web** (`apps/web/src/api/cockpit061.test.ts`, `apps/web/src/features/cockpit/*.test.ts(x)`):
 
 - **W1** Stufen: ruhig ohne Badge; erhöht/kritisch mit Symbol, Wort und Schwelle aus `COCKPIT_THRESHOLDS`; „Engpass“ an der Station
-  Legal Clearing genau ab erhöht; zugänglicher Name mit Stufe und Schwelle.
+  Legal Clearing genau ab erhöht; zugängliche Namen aller Kennzahlen, Stationsspalten und Fachbereichszeilen nach dem einen Muster aus Entscheidung 4.
 - **W2** Zulauf: 12 Rechtecke in 280 × 48, Grundlinie 0, Skala `max(…, 5)`, jüngste Säule Akzent, Strich für leere Fenster,
   Achsenbeschriftungen, Name mit allen Werten.
 - **W3** Rückstand: Reihenfolge, „Ohne Fachbereich“ zuletzt mit Unterzeile, `data-count`, Füllfarbe nur bei Stufe, Schwellenstrich an
@@ -705,7 +709,7 @@ Beide Teile:
 | D3 | 12-Spalten-Raster, 8-px-Raster, Unterkanten Hauptlesung/Zulauf fluchten, Karten gleich hoch; benannte Ausnahmen: Hauptzahl 44 px (40 px an der Wand), Achse 11 px; Kartenzahlen 28 px, Stationen 20 px. | Screenshot |
 | D4 | Ruhe ohne Farbe; Farbe nur bei Stufe als Badge oder Balkenfüllung, Statustönung der Stationen nur als 3-px-Kante; Zulauf einfarbig; keine Verläufe, keine Schatten. | W1–W3 |
 | D5 | Alle Zahlen, Nummern, Zeiten Mono, rechtsbündig, `tabular-nums`; Fehler mit Regel-id. | W3, W4 |
-| D6 | Laden, leer, Fehler, Lesezustand, Verbindung unterbrochen, leere Liste, Referenz nicht lesbar gestaltet. | W4, S4 |
+| D6 | Laden, leer, Fehler, Lesezustand, leere Liste, Referenz nicht lesbar gestaltet; Verbindungszustand nur in der Kopfzeile (nicht doppelt). | W4, S4 |
 | D7 | Texte aus `cockpit.*`/Shell, DE/en-US, Hausvokabular. | Parität, `pnpm vocabulary` |
 | D8 | Kernszene per Tastatur, Escape zweistufig, Fokus sichtbar, Live ohne Fokussprung, eine Ansage nur bei „kritisch“. | W8, W11, S3 |
 | D9 | Nichts Ausgegrautes; Lesezustand statt Teildaten; Liste < 100 ms, `getCockpit` < 50 ms bei 800. | W10, S4 |
@@ -716,7 +720,7 @@ Beide Teile:
 | Risiko | Abwehr | Nachweis |
 |---|---|---|
 | Kennzahl je Person (Feld, Schlüssel, Faden mit Akteur) | Schema `additionalProperties: false`, Allowlist aus dem Vertrag, Bericht im Katalog mit Tor-Regel (g), Faden ohne Akteure | K7, A6, A7, G3, W5, S6 |
-| Leistungskontrolle kleiner Gruppen (E13) | nur Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` vorgesehen; MF-15 | Kennzahlen-Allowlist, Bedrohungsmodell |
+| Leistungskontrolle kleiner Gruppen (E13) | nur Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` vorgesehen; MF-17 | Kennzahlen-Allowlist, Bedrohungsmodell |
 | Referenz auf eine Einzelfrage, die der Leser nicht lesen darf | Filter nach `can(actor, 'question.read', q)`; Inhaber ungebunden (K1) | K1, K12 |
 | Zwei Definitionen (Leitstand ≠ `/metrics`) | gemeinsame Hilfen, Gleichheitstest, Golden | K3, A5 |
 | Recht ohne Prüfung | `READ_PERMISSIONS`; 403 statt Teildaten | K2, A2, S4 |
@@ -727,7 +731,7 @@ Beide Teile:
 | Schwellen falsch gewählt | Konstanten an einer Stelle, Eigentümerfrage 1 | K10 |
 | `e2e-http` zu lang | nur Lesen, Messung vor dem Bau | Vor-dem-Bau-Punkt 6 |
 
-**Missbrauchsfall MF-15 „Leistungsauswertung über den Leitstand“** (061; verwandt MF-09), Text für das Bedrohungsmodell:
+**Missbrauchsfall MF-17 „Leistungsauswertung über den Leitstand“** (061; verwandt MF-09), Text für das Bedrohungsmodell:
 - *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“ oder den
   Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit einzelner Beschäftigter; Screenshots oder
   Mitschriften der Wand ersetzen eine Auswertung.
@@ -743,7 +747,7 @@ Beide Teile:
 
 Geschätzt **4,9 AStd** (Spanne 4,3–5,5), erste Fassung 3,9. Plan: 2 AStd, mit Zielbild 3,75. Mehraufwand gegenüber der ersten
 Fassung rund 1,0 AStd: Bericht im Katalog mit Generator und Tor-Regel (0,35), Filter nach `can()` und schärferes K1 (0,05), Golden
-(0,05), MF-15 und Zeilen (0,05), getrennte Schemas und Grenzen (0,05), weitere Testpins (0,05), Stationen über die volle Breite,
+(0,05), MF-17 und Zeilen (0,05), getrennte Schemas und Grenzen (0,05), weitere Testpins (0,05), Stationen über die volle Breite,
 vierte Karte, Schwellenbadges, Achse, Schwellenstrich, Ansage (0,4). Differenz an Prüfpunkt 2 und die Budgettabelle (Plan 6.5).
 
 | Teil | AStd |
@@ -751,7 +755,7 @@ vierte Karte, Schwellenbadges, Achse, Schwellenstrich, Ansage (0,4). Differenz a
 | **A** Vertragsschritt: Recht, Operation, drei Schemas, Version an vier Stellen, CHANGELOG, Typen | 0,4 |
 | **A** Kern: `cockpit.ts` (Faltung, `computeCockpit`, `statusTrail`, Schwellen, Stufen, `COCKPIT_REPORT`), Hilfen mit `indicators.ts`, Recht, `getCockpit` mit `can()`-Filter, K1–K12 | 0,85 |
 | **A** Dienst: Route, Golden, A1–A7 | 0,35 |
-| **A** Katalog: `reports`, Generator, Tor-Regel (g), Fixtures, G1–G3; MF-15, DSFA V15 | 0,4 |
+| **A** Katalog: `reports`, Generator, Tor-Regel (g), Fixtures, G1–G3; MF-17, DSFA V15 | 0,4 |
 | **B** Web-API: Route, Pufferausschluss, Wiederausgabe, Tests | 0,1 |
 | **B** Seite: Gerüst, Zustände, Hauptlesung, vier Karten, Zulauf mit Achse, Stationen mit Engpass, Rückstand mit Strich, Kanarienzeile, Live, Ansage | 1,05 |
 | **B** Liste, waagrechter Faden, URL-Zustand, Tastaturpfad | 0,45 |
@@ -775,7 +779,6 @@ A grün; W6 und der Faden-Teil von S3 entfallen) und meldet; der Faden geht an 0
 | Letzter Eintrag, kein Kürzel | Registerzeile | Alt+7 oder erste Position: < 0,1 AStd |
 | Zeilen ohne Fragetext | Liste | Text in der Zeile: < 0,1 AStd (Review Datenschutz) |
 | Drill-down in der Seite | Liste, Faden | Sprung in die Steuerung mit Filter: rund 0,4 AStd in 053 |
-| Bau in zwei Teilen auf einer Spec | zwei Branches | eine zweite Spec 061a: < 0,2 AStd Schreibarbeit |
 
 ## Offene Eigentümerfragen
 
@@ -797,7 +800,7 @@ Keine blockiert den Bau; alle mit Standard.
 - **Planzeile 061** nachziehen: Klasse **hoch**, Lanes `contract, core, service, docs-sicherheit, web-api, web-cockpit, web-shell,
   e2e, docs`, Aufwand 4,9 AStd (Teil A 2,0, Teil B 2,9), Nachweise um Rechte-Diff, Gleichheit mit 033b, Golden, Bericht im
   Auswertungskatalog, Negativtest und Allowlist ergänzen; Rolle „Architekt (Vertragsschritt) + Implementierer-Backend +
-  Implementierer-Oberfläche“; Bau in zwei PRs auf dieser Spec (oder eine Planzeile 061a, falls der Plan-Graph je PR einen Knoten will).
+  Implementierer-Oberfläche“; Bau in zwei PRs auf dieser Spec (vom Orchestrator angenommen 05.10.2026; **kein** Planknoten 061a).
 - **Neue Planzeile 061b** „Leitstand: Flussbild und Prognosen“ (hoch; Abhängigkeit 061).
 - **Vertragsreihenfolge:** 046 merged vorher (0.4.5), 061 erwartet 0.4.6; 055c danach.
 - Die Statuszeile der Spec 033b ist nicht nachgezogen (`115c28b`).
@@ -810,6 +813,9 @@ Keine blockiert den Bau; alle mit Standard.
   `computeIndicators` ausschließen (gleiche Hilfe), Test in beiden; Bericht `leitstand` um das Feld ergänzen.
 - **087:** „Offene Fragen vor Schluss“ als weiterer Drill-down; `debateClosedAt` schaltet die Stufe „Ohne Endstatus“ schon heute.
 - **085:** Alarme lesen `COCKPIT_THRESHOLDS`.
+- **Folgepunkt Beantwortung (Folgeliste):** die Schwellen 15/45 min stehen nach 061 zweimal — `urgencyLevel` in
+  `features/answers/lib.ts` und `COCKPIT_THRESHOLDS` im Kern; ein Takt stellt `urgencyLevel` auf die Kernkonstante um (Beantwortung
+  ist nicht in den „Files allowed“ dieser Scheibe). Der Bau trägt den Punkt in `docs/folgeliste.md` ein.
 - **047:** geschützte Einzelfragen: Referenzen filtert `can()` schon; ob sie in den Aggregaten zählen, entscheidet 047 (Rechte-Diff
   oben).
 - **089b:** `visibleRoutes` blendet `/cockpit` ohne `cockpit.read` aus; der Lesezustand bleibt.
@@ -826,7 +832,7 @@ Keine blockiert den Bau; alle mit Standard.
 | M6 | Auswertungskatalog | Abschnitt „Kennzahlen-Allowlist“ (Feld → Familie oder `Meeting.counts`), `COCKPIT_REPORT`, Bericht `reports` in `catalog.json`, Generator, Tor-Regel (g), Tests A6, G1–G3; Machbarkeit geprüft (Entscheidung 8b) |
 | M7 | E13 nur für Fachbereiche | auf Rollengruppen erweitert (Entscheidung 8, DSFA V15, Eigentümerfrage 5), „kein Durchsatz“ |
 | M8 | Referenzen ungefiltert | Filter nach `can(actor, 'question.read', q)` (Entscheidung 8a), K1 verlangt ungebundenes `question.read`, K12, Hinweis an 047 |
-| M9 | Missbrauchsfall fehlte | MF-15 mit Signal und Empfänger, T-G2-D-03 benannt, Zeile im Bedrohungsmodell in „Files allowed“ |
+| M9 | Missbrauchsfall fehlte | MF-17 mit Signal und Empfänger, T-G2-D-03 benannt, Zeile im Bedrohungsmodell in „Files allowed“ |
 | m10 | Version | „0.4.x (erwartet 0.4.6)“, 046 zuerst |
 | m11 | K5 unscharf | K5 mit genauer Liste; Beschriftung „seit n min in diesem Status“; Liste Legal Clearing zeigt `reviewAgeSeconds` („wartet seit“) |
 | m12 | `statusTrail` | Signatur, Quelle von `at`, gleicher Status ohne Eintrag, **eine** Faltung; Quelle von `statusAgeSeconds` in beiden Zuschnittsfällen |
@@ -839,7 +845,11 @@ Keine blockiert den Bau; alle mit Standard.
 | m19 | vierte Karte | entschieden: „Auf der Bühne“; Raster, D1, S1, S2 angeglichen |
 | m20 | „Ohne Fachbereich“ | Unterzeile „noch nicht zugewiesen“, gleiche Schwellen (K10) |
 | n24 | Ansagen | eine höfliche Ansage nur beim Wechsel nach „kritisch“ (W11) |
-| n21–23, n25 | Kleinbefunde | im Auftrag nur summarisch genannt; der Wortlaut lag dieser Sitzung nicht vor; die Nachprüfung gleicht ab |
+| n21 | Hook und Verbindungsanzeige | `useConnectionState` (`connection.ts:113`), Phase `polling` genannt; kein zweiter Verbindungshinweis, die Kopfzeile zeigt ihn (Entscheidung 7, D6) |
+| n22 | zwei Muster für zugängliche Namen | ein Muster „Liste öffnen: {Beschriftung}, {Zahl}[, {Stufe} · {Schwelle}]“ (Entscheidung 4, 11, W1) |
+| n23 | Schwellen doppelt | Folgepunkt: Beantwortung liest `urgencyLevel` aus dem Kern (Hinweise an Folgescheiben, Folgeliste) |
+| n25 | „Rückgabe nach `in_review`“ nicht erzeugbar | in K3 als eigens gebautes Altereignis gekennzeichnet |
+| — | MF-Nummer | MF-15 (046) und MF-16 (060) belegt; MF-17 |
 | Demo a | Hauptzahl | 44 px Mono, „min“ 16 px Grau 600, benannte D3-Ausnahme; Karten 28 px |
 | Demo b | Stationen | sechs beschriftete Spalten über die volle Breite mit „Engpass“ ab erhöht, statt `ProcessStrip` |
 | Demo c | vierte Karte | „Auf der Bühne“ mit „{answered} vorgelesen“; `totals.staged` im Vertrag |
@@ -870,4 +880,5 @@ Tabelle mit Vergleich zu `docs/evidence/089-lagebild.png` und Urteil zu den bena
 
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
   Demo; eingearbeitet nach den Entscheidungen des Orchestrators, Tabelle „Nacharbeit nach Lesebefund“. Nachprüfung der Blocker und
-  major-Punkte offen.
+  major-Punkte offen. Zweite Nacharbeit (Orchestrator, 05.10.2026): MF-17 statt MF-15, Kleinbefunde n21, n22, n23, n25 im Wortlaut
+eingearbeitet, Bau in zwei PRs angenommen.
