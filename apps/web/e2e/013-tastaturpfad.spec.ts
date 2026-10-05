@@ -411,7 +411,7 @@ test('013c: Antwort entwerfen und mit der Tastatur weiterleiten', async ({ page 
   await assertFocusVisible(page, { testId: 'answer-submit-draft' });
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="answer-version"][data-version="1"]')).toBeVisible();
-  // takt-008: the emptied editor makes the button `aria-disabled`, not `disabled` — it keeps focus.
+  // takt-008/takt-048: the saved, now unchanged draft makes the button `aria-disabled`, not `disabled` — it keeps focus.
   await assertFocusVisible(page, { testId: 'answer-submit-draft' });
   await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
   // The confirmation toast this raises (`answers/Page.tsx`'s shared `run()`) is waited out, not
@@ -799,7 +799,7 @@ test('013i: Doppelauslösung — zweimal Enter schnell hintereinander, genau ein
   await expect(page.locator('[data-testid="answer-version"]')).toHaveCount(1);
   await expectNoRefusal(page);
 
-  // A locked Button (emptied editor, `aria-disabled`) — Enter and a click write nothing.
+  // A locked Button (saved, unchanged draft, `aria-disabled`; takt-048) — Enter and a click write nothing.
   const draftButton = page.getByTestId('answer-submit-draft');
   await expect(draftButton).toHaveAttribute('aria-disabled', 'true');
   await waitForToastsGone(page);

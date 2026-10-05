@@ -197,6 +197,8 @@ describe('AnswerEditor remounted with a draft (review 055b, finding 5)', () => {
         generation={0}
         sources=""
         busy={false}
+        canSave={body !== null}
+        dirty={body !== null}
         primary
         hasApproval={false}
         onBody={() => undefined}
@@ -213,5 +215,106 @@ describe('AnswerEditor remounted with a draft (review 055b, finding 5)', () => {
     const empty = renderEditor(null);
     expect(empty).toContain('answer-editor-placeholder');
     expect(empty).toMatch(/data-testid="answer-submit-draft"[^>]*aria-disabled="true"|aria-disabled="true"[^>]*data-testid="answer-submit-draft"/);
+  });
+});
+
+/**
+ * takt-048 (U6): the Beantwortung starts with the latest answer version (`draftBase`, as the focus view). Unchanged, the
+ * draft is not saveable and saving is not the primary action; over a refusal the field starts empty with its hint.
+ */
+describe('QuestionDetail starts with the latest version (takt-048, U6)', () => {
+  const V1: AnswerVersion = { version: 1, text: 'Erste Fassung.', createdAt: at, createdBy: { id: 'u', role: 'expert' } };
+  const V2: AnswerVersion = {
+    version: 2, text: 'Die Dividende steigt.', sources: ['Bericht', 'Anhang'], createdAt: at, createdBy: { id: 'u', role: 'expert' },
+    body: { language: 'de', blocks: [{ type: 'paragraph', content: [{ text: 'Die ' }, { text: 'Dividende', marks: ['bold'] }, { text: ' steigt.' }] }] },
+  };
+  const drafted = (answers: AnswerVersion[]): Question => ({ ...q(['answer.draft', 'question.submit_review'], answers), status: 'answer_drafted' });
+  const editorPart = (html: string): string => html.slice(html.indexOf('data-testid="answer-editor"'));
+
+  it('with a latest version: no placeholder, saving locked, "Zur Prüfung" primary, no "Verwerfen"', () => {
+    const html = render(drafted([V1, V2]));
+    expect(html).not.toContain('answer-editor-placeholder');
+    // The field's content is written by its effect (not in static markup); no placeholder means it is built non-empty.
+    expect(editorPart(html)).not.toContain('aria-placeholder');
+    expect(html).toMatch(/value="Bericht; Anhang"/);
+    const save = buttonTag(html, 'answer-submit-draft');
+    expect(save).toContain('aria-disabled="true"');
+    expect(isPrimary(save)).toBe(false);
+    expect(isPrimary(buttonTag(html, 'answer-submit-review'))).toBe(true);
+    expect(html).not.toContain(de('answers.editor.discard'));
+    expect(html).not.toContain('data-testid="answer-editor-rebase"');
+  });
+
+  it('without any other step, saving stays primary but locked until something changes', () => {
+    const html = render({ ...drafted([V1]), _actions: ['answer.draft'] });
+    const save = buttonTag(html, 'answer-submit-draft');
+    expect(isPrimary(save)).toBe(true);
+    expect(save).toContain('aria-disabled="true"');
+  });
+
+  it('latest version a refusal: placeholder and hint', () => {
+    const html = render(drafted([V1, { ...noGround(refusal({ version: 2 })), answerKind: 'refusal_no_claim' }]));
+    expect(html).toContain('answer-editor-placeholder');
+    expect(html).toContain(de('answers.refusal.editorHint'));
+    expect(editorPart(html)).not.toContain('Zu dieser Frage gibt der Vorstand keine Auskunft.');
+    expect(buttonTag(html, 'answer-submit-draft')).toContain('aria-disabled="true"');
+  });
+});
+
+/**
+ * takt-048, follow-up to the design critique (D1, principle 5): the prefilled field says which version it starts from and
+ * why saving is locked; the locked button points at that line (`aria-describedby`). No line without a base (no version,
+ * a refusal: the field starts empty) and none once the draft is changed.
+ */
+describe('the start hint of the Beantwortung (takt-048, design critique D1)', () => {
+  const V1: AnswerVersion = { version: 1, text: 'Erste Fassung.', createdAt: at, createdBy: { id: 'u', role: 'expert' } };
+  const V2: AnswerVersion = { version: 2, text: 'Zweite Fassung.', createdAt: at, createdBy: { id: 'u', role: 'expert' } };
+  const drafted = (answers: AnswerVersion[]): Question => ({ ...q(['answer.draft', 'question.submit_review'], answers), status: 'answer_drafted' });
+  const hintTag = (html: string): string => html.match(/<[a-z]+[^>]*data-testid="answer-editor-start"[^>]*>/)?.[0] ?? '';
+
+  it('with a latest version: the hint names its number, the locked save button is described by it', () => {
+    const html = render(drafted([V1, V2]));
+    expect(html).toContain(de('answers.editor.startsFrom', { version: 2 }));
+    const id = hintTag(html).match(/ id="([^"]+)"/)?.[1] ?? '';
+    expect(id).not.toBe('');
+    const save = buttonTag(html, 'answer-submit-draft');
+    expect(save).toContain('aria-disabled="true"');
+    expect(save).toMatch(new RegExp(`aria-describedby="${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+  });
+
+  it('no hint without a version and over a refusal', () => {
+    for (const html of [
+      render(drafted([])),
+      render(drafted([V1, { ...noGround(refusal({ version: 2 })), answerKind: 'refusal_no_claim' }])),
+    ]) {
+      expect(hintTag(html)).toBe('');
+      expect(buttonTag(html, 'answer-submit-draft')).not.toContain('aria-describedby');
+    }
+  });
+
+  it('AnswerEditor: no hint and no description once the draft is changed', () => {
+    const editor = (dirty: boolean, startsFrom?: number): string =>
+      renderToStaticMarkup(
+        <AnswerEditor
+          body={{ blocks: [{ type: 'paragraph', content: [{ text: 'Text' }] }] }}
+          generation={0}
+          sources=""
+          busy={false}
+          canSave={dirty}
+          dirty={dirty}
+          {...(startsFrom !== undefined ? { startsFrom } : {})}
+          primary
+          hasApproval={false}
+          onBody={() => undefined}
+          onSources={() => undefined}
+          onSave={() => undefined}
+          onDiscard={() => undefined}
+        />,
+      );
+    expect(hintTag(editor(false, 3))).not.toBe('');
+    expect(editor(false, 3)).toContain(de('answers.editor.startsFrom', { version: 3 }));
+    const changed = editor(true, 3);
+    expect(hintTag(changed)).toBe('');
+    expect(buttonTag(changed, 'answer-submit-draft')).not.toContain('aria-describedby');
   });
 });

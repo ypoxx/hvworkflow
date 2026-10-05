@@ -2,12 +2,12 @@
  * Where the answer is written. Two fields, one button, and one warning that matters: a new version
  * voids an existing approval (R-GUARD-04) — the person has to know that before they type, not after
  * the server says no. Scheibe 055b: the answer text is the answer field with the house format
- * (`AnswerBodyEditor`, compact); it starts empty as before (owner question 4).
+ * (`AnswerBodyEditor`, compact). takt-048 (owner decision 05.10.2026, 055b question 4): the field starts with the latest
+ * answer version; saving is offered only for a changed draft (`canSave`), so an unchanged one never voids an approval.
  */
 import { useId } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { AnswerBodyInput } from '@hv/domain';
-import { previewText } from '../../api/answerFormat';
 import { Button, cx } from '../../components';
 import { useT } from '../../i18n';
 import { AnswerBodyEditor } from './AnswerBodyEditor';
@@ -15,10 +15,19 @@ import { AnswerBodyEditor } from './AnswerBodyEditor';
 interface AnswerEditorProps {
   /** What the field holds (the walker's input form), `null` when empty. */
   body: AnswerBodyInput | null;
-  /** The field rebuilds empty when this changes: discard, a saved version (decision 7). */
+  /** The field rebuilds from `body` when this changes: discard, a foreign version, an actor change (decision 7). */
   generation: number;
   sources: string;
   busy: boolean;
+  /** takt-048: a changed, non-empty draft that may be written now (`draft.ts` `canSave`); otherwise saving is locked. */
+  canSave: boolean;
+  /** takt-048: the draft differs from its base; only then "Verwerfen" is offered. */
+  dirty: boolean;
+  /**
+   * takt-048 (design critique D1): the number of the version the field starts from, when it starts from one (not without
+   * a version, not over a refusal). While the draft is unchanged a line says so and why saving is locked.
+   */
+  startsFrom?: number;
   primary: boolean;
   hasApproval: boolean;
   onBody: (value: AnswerBodyInput | null) => void;
@@ -32,6 +41,9 @@ export function AnswerEditor({
   generation,
   sources,
   busy,
+  canSave,
+  dirty,
+  startsFrom,
   primary,
   hasApproval,
   onBody,
@@ -41,11 +53,18 @@ export function AnswerEditor({
 }: AnswerEditorProps) {
   const t = useT();
   const labelId = useId();
-  const empty = previewText(body) === '';
+  const startId = useId();
+  const showStart = startsFrom !== undefined && !dirty;
 
   return (
     <section className="rounded-lg border border-line-strong bg-sunken p-3">
       <h3 className="text-[13px] font-semibold text-ink-900">{t('answers.editor.title')}</h3>
+      {showStart && (
+        // ink-600: 4.5:1 or more on this sunken ground, as the sources hint below.
+        <p id={startId} data-testid="answer-editor-start" className="mt-0.5 text-2xs text-ink-600">
+          {t('answers.editor.startsFrom', { version: startsFrom })}
+        </p>
+      )}
 
       <div className="mt-2 block">
         <span id={labelId} className="hv-label">
@@ -90,19 +109,22 @@ export function AnswerEditor({
           </span>
         )}
         <span className="flex-1" />
-        {!empty && (
+        {dirty && (
           <Button size="sm" variant="ghost" disabled={busy} onClick={onDiscard}>
             {t('answers.editor.discard')}
           </Button>
         )}
-        {/* takt-008: `aria-disabled`, not `disabled` — a saved version empties the editor, and a
-         *  natively disabled button would drop the focus it holds to `<body>`. Locked like this it
-         *  keeps focus, looks disabled (Button.tsx) and ignores a second Enter. */}
+        {/* takt-008: `aria-disabled`, not `disabled` — after a saved version the draft is unchanged
+         *  (takt-048: its base is what was sent), and a natively disabled button would drop the focus
+         *  it holds to `<body>`. Locked like this it keeps focus, looks disabled (Button.tsx) and
+         *  ignores a second Enter. */}
         <Button
           size="sm"
           variant={primary ? 'primary' : 'secondary'}
           data-testid="answer-submit-draft"
-          aria-disabled={busy || empty}
+          aria-disabled={!canSave}
+          // The locked button says why it is locked: the start line (a screen reader otherwise only hears "dimmed").
+          {...(showStart && !canSave ? { 'aria-describedby': startId } : {})}
           onClick={onSave}
         >
           {t('answers.editor.save')}

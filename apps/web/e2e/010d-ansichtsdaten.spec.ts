@@ -1006,7 +1006,7 @@ test('010d Runde 1 (Befund 3): Historie, Ereignisstrom — observer → admin, E
 // that answers with no rows).
 // ---------------------------------------------------------------------------------------------
 
-test('010d Runde 2 (N1): Beantwortung — Entwurf auf A gelingt, während B lädt; zurück zu A: der Editor ist leer', async ({
+test('010d Runde 2 (N1): Beantwortung — Entwurf auf A gelingt, während B lädt; zurück zu A: der Editor zeigt die gespeicherte Version', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1048,8 +1048,9 @@ test('010d Runde 2 (N1): Beantwortung — Entwurf auf A gelingt, während B läd
   await expect(detailNumber).toHaveText(first);
   await expect(page.getByTestId('answer-version')).toHaveCount(versionsBefore + 1);
   await settle(page);
-  // Saved is saved: the editor is empty, and Enter on its button saves nothing twice.
-  await expect(editor).toHaveText('');
+  // Saved is saved: takt-048 — the editor shows the saved version ("Entwurf zu A."), unchanged, and its button stays
+  // locked, so Enter on it saves nothing twice.
+  await expect(editor).toHaveText('Entwurf zu A.');
   await expect(page.getByTestId('answer-submit-draft')).toHaveAttribute('aria-disabled', 'true');
 });
 

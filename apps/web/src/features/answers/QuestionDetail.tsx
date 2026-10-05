@@ -12,7 +12,8 @@ import type { Ref } from 'react';
 import { Link } from 'react-router';
 import type { AnswerBodyInput, AnswerVersion, DomainEvent, Question, Unit } from '@hv/domain';
 import { TERMINAL_STATUSES } from '@hv/domain';
-import { answerBodyOf, previewText, sameBody } from '../../api/answerFormat';
+import { answerBodyOf, sameBody } from '../../api/answerFormat';
+import { useActor } from '../../api/actor';
 import {
   AnswerText,
   Badge,
@@ -21,6 +22,7 @@ import {
   KeyValueList,
   Panel,
   StageAssignmentBadge,
+  StaleBanner,
   StatusBadge,
   Toolbar,
   ToolbarSpacer,
@@ -28,7 +30,10 @@ import {
   cx,
 } from '../../components';
 import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n';
+import { isDirty } from '../focus/focus';
+import type { FocusDraft } from '../focus/focus';
 import { AnswerEditor } from './AnswerEditor';
+import { afterSave, canSave as mayBeSaved, discard, onRecord, startDraft } from './draft';
 import { clockTime, lapsedApproval, latestVersion, sealedApproval, wordDiff } from './lib';
 import { groundStatus, latestIsRefusal, refusalKindOf } from './refusal';
 import type { RefusalCatalogue } from './refusal';
@@ -121,7 +126,8 @@ interface QuestionDetailProps {
   historyForbidden: boolean;
   units: readonly Unit[];
   busy: boolean;
-  /** Bumped by the page after a version was written; the editor then starts empty again. */
+  /** Bumped by the page after a version was written (only on that question, 010d Ziel 3); the sent text becomes the
+   *  draft's base (takt-048 decision 6). */
   draftResetToken: number;
   /**
    * Scheibe 045 (decision 5, Fokusziel 'version'): bumped by the page after a refusal was written for
@@ -295,25 +301,52 @@ export function QuestionDetail({
   const t = useT();
   const latest = latestVersion(question);
   const [open, setOpen] = useState<readonly number[]>(latest === undefined ? [] : [latest]);
-  // Scheibe 055b (decision 7): the answer field's input form; `generation` rebuilds the (empty) field on a reset.
-  const [draft, setDraft] = useState<AnswerBodyInput | null>(null);
-  const [generation, setGeneration] = useState(0);
-  const [sources, setSources] = useState('');
+  const actorId = useActor().id;
+  /**
+   * takt-048: the draft starts with the latest answer version (`draftBase`, as the focus view; empty over a refusal). It
+   * is the focus view's `FocusDraft`: the input form, its sources and the base it started from; `generation` rebuilds
+   * the field (055b decision 7). This component is keyed per question, so a new question starts a new draft.
+   */
+  const [draft, setDraft] = useState<FocusDraft>(() => startDraft(actorId, question));
+  // What `onSave` sent, for `afterSave` once the page reports the write done (`draftResetToken`).
+  const [sent, setSent] = useState<{ body: AnswerBodyInput; sources: string; version: number } | null>(null);
 
   useEffect(() => {
     if (latest === undefined) return;
     setOpen((previous) => (previous.includes(latest) ? previous : [...previous, latest]));
   }, [latest]);
 
-  // takt-008: adjusted during render, not in an effect — the render that unlocks the editor's
-  // button (`busy` false again) must already carry the emptied draft. An effect would commit one
-  // frame with the old text and an enabled button, and a quick second Enter would save it twice.
+  /**
+   * takt-008: every adjustment of the draft below happens during render, not in an effect — the render that unlocks the
+   * editor's button (`busy` false again) must already carry the settled draft. An effect would commit one frame with an
+   * unsettled draft and an open button, and a quick second Enter would save it twice. The three steps run in one pass
+   * on one value, in this order, so none overwrites another.
+   */
+  const [draftActorId, setDraftActorId] = useState(actorId);
   const [resetSeen, setResetSeen] = useState(draftResetToken);
-  if (resetSeen !== draftResetToken) {
-    setResetSeen(draftResetToken);
-    setDraft(null);
-    setGeneration((value) => value + 1);
-    setSources('');
+  const [recordSeen, setRecordSeen] = useState(question);
+  if (draftActorId !== actorId || resetSeen !== draftResetToken || recordSeen !== question) {
+    let next = draft;
+    // takt-048, decision 2 (090, 010d Ziel 1): another actor starts a new draft from the record, compared by `id`,
+    // never by role (AGENTS.md R4). The new actor sees the record, never the previous actor's text.
+    if (draftActorId !== actorId) {
+      setDraftActorId(actorId);
+      next = startDraft(actorId, question, draft.generation + 1);
+      setSent(null);
+    } else if (resetSeen !== draftResetToken && sent !== null) {
+      // takt-048, decision 6: the own version was written — its text is the new base; the field is not rebuilt, and
+      // what was typed while saving stays and counts as a change.
+      next = afterSave(next, sent, sent.version);
+      setSent(null);
+    }
+    if (resetSeen !== draftResetToken) setResetSeen(draftResetToken);
+    // takt-048, decision 2: a new record of this question is compared with the draft (`writingOutcome`): one's own
+    // version moves the base, a foreign version over an unchanged draft is shown, over a changed one the notice stands.
+    if (recordSeen !== question) {
+      setRecordSeen(question);
+      next = onRecord(next, question).draft;
+    }
+    if (next !== draft) setDraft(next);
   }
 
   /**
@@ -392,9 +425,11 @@ export function QuestionDetail({
     if (question !== taken.question) stepTaken.current = null;
   }, [busy, question, versionFocus]);
 
-  const dirty = previewText(draft) !== '';
-  // Exactly one primary action (D2): the step that moves this question on — unless something is
-  // written in the editor, then saving it is what the person is doing.
+  // takt-048, decision 3: changed against the base (the latest version or what was saved last), not merely non-empty.
+  const dirty = isDirty(draft);
+  const saveable = mayBeSaved(draft, { mayDraft, busy });
+  // Exactly one primary action (D2): the step that moves this question on — unless the draft in the
+  // editor is changed, then saving it is what the person is doing (takt-048, decision 5).
   // Scheibe 045: approving a refusal stands where approving an answer stands (R-GUARD-12/13 exclude each
   // other); proposing a refusal is never primary.
   const primary: 'draft' | 'legal_clear' | 'approve' | 'refuse_approve' | 'submit' | 'stage' | 'none' =
@@ -756,26 +791,36 @@ export function QuestionDetail({
               {t('answers.refusal.editorHint')}
             </p>
           )}
+          {mayDraft && draft.rebase && (
+            // takt-048, decision 2: a newer version arrived over changed text; the text stays until "Neu laden".
+            <StaleBanner
+              testId="answer-editor-rebase"
+              message={t('answers.editor.rebase')}
+              onReload={() => setDraft(startDraft(actorId, question, draft.generation + 1))}
+            />
+          )}
           {mayDraft && (
             <AnswerEditor
-              body={draft}
-              generation={generation}
-              sources={sources}
+              body={draft.body}
+              generation={draft.generation}
+              sources={draft.sources}
               busy={busy}
+              canSave={saveable}
+              dirty={dirty}
+              // Only a field that starts from a version says so; empty without one and over a refusal (no base body).
+              {...(draft.baseBody !== null && draft.baseVersion > 0 ? { startsFrom: draft.baseVersion } : {})}
               primary={primary === 'draft'}
               hasApproval={question.approval !== undefined}
-              onBody={setDraft}
-              onSources={setSources}
-              onDiscard={() => {
-                setDraft(null);
-                setGeneration((value) => value + 1);
-                setSources('');
-              }}
-              // No guard of its own: a locked button (`aria-disabled`: busy or empty) never calls
-              // this — Button.tsx swallows the click — and a second press in the same task before
-              // the lock renders is refused by the page's own write lock.
+              onBody={(body) => setDraft((current) => ({ ...current, body }))}
+              onSources={(sources) => setDraft((current) => ({ ...current, sources }))}
+              onDiscard={() => setDraft((current) => discard(current, question))}
+              // A locked button (`aria-disabled`) never calls this — Button.tsx swallows the click — and a second
+              // press in the same task before the lock renders is refused by the page's own write lock. takt-048,
+              // decision 3: checked once more here, so no other way of saving sends an unchanged draft.
               onSave={() => {
-                if (draft !== null) onAction({ kind: 'draft', body: draft, sources });
+                if (!saveable || draft.body === null) return;
+                setSent({ body: draft.body, sources: draft.sources, version: question.answers.length + 1 });
+                onAction({ kind: 'draft', body: draft.body, sources: draft.sources });
               }}
             />
           )}

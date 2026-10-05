@@ -754,6 +754,13 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil
   `http.ts` die Eingabe schon unverändert sendet und `endpointCases` untypisiert ist · bei 055b einen typisierten Fall ergänzen.
 
+## Kontrast der Nullzähler (aus takt-048)
+
+- takt-048 Spec, Nicht-Ziel · `components/ProcessStrip.tsx:188/192` · Nullen in Grau 300 (1,7:1) im Modus ohne
+  `compact`/`dense`; heute in keiner Ansicht sichtbar · bei der nächsten Nutzung des Modus auf Grau 600.
+- takt-048 Spec, Frage 2 · `features/speakers/SpeakerRow.tsx:176` · Fragenzahl 0 der Wortmeldeliste in Grau 300 (1,7:1) ·
+  Grau 600 wie die Verteilung (Sammelgang, Screenshot ergänzen).
+
 ## Antwortformat in der Oberfläche (aus 055b)
 
 - 055b Bau, Vor-dem-Bau-Punkte 2 und 4 · `features/answers/editorCommands.ts`, `AnswerBodyEditor.tsx` · Kürzel
@@ -764,9 +771,17 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   und die erste getippte Zeile eines leeren Felds steht als Text direkt im Feld; der Walker liest beides richtig, nur der
   Abstand weicht bis zum nächsten Neuaufbau ab · beim Neuaufbau von 055c mit normalisieren.
 - 055b Spec, Folgekandidaten · `features/answers/QuestionDetail.tsx` (`AnswerDiff`), `AnswerEditor.tsx`, `domToBody.ts` ·
-  Diff der Marken statt nur des Hinweises „Nur Auszeichnung“; Vorbelegen der Beantwortung mit der letzten Version
-  (Eigentümerfrage 4); Hinweis „wird beim Speichern Text“ für nicht darstellbare Kandidaten (Unterstreichung, Überschrift) ·
-  Sammelgang.
+  Diff der Marken statt nur des Hinweises „Nur Auszeichnung“; ~~Vorbelegen der Beantwortung mit der letzten Version
+  (Eigentümerfrage 4)~~ erledigt mit takt-048; Hinweis „wird beim Speichern Text“ für nicht darstellbare Kandidaten
+  (Unterstreichung, Überschrift) · Sammelgang.
+- takt-048 Spec, Nicht-Ziel · `features/focus/focus.ts` (`draftBase`, `newDraft`, `isDirty`, `writingOutcome`, `FocusDraft`) ·
+  die Beantwortung importiert die Entwurfshelfer aus `focus/` · Helfer nach `features/answers/` (oder ein gemeinsames Modul)
+  verschieben, `FocusDraft` neutral benennen.
+- takt-048 Spec, Frage 1 · `packages/domain/src/api.ts` `draftAnswer` · der Kern legt auch eine wortgleiche Version an und hebt
+  damit Freigabe und Rechtsfreigabe auf; nur die Oberfläche sperrt · eigene Scheibe (Risikoklasse hoch): Guard an R-TRANS-03
+  mit 409 und Regel-id, Vertrag vorab.
+- takt-048 Bau · `features/answers/draft.ts` (`normalSources`) · die Normalisierung der Quellen steht ein zweites Mal neben
+  `focus.ts` (dort nicht exportiert, `focus/**` war gesperrt) · beim Verschieben der Helfer zusammenlegen.
 - 055b Review Minor 7 · `apps/web/e2e/055b-antwortformat.spec.ts` · der Schutz des Rückgängig nach einem Einfügen
   (`UndoBudget`) ist nur als Einheitstest belegt, kein e2e-Fall tippt, fügt ein und drückt Strg+Z/Strg+Umschalt+Z · einen
   Fall in Chromium ergänzen (zusammen mit 055c, das das einstufige Rückgängig bringt).
