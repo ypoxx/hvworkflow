@@ -232,4 +232,32 @@ dist/assets/index-CPbsjZGL.js                        764.46 kB │ gzip: 224.13 
 mark-test-run: wrote /home/user/wt/takt047/.claude/state/last-test-run (clean tree) at commit 45ac3dc, tree 6255494020f0…
 ```
 
+### Nachbesserung nach Review (Befunde 1 bis 5)
+
+Parser strikt: der Ausnahmeblock endet nur an einem neuen Top-Level-Schluessel; jede andere nicht leere Zeile muss eine exakte Eintragszeile sein (Spalte-0-Sequenz, Spalte-0-Kommentar, `---` sind Fehler); `added` darf nicht nach heute liegen; Muster brauchen ein woertliches Praefix (voller Scope plus `/` oder Namensstamm ab 3 Zeichen); CR und Dokumentmarker sind Fehler; Rot-Tests pruefen die Fehlermeldung.
+
+Rot auf dem alten Parser (neue Tests, `node --test scripts/release-age.test.mjs`):
+
+```
+not ok 7 - red: nested key only
+not ok 15 - red: added in the future
+not ok 17 - red: over-broad patterns
+not ok 19 - red: unindented sequence (column-0 bare name)
+not ok 20 - red: column-0 comment or document marker between entries
+not ok 21 - red: second document
+not ok 22 - red: entries after an inline empty list
+not ok 23 - red: CRLF entry line
+# pass 16
+# fail 8
+```
+
+Gruen nach der Korrektur: `# pass 24`, `# fail 0`. `pnpm gates` auf `17d57fd` (sauberer Baum), Exit 0, `pnpm test:scripts` `# pass 342`, `# fail 0`, Schluss:
+
+```
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.88s
+mark-test-run: wrote /home/user/wt/takt047/.claude/state/last-test-run (clean tree) at commit 17d57fd, tree 17c2537cf6e6…
+```
+
 ## Review findings
