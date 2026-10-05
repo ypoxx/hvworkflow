@@ -161,6 +161,8 @@ Teil 2:
 - `apps/web/src/features/answers/AnswerEditor.tsx`
 - `apps/web/src/features/answers/draft.ts` (neu), `apps/web/src/features/answers/draft.test.ts` (neu)
 - `apps/web/src/i18n/answers.de.ts`, `apps/web/src/i18n/answers.en.ts` (nur der neue Schlüssel answers.editor.rebase)
+- `apps/web/src/i18n/parity.test.ts` (nur die Schlüsselzahl-Sperre 619→620 und ihr Kommentar; Bauklärung: der neue
+  Schlüssel scheitert sonst an `pnpm gates`, Vorbild takt-038/takt-039; im Bericht als Befund genannt)
 
 Tests und Nachweise:
 
