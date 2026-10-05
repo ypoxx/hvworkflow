@@ -1,3 +1,9 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# Supply chain (takt-047): resolve only package versions that are at least 7 days old (minutes).
+# Exceptions for urgent security patches go in the list below; format and procedure in
+# docs/sicherheit/lieferkette-mindestalter.md, enforced by scripts/release-age.test.mjs.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude: []
