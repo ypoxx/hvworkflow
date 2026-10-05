@@ -37,6 +37,12 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.
 - 090 R2 nit · `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (`expectCleared`) · Prüfung von `#main` per
   `not.toContainText` sieht keine Feldwerte und fügt nichts hinzu · streichen oder auf Feldwerte umstellen.
+- takt-049 · `apps/web/playwright.config.ts` · kein `actionTimeout`: Jede wartende Locator-Aktion in einem
+  `expect.poll`-Rückruf kann über die Poll-Grenze hinaus hängen, und der Poll ruft dann nicht erneut auf · ein globales
+  `actionTimeout` (z. B. 10 s) prüfen, dabei alle Dateien laufen lassen.
+- takt-049 · `apps/web/e2e/045-verweigerung.spec.ts:160` · `count()` und danach `getAttribute('aria-pressed')`
+  (gleiche Form, außerhalb eines Polls, der Umschalter bleibt stehen) · bei Gelegenheit auf eine atomare Lesung
+  umstellen.
 
 ## Dienst: Anmeldung (vor oder mit 029)
 
