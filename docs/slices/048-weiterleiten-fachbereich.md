@@ -687,6 +687,11 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
    Klassifizieren und Zuweisen `record`; der Widerspruch besteht schon für `QuestionAssigned`. Der DSB entscheidet für beide
    Ereignisse zusammen; die Änderung ist je Ereignis eine Zeile.
 
+- Entschieden 05.10.2026: Frage 1 (E5): Bedeutung bleibt wie gebaut; E5 geschlossen.
+- Entschieden 05.10.2026: Frage 6 (048b): Auskunftsschuldner ist eine Funktion (Bühnenplatz), keine Person.
+- 05.10.2026 zu Frage 9: Der Eigentümer trägt den Standard `working` mit; die Entscheidung bleibt beim DSB (für `QuestionForwarded` und `QuestionAssigned` zusammen). Bis zur Antwort des DSB bleibt der Widerspruch zur DSFA-Zeile V4 offen; der Code bleibt `working` (auf Standard gebaut).
+- Entschieden 05.10.2026: Fragen 2 bis 5, 7, 8: Standard wie gebaut angenommen.
+
 ## Skizze 048b — Auskunftsschuldner (nicht ausgearbeitet)
 
 - **Ziel:** Auskunftsschuldner und Sprecher getrennt führen (Ist-Analyse `:148`, Recherche `:449`), ohne neues

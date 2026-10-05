@@ -507,6 +507,18 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Architekt; unabhängiges Review
   - *Nachweise:* fokussierter Vertragstest rot/grün, generierte Typen, contract:lint, pnpm gates
   - *Offene Entscheidung:* —
+- **takt-047 · pnpm minimumReleaseAge** — niedrig · Lanes: infra (Konfiguration), docs-plan
+  - *Ziel:* pnpm-Einstellung `minimumReleaseAge` auf 7 Tage (Eigentümerentscheidung 05.10.2026) mit Ausnahme für Sicherheitspatches (ausgenommene Paketliste oder dokumentierter Weg für einen dringenden Patch); Lockfile unverändert oder neu aufgelöst, Gates grün; Hinweis in `docs/sicherheit/` oder im Lieferketten-Dokument.
+  - *Abhängigkeiten:* —
+  - *Rolle:* Mechaniker; Review
+  - *Nachweise:* `pnpm install --frozen-lockfile` grün, pnpm gates
+  - *Offene Entscheidung:* —
+- **takt-048 · Kleine Oberfläche: Nullzähler Grau 600 und Beantwortung mit letzter Version vorbelegen** — niedrig · Lanes: web-steering, web-answers
+  - *Ziel:* (1) Zählerzellen mit 0 in der Steuerungsansicht von Grau 300 auf Grau 600 (Barrierefreiheit; 053 D4, Entscheidung 05.10.2026); (2) der Beantwortungs-Editor beginnt mit der letzten Version vorbelegt, wie die Fokusansicht (055b Frage 4, Entscheidung 05.10.2026; Erwartungen in 090 und 010d anpassen).
+  - *Abhängigkeiten:* —
+  - *Rolle:* Implementierer-Oberfläche; Review
+  - *Nachweise:* axe grün, Screenshot Nullzähler, Test Vorbelegung; pnpm gates
+  - *Offene Entscheidung:* —
 - **025 · Jahrgang, Lebenszyklus und Tagesordnung R-MTG, Nachtragsregel für Papier** — hoch · 2,5 AStd · Kalender 15.10.2026 (W3) · Lanes: core, service
   - *Ziel:* meetingId überall im Kern und in der Projektion; `seq` bleibt global lückenlos, Fragennummern F-n je Jahrgang; Meeting-Lebenszyklus preparation→running→closed mit `MeetingStarted`/`MeetingClosed` aus Vertrag 0.3.3 und Tagesordnungsfortschritt (AgendaItemOpened, VotingOpened, VotingClosed mit Recht agenda.manage) als Tabelle R-MTG-01..06; Guard R-MTG-03: nach debateClosed wird Erfassung verweigert, außer für source paper oder transcript mit occurredAt ≤ debateClosedAt und Pflichtgrund, das Ereignis trägt dann das Kennzeichen lateEntry; die Restantenliste aus 087 wird später Eingabe des Debattenschlusses; Listenfilter je Jahrgang; Seed erzeugt zwei HVs im selben Log als Test. Die Lebenszyklus-Projektion und Übergänge werden vor den öffentlichen Aktionen mit synthetischen v2-Ereignissen geprüft. Der HTTP-Test stellt `DebateClosed` als synthetische v2-Fixture her, weil die öffentliche Debattenschluss-Operation erst mit 087/R-MTG-07 kommt; der Test ruft danach die echte Erfassungsroute auf. Die Scheibe montiert die Routen ihrer Operationen aus Vertrag 0.3.3 im Dienst (`apps/api/src`) und entfernt deren Einträge aus `packages/contract/allowlist.json` (die Operationen stehen dort mit Feld `slice` = 025).
   - *Abhängigkeiten:* 024
@@ -777,7 +789,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Abhängigkeiten:* 036, 021c, 048, 082
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review
   - *Nachweise:* Screenshots inkl. Weiterleiten-Dialog; Playwright Doppelklick → Vollbild → speichern; axe grün
-  - *Offene Entscheidung:* Undo nach Weiterleiten → 054c (Eigentümerfrage E58)
+  - *Offene Entscheidung:* — (E58 entschieden 05.10.2026: kein Undo, 054c entfällt)
   - *Stand:* gebaut und gemergt am 04.10.2026 (`cc97005`, PR #149; Spec als #147 `4f37d07`, `docs/slices/054-fokusansicht.md`: angenommen). Laufzeit des Schritts „End-to-end http project“ in `e2e-http` nach 054 gemessen: 5:30 (Lauf 37223187826) und 4:45 (Lauf 37225467013) gegen die Harness-Grenze 8:00 (`TOTAL_MS`); der Takt „Grenze anheben oder Job teilen“ ist fällig, bevor der Schritt etwa 6:30 erreicht, nicht zwingend vor 055 (frühere Annahme: rund 6,8 von 8:00 min nach 054, vor 055/059).
 - **061 · Leitstand mit fachlichen Kennzahlen** — mittel · 2 AStd · Kalender 16.11.2026 (W8) · Lanes: web-cockpit
   - *Ziel:* Route /cockpit (Recht cockpit.read, Standard coordination, moderation, admin; eine Zeile im Feature-Register 082): Alter der ältesten offenen Frage, Rückstand je Fachbereich, Zulauf/5 min, Fragen in Rechtsfreigabe > 10 min, „Fragen ohne Endstatus" vor Debattenschluss; Drill-down auf Liste; Platz für den Kanarienfrage-Status (gefüllt durch 086); Werte aus /metrics oder Projektion; keine personenbezogenen Kennzahlen (Negativtest, Allowlist).
@@ -792,15 +804,21 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Abhängigkeiten:* 054, 048
   - *Rolle:* Architekt (Vertragsschritt) + Implementierer-Backend (Normalisierung); Review mit Perspektiven Vertrag, Security, Recht
   - *Nachweise:* Test verbotene Marke wird entfernt, Idempotenz der Normalisierung; pnpm gates + e2e-http grün
-  - *Offene Entscheidung:* E6 Formatumfang (Whitelist ist ein Enum; Zusatzfrage nummerierte Listen)
+  - *Offene Entscheidung:* — (E6 entschieden 05.10.2026: Whitelist bleibt, nummerierte Listen kommen mit 055c; Formatänderung = neue Version, Rechtsblick empfohlen, nicht erfolgt)
   - *Stand:* gebaut und gemergt am 04.10.2026 (Planzeitpunkt 18.11.2026, tatsächlich vorgezogen; `4da0165`, PR #152; Spec als #151 `ea3eb9a`, `docs/slices/055-antwortformat.md`: angenommen). Codex P1 (projiziertes `body` und `sources` geteilt) behoben in `514b564`.
-- **055b · Antwortformat: Renderer und Editor** — mittel · 3,6 AStd · Kalender 18.11.2026 (W8) · Lanes: web-components, web-focus, web-answers, web-stage, web-history, web-api, e2e, docs
+- **055b · Antwortformat: Renderer und Editor** — mittel · 4,0 AStd · Kalender 18.11.2026 (W8) · Lanes: web-components, web-focus, web-answers, web-stage, web-history, web-api, e2e, docs
   - *Ziel:* ein Renderer (nur Textknoten, kein innerHTML) für Bühne, Historie, Beantwortung und Fokus; Export (051/052) auf derselben Whitelist; Editor mit Werkzeugleiste und Tastenkürzeln in Fokus und Beantwortung; Einfügen aus Word über einen inerten Parser; Diff auf der Klartextprojektion. Entwurf im Abschnitt „055b — Entwurf“ der Spec 055; eigene Spec `docs/slices/055b-antwortformat-editor.md` folgt nach dem Merge von 055.
   - *Zielbild (089):* Z6. Quelle `docs/feedback/2026-09-zielbild-oberflaeche.md`.
   - *Abhängigkeiten:* 055
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review mit Perspektiven Security und UX/Barrierefreiheit
   - *Nachweise:* Screenshots Bühne, Historie und Editor (de/en) mit Format; axe grün; grüner Lauf `e2e-http` (Mehrzeit höchstens 0:40); pnpm gates
-  - *Offene Entscheidung:* E6 Formatumfang
+  - *Offene Entscheidung:* — (E6 entschieden 05.10.2026; Beantwortungs-Editor wird mit der letzten Version vorbelegt, Entscheidung zu 055b Frage 4, Umsetzung in takt-048; Rollout in eine geteilte Umgebung erst nach der CSP der Webseite, 037b)
+- **055c · Antwortformat: nummerierte Listen, Word-Listen, einstufiges Rückgängig** — hoch · 1,25 AStd · Kalender 19.11.2026 (W8) · Lanes: contract, core, web-components, web-answers, e2e
+  - *Ziel:* nummerierte Listen (Eigentümerentscheidung E6, 05.10.2026, rund 0,75 AStd) sowie die beiden Punkte aus Spec 055b (Word-Listen ohne `ul`/`ol` als Listenpunkte, einstufiges Rückgängig eines Einfügens, rund 0,5 AStd). Nummerierte Listen brauchen voraussichtlich eine Vertrags- und Kernänderung (Blocktyp oder Kennzeichen an `list`, Normalisierung, Klartextprojektion, Renderer); deshalb Klasse hoch statt mittel. **Eine Spec-Entscheidung ist nötig** (Blocktyp oder Kennzeichen, Vertragsversion, Wirkung auf bestehende Versionen und Freigabebindung); die Spec entscheidet auch, ob der Teil ohne Vertragsänderung (Word-Listen, Rückgängig) abgespalten wird.
+  - *Abhängigkeiten:* 055b
+  - *Rolle:* Architekt (Vertragsschritt) + Implementierer-Oberfläche; Review mit Perspektiven Vertrag, Security, UX
+  - *Nachweise:* Normalisierungstest (Idempotenz mit nummerierter Liste), Einfügetest Word-Liste, Screenshots de/en; pnpm gates + e2e-http grün
+  - *Offene Entscheidung:* Spec-Entscheidung zur Form der nummerierten Liste (kein Eigentümerpunkt). Mit dem Vertragsschritt wird auch die Beschreibung von `forwardQuestion` in `openapi.yaml` (heute „E5 open“) auf „E5 geschlossen 05.10.2026“ gezogen und `types.ts` neu erzeugt; ebenso der Stand von R-TRANS-17 in `packages/domain/src/transitions.ts` (heute „E5 offen“), danach `docs/legal-trace.md` neu erzeugt.
 - **060 · Entwurfspuffer, Präsenz und Merge-Ansicht** — mittel · 2 AStd · Kalender 23.11.2026 (W9) · Lanes: web-answers, web-focus
   - *Ziel:* lokaler Entwurfspuffer je Frage (IndexedDB, Wiederherstellung nach Reload, Playwright kappt die Verbindung beim Tippen), Präsenzanzeige „wird bearbeitet von" über Claim aus 028 (weiche Sperre), 412-Merge-Ansicht mit beiden Texten, Doppelklickschutz; auch in der Erfassung für laufende Atomisierung.
   - *Abhängigkeiten:* 028, 036, 054
@@ -814,12 +832,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik in frischem Kontext (nicht die Sitzung, die die Spec schrieb); Review
   - *Nachweise:* Test podium auf Platz ceo sieht keine cfo-Fragen im Standard; Playwright Vorblättern ohne Zustandsänderung, Korrektur zeigt Streifen; Screenshots je Einstellung; Bündelgröße; Zeitbudget Bühnenwechsel p90 < 150 ms
   - *Offene Entscheidung:* E7 (Standardwert own)
-- **054c · Zurückholen nach Weiterleiten (Undo, Z9)** — hoch · 1,25 AStd · Kalender 19.11.2026 (W8) · Lanes: core, web-focus
-  - *Ziel:* Die Fachkraft holt eine eben weitergeleitete Einzelfrage (`question.submit_review`, `in_review`) zurück, solange das Legal Clearing sie nicht bearbeitet hat: eigene Zeile in der Übergangstabelle mit Regel-id und Guard (nur der letzte Schritt, nur ohne Rechtsfreigabe, nur die Person oder Einheit, die weitergeleitet hat), Ereignis im Protokoll, Recht als Daten, Schaltfläche „Zurückholen“ in der Fokusansicht aus `_actions`. Herausgeschnitten aus 054 (Zielbild Z9 „Rückgängig“), weil der Kern dafür keinen Übergang hat; Bau erst nach Rechtsblick und Antwort auf E58. Bis dahin geht der Weg zurück über Zurückgeben durch Recht oder Versammlungsbüro.
-  - *Abhängigkeiten:* 054
-  - *Rolle:* Implementierer-Backend + Implementierer-Oberfläche; Review mit Perspektive Legal
-  - *Nachweise:* Test je Regelzeile und Guard (zurückholen nach Rechtsfreigabe → 409); Wahrheitstabellen-Diff; Playwright Weiterleiten → Zurückholen in der Fokusansicht
-  - *Offene Entscheidung:* E58
+- *Entfallen (Entscheidung des Eigentümers 05.10.2026, E58):* 054c „Zurückholen nach Weiterleiten (Undo, Z9)“ wird nicht gebaut; kein Undo nach dem Weiterleiten. Der Weg zurück bleibt Zurückgeben durch Recht oder Versammlungsbüro. Kein Knoten im Plan-Graph, aus allen Abhängigkeitslisten entfernt.
 - **057 · Antwortbündel** — mittel · 2 AStd · Kalender 20.11.2026 (W8) · Lanes: core, web-steering
   - *Ziel:* Entität AnswerBundle (Antwortbündel, getrennt von der bestehenden Runde `Speaker.round`) mit Ereignissen BundleAssembled/BundleClosed, Recht round.assemble (coordination), Strategie-Feld (manual | by_seat), Steuerungsansicht „Bündel zusammenstellen" (Zielgröße 20), Bühne filtert optional nach Bündel (zweite Sortierstrategie); Zähler je Bündel; ohne Bündel bleibt die Bühne je Gerät voll nutzbar.
   - *Abhängigkeiten:* 056, 053
@@ -838,6 +851,12 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Abhängigkeiten:* 045, 047, 055b, 082
   - *Rolle:* Implementierer-Backend (Guard) + Implementierer-Oberfläche; Design-Kritik; Review mit Perspektive Legal
   - *Nachweise:* Screenshots; Test Prüfliste unvollständig → 409 R-GUARD-10; Playwright Aktion fehlt, bis die Liste vollständig ist; axe grün
+  - *Offene Entscheidung:* —
+- **089b · Rechtebasierte Navigation (Quelle der Rechtemenge an `GET /auth/me`)** — mittel · 1,0 AStd · Kalender 04.12.2026 (W10) · Lanes: contract, core, service, web-shell
+  - *Ziel:* Option A aus Spec 053 Eigentümerfrage 3 (entschieden 05.10.2026): Vertragsfeld `permissions` an `GET /auth/me`, In-Process aus `can()`; `visibleRoutes` blendet Einträge ohne das nötige Recht aus (zuerst `/steering` ohne `question.classify`, `/my`). Eigene Scheibe nach der Freigabe-Demo, niedrige Priorität, nach 041. Nummer 089b nach der Konvention Suffix-Buchstabe (Folgescheibe zu 089).
+  - *Abhängigkeiten:* 041, 053
+  - *Rolle:* Architekt (Vertragsschritt) + Implementierer-Oberfläche; Review mit Perspektive Security (Rechte als Daten, R4)
+  - *Nachweise:* Vertragstest `permissions`; Playwright Navigation je Demo-Rolle; kein Rollenvergleich im Code (`role-literals`); pnpm gates
   - *Offene Entscheidung:* —
 - **062 · Onboarding, Kontexthilfe, Login-Check, Barrierefreiheit-Nacharbeit** — niedrig · 2 AStd · Kalender 25.11.2026 (W9) · Lanes: web-shell, web-components
   - *Ziel:* Rollenkarte beim ersten Login (Was darf ich, wo fange ich an), generiert aus ROLE_PERMISSIONS und Wahrheitstabelle, druckbar DE/EN; „?"-Kontexthilfe als Shell-Komponente, die je Feature einen Hilfeschlüssel aus dem Feature-Register liest; Login-Check-Seite (Anmeldung, Rolle, Gerät, Netz zu /readyz) für die Generalprobe; gebündelte Live-Regionen „polite" bei Bühnenwechsel; Tastaturpfad-Specs aus 013 um die neuen Ansichten ergänzt; 200 %-Zoom; axe-Befunde aus M1–M4 geschlossen.
@@ -967,7 +986,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 054c, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 055b, 055c, 089b, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —
@@ -1357,6 +1376,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
 - **C Oberfläche vollständig:** 043, 040, 041, 044 und 045 (Verweigerung im Kern und in der Oberfläche, auf Empfehlung
   aufgenommen), dann 048, 053, 054, 055, 055b, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055b).
+  *Stand 05.10.2026:* Eigentümerentscheidungen eingearbeitet (Register E5, E6, E58; Spec-Vermerke „Entschieden 05.10.2026“; `docs/bautage/uebergabe-2026-10-05.md`). Nächste Takte in dieser Reihenfolge: takt-046 (`e2e-http`-Laufzeit: Grenze anheben oder Job teilen), takt-045 (Stack-037a-Sonde `postgres-restart`), takt-047 (pnpm minimumReleaseAge), takt-048 (Nullzähler Grau 600, Beantwortung vorbelegen); danach die Oberflächenkette 059, 046, 060, 061, 041; 055c nach 055b mit dem Umfang nummerierte Listen (Klasse hoch, Spec-Entscheidung nötig); 089b (rechtebasierte Navigation) nach 041. 054c entfällt (E58). 055/055b gehen in keine geteilte Umgebung vor der CSP der Webseite (037b); Deployment nur auf ausdrückliches Go.
   *Stand 04.10.2026 nachts:* 055 (#152 `4da0165`, Spec #151 `ea3eb9a`; Klasse hoch, geteilt in 055 und 055b) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055b, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57: 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → 060 → 061 → 041). Takt-Scheiben der Nacht: takt-043 (Fokus nach Weiterleiten, #153 `6fbd2a0`, behebt das Fokus-Rennen F4 in `e2e-http`) und takt-044 (H13: Erfassungsfenster, #154 `d7020da`, Zeitabhängigkeit des Tests). Offen: eigener Takt für die Sonde `postgres-restart` des Stack-Jobs (vor 037b).
   *Stand 04.10.2026 abends:* 053 (#145 `d73f8fa`) und 054 (#149 `cc97005`, Spec #147 `4f37d07`) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57). 054c (Zurückholen, E58) hängt an 054 und wartet auf Rechtsblick.
   *Stand 04.10.2026 mittags:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette war 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
