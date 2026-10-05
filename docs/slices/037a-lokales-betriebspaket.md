@@ -569,6 +569,7 @@ Lokal mit dem Daemon aus „Vor dem Bau prüfen“ 1. Im CI-Job `stack-037a` lau
 - **S16 Robustheit** (CI: 1 und 2; lokal alle vier).
   1. **Postgres-Neustart.** `docker compose restart postgres`: `/readyz` meldet `db` vorübergehend nicht `ok`, innerhalb
      von 60 s wieder `ok`. Der `RestartCount` des Dienstes bleibt gleich.
+     Ablauf seit takt-045: stop, Ausfall gesehen, start statt `restart` (Wettlauf zwischen Ausfalldauer und Abtasttakt).
   2. **Absturz des Dienstes.** Im Container ein SIGKILL an den **Node-Kindprozess**, nicht an den Init. Das läuft über
      `docker compose exec api` mit dem Node des Images.
      - Die Probe sucht über `/proc/*/cmdline` den Prozess mit `apps/api/src/server.ts`. Ihre eigene PID
