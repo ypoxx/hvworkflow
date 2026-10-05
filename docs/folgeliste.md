@@ -33,8 +33,9 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 ## Tests
 
 - 021c Hotfix Review minor · `apps/api/src/__tests__/legal-clearance.test.ts` · der HTTP-Regressionstest prüft nach 422 derzeit nur die Frageversion; `legalClearance` und Ereigniszahl zusätzlich je Request prüfen (der Domänentest deckt beides bereits ab).
-- 010c CI-Korrektur minor · `apps/web/e2e/010c-lesezustand.spec.ts:118` · ein `import()` mit `await` bleibt in
-  `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.
+- ~~010c CI-Korrektur minor · `apps/web/e2e/010c-lesezustand.spec.ts:118` · ein `import()` mit `await` bleibt in
+  `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.~~ → erledigt in **010d**
+  (Ziel 5: `installHarness` startet die Importe und fragt den Zustand ab; geprüft in takt-050).
 - 090 R2 nit · `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (`expectCleared`) · Prüfung von `#main` per
   `not.toContainText` sieht keine Feldwerte und fügt nichts hinzu · streichen oder auf Feldwerte umstellen.
 - takt-049 · `apps/web/playwright.config.ts` · kein `actionTimeout`: Jede wartende Locator-Aktion in einem
@@ -43,6 +44,19 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 - takt-049 · `apps/web/e2e/045-verweigerung.spec.ts:160` · `count()` und danach `getAttribute('aria-pressed')`
   (gleiche Form, außerhalb eines Polls, der Umschalter bleibt stehen) · bei Gelegenheit auf eine atomare Lesung
   umstellen.
+- takt-050 · `apps/web/e2e/028-konflikte.spec.ts:20, 55, 77, 98` · `await import(...)` im Evaluate (gleiche Klasse wie
+  010b R4B) · auf `support/app-modules.ts` umstellen, Evaluates synchron.
+- takt-050 · `apps/web/e2e/053-steuerung.spec.ts:317` · `await import(...)` und danach `await` auf `listQuestions` und
+  `assignQuestion` im Evaluate · Hilfe nutzen, Ausgang an `window`, abfragen.
+- takt-050 · `apps/web/e2e/055b-antwortformat.spec.ts:307, 462` · `await import('…/domToBody')` im Evaluate · Hilfe mit
+  eigener URL nutzen.
+- takt-050 · `apps/web/e2e/takt-037-vorschlagsauswahl.spec.ts:56` · `await import(...)` und `await` auf App-Aufrufe im
+  Evaluate · wie 053.
+- takt-050 · `apps/web/e2e/010c-lesezustand.spec.ts:118–160` · eigenes `installHarness` mit gleichem Zweck, das Promise
+  hängt nicht an `window` · auf die gemeinsame Hilfe umstellen.
+- takt-050 · `apps/web/playwright.config.ts:27–28` und `.github/workflows/gates.yml:152` · lokal Chromium 141 (fest
+  abgelegt), in CI Headless Shell 151 (Revision 1234): Browserabhängige Wackler lassen sich lokal nicht nachstellen ·
+  Revision 1234 lokal bereitstellen oder CI auf denselben Browser festlegen (Eigentümer, Netzrichtlinie).
 
 - takt-049 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/focus-list.ts:28` · `readFocusList` ruft `checkVisibility()` ohne
   Optionen: `visibility:hidden` und Nullgröße zählen als sichtbar (Playwright wertet beides als versteckt) ·
