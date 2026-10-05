@@ -389,19 +389,6 @@ export function caretTarget(root: WalkNode, caret: ModelCaret): { node: WalkNode
   return last !== undefined ? { node: last, offset: (last.data ?? '').length } : { node: target, offset: 0 };
 }
 
-/**
- * The two Private Use Area characters an earlier build of 055b used as a text sentinel at the caret. They may stand in
- * versions saved with it; a paste strips them from the field and from the pasted input (review 055b, finding 1).
- */
-const OLD_SENTINEL_CHARS = /[\uE055\uE05B]/g;
-
-const stripRuns = (runs: readonly AnswerInlineInput[]): AnswerInlineInput[] =>
-  runs.flatMap((run) => {
-    if (isCaret(run)) return [run];
-    const text = run.text.replace(OLD_SENTINEL_CHARS, '');
-    return text === '' ? [] : [{ ...run, text }];
-  });
-
 interface Piece {
   /** `ITEM` for a list item, else the block type. */
   type: string;
@@ -411,13 +398,15 @@ interface Piece {
 const piecesOf = (body: AnswerBodyInput | null): Piece[] =>
   (body?.blocks ?? []).flatMap((block): Piece[] => {
     const pieces = [block.content, ...(block.items ?? [])].filter((piece): piece is AnswerInlineInput[] => piece !== undefined);
-    return pieces.map((runs) => ({ type: block.type === 'list' ? ITEM : block.type, runs: stripRuns(runs) }));
+    return pieces.map((runs) => ({ type: block.type === 'list' ? ITEM : block.type, runs: runs.map((run) => ({ ...run })) }));
   });
 
 const pieceLength = (runs: readonly AnswerInlineInput[]): number => runs.reduce((sum, run) => sum + run.text.length, 0);
 
 /**
- * Splices the pasted input into the field's model (read with `caretNode`) at the caret: the text before the caret
+ * Splices the pasted input into the field's model (read with `caretNode`) at the caret. Every character of the field and
+ * of the paste stays as it is, Private Use Area included (Codex P2 on #157: saved and approved wording must not change);
+ * the caret is the walker's identity-marked run, never a character: the text before the caret
  * continues with the first pasted piece, the last pasted piece continues with the text after it. Returns the new model
  * and the caret at the end of what was inserted; `null` when the model carries no caret.
  */

@@ -266,13 +266,29 @@ describe('spliceAtCaret, clipboardInput and plainTextToInput (decision 5)', () =
     expect(spliceAtCaret(domToBodyInput(root(el('p', 'eins'))), { blocks: [para(run('x'))] })).toBeNull();
   });
 
-  it('review finding 1: old sentinel characters in the field or the paste neither move the caret nor survive', () => {
-    // Repro: "Alt\uE055\uE05Bteil" (a version saved with the old text sentinel), caret at the end, paste "NEU".
+  it('review finding 1 (repro): "Altteil", caret at the end, paste "NEU" gives "AltteilNEU" at the caret', () => {
     const caret = text('');
-    const field = root(el('p', 'Alt\uE055\uE05Bteil', caret));
-    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('N\uE055EU\uE05B'))] });
+    const field = root(el('p', 'Altteil', caret));
+    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('NEU'))] });
     expect(result).toEqual({ body: { blocks: [para(run('Altteil'), run('NEU'))] }, caret: { block: 0, item: null, offset: 10 } });
-    expect(JSON.stringify(result)).not.toMatch(/[\uE055\uE05B]/);
+  });
+
+  it('Codex P2 on #157 (a): Private Use characters in the field stay, and do not move the caret', () => {
+    const caret = text('');
+    const field = root(el('p', 'Alt\uE055\uE05Bteil'), el('p', 'zwei', caret));
+    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('NEU'))] });
+    expect(result).toEqual({
+      body: { blocks: [para(run('Alt\uE055\uE05Bteil')), para(run('zwei'), run('NEU'))] },
+      caret: { block: 1, item: null, offset: 7 },
+    });
+  });
+
+  it('Codex P2 on #157 (b): Private Use characters in the pasted text stay', () => {
+    const caret = text('');
+    const field = root(el('p', 'vor ', caret));
+    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('N\uE055EU\uE05B'))] });
+    expect(result?.body).toEqual({ blocks: [para(run('vor '), run('N\uE055EU\uE05B'))] });
+    expect(result?.caret).toEqual({ block: 0, item: null, offset: 9 });
   });
 
   it('nit 8: HTML without text falls back to the plain text; neither gives nothing', () => {
