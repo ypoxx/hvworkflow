@@ -24,15 +24,13 @@ import { cx } from '../../components';
 import { useT } from '../../i18n';
 import type { TKey } from '../../i18n';
 import {
-  CARET_SENTINEL,
   HIGHLIGHT_FALLBACK,
   bodyToDom,
   caretTarget,
+  clipboardInput,
   domToBodyInput,
   marksAt,
-  parseClipboardHtml,
-  plainTextToInput,
-  spliceAtSentinel,
+  spliceAtCaret,
 } from './domToBody';
 import type { ModelCaret } from './domToBody';
 import { FORMAT_SHORTCUTS, UndoBudget, allowedInputType, deleteSelection, formatChord, prepareEditing, runFormat } from './editorCommands';
@@ -177,9 +175,7 @@ export function AnswerBodyEditor({
     /** Paste and drop: read, splice into the model at the caret, rebuild the whole field once (decision 5). */
     const insertTransfer = (data: DataTransfer | null, at: { x: number; y: number } | null): void => {
       if (data === null) return;
-      const html = data.getData('text/html');
-      const plain = data.getData('text/plain');
-      const pasted = html !== '' ? parseClipboardHtml(html) : plain !== '' ? plainTextToInput(plain) : null;
+      const pasted = clipboardInput(data.getData('text/html'), data.getData('text/plain'));
       // Only files or images: nothing is inserted.
       if (pasted === null) return;
       const selection = document.getSelection();
@@ -194,11 +190,12 @@ export function AnswerBodyEditor({
       if (selectionIn(field) === null) placeCaret(field, endOf(field));
       if (!selection.isCollapsed) deleteSelection(document);
       if (selection.rangeCount === 0) return;
-      const sentinel = document.createTextNode(CARET_SENTINEL);
-      selection.getRangeAt(0).insertNode(sentinel);
-      const spliced = spliceAtSentinel(domToBodyInput(field), pasted);
+      // The caret is an empty node of our own, found by identity in the walk (review 055b, finding 1), never by text.
+      const caretNode = document.createTextNode('');
+      selection.getRangeAt(0).insertNode(caretNode);
+      const spliced = spliceAtCaret(domToBodyInput(field, caretNode), pasted);
       if (spliced === null) {
-        sentinel.remove();
+        caretNode.remove();
         return;
       }
       field.replaceChildren(...bodyToDom(document, spliced.body, highlightColor(field)));
@@ -380,6 +377,8 @@ export function AnswerBodyEditor({
           className={cx(
             'w-full overflow-y-auto rounded-md border border-line bg-surface text-ink-900 transition-colors duration-100',
             'hover:border-ink-300 [&>*+*]:mt-[0.5em] [&_ul]:list-disc [&_ul]:pl-[1.25em]',
+            // D1 (review 055b, finding 6): a highlighted run looks as on the podium, the warning foreground on its ground.
+            '[&_span[style*=background-color]]:text-tone-warning-fg',
             large ? 'min-h-[12rem] flex-1 px-3 py-2.5 text-[15px] leading-relaxed' : 'min-h-[8.5rem] px-2.5 py-2 text-[13px] leading-relaxed',
           )}
         />

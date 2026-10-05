@@ -97,28 +97,70 @@ rules:
 
   - id: no-html-sink
     # Scheibe 055b (T-G1-T-06, second half): the interface builds every node itself (React elements, `createElement`,
-    # `createTextNode`); markup from data or from the clipboard must never reach an HTML parser of the live document.
+    # `createTextNode`); markup from data or from the clipboard must never reach an HTML parser of the live document,
+    # and no node of another document may be moved into it (review 055b, finding 3: write/writeln on any receiver,
+    # computed property, Object.assign, the *HTMLUnsafe family, importNode, adoptNode).
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
-      An HTML sink (`innerHTML`, `outerHTML`, `srcdoc`, `insertAdjacentHTML`, `document.write`,
-      `createContextualFragment`, `execCommand('insertHTML')`) parses markup into the live document and is an XSS
-      risk. Build the nodes with React or `createElement`/`createTextNode` instead (docs/slices/055b).
+      An HTML sink (`innerHTML`, `outerHTML`, `srcdoc`, `insertAdjacentHTML`, `write`/`writeln`,
+      `createContextualFragment`, `execCommand('insertHTML')`, `setHTMLUnsafe`, `parseHTMLUnsafe`) parses markup into
+      the live document, and `importNode`/`adoptNode` bring foreign nodes into it; both are an XSS risk. Build the nodes
+      with React or `createElement`/`createTextNode` instead (docs/slices/055b).
     paths:
       include:
         - "apps/web/src/**"
     pattern-either:
       - pattern: $X.innerHTML = $Y
       - pattern: $X.innerHTML += $Y
+      - pattern: $X["innerHTML"] = $Y
       - pattern: $X.outerHTML = $Y
       - pattern: $X.outerHTML += $Y
+      - pattern: $X["outerHTML"] = $Y
       - pattern: $X.srcdoc = $Y
+      - pattern: $X["srcdoc"] = $Y
       - pattern: $X.setAttribute("srcdoc", ...)
+      - pattern: 'Object.assign($X, {..., innerHTML: $Y, ...})'
+      - pattern: 'Object.assign($X, {..., outerHTML: $Y, ...})'
+      - pattern: 'Object.assign($X, {..., srcdoc: $Y, ...})'
       - pattern: $X.insertAdjacentHTML(...)
-      - pattern: document.write(...)
-      - pattern: document.writeln(...)
+      - pattern: $X.write(...)
+      - pattern: $X.writeln(...)
       - pattern: $X.createContextualFragment(...)
       - pattern: $X.execCommand("insertHTML", ...)
+      - pattern: $X.setHTMLUnsafe(...)
+      - pattern: $X.parseHTMLUnsafe(...)
+      - pattern: $X.importNode(...)
+      - pattern: $X.adoptNode(...)
+
+  - id: exec-command-only-in-editor-commands
+    # Scheibe 055b (decision 4, review finding 3): `document.execCommand` is deprecated and can insert markup; it lives
+    # in exactly one replaceable module.
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      `execCommand` is allowed only in apps/web/src/features/answers/editorCommands.ts (docs/slices/055b, decision 4).
+    paths:
+      include:
+        - "apps/web/src/**"
+      exclude:
+        - "apps/web/src/features/answers/editorCommands.ts"
+    pattern: $X.execCommand(...)
+
+  - id: dom-parser-only-in-walker
+    # Scheibe 055b (decision 5, review finding 3): the only parsed foreign document is the clipboard's, read by the walker.
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      `DOMParser` is allowed only in apps/web/src/features/answers/domToBody.ts (docs/slices/055b, decision 5).
+    paths:
+      include:
+        - "apps/web/src/**"
+      exclude:
+        - "apps/web/src/features/answers/domToBody.ts"
+    pattern-either:
+      - pattern: new DOMParser(...)
+      - pattern: new DOMParser
 
   - id: math-random-possible-security-use
     languages: [typescript, javascript]

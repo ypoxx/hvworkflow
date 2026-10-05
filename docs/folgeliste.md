@@ -746,6 +746,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Diff der Marken statt nur des Hinweises „Nur Auszeichnung“; Vorbelegen der Beantwortung mit der letzten Version
   (Eigentümerfrage 4); Hinweis „wird beim Speichern Text“ für nicht darstellbare Kandidaten (Unterstreichung, Überschrift) ·
   Sammelgang.
+- 055b Review Minor 7 · `apps/web/e2e/055b-antwortformat.spec.ts` · der Schutz des Rückgängig nach einem Einfügen
+  (`UndoBudget`) ist nur als Einheitstest belegt, kein e2e-Fall tippt, fügt ein und drückt Strg+Z/Strg+Umschalt+Z · einen
+  Fall in Chromium ergänzen (zusammen mit 055c, das das einstufige Rückgängig bringt).
+- 055b Review Nits 9–11 · laut Review (Wortlaut beim Orchestrator; dem Bau nicht im Einzelnen übergeben) · Sammelgang ·
+  beim Abarbeiten aus dem Reviewbericht übernehmen.
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 

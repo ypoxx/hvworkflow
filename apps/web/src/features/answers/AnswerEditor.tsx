@@ -53,7 +53,9 @@ export function AnswerEditor({
         </span>
         <AnswerBodyEditor
           testId="answer-editor"
-          initial={null}
+          // Review 055b, finding 5: the field is built from the draft, so a remount never shows an empty field over a
+          // draft that the save button would still send.
+          initial={body}
           generation={generation}
           labelId={labelId}
           size="compact"

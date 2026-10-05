@@ -1,6 +1,6 @@
 # Scheibe 055b — Antwortformat: Renderer und Editor in der Oberfläche
 
-**Status:** spec (04.10.2026; gelesen auf `4da0165`, Integration mit 055 (Vertrag 0.4.4, PR #152), takt-043 (#153) und
+**Status:** gebaut, Review eingearbeitet (05.10.2026: Bau `f2dcb06`, Nachtrag 010d `27b5566`, Review-Befunde 1–6 und 8 in diesem Zweig; CI `e2e-http` steht aus). Spec vom 04.10.2026; gelesen auf `4da0165`, Integration mit 055 (Vertrag 0.4.4, PR #152), takt-043 (#153) und
 takt-044 (#154)). Teil b der geteilten Planzeile 055 (Spec 055, Abschnitt „Teilung und Zuschnitt“ und „055b — Entwurf“);
 sechste Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → **055b** → 059 → 046 → 060 → 061 → 041
 (Register E57, Nachzug beim Orchestrator). **Geteilt** (Abschnitt „Teilung und Zuschnitt“): Diese Spec baut Renderer, Editor,

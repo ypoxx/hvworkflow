@@ -152,6 +152,15 @@ const markList = (marks: Marks): string[] => MARK_ORDER.filter((mark) => marks[m
 const sameList = (a: readonly string[] | undefined, b: readonly string[]): boolean =>
   (a ?? []).length === b.length && (a ?? []).every((mark, i) => mark === b[i]);
 
+/**
+ * The caret of a paste or drop (decision 5; review 055b, finding 1): an empty run marked by this module-private key, put
+ * where the walker meets the node the field inserted at the caret. Found by identity of that node, never by searching
+ * text, so characters already in the field or in a stored version cannot move the insertion point.
+ */
+const CARET = Symbol('caret');
+type CaretRun = AnswerInlineInput & { [CARET]?: true };
+const isCaret = (run: AnswerInlineInput | undefined): boolean => run !== undefined && (run as CaretRun)[CARET] === true;
+
 /** Collects pieces (paragraph-like blocks and list items) and groups the items into lists. */
 class Builder {
   readonly blocks: AnswerBlockInput[] = [];
@@ -160,18 +169,29 @@ class Builder {
   /** New items join the last block when it is a list started by the current outermost list element. */
   listOpen = false;
 
+  readonly caretNode: WalkNode | undefined;
+
+  constructor(caretNode: WalkNode | undefined) {
+    this.caretNode = caretNode;
+  }
+
   text(data: string, marks: Marks): void {
     if (data === '') return;
     const list = markList(marks);
     const last = this.runs[this.runs.length - 1];
-    if (last !== undefined && sameList(last.marks, list)) last.text += data;
+    if (last !== undefined && !isCaret(last) && sameList(last.marks, list)) last.text += data;
     else this.runs.push(list.length > 0 ? { text: data, marks: list } : { text: data });
+  }
+
+  caret(): void {
+    const run: CaretRun = { text: '', [CARET]: true };
+    this.runs.push(run);
   }
 
   flush(): void {
     const runs = this.runs;
     this.runs = [];
-    if (runs.every((run) => SOURCE_WHITE_SPACE.test(run.text))) return;
+    if (!runs.some(isCaret) && runs.every((run) => SOURCE_WHITE_SPACE.test(run.text))) return;
     if (this.type === ITEM) {
       const last = this.blocks[this.blocks.length - 1];
       if (this.listOpen && last !== undefined && last.type === 'list' && last.items !== undefined) last.items.push(runs);
@@ -192,6 +212,10 @@ function walkChildren(node: WalkNode, builder: Builder, marks: Marks, listDepth:
 }
 
 function walkNode(node: WalkNode, builder: Builder, marks: Marks, listDepth: number): void {
+  if (node === builder.caretNode) {
+    builder.caret();
+    return;
+  }
   if (node.nodeType === TEXT) {
     builder.text(node.data ?? '', marks);
     return;
@@ -232,9 +256,10 @@ function walkNode(node: WalkNode, builder: Builder, marks: Marks, listDepth: num
 /**
  * The walker: the children of `root` as an input form, or `null` when they hold no piece of text. Nested lists become
  * flat (E6), `br` ends a paragraph or item, the text stays raw (white space and characters are the core's, N3/N4).
+ * With `caretNode` (paste and drop only) the model carries the caret where that node stands, for `spliceAtCaret`.
  */
-export function domToBodyInput(root: WalkNode): AnswerBodyInput | null {
-  const builder = new Builder();
+export function domToBodyInput(root: WalkNode, caretNode?: WalkNode): AnswerBodyInput | null {
+  const builder = new Builder(caretNode);
   walkChildren(root, builder, NO_MARKS, 0);
   builder.flush();
   return builder.blocks.length === 0 ? null : { blocks: builder.blocks };
@@ -365,10 +390,17 @@ export function caretTarget(root: WalkNode, caret: ModelCaret): { node: WalkNode
 }
 
 /**
- * Where a paste or drop lands (decision 5): the field's model is read with a sentinel at the caret. Two characters of
- * the Private Use Area, which nobody types and the core never sees (the sentinel is gone before anything is sent).
+ * The two Private Use Area characters an earlier build of 055b used as a text sentinel at the caret. They may stand in
+ * versions saved with it; a paste strips them from the field and from the pasted input (review 055b, finding 1).
  */
-export const CARET_SENTINEL = '\uE055\uE05B';
+const OLD_SENTINEL_CHARS = /[\uE055\uE05B]/g;
+
+const stripRuns = (runs: readonly AnswerInlineInput[]): AnswerInlineInput[] =>
+  runs.flatMap((run) => {
+    if (isCaret(run)) return [run];
+    const text = run.text.replace(OLD_SENTINEL_CHARS, '');
+    return text === '' ? [] : [{ ...run, text }];
+  });
 
 interface Piece {
   /** `ITEM` for a list item, else the block type. */
@@ -379,31 +411,26 @@ interface Piece {
 const piecesOf = (body: AnswerBodyInput | null): Piece[] =>
   (body?.blocks ?? []).flatMap((block): Piece[] => {
     const pieces = [block.content, ...(block.items ?? [])].filter((piece): piece is AnswerInlineInput[] => piece !== undefined);
-    return pieces.map((runs) => ({ type: block.type === 'list' ? ITEM : block.type, runs: runs.map((run) => ({ ...run })) }));
+    return pieces.map((runs) => ({ type: block.type === 'list' ? ITEM : block.type, runs: stripRuns(runs) }));
   });
 
 const pieceLength = (runs: readonly AnswerInlineInput[]): number => runs.reduce((sum, run) => sum + run.text.length, 0);
 
 /**
- * Splices the pasted input into the field's model at the sentinel: the text before the caret continues with the first
- * pasted piece, the last pasted piece continues with the text after it. Returns the new model and the caret at the end
- * of what was inserted; `null` when the sentinel is not in the model.
+ * Splices the pasted input into the field's model (read with `caretNode`) at the caret: the text before the caret
+ * continues with the first pasted piece, the last pasted piece continues with the text after it. Returns the new model
+ * and the caret at the end of what was inserted; `null` when the model carries no caret.
  */
-export function spliceAtSentinel(field: AnswerBodyInput | null, pasted: AnswerBodyInput | null): { body: AnswerBodyInput | null; caret: ModelCaret } | null {
+export function spliceAtCaret(field: AnswerBodyInput | null, pasted: AnswerBodyInput | null): { body: AnswerBodyInput | null; caret: ModelCaret } | null {
   const pieces = piecesOf(field);
   let at = -1;
   let left: AnswerInlineInput[] = [];
   let right: AnswerInlineInput[] = [];
   for (const [index, piece] of pieces.entries()) {
-    const runIndex = piece.runs.findIndex((run) => run.text.includes(CARET_SENTINEL));
+    const runIndex = piece.runs.findIndex(isCaret);
     if (runIndex < 0) continue;
-    const run = piece.runs[runIndex]!;
-    const cut = run.text.indexOf(CARET_SENTINEL);
-    const before = run.text.slice(0, cut);
-    const after = run.text.slice(cut + CARET_SENTINEL.length);
-    const withText = (text: string): AnswerInlineInput[] => (text === '' ? [] : [{ ...run, text }]);
-    left = [...piece.runs.slice(0, runIndex), ...withText(before)];
-    right = [...withText(after), ...piece.runs.slice(runIndex + 1)];
+    left = piece.runs.slice(0, runIndex);
+    right = piece.runs.slice(runIndex + 1).filter((run) => !isCaret(run));
     at = index;
     break;
   }
@@ -470,4 +497,17 @@ export function plainTextToInput(text: string): AnswerBodyInput | null {
 export function parseClipboardHtml(html: string): AnswerBodyInput | null {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   return domToBodyInput(parsed);
+}
+
+/**
+ * What a paste or drop inserts: the HTML through the walker; when it holds no text (an image only, an empty fragment),
+ * the plain text next to it (review 055b, nit 8); nothing when neither has text (files only).
+ */
+export function clipboardInput(
+  html: string,
+  plain: string,
+  parse: (html: string) => AnswerBodyInput | null = parseClipboardHtml,
+): AnswerBodyInput | null {
+  const fromHtml = html !== '' ? parse(html) : null;
+  return fromHtml ?? (plain !== '' ? plainTextToInput(plain) : null);
 }

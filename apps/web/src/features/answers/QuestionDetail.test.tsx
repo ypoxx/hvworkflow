@@ -11,6 +11,7 @@ import type { AnswerVersion, Permission, Question, RefusalGround } from '@hv/dom
 import { translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
 import { AnswerText } from '../../components';
+import { AnswerEditor } from './AnswerEditor';
 import { AnswerDiff, QuestionDetail } from './QuestionDetail';
 
 const de = (key: TKey, params?: TParams) => translate('de', key, params);
@@ -180,5 +181,37 @@ describe('QuestionDetail with the answer format (Scheibe 055b, Tests 6 and 7)', 
     const part = answerPart(html) ?? '';
     expect(part).toContain('Zu dieser Frage gibt der Vorstand keine Auskunft.');
     expect(part).not.toContain(JUSTIFICATION_MARKER);
+  });
+});
+
+/**
+ * Review 055b, finding 5: the Beantwortung's field is built from the draft it is given, so a remount (another render of
+ * `AnswerEditor` while the page keeps the draft) never shows an empty field over text the save button would still send.
+ */
+describe('AnswerEditor remounted with a draft (review 055b, finding 5)', () => {
+  const draft = { blocks: [{ type: 'paragraph', content: [{ text: 'Noch nicht gespeichert', marks: ['bold'] }] }] };
+  const renderEditor = (body: typeof draft | null): string =>
+    renderToStaticMarkup(
+      <AnswerEditor
+        body={body}
+        generation={0}
+        sources=""
+        busy={false}
+        primary
+        hasApproval={false}
+        onBody={() => undefined}
+        onSources={() => undefined}
+        onSave={() => undefined}
+        onDiscard={() => undefined}
+      />,
+    );
+
+  it('with a draft: no placeholder, saving open; without one: placeholder, saving locked', () => {
+    const withDraft = renderEditor(draft);
+    expect(withDraft).not.toContain('answer-editor-placeholder');
+    expect(withDraft).toMatch(/data-testid="answer-submit-draft"[^>]*aria-disabled="false"|aria-disabled="false"[^>]*data-testid="answer-submit-draft"/);
+    const empty = renderEditor(null);
+    expect(empty).toContain('answer-editor-placeholder');
+    expect(empty).toMatch(/data-testid="answer-submit-draft"[^>]*aria-disabled="true"|aria-disabled="true"[^>]*data-testid="answer-submit-draft"/);
   });
 });

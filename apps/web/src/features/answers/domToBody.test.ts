@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnswerBody, AnswerBodyInput } from '@hv/domain';
 import { answerBodyOf, previewAnswer } from '../../api/answerFormat';
-import { CARET_SENTINEL, bodyToDom, caretTarget, domToBodyInput, marksAt, plainTextToInput, spliceAtSentinel } from './domToBody';
+import { bodyToDom, caretTarget, clipboardInput, domToBodyInput, marksAt, plainTextToInput, spliceAtCaret } from './domToBody';
 import type { DomFactory, WalkNode } from './domToBody';
 
 /** A test node after the minimal interface; it records every attribute the walker asks for. */
@@ -236,29 +236,50 @@ describe('answerBodyOf feeds bodyToDom (055 L)', () => {
   });
 });
 
-describe('spliceAtSentinel and plainTextToInput (decision 5)', () => {
-  const S = CARET_SENTINEL;
+describe('spliceAtCaret, clipboardInput and plainTextToInput (decision 5)', () => {
+  /** Reads a field of test nodes with the caret node where the field would insert it. */
+  const read = (field: TestNode, caretNode: TestNode): AnswerBodyInput | null => domToBodyInput(field, caretNode);
+
   it('one pasted piece continues the paragraph at the caret; the caret stands after it', () => {
-    const field: AnswerBodyInput = { blocks: [para(run(`ab${S}cd`))] };
-    const result = spliceAtSentinel(field, { blocks: [para(run('X', 'bold'))] });
+    const caret = text('');
+    const field = root(el('p', 'ab', caret, 'cd'));
+    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('X', 'bold'))] });
     expect(result).toEqual({ body: { blocks: [para(run('ab'), run('X', 'bold'), run('cd'))] }, caret: { block: 0, item: null, offset: 3 } });
   });
 
   it('several pieces: the first joins the text before, the last the text after; items stay in their list', () => {
-    const field: AnswerBodyInput = { blocks: [para(run('vor')), { type: 'list', items: [[run(`a${S}b`)]] }] };
+    const caret = text('');
+    const field = root(el('p', 'vor'), el('ul', el('li', 'a', caret, 'b')));
     const pasted: AnswerBodyInput = { blocks: [para(run('P1')), { type: 'list', items: [[run('L1')], [run('L2')]] }] };
-    const result = spliceAtSentinel(field, pasted);
+    const result = spliceAtCaret(read(field, caret), pasted);
     expect(result?.body).toEqual({ blocks: [para(run('vor')), { type: 'list', items: [[run('a'), run('P1')], [run('L1')], [run('L2'), run('b')]] }] });
     expect(result?.caret).toEqual({ block: 1, item: 2, offset: 2 });
   });
 
-  it('an empty paragraph holding the caret keeps its place; without the sentinel nothing happens', () => {
-    const field: AnswerBodyInput = { blocks: [para(run('eins')), para(run(S))] };
-    expect(spliceAtSentinel(field, { blocks: [para(run('zwei'))] })).toEqual({
+  it('an empty paragraph holding the caret keeps its place; without the caret node nothing happens', () => {
+    const caret = text('');
+    const field = root(el('p', 'eins'), el('p', caret));
+    expect(spliceAtCaret(read(field, caret), { blocks: [para(run('zwei'))] })).toEqual({
       body: { blocks: [para(run('eins')), para(run('zwei'))] },
       caret: { block: 1, item: null, offset: 4 },
     });
-    expect(spliceAtSentinel({ blocks: [para(run('eins'))] }, { blocks: [para(run('x'))] })).toBeNull();
+    expect(spliceAtCaret(domToBodyInput(root(el('p', 'eins'))), { blocks: [para(run('x'))] })).toBeNull();
+  });
+
+  it('review finding 1: old sentinel characters in the field or the paste neither move the caret nor survive', () => {
+    // Repro: "Alt\uE055\uE05Bteil" (a version saved with the old text sentinel), caret at the end, paste "NEU".
+    const caret = text('');
+    const field = root(el('p', 'Alt\uE055\uE05Bteil', caret));
+    const result = spliceAtCaret(read(field, caret), { blocks: [para(run('N\uE055EU\uE05B'))] });
+    expect(result).toEqual({ body: { blocks: [para(run('Altteil'), run('NEU'))] }, caret: { block: 0, item: null, offset: 10 } });
+    expect(JSON.stringify(result)).not.toMatch(/[\uE055\uE05B]/);
+  });
+
+  it('nit 8: HTML without text falls back to the plain text; neither gives nothing', () => {
+    expect(clipboardInput('<img src="x">', 'eins\nzwei', () => null)).toEqual({ blocks: [para(run('eins')), para(run('zwei'))] });
+    expect(clipboardInput('<b>a</b>', 'b', () => ({ blocks: [para(run('a', 'bold'))] }))).toEqual({ blocks: [para(run('a', 'bold'))] });
+    expect(clipboardInput('', 'nur Text', () => { throw new Error('not parsed'); })).toEqual({ blocks: [para(run('nur Text'))] });
+    expect(clipboardInput('', '', () => null)).toBeNull();
   });
 
   it('plain text: one paragraph per line (CR LF, CR, LF); empty lines and empty text give nothing', () => {
