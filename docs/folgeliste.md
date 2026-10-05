@@ -806,11 +806,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 
-- takt-048 Review (Opus, 05.10.2026) minor · `features/answers/QuestionDetail.tsx:317-320,794-800` · der eigene neue Stand kommt vor
+- takt-048 Review (Opus, 05.10.2026) minor · `features/answers/QuestionDetail.tsx:328-348,796` · der eigene neue Stand kommt vor
   `draftResetToken`: der Rebase-Hinweis „neuere Antwortversion“ blitzt kurz beim eigenen Speichern auf (`afterSave` läuft vor
   `onRecord`, wenn `latest` = gesendet) · Reihenfolge ändern oder den eigenen Stand erkennen.
-- takt-048 Review nit · `QuestionDetail.tsx:386` · `version = answers.length + 1` statt `latest.version + 1`.
-- takt-048 Review nit · `features/answers/draft.ts:699` · `discard` und `onRecord` erhöhen `generation` um 2.
+- takt-048 Review nit · `features/answers/QuestionDetail.tsx:822` · `version = answers.length + 1` statt `latest.version + 1`.
+- takt-048 Review nit · `features/answers/draft.ts:76` · `discard` und `onRecord` erhöhen `generation` um 2.
 - takt-048 Design-Kritik (05.10.2026) D2 · `QuestionDetail.tsx:435` · ohne anderen Schritt ist der einzige primäre Knopf ein
   gesperrter „Entwurf speichern“ über vorbelegtem Text; kein Screenshot · Zustand prüfen, Screenshot ergänzen.
 - takt-048 Design-Kritik D6/D7 · `i18n/answers.de.ts:65`, `i18n/focus.de.ts:24` (`answers.editor.rebase`, `focus.write.rebase`) · „Ihr Text ist nicht
