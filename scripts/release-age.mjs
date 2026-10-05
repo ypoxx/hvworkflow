@@ -22,7 +22,9 @@ export function checkReleaseAge(text, today) {
   const lines = text.split('\n');
   if (lines.some((l) => /^(---|\.\.\.)/.test(l))) errors.push('document marker found; one document only');
 
-  const countLines = (key) => lines.filter((l) => new RegExp(`^\\s*${key}\\s*:`).test(l));
+  const countLines = (key) => lines.filter((l) => new RegExp(`^\\s*["']?${key}["']?\\s*:`).test(l));
+  const quotedKey = (l) => /^\s*["']minimumReleaseAge(Exclude)?["']\s*:/.test(l);
+  for (const l of lines.filter(quotedKey)) errors.push(`quoted key not allowed: ${l}`);
   const ageLines = countLines('minimumReleaseAge');
   if (ageLines.length !== 1) {
     errors.push(`minimumReleaseAge must occur exactly once, found ${ageLines.length}`);
@@ -38,7 +40,7 @@ export function checkReleaseAge(text, today) {
   if (excludeLines.length !== 1) {
     errors.push('minimumReleaseAgeExclude must occur exactly once');
   }
-  const start = lines.findIndex((l) => /^\s*minimumReleaseAgeExclude\s*:/.test(l));
+  const start = lines.findIndex((l) => /^\s*["']?minimumReleaseAgeExclude["']?\s*:/.test(l));
   const head = lines[start].replace(/[ \t]+$/, '');
   const inlineEmpty = head === 'minimumReleaseAgeExclude: []';
   if (!inlineEmpty && head !== 'minimumReleaseAgeExclude:') {

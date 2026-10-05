@@ -152,6 +152,21 @@ test('red: CRLF entry line', () => {
   assertErr(crlf, /carriage return/);
 });
 
+test('red: quoted duplicate or quoted-only keys', () => {
+  for (const q of ['"', "'"]) {
+    const dupAge = build({ age: `minimumReleaseAge: 10080\n${q}minimumReleaseAge${q}: 1\n` });
+    assertErr(dupAge, /minimumReleaseAge must occur exactly once, found 2/);
+    assertErr(dupAge, /quoted key not allowed/);
+    const onlyAge = build({ age: `${q}minimumReleaseAge${q}: 10080\n` });
+    assertErr(onlyAge, /quoted key not allowed/);
+    const dupEx = build({ exclude: `minimumReleaseAgeExclude: []\n${q}minimumReleaseAgeExclude${q}: []\n` });
+    assertErr(dupEx, /minimumReleaseAgeExclude must occur exactly once/);
+    assertErr(dupEx, /quoted key not allowed/);
+    const onlyEx = build({ exclude: `${q}minimumReleaseAgeExclude${q}: []\n` });
+    assertErr(onlyEx, /quoted key not allowed/);
+  }
+});
+
 test('block ends only at a new top-level key', () => {
   const text = withEntries(OK_ENTRY) + 'nextKey: 1\n';
   assert.deepEqual(checkReleaseAge(text, TODAY), []);
