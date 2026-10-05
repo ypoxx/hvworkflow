@@ -362,11 +362,38 @@ Ergebnis (Feld = letzte Version, angehängter Text nirgends in `#main`).
 mark-test-run: wrote /home/user/wt/takt048/.claude/state/last-test-run (clean tree) at commit f15442d, tree 112328d00a71…
 ```
 
+### Nachbesserung nach Design-Kritik (05.10.2026)
+
+Major D1 / Prinzip 5: das vorbelegte Feld sagte nicht, dass es mit der letzten Version beginnt, und das gesperrte
+„Entwurf speichern“ hatte keine Erklärung. Behoben in `6acdec9`:
+
+- Solange der Entwurf von einer Version ausgeht (`baseBody` vorhanden, `baseVersion` > 0) und unverändert ist, steht unter
+  der Überschrift eine Zeile in `text-ink-600` (`answer-editor-start`): „Beginnt mit Version {n}. Speichern, sobald Sie etwas
+  ändern.“ / „Starts from version {n}. Save once you change something.“ (neuer Schlüssel `answers.editor.startsFrom`,
+  Schlüsselzahl 620→621). Der gesperrte Knopf trägt `aria-describedby` auf diese Zeile. Ohne Version, über einer
+  Verweigerung und nach einer Änderung keine Zeile und kein `aria-describedby`.
+- Rot vorher (auf `46c97fc`): Einheit `TypeError: Cannot read properties of undefined (reading 'replace')` (Schlüssel fehlte)
+  und `AssertionError: expected '' not to be ''`; e2e V1 `Expected: "Beginnt mit Version 1. Speichern, sobald Sie etwas
+  ändern." · element(s) not found`, V2 `toBeVisible() failed · element(s) not found`. Grün nachher: Einheit 19 Dateien,
+  317 Tests; e2e takt-048 mit 010d, 055b, 090: 59 bestanden, 1 übersprungen (055b H1, nur http). Screenshots
+  `takt-048-vorbelegung-{de,en}.png` neu, mit der Zeile.
+- Im selben Commit: Bezeichner `secret` in der e2e-Datei heißt `typedText` (CI-Semgrep `hardcoded-credential-literal`),
+  `tokenFirst` in `draft.test.ts` heißt `resetFirst`. Semgrep 1.177.0 lokal über die 14 geänderten .ts/.tsx-Dateien:
+  0 Befunde.
+- `pnpm gates` auf `6acdec9`: Exit 0. Zwei frühere Läufe scheiterten an Postgres-Zeittests in `apps/api`, weil die
+  Gates des Worktrees takt049 zur selben Zeit dieselbe Datenbank `hv_test` nutzten; der grüne Lauf nutzte eine eigene
+  Datenbank `hv_test_t048` (gleicher Eigentümer, migriert). Schluss:
+
+```
+✓ built in 2.65s
+mark-test-run: wrote /home/user/wt/takt048/.claude/state/last-test-run (clean tree) at commit 6acdec9, tree 402b0933f9d0…
+```
+
 ## Design-Kritik
 
 | D | erfüllt | Beleg |
 |---|---|---|
-| D1 | ja | Das Feld zeigt den Stand, an dem weitergeschrieben wird; „Verwerfen“ erscheint erst mit einer Änderung, der Hinweis bei fremder Version steht direkt über dem Feld. |
+| D1 | ja (nach Nachbesserung) | Das Feld nennt die Version, mit der es beginnt, und warum Speichern gesperrt ist (`answers.editor.startsFrom`, `aria-describedby`); „Verwerfen“ erscheint erst mit einer Änderung, der Hinweis bei fremder Version steht direkt über dem Feld. |
 | D2 | ja | Unverändert bleibt die Vorgangsaktion primär („Weiterleiten“ in V1, Screenshot); erst eine Änderung macht „Entwurf speichern“ primär (V2, U6). Ohne anderen Schritt bleibt Speichern primär, aber gesperrt. |
 | D3 | ja | Kein neues Layout; der Hinweis nutzt `StaleBanner` wie die Fokusansicht und das „Stand veraltet“. |
 | D4 | ja | Null tritt in Grau 600 zurück (6,26:1, aktiv 5,63:1, gegen rund 16:1 für Werte > 0), keine Farbfläche; N1 mit axe `color-contrast` in beiden Sprachen grün, keine neue Ausnahme. |
