@@ -140,7 +140,7 @@ describe('DistributionPanel (Test 3)', () => {
    */
   it('U1: a zero shows its number in text-ink-600, in every kind of cell and when active; above zero text-ink-900', () => {
     const zeroNone = meeting({ open: 24, byUnit: { 'unit-fin': 9, 'unit-ops': 15, 'unit-ar': 0 }, bySeat: { ceo: 3, cfo: 1, 'seat-x': 0 } });
-    const countSpan = (cell: string): string => cell.match(/<span[^>]*font-mono tabular-nums[^>]*>\d+<\/span>/)?.[0] ?? '';
+    const countSpan = (cell: string): string => cell.match(/<span[^>]*font-mono tabular-nums[^>]*>\d+<\/span>/)?.[0] ?? ''; // i18n-ok: expected markup in a test, not a rendered text
     for (const active of ['all', 'unit-ar']) {
       const html = render(zeroNone, READY, UNITS, active);
       const zeros = [
