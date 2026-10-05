@@ -41,9 +41,11 @@ export const KEYCLOAK_PORT = 18080;
 export const SERVICE_PORT = 18091;
 export const START_LINE = 'HV-Tool API: start mode=service persistence=postgres auth=oidc cors=none trusted-proxies=none';
 
-/** The whole run stays inside the 9 minutes of the CI step (`gates.yml`), so that the cleanup surely runs. */
-const TOTAL_MS = 480_000;
+/** The whole run stays inside the 14 minutes of the CI step (`gates.yml`, 2 minutes of room), so that the cleanup surely runs. */
+const TOTAL_MS = 720_000;
 const CLEANUP_RESERVE_MS = 30_000;
+/** Soft threshold (takt-046, 6:30 = plan threshold): above it the duration annotation is a warning; exit code and flow stay the same. */
+const WARN_MS = 390_000;
 
 /** The tsx loader is needed for the TypeScript of the service and the domain (spec decision 6). */
 export function loaderIsActive(execArgv = process.execArgv, options = process.env.NODE_OPTIONS ?? '') {
@@ -177,6 +179,21 @@ export async function checkAccessLogFiles(dir, forbidden) {
   return lines;
 }
 
+const clock = (ms) => {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
+
+/** takt-046: numbers and fixed stage names only, never error text. `stages` is a list of `[name, ms]` in run order. */
+export function formatDuration({ totalMs, limitMs, warnMs, stages }) {
+  const line = `031a duration: total ${clock(totalMs)} of limit ${clock(limitMs)}, warning above ${clock(warnMs)}; stages: ` +
+    stages.map(([name, ms]) => `${name} ${clock(ms)}`).join(', ');
+  const annotation = totalMs <= warnMs
+    ? `::notice title=e2e-http duration::${line}`
+    : `::warning title=e2e-http duration::${line} (above the soft threshold; see takt-046 for the split decision)`;
+  return { line, annotation };
+}
+
 /** Replaces every known secret in a line of child output; a safety net, the tests print none in the first place. */
 export function redact(text, secrets) {
   let out = text;
@@ -273,10 +290,28 @@ function endGroup(child, signal) {
 }
 
 async function main() {
-  const startedAt = Date.now();
   stage = 'tsx loader check';
   if (!loaderIsActive()) { console.error(LOADER_HINT); process.exitCode = 1; return; }
   if (process.argv.includes('--check')) { await check(); return; }
+  const startedAt = Date.now();
+  // Entry times of the main stages (fixed names, takt-046); the last one ends when run() settles.
+  const marks = [];
+  try {
+    await run({ startedAt, enter: (name) => marks.push([name, Date.now()]) });
+  } finally {
+    // Outside run(), so setup failures and a throwing cleanup still print the line (Codex P2 on #159);
+    // guarded, so the duration output can never replace the original error.
+    try {
+      const end = Date.now();
+      const stages = marks.map(([name, from], index) => [name, (marks[index + 1]?.[1] ?? end) - from]);
+      const { line, annotation } = formatDuration({ totalMs: end - startedAt, limitMs: TOTAL_MS, warnMs: WARN_MS, stages });
+      say(line);
+      say(annotation);
+    } catch {}
+  }
+}
+
+async function run({ startedAt, enter }) {
   const ownerBase = process.env.TEST_DATABASE_URL;
   const runtimeBase = process.env.TEST_RUNTIME_DATABASE_URL;
   const runtimeRole = process.env.HV_DB_RUNTIME_ROLE;
@@ -315,6 +350,7 @@ async function main() {
     await assertPortFree(httpPort);
     // 1. Keycloak
     if (!withoutIdp) {
+      enter('keycloak');
       stage = 'Keycloak startup';
       containerStarted = true;
       await startKeycloak({ directory: temp, container, port: KEYCLOAK_PORT, realm: fixture.realm,
@@ -323,6 +359,7 @@ async function main() {
     }
 
     // 2. database
+    enter('database');
     stage = 'database creation';
     const { Pool } = apiRequire('pg');
     const admin = new Pool({ connectionString: ownerBase, connectionTimeoutMillis: 5_000, max: 1 });
@@ -343,6 +380,7 @@ async function main() {
     assert.equal(migrate.status, 0);
 
     // 3. bootstrap
+    enter('bootstrap');
     stage = 'bootstrap of corpus and roles';
     const actorIds = await bootstrap({ Pool, ownerUrl, issuer, users: fixture.users, persons: PERSONS });
 
@@ -354,6 +392,7 @@ async function main() {
     writePrivateFile(join(stateDir, 'revoke.json'), JSON.stringify({ databaseUrl: runtimeUrl, actorId: actorIds.revoke }));
 
     // 4. service
+    enter('service');
     stage = 'service startup';
     const logDir = join(temp, 'access-log');
     await mkdir(logDir, { mode: 0o700 });
@@ -372,6 +411,7 @@ async function main() {
     say(`031a service start line: ${START_LINE}`);
 
     // 5. Playwright
+    enter('playwright');
     stage = 'end-to-end run';
     const limitMs = TOTAL_MS - (Date.now() - startedAt) - CLEANUP_RESERVE_MS;
     assert(limitMs > 30_000, 'Not enough time left for the end-to-end run.');
@@ -379,6 +419,7 @@ async function main() {
     assert.equal(exit, 0);
 
     // 6. access log
+    enter('access-log');
     stage = 'access log check';
     const forbidden = await forbiddenTexts({ stateDir, apiOrigin, users: fixture.users, actorIds, secrets, texts });
     await stopService(service);
@@ -391,6 +432,7 @@ async function main() {
     await Promise.race([body(), interruption]);
   } finally {
     // 7. cleanup, always
+    enter('cleanup');
     clearTimeout(limit);
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
