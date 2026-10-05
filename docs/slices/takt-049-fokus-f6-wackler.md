@@ -200,11 +200,30 @@ muss mit einem Timeout rot sein.
 
 ```
 Slice: takt-049-fokus-f6-wackler
-Done: <drei Zeilen>
-Evidence: <Ende von `pnpm gates` auf Commit …>; T1/T2/(c)-Ausgabe; F6 60/60 (2 × 30 parallel); 054+055b ×3 grün
-Open: <was nicht erledigt ist, mit Grund>
-Touched: <Dateiliste>
+Done: Neue Hilfe apps/web/e2e/support/focus-list.ts (readFocusList: ein page.evaluate; focusListLanded rein;
+      waitForMine mit 15 s); 054 nutzt sie mit EXPERT_UNIT_ID, 055b liest sein strengeres Prädikat über readFocusList.
+      Neuer Test takt-049-fokus-warten.spec.ts (T1 Ursache, T2 neun Fälle + waitForMine < 2 s); zwei Folgelisteneinträge.
+Evidence: pnpm gates grün auf Commit eda84c3 (sauberer Baum; slice-scope: 6 Dateien in Files allowed; Skripttests
+      pass 346 / fail 0, einschließlich scripts/e2e-http-031.test.mjs). Ende:
+        ✓ built in 2.39s
+        mark-test-run: wrote /home/user/wt/takt049/.claude/state/last-test-run (clean tree) at commit eda84c3, tree 0805bd029fb8…
+      T1/T2: takt-049-fokus-warten.spec.ts --project=in-process: 11 passed (8.1s).
+      T1 roh (ohne Abfangen, lokal, nicht festgeschrieben): "TimeoutError: locator.getAttribute: Timeout 2000ms exceeded.
+        Call log: - waiting for getByTestId('focus-list')".
+      (c) T2 "schlechte Reihenfolge" mit der alten Vier-Schritt-Lesart, Tausch zwischen count() und getAttribute (lokal,
+        nicht festgeschrieben): rot nach 15.3s, "Error: Timeout 15000ms exceeded while waiting on the predicate".
+      F6 --repeat-each=30, zwei Läufe gleichzeitig (E2E_PORT 4201/4202): 30 passed (3.5m) + 30 passed (3.5m) = 60/60.
+      054 + 055b --repeat-each=3: 42 passed, 3 skipped (H1, nur Projekt http) (4.8m).
+      Kein Screenshot (keine Interface-Änderung); von den Läufen überschriebene docs/evidence/054-*/055b-* zurückgesetzt.
+Open: CI auf dem PR (gates, e2e-http) steht aus; nicht gepusht (Auftrag).
+Touched: apps/web/e2e/support/focus-list.ts (neu), apps/web/e2e/takt-049-fokus-warten.spec.ts (neu),
+      apps/web/e2e/054-fokusansicht.spec.ts, apps/web/e2e/055b-antwortformat.spec.ts, docs/folgeliste.md,
+      docs/slices/takt-049-fokus-f6-wackler.md
 ```
+
+Akzeptanz 2, `rg -n -A3 "expect\.poll"` in 054/055b: die einzigen Poll-Rückrufe lesen den Zähler im Kopf
+(`header-counter-questions`), den Fokus per `page.evaluate`, `steeringRows` (`answers-row`, Steuerung) und in 055b `readFocusList`; keiner
+enthält eine Locator-Aktion auf `focus-list`, `focus-empty`, `focus-forbidden` oder `focus-row`.
 
 ## Review findings
 
