@@ -513,11 +513,41 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* `pnpm install --frozen-lockfile` grün, pnpm gates
   - *Offene Entscheidung:* —
-- **takt-048 · Kleine Oberfläche: Nullzähler Grau 600 und Beantwortung mit letzter Version vorbelegen** — niedrig · Lanes: web-steering, web-answers
+  - *Stand:* gebaut und gemergt am 05.10.2026 (`3136bf0`, PR #161; `minimumReleaseAge: 10080` mit Ausnahmeweg für Sicherheitspatches, Skript `scripts/release-age.mjs`, `docs/sicherheit/lieferkette-mindestalter.md`). Nachprüfung: zwei Minor in `docs/folgeliste.md`.
+- **takt-048 · Kleine Oberfläche: Nullzähler Grau 600 und Beantwortung mit letzter Version vorbelegen** — mittel · 1,0 AStd · Lanes: web-steering, web-answers
   - *Ziel:* (1) Zählerzellen mit 0 in der Steuerungsansicht von Grau 300 auf Grau 600 (Barrierefreiheit; 053 D4, Entscheidung 05.10.2026); (2) der Beantwortungs-Editor beginnt mit der letzten Version vorbelegt, wie die Fokusansicht (055b Frage 4, Entscheidung 05.10.2026; Erwartungen in 090 und 010d anpassen).
   - *Abhängigkeiten:* —
   - *Rolle:* Implementierer-Oberfläche; Review
   - *Nachweise:* axe grün, Screenshot Nullzähler, Test Vorbelegung; pnpm gates
+  - *Offene Entscheidung:* —
+  - *Stand:* gebaut und gemergt am 05.10.2026 (`c5990c8`, PR #162). Risikoklasse im Plan von niedrig auf **mittel** angehoben (Spec-Klasse): die Vorbelegung berührt den Pfad, der Antwortversionen anlegt (womit das Feld beginnt, wann Speichern angeboten wird, welche Aktion primär ist); Aufwand 1,0 AStd. Offen aus Spec und Review in `docs/folgeliste.md` (wortgleiche Version im Kern, Nullzähler in `SpeakerRow`, Rebase-Hinweis).
+- **takt-045 · Stack-Sonde `postgres-restart` ohne Wettlauf** — mittel · Lanes: infra (`scripts/stack.mjs`), docs-ops
+  - *Ziel:* die Sonde der Stack-037a-Prüfung stoppt Postgres, wartet auf die Meldung des Dienstes (DOWN) und startet neu, statt `restart` (der Neustart war mit 0,4 s zu kurz, die Sonde belegte nichts; zweimal rot, PR #148 und #154).
+  - *Abhängigkeiten:* 037a
+  - *Rolle:* Mechaniker; Review (Opus)
+  - *Nachweise:* Skripttests der Sonde, pnpm gates
+  - *Stand:* gebaut und gemergt am 05.10.2026 (`d17bcbf`, PR #160). Review ohne Blocker und Major; vier Minor und drei Nit in `docs/folgeliste.md` (offen, u. a. „misslungener Start lässt Postgres gestoppt“).
+  - *Offene Entscheidung:* —
+- **takt-046 · Laufzeit des Jobs `e2e-http`** — niedrig · Lanes: ci, infra (Harness)
+  - *Ziel:* Grenzen des Jobs auf 12, 14 und 20 Minuten angehoben (Schritt, Job, Gesamt) und eine Laufzeitzeile je Lauf mit Gesamtdauer, Grenze, Warnschwelle (6:30) und Stufen; Entscheidung über das Teilen des Jobs folgt aus den Messwerten.
+  - *Abhängigkeiten:* —
+  - *Rolle:* Mechaniker; Review (Sonnet)
+  - *Nachweise:* Skripttest der Laufzeitzeile, pnpm gates
+  - *Stand:* gebaut und gemergt am 05.10.2026 (`11bbdf7`, PR #159; Minor mit Codex P2 in `7928053` behoben, drei Nit in `docs/folgeliste.md`).
+  - *Offene Entscheidung:* —
+- **takt-049 · 054 F6: `waitForMine` liest atomar** — niedrig · ca. 1 AStd · Lanes: web (e2e)
+  - *Ziel:* der Wackler im in-process-Fall F6 der Fokusansicht („coordination: the notice, no rows“; 15-s-Timeout in `waitForMine`, Lauf 37337216828) ist behoben: die Fokusliste wird in einem einzigen `evaluate` gelesen statt Zeile für Zeile.
+  - *Abhängigkeiten:* 054
+  - *Rolle:* Mechaniker; Review (Sonnet)
+  - *Nachweise:* e2e-Fall F6 wiederholt grün, pnpm gates
+  - *Stand:* gebaut und gemergt am 05.10.2026 (`8215bc0`, PR #163, Spec `docs/slices/takt-049-fokus-f6-wackler.md`). Review ohne Blocker und Major; zwei Minor und zwei Nit in `docs/folgeliste.md`.
+  - *Offene Entscheidung:* —
+- **takt-050 · 010b Runde 4: Wettlauf `page.evaluate` beim Rollenwechsel** — niedrig · Lanes: web (e2e)
+  - *Ziel:* der einmalige Fehler „Resulting promise was garbage collected“ in `apps/web/e2e/010b-lesepfade.spec.ts:802` (Runde 4 B, Bühne, Rollenwechsel bei „Nur Bühne“; Lauf 37347756649, Job 111890560965, Commit `d17bcbf`) wird behoben: `evaluate` nicht über Navigation oder Rollenwechsel hinweg offen halten (Muster wie takt-049).
+  - *Abhängigkeiten:* takt-049
+  - *Rolle:* Mechaniker; Review
+  - *Nachweise:* Fall wiederholt grün, pnpm gates
+  - *Stand:* in Arbeit am 05.10.2026 (Spec und Bau laufen).
   - *Offene Entscheidung:* —
 - **025 · Jahrgang, Lebenszyklus und Tagesordnung R-MTG, Nachtragsregel für Papier** — hoch · 2,5 AStd · Kalender 15.10.2026 (W3) · Lanes: core, service
   - *Ziel:* meetingId überall im Kern und in der Projektion; `seq` bleibt global lückenlos, Fragennummern F-n je Jahrgang; Meeting-Lebenszyklus preparation→running→closed mit `MeetingStarted`/`MeetingClosed` aus Vertrag 0.3.3 und Tagesordnungsfortschritt (AgendaItemOpened, VotingOpened, VotingClosed mit Recht agenda.manage) als Tabelle R-MTG-01..06; Guard R-MTG-03: nach debateClosed wird Erfassung verweigert, außer für source paper oder transcript mit occurredAt ≤ debateClosedAt und Pflichtgrund, das Ereignis trägt dann das Kennzeichen lateEntry; die Restantenliste aus 087 wird später Eingabe des Debattenschlusses; Listenfilter je Jahrgang; Seed erzeugt zwei HVs im selben Log als Test. Die Lebenszyklus-Projektion und Übergänge werden vor den öffentlichen Aktionen mit synthetischen v2-Ereignissen geprüft. Der HTTP-Test stellt `DebateClosed` als synthetische v2-Fixture her, weil die öffentliche Debattenschluss-Operation erst mit 087/R-MTG-07 kommt; der Test ruft danach die echte Erfassungsroute auf. Die Scheibe montiert die Routen ihrer Operationen aus Vertrag 0.3.3 im Dienst (`apps/api/src`) und entfernt deren Einträge aus `packages/contract/allowlist.json` (die Operationen stehen dort mit Feld `slice` = 025).
@@ -1377,6 +1407,7 @@ aus Abschnitt 5 gelten, der Orchestrator löst sie beim Spec-Schreiben, wo mögl
   aufgenommen), dann 048, 053, 054, 055, 055b, 059, 061, 060, 046, zuletzt 057 (vor dem Bau ohne 056 neu schneiden oder
   zurückstellen). Die Reihenfolge folgt den Abhängigkeiten aus Abschnitt 5 (054 nach 048; 059 nach 045 und 055b).
   *Stand 05.10.2026:* Eigentümerentscheidungen eingearbeitet (Register E5, E6, E58; Spec-Vermerke „Entschieden 05.10.2026“; `docs/bautage/uebergabe-2026-10-05.md`). Nächste Takte in dieser Reihenfolge: takt-046 (`e2e-http`-Laufzeit: Grenze anheben oder Job teilen), takt-045 (Stack-037a-Sonde `postgres-restart`), takt-047 (pnpm minimumReleaseAge), takt-048 (Nullzähler Grau 600, Beantwortung vorbelegen); danach die Oberflächenkette 059, 046, 060, 061, 041; 055c nach 055b mit dem Umfang nummerierte Listen (Klasse hoch, Spec-Entscheidung nötig); 089b (rechtebasierte Navigation) nach 041. 054c entfällt (E58). 055/055b gehen in keine geteilte Umgebung vor der CSP der Webseite (037b); Deployment nur auf ausdrückliches Go.
+  *Stand 05.10.2026 (abends):* gemergt: #158 `4e38512` (Eigentümerentscheidungen in den Docs), takt-046 (#159 `11bbdf7`, Grenzen 12/14/20 Minuten, Laufzeitzeile), takt-045 (#160 `d17bcbf`, Sonde `postgres-restart` stop/DOWN/start), takt-047 (#161 `3136bf0`, `minimumReleaseAge` 10080 mit Ausnahmeweg), takt-049 (#163 `8215bc0`, 054 F6 `waitForMine` atomar), takt-048 (#162 `c5990c8`, Nullzähler Grau 600, Beantwortung vorbelegt; Klasse mittel, 1,0 AStd). Nächste Schritte in dieser Reihenfolge: takt-050 (010b Runde 4, in Arbeit), dann die Spec zu 055c (nummerierte Listen; Klasse hoch, Spec-Entscheidung nötig), dann die Oberflächenkette 059, 046, 060, 061, 041; 089b nach 041. 054c entfällt (E58). 055/055b gehen in keine geteilte Umgebung vor der CSP der Webseite (037b); Deployment nur auf ausdrückliches Go.
   *Stand 04.10.2026 nachts:* 055 (#152 `4da0165`, Spec #151 `ea3eb9a`; Klasse hoch, geteilt in 055 und 055b) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055b, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57: 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → 060 → 061 → 041). Takt-Scheiben der Nacht: takt-043 (Fokus nach Weiterleiten, #153 `6fbd2a0`, behebt das Fokus-Rennen F4 in `e2e-http`) und takt-044 (H13: Erfassungsfenster, #154 `d7020da`, Zeitabhängigkeit des Tests). Offen: eigener Takt für die Sonde `postgres-restart` des Stack-Jobs (vor 037b).
   *Stand 04.10.2026 abends:* 053 (#145 `d73f8fa`) und 054 (#149 `cc97005`, Spec #147 `4f37d07`) gebaut, angenommen und gemergt; nächste Scheibe der Oberflächenkette ist 055, danach in dieser Reihenfolge 059, 046, 060, 061, 041 (Register E57). 054c (Zurückholen, E58) hängt an 054 und wartet auf Rechtsblick.
   *Stand 04.10.2026 mittags:* 037a (#129 `5d89ad7`) und 048 (#142 `7405efb`) gebaut und gemergt, Spec 048 als #141 `e2e1432`; nächste Scheibe der Oberflächenkette war 053, danach in dieser Reihenfolge 054, 055, 059, 046, 060, 061, 041 (Register E57).
