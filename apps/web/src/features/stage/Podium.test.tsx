@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import type { AnswerVersion, Permission, Question, RefusalGround } from '@hv/domain';
 import { translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
-import { Podium, nextPress } from './Podium';
+import { AnswerText } from '../../components';
+import { Podium, PreviewAnswer, nextPress } from './Podium';
 import type { DeliverLock } from './lib';
 
 function staged(id: string, version: number, actions: Permission[]): Question {
@@ -127,5 +128,68 @@ describe('Podium with a refusal (Scheibe 045, Test 7)', () => {
     const html = renderWith(withAnswer({}));
     expect(html).not.toContain(de('stage.refusal.marker.noClaim'));
     expect(html).not.toContain(de('stage.refusal.marker.withGround'));
+  });
+});
+
+/**
+ * Scheibe 055b, Tests 6 and 10: the podium shows the approved version through the one renderer (`AnswerText`) — the
+ * same markup the Beantwortung, the focus view and the history show for that version (Recht/Freigabe). Both places
+ * are `<div>` now (a `<p>` may not hold blocks) with their test ids, classes and `data-prepared`.
+ */
+describe('Podium with a formatted answer (Scheibe 055b, Tests 6 and 10)', () => {
+  const at = '2027-04-20T10:00:00.000Z';
+  const FORMATTED: AnswerVersion = {
+    version: 1, text: 'Die Dividende steigt.\n\neins\nzwei', createdAt: at, createdBy: { id: 'u', role: 'expert' },
+    body: {
+      language: 'de',
+      blocks: [
+        { type: 'paragraph', content: [{ text: 'Die ' }, { text: 'Dividende', marks: ['bold'] }, { text: ' steigt.' }] },
+        { type: 'list', items: [[{ text: 'eins', marks: ['highlight'] }], [{ text: 'zwei' }]] },
+      ],
+    },
+  };
+  const approved: Question = {
+    ...staged('q1', 4, ['question.deliver']),
+    answers: [FORMATTED],
+    approval: { answerVersion: 1, approvedAt: at, approvedBy: { id: 'u-appr-1', role: 'approver' } },
+  };
+  const answerPart = (html: string): string | undefined =>
+    html.match(/<div[^>]*data-answer-text="true"[^>]*>([\s\S]*?)<\/div>/)?.[1]; // i18n-ok: expected markup in a test, not a rendered text
+
+  it('stage-answer is a div with data-prepared, holding strong, mark and the list of the approved version', () => {
+    const html = render(null, false, approved);
+    const tag = html.match(/<(\w+)[^>]*data-testid="stage-answer"[^>]*>/);
+    expect(tag?.[1]).toBe('div');
+    expect(tag?.[0]).toContain('data-prepared="true"');
+    expect(tag?.[0]).toContain('text-[24px]');
+    expect(html).toContain('<strong>Dividende</strong>'); // i18n-ok: expected markup in a test, not a rendered text
+    expect(html).toMatch(/<mark style="[^"]*">eins<\/mark>/); // i18n-ok: expected markup in a test, not a rendered text
+    expect(html).toMatch(/<div[^>]*data-answer-text="true"[^>]*lang="de"|<div[^>]*lang="de"[^>]*data-answer-text="true"/);
+  });
+
+  it('Test 6: the same renderer markup as AnswerText for this version', () => {
+    const own = answerPart(renderToStaticMarkup(<AnswerText answer={FORMATTED} />));
+    expect(own).toBeDefined();
+    expect(answerPart(render(null, false, approved))).toBe(own);
+    expect(answerPart(renderToStaticMarkup(<PreviewAnswer question={approved} />))).toBe(own);
+  });
+
+  it('stage-preview-answer is a div with its classes, holding the renderer', () => {
+    const html = renderToStaticMarkup(<PreviewAnswer question={approved} />);
+    const tag = html.match(/<(\w+)[^>]*data-testid="stage-preview-answer"[^>]*>/);
+    expect(tag?.[1]).toBe('div');
+    expect(tag?.[0]).toContain('text-[18px]');
+    expect(html).toContain('<strong>Dividende</strong>'); // i18n-ok: expected markup in a test, not a rendered text
+  });
+
+  it('without an approved version: the placeholder as a paragraph, data-prepared false, no renderer', () => {
+    const html = render(null, false, { ...approved, approval: undefined } as unknown as Question);
+    const tag = html.match(/<(\w+)[^>]*data-testid="stage-answer"[^>]*>/);
+    expect(tag?.[1]).toBe('div');
+    expect(tag?.[0]).toContain('data-prepared="false"');
+    expect(html).toMatch(new RegExp(`data-testid="stage-answer"[^>]*><p[^>]*>${translate('de', 'stage.answer.none')}</p>`));
+    expect(html).not.toContain('data-answer-text');
+    const preview = renderToStaticMarkup(<PreviewAnswer question={{ ...approved, approval: undefined } as unknown as Question} />);
+    expect(preview).toMatch(new RegExp(`data-testid="stage-preview-answer"[^>]*><p[^>]*>${translate('de', 'stage.answer.none')}</p>`));
   });
 });

@@ -95,6 +95,31 @@ rules:
       a normal React child instead.
     pattern-regex: dangerouslySetInnerHTML\s*=
 
+  - id: no-html-sink
+    # Scheibe 055b (T-G1-T-06, second half): the interface builds every node itself (React elements, `createElement`,
+    # `createTextNode`); markup from data or from the clipboard must never reach an HTML parser of the live document.
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      An HTML sink (`innerHTML`, `outerHTML`, `srcdoc`, `insertAdjacentHTML`, `document.write`,
+      `createContextualFragment`, `execCommand('insertHTML')`) parses markup into the live document and is an XSS
+      risk. Build the nodes with React or `createElement`/`createTextNode` instead (docs/slices/055b).
+    paths:
+      include:
+        - "apps/web/src/**"
+    pattern-either:
+      - pattern: $X.innerHTML = $Y
+      - pattern: $X.innerHTML += $Y
+      - pattern: $X.outerHTML = $Y
+      - pattern: $X.outerHTML += $Y
+      - pattern: $X.srcdoc = $Y
+      - pattern: $X.setAttribute("srcdoc", ...)
+      - pattern: $X.insertAdjacentHTML(...)
+      - pattern: document.write(...)
+      - pattern: document.writeln(...)
+      - pattern: $X.createContextualFragment(...)
+      - pattern: $X.execCommand("insertHTML", ...)
+
   - id: math-random-possible-security-use
     languages: [typescript, javascript]
     severity: INFO # a hint, not a block (spec: "als Hinweis") — `pnpm gates`/CI block at WARNING+

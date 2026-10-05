@@ -23,6 +23,7 @@ import {
   showProblem,
 } from '../../components';
 import { getLang, translate, useT } from '../../i18n';
+import { AnswerBlock } from './AnswerBlock';
 import { EventStream, HistoryKpiLine, Timeline } from './Timeline';
 import { refusalVersionsOf } from './eventSummary';
 import type { SummaryContext } from './eventSummary';
@@ -860,6 +861,8 @@ export function HistoryPage() {
                   paneLoading
                 ) : (
                   <div className="px-4 py-4">
+                    {/* Scheibe 055b: the latest answer of the chosen question, above its timeline. */}
+                    <AnswerBlock question={selected} />
                     <HistoryKpiLine events={history} />
                     <Timeline
                       events={history}

@@ -15,6 +15,7 @@ import { FileQuestion } from 'lucide-react';
 import type { Question } from '@hv/domain';
 import { api } from '../../api';
 import { useActor } from '../../api/actor';
+import { previewAnswer, previewText } from '../../api/answerFormat';
 import { EmptyState, PageHeader, Panel, SplitPane, StaleBanner, showToast } from '../../components';
 import { useT } from '../../i18n';
 import { ForwardDialog } from '../answers/ForwardDialog';
@@ -229,7 +230,7 @@ export function FocusPage() {
     settleFocus();
   }, [settleFocus]);
 
-  const updateDraft = useCallback((key: string, patch: Partial<Pick<FocusDraft, 'text' | 'sources'>>) => {
+  const updateDraft = useCallback((key: string, patch: Partial<Pick<FocusDraft, 'body' | 'sources'>>) => {
     setDrafts((previous) => {
       const draft = previous[key];
       return draft === undefined ? previous : { ...previous, [key]: { ...draft, ...patch } };
@@ -240,13 +241,18 @@ export function FocusPage() {
     (question: Question, draft: FocusDraft) => {
       const id = question.id;
       const key = draft.key;
-      const text = draft.text.trim();
+      // Scheibe 055b (decision 7): always with the input form; `text` is the plain text of its preview (055 decision 4).
+      const body = draft.body;
+      if (body === null) return;
+      const text = previewText(body);
+      const sentBody = previewAnswer(body);
       const sources = splitSources(draft.sources);
       const savedVersion = question.answers.length + 1;
       void run(
         'answer.draft',
-        (options) => api.draftAnswer(id, { text, ...(sources.length > 0 ? { sources } : {}) }, options),
-        // The draft now starts from what was saved: no longer unsaved. What was typed meanwhile stays (and counts).
+        (options) => api.draftAnswer(id, { text, body, ...(sources.length > 0 ? { sources } : {}) }, options),
+        // The draft now starts from what was saved: no longer unsaved. What was typed meanwhile stays (and counts); the
+        // field is not rebuilt (`generation` stays), so caret and content stay where they are.
         () =>
           setDrafts((previous) => {
             const current = previous[key];
@@ -256,7 +262,7 @@ export function FocusPage() {
               [key]: {
                 ...current,
                 baseVersion: Math.max(current.baseVersion, savedVersion),
-                baseText: text,
+                baseBody: sentBody,
                 baseSources: sources.join('; '),
                 rebase: false,
               },
@@ -335,14 +341,15 @@ export function FocusPage() {
       <div className="flex h-full min-h-0 flex-col">
         <WritingMode
           question={writingQuestion}
-          text={writingDraft.text}
+          body={writingDraft.body}
+          generation={writingDraft.generation}
           sources={writingDraft.sources}
           dirty={isDirty(writingDraft)}
           busy={busy}
           rebase={writingDraft.rebase}
           stale={staleFor === writingQuestion.id}
           dialogOpen={dialog !== null}
-          onText={(text) => updateDraft(key, { text })}
+          onBody={(body) => updateDraft(key, { body })}
           onSources={(sources) => updateDraft(key, { sources })}
           onAction={(action) => {
             if (action === 'save') save(writingQuestion, writingDraft);
@@ -350,7 +357,12 @@ export function FocusPage() {
             else if (action === 'forward') setDialog('forward');
           }}
           onClose={leaveWriting}
-          onRebase={() => setDrafts((previous) => ({ ...previous, [key]: newDraft(actorId, writingQuestion) }))}
+          onRebase={() =>
+            setDrafts((previous) => ({
+              ...previous,
+              [key]: newDraft(actorId, writingQuestion, (previous[key]?.generation ?? 0) + 1),
+            }))
+          }
           onStaleReload={() => {
             clearStale();
             reload();

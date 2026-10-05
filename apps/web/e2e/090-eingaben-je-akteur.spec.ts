@@ -91,7 +91,9 @@ async function switchToPerson(page: Page, actor: { id: string; role: string; dis
 /** Visible and empty — the strong form R1 asks for; an absent field does not count here. */
 async function expectVisibleAndEmpty(page: Page, testId: string): Promise<void> {
   await expect(page.getByTestId(testId)).toBeVisible();
-  await expect(page.getByTestId(testId)).toHaveValue('');
+  // Scheibe 055b: the answer field is `contenteditable`; its value is its text content.
+  if (await page.getByTestId(testId).evaluate((el) => (el as HTMLElement).isContentEditable)) await expect(page.getByTestId(testId)).toHaveText('');
+  else await expect(page.getByTestId(testId)).toHaveValue('');
 }
 
 async function waitForCorpus(page: Page): Promise<void> {
@@ -128,6 +130,8 @@ async function secretSeen(page: Page): Promise<boolean> {
 async function valueOrAbsent(page: Page, testId: string): Promise<string | null> {
   const field = page.getByTestId(testId);
   if ((await field.count()) === 0) return null;
+  // Scheibe 055b: the answer field is `contenteditable`; its value is its text content.
+  if (await field.evaluate((el) => (el as HTMLElement).isContentEditable)) return (await field.textContent()) ?? '';
   return field.inputValue();
 }
 

@@ -10,7 +10,8 @@ import { MemoryRouter } from 'react-router';
 import type { AnswerVersion, Permission, Question, RefusalGround } from '@hv/domain';
 import { translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
-import { QuestionDetail } from './QuestionDetail';
+import { AnswerText } from '../../components';
+import { AnswerDiff, QuestionDetail } from './QuestionDetail';
 
 const de = (key: TKey, params?: TParams) => translate('de', key, params);
 const at = '2027-04-20T10:00:00.000Z';
@@ -117,5 +118,67 @@ describe('QuestionDetail with a refusal (Test 9)', () => {
     expect(html).toContain(de('answers.refusal.editorHint'));
     const plain = render(q(['answer.draft', 'question.read'], []));
     expect(plain).not.toContain(de('answers.refusal.editorHint'));
+  });
+});
+
+/**
+ * Scheibe 055b, Tests 6 and 7: the version card shows its version through the one renderer (the same markup as on the
+ * podium, Recht/Freigabe); a version that changes only the formatting says so instead of an empty diff; the editor is
+ * the answer field with its toolbar; the justification of a refusal never goes through the renderer.
+ */
+describe('QuestionDetail with the answer format (Scheibe 055b, Tests 6 and 7)', () => {
+  const BODY = {
+    language: 'de' as const,
+    blocks: [
+      { type: 'paragraph' as const, content: [{ text: 'Die ' }, { text: 'Dividende', marks: ['bold' as const] }, { text: ' steigt.' }] },
+      { type: 'list' as const, items: [[{ text: 'eins', marks: ['highlight' as const] }], [{ text: 'zwei' }]] },
+    ],
+  };
+  const TEXT = 'Die Dividende steigt.\n\neins\nzwei';
+  const FORMATTED: AnswerVersion = { version: 1, text: TEXT, body: BODY, createdAt: at, createdBy: { id: 'u', role: 'expert' } };
+  const answerPart = (html: string): string | undefined =>
+    html.match(/<div[^>]*data-answer-text="true"[^>]*>([\s\S]*?)<\/div>/)?.[1]; // i18n-ok: expected markup in a test, not a rendered text
+
+  it('Test 6: the version card holds the same renderer markup as AnswerText', () => {
+    const html = render(q(['question.read'], [FORMATTED]));
+    const card = html.slice(html.indexOf('data-testid="answer-version"'));
+    expect(answerPart(card)).toBe(answerPart(renderToStaticMarkup(<AnswerText answer={FORMATTED} />)));
+    expect(card).toContain('<strong>Dividende</strong>'); // i18n-ok: expected markup in a test, not a rendered text
+  });
+
+  it('Test 7: same text, other body → "Nur die Auszeichnung ist geändert" instead of an empty diff', () => {
+    const plainBody = { language: 'de' as const, blocks: [{ type: 'paragraph' as const, content: [{ text: 'Die Dividende steigt.' }] }] };
+    const boldBody = { language: 'de' as const, blocks: [{ type: 'paragraph' as const, content: [{ text: 'Die ' }, { text: 'Dividende', marks: ['bold' as const] }, { text: ' steigt.' }] }] };
+    const html = renderToStaticMarkup(
+      <AnswerDiff previous={{ text: 'Die Dividende steigt.', body: plainBody }} current={{ text: 'Die Dividende steigt.', body: boldBody }} />,
+    );
+    expect(html).toContain('data-testid="answer-diff-format-only"');
+    expect(html).toContain(de('answers.version.formatOnly'));
+    expect(html).not.toContain('data-testid="answer-diff"');
+  });
+
+  it('Test 7: other text → the word diff as before; same text and same body → the diff (nothing changed)', () => {
+    const changed = renderToStaticMarkup(<AnswerDiff previous={{ text: 'Die Dividende steigt.' }} current={{ text: 'Die Dividende sinkt.' }} />);
+    expect(changed).toContain('data-testid="answer-diff"');
+    expect(changed).not.toContain('answer-diff-format-only');
+    expect(changed).toContain('sinkt.');
+    const same = renderToStaticMarkup(<AnswerDiff previous={{ text: 'A', body: BODY }} current={{ text: 'A', body: structuredClone(BODY) }} />);
+    expect(same).not.toContain('answer-diff-format-only');
+  });
+
+  it('Test 7: answer-editor is the answer field (textbox) with the toolbar', () => {
+    const html = render(q(['answer.draft', 'question.read'], []));
+    expect(html).toMatch(/<div[^>]*data-testid="answer-editor"[^>]*role="textbox"|<div[^>]*role="textbox"[^>]*data-testid="answer-editor"/);
+    expect(html).not.toContain('<textarea');
+    expect(html).toContain('role="toolbar"');
+    expect(html).toContain('data-testid="format-bold"');
+  });
+
+  it('Test 7: the justification of a refusal is never inside the renderer', () => {
+    const html = render(q(['question.read'], [refusal({ refusalJustification: JUSTIFICATION_MARKER })]));
+    expect(html).toContain(JUSTIFICATION_MARKER);
+    const part = answerPart(html) ?? '';
+    expect(part).toContain('Zu dieser Frage gibt der Vorstand keine Auskunft.');
+    expect(part).not.toContain(JUSTIFICATION_MARKER);
   });
 });

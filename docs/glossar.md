@@ -54,6 +54,9 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Fokusansicht | Focus view | `apps/web/src/features/focus/**` | — |
 | Schreibmodus | Writing mode | `apps/web/src/features/focus/WritingMode.tsx`; Frage oben, Antwort groß, Liste ausgeblendet (Scheibe 054) | „Vollbild“ als Name der Funktion (es bleibt die Shell), „Editor“ in Texten |
 | Vorlesezeit | Reading time | `readingSeconds` (130 Wörter je Minute, Ziel zwei Minuten, Scheibe 054) | — |
+| Hausformat | House format | die Whitelist des Antwortformats aus ADR 0005: Absatz, Aufzählung, fett, kursiv, Hervorhebung (`ANSWER_MARKS`, Werkzeugleiste `answers.format.toolbar`, Scheibe 055b) | „Formatierung frei“ |
+| Hervorhebung | Highlight | Marke `highlight`; dargestellt als `<mark>` mit `--color-tone-warning-bg`/`-fg` (Scheibe 055b) | „Markierung“ (meint die Auswahl) |
+| Auszeichnung | Formatting | fett, kursiv, Hervorhebung einer Antwort (`marks`); „Nur die Auszeichnung ist geändert“ (Scheibe 055b) | „Styling“ |
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
 | Verteilung | Distribution | `Meeting.counts.byUnit` (offen je Fachbereich), `Meeting.counts.bySeat` (auf der Bühne je Bühnenplatz); Summen aus dem Dienst, nie je Person (Scheibe 053) | „Matrix“ (es sind zwei Randsummen), „Dashboard“ |
 | Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | — |

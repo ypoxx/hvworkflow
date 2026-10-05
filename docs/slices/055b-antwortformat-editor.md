@@ -829,11 +829,91 @@ Keine blockiert den Bau; alle mit Standard.
 
 ```
 Slice: 055b-antwortformat-editor
-Done: …
-Evidence: <Schluss von `pnpm gates`>, docs/evidence/055b-*.png, CI-Lauf e2e-http …
-Open: …
-Touched: …
+Done: Renderer AnswerText (eine Komponente für Bühne, Vorschau, Beantwortung, Fokus, Historie), Antwortfeld
+      AnswerBodyEditor mit Werkzeugleiste, Kürzeln und Einfügen/Ablegen ohne HTML-Senke (Walker domToBody,
+      editorCommands), Entwurf als Eingabeform in Fokus und Beantwortung, Semgrep-Regel no-html-sink.
+Evidence: Schluss von `pnpm gates` im Bericht an den Orchestrator (Commit dort genannt), docs/evidence/055b-*.png (6),
+      CI-Lauf e2e-http steht aus (kein Push in diesem Bau).
+Open: 010d-ansichtsdaten.spec.ts:885 und :1052 (toHaveValue auf answer-editor) liegen außerhalb der erlaubten Dateien,
+      siehe „Abweichungen und offene Punkte“.
+Touched: siehe Bericht an den Orchestrator.
 ```
+
+### Vor-dem-Bau-Punkte
+
+1. **Basis:** `794c192` (enthält 055 `4da0165`); `normalizeAnswerBodyForRead`, `answerPlainText`, `answerBodyFromText` über
+   `@hv/domain` erreichbar; Paritätstest (f) bei 610 (jetzt 619). Eine Version mit Marke über die Demo geschrieben und
+   gelesen: e2e A1 (`focus-latest` zeigt `strong`/`mark` nach dem Speichern).
+2. **Kürzel (Chromium 1194 über Playwright):** `preventDefault` auf `keydown` für Strg/Cmd+B, I, U, Umschalt+H, Umschalt+L
+   greift (Inhalt unverändert, keine Navigation, kein `beforeinput`). Ohne Abfangen löst Chromium für Strg+B/I/U
+   `formatBold`/`formatItalic`/`formatUnderline` aus (abbrechbar); Strg+Umschalt+H/L tun in Chromium nichts. Firefox und
+   WebKit sind nicht installiert: **nicht geprüft** (Folgeliste). Quellen der Browser-Kürzel: Chrome-Hilfe „Tastenkombinationen“
+   (support.google.com/chrome/answer/157179), Firefox „Tastenkombinationen“ (support.mozilla.org, Strg+Umschalt+H = Chronik),
+   Safari-Menü (Cmd+Umschalt+H Startseite, Cmd+Umschalt+L Seitenleiste); nicht live nachgeschlagen.
+3. **Befehle auf eigenem Inhalt (Chromium):** `bold`, `italic`, `hiliteColor` (Farbe, dann `transparent`) und
+   `insertUnorderedList` schalten auf einem aus `bodyToDom` gebauten Inhalt um und zurück; der Walker liest danach jeweils
+   dasselbe Modell wie vorher. Ein teilweises Aufheben der Hervorhebung teilt den `span` sauber. `execCommand` löst **kein**
+   `beforeinput` aus. Auffällig: `insertUnorderedList` erzeugt `<p><ul>…</ul></p>` (Walker liest es richtig; Folgeliste).
+4. **Rückgängig nach Neuaufbau (Chromium):** Nach einem Neuaufbau durch Skript taten Strg+Z-Schritte in den alten Verlauf
+   sichtbar nichts, ein anschließendes Strg+Umschalt+Z erzeugte aber einen Stand, der nie bestand (Text verdoppelt:
+   `…EINGEFUEGT</p>Erster Satz.Erster Satz.<p>ZZweiter</p>`), **auch nachdem nach dem Neuaufbau getippt wurde**. Deshalb gilt der
+   Schutz aus Entscheidung 5, in einer strengeren Form (Abweichung 1).
+5. **Seed `http`:** nach 054 hält Finanzen laut Dateikopf von 054 F2 (eine Frage `answer_drafted` mit Version) und F7 (eine
+   Frage `assigned`) Einzelfragen mit `answer.draft` für die gebundene Fachkraft; H1 nimmt die erste in `answer_drafted`
+   oder `assigned`.
+6. **Tabulatorweg 013:** `013-tastaturpfad.spec.ts:400` grün mit 15 (Werkzeugleiste ein Halt); keine Änderung an 013.
+7. **Laufzeit `e2e-http`:** letzte drei grüne Läufe mit ausgeführtem Schritt: 37240940303 4:09, 37239067336 5:35,
+   37239065778 5:33. Höchstwert plus Schätzung 0:40 = 6:15 < 6:30; keine Meldung nötig, aber knapp (Takt „Grenze anheben
+   oder Job teilen“ vor 059).
+7a. **CSP:** weiterhin keine CSP der Web-Seite (`netlify.toml` ohne, `deploy/docker/nginx.conf:3` „No CSP here: it comes in
+   037b“, `apps/web/index.html` ohne `<meta>`); keine Änderung.
+8. **Kontrast:** `<mark>` `#8a5a08` auf `#fdf3e4` = 5,39:1 (eigener Vorder- und Hintergrund, daher auch in `.stage-contrast`);
+   axe auf Bühne (Kontrastmodus), Historie und Schreibmodus ohne serious/critical.
+
+### Ergebnisse
+
+- **A2b grün** (Akzeptanzkriterium 1a): null Anfragen an `sentinel-055b.invalid` bei `paste` und `drop` und nach dem Speichern
+  und Rendern; der Kontrollfall (ein `img` mit Wächter-URL im lebenden Dokument) zählt genau eine. Auch mit
+  `--repeat-each=3` (dreimal 0/1). Kein Rückfall auf `text/plain` nötig.
+- **D9:** Walker über 20 000 Zeichen (100 Absätze mit Marken): Median 0,2–0,3 ms, Höchstwert 0,7–1,5 ms (A1).
+- **Semgrep `no-html-sink`:** Probe mit `el.innerHTML = x`, `outerHTML +=`, `srcdoc`, `insertAdjacentHTML`, `document.write`,
+  `createContextualFragment`, `execCommand('insertHTML')` meldet sieben Treffer (Exit 1), `execCommand('bold')` und
+  `textContent` keinen; Wegwerfdatei gelöscht; `apps/web/src` und alle neuen Dateien: 0 Treffer.
+- **Grenze `features` → `@hv/domain`:** 14 Warnungen vorher, 14 nachher (Werte nur über `apps/web/src/api/answerFormat.ts`).
+
+### Abweichungen und offene Punkte
+
+1. **Schutz des Rückgängig strenger als „bis zur nächsten getippten Eingabe“.** Vor-dem-Bau-Punkt 4 zeigte die Verfälschung
+   auch nach Tippen. `UndoBudget` (`editorCommands.ts`) lässt Rückgängig und Wiederholen nur innerhalb der seit dem letzten
+   Neuaufbau gemachten Schritte zu (von unten gezählt: ein Schritt je Tipp-Lauf, einer je Formatbefehl auf einer Auswahl);
+   ein Rückgängig über den Neuaufbau hinaus wird verhindert. Kein Verlust; das Einfügen selbst bleibt nicht rückgängig
+   (055c). Ein Neuaufbau ist auch das erste Aufbauen des Felds beim Öffnen.
+2. **`initial` hat den Typ `AnswerBodyInput | null`** statt `AnswerBody | null`: der Schreibmodus baut ein ungespeichertes
+   Feld nach dem Zurückkehren („Entwurf fortsetzen“) aus der Eingabeform des Entwurfs auf; die Speicherform ist darin
+   enthalten.
+3. **`010d-ansichtsdaten.spec.ts:885` und `:1052`** prüfen `answer-editor` mit `toHaveValue`, das Playwright für ein
+   `contenteditable`-Feld nicht kennt („Not an input element“); die Spec nennt 010d nur für `fill`/`focus` (868/1026). Die
+   Datei liegt außerhalb der erlaubten Dateien: **nicht geändert, gemeldet.** Nötige Umstellung (wie in 054): zweimal
+   `toHaveValue` → `toHaveText`. Mit dieser Umstellung (geprüft an einer nicht eingecheckten Kopie) sind beide Fälle grün.
+4. Der Platzhalter des Felds ist ein echter `<span>` und wird von axe gemessen; `ink-400` (2,48:1) fiel durch, daher `ink-600`.
+5. Firefox/WebKit nicht geprüft (Punkt 2 und 4), Folgeliste.
+
+055 und 055b sind zusammen auslieferbar; Ausrollen nur nach Go des Eigentümers.
+
+### Design-Kritik D1–D10
+
+| D | erfüllt | Satz |
+|---|---|---|
+| D1 | ja | Vier Symbole mit Namen als Tooltip und `aria-label`, gedrückt über Tönung und dickeren Strich; Hinweis Z6 in einem Satz neben der Leiste. |
+| D2 | ja | Keine neue primäre Aktion; „Entwurf speichern“ bleibt die eine primäre im Schreibmodus mit Änderung (Test 8, A1). |
+| D3 | ja | Leiste mit 32-px-Knöpfen bündig über dem Feld; Blockabstände in em, Bühne und Fokus gleich gegliedert. |
+| D4 | ja | Farbe nur für die Hervorhebung (vorhandenes Token, 5,39:1); gedrückte Knöpfe über Tönung und Strichstärke. |
+| D5 | ja | Versionsnummer im Historienblock als Mono-Badge wie in der Beantwortung. |
+| D6 | ja | Leeres Feld mit Platzhalter; ohne Version kein Historienblock; ohne `body` Rückfall auf Text; 422 über die Schreibtür. |
+| D7 | ja | 9 Schlüssel je Sprache, Hausvokabular, kein „Editor“ in Texten (`pnpm vocabulary`, `pnpm i18n-literals`). |
+| D8 | ja | Kürzel, ein Tabulatorhalt mit Pfeilen/Pos1/Ende, Strg+Enter und Escape wie 054; Übergaben unverändert nach takt-043. |
+| D9 | ja | Walker unter 2 ms bei 20 000 Zeichen. |
+| D10 | ja | Vier Knöpfe, ein Satz Hinweis, keine Menüs, keine Farb- oder Schriftwahl. |
 
 ## Review findings
 

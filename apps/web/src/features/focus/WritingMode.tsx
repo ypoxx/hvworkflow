@@ -7,12 +7,14 @@
  * leaves and keeps the text, unless a dialog took the key first. The actions come from `focusActions` (`_actions` and
  * the two states of the interface, never a role or the status, AGENTS.md R4/R5).
  */
-import { useEffect, useId, useRef } from 'react';
+import { useId } from 'react';
 import type { KeyboardEvent } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { Question } from '@hv/domain';
+import type { AnswerBodyInput, Question } from '@hv/domain';
+import { previewText } from '../../api/answerFormat';
 import { Button, Panel, StaleBanner, Toolbar, ToolbarSpacer, cx } from '../../components';
 import { useT } from '../../i18n';
+import { AnswerBodyEditor } from '../answers/AnswerBodyEditor';
 import { latestIsRefusal } from '../answers/refusal';
 import { ReadingTime, ReturnedNote, focusActionLabel } from './FocusDetail';
 import { focusActions, isSaveChord, shouldLeaveWriting } from './focus';
@@ -27,14 +29,15 @@ const TEST_IDS: Readonly<Record<FocusAction, string>> = {
 
 export function WritingMode({
   question,
-  text,
+  body,
+  generation,
   sources,
   dirty,
   busy,
   rebase,
   stale,
   dialogOpen,
-  onText,
+  onBody,
   onSources,
   onAction,
   onClose,
@@ -42,7 +45,10 @@ export function WritingMode({
   onStaleReload,
 }: {
   question: Question;
-  text: string;
+  /** What the answer field holds (055b): the input form the walker read, `null` when empty. */
+  body: AnswerBodyInput | null;
+  /** The field rebuilds from `body` when this changes (a foreign version, "neu laden"). */
+  generation: number;
   sources: string;
   dirty: boolean;
   /** The write door is taken (takt-008). */
@@ -53,7 +59,7 @@ export function WritingMode({
   stale: boolean;
   /** A dialog of the page is open over the writing mode: Escape is its own then. */
   dialogOpen: boolean;
-  onText: (value: string) => void;
+  onBody: (value: AnswerBodyInput | null) => void;
   onSources: (value: string) => void;
   onAction: (action: FocusAction) => void;
   onClose: () => void;
@@ -62,19 +68,13 @@ export function WritingMode({
   onStaleReload: () => void;
 }) {
   const t = useT();
-  const editorRef = useRef<HTMLTextAreaElement>(null);
   const keysId = useId();
+  const labelId = useId();
   const { primary, secondary } = focusActions(question._actions, { dirty, writing: true });
   const mayDraft = question._actions.includes('answer.draft');
-  const canSave = mayDraft && dirty && text.trim() !== '' && !busy;
-
-  // Opening puts the caret at the end of the text (decision 5).
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (editor === null) return;
-    editor.focus();
-    editor.setSelectionRange(editor.value.length, editor.value.length);
-  }, []);
+  // The plain text of the previewed document (055b decision 7): the reading time and "nothing to save" read it.
+  const text = previewText(body);
+  const canSave = mayDraft && dirty && text !== '' && !busy;
 
   const onFieldKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     const chord = {
@@ -165,23 +165,24 @@ export function WritingMode({
             </p>
           )}
 
-          <label className="flex min-h-[12rem] flex-1 flex-col">
-            <span className="hv-label">{t('answers.editor.label')}</span>
-            <textarea
-              ref={editorRef}
-              data-testid="focus-editor"
-              value={text}
-              placeholder={t('answers.editor.placeholder')}
-              aria-describedby={keysId}
-              onChange={(event) => onText(event.target.value)}
+          {/* Opening puts the caret at the end of the text (054 decision 5): `autoFocusEnd`. */}
+          <div className="flex min-h-[14rem] flex-1 flex-col">
+            <span id={labelId} className="hv-label">
+              {t('answers.editor.label')}
+            </span>
+            <AnswerBodyEditor
+              testId="focus-editor"
+              initial={body}
+              generation={generation}
+              labelId={labelId}
+              describedBy={keysId}
+              size="large"
+              autoFocusEnd
+              onChange={onBody}
               onKeyDown={onFieldKeyDown}
-              className={cx(
-                'mt-1 min-h-0 w-full flex-1 resize-none rounded-md border border-line bg-surface px-3 py-2.5',
-                'text-[15px] leading-relaxed text-ink-900 transition-colors duration-100',
-                'placeholder:text-ink-400 hover:border-ink-300',
-              )}
+              className="mt-1 flex-1"
             />
-          </label>
+          </div>
 
           <label className="block">
             <span className="hv-label">{t('answers.editor.sources.label')}</span>

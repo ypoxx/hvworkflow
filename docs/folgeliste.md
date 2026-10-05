@@ -733,6 +733,22 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil
   `http.ts` die Eingabe schon unverändert sendet und `endpointCases` untypisiert ist · bei 055b einen typisierten Fall ergänzen.
 
+## Antwortformat in der Oberfläche (aus 055b)
+
+- 055b Bau, Vor-dem-Bau-Punkte 2 und 4 · `features/answers/editorCommands.ts`, `AnswerBodyEditor.tsx` · Kürzel
+  (Strg/Cmd+B, I, U, Umschalt+H, Umschalt+L) und der Schutz des Rückgängig sind nur in Chromium geprüft; Firefox und WebKit
+  sind im Container nicht installiert (nicht geprüft; bekannt: Firefox Strg+Umschalt+H öffnet die Chronik, Safari
+  Cmd+Umschalt+H/L sind Menübefehle) · in einem Lauf mit Firefox/WebKit nachprüfen, sonst Eigentümerfrage 3.
+- 055b Bau · `features/answers/AnswerBodyEditor.tsx` · `insertUnorderedList` erzeugt in Chromium `<p><ul>…</ul></p>` im Feld,
+  und die erste getippte Zeile eines leeren Felds steht als Text direkt im Feld; der Walker liest beides richtig, nur der
+  Abstand weicht bis zum nächsten Neuaufbau ab · beim Neuaufbau von 055c mit normalisieren.
+- 055b Spec, Folgekandidaten · `features/answers/QuestionDetail.tsx` (`AnswerDiff`), `AnswerEditor.tsx`, `domToBody.ts` ·
+  Diff der Marken statt nur des Hinweises „Nur Auszeichnung“; Vorbelegen der Beantwortung mit der letzten Version
+  (Eigentümerfrage 4); Hinweis „wird beim Speichern Text“ für nicht darstellbare Kandidaten (Unterstreichung, Überschrift) ·
+  Sammelgang.
+- 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
+  liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

@@ -4,7 +4,8 @@
  * yields the same result in every status (R5), shown with real `Question` records (lesson of 053 review 6).
  */
 import { describe, expect, it } from 'vitest';
-import type { AnswerVersion, DomainEvent, Permission, Question, QuestionStatus } from '@hv/domain';
+import type { AnswerBody, AnswerBodyInput, AnswerMark, AnswerVersion, DomainEvent, Permission, Question, QuestionStatus } from '@hv/domain';
+import { answerBodyOf, previewText } from '../../api/answerFormat';
 import {
   FOCUS_STATUSES,
   disarmFocus,
@@ -149,55 +150,118 @@ describe('Test 4: reading time, last forward, draft helpers', () => {
     expect(withoutFrom !== undefined && 'fromUnitId' in withoutFrom).toBe(false);
   });
 
-  it('draftBase: the latest version; empty with a refusal as latest version and without a version', () => {
-    expect(draftBase(question())).toEqual({ baseVersion: 0, baseText: '', baseSources: '' });
+  it('draftBase: the body of the latest version (L without one); empty with a refusal as latest version and without a version', () => {
+    expect(draftBase(question())).toEqual({ baseVersion: 0, baseBody: null, baseSources: '' });
     expect(draftBase(question({ answers: [version(1), version(2, { sources: ['GB S. 4', 'Anhang'] })] })))
-      .toEqual({ baseVersion: 2, baseText: 'Antwort 2', baseSources: 'GB S. 4; Anhang' });
+      .toEqual({ baseVersion: 2, baseBody: doc('Antwort 2'), baseSources: 'GB S. 4; Anhang' });
+    const bold = doc('Antwort 2', ['bold']);
+    expect(draftBase(question({ answers: [version(1), version(2, { body: bold })] })).baseBody).toBe(bold);
     expect(draftBase(question({ answers: [version(1), version(2, { answerKind: 'refusal_no_claim' })] })))
-      .toEqual({ baseVersion: 2, baseText: '', baseSources: '' });
+      .toEqual({ baseVersion: 2, baseBody: null, baseSources: '' });
   });
 
-  it('isDirty compares the trimmed text and the sources', () => {
+  it('newDraft starts from the base with generation 0 (or the one given)', () => {
+    const q = question({ answers: [version(1)] });
+    const draft = newDraft('u-1', q);
+    expect(draft.body).toEqual(doc('Antwort 1'));
+    expect(draft.baseBody).toEqual(doc('Antwort 1'));
+    expect(draft.generation).toBe(0);
+    expect(draft.rebase).toBe(false);
+    expect(newDraft('u-1', q, 4).generation).toBe(4);
+  });
+
+  it('isDirty: a mark alone is a change (055 decision 7), white space alone is not, sources as in 054', () => {
     const draft = newDraft('u-1', question({ answers: [version(1, { sources: ['A'] })] }));
     expect(isDirty(draft)).toBe(false);
-    expect(isDirty({ ...draft, text: '  Antwort 1  ' })).toBe(false);
-    expect(isDirty({ ...draft, text: 'Antwort 1 neu' })).toBe(true);
+    expect(isDirty({ ...draft, body: input([{ text: '  Antwort ' }, { text: '\u00A01  ' }]) })).toBe(false);
+    expect(isDirty({ ...draft, body: input([{ text: 'Antwort 1', marks: ['bold'] }]) })).toBe(true);
+    expect(isDirty({ ...draft, body: input([{ text: 'Antwort 1', marks: ['underline'] }]) })).toBe(false);
+    expect(isDirty({ ...draft, body: input([{ text: 'Antwort 1 neu' }]) })).toBe(true);
+    expect(isDirty({ ...draft, body: null })).toBe(true);
     expect(isDirty({ ...draft, sources: ' A ;' })).toBe(false);
     expect(isDirty({ ...draft, sources: 'A; B' })).toBe(true);
+    const fresh = newDraft('u-1', question());
+    expect(isDirty(fresh)).toBe(false);
+    expect(isDirty({ ...fresh, body: input([{ text: '   ' }]) })).toBe(false);
+  });
+
+  it('the reading time of the preview counts no bullet', () => {
+    const list: AnswerBodyInput = { blocks: [{ type: 'list', items: [[{ text: 'eins zwei' }], [{ text: 'drei', marks: ['bold'] }]] }] };
+    expect(previewText(list)).toBe('eins zwei\ndrei');
+    expect(readingSeconds(previewText(list))).toBe(readingSeconds('eins zwei drei'));
   });
 });
+
+/** A stored document of one paragraph. */
+function doc(text: string, marks?: AnswerMark[]): AnswerBody {
+  return { language: 'de', blocks: [{ type: 'paragraph', content: [marks !== undefined ? { text, marks } : { text }] }] };
+}
+/** An input form of one paragraph. */
+function input(content: NonNullable<AnswerBodyInput['blocks'][number]['content']>): AnswerBodyInput {
+  return { blocks: [{ type: 'paragraph', content }] };
+}
 
 describe('Test 8: writingOutcome', () => {
   const start = (): FocusDraft => newDraft('u-1', question({ answers: [version(1)] }));
   it('the question leaves "Meine Fragen": end, with notice only for unsaved text', () => {
     expect(writingOutcome(start(), undefined)).toEqual({ kind: 'end', discarded: false });
-    expect(writingOutcome({ ...start(), text: 'neu' }, undefined)).toEqual({ kind: 'end', discarded: true });
-    expect(writingOutcome({ ...start(), text: 'neu' }, question({ answers: [version(1)], _actions: ['question.forward'] })))
+    expect(writingOutcome({ ...start(), body: input([{ text: 'neu' }]) }, undefined)).toEqual({ kind: 'end', discarded: true });
+    expect(writingOutcome({ ...start(), body: input([{ text: 'neu' }]) }, question({ answers: [version(1)], _actions: ['question.forward'] })))
       .toEqual({ kind: 'end', discarded: true });
   });
   it('no newer version: keep', () => {
-    expect(writingOutcome({ ...start(), text: 'neu' }, question({ answers: [version(1)] }))).toEqual({ kind: 'keep' });
+    expect(writingOutcome({ ...start(), body: input([{ text: 'neu' }]) }, question({ answers: [version(1)] }))).toEqual({ kind: 'keep' });
   });
-  it('a newer version over unchanged text: moved onto it silently', () => {
+  it('a foreign newer version over an unchanged draft: moved onto it, reseed with generation + 1', () => {
     const outcome = writingOutcome(start(), question({ answers: [version(1), version(2)] }));
     expect(outcome.kind).toBe('rebase');
     if (outcome.kind === 'rebase') {
-      expect(outcome.draft.text).toBe('Antwort 2');
+      expect(outcome.reseed).toBe(true);
+      expect(outcome.draft.body).toEqual(doc('Antwort 2'));
+      expect(outcome.draft.baseVersion).toBe(2);
+      expect(outcome.draft.generation).toBe(1);
+      expect(isDirty(outcome.draft)).toBe(false);
+    }
+  });
+  it('one\'s own version (same document) before the write answered: rebase without reseed, body and generation stay', () => {
+    const mine = { ...start(), body: input([{ text: 'Antwort ' }, { text: 'zwei', marks: ['bold'] }, { text: ' ' }]), generation: 3 };
+    const saved = version(2, { text: 'Antwort zwei', body: { language: 'de', blocks: [{ type: 'paragraph', content: [{ text: 'Antwort ' }, { text: 'zwei', marks: ['bold'] }] }] } });
+    const outcome = writingOutcome(mine, question({ answers: [version(1), saved] }));
+    expect(outcome.kind).toBe('rebase');
+    if (outcome.kind === 'rebase') {
+      expect(outcome.reseed).toBe(false);
+      expect(outcome.draft.body).toBe(mine.body);
+      expect(outcome.draft.generation).toBe(3);
       expect(outcome.draft.baseVersion).toBe(2);
       expect(isDirty(outcome.draft)).toBe(false);
     }
   });
-  it('a newer version that says what the text says (own save read first): silent as well', () => {
-    expect(writingOutcome({ ...start(), text: 'Antwort 2 ' }, question({ answers: [version(1), version(2)] })).kind).toBe('rebase');
+  it('one\'s own version after the write answered: keep when the base already moved; rebase without reseed when it did not', () => {
+    const saved = version(2, { body: doc('Antwort 2', ['italic']) });
+    const answered = { ...start(), body: input([{ text: 'Antwort 2', marks: ['italic'] }]), baseBody: doc('Antwort 2', ['italic']), baseVersion: 2 };
+    expect(writingOutcome(answered, question({ answers: [version(1), saved] }))).toEqual({ kind: 'keep' });
+    const lagging = { ...answered, baseVersion: 1 };
+    const outcome = writingOutcome(lagging, question({ answers: [version(1), saved] }));
+    expect(outcome.kind === 'rebase' && outcome.reseed).toBe(false);
+    expect(outcome.kind === 'rebase' && outcome.draft.generation).toBe(0);
   });
-  it('a newer version over changed text: the text stays, the notice is set once', () => {
-    const outcome = writingOutcome({ ...start(), text: 'mein Text' }, question({ answers: [version(1), version(2)] }));
+  it('a foreign newer version over a changed draft: the draft stays, the notice is set once', () => {
+    const outcome = writingOutcome({ ...start(), body: input([{ text: 'mein Text' }]) }, question({ answers: [version(1), version(2)] }));
     expect(outcome.kind).toBe('notice');
     if (outcome.kind === 'notice') {
-      expect(outcome.draft.text).toBe('mein Text');
+      expect(outcome.draft.body).toEqual(input([{ text: 'mein Text' }]));
       expect(outcome.draft.rebase).toBe(true);
+      expect(outcome.draft.generation).toBe(0);
       expect(writingOutcome(outcome.draft, question({ answers: [version(1), version(2)] }))).toEqual({ kind: 'keep' });
     }
+  });
+  it('a mark alone in the newer version counts as different from an unmarked draft', () => {
+    const changed = { ...start(), body: input([{ text: 'Antwort 2' }, { text: ' mehr' }]) };
+    const outcome = writingOutcome(changed, question({ answers: [version(1), version(2, { body: doc('Antwort 2 mehr', ['bold']) })] }));
+    expect(outcome.kind).toBe('notice');
+  });
+  it('answerBodyOf of a version without body is the base of a draft (L)', () => {
+    expect(newDraft('u-1', question({ answers: [version(1)] })).baseBody).toEqual(answerBodyOf(version(1)));
   });
 });
 

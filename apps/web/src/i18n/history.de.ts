@@ -16,6 +16,7 @@ export const historyDe = {
   'history.tab.stream': 'Ereignisstrom',
   'history.timeline.title': 'Vorgangshistorie',
   'history.timeline.label': 'Vorgangshistorie der Einzelfrage {number}',
+  'history.answer.title': 'Antwort, Version {version}',
   'history.timeline.empty.title': 'Keine Einzelfrage gewählt',
   'history.timeline.empty.body':
     'Wählen Sie links einen Treffer. Hier steht dann der Vorgang von der Erfassung bis zur Bühne.',

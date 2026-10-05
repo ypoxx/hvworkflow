@@ -10,9 +10,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, Lock, ShieldCheck, ShieldOff, Undo2 } from 'lucide-react';
 import type { Ref } from 'react';
 import { Link } from 'react-router';
-import type { AnswerVersion, DomainEvent, Question, Unit } from '@hv/domain';
+import type { AnswerBodyInput, AnswerVersion, DomainEvent, Question, Unit } from '@hv/domain';
 import { TERMINAL_STATUSES } from '@hv/domain';
+import { answerBodyOf, previewText, sameBody } from '../../api/answerFormat';
 import {
+  AnswerText,
   Badge,
   Button,
   KeyValue,
@@ -34,9 +36,29 @@ import type { RefusalCatalogue } from './refusal';
 /**
  * "Änderung gegenüber Version n-1" (point 3): a word-level diff, removed words struck through,
  * added words underlined. Rendered inline so that reading it needs no separate view.
+ *
+ * Scheibe 055b: the diff stays on `text`. When the wording is the same and only the documents differ (a mark added or
+ * taken away, 055 decision 7: still a new version), it says so instead of showing an empty diff.
  */
-function AnswerDiff({ previous, current }: { previous: string; current: string }) {
-  const parts = useMemo(() => wordDiff(previous, current), [previous, current]);
+export function AnswerDiff({
+  previous,
+  current,
+}: {
+  previous: Pick<AnswerVersion, 'text' | 'body'>;
+  current: Pick<AnswerVersion, 'text' | 'body'>;
+}) {
+  const t = useT();
+  const parts = useMemo(() => wordDiff(previous.text, current.text), [previous.text, current.text]);
+  if (previous.text === current.text && !sameBody(answerBodyOf(previous), answerBodyOf(current))) {
+    return (
+      <p
+        data-testid="answer-diff-format-only"
+        className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] leading-relaxed text-ink-700"
+      >
+        {t('answers.version.formatOnly')}
+      </p>
+    );
+  }
   return (
     <p
       data-testid="answer-diff"
@@ -76,7 +98,7 @@ function AnswerDiff({ previous, current }: { previous: string; current: string }
 }
 
 export type DetailAction =
-  | { kind: 'draft'; text: string; sources: string }
+  | { kind: 'draft'; body: AnswerBodyInput; sources: string }
   | { kind: 'submit_review' }
   | { kind: 'approve'; version: number }
   | { kind: 'refuse_approve'; version: number }
@@ -159,9 +181,8 @@ function VersionCard({
   version,
   author,
   at,
-  text,
   sources,
-  previousText,
+  previous,
   latest,
   open,
   onToggle,
@@ -173,10 +194,9 @@ function VersionCard({
   version: number;
   author: string;
   at: string;
-  text: string;
   sources: readonly string[] | undefined;
-  /** The text of version n-1, when there is one — carries the diff toggle (point 3). */
-  previousText: string | undefined;
+  /** Version n-1, when there is one — carries the diff toggle (point 3). */
+  previous: AnswerVersion | undefined;
   latest: boolean;
   open: boolean;
   onToggle: () => void;
@@ -225,7 +245,8 @@ function VersionCard({
       {open && (
         <div className="border-t border-line px-3 py-2.5">
           {kind !== 'answer' && <span className="hv-label">{t('answers.refusal.text.label')}</span>}
-          <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-ink-800">{text}</p>
+          {/* Scheibe 055b: the one renderer — the podium shows the approved version exactly like this (Recht/Freigabe). */}
+          <AnswerText answer={answer} className="text-[13px] leading-relaxed text-ink-800" />
           {kind !== 'answer' && <RefusalFacts answer={answer} latest={latest} catalogue={catalogue} />}
           {sources !== undefined && sources.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
@@ -237,7 +258,7 @@ function VersionCard({
               ))}
             </div>
           )}
-          {previousText !== undefined && (
+          {previous !== undefined && (
             <>
               <button
                 type="button"
@@ -251,7 +272,7 @@ function VersionCard({
               >
                 {t('answers.diff.toggle', { previous: version - 1 })}
               </button>
-              {showDiff && <AnswerDiff previous={previousText} current={text} />}
+              {showDiff && <AnswerDiff previous={previous} current={answer} />}
             </>
           )}
         </div>
@@ -274,7 +295,9 @@ export function QuestionDetail({
   const t = useT();
   const latest = latestVersion(question);
   const [open, setOpen] = useState<readonly number[]>(latest === undefined ? [] : [latest]);
-  const [draft, setDraft] = useState('');
+  // Scheibe 055b (decision 7): the answer field's input form; `generation` rebuilds the (empty) field on a reset.
+  const [draft, setDraft] = useState<AnswerBodyInput | null>(null);
+  const [generation, setGeneration] = useState(0);
   const [sources, setSources] = useState('');
 
   useEffect(() => {
@@ -288,7 +311,8 @@ export function QuestionDetail({
   const [resetSeen, setResetSeen] = useState(draftResetToken);
   if (resetSeen !== draftResetToken) {
     setResetSeen(draftResetToken);
-    setDraft('');
+    setDraft(null);
+    setGeneration((value) => value + 1);
     setSources('');
   }
 
@@ -368,7 +392,7 @@ export function QuestionDetail({
     if (question !== taken.question) stepTaken.current = null;
   }, [busy, question, versionFocus]);
 
-  const dirty = draft.trim() !== '';
+  const dirty = previewText(draft) !== '';
   // Exactly one primary action (D2): the step that moves this question on — unless something is
   // written in the editor, then saving it is what the person is doing.
   // Scheibe 045: approving a refusal stands where approving an answer stands (R-GUARD-12/13 exclude each
@@ -709,9 +733,8 @@ export function QuestionDetail({
                     version={answer.version}
                     author={answer.createdBy.displayName ?? answer.createdBy.id}
                     at={answer.createdAt}
-                    text={answer.text}
                     sources={answer.sources}
-                    previousText={question.answers[index - 1]?.text}
+                    previous={question.answers[index - 1]}
                     latest={answer.version === latest}
                     open={open.includes(answer.version)}
                     onToggle={() =>
@@ -735,21 +758,25 @@ export function QuestionDetail({
           )}
           {mayDraft && (
             <AnswerEditor
-              text={draft}
+              body={draft}
+              generation={generation}
               sources={sources}
               busy={busy}
               primary={primary === 'draft'}
               hasApproval={question.approval !== undefined}
-              onText={setDraft}
+              onBody={setDraft}
               onSources={setSources}
               onDiscard={() => {
-                setDraft('');
+                setDraft(null);
+                setGeneration((value) => value + 1);
                 setSources('');
               }}
               // No guard of its own: a locked button (`aria-disabled`: busy or empty) never calls
               // this — Button.tsx swallows the click — and a second press in the same task before
               // the lock renders is refused by the page's own write lock.
-              onSave={() => onAction({ kind: 'draft', text: draft, sources })}
+              onSave={() => {
+                if (draft !== null) onAction({ kind: 'draft', body: draft, sources });
+              }}
             />
           )}
         </div>

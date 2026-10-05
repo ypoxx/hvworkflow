@@ -243,7 +243,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await expect(page.getByTestId('focus-writing')).toBeVisible();
     await expect(page.getByTestId('focus-list')).toHaveCount(0);
     await expect(editor(page)).toBeFocused();
-    await expect(editor(page)).toHaveValue('');
+    await expect(editor(page)).toHaveText('');
 
     await editor(page).fill(FOCUS_054_ANSWER);
     await expect(page.getByTestId('focus-reading-time')).toHaveText(/^Vorlesezeit ca\. \d+:\d{2} min$/);
@@ -256,7 +256,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: evidence('054-schreibmodus-de.png') });
       await setLang(page, 'en');
-      await expect(editor(page)).toHaveValue(FOCUS_054_ANSWER);
+      await expect(editor(page)).toHaveText(FOCUS_054_ANSWER);
       await expect(page.getByTestId('focus-writing')).toContainText('Writing mode');
       await clearToasts(page);
       await checkAxe(page, '054 writing mode EN');
@@ -272,7 +272,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
       await expect(page.getByTestId('focus-writing-submit')).toBeVisible();
       await expect(page.getByTestId('focus-writing-submit')).toHaveAttribute('data-primary', 'true');
       await expect(page.getByTestId('focus-save')).toHaveAttribute('aria-disabled', 'true');
-      await expect(editor(page)).toHaveValue(FOCUS_054_ANSWER);
+      await expect(editor(page)).toHaveText(FOCUS_054_ANSWER);
     });
 
     await test.step('Escape leaves: the list holds the focus on this question; the detail shows the saved version', async () => {
@@ -308,7 +308,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('focus-writing')).toBeVisible();
     await expect(editor(page)).toBeFocused();
-    const base = await editor(page).inputValue();
+    const base = (await editor(page).textContent()) ?? '';
     await page.keyboard.type(` ${FOCUS_054_UNSAVED}`);
 
     await page.keyboard.press('Escape');
@@ -321,7 +321,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await expect(page.getByTestId('focus-forward')).toHaveCount(0);
 
     await page.keyboard.press('Enter');
-    await expect(editor(page)).toHaveValue(`${base} ${FOCUS_054_UNSAVED}`);
+    await expect(editor(page)).toHaveText(`${base} ${FOCUS_054_UNSAVED}`);
     await editor(page).fill(base);
     const forward = page.getByTestId('focus-writing-forward');
     await expect(forward).toBeVisible();
@@ -524,7 +524,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await row(page, number).dblclick();
     await expect(editor(page)).toBeFocused();
     await page.keyboard.type(FOCUS_054_UNSAVED);
-    await expect(editor(page)).toHaveValue(new RegExp(FOCUS_054_UNSAVED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await expect(editor(page)).toHaveText(new RegExp(FOCUS_054_UNSAVED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
     await asRole(page, 'coordination');
     await asRole(page, 'expert');
@@ -536,7 +536,7 @@ test.describe.serial('054 Fokusansicht der Beantworter', () => {
     await expect(page.getByTestId('focus-draft-unsaved')).toHaveCount(0);
     await row(page, number).dblclick();
     await expect(editor(page)).toBeVisible();
-    await expect(editor(page)).not.toHaveValue(new RegExp(FOCUS_054_UNSAVED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await expect(editor(page)).not.toHaveText(new RegExp(FOCUS_054_UNSAVED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('focus-writing')).toHaveCount(0);
   });

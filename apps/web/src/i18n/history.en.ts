@@ -18,6 +18,7 @@ export const historyEn: typeof historyDe = {
   'history.tab.stream': 'Event stream',
   'history.timeline.title': 'History',
   'history.timeline.label': 'History of question {number}',
+  'history.answer.title': 'Answer, version {version}',
   'history.timeline.empty.title': 'No question selected',
   'history.timeline.empty.body':
     'Select a result on the left. Its course from capture to podium then appears here.',

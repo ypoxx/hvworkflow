@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CornerUpLeft, Presentation, Undo2 } from 'lucide-react';
 import type { Question, StageView } from '@hv/domain';
 import {
+  AnswerText,
   Badge,
   Button,
   Dialog,
@@ -373,18 +374,19 @@ export function Podium({ stage, catalogue = NO_CATALOGUE, lock, returning, onNex
             )}
             <RefusalMarker question={current} catalogue={catalogue} size="stage" />
           </div>
-          <p
+          {/* Scheibe 055b: a <div>, because the renderer brings blocks; the approved version through the one renderer. */}
+          <div
             data-testid="stage-answer"
             data-prepared={answer !== undefined}
             className={cx('mt-3 text-[24px] leading-8', answer === undefined && 'text-ink-500 italic')}
             style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
           >
-            {answer !== undefined
-              ? answer.text
-              : current.track === 'podium'
-                ? t('stage.answer.podium')
-                : t('stage.answer.none')}
-          </p>
+            {answer !== undefined ? (
+              <AnswerText answer={answer} />
+            ) : (
+              <p>{current.track === 'podium' ? t('stage.answer.podium') : t('stage.answer.none')}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -422,6 +424,28 @@ export function Podium({ stage, catalogue = NO_CATALOGUE, lock, returning, onNex
 }
 
 /**
+ * Scheibe 055b: the answer in the queue preview — the approved version through the one renderer, the same markup the
+ * podium itself will show. A <div>, because the renderer brings blocks; without an approved version the placeholder.
+ */
+export function PreviewAnswer({ question }: { question: Question }) {
+  const t = useT();
+  const answer = approvedAnswer(question);
+  return (
+    <div
+      data-testid="stage-preview-answer"
+      className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-600 italic')}
+      style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
+    >
+      {answer !== undefined ? (
+        <AnswerText answer={answer} />
+      ) : (
+        <p>{question.track === 'podium' ? t('stage.answer.podium') : t('stage.answer.none')}</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Point #10: the preview a click on the queue opens. Read-only on purpose — it shows the question
  * and its released answer, exactly what the podium device will show once the question is actually
  * read, without touching the record: no "vorgelesen", no write, no new event.
@@ -436,7 +460,6 @@ function QueuePreview({
   onClose: () => void;
 }) {
   const t = useT();
-  const answer = question !== null ? approvedAnswer(question) : undefined;
   return (
     <Dialog
       open={question !== null}
@@ -477,17 +500,7 @@ function QueuePreview({
               <span className="hv-label">{t('stage.answer.label')}</span>
               <RefusalMarker question={question} catalogue={catalogue} size="preview" />
             </span>
-            <p
-              data-testid="stage-preview-answer"
-              className={cx('mt-2 text-[18px] leading-7', answer === undefined && 'text-ink-600 italic')}
-              style={answer !== undefined ? { color: 'var(--color-stage-text)', fontWeight: 500 } : undefined}
-            >
-              {answer !== undefined
-                ? answer.text
-                : question.track === 'podium'
-                  ? t('stage.answer.podium')
-                  : t('stage.answer.none')}
-            </p>
+            <PreviewAnswer question={question} />
           </div>
         </div>
       )}
