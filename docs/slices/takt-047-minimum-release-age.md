@@ -161,28 +161,75 @@ Etwa 1,5 AStd: Konfiguration und Doku 0,5 AStd, Parser und Test mit Fixtures 0,7
 
 ```
 Slice: takt-047-minimum-release-age
-Done: <Einstellung in pnpm-workspace.yaml, Skripttest, Verfahrensdokument, T-Q-T-01/SC-10>
-Evidence: pnpm gates auf <commit> (sauberer Baum, Postgres-Variablen), Exit 0; Ausgabe unten
-Open: <…>
-Touched: <Dateiliste>
+Done: Einstellung minimumReleaseAge 10080 und leere Ausnahmeliste in pnpm-workspace.yaml; Parser scripts/release-age.mjs mit Skripttest (13 Tests); Verfahrensdokument, T-Q-T-01 und SC-10 ergaenzt
+Evidence: pnpm gates auf 45ac3dc (sauberer Baum, Postgres-Variablen TEST_DATABASE_URL, TEST_RUNTIME_DATABASE_URL, HV_DB_RUNTIME_ROLE), Exit 0; Ausgabe unten
+Open: keine; pnpm-lock.yaml und package.json unveraendert (git diff --stat 4e38512 leer)
+Touched: pnpm-workspace.yaml, scripts/release-age.mjs, scripts/release-age.test.mjs, docs/sicherheit/lieferkette-mindestalter.md, docs/sicherheit/bedrohungsmodell.md, docs/sicherheit/reviewer-checkliste-sicherheit.md, diese Spec
 ```
 
-`pnpm config get minimumReleaseAge`, wörtlich:
+`pnpm config get minimumReleaseAge`, woertlich:
 
 ```
-<…>
+10080
 ```
 
-Wirkprobe (Kriterium 3), gekürzt:
+Rot vor der Konfiguration (Parser vorhanden, pnpm-workspace.yaml noch ohne Einstellung; 12 pass, 1 fail), Anfang:
 
 ```
-<…>
+TAP version 13
+# Subtest: real pnpm-workspace.yaml passes with today as the reference date
+not ok 1 - real pnpm-workspace.yaml passes with today as the reference date
+  ---
+  duration_ms: 9.944754
+  type: 'test'
+  location: '/home/user/wt/takt047/scripts/release-age.test.mjs:20:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   'minimumReleaseAge must occur exactly once, found 0',
+    +   'minimumReleaseAgeExclude is missing'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'minimumReleaseAge must occur exactly once, found 0'
+    1: 'minimumReleaseAgeExclude is missing'
+  operator: 'deepStrictEqual'
 ```
 
-`pnpm gates` auf `<commit>`, Schluss, wörtlich:
+Danach gruen: `# pass 13`, `# fail 0` fuer `node --test scripts/release-age.test.mjs`.
+
+Wirkprobe (Kriterium 3), gekuerzt, in Wegwerfkopie ausserhalb des Repositorys, `pnpm add -Dw hono@4.13.13` (veroeffentlicht 2026-10-04):
 
 ```
-<…>
+This error happened while installing a direct dependency of /tmp/claude-0/scratchcopy
+
+The latest release of hono is "4.13.13". Published at 10/4/2026
+...
+If you want to install the matched version ignoring the time it was published, you can add the package name to the minimumReleaseAgeExclude setting.
+```
+
+`pnpm gates` auf `45ac3dc`, Schluss, woertlich:
+
+```
+dist/assets/index-B5FacydS.css                        44.49 kB │ gzip:   9.45 kB
+dist/assets/index-CPbsjZGL.js                        764.46 kB │ gzip: 224.13 kB │ map: 3,162.87 kB
+
+[plugin @tailwindcss/vite:generate:build] [33m[SOURCEMAP_BROKEN] [0mSourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.99s
+mark-test-run: wrote /home/user/wt/takt047/.claude/state/last-test-run (clean tree) at commit 45ac3dc, tree 6255494020f0…
 ```
 
 ## Review findings
