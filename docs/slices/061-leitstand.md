@@ -1,202 +1,223 @@
 # Scheibe 061 — Leitstand mit fachlichen Kennzahlen
 
-**Status:** spec (05.10.2026; gelesen auf `c5990c8`, Vertrag 0.4.4; neunte Scheibe der Oberflächenkette der Freigabe-Demo
+**Status:** spec, nach Lesebefund überarbeitet (05.10.2026; erste Fassung `1ebe51e`, gelesen auf `c5990c8`, Vertrag 0.4.4;
+Lesebefund in frischem Kontext: 3 Blocker, 6 major, 11 minor, 5 nits, dazu Vorschläge zur Wirkung in der Demo; Entscheidungen des
+Orchestrators eingearbeitet, Abschnitt „Nacharbeit nach Lesebefund“; neunte Scheibe der Oberflächenkette der Freigabe-Demo
 045 → 048 → 053 → 054 → 055 → 059 → 046 → 060 → 061 → 041, Register E57; Wunsch des Eigentümers vom 05.10.2026: „061 soll
-richtig geil werden“; geteilt: Prognosen Z11 und Flussbild Z12 als 061b skizziert, Abschnitt „Teilung und Zuschnitt“)
-**Risikoklasse:** hoch · 3,9 AStd (Spanne 3,4–4,5; Plan 061: mittel · 2 AStd, mit Zielbild +1,75; Begründung in „Warum
-hoch“ und „Aufwand“) · Plan 061: 16.11.2026 (W8), tatsächlich nach 060 in der Kette der Freigabe-Demo · Lanes: contract
-(Recht `cockpit.read`, Operation `getMeetingCockpit`, Schemas `Cockpit` und `CockpitQuestionRef`, 0.4.5); core (neue Datei
-`cockpit.ts`, ein Recht in drei Bündeln, eine Lesemethode); service (eine Route); web-api (eine HTTP-Route, ein Eintrag in
-`READ_TOPICS`); web-cockpit (neu, `apps/web/src/features/cockpit/**`); web-shell (eine Zeile im Feature-Register, drei
-Shell-Schlüssel); e2e (eigene Datei, im Projekt `http` eingereiht); docs (Glossar, DSFA-Zeile V15, Bedrohungsmodell, Status im
-Zielbild). Die Planzeile nennt nur web-cockpit; die zusätzlichen Lanes folgen aus dem Befund (Hinweise an den Orchestrator).
-**Bedrohungsmodell:** neue Leseoperation mit eigenem Recht (Rechte als Daten, R-PERM-02); berührt T-G1-I-01 (Anzeige) und
-den Risikopunkt der DSFA „Vorgangshistorie wird zur Leistungskontrolle“ (Abschnitt 4): der Leitstand zeigt Aggregate je
-Jahrgang und Fachbereich, nie je Person, und blendet im Faden die handelnden Personen aus (Entscheidung 8).
-**Rolle:** Architekt (Vertragsschritt, erster Commit der Scheibe, vor jedem Code; AGENTS.md R6) + implementierer-backend (Kern,
-Dienst) + implementierer-oberflaeche (Seite); **Lesebefund der Spec vor dem Bau** in frischem Kontext (Leitplanken §4, Klasse
-hoch) mit den Perspektiven **Datenschutz** (keine Kennzahl je Person, Faden ohne Akteure, Allowlist), **Security** (neues
-Recht, Deny by default, 403 statt Teildaten) und **Vertrag** (additiv, `additionalProperties: false`); nach dem Bau **ein**
-Review in frischem Kontext mit denselben Perspektiven plus **UX/Barrierefreiheit**; **Design-Kritik in frischem Kontext**
-(weder die Sitzung, die diese Spec schrieb, noch die bauende) gegen D1–D10 und `docs/evidence/089-lagebild.png`; Codex einmal,
-wenn der PR bereit ist. Modell nur in `.claude/agents/` (takt-012)
+richtig geil werden“; Prognosen Z11 und Flussbild Z12 als 061b skizziert; Bau in zwei Teilen auf dieser einen Spec, Abschnitt
+„Teilung und Zuschnitt“)
+**Risikoklasse:** hoch · 4,9 AStd (Spanne 4,3–5,5; Plan 061: mittel · 2 AStd, mit Zielbild +1,75; Begründung in „Warum hoch“ und
+„Aufwand“; gebaut in Teil A ≈ 2,0 und Teil B ≈ 2,9, je unter einem Agententag) · Plan 061: 16.11.2026 (W8), tatsächlich nach 060 in
+der Kette der Freigabe-Demo · Lanes: contract (Rechtebezeichner `cockpit.read` im Enum `Action`, Operation `getMeetingCockpit`,
+Schemas, Vertrag 0.4.x); core (neue Datei `cockpit.ts`, ein Recht in drei Bündeln, eine Lesemethode); service (eine Route);
+docs-sicherheit und Kennzahlenkatalog (Bericht „Leitstand“ im Auswertungskatalog, Regel (g) im Allowlist-Tor, MF-15); web-api
+(eine HTTP-Route, Ausschluss aus dem Puffer, Wiederausgabe der Kernhilfen); web-cockpit (neu, `apps/web/src/features/cockpit/**`);
+web-shell (eine Zeile im Feature-Register, drei Shell-Schlüssel); e2e (eigene Datei, im Projekt `http` eingereiht); docs (Glossar,
+DSFA-Zeile V15, Status im Zielbild). Die Planzeile nennt nur web-cockpit; die zusätzlichen Lanes folgen aus dem Befund (Hinweise an
+den Orchestrator).
+**Bedrohungsmodell:** neue Leseoperation mit eigenem Recht (R-PERM-02); neuer Missbrauchsfall **MF-15** „Leistungsauswertung über
+den Leitstand“ (verwandt MF-09); berührt T-G1-I-01 (Anzeige), **T-G2-D-03** (Vollscan des Logs je Aufruf, hier je Leitstand-Lesung)
+und den Risikopunkt der DSFA „Vorgangshistorie wird zur Leistungskontrolle“ (Abschnitt 4). Der Leitstand zeigt Aggregate je
+Jahrgang, Status und Fachbereich, nie je Person; Referenzen auf Einzelfragen nur, soweit der Leser sie nach `can()` lesen darf;
+der Faden blendet handelnde Personen aus (Entscheidungen 8 und 8a).
+**Rolle:** Architekt (Vertragsschritt, erster Commit von Teil A, vor jedem Code; AGENTS.md R6) + implementierer-backend (Kern,
+Dienst, Katalog, Tor) + implementierer-oberflaeche (Teil B); Lesebefund der Spec erfolgt (05.10.2026); eine **Nachprüfung** der
+Blocker und major-Punkte in frischem Kontext vor dem Bau (Lean-Modus, AGENTS.md R3); nach dem Bau **ein** Review je Teil in frischem
+Kontext mit den Perspektiven **Datenschutz**, **Security**, **Vertrag** (Teil A) bzw. **Datenschutz** und **UX/Barrierefreiheit**
+(Teil B); **Design-Kritik in frischem Kontext** (weder die Sitzung, die diese Spec schrieb, noch die bauende) gegen D1–D10, die
+benannten Ausnahmen dieser Spec und `docs/evidence/089-lagebild.png`; Codex einmal je PR, wenn er bereit ist. Modell nur in
+`.claude/agents/` (takt-012)
 **Rule ids:** keine neue fachliche Regel und keine neue Übergangszeile. Neu belegt: R-PERM-02 für `getCockpit` (Leserecht
-`cockpit.read` fehlt). Gelesen und unverändert übernommen: die Definitionen der Kennzahlen aus 033b (`indicators.ts`,
-`catalog.json`: „offen“, Alter der ältesten offenen Einzelfrage, Rückstand je Fachbereich, Zulauf in 300 s, Legal Clearing
-über 600 s); R-PERM-04 (Stromsignale ohne Inhalt); R-TIME (Zeit nur aus der injizierten Uhr, AGENTS.md R8). Dazu AGENTS.md R1,
-R2, R3, R4, R5, R6, R8, R9, R10, R12; `docs/design-prinzipien.md` D1–D10; ADR 0013 (keine Kennzahl je Person).
+`cockpit.read` fehlt); R-PERM-03 wirkt über `can(actor, 'question.read', q)` auf jede Referenz (Entscheidung 8a). Gelesen und
+unverändert übernommen: die Definitionen der Kennzahlen aus 033b (`indicators.ts`, `catalog.json`); R-PERM-04 (Stromsignale ohne
+Inhalt); R-TIME (Zeit nur aus der injizierten Uhr, AGENTS.md R8). Dazu AGENTS.md R1–R6, R8–R10, R12; `docs/design-prinzipien.md`
+D1–D10; ADR 0013 (keine Kennzahl je Person, generierter Auswertungskatalog).
 **Quellen-IDs:** `docs/produktplan-beta.md` §5 Eintrag 061 (Zeile 794–800), 033b (587–592), 082 (408–413), 040 (644–649), 043
-(686–691), 086 (928–933, hängt an 061), 087 (762–767, hängt an 061), 089b (827–832); `docs/feedback/2026-09-zielbild-oberflaeche.md`
-Z10 (Zeile 58), Z11 (59), Z12 (60), Z13 (61), Aufwand (109–110); `docs/zielbild/README.md` („Namen im Prototyp“: Lagebild →
-Leitstand); `docs/zielbild/js/lagebild.js`; `docs/evidence/089-lagebild.png`; `docs/rollen-und-rechtekonzept.md` §5
-(„Leitstand / Projektleitung: Schritt 8A, Steuerung, Eskalation“), §6 (Datenschutz, Betriebsrat); ADR 0013; DSFA V15
-(`docs/datenschutz/dsfa-vorentwurf.md:203`); Register E13, E57; Specs 033b, 053 (Verteilung, Lesezustand, Muster), 054
-(Lesehinweis, Registerzeile), takt-047 (Lieferkette, Mindestalter), takt-048 (Nullzähler Grau 600); Glossar Zeilen 61–62
-**Depends on:** 033b (gemergt `115c28b`, PR #73: `computeIndicators`, Katalog, `/metrics`; die Statuszeile der Spec 033b ist nicht
-nachgezogen), 043/043a (gemergt `88fa9be`, Vertrag 0.4.0), 040b (gemergt `6146251`: `counts.byUnit`, Fachbereiche je Jahrgang),
-082 (gemergt `c8bcf83`: Register; die Quelle der Rechtemenge fehlt weiter, 089b), 036a/036b (Live-Store, Strom), 053 und 054
-(gemergt: Muster für Lesezustand, Registerzeile, e2e-Einreihung)
-**Perspektive:** Datenschutz, Security, Vertrag, UX · **Glossar: neue Begriffe:** ja (Faden, Endstatus, Kanarienfrage)
+(686–691), 046 (692–697), 086 (928–933, hängt an 061), 087 (762–767, hängt an 061), 089b (827–832);
+`docs/feedback/2026-09-zielbild-oberflaeche.md` Z10 (Zeile 58), Z11 (59), Z12 (60), Z13 (61), Aufwand (109–110);
+`docs/zielbild/README.md` („Namen im Prototyp“: Lagebild → Leitstand); `docs/zielbild/js/lagebild.js`; `docs/evidence/089-lagebild.png`;
+`docs/rollen-und-rechtekonzept.md` §5 („Leitstand / Projektleitung: Schritt 8A, Steuerung, Eskalation“), §6; ADR 0013; DSFA V15
+(`docs/datenschutz/dsfa-vorentwurf.md:203`); Bedrohungsmodell T-G2-D-03 (Zeile 248), MF-09 (Zeile 526); Register E13, E57; Specs
+033b, 053, 054, takt-046, takt-047, takt-048; Glossar Zeilen 61–62
+**Depends on:** 033b (gemergt `115c28b`, PR #73; die Statuszeile der Spec 033b ist nicht nachgezogen), 043/043a (gemergt `88fa9be`),
+040b (gemergt `6146251`), 082 (gemergt `c8bcf83`; Quelle der Rechtemenge fehlt weiter, 089b), 036a/036b (Live-Store, Strom), 053 und
+054 (gemergt: Muster für Lesezustand, Registerzeile, e2e-Einreihung); **046** nimmt vorher die nächste Vertragsversion (erwartet
+0.4.5), 061 dann 0.4.6
+**Perspektive:** Datenschutz, Security, Vertrag, UX · **Glossar: neue Begriffe:** ja (Faden, Endstatus, Kanarienfrage, Engpass)
 
 ## Qualitätswirkung
 
 Reifestufe: demo (Freigabe-Demo), gebaut pilotfest · Risikoklasse: hoch
 Ausgelöst: [ ] Fachregel, Status (nur Anzeige; Statusverlauf über `reduce` der Projektion, keine eigene Statuslogik)
-[x] Vertrag, Ereignis, Konfiguration (neue Operation, zwei Schemas, ein Rechtebezeichner) [ ] Persistenz, Migration,
-Nebenläufigkeit (nur Lesen) [x] Rolle, Recht, Identität, Schutzklasse (neues Recht `cockpit.read` in drei Bündeln)
-[x] personenbezogene oder vertrauliche Daten (Auswertung; Negativtest und Allowlist) [x] Betrieb, Wiederherstellung (Lagebild am
-HV-Tag, Rechenzeit bei 800) [ ] Administration [x] Oberfläche, Barrierefreiheit [ ] Nachbarsystem [ ] KI, Agenten
-[x] Dokumentation, Schulung (Glossar, DSFA V15)
+[x] Vertrag, Ereignis, Konfiguration (neue Operation, drei Schemas, ein Rechtebezeichner) [ ] Persistenz, Migration,
+Nebenläufigkeit (nur Lesen) [x] Rolle, Recht, Identität, Schutzklasse (neues Recht `cockpit.read` in drei Bündeln; Referenzen über
+`can()`) [x] personenbezogene oder vertrauliche Daten (Auswertung; Bericht im Auswertungskatalog, Negativtest, Allowlist aus dem
+Vertrag) [x] Betrieb, Wiederherstellung (Lagebild am HV-Tag, Rechenzeit bei 800, T-G2-D-03) [ ] Administration [x] Oberfläche,
+Barrierefreiheit [ ] Nachbarsystem [ ] KI, Agenten [x] Dokumentation, Schulung (Glossar, DSFA V15, MF-15)
 Perspektive(n): Datenschutz, Security, Vertrag, UX · Nachweise: Abschnitt „Nachweise“ · Offene Entscheidung: E13 (Mindest-
-Aggregationsschwelle, Standard: keine Unterdrückung wie in 033b), Eigentümerfragen unten (alle mit Standard)
+Aggregationsschwelle für Fachbereiche **und Rollengruppen**, Standard: keine Unterdrückung wie in 033b, Mindestzahl im Bericht als
+Feld vorgesehen), Eigentümerfragen unten (alle mit Standard)
 
 ## Warum hoch
 
-Der Plan führt 061 als „mittel“ mit „Werte aus /metrics oder Projektion“. Der Befund zeigt, dass keiner der beiden Wege ohne
-Vertragsschritt trägt, und die Leitplanken (§4) nennen drei Hoch-Auslöser, die 061 alle berührt. **Hochstufung, kein Fall für
-`downgrade-check`.**
+Der Plan führt 061 als „mittel“ mit „Werte aus /metrics oder Projektion“. Keiner der beiden Wege trägt ohne Vertragsschritt, und
+die Leitplanken (§4) nennen drei Hoch-Auslöser, die 061 alle berührt. **Hochstufung, kein Fall für `downgrade-check`.**
 
-1. **Recht.** `cockpit.read` gibt es nicht (weder in `PERMISSIONS`, `types.ts:34-76`, noch im Vertragsenum `Permission`,
-   `openapi.yaml:2616-2657`). Die Planzeile verlangt es mit dem Standard coordination, moderation, admin. Ein neuer
-   Rechtebezeichner ist eine Vertragsänderung (das Enum ist „identical to the domain permission list“) und eine Änderung in
-   `ROLE_PERMISSIONS`.
+1. **Recht.** `cockpit.read` gibt es nicht (weder in `PERMISSIONS`, `types.ts:34-76`, noch im Vertragsenum **`Action`**,
+   `openapi.yaml:2583-2657`, das „identical to the domain permission list“ ist). Die Planzeile verlangt es mit dem Standard
+   coordination, moderation, admin.
 2. **Auswertung.** Der Leitstand ist die erste Oberfläche, die Kennzahlen aus Bearbeitungszeiten zeigt. ADR 0013 und das
-   Rechtekonzept §6 machen „keine Kennzahl je Person“ zur Bedingung; der Plan verlangt Negativtest und Allowlist.
+   Rechtekonzept §6 machen „keine Kennzahl je Person“ zur Bedingung und verlangen einen generierten Auswertungskatalog.
 3. **Vertrag.** `/metrics` ist für den Scraper (`metricsBearer`, kein Akteur, kein `can()`, `openapi.yaml:2094-2112`), nie für den
    Browser. Die Projektion liefert dem Browser über `listQuestions` nicht, seit wann eine Einzelfrage im Legal Clearing liegt
    (`QuestionRecord` hat `createdAt` und `updatedAt`, `types.ts:315-348`; `updatedAt` ändert sich auch bei Claim, Rechtsfreigabe
-   und Weiterleiten). „Legal Clearing über 10 min“ ist im Browser also nicht berechenbar, ohne die Definition aus 033b zu
-   verfälschen. Und ohne serverseitige Prüfung wäre `cockpit.read` ein Recht, das niemand prüft: die Navigation zeigt
-   ohnehin jede Route (Quelle der Rechtemenge fehlt, 089b), und eine Rolle mit `question.read.delivered` (Beobachtung) bekäme
-   aus der eigenen Liste falsche Zahlen („0 offen“) statt eines Lesezustands.
+   und Weiterleiten). Ohne serverseitige Prüfung wäre `cockpit.read` ein Recht, das niemand prüft, und eine Rolle mit
+   `question.read.delivered` (Beobachtung) bekäme falsche Zahlen („0 offen“) statt eines Lesezustands.
 
-Deshalb: **eine Leseoperation `getMeetingCockpit` mit eigenem Recht**, gerechnet im Kern aus dem Ereignisprotokoll mit
-denselben Definitionen wie `/metrics` (der Kopfkommentar von `indicators.ts` sieht genau das vor: „It lives in the core so the
-control desk (Leitstand, 061) uses the same definitions instead of rebuilding them“). Folgen der Klasse: Lesebefund vor dem
-Bau, Positiv- und Negativtest je Auslöser, Fehlerfall, Rechte-Diff vor dem Bau (unten), nie gebündelt.
+Deshalb **eine Leseoperation `getMeetingCockpit` mit eigenem Recht**, gerechnet im Kern mit denselben Definitionen wie `/metrics`
+(Kopfkommentar von `indicators.ts`: „It lives in the core so the control desk (Leitstand, 061) uses the same definitions instead of
+rebuilding them“). Folgen der Klasse: Lesebefund vor dem Bau (erfolgt), Positiv- und Negativtest je Auslöser, Fehlerfall, Rechte-
+Diff vor dem Bau (unten), nie gebündelt.
 
 ## Befund (Ist-Stand, gelesen auf `c5990c8`)
 
 - **Kennzahlen im Kern (033b).** `computeIndicators(events, now)` (`packages/domain/src/indicators.ts`) liefert je laufendem
-  Jahrgang: `oldestOpenQuestionAgeSeconds` (Minimum der Erfassungszeit `recordedAt ?? at` über offene Einzelfragen),
-  `openQuestionsByUnit` (offen je Fachbereich, Schlüssel `unassigned` ohne Zuweisung), `questionsCapturedLast5m` (Alter 0–300 s
-  einschließlich), `questionsInLegalReviewOver10m` (Status `in_review` ohne Rechtsfreigabe der aktuellen Fassung, Eintritt
-  > 600 s; Eintritt = `QuestionSubmittedForReview`, `QuestionReturned` mit `toStatus: in_review`, `AnswerDrafted` mit
-  `toStatus: in_review` — ein neuer Verweigerungsvorschlag startet die Uhr neu). „Offen“ = Status nicht in delivered, closed,
-  withdrawn, merged. Nur Jahrgänge im Status `running`. Getestet in `indicators033b.test.ts`, verwendet in
-  `apps/api/src/app.ts:793-813` mit eigenem Lese-Schnappschuss (takt-024) und 10-s-Zwischenspeicher.
-- **Katalog** `apps/api/src/metrics/catalog.json`: sechs Familien, Labels nur `meeting_id`, `unit_id`; Tor
-  `scripts/metrics-allowlist-check.mjs` (Personenbegriffe immer rot). `hv_open_questions` trägt den Vermerk E13
-  (Fachbereich mit genau einer Person).
+  Jahrgang: `oldestOpenQuestionAgeSeconds`, `openQuestionsByUnit` (Schlüssel `unassigned` ohne Zuweisung),
+  `questionsCapturedLast5m` (Alter 0–300 s einschließlich), `questionsInLegalReviewOver10m` (Status `in_review` ohne Rechtsfreigabe
+  der aktuellen Fassung, Eintritt > 600 s; Eintritt = `QuestionSubmittedForReview`, `QuestionReturned` mit `toStatus: in_review`,
+  `AnswerDrafted` mit `toStatus: in_review` — ein neuer Verweigerungsvorschlag startet die Uhr neu). „Offen“ = Status nicht in
+  delivered, closed, withdrawn, merged. Nur Jahrgänge im Status `running`. Verwendet in `apps/api/src/app.ts:793-813` mit eigenem
+  Lese-Schnappschuss (takt-024) und 10-s-Zwischenspeicher; Prometheus-Ausgabe in `apps/api/src/metrics/prometheus.ts`
+  (`renderMetrics`, iteriert nur `catalog.metrics`).
+- **Katalog** `apps/api/src/metrics/catalog.json`: `version`, `notice`, `definitions`, `metrics` (sechs Familien, Labels nur
+  `meeting_id`, `unit_id`). Tor `scripts/metrics-allowlist-check.mjs`: Regeln (a)–(f) nur über `metrics`, unbekannte Schlüssel der
+  obersten Ebene werden weder geprüft noch abgelehnt. Generator `scripts/auswertungskatalog.mjs` schreibt `dist/auswertungskatalog/`
+  aus `metrics` (CI-Schritt in `.github/workflows/gates.yml:111-116`, Artefakt `auswertungskatalog`); Test
+  `scripts/auswertungskatalog.test.mjs`. Es gibt heute **keinen Platz für einen Bericht** (eine Ansicht, die Kennzahlen zeigt) —
+  061 schafft ihn (Entscheidung 8b).
 - **Projektion.** `reduce(state, event)` und `project(events)` sind exportiert (`state.ts:140`, `:555`); `createdAt` einer Einzelfrage
-  ist `e.at` des `QuestionCaptured` (`state.ts:348`). `Meeting.counts` hat `open`, `delivered`, `byStatus`, `byUnit` (jeder
-  Fachbereich des Jahrgangs als Schlüssel, auch mit 0; ohne `unassigned`), `bySeat`. `Meeting.debateClosedAt` ist projiziert
-  (takt-016), die schließende Operation folgt mit 087.
+  ist `e.at` des `QuestionCaptured` (`state.ts:348`). `Meeting.counts` hat `questions`, `open`, `staged`, `delivered`, `byStatus`,
+  `byUnit` (jeder Fachbereich als Schlüssel, ohne `unassigned`), `bySeat`. `TERMINAL_STATUSES` = closed, withdrawn, merged
+  (`types.ts:122`) — **ohne** delivered. `Meeting.debateClosedAt` ist projiziert (takt-016), die schließende Operation folgt mit 087.
 - **Rechte.** `ROLE_PERMISSIONS` (`permissions.ts:22-104`): moderation, coordination und admin halten `question.read` und
-  `history.read`; admin ist eine ausdrückliche Liste mit 14 Einträgen (gepinnt in `admin040a.test.ts:42-43`).
-  `READ_PERMISSIONS` (`types.ts:90-103`) ordnet Lesemethoden ihren Rechten zu; `api.test.ts:538` prüft, dass jeder Eintrag
-  eine echte `HvApi`-Methode nennt; `stream.ts:159-173` leitet daraus die Themen des Stroms ab. Die Wahrheitstabelle
-  `packages/domain/policy-truth-table.md` enthält nur Aktionen an Einzelfragen (Rolle × Status × Aktion).
-- **HvApi** (`api.ts:85-165`): Lesemethoden `get…`/`list…`; `getStage()` liest den aktuellen Jahrgang, im Dienst über
-  `meetingDomain(meetingId)` an `/v1/meetings/{meetingId}/stage` (`app.ts:1065-1066`); `requireReadPermission(method)`
-  prüft über `READ_PERMISSIONS`.
-- **Live-Store** (`apps/web/src/api/liveStore.ts`): `READ_TOPICS` ist vollständig per Typ (`satisfies Record<BufferedRead, …>`):
-  eine neue Lesemethode ohne Eintrag kompiliert nicht. Einträge leben höchstens 30 s (`MAX_AGE_MS`); Stromsignale nach
-  Thema leeren sie. Ansichten hängen an `useApiVersion()`.
-- **HTTP-Adapter** (`apps/web/src/api/http.ts:600-630`): kanonische Pfade mit `meetingRoute()`.
-- **Feature-Register** (`apps/web/src/app/featureRegistry.ts`): sieben Zeilen, Kürzel Alt+1…6 belegt (speakers 1, capture 2,
-  answers 3, stage 4, history 5, focus 6); steering ohne Kürzel. `visibleRoutes` wird weiter nirgends mit einer Menge gerufen.
-- **Bauteile** (`apps/web/src/components`): `Panel`, `PageHeader`, `EmptyState`, `Badge`, `ProcessStrip` (gestapelter Balken mit
-  Zahlen, Tönungen aus den Tokens), `SplitPane`, `Table`, `Sparkline` (Linie, auf Min–Max skaliert — für Mengen irreführend, siehe
-  Entscheidung 5). Keine Diagrammbibliothek im Projekt; Symbole aus `lucide-react`.
-- **Tokens** (`apps/web/src/styles/index.css`): Grautöne `--color-ink-*`, Akzent `--color-accent-*`, Tönungen
-  `--color-tone-{neutral,accent,success,warning,danger}-{bg,fg,bd}`, Statustönungen je Status. Keine Druckstile.
-- **Dringlichkeit heute:** `urgencyLevel` in `features/answers/lib.ts:147-152`: unter 15 min 0, unter 45 min 1, sonst 2.
-- **i18n:** Paritätstest (f) **621** Schlüssel je Sprache (`parity.test.ts`, nach takt-048).
-- **e2e:** `SHARED_SPECS` (`apps/web/playwright.config.ts:38-42`) und Reihenfolge-Pin (`scripts/e2e-http-031.test.mjs:26-31`):
-  002, 021b, 021c, (030, 031), 045, 053, 054, 055b, 080, abnahme. Gesamtgrenze der Harness jetzt 12:00 (`TOTAL_MS = 720_000`),
-  weiche Warnschwelle 6:30 (`WARN_MS`, takt-046). Personen im Projekt `http`: moderation, capture, coordination, expert (an
-  `unit-fin` gebunden), legal, approver, podium; keine admin- oder observer-Person.
-- **Zielbild.** Lagebild (Prototyp) = Leitstand (061) + Steuerung (053). Z10 große Zahl mit Station und Einheit, darunter die
-  drei nächstältesten; Z11 Prognosen aus dem Tempo; Z12 Flussbild mit Punkt je Einzelfrage; Z13 Faden je Frage als
-  Drill-down. Der Prototyp zeigt Namen von Rednern im Faden und in der Rednerwand; das übernimmt 061 **nicht** (Entscheidung 8).
+  `history.read`, keines davon ist ein `unitBound`-Bündel; expert ist `unitBound` (R-PERM-03). Die Liste der Administration ist an
+  **zwei** Stellen gepinnt: `admin040a.test.ts:42-43` (Menge und Länge 14) und `forward048.test.ts:149-152` (genaue Reihenfolge).
+  `READ_PERMISSIONS` (`types.ts:90-103`); `api.test.ts:538` prüft, dass jeder Eintrag eine `HvApi`-Methode nennt; `stream.ts:159-173`
+  leitet daraus die Stromthemen ab. `policy-truth-table.md` enthält nur Aktionen an Einzelfragen.
+- **Vertragsversion an vier Stellen:** `openapi.yaml` `info.version`, `packages/contract/package.json` (`"version": "0.4.4"`),
+  `apps/api/src/__tests__/takt-019-contract.test.ts:8,11` (Version und **70** Operationen), `apps/api/src/__tests__/contract.test.ts:90`
+  (Version). Antwort `503 PersistenceBusy` ist für Lesungen über Postgres üblich (`openapi.yaml:108`, `:182`).
+- **HvApi** (`api.ts:85-165`): `getStage()` liest den aktuellen Jahrgang, im Dienst über `meetingDomain(meetingId)`
+  (`app.ts:409-434`, `:1065-1066`); `requireReadPermission(method)` über `READ_PERMISSIONS`; `can()` entscheidet je Einzelfrage
+  einschließlich R-PERM-03.
+- **Live-Store** (`apps/web/src/api/liveStore.ts`): `BufferedRead = Exclude<ReadMethodName, 'listEvents'>`; `READ_TOPICS` vollständig
+  per Typ; Einträge leben höchstens 30 s (`MAX_AGE_MS`). `http.ts:718` umhüllt jede Methode aus `READ_TOPICS` für die Neuanmeldung
+  des Stroms.
+- **Feature-Register:** sieben Zeilen, Alt+1…6 belegt, steering ohne Kürzel; `visibleRoutes` wird ohne Menge gerufen.
+- **Bauteile:** `Panel`, `PageHeader`, `EmptyState`, `Badge`, `ProcessStrip`, `Table`, `Sparkline` (Min–Max-Linie). Keine
+  Diagrammbibliothek; Symbole aus `lucide-react`. Tokens `--color-ink-*`, `--color-accent-*`, `--color-tone-*-{bg,fg,bd}`,
+  Statustönungen. `urgencyLevel` (`features/answers/lib.ts:147-152`): < 15 min, < 45 min, sonst.
+- **i18n:** Paritätstest (f) **621**. **e2e:** `SHARED_SPECS` und Reihenfolge-Pin (002, 021b, 021c, (030, 031), 045, 053, 054, 055b,
+  080, abnahme); Harness 12:00, Warnschwelle 6:30 (takt-046); Personen im Projekt `http` ohne admin und observer.
+- **Bedrohungsmodell:** T-G2-D-03 (Vollscan je Aufruf; für `/metrics` mit 10-s-Zwischenspeicher behandelt); MF-09 (Leistungs-
+  auswertung über das Zugriffslog); höchste Nummer MF-14.
+- **Zielbild.** Lagebild = Leitstand (061) + Steuerung (053). Z10–Z13 wie in der Quelle. Der Prototyp zeigt Namen von Rednern im
+  Faden und in der Rednerwand; das übernimmt 061 **nicht**.
 
 ## Was die Koordination im Saal braucht (Gestaltungsgrundlage)
 
-Nachmittag der Generaldebatte, Raum hinter dem Saal, mehrere hundert Einzelfragen, der Leitstand hängt oft zusätzlich auf
-einem Bildschirm an der Wand. Die Person schaut **alle paar Minuten für wenige Sekunden** hin. Sie will drei Dinge wissen,
-in dieser Reihenfolge:
+Nachmittag der Generaldebatte, Raum hinter dem Saal, mehrere hundert Einzelfragen, der Leitstand hängt oft zusätzlich an der Wand.
+Die Person schaut **alle paar Minuten für wenige Sekunden** hin und will drei Dinge wissen, in dieser Reihenfolge:
 
-1. **Wartet etwas zu lange?** Die älteste offene Einzelfrage: wie alt, wo sie liegt (Station, Fachbereich), seit wann in dieser
-   Station. Das ist die **eine Hauptlesung** der Ansicht (D1), groß, links oben.
-2. **Wo staut es sich?** Legal Clearing über 10 Minuten (der bekannte Engpass, Recherche Z.27) und der Rückstand je Fachbereich.
-3. **Wie entwickelt sich die Lage?** Zulauf je 5 Minuten mit dem Verlauf der letzten Stunde, und wie viele Einzelfragen
+1. **Wartet etwas zu lange?** Die älteste offene Einzelfrage — die **eine Hauptlesung** (D1), groß, links oben.
+2. **Wo staut es sich?** Die Stationen mit dem Engpass im Legal Clearing (Recherche Z.27), Legal Clearing über 10 Minuten und der
+   Rückstand je Fachbereich.
+3. **Wie entwickelt sich die Lage?** Zulauf je 5 Minuten über die letzte Stunde, was auf der Bühne wartet, und wie viele Einzelfragen
    noch ohne Endstatus sind — vor dem Debattenschluss die Frage „schaffen wir das“.
 
-Alles andere ist Drill-down: Wer eine Zahl anklickt, sieht die Einzelfragen dahinter, und zu jeder ihren Faden. Der Leitstand
-ist eine **Konsole, kein Dashboard**: ruhig, solange alles ruhig ist; Farbe erscheint erst, wenn eine Schwelle überschritten ist,
-und dann immer mit Symbol und Wort. Er hat genau eine primäre Aktion: „Faden öffnen“ an der ältesten Einzelfrage.
+Alles andere ist Drill-down. Der Leitstand ist eine **Konsole, kein Dashboard**: ruhig, solange alles ruhig ist; Farbe erscheint erst
+über einer Schwelle, dann immer mit Symbol, Wort und Schwelle. Genau eine primäre Aktion: „Faden öffnen“ an der ältesten Einzelfrage.
 
-### Aufbau (Breite ab 1280 px; 1440 px wie Bild 089)
+### Aufbau (1440 px wie Bild 089; Wandbildschirm 1280 × 720)
 
 ```
-Leitstand                                          Stand 15:42:10 · Kanarienfrage: nicht eingerichtet
+Leitstand                                              Stand 15:42:10 · Kanarienfrage: nicht eingerichtet
 Lage der Einzelfragen auf einen Blick
-┌ ÄLTESTE OFFENE EINZELFRAGE ───────────────┐ ┌ OHNE ENDSTATUS ─────────┐ ┌ IM LEGAL CLEARING ÜBER 10 MIN ┐
-│ 50 min   [⬣ kritisch]                      │ │ 47                      │ │ 6              [▲ erhöht]     │
-│ F-0125 · zugewiesen · Finanzen             │ │ von 171 erfassten ·     │ │ von 14 im Legal Clearing      │
-│ seit 14 min in dieser Station              │ │ 124 vorgelesen          │ │                               │
-│ [ Faden öffnen ]          (primär)         │ │ ▇▇▇▅▃▂▁ Stationsleiste  │ │                               │
-│ ───────────────────────────────            │ └─────────────────────────┘ └───────────────────────────────┘
-│ DANACH DIE ÄLTESTEN                        │ ┌ ZULAUF JE 5 MIN ──────────────────────────────────────────┐
-│ F-0126  auf der Bühne · Finanzen   49 min  │ │ 3      ▁▂▃▅▃▂▁▂▃▂▁█   letzte Stunde: 41                    │
-│ F-0127  freigegeben · Personal     46 min  │ └───────────────────────────────────────────────────────────┘
-│ F-0128  im Legal Clearing · ESG    45 min  │
-└────────────────────────────────────────────┘
-┌ RÜCKSTAND JE FACHBEREICH ──────────────────────────────────────────────────────────────────────────────┐
-│ Finanzen           ██████████████████████████                                   23   [▲ erhöht]       │
-│ Personal           ██████████                                                    9                    │
-│ Nachhaltigkeit     ████████                                                      7                    │
-│ …                                                                                                      │
-│ Ohne Fachbereich   █████                                                         5                    │
-└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-┌ IM LEGAL CLEARING ÜBER 10 MIN · 6                                  [×] ┐ ┌ FADEN F-0141                  [×] ┐
-│ Nr.      Station             Fachbereich    in Station   offen seit    │ │ Wie hoch war die Ausschüttungs…   │
-│ F-0141   im Legal Clearing   Finanzen         24 min        52 min     │ │ ● erfasst          14:53          │
-│ …                                                                      │ │ ● zugewiesen       15:02          │
-└────────────────────────────────────────────────────────────────────────┘ │ ◉ im Legal Clearing 15:18 · seit 24 min │
-     (Liste und Faden erscheinen erst auf Klick; Escape schließt)          │ ○ freigegeben  ○ auf der Bühne …  │
-                                                                           └───────────────────────────────────┘
+┌ ÄLTESTE OFFENE EINZELFRAGE ──────────────┐ ┌ OHNE ENDSTATUS ─┐ ┌ LEGAL CLEARING > 10 MIN ┐ ┌ AUF DER BÜHNE ─┐
+│ 50 min  [⬣ kritisch · über 45 min]       │ │ 47              │ │ 6 [▲ erhöht · ab 3]     │ │ 8              │
+│  (44 px Mono, „min“ 16 px Grau 600)      │ │ von 171 erfass- │ │ von 14 im Legal         │ │ 124 vorgelesen │
+│ F-0125 · zugewiesen · Finanzen           │ │ ten             │ │ Clearing                │ │                │
+│ seit 14 min in diesem Status             │ └─────────────────┘ └─────────────────────────┘ └────────────────┘
+│ [ Faden öffnen ]          (primär)       │ ┌ ZULAUF JE 5 MIN ─────────────────────────────────────────────┐
+│ ───────────────────────────────          │ │ 3     ▁▂▃▅▃▂▁▂▃▂▁█  (280 × 48 px)    letzte Stunde: 41       │
+│ DANACH DIE ÄLTESTEN                      │ │       −60 min                 jetzt                           │
+│ F-0126  freigegeben · Finanzen   49 min  │ └───────────────────────────────────────────────────────────────┘
+│ F-0127  Antwortentwurf · Personal 46 min │
+│ F-0128  im Legal Clearing · ESG  45 min  │
+└──────────────────────────────────────────┘
+┌ STATIONEN ─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ERFASST      │ KLASSIFIZIERT │ ZUGEWIESEN   │ ANTWORTENTWURF │ IM LEGAL CLEARING      │ FREIGEGEBEN           │
+│ 5            │ 3             │ 12           │ 9              │ 14  [▲ Engpass]         │ 4                     │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ RÜCKSTAND JE FACHBEREICH ──────────────────────────────────────── Strich = Schwelle „erhöht“ (20) ─────────┐
+│ Finanzen           ███████████████████████|███                             23   [▲ erhöht · ab 20]         │
+│ Personal           ██████████             |                                 9                              │
+│ …                                                                                                          │
+│ Ohne Fachbereich   █████                  |                                 5   noch nicht zugewiesen      │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ IM LEGAL CLEARING ÜBER 10 MIN · 6                                                                     [×] ┐
+│ Nr.      Station             Fachbereich    wartet seit   offen seit                                       │
+│ F-0141   im Legal Clearing   Finanzen          24 min        52 min                                        │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ FADEN F-0141 ──────────────────────────────────────────────────────────────────────────────────────── [×] ┐
+│ Wie hoch war die Ausschüttungsquote im Geschäftsjahr 2025 …                         Finanzen · Bühne: CFO  │
+│ ●──────────●──────────●──────────◉──────────○──────────○──────────○                                       │
+│ erfasst    klassif.   zugewiesen  im Legal Clearing  freigegeben  auf der Bühne  vorgelesen               │
+│ 14:53      14:58      15:02       15:18 · seit 24 min                                                     │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+        (Liste und Faden erscheinen erst auf Klick; Escape schließt erst den Faden, dann die Liste)
 ```
 
-Raster: 12 Spalten, Abstand 16 px; Hauptzahl 5 Spalten, Kennzahlen 7 Spalten (2 × 2, Zulauf über beide Spalten der zweiten
-Zeile); Rückstand volle Breite; Drill-down als `SplitPane` (Liste 60 %, Faden 40 %). Bei 1024 px: Hauptzahl volle Breite,
-Kennzahlen 2 × 2 darunter. Unter 768 px CSS-Breite (1280 px bei 200 % Zoom): eine Spalte, kein waagrechtes Scrollen.
+Raster: 12 Spalten, Abstand 16 px. Zeile 1: Hauptlesung 5 Spalten über zwei Kartenhöhen; rechts 7 Spalten mit drei Karten (Ohne
+Endstatus, Legal Clearing über 10 min, Auf der Bühne) in der ersten und der Zulaufkarte über alle 7 Spalten in der zweiten Höhe;
+die Unterkanten der Hauptlesung und der Zulaufkarte fluchten. Darunter Stationen, Rückstand, Liste, Faden jeweils über die volle
+Breite. Bei 1024 px: Hauptlesung volle Breite, drei Karten in einer Reihe, Zulauf darunter. Unter 768 CSS-px (1280 px bei 200 %
+Zoom): eine Spalte, Stationen als zwei Reihen zu drei, kein waagrechtes Scrollen.
 
 ## Teilung und Zuschnitt
 
 | Punkt | In 061 | Wohin sonst | Grund |
 |---|---|---|---|
-| Route `/cockpit`, Recht `cockpit.read`, Registerzeile | **ja** | Ausblenden in der Navigation: 089b | Rechte als Daten; ohne Quelle der Rechtemenge wie 053/054 |
-| Alter der ältesten offenen Einzelfrage, drei nächstälteste (Z10) | **ja** (Hauptzahl) | — | Planzeile und Z10 |
-| Rückstand je Fachbereich | **ja** (Balken je Fachbereich) | — | Planzeile |
-| Zulauf je 5 min mit Verlauf | **ja** (12 Säulen über eine Stunde) | — | Planzeile, Wunsch des Eigentümers |
+| Route `/cockpit`, Recht `cockpit.read`, Registerzeile | **ja** | Ausblenden in der Navigation: 089b | Rechte als Daten |
+| Älteste offene Einzelfrage und drei nächstälteste (Z10) | **ja** (Hauptlesung) | — | Planzeile und Z10 |
+| Rückstand je Fachbereich | **ja**, mit Schwellenstrich | — | Planzeile |
+| Zulauf je 5 min mit Verlauf | **ja**, 12 Säulen mit Achse | — | Planzeile |
 | Legal Clearing über 10 min | **ja** | — | Planzeile |
-| „Fragen ohne Endstatus“ vor Debattenschluss | **ja**, mit Stationsleiste | Restantenliste mit Quittung: 087 | Planzeile; 087 baut die namentliche Liste |
-| Drill-down auf Liste | **ja**, in der Seite, mit URL-Zustand | Sprung in Steuerung/Beantwortung mit Filter: Folgeliste | deren Filter haben keinen URL-Zustand; 061 berührt fremde Ansichten nicht |
-| Faden je Frage (Z13) | **ja**, ohne Akteure | — | Drill-down der Planzeile |
-| Platz für den Status der Kanarienfrage | **ja**, ruhige Zeile im Kopf | Inhalt: 086 | Planzeile |
-| Prognosen aus dem Tempo (Z11) | nein | **061b** | neue Durchsatzkennzahl des Legal Clearing (Rechtsfreigaben je 15 min) ist eine neue Auswertung: Katalogeintrag, E13-Vermerk, Datenschutzblick; „nächste Antwortrunde voll“ braucht das Antwortbündel (057) |
-| Flussbild mit Punkt je Einzelfrage, Alter als Farbe und Form, Tempo je Station (Z12) | nein; 061 zeigt die Stationen als Leiste | **061b** | rund 1 AStd; 061 bliebe sonst nicht unter dem Doppelten der Planzeit |
-| Druckansicht | nein | Folgeliste | Druckstile gehören in `app/**` und `styles/**`; der Papierweg ist der Export (051/052) |
-| Schwellen je Jahrgang einstellbar | nein, Konstanten im Kern | 041 (Administration) nach Eigentümerfrage 1 | 6.8: erst einstellbar machen, wenn wirklich variabel |
+| „Fragen ohne Endstatus“ vor Debattenschluss | **ja** | Restantenliste: 087 | Planzeile |
+| Stationen mit Engpass | **ja**, sechs Spalten mit Zahl | Punkt je Einzelfrage: 061b | Wirkung in der Demo, ohne Z12-Aufwand |
+| Auf der Bühne | **ja**, vierte Karte | — | Wirkung in der Demo; ergänzt die Stationen bis zum Vorlesen |
+| Drill-down auf Liste | **ja**, in der Seite, mit URL-Zustand | Sprung in Steuerung/Beantwortung mit Filter: Folgeliste | deren Filter haben keinen URL-Zustand |
+| Faden je Frage (Z13) | **teilweise**: Stationen mit Uhrzeit und Verweildauer, ohne Akteure | Absprung in die Fokusansicht: nicht vorgesehen (die Koordination ist keine Fachkraft) | Drill-down der Planzeile |
+| Platz für den Status der Kanarienfrage | **ja** | Inhalt: 086 | Planzeile |
+| Bericht „Leitstand“ im Auswertungskatalog | **ja** (Entscheidung 8b) | — | ADR 0013, Leitplanken 6.6 |
+| Prognosen aus dem Tempo (Z11) | nein | **061b** | neue Durchsatzkennzahl des Legal Clearing (Leistungsbezug einer Rollengruppe, E13); „nächste Antwortrunde voll“ braucht 057 |
+| Flussbild mit Punkt je Einzelfrage (Z12) | nein | **061b** | rund 1 AStd |
+| Druckansicht, Schwellen je Jahrgang | nein | Folgeliste; 041 nach Eigentümerfrage 1 | — |
 
-**Skizze 061b „Leitstand: Flussbild und Prognosen“** (eigene Spec vor dem Bau, AGENTS.md R1; mittel, wenn Z11 ohne neue
-Kennzahl gelingt, sonst hoch): Flussbild als SVG aus Tokens (Punkt je offene Einzelfrage in ihrer Station, Alter in drei
-Stufen als Farbe **und** Form — Kreis, Ring, Quadrat —, „+n in 15 min“ je Station aus `statusTrail`, Kennzeichen „Engpass“ aus
-den Schwellen dieser Scheibe, Tabelle mit denselben Zahlen als Alternative für Screenreader); Prognose „im Legal Clearing
-abgebaut ca. HH:MM bei n Rechtsfreigaben je 15 min“ mit Katalogeintrag `hv_legal_clearances_last_15m` (Labels `meeting_id`),
-Vermerk E13 und Abschnitt „Kennzahlen-Allowlist“ in ihrer Spec. Rund 1,25–1,5 AStd. Abhängigkeit: 061.
+**Bau in zwei Teilen auf dieser Spec (Standard; Entscheidung des Orchestrators bei Abweichung).** Die überarbeitete Scheibe liegt
+mit 4,9 AStd über einem Agententag und über dem Doppelten der Planzeit. Statt einer zweiten Spec wird sie in zwei PRs gebaut, die
+beide diese Spec und ihre „Files allowed“ nutzen (`slice-scope` erkennt `claude/slice-061-…`):
+
+- **Teil A „Kern“** (Branch `claude/slice-061-kern`, ≈ 2,0 AStd, hoch): Vertragsschritt, `cockpit.ts`, Recht, `getCockpit`, Route,
+  Bericht im Katalog, Regel (g) im Tor, Generator, MF-15, DSFA V15; Tests K1–K12, A1–A7, G1–G3. Merge vor Teil B.
+- **Teil B „Oberfläche“** (Branch `claude/slice-061-oberflaeche`, ≈ 2,9 AStd): Web-API, Seite, Liste, Faden, i18n, Register, Glossar,
+  Zielbild-Status; Tests W1–W11, S1–S8; Screenshots; Design-Kritik.
+
+**Skizze 061b „Leitstand: Flussbild und Prognosen“** (eigene Spec vor dem Bau, AGENTS.md R1): Flussbild als SVG aus Tokens (Punkt je
+offene Einzelfrage in ihrer Station, Alter in drei Stufen als Farbe **und** Form, „+n in 15 min“ je Station, Tabelle mit denselben
+Zahlen); Prognose „im Legal Clearing abgebaut ca. HH:MM bei n Rechtsfreigaben je 15 min“ mit Katalogfamilie
+`hv_legal_clearances_last_15m`, E13-Vermerk für die Rollengruppe Legal Clearing und Erweiterung des Berichts „Leitstand“. Rund
+1,25–1,5 AStd, hoch. Abhängigkeit: 061.
 
 ## Rechte-Diff (vor dem Bau, Leitplanken §4)
 
@@ -204,536 +225,649 @@ Vermerk E13 und Abschnitt „Kennzahlen-Allowlist“ in ihrer Spec. Rund 1,25–
 
 | Rolle | vorher | nachher | Begründung |
 |---|---|---|---|
-| moderation (Versammlungsbüro) | · | ✓ | Planzeile; Versammlungsbüro steuert die Debatte und den Debattenschluss (087) |
+| moderation (Versammlungsbüro) | · | ✓ | Planzeile; steuert die Debatte und den Debattenschluss (087) |
 | coordination (Koordination) | · | ✓ | Planzeile; nächste Rolle zu „Leitstand / Projektleitung“ (Rechtekonzept §5) |
-| admin (Administration) | · | ✓ | Planzeile; Aggregate, keine Inhalte (§4 „Rechte, keine Inhalte“); ausdrückliche Liste 14 → 15 |
+| admin (Administration) | · | ✓ | Planzeile; Aggregate (§4 „Rechte, keine Inhalte“); Liste 14 → 15, `cockpit.read` als letzter Eintrag |
 | capture, expert, legal, approver, podium, observer | · | · | Deny by default; Eigentümerfrage 6 |
 
-`READ_PERMISSIONS`: neuer Eintrag `getCockpit: ['cockpit.read']`. `policy-truth-table.md` bleibt **unverändert** (sie enthält
-nur Aktionen an Einzelfragen; `cockpit.read` ist keine). Stromthemen (`stream.ts`) bleiben unverändert: `getCockpit` bekommt
-kein eigenes Thema; die Ansicht lebt von `questions` und `meeting` (Entscheidung 7). **Invariante, als Test:** jeder Inhaber von
-`cockpit.read` hält auch ein Recht des Themas `questions`; sonst fiele seine Ansicht auf den 30-s-Takt zurück, und das wäre eine
-Spec-Entscheidung, keine Nebenwirkung.
+`PERMISSIONS`: `cockpit.read` nach `event.read` (Leserechte stehen zusammen). `READ_PERMISSIONS`: `getCockpit: ['cockpit.read']`.
+`policy-truth-table.md` bleibt **unverändert** (nur Aktionen an Einzelfragen). Stromthemen bleiben unverändert. **Invarianten,
+als Test (K1):** jeder Inhaber von `cockpit.read` hält `question.read` **ungebunden** (sein Bündel ist kein `unitBound`-Bündel) und
+damit auch das Thema `questions`. Ein späteres gebundenes oder auf Schutzklassen beschränktes Bündel mit `cockpit.read` ist eine
+Spec-Entscheidung: Die Aggregate wären dann Zahlen über Einzelfragen, die der Leser nicht lesen darf (Hinweis an 047).
 
 ## Ziel und Entscheidungen vor Bau
 
-**Ziel:** Eine Route `/cockpit` („Leitstand“), die Inhabern von `cockpit.read` in einer Sekunde zeigt, was am längsten wartet,
-wo es sich staut und wie sich die Lage entwickelt; jede Zahl führt per Klick oder Tastatur auf die Einzelfragen dahinter und zu
-jeder auf ihren Faden; alles live, alles aus dem Kern mit denselben Definitionen wie `/metrics`, nichts je Person.
+**Ziel:** Eine Route `/cockpit` („Leitstand“), die Inhabern von `cockpit.read` in einer Sekunde zeigt, was am längsten wartet, wo
+es sich staut und wie sich die Lage entwickelt; jede Zahl führt per Klick oder Tastatur auf die Einzelfragen dahinter und zu jeder
+auf ihren Faden; live, aus dem Kern mit denselben Definitionen wie `/metrics`, als Bericht im Auswertungskatalog geführt, nichts je
+Person.
 
 Jede Entscheidung hat einen **Standard**, nach dem gebaut wird; Abweichungen nur über die Eigentümerfragen unten.
 
 ### 1. Quelle der Zahlen: eine Leseoperation im Kern (Vertragsschritt)
 
-**Standard:** neue Operation `GET /v1/meetings/{meetingId}/cockpit` (`operationId: getMeetingCockpit`), `HvApi.getCockpit()`
-für den aktuellen Jahrgang (wie `getStage`), im Dienst über `meetingDomain(meetingId)`. Kein Alias ohne `meetingId` (Aliase
-laufen bis 0.5 aus). Gerechnet von einer **reinen Kernfunktion** `computeCockpit(events, now, meetingId)` in
-`packages/domain/src/cockpit.ts`, die die Definitionen aus `indicators.ts` **teilt** (gemeinsame Hilfen dort exportieren oder in
-`cockpit.ts` ziehen und von `indicators.ts` importieren; die Ausgabe von `/metrics` bleibt Byte für Byte gleich). Keine zweite
-Definition von „offen“, „Eintritt ins Legal Clearing“ oder „Erfassungszeit“.
+**Standard:** `GET /v1/meetings/{meetingId}/cockpit` (`operationId: getMeetingCockpit`), `HvApi.getCockpit()` für den aktuellen
+Jahrgang (wie `getStage`), im Dienst über `meetingDomain(meetingId)`. Kein Alias. Gerechnet von der reinen Kernfunktion
+`computeCockpit(events, now, meetingId, canRead)` in `packages/domain/src/cockpit.ts`, die die Definitionen aus `indicators.ts`
+**teilt** (gemeinsame Hilfen dort exportieren oder in `cockpit.ts` ziehen; die Ausgabe von `/metrics` bleibt Byte für Byte gleich,
+Test A5 gegen ein vorher gepinntes Golden). `computeCockpit` faltet `reduce` **einmal** über die Ereignisse des Jahrgangs und hält
+dabei je Einzelfrage Erfassungszeit, Zeit des letzten Statuswechsels und Eintritt ins Legal Clearing (033b-Definition) fest.
 
-Verworfen: (a) Rechnen im Browser aus `listQuestions` — „Legal Clearing über 10 min“ nicht berechenbar, `cockpit.read` ungeprüft,
-falsche Zahlen bei eingeschränktem Leserecht; (b) `/metrics` im Browser — Scraper-Token, kein Akteur; (c) neues Feld
-`statusSince` an `Question` — verallgemeinert, löst das Rechteproblem nicht und erweitert jede Liste; als Kandidat für 061b
-notiert.
+Verworfen: Rechnen im Browser aus `listQuestions`; `/metrics` im Browser; neues Feld `statusSince` an `Question` (Kandidat für 061b).
 
-**Vertragsschritt (Architekt, erster Commit, nach dem Lesebefund):** Vertrag 0.4.4 → **0.4.5** (additiver Patch; ist vorher eine
-andere Vertragsänderung gemergt, die nächste freie Patchnummer), Eintrag in `CHANGELOG.md`, Typen neu erzeugt
-(`pnpm contract:types`). Inhalt:
+**Vertragsschritt (Architekt, erster Commit von Teil A):** Vertrag **0.4.x (erwartet 0.4.6**, weil 046 vorher merged und 0.4.5
+nimmt; sonst die nächste freie Patchnummer); `info.version`, `packages/contract/package.json`, `CHANGELOG.md`, Typen neu erzeugt
+(`pnpm contract:types`); die Versions- und Operationszeilen in `takt-019-contract.test.ts` (eine Operation mehr) und
+`contract.test.ts` nachgezogen. Inhalt:
 
-- `Permission` + `cockpit.read` (Beschreibung: „Since 0.4.5 (slice 061): read the control desk figures (`getMeetingCockpit`);
-  granted in `ROLE_PERMISSIONS` by slice 061“).
+- Enum **`Action`** + `cockpit.read`; in seiner Beschreibung der Absatz „Since 0.4.x (slice 061): `cockpit.read` (read the control
+  desk figures, `getMeetingCockpit`); granted in `ROLE_PERMISSIONS` by slice 061 to moderation, coordination and admin; holders hold
+  unscoped `question.read`.“
 - Operation `getMeetingCockpit`: Parameter `meetingId`; Antworten `200` (`Cockpit`, Header `X-Server-Time`), `401`, `403`
-  (R-PERM-02), `404` (unbekannter Jahrgang), `408`, `429`, `500`. Beschreibung: Aggregate je Jahrgang und Fachbereich nach den
-  Definitionen des Auswertungskatalogs (033b); keine Kennzahl je Person; keine Fragetexte, keine Akteure, keine Redner.
-- Schema **`Cockpit`**, überall `additionalProperties: false` (außer der Abbildung `openByUnit`):
+  (R-PERM-02), `404`, `408`, `429`, `500`, **`503` (`PersistenceBusy`)**. Beschreibung: Aggregate je Jahrgang, Status und
+  Fachbereich nach den Definitionen des Auswertungskatalogs (033b, Bericht `leitstand`); keine Kennzahl je Person; Referenzen nur auf
+  Einzelfragen, die der Leser lesen darf; keine Fragetexte, keine Akteure, keine Redner.
+- Schema **`Cockpit`** (`additionalProperties: false` überall außer der Abbildung `openByUnit`; alle Zahlen `type: integer`,
+  `minimum: 0`):
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
-| `meetingId` | string | Jahrgang |
-| `asOf` | date-time | Rechenzeitpunkt aus der injizierten Uhr des Dienstes; alle Alter beziehen sich darauf |
+| `meetingId` | string, `maxLength: 200` | Jahrgang |
+| `asOf` | date-time | Rechenzeitpunkt aus der injizierten Uhr des Dienstes |
 | `meetingStatus` | `MeetingStatus` | `preparation`, `running`, `closed` |
 | `debateClosedAt` | date-time, optional | wie `Meeting.debateClosedAt` |
-| `totals` | `{ captured, open, answered }`, ganze Zahlen ≥ 0, alle Pflicht | erfasst (alle Einzelfragen des Jahrgangs), offen (Definition 033b = „ohne Endstatus“), vorgelesen (delivered + closed) |
-| `openByStatus` | Objekt mit genau den sieben offenen Status `captured`, `classified`, `assigned`, `answer_drafted`, `in_review`, `approved`, `staged`, alle Pflicht | offene Einzelfragen je Station |
-| `openByUnit` | Abbildung Fachbereichs-id → ganze Zahl | jeder Fachbereich des Jahrgangs als Schlüssel, auch mit 0 (wie `counts.byUnit`) |
-| `openUnassigned` | ganze Zahl | offen ohne Fachbereich (entspricht `unassigned` in `/metrics`) |
-| `oldestOpen` | `{ ageSeconds, items }` | Alter der ältesten offenen (0 ohne offene) und bis zu **4** `CockpitQuestionRef`, älteste zuerst, bei gleicher Zeit nach `number` |
-| `inflow` | `{ binSeconds: 300, bins, last5m }` | `bins`: genau **12** ganze Zahlen, älteste zuerst; `bins[11]` = `last5m` = Erfassungen mit Alter 0–300 s einschließlich (033b); `bins[i]` für i < 11 = Alter in (300·(11−i), 300·(12−i)] |
-| `legalReview` | `{ over10m, items }` | Anzahl wie `hv_questions_in_legal_review_over_10m`; bis zu **50** `CockpitQuestionRef` mit `reviewAgeSeconds`, längste Wartezeit zuerst |
+| `totals` | `{ captured, open, staged, answered }`, alle Pflicht | erfasst (alle Einzelfragen), offen (033b = „ohne Endstatus“), auf der Bühne (`staged`), vorgelesen (delivered + closed) |
+| `openByStatus` | genau die sieben offenen Status `captured`, `classified`, `assigned`, `answer_drafted`, `in_review`, `approved`, `staged`, alle Pflicht | offene Einzelfragen je Station |
+| `openByUnit` | Abbildung Fachbereichs-id → integer, `maxProperties: 200` | jeder Fachbereich des Jahrgangs, auch mit 0 |
+| `openUnassigned` | integer | offen ohne Fachbereich |
+| `oldestOpen` | `{ ageSeconds, items }`; `items`: `CockpitOldestRef[]`, `maxItems: 4` | Alter der ältesten offenen (0 ohne offene, unabhängig vom Filter in 8a); Referenzen älteste zuerst, Gleichstand nach `number` |
+| `inflow` | `{ binSeconds, bins, last5m }`; `binSeconds` `enum: [300]`; `bins` `minItems: 12`, `maxItems: 12` | `bins[11]` = `last5m` = Alter 0–300 s einschließlich (033b); `bins[i]` für i < 11 = Alter in (300·(11−i), 300·(12−i)] |
+| `legalReview` | `{ over10m, items }`; `items`: `CockpitReviewRef[]`, `maxItems: 50` | Anzahl wie `hv_questions_in_legal_review_over_10m`; Referenzen längste Wartezeit zuerst |
 
-- Schema **`CockpitQuestionRef`** (`additionalProperties: false`): `id`, `number`, `status` (`QuestionStatus`), `unitId`
-  (optional), `ageSeconds` (seit Erfassung), `statusAgeSeconds` (seit Eintritt in den aktuellen Status, aus dem Statusverlauf der
-  Projektion, Entscheidung 6), `reviewAgeSeconds` (optional, nur in `legalReview.items`: Wartezeit nach der Definition aus 033b).
-  **Kein** Fragetext, kein `speakerId`, kein Rednername, kein Akteur, kein Claim.
-- Alle Zahlen ganzzahlig (Sekunden abgerundet wie in 033b), nie negativ (ein Ereignis nach `asOf` zählt nirgends).
-- Jahrgänge in jedem Status werden gerechnet (anders als `/metrics`, das nur `running` zeigt); die Gleichheit mit
-  `computeIndicators` gilt für laufende Jahrgänge (Test K3).
+- Schema **`CockpitOldestRef`** (`additionalProperties: false`): `id`, `number` (je `maxLength: 200`), `status` (`QuestionStatus`),
+  `unitId` (optional), `ageSeconds` (seit Erfassung), `statusAgeSeconds` (seit dem letzten Statuswechsel).
+- Schema **`CockpitReviewRef`** (`additionalProperties: false`): dieselben Felder plus `reviewAgeSeconds` (Pflicht; Wartezeit nach
+  033b, ein neuer Verweigerungsvorschlag setzt sie zurück). Getrennte Schemas, damit `reviewAgeSeconds` in `oldestOpen` nicht
+  vorkommen kann.
+- **Kein** Fragetext, kein `speakerId`, kein Rednername, kein Akteur, kein Claim. Sekunden abgerundet wie in 033b, nie negativ.
+- Jahrgänge in jedem Status werden gerechnet; die Gleichheit mit `computeIndicators` gilt für laufende Jahrgänge (K3).
 
 ### 2. Route, Registerzeile, Lesezustand
 
-**Standard:** eine Zeile im Feature-Register: `id: 'cockpit'`, `path: '/cockpit'`, `labelKey: 'nav.cockpit'`, Symbol `Gauge`
-(lucide; fehlt es in der gepinnten Version, `Activity`), `testId: 'nav-cockpit'`, `helpKey: 'page.cockpit.description'`,
-`i18nModule: 'cockpit'`, `requires: 'cockpit.read'`, **kein** Kürzel, **letzte** Zeile (nach `history`). Kein Zähler an der
-Navigation. Die Navigation zeigt den Eintrag allen, bis 089b die Rechtemenge liefert (wie 053, 054). Antwortet `getCockpit` mit
-403 R-PERM-02 (oder R-PERM-03), zeigt die Seite den Lesezustand `cockpit-forbidden` (`EmptyState`, Titel und ein Satz, keine
-Erklärung von Rechten, D9), nie Teildaten.
+**Standard:** Registerzeile `id: 'cockpit'`, `path: '/cockpit'`, `labelKey: 'nav.cockpit'`, Symbol `Gauge` (sonst `Activity`),
+`testId: 'nav-cockpit'`, `helpKey: 'page.cockpit.description'`, `i18nModule: 'cockpit'`, `requires: 'cockpit.read'`, kein Kürzel,
+**letzte** Zeile. Kein Zähler an der Navigation. Die Navigation zeigt den Eintrag allen, bis 089b die Rechtemenge liefert. 403
+R-PERM-02/-03 ⇒ Lesezustand `cockpit-forbidden` (`EmptyState`, Titel und ein Satz, D9), nie Teildaten.
 
 ### 3. Hauptlesung: älteste offene Einzelfrage (Z10)
 
-**Standard:** links oben, Panel über 5 von 12 Spalten. Beschriftung (12 px, Gewicht 500, Grau 600, Großbuchstaben per CSS);
-Zahl in Minuten, **28 px Mono**, `tabular-nums`, rechtsbündig in fester Breite (kein Springen von 9 auf 10); ab 100 min als
-„1 h 40 min“. Daneben die Stufe (Entscheidung 4). Darunter in 13 px: `F-0125 · zugewiesen · Finanzen` (Nummer in Mono; Station
-aus den vorhandenen Statusbeschriftungen `status.*`; Fachbereich als Kurzname aus `listMeetingUnits`, sonst „ohne
-Fachbereich“) und „seit 14 min in dieser Station“. Dann die **einzige primäre Schaltfläche der Seite: „Faden öffnen“**. Unter
-einer Trennlinie „Danach die ältesten“: drei Zeilen (Nummer Mono links, Station · Fachbereich, Alter Mono rechtsbündig mit
-Stufenfarbe nur als Text-Tönung, keine Fläche), jede Zeile eine Schaltfläche, die den Faden öffnet. Ohne offene Einzelfrage:
-„—“ statt Zahl, der Satz „Keine offene Einzelfrage.“, keine Schaltfläche (der leere Zustand hat nichts zu tun; zulässige Ausnahme
-zu D2, im Bericht zu nennen).
+**Standard:** Panel über 5 Spalten und zwei Kartenhöhen. Beschriftung 12 px, Gewicht 500, Grau 600, Großbuchstaben per CSS. Zahl in
+Minuten in **44 px Mono** (`tabular-nums`, feste Breite), Einheit „min“ in **16 px Grau 600** — **benannte Ausnahme zu D3** (dort
+20–28 px für die Bühne): die Hauptlesung muss auf dem Wandbildschirm aus mehreren Metern lesbar sein und ist die einzige Zahl dieser
+Größe; die Design-Kritik prüft die Ausnahme. Bei 1280 × 720 darf sie auf 40 px fallen. Ab 100 min „1 h 40 min“. Daneben die Stufe
+(Entscheidung 4). Darunter 13 px: `F-0125 · zugewiesen · Finanzen` (Nummer Mono; Station aus `status.*`; Fachbereich als Kurzname,
+sonst „ohne Fachbereich“) und **„seit 14 min in diesem Status“** (`statusAgeSeconds`). Dann die **einzige primäre Schaltfläche:
+„Faden öffnen“**. Unter einer Trennlinie „Danach die ältesten“: drei Zeilen (Nummer Mono, Station · Fachbereich, Alter Mono
+rechtsbündig), jede eine Schaltfläche zum Faden. Ohne offene Einzelfrage: „—“, „Keine offene Einzelfrage.“, keine Schaltfläche
+(benannte Ausnahme zu D2). Darf der Leser die älteste nicht lesen (8a), zeigt die Hauptlesung Alter und Stufe, ohne Nummer und ohne
+Schaltfläche.
 
 ### 4. Stufen als Daten: ruhig, erhöht, kritisch
 
-**Standard:** `COCKPIT_THRESHOLDS` und `cockpitLevel(figure, value, context)` in `packages/domain/src/cockpit.ts` (rein,
-importierbar von Web und später von 085/086), Stufen `calm` | `attention` | `critical`. Werte (Eigentümerfrage 1):
+**Standard:** `COCKPIT_THRESHOLDS` und `cockpitLevel(figure, value, context)` in `cockpit.ts` (rein; importierbar vom Web über
+`apps/web/src/api/cockpit.ts`, später von 085/086). Stufen `calm` | `attention` | `critical`. Werte (Eigentümerfrage 1):
 
-| Kennzahl | erhöht ab | kritisch ab | Quelle |
+| Kennzahl | erhöht ab | kritisch ab | Badge-Text (DE) |
 |---|---|---|---|
-| Alter der ältesten offenen Einzelfrage | 15 min | 45 min | wie `urgencyLevel` (Beantwortung) und Legende des Zielbilds |
-| Legal Clearing über 10 min | 3 | 10 | Annahme; Zielbild markiert „Engpass“ ab 12 im Legal Clearing |
-| Rückstand eines Fachbereichs | 20 | 40 | Annahme (230er-Korpus: höchster Fachbereich unter 20) |
-| Ohne Endstatus | nach Debattenschluss: > 0 | — | vor Debattenschluss immer ruhig (Planzeile: „vor Debattenschluss“) |
-| Zulauf je 5 min | — | — | Information, kein Missstand: nie farbig |
+| Alter der ältesten offenen Einzelfrage | 15 min | 45 min | „erhöht · über 15 min“, „kritisch · über 45 min“ |
+| Legal Clearing über 10 min | 3 | 10 | „erhöht · ab 3“, „kritisch · ab 10“ |
+| Rückstand eines Fachbereichs **und** „Ohne Fachbereich“ | 20 | 40 | „erhöht · ab 20“, „kritisch · ab 40“ |
+| Ohne Endstatus | nach Debattenschluss > 0 | — | „erhöht · nach Debattenschluss“ |
+| Zulauf je 5 min, Auf der Bühne | — | — | nie farbig |
 
-Grenzwert gleich Schwelle ⇒ höhere Stufe. **Darstellung:** ruhig = **keine** Markierung (Ruhe ist der Normalfall, D4); erhöht =
-Badge in `--color-tone-warning-*` mit Symbol `TriangleAlert` und Wort „erhöht“; kritisch = Badge in `--color-tone-danger-*` mit
-Symbol `OctagonAlert` und Wort „kritisch“. Zahlen bleiben Grau 900; Balken im Rückstand bekommen die Füllfarbe der Stufe
-(`--color-tone-*-fg`), sonst Grau 400. Jede Stufe ist ohne Farbe lesbar (Symbol, Wort, Zahl) — farbfehlsichtig sicher; der
-zugängliche Name jeder Kennzahl enthält die Stufe („Im Legal Clearing über 10 min: 6, erhöht“).
+Grenzwert gleich Schwelle ⇒ höhere Stufe (beim Alter: genau 15 min ist erhöht, wie `urgencyLevel`). Die Schwelle im Badge-Text
+kommt aus `COCKPIT_THRESHOLDS`, nie als Literal. **„Engpass“** an der Spalte „im Legal Clearing“ der Stationen erscheint, wenn die
+Stufe „Legal Clearing über 10 min“ mindestens erhöht ist (gleiche Tönung wie dessen Badge). **Darstellung:** ruhig = keine
+Markierung (D4); erhöht = Badge `--color-tone-warning-*` mit `TriangleAlert`; kritisch = Badge `--color-tone-danger-*` mit
+`OctagonAlert`. Zahlen bleiben Grau 900; Balken im Rückstand in der Füllfarbe der Stufe, sonst Grau 400. Jede Stufe ist ohne Farbe
+lesbar (Symbol, Wort, Schwelle); der zugängliche Name jeder Kennzahl enthält Stufe und Schwelle.
 
-### 5. Die vier Kennzahlen, der Rückstand und der Zulaufverlauf
+### 5. Karten, Stationen, Rückstand, Zulauf
 
 **Standard:**
 
-- **Ohne Endstatus:** Zahl 20 px Mono = `totals.open`; darunter „von {captured} erfassten · {answered} vorgelesen“; nach
-  Debattenschluss die Unterzeile „nach Debattenschluss offen“. Darunter die **Stationsleiste**: `ProcessStrip` im Modus `dense`
-  aus `openByStatus` mit den vorhandenen Statustönungen (`statusTone`) und Legende im Zugänglichen Namen; keine neue Farbe.
-- **Im Legal Clearing über 10 min:** Zahl = `legalReview.over10m`; darunter „von {openByStatus.in_review} im Legal Clearing“.
-- **Zulauf je 5 min:** Zahl = `inflow.last5m`; daneben **12 Säulen** (inline SVG, 132 × 32 px, Säule 8 px, Abstand 3 px),
-  **Grundlinie bei 0** (keine Min–Max-Skalierung, damit 2 → 3 nicht wie ein Sprung aussieht), Skala `max(…bins, 5)`, Säulen
-  Grau 300, die jüngste Säule Akzent 500, leere Fenster als 1-px-Strich auf der Grundlinie; `role="img"` mit Zugänglichem Namen
-  „Zulauf je 5 Minuten in der letzten Stunde: 2, 3, …; zuletzt 3“. Darunter „letzte Stunde: {Summe}“. Eine Farbe, Position
-  trägt die Bedeutung (farbfehlsichtig sicher). Das vorhandene `Sparkline` bleibt unberührt (Min–Max-Linie, für Mengen hier
-  irreführend). **Keine Diagrammbibliothek** (takt-047, Lieferkette): zwölf Rechtecke brauchen keine.
-- **Rückstand je Fachbereich:** Panel über die volle Breite, eine Zeile je Fachbereich (36 px): Kurzname, waagrechter Balken
-  (Länge relativ zum größten Wert, mindestens 2 px bei > 0), Zahl Mono rechtsbündig (Null in Grau 600, takt-048), Stufe. Sortiert
-  nach Zahl absteigend, bei Gleichstand nach Name; „Ohne Fachbereich“ (`openUnassigned`) immer zuletzt, abgesetzt. Jede Zeile ist
-  eine Schaltfläche (Drill-down).
-- **Kopfzeile der Seite:** `PageHeader` mit Titel „Leitstand“ und Beschreibung; rechts „Stand HH:MM:SS“ (Mono, aus `asOf`,
-  Europe/Berlin wie `Clock.tsx`) und die Zeile der Kanarienfrage (Entscheidung 9). Ist der Jahrgang nicht `running`, zusätzlich
-  „HV in Vorbereitung“ bzw. „HV geschlossen“ als neutrales Badge.
+- **Ohne Endstatus:** Zahl 28 px Mono = `totals.open`; „von {captured} erfassten“; nach Debattenschluss „nach Debattenschluss offen“.
+- **Im Legal Clearing über 10 min:** Zahl = `legalReview.over10m`; „von {openByStatus.in_review} im Legal Clearing“.
+- **Auf der Bühne:** Zahl = `totals.staged`; „{answered} vorgelesen“. Keine Stufe.
+- **Zulauf je 5 min:** Zahl = `inflow.last5m`; **12 Säulen** als inline SVG **280 × 48 px** (Säule 18 px, Abstand 5 px), Grundlinie bei
+  0, Skala `max(…bins, 5)`, Säulen Grau 300, jüngste Akzent 500, leere Fenster als 1-px-Strich; Achsenbeschriftung **11 px Grau 600**
+  „−60 min“ links und „jetzt“ rechts (benannte Ausnahme zu D3: 11 px wie Badges); `role="img"` mit Namen „Zulauf je 5 Minuten in der
+  letzten Stunde: 2, 3, …; zuletzt 3“; daneben „letzte Stunde: {Summe}“. Eine Farbe, Position trägt die Bedeutung. `Sparkline`
+  bleibt unberührt. **Keine Diagrammbibliothek** (takt-047).
+- **Stationen** (volle Breite, ersetzt hier die dichte `ProcessStrip`): sechs beschriftete Spalten **erfasst, klassifiziert,
+  zugewiesen, Antwortentwurf, im Legal Clearing, freigegeben** mit `openByStatus` (20 px Mono) und der Statustönung nur als 3-px-
+  Oberkante; „auf der Bühne“ steht in der vierten Karte, nicht doppelt. „Engpass“-Badge nach Entscheidung 4. Jede Spalte eine
+  Schaltfläche: Drill-down „Ohne Endstatus“, auf diese Station gefiltert. Die Reihenfolge ist Anzeigereihenfolge (wie die
+  Statusbeschriftungen), keine Statuslogik.
+- **Rückstand je Fachbereich:** volle Breite, Zeile je Fachbereich (36 px): Kurzname, Balken (relativ zu `max(größter Wert,
+  kritische Schwelle)`, mindestens 2 px bei > 0), **senkrechter 1-px-Strich bei der Schwelle „erhöht“** (Grau 500, `aria-hidden`,
+  Legende im Kopf „Strich = Schwelle ‚erhöht‘ (20)“), Zahl Mono rechtsbündig (Null in Grau 600), Stufe. Sortiert nach Zahl
+  absteigend, dann Name; „Ohne Fachbereich“ zuletzt mit Unterzeile „noch nicht zugewiesen“, gleiche Schwellen. Jede Zeile eine
+  Schaltfläche.
+- **Kopfzeile:** `PageHeader` „Leitstand“ mit Beschreibung; rechts „Stand HH:MM:SS“ (Mono, aus `asOf`, Europe/Berlin) und die
+  Kanarienzeile; nicht laufender Jahrgang zusätzlich „HV in Vorbereitung“ bzw. „HV geschlossen“ als neutrales Badge.
 
-### 6. Drill-down und Faden (Z13)
+### 6. Drill-down und Faden (Z13, teilweise)
 
-**Standard:** Jede Kennzahl, jede Fachbereichszeile und jede Zeile der Hauptlesung öffnet unter den Kennzahlen eine **Liste**
-(Panel, `SplitPane` mit dem Faden rechts). Der Zustand steht in der URL (`?list=oldest|open|legal|inflow|unit&unit=<id>&q=<id>`,
-`useSearchParams` wie die Erfassung), damit Zurück im Browser schließt und der Wandbildschirm eine Liste festhalten kann.
+**Standard:** Jede Karte, jede Stationsspalte, jede Fachbereichszeile und jede Zeile der Hauptlesung öffnet unter dem Rückstand eine
+**Liste** (Panel über die volle Breite); der **Faden** erscheint darunter, ebenfalls über die volle Breite, **waagrecht**. Zustand in
+der URL (`?list=oldest|open|legal|inflow|unit|stage&station=<status>&unit=<id>&q=<id>`, `useSearchParams`), Zurück schließt.
 
 | Auslöser | Liste | Quelle |
 |---|---|---|
-| Hauptzahl, „Faden öffnen“, Zeilen „Danach die ältesten“ | „Älteste offene Einzelfragen“, Faden der gewählten offen | `oldestOpen.items` |
-| Im Legal Clearing über 10 min | „Im Legal Clearing über 10 min“ (bis 50, sonst Hinweis „50 von n, die am längsten wartenden“) | `legalReview.items` |
-| Ohne Endstatus | „Ohne Endstatus“, gruppiert nach Station in Reihenfolge der Stationsleiste | `listQuestions({ status: [sieben offene Status], limit: 2000 })` |
-| Zulauf je 5 min | „Erfasst in den letzten 5 Minuten“ | `listQuestions({ limit: 2000 })`, gefiltert auf Alter ≤ 300 s gegen `asOf` |
-| Fachbereichszeile | „Offen bei {Fachbereich}“ | `listQuestions({ unitId, status: [sieben offene Status] })`; „Ohne Fachbereich“ clientseitig aus der offenen Liste |
+| Hauptlesung, „Faden öffnen“, „Danach die ältesten“ | „Älteste offene Einzelfragen“, Faden der gewählten offen | `oldestOpen.items` |
+| Legal Clearing über 10 min | „Im Legal Clearing über 10 min“ (bis 50, sonst „50 von n, die am längsten wartenden“) | `legalReview.items` |
+| Ohne Endstatus, Stationsspalte | „Ohne Endstatus“ bzw. „{Station}“, gruppiert nach Station | `listQuestions({ status: […], limit: 2000 })` |
+| Auf der Bühne | „Auf der Bühne“ | `listQuestions({ status: ['staged'] })` |
+| Zulauf je 5 min | „Erfasst in den letzten 5 Minuten“ | `listQuestions({ limit: 2000 })`, Alter ≤ 300 s gegen `asOf` |
+| Fachbereichszeile | „Offen bei {Fachbereich}“ / „Ohne Fachbereich“ | `listQuestions({ unitId, status: […] })` bzw. clientseitig aus der offenen Liste |
 
-Spalten: Nummer (Mono), Station (Statusbeschriftung), Fachbereich, „in Station“ (nur bei Referenzen mit `statusAgeSeconds`),
-„offen seit“ (Mono, rechtsbündig). Alter in Listen aus `listQuestions` = `asOf − createdAt` mit `asOf` derselben
-Leitstand-Lesung (Entscheidung 10). **Kein Fragetext, kein Redner, keine Wortmeldung in den Zeilen** (Entscheidung 8).
+Spalten: Nummer (Mono), Station, Fachbereich, eine Zeitspalte — in „Älteste“ **„in diesem Status“** (`statusAgeSeconds`), in „Legal
+Clearing“ **„wartet seit“** (`reviewAgeSeconds`), sonst keine —, „offen seit“ (Mono, rechtsbündig). Alter aus `listQuestions` =
+`max(0, asOf − createdAt)` mit `asOf` derselben Leitstand-Lesung. Die Liste trägt ihre **eigene Zahl** im Kopf; sie kann von der
+Karte abweichen, weil Liste und Kennzahl zu verschiedenen Zeitpunkten gelesen werden; die nächste Lesung gleicht an (im Bericht
+genannt, kein Fehler). **Kein Fragetext, kein Redner, keine Wortmeldung in den Zeilen.**
 
-**Faden:** Kopf „Faden F-0141“, Fragetext (`getQuestion`, nur mit Leserecht; ohne: Faden ohne Text), Fachbereich und
-Bühnenplatz als Badges, darunter die Stationen als senkrechte Liste: vergangene Station gefüllter Punkt (Grau 600) mit Uhrzeit
-HH:MM; aktuelle Station Ring in Akzent 500 mit „seit n min“ (aus `asOf`) und dem Wort „aktuell“ im Zugänglichen Namen; künftige
-Stationen hohler Punkt Grau 300 ohne Zeit (drei Formen, nicht nur Farbe). Der Verlauf kommt aus `getQuestionHistory` über die
-reine Funktion **`statusTrail(events)`** in `cockpit.ts`, die `reduce` der Projektion über die Ereignisse faltet und nach jedem
-Ereignis den Status der Einzelfrage vergleicht: Statuswechsel ⇒ Eintrag `{ status, at }`. **Keine eigene Zuordnung
-Ereignistyp → Status in Web oder Kern** (AGENTS.md R5). Rücksprünge (Zurückgeben) erscheinen als eigene Einträge in
-Zeitreihenfolge. Der Faden zeigt **keine Akteure** (weder Name noch id noch Rolle), keine Rückgabegründe, keine Antworttexte.
-Ohne `history.read` zeigt der Faden nur die aktuelle Station aus der Referenz.
+**Faden:** Kopf „Faden F-0141“, Fragetext (`getQuestion`, nur mit Leserecht), Fachbereich und Bühnenplatz als Badges; darunter eine
+waagrechte Linie mit den Einträgen des Verlaufs in Zeitreihenfolge, dann die noch nicht erreichten Stationen bis „vorgelesen“:
+vergangen gefüllter Punkt (Grau 600) mit HH:MM; aktuell Ring Akzent 500 mit „seit n min“ aus `asOf` und „aktuell“ im zugänglichen
+Namen; künftig hohler Punkt Grau 300 ohne Zeit (drei Formen). Rücksprünge (Zurückgeben) erscheinen als eigene Einträge; bei mehr als
+acht Einträgen bricht die Linie um. Quelle: `getQuestionHistory` und **`statusTrail(events, questionId)`** in `cockpit.ts`: faltet
+`reduce` über die übergebenen Ereignisse und legt einen Eintrag `{ status, at }` an, wenn der Status der Einzelfrage nach dem Ereignis
+ein anderer ist als davor; `at` = `recordedAt ?? at` des Ereignisses; gleicher Status (z. B. neuer Verweigerungsvorschlag im Legal
+Clearing) ergibt keinen Eintrag; der erste Eintrag ist `captured`. Dieselbe Faltung nutzt `computeCockpit` für `statusAgeSeconds`
+(eine Implementierung). **Keine eigene Zuordnung Ereignistyp → Status** (R5). Kein Akteur (Name, id, Rolle), kein Rückgabegrund,
+kein Antworttext. Ohne `history.read` nur die aktuelle Station aus der Referenz.
 
 ### 7. Live
 
-**Standard:** `getCockpit` ist eine gepufferte Lesung im Live-Store mit `READ_TOPICS.getCockpit = ['meeting', 'questions']`.
-Die Seite liest neu, wenn `useApiVersion()` zählt (Strom oder Takt), und zusätzlich alle **30 s** über ein `setInterval`
-(der Puffer ist dann nach `MAX_AGE_MS` abgelaufen; das Intervall ist ein Anstoß, keine Zeitquelle). Eine Aktualisierung
-verschiebt **nie** den Fokus, ändert keine Layouthöhe (feste Mindesthöhen, `tabular-nums`) und animiert nichts. Kein
-`aria-live` auf den Kennzahlen (alle 30 s eine Ansage wäre Lärm). Ist die Verbindung unterbrochen (Phase `reconnecting` oder
-`offline` aus `useConnection`), zeigt der Kopf „Stand HH:MM:SS · Verbindung unterbrochen“ in Warnton als Text, ohne Fläche.
-Eine offene Liste wird mit derselben Lesung neu aufgebaut; verschwindet die fokussierte Zeile, geht der Fokus auf die
-Überschrift der Liste.
+**Standard:** `getCockpit` wird **nicht gepuffert** (`BufferedRead = Exclude<ReadMethodName, 'listEvents' | 'getCockpit'>`; kein
+Eintrag in `READ_TOPICS`): eine zeitabhängige Lesung, deren Wert ohne Ereignis altert. Die Seite liest neu, wenn `useApiVersion()`
+zählt (Strom oder Takt), und **alle 15 s** über ein `setInterval` (Anstoß, keine Zeitquelle; pausiert, solange das Dokument
+verborgen ist). Keine Fokusverschiebung, keine Layoutänderung (feste Mindesthöhen, `tabular-nums`), keine Animation. **Eine einzige
+höfliche Ansage** (`aria-live="polite"`, sonst stumm): wenn eine Kennzahl neu in „kritisch“ wechselt („Leitstand: älteste offene
+Einzelfrage kritisch, über 45 min“); keine Ansage bei jedem Wert. Verbindung unterbrochen (`reconnecting`, `offline`) ⇒ „Stand
+HH:MM:SS · Verbindung unterbrochen“ in Warnton als Text. Verschwindet die fokussierte Zeile, geht der Fokus auf die Überschrift der
+Liste.
 
 ### 8. Datenschutz: nichts je Person
 
 **Standard:**
 
-- Die Antwort von `getMeetingCockpit` enthält **nur** die Pfade der Allowlist (Test K7, Vertragsschema mit
-  `additionalProperties: false`): `meetingId`, `asOf`, `meetingStatus`, `debateClosedAt`, `totals.{captured,open,answered}`,
-  `openByStatus.{captured,classified,assigned,answer_drafted,in_review,approved,staged}`, `openByUnit.<Fachbereichs-id>`,
-  `openUnassigned`, `oldestOpen.{ageSeconds,items}`, `inflow.{binSeconds,bins,last5m}`, `legalReview.{over10m,items}` und in
-  jedem Element von `items`: `id`, `number`, `status`, `unitId`, `ageSeconds`, `statusAgeSeconds`, `reviewAgeSeconds`.
-- Schlüssel von `openByUnit` sind ausschließlich Fachbereichs-ids des Jahrgangs, auch wenn Personen über Rollenzuordnungen an
-  Fachbereiche gebunden sind. Kein Wert je Person, je Rolle, je Sitzung, je Gerät.
-- Die Seite zeigt keine Rednernamen, keine Wortmeldungsnummern, keine Akteure (auch nicht im Faden), keine Claims („wird
-  bearbeitet von“), keine Zahl je Person. Die Kanarienzeile zeigt keine Person.
-- E13 (offen): ein Fachbereich mit genau einer Person macht dessen Rückstand faktisch zu einer Zahl je Person; der Leitstand
-  folgt dem Katalog (`hv_open_questions`): **keine Unterdrückung im Code**, Schwelle regelt die Betriebsvereinbarung
-  (Eigentümerfrage 5). DSFA-Zeile V15 nennt den Leitstand als Empfänger.
+- Die Antwort enthält **nur** die Pfade der Schemas aus Entscheidung 1; die Allowlist des Tests wird **aus dem Vertrag abgeleitet**
+  (A7, Schemawanderung über `openapi.yaml`), nicht von Hand gepflegt; `additionalProperties: false` verbietet jedes weitere Feld.
+- Schlüssel von `openByUnit` sind ausschließlich Fachbereichs-ids des Jahrgangs, auch wenn Personen an Fachbereiche gebunden sind.
+  Kein Wert je Person, je Rolle, je Sitzung, je Gerät.
+- Die Seite zeigt keine Rednernamen, keine Wortmeldungsnummern, keine Akteure (auch nicht im Faden), keine Claims, keine Zahl je
+  Person.
+- **E13 (offen), weiter gefasst:** Ein Fachbereich mit genau einer Person macht dessen Rückstand faktisch zu einer Zahl je Person.
+  Dasselbe gilt für **Rollengruppen**: Die Stationen „im Legal Clearing“ (Gruppe Legal Clearing, im Seed zwei Personen), „erfasst“
+  (Gruppe Erfassung) und „freigegeben“ (Freigabe) zeigen Bestände, deren Abbau einer kleinen Gruppe zuzurechnen ist; „Legal Clearing
+  über 10 min“ ist eine Wartezeit vor genau dieser Gruppe. Der Leitstand zeigt **Bestände und Wartezeiten, keine Durchsätze** (kein
+  „erledigt je Zeit“); der Durchsatz (Z11) ist an 061b und einen Katalogeintrag gebunden. Keine Unterdrückung im Code; die
+  Mindestzahl ist im Bericht als Feld `minimumGroupSize` vorgesehen (Standard `null` = nicht festgelegt, Eigentümerfrage 5); DSFA V15
+  nennt den Leitstand als Empfänger und beide Fälle (Fachbereich, Rollengruppe).
+
+### 8a. Security: Referenzen nur, was der Leser lesen darf
+
+**Standard:** `getCockpit` reicht `computeCockpit` die Prüfung `(q) => can(actor, 'question.read', q).allow` mit; jede Referenz in
+`oldestOpen.items` und `legalReview.items` wird dadurch gefiltert (R-PERM-03 heute, Schutzklassen aus 047 später automatisch). Die
+**Aggregate** bleiben ungefiltert — K1 stellt sicher, dass heute nur ungebundene Leser sie bekommen. Wird gefiltert, bleiben Zahlen
+und `oldestOpen.ageSeconds` gleich, `items` enthält nur lesbare Referenzen (die Hauptlesung zeigt dann Alter ohne Nummer, Entscheidung
+3). **Hinweis an 047:** mit `question.read.protected` muss 047 entscheiden, ob geschützte Einzelfragen in den Aggregaten zählen.
+
+### 8b. Bericht „Leitstand“ im Auswertungskatalog
+
+**Standard:** Der Leitstand wird als **Bericht** (eine Ansicht, die Kennzahlen zeigt) in derselben einzigen Quelle geführt wie die
+Familien: `catalog.json` bekommt ein Feld `reports` (Liste), Eintrag `id: "leitstand"`, `spec: "061"`, `operationId:
+"getMeetingCockpit"`, `permission: "cockpit.read"`, `aggregation` (Jahrgang, Status, Fachbereich; Referenzen je Einzelfrage ohne
+Person), `minimumGroupSize: null`, `fields` (je Feld des Schemas `Cockpit`: Pfad, Quelle = Katalogfamilie oder `Meeting.counts`-Feld
+nach dem Abschnitt „Kennzahlen-Allowlist“, `personalReference`). Im Kern spiegelt `COCKPIT_REPORT` in `cockpit.ts` denselben
+Deskriptor (Aggregationsstufe, Mindestzahl, Felder); Test A6 hält beide gleich. Technisch möglich, geprüft: `renderMetrics` iteriert
+nur `catalog.metrics` (Prometheus-Ausgabe unberührt, A5), das Tor lehnt unbekannte Schlüssel der obersten Ebene nicht ab.
+
+- **Generator** `scripts/auswertungskatalog.mjs`: neuer Abschnitt „## Berichte (Oberfläche)“ je Bericht mit Zweck, Recht,
+  Operation, Aggregation, Mindestzahl, Feldtabelle; JSON-Ausgabe mit `reports`. Test G1 in `auswertungskatalog.test.mjs`.
+- **Tor** `scripts/metrics-allowlist-check.mjs`, neue Regel **(g)**: jeder Bericht hat eine `id` nach `^[a-z0-9-]+$`, eine `spec`,
+  deren Abschnitt „## Kennzahlen-Allowlist“ die `id` in Backticks nennt; kein Feldpfad und keine `aggregation` enthält einen
+  Personenbegriff (gleiche Liste wie (c)); jede `fields[].source` ist eine Familie aus `metrics`, ein Feld `Meeting.counts.*` oder
+  `derived:` mit Begründung. Fehlt `reports`, ist das kein Fehler (Rückwärtsverträglichkeit). Tests G2, G3 mit Fixtures.
 
 ### 9. Platz für die Kanarienfrage (086)
 
-**Standard:** eine ruhige Zeile im Kopf rechts neben „Stand“: „Kanarienfrage: nicht eingerichtet“ in Grau 600, ohne Farbe, ohne
-Symbol, nicht fokussierbar; Komponente `CanaryLine` mit einer Eigenschaft `status?: undefined`, die 086 durch seinen Status
-ersetzt (ok, verspätet, fehlgeschlagen; Stufe nach Entscheidung 4). Kein Vertragsfeld in 061 (086 bringt `Cockpit.canary`).
-Eigentümerfrage 2 (ausblenden bis 086).
+**Standard:** ruhige Zeile im Kopf: „Kanarienfrage: nicht eingerichtet“ in Grau 600, ohne Farbe, nicht fokussierbar; Komponente
+`CanaryLine` mit `status?: undefined`, die 086 füllt. Kein Vertragsfeld in 061. Eigentümerfrage 2.
 
 ### 10. Zeit
 
-**Standard:** Jede Altersangabe der Seite stammt aus dem Dienst (`ageSeconds`, `statusAgeSeconds`, `reviewAgeSeconds`) oder ist
-`asOf − Zeitstempel` mit `asOf` derselben Lesung. Der Code unter `features/cockpit/**` liest **nie** die Uhr des Geräts (kein
-`Date.now`, kein `new Date()` ohne Argument, kein `performance.now`; Test W7). Im Kern kommt `now` aus `clock()` der API (R8).
+**Standard:** Jede Altersangabe stammt aus dem Dienst oder ist `max(0, asOf − Zeitstempel)` derselben Lesung. Der Code unter
+`features/cockpit/**` liest nie die Uhr des Geräts (Test W7). Im Kern kommt `now` aus `clock()` (R8).
 
 ### 11. Tastaturpfad (D8)
 
-**Standard:** Tab-Reihenfolge: „Faden öffnen“ → drei Zeilen „Danach die ältesten“ → Kennzahlen (jede eine Schaltfläche mit
-Namen „Liste öffnen: Ohne Endstatus, 47“) → Fachbereichszeilen → Liste (Pfeil auf/ab innerhalb, Enter öffnet den Faden) →
-Faden (Schließen). **Escape** schließt zuerst den Faden, dann die Liste; der Fokus kehrt zum Auslöser zurück. Sichtbare
-Fokusringe der Bauteile. Kein neues globales Kürzel (Eigentümerfrage 4).
+**Standard:** Tab: „Faden öffnen“ → „Danach die ältesten“ → vier Karten (Name „Liste öffnen: Ohne Endstatus, 47“) → Stationsspalten →
+Fachbereichszeilen → Liste (Pfeil auf/ab, Enter öffnet den Faden) → Faden (Schließen). Escape schließt erst den Faden, dann die
+Liste; Fokus zurück zum Auslöser. Kein neues globales Kürzel.
 
 ### 12. Wandbildschirm und Zoom
 
-**Standard:** bei 1280 × 720 (Navigation ausgeklappt) sind Hauptlesung, vier Kennzahlen und die ersten Zeilen des Rückstands
-ohne Scrollen sichtbar (Screenshot); keine Information nur im Hover; Kontrast nach den Tokens (axe). Bei 200 % Zoom eine Spalte
-ohne waagrechtes Scrollen (e2e prüft `scrollWidth <= clientWidth`). Eine eigene Großanzeige ohne Navigation ist kein Ziel.
+**Standard:** bei 1280 × 720 mit ausgeklappter Navigation sind Hauptlesung, vier Karten mit Zulauf und die Stationen ohne Scrollen
+sichtbar (Screenshot); keine Information nur im Hover; Kontrast nach den Tokens. Bei 200 % Zoom eine Spalte ohne waagrechtes Scrollen.
+Keine eigene Großanzeige.
 
 ### 13. Sprache, Begriffe, Glossar
 
-**Standard:** neues i18n-Modul `cockpit` (DE und en-US, rund 52 Schlüssel; der Bau nennt die Zahl) und drei Shell-Schlüssel
-(`nav.cockpit`, `page.cockpit.title`, `page.cockpit.description`); Paritätstest (f) 621 → 621 + n. Begriffe: „Leitstand“
-/ „Cockpit“ (Glossar), „im Legal Clearing“ (vorhandene Statusbeschriftung), „Rückstand je Fachbereich“, „Zulauf
-je 5 min“, „Ohne Endstatus“ / „No final status yet“, „Faden“ / „Thread“, „Kanarienfrage“ / „Canary question“, Stufen
-„erhöht“ / „elevated“ und „kritisch“ / „critical“. Nie „Dashboard“, „Ticket“, „KPI“ in Texten. Glossar: neue Zeilen
-**Faden** (Code `statusTrail`, „Timeline“ verboten), **Endstatus** (vorgelesen, abgeschlossen, zurückgezogen, zusammengeführt;
-Gegenteil von „offen“ im Auswertungskatalog 033b; „terminal“ in Texten verboten), **Kanarienfrage** (Platzhalter in 061, Inhalt
-086); Zeile **Leitstand** ergänzt um `getMeetingCockpit`, `cockpit.read`.
+**Standard:** neues i18n-Modul `cockpit` (DE, en-US; rund 62 Schlüssel, der Bau nennt die Zahl) und drei Shell-Schlüssel; Parität
+621 → 621 + n. Begriffe: „Leitstand“ / „Cockpit“ (Glossar), „im Legal Clearing“, „Stationen“ / „Stations“, „Engpass“ /
+„Bottleneck“, „Rückstand je Fachbereich“, „Zulauf je 5 min“, „Auf der Bühne“, „Ohne Endstatus“ / „No final status yet“, „Faden“ /
+„Thread“, „Kanarienfrage“ / „Canary question“, „erhöht“ / „elevated“, „kritisch“ / „critical“. Nie „Dashboard“, „Ticket“, „KPI“.
+Glossar: **Faden** (`statusTrail`; „Timeline“ verboten); **Endstatus** (Oberfläche: vorgelesen, abgeschlossen, zurückgezogen,
+zusammengeführt = Gegenteil von „offen“ im Katalog 033b; **nicht** dasselbe wie `TERMINAL_STATUSES` im Code, das „vorgelesen“
+nicht enthält, weil danach noch „abgeschlossen“ folgen kann; „terminal“ in Texten verboten); **Kanarienfrage** (Platzhalter in 061,
+Inhalt 086); **Engpass** (Kennzeichen an der Station Legal Clearing ab Stufe erhöht); Zeile **Leitstand** um `getMeetingCockpit`,
+`cockpit.read`, Bericht `leitstand` ergänzt.
+
+## Kennzahlen-Allowlist
+
+Bericht `leitstand` (Entscheidung 8b). Keine neue Familie; jedes Feld von `Cockpit` hat eine Quelle im Katalog oder in
+`Meeting.counts`:
+
+| Feld | Quelle | Personenbezug |
+|---|---|---|
+| `oldestOpen.ageSeconds` | Familie `hv_open_question_oldest_age_seconds` | keiner |
+| `openByUnit`, `openUnassigned` | Familie `hv_open_questions` (Label `unit_id`; `unassigned`) | E13: Fachbereich mit einer Person |
+| `inflow.last5m`, `inflow.bins[11]` | Familie `hv_questions_captured_last_5m` | keiner |
+| `inflow.bins[0..10]` | dieselbe Definition, frühere Fenster (Zeitreihe derselben Familie, `derived:`) | keiner |
+| `legalReview.over10m` | Familie `hv_questions_in_legal_review_over_10m` | E13: Rollengruppe Legal Clearing |
+| `totals.captured` | `Meeting.counts.questions` | keiner |
+| `totals.open` | `Meeting.counts.open` | keiner |
+| `totals.staged` | `Meeting.counts.staged` | keiner |
+| `totals.answered` | `Meeting.counts.byStatus.delivered` + `.closed` (`derived:`) | keiner |
+| `openByStatus.*` | `Meeting.counts.byStatus` | E13: Rollengruppen Erfassung, Legal Clearing, Freigabe |
+| `oldestOpen.items`, `legalReview.items` | Referenzen je Einzelfrage (`derived:` aus der Projektion, gefiltert nach `can()`), keine Kennzahl | keiner (kein Redner, kein Akteur) |
+| `meetingId`, `asOf`, `meetingStatus`, `debateClosedAt` | Stammdaten | keiner |
 
 ## Nicht-Ziele
 
-- Keine Prognosen (Z11) und kein Flussbild mit Punkt je Einzelfrage (Z12): 061b.
-- Keine neue Kennzahl im Katalog, keine Änderung an `/metrics`, `catalog.json` oder dem Allowlist-Tor; die Ausgabe von `/metrics`
-  bleibt gleich (Test K3b).
+- Keine Prognosen (Z11), kein Flussbild mit Punkt je Einzelfrage (Z12): 061b. Kein Durchsatz („erledigt je Zeit“).
+- **Keine neue Kennzahlfamilie**, keine Änderung an `/metrics` oder `prometheus.ts`; `catalog.json` bekommt nur den Bericht.
 - Keine Schwellen je Jahrgang, keine Konfiguration, keine Alarme (085), kein Inhalt der Kanarienfrage (086), keine Restantenliste
-  oder Quittung (087), kein Debattenschluss.
-- Kein Sprung in Steuerung, Beantwortung oder Historie mit vorbelegtem Filter (deren Filter haben keinen URL-Zustand).
-- Keine Quelle der Rechtemenge an `/auth/me` und kein Ausblenden in der Navigation (089b).
-- Keine Druckstile, keine Großanzeige, kein Dunkelmodus.
-- Kein Schreiben: der Leitstand bietet keine Aktion an einer Einzelfrage an.
-- Kein Ausschluss synthetischer Einzelfragen (das bringt 086 mit `synthetic=true`; Hinweis an 086 unten).
-- Keine Änderung an `apps/web/src/components/**`, `styles/**`, anderen Feature-Ordnern oder an der Shell außer der Registerzeile.
+  (087), kein Debattenschluss, kein Schreiben.
+- Kein Sprung in andere Ansichten mit Filter; keine Quelle der Rechtemenge (089b); keine Druckstile, keine Großanzeige.
+- Kein Ausschluss synthetischer Einzelfragen (086). Keine Änderung an `components/**`, `styles/**`, anderen Feature-Ordnern oder der
+  Shell außer der Registerzeile.
 
 ## Files allowed
 
-Vertragsschritt (Architekt):
-- `packages/contract/openapi.yaml` (nur `cockpit.read` im Enum `Permission`, die Operation `getMeetingCockpit`, die Schemas `Cockpit` und `CockpitQuestionRef`, ggf. ein Tag, `info.version`)
-- `packages/contract/CHANGELOG.md` (nur der Abschnitt 0.4.5)
+Teil A — Vertragsschritt (Architekt):
+- `packages/contract/openapi.yaml` (nur `cockpit.read` im Enum `Action` mit seinem „Since“-Absatz, die Operation `getMeetingCockpit`, die Schemas `Cockpit`, `CockpitOldestRef`, `CockpitReviewRef`, ggf. ein Tag, `info.version`)
+- `packages/contract/package.json` (nur `version`)
+- `packages/contract/CHANGELOG.md` (nur der neue Abschnitt)
 - `packages/contract/src/types.ts` (nur neu erzeugt)
+- `apps/api/src/__tests__/takt-019-contract.test.ts` (nur die Zeilen zu Version und Zahl der Operationen)
+- `apps/api/src/__tests__/contract.test.ts` (nur die Versionszeile)
 
-Kern und Dienst (implementierer-backend):
+Teil A — Kern, Dienst, Katalog (implementierer-backend):
 - `packages/domain/src/cockpit.ts` (neu)
 - `packages/domain/src/__tests__/cockpit061.test.ts` (neu)
 - `packages/domain/src/indicators.ts` (nur gemeinsame Hilfen exportieren oder aus `cockpit.ts` importieren; Ausgabe unverändert)
-- `packages/domain/src/types.ts` (nur `cockpit.read` in `PERMISSIONS`, `getCockpit` in `READ_PERMISSIONS`, die Typen `Cockpit` und `CockpitQuestionRef`)
+- `packages/domain/src/types.ts` (nur `cockpit.read` in `PERMISSIONS`, `getCockpit` in `READ_PERMISSIONS`, die drei Typen)
 - `packages/domain/src/permissions.ts` (nur `cockpit.read` in den Bündeln moderation, coordination, admin)
 - `packages/domain/src/api.ts` (nur `getCockpit` in `HvApi` und seine Umsetzung)
 - `packages/domain/src/index.ts` (nur Exporte aus `cockpit.ts`)
 - `packages/domain/src/__tests__/admin040a.test.ts` (nur die Liste der Administration 14 → 15)
+- `packages/domain/src/__tests__/forward048.test.ts` (nur die Zeile der Administrationsliste)
 - `apps/api/src/app.ts` (nur die Route `GET /v1/meetings/:meetingId/cockpit`)
 - `apps/api/src/__tests__/cockpit061.test.ts` (neu)
 - `apps/api/src/__tests__/postgres-cockpit061.test.ts` (neu)
+- `apps/api/src/__tests__/fixtures/metrics-golden-061.txt` (neu, vor jeder Änderung an `indicators.ts` erzeugt)
+- `apps/api/src/metrics/catalog.json` (nur das neue Feld `reports`)
+- `scripts/auswertungskatalog.mjs` (nur der Abschnitt Berichte), `scripts/auswertungskatalog.test.mjs` (nur Test G1)
+- `scripts/metrics-allowlist-check.mjs` (nur Regel (g)), `scripts/metrics-allowlist-check.test.mjs` (nur Tests G2, G3)
+- `scripts/fixtures/metrics-allowlist/report-*.json` (neu)
+- `docs/sicherheit/bedrohungsmodell.md` (nur eine Zeile 061 in „Weitere Scheiben mit Sicherheitsbezug“, Verweis in der Zeile T-G2-D-03 und der neue Missbrauchsfall MF-15)
+- `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V15)
 
-Oberfläche (implementierer-oberflaeche):
+Teil B — Oberfläche (implementierer-oberflaeche):
 - `apps/web/src/features/cockpit/**` (neu)
+- `apps/web/src/api/cockpit.ts` (neu: Wiederausgabe von `cockpitLevel`, `COCKPIT_THRESHOLDS`, `statusTrail` und der Typen für die Ansicht)
 - `apps/web/src/api/http.ts` (nur die Route `getCockpit`)
-- `apps/web/src/api/liveStore.ts` (nur der Eintrag `getCockpit` in `READ_TOPICS`)
+- `apps/web/src/api/liveStore.ts` (nur `getCockpit` im Ausschluss von `BufferedRead`)
 - `apps/web/src/api/http.test.ts` (nur die Zeile der Routentabelle für `getCockpit`)
 - `apps/web/src/api/cockpit061.test.ts` (neu)
 - `apps/web/src/app/featureRegistry.ts` (nur die Zeile `cockpit`, ihr Import und ihr Symbol)
 - `apps/web/src/app/featureRegistry.test.ts` (nur die Erwartungen zur neuen Zeile)
 - `apps/web/src/i18n/cockpit.de.ts` (neu), `apps/web/src/i18n/cockpit.en.ts` (neu)
 - `apps/web/src/i18n/{de,en}.ts` (nur das Modul `cockpit`)
-- `apps/web/src/i18n/{shell.de,shell.en}.ts` (nur die drei Schlüssel `nav.cockpit`, `page.cockpit.*`)
+- `apps/web/src/i18n/{shell.de,shell.en}.ts` (nur `nav.cockpit`, `page.cockpit.*`)
 - `apps/web/src/i18n/parity.test.ts` (nur Modul `cockpit` und die Gesamtzahl)
 - `apps/web/e2e/061-leitstand.spec.ts` (neu)
-- `apps/web/playwright.config.ts` (nur `SHARED_SPECS`: die neue Datei eintragen)
-- `scripts/e2e-http-031.test.mjs` (nur `SHARED_FILES` und `HTTP_ORDER`: die neue Datei an ihrer Pfadstelle zwischen 055b und 080)
-
-Dokumentation:
+- `apps/web/playwright.config.ts` (nur `SHARED_SPECS`)
+- `scripts/e2e-http-031.test.mjs` (nur `SHARED_FILES` und `HTTP_ORDER`: die neue Datei zwischen 055b und 080)
 - `docs/evidence/061-*.png`
 - `docs/glossar.md` (nur die Zeilen aus Entscheidung 13)
-- `docs/datenschutz/dsfa-vorentwurf.md` (nur Zeile V15: Leitstand als Empfänger, Verweis auf 061)
-- `docs/sicherheit/bedrohungsmodell.md` (nur eine Zeile 061 in „Weitere Scheiben mit Sicherheitsbezug“)
-- `docs/feedback/2026-09-zielbild-oberflaeche.md` (nur Status Z10 und Z13 auf `ist (061)`, Ort von Z11 und Z12 auf 061b)
+- `docs/feedback/2026-09-zielbild-oberflaeche.md` (nur Status Z10 `ist (061)`, Z13 `ist teilweise (061)`, Ort von Z11 und Z12 auf 061b)
+
+Beide Teile:
 - `docs/folgeliste.md` (nur nicht blockierende Befunde aus Bau und Review)
 - `docs/slices/061-leitstand.md` (diese Spec: Bericht, Review findings)
 
 ## Ausdrücklich nicht erlaubt
 
-Alles unter `apps/web/src/components`, `apps/web/src/styles`, `apps/web/src/app` außer den zwei Registerdateien, die übrigen
-Feature-Ordner (answers, steering, focus, capture, stage, history, speakers), `apps/api/src/metrics`, `scripts/` außer der einen
-Testdatei, die Wahrheitstabelle, `docs/produktplan-beta.md` (Hinweise an den Orchestrator unten), `.github`. Fehlt etwas: anhalten
-und melden. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“.
+`apps/web/src/components`, `apps/web/src/styles`, `apps/web/src/app` außer den zwei Registerdateien, die übrigen Feature-Ordner,
+`apps/api/src/metrics/prometheus.ts`, die Familien in `catalog.json`, `scripts/` außer den genannten Dateien, die Wahrheitstabelle,
+`docs/produktplan-beta.md`, `.github`. Fehlt etwas: anhalten und melden. Dieser Abschnitt steht bewusst außerhalb von „Files allowed“.
 
 ## Vor dem Bau prüfen
 
-1. **Lesebefund** dieser Spec in frischem Kontext liegt vor (Datenschutz, Security, Vertrag) und ist eingearbeitet; erst dann
-   der Vertragsschritt. Vertrag ist noch 0.4.4, sonst nächste freie Patchnummer.
-2. `reduce` lässt sich über die Ereignisse falten, die `getQuestionHistory` liefert (maskierte Leseereignisse einer einzelnen
-   Einzelfrage, ohne Redebeitrag und Wortmeldung im Zustand), und liefert für jede Einzelfrage des Seeds den Status, den
-   `getQuestion` meldet. **Geht das nicht, anhalten und melden**; keine zweite Zuordnung Ereignistyp → Status. Rückfall nach
-   Entscheidung des Orchestrators: der Faden zeigt nur die aktuelle Station aus der Referenz.
-3. `listQuestions({ status: […], limit: 2000 })` ist für moderation, coordination und admin in beiden Projekten vollständig
-   (Summe = `totals.open`). Sonst nennt der Bericht die Abweichung.
-4. Rechenzeit: `getCockpit` bei 800 Einzelfragen in-process (Seed mit `questions: 800`) p90 < 50 ms. Darüber: Zwischenspeicher je
-   Jahrgang bis zum nächsten Ereignis oder 5 s, eine Rechnung zur Zeit (Muster `createSingleFlightCache`), im Bericht begründet.
-5. **Laufzeit `e2e-http`:** Dauer des Schritts „End-to-end http project …“ aus den letzten drei grünen Läufen lesen
-   (`gh api repos/ypoxx/hvworkflow/actions/runs/<id>/jobs`). Schätzung der Mehrzeit: drei Rollenwechsel, keine Schreibschritte,
-   axe, ein Screenshot ≈ **0:40**. Liegt Ist plus Schätzung über 6:30 (weiche Warnschwelle), im Bericht nennen; über 11:00
-   anhalten.
-6. Die e2e-Datei schreibt im Projekt `http` **nichts** (nur Lesen); dann bleibt der Endzustand für 080 und abnahme unberührt.
+1. Nachprüfung der Blocker und major-Punkte in frischem Kontext liegt vor; dann der Vertragsschritt. Vertragsversion lesen
+   (046 gemergt? dann 0.4.6).
+2. **Golden zuerst:** vor jeder Änderung an `indicators.ts` die Ausgabe von `renderMetrics` für den Seed mit fester Uhr als
+   `metrics-golden-061.txt` committen (eigener Commit); A5 vergleicht dagegen.
+3. `reduce` lässt sich über die Ereignisse falten, die `getQuestionHistory` liefert, und ergibt für jede Einzelfrage des Seeds den
+   Status von `getQuestion`. **Geht das nicht, anhalten und melden**; keine zweite Zuordnung Ereignistyp → Status. Rückfall: der Faden
+   zeigt nur die aktuelle Station aus der Referenz; `statusAgeSeconds` kommt **in jedem Fall** aus der Faltung in `computeCockpit`
+   über das vollständige Log des Jahrgangs (dort ist der Zustand vollständig).
+4. `listQuestions({ status: […], limit: 2000 })` ist für moderation, coordination und admin in beiden Projekten vollständig.
+5. Rechenzeit (T-G2-D-03): `getCockpit` bei 800 in-process p90 < 50 ms. Darüber: Zwischenspeicher je Jahrgang bis zum nächsten
+   Ereignis oder 5 s, eine Rechnung zur Zeit (`createSingleFlightCache`), Filter nach `can()` je Leser **nach** dem Zwischenspeicher.
+6. Laufzeit `e2e-http` aus den letzten drei grünen Läufen; Schätzung +0:40 (nur Lesen); über 6:30 im Bericht nennen, über 11:00
+   anhalten. Die e2e-Datei schreibt im Projekt `http` nichts.
 
 ## Tests zuerst (rot, dann grün)
 
 **Kern** (`packages/domain/src/__tests__/cockpit061.test.ts`, feste Uhr):
 
-- **K1 Rechte.** Genau die Bündel moderation, coordination, admin halten `cockpit.read` (erwartete Liste als Daten im Test, wie
-  `admin040a`); die Administration hat 15 Rechte. Jeder Inhaber hält auch ein Recht des Themas `questions` (Invariante oben).
-- **K2 Verweigerung.** `getCockpit` antwortet für jede übrige Rolle (aus `ROLES` minus Inhaber, datengetrieben) mit 403 R-PERM-02;
-  für eine gebundene Fachkraft ebenso; keine Teildaten.
-- **K3 Gleichheit mit 033b.** Für einen laufenden Jahrgang (Seed und eine Grenzfall-Ereignisliste mit Erfassung genau 300 s und
-  301 s vor `now`, Eintritt ins Legal Clearing genau 600 s und 601 s vor `now`, Rückgabe nach `in_review`, neuer
-  Verweigerungsvorschlag): `oldestOpen.ageSeconds`, `openByUnit` + `openUnassigned`, `inflow.last5m` und `legalReview.over10m`
-  gleichen den Werten von `computeIndicators` für dieselbe Liste und dasselbe `now`. **K3b:** `renderMetrics` gibt für den Seed
-  vor und nach der Änderung dieselbe Zeichenkette aus.
+- **K1 Rechte.** Genau moderation, coordination, admin halten `cockpit.read` (Liste als Daten im Test); die Administration hat 15
+  Rechte, `cockpit.read` zuletzt; jeder Inhaber hält `question.read`, und sein Bündel ist **kein** `unitBound`-Bündel.
+- **K2 Verweigerung.** `getCockpit` für jede übrige Rolle (datengetrieben) und für eine gebundene Fachkraft: 403 R-PERM-02, keine
+  Teildaten.
+- **K3 Gleichheit mit 033b** (laufender Jahrgang; Seed und Grenzfall-Liste: Erfassung 300/301 s, Eintritt ins Legal Clearing 600/601 s,
+  Rückgabe nach `in_review`, neuer Verweigerungsvorschlag): `oldestOpen.ageSeconds`, `openByUnit` + `openUnassigned`,
+  `inflow.last5m`, `legalReview.over10m` gleich `computeIndicators`.
 - **K4 Zulauf.** 12 Fächer, disjunkt, `bins[11] === last5m`, Summe = Erfassungen mit Alter ≤ 3600 s; Grenzen 300/600/3600 s.
-- **K5 Älteste.** Höchstens 4 Referenzen, älteste zuerst, Gleichstand nach `number`; `items[0].ageSeconds === ageSeconds`;
-  `statusAgeSeconds` ändert sich durch Claim, Rechtsfreigabe und Weiterleiten **nicht**, durch Zuweisen und Zurückgeben schon.
-- **K6 Legal Clearing.** Höchstens 50 Referenzen, längste Wartezeit zuerst, jede mit `reviewAgeSeconds > 600`; ein neuer
-  Verweigerungsvorschlag setzt `reviewAgeSeconds` zurück (033b-Regel).
-- **K7 Datenschutz (Negativtest und Allowlist).** Seed mit Rollenzuordnungen, die Personen an Fachbereiche binden, mit
-  `personId` und Klarnamen; Akteur coordination (hält `question.identity.reveal`). Die serialisierte Antwort enthält **keine**
-  Akteur-id, keine `personId`, keine `subjectId` einer Rollenzuordnung, keinen `speakerId`, keinen Rednernamen, keinen
-  Teil eines Fragetexts (Stichproben über alle Einzelfragen); der rekursive Schlüsselweg ergibt genau die Pfade der Allowlist
-  (Entscheidung 8); die Schlüssel von `openByUnit` sind genau die Fachbereichs-ids des Jahrgangs. Rot-Probe: ein absichtlich
-  ergänztes Feld `claimedBy` lässt den Test scheitern (im Bericht gezeigt, nicht committet).
-- **K8 Zeit.** `asOf` gleich der injizierten Uhr; Uhr um 10 min vorgestellt ohne Ereignis ⇒ alle Alter + 600, `over10m` und Stufen
-  folgen; ein Ereignis nach `asOf` zählt nirgends.
-- **K9 Statusverlauf.** `statusTrail` liefert für jede Einzelfrage des Seeds als letzten Status den projizierten; Ereignisse ohne
-  Statuswechsel erzeugen keinen Eintrag; über die Ereignisse aus `getQuestionHistory`.
-- **K10 Stufen.** `cockpitLevel` an jeder Schwelle (Grenzwert ⇒ höhere Stufe), Zulauf immer `calm`, „Ohne Endstatus“ vor
-  Debattenschluss immer `calm`, danach bei > 0 `attention`.
-- **K11 Jahrgang nicht laufend.** In `preparation` und `closed` gerechnet, `meetingStatus` gemeldet; leerer Jahrgang: alle Zahlen 0,
-  `items` leer, `bins` zwölf Nullen.
+- **K5 Älteste und Verweildauer.** Höchstens 4 Referenzen, älteste zuerst, Gleichstand nach `number`; `items[0].ageSeconds ===
+  ageSeconds`. `statusAgeSeconds` = Sekunden seit dem letzten Ereignis, nach dem sich der Status geändert hat: **unverändert** nach
+  Claim und Freigabe des Claims, Rechtsfreigabe (Status bleibt `in_review`), Weiterleiten und neuem Verweigerungsvorschlag im Legal
+  Clearing; **neu gesetzt** nach Zuweisen (classified → assigned), Einreichen, Zurückgeben, Freigeben.
+- **K6 Legal Clearing.** Höchstens 50, längste Wartezeit zuerst, `reviewAgeSeconds > 600`, Rücksetzen beim neuen Vorschlag;
+  `reviewAgeSeconds` erscheint nie in `oldestOpen.items`.
+- **K7 Datenschutz (Negativtest).** Seed mit Rollenzuordnungen, die Personen an Fachbereiche binden, mit `personId` und Klarnamen;
+  Akteur coordination (hält `question.identity.reveal`): die serialisierte Antwort enthält keine Akteur-id, keine `personId`, keine
+  `subjectId` einer Rollenzuordnung, keinen `speakerId`, keinen Rednernamen, keinen Teil eines Fragetexts; Schlüssel von `openByUnit`
+  = Fachbereichs-ids. Rot-Probe: ein ergänztes Feld `claimedBy` lässt den Test scheitern (im Bericht gezeigt, nicht committet).
+- **K8 Zeit.** `asOf` = injizierte Uhr; Uhr +10 min ohne Ereignis ⇒ alle Alter + 600, `over10m` und Stufen folgen; Ereignis nach `asOf`
+  zählt nirgends.
+- **K9 Statusverlauf.** `statusTrail` für jede Einzelfrage des Seeds: letzter Eintrag = projizierter Status, erster = `captured`, kein
+  Eintrag ohne Statuswechsel; über die Ereignisse aus `getQuestionHistory`; `statusAgeSeconds` = `asOf − letzter Eintrag.at`.
+- **K10 Stufen.** `cockpitLevel` an jeder Schwelle; Zulauf und Bühne immer `calm`; „Ohne Endstatus“ vor Debattenschluss `calm`,
+  danach bei > 0 `attention`; „Ohne Fachbereich“ mit den Rückstandsschwellen.
+- **K11 Jahrgang nicht laufend / leer.** `preparation`, `closed` gerechnet; leerer Jahrgang: Nullen, `items` leer, `bins` zwölf Nullen.
+- **K12 Filter nach `can()`.** Mit einer Prüfung, die eine bestimmte Einzelfrage ablehnt: sie fehlt in `items`, alle Zahlen und
+  `oldestOpen.ageSeconds` bleiben gleich.
 
-**Dienst** (`apps/api/src/__tests__/cockpit061.test.ts`, `postgres-cockpit061.test.ts`):
+**Dienst und Katalog** (`apps/api/src/__tests__/cockpit061.test.ts`, `postgres-cockpit061.test.ts`; `scripts/*.test.mjs`):
 
-- **A1** 200 für coordination, Antwort gültig gegen das Vertragsschema, Header `X-Server-Time`.
-- **A2** 403 R-PERM-02 für expert und observer mit Regel-id im Problem; 401 ohne Akteur; 404 für einen unbekannten Jahrgang.
+- **A1** 200 für coordination, gültig gegen das Vertragsschema, Header `X-Server-Time`.
+- **A2** 403 R-PERM-02 für expert und observer mit Regel-id; 401 ohne Akteur; 404 unbekannter Jahrgang.
 - **A3** Antwort über HTTP gleich `getCockpit` in-process für denselben Speicher und dieselbe Uhr.
-- **A4** (Postgres) 200 aus dem Jahrgangs-Schnappschuss, nie aus der globalen Projektion (takt-024); Zugriffslog mit
-  `operationId` und ohne Inhalt der Antwort.
+- **A4** (Postgres) 200 aus dem Jahrgangs-Schnappschuss (takt-024); 503 `PersistenceBusy` bei belegter Persistenz wie andere Lesungen;
+  Zugriffslog mit `operationId`, ohne Antwortinhalt.
+- **A5** `/metrics` unverändert (früher K3b): Ausgabe von `renderMetrics` für den Seed mit fester Uhr gleich `metrics-golden-061.txt`
+  (rot, wenn ein Refactoring die Ausgabe ändert; die Rot-Probe steht im Bericht).
+- **A6** Bericht: `catalog.json` `reports[leitstand]` gleich `COCKPIT_REPORT` (Felder, Aggregation, Mindestzahl, Recht, Operation).
+- **A7** Allowlist aus dem Vertrag (früher Teil von K7): die Menge der Pfade, die das Schema `Cockpit` mit Unterschemas erlaubt, ist
+  gleich der Feldliste von `COCKPIT_REPORT`, und jede tatsächliche Antwort (Seed, alle drei Inhaber) enthält nur solche Pfade.
+- **G1** Generator schreibt den Abschnitt „Berichte (Oberfläche)“ mit `leitstand` und `reports` ins JSON.
+- **G2** Tor grün mit dem echten Katalog und für einen Katalog ohne `reports`; **G3** rot für die Fixtures
+  `report-person-field.json` (Feldpfad mit `actor`), `report-no-spec-section.json`, `report-bad-source.json`, `report-bad-id.json`.
 
 **Web** (`apps/web/src/api/cockpit061.test.ts`, `apps/web/src/features/cockpit/*.test.ts(x)`):
 
-- **W1** Stufe → Darstellung: ruhig ohne Badge, erhöht und kritisch mit Symbol und Wort; Zugänglicher Name enthält die Stufe.
-- **W2** Zulaufsäulen: 12 Rechtecke, Grundlinie 0, Skala `max(…, 5)`, jüngste Säule Akzent, leere Fenster als Strich, Name mit
-  allen Werten.
-- **W3** Rückstand: Reihenfolge, „Ohne Fachbereich“ zuletzt, `data-count` gleich `openByUnit`, Füllfarbe nur bei Stufe.
-- **W4** Zustände: Laden (Skelette mit festen Höhen, keine Layoutänderung beim Wechsel zu Daten), Fehler (Grund und Regel-id,
-  „Erneut laden“), Lesezustand bei 403 (`cockpit-forbidden`), leer („—“, kein „Faden öffnen“).
-- **W5** Datenschutz im DOM: Seite mit Seed und Akteur coordination, Liste „Ohne Endstatus“ und ein Faden offen: das DOM enthält
-  keinen Rednernamen aus `listSpeakers`, keine Akteur-id (`u-…`), kein `data-*`-Attribut mit Person.
-- **W6** Faden: Stationen mit HH:MM, aktuelle mit „seit n min“ aus `asOf`, drei Formen, kein Akteur, kein Rückgabegrund.
-- **W7** Keine Geräteuhr: die Quellen unter `features/cockpit/` enthalten weder `Date.now` noch `new Date()` ohne Argument noch
-  `performance.now` (Test liest die Dateien).
-- **W8** Tastatur: Enter auf einer Kennzahl öffnet die Liste, Pfeile in der Liste, Enter öffnet den Faden, Escape schließt in
-  zwei Stufen, Fokus zurück zum Auslöser; eine Live-Aktualisierung (Schreibvorgang eines zweiten Akteurs auf demselben Speicher)
-  ändert die Zahl, ohne den Fokus zu verschieben.
-- **W9** Live über den echten Live-Store in-process: Schreibvorgang (Zurückziehen durch moderation) ⇒ `totals.open` sinkt in der
-  angezeigten Zahl ohne Neuladen der Seite.
-- **W10** Zeit: `getCockpit` bei 800 in-process p90 < 50 ms (20 Läufe); Aufbau der Liste „Ohne Endstatus“ bei 800 p90 < 100 ms (D9).
+- **W1** Stufen: ruhig ohne Badge; erhöht/kritisch mit Symbol, Wort und Schwelle aus `COCKPIT_THRESHOLDS`; „Engpass“ an der Station
+  Legal Clearing genau ab erhöht; zugänglicher Name mit Stufe und Schwelle.
+- **W2** Zulauf: 12 Rechtecke in 280 × 48, Grundlinie 0, Skala `max(…, 5)`, jüngste Säule Akzent, Strich für leere Fenster,
+  Achsenbeschriftungen, Name mit allen Werten.
+- **W3** Rückstand: Reihenfolge, „Ohne Fachbereich“ zuletzt mit Unterzeile, `data-count`, Füllfarbe nur bei Stufe, Schwellenstrich an
+  der richtigen Position (Anteil 20 / Skala).
+- **W4** Zustände: Laden mit festen Höhen, Fehler mit Regel-id und „Erneut laden“, `cockpit-forbidden`, leer, Hauptlesung ohne
+  lesbare Referenz (8a).
+- **W5** Datenschutz im DOM: Liste „Ohne Endstatus“ und Faden offen ⇒ kein Rednername aus `listSpeakers`, keine Akteur-id (`u-…`).
+- **W6** Faden: waagrecht, Einträge in Zeitreihenfolge mit HH:MM, aktuelle mit „seit n min“, drei Formen, Umbruch nach acht, kein
+  Akteur, kein Rückgabegrund.
+- **W7** Keine Geräteuhr in `features/cockpit/` (Test liest die Dateien).
+- **W8** Tastatur und Fokus: Pfad nach Entscheidung 11; eine Live-Aktualisierung verschiebt den Fokus nicht.
+- **W9** Live in-process über den echten Live-Store: Zurückziehen durch moderation ⇒ `totals.open` sinkt ohne Neuladen; das
+  15-s-Intervall liest `getCockpit` am Puffer vorbei (zwei Aufrufe ⇒ zwei Rechnungen).
+- **W10** Zeit: `getCockpit` bei 800 p90 < 50 ms; Liste „Ohne Endstatus“ bei 800 p90 < 100 ms (D9).
+- **W11** Ansage: Wechsel einer Kennzahl nach „kritisch“ erzeugt genau eine Ansage; gleichbleibend kritisch keine weitere; Wechsel
+  nach erhöht keine.
 
 **e2e** (`apps/web/e2e/061-leitstand.spec.ts`, Projekte `in-process` und `http`, axe bei jedem Ansichtswechsel):
 
-- **S1** coordination öffnet `/cockpit` über die Navigation: Hauptlesung, vier Kennzahlen, Rückstand sichtbar; genau eine
-  primäre Schaltfläche.
-- **S2** Gleichheit über Ansichten: „Ohne Endstatus“ gleich dem Zähler `open` der Navigation; jede Fachbereichszeile gleich der
-  Zelle der Verteilung in `/steering` (`data-count`, 053).
-- **S3** Drill-down: Klick auf „Im Legal Clearing über 10 min“ ⇒ Liste mit so vielen Zeilen wie die Zahl (bis 50), jede Zeile
-  Station „im Legal Clearing“; Enter auf einer Zeile ⇒ Faden mit aktueller Station „im Legal Clearing“; Escape, Escape ⇒ zu,
-  Fokus auf der Kennzahl; die URL trägt `list=legal` und nach dem Schließen nicht mehr.
-- **S4** Lesezustand: expert öffnet `/cockpit` ⇒ `cockpit-forbidden`, keine Zahl.
-- **S5** (nur in-process) moderation: Zahl „Ohne Endstatus“ N; eine Einzelfrage in der Beantwortung zurückziehen; zurück im
-  Leitstand N − 1 und die Einzelfrage fehlt in der Liste „Ohne Endstatus“.
-- **S6** Datenschutz: nach S3 enthält der Seiteninhalt keinen Rednernamen aus dem Seed (Liste der synthetischen Namen aus
-  `listSpeakers` im Test gelesen) und keine Akteur-id.
-- **S7** 200 % Zoom (Breite 640 CSS-px): kein waagrechtes Scrollen, alle vier Kennzahlen erreichbar.
-- **S8** Screenshots (nur in-process, Schriften geladen): `061-leitstand-de.png`, `061-leitstand-en.png` (1440 × 900),
-  `061-liste-faden-de.png`, `061-liste-faden-en.png` (Liste Legal Clearing mit offenem Faden), `061-wand-1280x720-de.png`.
+- **S1** coordination öffnet `/cockpit`: Hauptlesung, vier Karten, Zulauf, Stationen, Rückstand sichtbar; genau eine primäre
+  Schaltfläche.
+- **S2** Gleichheit über Ansichten: „Ohne Endstatus“ = Zähler `open` der Navigation; „Auf der Bühne“ = Zähler `staged`; jede
+  Fachbereichszeile = Zelle der Verteilung in `/steering`.
+- **S3** Drill-down Legal Clearing: Zeilenzahl = Kennzahl (bis 50), Spalte „wartet seit“; Enter ⇒ Faden mit aktueller Station; Escape,
+  Escape ⇒ zu, Fokus auf der Karte; URL mit und ohne `list=legal`.
+- **S4** Lesezustand für expert.
+- **S5** (nur in-process) moderation zieht eine Einzelfrage zurück ⇒ „Ohne Endstatus“ N − 1, Einzelfrage fehlt in der Liste.
+- **S6** Datenschutz: nach S3 kein Rednername aus dem Seed, keine Akteur-id im Seiteninhalt.
+- **S7** 200 % Zoom (640 CSS-px): kein waagrechtes Scrollen.
+- **S8** Screenshots (in-process, Schriften geladen): `061-leitstand-de.png`, `061-leitstand-en.png` (1440 × 900),
+  `061-liste-faden-de.png`, `061-liste-faden-en.png` (Liste Legal Clearing mit waagrechtem Faden), `061-wand-1280x720-de.png`,
+  `061-wand-1280x720-en.png`.
 
 ## Akzeptanzkriterium
 
-1. Lesebefund vor dem Bau liegt vor; Vertragsschritt als erster Commit (Typen erzeugt, CHANGELOG 0.4.5), vor jedem Code.
-2. Tests K1–K11, A1–A4, W1–W10 vor der Änderung rot (Ausgabe im Bericht), danach grün; S1–S8 im Projekt `in-process` grün,
-   auch mit `--repeat-each=3`; S1–S4, S6, S7 im Projekt `http` grün im CI-Lauf `e2e-http` des PR.
-3. Volle Playwright-Suite `in-process` grün (Anzahl nennen), darunter unverändert 001, 013, 053, 054; axe ohne serious/critical.
-4. Fünf Screenshots in `docs/evidence/061-*.png` nach S8; auf dem Hauptbild sind Hauptlesung mit Stufe, vier Kennzahlen mit
-   Zulaufsäulen und Stationsleiste, Rückstand und die Kanarienzeile lesbar.
-5. `pnpm role-literals`, `pnpm i18n-literals`, `pnpm vocabulary`, `pnpm now-check`, `pnpm metrics-allowlist` grün; Paritätstest
-   mit der neuen Zahl; `policy-truth-table.md` unverändert; `/metrics`-Ausgabe unverändert (K3b).
+1. Nachprüfung liegt vor; Vertragsschritt als erster Commit von Teil A, Golden als eigener Commit vor jeder Änderung an
+   `indicators.ts`.
+2. Teil A: K1–K12, A1–A7, G1–G3 vor der Änderung rot (Ausgabe im Bericht), danach grün; `pnpm gates` grün auf dem Branch von Teil A.
+3. Teil B: W1–W11 rot, dann grün; S1–S8 `in-process` grün, auch mit `--repeat-each=3`; S1–S4, S6, S7 im Projekt `http` grün im CI-Lauf
+   `e2e-http` des PR; volle Suite `in-process` grün, darunter unverändert 001, 013, 053, 054; axe ohne serious/critical.
+4. Sechs Screenshots nach S8; auf dem Hauptbild sind Hauptlesung mit Stufe und Schwelle, vier Karten, Zulauf mit Achse, Stationen mit
+   Zahlen, Rückstand mit Schwellenstrich und die Kanarienzeile lesbar.
+5. `pnpm role-literals`, `i18n-literals`, `vocabulary`, `now-check`, `metrics-allowlist` grün; Parität mit neuer Zahl;
+   `policy-truth-table.md` unverändert; `/metrics` unverändert (A5); Artefakt `auswertungskatalog` des PR-Laufs enthält den Bericht.
 6. Keine neue Abhängigkeit in einer `package.json` (takt-047).
-7. `pnpm slice-scope` grün auf `claude/slice-061-…`; `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
-8. Design-Kritik in frischem Kontext liegt vor, ohne Blocker (Tabelle D1–D10 unten), mit Vergleich zu `089-lagebild.png`.
+7. `pnpm slice-scope` grün auf beiden Branches; `pnpm gates` grün (Commit nennen, Schluss einmal wörtlich).
+8. Design-Kritik in frischem Kontext ohne Blocker (Tabelle unten), mit Vergleich zu `089-lagebild.png` und Prüfung der benannten
+   Ausnahmen (44-px-Hauptzahl, 11-px-Achse, leerer Zustand ohne Aktion).
 
 ## Nachweise
 
-- Rote und grüne Testausgaben, Schluss von `pnpm gates` mit Commit, Playwright-Zahlen, Zeitmessungen W10 und Vor-dem-Bau-Punkt 4.
-- `docs/evidence/061-*.png` (fünf Bilder aus `in-process`). Das ist der Bildnachweis.
-- Projekt `http`: grüner CI-Lauf `e2e-http` des PR mit Lauf-ID, Job-ID, Schluss des Logs mit den Fällen aus
-  `061-leitstand.spec.ts` und der Dauer des Schritts gegen 12:00 (Warnschwelle 6:30).
-- K7 mit der Rot-Probe (Ausgabe), Schlüsselweg der Antwort im Bericht.
+- Rote und grüne Testausgaben, Schluss von `pnpm gates` mit Commit je Teil, Playwright-Zahlen, Zeitmessungen.
+- `docs/evidence/061-*.png` (sechs Bilder aus `in-process`).
+- Projekt `http`: grüner CI-Lauf `e2e-http` des PR von Teil B mit Lauf-ID, Job-ID, Log-Schluss mit den Fällen aus
+  `061-leitstand.spec.ts`, Dauer gegen 12:00 (Warnschwelle 6:30).
+- Artefakt `auswertungskatalog` des PR von Teil A (Lauf-ID, Artefakt-ID) mit dem Abschnitt „Berichte (Oberfläche)“.
+- K7 und A5 mit Rot-Probe; Schlüsselweg der Antwort.
 - Design-Kritik als Tabelle im Bericht.
 
 ### Design-Vorgaben D1–D10 (Maßstab der Design-Kritik)
 
 | D | Vorgabe für diese Scheibe | Prüfung |
 |---|---|---|
-| D1 | In 30 s klar: links oben die älteste offene Einzelfrage, rechts drei Kennzahlen und der Zulauf, darunter der Rückstand; Titel und ein Satz, keine Erklärtexte. | Screenshot, Design-Kritik |
-| D2 | Genau eine primäre Schaltfläche („Faden öffnen“); Kennzahlen und Zeilen sind sekundär. Leerer Zustand ohne Aktion als begründete Ausnahme. | S1, W4 |
-| D3 | 12-Spalten-Raster, 8-px-Raster, Panels 16–24 px Innenabstand, Kanten der Kennzahlen fluchten mit der Hauptlesung und dem Rückstand. | Screenshot |
-| D4 | Ruhe ohne Farbe; Farbe nur bei Stufe, nur als Badge-Tönung oder Balkenfüllung, nie als Fläche; Zulauf einfarbig; keine Verläufe, keine Schatten. | W1–W3, Screenshot |
-| D5 | Alle Zahlen, Nummern, Zeiten in Mono, rechtsbündig, `tabular-nums`; Fehler mit Regel-id. | W3, W4, Screenshot |
-| D6 | Laden, leer, Fehler, Lesezustand, Verbindung unterbrochen, leere Liste gestaltet. | W4, S4 |
-| D7 | Alle Texte aus `cockpit.*`/Shell, DE und en-US, Hausvokabular, nie „Dashboard“, „KPI“, „Ticket“. | Parität, `pnpm vocabulary` |
-| D8 | Kernszene per Tastatur, Escape in zwei Stufen, Fokus sichtbar, Live verschiebt keinen Fokus. | W8, S3 |
-| D9 | Nichts Ausgegrautes; Lesezustand statt Teildaten; bei 800 unter 100 ms für Liste, `getCockpit` unter 50 ms. | W10, S4 |
-| D10 | Wirkt wie eine Konsole von 2026: ruhig, dicht, präzise; Hauptzahl trägt, Säulen und Leiste sind klein und genau, nichts wirkt wie eine Vorlage. | Design-Kritik gegen 089-lagebild |
+| D1 | In 30 s klar: links oben die älteste offene Einzelfrage, rechts drei Karten und der Zulauf, darunter Stationen mit Engpass und Rückstand; Titel und ein Satz. | Screenshot, Design-Kritik |
+| D2 | Genau eine primäre Schaltfläche („Faden öffnen“); leerer Zustand ohne Aktion als benannte Ausnahme. | S1, W4 |
+| D3 | 12-Spalten-Raster, 8-px-Raster, Unterkanten Hauptlesung/Zulauf fluchten, Karten gleich hoch; benannte Ausnahmen: Hauptzahl 44 px (40 px an der Wand), Achse 11 px; Kartenzahlen 28 px, Stationen 20 px. | Screenshot |
+| D4 | Ruhe ohne Farbe; Farbe nur bei Stufe als Badge oder Balkenfüllung, Statustönung der Stationen nur als 3-px-Kante; Zulauf einfarbig; keine Verläufe, keine Schatten. | W1–W3 |
+| D5 | Alle Zahlen, Nummern, Zeiten Mono, rechtsbündig, `tabular-nums`; Fehler mit Regel-id. | W3, W4 |
+| D6 | Laden, leer, Fehler, Lesezustand, Verbindung unterbrochen, leere Liste, Referenz nicht lesbar gestaltet. | W4, S4 |
+| D7 | Texte aus `cockpit.*`/Shell, DE/en-US, Hausvokabular. | Parität, `pnpm vocabulary` |
+| D8 | Kernszene per Tastatur, Escape zweistufig, Fokus sichtbar, Live ohne Fokussprung, eine Ansage nur bei „kritisch“. | W8, W11, S3 |
+| D9 | Nichts Ausgegrautes; Lesezustand statt Teildaten; Liste < 100 ms, `getCockpit` < 50 ms bei 800. | W10, S4 |
+| D10 | Konsole von 2026: die große Zahl trägt, Stationen und Säulen sind genau und klein, Schwellen sichtbar, nichts wirkt wie eine Vorlage. | Design-Kritik gegen 089-lagebild |
 
 ## Wirkung und Risiko
 
 | Risiko | Abwehr | Nachweis |
 |---|---|---|
-| Eine Kennzahl je Person schleicht sich ein (Feld, Schlüssel, Faden mit Akteur) | Schema `additionalProperties: false`, Allowlist-Schlüsselweg, Faden ohne Akteure, DOM-Negativtest | K7, W5, W6, S6 |
-| Zwei Definitionen derselben Kennzahl (Leitstand ≠ `/metrics`) | gemeinsame Hilfen, Gleichheitstest, Ausgabe von `/metrics` gepinnt | K3, K3b |
-| Recht ohne Prüfung | Prüfung im Kern über `READ_PERMISSIONS`; 403 statt Teildaten | K2, A2, S4 |
-| Statuslogik außerhalb der Tabelle | Statusverlauf nur über `reduce` der Projektion | K9, Vor-dem-Bau-Punkt 2 |
-| Zeit aus dem Gerät | alle Alter aus dem Dienst bzw. `asOf` | K8, W7 |
-| Rechenlast bei vielen Leitständen | Messung bei 800, Zwischenspeicher nur bei Bedarf | W10, Vor-dem-Bau-Punkt 4 |
-| Dashboard-Lärm (Farbe, Bewegung, Ansagen) | Farbe nur bei Stufe, keine Animation, kein `aria-live` auf Zahlen | Design-Kritik, W1 |
-| Schwellen falsch gewählt | Konstanten als Daten an einer Stelle, Eigentümerfrage 1 | K10 |
-| Leitstand in der Navigation für Rollen ohne Recht | Lesezustand; Ausblenden mit 089b | S4 |
-| `e2e-http` wird zu lang | nur Lesen, Messung vor dem Bau | Vor-dem-Bau-Punkt 5 |
+| Kennzahl je Person (Feld, Schlüssel, Faden mit Akteur) | Schema `additionalProperties: false`, Allowlist aus dem Vertrag, Bericht im Katalog mit Tor-Regel (g), Faden ohne Akteure | K7, A6, A7, G3, W5, S6 |
+| Leistungskontrolle kleiner Gruppen (E13) | nur Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` vorgesehen; MF-15 | Kennzahlen-Allowlist, Bedrohungsmodell |
+| Referenz auf eine Einzelfrage, die der Leser nicht lesen darf | Filter nach `can(actor, 'question.read', q)`; Inhaber ungebunden (K1) | K1, K12 |
+| Zwei Definitionen (Leitstand ≠ `/metrics`) | gemeinsame Hilfen, Gleichheitstest, Golden | K3, A5 |
+| Recht ohne Prüfung | `READ_PERMISSIONS`; 403 statt Teildaten | K2, A2, S4 |
+| Statuslogik außerhalb der Tabelle | eine Faltung über `reduce` | K5, K9 |
+| Zeit aus dem Gerät | Alter aus dem Dienst bzw. `asOf` | K8, W7 |
+| Rechenlast (T-G2-D-03) | Messung bei 800, Zwischenspeicher nur bei Bedarf, kein Puffer im Browser, 15 s | W10, Vor-dem-Bau-Punkt 5 |
+| Dashboard-Lärm | Farbe nur bei Stufe, keine Animation, eine Ansage nur bei „kritisch“ | W1, W11, Design-Kritik |
+| Schwellen falsch gewählt | Konstanten an einer Stelle, Eigentümerfrage 1 | K10 |
+| `e2e-http` zu lang | nur Lesen, Messung vor dem Bau | Vor-dem-Bau-Punkt 6 |
+
+**Missbrauchsfall MF-15 „Leistungsauswertung über den Leitstand“** (061; verwandt MF-09), Text für das Bedrohungsmodell:
+- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“ oder den
+  Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit einzelner Beschäftigter; Screenshots oder
+  Mitschriften der Wand ersetzen eine Auswertung.
+- *Verhindert durch:* nur Bestände und Wartezeiten, kein Durchsatz, kein Akteur, keine Zahl je Person (Allowlist, Tor-Regel (g));
+  Inhaberkreis auf drei Rollen; Mindestzahl über E13 vorbereitet (`minimumGroupSize`); organisatorisch die Betriebsvereinbarung.
+- *Erkennung, Signal und Empfänger:* jede Lesung steht im Zugriffslog mit `operationId` `getMeetingCockpit` und `subjectHash`
+  (033a); auffällige Lesemuster außerhalb des HV-Fensters prüft der Datenschutz im Verfahren zu zweit (ADR 0013); Empfänger DSB und
+  Betriebsrat über die Betriebsakte. Kein automatischer Alarm (Ausnahme mit Eigentümer Datenschutz, Ablauf mit E13, spätestens
+  29.01.2027).
+- *Nachweis:* K7, A6, A7, G3.
 
 ## Aufwand
 
-Geschätzt **3,9 AStd** (Spanne 3,4–4,5). Plan: 2 AStd, mit dem Zielbild 3,75 (Z11 0,25, Z12 1,0, Z13 0,5); 061 trägt Z13 und
-den nicht vorgesehenen Vertragsschritt, Z11 und Z12 gehen an 061b. Differenz an Prüfpunkt 2 und die Budgettabelle (Plan 6.5).
+Geschätzt **4,9 AStd** (Spanne 4,3–5,5), erste Fassung 3,9. Plan: 2 AStd, mit Zielbild 3,75. Mehraufwand gegenüber der ersten
+Fassung rund 1,0 AStd: Bericht im Katalog mit Generator und Tor-Regel (0,35), Filter nach `can()` und schärferes K1 (0,05), Golden
+(0,05), MF-15 und Zeilen (0,05), getrennte Schemas und Grenzen (0,05), weitere Testpins (0,05), Stationen über die volle Breite,
+vierte Karte, Schwellenbadges, Achse, Schwellenstrich, Ansage (0,4). Differenz an Prüfpunkt 2 und die Budgettabelle (Plan 6.5).
 
 | Teil | AStd |
 |---|---|
-| Vertragsschritt: Recht, Operation, zwei Schemas, CHANGELOG, Typen | 0,35 |
-| Kern: `cockpit.ts` (`computeCockpit`, `statusTrail`, Schwellen, Stufen), gemeinsame Hilfen mit `indicators.ts`, Recht, `getCockpit`, K1–K11 | 0,8 |
-| Dienst: Route, A1–A4 | 0,3 |
-| Web-API: HTTP-Route, `READ_TOPICS`, Tests | 0,1 |
-| Seite: Gerüst, Zustände, Hauptlesung, vier Kennzahlen, Zulaufsäulen, Stationsleiste, Rückstand, Kanarienzeile, Live | 0,8 |
-| Drill-down-Liste, Faden, URL-Zustand, Tastaturpfad | 0,45 |
-| i18n, Registerzeile, Glossar | 0,15 |
-| Web-Tests W1–W10 | 0,3 |
-| e2e S1–S8 in beiden Projekten, axe, Screenshots, Einreihung `http` | 0,45 |
-| Doku-Zeilen (DSFA, Bedrohungsmodell, Zielbild), `pnpm gates`, Bericht, CI-Nachweis | 0,2 |
+| **A** Vertragsschritt: Recht, Operation, drei Schemas, Version an vier Stellen, CHANGELOG, Typen | 0,4 |
+| **A** Kern: `cockpit.ts` (Faltung, `computeCockpit`, `statusTrail`, Schwellen, Stufen, `COCKPIT_REPORT`), Hilfen mit `indicators.ts`, Recht, `getCockpit` mit `can()`-Filter, K1–K12 | 0,85 |
+| **A** Dienst: Route, Golden, A1–A7 | 0,35 |
+| **A** Katalog: `reports`, Generator, Tor-Regel (g), Fixtures, G1–G3; MF-15, DSFA V15 | 0,4 |
+| **B** Web-API: Route, Pufferausschluss, Wiederausgabe, Tests | 0,1 |
+| **B** Seite: Gerüst, Zustände, Hauptlesung, vier Karten, Zulauf mit Achse, Stationen mit Engpass, Rückstand mit Strich, Kanarienzeile, Live, Ansage | 1,05 |
+| **B** Liste, waagrechter Faden, URL-Zustand, Tastaturpfad | 0,45 |
+| **B** i18n, Registerzeile, Glossar, Zielbild-Status | 0,15 |
+| **B** Web-Tests W1–W11 | 0,35 |
+| **B** e2e S1–S8, axe, sechs Screenshots, Einreihung `http` | 0,5 |
+| beide: `pnpm gates`, Berichte, CI-Nachweise | 0,3 |
 
-**Zuschnitt bei Überschreitung (vorbereitet).** Zeichnet sich ab, dass der Bau über 4,0 AStd geht (das Doppelte der Planzeit),
-committet er nach Vertrag, Kern, Dienst, Hauptlesung, Kennzahlen, Rückstand und den Listen ohne Faden einen Zwischenstand mit
-allen Tests außer K9, W6 und dem Faden-Teil von S3, und meldet. Der Faden folgt dann mit 061b, nach Ergänzung von dessen Spec.
+Teil A ≈ 2,0 AStd, Teil B ≈ 2,9 AStd. **Zuschnitt bei Überschreitung in Teil B:** über 3,2 AStd committet Teil B ohne Faden (K9 bleibt in
+A grün; W6 und der Faden-Teil von S3 entfallen) und meldet; der Faden geht an 061b.
 
 ## Standards (auf Standard gebaut)
 
 | Standard | Was 061 baut | Kosten einer späteren Änderung |
 |---|---|---|
 | Eigene Leseoperation mit `cockpit.read` | Vertrag, Kern, Dienst | — |
-| Inhaber moderation, coordination, admin | `ROLE_PERMISSIONS` | weitere Rolle: eine Zeile plus Rechte-Diff, < 0,1 AStd (Review Security) |
-| Schwellen als Konstanten im Kern | `COCKPIT_THRESHOLDS` | je Jahrgang einstellbar: Konfiguration plus Ereignis, rund 0,75 AStd (mit 041) |
-| Kanarienzeile sichtbar mit „nicht eingerichtet“ | `CanaryLine` | ausblenden bis 086: < 0,1 AStd |
-| Letzter Eintrag der Navigation, kein Kürzel | Registerzeile | Alt+7 oder andere Position: < 0,1 AStd |
-| Zeilen ohne Fragetext, Text nur im Faden | Liste | Text in der Zeile: < 0,1 AStd (Review Datenschutz) |
-| Keine Unterdrückung kleiner Fachbereiche (E13) | Rückstand | Mindestzahl aus der BV: rund 0,25 AStd in Kern und Katalog |
-| Drill-down in der Seite | Liste, Faden | Sprung in Steuerung mit Filter: Filter mit URL-Zustand in 053, rund 0,4 AStd |
+| Inhaber moderation, coordination, admin, alle ungebunden | `ROLE_PERMISSIONS`, K1 | weitere Rolle: eine Zeile plus Rechte-Diff, < 0,1 AStd |
+| Schwellen als Konstanten | `COCKPIT_THRESHOLDS` | je Jahrgang einstellbar: rund 0,75 AStd (mit 041) |
+| Bericht im Katalog, `minimumGroupSize: null` | `catalog.json`, `COCKPIT_REPORT` | Mindestzahl setzen und unterdrücken: rund 0,25 AStd |
+| Kanarienzeile „nicht eingerichtet“ | `CanaryLine` | ausblenden: < 0,1 AStd |
+| Letzter Eintrag, kein Kürzel | Registerzeile | Alt+7 oder erste Position: < 0,1 AStd |
+| Zeilen ohne Fragetext | Liste | Text in der Zeile: < 0,1 AStd (Review Datenschutz) |
+| Drill-down in der Seite | Liste, Faden | Sprung in die Steuerung mit Filter: rund 0,4 AStd in 053 |
+| Bau in zwei Teilen auf einer Spec | zwei Branches | eine zweite Spec 061a: < 0,2 AStd Schreibarbeit |
 
 ## Offene Eigentümerfragen
 
 Keine blockiert den Bau; alle mit Standard.
 
-1. **Schwellen.** Älteste offene 15/45 min, Legal Clearing über 10 min 3/10, Rückstand je Fachbereich 20/40, „Ohne Endstatus“
-   erhöht erst nach Debattenschluss. *Standard:* diese Werte als Konstanten; Einstellbarkeit je Jahrgang erst mit 041.
-2. **Kanarienfrage vor 086.** *Standard:* ruhige Zeile „Kanarienfrage: nicht eingerichtet“. Alternative: ausblenden, bis 086
-   sie füllt (wirkt in der Freigabe-Demo fertiger, zeigt aber den Plan nicht).
-3. **061b vor der Freigabe-Demo?** Flussbild (Z12) und Prognose (Z11) machen das Lagebild aus dem Zielbild komplett.
-   *Standard:* 061b bekommt direkt nach 061 eine eigene Spec und läuft vor der Demo nur, wenn das Budget an Prüfpunkt 2 es
-   trägt; die Prognose braucht dann eine neue Katalogkennzahl mit E13-Vermerk.
-4. **Navigation.** *Standard:* letzter Eintrag, kein Kürzel. Alternative: erster Eintrag als Übersicht, Alt+7.
-5. **E13, kleine Fachbereiche.** *Standard:* keine Unterdrückung (wie `/metrics`), bis die Betriebsvereinbarung eine Mindestzahl
-   nennt.
-6. **Weitere Inhaber.** *Standard:* nur moderation, coordination, admin (Planzeile). Frage: soll die Freigabe (approver) den
-   Leitstand sehen?
-7. **Fragetext in Listen.** *Standard:* nein, nur im Faden (Datensparsamkeit, Ruhe).
+1. **Schwellen.** Älteste offene 15/45 min, Legal Clearing über 10 min 3/10, Rückstand je Fachbereich und ohne Fachbereich 20/40,
+   „Ohne Endstatus“ erhöht erst nach Debattenschluss. *Standard:* Konstanten; Einstellbarkeit mit 041.
+2. **Kanarienfrage vor 086.** *Standard:* ruhige Zeile „nicht eingerichtet“. Alternative: ausblenden bis 086.
+3. **061b vor der Freigabe-Demo?** *Standard:* eigene Spec direkt nach 061, Bau vor der Demo nur mit Budget an Prüfpunkt 2.
+4. **Navigation.** *Standard:* letzter Eintrag, kein Kürzel. Alternative: erster Eintrag, Alt+7.
+5. **E13, kleine Fachbereiche und Rollengruppen** (Legal Clearing, Erfassung, Freigabe). *Standard:* keine Unterdrückung, nur
+   Bestände und Wartezeiten, kein Durchsatz; `minimumGroupSize` bleibt `null`, bis die Betriebsvereinbarung eine Zahl nennt. Frage:
+   welche Mindestgröße, und gilt sie auch für Stationen, die einer Rollengruppe entsprechen?
+6. **Weitere Inhaber** (etwa approver). *Standard:* nein.
+7. **Fragetext in Listen.** *Standard:* nein, nur im Faden.
 
 ## Hinweise an den Orchestrator
 
-- **Planzeile 061** nachziehen: Risikoklasse **hoch** (Hochstufung, Begründung „Warum hoch“), Lanes `contract, core, service,
-  web-api, web-cockpit, web-shell, e2e, docs`, Aufwand 3,9 AStd, Nachweise um Rechte-Diff, Gleichheit mit 033b, Negativtest und
-  Allowlist ergänzen; Rolle „Architekt (Vertragsschritt) + Implementierer-Backend + Implementierer-Oberfläche“.
-- **Neue Planzeile 061b** „Leitstand: Flussbild und Prognosen“ (Skizze oben; Abhängigkeit 061; Lanes web-cockpit, ggf. core,
-  service, docs-sicherheit), Zielbild Z11, Z12; Kalender nach 061.
-- **Vertragsreihenfolge:** 055c plant ebenfalls einen Vertragsschritt; wer zuerst merged, nimmt 0.4.5.
-- Die Statuszeile der Spec 033b ist nicht nachgezogen (Code gemergt in `115c28b`).
-- Die Freigabe-Demo sieht nach 061 im Leitstand das Lagebild; das Demo-Skript (`docs/demo-skript.md`) kann eine Szene „Leitstand“
-  bekommen (nicht in dieser Scheibe).
+- **Planzeile 061** nachziehen: Klasse **hoch**, Lanes `contract, core, service, docs-sicherheit, web-api, web-cockpit, web-shell,
+  e2e, docs`, Aufwand 4,9 AStd (Teil A 2,0, Teil B 2,9), Nachweise um Rechte-Diff, Gleichheit mit 033b, Golden, Bericht im
+  Auswertungskatalog, Negativtest und Allowlist ergänzen; Rolle „Architekt (Vertragsschritt) + Implementierer-Backend +
+  Implementierer-Oberfläche“; Bau in zwei PRs auf dieser Spec (oder eine Planzeile 061a, falls der Plan-Graph je PR einen Knoten will).
+- **Neue Planzeile 061b** „Leitstand: Flussbild und Prognosen“ (hoch; Abhängigkeit 061).
+- **Vertragsreihenfolge:** 046 merged vorher (0.4.5), 061 erwartet 0.4.6; 055c danach.
+- Die Statuszeile der Spec 033b ist nicht nachgezogen (`115c28b`).
+- Demo-Skript (`docs/demo-skript.md`): Szene „Leitstand“ später, nicht in dieser Scheibe.
 
 ## Hinweise an Folgescheiben
 
-- **061b:** Flussbild und `+n in 15 min` aus `statusTrail` und den Schwellen dieser Scheibe; Prognose nur mit Katalogeintrag.
-- **086:** `Cockpit.canary` als optionales Feld (Vertragsschritt), `CanaryLine` füllen; synthetische Einzelfragen aus
-  `computeCockpit` **und** `computeIndicators` ausschließen (gleiche Hilfe), Test in beiden.
-- **087:** Ansicht „Offene Fragen vor Schluss“ als weiterer Drill-down im Leitstand (Liste „Ohne Endstatus“ ist die Grundlage);
-  `debateClosedAt` schaltet die Stufe „Ohne Endstatus“ schon heute.
-- **085:** Alarme lesen `COCKPIT_THRESHOLDS`, keine zweite Schwellenliste.
-- **089b:** `visibleRoutes` blendet `/cockpit` ohne `cockpit.read` aus; der Lesezustand bleibt für Direktaufrufe.
+- **061b:** Flussbild und `+n in 15 min` aus `statusTrail`; Prognose nur mit Katalogfamilie und Erweiterung des Berichts `leitstand`.
+- **086:** `Cockpit.canary` (Vertragsschritt), `CanaryLine` füllen; synthetische Einzelfragen aus `computeCockpit` **und**
+  `computeIndicators` ausschließen (gleiche Hilfe), Test in beiden; Bericht `leitstand` um das Feld ergänzen.
+- **087:** „Offene Fragen vor Schluss“ als weiterer Drill-down; `debateClosedAt` schaltet die Stufe „Ohne Endstatus“ schon heute.
+- **085:** Alarme lesen `COCKPIT_THRESHOLDS`.
+- **047:** geschützte Einzelfragen: Referenzen filtert `can()` schon; ob sie in den Aggregaten zählen, entscheidet 047 (Rechte-Diff
+  oben).
+- **089b:** `visibleRoutes` blendet `/cockpit` ohne `cockpit.read` aus; der Lesezustand bleibt.
 
-## Bericht (nach Bau ausfüllen)
+## Nacharbeit nach Lesebefund (05.10.2026, Entscheidungen des Orchestrators)
+
+| Nr. | Befund | Änderung in dieser Spec |
+|---|---|---|
+| B1 | `packages/contract/package.json` fehlte | in „Files allowed“ (nur `version`); Befund „Vertragsversion an vier Stellen“ |
+| B2 | Versions- und Listenpins fehlten | `takt-019-contract.test.ts`, `contract.test.ts`, `forward048.test.ts` je eng beschränkt in „Files allowed“ |
+| B3 | K3b im Kern nicht prüfbar, kein echtes Rot | K3b als A5 in den Dienst-Test; Golden als eigener Commit vor jeder Änderung an `indicators.ts` (Vor-dem-Bau-Punkt 2) |
+| M4 | Enum heißt `Action` | Verweise korrigiert, „Since 0.4.x (slice 061)“-Absatz vorgegeben |
+| M5 | 503 fehlte | `503 PersistenceBusy` in der Operation, A4 |
+| M6 | Auswertungskatalog | Abschnitt „Kennzahlen-Allowlist“ (Feld → Familie oder `Meeting.counts`), `COCKPIT_REPORT`, Bericht `reports` in `catalog.json`, Generator, Tor-Regel (g), Tests A6, G1–G3; Machbarkeit geprüft (Entscheidung 8b) |
+| M7 | E13 nur für Fachbereiche | auf Rollengruppen erweitert (Entscheidung 8, DSFA V15, Eigentümerfrage 5), „kein Durchsatz“ |
+| M8 | Referenzen ungefiltert | Filter nach `can(actor, 'question.read', q)` (Entscheidung 8a), K1 verlangt ungebundenes `question.read`, K12, Hinweis an 047 |
+| M9 | Missbrauchsfall fehlte | MF-15 mit Signal und Empfänger, T-G2-D-03 benannt, Zeile im Bedrohungsmodell in „Files allowed“ |
+| m10 | Version | „0.4.x (erwartet 0.4.6)“, 046 zuerst |
+| m11 | K5 unscharf | K5 mit genauer Liste; Beschriftung „seit n min in diesem Status“; Liste Legal Clearing zeigt `reviewAgeSeconds` („wartet seit“) |
+| m12 | `statusTrail` | Signatur, Quelle von `at`, gleicher Status ohne Eintrag, **eine** Faltung; Quelle von `statusAgeSeconds` in beiden Zuschnittsfällen |
+| m13 | 30-s-Puffer | `getCockpit` nicht gepuffert, 15-s-Intervall, W9 |
+| m14 | Alter, Zahlendrift | `max(0, …)`, eigene Zahl der Liste, Drift benannt |
+| m15 | Import der Kernhilfen | Wiederausgabe über `apps/web/src/api/cockpit.ts` |
+| m16 | Schema | Grenzen, getrennte Schemas `CockpitOldestRef`/`CockpitReviewRef`, Allowlist aus dem Vertrag (A7) |
+| m17 | Endstatus | Glossar grenzt gegen `TERMINAL_STATUSES` ab |
+| m18 | Z13 | „teilweise“ (ohne Absprung in die Fokusansicht) |
+| m19 | vierte Karte | entschieden: „Auf der Bühne“; Raster, D1, S1, S2 angeglichen |
+| m20 | „Ohne Fachbereich“ | Unterzeile „noch nicht zugewiesen“, gleiche Schwellen (K10) |
+| n24 | Ansagen | eine höfliche Ansage nur beim Wechsel nach „kritisch“ (W11) |
+| n21–23, n25 | Kleinbefunde | im Auftrag nur summarisch genannt; der Wortlaut lag dieser Sitzung nicht vor; die Nachprüfung gleicht ab |
+| Demo a | Hauptzahl | 44 px Mono, „min“ 16 px Grau 600, benannte D3-Ausnahme; Karten 28 px |
+| Demo b | Stationen | sechs beschriftete Spalten über die volle Breite mit „Engpass“ ab erhöht, statt `ProcessStrip` |
+| Demo c | vierte Karte | „Auf der Bühne“ mit „{answered} vorgelesen“; `totals.staged` im Vertrag |
+| Demo d | Faden | waagrecht, volle Breite unter der Liste |
+| Demo e | Badge | Text mit Schwelle („kritisch · über 45 min“) |
+| Demo f | Zulauf | 280 × 48 px, Achse 11 px „−60 min“/„jetzt“ |
+| Demo g | Rückstand | Schwellenstrich „erhöht“ |
+| — | Aufwand | 3,9 → 4,9 AStd; Bau in zwei Teilen auf dieser Spec |
+
+## Bericht (nach Bau ausfüllen, je Teil)
 
 ```
-Slice: 061-leitstand
-Done: <drei Zeilen: Vertrag 0.4.5 mit cockpit.read und getMeetingCockpit; Kern computeCockpit/statusTrail/Stufen mit
-      Gleichheit zu 033b; Seite /cockpit mit Hauptlesung, Kennzahlen, Rückstand, Drill-down, Faden, live>
-Evidence: <Schluss von `pnpm gates` auf Commit …>, docs/evidence/061-leitstand-de.png, 061-leitstand-en.png,
-          061-liste-faden-de.png, 061-liste-faden-en.png, 061-wand-1280x720-de.png; CI e2e-http Lauf <id>, Job <id>, Dauer <m:ss>
+Slice: 061-leitstand (Teil A | Teil B)
+Done: <drei Zeilen>
+Evidence: <Schluss von `pnpm gates` auf Commit …>; Teil A: Artefakt auswertungskatalog (Lauf, Artefakt-ID);
+          Teil B: docs/evidence/061-leitstand-{de,en}.png, 061-liste-faden-{de,en}.png, 061-wand-1280x720-{de,en}.png;
+          CI e2e-http Lauf <id>, Job <id>, Dauer <m:ss>
 Open: <was nicht erledigt ist, mit Grund; Abweichungen vom Zielbild 089-lagebild>
 Touched: <Dateiliste>
 ```
 
-Zusätzlich im Bericht: rote Testausgaben vor der Änderung; Zeitmessungen (W10, `getCockpit` p90, Liste p90, ggf.
-Zwischenspeicher); Schlüsselweg der Antwort und Rot-Probe aus K7; Zahl der i18n-Schlüssel und neue Paritätszahl; Ergebnis von
-Vor-dem-Bau-Punkt 2 (Faltbarkeit) und 5 (Laufzeit); Design-Kritik D1–D10 als Tabelle (je Zeile ja/nein mit einem Satz) mit dem
-Vergleich zu `docs/evidence/089-lagebild.png`; Liste der Abweichungen vom Prototyp (Rednernamen, Wortmeldung, Widerspruchskanal,
-Rednerwand, Flussbild, Prognosen) mit Grund.
+Zusätzlich: rote Testausgaben vor der Änderung; Zeitmessungen; Schlüsselweg der Antwort und Rot-Proben aus K7 und A5; Zahl der
+i18n-Schlüssel; Ergebnisse der Vor-dem-Bau-Punkte 3 (Faltbarkeit), 5 (Rechenzeit) und 6 (Laufzeit); Design-Kritik D1–D10 als
+Tabelle mit Vergleich zu `docs/evidence/089-lagebild.png` und Urteil zu den benannten Ausnahmen; Abweichungen vom Prototyp
+(Rednernamen, Wortmeldung, Widerspruchskanal, Rednerwand, Flussbild, Prognosen) mit Grund.
 
 ## Review findings
 
-(leer bis zum Lesebefund)
+- **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
+  Demo; eingearbeitet nach den Entscheidungen des Orchestrators, Tabelle „Nacharbeit nach Lesebefund“. Nachprüfung der Blocker und
+  major-Punkte offen.
