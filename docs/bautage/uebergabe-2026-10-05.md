@@ -16,7 +16,7 @@ Für die nächste Orchestrator-Sitzung. Vorgänger: `docs/bautage/uebergabe-2026
 5. **minimumReleaseAge:** ja, 7 Tage, Ausnahme für Sicherheitspatches; neuer Takt **takt-047**.
 6. **E6:** Whitelist bleibt; nummerierte Listen ja (rund 0,75 AStd) im Umfang von **055c**. Voraussichtlich Vertrags- und Kernänderung, daher Klasse hoch; Spec-Entscheidung nötig.
 7. **048b:** Auskunftsschuldner ist eine Funktion (Bühnenplatz), keine Person.
-8. **Aufbewahrungsklasse `QuestionForwarded`:** `working` bestätigt (Hinweis an den DSB).
+8. **Aufbewahrungsklasse `QuestionForwarded`:** der Eigentümer trägt den Standard `working` mit; die Entscheidung bleibt beim DSB (zusammen mit `QuestionAssigned`), der Widerspruch zur DSFA-Zeile V4 bleibt bis dahin offen.
 9. **053 D4:** Nullzähler von Grau 300 auf Grau 600; **takt-048** zusammen mit Punkt 11.
 10. **053 Frage 3:** Option A (Rechtemenge an `GET /auth/me`) als eigene Scheibe **089b**, niedrige Priorität, nach 041.
 11. **055b Frage 4:** Beantwortung mit der letzten Version vorbelegen (in takt-048).
@@ -29,6 +29,6 @@ takt-046 (`e2e-http`-Laufzeit: Grenze anheben oder Job teilen), takt-045 (Sonde 
 ## Offen
 
 - Rechtsblick zur Formatänderung (empfohlen, nicht erfolgt).
-- Hinweis an den DSB zur Aufbewahrungsklasse `working`.
+- Frage an den DSB zur Aufbewahrungsklasse (`working` oder `record`) für `QuestionForwarded` und `QuestionAssigned`; offen bis zur Antwort.
 - CSP der Webseite (037b) vor jedem Rollout von 055/055b.
 - E21 unverändert (Nach-Beta).

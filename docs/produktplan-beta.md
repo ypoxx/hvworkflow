@@ -813,12 +813,12 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Rolle:* Implementierer-Oberfläche; Design-Kritik; Review mit Perspektiven Security und UX/Barrierefreiheit
   - *Nachweise:* Screenshots Bühne, Historie und Editor (de/en) mit Format; axe grün; grüner Lauf `e2e-http` (Mehrzeit höchstens 0:40); pnpm gates
   - *Offene Entscheidung:* — (E6 entschieden 05.10.2026; Beantwortungs-Editor wird mit der letzten Version vorbelegt, Entscheidung zu 055b Frage 4, Umsetzung in takt-048; Rollout in eine geteilte Umgebung erst nach der CSP der Webseite, 037b)
-- **055c · Antwortformat: nummerierte Listen, Word-Listen, einstufiges Rückgängig** — hoch · 1,25 AStd · Kalender 19.11.2026 (W8) · Lanes: contract, core, web-components
+- **055c · Antwortformat: nummerierte Listen, Word-Listen, einstufiges Rückgängig** — hoch · 1,25 AStd · Kalender 19.11.2026 (W8) · Lanes: contract, core, web-components, web-answers, e2e
   - *Ziel:* nummerierte Listen (Eigentümerentscheidung E6, 05.10.2026, rund 0,75 AStd) sowie die beiden Punkte aus Spec 055b (Word-Listen ohne `ul`/`ol` als Listenpunkte, einstufiges Rückgängig eines Einfügens, rund 0,5 AStd). Nummerierte Listen brauchen voraussichtlich eine Vertrags- und Kernänderung (Blocktyp oder Kennzeichen an `list`, Normalisierung, Klartextprojektion, Renderer); deshalb Klasse hoch statt mittel. **Eine Spec-Entscheidung ist nötig** (Blocktyp oder Kennzeichen, Vertragsversion, Wirkung auf bestehende Versionen und Freigabebindung); die Spec entscheidet auch, ob der Teil ohne Vertragsänderung (Word-Listen, Rückgängig) abgespalten wird.
   - *Abhängigkeiten:* 055b
   - *Rolle:* Architekt (Vertragsschritt) + Implementierer-Oberfläche; Review mit Perspektiven Vertrag, Security, UX
   - *Nachweise:* Normalisierungstest (Idempotenz mit nummerierter Liste), Einfügetest Word-Liste, Screenshots de/en; pnpm gates + e2e-http grün
-  - *Offene Entscheidung:* Spec-Entscheidung zur Form der nummerierten Liste (kein Eigentümerpunkt)
+  - *Offene Entscheidung:* Spec-Entscheidung zur Form der nummerierten Liste (kein Eigentümerpunkt). Mit dem Vertragsschritt wird auch die Beschreibung von `forwardQuestion` in `openapi.yaml` (heute „E5 open“) auf „E5 geschlossen 05.10.2026“ gezogen und `types.ts` neu erzeugt; ebenso der Stand von R-TRANS-17 in `packages/domain/src/transitions.ts` (heute „E5 offen“), danach `docs/legal-trace.md` neu erzeugt.
 - **060 · Entwurfspuffer, Präsenz und Merge-Ansicht** — mittel · 2 AStd · Kalender 23.11.2026 (W9) · Lanes: web-answers, web-focus
   - *Ziel:* lokaler Entwurfspuffer je Frage (IndexedDB, Wiederherstellung nach Reload, Playwright kappt die Verbindung beim Tippen), Präsenzanzeige „wird bearbeitet von" über Claim aus 028 (weiche Sperre), 412-Merge-Ansicht mit beiden Texten, Doppelklickschutz; auch in der Erfassung für laufende Atomisierung.
   - *Abhängigkeiten:* 028, 036, 054
@@ -986,7 +986,7 @@ Höchstens drei Scheiben laufen gleichzeitig (drei Worktrees je Bautag). Die Gre
   - *Offene Entscheidung:* E15
 - **077 · Vertrags- und Konfigurationsfreeze, Rechte-Snapshot, Release-Kandidat** — mittel · 1 AStd · Kalender 08.02.2027 (W20) · Lanes: contract, infra
   - *Ziel:* Vertrag 0.4.x eingefroren (Tor: keine Vertragsänderung nach beta-1-rc ohne ADR und Eigentümer-Go), ConfigFrozen für den Übungsmandanten mit Hash-Anzeige, Rechte-Snapshot des Jahrgangs als Artefakt, Tag beta-1-rc, Freeze-Fenster in der Pipeline aktiviert.
-  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
+  - *Abhängigkeiten:* 019, 080, 020, 021c, 082, 084, 023, 024, 025, 026, 027, 028, 029b, 030, 031a, 031b, 032, 033a, 033b, 034a, 034b, 035, 036, 037, 038, 039, 040, 041, 042, 088, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 085, 087, 053, 054, 055, 055b, 055c, 089b, 056, 057, 058, 059, 060, 061, 062, 064, 065, 066, 067, 068, 069, 081, 086, 083
   - *Rolle:* Mechaniker; Review
   - *Nachweise:* Tag im Repositorium; Snapshot-Artefakt mit Hash; Test Deploy im Freeze → abgelehnt
   - *Offene Entscheidung:* —

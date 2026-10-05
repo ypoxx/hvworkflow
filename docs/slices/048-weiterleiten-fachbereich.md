@@ -689,7 +689,7 @@ Keine blockiert die Spec; Frage 1 blockiert den **Baubeginn** (Antwort oder ausd
 
 - Entschieden 05.10.2026: Frage 1 (E5): Bedeutung bleibt wie gebaut; E5 geschlossen.
 - Entschieden 05.10.2026: Frage 6 (048b): Auskunftsschuldner ist eine Funktion (Bühnenplatz), keine Person.
-- Entschieden 05.10.2026: Frage 9: Aufbewahrungsklasse von `QuestionForwarded` ist `working` (bestätigt; Hinweis an den DSB).
+- 05.10.2026 zu Frage 9: Der Eigentümer trägt den Standard `working` mit; die Entscheidung bleibt beim DSB (für `QuestionForwarded` und `QuestionAssigned` zusammen). Bis zur Antwort des DSB bleibt der Widerspruch zur DSFA-Zeile V4 offen; der Code bleibt `working` (auf Standard gebaut).
 - Entschieden 05.10.2026: Fragen 2 bis 5, 7, 8: Standard wie gebaut angenommen.
 
 ## Skizze 048b — Auskunftsschuldner (nicht ausgearbeitet)
