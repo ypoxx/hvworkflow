@@ -65,6 +65,7 @@ export const answersEn: typeof answersDe = {
   'answers.editor.discard': 'Discard the input',
   'answers.editor.hint': 'A new version voids an existing approval.',
   'answers.editor.rebase': 'A newer answer version has arrived meanwhile. Your text is not saved.',
+  'answers.editor.startsFrom': 'Starts from version {version}. Save once you change something.',
   'answers.format.toolbar': 'House format',
   'answers.format.bold': 'Bold',
   'answers.format.italic': 'Italic',

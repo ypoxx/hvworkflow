@@ -807,6 +807,8 @@ export function QuestionDetail({
               busy={busy}
               canSave={saveable}
               dirty={dirty}
+              // Only a field that starts from a version says so; empty without one and over a refusal (no base body).
+              {...(draft.baseBody !== null && draft.baseVersion > 0 ? { startsFrom: draft.baseVersion } : {})}
               primary={primary === 'draft'}
               hasApproval={question.approval !== undefined}
               onBody={(body) => setDraft((current) => ({ ...current, body }))}

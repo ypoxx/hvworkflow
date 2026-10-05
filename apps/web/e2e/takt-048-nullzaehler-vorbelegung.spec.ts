@@ -149,8 +149,17 @@ test('V1: the Beantwortung starts with the latest version; saving locked, "Zur P
   await expect(page.getByTestId('answer-submit-review')).toHaveClass(PRIMARY);
   await expect(save(page)).not.toHaveClass(PRIMARY);
   await expect(discard(page)).toHaveCount(0);
+  // Design critique D1: the field says which version it starts from and why saving is locked; the button points at it.
+  const version = (await latestCard(page).getAttribute('data-version')) ?? '';
+  const hint = page.getByTestId('answer-editor-start');
+  await expect(hint).toHaveText(`Beginnt mit Version ${version}. Speichern, sobald Sie etwas ändern.`);
+  await expect(hint).toHaveCSS('color', GREY_600);
+  const hintId = (await hint.getAttribute('id')) ?? '';
+  expect(hintId).not.toBe('');
+  await expect(save(page)).toHaveAttribute('aria-describedby', hintId);
   for (const lang of ['de', 'en'] as const) {
     await setLang(page, lang);
+    if (lang === 'en') await expect(hint).toHaveText(`Starts from version ${version}. Save once you change something.`);
     await clearToasts(page);
     // The evidence shows the prefilled field together with the locked save button below it.
     await save(page).scrollIntoViewIfNeeded();
@@ -169,9 +178,12 @@ test('V2: white space changes nothing; a word makes saving primary; "Verwerfen" 
   await expect(discard(page)).toHaveCount(0);
   await appendText(page, 'Zusatz048');
   await expect(save(page)).toHaveAttribute('aria-disabled', 'false');
+  await expect(page.getByTestId('answer-editor-start')).toHaveCount(0);
+  await expect(save(page)).not.toHaveAttribute('aria-describedby', /.+/);
   await expect(save(page)).toHaveClass(PRIMARY);
   await expect(discard(page)).toBeVisible();
   await discard(page).click();
+  await expect(page.getByTestId('answer-editor-start')).toBeVisible();
   await expect.poll(async () => squash(await field(page).innerText())).toBe(squash(before));
   await expect(field(page)).not.toContainText('Zusatz048');
   await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
@@ -232,17 +244,18 @@ test('V5: a refusal as latest version — the field starts empty with its placeh
   await expect(field(page)).toBeVisible();
   await expect(page.getByTestId('answer-editor-placeholder')).toBeVisible();
   await expect(page.getByTestId('answer-editor-refusal-hint')).toBeVisible();
+  await expect(page.getByTestId('answer-editor-start')).toHaveCount(0);
   await expect(field(page)).not.toContainText('Ein Auskunftsanspruch besteht nicht');
   await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
 });
 
 test('V6: an actor change — the field shows the latest version again, the appended text is gone', async ({ page }) => {
   const number = await openWhere(page, 'expert', 'answer_drafted', drafted);
-  const secret = 'Vertraulicher Zusatz takt-048';
-  await appendText(page, ` ${secret}`);
-  await expect(field(page)).toContainText(secret);
+  const typedText = 'Vertraulicher Zusatz takt-048';
+  await appendText(page, ` ${typedText}`);
+  await expect(field(page)).toContainText(typedText);
   await asRole(page, 'legal');
-  await expect(page.locator('#main')).not.toContainText(secret);
+  await expect(page.locator('#main')).not.toContainText(typedText);
   await asRole(page, 'expert');
   if ((await page.getByTestId('answers-detail-number').count()) === 0) {
     await page.getByTestId('answers-filter-status-all').click();
@@ -251,6 +264,6 @@ test('V6: an actor change — the field shows the latest version again, the appe
   }
   await expect(page.getByTestId('answers-detail-number')).toHaveText(number);
   await expectPrefilled(page);
-  await expect(page.locator('#main')).not.toContainText(secret);
+  await expect(page.locator('#main')).not.toContainText(typedText);
   await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
 });

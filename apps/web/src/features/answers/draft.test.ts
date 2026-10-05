@@ -181,13 +181,13 @@ describe('U5: afterSave', () => {
     const draft = { ...start(), body: typed };
     const saved = question({ answers: [version(1), version(2, { text: 'Antwort zwei', body: previewAnswer(typed)! })] });
     const sent = { body: typed, sources: '' };
-    const tokenFirst = onRecord(afterSave(draft, sent, 2), saved).draft;
+    const resetFirst = onRecord(afterSave(draft, sent, 2), saved).draft;
     const recordFirst = afterSave(onRecord(draft, saved).draft, sent, 2);
-    expect(pick(tokenFirst)).toEqual(pick(recordFirst));
-    expect(tokenFirst.generation).toBe(recordFirst.generation);
-    expect(tokenFirst.rebase).toBe(recordFirst.rebase);
-    expect(tokenFirst.baseSources).toBe(recordFirst.baseSources);
-    expect(isDirty(tokenFirst)).toBe(false);
+    expect(pick(resetFirst)).toEqual(pick(recordFirst));
+    expect(resetFirst.generation).toBe(recordFirst.generation);
+    expect(resetFirst.rebase).toBe(recordFirst.rebase);
+    expect(resetFirst.baseSources).toBe(recordFirst.baseSources);
+    expect(isDirty(resetFirst)).toBe(false);
   });
 
   it('both orders also agree when text was typed while saving', () => {
@@ -195,10 +195,10 @@ describe('U5: afterSave', () => {
     const draft = { ...start(), body: more };
     const saved = question({ answers: [version(1), version(2, { text: 'Antwort zwei', body: previewAnswer(typed)! })] });
     const sent = { body: typed, sources: '' };
-    const tokenFirst = onRecord(afterSave(draft, sent, 2), saved).draft;
+    const resetFirst = onRecord(afterSave(draft, sent, 2), saved).draft;
     const recordFirst = afterSave(onRecord(draft, saved).draft, sent, 2);
-    expect(pick(tokenFirst)).toEqual(pick(recordFirst));
-    expect(tokenFirst.rebase).toBe(false);
+    expect(pick(resetFirst)).toEqual(pick(recordFirst));
+    expect(resetFirst.rebase).toBe(false);
     expect(recordFirst.rebase).toBe(false);
   });
 });

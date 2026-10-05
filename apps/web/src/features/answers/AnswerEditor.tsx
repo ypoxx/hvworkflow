@@ -23,6 +23,11 @@ interface AnswerEditorProps {
   canSave: boolean;
   /** takt-048: the draft differs from its base; only then "Verwerfen" is offered. */
   dirty: boolean;
+  /**
+   * takt-048 (design critique D1): the number of the version the field starts from, when it starts from one (not without
+   * a version, not over a refusal). While the draft is unchanged a line says so and why saving is locked.
+   */
+  startsFrom?: number;
   primary: boolean;
   hasApproval: boolean;
   onBody: (value: AnswerBodyInput | null) => void;
@@ -38,6 +43,7 @@ export function AnswerEditor({
   busy,
   canSave,
   dirty,
+  startsFrom,
   primary,
   hasApproval,
   onBody,
@@ -47,10 +53,18 @@ export function AnswerEditor({
 }: AnswerEditorProps) {
   const t = useT();
   const labelId = useId();
+  const startId = useId();
+  const showStart = startsFrom !== undefined && !dirty;
 
   return (
     <section className="rounded-lg border border-line-strong bg-sunken p-3">
       <h3 className="text-[13px] font-semibold text-ink-900">{t('answers.editor.title')}</h3>
+      {showStart && (
+        // ink-600: 4.5:1 or more on this sunken ground, as the sources hint below.
+        <p id={startId} data-testid="answer-editor-start" className="mt-0.5 text-2xs text-ink-600">
+          {t('answers.editor.startsFrom', { version: startsFrom })}
+        </p>
+      )}
 
       <div className="mt-2 block">
         <span id={labelId} className="hv-label">
@@ -109,6 +123,8 @@ export function AnswerEditor({
           variant={primary ? 'primary' : 'secondary'}
           data-testid="answer-submit-draft"
           aria-disabled={!canSave}
+          // The locked button says why it is locked: the start line (a screen reader otherwise only hears "dimmed").
+          {...(showStart && !canSave ? { 'aria-describedby': startId } : {})}
           onClick={onSave}
         >
           {t('answers.editor.save')}
