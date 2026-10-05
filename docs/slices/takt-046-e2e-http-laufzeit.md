@@ -1,6 +1,6 @@
 # takt-046 — Laufzeit e2e-http: Grenzen mit Puffer, Dauerzeile und weiche Warnschwelle
 
-**Status:** spec · **Risikoklasse:** niedrig (nur CI-Konfiguration und das Test-Harness eines CI-Jobs, kein Produktivcode, kein Vertrag, keine Persistenz, kein Betrieb, keine neuen Rechte oder Geheimnisse; Leitplanken §4) · ≤ 0,5 AStd · **Lanes:** CI
+**Status:** gebaut · **Risikoklasse:** niedrig (nur CI-Konfiguration und das Test-Harness eines CI-Jobs, kein Produktivcode, kein Vertrag, keine Persistenz, kein Betrieb, keine neuen Rechte oder Geheimnisse; Leitplanken §4) · ≤ 0,5 AStd · **Lanes:** CI
 **Rolle:** builder; Review in frischem Kontext (Perspektive: läuft die Aufräumphase weiter sicher innerhalb der Schrittgrenze, und verrät die neue Ausgabe nichts?), Modell nur in `.claude/agents/` (takt-012); niedriges Risiko, Review mit Sonnet zulässig (AGENTS.md R3)
 **Regeln:** AGENTS.md R1, R2, R3, R11 (keine Zugangsdaten in Ausgaben), R12; 031a Entscheidung „die Aufräumphase läuft immer innerhalb der Schrittgrenze“ (`CLEANUP_RESERVE_MS`), 031a „bei einem Fehlschlag erreicht nur der Name der Phase stderr“
 **Quellen-IDs:** Plan Abschnitt 5, Stand zu 054 (Zeile 781: Takt „Grenze anheben oder Job teilen“ fällig, bevor der Schritt etwa 6:30 erreicht); 055b-Spec (Messungen gegen 8:00/9:00)
@@ -191,8 +191,10 @@ Evidence: Test rot vor der Umsetzung: `node --test scripts/e2e-http-031.test.mjs
       Grün danach: `# tests 43 / # pass 43 / # fail 0`.
       `pnpm gates` exit 0 auf Commit 546f67c, Schluss:
       `mark-test-run: wrote .../.claude/state/last-test-run (clean tree) at commit 546f67c, tree 5ab9010e2ef5…`
-      CI-Lauf, Job-ID und Annotation: noch offen (kein Push in diesem Auftrag).
-Open: Akzeptanzkriterium 3 (CI auf dem PR, Annotation) und optional 4 (lokaler Lauf) stehen aus.
+      CI (Nachtrag des Orchestrators): Lauf 37333958013, Job e2e-http 111843861779, grün auf 695be18; Annotation
+      `notice e2e-http duration: 031a duration: total 5:55 of limit 12:00, warning above 6:30; stages: keycloak 0:34,
+      database 0:00, bootstrap 0:01, service 0:01, playwright 5:18, access-log 0:00, cleanup 0:00`.
+Open: Akzeptanzkriterium 4 (optionaler lokaler Lauf) nicht ausgeführt. Review (Sonnet): kein Blocker, kein Major; ein Minor und drei Nits in die Folgeliste.
 Touched: .github/workflows/gates.yml, scripts/e2e-http-031.mjs, scripts/e2e-http-031.test.mjs,
       docs/slices/takt-046-e2e-http-laufzeit.md
 ```
