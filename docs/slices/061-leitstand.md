@@ -566,6 +566,7 @@ Teil A — Web-Adapter, damit Teil A allein durch `pnpm gates` kommt (implementi
 - `apps/web/src/api/liveStore.ts` (nur `getCockpit` im Ausschluss von `BufferedRead` und die Durchreichung neben `listEvents`)
 - `apps/web/src/api/http.test.ts` (nur die Zeile der Routentabelle für `getCockpit`)
 - `apps/web/src/api/liveStore061.test.ts` (neu, Test L1)
+- `apps/web/src/api/liveStore.test.ts` (nur Test „(p)“: `getCockpit` steht neben `listEvents` als ungepufferte Lesemethode; Nachtrag des Orchestrators nach der Nachprüfung, 05.10.2026)
 - `apps/web/src/i18n/labels.ts` (nur der Eintrag `cockpit.read` in `ACTION_KEYS`)
 - `apps/web/src/i18n/{shell.de,shell.en}.ts` (nur `action.cockpit.read`)
 - `apps/web/src/i18n/parity.test.ts` (nur die Gesamtzahl +1 und ihr Kommentar)
