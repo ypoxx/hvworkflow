@@ -118,6 +118,11 @@ test('T4 Hilfe, hängender Import: benannte loading-Meldung statt "garbage colle
     () => 'resolved',
     (error: unknown) => String(error),
   );
+  // Collect only once the helper's evaluate has installed the pending import (Codex P2 on #165, as T1
+  // waits for its flag): otherwise the collection could run before the import starts and prove nothing.
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as AppModulesWindow).__appModules?.state), { timeout: 1_000 })
+    .toBe('loading');
   await collectGarbage(page);
   const message = await within(outcome, 5_000);
   const elapsed = Date.now() - started;
