@@ -31,3 +31,4 @@ export { ToastProvider } from './Toast';
 export { dismissToast, showProblem, showToast, useToasts } from './toastStore';
 export type { ToastMessage, ToastTone } from './toastStore';
 export { Toolbar, ToolbarSeparator, ToolbarSpacer } from './Toolbar';
+export { AnswerText } from './AnswerText';

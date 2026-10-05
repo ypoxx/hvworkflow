@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { AnswerVersion, DomainEvent, Permission, Question, Unit } from '@hv/domain';
 import { translate } from '../../i18n';
 import type { TKey } from '../../i18n';
+import { AnswerText } from '../../components';
 import { FocusDetail } from './FocusDetail';
 
 const de = (key: TKey, params?: Record<string, string | number>) => translate('de', key, params);
@@ -108,3 +109,28 @@ describe('FocusDetail (Test 6)', () => {
 function version(n: number, over: Partial<AnswerVersion> = {}): AnswerVersion {
   return { version: n, text: `Antwort ${n}`, createdAt: '2026-06-15T10:05:00.000Z', createdBy: { id: 'u-1', role: 'expert' }, ...over };
 }
+
+/** Scheibe 055b, Test 6: `focus-latest` shows the latest version through the one renderer, as the podium does. */
+describe('FocusDetail with a formatted answer (Scheibe 055b, Test 6)', () => {
+  const FORMATTED = version(1, {
+    text: 'Die Dividende steigt.\n\neins\nzwei',
+    body: {
+      language: 'de',
+      blocks: [
+        { type: 'paragraph', content: [{ text: 'Die ' }, { text: 'Dividende', marks: ['bold'] }, { text: ' steigt.' }] },
+        { type: 'list', items: [[{ text: 'eins', marks: ['highlight'] }], [{ text: 'zwei' }]] },
+      ],
+    },
+  });
+  const answerPart = (html: string): string | undefined =>
+    html.match(/<div[^>]*data-answer-text="true"[^>]*>([\s\S]*?)<\/div>/)?.[1]; // i18n-ok: expected markup in a test, not a rendered text
+
+  it('the same renderer markup as AnswerText; lang de; the reading time stays on the text', () => {
+    const html = render(question(EXPERT, { status: 'answer_drafted', answers: [FORMATTED] }));
+    const latest = html.slice(html.indexOf('data-testid="focus-latest"'));
+    expect(answerPart(latest)).toBe(answerPart(renderToStaticMarkup(<AnswerText answer={FORMATTED} />)));
+    expect(latest).toContain('lang="de"');
+    expect(latest).toContain('<strong>Dividende</strong>'); // i18n-ok: expected markup in a test, not a rendered text
+    expect(latest).toMatch(/data-testid="focus-reading-time"[^>]*data-seconds="3"/);
+  });
+});

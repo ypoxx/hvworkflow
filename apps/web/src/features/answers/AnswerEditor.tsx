@@ -1,57 +1,68 @@
 /**
  * Where the answer is written. Two fields, one button, and one warning that matters: a new version
  * voids an existing approval (R-GUARD-04) — the person has to know that before they type, not after
- * the server says no.
+ * the server says no. Scheibe 055b: the answer text is the answer field with the house format
+ * (`AnswerBodyEditor`, compact); it starts empty as before (owner question 4).
  */
+import { useId } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import type { AnswerBodyInput } from '@hv/domain';
+import { previewText } from '../../api/answerFormat';
 import { Button, cx } from '../../components';
 import { useT } from '../../i18n';
+import { AnswerBodyEditor } from './AnswerBodyEditor';
 
 interface AnswerEditorProps {
-  text: string;
+  /** What the field holds (the walker's input form), `null` when empty. */
+  body: AnswerBodyInput | null;
+  /** The field rebuilds empty when this changes: discard, a saved version (decision 7). */
+  generation: number;
   sources: string;
   busy: boolean;
   primary: boolean;
   hasApproval: boolean;
-  onText: (value: string) => void;
+  onBody: (value: AnswerBodyInput | null) => void;
   onSources: (value: string) => void;
   onSave: () => void;
   onDiscard: () => void;
 }
 
 export function AnswerEditor({
-  text,
+  body,
+  generation,
   sources,
   busy,
   primary,
   hasApproval,
-  onText,
+  onBody,
   onSources,
   onSave,
   onDiscard,
 }: AnswerEditorProps) {
   const t = useT();
-  const empty = text.trim() === '';
+  const labelId = useId();
+  const empty = previewText(body) === '';
 
   return (
     <section className="rounded-lg border border-line-strong bg-sunken p-3">
       <h3 className="text-[13px] font-semibold text-ink-900">{t('answers.editor.title')}</h3>
 
-      <label className="mt-2 block">
-        <span className="hv-label">{t('answers.editor.label')}</span>
-        <textarea
-          data-testid="answer-editor"
-          rows={6}
-          value={text}
-          placeholder={t('answers.editor.placeholder')}
-          onChange={(event) => onText(event.target.value)}
-          className={cx(
-            'mt-1 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-2',
-            'text-[13px] leading-relaxed text-ink-900 transition-colors duration-100',
-            'placeholder:text-ink-400 hover:border-ink-300',
-          )}
+      <div className="mt-2 block">
+        <span id={labelId} className="hv-label">
+          {t('answers.editor.label')}
+        </span>
+        <AnswerBodyEditor
+          testId="answer-editor"
+          // Review 055b, finding 5: the field is built from the draft, so a remount never shows an empty field over a
+          // draft that the save button would still send.
+          initial={body}
+          generation={generation}
+          labelId={labelId}
+          size="compact"
+          onChange={onBody}
+          className="mt-1"
         />
-      </label>
+      </div>
 
       <label className="mt-2 block">
         <span className="hv-label">{t('answers.editor.sources.label')}</span>

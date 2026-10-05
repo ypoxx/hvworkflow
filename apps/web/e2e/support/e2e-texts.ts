@@ -60,6 +60,12 @@ export const FOCUS_054_ANSWER = 'Synthetische Antwort 054: Die Rückstellungen s
 export const FOCUS_054_UNSAVED = 'Synthetischer Zusatz 054, nie gespeichert.';
 export const FOCUS_054_RETURN_REASON = 'e2e 054';
 
+/**
+ * Scheibe 055b: the formatted answer H1 writes over the service (`Dividende` bold, `deutlich` highlighted through the
+ * toolbar); its plain text is what the core stores as `text`.
+ */
+export const FORMAT_055B_HTTP_ANSWER = 'Synthetische Antwort 055b: Die Dividende steigt deutlich.';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -83,4 +89,5 @@ export const WRITTEN_TEXTS: readonly string[] = [
   FOCUS_054_ANSWER,
   FOCUS_054_UNSAVED,
   FOCUS_054_RETURN_REASON,
+  FORMAT_055B_HTTP_ANSWER,
 ];

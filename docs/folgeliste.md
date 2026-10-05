@@ -733,6 +733,30 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055 Bau · `apps/web/src/api/http.test.ts` · der Fall „`draftAnswer` reicht `body` durch“ ist vor der Änderung nicht rot, weil
   `http.ts` die Eingabe schon unverändert sendet und `endpointCases` untypisiert ist · bei 055b einen typisierten Fall ergänzen.
 
+## Antwortformat in der Oberfläche (aus 055b)
+
+- 055b Bau, Vor-dem-Bau-Punkte 2 und 4 · `features/answers/editorCommands.ts`, `AnswerBodyEditor.tsx` · Kürzel
+  (Strg/Cmd+B, I, U, Umschalt+H, Umschalt+L) und der Schutz des Rückgängig sind nur in Chromium geprüft; Firefox und WebKit
+  sind im Container nicht installiert (nicht geprüft; bekannt: Firefox Strg+Umschalt+H öffnet die Chronik, Safari
+  Cmd+Umschalt+H/L sind Menübefehle) · in einem Lauf mit Firefox/WebKit nachprüfen, sonst Eigentümerfrage 3.
+- 055b Bau · `features/answers/AnswerBodyEditor.tsx` · `insertUnorderedList` erzeugt in Chromium `<p><ul>…</ul></p>` im Feld,
+  und die erste getippte Zeile eines leeren Felds steht als Text direkt im Feld; der Walker liest beides richtig, nur der
+  Abstand weicht bis zum nächsten Neuaufbau ab · beim Neuaufbau von 055c mit normalisieren.
+- 055b Spec, Folgekandidaten · `features/answers/QuestionDetail.tsx` (`AnswerDiff`), `AnswerEditor.tsx`, `domToBody.ts` ·
+  Diff der Marken statt nur des Hinweises „Nur Auszeichnung“; Vorbelegen der Beantwortung mit der letzten Version
+  (Eigentümerfrage 4); Hinweis „wird beim Speichern Text“ für nicht darstellbare Kandidaten (Unterstreichung, Überschrift) ·
+  Sammelgang.
+- 055b Review Minor 7 · `apps/web/e2e/055b-antwortformat.spec.ts` · der Schutz des Rückgängig nach einem Einfügen
+  (`UndoBudget`) ist nur als Einheitstest belegt, kein e2e-Fall tippt, fügt ein und drückt Strg+Z/Strg+Umschalt+Z · einen
+  Fall in Chromium ergänzen (zusammen mit 055c, das das einstufige Rückgängig bringt).
+- 055b Review Nit 9 · `AnswerBodyEditor.tsx:373-374` · `aria-placeholder` steht in der Oberflächensprache auf einem Element mit `lang="de"`;
+  ein englischer Platzhalter wird deutsch ausgesprochen · Platzhalter nur im `aria-hidden`-Span plus `aria-describedby` ohne `lang`.
+- 055b Review Nit 10 · Spec-Kopf und `answers.format.keys` · Kürzelhinweis nennt nur Strg/Ctrl, nicht Cmd auf macOS · Text ergänzen.
+- 055b Review Nit 11 · `054-fokusansicht.spec.ts` · `toHaveText` normalisiert Leerraum (etwas lockerer als `toHaveValue`); H1 prüft
+  `aria-disabled` direkt nach Strg+Enter mit wenig Aussagekraft (Neuladen deckt es) · bei Gelegenheit schärfen.
+- 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
+  liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

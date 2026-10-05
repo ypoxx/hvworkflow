@@ -172,13 +172,14 @@ describe('i18n parity checks', () => {
   // Scheibe 053: +25 keys for the steering view (shell 3: nav, page title, description; steering 14; answers 8: the
   // forward dialog).
   // Scheibe 054: +24 keys for the focus view (shell 3: nav, page title, description; focus 21).
-  it('(f) Total key count is 610 across all modules and matches de and en', () => {
+  // Scheibe 055b: +9 keys for the answer format (answers 8: toolbar, four marks, hint, keys, format-only; history 1).
+  it('(f) Total key count is 619 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(610);
-    expect(deKeys).toBe(610);
-    expect(enKeys).toBe(610);
+    expect(totalKeys).toBe(619);
+    expect(deKeys).toBe(619);
+    expect(enKeys).toBe(619);
   });
 });

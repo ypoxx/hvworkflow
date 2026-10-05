@@ -7,7 +7,7 @@
  */
 import { useId } from 'react';
 import type { DomainEvent, Question, Unit } from '@hv/domain';
-import { Badge, Button, Panel, StatusBadge, Toolbar, ToolbarSpacer } from '../../components';
+import { AnswerText, Badge, Button, Panel, StatusBadge, Toolbar, ToolbarSpacer } from '../../components';
 import { actionLabel, useT } from '../../i18n';
 import type { Translate } from '../../i18n';
 import { forwardReasonLabel } from '../../i18n/labels';
@@ -178,7 +178,8 @@ export function FocusDetail({
             ) : (
               <div data-testid="focus-latest" className="mt-1 space-y-2">
                 {refusal && <Badge tone="warning">{t('answers.refusal.badge')}</Badge>}
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-ink-900">{latest.text}</p>
+                {/* Scheibe 055b: the one renderer (the podium shows this version the same way); the reading time stays on `text`. */}
+                <AnswerText answer={latest} className="text-[13px] leading-relaxed text-ink-900" />
                 {latest.sources !== undefined && latest.sources.length > 0 && (
                   <p className="text-2xs text-ink-600">
                     <span className="hv-label mr-2">{t('answers.editor.sources.label')}</span>

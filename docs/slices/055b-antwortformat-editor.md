@@ -1,6 +1,6 @@
 # Scheibe 055b — Antwortformat: Renderer und Editor in der Oberfläche
 
-**Status:** spec (04.10.2026; gelesen auf `4da0165`, Integration mit 055 (Vertrag 0.4.4, PR #152), takt-043 (#153) und
+**Status:** gebaut, Review eingearbeitet (05.10.2026: Bau `f2dcb06`, Nachtrag 010d `27b5566`, Review-Befunde 1–6 und 8 in diesem Zweig; CI `e2e-http` steht aus). Spec vom 04.10.2026; gelesen auf `4da0165`, Integration mit 055 (Vertrag 0.4.4, PR #152), takt-043 (#153) und
 takt-044 (#154)). Teil b der geteilten Planzeile 055 (Spec 055, Abschnitt „Teilung und Zuschnitt“ und „055b — Entwurf“);
 sechste Scheibe der Oberflächenkette der Freigabe-Demo 045 → 048 → 053 → 054 → 055 → **055b** → 059 → 046 → 060 → 061 → 041
 (Register E57, Nachzug beim Orchestrator). **Geteilt** (Abschnitt „Teilung und Zuschnitt“): Diese Spec baut Renderer, Editor,
@@ -466,6 +466,7 @@ e2e:
   den Textinhalt lesen; Aufrufe und Erwartungen bleiben)
 - `apps/web/e2e/013-tastaturpfad.spec.ts` (nur falls Vor-dem-Bau-Punkt 6 es verlangt: die Höchstzahl der Tabulatorschritte zu
   `answer-editor` in Zeile 400 um eins)
+- Nachtrag Orchestrator 05.10.2026: `apps/web/e2e/010d-ansichtsdaten.spec.ts` — nur die zwei `toHaveValue`-Prüfungen auf `answer-editor` (Z. 885, 1052) werden `toHaveText`, weil das Feld jetzt `contenteditable` ist
 
 Sonstiges:
 
@@ -829,12 +830,244 @@ Keine blockiert den Bau; alle mit Standard.
 
 ```
 Slice: 055b-antwortformat-editor
-Done: …
-Evidence: <Schluss von `pnpm gates`>, docs/evidence/055b-*.png, CI-Lauf e2e-http …
-Open: …
-Touched: …
+Done: Renderer AnswerText (eine Komponente für Bühne, Vorschau, Beantwortung, Fokus, Historie), Antwortfeld
+      AnswerBodyEditor mit Werkzeugleiste, Kürzeln und Einfügen/Ablegen ohne HTML-Senke (Walker domToBody,
+      editorCommands), Entwurf als Eingabeform in Fokus und Beantwortung, Semgrep-Regel no-html-sink.
+Evidence: Schluss von `pnpm gates` im Bericht an den Orchestrator (Commit dort genannt), docs/evidence/055b-*.png (6),
+      CI-Lauf e2e-http grün (Lauf 37251657065, unten).
+Open: Firefox/WebKit nicht geprüft (Folgeliste); CSP der Webseite fehlt (037b, Eigentümerfrage vor geteilter Umgebung).
+Touched: siehe Bericht an den Orchestrator.
 ```
+
+### Vor-dem-Bau-Punkte
+
+1. **Basis:** `794c192` (enthält 055 `4da0165`); `normalizeAnswerBodyForRead`, `answerPlainText`, `answerBodyFromText` über
+   `@hv/domain` erreichbar; Paritätstest (f) bei 610 (jetzt 619). Eine Version mit Marke über die Demo geschrieben und
+   gelesen: e2e A1 (`focus-latest` zeigt `strong`/`mark` nach dem Speichern).
+2. **Kürzel (Chromium 1194 über Playwright):** `preventDefault` auf `keydown` für Strg/Cmd+B, I, U, Umschalt+H, Umschalt+L
+   greift (Inhalt unverändert, keine Navigation, kein `beforeinput`). Ohne Abfangen löst Chromium für Strg+B/I/U
+   `formatBold`/`formatItalic`/`formatUnderline` aus (abbrechbar); Strg+Umschalt+H/L tun in Chromium nichts. Firefox und
+   WebKit sind nicht installiert: **nicht geprüft** (Folgeliste). Quellen der Browser-Kürzel: Chrome-Hilfe „Tastenkombinationen“
+   (support.google.com/chrome/answer/157179), Firefox „Tastenkombinationen“ (support.mozilla.org, Strg+Umschalt+H = Chronik),
+   Safari-Menü (Cmd+Umschalt+H Startseite, Cmd+Umschalt+L Seitenleiste); nicht live nachgeschlagen.
+3. **Befehle auf eigenem Inhalt (Chromium):** `bold`, `italic`, `hiliteColor` (Farbe, dann `transparent`) und
+   `insertUnorderedList` schalten auf einem aus `bodyToDom` gebauten Inhalt um und zurück; der Walker liest danach jeweils
+   dasselbe Modell wie vorher. Ein teilweises Aufheben der Hervorhebung teilt den `span` sauber. `execCommand` löst **kein**
+   `beforeinput` aus. Auffällig: `insertUnorderedList` erzeugt `<p><ul>…</ul></p>` (Walker liest es richtig; Folgeliste).
+4. **Rückgängig nach Neuaufbau (Chromium):** Nach einem Neuaufbau durch Skript taten Strg+Z-Schritte in den alten Verlauf
+   sichtbar nichts, ein anschließendes Strg+Umschalt+Z erzeugte aber einen Stand, der nie bestand (Text verdoppelt:
+   `…EINGEFUEGT</p>Erster Satz.Erster Satz.<p>ZZweiter</p>`), **auch nachdem nach dem Neuaufbau getippt wurde**. Deshalb gilt der
+   Schutz aus Entscheidung 5, in einer strengeren Form (Abweichung 1).
+5. **Seed `http`:** nach 054 hält Finanzen laut Dateikopf von 054 F2 (eine Frage `answer_drafted` mit Version) und F7 (eine
+   Frage `assigned`) Einzelfragen mit `answer.draft` für die gebundene Fachkraft; H1 nimmt die erste in `answer_drafted`
+   oder `assigned`.
+6. **Tabulatorweg 013:** `013-tastaturpfad.spec.ts:400` grün mit 15 (Werkzeugleiste ein Halt); keine Änderung an 013.
+7. **Laufzeit `e2e-http`:** letzte drei grüne Läufe mit ausgeführtem Schritt: 37240940303 4:09, 37239067336 5:35,
+   37239065778 5:33. Höchstwert plus Schätzung 0:40 = 6:15 < 6:30; keine Meldung nötig, aber knapp (Takt „Grenze anheben
+   oder Job teilen“ vor 059).
+7a. **CSP:** weiterhin keine CSP der Web-Seite (`netlify.toml` ohne, `deploy/docker/nginx.conf:3` „No CSP here: it comes in
+   037b“, `apps/web/index.html` ohne `<meta>`); keine Änderung.
+8. **Kontrast:** `<mark>` `#8a5a08` auf `#fdf3e4` = 5,39:1 (eigener Vorder- und Hintergrund, daher auch in `.stage-contrast`);
+   axe auf Bühne (Kontrastmodus), Historie und Schreibmodus ohne serious/critical.
+
+### Ergebnisse
+
+- **A2b grün** (Akzeptanzkriterium 1a): null Anfragen an `sentinel-055b.invalid` bei `paste` und `drop` und nach dem Speichern
+  und Rendern; der Kontrollfall (ein `img` mit Wächter-URL im lebenden Dokument) zählt genau eine. Auch mit
+  `--repeat-each=3` (dreimal 0/1). Kein Rückfall auf `text/plain` nötig.
+- **D9:** Walker über 20 000 Zeichen (100 Absätze mit Marken): Median 0,2–0,3 ms, Höchstwert 0,7–1,5 ms (A1).
+- **Semgrep `no-html-sink`:** Probe mit `el.innerHTML = x`, `outerHTML +=`, `srcdoc`, `insertAdjacentHTML`, `document.write`,
+  `createContextualFragment`, `execCommand('insertHTML')` meldet sieben Treffer (Exit 1), `execCommand('bold')` und
+  `textContent` keinen; Wegwerfdatei gelöscht; `apps/web/src` und alle neuen Dateien: 0 Treffer.
+- **Grenze `features` → `@hv/domain`:** 14 Warnungen vorher, 14 nachher (Werte nur über `apps/web/src/api/answerFormat.ts`).
+
+### Abweichungen und offene Punkte
+
+1. **Schutz des Rückgängig strenger als „bis zur nächsten getippten Eingabe“.** Vor-dem-Bau-Punkt 4 zeigte die Verfälschung
+   auch nach Tippen. `UndoBudget` (`editorCommands.ts`) lässt Rückgängig und Wiederholen nur innerhalb der seit dem letzten
+   Neuaufbau gemachten Schritte zu (von unten gezählt: ein Schritt je Tipp-Lauf, einer je Formatbefehl auf einer Auswahl);
+   ein Rückgängig über den Neuaufbau hinaus wird verhindert. Kein Verlust; das Einfügen selbst bleibt nicht rückgängig
+   (055c). Ein Neuaufbau ist auch das erste Aufbauen des Felds beim Öffnen.
+2. **`initial` hat den Typ `AnswerBodyInput | null`** statt `AnswerBody | null`: der Schreibmodus baut ein ungespeichertes
+   Feld nach dem Zurückkehren („Entwurf fortsetzen“) aus der Eingabeform des Entwurfs auf; die Speicherform ist darin
+   enthalten.
+3. **`010d-ansichtsdaten.spec.ts:885` und `:1052`** prüften `answer-editor` mit `toHaveValue`, das Playwright für ein
+   `contenteditable`-Feld nicht kennt („Not an input element“). Zunächst gemeldet; nach Go des Orchestrators (Nachtrag in
+   „Files allowed“, 05.10.2026) nur diese zwei Prüfungen auf `toHaveText` umgestellt, wie in 054; sonst nichts an 010d.
+4. **Farbe des Platzhalters:** Der Platzhalter des Felds ist ein echter `<span>` und wird von axe gemessen; `ink-400` (2,48:1) fiel durch (003, 013h, 020, 090), daher `ink-600`.
+5. Firefox/WebKit nicht geprüft (Punkt 2 und 4), Folgeliste.
+
+055 und 055b sind zusammen auslieferbar; Ausrollen nur nach Go des Eigentümers.
+
+### Design-Kritik D1–D10
+
+| D | erfüllt | Satz |
+|---|---|---|
+| D1 | ja | Vier Symbole mit Namen als Tooltip und `aria-label`, gedrückt über Tönung und dickeren Strich; Hinweis Z6 in einem Satz neben der Leiste. |
+| D2 | ja | Keine neue primäre Aktion; „Entwurf speichern“ bleibt die eine primäre im Schreibmodus mit Änderung (Test 8, A1). |
+| D3 | ja | Leiste mit 32-px-Knöpfen bündig über dem Feld; Blockabstände in em, Bühne und Fokus gleich gegliedert. |
+| D4 | ja | Farbe nur für die Hervorhebung (vorhandenes Token, 5,39:1); gedrückte Knöpfe über Tönung und Strichstärke. |
+| D5 | ja | Versionsnummer im Historienblock als Mono-Badge wie in der Beantwortung. |
+| D6 | ja | Leeres Feld mit Platzhalter; ohne Version kein Historienblock; ohne `body` Rückfall auf Text; 422 über die Schreibtür. |
+| D7 | ja | 9 Schlüssel je Sprache, Hausvokabular, kein „Editor“ in Texten (`pnpm vocabulary`, `pnpm i18n-literals`). |
+| D8 | ja | Kürzel, ein Tabulatorhalt mit Pfeilen/Pos1/Ende, Strg+Enter und Escape wie 054; Übergaben unverändert nach takt-043. |
+| D9 | ja | Walker unter 2 ms bei 20 000 Zeichen. |
+| D10 | ja | Vier Knöpfe, ein Satz Hinweis, keine Menüs, keine Farb- oder Schriftwahl. |
+
+### Nachweise (Review-Nacharbeit, 05.10.2026)
+
+**Commits:** `f2dcb06` (Bau), `27b5566` (Nachtrag 010d), `c0ccbc7` (Review-Befunde 1–6 und 8), danach dieser Doku-Commit.
+
+**`pnpm gates` auf `c0ccbc7` (Schluss, wörtlich):**
+
+```
+slice-scope: warning — "docs/slices/055b-antwortformat-editor.md"'s "Files allowed" section differs from its version at the merge-base (794c192) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 51 changed file(s), all within "docs/slices/055b-antwortformat-editor.md"'s "Files allowed" list (85 pattern(s)).
+...
+# pass 318
+# fail 0
+...
+✓ built in 2.83s
+mark-test-run: wrote /home/user/wt/s055b/.claude/state/last-test-run (clean tree) at commit c0ccbc7, tree 2d501c4f2345…
+gates exit=0
+```
+
+(Die Warnung von `slice-scope` stammt vom Nachtrag des Orchestrators in „Files allowed“.)
+
+**e2e:** 055b mit `--repeat-each=3`: 18 passed, 3 skipped (H1 nur `http`); A2b dreimal „0; control: 1“ mit der erweiterten
+Wächterprobe (`<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face src`). Volle Suite
+`in-process` auf `c0ccbc7`: 163 passed, 0 failed, 1 skipped (H1).
+
+**CI `e2e-http` (Orchestrator, 05.10.2026):** PR #157, Commit e25adda (Code-Stand c0ccbc7), Lauf 37251657065, Job 111580365445, grün:
+
+```
+✓  62 [http] › e2e/055b-antwortformat.spec.ts:687:3 › 055b http › H1 formatierte Version über den Dienst, nach dem Neuladen gleich (2.5s)
+57 passed (3.5m)
+```
+
+Schritt „End-to-end http project …“ 01:30:51 bis 01:34:57, rund 4:06 gegen Limit 9:00 und Harness-Grenze 8:00. Artefakt
+`evidence-031-http` (ID 11321147001, `sha256:86f433cad5ae653fdca4f6c2b43664dc3f421b47582a3326bb21bbd73683aada`). Vorher grün
+auch auf 27b5566 (Lauf 37249410736, H1 3.9s, Schritt rund 5:45).
+
+**Rot vor der Änderung:**
+
+- Bau, Einheit (vor der Umsetzung): 28 Fälle in 12 Dateien rot — `answerFormat.test.ts`, `AnswerText.test.tsx`,
+  `AnswerBodyEditor.test.tsx`, `domToBody.test.ts`, `editorCommands.test.ts`, `focus.test.ts`, `AnswerBlock.test.tsx` (Modul
+  fehlt), dazu Test 6/7 in `QuestionDetail.test.tsx`, Test 6 in `FocusDetail.test.tsx`, Test 8 in `WritingMode.test.tsx` (zehn
+  Fälle), Test 6/10 in `Podium.test.tsx` (vier), Parität (f) „expected 610 to be 619“.
+- Bau, e2e (Quelltext zurückgestellt): `6 failed, 1 skipped` — A1 `toHaveCount`, A2 `toContainText`, A2b „Timeout 5000ms
+  exceeded while waiting on the predicate“, A3 „Failed to fetch dynamically imported module …/domToBody.ts“, A4/A5
+  `toHaveCount`, A6 `toHaveText`.
+- Review-Befund 1 (alter Stand `27b5566`, Wiedergabe): Feld „Alt⟨S⟩teil⟨S⟩“, Caret am Ende, Einfügen „NEU“ →
+  `{"text":"Alt"},{"text":"NEU"},{"text":"teil⟨S⟩"}` statt „AltteilNEU“ (⟨S⟩ = U+E055 U+E05B, unsichtbar).
+- Review-Befund 5 (`AnswerEditor.tsx` zurückgestellt): `× with a draft: no placeholder, saving open …` — `Tests 1 failed | 12 passed (13)`.
+
+**Semgrep-Probe (Wegwerfdatei `apps/web/src/zz/probe-sink.ts`, danach gelöscht), Exit 1, 18 Treffer:**
+
+```
+   ❯❯❱ scripts.semgrep.no-html-sink
+            2┆ el.innerHTML = x;
+            3┆ el['innerHTML'] = x;
+            4┆ el.outerHTML += x;
+            5┆ (el as HTMLIFrameElement).srcdoc = x;
+            6┆ Object.assign(el, { id: 'a', innerHTML: x });
+            7┆ el.insertAdjacentHTML('beforeend', x);
+            8┆ document.write(x);
+            9┆ w.document.writeln(x);
+           10┆ d.write(x);
+           11┆ d.createRange().createContextualFragment(x);
+   ❯❯❱ scripts.semgrep.exec-command-only-in-editor-commands
+           12┆ d.execCommand('insertHTML', false, x);
+   ❯❯❱ scripts.semgrep.no-html-sink
+           12┆ d.execCommand('insertHTML', false, x);
+           13┆ (el as unknown as { setHTMLUnsafe(h: string): void }).setHTMLUnsafe(x);
+           14┆ (Document as unknown as { parseHTMLUnsafe(h: string): Document }).parseHTMLUnsafe(x);
+           15┆ d.importNode(el, true);
+           16┆ d.adoptNode(el);
+   ❯❯❱ scripts.semgrep.exec-command-only-in-editor-commands
+           17┆ d.execCommand('bold');
+   ❯❯❱ scripts.semgrep.dom-parser-only-in-walker
+           18┆ new DOMParser().parseFromString(x, 'text/html');
+ • Findings: 18 (18 blocking)
+```
+
+`el.textContent = x` (Zeile 19) meldet keine Regel. Über alle `.ts`/`.tsx` unter `apps/web/src`: „Ran 7 rules on 174 files: 0
+findings.“ (Exit 0).
+
+**Akzeptanzkriterium 7 (Suche nach rohen Steuer-, Format-, unsichtbaren und Private-Use-Zeichen):**
+
+```
+$ FILES=$(git diff --name-only 794c192 HEAD | grep -v '\.png$'); LC_ALL=C.UTF-8 grep -nP '[\x{0000}-\x{0008}\x{000B}\x{000C}\x{000E}-\x{001F}\x{007F}-\x{009F}\x{00A0}\x{00AD}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{2066}-\x{2069}\x{FEFF}\x{E000}-\x{F8FF}]' $FILES; echo "exit=$? files=$(echo "$FILES" | wc -l)"
+exit=1 files=45
+```
+
+Kein Treffer (Exit 1 von `grep` = nichts gefunden) über alle 45 berührten Textdateien.
+
+**Berührte Dateien (gegen `794c192`):**
+
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts`
+- `apps/web/e2e/054-fokusansicht.spec.ts`
+- `apps/web/e2e/055b-antwortformat.spec.ts`
+- `apps/web/e2e/090-eingaben-je-akteur.spec.ts`
+- `apps/web/e2e/support/e2e-texts.ts`
+- `apps/web/e2e/support/word-sample-055b.ts`
+- `apps/web/playwright.config.ts`
+- `apps/web/src/api/answerFormat.test.ts`
+- `apps/web/src/api/answerFormat.ts`
+- `apps/web/src/components/AnswerText.test.tsx`
+- `apps/web/src/components/AnswerText.tsx`
+- `apps/web/src/components/index.ts`
+- `apps/web/src/features/answers/AnswerBodyEditor.test.tsx`
+- `apps/web/src/features/answers/AnswerBodyEditor.tsx`
+- `apps/web/src/features/answers/AnswerEditor.tsx`
+- `apps/web/src/features/answers/Page.tsx`
+- `apps/web/src/features/answers/QuestionDetail.test.tsx`
+- `apps/web/src/features/answers/QuestionDetail.tsx`
+- `apps/web/src/features/answers/domToBody.test.ts`
+- `apps/web/src/features/answers/domToBody.ts`
+- `apps/web/src/features/answers/editorCommands.test.ts`
+- `apps/web/src/features/answers/editorCommands.ts`
+- `apps/web/src/features/focus/FocusDetail.test.tsx`
+- `apps/web/src/features/focus/FocusDetail.tsx`
+- `apps/web/src/features/focus/Page.tsx`
+- `apps/web/src/features/focus/WritingMode.test.tsx`
+- `apps/web/src/features/focus/WritingMode.tsx`
+- `apps/web/src/features/focus/focus.test.ts`
+- `apps/web/src/features/focus/focus.ts`
+- `apps/web/src/features/history/AnswerBlock.test.tsx`
+- `apps/web/src/features/history/AnswerBlock.tsx`
+- `apps/web/src/features/history/Page.tsx`
+- `apps/web/src/features/stage/Podium.test.tsx`
+- `apps/web/src/features/stage/Podium.tsx`
+- `apps/web/src/i18n/answers.de.ts`
+- `apps/web/src/i18n/answers.en.ts`
+- `apps/web/src/i18n/history.de.ts`
+- `apps/web/src/i18n/history.en.ts`
+- `apps/web/src/i18n/parity.test.ts`
+- `docs/evidence/055b-buehne-de.png`
+- `docs/evidence/055b-buehne-en.png`
+- `docs/evidence/055b-editor-de.png`
+- `docs/evidence/055b-editor-en.png`
+- `docs/evidence/055b-historie-de.png`
+- `docs/evidence/055b-historie-en.png`
+- `docs/folgeliste.md`
+- `docs/glossar.md`
+- `docs/sicherheit/bedrohungsmodell.md`
+- `docs/slices/055b-antwortformat-editor.md`
+- `scripts/e2e-http-031.test.mjs`
+- `scripts/semgrep/rules.yml`
 
 ## Review findings
 
-Noch keine. Ein Review nach dem Bau in frischem Kontext (Security, UX/Barrierefreiheit, Prüfpunkt Recht/Freigabe).
+Review nach dem Bau (frischer Kontext, Security, UX/Barrierefreiheit, Recht/Freigabe; 05.10.2026): kein Blocker, kein Major.
+In der Scheibe behoben (`c0ccbc7`): 1 (Security/Integrität: Caret des Einfügens über den eingefügten Knoten statt Textsuche,
+Wächterzeichen U+E055/U+E05B werden nicht mehr gesucht und, nach Codex P2 auf #157 (`1e0ee7c`), auch nicht mehr entfernt, weil der Kern Zeichen aus dem Privatbereich zulässt; Einheitstest der Wiedergabe), 2 (Security: Wächterprobe
+A2b um `<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face` erweitert, A2b grün),
+3 (Security: Semgrep `no-html-sink` erweitert, pfadgebundene Regeln für `execCommand` und `DOMParser`, Bedrohungsmodell
+angeglichen), 4 (Nachweise oben), 5 (Security/Daten: Feld der Beantwortung aus dem Entwurf gebaut; Test), 6 (D1: Vordergrund
+der Hervorhebung im Feld wie auf der Bühne), 8 (HTML ohne Text fällt auf `text/plain` zurück; Test). In die Folgeliste:
+Minor 7 (e2e für den Schutz des Rückgängig), Nits 9–11.
+
+**Codex auf #157 (Orchestrator, 05.10.2026):** P2 — das Entfernen von U+E055/U+E05B beim Einfügen hätte zulässige Zeichen
+aus gespeicherten (auch freigegebenen) Fassungen gelöscht. Behoben in `1e0ee7c`: Caret nur über die Identität des eigenen leeren
+Knotens, keine Zeichen werden entfernt; Tests (a) bis (c) in `domToBody.test.ts`, vorher (a) und (b) rot.

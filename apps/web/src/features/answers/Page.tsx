@@ -12,6 +12,7 @@ import { FileQuestion } from 'lucide-react';
 import type { RefusalGround } from '@hv/domain';
 import { api } from '../../api';
 import { useActor } from '../../api/actor';
+import { previewText } from '../../api/answerFormat';
 import { useRefusalGrounds } from '../../api/useRefusalGrounds';
 import {
   EmptyState,
@@ -78,12 +79,14 @@ export function AnswersPage() {
       switch (action.kind) {
         case 'draft': {
           const sources = splitSources(action.sources);
+          // Scheibe 055b (decision 7): always with the input form; `text` is the plain text of its preview.
+          const body = action.body;
           void run(
             'answer.draft',
             (options) =>
               api.draftAnswer(
                 id,
-                { text: action.text.trim(), ...(sources.length > 0 ? { sources } : {}) },
+                { text: previewText(body), body, ...(sources.length > 0 ? { sources } : {}) },
                 options,
               ),
             // Only the draft of the question it was written for (slice 010d, Ziel 3).
