@@ -257,10 +257,12 @@ jobs:
   # the workflow rights (`contents: read`, `pull-requests: read`) and declares none of its own. The Keycloak step of
   # 029b stays in `gates` until the owner has made `e2e-http` a required check (spec 031a, owner question 1), so two
   # Keycloak containers run one after the other, in two jobs. Only the four screenshots are uploaded, never a report.
+  # takt-046: job 20 minutes (measured lead-in at most 1:08, Chromium 4:00, step 14:00), harness limit 12:00 inside the
+  # step; the harness prints a duration line and a notice, or a warning above 6:30 (soft, never red).
   e2e-http:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
@@ -308,7 +310,7 @@ jobs:
       # The harness creates and migrates its own database (`hv_e2e031_<hex>`), so the migration step of `gates` is not needed.
       - name: End-to-end http project against Hono, Postgres and Keycloak
         if: steps.docsfilter.outputs.code == 'true'
-        timeout-minutes: 9
+        timeout-minutes: 14
         run: node --import ./apps/api/node_modules/tsx/dist/loader.mjs scripts/e2e-http-031.mjs
       - name: Upload the screenshots of the http project
         if: always()
