@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ALLOWED_SERVICE_VARIABLES, FORBIDDEN_SERVICE_VARIABLES, LOADER_HINT, PERSONS, START_LINE, loaderIsActive, assertLoginLimits, assertOutsideRepository,
-  assertServiceEnv, buildFixture, buildServiceEnv, checkAccessLogFiles, writePrivateFile,
+  assertServiceEnv, buildFixture, buildServiceEnv, checkAccessLogFiles, formatDuration, writePrivateFile,
 } from './e2e-http-031.mjs';
 import { KEYCLOAK_IMAGE, KEYCLOAK_IMAGE_FORM } from './lib/keycloak-ci.mjs';
 
@@ -455,11 +455,11 @@ test('workflow: e2e-http is a second job on pull requests with the inherited rig
   assert(workflow.indexOf('\n  e2e-http:') > workflow.indexOf('\n  gates:'));
   assert.match(job, /if: github\.event_name == 'pull_request'/);
   assert.match(job, /runs-on: ubuntu-latest/);
-  assert.match(job, /timeout-minutes: 15/);
+  assert.match(job, /timeout-minutes: 20/);
   assert.doesNotMatch(job, /\n    permissions:/, 'no own permissions block: the workflow rights are inherited');
   assert.match(workflow, /^permissions:\n  contents: read\n  pull-requests: read$/m);
   assert.match(job, /Install Chromium for Playwright[^]*?timeout-minutes: 4/);
-  assert.match(job, /name: End-to-end http project against Hono, Postgres and Keycloak\n[^]*?timeout-minutes: 9/);
+  assert.match(job, /name: End-to-end http project against Hono, Postgres and Keycloak\n[^]*?timeout-minutes: 14/);
   assert.match(job, /scripts\/e2e-http-031\.mjs/);
   assert.match(job, /persist-credentials: false/);
   assert.match(job, /fetch-depth: 0/);
@@ -526,8 +526,48 @@ test('harness: signals, total time limit, process group and free ports are handl
   assert.match(source, /process\.kill\(-child\.pid/);
   assert.match(source, /assertPortFree\(SERVICE_PORT\)/);
   assert.doesNotMatch(source, /pkill|killall|lsof/);
-  const total = Number(/const TOTAL_MS = ([\d_]+);/.exec(source)?.[1].replaceAll('_', ''));
-  assert(total > 0 && total < 9 * 60_000, 'the total limit stays inside the 9 minutes of the CI step');
+  const number = (name) => Number(new RegExp(`const ${name} = ([\\d_]+);`).exec(source)?.[1].replaceAll('_', ''));
+  const total = number('TOTAL_MS');
+  assert.equal(total, 720_000);
+  // takt-046: the limits are read from the workflow, not copied.
+  const stepMinutes = Number(/name: End-to-end http project against Hono, Postgres and Keycloak\n[^]*?timeout-minutes: (\d+)/.exec(job)?.[1]);
+  const chromiumMinutes = Number(/Install Chromium for Playwright[^]*?timeout-minutes: (\d+)/.exec(job)?.[1]);
+  const jobMinutes = Number(/^    timeout-minutes: (\d+)$/m.exec(job)?.[1]);
+  assert(total + 60_000 <= stepMinutes * 60_000, 'the harness limit lies at least one minute inside the step limit');
+  assert(jobMinutes >= stepMinutes + chromiumMinutes + 1, 'the job limit covers step, Chromium and one minute');
+  assert.equal(number('WARN_MS'), 390_000);
+  assert(number('WARN_MS') < total - number('CLEANUP_RESERVE_MS'));
+});
+
+test('harness: the duration line reports total, limit, threshold and stages; the annotation is a warning only above the threshold', () => {
+  const stages = [['database', 12_000], ['end-to-end run', 300_000]];
+  const calm = formatDuration({ totalMs: 345_000, limitMs: 720_000, warnMs: 390_000, stages });
+  assert(calm.line.startsWith('031a duration: total 5:45 of limit 12:00, warning above 6:30; stages: '), calm.line);
+  assert(calm.line.indexOf('database 0:12') < calm.line.indexOf('end-to-end run 5:00'), 'stages keep their order');
+  assert(calm.annotation.startsWith('::notice title=e2e-http duration::'));
+  assert(formatDuration({ totalMs: 390_000, limitMs: 720_000, warnMs: 390_000, stages }).annotation.startsWith('::notice title=e2e-http duration::'));
+  assert(formatDuration({ totalMs: 390_001, limitMs: 720_000, warnMs: 390_000, stages }).annotation
+    .startsWith('::warning title=e2e-http duration::'));
+  assert(formatDuration({ totalMs: 61_999, limitMs: 720_000, warnMs: 390_000, stages }).line.includes('total 1:01 of'));
+  assert(formatDuration({ totalMs: 600_000, limitMs: 720_000, warnMs: 390_000, stages }).line.includes('total 10:00 of'));
+});
+
+test('harness: formatDuration is called in the finally of main around run(), guarded, with the four fields only', () => {
+  const source = readFileSync(HARNESS, 'utf8');
+  const main = source.slice(source.indexOf('async function main()'), source.indexOf('async function run('));
+  assert.match(main, /await run\([^]*\} finally \{\s*(?:\/\/[^\n]*\n\s*)*try \{[^]*formatDuration\(\{ totalMs: [^}]*\}\)[^]*\} catch \{\}/);
+  const run = source.slice(source.indexOf('async function run('), source.indexOf('function collect('));
+  assert.doesNotMatch(run, /formatDuration/);
+  assert.match(source, /export function formatDuration\(\{ totalMs, limitMs, warnMs, stages \}\)/);
+});
+
+test('harness: a setup failure (missing database variables) still prints the duration line and annotation', () => {
+  const result = spawnSync(process.execPath, ['--import', LOADER, HARNESS], {
+    cwd: ROOT, encoding: 'utf8', timeout: 30_000, env: baseEnv });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /^031a duration: total 0:0\d of limit 12:00, warning above 6:30; stages: $/m);
+  assert.match(result.stdout, /^::notice title=e2e-http duration::031a duration: /m);
+  assert.equal(result.stderr, '031a e2e http harness failed during tsx loader check.\n');
 });
 
 test('harness: without the tsx loader it says so with a fixed sentence', () => {
