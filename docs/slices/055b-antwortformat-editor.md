@@ -914,6 +914,147 @@ Touched: siehe Bericht an den Orchestrator.
 | D9 | ja | Walker unter 2 ms bei 20 000 Zeichen. |
 | D10 | ja | Vier Knöpfe, ein Satz Hinweis, keine Menüs, keine Farb- oder Schriftwahl. |
 
+### Nachweise (Review-Nacharbeit, 05.10.2026)
+
+**Commits:** `f2dcb06` (Bau), `27b5566` (Nachtrag 010d), `c0ccbc7` (Review-Befunde 1–6 und 8), danach dieser Doku-Commit.
+
+**`pnpm gates` auf `c0ccbc7` (Schluss, wörtlich):**
+
+```
+slice-scope: warning — "docs/slices/055b-antwortformat-editor.md"'s "Files allowed" section differs from its version at the merge-base (794c192) with origin/claude/dax-shareholder-meeting-workflow-0s934z.
+slice-scope: 51 changed file(s), all within "docs/slices/055b-antwortformat-editor.md"'s "Files allowed" list (85 pattern(s)).
+...
+# pass 318
+# fail 0
+...
+✓ built in 2.83s
+mark-test-run: wrote /home/user/wt/s055b/.claude/state/last-test-run (clean tree) at commit c0ccbc7, tree 2d501c4f2345…
+gates exit=0
+```
+
+(Die Warnung von `slice-scope` stammt vom Nachtrag des Orchestrators in „Files allowed“.)
+
+**e2e:** 055b mit `--repeat-each=3`: 18 passed, 3 skipped (H1 nur `http`); A2b dreimal „0; control: 1“ mit der erweiterten
+Wächterprobe (`<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face src`). Volle Suite
+`in-process` auf `c0ccbc7`: 163 passed, 0 failed, 1 skipped (H1).
+
+**CI `e2e-http`:** _Platzhalter — Lauf-ID, Job-ID, Commit, Logzeile H1 und Dauer des Schritts trägt der Orchestrator ein._
+
+**Rot vor der Änderung:**
+
+- Bau, Einheit (vor der Umsetzung): 28 Fälle in 12 Dateien rot — `answerFormat.test.ts`, `AnswerText.test.tsx`,
+  `AnswerBodyEditor.test.tsx`, `domToBody.test.ts`, `editorCommands.test.ts`, `focus.test.ts`, `AnswerBlock.test.tsx` (Modul
+  fehlt), dazu Test 6/7 in `QuestionDetail.test.tsx`, Test 6 in `FocusDetail.test.tsx`, Test 8 in `WritingMode.test.tsx` (zehn
+  Fälle), Test 6/10 in `Podium.test.tsx` (vier), Parität (f) „expected 610 to be 619“.
+- Bau, e2e (Quelltext zurückgestellt): `6 failed, 1 skipped` — A1 `toHaveCount`, A2 `toContainText`, A2b „Timeout 5000ms
+  exceeded while waiting on the predicate“, A3 „Failed to fetch dynamically imported module …/domToBody.ts“, A4/A5
+  `toHaveCount`, A6 `toHaveText`.
+- Review-Befund 1 (alter Stand `27b5566`, Wiedergabe): Feld „Alt⟨S⟩teil⟨S⟩“, Caret am Ende, Einfügen „NEU“ →
+  `{"text":"Alt"},{"text":"NEU"},{"text":"teil⟨S⟩"}` statt „AltteilNEU“ (⟨S⟩ = U+E055 U+E05B, unsichtbar).
+- Review-Befund 5 (`AnswerEditor.tsx` zurückgestellt): `× with a draft: no placeholder, saving open …` — `Tests 1 failed | 12 passed (13)`.
+
+**Semgrep-Probe (Wegwerfdatei `apps/web/src/zz/probe-sink.ts`, danach gelöscht), Exit 1, 18 Treffer:**
+
+```
+   ❯❯❱ scripts.semgrep.no-html-sink
+            2┆ el.innerHTML = x;
+            3┆ el['innerHTML'] = x;
+            4┆ el.outerHTML += x;
+            5┆ (el as HTMLIFrameElement).srcdoc = x;
+            6┆ Object.assign(el, { id: 'a', innerHTML: x });
+            7┆ el.insertAdjacentHTML('beforeend', x);
+            8┆ document.write(x);
+            9┆ w.document.writeln(x);
+           10┆ d.write(x);
+           11┆ d.createRange().createContextualFragment(x);
+   ❯❯❱ scripts.semgrep.exec-command-only-in-editor-commands
+           12┆ d.execCommand('insertHTML', false, x);
+   ❯❯❱ scripts.semgrep.no-html-sink
+           12┆ d.execCommand('insertHTML', false, x);
+           13┆ (el as unknown as { setHTMLUnsafe(h: string): void }).setHTMLUnsafe(x);
+           14┆ (Document as unknown as { parseHTMLUnsafe(h: string): Document }).parseHTMLUnsafe(x);
+           15┆ d.importNode(el, true);
+           16┆ d.adoptNode(el);
+   ❯❯❱ scripts.semgrep.exec-command-only-in-editor-commands
+           17┆ d.execCommand('bold');
+   ❯❯❱ scripts.semgrep.dom-parser-only-in-walker
+           18┆ new DOMParser().parseFromString(x, 'text/html');
+ • Findings: 18 (18 blocking)
+```
+
+`el.textContent = x` (Zeile 19) meldet keine Regel. Über alle `.ts`/`.tsx` unter `apps/web/src`: „Ran 7 rules on 174 files: 0
+findings.“ (Exit 0).
+
+**Akzeptanzkriterium 7 (Suche nach rohen Steuer-, Format-, unsichtbaren und Private-Use-Zeichen):**
+
+```
+$ FILES=$(git diff --name-only 794c192 HEAD | grep -v '\.png$'); LC_ALL=C.UTF-8 grep -nP '[\x{0000}-\x{0008}\x{000B}\x{000C}\x{000E}-\x{001F}\x{007F}-\x{009F}\x{00A0}\x{00AD}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{2066}-\x{2069}\x{FEFF}\x{E000}-\x{F8FF}]' $FILES; echo "exit=$? files=$(echo "$FILES" | wc -l)"
+exit=1 files=45
+```
+
+Kein Treffer (Exit 1 von `grep` = nichts gefunden) über alle 45 berührten Textdateien.
+
+**Berührte Dateien (gegen `794c192`):**
+
+- `apps/web/e2e/010d-ansichtsdaten.spec.ts`
+- `apps/web/e2e/054-fokusansicht.spec.ts`
+- `apps/web/e2e/055b-antwortformat.spec.ts`
+- `apps/web/e2e/090-eingaben-je-akteur.spec.ts`
+- `apps/web/e2e/support/e2e-texts.ts`
+- `apps/web/e2e/support/word-sample-055b.ts`
+- `apps/web/playwright.config.ts`
+- `apps/web/src/api/answerFormat.test.ts`
+- `apps/web/src/api/answerFormat.ts`
+- `apps/web/src/components/AnswerText.test.tsx`
+- `apps/web/src/components/AnswerText.tsx`
+- `apps/web/src/components/index.ts`
+- `apps/web/src/features/answers/AnswerBodyEditor.test.tsx`
+- `apps/web/src/features/answers/AnswerBodyEditor.tsx`
+- `apps/web/src/features/answers/AnswerEditor.tsx`
+- `apps/web/src/features/answers/Page.tsx`
+- `apps/web/src/features/answers/QuestionDetail.test.tsx`
+- `apps/web/src/features/answers/QuestionDetail.tsx`
+- `apps/web/src/features/answers/domToBody.test.ts`
+- `apps/web/src/features/answers/domToBody.ts`
+- `apps/web/src/features/answers/editorCommands.test.ts`
+- `apps/web/src/features/answers/editorCommands.ts`
+- `apps/web/src/features/focus/FocusDetail.test.tsx`
+- `apps/web/src/features/focus/FocusDetail.tsx`
+- `apps/web/src/features/focus/Page.tsx`
+- `apps/web/src/features/focus/WritingMode.test.tsx`
+- `apps/web/src/features/focus/WritingMode.tsx`
+- `apps/web/src/features/focus/focus.test.ts`
+- `apps/web/src/features/focus/focus.ts`
+- `apps/web/src/features/history/AnswerBlock.test.tsx`
+- `apps/web/src/features/history/AnswerBlock.tsx`
+- `apps/web/src/features/history/Page.tsx`
+- `apps/web/src/features/stage/Podium.test.tsx`
+- `apps/web/src/features/stage/Podium.tsx`
+- `apps/web/src/i18n/answers.de.ts`
+- `apps/web/src/i18n/answers.en.ts`
+- `apps/web/src/i18n/history.de.ts`
+- `apps/web/src/i18n/history.en.ts`
+- `apps/web/src/i18n/parity.test.ts`
+- `docs/evidence/055b-buehne-de.png`
+- `docs/evidence/055b-buehne-en.png`
+- `docs/evidence/055b-editor-de.png`
+- `docs/evidence/055b-editor-en.png`
+- `docs/evidence/055b-historie-de.png`
+- `docs/evidence/055b-historie-en.png`
+- `docs/folgeliste.md`
+- `docs/glossar.md`
+- `docs/sicherheit/bedrohungsmodell.md`
+- `docs/slices/055b-antwortformat-editor.md`
+- `scripts/e2e-http-031.test.mjs`
+- `scripts/semgrep/rules.yml`
+
 ## Review findings
 
-Noch keine. Ein Review nach dem Bau in frischem Kontext (Security, UX/Barrierefreiheit, Prüfpunkt Recht/Freigabe).
+Review nach dem Bau (frischer Kontext, Security, UX/Barrierefreiheit, Recht/Freigabe; 05.10.2026): kein Blocker, kein Major.
+In der Scheibe behoben (`c0ccbc7`): 1 (Security/Integrität: Caret des Einfügens über den eingefügten Knoten statt Textsuche,
+alte Wächterzeichen U+E055/U+E05B aus Feld und Einfügung entfernt; Einheitstest der Wiedergabe), 2 (Security: Wächterprobe
+A2b um `<script src>`, `<link rel=prefetch|modulepreload|icon>`, `<img loading=lazy>`, `@font-face` erweitert, A2b grün),
+3 (Security: Semgrep `no-html-sink` erweitert, pfadgebundene Regeln für `execCommand` und `DOMParser`, Bedrohungsmodell
+angeglichen), 4 (Nachweise oben), 5 (Security/Daten: Feld der Beantwortung aus dem Entwurf gebaut; Test), 6 (D1: Vordergrund
+der Hervorhebung im Feld wie auf der Bühne), 8 (HTML ohne Text fällt auf `text/plain` zurück; Test). In die Folgeliste:
+Minor 7 (e2e für den Schutz des Rückgängig), Nits 9–11.
