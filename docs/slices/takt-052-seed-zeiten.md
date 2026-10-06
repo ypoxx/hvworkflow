@@ -176,12 +176,22 @@ der Demo bearbeitete Fragen stimmt er. Variante B kommt als Folgezeile in `docs/
    Befund dieser Spec (eine übersehene Zeitabhängigkeit): **anhalten und berichten, nicht die Datei hinzunehmen.**
 4. `rg -n "seedEvents|seedDemo|CORPUS_DEMO" apps/web/e2e` auf neue Specs seit `68c87d9` prüfen, die Seed-Zeiten lesen.
 
+**Nachtrag (Bau, 06.10.2026): übersehene Zeitabhängigkeit.** `apps/api/src/__tests__/metrics033b.test.ts:221` („shows a
+new question only after the window“) sät `{ questions: 30, seed: 3 }`, liest `hv_questions_captured_last_5m`, erfasst eine
+Frage, rückt die Uhr um 10 s vor und erwartet `vorher + 1`. Das galt nur, weil fast alle Seed-Erfassungen auf `now` lagen;
+mit den gestauchten Zeiten verlässt eine Seed-Erfassung in diesen 10 s das 300-s-Fenster (rot: `expected 6 to be 7`).
+Entscheidung des Orchestrators: Die Absicht des Tests bleibt (neue Frage erst nach dem Fenster sichtbar, Werte aus dem
+Cache, nicht aus dem Log); der erwartete Wert wird aus derselben Quelle wie die Metrik zur späteren Uhrzeit ohne die neue
+Frage berechnet, statt anzunehmen, dass jede Seed-Erfassung auf `now` liegt. Die Datei kommt unter Files allowed, nur für
+diesen Test und seine Fixture-Nutzung.
+
 ## Files allowed
 
 - `packages/domain/src/seed.ts`
 - `packages/domain/src/__tests__/seed.test.ts`
 - `packages/domain/src/__tests__/seed-fictitious-names.test.ts`
 - `apps/api/src/__tests__/fixtures/metrics-golden-061.txt`
+- `apps/api/src/__tests__/metrics033b.test.ts` (Nachtrag: nur der Test an `:221` und seine Fixture-Nutzung)
 - `docs/folgeliste.md` (nur die zwei Zeilen aus Ziel 5)
 - `docs/slices/takt-052-seed-zeiten.md` (Bericht, Review findings)
 - `docs/evidence/takt-052-*.png` (freiwillig, siehe Nachweise)
@@ -189,7 +199,7 @@ der Demo bearbeitete Fragen stimmt er. Variante B kommt als Folgezeile in `docs/
 ## Ausdrücklich nicht erlaubt
 
 `packages/domain/src/` außer `seed.ts` und den zwei Testdateien (insbesondere `indicators.ts`, `cockpit.ts`, `api.ts`,
-`state.ts`, `envelope.ts`, `transitions.ts`), `apps/api/src/` außer der Golden-Datei (insbesondere
+`state.ts`, `envelope.ts`, `transitions.ts`), `apps/api/src/` außer der Golden-Datei und dem Test in `metrics033b.test.ts` (Nachtrag; insbesondere
 `apps/api/src/__tests__/cockpit061.test.ts`), `apps/web/`, `packages/contract/`, `scripts/`, `.github/`,
 `docs/evidence/` außer `takt-052-*`.
 
