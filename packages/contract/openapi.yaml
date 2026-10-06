@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HV-Tool API
-  version: 0.4.4
+  version: 0.4.5
   license: { name: Proprietary, identifier: LicenseRef-Proprietary }
   summary: Question-and-answer workflow for the general meeting (Hauptversammlung) of one company.
   description: |
@@ -1824,6 +1824,31 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/PersistenceBusy' }
+  /meetings/{meetingId}/cockpit:
+    parameters: [ { $ref: '#/components/parameters/MeetingId' } ]
+    get:
+      tags: [meeting]
+      operationId: getMeetingCockpit
+      summary: Control desk (Leitstand) figures of a meeting — oldest open question, stations, backlog per unit, inflow, legal clearing
+      description: >-
+        Since 0.4.5 (slice 061). Permission `cockpit.read` (denial R-PERM-02). Aggregates per meeting
+        (Jahrgang), status and answering unit (Fachbereich) by the definitions of the evaluation
+        catalogue (slice 033b, report `leitstand` in `catalog.json`); no figure per person, per role,
+        per session or per device. References (`oldestOpen.items`, `legalReview.items`) name only
+        questions the reader may read (`can(actor, 'question.read', question)`); the aggregates are
+        unfiltered, which is why every holder of `cockpit.read` holds unscoped `question.read`. No
+        question text, no actor, no speaker, no claim. Ages are whole seconds, rounded down, never
+        negative, computed against the service clock (`asOf`); an event after `asOf` counts nowhere.
+        Meetings in every status are computed; equality with `/metrics` holds for running meetings.
+      responses:
+        '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Cockpit' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '408': { $ref: '#/components/responses/RequestTimeout' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/PersistenceBusy' }
   # ---- sign-in through the BFF (ADR 0004) — outside /v1 ---------------------------------------------
   /auth/login:
     servers: [ { url: /, description: 'Outside /v1: browser navigation, not an API call' } ]
@@ -2613,6 +2638,9 @@ components:
         Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with
         a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin.
         It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich".
+        Since 0.4.5 (slice 061): `cockpit.read` (read the control desk figures, `getMeetingCockpit`);
+        granted in `ROLE_PERMISSIONS` by slice 061 to moderation, coordination and admin; holders hold
+        unscoped `question.read`.
       enum:
         - speaker.register
         - speaker.reorder
@@ -2641,6 +2669,7 @@ components:
         - stage.read
         - history.read
         - event.read
+        - cockpit.read
         - agenda.manage
         - admin.meetings.manage
         - admin.units.manage
@@ -3492,6 +3521,110 @@ components:
         queue: { type: array, items: { $ref: '#/components/schemas/Question' } }
         deliveredCount: { type: integer }
         openCount: { type: integer }
+    Cockpit:
+      type: object
+      additionalProperties: false
+      description: >-
+        Since 0.4.5 (slice 061): the control desk figures of one meeting (`getMeetingCockpit`). Every
+        leaf path is listed with its source in the report `leitstand` of the evaluation catalogue
+        (`apps/api/src/metrics/catalog.json`). "Open" is the catalogue definition of slice 033b: status
+        not in delivered, closed, withdrawn, merged.
+      required: [meetingId, asOf, meetingStatus, totals, openByStatus, openByUnit, openUnassigned, oldestOpen, inflow, legalReview]
+      properties:
+        meetingId: { type: string, maxLength: 200 }
+        asOf: { type: string, format: date-time, description: 'Computation time from the service clock' }
+        meetingStatus: { $ref: '#/components/schemas/MeetingStatus' }
+        debateClosedAt: { type: string, format: date-time }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [captured, open, staged, answered]
+          properties:
+            captured: { type: integer, minimum: 0, description: 'All questions of the meeting' }
+            open: { type: integer, minimum: 0, description: 'Questions without a final status (033b "open")' }
+            staged: { type: integer, minimum: 0, description: 'Questions on the podium queue' }
+            answered: { type: integer, minimum: 0, description: 'Questions read out: delivered and closed' }
+        openByStatus:
+          type: object
+          additionalProperties: false
+          description: Open questions per station (the seven open statuses)
+          required: [captured, classified, assigned, answer_drafted, in_review, approved, staged]
+          properties:
+            captured: { type: integer, minimum: 0 }
+            classified: { type: integer, minimum: 0 }
+            assigned: { type: integer, minimum: 0 }
+            answer_drafted: { type: integer, minimum: 0 }
+            in_review: { type: integer, minimum: 0 }
+            approved: { type: integer, minimum: 0 }
+            staged: { type: integer, minimum: 0 }
+        openByUnit:
+          type: object
+          description: Open questions per answering unit id of the meeting; every unit is a key, also with 0
+          maxProperties: 200
+          additionalProperties: { type: integer, minimum: 0 }
+        openUnassigned: { type: integer, minimum: 0, description: 'Open questions without an answering unit' }
+        oldestOpen:
+          type: object
+          additionalProperties: false
+          required: [ageSeconds, items]
+          properties:
+            ageSeconds: { type: integer, minimum: 0, description: 'Age of the oldest open question since capture; 0 without one; independent of the reference filter' }
+            items:
+              type: array
+              maxItems: 4
+              description: Oldest first, ties by `number`; only questions the reader may read
+              items: { $ref: '#/components/schemas/CockpitOldestRef' }
+        inflow:
+          type: object
+          additionalProperties: false
+          required: [binSeconds, bins, last5m]
+          properties:
+            binSeconds: { type: integer, enum: [300] }
+            bins:
+              type: array
+              minItems: 12
+              maxItems: 12
+              description: >-
+                Captures per 300 s window over the last hour; `bins[11]` = `last5m` (age 0 to 300 s
+                inclusive), `bins[i]` for i < 11 counts ages in (300·(11−i), 300·(12−i)]
+              items: { type: integer, minimum: 0 }
+            last5m: { type: integer, minimum: 0, description: 'As `hv_questions_captured_last_5m`' }
+        legalReview:
+          type: object
+          additionalProperties: false
+          required: [over10m, items]
+          properties:
+            over10m: { type: integer, minimum: 0, description: 'As `hv_questions_in_legal_review_over_10m`' }
+            items:
+              type: array
+              maxItems: 50
+              description: Longest waiting first; only questions the reader may read
+              items: { $ref: '#/components/schemas/CockpitReviewRef' }
+    CockpitOldestRef:
+      type: object
+      additionalProperties: false
+      description: 'Since 0.4.5 (slice 061): a reference to an open question in `Cockpit.oldestOpen`; no text, no speaker, no actor'
+      required: [id, number, status, ageSeconds, statusAgeSeconds]
+      properties:
+        id: { type: string, maxLength: 200 }
+        number: { type: string, maxLength: 200 }
+        status: { $ref: '#/components/schemas/QuestionStatus' }
+        unitId: { type: string, maxLength: 200 }
+        ageSeconds: { type: integer, minimum: 0, description: 'Seconds since capture' }
+        statusAgeSeconds: { type: integer, minimum: 0, description: 'Seconds since the last status change' }
+    CockpitReviewRef:
+      type: object
+      additionalProperties: false
+      description: 'Since 0.4.5 (slice 061): a reference to a question in legal clearing over 10 minutes; no text, no speaker, no actor'
+      required: [id, number, status, ageSeconds, statusAgeSeconds, reviewAgeSeconds]
+      properties:
+        id: { type: string, maxLength: 200 }
+        number: { type: string, maxLength: 200 }
+        status: { $ref: '#/components/schemas/QuestionStatus' }
+        unitId: { type: string, maxLength: 200 }
+        ageSeconds: { type: integer, minimum: 0, description: 'Seconds since capture' }
+        statusAgeSeconds: { type: integer, minimum: 0, description: 'Seconds since the last status change' }
+        reviewAgeSeconds: { type: integer, minimum: 0, description: 'Waiting time in legal clearing by the 033b definition; a new refusal proposal restarts it' }
     QuestionLegalClearedPayload:
       type: object
       description: >

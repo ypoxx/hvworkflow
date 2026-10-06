@@ -1209,6 +1209,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/meetings/{meetingId}/cockpit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Control desk (Leitstand) figures of a meeting — oldest open question, stations, backlog per unit, inflow, legal clearing
+         * @description Since 0.4.5 (slice 061). Permission `cockpit.read` (denial R-PERM-02). Aggregates per meeting (Jahrgang), status and answering unit (Fachbereich) by the definitions of the evaluation catalogue (slice 033b, report `leitstand` in `catalog.json`); no figure per person, per role, per session or per device. References (`oldestOpen.items`, `legalReview.items`) name only questions the reader may read (`can(actor, 'question.read', question)`); the aggregates are unfiltered, which is why every holder of `cockpit.read` holds unscoped `question.read`. No question text, no actor, no speaker, no claim. Ages are whole seconds, rounded down, never negative, computed against the service clock (`asOf`); an event after `asOf` counts nowhere. Meetings in every status are computed; equality with `/metrics` holds for running meetings.
+         */
+        get: operations["getMeetingCockpit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -1439,10 +1462,10 @@ export interface components {
             personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`. Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin. It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich".
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`. Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin. It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich". Since 0.4.5 (slice 061): `cockpit.read` (read the control desk figures, `getMeetingCockpit`); granted in `ROLE_PERMISSIONS` by slice 061 to moderation, coordination and admin; holders hold unscoped `question.read`.
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.forward" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.forward" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "cockpit.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
         /**
          * @description Lifecycle of a meeting (Jahrgang): MeetingCreated projects preparation from slice 025, MeetingStarted projects running, MeetingClosed projects closed. DebateClosed does not close the meeting; it records only the end of the general debate. R-MTG in slice 025 checks the transitions. Public actions arrive in later slices.
          * @enum {string}
@@ -2070,6 +2093,88 @@ export interface components {
             queue: components["schemas"]["Question"][];
             deliveredCount: number;
             openCount: number;
+        };
+        /** @description Since 0.4.5 (slice 061): the control desk figures of one meeting (`getMeetingCockpit`). Every leaf path is listed with its source in the report `leitstand` of the evaluation catalogue (`apps/api/src/metrics/catalog.json`). "Open" is the catalogue definition of slice 033b: status not in delivered, closed, withdrawn, merged. */
+        Cockpit: {
+            meetingId: string;
+            /**
+             * Format: date-time
+             * @description Computation time from the service clock
+             */
+            asOf: string;
+            meetingStatus: components["schemas"]["MeetingStatus"];
+            /** Format: date-time */
+            debateClosedAt?: string;
+            totals: {
+                /** @description All questions of the meeting */
+                captured: number;
+                /** @description Questions without a final status (033b "open") */
+                open: number;
+                /** @description Questions on the podium queue */
+                staged: number;
+                /** @description Questions read out: delivered and closed */
+                answered: number;
+            };
+            /** @description Open questions per station (the seven open statuses) */
+            openByStatus: {
+                captured: number;
+                classified: number;
+                assigned: number;
+                answer_drafted: number;
+                in_review: number;
+                approved: number;
+                staged: number;
+            };
+            /** @description Open questions per answering unit id of the meeting; every unit is a key, also with 0 */
+            openByUnit: {
+                [key: string]: number;
+            };
+            /** @description Open questions without an answering unit */
+            openUnassigned: number;
+            oldestOpen: {
+                /** @description Age of the oldest open question since capture; 0 without one; independent of the reference filter */
+                ageSeconds: number;
+                /** @description Oldest first, ties by `number`; only questions the reader may read */
+                items: components["schemas"]["CockpitOldestRef"][];
+            };
+            inflow: {
+                /** @enum {integer} */
+                binSeconds: 300;
+                /** @description Captures per 300 s window over the last hour; `bins[11]` = `last5m` (age 0 to 300 s inclusive), `bins[i]` for i < 11 counts ages in (300·(11−i), 300·(12−i)] */
+                bins: number[];
+                /** @description As `hv_questions_captured_last_5m` */
+                last5m: number;
+            };
+            legalReview: {
+                /** @description As `hv_questions_in_legal_review_over_10m` */
+                over10m: number;
+                /** @description Longest waiting first; only questions the reader may read */
+                items: components["schemas"]["CockpitReviewRef"][];
+            };
+        };
+        /** @description Since 0.4.5 (slice 061): a reference to an open question in `Cockpit.oldestOpen`; no text, no speaker, no actor */
+        CockpitOldestRef: {
+            id: string;
+            number: string;
+            status: components["schemas"]["QuestionStatus"];
+            unitId?: string;
+            /** @description Seconds since capture */
+            ageSeconds: number;
+            /** @description Seconds since the last status change */
+            statusAgeSeconds: number;
+        };
+        /** @description Since 0.4.5 (slice 061): a reference to a question in legal clearing over 10 minutes; no text, no speaker, no actor */
+        CockpitReviewRef: {
+            id: string;
+            number: string;
+            status: components["schemas"]["QuestionStatus"];
+            unitId?: string;
+            /** @description Seconds since capture */
+            ageSeconds: number;
+            /** @description Seconds since the last status change */
+            statusAgeSeconds: number;
+            /** @description Waiting time in legal clearing by the 033b definition; a new refusal proposal restarts it */
+            reviewAgeSeconds: number;
         };
         /** @description Payload of `QuestionLegalCleared` (since 0.2.0): legal (Recht) has cleared the current answer version (Rechtsfreigabe), or a podium question without an answer. The clearing is a recommendation, not the approval itself, which stays with `question.approve` (register E25). Emitted by `clearQuestionLegally` from slice 021c. */
         QuestionLegalClearedPayload: {
@@ -4876,6 +4981,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StageView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    getMeetingCockpit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cockpit"];
                 };
             };
             401: components["responses"]["Unauthorized"];
