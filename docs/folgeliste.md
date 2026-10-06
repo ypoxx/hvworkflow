@@ -12,10 +12,14 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 Diese Punkte stehen hier nur, damit sie nicht verloren gehen. Sie sind **keine** Folgelisten-Nits und werden vor jedem Rollout
 in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
 
-- **`listEvents` ohne Akteurschutz: in Arbeit als takt-056 (#177), nicht aufgeschoben** · `apps/web/src/api/liveStore.ts` ·
-  eine vor Akteurwechsel oder `clear` angeforderte Ereignisseite konnte die neue Person erreichen (gleiches Muster wie Codex P1
-  auf #168). Nach Codex P1 auf #176 als Sicherheitsbefund sofort gebaut: `listEvents` über `guarded()`, Test zuerst rot. Diese
-  Zeile entfällt mit dem Merge von #177.
+- ~~**`listEvents` ohne Akteurschutz**~~ · erledigt mit takt-056 (#177): `listEvents` läuft über `guarded()`, Test zuerst rot.
+- **takt-057-Kandidat: übrige Durchreichungen im Live-Speicher (Sicherheit, aus Review takt-056)** · eigener Takt vor Rollout:
+  - minor · `apps/web/src/api/liveStore.ts` `lastWriteEtag` ohne Akteurprüfung, überlebt `clear()` · `clear()` setzt den
+    Schreib-ETag zurück, nach Akteurwechsel `undefined`.
+  - minor · `liveStore.ts` Schreibantworten und `seedDemo` ohne `forCaller` · Inhalt nach Akteurwechsel zurückhalten,
+    Erfolgs- und Fehlersignal nicht.
+  - minor · `features/history/Page.tsx` `keyBelongsTo` vergleicht nur die id · strukturellen Akteurschlüssel nutzen.
+  - nit · `guarded()` ohne try/catch im abgemeldeten Pfad; nit · Test ohne Ablehnungsfall und ohne Wechsel ohne `clear()`.
 - **Zwischenspeicher des Leitstands (vor Rollout)** · W10 auf dem CI-Läufer 57,7 ms gegen das Ziel 50 ms · Eintrag im Abschnitt
   „Leitstand (aus 061)“ (Lauf 37468958219).
 - **`source-map-js` 1.2.2 (vor Ablauf der Ausnahme)** · nach 2026-10-07T14:08Z anheben, Ausnahme 1241209 entfernen, bevor sie am
@@ -965,7 +969,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 061 Teil B Bau · `packages/domain/src/seed.ts` (Uhr des Seeds, `Math.min(clock, o.now)`) · der Demo-Seed staucht fast alle
   Ereignisse auf den Seed-Zeitpunkt: im Leitstand steht der Zulauf als eine Säule, alle Uhrzeiten eines Fadens sind gleich, die
   „Danach die ältesten“ springen von 74 auf 22 min · Seed über den Nachmittag verteilen (eigener Takt; Golden von 061 und 033b
-  neu, weil `/metrics` den Seed liest). → als **takt-052** in PR #173 (Seed-Zeiten über 90 min verteilt), noch offen.
+  neu, weil `/metrics` den Seed liest). → erledigt mit **takt-052** (#173, Seed-Zeiten über 90 min verteilt).
 - 061 Teil B Review R8 · `features/cockpit/Page.tsx` (`useCockpit`, `useApiVersion`) · ein Wechsel der Person startet den Feed neu
   (eine Lesung) und zählt zugleich `useApiVersion` hoch (zweite Lesung) · die Versionszählung beim Personenwechsel im Leitstand
   übergehen oder den Feed die erste Lesung selbst auslösen lassen.
@@ -1039,7 +1043,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
 
 
-## Seed-Zeiten (aus takt-052, PR #173 offen)
+## Seed-Zeiten (aus takt-052, #173 gemergt)
 
 Gelten erst nach dem Merge von PR #173; bis dahin stehen die Zeilen nicht im Integrationszweig.
 
