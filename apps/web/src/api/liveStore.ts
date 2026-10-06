@@ -523,7 +523,8 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     },
   };
   return Object.assign(store, control, {
-    listEvents: (after?: number, limit?: number) => adapter.listEvents(after, limit),
+    // takt-056: unbuffered like getCockpit, but under the same actor protection (Codex P1 on #176).
+    listEvents: (after?: number, limit?: number) => guarded(() => adapter.listEvents(after, limit)),
     getCockpit: () => guarded(() => adapter.getCockpit()),
     lastWriteEtag: () => adapter.lastWriteEtag(),
     seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => adapter.seedDemo(seedOptions),
