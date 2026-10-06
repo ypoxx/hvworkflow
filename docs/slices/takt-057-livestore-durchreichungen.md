@@ -208,3 +208,21 @@ Open: –
 Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts, apps/web/src/api/actor.ts,
       apps/web/src/api/index.ts, docs/slices/takt-057-livestore-durchreichungen.md
 ```
+
+### Nachtrag: Codex P2 auf #179 (synchroner Wurf)
+
+Wirft eine Schreibung synchron, nahm sie bisher eine Abkürzung (`return Promise.reject(error)`). Dabei entfielen die Prüfung bei
+der Zustellung und `settleWrite('server_error')`: Nach einem Akteurwechsel hätte der Fehler der vorigen Person die neue
+erreichen können. Jetzt wird der Wurf zu `result = Promise.reject(error)` und nimmt denselben Weg wie eine asynchrone
+Ablehnung. Zwei neue Fälle in `liveStore061.test.ts` (zurückgehalten nach `clear()`; dieselbe Person erhält die Ablehnung
+und der Puffer wird geleert) waren ohne den Fix rot und sind mit ihm grün.
+
+```
+pnpm gates auf 33917ca (Exit 0):
+packages/domain test:       Tests  562 passed (562)
+apps/web test:       Tests  1162 passed (1162)
+apps/api test:       Tests  710 passed (710)
+slice-scope: 10 changed file(s), all within "docs/slices/takt-057-livestore-durchreichungen.md"'s "Files allowed" list (11 pattern(s)).
+✓ built in 3.34s
+mark-test-run: wrote /home/user/wt/takt057/.claude/state/last-test-run (clean tree) at commit 33917ca, tree 224c3876c331…
+```
