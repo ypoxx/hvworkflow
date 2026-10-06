@@ -62,3 +62,25 @@ describe('L1b getCockpit is withheld after an actor change (Codex P1 on #168)', 
     await expect(store.getCockpit()).resolves.toEqual(answer(2));
   });
 });
+
+describe('takt-056 listEvents is withheld after an actor change (Codex P1 on #176)', () => {
+  it('an event page requested before clear() never reaches the caller, and a page read after it does', async () => {
+    const page = (n: number) => ({ items: [], lastSeq: n });
+    let release: (value: ReturnType<typeof page>) => void = () => undefined;
+    const listEvents = vi
+      .fn<(after?: number, limit?: number) => Promise<ReturnType<typeof page>>>()
+      .mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }))
+      .mockImplementation(async () => page(2));
+    const adapter = { listEvents, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    let settled = false;
+    void store.listEvents(0, 50).then(() => { settled = true; }, () => { settled = true; });
+    actor = { id: 'other-056', role: 'coordination' };
+    store.clear('actor');
+    release(page(1));
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(settled).toBe(false);
+    await expect(store.listEvents(0, 50)).resolves.toEqual(page(2));
+  });
+});
