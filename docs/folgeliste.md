@@ -779,6 +779,16 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 
+## Leitstand (aus 061)
+
+- 061 Spec, Hinweis an Folgescheiben · `apps/web/src/features/answers/lib.ts:147-152` (`urgencyLevel`, 15/45 min) und
+  `packages/domain/src/cockpit.ts` (`COCKPIT_THRESHOLDS.oldestOpenSeconds`) · die Schwellen stehen nach 061 zweimal · ein Takt
+  stellt `urgencyLevel` auf die Kernkonstante um (Beantwortung war nicht in den „Files allowed“ von 061).
+- 061 Teil A Bau · `packages/domain/src/cockpit.ts` (`computeCockpit`) · ein Ereignis mit Serverzeit nach `now` (Uhr
+  zurückgestellt) zählt im Leitstand nirgends, in `computeIndicators` aber weiter im Bestand („offen“, Rückstand je Fachbereich,
+  älteste offene mit Alter 0); die Gleichheit K3 gilt nur ohne solche Ereignisse · in 071 oder 086 entscheiden, ob `/metrics`
+  dieselbe Zeitgrenze bekommt (Golden neu, eigener Commit).
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
