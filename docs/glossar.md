@@ -23,6 +23,8 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Fachbereich | Answering unit | `unit` | Team, Assignee |
 | Zuweisung | Assignment | `assignment` | Assignee |
 | Antwortentwurf, Antwortversion | Answer draft, answer version | `answer`, `AnswerVersion` | Comment |
+| Fassungen vergleichen | Compare versions | `CompareVersions`, `conflictAfterRefusal`, `keepMine` | Merge, Zusammenführen (gehört den Einzelfragen) |
+| In diesem Browser zwischengespeichert | Saved in this browser for now | `draftBuffer` (IndexedDB, je Akteur und Versammlung) | Cache, Autosave |
 | Zur Prüfung geben, Legal Clearing | Submit for clearing | `submitForReview`, `in_review` | Review request |
 | Freigabe | Approval | `approval`, `approved` | Sign-off |
 | Zurückgeben | Return | `return` | Reject |

@@ -12,12 +12,16 @@ import type { Ref } from 'react';
 import { Link } from 'react-router';
 import type { AnswerBodyInput, AnswerVersion, DomainEvent, Question, Unit } from '@hv/domain';
 import { TERMINAL_STATUSES } from '@hv/domain';
+import { draftBuffer as defaultBuffer } from '../../api';
 import { answerBodyOf, sameBody } from '../../api/answerFormat';
+import { useBufferRevision } from '../../api/draftBuffer';
+import type { DraftBuffer } from '../../api/draftBuffer';
 import { useActor } from '../../api/actor';
 import {
   AnswerText,
   Badge,
   Button,
+  DraftNote,
   KeyValue,
   KeyValueList,
   Panel,
@@ -33,8 +37,12 @@ import { actionLabel, stageAssignmentLabel, trackLabel, useT } from '../../i18n'
 import { isDirty } from '../focus/focus';
 import type { FocusDraft } from '../focus/focus';
 import { AnswerEditor } from './AnswerEditor';
-import { afterSave, canSave as mayBeSaved, discard, onRecord, startDraft } from './draft';
-import { clockTime, lapsedApproval, latestVersion, sealedApproval, wordDiff } from './lib';
+import { CompareVersions } from './CompareVersions';
+import {
+  afterSave, bufferStep, canSave as mayBeSaved, conflictAfterRefusal, discard, keepMine, lateRestore, onRecord, restoreDraft,
+  saveDecision, takeTheirs,
+} from './draft';
+import { clockTime, lapsedApproval, latestVersion, problemStatus, sealedApproval, wordDiff } from './lib';
 import { groundStatus, latestIsRefusal, refusalKindOf } from './refusal';
 import type { RefusalCatalogue } from './refusal';
 
@@ -103,7 +111,8 @@ export function AnswerDiff({
 }
 
 export type DetailAction =
-  | { kind: 'draft'; body: AnswerBodyInput; sources: string }
+  /** Scheibe 060: `onProblem` goes to the write door's `run`; it sorts a 412 for the comparison (decision 7.3). */
+  | { kind: 'draft'; body: AnswerBodyInput; sources: string; onProblem?: (error: unknown, stillShown: () => boolean) => boolean }
   | { kind: 'submit_review' }
   | { kind: 'approve'; version: number }
   | { kind: 'refuse_approve'; version: number }
@@ -138,6 +147,10 @@ interface QuestionDetailProps {
   /** Scheibe 045: the catalogue of refusal grounds of this actor (`useRefusalGrounds`). */
   catalogue: RefusalCatalogue;
   onAction: (action: DetailAction) => void;
+  /** Scheibe 060: the draft buffer (the app's by default; tests hand in their own). */
+  buffer?: DraftBuffer;
+  /** Scheibe 060: the comparison opened or closed; the page hides its "Stand veraltet" meanwhile (one notice, not two). */
+  onCompareChange?: (open: boolean) => void;
 }
 
 /**
@@ -297,6 +310,8 @@ export function QuestionDetail({
   versionFocus,
   catalogue,
   onAction,
+  buffer = defaultBuffer,
+  onCompareChange,
 }: QuestionDetailProps) {
   const t = useT();
   const latest = latestVersion(question);
@@ -307,7 +322,27 @@ export function QuestionDetail({
    * is the focus view's `FocusDraft`: the input form, its sources and the base it started from; `generation` rebuilds
    * the field (055b decision 7). This component is keyed per question, so a new question starts a new draft.
    */
-  const [draft, setDraft] = useState<FocusDraft>(() => startDraft(actorId, question));
+  useBufferRevision(buffer);
+  const meetingId = question.meetingId;
+  // Scheibe 060: the owner is compared inside the buffer on every access (`getActor`); a draft of another person is never
+  // returned, and without a meeting id this question is not buffered at all (decision 2).
+  const entry = meetingId === undefined ? undefined : buffer.entryFor(meetingId, question.id);
+  const [initial] = useState(() => restoreDraft(entry, actorId, question, 0, { rolesChanged: buffer.rolesChanged() }));
+  const [draft, setDraft] = useState<FocusDraft>(initial.draft);
+  /** Scheibe 060 (decision 5): when the restored text was last changed; the line "wiederhergestellt" while it is unsaved. */
+  const [restoredAt, setRestoredAt] = useState<number | null>(initial.restored ? (initial.changedAt ?? null) : null);
+  /** An entry to delete after this render (a person's act, or a restore that found nothing to restore). */
+  const dropEntry = useRef(initial.drop);
+  /** Set by an input (or a decision of the person), read by the effect that buffers the draft (decision 4). */
+  const byInput = useRef(false);
+  /** Decision 7: the comparison stands in place of the field; `null` while the field is shown. */
+  const [comparing, setComparing] = useState(false);
+  /** After the comparison closed, the rebuilt field takes the focus at its end. */
+  const [focusField, setFocusField] = useState(false);
+  /** Decision 7.3: the record version a refused (412) save was made against, until a newer record sorted it. */
+  const [refused, setRefused] = useState<{ version: number } | null>(null);
+  const [snapshotSeen, setSnapshotSeen] = useState(buffer.snapshotId());
+
   // What `onSave` sent, for `afterSave` once the page reports the write done (`draftResetToken`).
   const [sent, setSent] = useState<{ body: AnswerBodyInput; sources: string; version: number } | null>(null);
 
@@ -325,29 +360,85 @@ export function QuestionDetail({
   const [draftActorId, setDraftActorId] = useState(actorId);
   const [resetSeen, setResetSeen] = useState(draftResetToken);
   const [recordSeen, setRecordSeen] = useState(question);
-  if (draftActorId !== actorId || resetSeen !== draftResetToken || recordSeen !== question) {
+  const snapshotNow = buffer.snapshotId();
+  const refusalDue = refused !== null && question.version > refused.version;
+  if (draftActorId !== actorId || resetSeen !== draftResetToken || recordSeen !== question || snapshotSeen !== snapshotNow || refusalDue) {
     let next = draft;
+    const rolesChanged = buffer.rolesChanged();
     // takt-048, decision 2 (090, 010d Ziel 1): another actor starts a new draft from the record, compared by `id`,
     // never by role (AGENTS.md R4). The new actor sees the record, never the previous actor's text.
     if (draftActorId !== actorId) {
       setDraftActorId(actorId);
-      next = startDraft(actorId, question, draft.generation + 1);
+      // Scheibe 060: the new actor's own buffered draft, if any; never the previous actor's (090).
+      const restored = restoreDraft(entry, actorId, question, draft.generation + 1, { rolesChanged });
+      next = restored.draft;
+      setRestoredAt(restored.restored ? (restored.changedAt ?? null) : null);
+      if (restored.drop) dropEntry.current = true;
       setSent(null);
+      setRefused(null);
+      setComparing(false);
     } else if (resetSeen !== draftResetToken && sent !== null) {
       // takt-048, decision 6: the own version was written — its text is the new base; the field is not rebuilt, and
       // what was typed while saving stays and counts as a change.
       next = afterSave(next, sent, sent.version);
       setSent(null);
+      // Scheibe 060 (decision 4): a save that leaves the draft unchanged deletes its entry.
+      if (!isDirty(next)) {
+        dropEntry.current = true;
+        setRestoredAt(null);
+      }
     }
     if (resetSeen !== draftResetToken) setResetSeen(draftResetToken);
     // takt-048, decision 2: a new record of this question is compared with the draft (`writingOutcome`): one's own
     // version moves the base, a foreign version over an unchanged draft is shown, over a changed one the notice stands.
+    // Scheibe 060 (decision 7.3): a refused save is sorted against the record shown at the 412 and again against the next
+    // newer record of this question: compare (the person acted, the focus may move), rebase silently, or retry.
+    if (refusalDue) {
+      setRefused(null);
+      if (conflictAfterRefusal(next, question) === 'compare') {
+        next = { ...next, rebase: true };
+        setComparing(true);
+      }
+    }
     if (recordSeen !== question) {
       setRecordSeen(question);
       next = onRecord(next, question).draft;
+      // Decision 4: after `roles_changed`, an entry is deleted where drafting is no longer offered.
+      if (rolesChanged && entry !== undefined && !question._actions.includes('answer.draft')) dropEntry.current = true;
+    }
+    // Decision 5, the late snapshot: it arrived after this draft was started; over an unchanged draft it restores.
+    if (snapshotSeen !== snapshotNow) {
+      setSnapshotSeen(snapshotNow);
+      if (draftActorId === actorId) {
+        const late = lateRestore(next, entry, actorId, question, { rolesChanged });
+        if (late.restored) {
+          next = late.draft;
+          setRestoredAt(late.changedAt ?? null);
+        }
+        if (late.drop) dropEntry.current = true;
+      }
     }
     if (next !== draft) setDraft(next);
   }
+
+  // Scheibe 060 (decision 4): only an input or a decision of the person writes to the buffer, debounced 400 ms; a draft
+  // made unchanged again by an input deletes its entry. Programmatic rebuilds never write.
+  useEffect(() => {
+    if (dropEntry.current && meetingId !== undefined) void buffer.delete(meetingId, question.id);
+    dropEntry.current = false;
+    if (!byInput.current) return;
+    byInput.current = false;
+    if (meetingId === undefined || !question._actions.includes('answer.draft')) return;
+    const step = bufferStep(draft, true);
+    const target = { ownerId: actorId, meetingId, questionId: question.id };
+    if (step.kind === 'put') buffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
+    else if (step.kind === 'delete' && entry !== undefined) buffer.scheduleDelete(target);
+  });
+
+  useEffect(() => {
+    onCompareChange?.(comparing);
+  }, [comparing, onCompareChange]);
+  useEffect(() => () => onCompareChange?.(false), [onCompareChange]);
 
   /**
    * takt-008: "Zur Prüfung" and "Freigeben" leave the command bar together with the step they
@@ -428,6 +519,8 @@ export function QuestionDetail({
   // takt-048, decision 3: changed against the base (the latest version or what was saved last), not merely non-empty.
   const dirty = isDirty(draft);
   const saveable = mayBeSaved(draft, { mayDraft, busy });
+  const keptAt = meetingId === undefined ? undefined : buffer.keptAt(meetingId, question.id);
+  const latestAnswer = question.answers[question.answers.length - 1];
   // Exactly one primary action (D2): the step that moves this question on — unless the draft in the
   // editor is changed, then saving it is what the person is doing (takt-048, decision 5).
   // Scheibe 045: approving a refusal stands where approving an answer stands (R-GUARD-12/13 exclude each
@@ -791,15 +884,40 @@ export function QuestionDetail({
               {t('answers.refusal.editorHint')}
             </p>
           )}
-          {mayDraft && draft.rebase && (
-            // takt-048, decision 2: a newer version arrived over changed text; the text stays until "Neu laden".
+          {mayDraft && draft.rebase && !comparing && (
+            // Scheibe 060 (decision 7.1): a newer version arrived over changed text; the field stays as it is, and the
+            // notice offers the comparison (the old "Neu laden" discarded the text without a word).
             <StaleBanner
               testId="answer-editor-rebase"
               message={t('answers.editor.rebase')}
-              onReload={() => setDraft(startDraft(actorId, question, draft.generation + 1))}
+              actionLabel={t('answers.editor.compare')}
+              onReload={() => setComparing(true)}
             />
           )}
-          {mayDraft && (
+          {mayDraft && comparing && latestAnswer !== undefined ? (
+            <CompareVersions
+              mine={{ body: draft.body, sources: draft.sources }}
+              theirs={latestAnswer}
+              autoFocus
+              onKeepMine={(shown) => {
+                byInput.current = true;
+                setDraft((current) => keepMine(current, shown, question));
+                setComparing(false);
+                setFocusField(true);
+              }}
+              onTakeTheirs={(shown) => {
+                setDraft((current) => takeTheirs(current, shown, question));
+                setRestoredAt(null);
+                dropEntry.current = true;
+                setComparing(false);
+                setFocusField(true);
+              }}
+              onBack={() => {
+                setComparing(false);
+                setFocusField(true);
+              }}
+            />
+          ) : mayDraft && (
             <AnswerEditor
               body={draft.body}
               generation={draft.generation}
@@ -811,16 +929,51 @@ export function QuestionDetail({
               {...(draft.baseBody !== null && draft.baseVersion > 0 ? { startsFrom: draft.baseVersion } : {})}
               primary={primary === 'draft'}
               hasApproval={question.approval !== undefined}
-              onBody={(body) => setDraft((current) => ({ ...current, body }))}
-              onSources={(sources) => setDraft((current) => ({ ...current, sources }))}
-              onDiscard={() => setDraft((current) => discard(current, question))}
+              autoFocusEnd={focusField}
+              {...(restoredAt !== null && dirty ? { restoredNote: <DraftNote kind="restored" time={restoredAt} /> } : {})}
+              {...(dirty && keptAt !== undefined
+                ? { keptNote: <DraftNote kind="kept" time={keptAt} /> }
+                : dirty && buffer.status() === 'unavailable' && meetingId !== undefined
+                  ? { keptNote: <DraftNote kind="unavailable" /> }
+                  : {})}
+              onBody={(body) => {
+                byInput.current = true;
+                setDraft((current) => ({ ...current, body }));
+              }}
+              onSources={(sources) => {
+                byInput.current = true;
+                setDraft((current) => ({ ...current, sources }));
+              }}
+              onDiscard={() => {
+                setDraft((current) => discard(current, question));
+                setRestoredAt(null);
+                if (meetingId !== undefined) void buffer.delete(meetingId, question.id);
+              }}
               // A locked button (`aria-disabled`) never calls this — Button.tsx swallows the click — and a second
               // press in the same task before the lock renders is refused by the page's own write lock. takt-048,
-              // decision 3: checked once more here, so no other way of saving sends an unchanged draft.
-              onSave={() => {
-                if (!saveable || draft.body === null) return;
+              // decision 3: checked once more here, so no other way of saving sends an unchanged draft. Scheibe 060
+              // (decision 7.2): with the notice of a newer version standing, saving opens the comparison instead.
+              onSave={(event) => {
+                // Decision 9: the second click of a double click never saves — the first one did, or it was a decision in
+                // the comparison, which closed it, and the second lands where "Entwurf speichern" now stands.
+                if (event !== undefined && event.detail > 1) return;
+                const decision = saveDecision(draft, saveable);
+                if (decision === 'compare') {
+                  setComparing(true);
+                  return;
+                }
+                if (decision !== 'send' || draft.body === null) return;
+                const clickedAt = question.version;
                 setSent({ body: draft.body, sources: draft.sources, version: question.answers.length + 1 });
-                onAction({ kind: 'draft', body: draft.body, sources: draft.sources });
+                onAction({
+                  kind: 'draft',
+                  body: draft.body,
+                  sources: draft.sources,
+                  onProblem: (error) => {
+                    if (problemStatus(error) === 412) setRefused({ version: clickedAt });
+                    return false;
+                  },
+                });
               }}
             />
           )}

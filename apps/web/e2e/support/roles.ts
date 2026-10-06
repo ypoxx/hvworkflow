@@ -99,5 +99,12 @@ export async function newContextAs(browser: Browser, role: string): Promise<Brow
   const stateDir = process.env['E2E_HTTP_STATE_DIR'];
   if (!stateDir) throw new Error('E2E_HTTP_STATE_DIR is required.');
   labelsOf(role);
-  return browser.newContext({ ...test.info().project.use, storageState: `${stateDir}/state-${role}.json` });
+  const { baseURL } = test.info().project.use;
+  return browser.newContext({
+    ...(baseURL !== undefined ? { baseURL } : {}),
+    locale: 'de-DE',
+    timezoneId: 'Europe/Berlin',
+    viewport: { width: 1440, height: 900 },
+    storageState: `${stateDir}/state-${role}.json`,
+  });
 }

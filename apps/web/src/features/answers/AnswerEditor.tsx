@@ -6,6 +6,7 @@
  * answer version; saving is offered only for a changed draft (`canSave`), so an unchanged one never voids an approval.
  */
 import { useId } from 'react';
+import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { AnswerBodyInput } from '@hv/domain';
 import { Button, cx } from '../../components';
@@ -32,8 +33,15 @@ interface AnswerEditorProps {
   hasApproval: boolean;
   onBody: (value: AnswerBodyInput | null) => void;
   onSources: (value: string) => void;
-  onSave: () => void;
+  /** The click's `detail` tells the second click of a double click (Scheibe 060, decision 9). */
+  onSave: (event?: { detail: number }) => void;
   onDiscard: () => void;
+  /** Scheibe 060: the field takes the focus at its end when it is built (after the comparison closed). */
+  autoFocusEnd?: boolean;
+  /** Scheibe 060: the line "wiederhergestellt" under the heading. */
+  restoredNote?: ReactNode;
+  /** Scheibe 060: the line "zwischengespeichert" (or "nicht möglich") next to the save button. */
+  keptNote?: ReactNode;
 }
 
 export function AnswerEditor({
@@ -50,6 +58,9 @@ export function AnswerEditor({
   onSources,
   onSave,
   onDiscard,
+  autoFocusEnd = false,
+  restoredNote,
+  keptNote,
 }: AnswerEditorProps) {
   const t = useT();
   const labelId = useId();
@@ -59,6 +70,7 @@ export function AnswerEditor({
   return (
     <section className="rounded-lg border border-line-strong bg-sunken p-3">
       <h3 className="text-[13px] font-semibold text-ink-900">{t('answers.editor.title')}</h3>
+      {restoredNote}
       {showStart && (
         // ink-600: 4.5:1 or more on this sunken ground, as the sources hint below.
         <p id={startId} data-testid="answer-editor-start" className="mt-0.5 text-2xs text-ink-600">
@@ -78,6 +90,7 @@ export function AnswerEditor({
           generation={generation}
           labelId={labelId}
           size="compact"
+          autoFocusEnd={autoFocusEnd}
           onChange={onBody}
           className="mt-1"
         />
@@ -109,6 +122,7 @@ export function AnswerEditor({
           </span>
         )}
         <span className="flex-1" />
+        {keptNote}
         {dirty && (
           <Button size="sm" variant="ghost" disabled={busy} onClick={onDiscard}>
             {t('answers.editor.discard')}

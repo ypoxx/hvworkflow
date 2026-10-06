@@ -714,14 +714,14 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-043 Review nit 3 · `Page.tsx` · `armHandOver` vor `run`; kehrt `run` früh zurück (Schreiben läuft), bleibt der Fokus
   scharf bis zur nächsten Bewegung · heute durch busy/aria-disabled verhindert; bei Änderung an `useWriteDoor` erst nach Annahme
   scharf machen.
-- 054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
-  mit Toast `focus.write.gone` · Entwurfspuffer mit 060.
+- ~~054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
+  mit Toast `focus.write.gone` · Entwurfspuffer mit 060.~~ Erledigt in 060 (`focus.write.goneKept`, e2e E9).
 - 054 Bau · `apps/web/src/app/ShortcutsDialog.tsx` · die Kürzelliste kennt Strg+Enter und Escape des Schreibmodus nicht ·
   Zeilen ergänzen (Lane web-shell).
 - 054 Bau · `apps/web/src/features/focus/Page.tsx` Fokus nach der Übergabe · wird nach der letzten Einzelfrage der Liste (leere
   Liste) verworfen; der Fokus fällt dann auf `body` · Fokusziel im Hinweis `focus-empty` vorsehen.
-- 054 Review 5 · ungespeicherter Text beim Verlassen von `/my` (Navigation weg von der Seite) geht still verloren · mit dem
-  Entwurfspuffer 060.
+- ~~054 Review 5 · ungespeicherter Text beim Verlassen von `/my` (Navigation weg von der Seite) geht still verloren · mit dem
+  Entwurfspuffer 060.~~ Erledigt in 060 (Wiederherstellen beim nächsten Öffnen des Schreibmodus, e2e E2).
 - 054 Review 6 · Escape während einer IME-Komposition verlässt den Schreibmodus · `isComposing` auch in `shouldLeaveWriting`.
 - 054 Review 7 · Verweigerungsbadge in Liste (`danger`) und Detail/Steuerung (`warning`) uneinheitlich · einen Ton festlegen.
 - 054 Review 8 · `DEMO_BINDINGS` ohne Grund (`reason`) und bei jedem Start erneut versucht (409 übergangen) · Grund mitgeben,
@@ -785,3 +785,22 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Buchstaben (043a, 044a, 064a …) fallen aus der Prüfung; eine zu niedrig eingestufte Teil-Spec fällt nicht auf · Muster
   um `[a-z]?` erweitern und Teil-Specs gegen den Plan-Eintrag der Stammscheibe prüfen (ergänzt den Eintrag takt-021 Codex P1).
 - Vorschlag (04.10.2026, #148 geschlossen wegen eines Gitleaks-Fehlalarms in einem Commit) · Ablauf vor dem Push · lokaler Gitleaks-Lauf über die Commits des Zweigs; das Programm fehlt im Container · Bereitstellung klären (Binärdatei im Bauabbild oder Pre-push-Skript), bis dahin gilt die Regel: Speichernamen als Modulkonstanten, nie als JSX-Literal.
+
+## Entwurfspuffer und Fassungsvergleich (aus 060 Bau)
+
+- 060 Bau · `apps/web/src/components/Button.tsx` · ein gesperrter Knopf (`aria-disabled`) trägt `pointer-events: none`; der zweite
+  Klick eines echten Doppelklicks trifft deshalb den Rahmen darunter, und der Fokus verlässt den Speichern-Knopf (E8 prüft den
+  Fokus darum nicht) · Sperre ohne `pointer-events: none` (Klick im Handler schlucken, wie heute schon) und E8 um den Fokus ergänzen.
+- 060 Bau · Spec Entscheidung 2 / U1 nennt „Blocktyp `script`“ als Beispiel einer Ablehnung durch `checkAnswerBodyInput`; der Kern
+  nimmt jeden Blocktyp bis 32 Zeichen an und bildet ihn auf einen Absatz ab (N1). Abgelehnt wird der manipulierte Eintrag erst
+  durch den Schlüssel `html` im Block; ein Block `script` ohne fremde Schlüssel erscheint als Absatz mit Klartext (keine Senke) ·
+  Spec-Wortlaut bei Gelegenheit berichtigen; keine engere eigene Regel (der Dienst würde den Entwurf annehmen).
+- 060 Bau · Entscheidung 9 · der zweite Klick eines Doppelklicks auf „Mit meiner Fassung weiter“ landet dort, wo nun „Entwurf
+  speichern“ steht; Speichern übergeht deshalb jeden Klick mit `detail > 1` (der erste Klick hat gehandelt) · Layout so ändern,
+  dass unter den Entscheidungsknöpfen das Feld liegt.
+- 060 Bau · Speichern, während schon weitergetippt wurde: der Eintrag behält bis zur nächsten Eingabe die alte Basisversion; ein
+  Neuladen genau dazwischen zeigt das Band „Vergleichen“ gegen die eigene neue Version · nach dem Speichern mit verändertem Rest
+  den Eintrag mit der neuen Basis neu schreiben.
+- 060 Bau · Persona-Wechsel in der Demo erreicht den Puffer über den Lesepfad (`getActor` des Live-Speichers ruft `notice()`);
+  `actor.ts` bietet kein Abonnement · bei der nächsten Scheibe an `actor.ts` ein `subscribe` anbieten und dort verdrahten.
+

@@ -189,6 +189,8 @@ export interface DraftBuffer {
   subscribe(listener: () => void): () => void;
   /** Loads the snapshot for the confirmed actor (and deletes every other actor's entries); arms the buffer. */
   load(): Promise<void>;
+  /** Once armed: a confirmed actor other than the snapshot's starts loading for it (a persona switch). Never arms. */
+  notice(): void;
   entryFor(meetingId: string, questionId: string): BufferEntry | undefined;
   /** The time of the last write of this draft that completed (`oncomplete`), for the line "zwischengespeichert". */
   keptAt(meetingId: string, questionId: string): number | undefined;
@@ -398,6 +400,9 @@ export function createDraftBuffer(options: {
       const id = actorId();
       if (id === undefined || id === loadedFor) return;
       await loadFor(id);
+    },
+    notice() {
+      owner();
     },
     entryFor(meetingId, questionId) {
       const id = owner();

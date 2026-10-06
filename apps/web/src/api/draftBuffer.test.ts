@@ -467,7 +467,7 @@ describe('wireDraftBuffer and sign-out', () => {
 });
 
 describe('never synchronises (source text without comments, nit N3)', () => {
-  const source = readFileSync(new URL('./draftBuffer.ts', import.meta.url), 'utf8')
+  const source = readFileSync(decodeURIComponent(new URL('./draftBuffer.ts', import.meta.url).pathname), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 
@@ -487,5 +487,23 @@ describe('never synchronises (source text without comments, nit N3)', () => {
     expect(source).toMatch(/export const BUFFER_OBJECT_STORE\b/);
     expect(source).toMatch(/export const BUFFER_SCHEMA\b/);
     expect(source).not.toMatch(/const \w*(KEY|Key)\s*=/);
+  });
+});
+
+describe('notice (a persona switch seen on a read)', () => {
+  it('once armed, another actor starts loading and deletes the previous actor’s entries; before arming nothing happens', async () => {
+    const store = createMemoryStore();
+    await store.put(entry({ ownerId: 'u-a' }));
+    const buffer = bufferOver(store);
+    actor = { id: 'u-b' };
+    buffer.notice();
+    await settle();
+    expect(store.rows.size).toBe(1);
+    actor = { id: 'u-a' };
+    await buffer.load();
+    actor = { id: 'u-b' };
+    buffer.notice();
+    await settle();
+    expect(store.rows.size).toBe(0);
   });
 });

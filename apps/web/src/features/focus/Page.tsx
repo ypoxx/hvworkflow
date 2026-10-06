@@ -13,14 +13,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileQuestion } from 'lucide-react';
 import type { Question } from '@hv/domain';
-import { api } from '../../api';
+import { api, draftBuffer } from '../../api';
 import { useActor } from '../../api/actor';
 import { previewAnswer, previewText } from '../../api/answerFormat';
-import { EmptyState, PageHeader, Panel, SplitPane, StaleBanner, showToast } from '../../components';
+import { BUFFER_LIFETIME_MS, useBufferRevision } from '../../api/draftBuffer';
+import { DraftNote, EmptyState, PageHeader, Panel, SplitPane, StaleBanner, showToast } from '../../components';
 import { useT } from '../../i18n';
+import { CompareVersions } from '../answers/CompareVersions';
+import { bufferStep, conflictAfterRefusal, keepMine, lateRestore, restoreDraft, takeTheirs } from '../answers/draft';
 import { ForwardDialog } from '../answers/ForwardDialog';
 import { forwardProblemHandler } from '../answers/forward';
-import { splitSources } from '../answers/lib';
+import { problemStatus, splitSources } from '../answers/lib';
 import { EMPTY_FILTERS, useBacklog } from '../answers/useBacklog';
 import { useWriteDoor } from '../answers/useWriteDoor';
 import { mayMoveFocus } from '../steering/steering';
@@ -28,7 +31,7 @@ import { FocusDetail } from './FocusDetail';
 import { FocusList } from './FocusList';
 import type { FocusListState } from './FocusList';
 import { WritingMode } from './WritingMode';
-import { disarmFocus, draftKey, focusDue, isDirty, myQuestions, newDraft, nextSelection, writingOutcome } from './focus';
+import { disarmFocus, draftKey, focusDue, isDirty, myQuestions, nextSelection, writingOutcome } from './focus';
 import type { FocusAction, FocusDraft, PendingFocus, ShownForFocus } from './focus';
 
 // Browser-storage name of the split position. A module constant, not a JSX literal: gitleaks' generic-api-key rule
@@ -40,6 +43,14 @@ type FocusDialog = 'forward';
 
 type Drafts = Readonly<Record<string, FocusDraft>>;
 const NO_DRAFTS: Drafts = {};
+const NO_TIMES: Readonly<Record<string, number>> = {};
+
+const two = (n: number): string => String(n).padStart(2, '0');
+/** "HH:MM" of a wall-clock time in milliseconds (the end of the buffer's lifetime in the notice). */
+const clockOf = (ms: number): string => {
+  const at = new Date(ms);
+  return `${two(at.getHours())}:${two(at.getMinutes())}`;
+};
 
 export function FocusPage() {
   const t = useT();
@@ -54,6 +65,22 @@ export function FocusPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const focusListPending = useRef(false);
+  /**
+   * Scheibe 060: the draft buffer. Per draft key: the meeting of its question (the record is gone when a question leaves),
+   * the keys an input changed (only those are buffered, decision 4), the keys a save settled (an unchanged draft then
+   * deletes its entry), and when a restored text was last changed (the line "wiederhergestellt").
+   */
+  useBufferRevision(draftBuffer);
+  const meetingOf = useRef<Record<string, string>>({});
+  const typedKeys = useRef(new Set<string>());
+  const savedKeys = useRef(new Set<string>());
+  const [restoredAt, setRestoredAt] = useState<Readonly<Record<string, number>>>(NO_TIMES);
+  /** Decision 7: the question whose writing mode shows "Fassungen vergleichen" instead of the field. */
+  const [compareFor, setCompareFor] = useState<string | null>(null);
+  /** Decision 7.3: a refused (412) save, until a newer record of that question sorted it. */
+  const [refused, setRefused] = useState<{ questionId: string; version: number } | null>(null);
+  const [snapshotSeen, setSnapshotSeen] = useState(draftBuffer.snapshotId());
+
 
   /**
    * Slice 090 / 010d: the writing mode, its text and the selection belong to the actor who made them. On an actor change
@@ -67,7 +94,16 @@ export function FocusPage() {
     setWritingId(null);
     setOpenRequest(null);
     setDrafts(NO_DRAFTS);
+    setRestoredAt(NO_TIMES);
+    setCompareFor(null);
+    setRefused(null);
   }
+
+  // Scheibe 060: a persona switch loads the buffer for the new actor at once (deleting every other actor's entries); the
+  // buffer itself compares the owner on every access, this only does it before the next access needs it.
+  useEffect(() => {
+    void draftBuffer.load();
+  }, [actorId]);
 
   const backlog = useBacklog(EMPTY_FILTERS, selectedId);
   const { reload, selected, listLoading, listFailed, listForbidden } = backlog;
@@ -109,7 +145,7 @@ export function FocusPage() {
     let changed = false;
     let endWriting = false;
     const next: Record<string, FocusDraft> = {};
-    const discarded: string[] = [];
+    const discarded: { number: string; key: string; questionId: string }[] = [];
     for (const draft of Object.values(drafts)) {
       if (draft.key !== draftKey(actorId, draft.questionId)) {
         changed = true;
@@ -122,7 +158,7 @@ export function FocusPage() {
       }
       changed = true;
       if (outcome.kind === 'end') {
-        if (outcome.discarded) discarded.push(draft.number);
+        if (outcome.discarded) discarded.push({ number: draft.number, key: draft.key, questionId: draft.questionId });
         if (draft.questionId === writingId) endWriting = true;
         continue;
       }
@@ -131,7 +167,18 @@ export function FocusPage() {
     if (!changed) return;
     setDrafts(next);
     if (endWriting) setWritingId(null);
-    for (const number of discarded) showToast({ tone: 'neutral', title: t('focus.write.gone', { number }) });
+    // Scheibe 060 (decision 4): the newest text is written at once (no debounce); only once that completed does the notice
+    // say until when it stays on this device. Without the buffer the notice of 054 stands: the text is gone.
+    for (const { number, key, questionId } of discarded) {
+      const meetingId = meetingOf.current[key];
+      const written = meetingId === undefined ? Promise.resolve(undefined) : draftBuffer.flush(meetingId, questionId);
+      void written.then((at) => showToast({
+        tone: 'neutral',
+        title: at === undefined
+          ? t('focus.write.gone', { number })
+          : t('focus.write.goneKept', { number, time: clockOf(at + BUFFER_LIFETIME_MS) }),
+      }));
+    }
   }, [listSettled, drafts, recordOf, actorId, writingId, t]);
 
   // Opening the writing mode waits for the record of the chosen question; it opens only when that record offers
@@ -146,9 +193,18 @@ export function FocusPage() {
     setOpenRequest(null);
     if (!selected._actions.includes('answer.draft') || !mine.some((question) => question.id === selected.id)) return;
     const key = draftKey(actorId, selected.id);
-    setDrafts((previous) => (previous[key] !== undefined ? previous : { ...previous, [key]: newDraft(actorId, selected) }));
+    if (drafts[key] === undefined) {
+      // Scheibe 060 (decision 5): a buffered draft of this actor goes before the prefill of takt-048.
+      const meetingId = selected.meetingId;
+      if (meetingId !== undefined) meetingOf.current[key] = meetingId;
+      const entry = meetingId === undefined ? undefined : draftBuffer.entryFor(meetingId, selected.id);
+      const result = restoreDraft(entry, actorId, selected, 0, { rolesChanged: draftBuffer.rolesChanged() });
+      if (result.drop && meetingId !== undefined) void draftBuffer.delete(meetingId, selected.id);
+      setDrafts((previous) => (previous[key] !== undefined ? previous : { ...previous, [key]: result.draft }));
+      if (result.restored && result.changedAt !== undefined) setRestoredAt((previous) => ({ ...previous, [key]: result.changedAt! }));
+    }
     setWritingId(selected.id);
-  }, [openRequest, selectedId, selected, mine, actorId]);
+  }, [openRequest, selectedId, selected, mine, actorId, drafts]);
 
   const requestOpen = useCallback((id: string) => {
     setSelectedId(id);
@@ -162,6 +218,7 @@ export function FocusPage() {
 
   const leaveWriting = useCallback(() => {
     setWritingId(null);
+    setCompareFor(null);
     focusListPending.current = true;
   }, []);
 
@@ -231,11 +288,69 @@ export function FocusPage() {
   }, [settleFocus]);
 
   const updateDraft = useCallback((key: string, patch: Partial<Pick<FocusDraft, 'body' | 'sources'>>) => {
+    typedKeys.current.add(key);
     setDrafts((previous) => {
       const draft = previous[key];
       return draft === undefined ? previous : { ...previous, [key]: { ...draft, ...patch } };
     });
   }, []);
+
+  /**
+   * Scheibe 060 (decision 4): only an input (or a decision in the comparison) writes to the buffer, debounced 400 ms; a
+   * draft made unchanged again deletes its entry; a save that leaves the draft unchanged deletes it too.
+   */
+  useEffect(() => {
+    for (const key of typedKeys.current) {
+      const draft = drafts[key];
+      const meetingId = meetingOf.current[key];
+      if (draft === undefined || meetingId === undefined) continue;
+      const target = { ownerId: actorId, meetingId, questionId: draft.questionId };
+      const step = bufferStep(draft, true);
+      if (step.kind === 'put') draftBuffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
+      else if (step.kind === 'delete') draftBuffer.scheduleDelete(target);
+    }
+    typedKeys.current.clear();
+    for (const key of savedKeys.current) {
+      const draft = drafts[key];
+      const meetingId = meetingOf.current[key];
+      if (draft !== undefined && meetingId !== undefined && !isDirty(draft)) {
+        void draftBuffer.delete(meetingId, draft.questionId);
+        setRestoredAt((previous) => {
+          if (previous[key] === undefined) return previous;
+          const { [key]: _gone, ...rest } = previous;
+          return rest;
+        });
+      }
+    }
+    savedKeys.current.clear();
+  }, [drafts, actorId]);
+
+  // Decision 5, the late snapshot: over an unchanged draft of the writing mode, the buffered draft restores.
+  const snapshotNow = draftBuffer.snapshotId();
+  useEffect(() => {
+    if (snapshotSeen === snapshotNow) return;
+    setSnapshotSeen(snapshotNow);
+    if (writingId === null || selected === null || selected.id !== writingId || selected.meetingId === undefined) return;
+    const key = draftKey(actorId, writingId);
+    const draft = drafts[key];
+    if (draft === undefined) return;
+    const late = lateRestore(draft, draftBuffer.entryFor(selected.meetingId, writingId), actorId, selected, { rolesChanged: draftBuffer.rolesChanged() });
+    if (late.restored) {
+      setDrafts((previous) => ({ ...previous, [key]: late.draft }));
+      if (late.changedAt !== undefined) setRestoredAt((previous) => ({ ...previous, [key]: late.changedAt! }));
+    }
+  }, [snapshotSeen, snapshotNow, writingId, selected, actorId, drafts]);
+
+  // Decision 7.3: a refused save is sorted against the next record of its question that is newer than the click's.
+  useEffect(() => {
+    if (refused === null || selected === null || selected.id !== refused.questionId || selected.version <= refused.version) return;
+    setRefused(null);
+    const key = draftKey(actorId, selected.id);
+    const draft = drafts[key];
+    if (draft === undefined || conflictAfterRefusal(draft, selected) !== 'compare') return;
+    setDrafts((previous) => (previous[key] === undefined ? previous : { ...previous, [key]: { ...previous[key]!, rebase: true } }));
+    setCompareFor(selected.id);
+  }, [refused, selected, actorId, drafts]);
 
   const save = useCallback(
     (question: Question, draft: FocusDraft) => {
@@ -248,12 +363,14 @@ export function FocusPage() {
       const sentBody = previewAnswer(body);
       const sources = splitSources(draft.sources);
       const savedVersion = question.answers.length + 1;
+      const clickedAt = question.version;
       void run(
         'answer.draft',
         (options) => api.draftAnswer(id, { text, body, ...(sources.length > 0 ? { sources } : {}) }, options),
         // The draft now starts from what was saved: no longer unsaved. What was typed meanwhile stays (and counts); the
         // field is not rebuilt (`generation` stays), so caret and content stay where they are.
-        () =>
+        () => {
+          savedKeys.current.add(key);
           setDrafts((previous) => {
             const current = previous[key];
             if (current === undefined) return previous;
@@ -267,7 +384,13 @@ export function FocusPage() {
                 rebase: false,
               },
             };
-          }),
+          });
+        },
+        // Scheibe 060 (decision 7.3): a 412 is remembered and sorted once a newer record is shown; the default stays.
+        (error) => {
+          if (problemStatus(error) === 412) setRefused({ questionId: id, version: clickedAt });
+          return false;
+        },
       );
     },
     [run],
@@ -320,6 +443,11 @@ export function FocusPage() {
       />
     ) : null;
 
+  // One notice, not two: while the comparison is open, "Stand veraltet" of the same question gives way.
+  useEffect(() => {
+    if (compareFor !== null && staleFor === compareFor) clearStale();
+  }, [compareFor, staleFor, clearStale]);
+
   const header = <PageHeader title={t('page.focus.title')} description={t('page.focus.description')} />;
 
   if (listForbidden) {
@@ -337,6 +465,33 @@ export function FocusPage() {
 
   if (inWriting) {
     const key = writingDraft.key;
+    const meetingId = writingQuestion.meetingId;
+    const dirty = isDirty(writingDraft);
+    const keptAt = meetingId === undefined ? undefined : draftBuffer.keptAt(meetingId, writingQuestion.id);
+    const latest = writingQuestion.answers[writingQuestion.answers.length - 1];
+    const closeCompare = (): void => setCompareFor(null);
+    const compare = compareFor === writingQuestion.id && latest !== undefined ? (
+      <CompareVersions
+        mine={{ body: writingDraft.body, sources: writingDraft.sources }}
+        theirs={latest}
+        autoFocus
+        onKeepMine={(shown) => {
+          typedKeys.current.add(key);
+          setDrafts((previous) => (previous[key] === undefined ? previous : { ...previous, [key]: keepMine(previous[key]!, shown, writingQuestion) }));
+          closeCompare();
+        }}
+        onTakeTheirs={(shown) => {
+          setDrafts((previous) => (previous[key] === undefined ? previous : { ...previous, [key]: takeTheirs(previous[key]!, shown, writingQuestion) }));
+          if (meetingId !== undefined) void draftBuffer.delete(meetingId, writingQuestion.id);
+          setRestoredAt((previous) => {
+            const { [key]: _gone, ...rest } = previous;
+            return rest;
+          });
+          closeCompare();
+        }}
+        onBack={closeCompare}
+      />
+    ) : undefined;
     return (
       <div className="flex h-full min-h-0 flex-col">
         <WritingMode
@@ -344,7 +499,7 @@ export function FocusPage() {
           body={writingDraft.body}
           generation={writingDraft.generation}
           sources={writingDraft.sources}
-          dirty={isDirty(writingDraft)}
+          dirty={dirty}
           busy={busy}
           rebase={writingDraft.rebase}
           stale={staleFor === writingQuestion.id}
@@ -357,12 +512,14 @@ export function FocusPage() {
             else if (action === 'forward') setDialog('forward');
           }}
           onClose={leaveWriting}
-          onRebase={() =>
-            setDrafts((previous) => ({
-              ...previous,
-              [key]: newDraft(actorId, writingQuestion, (previous[key]?.generation ?? 0) + 1),
-            }))
-          }
+          onCompare={() => setCompareFor(writingQuestion.id)}
+          {...(compare !== undefined ? { compare } : {})}
+          {...(restoredAt[key] !== undefined && dirty ? { restoredNote: <DraftNote kind="restored" time={restoredAt[key]} /> } : {})}
+          {...(dirty && keptAt !== undefined
+            ? { keptNote: <DraftNote kind="kept" time={keptAt} /> }
+            : dirty && meetingId !== undefined && draftBuffer.status() === 'unavailable'
+              ? { keptNote: <DraftNote kind="unavailable" /> }
+              : {})}
           onStaleReload={() => {
             clearStale();
             reload();
