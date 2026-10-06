@@ -634,7 +634,7 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     claimQuestion: (questionId, writeOptions) => write('post', '/questions/{questionId}/claim', { params: questionPath(questionId), write: writeOptions }),
     releaseQuestion: (questionId, writeOptions) => write('post', '/questions/{questionId}/release', { params: questionPath(questionId), write: writeOptions }),
     lastWriteEtag: () => writeEtag,
-    listQuestions: (filter) => read('get', '/questions', { query: { status: filter?.status, track: filter?.track, unitId: filter?.unitId, speakerId: filter?.speakerId, contributionId: filter?.contributionId, agendaItemId: filter?.agendaItemId, q: filter?.q, limit: filter?.limit, offset: filter?.offset } }),
+    listQuestions: (filter) => read('get', '/questions', { query: { status: filter?.status, track: filter?.track, unitId: filter?.unitId, speakerId: filter?.speakerId, contributionId: filter?.contributionId, agendaItemId: filter?.agendaItemId, q: filter?.q, parentQuestionId: filter?.parentQuestionId, limit: filter?.limit, offset: filter?.offset } }),
     getQuestion: (questionId) => read('get', '/questions/{questionId}', { params: questionPath(questionId) }),
     getQuestionHistory: (questionId) => read('get', '/questions/{questionId}/history', { params: questionPath(questionId) }),
     classifyQuestion: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/classification', { params: questionPath(questionId), body: input, write: writeOptions }),

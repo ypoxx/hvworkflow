@@ -238,6 +238,7 @@ export const shellEn: typeof shellDe = {
   'event.ContributionClaimed': 'Contribution claimed',
   'event.ContributionReleased': 'Contribution released',
   'event.QuestionCaptured': 'Question captured',
+  'event.QuestionLinked': 'Reference set',
   'event.QuestionClassified': 'Classified',
   'event.QuestionAssigned': 'Assigned',
   'event.QuestionForwarded': 'Forwarded to another answering unit',
