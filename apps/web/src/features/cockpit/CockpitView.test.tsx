@@ -15,6 +15,13 @@ import type { CockpitViewProps } from './CockpitView';
 import { cockpitFixture, UNITS } from './fixtures';
 import { rowsFromRefs, threadEntries } from './lib';
 
+/** The page's own sources (the kit's components keep their own spacing). */
+const SOURCES = import.meta.glob<string>(['./CockpitView.tsx', './Figures.tsx', './DrillList.tsx', './Thread.tsx'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
 const de = (key: TKey, params?: TParams) => translate('de', key, params);
 const T = COCKPIT_THRESHOLDS;
 
@@ -92,13 +99,23 @@ describe('W1 levels in the markup', () => {
   it('every figure, station column and unit row has the one accessible name pattern', () => {
     const html = render();
     expect(attr(tags(html, 'cockpit-card-open')[0] ?? '', 'aria-label')).toBe('Liste öffnen: Ohne Endstatus, 55');
+    // The sub-line belongs to the name of each card (aria-describedby).
+    for (const id of ['cockpit-card-open', 'cockpit-card-legal', 'cockpit-card-stage', 'cockpit-card-inflow']) {
+      const card = tags(html, id)[0] ?? '';
+      const described = attr(card, 'aria-describedby') ?? '';
+      expect(described, id).not.toBe('');
+      expect(html, id).toContain(`id="${described}"`);
+    }
     expect(attr(tags(html, 'cockpit-card-legal')[0] ?? '', 'aria-label'))
-      .toBe(`Liste öffnen: Im Legal Clearing über 10 min, 6, erhöht · ab ${T.legalReviewOver10m.attention}`);
+      .toBe(`Liste öffnen: Legal Clearing über 10 min, 6, erhöht · ab ${T.legalReviewOver10m.attention}`);
+    // WCAG 2.5.3: the visible label is the label of the name, word for word.
+    expect(text(element(html, 'cockpit-card-legal'))).toContain('Legal Clearing über 10 min');
     expect(attr(tags(html, 'cockpit-card-stage')[0] ?? '', 'aria-label')).toBe('Liste öffnen: Auf der Bühne, 8');
-    expect(attr(tags(html, 'cockpit-card-inflow')[0] ?? '', 'aria-label')).toBe('Liste öffnen: Zulauf je 5 min, 3');
+    expect(attr(tags(html, 'cockpit-card-inflow')[0] ?? '', 'aria-label')).toBe('Liste öffnen: Zulauf letzte 5 min, 3');
     const stations = tags(html, 'cockpit-station');
     expect(stations.map((tag) => attr(tag, 'data-status'))).toEqual(['captured', 'classified', 'assigned', 'answer_drafted', 'in_review', 'approved']);
-    expect(attr(stations[4] ?? '', 'aria-label')).toBe(`Liste öffnen: im Legal Clearing, 14, erhöht · ab ${T.legalReviewOver10m.attention}`);
+    // The station names its bottleneck, not the threshold of another figure (review minor 2).
+    expect(attr(stations[4] ?? '', 'aria-label')).toBe('Liste öffnen: im Legal Clearing, 14, Engpass');
     expect(attr(stations[0] ?? '', 'aria-label')).toBe('Liste öffnen: erfasst, 5');
     const units = tags(html, 'cockpit-unit-row');
     expect(attr(units[0] ?? '', 'aria-label')).toBe(`Liste öffnen: Finanzen, 23, erhöht · ab ${T.unitBacklog.attention}`);
@@ -119,7 +136,10 @@ describe('W2 inflow chart', () => {
     expect(bars).toHaveLength(12);
     expect(bars.filter((bar) => attr(bar, 'data-latest') === 'true')).toHaveLength(1);
     expect(attr(bars[11] ?? '', 'class')).toContain('fill-accent-500');
-    expect(attr(bars[0] ?? '', 'class')).toContain('fill-ink-300');
+    // Contrast (orchestrator decision): bars in grey 500 (3.9:1), empty windows as a grey 500 stroke, both at least 3:1.
+    expect(attr(bars[0] ?? '', 'class')).toContain('fill-ink-500');
+    expect(attr(bars[2] ?? '', 'class')).toContain('fill-ink-500');
+    expect(html).not.toContain('fill-ink-300');
     expect(attr(bars[2] ?? '', 'data-empty')).toBe('true');
     expect(attr(bars[2] ?? '', 'height')).toBe('1');
     const card = text(element(html, 'cockpit-card-inflow'));
@@ -159,6 +179,7 @@ describe('W4 states', () => {
     const [loading] = tags(html, 'cockpit-loading');
     expect(loading).toBeDefined();
     expect(attr(loading ?? '', 'aria-busy')).toBe('true');
+    expect(tags(html, 'cockpit-loading-backlog')).toHaveLength(1);
     expect(html).toContain('min-h-');
     expect(tags(html, 'cockpit-oldest-open')).toHaveLength(0);
   });
@@ -203,12 +224,35 @@ describe('W4 states', () => {
     expect(tags(html, 'cockpit-oldest-next')).toHaveLength(0);
   });
 
+  it('8a: a filtered oldest question is never the main reference; every readable one stands under "Danach die ältesten"', () => {
+    // The true oldest (3000 s) is not readable; the first readable reference is younger.
+    const items = cockpitFixture().oldestOpen.items.slice(1);
+    const html = render(ready(cockpitFixture({ oldestOpen: { ageSeconds: 3000, items } })));
+    const oldest = element(html, 'cockpit-oldest');
+    expect(text(oldest)).toContain('50');
+    expect(tags(html, 'cockpit-oldest-ref')).toHaveLength(0);
+    expect(tags(html, 'cockpit-oldest-open')).toHaveLength(0);
+    expect(tags(html, 'cockpit-oldest-next').map((tag) => attr(tag, 'data-id'))).toEqual(items.map((item) => item.id));
+  });
+
   it('a meeting that is not running says so in a neutral badge; the canary line is quiet', () => {
     const html = render(ready(cockpitFixture({ meetingStatus: 'preparation' })));
     expect(text(element(html, 'cockpit-meeting-status'))).toBe('HV in Vorbereitung');
     expect(text(element(html, 'cockpit-canary'))).toBe('Kanarienfrage: nicht eingerichtet');
     expect(text(element(html, 'cockpit-asof'))).toBe('Stand 15:42:10');
     expect(tags(render(), 'cockpit-meeting-status')).toHaveLength(0);
+  });
+});
+
+describe('D3 one padding token for every panel, spacing on the 4/8 grid', () => {
+  it('the main reading uses p-4 like the cards; the sources of the page use no off-grid spacing', () => {
+    const html = render();
+    expect(attr(tags(html, 'cockpit-oldest')[0] ?? '', 'class')).toMatch(/\bp-4\b/);
+    for (const [name, source] of Object.entries(SOURCES)) {
+      for (const off of [/\bp-5\b/, /pt-2\.5/, /gap-1\.5/, /gap-x-2\.5/, /mt-0\.5/, /mx-1\.5/, /\bh-2\.5/, /\bw-2\.5/, /h-3\.5/]) {
+        expect(`${name}: ${off.test(source) ? off.source : 'clean'}`).toBe(`${name}: clean`);
+      }
+    }
   });
 });
 
@@ -233,6 +277,10 @@ describe('W5 privacy in the DOM, list and thread open', () => {
       },
     });
     expect(tags(html, 'cockpit-list-row')).toHaveLength(6);
+    // The count badge shows the number in mono; the words stay for assistive technology.
+    const badge = element(html, 'cockpit-list-count');
+    expect(badge).toMatch(/<span aria-hidden="true" class="font-mono">6<\/span>/);
+    expect(badge).toContain('<span class="sr-only">6 Einzelfragen</span>');
     expect(html).toContain('Ausschüttungsquote');
     expect(html).not.toMatch(/\bu-[a-z]+(-[a-z0-9]+)?\b/); // no actor id (u-legal-1, u-exp-fin, …)
     expect(html).not.toMatch(/Birgit|Mertens|Wortmeldung|speaker/i);

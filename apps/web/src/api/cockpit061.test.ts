@@ -9,8 +9,8 @@
  *   grouping) at 800 p90 < 100 ms (D9); best of up to three batches, each printed. As in `timing053.test.ts`, the hard
  *   bound for `getCockpit` carries a margin (100 ms) because `pnpm gates` runs the test files in parallel on few cores:
  *   alone the read measured 43 ms p90 at load 10 on four cores, in the parallel suite 73–93 ms (report of part B). The
- *   50 ms target is printed with every batch ("within" or "above"); the cache of spec point 5 is the remedy if a calm
- *   machine ever measures above it.
+ *   50 ms target is printed with every batch ("within" or "above"). The orchestrator accepted this limit (spec, W10);
+ *   with `CI` set the best batch must stay below 50 ms as well (tripwire, review R6), else the cache of spec point 5.
  *
  * The clocks are injected (AGENTS.md R8): a fixed afternoon of the meeting. It lives in `src/api` because only here may
  * values be loaded from `@hv/domain` (as `timing053.test.ts`).
@@ -100,12 +100,12 @@ describe('W9 live over the real live store', () => {
     expect(tick).toBeUndefined();
   }, 60_000);
 
-  it('a hidden document pauses the interval; a refused read is reported as forbidden', async () => {
+  it('a hidden document pauses the interval; a failed read is reported with its rule', async () => {
     let hidden = true;
     let onVisibility: (() => void) | undefined;
     const ticks: Array<() => void> = [];
     const read = vi.fn(async (): Promise<Cockpit> => {
-      throw Object.assign(new Error('403'), { status: 403, ruleId: 'R-PERM-02' });
+      throw Object.assign(new Error('500'), { status: 500, ruleId: 'R-TEST-01' });
     });
     const results: CockpitResult[] = [];
     const feed = startCockpitFeed({
@@ -115,7 +115,7 @@ describe('W9 live over the real live store', () => {
       visibility: { hidden: () => hidden, subscribe: (listener) => { onVisibility = listener; return () => undefined; } },
     });
     await vi.waitFor(() => expect(results).toHaveLength(1));
-    expect(results[0]).toEqual({ status: 'forbidden' });
+    expect(results[0]).toEqual({ status: 'error', ruleId: 'R-TEST-01' });
     ticks[0]!();
     await Promise.resolve();
     expect(read).toHaveBeenCalledTimes(1); // hidden: the tick reads nothing
@@ -127,6 +127,9 @@ describe('W9 live over the real live store', () => {
 });
 
 const TARGET_MS = 50;
+/** The web project has no Node types; the environment is read structurally. */
+const onCi = (): boolean =>
+  Boolean((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.['CI']);
 const HARD_MS = 100;
 
 describe('W10 time at 800 questions (in-process)', () => {
@@ -171,6 +174,8 @@ describe('W10 time at 800 questions (in-process)', () => {
         `(${cockpit!.totals.captured} questions, ${cockpit!.totals.open} open, 30 runs after 5 warm-up per batch)`,
     );
     expect(Math.min(...figures)).toBeLessThan(HARD_MS);
+    // Tripwire (review R6): on CI, a dedicated runner, the best batch must meet the 50 ms target itself.
+    if (onCi()) expect(Math.min(...figures)).toBeLessThan(TARGET_MS);
     expect(Math.min(...list)).toBeLessThan(100);
   }, 120_000);
 });

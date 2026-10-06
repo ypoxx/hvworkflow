@@ -48,7 +48,13 @@ describe('W6 thread', () => {
     expect(all).toContain('Faden F-0141');
     expect(all).toContain('Ausschüttungsquote');
     expect(all).toContain('Finanzen');
-    expect(all).toContain('Finanzvorstand');
+    expect(all).toContain('Bühne: Finanzvorstand');
+    // "seit …" stands on its own line in grey mono, never truncated with the time (design major 3, 15).
+    const since = tags(html, 'cockpit-thread-since');
+    expect(since).toHaveLength(1);
+    expect(attr(since[0] ?? '', 'class')).toContain('text-ink-600');
+    expect(attr(since[0] ?? '', 'class')).not.toContain('truncate');
+    expect(html).not.toContain('text-accent-700');
     // Horizontal: one ordered row per eight entries.
     expect(tags(html, 'cockpit-thread-row')).toHaveLength(1);
   });
