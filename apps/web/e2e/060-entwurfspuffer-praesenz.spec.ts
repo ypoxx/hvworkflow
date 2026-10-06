@@ -395,8 +395,13 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
     await page.route('**/v1/questions*', (route) => route.fulfill({
       status: 401, contentType: 'application/problem+json', body: JSON.stringify({ status: 401, title: 'Unauthorized', detail: 'synthetic' }),
     }), { times: 1 });
-    await page.getByTestId('answers-search').fill(`${number} `);
-    await expect(page.getByRole('heading', { name: /^(Anmelden|Sign in)$/ })).toBeVisible();
+    // A search term the list has not read yet: the list trims and debounces the term (150 ms) and reads only a changed one,
+    // so the previous `${number} ` (trimmed: the same term) sent no request and the double never answered (CI run
+    // 37460612152). Any 401 of a read goes to `onUnauthorized` (http.ts) and the shell shows the sign-in page.
+    const unread = page.waitForRequest((request) => /\/v1\/questions\?/.test(request.url()));
+    await page.getByTestId('answers-search').fill(`${number} 060`);
+    await unread;
+    await expect(page.getByRole('heading', { name: /^(Anmelden|Sign in)$/ })).toBeVisible({ timeout: 15_000 });
     expect((await readBuffer(page)).length).toBeGreaterThan(0);
     await asRole(page, 'expert');
     await openInAnswers(page, number);
@@ -471,9 +476,11 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
       await other.goto('/answers');
       await waitForCorpus(other);
       await openInAnswers(other, number);
+      const written = await other.getByTestId('answer-version').count();
       await appendText(other.getByTestId('answer-editor'), other, ` ${text}`);
       await other.getByTestId('answer-submit-draft').click();
-      await expect(other.getByTestId('draft-kept')).toHaveCount(0);
+      // The version is written once the second browser shows it (not merely once the click left).
+      await expect(other.getByTestId('answer-version')).toHaveCount(written + 1, { timeout: 30_000 });
     };
     try {
       await writeAsLegal(DRAFT_060_OTHER);
