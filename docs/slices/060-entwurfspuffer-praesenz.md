@@ -817,6 +817,52 @@ Liste des http-Projekts und das Abmelde-Double in E5 (http).
 `docs/sicherheit/bedrohungsmodell.md`, `docs/agentische-entwicklung-plan.md`, `docs/folgeliste.md`, diese Datei.
 `apps/web/playwright.config.ts` und `scripts/e2e-http-031.test.mjs` (die neue Datei nach 055b in beiden Listen).
 
+### Nacharbeit nach Review, Design-Kritik und CI (06.10.2026)
+
+Gebaut auf `20f8b68` (Basis eingemischt). Commits: `b5b0b5b` (Tests zuerst, rot), `5bd83cb` (Behebung, Doku). `pnpm gates` auf
+`5bd83cb` (Exit 0, sauberer Baum):
+
+```
+✓ built in 4.24s
+mark-test-run: wrote /home/user/wt/s060/.claude/state/last-test-run (clean tree) at commit 5bd83cb, tree 1217609a4906…
+```
+
+Rot vor der Behebung (Einheit): `draftBuffer.test.ts` 3 von 36 rot (Blocker 1: `getAll` mehr als einmal je Akteur; minor 5: Eintrag
+nach `clear` während des Ladens wieder da; minor 6: Eintrag über 256 KiB beim Lesen angenommen), `CompareVersions.test.tsx` D-b und
+D-e, `WritingMode.test.tsx` D-a/D-c, `draft.test.ts` D-d. Danach 878 Einheitstests grün. e2e in-process 060 mit
+`--repeat-each=3`: 24 bestanden, 6 übersprungen (E5b, E7 nur http); Screenshots `060-*` neu erzeugt (Vergleich geändert).
+
+**CI e2e-http, Lauf 37458349373, E3 (`:260`) — der Test war falsch, nicht der Code dieser Scheibe.** Im HTTP-Betrieb scheitert das
+Speichern offline mit einem Netzfehler; die Schreibtür (`useWriteDoor`) ruft danach wie bei jeder Ablehnung `reload()`. Offline
+scheitert auch das erneute `getQuestion`, und `useBacklog` setzt dann `selected` auf `null` (010d: eine gescheiterte Lesung zeigt
+keine Frage). Die Beantwortung baut das Detail ab, `answer-editor` ist nicht mehr da. In-process gibt es kein Netz, deshalb lief der
+Schritt dort nie. Der Text geht nicht verloren: er liegt im Puffer und kommt nach erneuter Anmeldung und beim Öffnen der Frage wieder
+(der Rest von E3 prüft das). E3 prüft jetzt nach dem Toast den Puffer statt des Felds. Dass das Detail bei einem gescheiterten
+Neuladen verschwindet, ist ein Verhalten von `useBacklog` außerhalb der erlaubten Dateien; Eintrag in der Folgeliste.
+
+| Befund | Behebung | Beleg |
+|---|---|---|
+| Review blocker 1 (Ladeschleife bei totem Speicher) | fehlgeschlagene Akteur-ids werden gemerkt; `owner()`/`load()` laden für sie nicht erneut | U1 „blocker 1“ |
+| Review major 2 (Rückgängig innerhalb 400 ms) | `scheduleDelete` ohne Bedingung `entry !== undefined` | U1 „major 2“ (Puffer), `QuestionDetail.tsx` |
+| Review major 3 (Datenschutz-Wortlaut) | DSFA V5, T-G1-I-08, Zeile 060 und MF-16: Ablauf wirkt erst beim nächsten Öffnen in diesem Browser, bis dahin Klartext; Restrisiko anderer Tabs bis zu ihrem nächsten 401 | Doku-Diff |
+| Review minor 4 (`roles_changed` im Schreibmodus) | Eintrag gelöscht und `focus.write.gone`, kein Flush | `focus/Page.tsx` |
+| Review minor 5 (`clear` während des Ladens) | Epoche, ein Laden über ein `clear` hinweg übernimmt nichts | U1 „minor 5“ |
+| Review minor 6 (256 KiB beim Lesen, Literal) | Grenze in `sanitizeEntry`; `ANSWER_TEXT_MAX_LENGTH` aus dem Kern | U1 „minor 6“ |
+| Review minor 7 (`refused`/`compareFor`) | fallen bei Wechsel von Auswahl oder Schreibmodus | `focus/Page.tsx` |
+| Review minor 8 (`comparing` ohne `answer.draft`) | schließt im Render | `QuestionDetail.tsx` |
+| Review minor 9 (`focusField`) | einmalig, nach dem Aufbau zurückgesetzt | `QuestionDetail.tsx` |
+| D-a (zwei primäre Aktionen) | Fußzeile ohne „Entwurf speichern“ während des Vergleichs | U7 „D-a/D-c“ |
+| D-b (Knopfkanten) | drei Knöpfe in einer Reihe, Hinweis in eigener Zeile darunter | U5 „D-b“, Screenshot |
+| D-c (Tastenhinweis) | ausgeblendet während des Vergleichs | U7 „D-a/D-c“ |
+| D-d (Orchestrator) | `focus.write.goneKept` sagt „in diesem Browser / in this browser“; **Abweichung von der Tabelle in Entscheidung 13** (dort „auf diesem Gerät / on this device“), passend zu Entscheidung 6 | `draft.test.ts`, E9 |
+| D-e (Spaltenköpfe) | `text-ink-600` statt `hv-label`, Autor-id nicht in Großbuchstaben | U5 „D-e“ |
+
+Folgeliste ergänzt (060-Abschnitt): Doppelklick-Sperre schluckt bewussten zweiten Klick (nit 11), E5 http belegt „vor der Anfrage“
+nicht (nit 12), enge Spalten in der geteilten Ansicht, Toastzeit ohne Mono und Datum, HH:MM gegen HH:MM:SS, Zeitzone der Formatierung,
+Detail verschwindet nach gescheitertem Neuladen offline.
+
+Offen: neuer CI-Lauf `e2e-http` nach dem Push (E3, E5, E5b, E7); Nachweis mit Artefaktangaben folgt aus dem PR.
+
 ## Review findings
 
 (leer)
