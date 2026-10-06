@@ -1006,6 +1006,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 061 Review Nit 11 · `scripts/metrics-allowlist-check.mjs` Regel (g) · `derived:` und `meta:` nehmen jeden Text an; der eigentliche
   Riegel ist A7 (Blattpfade aus dem Vertrag) · eine Begründungspflicht mit Mindestlänge oder geschlossene `meta:`-Liste prüfen.
 
+- takt-055 Review (06.10.2026) minor · `scripts/stack.test.mjs` · der Test prüft nur `plan.env`, nicht dass die Umgebung den
+  Build-Aufruf erreicht · Prüfung, dass `plan.build` mit `{ env: plan.env }` läuft (oder Quellprüfung).
+- takt-055 Codex P1 (#175) · `scripts/stack.mjs` `upPlan` · `BUILDX_BAKE_ENTITLEMENTS_FS=0` schaltet die Bake-Dateisystemprüfung
+  für den Stack ab, weil Compose v5 die Freigabe `--allow=fs.read` nicht durchreicht · dauerhafte Lösung prüfen (Secret-Quelle
+  ohne Lesefreigabe außerhalb des Kontexts, oder Compose-Schalter, sobald es einen gibt).
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
