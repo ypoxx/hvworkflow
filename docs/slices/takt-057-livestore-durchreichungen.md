@@ -101,3 +101,34 @@ Open: Review (frischer Kontext, Perspektive Sicherheit) steht aus. „Files allo
 Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts, apps/web/src/features/history/Page.tsx,
       apps/web/src/features/history/Page.test.tsx, docs/slices/takt-057-livestore-durchreichungen.md
 ```
+
+### Nachtrag nach dem Review (frischer Kontext, Perspektive Sicherheit: kein Leck, 1 Major, 3 Minor, 2 Nit)
+
+```
+Slice: takt-057-livestore-durchreichungen (Review-Befunde)
+Done: Befund 1 (Major): eine zurückgehaltene Schreibung bzw. seedDemo lehnt mit `WithheldAnswer` ab (liveStore.ts,
+      extends Error, fester Text, keine Nutzlast/Status/cause); Lesungen bleiben unerfüllt. showProblem zeigt dafür keine
+      Meldung. Die drei Schreibtüren erholen sich ohne Änderung über ihr catch/finally: speakers/Page.tsx `run` (showProblem
+      still, reload, finally gibt inFlight frei), capture/Page.tsx beide Schreibungen (isVersionConflict liest nur `status`,
+      der Merker hat keinen → showProblem still, finally gibt writingRef frei), answers/useWriteDoor.ts (settleProblem:
+      problemStatus undefined → 'toast' → still; onProblem in QuestionDetail prüft nur 412; Sperre fällt, reload).
+      Befund 2: write() liest Epoche und Akteur nach observeActor(). Befund 3: Testkommentar berichtigt, drei
+      Regressionswächter benannt. Befund 4: shownStream/heldStreamBase in Page.tsx (Anzeige und Startpunkt des
+      Weiterlesens), getestet mit advanceStream: gleiche id, andere Rolle → nichts angezeigt, listEvents(0, 1) von vorn.
+      Nit 5: abgemeldet bleibt etagStale unberührt. Nit 6: seedDemo im abgemeldeten Wurf-Test.
+      Zuerst rot: 4 Store-Fälle (WithheldAnswer: „expected false to be true“), Befund 2 und Nit 5 („expected undefined to
+      be '"v7"'/'"v9"'“), toastStore („WithheldAnswer is not a constructor“), useWriteDoor („expected false to be true“:
+      Sperre blieb stehen), Historie („shownStream is not a function“). Nit 6 war schon grün (guarded fängt seit e107f93).
+Evidence: pnpm gates auf 63d746a (danach nur dieser Bericht), Ausgabe-Ende:
+      packages/domain test:       Tests  562 passed (562)
+      apps/web test:       Tests  1154 passed (1154)
+      apps/api test:       Tests  710 passed (710)
+      slice-scope: warning — "docs/slices/takt-057-livestore-durchreichungen.md"'s "Files allowed" section differs from its version at the commit that introduced it (e107f93).
+      slice-scope: 8 changed file(s), all within "docs/slices/takt-057-livestore-durchreichungen.md"'s "Files allowed" list (9 pattern(s)).
+      ✓ built in 2.15s
+      mark-test-run: wrote /home/user/wt/takt057/.claude/state/last-test-run (clean tree) at commit 63d746a, tree 527502a3fe23…
+Open: Re-Check des Majors (schmal). oxlint-Warnungen only-export-components für vier Hilfsfunktionen in history/Page.tsx
+      (lib.ts nicht erlaubt). Die slice-scope-Warnung ist die gewollte Spec-Änderung nach Befund 1.
+Touched: zusätzlich apps/web/src/components/toastStore.ts, apps/web/src/components/toastStore.test.ts,
+      apps/web/src/features/answers/useWriteDoor.test.tsx
+```
