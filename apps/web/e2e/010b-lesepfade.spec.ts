@@ -34,6 +34,8 @@
  */
 import { CORPUS_DEMO } from '@hv/domain';
 import { expect, test } from '@playwright/test';
+import { ACTOR_MODULE, API_MODULE, loadAppModules } from './support/app-modules';
+import type { AppModulesWindow } from './support/app-modules';
 import { checkAxe } from './support/axe';
 import type { Page } from '@playwright/test';
 
@@ -95,11 +97,16 @@ async function historyResultStatusWords(page: Page): Promise<string[]> {
  * Nit D (review round 4): Patch nur gegen `vite` dev, nicht gegen einen Build; eigener Port je
  * Worktree (E2E_PORT). A production bundle has no `/src/api/index.ts` to import, and two worktrees
  * sharing one dev server would patch each other's module.
+ *
+ * Takt-050: the module URLs (`API_MODULE`, and `ACTOR_MODULE` — the demo actor store, which only the tests use, to
+ * switch the actor without the header: review round 4, B, the "Nur Bühne" overlay covers the role switcher) come
+ * from `support/app-modules.ts`. Every test that patches a module calls `loadAppModules(page)` once after
+ * `waitForCorpus`; every evaluate below is synchronous and reads `window.__appModules.modules[url]`. No evaluate
+ * waits in the page on a dynamic import (CI runs 37347756649 and 37360163818: "Resulting promise was garbage
+ * collected" in Runde 4 (B)), and none waits on an `api` call across an actor switch: the live store leaves such a
+ * read pending on purpose (`apps/web/src/api/liveStore.ts:14–19`). Start it synchronously, put the outcome on
+ * `window`, poll it.
  */
-const API_MODULE = '/src/api/index.ts';
-/** The demo actor store — only the tests use it, to switch the actor without the header (review
- *  round 4, B: the "Nur Bühne" overlay covers the role switcher). */
-const ACTOR_MODULE = '/src/api/actor.ts';
 
 /** The shell's toast stack (see `expectNoErrorToast` above for why it is scoped this way). */
 const toasts = (page: Page) => page.locator('[aria-live="polite"] [role="status"]');
@@ -424,16 +431,22 @@ interface Probe {
   __calls: unknown[];
   __fail: boolean;
 }
+/** Runde 4 (A): the version read in the page and the outcome of the write started there (takt-050). */
+interface WriteProbe {
+  __speakerListVersion: number | string | undefined;
+  __writes: string[];
+}
 
 test('Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein 500 bringt einen Toast', async ({
   page,
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
 
   // Every call's filter is recorded; `__fail` turns every call into a 500 (not a read refusal).
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const w = window as unknown as Probe;
     w.__calls = [];
     w.__fail = false;
@@ -480,13 +493,14 @@ test('Runde 3 (1): Erfassung fragt listContributions nicht ungefiltert nach, ein
 test('Runde 3 (2) / Codex (a): Beantwortung — der Verlauf gehört zur gewählten Einzelfrage', async ({ page }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'moderation');
 
   // The first question opened gets a lapsed approval appended to its real history; every later
   // question's history is held back and never arrives, so what the detail shows for it can only
   // come from its own (unknown) history — never from the previous question's.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const original = api['getQuestionHistory']!.bind(api);
     let first: unknown;
     api['getQuestionHistory'] = (id: unknown) => {
@@ -526,14 +540,15 @@ test('Runde 3 (2): Beantwortung — scheitern Einzelfrage und Verlauf beide, ers
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'moderation');
   await page.getByTestId('nav-answers').click();
   await expect(page).toHaveURL(/\/answers$/);
   const rows = page.getByTestId('answers-row');
   await expect(rows.first()).toBeVisible();
 
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const fail = () => Promise.reject({ status: 500, title: 'Testfehler', detail: 'Runde 3, absichtlich' });
     api['getQuestion'] = fail;
     api['getQuestionHistory'] = fail;
@@ -608,10 +623,11 @@ test('Runde 3 (4): Bühne — ein gespeichertes "Nur Bühne" blitzt nicht auf, b
   });
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
 
   // `getStage` answers one and a half seconds late — long enough to see what stands meanwhile.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const original = api['getStage']!.bind(api);
     api['getStage'] = (...args: unknown[]) =>
       new Promise((resolve, reject) => {
@@ -638,6 +654,7 @@ test('Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Lee
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'podium');
   // The ordinary shell, so the role switcher stays reachable (as in 013e).
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
@@ -648,8 +665,8 @@ test('Runde 3 (5): Bühne — podium mit aktueller Frage, Wechsel zu expert, Lee
   // The server refuses a delivery by expert anyway (R-PERM-01), so the delivered count alone would
   // stay the same even without the fix; what the fix prevents is the attempt itself — counted here
   // — and the error toast its refusal would raise.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const w = window as unknown as Probe;
     w.__calls = [];
     const original = api['deliverQuestion']!.bind(api);
@@ -682,13 +699,14 @@ test('Codex P2-1 (4f0d231): Erfassung fragt vom ersten Aufruf an nicht ungefilte
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'moderation');
   // Away from the desk first, so the patch below is in place before the desk mounts afresh
   // (no `?speaker`) — every call from the very first one is recorded.
   await page.getByTestId('nav-speakers').click();
   await expect(page).toHaveURL(/\/speakers$/);
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const w = window as unknown as Probe;
     w.__calls = [];
     const original = api['listContributions']!.bind(api);
@@ -740,6 +758,7 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   // podium delivers (Scheibe 040a: the administration no longer does); the unrelated write below
   // (a Wortmeldung) comes from a second, synthetic person of the Versammlungsbüro.
   await asRole(page, 'podium');
@@ -750,8 +769,8 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
   await expect(currentNumber).toBeVisible();
 
   // The next `getStage` fails once with a 500; every `deliverQuestion` is counted.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const w = window as unknown as Probe;
     w.__calls = [];
     const originalStage = api['getStage']!.bind(api);
@@ -773,25 +792,51 @@ test('Runde 4 (A): Bühne — nach einem 500 von getStage wirkt "Vorgelesen, wei
   // previous actor's record on purpose, so the failed reload is now caused by an ordinary event.
   // Scheibe 040a: the event is written by `u-mod-2`, swapped in and restored around the synchronous
   // part of the in-process write (as `unrelatedEvent` in 010c) — the view never sees another actor.
-  await page.evaluate(async ([url, actorUrl]) => {
-    const { api } = (await import(/* @vite-ignore */ url!)) as { api: Wrapped };
-    const actorModule = (await import(/* @vite-ignore */ actorUrl!)) as {
-      getActor: () => unknown;
-      setActor: (actor: unknown) => void;
-    };
-    const meeting = (await api['getMeeting']!()) as { speakerListVersion: number };
-    const before = actorModule.getActor();
-    actorModule.setActor({ id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' });
-    let written: Promise<unknown>;
-    try {
-      written = api['registerSpeaker']!({ displayName: 'Testperson Runde 5' }, {
-        ifMatch: `"v${meeting.speakerListVersion}"`,
-      });
-    } finally {
-      actorModule.setActor(before);
-    }
-    await written;
-  }, [API_MODULE, ACTOR_MODULE] as const);
+  // Takt-050: in two synchronous steps — nothing in the page is awaited; each outcome goes to `window` and is polled.
+  // (a) the current Wortmeldeliste version, read with the view's own actor.
+  await page.evaluate((url) => {
+    const w = window as unknown as WriteProbe;
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
+    w.__speakerListVersion = undefined;
+    api['getMeeting']!().then(
+      (meeting) => (w.__speakerListVersion = (meeting as { speakerListVersion: number }).speakerListVersion),
+      (error: unknown) =>
+        (w.__speakerListVersion = `failed: ${(error as { detail?: string } | null)?.detail ?? String(error)}`),
+    );
+  }, API_MODULE);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as WriteProbe).__speakerListVersion))
+    .toEqual(expect.any(Number));
+  // (b) the write, under `u-mod-2` for its synchronous part only; the actor is restored before the evaluate returns.
+  await page.evaluate(
+    ([url, actorUrl]) => {
+      const w = window as unknown as WriteProbe;
+      const modules = (window as unknown as AppModulesWindow).__appModules!.modules;
+      const { api } = modules[url!] as { api: Wrapped };
+      const actorModule = modules[actorUrl!] as {
+        getActor: () => unknown;
+        setActor: (actor: unknown) => void;
+      };
+      const before = actorModule.getActor();
+      actorModule.setActor({ id: 'u-mod-2', role: 'moderation', displayName: 'Versammlungsbüro 2' });
+      let written: Promise<unknown>;
+      try {
+        written = api['registerSpeaker']!({ displayName: 'Testperson Runde 5' }, {
+          ifMatch: `"v${String(w.__speakerListVersion)}"`,
+        });
+      } finally {
+        actorModule.setActor(before);
+      }
+      w.__writes = ['pending'];
+      written.then(
+        () => (w.__writes[0] = 'ok'),
+        (error: unknown) =>
+          (w.__writes[0] = `failed: ${(error as { detail?: string } | null)?.detail ?? String(error)}`),
+      );
+    },
+    [API_MODULE, ACTOR_MODULE] as const,
+  );
+  await expect.poll(() => page.evaluate(() => (window as unknown as WriteProbe).__writes[0])).toBe('ok');
   await expect(toasts(page)).toHaveCount(1);
   await expect(currentNumber).toBeVisible();
 
@@ -807,14 +852,15 @@ test('Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht
   });
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'podium');
   await page.getByTestId('nav-stage').click();
   await expect(page).toHaveURL(/\/stage$/);
   await expect(page.getByTestId('stage-only')).toBeVisible();
 
   // `getStage` answers one and a half seconds late from now on.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const original = api['getStage']!.bind(api);
     api['getStage'] = (...args: unknown[]) =>
       new Promise((resolve, reject) => {
@@ -826,8 +872,8 @@ test('Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht
   // actor store directly — the same call the switcher makes. Nit 4 (review round 5): a
   // MutationObserver, armed in the same task as the switch, records whether the overlay is still in
   // the DOM at any later mutation — `toBeVisible` on the skeleton alone would not see a short flash.
-  await page.evaluate(async (url) => {
-    const mod = (await import(/* @vite-ignore */ url)) as {
+  await page.evaluate((url) => {
+    const mod = (window as unknown as AppModulesWindow).__appModules!.modules[url] as {
       DEMO_ACTORS: readonly { role: string }[];
       setActor: (actor: unknown) => void;
     };
@@ -855,9 +901,10 @@ test('Runde 4 (B): Bühne — Rollenwechsel bei offenem "Nur Bühne" zeigt nicht
 
 /** Switches the demo actor in the running app without the header — the call the switcher makes. */
 async function switchActor(page: Page, role: string): Promise<void> {
+  await loadAppModules(page);
   await page.evaluate(
-    async ([url, wanted]) => {
-      const mod = (await import(/* @vite-ignore */ url!)) as {
+    ([url, wanted]) => {
+      const mod = (window as unknown as AppModulesWindow).__appModules!.modules[url!] as {
         DEMO_ACTORS: readonly { role: string }[];
         setActor: (actor: unknown) => void;
       };
@@ -921,6 +968,7 @@ test('Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Ro
 }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'admin');
   await page.evaluate(() => localStorage.setItem('hv-stage-only-v1', '0'));
   await page.getByTestId('nav-stage').click();
@@ -929,8 +977,8 @@ test('Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Ro
 
   // Latency patch: every `getStage` is answered by the API at once — for the actor current at
   // that moment — but handed to the page only when the test releases it.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const w = window as unknown as { __held: (() => void)[]; __release: () => void };
     w.__held = [];
     w.__release = () => {
@@ -953,8 +1001,8 @@ test('Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Ro
 
   // ... and arrives in the very task in which the actor becomes expert, which may not read the
   // stage. A MutationObserver records whether podium's question shows at any moment after.
-  await page.evaluate(async (url) => {
-    const mod = (await import(/* @vite-ignore */ url)) as {
+  await page.evaluate((url) => {
+    const mod = (window as unknown as AppModulesWindow).__appModules!.modules[url] as {
       DEMO_ACTORS: readonly { role: string }[];
       setActor: (actor: unknown) => void;
     };
@@ -979,14 +1027,15 @@ test('Codex P2-B (948a721): Bühne — eine Antwort, die noch für die vorige Ro
 test('Runde 5 (1): Erfassung — der Zustand "keine Leseberechtigung" flackert bei Latenz nicht', async ({ page }) => {
   await page.goto('/');
   await waitForCorpus(page);
+  await loadAppModules(page);
   await asRole(page, 'observer');
   await page.getByTestId('nav-capture').click();
   await expect(page).toHaveURL(/\/capture$/);
   await expect(page.getByTestId('capture-forbidden')).toBeVisible();
 
   // The Wortmeldung lookup answers 300 ms late from now on.
-  await page.evaluate(async (url) => {
-    const { api } = (await import(/* @vite-ignore */ url)) as { api: Wrapped };
+  await page.evaluate((url) => {
+    const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Wrapped };
     const original = api['listSpeakers']!.bind(api);
     api['listSpeakers'] = (...args: unknown[]) =>
       new Promise((resolve, reject) => {
