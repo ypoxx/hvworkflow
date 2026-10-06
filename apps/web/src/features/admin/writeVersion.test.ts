@@ -37,8 +37,8 @@ function fakeApi(start: number) {
     return Promise.resolve(value());
   };
   const api: MasterApi = {
-    getMeetingById: (id: string) => {
-      calls.push(`getMeetingById:${id}`);
+    getMeeting: () => {
+      calls.push(`getMeeting:${MEETING_ID}`);
       return Promise.resolve(meeting());
     },
     listMeetingUnits: list('listMeetingUnits', () => units),
@@ -72,7 +72,7 @@ describe('(a) the meeting version is read before the list', () => {
   ] as const)('%s', async (kind, method) => {
     const fake = fakeApi(4);
     const read = await readMaster(fake.api, MEETING_ID, kind);
-    expect(fake.calls).toEqual([`getMeetingById:${MEETING_ID}`, `${method}:${MEETING_ID}`]);
+    expect(fake.calls).toEqual([`getMeeting:${MEETING_ID}`, `${method}:${MEETING_ID}`]);
     expect(read.version).toBe(4);
   });
 });

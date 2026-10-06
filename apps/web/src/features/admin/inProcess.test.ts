@@ -3,7 +3,7 @@
  * injected clock, acting as the administration persona. Every write is one whole-list replacement with `If-Match` of
  * the version read before the list (decision 6); refusals map to the dialog's keys (decision 7).
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CORPUS_DEMO,
   ROLE_PERMISSIONS,
@@ -11,7 +11,7 @@ import {
   createInProcessApi,
   seedEvents,
 } from '@hv/domain';
-import type { Actor, EventStore, HvApi, Role } from '@hv/domain';
+import type { Actor, DomainEvent, EventStore, HvApi, Role } from '@hv/domain';
 import { adminProblemKey, attempt } from './problems';
 import { readMaster, writeMaster } from './masterData';
 import { assignInput, EMPTY_ASSIGN_FORM } from './assignments';
@@ -22,16 +22,28 @@ const ADMIN: Actor = { id: 'u-admin', role: ADMIN_ROLE, displayName: 'Administra
 const EXPERT_ROLE = (Object.keys(ROLE_PERMISSIONS) as Role[]).find((role) => ROLE_PERMISSIONS[role].unitBoundRead === true)!;
 const NOW = new Date('2026-06-18T10:00:00.000Z');
 
+// Each test rebuilds a projection over ~1000 events (well under a second alone); the margin covers a loaded machine.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 });
+
 let store: EventStore;
 let api: HvApi;
 let meetingId: string;
+/** The seeded log, built once (seeding the demo corpus takes seconds under load; review 041, blocker). */
+let seeded: readonly DomainEvent[];
+
+beforeAll(async () => {
+  const base = createInMemoryEventStore();
+  const seeder = createInProcessApi({ store: base, actor: () => ADMIN, clock: () => NOW, seeder: seedEvents });
+  await seeder.seedDemo({ questions: CORPUS_DEMO.questions, roundSizes: CORPUS_DEMO.roundSizes, seed: CORPUS_DEMO.seed });
+  // The demo's binding of the Fachkraft (DEMO_BINDINGS): Finanzen is held by an active assignment.
+  await seeder.assignRole({ subjectId: 'u-exp-fin', role: EXPERT_ROLE, unitId: 'unit-fin' });
+  seeded = [...base.all()];
+}, 60_000);
 
 beforeEach(async () => {
-  store = createInMemoryEventStore();
+  // Every test starts from its own store over the same seeded events (append-only: the shared ones are never changed).
+  store = createInMemoryEventStore({ load: () => [...seeded], save: () => undefined });
   api = createInProcessApi({ store, actor: () => ADMIN, clock: () => NOW, seeder: seedEvents });
-  await api.seedDemo({ questions: CORPUS_DEMO.questions, roundSizes: CORPUS_DEMO.roundSizes, seed: CORPUS_DEMO.seed });
-  // The demo's binding of the Fachkraft (DEMO_BINDINGS): Finanzen is held by an active assignment.
-  await api.assignRole({ subjectId: 'u-exp-fin', role: EXPERT_ROLE, unitId: 'unit-fin' });
   meetingId = (await api.getMeeting()).id;
 });
 

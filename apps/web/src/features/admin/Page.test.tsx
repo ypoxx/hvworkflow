@@ -236,7 +236,7 @@ describe('(e) removing a unit that is still referenced', () => {
   it('409 R-ADM-02 from the service is a refusal with its rule id, and the list is not changed', async () => {
     const units: Unit[] = [...UNITS];
     const { api, calls } = recordingApi({
-      getMeetingById: () => Promise.resolve(MEETING),
+      getMeeting: () => Promise.resolve(MEETING),
       listMeetingUnits: () => Promise.resolve(units),
       replaceMeetingUnits: () => Promise.reject(new ApiProblem(409, 'Conflict', 'Unit unit-fin is still referenced', 'R-ADM-02')),
     });
@@ -245,7 +245,7 @@ describe('(e) removing a unit that is still referenced', () => {
     expect(outcome).toEqual({ kind: 'problem', key: 'admin.problem.R-ADM-02', ruleId: 'R-ADM-02' });
     expect(units).toEqual(UNITS);
     expect(read.items).toEqual(UNITS);
-    expect(calls).toEqual(['getMeetingById', 'listMeetingUnits', 'replaceMeetingUnits']);
+    expect(calls).toEqual(['getMeeting', 'listMeetingUnits', 'replaceMeetingUnits']);
   });
 
   it('the remove dialog names the entry and shows the refusal with the rule id', () => {

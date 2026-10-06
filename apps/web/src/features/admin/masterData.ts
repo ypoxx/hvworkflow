@@ -5,6 +5,11 @@
  * than the version and the service answers 412 — safe. A version newer than the list is never sent, because then a
  * replacement could overwrite somebody else's change unnoticed. `useMeeting().version` is not used here: the header
  * and the lists are read separately.
+ *
+ * Review 041 (major): the reads go through the live store, which buffers the lists per meeting version. The version is
+ * read with `getMeeting()`, the one read that raises the store's version watermark and so drops every list buffered at
+ * an older version; `getMeetingById` would not, and a fresh version could then pair with an old buffered list. Only the
+ * managed meeting (the alias) is edited in 041, so its id must match.
  */
 import type {
   AgendaItem,
@@ -32,7 +37,7 @@ export interface MasterInputs {
 
 export type MasterApi = Pick<
   HvApi,
-  | 'getMeetingById'
+  | 'getMeeting'
   | 'listMeetingUnits'
   | 'listMeetingAgendaItems'
   | 'listMeetingStageSeats'
@@ -65,7 +70,8 @@ function list(api: MasterApi, meetingId: string, kind: MasterKind): Promise<read
 
 /** The version first, the list after it (the order is the safety, see above). */
 export async function readMaster<K extends MasterKind>(api: MasterApi, meetingId: string, kind: K): Promise<MasterRead<K>> {
-  const meeting = await api.getMeetingById(meetingId);
+  const meeting = await api.getMeeting();
+  if (meeting.id !== meetingId) throw new Error('The managed meeting changed; read again.');
   const items = (await list(api, meetingId, kind)) as readonly MasterItems[K][];
   return { version: meeting.version, items };
 }

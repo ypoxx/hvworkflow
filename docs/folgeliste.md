@@ -789,16 +789,25 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 041 Befund (Kern) · `packages/domain/src/api.ts` `assignRole` · ohne `expiresAt` setzt der Kern kein Ablaufdatum, der
   Vertrag sagt „Standard: Ende der Hauptversammlung“; die Oberfläche zeigt nur „Ende der Hauptversammlung“ · Vertragstext
   und Projektion angleichen (Lane core).
-- 041 Bau · `apps/web/e2e/support/e2e-texts.ts` · die Texte, die `041-verwaltung.spec.ts` im Projekt `http` schreibt
-  (Kennung `e2e-041-pruefung`, Grund, Fachbereich, TOP, Bühnenplatz, Gerät), stehen nur als Konstanten in der Datei,
-  nicht in `WRITTEN_TEXTS`; die Prüfung des Zugriffslogs sucht sie deshalb nicht · in einer Scheibe mit `e2e-texts.ts`
-  nachtragen.
 - 041 Bau · `apps/web/src/features/admin/Page.test.tsx` · Test 7 der Spec verlangte Testing Library; das Web-Paket hat keine
   DOM-Testumgebung, und eine neue Abhängigkeit liegt außerhalb der erlaubten Dateien · Komponenten statisch gerendert,
   Klick- und Tastenverhalten als reine Funktionen getestet, der Bedienweg in `e2e/041-verwaltung.spec.ts`; eine
   DOM-Testumgebung (jsdom oder happy-dom) als eigene Scheibe der Lane web-api erwägen.
 - 041 Bau · `apps/web/src/components/Dialog.tsx` · D3 verlangt Dialoge mit 480 px; das Bauteil kennt nur 384/512/672 px
   (`sm`/`md`/`lg`), die Verwaltung nutzt `md` · Größe in einer Bauteil-Scheibe ergänzen oder die Vorgabe auf 512 px setzen.
+- 041 Review minor 4 · `apps/web/e2e/041-verwaltung.spec.ts` · das Aufräumen im Projekt `http` ist nicht ausfallsicher:
+  scheitert ein Schritt nach dem Anlegen, bleiben Fachbereich, TOP, Platz oder Zuordnung für die Folgedateien stehen ·
+  `afterAll` mit eigenem Kontext der Verwaltungsperson, der eigene Einträge (Präfix „E2E 041“, Kennung
+  `e2e-041-pruefung`) entfernt bzw. entzieht.
+- 041 Review minor 5 · `features/admin/problems.ts` · ein 409 ohne Regel-id zeigt auch in den Stammdaten-Dialogen den Text
+  der Rollenzuordnung („Diese Kennung hat die Rolle schon …“) · eigener Schlüssel je Dialogart oder neutraler Text.
+- 041 Review nit 7 · `features/admin/noRoleNames.test.ts` · der Quelltest findet einen Rollennamen als ungequoteten
+  Objektschlüssel nicht (`{ admin: … }`) · Muster `\b<rolle>\s*:` ergänzen.
+- 041 Review nit 8 · `features/admin/AdminLayout.tsx` · `aria-controls` der nicht gewählten Tabs zeigt auf nicht
+  gerenderte Panels; das Tabpanel hat kein `tabIndex` (bei Tabs ohne fokussierbaren Inhalt, z. B. Hauptversammlungen) ·
+  alle Panels gerendert und versteckt oder `aria-controls` nur am gewählten Tab; `tabIndex={0}` am Panel.
+- 041 Review nit 9 · Spec-Bericht 041, „Vor dem Bau prüfen“ 4 · die Aussage zu Konstanten mit SECRET/TOKEN/KEY/PASSWORD
+  im Namen ist ungenau formuliert · auf die Konstanten dieser Scheibe beschränken und so benennen.
 
 ## Skripte
 

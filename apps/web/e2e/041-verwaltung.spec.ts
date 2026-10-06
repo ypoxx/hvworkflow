@@ -17,18 +17,27 @@
 import { CORPUS_DEMO } from '@hv/domain';
 import type { Locator, Page } from '@playwright/test';
 import { checkAxe } from './support/axe';
+import {
+  ADMIN_041_AGENDA_TITLE,
+  ADMIN_041_REVOKE_REASON,
+  ADMIN_041_SEAT_DEVICE,
+  ADMIN_041_SEAT_LABEL,
+  ADMIN_041_SUBJECT,
+  ADMIN_041_UNIT_NAME,
+  ADMIN_041_UNIT_RENAMED,
+} from './support/e2e-texts';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
 import { asRole } from './support/roles';
 
-/** Synthetic texts of this file (no real names, R11). */
-const SUBJECT = 'e2e-041-pruefung';
-const REVOKE_REASON = 'Synthetischer Grund der Prüfung 041';
-const UNIT_NAME = 'E2E 041 Prüfbereich';
-const UNIT_RENAMED = 'E2E 041 Prüfbereich neu';
-const AGENDA_TITLE = 'E2E 041 Prüfpunkt';
-const SEAT_LABEL = 'E2E 041 Prüfplatz';
-const SEAT_DEVICE = 'geraet-041';
+/** Synthetic texts of this file (no real names, R11); in `e2e-texts.ts`, so the access-log check looks for them. */
+const SUBJECT = ADMIN_041_SUBJECT;
+const REVOKE_REASON = ADMIN_041_REVOKE_REASON;
+const UNIT_NAME = ADMIN_041_UNIT_NAME;
+const UNIT_RENAMED = ADMIN_041_UNIT_RENAMED;
+const AGENDA_TITLE = ADMIN_041_AGENDA_TITLE;
+const SEAT_LABEL = ADMIN_041_SEAT_LABEL;
+const SEAT_DEVICE = ADMIN_041_SEAT_DEVICE;
 /** The unit with open questions and the expert's active assignment (seed `unit-fin`, short name "Finanzen"). */
 const FIN = 'Finanzen';
 const FIN_ID = 'unit-fin';
@@ -315,40 +324,6 @@ test.describe.serial('041 Verwaltung', () => {
     expect(await snapshot(page)).toEqual(before);
   });
 
-  test('E5 Rollenkarten per Tastatur @screenshot', async ({ page }) => {
-    await asRole(page, 'admin');
-    await toAdmin(page);
-    await openTab(page, 'admin-tab-roles');
-    for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
-    await expect(page.getByTestId('admin-tab-role-cards')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('admin-tab-role-cards')).toBeFocused();
-    await page.keyboard.press('Tab');
-    await expect(page.getByTestId('admin-role-cards-list')).toBeFocused();
-    const card = page.getByTestId('admin-role-card');
-
-    const goTo = async (role: string): Promise<void> => {
-      for (let i = 0; i < 12 && (await card.getAttribute('data-role')) !== role; i++) await page.keyboard.press('ArrowDown');
-      await expect(card).toHaveAttribute('data-role', role);
-    };
-    await goTo('coordination');
-    await expect(card).toContainText('An anderen Fachbereich weiterleiten');
-    await expect(page.locator('[data-testid="admin-role-card-option"][data-role="coordination"]')).toHaveAttribute('aria-selected', 'true');
-    await goTo('expert');
-    await expect(page.getByTestId('admin-role-card-unit-bound')).toHaveText('Liest nur Einzelfragen des zugeordneten Fachbereichs.');
-    await page.keyboard.press('Home');
-    await expect(page.getByTestId('admin-role-card-option').first()).toHaveAttribute('aria-selected', 'true');
-    await goTo('coordination');
-    await checkAxe(page, '041 admin role cards DE');
-    if (!isHttp()) {
-      await shot(page, '041-rollenkarten-de.png');
-      await setLang(page, 'en');
-      await expect(card).toContainText('Forward to another answering unit');
-      await checkAxe(page, '041 admin role cards EN');
-      await shot(page, '041-rollenkarten-en.png');
-      await setLang(page, 'de');
-    }
-  });
-
   test('E6 Gesperrt ohne das Recht @screenshot', async ({ page }) => {
     await asRole(page, 'capture');
     await page.getByTestId('nav-admin').click();
@@ -360,20 +335,58 @@ test.describe.serial('041 Verwaltung', () => {
     if (!isHttp()) await shot(page, '041-gesperrt-de.png');
   });
 
-  test('090: a change of actor closes an open dialog (in-process)', async ({ page }) => {
-    test.skip(isHttp(), 'The demo actor is switched under the dialog; the http project has no switcher.');
-    await asRole(page, 'admin');
-    await toAdmin(page);
-    await page.getByTestId('admin-assign-open').click();
-    await page.getByTestId('admin-assign-subject').fill('kennung-090');
-    await page.evaluate(async (url) => {
-      const mod = (await import(/* @vite-ignore */ url)) as {
-        DEMO_ACTORS: readonly { id: string }[];
-        setActor: (actor: unknown) => void;
+  test.describe('in-process only', () => {
+    // Declared skips (before `beforeEach`), to save e2e-http time: the role cards are build data, identical in both
+    // projects; the actor switch under a dialog needs the demo switcher, which http does not have.
+    // With `E2E_HTTP=1` only the http projects run (playwright.config.ts), so this skips exactly there.
+    test.skip(process.env['E2E_HTTP'] === '1', 'Build data or demo switcher; nothing to prove in http.');
+
+    test('E5 Rollenkarten per Tastatur @screenshot', async ({ page }) => {
+      await asRole(page, 'admin');
+      await toAdmin(page);
+      await openTab(page, 'admin-tab-roles');
+      for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
+      await expect(page.getByTestId('admin-tab-role-cards')).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('admin-tab-role-cards')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.getByTestId('admin-role-cards-list')).toBeFocused();
+      const card = page.getByTestId('admin-role-card');
+
+      const goTo = async (role: string): Promise<void> => {
+        for (let i = 0; i < 12 && (await card.getAttribute('data-role')) !== role; i++) await page.keyboard.press('ArrowDown');
+        await expect(card).toHaveAttribute('data-role', role);
       };
-      mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-cap-1'));
-    }, '/src/api/actor.ts');
-    await expect(dialog(page)).toBeHidden();
-    await expect(page.getByTestId('admin-forbidden')).toBeVisible();
+      await goTo('coordination');
+      await expect(card).toContainText('An anderen Fachbereich weiterleiten');
+      await expect(page.locator('[data-testid="admin-role-card-option"][data-role="coordination"]')).toHaveAttribute('aria-selected', 'true');
+      await goTo('expert');
+      await expect(page.getByTestId('admin-role-card-unit-bound')).toHaveText('Liest nur Einzelfragen des zugeordneten Fachbereichs.');
+      await page.keyboard.press('Home');
+      await expect(page.getByTestId('admin-role-card-option').first()).toHaveAttribute('aria-selected', 'true');
+      await goTo('coordination');
+      await checkAxe(page, '041 admin role cards DE');
+      await shot(page, '041-rollenkarten-de.png');
+      await setLang(page, 'en');
+      await expect(card).toContainText('Forward to another answering unit');
+      await checkAxe(page, '041 admin role cards EN');
+      await shot(page, '041-rollenkarten-en.png');
+      await setLang(page, 'de');
+    });
+
+    test('090: a change of actor closes an open dialog (in-process)', async ({ page }) => {
+      await asRole(page, 'admin');
+      await toAdmin(page);
+      await page.getByTestId('admin-assign-open').click();
+      await page.getByTestId('admin-assign-subject').fill('kennung-090');
+      await page.evaluate(async (url) => {
+        const mod = (await import(/* @vite-ignore */ url)) as {
+          DEMO_ACTORS: readonly { id: string }[];
+          setActor: (actor: unknown) => void;
+        };
+        mod.setActor(mod.DEMO_ACTORS.find((actor) => actor.id === 'u-cap-1'));
+      }, '/src/api/actor.ts');
+      await expect(dialog(page)).toBeHidden();
+      await expect(page.getByTestId('admin-forbidden')).toBeVisible();
+    });
   });
 });

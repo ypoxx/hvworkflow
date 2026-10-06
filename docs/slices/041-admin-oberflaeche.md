@@ -347,6 +347,7 @@ gibt. Der Bau nennt die genaue Zahl im Bericht; der Paritätstest (f) zählt sie
 - `apps/web/src/i18n/parity.test.ts` (nur Modul `admin` und die Zahl)
 - `apps/web/e2e/041-verwaltung.spec.ts` (neu)
 - `apps/web/e2e/support/roles.ts` (nur die Beschriftung `admin`)
+- `apps/web/e2e/support/e2e-texts.ts` (nur die Texte der Datei 041 und ihre Einträge in `WRITTEN_TEXTS`; Nachtrag des Orchestrators nach Review 06.10.2026)
 - `apps/web/e2e/http/anmeldung.setup.ts` (nur `admin` in `SETUP_PERSONS`)
 - `apps/web/playwright.config.ts` (nur `SHARED_SPECS`: die neue Datei eintragen)
 - `scripts/e2e-http-031.mjs` (nur die Personenliste des Harness und die Zusicherungen zur Personenzahl, Entscheidung 11)
