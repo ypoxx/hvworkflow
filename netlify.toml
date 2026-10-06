@@ -20,3 +20,6 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"
+    # takt-059 (BF-06): the policy of the public demo. The Playwright project demo-build reads this line and applies it to
+    # the built demo (apps/web/e2e/takt-059-demo-csp.spec.ts), so keep it one double-quoted line without escapes.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
