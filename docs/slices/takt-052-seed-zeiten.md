@@ -297,4 +297,33 @@ zufällig dem gecachten glich. Mutationsprobe auf der gebauten Fassung (`app.ts`
 - Cache im Handler umgangen (`((f) => f())(…)` statt `cachedIndicators(…)`): derselbe Test rot, `expected 1 to be +0`.
 Die übrigen Tests von `seeded()` säen weiter `{ questions: 30, seed: 3 }` (Vorgabe des neuen zweiten Parameters).
 
+**`pnpm gates`** auf sauberem Baum, Commit **`a42a795`**, eigene Datenbank `hv_test_t052` (Postgres-Tests liefen mit, keine
+übersprungen; keine Zeitfehler unter Last, also kein Einzel-Nachlauf nötig). Ausschnitt aus dem echten Lauf:
+```
+packages/domain test:  Test Files  23 passed (23)
+packages/domain test:       Tests  526 passed (526)
+apps/web test:  Test Files  59 passed (59)
+apps/web test:       Tests  925 passed (925)
+apps/api test:  Test Files  50 passed (50)
+apps/api test:       Tests  700 passed (700)
+slice-scope: warning — "docs/slices/takt-052-seed-zeiten.md"'s "Files allowed" section differs from its version at the commit that introduced it (016b117).
+slice-scope: 7 changed file(s), all within "docs/slices/takt-052-seed-zeiten.md"'s "Files allowed" list (9 pattern(s)).
+✓ built in 1.89s
+mark-test-run: wrote /home/user/wt/takt052/.claude/state/last-test-run (clean tree) at commit a42a795, tree a21736e8ad5a…
+```
+Die slice-scope-Warnung ist der Nachtrag `73e3b6e` (Files allowed um `metrics033b.test.ts` erweitert). Ein erster Lauf auf dem
+Vorgänger-Commit scheiterte an der Typprüfung (`seed.ts`: `NewEvent` verliert die Verengung auf `type`); behoben durch einen
+Payload-Cast, in denselben, nicht gepushten Commit eingefaltet.
+
+**e2e in-process** (`pnpm --filter @hv/web e2e --project=in-process`, auf `a42a795`): `190 passed (12.3m)`, `1 skipped` (der
+übersprungene Fall ist `055b-antwortformat.spec.ts:697` „055b http“, nur im HTTP-Projekt). Kein e2e hängt an den alten Zeiten. Die
+vom Lauf überschriebenen Bilder in `docs/evidence/` sind mit `git checkout -- docs/evidence` zurückgesetzt.
+
+**Offen.** CI auf dem PR (einschließlich `e2e-http`) steht aus; nicht gepusht. Review in frischem Kontext steht aus. Keine
+Belegbilder (freiwillig; Leitstand-Oberfläche nicht gemergt).
+
+**Berührt.** `packages/domain/src/seed.ts`, `packages/domain/src/__tests__/seed.test.ts`,
+`packages/domain/src/__tests__/seed-fictitious-names.test.ts`, `apps/api/src/__tests__/fixtures/metrics-golden-061.txt`,
+`apps/api/src/__tests__/metrics033b.test.ts` (Nachtrag), `docs/folgeliste.md`, `docs/slices/takt-052-seed-zeiten.md`.
+
 ## Review findings
