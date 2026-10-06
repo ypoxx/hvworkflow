@@ -79,14 +79,14 @@ export function FollowUpPanel({ relation, onRelation, query, onQuery, state, act
       {/* Fixed height for every state, so nothing jumps while the hits arrive (design principle 8). */}
       <div className="h-72 overflow-y-auto rounded-md border border-line">
         {state.kind === 'empty' ? (
-          <p className="px-3 py-6 text-center text-[13px] text-ink-500">{t('capture.followUp.hint')}</p>
+          <p className="px-3 py-6 text-center text-[13px] text-ink-600">{t('capture.followUp.hint')}</p>
         ) : state.kind === 'loading' ? (
           <div role="status" aria-busy="true" className="grid gap-2 p-3">
             <span className="sr-only">{t('capture.followUp.loading')}</span>
             {[0, 1, 2, 3].map((row) => <div key={row} aria-hidden="true" className="h-9 animate-pulse rounded-sm bg-ink-50" />)}
           </div>
         ) : state.kind === 'none' ? (
-          <p className="px-3 py-6 text-center text-[13px] text-ink-500">{t('capture.followUp.none')}</p>
+          <p className="px-3 py-6 text-center text-[13px] text-ink-600">{t('capture.followUp.none')}</p>
         ) : state.kind === 'error' ? (
           <div className="grid justify-items-center gap-3 px-3 py-6 text-center">
             <p className="text-[13px] text-ink-600">{t('capture.followUp.error')}</p>
@@ -111,7 +111,7 @@ export function FollowUpPanel({ relation, onRelation, query, onQuery, state, act
                   question.id === chosenId && 'outline outline-2 -outline-offset-2 outline-accent-500',
                 )}
               >
-                <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
+                <span className="font-mono text-2xs tabular-nums text-ink-600">{question.number}</span>
                 <span className="min-w-0 flex-1 truncate text-[13px] text-ink-800">{excerpt(question.text)}</span>
                 <StatusBadge status={question.status} />
               </li>

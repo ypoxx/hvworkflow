@@ -66,6 +66,16 @@ export const FOCUS_054_RETURN_REASON = 'e2e 054';
  */
 export const FORMAT_055B_HTTP_ANSWER = 'Synthetische Antwort 055b: Die Dividende steigt deutlich.';
 
+/**
+ * Scheibe 046: the follow-up threads. A speech with two question sentences: the first is captured as a clarification
+ * (Klarstellung) of a question found in the dialog, the second through the free entry without a reference. The search
+ * word finds questions of the seed corpus; the number of the referenced question is read from the hit, never fixed.
+ */
+export const FOLLOW_UP_046_QUESTION = 'Wie genau ist die genannte Quote im Bericht abgegrenzt?';
+export const FOLLOW_UP_046_FREE_QUESTION = 'Synthetische Frage 046 ohne Bezug zum Geschäftsbericht?';
+export const FOLLOW_UP_046_SPEECH = 'Synthetischer Redebeitrag 046 zur Nachfrage. ' + FOLLOW_UP_046_QUESTION + ' Ich danke Ihnen.';
+export const FOLLOW_UP_046_SEARCH = 'Dividende';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -90,4 +100,7 @@ export const WRITTEN_TEXTS: readonly string[] = [
   FOCUS_054_UNSAVED,
   FOCUS_054_RETURN_REASON,
   FORMAT_055B_HTTP_ANSWER,
+  FOLLOW_UP_046_QUESTION,
+  FOLLOW_UP_046_FREE_QUESTION,
+  FOLLOW_UP_046_SPEECH,
 ];
