@@ -48,6 +48,7 @@ export const shellDe = {
   'nav.focus': 'Meine Fragen',
   'nav.stage': 'Bühne',
   'nav.history': 'Historie & Suche',
+  'nav.cockpit': 'Leitstand',
   'nav.admin': 'Verwaltung',
   // --- 005 design system ---
   'process.segment.captured': 'Erfasst',
@@ -157,6 +158,8 @@ export const shellDe = {
   'page.stage.description': 'Podiumsansicht: freigegebene Antwort vorlesen und abschließen.',
   'page.history.title': 'Historie & Suche',
   'page.history.description': 'Vorgangshistorie und Volltextsuche über den gesamten Bestand.',
+  'page.cockpit.title': 'Leitstand',
+  'page.cockpit.description': 'Lage der Einzelfragen auf einen Blick: was am längsten wartet, wo es sich staut, wie sich die Lage entwickelt.',
   'page.admin.title': 'Verwaltung',
   'page.admin.description': 'Hauptversammlung einrichten: Rollen zuordnen, Fachbereiche, Tagesordnung und Bühnenplätze pflegen, Rollenkarten prüfen.',
   'page.notFound.title': 'Bereich nicht gefunden',

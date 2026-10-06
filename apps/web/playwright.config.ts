@@ -38,7 +38,7 @@ const HTTP_SPECS = ['030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts'];
 const SHARED_SPECS = [
   '002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
   '041-verwaltung.spec.ts', '045-verweigerung.spec.ts', '046-nachfragen.spec.ts', '053-steuerung.spec.ts', '054-fokusansicht.spec.ts', '055b-antwortformat.spec.ts',
-  '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts',
+  '061-leitstand.spec.ts', '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts',
 ];
 const HTTP_SETUP = 'http/anmeldung.setup.ts';
 
