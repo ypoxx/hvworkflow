@@ -853,10 +853,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   zurückgestellt) zählt im Leitstand nirgends, in `computeIndicators` aber weiter im Bestand („offen“, Rückstand je Fachbereich,
   älteste offene mit Alter 0); die Gleichheit K3 gilt nur ohne solche Ereignisse · in 071 oder 086 entscheiden, ob `/metrics`
   dieselbe Zeitgrenze bekommt (Golden neu, eigener Commit).
-- 061 Teil B Bau · `apps/web/src/api/cockpit061.test.ts` (W10) · `getCockpit` bei 800 lag allein bei p90 43 ms (Lastmittel 10 auf
-  vier Kernen), in der parallel laufenden Web-Suite bei 73–93 ms; die harte Grenze trägt deshalb wie `timing053` einen Aufschlag
-  (100 ms), das Ziel 50 ms steht je Messreihe im Log · auf einer ruhigen Maschine (CI) nachmessen; liegt es dort über 50 ms, den
-  Zwischenspeicher aus Vor-dem-Bau-Punkt 5 der Spec 061 bauen (`createSingleFlightCache`, Filter nach `can()` danach).
+- 061 Teil B Bau · `apps/web/src/api/cockpit061.test.ts` (W10) · `getCockpit` bei 800 lag bei Lastmittel 10 auf vier Kernen allein
+  bei p90 43 ms, in der parallel laufenden Web-Suite bei 73–93 ms; bei Lastmittel 2,4 allein 20,1 ms, in der vollen Suite 30,3 ms.
+  Die harte Grenze trägt deshalb wie `timing053` einen Aufschlag (100 ms), das Ziel 50 ms steht je Messreihe im Log · im CI-Log
+  nachsehen; liegt es dort über 50 ms, den Zwischenspeicher aus Vor-dem-Bau-Punkt 5 der Spec 061 bauen
+  (`createSingleFlightCache`, Filter nach `can()` danach).
 - 061 Teil B Bau · `packages/domain/src/seed.ts` (Uhr des Seeds, `Math.min(clock, o.now)`) · der Demo-Seed staucht fast alle
   Ereignisse auf den Seed-Zeitpunkt: im Leitstand steht der Zulauf als eine Säule, alle Uhrzeiten eines Fadens sind gleich, die
   „Danach die ältesten“ springen von 74 auf 22 min · Seed über den Nachmittag verteilen (eigener Takt; Golden von 061 und 033b
