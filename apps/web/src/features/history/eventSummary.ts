@@ -6,11 +6,14 @@
  * The switch is exhaustive over `DomainEvent`; a new event type makes this file fail to compile
  * rather than silently show an empty row.
  */
-import type { DomainEvent } from '@hv/domain';
+import type { DomainEvent, QuestionLinkedReadPayload } from '@hv/domain';
 import { roleLabel, stageAssignmentLabel, statusLabel, trackLabel } from '../../i18n';
 import type { Translate } from '../../i18n';
 // Not re-exported by the i18n entry point (outside this slice's files); a label helper, not a dictionary.
 import { forwardReasonLabel } from '../../i18n/labels';
+
+/** Scheibe 046: the timeline line of a link; the number stands in the thread block (the read payload has no id). */
+const LINKED_KEYS = { follow_up: 'history.payload.linked.follow_up', clarification: 'history.payload.linked.clarification' } as const;
 import { excerpt } from './lib';
 
 export interface SummaryContext {
@@ -78,6 +81,12 @@ export function eventSummary(t: Translate, event: DomainEvent, context: SummaryC
     case 'QuestionCaptured':
       parts.push(excerpt(event.payload.text));
       break;
+    case 'QuestionLinked': {
+      // Read only `relation`: every event read path strips the parent id and the answer version (maskEvent).
+      const relation = (event.payload as unknown as QuestionLinkedReadPayload).relation;
+      parts.push(Object.hasOwn(LINKED_KEYS, relation) ? t(LINKED_KEYS[relation]) : String(relation));
+      break;
+    }
     case 'QuestionClassified': {
       parts.push(t('history.payload.track', { track: trackLabel(t, event.payload.track) }));
       const agendaItemId = event.payload.agendaItemId;

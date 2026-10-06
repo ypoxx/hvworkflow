@@ -293,7 +293,7 @@ const idsOf = (states: Map<string, State>): { speakers: string[]; contributions:
 const ALL_EVENT_TYPES: Record<EventType, true> = {
   MeetingCreated: true, MeetingStarted: true, MeetingClosed: true, DebateClosed: true, AgendaItemOpened: true,
   VotingOpened: true, VotingClosed: true, SpeakerRegistered: true, RoleAssigned: true, RoleRevoked: true,
-  SpeakersReordered: true, SpeakerUpdated: true, ContributionCaptured: true, QuestionCaptured: true,
+  SpeakersReordered: true, SpeakerUpdated: true, ContributionCaptured: true, QuestionCaptured: true, QuestionLinked: true,
   QuestionClassified: true, QuestionAssigned: true, QuestionForwarded: true, AnswerDrafted: true, QuestionSubmittedForReview: true,
   QuestionApproved: true, QuestionLegalCleared: true, QuestionReturned: true, QuestionStaged: true,
   QuestionDelivered: true, QuestionClosed: true, QuestionWithdrawn: true, QuestionMerged: true,

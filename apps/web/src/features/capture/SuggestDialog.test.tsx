@@ -2,8 +2,11 @@
  * takt-037: the selection in the suggestion dialog belongs to the candidate texts, not to array identity
  * or to an effect that runs after the first render. The model is pure, so it is tested without a DOM.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { setLang, translate, type Lang } from '../../i18n';
 import {
+  ReferenceHint,
   candidateKeys,
   checkedCount,
   initialSelection,
@@ -58,3 +61,14 @@ describe('SuggestDialog selection', () => {
     expect(checkedCount(setAllChecked(keys, true), keys)).toBe(2);
   });
 });
+
+/* Scheibe 046, W3 (Lesebefund M7): with a set chip the dialog says that taken-over suggestions go without it. */
+describe.each(['de', 'en'] as Lang[])('SuggestDialog reference hint (%s)', (lang) => {
+  afterEach(() => setLang('de'));
+  it('visible with a set reference, absent without', () => {
+    setLang(lang);
+    expect(renderToStaticMarkup(<ReferenceHint show />)).toContain(translate(lang, 'capture.followUp.suggestHint'));
+    expect(renderToStaticMarkup(<ReferenceHint show={false} />)).toBe('');
+  });
+});
+
