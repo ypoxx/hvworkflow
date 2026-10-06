@@ -342,6 +342,49 @@ const OTHER_RULES: readonly RuleEntry[] = [
     },
   },
   {
+    ruleId: 'R-LINK-01',
+    kind: 'Guard',
+    description:
+      'A follow-up question or clarification may reference only a question that lies in the meeting of the capture ' +
+      'and that the capturing person may read; otherwise captureQuestions answers 422 with this rule id, one ' +
+      'message for an unknown id, a question of another meeting and an unreadable question, without the id, and ' +
+      'appends no event for any question of the call. No status criterion on the referenced question (Scheibe 046).',
+    legalRef: {
+      source: 'Recherche',
+      citation:
+        'docs/anforderungen-recherche.md:256 ("harte Verknüpfung zur Ursprungsantwort"; umgesetzt über ' +
+        'parentQuestionId und parentAnswerVersion) und :70 ("Nachfrage-Threads über alle Antworten"). Teilweise: ' +
+        'keine eigene Warteschlange, keine verkürzte Frist, keine Angemessenheitsgrenzen, keine Prüfschritte ' +
+        '"echte Nachfrage oder neue Frage?"; :195 verlangt getrennte Objekttypen mit eigenen Pflichtfeldern und ' +
+        'eigener Fristuhr: hier ist die Nachfrage eine Einzelfrage mit Relation, kein eigener Objekttyp, ohne eigene ' +
+        'Frist (Fristen für Zurückstellen und Korrektur folgen in 046b/046c). Ableitung (Spec 046): Jahrgangsgrenze ' +
+        'aus ADR 0012; Lesbarkeit und eine gleichlautende Ablehnung aus T-G1-I-01. Auf Standard gebaut (Spec 046).',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
+    ruleId: 'R-LINK-02',
+    kind: 'Guard',
+    description:
+      'A reference arises only with the capture, at most once per question, and never changes: the core writes ' +
+      'QuestionLinked only in captureQuestions right after the QuestionCaptured of the same question; the ' +
+      'projection applies it only then (same command if both carry one), to an existing question without a ' +
+      'reference, with a different referenced question of the same meeting, a known relation and an answer ' +
+      'version of at least 1; any other QuestionLinked stays without effect and never fails loading (Scheibe 046).',
+    legalRef: {
+      source: 'Leitplanken',
+      citation:
+        'AGENTS.md R7 (Ereignisse nur anhängen) und docs/anforderungen-recherche.md:295 ("Korrekturen nur als ' +
+        'kompensierende Events"). Ableitung (Spec 046): ein falscher Bezug wird nicht umgeschrieben, sondern ' +
+        'durch Zurückziehen (R-TRANS-11) und Neuerfassen ersetzt. Nicht belegt.',
+      docVersion: null,
+      docHash: null,
+      verified: false,
+    },
+  },
+  {
     ruleId: 'R-CLAIM-01',
     kind: 'Guard',
     description: 'An active soft claim may be renewed by its holder; another actor must wait until release or expiry.',

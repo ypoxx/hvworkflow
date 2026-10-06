@@ -201,13 +201,15 @@ export type EventType = DomainEvent['type'];
  * Standard read projection. `maskEvent` (api.ts) strips `displayName`, `organisation`, `pii` and
  * `personId` recursively from every payload; a new payload field that holds clear-text person data
  * must be added to that block list. sourceHash identifies the immutable original, not this redacted JSON. */
-type ReadForm<E extends DomainEvent> = Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string };
 export type ReadEvent = DomainEvent extends infer E
-  ? E extends DomainEvent
-    // Scheibe 046: the read payload of a link is the relation only, so no read path can type-read the id.
-    ? E extends QuestionLinked ? Omit<ReadForm<E>, 'payload'> & { payload: { relation: QuestionRelation } } : ReadForm<E>
-    : never
+  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string } : never
   : never;
+/**
+ * Scheibe 046: what a read path may take from a `QuestionLinked` (`maskEvent` removes the parent id and
+ * the answer version for every reader). `ReadEvent` itself keeps the stored shape for this type,
+ * because existing callers assign `ReadEvent[]` to `DomainEvent[]`; read paths use this type instead.
+ */
+export type QuestionLinkedReadPayload = { relation: QuestionRelation };
 
 /** An event before it is appended: the store assigns `seq`. */
 export type NewEvent = Omit<DomainEvent, 'seq'>;

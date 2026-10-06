@@ -151,6 +151,8 @@ function appendOtherMeeting(questionIds: string[]): void {
     ]),
   ] as NewEvent[]);
 }
+/** A complete command envelope for a forged event (the chain check requires all three fields). */
+const cmd = (commandId: string) => ({ commandId, commandOperation: 'forged', commandResource: 'forged' });
 let rawCounter = 0;
 const raw = (type: string, subjectId: string, payload: object, extra: object = {}): NewEvent =>
   ({ id: `raw46-${(rawCounter += 1)}`, type, at: at(), actor: A.capture, subjectId, meetingId, payload, ...extra }) as unknown as NewEvent;
@@ -286,12 +288,13 @@ describe('Test 3: mixed call and calls without reference', () => {
   it('the adjacent raw pair applies without commandId and with equal commandId; a different commandId does not', async () => {
     const parent = await captured();
     store.append([rawCapture('pair-none'), rawLink('pair-none', parent.id)]);
-    store.append([rawCapture('pair-same', { commandId: 'cmd-a' }), rawLink('pair-same', parent.id, { commandId: 'cmd-a' })]);
-    store.append([rawCapture('pair-diff', { commandId: 'cmd-b' }), rawLink('pair-diff', parent.id, { commandId: 'cmd-c' })]);
+    store.append([rawCapture('pair-same', cmd('cmd-a')), rawLink('pair-same', parent.id, cmd('cmd-a'))]);
+    store.append([rawCapture('pair-diff', cmd('cmd-b')), rawLink('pair-diff', parent.id, cmd('cmd-c'))]);
     expect(record('pair-none')).toMatchObject({ parentQuestionId: parent.id, relation: 'follow_up', version: 2 });
     expect(record('pair-same')).toMatchObject({ parentQuestionId: parent.id, relation: 'follow_up', version: 2 });
     expect(hasNoRefKeys(record('pair-diff'))).toBe(true);
     expect(record('pair-diff').version).toBe(1);
+    expect(() => verifyEventChain([...store.all()])).not.toThrow();
   });
 
   it('a call without any reference: events and answer as before the slice', async () => {
@@ -405,8 +408,8 @@ describe('Test 6: R-LINK-02 in the reducer against a forged log', () => {
     const a = await classify(await captured('Ältere Frage A?'));
     const b = await followUp(a.id);
     expect(b.parentQuestionId).toBe(a.id);
-    store.append([raw('QuestionClaimed', a.id, { actorId: 'x', claimedAt: at(), expiresAt: at() }, { commandId: 'cmd-other' }),
-      rawLink(a.id, b.id, { commandId: 'cmd-late' })]);
+    store.append([raw('QuestionClaimed', a.id, { actorId: 'x', claimedAt: at(), expiresAt: at() }, cmd('cmd-other')),
+      rawLink(a.id, b.id, cmd('cmd-late'))]);
     expect(hasNoRefKeys(record(a.id))).toBe(true);
     expect(ancestors(b.id)).toEqual([a.id]);
     loads();
