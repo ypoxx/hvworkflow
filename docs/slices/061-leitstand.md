@@ -355,6 +355,11 @@ Fachbereichszeile: „Liste öffnen: {Beschriftung}, {Zahl}[, {Stufe} · {Schwel
   „−60 min“ links und „jetzt“ rechts (benannte Ausnahme zu D3: 11 px wie Badges); `role="img"` mit Namen „Zulauf je 5 Minuten in der
   letzten Stunde: 2, 3, …; zuletzt 3“; daneben „letzte Stunde: {Summe}“. Eine Farbe, Position trägt die Bedeutung. `Sparkline`
   bleibt unberührt. **Keine Diagrammbibliothek** (takt-047).
+  *Nachtrag nach Design-Kritik (Entscheidung des Orchestrators, 06.10.2026):* Säulen **Grau 500** (3,9:1 auf der Karte) statt Grau 300
+  (1,68:1); leere Fenster als 1-px-Strich ebenfalls in Grau 500 (mindestens 3:1, WCAG 1.4.11). Beschriftung der Karte „Zulauf letzte
+  5 min“ / „Inflow last 5 min“, damit eine 0 nicht wie ein Fehler liest; Zahl, Säulen und „letzte Stunde“ auf einer Zeile, Achse
+  darunter (wie die Skizze). Die Karte „Im Legal Clearing über 10 min“ trägt sichtbar „Legal Clearing über 10 min“; Beschriftung und
+  zugänglicher Name teilen eine Zeichenkette (WCAG 2.5.3).
 - **Stationen** (volle Breite, ersetzt hier die dichte `ProcessStrip`): sechs beschriftete Spalten **erfasst, klassifiziert,
   zugewiesen, Antwortentwurf, im Legal Clearing, freigegeben** mit `openByStatus` (20 px Mono) und der Statustönung nur als 3-px-
   Oberkante; „auf der Bühne“ steht in der vierten Karte, nicht doppelt. „Engpass“-Badge nach Entscheidung 4. Jede Spalte eine
@@ -688,6 +693,9 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 - **W9** Live in-process über den echten Live-Store: Zurückziehen durch moderation ⇒ `totals.open` sinkt ohne Neuladen; das
   15-s-Intervall liest `getCockpit` am Puffer vorbei (zwei Aufrufe ⇒ zwei Rechnungen).
 - **W10** Zeit: `getCockpit` bei 800 p90 < 50 ms; Liste „Ohne Endstatus“ bei 800 p90 < 100 ms (D9).
+  *Angenommen vom Orchestrator (06.10.2026, Review R6):* harte Grenze für `getCockpit` 100 ms wie `timing053`, bis zu drei
+  Messreihen, die beste zählt, jede steht im Log mit „within/above“ gegen 50 ms; Stolperdraht: mit gesetztem `CI` muss die beste
+  Messreihe unter 50 ms liegen (sonst Zwischenspeicher nach Vor-dem-Bau-Punkt 5).
 - **W11** Ansage: Wechsel einer Kennzahl nach „kritisch“ erzeugt genau eine Ansage; gleichbleibend kritisch keine weitere; Wechsel
   nach erhöht keine.
 
@@ -1055,6 +1063,182 @@ metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
 ✓ built in 2.50s
 mark-test-run: wrote /home/user/wt/s061/.claude/state/last-test-run (clean tree) at commit 46b8290, tree 8f66f729fff4…
 ```
+
+### Bericht Teil B (Oberfläche), 06.10.2026
+
+```
+Slice: 061-leitstand (Teil B)
+Done: Route /cockpit („Leitstand“, letzte Registerzeile, requires cockpit.read): Hauptlesung (44 px), drei Karten und Zulauf
+      (12 Säulen, Achse), Stationen mit „Engpass“, Rückstand mit Schwellenstrich, Kanarienzeile; Liste und waagrechter Faden
+      mit URL-Zustand, Escape zweistufig, Fokus zurück zum Auslöser; live über useApiVersion und 15-s-Takt, eine Ansage.
+Evidence: pnpm gates grün auf 41e874c (Schluss unten); docs/evidence/061-leitstand-{de,en}.png,
+          061-liste-faden-{de,en}.png, 061-wand-1280x720-{de,en}.png; CI e2e-http: im PR-Lauf (offen)
+Open: siehe „Offen“ unten
+Touched: siehe „Dateien“ unten
+```
+
+**Commits** (auf `b32ecaf`, Branch `claude/slice-061-oberflaeche`, nicht gepusht): `3578ca9` Web-Tests zuerst (rot) · `b973808`
+Seite, Liste, Faden, i18n, Register, e2e · `9e8d93d` Glossar, Zielbild, Folgeliste · `41e874c` Nachweisbilder · danach dieser
+Bericht (nur Doku).
+
+**Rot, dann grün (echte Ausgaben, gekürzt):**
+- W1–W11 und Registererwartungen vor der Seite (`3578ca9`): `Test Files 6 failed (6)`, `Tests 5 failed | 15 passed (20)` —
+  `Error: Cannot find module '../../api/cockpit'` (lib, CockpitView), `Cannot find module './Thread'`, `Cannot find module
+  './cockpit'` (cockpit061), `expected [ 'speakers', 'capture', …(3) ] to include 'cockpit'`, `expected 'history' to be
+  'cockpit'`, W7 `expected [ './fixtures.ts' ] to include './CockpitView.tsx'`.
+- Danach: `apps/web test: Tests 848 passed (848)`; neu sind 37 Fälle in `features/cockpit/` (lib, CockpitView, Thread, clock),
+  4 in `api/cockpit061.test.ts` (Wiederausgabe, W9 zweimal, W10) und 2 im Register, dazu geänderte Paritäts- und Registerfälle.
+- Zwischenrot beim Bau, behoben: W1 (Name der Legal-Clearing-Karte nach dem Muster), W11 (Ansagebegriff), Parität (Modul
+  `cockpit` fehlte in der Liste).
+
+**e2e `in-process`:** `061-leitstand.spec.ts` S1–S8 `7 passed (45.2s)`; mit `--repeat-each=3` `21 passed (1.8m)`; volle Suite
+`192 passed, 1 skipped (13.4m)` (übersprungen: 055b H1, nur `http`), darunter 001, 013, 053, 054 unverändert grün (29 Fälle).
+axe bei jedem Ansichtswechsel: 0 serious/critical (DE, EN, Lesezustand, 200 %, Wand). Fremde Nachweisbilder aus dem Lauf
+zurückgesetzt (`git checkout -- docs/evidence`). Projekt `http`: lokal ohne Keycloak nicht lauffähig; die Datei ist zwischen
+055b und 080 eingereiht (`SHARED_SPECS`, `HTTP_ORDER`), schreibt dort nichts (S5 und S8 nur `in-process`), S3 trägt den Fall
+„keine Einzelfrage über 10 min“ (dann nur Zeilenzahl 0 und Escape). Lauf-ID, Job-ID, Dauer: im PR nachtragen.
+
+**Zeitmessungen (W10, 800 Einzelfragen, in-process, 30 Läufe nach 5 Aufwärmläufen):** Lastmittel 2,4: `getCockpit` p90 20,1 ms
+allein, 30,3 ms in der vollen Web-Suite; Liste „Ohne Endstatus“ p90 5,1 bzw. 10,6 ms. Lastmittel 10 auf vier Kernen (parallele
+Agenten): `getCockpit` 43 ms allein, 73–93 ms in der parallelen Suite. **Abweichung:** die harte Grenze von W10 für `getCockpit`
+ist wie in `timing053.test.ts` 100 ms, das Ziel 50 ms steht je Messreihe im Log („within“/„above“); bis zu drei Messreihen, die
+beste zählt, jede wird ausgegeben (Folgeliste). Die Liste hält die harte Grenze 100 ms (D9).
+
+**i18n:** Modul `cockpit` mit 81 Schlüsseln (DE, en-US) und drei Shell-Schlüssel (`nav.cockpit`, `page.cockpit.title`,
+`page.cockpit.description`); Parität 622 → **706**. Die Schätzung „rund 62“ lag zu niedrig: zugängliche Namen je Zeile,
+Faden-Einträge in drei Formen und die Ansage brauchen eigene Schlüssel.
+
+**Vor-dem-Bau-Punkte Teil B:** (4) `listQuestions({ status: […], limit: 2000 })` ist in-process für coordination vollständig
+(332 offene von 800, W10; Seed 100 von 230, S5); im Projekt `http` prüft S2/S3 den Weg, die Vollständigkeit bei 2000 nicht
+(Folgeliste nicht nötig: Grenze 2000 = `LIST_LIMIT` der Beantwortung). (6) Laufzeit `e2e-http`: lokal nicht messbar; die Datei
+liest nur, Schätzung +0:40; im PR-Lauf nachtragen.
+
+**Umsetzung und Präzisierungen:**
+- Dateien unter `features/cockpit/`: `CockpitView.tsx` (eine Ansicht ohne API-Hooks, jeder Zustand statisch testbar),
+  `Figures.tsx` (Hauptlesung, Karten, Zulauf, Stationen, Rückstand, Kopf), `DrillList.tsx`, `Thread.tsx`, `Page.tsx` (Hooks,
+  URL, Escape, Fokus), `feed.ts` (15-s-Takt, Strom, Sichtbarkeit; ein Lesen zur Zeit), `lib.ts` (rein), `fixtures.ts` (nur
+  Tests). Werte des Kerns nur über `apps/web/src/api/cockpit.ts` (Regel `web-features-i18n-domain-types-only`, keine neue
+  Warnung in `pnpm arch`).
+- Raster mit Container-Abfragen statt Viewport-Breakpoints (die eingeklappte Navigation zählt mit): nebeneinander ab 56rem
+  Inhalt, Karten in einer Reihe ab 36rem, sechs Stationen ab 48rem. Bei 1280 × 720 mit ausgeklappter Navigation sind
+  Hauptlesung, vier Karten mit Zulauf und Stationen ohne Scrollen sichtbar, Unterkanten Hauptlesung/Zulauf bündig (S8 misst
+  beides). Schmale Karten reservieren zwei Beschriftungszeilen, damit die Zahlen einer Reihe auf einer Linie stehen.
+- Sichtbare Beschriftung der Karte „Legal Clearing > 10 min“ (Skizze), zugänglicher Name „Liste öffnen: Im Legal Clearing über
+  10 min, …“ (Entscheidung 4); die Ansage nennt „Im Legal Clearing über 10 min“. WCAG 2.5.3 als Frage an das Review (Folgeliste).
+- Die Liste fokussiert beim Öffnen ihre Überschrift; Tab erreicht „Liste schließen“, dann die eine Zeile im Tab-Pfad (rovierend,
+  Pfeile, Pos1/Ende), Enter öffnet den Faden, der Fokus bleibt auf der Zeile. Eine Live-Lesung verschiebt den Fokus nicht (S3
+  mit 15-s-Takt geprüft). Fokusring in rollenden Listen und Stationen nach innen versetzt, damit nichts ihn abschneidet.
+- Erste Lesung kündigt nichts an; danach eine höfliche Ansage je Wechsel nach „kritisch“, mehrere Kennzahlen in einer Ansage.
+- Ein fehlgeschlagenes Neulesen nach einer erfolgreichen Lesung behält die Zahlen („Stand“ zeigt ihr Alter); eine Verweigerung
+  ersetzt sie immer durch den Lesezustand; ein Wechsel der Person beginnt bei „wird geladen“.
+- Faden: `getQuestion` und `getQuestionHistory` parallel; eine Verweigerung ist kein Fehler (ohne Leserecht kein Text, ohne
+  `history.read` nur die aktuelle Station). Bühnenplatz als `StageAssignmentBadge` aus `stageAssignment`.
+- e2e in-process mit installierter Browser-Uhr (Seed 15:20, dann +22 min), damit die Demo einen Nachmittag zeigt; im Projekt
+  `http` bleibt die Uhr unberührt.
+
+**Abweichungen vom Prototyp `089-lagebild.png` (mit Grund):** keine Rednernamen und keine Wortmeldungsnummer (Entscheidung 8);
+kein Widerspruchskanal (Z15, 050/085); keine Rednerwand (Z14, 087); kein Flussbild mit Punkt je Einzelfrage und kein „+n in 15
+min“ (Z12, 061b); keine Prognosen „abgebaut ca.“, „nächste Antwortrunde“ (Z11, 061b); vierte Karte „Auf der Bühne“ statt
+„Nächste Antwortrunde“; Zulauf als 12 Säulen statt Linie; Stationen ohne „vorgelesen“-Spalte (steht in der Karte „Auf der
+Bühne“ als „n vorgelesen“); kein Absprung „Im Schreibraum öffnen“ (Z13 teilweise).
+
+**Design-Kritik:** nach Spec in frischem Kontext (weder Spec- noch Bausitzung) — offen, an den Orchestrator. Selbstprüfung der
+Bausitzung, kein Ersatz: D1 Hauptlesung links oben, Titel und ein Satz; D2 eine primäre Schaltfläche (S1 zählt sie), leerer
+Zustand ohne Aktion (W4); D3 Raster 12/16 px, bündige Unterkanten (S8), benannte Ausnahmen 44 px, 11 px Achse, 3-px-Oberkante;
+D4 Farbe nur bei Stufe (Badge, Balken), Zulauf einfarbig; D5 alle Zahlen Mono, `tabular-nums`, Fehler mit Regel-id (W4); D6
+Laden, leer, Fehler, Lesezustand, leere Liste, Referenz nicht lesbar; Verbindung nur in der Kopfzeile; D8 S3; D9 Lesezustand
+statt Teildaten (S4), Zeiten oben; D10 gegen 089: gleiche Ruhe, große Zahl trägt; schwächer als 089 wirkt der Zulauf, weil der
+Demo-Seed fast alle Ereignisse auf einen Zeitpunkt staucht (eine Säule, gleiche Uhrzeiten im Faden; Folgeliste).
+
+**Gates** (`pnpm gates` auf sauberem Baum, Commit `41e874c`, eigene Datenbank `hv_test_s061b`, Postgres-Tests aktiv, erster Lauf):
+
+```
+packages/domain test:       Tests  513 passed (513)
+apps/web test:       Tests  848 passed (848)
+apps/api test:       Tests  700 passed (700)
+apps/api test: operation-coverage: 71 operations in the contract, 69 exercised by tests, 2 pre-declared in allowlist.json
+slice-scope: 74 changed file(s), all within "docs/slices/061-leitstand.md"'s "Files allowed" list (101 pattern(s)).
+metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
+# tests 358
+# pass 358
+# fail 0
+✓ built in 1.78s
+mark-test-run: wrote /home/user/wt/s061b/.claude/state/last-test-run (clean tree) at commit 41e874c, tree 2a8d0b38190b…
+```
+
+**Offen:**
+- Projekt `http`: CI-Lauf `e2e-http` des PR (S1–S4, S6, S7) mit Lauf-ID, Job-ID, Dauer gegen 12:00 (Warnschwelle 6:30).
+- Design-Kritik in frischem Kontext und das Review (Datenschutz, UX/Barrierefreiheit).
+- W10: harte Grenze 100 ms statt 50 ms für `getCockpit` (oben, Folgeliste).
+- Folgeliste neu: W10-Grenze, Demo-Seed staucht die Zeiten, sichtbare Beschriftung vs. Name der Legal-Clearing-Karte.
+
+**Dateien:** `apps/web/src/features/cockpit/{CockpitView,Figures,DrillList,Thread,Page}.tsx`,
+`apps/web/src/features/cockpit/{feed,lib,fixtures}.ts`, `apps/web/src/features/cockpit/{lib,clock}.test.ts`,
+`apps/web/src/features/cockpit/{CockpitView,Thread}.test.tsx`; `apps/web/src/api/cockpit.ts`, `apps/web/src/api/cockpit061.test.ts`;
+`apps/web/src/app/featureRegistry{,.test}.ts`; `apps/web/src/i18n/{cockpit.de,cockpit.en,de,en,shell.de,shell.en,parity.test}.ts`;
+`apps/web/e2e/061-leitstand.spec.ts`; `apps/web/playwright.config.ts`; `scripts/e2e-http-031.test.mjs`;
+`docs/evidence/061-{leitstand-de,leitstand-en,liste-faden-de,liste-faden-en,wand-1280x720-de,wand-1280x720-en}.png`;
+`docs/glossar.md`; `docs/feedback/2026-09-zielbild-oberflaeche.md`; `docs/folgeliste.md`; diese Spec.
+
+### Nacharbeit Teil B nach Design-Kritik und Review (06.10.2026)
+
+Basis eingemischt (`dca472e`: Teil A gemergt als `68c87d9`, dazu 041; Teil-A-Dateien auf Stand der Basis, Registerreihenfolge
+… history, admin, cockpit; Parität 747 + 84 = 831, mit `cockpit.thread.seat` **832**). Tests zuerst (`40caceb`, rot: `Tests 10
+failed | 36 passed (46)`), dann `04145d0` (grün), Bilder `bf4d92b`.
+
+| Nr. | Befund | Änderung |
+|---|---|---|
+| D1 (Blocker) D3 | Hauptlesung `p-5`, übrige Panels `p-4` | ein Token `p-4` für alle Panels; Quelltest gegen `p-5` |
+| D2 D8 | „Faden öffnen“ verschob den Fokus nicht | Fokus auf die Fadenüberschrift (`preventScroll`), danach Bildlauf; Escape und Zurück geben den Fokus an den Auslöser (S3) |
+| D3 D5/D1 | „seit …“ abgeschnitten | eigene Zeile, darf umbrechen, Grau 600 Mono |
+| D4 WCAG 2.5.3 | Beschriftung ≠ Name | sichtbar „Legal Clearing über 10 min“ / „Legal clearing over 10 min“, `nameLabel` entfernt |
+| D5 Kontrast | Säulen Grau 300 (1,68:1), leere Fenster unsichtbar | Säulen und Striche Grau 500 (3,9:1); Nachtrag in Entscheidung 5 |
+| D6/7 Zulauf, Karten | 400-px-Lücke, „0“ liest wie Fehler, Unterzeile unten | Zahl, Säulen, „letzte Stunde“ auf einer Zeile, Achse darunter; „Zulauf letzte 5 min“; Unterzeile direkt unter der Zahl |
+| D8 Bildlauf, Zurück | Liste/Faden nicht oben; Zurück ohne Fokus | Bildlauf nur im Hauptbereich (block „start“; `scrollIntoView` verschob den Shell-Rahmen, gefunden am Bild), Faden nach dem Laden; Zurück fokussiert den gespeicherten Auslöser |
+| D9 Namen | Unterzeile fehlte, Station mit fremder Schwelle | `aria-describedby` auf die Unterzeile; Station „…, 14, Engpass“ (auch Review minor 2) |
+| D10 Raster | `pt-2.5`, `gap-1.5`, `gap-x-2.5`, `mt-0.5`, `mx-1.5`, `h-2.5` | auf 4/8 px; Quelltest |
+| D11–D16 | Zählbadge, Bühnenbadge, Ladeplatzhalter, Farbe | nur die Zahl in Mono (Wörter `sr-only`); „Bühne: Finanzvorstand“; Platzhalter Rückstand; aktuelle Zeit Grau Mono; gewählte Zeile Akzent 50 + Balken, Text ungefärbt |
+| R3 | Ansage wiederholt sich nicht nach ruhiger Phase | `applyResult` leert die Region ohne neuen Wechsel; Test W11 auf Seitenebene (`feed.test.ts`) |
+| R4 | Verweigerter Leser liest alle 15 s | nach `forbidden` kein Intervall, keine Änderungs- oder Neuleselesung bis zum nächsten Feed (Personenwechsel); Test |
+| R5 | gefilterte älteste neben fremder Nummer | Hauptreferenz nur, wenn `items[0].ageSeconds === oldestOpen.ageSeconds`, sonst alle unter „Danach die ältesten“; Test W4 |
+| R6 | W10 | Annahme bei W10 vermerkt; Stolperdraht unter `CI` als Warnhinweis (beste Reihe ≥ 50 ms → `::warning`), nicht als Fehler: der erste CI-Lauf (37468958219) maß 57,7 ms bei gleichzeitig laufenden Paket-Suiten; Entscheidung des Orchestrators, Abhilfe Zwischenspeicher vor Rollout |
+| R7 | `lastFocused` | bei Fokuswechsel aus der Liste gelöscht; `focus({ preventScroll: true })` |
+| R10 | globales Escape | ignoriert Kopfzeile der Shell, Eingabefelder, `[role="menu"]` |
+| R8, R9, R12, R13, D14, D17 | — | Folgeliste |
+
+**Nachweise:** Web `Tests 977 passed (977)`; `061-leitstand.spec.ts` `--repeat-each=3` `21 passed (1.6m)`, axe 0 serious/critical; sechs
+Bilder neu (`bf4d92b`). Die volle `in-process`-Suite lief nicht erneut (Teil-B-Änderungen nur unter `features/cockpit/**` und der
+eigenen e2e-Datei; letzte volle Suite vor der Nacharbeit 192 passed).
+
+**Gates** (`pnpm gates` auf sauberem Baum, Commit `bf4d92b`, Datenbank `hv_test_s061b`, erster Lauf):
+
+```
+packages/domain test:       Tests  519 passed (519)
+apps/web test:       Tests  977 passed (977)
+apps/api test:       Tests  700 passed (700)
+slice-scope: 38 changed file(s), all within "docs/slices/061-leitstand.md"'s "Files allowed" list (101 pattern(s)).
+metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
+# tests 358
+# pass 358
+# fail 0
+✓ built in 2.57s
+mark-test-run: wrote /home/user/wt/s061b/.claude/state/last-test-run (clean tree) at commit bf4d92b, tree c01159ddb58e…
+```
+
+**Offen:** CI `e2e-http` (Lauf, Job, Dauer); Seed-Streuung (eigener Takt des Orchestrators).
+
+### Nacharbeit Teil B nach CI e2e-http und Codex (06.10.2026)
+
+- **S7 im Projekt `http`** (Lauf 37469905992 auf `ad871f7`): `asRole` wartet auf den Kopfzähler, den die Shell bei 640 px ausblendet.
+  S7 öffnet den Leitstand jetzt in normaler Breite und zoomt danach auf 640 × 450; geprüft werden eine Spalte (Hauptlesung und
+  erste Karte übereinander, linke Kanten bündig) und kein waagrechtes Scrollen. `roles.ts` unverändert.
+- **Codex P2** (`Page.tsx`): eine nicht verweigerte, gescheiterte Lesung der Historie (Netz, 5xx) ließ den Faden wie den Zustand
+  „ohne `history.read`“ aussehen. `settleThread` (lib.ts) wertet beide Lesungen aus: Verweigerung bleibt ein Zustand, jedes andere
+  Scheitern macht den Faden gescheitert, mit Regel-id und „Erneut laden“ (`cockpit-thread-retry`). Tests zuerst (`67ce6b4`, rot:
+  `Tests 4 failed | 42 passed (46)`), danach grün (`ab0a44d`).
+- Nachweise: `061-leitstand.spec.ts` in-process `--repeat-each=3` `21 passed (1.8m)`, axe 0 serious/critical; Bilder unverändert
+  (keine sichtbare Änderung). `pnpm gates` auf `ab0a44d` grün: domain `555 passed`, web `1040 passed`, api `710 passed`,
+  `slice-scope: 38 changed file(s), all within …`, Skripte `# pass 358 # fail 0`, `mark-test-run: … (clean tree) at commit ab0a44d`.
 
 ## Review findings
 
