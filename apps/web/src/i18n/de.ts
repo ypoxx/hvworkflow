@@ -3,7 +3,7 @@
  * key is a compile error (AGENTS.md rule 10). Wording follows the house vocabulary in
  * docs/glossar.md; no literal strings may appear in components.
  * 
- * The dictionary is split into feature modules (shell, speakers, capture, answers, stage, history, steering, focus).
+ * The dictionary is split into feature modules (shell, speakers, capture, answers, stage, history, steering, focus, cockpit).
  * Each new key belongs to the module corresponding to its feature prefix; new feature modules are
  * added to the module list below and in parity.test.ts.
  */
@@ -16,6 +16,7 @@ import { stageDe } from './stage.de';
 import { historyDe } from './history.de';
 import { steeringDe } from './steering.de';
 import { focusDe } from './focus.de';
+import { cockpitDe } from './cockpit.de';
 
 export const de = {
   ...shellDe,
@@ -26,4 +27,5 @@ export const de = {
   ...historyDe,
   ...steeringDe,
   ...focusDe,
+  ...cockpitDe,
 } as const;

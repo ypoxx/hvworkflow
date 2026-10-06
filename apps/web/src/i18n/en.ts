@@ -11,6 +11,7 @@ import { stageEn } from './stage.en';
 import { historyEn } from './history.en';
 import { steeringEn } from './steering.en';
 import { focusEn } from './focus.en';
+import { cockpitEn } from './cockpit.en';
 
 export const en: Dictionary = {
   ...shellEn,
@@ -21,4 +22,5 @@ export const en: Dictionary = {
   ...historyEn,
   ...steeringEn,
   ...focusEn,
+  ...cockpitEn,
 };

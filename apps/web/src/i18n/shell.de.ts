@@ -48,6 +48,7 @@ export const shellDe = {
   'nav.focus': 'Meine Fragen',
   'nav.stage': 'Bühne',
   'nav.history': 'Historie & Suche',
+  'nav.cockpit': 'Leitstand',
   // --- 005 design system ---
   'process.segment.captured': 'Erfasst',
   'process.segment.drafting': 'In Arbeit',
@@ -156,6 +157,8 @@ export const shellDe = {
   'page.stage.description': 'Podiumsansicht: freigegebene Antwort vorlesen und abschließen.',
   'page.history.title': 'Historie & Suche',
   'page.history.description': 'Vorgangshistorie und Volltextsuche über den gesamten Bestand.',
+  'page.cockpit.title': 'Leitstand',
+  'page.cockpit.description': 'Lage der Einzelfragen auf einen Blick: was am längsten wartet, wo es sich staut, wie sich die Lage entwickelt.',
   'page.notFound.title': 'Bereich nicht gefunden',
   'page.notFound.description': 'Diese Adresse gehört zu keinem Bereich des Werkzeugs.',
   'page.notFound.back': 'Zurück zu den Wortmeldungen',

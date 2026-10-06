@@ -50,6 +50,7 @@ export const shellEn: typeof shellDe = {
   'nav.focus': 'My questions',
   'nav.stage': 'Podium',
   'nav.history': 'History & search',
+  'nav.cockpit': 'Cockpit',
   // --- 005 design system ---
   'process.segment.captured': 'Captured',
   'process.segment.drafting': 'Drafting',
@@ -158,6 +159,8 @@ export const shellEn: typeof shellDe = {
   'page.stage.description': 'Podium view: read out the approved answer and close it.',
   'page.history.title': 'History & search',
   'page.history.description': 'History of each question and full-text search across the corpus.',
+  'page.cockpit.title': 'Cockpit',
+  'page.cockpit.description': 'The questions at a glance: what waits longest, where it backs up, how things develop.',
   'page.notFound.title': 'Part not found',
   'page.notFound.description': 'This address does not belong to any part of the tool.',
   'page.notFound.back': 'Back to the requests to speak',
