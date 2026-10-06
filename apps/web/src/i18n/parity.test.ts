@@ -18,6 +18,8 @@ import { focusDe } from './focus.de';
 import { focusEn } from './focus.en';
 import { adminDe } from './admin.de';
 import { adminEn } from './admin.en';
+import { cockpitDe } from './cockpit.de';
+import { cockpitEn } from './cockpit.en';
 import { de } from './de';
 import { en } from './en';
 
@@ -65,6 +67,7 @@ const modules: Array<{
   { name: 'steering', de: steeringDe as Record<string, string>, en: steeringEn as Record<string, string>, prefixes: ['steering'] },
   { name: 'focus', de: focusDe as Record<string, string>, en: focusEn as Record<string, string>, prefixes: ['focus'] },
   { name: 'admin', de: adminDe as Record<string, string>, en: adminEn as Record<string, string>, prefixes: ['admin'] },
+  { name: 'cockpit', de: cockpitDe as Record<string, string>, en: cockpitEn as Record<string, string>, prefixes: ['cockpit'] },
 ];
 
 describe('i18n parity checks', () => {
