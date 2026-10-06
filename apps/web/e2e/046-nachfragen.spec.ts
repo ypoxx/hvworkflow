@@ -14,6 +14,8 @@
  */
 import type { Page } from '@playwright/test';
 import { CORPUS_DEMO } from '@hv/domain';
+import { API_MODULE, loadAppModules } from './support/app-modules';
+import type { AppModulesWindow } from './support/app-modules';
 import { checkAxe } from './support/axe';
 import { FOLLOW_UP_046_FREE_QUESTION, FOLLOW_UP_046_QUESTION, FOLLOW_UP_046_SEARCH, FOLLOW_UP_046_SPEECH } from './support/e2e-texts';
 import { evidence } from './support/evidence';
@@ -236,11 +238,15 @@ test('E3 keyboard and axe: Alt+B focuses the search, Escape returns to the butto
  * `http`: the questions of a Redebeitrag answer 1.5 s late (the window of one slow HTTP round, made deterministic); E1
  * left a Redebeitrag on the speaker at the microphone, so the preselected Wortmeldung has one. Reads only, no state left.
  * `in-process`: there is no network to delay; the window is a few microtasks. The case still runs there, a Redebeitrag is
- * captured first and the page is mounted afresh. In both projects a MutationObserver installed before the page loads
+ * captured first and the page is mounted afresh. For the evidence image of the skeleton the test patches the in-process
+ * `api.listQuestions` from the page (the pattern of 010b/028, no product hook) and holds the questions of a Redebeitrag
+ * until it releases them; the images of the stable state (DE/EN) follow (Codex P1 on #174). In both projects a MutationObserver installed before the page loads
  * records any appearance of the form, however short, so the check does not depend on polling into the window; in-process
  * it is red without the takt-054 fix (verified 06.10.2026, 3 of 3 runs), not a mere smoke check.
  */
-test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load', async ({ page }) => {
+type HoldWindow = Window & { __releaseQuestions?: () => void; __questionsHeld?: number };
+
+test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load @screenshot', async ({ page }) => {
   await page.addInitScript(() => {
     const flag = window as unknown as { __captureFormSeen: boolean };
     flag.__captureFormSeen = false;
@@ -281,6 +287,24 @@ test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its qu
     await page.getByTestId('nav-speakers').click();
     await expect(page).toHaveURL(/\/speakers$/);
     await expect(fresh).toHaveCount(0);
+    // Hold the questions of a Redebeitrag until the test releases them: the in-process twin of the delayed HTTP read.
+    await loadAppModules(page, [API_MODULE]);
+    await page.evaluate((url) => {
+      type Api = Record<string, (...args: unknown[]) => Promise<unknown>>;
+      const { api } = (window as unknown as AppModulesWindow).__appModules!.modules[url] as { api: Api };
+      const w = window as unknown as HoldWindow;
+      const original = api['listQuestions']!.bind(api);
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      w.__releaseQuestions = () => release();
+      w.__questionsHeld = 0;
+      api['listQuestions'] = (...args: unknown[]) => {
+        const filter = args[0] as { contributionId?: string } | undefined;
+        if (filter?.contributionId === undefined) return original(...args);
+        w.__questionsHeld = (w.__questionsHeld ?? 0) + 1;
+        return gate.then(() => original(...args));
+      };
+    }, API_MODULE);
     await page.evaluate(() => { (window as unknown as { __captureFormSeen: boolean }).__captureFormSeen = false; });
   }
 
@@ -295,9 +319,29 @@ test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its qu
       })
       .toBeGreaterThan(0);
     await expect(fresh).toHaveCount(0);
+  } else {
+    // Inside the held window: the skeleton, not the form (takt-054-erfassung-geruest-de.png).
+    await expect.poll(() => page.evaluate(() => (window as unknown as HoldWindow).__questionsHeld ?? 0)).toBeGreaterThan(0);
+    const skeleton = page.getByTestId('capture-contribution-pane').getByRole('status').filter({ hasText: 'Redebeitrag wird geladen' });
+    await expect(skeleton).toHaveCount(1);
+    await expect(fresh).toHaveCount(0);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('takt-054-erfassung-geruest-de.png') });
+    await page.evaluate(() => (window as unknown as HoldWindow).__releaseQuestions?.());
   }
   await expect(another).toBeVisible({ timeout: 30_000 });
   await expect(fresh).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __captureFormSeen: boolean }).__captureFormSeen)).toBe(false);
+  if (!isHttp()) {
+    // The corrected stable state: the existing Redebeitrag, "Weiterer Redebeitrag", no empty form (E2 of takt-054, R2).
+    await expect(page.getByTestId('capture-contribution-text')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('takt-054-erfassung-stabil-de.png') });
+    await setLang(page, 'en');
+    await expect(another).toBeVisible();
+    await expect(fresh).toHaveCount(0);
+    await page.screenshot({ path: evidence('takt-054-erfassung-stabil-en.png') });
+    await setLang(page, 'de');
+  }
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
