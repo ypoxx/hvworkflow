@@ -49,9 +49,13 @@ const FORBIDDEN_NAMES = [
  *  tracks, numbers, answer text — is byte-identical to the pre-change seed (review round 2, item 2).
  *  Slice 080 removed the kind (Art) and requested speaking time (Redezeit) from the seed payload;
  *  both are stripped here, so the fingerprint still proves the random sequence is unchanged.
+ *  takt-052 may change only times (the seed compresses them into the 90 minutes before `now`), so
+ *  every `at` and every answer `createdAt` is masked too; everything else must stay byte-identical.
  */
 function maskNames(json: string): string {
   return json
+    .replace(/"at":"[^"]*"/g, '"at":"<time>"')
+    .replace(/"createdAt":"[^"]*"/g, '"createdAt":"<time>"')
     .replace(/"kind":"[a-z]+",/g, '')
     .replace(/,"requestedMinutes":\d+/g, '')
     .replace(/"displayName":"[^"]*"/g, '"displayName":"<masked>"')
@@ -118,7 +122,10 @@ function fingerprintOf(events: readonly unknown[]): string {
 // Slice 080: recomputed with the extended `maskNames` on the pre-080 seed (seed.ts before 080, which
 // still wrote `kind` and the speaking time); the post-080 seed gives the same value, so the random
 // draw sequence is unchanged. Before 080 the value was '14306754d3352f'.
-const PRE_CHANGE_FINGERPRINT = '1bac7aa18a9d88';
+// takt-052: recomputed with `maskNames` now also masking `at` and `createdAt` (placeholder `<time>`) on
+// the pre-052 seed (commit 68c87d9); the post-052 seed, whose times are compressed into the 90 minutes
+// before `now`, gives the same value, so only times changed. Before takt-052 the value was '1bac7aa18a9d88'.
+const PRE_CHANGE_FINGERPRINT = 'f28ff6ae63fc7';
 
 describe('seed corpus: no real association, family or public-figure names (takt-004)', () => {
   const events = seedEvents(OPTIONS);
