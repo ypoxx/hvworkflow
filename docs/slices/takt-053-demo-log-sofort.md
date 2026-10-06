@@ -1,6 +1,6 @@
 # takt-053 — Demo-Ereignisprotokoll beim Verlassen der Seite sofort schreiben
 
-**Status:** spec · **Risikoklasse:** niedrig (nur Demo-Betriebsart im Browser; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug, keine Workflows. Leitplanken §4) · ca. 0,5 AStd · **Lanes:** web-api
+**Status:** gebaut · **Risikoklasse:** niedrig (nur Demo-Betriebsart im Browser; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug, keine Workflows. Leitplanken §4) · ca. 0,5 AStd · **Lanes:** web-api
 **Rolle:** Orchestrator baut (kleiner Takt); Review in frischem Kontext
 **Regeln:** AGENTS.md R1, R2, R3, R7 (das Protokoll wird nur geschrieben, nie verändert), R12. Keine Rule ids aus `transitions.ts`.
 **Depends on:** – · **Glossar: neue Begriffe:** nein
@@ -19,8 +19,9 @@ aus, darf es den alten Stand nicht zurückschreiben; mit einem Sofort-Schreiben 
 
 1. Das verzögerte Schreiben bleibt (ein Schub von Ereignissen wird einmal geschrieben), aber ein ausstehender Stand wird
    bei `pagehide` und bei `visibilitychange` nach `hidden` sofort geschrieben.
-2. `resetDemo()` verwirft ein ausstehendes Schreiben, bevor es den Schlüssel löscht.
-3. Die Logik steckt in einer kleinen, testbaren Funktion `createDebouncedSaver` mit `save`, `flush`, `cancel`.
+2. `resetDemo()` verwirft ein ausstehendes Schreiben und schaltet den Schreiber ab (`stop`), bevor es den Schlüssel
+   löscht; auch ein Schreiben, das zwischen Löschen und Entladen angestoßen wird, schreibt nichts mehr.
+3. Die Logik steckt in einer kleinen, testbaren Funktion `createDebouncedSaver` mit `save`, `flush`, `cancel`, `stop`.
 
 ## Nicht-Ziele
 
@@ -41,3 +42,23 @@ aus, darf es den alten Stand nicht zurückschreiben; mit einem Sofort-Schreiben 
 - `apps/web/src/api/index.ts` (nur `saveLog`, die Anmeldung der Ereignisse, `resetDemo`)
 - `docs/slices/takt-053-demo-log-sofort.md`
 - `docs/folgeliste.md` (nur den 060-Eintrag zum Demo-Protokoll als erledigt markieren)
+
+## Bericht
+
+- Gebaut vom Orchestrator; Spec 674c284, Umsetzung ffb6cbf, Review-Nacharbeit im Folge-Commit.
+- Rot zuerst: `demoLogSaver.test.ts` scheiterte ohne Modul (`Cannot find module './demoLogSaver'`), der `stop`-Fall
+  scheiterte vor der Nacharbeit (1 failed | 5 passed); danach grün.
+- `pnpm gates` grün auf ffb6cbf (domain 519, web 929, api 700; slice-scope 4 Dateien). Lauf auf dem Nacharbeits-Commit
+  steht in der PR-Beschreibung.
+- Review (frischer Kontext, Sonnet, niedriges Risiko): kein Blocker, kein Major. Minor 1 (Reset durch spätes Schreiben
+  rückgängig) behoben mit `stop`; Test-Nits (`afterEach` für echte Uhr, `save` nach `cancel`) übernommen.
+
+## Offen
+
+- Bekannte Grenze, kein Ziel dieses Takts: mehrere Tabs desselben Browsers schreiben das ganze Protokoll unter einem
+  Schlüssel, der letzte Schreiber gewinnt. Mit dem Sofort-Schreiben beim Verbergen eines Tabs tritt das häufiger ein.
+  Die Demo ist für ein Gerät und einen Tab gedacht.
+- Die Verdrahtung in `index.ts` (Anmeldung der Ereignisse, `stop` vor dem Löschen) hat keinen eigenen Test; die
+  Reihenfolge hält der Code.
+- `docs/folgeliste.md` hat auf dieser Basis keinen 060-Eintrag zum Demo-Protokoll (er liegt im Branch von 060); er wird
+  beim Doku-Pass als erledigt geführt.

@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDebouncedSaver } from './demoLogSaver';
 
 /** takt-053: the demo log is written late, but never lost on leaving the page, and never revived by a reset. */
 describe('takt-053 createDebouncedSaver', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('writes the last value of a burst once after the delay', () => {
     vi.useFakeTimers();
     const write = vi.fn();
@@ -45,5 +47,29 @@ describe('takt-053 createDebouncedSaver', () => {
     vi.advanceTimersByTime(500);
     expect(write).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it('stop drops a pending value and ignores every later save and flush (a reset is never undone)', () => {
+    vi.useFakeTimers();
+    const write = vi.fn();
+    const saver = createDebouncedSaver<string>(write, 150);
+    saver.save('old');
+    saver.stop();
+    saver.save('late');
+    saver.flush();
+    vi.advanceTimersByTime(500);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('a save after cancel writes only the new value', () => {
+    vi.useFakeTimers();
+    const write = vi.fn();
+    const saver = createDebouncedSaver<string>(write, 150);
+    saver.save('old');
+    saver.cancel();
+    saver.save('new');
+    vi.advanceTimersByTime(150);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenLastCalledWith('new');
   });
 });

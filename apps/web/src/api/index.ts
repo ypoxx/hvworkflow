@@ -193,8 +193,8 @@ async function bindDemoActors(): Promise<void> {
 /** Wipe this device's demo data and reload with a fresh corpus. */
 export function resetDemo(): void {
   if (!DEMO_MODE) return;
-  // A pending write must not bring the old log back after it is deleted (takt-053).
-  logSaver.cancel();
+  // Neither a pending write nor one queued before the reload unloads the page may bring the old log back (takt-053).
+  logSaver.stop();
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
