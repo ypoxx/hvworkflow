@@ -6,5 +6,13 @@
     "reason": "High-severity CPU-exhaustion advisory in js-yaml, pulled in transitively via openapi-typescript > @redocly/openapi-core. Both are build-time-only devDependencies (contract lint/type generation); js-yaml never parses untrusted input at runtime here. Bumping openapi-typescript is an unrelated dependency change outside this slice's Files allowed (docs/slices/012-architektur-sicherheitstore.md).",
     "owner": "Umsetzer",
     "expires": "2026-12-31"
+  },
+  {
+    "id": 1241209,
+    "githubAdvisoryId": "GHSA-68fv-2mgg-jv7q",
+    "module": "source-map-js",
+    "reason": "High-severity event-loop DoS (indexed source-map section offsets) in source-map-js <1.2.2, locked 1.2.1. Reachable only at build/test time: pulled in via postcss (vite, vitest, @vitejs/plugin-react) and @tailwindcss/vite, all devDependencies; `pnpm why source-map-js -r --prod` is empty and apps/web dist contains no source-map-js code. It only parses source maps produced by our own build, never untrusted input at runtime. Patched 1.2.2 (published 2026-09-30T14:08Z) is younger than minimumReleaseAge until 2026-10-07T14:08Z; a follow-up bumps it without a minimumReleaseAgeExclude entry and removes this exception (docs/slices/takt-051-source-map-js-ausnahme.md).",
+    "owner": "Umsetzer",
+    "expires": "2026-10-14"
   }
 ]
