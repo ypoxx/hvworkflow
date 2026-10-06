@@ -329,3 +329,17 @@ Belegbilder (freiwillig; Leitstand-Oberfläche nicht gemergt).
 `apps/api/src/__tests__/metrics033b.test.ts` (Nachtrag), `docs/folgeliste.md`, `docs/slices/takt-052-seed-zeiten.md`.
 
 ## Review findings
+
+### Gates nach dem Einmischen der Basis (Codex P1 auf #173)
+
+`pnpm gates` lief nach dem Einmischen von 046 (Merge-Commit **228d237**, Basis fd6ebd7) auf sauberem Baum, mit hv_test_t052 und aktiven Postgres-Tests. Danach kamen nur Doku-Commits (85a726d und dieser). Echter Schluss:
+
+```
+packages/domain test:       Tests  562 passed (562)
+apps/web test:       Tests  984 passed (984)
+apps/api test:       Tests  710 passed (710)
+slice-scope: warning — "docs/slices/takt-052-seed-zeiten.md"'s "Files allowed" section differs from its version at the commit that introduced it (016b117).
+slice-scope: 7 changed file(s), all within "docs/slices/takt-052-seed-zeiten.md"'s "Files allowed" list (9 pattern(s)).
+✓ built in 1.83s
+mark-test-run: wrote /home/user/wt/takt052/.claude/state/last-test-run (clean tree) at commit 228d237, tree 4de63309ce71…
+```
