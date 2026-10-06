@@ -381,7 +381,8 @@ describe('QuestionDetail with the draft buffer (Scheibe 060, U6)', () => {
     const { buffer } = await bufferWith(plainInput('Antwort eins. Gepuffert060.'), 1);
     const html = renderWith(record([v(1, 'Antwort eins.'), v(2, 'Antwort zwei.')]), buffer);
     expect(html).toContain('data-testid="answer-editor-rebase"');
-    expect(html).toMatch(/data-testid="answer-editor-rebase"[\s\S]*?<button[^>]*>Vergleichen<\/button>/);
+    const compareLabel = translate('de', 'answers.editor.compare');
+    expect(html).toMatch(new RegExp(`data-testid="answer-editor-rebase"[\\s\\S]*?<button[^>]*>${compareLabel}</button>`));
     expect(html).not.toContain(translate('de', 'stale.reload'));
   });
 

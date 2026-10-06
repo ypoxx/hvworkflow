@@ -165,7 +165,8 @@ describe('WritingMode with the comparison (Scheibe 060, U7)', () => {
 
   it('the notice carries "Vergleichen" instead of "Neu laden"', () => {
     const html = render(question(), { text: 'mein Text', rebase: true });
-    expect(html).toMatch(/data-testid="focus-rebase"[\s\S]*?<button[^>]*>Vergleichen<\/button>/);
+    const compareLabel = translate('de', 'answers.editor.compare');
+    expect(html).toMatch(new RegExp(`data-testid="focus-rebase"[\\s\\S]*?<button[^>]*>${compareLabel}</button>`));
     expect(html).not.toContain(translate('de', 'stale.reload'));
   });
 

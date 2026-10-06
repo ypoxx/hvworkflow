@@ -48,7 +48,7 @@ describe('CompareVersions (U5)', () => {
     expect(html).toContain('data-testid="compare-mine"');
     expect(html).toContain('data-testid="compare-theirs"');
     expect(html).toMatch(/data-testid="compare-theirs-head"[\s\S]*?<span class="font-mono[^"]*">2<\/span>/);
-    expect(html).toMatch(/data-testid="compare-theirs-head"[\s\S]*?<span class="font-mono[^"]*">\d\d:\d\d<\/span>/);
+    expect(html).toMatch(/data-testid="compare-theirs-head"[\s\S]*?<span class="font-mono[^"]*">[0-9]{2}:[0-9]{2}<\/span>/);
     expect(html).toContain('Recht Eins');
     expect(html).toContain(translate('de', 'answers.compare.takeTheirsHint'));
     expect(html).toContain(translate('de', 'answers.compare.keepMine'));
@@ -65,7 +65,8 @@ describe('CompareVersions (U5)', () => {
 
   it('the left column renders the input form through previewAnswer (runs without marks, an empty paragraph)', () => {
     const html = render();
-    expect(html).toMatch(/data-testid="compare-mine"[\s\S]*?<p>Meine <strong>Fassung<\/strong><\/p>/);
+    const [first, second] = ['Meine', 'Fassung'];
+    expect(html).toMatch(new RegExp(`data-testid="compare-mine"[\\s\\S]*?<p>${first} <strong>${second}</strong></p>`));
     expect(html).toContain('GB S. 4');
     expect(html).toContain('GB S. 9');
   });
