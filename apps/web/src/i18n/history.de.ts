@@ -73,4 +73,15 @@ export const historyDe = {
   'history.forward.reason.expertise_elsewhere': 'Fachwissen liegt in einem anderen Fachbereich',
   'history.forward.reason.capacity': 'Auslastung',
   'history.forward.reason.other': 'Sonstiges',
+  // Scheibe 046: the thread block (Bezug) and the timeline line of a QuestionLinked.
+  'history.thread.title': 'Bezug',
+  'history.thread.parent': 'Bezugsfrage',
+  'history.thread.hidden.follow_up': 'Nachfrage zu einer nicht sichtbaren Frage',
+  'history.thread.hidden.clarification': 'Klarstellung zu einer nicht sichtbaren Frage',
+  'history.thread.answerVersion': 'bezieht sich auf die vorgelesene Antwortversion',
+  'history.thread.children': 'Nachfragen und Klarstellungen ({count})',
+  'history.thread.loading': 'Bezug wird geladen',
+  'history.thread.error': 'Der Bezug konnte nicht geladen werden.',
+  'history.payload.linked.follow_up': 'Als Nachfrage erfasst',
+  'history.payload.linked.clarification': 'Als Klarstellung erfasst',
 };

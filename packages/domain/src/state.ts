@@ -3,7 +3,7 @@
  * state; `project(events)` folds the whole log. Rebuilding from scratch is cheap at HV volume
  * (a few thousand events).
  */
-import type { DomainEvent } from './events.js';
+import type { DomainEvent, EventType } from './events.js';
 import type {
   AgendaItem,
   Contribution,
@@ -17,7 +17,7 @@ import type {
   StageSeat,
   Unit,
 } from './types.js';
-import { QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
+import { QUESTION_RELATIONS, QUESTION_STATUSES, STAGE_ASSIGNMENTS } from './types.js';
 import { computeCoverage } from './coverage.js';
 import { projectAnswerBody } from './answerFormat.js';
 
@@ -45,6 +45,19 @@ export interface State {
   /** Highest stage position handed out so far; the queue is ordered by it. */
   stageCounter: number;
   lastSeq: number;
+  /**
+   * Scheibe 046 (R-LINK-02, rule e): type, subject and command of the event of this meeting reduced
+   * last, applied or not. A `QuestionLinked` takes effect only right after the `QuestionCaptured` of
+   * the same question. Events of another meeting (the early return in `reduce`) leave it alone.
+   */
+  lastReduced: ReducedMark | null;
+}
+
+/** Scheibe 046: what `reduce` remembers of the event it reduced last (rule e of R-LINK-02). */
+export interface ReducedMark {
+  readonly type: EventType;
+  readonly subjectId: string;
+  readonly commandId?: string;
 }
 
 export function emptyState(): State {
@@ -60,6 +73,7 @@ export function emptyState(): State {
     questions: new Map(),
     stageCounter: 0,
     lastSeq: 0,
+    lastReduced: null,
   };
 }
 
@@ -142,6 +156,8 @@ export function reduce(state: State, e: DomainEvent): State {
   // The unscoped demo alias follows the latest meeting even when an older meeting receives
   // another event later in the same global log. Scoped projections already filter by meetingId.
   if (e.type !== 'MeetingCreated' && state.meeting && e.meetingId !== state.meeting.id) return state;
+  // Scheibe 046: read before the switch, overwritten after it, so a `QuestionLinked` sees its predecessor.
+  const previous = state.lastReduced;
   switch (e.type) {
     case 'MeetingCreated': {
       if (state.meeting?.id === e.subjectId) throw new Error('R-MTG-01: meeting already exists.');
@@ -363,6 +379,30 @@ export function reduce(state: State, e: DomainEvent): State {
       }
       break;
     }
+    case 'QuestionLinked': {
+      // 'R-LINK-02': a reference arises only with the capture, once, and never changes. Held here also
+      // against a forged or faulty log; a violating event stays without effect and never throws, so
+      // loading and the chain check of a stored log cannot fail on it (R7).
+      const q = state.questions.get(e.subjectId);
+      const p = e.payload;
+      if (!q || q.parentQuestionId !== undefined || q.relation !== undefined) break; // (a) exists, (b) no reference yet
+      if (typeof p.parentQuestionId !== 'string' || p.parentQuestionId === e.subjectId) break; // (d) not itself
+      if (!state.questions.has(p.parentQuestionId)) break; // (c) parent in this projection (this meeting)
+      // (e) right after the QuestionCaptured of the same question, in the same command if both carry one.
+      // This orders the parent before the child, so a thread is free of cycles.
+      if (previous?.type !== 'QuestionCaptured' || previous.subjectId !== e.subjectId) break;
+      if (previous.commandId !== undefined && e.commandId !== undefined && previous.commandId !== e.commandId) break;
+      // (f) a known relation and, if present, an answer version that is an integer >= 1.
+      if (!(QUESTION_RELATIONS as readonly string[]).includes(p.relation)) break;
+      if (p.parentAnswerVersion !== undefined && !(Number.isInteger(p.parentAnswerVersion) && p.parentAnswerVersion >= 1)) break;
+      q.parentQuestionId = p.parentQuestionId;
+      q.relation = p.relation;
+      if (p.parentAnswerVersion !== undefined) q.parentAnswerVersion = p.parentAnswerVersion;
+      // Only the child moves; the parent, the contribution and the speaker request stay untouched, so
+      // nobody working on the parent gets a 412 from a new follow-up question.
+      touch(q, e.at);
+      break;
+    }
     case 'ContributionClaimed': {
       const c = state.contributions.get(e.subjectId);
       if (!c) break;
@@ -519,6 +559,10 @@ export function reduce(state: State, e: DomainEvent): State {
       if (!q) break;
       q.status = 'delivered';
       q.deliveredAt = e.at;
+      // Scheibe 046: "last delivered with a version". A later delivery without a version (podium path)
+      // keeps the old value; returns, withdrawals and new versions never clear it.
+      const delivered = e.payload.answerVersion;
+      if (typeof delivered === 'number' && Number.isInteger(delivered) && delivered >= 1) q.deliveredAnswerVersion = delivered;
       touch(q, e.at);
       break;
     }
@@ -548,6 +592,7 @@ export function reduce(state: State, e: DomainEvent): State {
       break;
     }
   }
+  state.lastReduced = { type: e.type, subjectId: e.subjectId, ...(e.commandId !== undefined ? { commandId: e.commandId } : {}) };
   refreshCounts(state);
   return state;
 }

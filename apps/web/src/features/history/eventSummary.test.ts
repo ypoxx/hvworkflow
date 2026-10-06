@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AnswerDrafted, QuestionApproved, QuestionForwarded, RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
+import type { AnswerDrafted, QuestionApproved, QuestionForwarded, QuestionLinked, RoleAssigned, RoleRevoked, SpeakerRegistered } from '@hv/domain';
 import { eventLabel, eventTypeLabel, translate } from '../../i18n';
 import { eventSubject, eventSummary, refusalVersionsOf, type SummaryContext } from './eventSummary';
 
@@ -200,3 +200,25 @@ describe('Scheibe 048, W1: history row of a forward to another answering unit', 
     expect(eventSummary(en, future, units)).toBe('Answering unit: Finanzen und Controlling → unit-new · Reason: reorganisation');
   });
 });
+
+/* Scheibe 046, W5: a QuestionLinked is summarised from its read payload { relation } only. */
+describe('history summary of QuestionLinked', () => {
+  const tEn = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params);
+  const linked = (relation: string): QuestionLinked => ({
+    seq: 10, id: 'event-linked', type: 'QuestionLinked', at: '2027-04-20T10:31:00.000Z',
+    actor: { id: 'capture-1', role: 'capture' }, subjectId: 'q-31',
+    // The read path carries the relation only (maskEvent); the summary must not need anything else.
+    payload: { relation } as unknown as QuestionLinked['payload'],
+  });
+  it('both relations in German and English, an unknown code as the code; the label is the event name', () => {
+    const none = context(new Map());
+    expect(eventSummary(t, linked('follow_up'), none)).toBe('Als Nachfrage erfasst');
+    expect(eventSummary(t, linked('clarification'), none)).toBe('Als Klarstellung erfasst');
+    expect(eventSummary(tEn, linked('follow_up'), none)).toBe('Captured as a follow-up question');
+    expect(eventSummary(tEn, linked('clarification'), none)).toBe('Captured as a clarification');
+    expect(eventSummary(t, linked('duplicate'), none)).toBe('duplicate');
+    expect(eventTypeLabel(t, 'QuestionLinked')).toBe('Bezug gesetzt');
+    expect(eventTypeLabel(tEn, 'QuestionLinked')).toBe('Reference set');
+  });
+});
+

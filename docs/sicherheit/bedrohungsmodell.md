@@ -335,6 +335,7 @@ Weitere Scheiben mit Sicherheitsbezug:
 | 040 Administration im Kern (040a: Inhaltsrechte, R-ADM-07, R-ADM-08; Rest 040b–d) | T-G1-E-04 (Inhaltsteil mit 040a; Override 040d) | MF-01 |
 | 044 Verweigerung (044a Kern: Rechte, R-GUARD-08/-09/-11/-12/-13/-14, Maskierung der Begründung und des Vermerks; 044b Dienst und HTTP-Probe, gebaut: `refusal044b.test.ts` Tests 1–16, `postgres-refusal044b.test.ts` P1–P5; Zugriffslog unverändert) | SG2 für Verweigerungen; T-G1-E-03 für Verweigerungen (R-GUARD-08) | T-G1-E-02, T-G1-E-04, T-G1-I-01, T-G1-I-02, T-G1-I-04, T-G1-I-09, MF-01, MF-07 |
 | 048 An anderen Fachbereich weiterleiten (Recht `question.forward` für `coordination` und `expert`, R-TRANS-17, R-GUARD-15, Ereignis `QuestionForwarded` mit geschlossenem Grundcode; gebaut: `packages/domain/src/__tests__/forward048.test.ts` Tests 1–15, `apps/api/src/__tests__/forward048.test.ts` H1–H9, `postgres-forward048.test.ts` P1–P2; Zugriffslog unverändert) | — (MF-14 neu) | T-G1-E-01, T-G1-I-01 (Leserkreis wächst um die Zieleinheit), T-G1-I-09 (Strom: `QuestionForwarded` in `SCOPE_EXIT_EVENTS`), MF-01 |
+| 046 Nachfragen-Threads (Vertrag 0.4.5: `parentQuestionId`/`relation` beim Erfassen, Ereignis `QuestionLinked`, Filter `parentQuestionId`; R-LINK-01 mit gleichlautender 422 ohne id, R-LINK-02 im Reduzierer; Bezugs-id und `parentAnswerVersion` nur für Leser der Bezugsfrage, nie auf der Bühne, in jedem Ereignis-Lesepfad entfernt; Strom nur mit dem Kind; gebaut: `packages/domain/src/__tests__/link046.test.ts` Tests 1–17, `apps/api/src/__tests__/link046.test.ts` H1–H7, `postgres-link046.test.ts` P1–P2; kein neues Recht, Zugriffslog unverändert) | — (MF-15 neu) | T-G1-I-01, T-G1-I-09, T-G1-E-01 |
 | 055 Antwortformat, Teil a (Vertrag 0.4.4, Kern, Dienst: geschlossene Speicherform `AnswerBody`, Whitelist beim Schreiben und Lesen, Zeichenfilter für `\p{Cc}`/`\p{Cf}` in Dokument und `text` neuer Versionen und in der Begründung einer Verweigerung, einsames Ersatzzeichen 422, Validator-Meldung auf 20 Einzelfehler begrenzt; gebaut: `answerFormat055.test.ts` Kern und Dienst, `answerDraft055.test.ts`, `postgres-answerFormat055.test.ts`; nicht vor 055b in eine geteilte Umgebung) | T-G1-T-06 (Kernhälfte) | T-G1-D-01 (Problem-Meldung begrenzt) |
 | 055b Antwortformat, Renderer und Editor (ein Renderer aus der Projektion, Feld ohne HTML-Senke, Einfügen über `DOMParser` nur lesend, Semgrep `no-html-sink`; gebaut: `AnswerText.test.tsx`, `domToBody.test.ts`, `editorCommands.test.ts`, e2e `055b-antwortformat.spec.ts` A1–A6, A2b, H1; keine Auslieferungskonfiguration geändert, CSP der Web-Seite bleibt bei 037b) | T-G1-T-06 (Oberflächenhälfte) | — |
 | 061 Leitstand, Teil A (Vertrag 0.4.5: Leseoperation `getMeetingCockpit` mit eigenem Recht `cockpit.read` für moderation, coordination, admin, R-PERM-02; Referenzen nur über `can(actor, 'question.read', q)`; geschlossene Schemas ohne Text, Akteur, Redner, Claim; Bericht `leitstand` im Auswertungskatalog mit Tor-Regel (g); gebaut: `packages/domain/src/__tests__/cockpit061.test.ts` K1–K12, `apps/api/src/__tests__/cockpit061.test.ts` A1–A3, A5–A7, `postgres-cockpit061.test.ts` A4, `scripts/metrics-allowlist-check.test.mjs` G2/G3; Zugriffslog unverändert, Zeile mit `operationId` ohne Antwortinhalt) | — (MF-17 neu) | T-G1-I-01 (Anzeige), T-G2-D-03 (eine Faltung je Lesung), T-G3-I-03, MF-09 |
@@ -489,6 +490,24 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   Verweigerungsvorschlag ohne Begründung) ist gewollt; eine Attributregel für vertrauliche Fragen folgt mit 047.
 - *Nachweis:* `packages/domain/src/__tests__/forward048.test.ts` Tests 2, 3, 6, 7, 8a–8c, 11, 13; über HTTP
   `apps/api/src/__tests__/forward048.test.ts` H3, H4, H8, H9; auf Postgres `postgres-forward048.test.ts` P2.
+
+**MF-15 Bezug als Existenzorakel oder als Umweg zum Lesen** (046; verwandt T-G1-I-01, T-G1-I-09)
+- *Ablauf:* (1) eine Person mit Erfassungsrecht probiert ids durch, um zu erfahren, ob es eine Frage gibt (etwa in einem anderen
+  Jahrgang); (2) über den Thread einer lesbaren Frage id, Nummer oder Wortlaut einer nicht lesbaren Bezugsfrage erfahren; (3) über den
+  Strom erfahren, dass zu einer lesbaren Frage eine nicht lesbare Nachfrage erfasst wurde; (4) mit dem Filter `parentQuestionId` und
+  einer bekannten id prüfen, ob lesbare Kinder auf sie zeigen; (5) einen falschen Bezug setzen, um eine Frage als „bloße Nachfrage“
+  abzuwerten.
+- *Verhindert durch:* (1) R-LINK-01 antwortet für unbekannt, fremden Jahrgang und nicht lesbar gleich und nennt die id nicht; (2)
+  `parentQuestionId` und `parentAnswerVersion` nur für Leser der Bezugsfrage, nie auf der Bühne, nie in einem Ereignis-Lesepfad
+  (`QuestionLinkedPayload` nur `relation`); Nummer und Wortlaut nie an der Nachfrage; (3) `EVENT_SUBJECTS.QuestionLinked` nennt nur das
+  Kind; (4) hingenommen: die Kinder sind ohnehin lesbar, ihre Bezugs-id bleibt gemaskt, preisgegeben wird nur, dass eine bekannte id
+  die Bezugsfrage ist; (5) der Bezug ist sichtbar, unveränderlich (R-LINK-02) und mit Akteur protokolliert; Korrektur nur durch
+  Zurückziehen mit Grund und Neuerfassen.
+- *Erkennung:* Häufung von 422 auf `captureQuestions` je `subjectHash` im Zugriffslog (das Log führt `operationId` und Status, keine
+  Regel-id), Auswertung nur zu zweit; Historie beider Fragen für (5). *Signal und Empfänger:* Zugriffslog, technischer Betrieb.
+- *Restrisiko:* Angriff 4 (bekannte id als Bezugsfrage bestätigt).
+- *Nachweis:* `packages/domain/src/__tests__/link046.test.ts` Tests 5, 8, 9, 10, 15; über HTTP `apps/api/src/__tests__/link046.test.ts`
+  H3, H6, H7; auf Postgres `postgres-link046.test.ts` P2.
 
 **MF-17 Leistungsauswertung über den Leitstand** (061; verwandt MF-09)
 - *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“, den Zulauf

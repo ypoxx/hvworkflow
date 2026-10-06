@@ -10,6 +10,41 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
+## [0.4.6] - 2026-10-06
+
+Additive patch step of the 0.4 cycle, after 0.4.5 of slice 061 (moved from 0.4.5 when 061 part A merged first). The contract step of Scheibe 046 (Nachfragen-Threads),
+written as the first commit of that slice, before its core code (AGENTS.md rule 6). One new request pair, three new
+optional response fields, one new query parameter, one new `Event.type` and one closed read payload; no new operation,
+no new `Action`, no new required field. Built on the defaults: "auf Standard gebaut (Spec 046)".
+
+### Added
+
+- **`QuestionRelation`** (Scheibe 046): closed code `follow_up` (Nachfrage) or `clarification` (Klarstellung), no
+  free text.
+- **`QuestionCapture.parentQuestionId`** and **`QuestionCapture.relation`** (Scheibe 046): optional, both or
+  neither (`dependentRequired`); the referenced question (Bezugsfrage) lies in the same meeting and is readable for
+  the caller (R-LINK-01), and the reference never changes (R-LINK-02). `parentQuestionId` 1 to 128 code points.
+- **`Question.parentQuestionId`**, **`Question.relation`**, **`Question.parentAnswerVersion`** (Scheibe 046): the
+  reference on the view. `parentQuestionId` and `parentAnswerVersion` only for readers of the referenced question,
+  never in the stage view; `relation` may stand alone. `dependentRequired` binds in one direction only
+  (`parentQuestionId` requires `relation`, `parentAnswerVersion` requires `parentQuestionId`). `parentAnswerVersion`
+  is the answer version of the parent last read out when the question was captured.
+- **`ParentQuestionIdFilter`** (Scheibe 046): query parameter `parentQuestionId` on `listQuestions` and
+  `listMeetingQuestions`; the direct children, each filtered with the read scope of the list.
+- **`Event.type` `QuestionLinked`** (Scheibe 046): stored payload `{ parentQuestionId, relation,
+  parentAnswerVersion? }`, appended directly after the `QuestionCaptured` of the same question in the same command.
+- **`QuestionLinkedPayload`** (Scheibe 046): closed read payload (`relation` only), bound in `EventRead` to
+  `type: QuestionLinked`.
+
+### Changed
+
+- **`captureQuestions`** description (Scheibe 046): `422` with `ruleId` `R-LINK-01` (one message for unknown,
+  other meeting and unreadable), all or nothing, event order `QuestionCaptured`, `QuestionLinked`.
+- **`getStage`**, **`getMeetingStage`** descriptions (Scheibe 046): stage questions never carry `parentQuestionId`
+  or `parentAnswerVersion`.
+- **`Event`**, **`EventRead`** descriptions (Scheibe 046): the stored and the read form of `QuestionLinked`; every
+  event read path removes `parentQuestionId` and `parentAnswerVersion`, for every reader.
+
 ## [0.4.5] - 2026-10-06
 
 Additive patch step of the 0.4 cycle, after 0.4.4 of slice 055. The contract step of Scheibe 061 (Leitstand, part A:

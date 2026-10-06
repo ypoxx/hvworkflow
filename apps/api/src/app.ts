@@ -953,6 +953,8 @@ export function createApp(options: CreateAppOptions = {}): App {
     ...(query['contributionId'] !== undefined ? { contributionId: query['contributionId'] as string } : {}),
     ...(query['agendaItemId'] !== undefined ? { agendaItemId: query['agendaItemId'] as string } : {}),
     ...(query['q'] !== undefined ? { q: query['q'] as string } : {}),
+    // Scheibe 046: the validator has already refused an empty or overlong value (422).
+    ...(query['parentQuestionId'] !== undefined ? { parentQuestionId: query['parentQuestionId'] as string } : {}),
     ...(query['limit'] !== undefined ? { limit: query['limit'] as number } : {}),
     ...(query['offset'] !== undefined ? { offset: query['offset'] as number } : {}),
   });
