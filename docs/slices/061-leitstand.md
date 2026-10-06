@@ -1020,6 +1020,42 @@ no-spec-section,bad-source,bad-id}.json`; `apps/web/src/api/{http.ts,http.test.t
 liveStore061.test.ts}`; `apps/web/src/i18n/{labels.ts,shell.de.ts,shell.en.ts,parity.test.ts}`;
 `docs/sicherheit/bedrohungsmodell.md`; `docs/datenschutz/dsfa-vorentwurf.md`; `docs/folgeliste.md`; diese Spec.
 
+### Nacharbeit Teil A nach Review (06.10.2026)
+
+Review in frischem Kontext auf PR #168 (Kopf `b32ecaf` nach Einmischen der Basis): 1 major, 4 minor (sofort behoben), Testlücken,
+5 nits (Folgeliste). **Entscheidung Merge-Reihenfolge (Orchestrator):** 061 Teil A merged zuerst und behält Vertrag **0.4.5**; 046
+rückt auf 0.4.6. Die Liste „Offen → Vertragsversion“ oben entfällt damit für 061.
+
+| Nr. | Befund | Änderung | Commit |
+|---|---|---|---|
+| major 1 | Zeitfilter vor der Faltung bricht `reduce` (R-MTG-02/-05 ⇒ 500, MeetingCreated nach now ⇒ 404) | Log auf Jahrgangsebene ungeschnitten gefaltet; „nach asOf zählt nirgends“ nur je Einzelfrage (Erfassung nach now entfällt, eigene Liste endet vor dem ersten Ereignis nach now); Beschreibung im Vertrag präzisiert | `b681434` |
+| minor 2 | `can()` an rekonstruiertem Datensatz | `getCockpit` prüft `state.questions.get(q.id) ?? q`; Test mit gebundenem Leser (Bündel für die Testdauer gebunden) und Weiterleitung nach now | `b681434` |
+| minor 3 | Verweildauern sind Historiendaten | K1 pinnt `history.read` für jeden Inhaber | `b681434` |
+| minor 4 | „kein Erledigungsdurchsatz“ zu stark | MF-17 und DSFA V15: Durchsatz aus aufeinanderfolgenden Lesungen ableitbar, Abwehr organisatorisch plus Zugriffslog (E13, `minimumGroupSize`); MF-17 nach MF-14 verschoben (MF-15/MF-16 stehen auf ihren Branches dort) | `46b8290` |
+| Tests 5 | zwei Jahrgänge; K8 genau | Leitstand von B zählt nur B, während A aktuell ist; K8 `over10m` nach +600 s = 15 und = `computeIndicators` | `b681434` |
+| nits 7–11 | drei Definitionen von „offen“, `withinWindow`, `maxProperties`/`status`, Commitfolge und Branch, Regel (g) für `derived:`/`meta:` | `docs/folgeliste.md` unter „Leitstand (aus 061)“ | `46b8290` |
+
+Rot vorher (Tests zuerst): `Tests 4 failed | 24 passed (28)` — `Error: R-MTG-02: Cannot apply MeetingClosed while meeting is
+preparation.`, `Error: R-MTG-05: VotingOpened is not allowed at this agenda progress.`, `expected undefined to be defined`
+(MeetingCreated nach now), `expected [] to deeply equal [ 'q1' ]` (kanonischer Datensatz). Danach `Tests 28 passed (28)`.
+Rechenzeit nach dem Umbau bei 800 Einzelfragen in-process: p50 22,5 ms, p90 33,4 ms (Grenze 50 ms).
+
+Gates auf sauberem Baum, Commit `46b8290`, Datenbank `hv_test_s061`:
+
+```
+packages/domain test:       Tests  519 passed (519)
+apps/web test:       Tests  801 passed (801)
+apps/api test:       Tests  700 passed (700)
+apps/api test: operation-coverage: 71 operations in the contract, 69 exercised by tests, 2 pre-declared in allowlist.json
+slice-scope: 43 changed file(s), all within "docs/slices/061-leitstand.md"'s "Files allowed" list (101 pattern(s)).
+metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
+# tests 358
+# pass 358
+# fail 0
+✓ built in 2.50s
+mark-test-run: wrote /home/user/wt/s061/.claude/state/last-test-run (clean tree) at commit 46b8290, tree 8f66f729fff4…
+```
+
 ## Review findings
 
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
