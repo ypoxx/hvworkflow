@@ -22,6 +22,7 @@ import { createHttpApi, followSessionActor, getHttpSession, logoutHttpSession, t
 import { actorKey, createLiveStore, type LiveStore } from './liveStore';
 import { DEMO_MODE } from './mode';
 import { getLang } from '../i18n';
+import { createDebouncedSaver } from './demoLogSaver';
 
 const STORAGE_KEY = 'hv-demo-events-v1';
 
@@ -52,17 +53,22 @@ function loadLog(): DomainEvent[] | undefined {
   const raw = localStorage.getItem(STORAGE_KEY);
   return raw === null ? undefined : parseDemoLog(raw);
 }
-let saveTimer: number | undefined;
+// Delayed, so a burst of events (seed, atomisation) is written once; written at once when the page is left (takt-053).
+const logSaver = createDebouncedSaver<readonly DomainEvent[]>((events) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  } catch (e) {
+    console.warn('Could not persist the demo event log', e);
+  }
+}, 150);
 function saveLog(events: readonly DomainEvent[]): void {
-  // Debounced: a burst of events (seed, atomisation) is written once.
-  if (saveTimer !== undefined) window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-    } catch (e) {
-      console.warn('Could not persist the demo event log', e);
-    }
-  }, 150);
+  logSaver.save(events);
+}
+if (DEMO_MODE && typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => logSaver.flush());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') logSaver.flush();
+  });
 }
 
 let startupError: Error | undefined;
@@ -187,6 +193,8 @@ async function bindDemoActors(): Promise<void> {
 /** Wipe this device's demo data and reload with a fresh corpus. */
 export function resetDemo(): void {
   if (!DEMO_MODE) return;
+  // A pending write must not bring the old log back after it is deleted (takt-053).
+  logSaver.cancel();
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
