@@ -1081,3 +1081,20 @@ Merkfelds in `snapshotBefore` als angenommene Scope-Abweichung; `RELATIONS` dopp
 ohne Grund; 11-px-Beschriftungen und Zahl „(n)“ nicht Mono; Chip accent gegen Badge neutral; linke Liste nach Öffnen aus dem
 Block nicht nachgeführt; Dialogbreite 512 statt 480 px. Vertragsversion bleibt 0.4.5 (Umstellung auf 0.4.6 nach dem Merge
 von 061 Teil A, auf Ansage des Orchestrators).
+
+### Einmischen und Vertragsstufe 0.4.6 (06.10.2026, Auftrag des Orchestrators)
+
+Reihenfolge der Merges: 041 (/admin) und danach 061 Teil A (Leitstand, Vertrag 0.4.5) sind vor 046 in den Integrationszweig
+gegangen. Der Integrationszweig wurde als Merge-Commit eingemischt (`f2b3f7e`, kein Rebase); im selben Commit rückt der
+Vertragsschritt von 046 auf **0.4.6**: `info.version`, alle „Since 0.4.5 (slice 046)“ → 0.4.6, `package.json`, neuer
+Abschnitt `## [0.4.6]` über `## [0.4.5]` von 061 (unverändert), `types.ts` mit `pnpm contract:types` neu erzeugt,
+`contract.test.ts` und `takt-019-contract.test.ts` auf 0.4.6 (Operationen 71 = 70 + `getMeetingCockpit` von 061; 046 fügt
+keine hinzu), zwei Code-Kommentare. `check.mjs`: (a)–(d) ok, (c) „0.4.5 -> 0.4.6“, 71 Operationen. Konflikte beidseitig:
+CHANGELOG, `e2e-texts.ts`, SHARED_SPECS und HTTP_ORDER (041 und 046), Paritätszahl 775 (747 Basis + 28 aus 046),
+Folgeliste, Bedrohungsmodell (MF-15 zwischen MF-14 und MF-17). Leitstand: `computeCockpit` faltet über `reduce`, der Zulauf
+zählt nur `QuestionCaptured`; neuer Test in `link046.test.ts` („Leitstand (061) with QuestionLinked“: eine Erfassung mit
+Bezug zählt einmal); `cockpit061.test.ts` grün.
+
+`pnpm gates` mit Postgres-Variablen (Datenbank hv_test_s046) auf dem sauberen Commit `f2b3f7e`, exit 0; domain 555, web 984,
+api 710; Schluss: `mark-test-run: wrote … (clean tree) at commit f2b3f7e, tree 3591902131ce…`. e2e `046-nachfragen.spec.ts`
+in-process `--repeat-each=3`: 6 passed; die sechs Screenshots `docs/evidence/046-*.png` auf dem eingemischten Stand neu erzeugt.
