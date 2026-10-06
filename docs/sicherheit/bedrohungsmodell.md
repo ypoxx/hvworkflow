@@ -490,6 +490,24 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Nachweis:* `packages/domain/src/__tests__/forward048.test.ts` Tests 2, 3, 6, 7, 8a–8c, 11, 13; über HTTP
   `apps/api/src/__tests__/forward048.test.ts` H3, H4, H8, H9; auf Postgres `postgres-forward048.test.ts` P2.
 
+**MF-17 Leistungsauswertung über den Leitstand** (061; verwandt MF-09)
+- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“, den Zulauf
+  (Arbeitsmenge der Erfassung) oder den Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit
+  einzelner Beschäftigter; Screenshots oder Mitschriften der Wand ersetzen eine Auswertung.
+- *Verhindert durch:* die Antwort liefert nur Bestände, Wartezeiten und Zulauf, keinen Erledigungsdurchsatz (erledigt je Zeit je
+  Station) als Feld, keinen Akteur, keine Zahl je Person (geschlossenes Schema `Cockpit`, Allowlist aus dem Vertrag, Bericht `leitstand`
+  mit Tor-Regel (g)); Inhaberkreis auf drei Rollen. **Ehrlich benannt:** ein Durchsatz lässt sich aus aufeinanderfolgenden Lesungen
+  ableiten (die Seite liest alle 15 s neu; Einzelfragen, die aus `legalReview.items` verschwinden, und sinkende Bestände je Station
+  zeigen, wie viel eine kleine Gruppe erledigt hat). Dagegen gibt es keinen technischen Riegel; die Abwehr ist organisatorisch
+  (Betriebsvereinbarung, Mindestzahl über E13 vorbereitet als `minimumGroupSize`, heute `null`) plus das Zugriffslog als Erkennungsweg.
+- *Erkennung:* jede Lesung steht im Zugriffslog mit `operationId` `getMeetingCockpit` und `subjectHash` (033a); auffällige
+  Lesemuster außerhalb des HV-Fensters prüft der Datenschutz im Verfahren zu zweit (ADR 0013). *Signal und Empfänger:* DSB und
+  Betriebsrat über die Betriebsakte. *Ausnahme:* kein automatischer Alarm; Eigentümer Datenschutz, Ablauf mit E13, spätestens
+  29.01.2027.
+- *Nachweis:* `packages/domain/src/__tests__/cockpit061.test.ts` K7 (Negativtest mit Rot-Probe `claimedBy`); `apps/api/src/__tests__/cockpit061.test.ts`
+  A6 (Bericht gleich `COCKPIT_REPORT`), A7 (Blattpfade aus dem Vertrag); `scripts/metrics-allowlist-check.test.mjs` G3; auf Postgres
+  `postgres-cockpit061.test.ts` A4 (Zugriffslog ohne Antwortinhalt).
+
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.
 - *Verhindert durch:* T-Q-T-04, T-G1-S-01; Startabbruch bei `HV_DEMO=1` mit Issuer (gebaut in 029a, Test
@@ -535,21 +553,6 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
 - *Erkennung:* bis 047 keine technische, nur das Protokoll in der Betriebsakte des Eigentümers.
 - *Nachweis:* 033a: `apps/api/src/__tests__/access-log033a.test.ts` (exakte Schlüsselmenge, Zeile ohne Fragetext
   trotz Body); Sperrtest folgt mit 047.
-
-**MF-17 Leistungsauswertung über den Leitstand** (061; verwandt MF-09)
-- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“, den Zulauf
-  (Arbeitsmenge der Erfassung) oder den Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit
-  einzelner Beschäftigter; Screenshots oder Mitschriften der Wand ersetzen eine Auswertung.
-- *Verhindert durch:* nur Bestände, Wartezeiten und Zulauf, kein Erledigungsdurchsatz (erledigt je Zeit je Station), kein Akteur,
-  keine Zahl je Person (geschlossenes Schema `Cockpit`, Allowlist aus dem Vertrag, Bericht `leitstand` mit Tor-Regel (g)); Inhaberkreis
-  auf drei Rollen; Mindestzahl über E13 vorbereitet (`minimumGroupSize`, heute `null`); organisatorisch die Betriebsvereinbarung.
-- *Erkennung:* jede Lesung steht im Zugriffslog mit `operationId` `getMeetingCockpit` und `subjectHash` (033a); auffällige
-  Lesemuster außerhalb des HV-Fensters prüft der Datenschutz im Verfahren zu zweit (ADR 0013). *Signal und Empfänger:* DSB und
-  Betriebsrat über die Betriebsakte. *Ausnahme:* kein automatischer Alarm; Eigentümer Datenschutz, Ablauf mit E13, spätestens
-  29.01.2027.
-- *Nachweis:* `packages/domain/src/__tests__/cockpit061.test.ts` K7 (Negativtest mit Rot-Probe `claimedBy`); `apps/api/src/__tests__/cockpit061.test.ts`
-  A6 (Bericht gleich `COCKPIT_REPORT`), A7 (Blattpfade aus dem Vertrag); `scripts/metrics-allowlist-check.test.mjs` G3; auf Postgres
-  `postgres-cockpit061.test.ts` A4 (Zugriffslog ohne Antwortinhalt).
 
 **MF-10 Flutung ohne Anmeldung** (034a; verwandt MF-09)
 - *Ablauf:* eine Person im internen Netz oder mit Zugang zur Staging-Adresse ruft `GET /auth/login` und beliebige Pfade in einer
