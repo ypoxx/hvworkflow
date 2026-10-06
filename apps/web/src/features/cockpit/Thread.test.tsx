@@ -29,6 +29,7 @@ function render(trail: StatusTrailEntry[] | null, current: StatusTrailEntry['sta
       read={{ status: 'ready', id: 'q-141', number: 'F-0141', text: 'Wie hoch war die Ausschüttungsquote?', unitId: 'unit-fin', stageAssignment: 'cfo', entries: threadEntries(trail, current, ASOF) }}
       units={UNITS}
       onClose={() => undefined}
+      onRetry={() => undefined}
     />,
   );
 }
@@ -84,6 +85,18 @@ describe('W6 thread', () => {
     const html = render(long, 'answer_drafted');
     expect(tags(html, 'cockpit-thread-entry')).toHaveLength(9 + 4);
     expect(tags(html, 'cockpit-thread-row')).toHaveLength(2);
+  });
+
+  it('a failed read names its rule and offers to load the thread again (Codex P2)', () => {
+    let retried = 0;
+    const html = renderToStaticMarkup(
+      <Thread read={{ status: 'failed', id: 'q-141', number: 'F-0141', ruleId: 'R-PERSIST-01' }} units={UNITS} onClose={() => undefined} onRetry={() => { retried += 1; }} />,
+    );
+    expect(text(html)).toContain('Der Faden konnte nicht gelesen werden.');
+    expect(text(html)).toContain('R-PERSIST-01');
+    expect(tags(html, 'cockpit-thread-retry')).toHaveLength(1);
+    expect(tags(html, 'cockpit-thread-entry')).toHaveLength(0);
+    expect(retried).toBe(0);
   });
 
   it('without history only the current station; no actor, no reason', () => {

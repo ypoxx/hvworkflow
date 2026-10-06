@@ -22,6 +22,7 @@ import {
   parseSelection,
   rowsFromQuestions,
   selectionSearch,
+  settleThread,
   threadEntries,
   unitRows,
 } from './lib';
@@ -231,5 +232,25 @@ describe('W11 one polite announcement when a figure turns critical', () => {
     expect(text.match(/Leitstand:/g)).toHaveLength(1);
     expect(text).toContain('Legal Clearing über 10 min');
     expect(text).toContain('Rückstand Finanzen');
+  });
+});
+
+describe('Codex P2: a failed history read is a failed thread, never the "no history right" state', () => {
+  const question = { status: 'fulfilled', value: { id: 'q-1', status: 'in_review' } } as const;
+  const history = { status: 'fulfilled', value: [] } as const;
+  const refused = { status: 'rejected', reason: { status: 403, ruleId: 'R-PERM-02' } } as const;
+  const broken = { status: 'rejected', reason: { status: 503, ruleId: 'R-PERSIST-01' } } as const;
+
+  it('question read, history broken (network, 5xx): failed with the rule of the history read', () => {
+    expect(settleThread('q-1', question, broken)).toMatchObject({ failed: true, ruleId: 'R-PERSIST-01', trail: null });
+  });
+
+  it('history refused (no history.read): not failed, the thread shows only the current station', () => {
+    expect(settleThread('q-1', question, refused)).toMatchObject({ failed: false, trail: null });
+  });
+
+  it('question refused, history read: not failed, no text; question broken: failed', () => {
+    expect(settleThread('q-1', refused, history)).toMatchObject({ failed: false, question: null, trail: [] });
+    expect(settleThread('q-1', broken, history)).toMatchObject({ failed: true, ruleId: 'R-PERSIST-01' });
   });
 });
