@@ -672,7 +672,7 @@ describe('coordination role (slice 021b): classify and assign move from capture 
     // Scheibe 044a adds `question.refuse.propose` (E25, ADR 0012; built on the default); Scheibe 048 adds
     // `question.forward` (E5 open, built on the default).
     expect([...(ROLE_PERMISSIONS.coordination ?? [])].sort()).toEqual(
-      ['contribution.read', 'history.read', 'question.assign', 'question.classify', 'question.forward', 'question.identity.reveal', 'question.read', 'question.refuse.propose', 'speaker.read'].sort(),
+      ['cockpit.read', 'contribution.read', 'history.read', 'question.assign', 'question.classify', 'question.forward', 'question.identity.reveal', 'question.read', 'question.refuse.propose', 'speaker.read'].sort(),
     );
   });
 

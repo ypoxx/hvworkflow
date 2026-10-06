@@ -877,6 +877,29 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 041 Review nit 9 · Spec-Bericht 041, „Vor dem Bau prüfen“ 4 · die Aussage zu Konstanten mit SECRET/TOKEN/KEY/PASSWORD
   im Namen ist ungenau formuliert · auf die Konstanten dieser Scheibe beschränken und so benennen.
 
+## Leitstand (aus 061)
+
+- 061 Spec, Hinweis an Folgescheiben · `apps/web/src/features/answers/lib.ts:147-152` (`urgencyLevel`, 15/45 min) und
+  `packages/domain/src/cockpit.ts` (`COCKPIT_THRESHOLDS.oldestOpenSeconds`) · die Schwellen stehen nach 061 zweimal · ein Takt
+  stellt `urgencyLevel` auf die Kernkonstante um (Beantwortung war nicht in den „Files allowed“ von 061).
+- 061 Teil A Bau · `packages/domain/src/cockpit.ts` (`computeCockpit`) · eine Einzelfrage, die nach `now` erfasst wurde, und
+  ihre eigenen Ereignisse nach `now` (Uhr zurückgestellt) zählen im Leitstand nirgends, in `computeIndicators` aber weiter im
+  Bestand („offen“, Rückstand je Fachbereich, älteste offene mit Alter 0); die Gleichheit K3 gilt nur ohne solche Ereignisse · in
+  071 oder 086 entscheiden, ob `/metrics` dieselbe Zeitgrenze bekommt (Golden neu, eigener Commit).
+- 061 Review Nit 7 · `indicators.ts` (`NOT_OPEN_STATUSES`), `state.ts` (`refreshCounts`, Liste inline), `types.ts`
+  (`CockpitOpenStatus`) · drei Definitionen von „offen“ · später eine Konsistenzprüfung (Test, der alle drei gegeneinander hält)
+  oder eine gemeinsame Quelle.
+- 061 Review Nit 8 · `indicators.ts` (`withinWindow`) · exportiert, aber außerhalb der Datei ungenutzt · Export entfernen oder
+  in `cockpit.ts` verwenden.
+- 061 Review Nit 9 · Vertrag `Cockpit.openByUnit` (`maxProperties: 200`) und `CockpitOldestRef.status` · veraltete
+  Fachbereichs-ids aus dem Log behalten einen Schlüssel und zählen gegen die Grenze; `status` ließe sich auf die offenen Status
+  verengen · mit der nächsten Vertragsänderung am Leitstand.
+- 061 Review Nit 10 · Commitfolge und Branch · das Golden kam vor dem Vertragsschritt (die Spec nennt den Vertragsschritt als
+  ersten Commit; der Auftrag verlangte das Golden zuerst), der Branch heißt `claude/slice-061-leitstand` statt
+  `claude/slice-061-kern` · nur festgehalten, keine Änderung.
+- 061 Review Nit 11 · `scripts/metrics-allowlist-check.mjs` Regel (g) · `derived:` und `meta:` nehmen jeden Text an; der eigentliche
+  Riegel ist A7 (Blattpfade aus dem Vertrag) · eine Begründungspflicht mit Mindestlänge oder geschlossene `meta:`-Liste prüfen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

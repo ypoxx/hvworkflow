@@ -148,7 +148,7 @@ describe('Test 1: rights as data', () => {
     expect(holders.sort()).toEqual(['coordination', 'expert']);
     expect([...ROLE_PERMISSIONS.admin]).toEqual([
       'speaker.read', 'contribution.read', 'question.read', 'question.read.delivered', 'stage.read', 'history.read', 'event.read',
-      'question.assign', 'question.return', 'agenda.manage', 'admin.roles.manage', 'admin.units.manage', 'admin.seats.manage', 'demo.seed',
+      'question.assign', 'question.return', 'agenda.manage', 'admin.roles.manage', 'admin.units.manage', 'admin.seats.manage', 'demo.seed', 'cockpit.read',
     ]);
     expect(FORWARD_REASON_CODES).toEqual(['wrong_unit', 'expertise_elsewhere', 'capacity', 'other']);
   });

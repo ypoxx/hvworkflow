@@ -12,7 +12,14 @@
  *   (d) a name containing `rate_limit` (ephemeral, ADR 0013, never in the catalog);
  *   (f) `metrics` missing or not an array; a label twice within one metric; a `type` outside {gauge, counter}.
  *   (e) a `spec` that does not name a file `docs/slices/<spec>-*.md` whose section
- *       "## Kennzahlen-Allowlist" contains the name in backticks.
+ *       "## Kennzahlen-Allowlist" contains the name in backticks;
+ *   (g) slice 061, for every entry of the optional `reports` (a view that shows figures, e.g. the
+ *       control desk): an `id` outside `^[a-z0-9-]+$`; a `spec` whose "## Kennzahlen-Allowlist" does not
+ *       name the id in backticks; an `aggregation` that is not a non-empty list from the closed set
+ *       {meeting, status, unit, seat}; a `questionReferences` that is not boolean; a `minimumGroupSize`
+ *       that is neither null nor a positive integer; a field path that points at a person (same terms
+ *       as (c)); a field source that is not a family of `metrics`, a `Meeting.counts.*` field,
+ *       `derived: <reason>` or `meta: <what>`. A catalog without `reports` passes (backward compatible).
  * Run as `pnpm metrics-allowlist` (part of `pnpm gates`). `--catalog <file>` and `--specs-dir <dir>`
  * override the inputs for tests. No network, deterministic.
  */
@@ -62,6 +69,48 @@ function specNames(specsDir, spec) {
   return names;
 }
 
+const REPORT_ID_RE = /^[a-z0-9-]+$/;
+const AGGREGATION_LEVELS = new Set(['meeting', 'status', 'unit', 'seat']);
+const COUNTS_SOURCE_RE = /^Meeting\.counts\.[A-Za-z]+(\.[A-Za-z_]+)?$/;
+const FREE_SOURCE_RE = /^(derived|meta): \S/;
+
+/** Rule (g): the reports of the catalog (slice 061). `metricNames` are the families of `metrics`. */
+function checkReports(catalog, specsDir, metricNames) {
+  if (catalog.reports === undefined) return [];
+  if (!Array.isArray(catalog.reports)) return ['catalog: (g) "reports" is not an array'];
+  const failures = [];
+  for (const report of catalog.reports) {
+    const id = String(report?.id);
+    if (!REPORT_ID_RE.test(id)) failures.push(`report ${id}: (g) id must match ^[a-z0-9-]+$`);
+    const covered = specNames(specsDir, report?.spec);
+    if (covered === undefined || !covered.has(id)) {
+      failures.push(`report ${id}: (g) spec "${report?.spec}" has no docs/slices/${report?.spec}-*.md with "## Kennzahlen-Allowlist" naming \`${id}\``);
+    }
+    const aggregation = report?.aggregation;
+    if (!Array.isArray(aggregation) || aggregation.length === 0 || aggregation.some((level) => !AGGREGATION_LEVELS.has(level))) {
+      failures.push(`report ${id}: (g) aggregation must be a non-empty list from {meeting, status, unit, seat}`);
+    }
+    if (typeof report?.questionReferences !== 'boolean') failures.push(`report ${id}: (g) questionReferences must be boolean`);
+    const minimum = report?.minimumGroupSize;
+    if (minimum !== null && !(Number.isInteger(minimum) && minimum > 0)) {
+      failures.push(`report ${id}: (g) minimumGroupSize must be null or a positive integer`);
+    }
+    const fields = Array.isArray(report?.fields) ? report.fields : [];
+    if (fields.length === 0) failures.push(`report ${id}: (g) fields must be a non-empty list`);
+    for (const field of fields) {
+      const path = String(field?.path);
+      // Path segments become words, so the short term `ip` matches as in (c) (`client.ip`, `ipAddress` aside).
+      const term = personalTerm(path.replace(/[^A-Za-z0-9]+/g, '_'));
+      if (term !== undefined) failures.push(`report ${id}: (g) field "${path}" points at a person ("${term}")`);
+      const source = String(field?.source);
+      if (!metricNames.has(source) && !COUNTS_SOURCE_RE.test(source) && !FREE_SOURCE_RE.test(source)) {
+        failures.push(`report ${id}: (g) field "${path}" has source "${source}", not a catalog family, Meeting.counts.*, derived: or meta:`);
+      }
+    }
+  }
+  return failures;
+}
+
 export function checkCatalog(catalog, specsDir) {
   const failures = [];
   const seen = new Set();
@@ -88,6 +137,7 @@ export function checkCatalog(catalog, specsDir) {
       failures.push(`${name}: (e) spec "${metric.spec}" has no docs/slices/${metric.spec}-*.md with "## Kennzahlen-Allowlist" naming \`${name}\``);
     }
   }
+  failures.push(...checkReports(catalog, specsDir, seen));
   return failures;
 }
 
@@ -99,5 +149,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error(`metrics-allowlist: ${failures.length} finding(s).`);
     process.exit(1);
   }
-  console.log(`metrics-allowlist: ${JSON.parse(readFileSync(args.catalog, 'utf8')).metrics.length} metrics, all within the allowlist.`);
+  const checked = JSON.parse(readFileSync(args.catalog, 'utf8'));
+  console.log(`metrics-allowlist: ${checked.metrics.length} metrics, ${(checked.reports ?? []).length} report(s), all within the allowlist.`);
 }

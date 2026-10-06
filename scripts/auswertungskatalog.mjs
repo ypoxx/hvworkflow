@@ -5,6 +5,8 @@
  * `apps/api/src/metrics/catalog.json` and writes `auswertungskatalog.md` and `.json` into
  * `dist/auswertungskatalog/` (`dist/` is ignored). CI uploads both as the artifact `auswertungskatalog`.
  * The diff gate and the completion (legal-basis matrix) follow in slice 073. `--out <dir>` for tests.
+ * Slice 061 adds the section "Berichte (Oberfläche)": every report of the catalog with purpose, right,
+ * operation, aggregation, minimum group size and its field table.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -36,6 +38,11 @@ const data = {
     name: m.name, type: m.type, definition: m.help, purpose: m.purpose, labels: m.labels, source: m.source,
     aggregation: m.aggregation, personalReference: m.personalReference, spec: m.spec,
   })),
+  // Slice 061: views that show figures (Berichte), e.g. the control desk; absent in older catalogs.
+  reports: (catalog.reports ?? []).map((r) => ({
+    id: r.id, purpose: r.purpose, permission: r.permission, operationId: r.operationId, aggregation: r.aggregation,
+    questionReferences: r.questionReferences, minimumGroupSize: r.minimumGroupSize, fields: r.fields, spec: r.spec,
+  })),
   notInCatalog: NOT_IN_CATALOG,
 };
 
@@ -65,6 +72,26 @@ for (const m of data.metrics) {
     `- Spezifikation: Scheibe ${m.spec}`,
     '',
   );
+}
+if (data.reports.length > 0) {
+  lines.push('## Berichte (Oberfläche)', '');
+  for (const r of data.reports) {
+    lines.push(
+      `### Bericht \`${r.id}\``,
+      '',
+      `- Zweck: ${r.purpose}`,
+      `- Recht: \`${r.permission}\``,
+      `- Operation: \`${r.operationId}\``,
+      `- Aggregation: ${r.aggregation.join(', ')}${r.questionReferences ? '; Referenzen je Einzelfrage (nur lesbare, ohne Text und ohne Akteur)' : ''}`,
+      `- Mindestzahl: ${r.minimumGroupSize === null ? 'nicht festgelegt (E13)' : r.minimumGroupSize}`,
+      `- Spezifikation: Scheibe ${r.spec}`,
+      '',
+      '| Feld | Quelle | Personenbezug |',
+      '|---|---|---|',
+      ...r.fields.map((f) => `| \`${f.path}\` | ${f.source} | ${f.personalReference} |`),
+      '',
+    );
+  }
 }
 lines.push('## Nicht im Katalog', '');
 for (const item of NOT_IN_CATALOG) lines.push(`- ${item.name}: ${item.why}`);

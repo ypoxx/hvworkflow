@@ -31,21 +31,22 @@ const ADMIN_LIST: readonly Permission[] = [
   'question.assign', 'question.return',
   'agenda.manage', 'admin.roles.manage', 'demo.seed',
   'admin.units.manage', 'admin.seats.manage', // Scheibe 040b
+  'cockpit.read', // Scheibe 061
 ];
 
 const admin: Actor = { id: 'admin-040a', role: SEEDING_ROLE };
 const at = '2027-04-20T10:00:00.000Z';
 
 describe('Scheibe 040a: the administration bundle is an explicit list', () => {
-  it('Test 1: holds exactly the fourteen rights of 040a and 040b', () => {
+  it('Test 1: holds exactly the fifteen rights of 040a, 040b and 061', () => {
     expect(MANAGING_ROLES).toEqual([SEEDING_ROLE]);
     expect([...ROLE_PERMISSIONS[SEEDING_ROLE]].sort()).toEqual([...ADMIN_LIST].sort());
-    expect(ROLE_PERMISSIONS[SEEDING_ROLE]).toHaveLength(14);
+    expect(ROLE_PERMISSIONS[SEEDING_ROLE]).toHaveLength(15);
   });
 
   it('Test 2: deny by default — every other permission is refused with R-PERM-01 or R-PERM-02', () => {
     const denied = PERMISSIONS.filter((permission) => !ADMIN_LIST.includes(permission));
-    expect(denied.length).toBe(PERMISSIONS.length - 14);
+    expect(denied.length).toBe(PERMISSIONS.length - 15);
     for (const permission of denied) {
       const decision = hasPermission(admin, permission);
       expect(decision, permission).toMatchObject({

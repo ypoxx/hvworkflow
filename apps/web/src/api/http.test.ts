@@ -183,6 +183,7 @@ describe('HTTP HvApi adapter', () => {
     ['withdrawQuestion', ['q /1', 'Why'], 'POST', '/v1/questions/q%20%2F1/withdrawal', { reason: 'Why' }],
     ['mergeQuestion', ['q /1', 'q2'], 'POST', '/v1/questions/q%20%2F1/merge', { intoQuestionId: 'q2' }],
     ['getStage', [], 'GET', '/v1/stage'],
+    ['getCockpit', [], 'GET', '/v1/meetings/current/cockpit'], // Scheibe 061 (contract 0.4.5)
     ['listEvents', [7, 50], 'GET', '/v1/events?after=7&limit=50'],
     // Scheibe 044a: the three refusal operations of contract 0.4.0.
     ['listRefusalGrounds', [], 'GET', '/v1/refusal-grounds'],
