@@ -41,3 +41,24 @@ describe('L1 getCockpit passes the live store unbuffered', () => {
     expect(notBuffered).toBe(true);
   });
 });
+
+describe('L1b getCockpit is withheld after an actor change (Codex P1 on #168)', () => {
+  it('an answer requested before clear() never reaches the caller, and a new request after it does', async () => {
+    let release: (value: Cockpit) => void = () => undefined;
+    const getCockpit = vi
+      .fn<() => Promise<Cockpit>>()
+      .mockImplementationOnce(() => new Promise<Cockpit>((resolve) => { release = resolve; }))
+      .mockImplementation(async () => answer(2));
+    const adapter = { getCockpit, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    let settled = false;
+    void store.getCockpit().then(() => { settled = true; }, () => { settled = true; });
+    actor = { id: 'other-061', role: 'coordination' };
+    store.clear('actor');
+    release(answer(1));
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(settled).toBe(false);
+    await expect(store.getCockpit()).resolves.toEqual(answer(2));
+  });
+});

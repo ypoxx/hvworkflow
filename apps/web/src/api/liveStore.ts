@@ -405,6 +405,26 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     return forCaller(shared, startA, actor);
   };
 
+  /**
+   * An unbuffered read under the same actor protection as `read()` (Codex P1 on #168): nothing is kept, but an answer
+   * requested before an actor change or `clear()` never reaches the caller.
+   */
+  const guarded = <T>(call: () => Promise<T>): Promise<T> => {
+    const actor = observeActor();
+    if (actor === undefined) return call();
+    const startA = actorEpoch;
+    let shared: Promise<Outcome>;
+    try {
+      shared = call().then(
+        (value): Outcome => ({ kind: 'ok', value }),
+        (error: unknown): Outcome => ({ kind: 'error', error }),
+      );
+    } catch (error) {
+      shared = Promise.resolve({ kind: 'error', error });
+    }
+    return forCaller(shared, startA, actor);
+  };
+
   /** Collects what one message invalidates; applied once when the batch closes. */
   const collect = (events: readonly ReadEvent[], change: StreamChange | undefined): { full: boolean; matches: Match[] } => {
     if (events.length === 0 && change === undefined) return { full: true, matches: [] };
@@ -504,7 +524,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   };
   return Object.assign(store, control, {
     listEvents: (after?: number, limit?: number) => adapter.listEvents(after, limit),
-    getCockpit: () => adapter.getCockpit(),
+    getCockpit: () => guarded(() => adapter.getCockpit()),
     lastWriteEtag: () => adapter.lastWriteEtag(),
     seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => adapter.seedDemo(seedOptions),
     subscribe(listener: Listener) {
