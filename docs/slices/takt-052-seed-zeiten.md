@@ -343,3 +343,10 @@ slice-scope: 7 changed file(s), all within "docs/slices/takt-052-seed-zeiten.md"
 ✓ built in 1.83s
 mark-test-run: wrote /home/user/wt/takt052/.claude/state/last-test-run (clean tree) at commit 228d237, tree 4de63309ce71…
 ```
+
+### Nachweis Leitstand mit gestauchten Zeiten (nach Einmischen von 061 B)
+
+`pnpm gates` grün auf dem Merge-Commit **d0f83a8** (domain 562, web 1046, api 710); `061-leitstand.spec.ts` in-process 7/7 grün.
+Bilder aus S1/S8 mit dem neuen Seed: `docs/evidence/takt-052-leitstand-de.png`, `docs/evidence/takt-052-wand-1280x720-de.png`
+(Zulauf mit Verlauf über die Stunde, älteste offene 1 h 51 min, Alter je Einzelfrage verschieden; die letzten drei Fenster
+sind leer, weil das e2e die Demo-Uhr um 22 min vorstellt). Die 061-Bilder bleiben unverändert.
