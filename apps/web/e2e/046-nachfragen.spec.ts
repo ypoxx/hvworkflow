@@ -237,24 +237,29 @@ test('E3 keyboard and axe: Alt+B focuses the search, Escape returns to the butto
  * left a Redebeitrag on the speaker at the microphone, so the preselected Wortmeldung has one. Reads only, no state left.
  * `in-process`: there is no network to delay; the window is a few microtasks. The case still runs there, a Redebeitrag is
  * captured first and the page is mounted afresh. In both projects a MutationObserver installed before the page loads
- * records any appearance of the form, however short, so the check does not depend on polling into the window.
+ * records any appearance of the form, however short, so the check does not depend on polling into the window; in-process
+ * it is red without the takt-054 fix (verified 06.10.2026, 3 of 3 runs), not a mere smoke check.
  */
 test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load', async ({ page }) => {
   await page.addInitScript(() => {
     const flag = window as unknown as { __captureFormSeen: boolean };
     flag.__captureFormSeen = false;
-    new MutationObserver(() => {
-      if (document.querySelector('[data-testid="capture-text"]') !== null) flag.__captureFormSeen = true;
+    const selector = '[data-testid="capture-text"]';
+    new MutationObserver((records) => {
+      // The records, not only the document: a form inserted and removed again within one task leaves no trace in the
+      // document by the time the callback runs, but its addedNodes entry stays.
+      const added = records.some((record) =>
+        Array.from(record.addedNodes).some(
+          (node) => node instanceof Element && (node.matches(selector) || node.querySelector(selector) !== null),
+        ));
+      if (added || document.querySelector(selector) !== null) flag.__captureFormSeen = true;
     }).observe(document, { childList: true, subtree: true });
   });
   let delayed = 0;
-  let firstDelay: () => void = () => {};
-  const delayStarted = new Promise<void>((resolve) => { firstDelay = resolve; });
   await page.route(
     (url) => url.pathname.endsWith('/v1/questions') && url.searchParams.has('contributionId'),
     async (route) => {
       delayed += 1;
-      firstDelay();
       await new Promise((resolve) => setTimeout(resolve, 1_500));
       await route.continue();
     },
@@ -283,11 +288,16 @@ test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its qu
   await expect(page).toHaveURL(/\/capture$/);
   if (isHttp()) {
     // Inside the window: the questions of the Redebeitrag are held back right now.
-    await delayStarted;
+    await expect
+      .poll(() => delayed, {
+        timeout: 15_000,
+        message: 'no questions read for a Redebeitrag: the preselected Wortmeldung has no Redebeitrag (E1 leaves one)',
+      })
+      .toBeGreaterThan(0);
     await expect(fresh).toHaveCount(0);
   }
   await expect(another).toBeVisible({ timeout: 30_000 });
   await expect(fresh).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __captureFormSeen: boolean }).__captureFormSeen)).toBe(false);
-  if (isHttp()) expect(delayed).toBeGreaterThan(0);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
