@@ -63,6 +63,8 @@ let current: Actor;
 let clockAt: Date;
 let api: HvApi;
 const SEED_NOW = new Date('2031-05-06T15:00:00.000Z');
+/** Legal clearing over 10 minutes for the demo corpus at seed time + 25 minutes (pinned once, review 061 A). */
+const OVER10M_AFTER_600S = 15;
 
 beforeEach(async () => {
   store = createInMemoryEventStore();
@@ -84,9 +86,11 @@ describe('K1 rights: cockpit.read as data', () => {
     expect(READ_PERMISSIONS.getCockpit).toEqual(['cockpit.read']);
   });
 
-  it('every holder holds question.read and its bundle is not unit-bound', () => {
+  it('every holder holds question.read and history.read, and its bundle is not unit-bound', () => {
     for (const role of ROLES.filter((r) => ROLE_PERMISSIONS[r].includes('cockpit.read'))) {
       expect(ROLE_PERMISSIONS[role], role).toContain('question.read');
+      // statusAgeSeconds and reviewAgeSeconds of a reference are history data (review 061 A, minor 3).
+      expect(ROLE_PERMISSIONS[role], role).toContain('history.read');
       expect(ROLE_PERMISSIONS[role].unitBoundRead, role).toBeUndefined();
     }
   });
@@ -290,6 +294,11 @@ describe('K8 time comes from the injected clock', () => {
       expect(item.statusAgeSeconds).toBe(before.oldestOpen.items[i]!.statusAgeSeconds + 600);
     });
     expect(after.legalReview.over10m).toBeGreaterThanOrEqual(before.legalReview.over10m);
+    // Exact after +600 s: the 033b count at the new clock, and every reference waits more than 600 s.
+    const indicator = computeIndicators(store.all(), clockAt).meetings[0]!;
+    expect(after.legalReview.over10m).toBe(indicator.questionsInLegalReviewOver10m);
+    expect(after.legalReview.over10m).toBe(OVER10M_AFTER_600S);
+    expect(after.legalReview.items.every((item) => item.reviewAgeSeconds > 600)).toBe(true);
 
     const fixture = [...meeting(), capture('q1', ago(100)), capture('q2', ago(-5))];
     const cockpit = compute(fixture);
@@ -421,5 +430,89 @@ describe('COCKPIT_REPORT mirrors the report descriptor', () => {
     expect(COCKPIT_REPORT.aggregation).toEqual(['meeting', 'status', 'unit']);
     expect(COCKPIT_REPORT.questionReferences).toBe(true);
     expect(COCKPIT_REPORT.minimumGroupSize).toBeNull();
+  });
+});
+
+describe('Review 061 A, major 1: the meeting-level log is folded without the time cut', () => {
+  const agenda = [{ id: 'top-1', number: 1, title: 'TOP 1' }];
+  const created = (at: string) => ev('MeetingCreated', M, { title: 'Synthetisch', date: '2031-05-06', lifecycleVersion: 2,
+    agendaItems: agenda, units: [{ id: 'u-fin', name: 'Finanzen' }] }, at);
+
+  it('MeetingStarted after now, then MeetingClosed at now: no throw, closed', () => {
+    const events = [created(ago(86_000)), ev('MeetingStarted', M, {}, ago(-1)), ev('MeetingClosed', M, {}, ago(0)),
+      capture('q1', ago(100))];
+    const cockpit = compute(events);
+    expect(cockpit.meetingStatus).toBe('closed');
+    expect(cockpit.totals.captured).toBe(1);
+  });
+
+  it('AgendaItemOpened after now, then VotingOpened at now: no throw, figures as without them', () => {
+    const base = [created(ago(86_000)), ev('MeetingStarted', M, {}, ago(85_000)), capture('q1', ago(100))];
+    const events = [...base, ev('AgendaItemOpened', M, { agendaItemId: 'top-1', number: 1 }, ago(-1)),
+      ev('VotingOpened', M, { agendaItemId: 'top-1', number: 1 }, ago(0))];
+    expect(compute(events)).toEqual(compute(base));
+  });
+
+  it('MeetingCreated after now: the meeting is found, no false 404', () => {
+    const events = [created(ago(-5)), ev('MeetingStarted', M, {}, ago(-5)), capture('q1', ago(-4))];
+    const cockpit = computeCockpit(events, NOW, M, allRead);
+    expect(cockpit).toBeDefined();
+    expect(cockpit!.totals.captured).toBe(0); // the capture after now counts nowhere
+  });
+
+  it('per question: a capture after now is dropped, its own events after now are cut', () => {
+    const events = [...meeting(), capture('q1', ago(1000)), classify('q1', ago(900)), assignTo('q1', 'u-fin', ago(-10)),
+      capture('q2', ago(-5)), classify('q2', ago(-4))];
+    const cockpit = compute(events);
+    expect(cockpit.totals.captured).toBe(1);
+    expect(cockpit.openByStatus.classified).toBe(1);
+    expect(cockpit.openByUnit['u-fin']).toBe(0);
+    expect(cockpit.openUnassigned).toBe(1);
+    expect(cockpit.oldestOpen.items.map((item) => [item.id, item.status, item.statusAgeSeconds])).toEqual([['q1', 'classified', 900]]);
+  });
+});
+
+describe('Review 061 A, minor 2: getCockpit checks the canonical question record', () => {
+  it('a unit-bound reader sees a reference by the unit of the projection, not of the time-cut record', async () => {
+    const fixture = createInMemoryEventStore();
+    fixture.append([...meeting(), ev('RoleAssigned', 'ra-1', { assignmentId: 'ra-1', subjectId: 'reader-061', role: 'coordination',
+      unitId: 'u-ir' }, ago(80_000)),
+      capture('q1', ago(5000)), classify('q1', ago(4900)), assignTo('q1', 'u-fin', ago(4800)),
+      ev('QuestionForwarded', 'q1', { unitId: 'u-ir', reasonCode: 'wrong_unit' }, ago(-30))]
+      .map(({ seq: _seq, ...event }) => event) as never);
+    const bundle = ROLE_PERMISSIONS.coordination as unknown as { unitBoundRead?: true };
+    // Today no holder of cockpit.read is unit-bound (K1); the test binds one for its duration only.
+    bundle.unitBoundRead = true;
+    try {
+      const reader = createInProcessApi({ store: fixture, meetingId: M, clock: () => NOW,
+        actor: () => ({ id: 'reader-061', role: 'coordination', assignmentScoped: true }) });
+      const cockpit = await reader.getCockpit();
+      expect(cockpit.oldestOpen.items.map((item) => item.id)).toEqual(['q1']);
+      expect(cockpit.oldestOpen.items[0]!.unitId).toBe('u-fin'); // the figure stays at now; only the check is canonical
+    } finally {
+      delete bundle.unitBoundRead;
+    }
+    expect(ROLE_PERMISSIONS.coordination.unitBoundRead).toBeUndefined();
+  });
+});
+
+describe('Review 061 A, test 5: two meetings', () => {
+  it('the cockpit of meeting B counts only B while A is the current meeting', async () => {
+    const two = createInMemoryEventStore();
+    const mk = (id: string, date: string, questions: number): DomainEvent[] => [
+      { ...ev('MeetingCreated', id, { title: id, date, lifecycleVersion: 2, agendaItems: [], units: [{ id: 'u-fin', name: 'Finanzen' }] },
+        ago(86_000)), meetingId: id },
+      { ...ev('MeetingStarted', id, {}, ago(85_000)), meetingId: id },
+      ...Array.from({ length: questions }, (_, i) => ({ ...capture(`${id}-q${i}`, ago(500 + i)), meetingId: id })),
+    ];
+    two.append([...mk('hv-a', '2031-06-01', 3), ...mk('hv-b', '2031-05-01', 2)].map(({ seq: _seq, ...event }) => event) as never);
+    const coordination: Actor = { id: 'coord-two-061', role: 'coordination' };
+    const current = await createInProcessApi({ store: two, clock: () => NOW, actor: () => coordination }).getCockpit();
+    const b = await createInProcessApi({ store: two, meetingId: 'hv-b', clock: () => NOW, actor: () => coordination }).getCockpit();
+    expect(current.meetingId).toBe('hv-a');
+    expect(current.totals.captured).toBe(3);
+    expect(b.meetingId).toBe('hv-b');
+    expect(b.totals.captured).toBe(2);
+    expect(b.oldestOpen.items.every((item) => item.id.startsWith('hv-b-'))).toBe(true);
   });
 });

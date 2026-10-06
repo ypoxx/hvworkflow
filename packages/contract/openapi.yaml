@@ -1838,7 +1838,8 @@ paths:
         questions the reader may read (`can(actor, 'question.read', question)`); the aggregates are
         unfiltered, which is why every holder of `cockpit.read` holds unscoped `question.read`. No
         question text, no actor, no speaker, no claim. Ages are whole seconds, rounded down, never
-        negative, computed against the service clock (`asOf`); an event after `asOf` counts nowhere.
+        negative, computed against the service clock (`asOf`); a question captured after `asOf`, and a
+        question's own events after `asOf`, count nowhere.
         Meetings in every status are computed; equality with `/metrics` holds for running meetings.
       responses:
         '200': { description: OK, headers: { X-Server-Time: { $ref: '#/components/headers/X-Server-Time' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Cockpit' } } } }

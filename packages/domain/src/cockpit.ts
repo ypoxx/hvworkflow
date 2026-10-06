@@ -69,7 +69,8 @@ const byNumber = (a: QuestionRecord, b: QuestionRecord): number =>
 
 /**
  * The figures of `meetingId` at `now`; `undefined` while the events hold no such meeting. Events of other
- * meetings and events with a server time after `now` (clock set back) count nowhere. `canRead` filters the
+ * meetings count nowhere; a question captured after `now` (clock set back) and a question's own events after `now` count
+ * nowhere either, while the meeting-level log is folded whole (review 061 A). `canRead` filters the
  * references only; the aggregates stay unfiltered (every holder of `cockpit.read` reads unscoped, K1).
  */
 export function computeCockpit(
@@ -79,7 +80,7 @@ export function computeCockpit(
   canRead: (question: QuestionRecord) => boolean,
 ): Cockpit | undefined {
   const nowMs = now.getTime();
-  const relevant = events.filter((e) => e.meetingId === meetingId && eventTime(e) <= nowMs);
+  const relevant = events.filter((e) => e.meetingId === meetingId);
   const capturedAt = new Map<string, number>();
   const statusSince = new Map<string, number>();
   const inReviewSince = new Map<string, number>();
@@ -88,11 +89,25 @@ export function computeCockpit(
   // events on an empty state (no meeting, nothing to recount), the rest of the log once; the question
   // records then join that state and `refreshCounts` (state.ts) recounts once. Every question event names
   // its question as subject (state.ts), so the records equal those of `project` (K3, K11 pin it).
-  const questionIds = new Set(relevant.filter((e) => e.type === 'QuestionCaptured').map((e) => e.subjectId));
+  //
+  // "After asOf counts nowhere" (K8) applies per question only (review 061 A, major 1): a question captured
+  // after `now` is left out, and its own list ends before its first event after `now`. The meeting-level log
+  // is folded whole, in log order, as `project` does: cutting it by time could drop a MeetingStarted or an
+  // AgendaItemOpened that a later-logged event depends on, and `reduce` would throw.
+  const questionIds = new Set<string>();
+  const anyQuestion = new Set<string>();
+  for (const e of relevant) {
+    if (e.type !== 'QuestionCaptured') continue;
+    anyQuestion.add(e.subjectId);
+    if (eventTime(e) <= nowMs) questionIds.add(e.subjectId);
+  }
   const perQuestion = new Map<string, DomainEvent[]>();
+  const cut = new Set<string>();
   const rest: DomainEvent[] = [];
   for (const event of relevant) {
-    if (!questionIds.has(event.subjectId)) { rest.push(event); continue; }
+    if (!anyQuestion.has(event.subjectId)) { rest.push(event); continue; }
+    if (!questionIds.has(event.subjectId) || cut.has(event.subjectId)) continue;
+    if (eventTime(event) > nowMs) { cut.add(event.subjectId); continue; }
     const list = perQuestion.get(event.subjectId);
     if (list) list.push(event);
     else perQuestion.set(event.subjectId, [event]);
