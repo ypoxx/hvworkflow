@@ -859,3 +859,4 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   erlaubt (Spec: mindestens 3 Zeichen oder ein voller Scope) · engere Regel.
 - takt-047 Nachprüfung minor · `scripts/release-age.mjs:53` · Zeilen im Ausnahmeblock, die nur aus NBSP oder VT bestehen, werden
   übersprungen (verbirgt keinen Eintrag) · als unbekannte Zeile melden.
+- takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
