@@ -73,6 +73,24 @@ Perspektive und Rolle: Security/Lieferkette, Reviewer in frischem Kontext. Nachw
 
 ## Bericht
 
-(wird nach dem Lauf ergänzt)
+```
+Slice: takt-051-source-map-js-ausnahme
+Done: Befristete Audit-Ausnahme 1241209 (GHSA-68fv-2mgg-jv7q, source-map-js < 1.2.2) bis 2026-10-14 in
+      scripts/audit-exceptions.json; Folgezeile für das Anheben auf 1.2.2 nach 2026-10-07T14:08Z ohne Mindestalter-Ausnahme.
+Evidence: audit:check vor der Änderung (924266a) rot:
+        pnpm audit: 1 blocking advisory(ies) at "moderate" or above:
+          #1241209 high source-map-js (...) — no exception entry. (...)
+         ELIFECYCLE  Command failed with exit code 1.
+      audit:check nach der Änderung grün:
+        pnpm audit: 2 advisory(ies) found, all at "moderate"+ covered by an unexpired exception.
+      Erreichbarkeit: pnpm why source-map-js -r nur über postcss/@tailwindcss (devDependencies); --prod leer;
+        apps/web/dist ohne Treffer; api.Dockerfile installiert --prod.
+      pnpm gates auf 0e550f8: im Bau-Lauf unter Maschinenlast (Last ~27 auf 4 Kernen) dreimal rot nur in zeitkritischen
+        Postgres-Tests von apps/api (keine Codeänderung in dieser Scheibe); im Lauf des Sicherheitsreviews vollständig grün,
+        mark-test-run: wrote .claude/state/last-test-run (clean tree) at commit 0e550f8, tree 857baa00c0c4…
+Open: Anheben auf 1.2.2 (Folgeliste), spätestens bis zum Ablauf der Ausnahme am 2026-10-14.
+Touched: docs/slices/takt-051-source-map-js-ausnahme.md, scripts/audit-exceptions.json, docs/folgeliste.md
+Review (Sonnet, Sicherheit, frischer Kontext): kein Blocker, kein Major, kein Minor; Nit = dieser Bericht.
+```
 
 ## Review findings
