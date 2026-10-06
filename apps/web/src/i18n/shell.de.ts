@@ -212,6 +212,7 @@ export const shellDe = {
   'action.stage.read': 'Ansehen',
   'action.history.read': 'Ansehen',
   'action.event.read': 'Ansehen',
+  'action.cockpit.read': 'Leitstand ansehen',
   'action.demo.seed': 'Demobestand erzeugen',
   'event.MeetingCreated': 'Hauptversammlung angelegt',
   'event.MeetingStarted': 'Hauptversammlung eröffnet',

@@ -658,11 +658,13 @@ describe('live store (slice 036a)', () => {
     expect(t.count('getQuestion', 'q1')).toBe(2);
   });
 
-  it('(p) READ_TOPICS names every read method of HvApi except listEvents', () => {
+  it('(p) READ_TOPICS names every read method of HvApi except listEvents and getCockpit', () => {
     const inProcess = createInProcessApi({ store: createInMemoryEventStore(), actor: () => A, clock: () => new Date(0) });
     const reads = Object.keys(inProcess).filter((name) => /^(get|list)[A-Z]/.test(name)).sort();
-    expect([...Object.keys(READ_TOPICS), 'listEvents'].sort()).toEqual(reads);
+    // Scheibe 061: `getCockpit` is time-dependent (its ages move without an event) and passes unbuffered, like the cursor read.
+    expect([...Object.keys(READ_TOPICS), 'listEvents', 'getCockpit'].sort()).toEqual(reads);
     expect(Object.keys(READ_TOPICS)).not.toContain('listEvents');
+    expect(Object.keys(READ_TOPICS)).not.toContain('getCockpit');
   });
 
   it('is the only subscriber of the adapter and buffers nothing without a listener of its own', async () => {
