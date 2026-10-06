@@ -212,6 +212,11 @@ test('S2 --recreate keeps the stored ports, also an override from the first star
   assert(!normal.up.includes('--force-recreate'));
 });
 
+test('takt-055 every compose call of the stack runs without bake (no extra fs.read grant for the build secret)', () => {
+  const plan = upPlan(parseArgs(['up']), createState({ webPort: 18480, idpPort: 18555 }), '/state/dir');
+  assert.equal(plan.env.COMPOSE_BAKE, 'false');
+});
+
 // ---- S3 secrets -----------------------------------------------------------------------------------------------------
 
 test('S3 no secret in a versioned file; every env_file points into the state directory', () => {

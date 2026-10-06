@@ -288,7 +288,11 @@ export function upPlan(args, state, dir) {
     compose,
     build: [...compose, 'build'],
     up: [...compose, 'up', '--detach', '--quiet-pull', ...(args.recreate.length > 0 ? ['--force-recreate', ...args.recreate] : [])],
-    env: { HV_STACK_STATE_DIR: dir, HV_STACK_WEB_PORT: String(state.webPort), HV_STACK_IDP_PORT: String(state.idpPort) },
+    // takt-055: newer Compose builds through buildx bake, which demands an explicit fs.read grant for the build secret
+    // in the state directory; the classic builder keeps the secret a build secret without a new grant.
+    env: {
+      HV_STACK_STATE_DIR: dir, HV_STACK_WEB_PORT: String(state.webPort), HV_STACK_IDP_PORT: String(state.idpPort), COMPOSE_BAKE: 'false',
+    },
   };
 }
 
