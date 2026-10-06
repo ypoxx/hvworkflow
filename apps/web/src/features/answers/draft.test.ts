@@ -9,7 +9,11 @@ import type { AnswerBody, AnswerBodyInput, AnswerMark, AnswerVersion, Permission
 import { previewAnswer } from '../../api/answerFormat';
 import { isDirty, newDraft } from '../focus/focus';
 import type { FocusDraft } from '../focus/focus';
-import { afterSave, canSave, discard, onRecord, startDraft } from './draft';
+import type { BufferedDraft } from '../../api/draftBuffer';
+import {
+  afterSave, baseAt, bufferStep, canSave, conflictAfterRefusal, discard, keepMine, lateRestore, onRecord, restoreDraft, saveDecision,
+  startDraft, takeTheirs,
+} from './draft';
 
 const DRAFTING: Permission[] = ['answer.draft', 'question.submit_review', 'question.read'];
 
@@ -223,5 +227,178 @@ describe('discard', () => {
     expect(back.baseVersion).toBe(2);
     expect(back.rebase).toBe(false);
     expect(isDirty(back)).toBe(false);
+  });
+});
+
+/**
+ * Scheibe 060, U2–U4: the buffered draft restored (`restoreDraft`, base always from the record, never from the entry),
+ * the 412 sorted (`conflictAfterRefusal`), "Mit meiner Fassung weiter" (`keepMine`), "Version n übernehmen"
+ * (`takeTheirs`), the save step with a standing notice (`saveDecision`) and the buffer step of an input (`bufferStep`).
+ */
+describe('Scheibe 060', () => {
+  const M = 'm-1';
+  const plain = (text: string): AnswerBodyInput => ({ blocks: [{ type: 'paragraph', content: [{ text }] }] });
+  const withMeeting = (over: Partial<Question> = {}): Question => question({ meetingId: M, ...over });
+  const v1 = version(1, { text: 'Antwort eins.', sources: ['GB S. 4'] });
+  const v2 = version(2, { text: 'Antwort zwei.', createdBy: { id: 'u-legal-1', role: 'legal' } });
+  function stored(over: Partial<BufferedDraft> = {}): BufferedDraft {
+    return { ownerId: 'u-1', meetingId: M, questionId: 'q-1', body: plain('Antwort eins. Mein Zusatz.'), sources: 'GB S. 4', baseVersion: 1, changedAt: 1_000, ...over };
+  }
+
+  describe('U2 restoreDraft', () => {
+    it('an entry goes before the prefill: restored, changed, generation as given', () => {
+      const r = restoreDraft(stored(), 'u-1', withMeeting({ answers: [v1] }), 4);
+      expect(r.restored).toBe(true);
+      expect(r.drop).toBe(false);
+      expect(r.changedAt).toBe(1_000);
+      expect(r.draft.body).toEqual(plain('Antwort eins. Mein Zusatz.'));
+      expect(r.draft.generation).toBe(4);
+      expect(isDirty(r.draft)).toBe(true);
+      expect(r.draft.rebase).toBe(false);
+    });
+
+    it('an entry equal to its base: not restored, dropped; the prefill stands', () => {
+      const r = restoreDraft(stored({ body: plain('Antwort eins.') }), 'u-1', withMeeting({ answers: [v1] }), 0);
+      expect(r.restored).toBe(false);
+      expect(r.drop).toBe(true);
+      expect(pick(r.draft)).toEqual(pick(startDraft('u-1', withMeeting({ answers: [v1] }))));
+    });
+
+    it('base from the record: an entry with the wording of version 1 stays locked for canSave (takt-048)', () => {
+      const r = restoreDraft(stored({ body: plain('Antwort eins.'), sources: 'GB S. 4' }), 'u-1', withMeeting({ answers: [v1] }), 0);
+      expect(r.restored).toBe(false);
+      expect(canSave(r.draft, { mayDraft: true, busy: false })).toBe(false);
+    });
+
+    it('a manipulated entry is restored against the base of version 1 from the record, never a base of its own', () => {
+      const raw = { ...stored({ body: plain('Ganz anders.') }), baseBody: doc('Ganz anders.'), baseSources: 'GB S. 4' } as BufferedDraft;
+      const r = restoreDraft(raw, 'u-1', withMeeting({ answers: [v1] }), 0);
+      expect(r.restored).toBe(true);
+      expect(r.draft.baseBody).toEqual(doc('Antwort eins.'));
+      expect(isDirty(r.draft)).toBe(true);
+    });
+
+    it('baseVersion above the newest version, or a version missing in the record: rejected and dropped', () => {
+      const future = restoreDraft(stored({ baseVersion: 6 }), 'u-1', withMeeting({ answers: [v1] }), 0);
+      expect(future).toMatchObject({ restored: false, drop: true });
+      const missing = restoreDraft(stored({ baseVersion: 1 }), 'u-1', withMeeting({ answers: [version(2)] }), 0);
+      expect(missing).toMatchObject({ restored: false, drop: true });
+    });
+
+    it('baseVersion at a refusal: the base is empty as with draftBase', () => {
+      const record = withMeeting({ answers: [v1, REFUSAL] });
+      const r = restoreDraft(stored({ baseVersion: 2, sources: '' }), 'u-1', record, 0);
+      expect(r.restored).toBe(true);
+      expect(r.draft.baseVersion).toBe(2);
+      expect(r.draft.baseBody).toBeNull();
+      expect(r.draft.baseSources).toBe('');
+      expect(baseAt(record, 2)).toEqual({ baseVersion: 2, baseBody: null, baseSources: '' });
+      expect(baseAt(record, 0)).toEqual({ baseVersion: 0, baseBody: null, baseSources: '' });
+      expect(baseAt(record, 3)).toBeUndefined();
+    });
+
+    it('a newer version saying what the entry says: base moved, unchanged, dropped', () => {
+      const v2same = version(2, { text: 'Antwort eins. Mein Zusatz.', sources: ['GB S. 4'] });
+      const r = restoreDraft(stored(), 'u-1', withMeeting({ answers: [v1, v2same] }), 0);
+      expect(r.restored).toBe(false);
+      expect(r.drop).toBe(true);
+      expect(r.draft.baseVersion).toBe(2);
+      expect(isDirty(r.draft)).toBe(false);
+    });
+
+    it('a newer version over a changed entry: restored with rebase', () => {
+      const r = restoreDraft(stored(), 'u-1', withMeeting({ answers: [v1, v2] }), 0);
+      expect(r.restored).toBe(true);
+      expect(r.draft.rebase).toBe(true);
+      expect(r.draft.baseVersion).toBe(1);
+    });
+
+    it('without answer.draft: no restore, the entry stays; after roles_changed it is dropped', () => {
+      const record = withMeeting({ answers: [v1], _actions: ['question.read'] });
+      expect(restoreDraft(stored(), 'u-1', record, 0)).toMatchObject({ restored: false, drop: false });
+      expect(restoreDraft(stored(), 'u-1', record, 0, { rolesChanged: true })).toMatchObject({ restored: false, drop: true });
+    });
+
+    it('an entry of another actor, another meeting or another question is never used', () => {
+      const record = withMeeting({ answers: [v1] });
+      for (const other of [stored({ ownerId: 'u-2' }), stored({ meetingId: 'm-2' }), stored({ questionId: 'q-9' })]) {
+        const r = restoreDraft(other, 'u-1', record, 0);
+        expect(r.restored).toBe(false);
+        expect(r.draft.body).toEqual(startDraft('u-1', record).body);
+      }
+      expect(restoreDraft(stored(), 'u-1', question({ answers: [v1] }), 0).restored).toBe(false);
+    });
+
+    it('late snapshot: over an unchanged draft it replaces it with generation + 1; over a changed one nothing changes', () => {
+      const record = withMeeting({ answers: [v1] });
+      const fresh = startDraft('u-1', record, 2);
+      const late = lateRestore(fresh, stored(), 'u-1', record);
+      expect(late.restored).toBe(true);
+      expect(late.draft.generation).toBe(3);
+      const typed = { ...fresh, body: plain('Schon getippt.') };
+      const kept = lateRestore(typed, stored(), 'u-1', record);
+      expect(kept.restored).toBe(false);
+      expect(kept.draft).toBe(typed);
+    });
+  });
+
+  describe('U3 conflictAfterRefusal', () => {
+    const mine = (): FocusDraft => ({ ...startDraft('u-1', withMeeting({ answers: [v1] })), body: plain('Mein Text.') });
+    it('a newer differing version: compare', () => {
+      expect(conflictAfterRefusal(mine(), withMeeting({ answers: [v1, v2] }))).toBe('compare');
+    });
+    it('a newer version saying the same: rebase-silent', () => {
+      expect(conflictAfterRefusal(mine(), withMeeting({ answers: [v1, version(2, { text: 'Mein Text.', sources: ['GB S. 4'] })] }))).toBe('rebase-silent');
+    });
+    it('no newer version: retry', () => {
+      expect(conflictAfterRefusal(mine(), withMeeting({ answers: [v1], version: 9 }))).toBe('retry');
+    });
+    it('a refusal as newest version: compare', () => {
+      expect(conflictAfterRefusal(mine(), withMeeting({ answers: [v1, REFUSAL] }))).toBe('compare');
+    });
+  });
+
+  describe('U4 keepMine and takeTheirs', () => {
+    const mine = (): FocusDraft => ({ ...startDraft('u-1', withMeeting({ answers: [v1] })), body: plain('Mein Text.'), rebase: true });
+    it('the base is the shown version n, not the record’s; record already at n+1 → rebase stands again', () => {
+      const v3 = version(3, { text: 'Antwort drei.' });
+      const next = keepMine(mine(), 2, withMeeting({ answers: [v1, v2, v3] }));
+      expect(next.baseVersion).toBe(2);
+      expect(next.rebase).toBe(true);
+      expect(next.body).toEqual(plain('Mein Text.'));
+    });
+    it('record at n: rebase false, the draft is changed against n, the field rebuilds', () => {
+      const before = mine();
+      const next = keepMine(before, 2, withMeeting({ answers: [v1, v2] }));
+      expect(next.baseVersion).toBe(2);
+      expect(next.rebase).toBe(false);
+      expect(isDirty(next)).toBe(true);
+      expect(next.generation).toBe(before.generation + 1);
+    });
+    it('takeTheirs: the draft is the shown version, unchanged, rebuilt', () => {
+      const before = mine();
+      const next = takeTheirs(before, 2, withMeeting({ answers: [v1, v2] }));
+      expect(next.baseVersion).toBe(2);
+      expect(isDirty(next)).toBe(false);
+      expect(previewAnswer(next.body)).toEqual(doc('Antwort zwei.'));
+      expect(next.generation).toBe(before.generation + 1);
+    });
+  });
+
+  describe('saving with a standing notice, and the buffer step of an input', () => {
+    it('saveDecision: rebase opens the comparison instead of sending; locked stays locked', () => {
+      expect(saveDecision({ rebase: true }, true)).toBe('compare');
+      expect(saveDecision({ rebase: false }, true)).toBe('send');
+      expect(saveDecision({ rebase: true }, false)).toBe('none');
+      expect(saveDecision({ rebase: false }, false)).toBe('none');
+    });
+    it('bufferStep: only an input writes; a changed draft is put, an unchanged one deleted', () => {
+      const record = withMeeting({ answers: [v1] });
+      const fresh = startDraft('u-1', record);
+      const typed = { ...fresh, body: plain('Neu.') };
+      expect(bufferStep(typed, false)).toEqual({ kind: 'none' });
+      expect(bufferStep(typed, true)).toEqual({ kind: 'put', body: plain('Neu.'), sources: 'GB S. 4', baseVersion: 1 });
+      expect(bufferStep(fresh, true)).toEqual({ kind: 'delete' });
+    });
   });
 });
