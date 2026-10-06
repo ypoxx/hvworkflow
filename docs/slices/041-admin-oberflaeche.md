@@ -644,17 +644,92 @@ hoch). Rund **2,0 AStd** (Spanne 1,75–2,5), Lanes web-admin, e2e, docs.
 
 ```
 Slice: 041-admin-oberflaeche
-Done: <Route /admin mit Registerzeile; Kopf und sechs Tabs; Rollen zuordnen/entziehen mit Fachbereich und Ablauf;
+Done: Route /admin als letzte Registerzeile (requires admin.roles.manage, ohne Kürzel); Kopf mit Hauptversammlung,
+      Zustand und Version (Mono) und sechs Tabs; Rollen zuordnen/entziehen mit Fachbereich und Ablauf (Berlin);
       Stammdaten je Eintrag mit If-Match der vor der Liste gelesenen Version; Rollenkarten aus ROLE_PERMISSIONS;
-      Admin-Anleitung v1; Testperson admin im Harness von e2e-http>
-Evidence: <Schluss von `pnpm gates` mit Commit>, docs/evidence/041-*.png, CI-Lauf <id> (e2e-http, Dauer des Schritts)
-Open: <was nicht erledigt ist, mit Grund; Folgeliste-Einträge>
-Touched: <Dateiliste, nur Files allowed>
+      gesperrter Zustand über 403; Admin-Anleitung v1; Testperson admin im Harness von e2e-http
+Evidence: pnpm gates grün auf b8ca5dc (Schluss unten), docs/evidence/041-*.png (9 Bilder), CI-Lauf: offen (nicht gepusht)
+Open: CI-Lauf e2e-http mit Dauer; Design-Kritik D1–D10 durch design-kritiker; Review; sechs Folgeliste-Einträge
+      (Abschnitt „Verwaltung (aus 041)“)
+Touched: siehe unten, alles in Files allowed (slice-scope: 61 Dateien, alle erlaubt)
 ```
 
-Zusätzlich: Ergebnisse der Punkte „Vor dem Bau prüfen“ (1–7) mit Fundstellen; rote und grüne Testläufe; genaue Zahl der
-neuen i18n-Schlüssel; Laufzeit `e2e-http` (Ist vorher, Schätzung, tatsächlich); Design-Kritik D1–D10 als Tabelle;
-Abweichungen von der Spec mit Grund.
+**Commits:** `3dcb775` (WIP, vom Orchestrator nach Abbruch gesichert und gepusht; enthielt versehentlich neun
+überschriebene Screenshots anderer Scheiben), `b8ca5dc` (stellt diese neun auf den Stand `c5990c8` zurück, frische
+041-Bilder; Nettodiff der Verzweigung berührt keinen fremden Nachweis), danach dieser Bericht (nur Doku).
+
+**Vor dem Bau prüfen**
+1. 040a/040b gemergt; alle Methoden in `HvApi` (`packages/domain/src/api.ts:85-107`), Live-Puffer `READ_TOPICS`/
+   `WRITE_METHODS` (`liveStore.ts:43-96`). `createMeeting`/`freezeMeetingConfig` nicht montiert. Ja.
+2. In-process als Verwaltung: Listenersatz mit aktuellem `If-Match` gelingt, veraltet → 412 — belegt durch
+   `features/admin/inProcess.test.ts` (Fall „a stale If-Match → 412 → stale“). Ja.
+3. `roleLabel`/`actionLabel` über `i18n/index.ts` erreichbar; Kartenreihenfolge = Schlüsselreihenfolge von
+   `ROLE_PERMISSIONS` (Test 4). Ja.
+4. Projekt `http` lokal nicht lauffähig (kein Docker/Keycloak); die Dateien vor 041 in `HTTP_ORDER` (002, 021b, 021c,
+   030, 031) berühren keine Fachbereiche, TOPs oder Plätze (grep, keine Fundstelle). R-ADM-08-Versuch und
+   `unit-fin` wie in der Spec; Nachweis kommt mit dem CI-Lauf. Keine Konstante heißt SECRET/TOKEN/KEY/PASSWORD.
+5. Laufzeit `e2e-http`, Schritt „End-to-end http project …“ der letzten drei grünen Läufe: 37369284554 5:06,
+   37360163818 4:52, 37358071699 5:44 (Mittel 5:14). Schätzung +1,1 min → Mittel 6:20 (unter 6:30), schlechtester
+   Lauf 6:50 (über der weichen Warnschwelle, die nur eine Annotation auslöst). Gebaut mit Mittelwert-Lesart; um Zeit
+   zu sparen laufen Sprachwechsel und Screenshots nur in-process, die Datei braucht drei Wechsel auf `admin`. Tatsächliche
+   Dauer: steht mit dem CI-Lauf aus. **Hinweis an den Orchestrator:** knapp; bitte im CI-Lauf prüfen.
+6. `featureRegistry.test.ts` angepasst (letzter Eintrag, `requires`, gated-Liste, Reihenfolgetest); `001-shell.spec.ts`
+   unverändert grün.
+7. Paritätszahl war 621; jetzt 746 (+125: shell 3, admin 122). Schätzung der Spec 95–110 überschritten: eigene
+   Spaltenköpfe je Tab, benannte Zeilenaktionen für Bildschirmleser und sieben Lesebezeichnungen der Rollenkarten.
+
+**Tests rot, dann grün.** Rot (vor der Implementierung, `vitest run src/features/admin src/api/roleCards.test.ts
+src/app/featureRegistry.test.ts src/i18n/parity.test.ts`):
+
+```
+ Test Files  11 failed (11)
+      Tests  6 failed | 15 passed (21)
+Error: Cannot find module './lists' imported from …/features/admin/lists.test.ts
+Error: Cannot find module './masterData' imported from …/features/admin/writeVersion.test.ts
+Error: Cannot find module './problems' imported from …/features/admin/problems.test.ts
+Error: Cannot find module './roleCards' imported from …/api/roleCards.test.ts
+Error: Cannot find module './time' imported from …/features/admin/time.test.ts
+Error: Cannot find module './admin.de' imported from …/i18n/parity.test.ts
+AssertionError: expected 'history' to be 'admin' // Object.is equality
+AssertionError: expected undefined to be '/admin' // Object.is equality
+```
+
+Grün: `apps/web test: Test Files 57 passed (57) · Tests 918 passed (918)`. `entries.test.ts` entstand mit seinem Modul
+(nicht vorher rot). E2e in-process (`E2E_PORT=4412`): `001-shell`, `013-tastaturpfad`, `041-verwaltung` → 16 bestanden,
+axe in allen 041-Schritten 0 Verstöße (beide Durchgänge).
+
+**Abweichungen von der Spec**
+- Test 7 ohne Testing Library: das Web-Paket hat keine DOM-Testumgebung; statische Darstellung plus reine Funktionen
+  (`rovingTarget`, `assignInput`, `submitRevoke`, `followActor`, `readAccess`, `attempt`/`outcomeEffects`), Bedienweg im
+  e2e (E1–E7, 090-Fall in-process). Folgeliste.
+- Rollenkarten: Leserechte tragen alle die Aktionsbeschriftung „Ansehen“; die Karte zeigt stattdessen sieben eigene
+  Lesebezeichnungen (Rückfall auf `actionLabel` für ein neues Recht) und die Rechte-id in Mono.
+- `If-Match` wird im Feature als `ifMatchOf` gebildet (Test hält es gleich `etagOf`), damit keine neue Wertimportwarnung
+  aus `@hv/domain` entsteht; die sechs neuen Warnungen von `arch` stammen nur aus Testdateien (wie `Timeline.test.tsx`).
+- Dialogbreite 512 px statt 480 px (Bauteil kennt nur sm/md/lg; Folgeliste).
+- Kein „Gespeichert“-Toast; nach dem Speichern springt der Fokus zurück (takt-008), 412 meldet `admin.stale`.
+- Die Abschlussprüfung „Stand wie vorher“ im Projekt `http` steckt im zweiten Test (vor und nach dem Hin-und-zurück gegen
+  den Stand vom Dateianfang) statt in einem `afterAll` (dort gibt es keine Seite mit Sitzung).
+
+**Design-Kritik D1–D10:** steht aus (design-kritiker in frischem Kontext, vor dem Review).
+
+**Touched:** `apps/web/src/features/admin/**` (30 Dateien), `apps/web/src/api/roleCards{,.test}.ts`,
+`apps/web/src/app/featureRegistry{,.test}.ts`, `apps/web/src/i18n/{admin.de,admin.en,de,en,shell.de,shell.en,parity.test}.ts`,
+`apps/web/e2e/041-verwaltung.spec.ts`, `apps/web/e2e/support/roles.ts`, `apps/web/e2e/http/anmeldung.setup.ts`,
+`apps/web/playwright.config.ts`, `scripts/e2e-http-031{,.test}.mjs`, `docs/admin/anleitung.md`, `docs/glossar.md`,
+`docs/sicherheit/bedrohungsmodell.md`, `docs/folgeliste.md`, `docs/evidence/041-*.png`, diese Spec.
+
+**Schluss von `pnpm gates` auf `b8ca5dc`:**
+
+```
+slice-scope: 61 changed file(s), all within "docs/slices/041-admin-oberflaeche.md"'s "Files allowed" list (35 pattern(s)).
+# pass 352
+# fail 0
+✓ 1784 modules transformed.
+dist/assets/index-CTxymbJW.js                        814.52 kB │ gzip: 236.97 kB │ map: 3,316.90 kB
+✓ built in 2.55s
+mark-test-run: wrote /home/user/wt/s041/.claude/state/last-test-run (clean tree) at commit b8ca5dc, tree 9af2f3059e55…
+```
 
 ## Review findings
 
