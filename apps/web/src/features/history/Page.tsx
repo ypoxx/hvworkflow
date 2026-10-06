@@ -45,7 +45,7 @@ import {
   readVerdict,
   tableRows,
 } from './lib';
-import type { KeyedRead, PagedResults, ReadVerdict } from './lib';
+import type { KeyedRead, PagedResults, ReadVerdict, StreamWindowState } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -119,6 +119,29 @@ export function streamWindowOwned(key: string | null, actor: Actor): boolean {
   return keyBelongsTo(key, actorKey(actor));
 }
 
+/** The held stream window as the page keeps it (`streamState`). */
+interface HeldStream {
+  key: string | null;
+  cursor: number;
+  window: readonly ReadEvent[];
+  curve: readonly number[];
+}
+
+/** What the Ereignisstrom tab shows of the held window: nothing of a structurally other person (takt-057). */
+export function shownStream(
+  held: HeldStream,
+  actor: Actor,
+): { window: readonly ReadEvent[]; curve: readonly number[] } {
+  return streamWindowOwned(held.key, actor)
+    ? { window: held.window, curve: held.curve }
+    : { window: NO_READ_EVENTS, curve: NO_CURVE };
+}
+
+/** The start the stream effect hands to `advanceStream`: the own window, or `null` (read afresh) for anyone else. */
+export function heldStreamBase(held: HeldStream, actor: Actor): StreamWindowState | null {
+  return streamWindowOwned(held.key, actor) ? { cursor: held.cursor, events: held.window } : null;
+}
+
 export function HistoryPage() {
   const t = useT();
   const version = useApiVersion();
@@ -171,12 +194,7 @@ export function HistoryPage() {
   // load that read it.
   // takt-038, Ziel 2: `cursor` is the `seq` the window has been read up to; later counts read only
   // from there to the head (`advanceStream`, lib.ts).
-  const [streamState, setStreamState] = useState<{
-    key: string | null;
-    cursor: number;
-    window: readonly ReadEvent[];
-    curve: readonly number[];
-  }>({ key: null, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
+  const [streamState, setStreamState] = useState<HeldStream>({ key: null, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
   // Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Historie — set from the 403's
   // ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
@@ -261,8 +279,7 @@ export function HistoryPage() {
       ? historyState.events
       : null;
   const streamOwned = streamWindowOwned(streamState.key, actor);
-  const streamWindow = streamOwned ? streamState.window : NO_READ_EVENTS;
-  const curve = streamOwned ? streamState.curve : NO_CURVE;
+  const { window: streamWindow, curve } = shownStream(streamState, actor);
   /**
    * Slice 010d, review round 1, finding 3: the stream effect reads its own record through this ref
    * instead of depending on it. As a dependency (`streamOwned`, and before it `streamLastSeq`) every
@@ -520,9 +537,7 @@ export function HistoryPage() {
     // compares with `mainKey`.
     const windowKey = streamWindowKey(getActor(), version);
     const held = streamRef.current;
-    const base = streamWindowOwned(held.key, getActor())
-      ? { cursor: held.cursor, events: held.window }
-      : null;
+    const base = heldStreamBase(held, getActor());
     advanceStream(api, base)
       .then((next) => {
         if (!isCurrentLoad(requested, current())) return;

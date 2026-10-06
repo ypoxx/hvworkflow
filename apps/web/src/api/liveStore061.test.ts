@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { Actor, Cockpit, HvApi } from '@hv/domain';
-import { createLiveStore, READ_TOPICS } from './liveStore';
+import { createLiveStore, READ_TOPICS, WithheldAnswer } from './liveStore';
 
 const reader: Actor = { id: 'coord-061', role: 'coordination' };
 
@@ -88,19 +88,39 @@ describe('takt-056 listEvents is withheld after an actor change (Codex P1 on #17
 /**
  * takt-057: the remaining pass-throughs of the live store under the actor protection (T-G1-I-09). A write, `seedDemo`
  * and `lastWriteEtag` began for one person must not hand their content to the next; the invalidation signal of a write
- * stays. Each case first failed against the store of takt-056.
+ * stays. A withheld write rejects with the content-free `WithheldAnswer` (review finding 1), so the views' write locks
+ * fall; a withheld read stays unsettled. Every case failed first against the store of takt-056, except three regression
+ * guards that takt-056 already satisfied: "for the same person a write answer and a write failure are delivered
+ * unchanged", "a rejection is delivered to the same person and withheld after a change" and "an actor change without
+ * clear() withholds a running getCockpit answer" (checked by mutation: they fail without the delivery-time actor
+ * comparison in `forCaller` or without its `reject`).
  */
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
 };
-function tracked(promise: Promise<unknown>): { settled: () => boolean } {
+function tracked(promise: Promise<unknown>): { settled: () => boolean; value: () => unknown; error: () => unknown } {
   let settled = false;
-  void promise.then(() => { settled = true; }, () => { settled = true; });
-  return { settled: () => settled };
+  let value: unknown;
+  let error: unknown;
+  void promise.then((v) => { settled = true; value = v; }, (e: unknown) => { settled = true; error = e; });
+  return { settled: () => settled, value: () => value, error: () => error };
+}
+/** Review finding 1: a withheld write rejects with the sentinel and nothing else — no payload, text, status or cause. */
+function expectWithheld(outcome: ReturnType<typeof tracked>, ...secrets: string[]): void {
+  expect(outcome.settled()).toBe(true);
+  expect(outcome.value()).toBeUndefined();
+  const error = outcome.error();
+  expect(error).toBeInstanceOf(WithheldAnswer);
+  const own = Object.getOwnPropertyNames(error).filter((name) => name !== 'stack' && name !== 'message' && name !== 'name');
+  expect(own).toEqual([]);
+  expect((error as Error).cause).toBeUndefined();
+  for (const name of ['status', 'detail', 'title', 'ruleId', 'body']) expect(name in (error as object)).toBe(false);
+  const text = `${(error as Error).message} ${String(error)}`;
+  for (const secret of secrets) expect(text).not.toContain(secret);
 }
 
 describe('takt-057 writes are withheld after an actor change', () => {
-  it('a write answered after clear() never reaches the caller, and its invalidation still runs (observeWrites)', async () => {
+  it('a write answered after clear() rejects with WithheldAnswer, without its content, and its invalidation still runs (observeWrites)', async () => {
     let release: (value: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     let n = 0;
@@ -120,14 +140,14 @@ describe('takt-057 writes are withheld after an actor change', () => {
     expect(listQuestions).toHaveBeenCalledTimes(1);
     release({ id: 'q-1', _actions: ['close'] });
     await flush();
-    expect(write.settled()).toBe(false);
+    expectWithheld(write, 'q-1', 'close');
     // settleWrite('success') ran anyway: the buffer is empty and the listeners heard it.
     expect(heard).toHaveBeenCalledTimes(1);
     await store.listQuestions();
     expect(listQuestions).toHaveBeenCalledTimes(2);
   });
 
-  it('a failed write after clear() is not delivered either, and still empties the buffer (observeWrites)', async () => {
+  it('a failed write after clear() rejects with WithheldAnswer, not the earlier problem, and still empties the buffer (observeWrites)', async () => {
     let fail: (error: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((_resolve, reject) => { fail = reject; }));
     const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
@@ -141,9 +161,9 @@ describe('takt-057 writes are withheld after an actor change', () => {
     actor = { id: 'other-057', role: 'coordination' };
     store.clear('actor');
     await store.listQuestions();
-    fail(new Error('412'));
+    fail(Object.assign(new Error('secret detail of the earlier person'), { status: 412, detail: 'secret detail', ruleId: 'R-X' }));
     await flush();
-    expect(write.settled()).toBe(false);
+    expectWithheld(write, 'secret', 'R-X', '412');
     await store.listQuestions();
     expect(listQuestions).toHaveBeenCalledTimes(2);
   });
@@ -159,7 +179,7 @@ describe('takt-057 writes are withheld after an actor change', () => {
     await expect(store.closeQuestion('q-1', {} as never)).rejects.toThrow('409');
   });
 
-  it('an actor change without clear() (only getActor() returns another person) withholds a running write', async () => {
+  it('an actor change without clear() (only getActor() returns another person) withholds a running write with WithheldAnswer', async () => {
     let release: (value: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
@@ -169,10 +189,10 @@ describe('takt-057 writes are withheld after an actor change', () => {
     actor = { ...reader, role: 'moderation' }; // same id, other rights
     release({ id: 'q-1', _actions: ['close'] });
     await flush();
-    expect(write.settled()).toBe(false);
+    expectWithheld(write, 'q-1', 'close');
   });
 
-  it('seedDemo answered after clear() never reaches the caller', async () => {
+  it('seedDemo answered after clear() rejects with WithheldAnswer, without its content', async () => {
     let release: (value: unknown) => void = () => undefined;
     const seedDemo = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     const adapter = { seedDemo, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
@@ -181,9 +201,9 @@ describe('takt-057 writes are withheld after an actor change', () => {
     const seeded = tracked(store.seedDemo());
     actor = { id: 'other-057', role: 'admin' };
     store.clear('actor');
-    release({ questions: 3 });
+    release({ questions: 3, marker: 'seed-secret' });
     await flush();
-    expect(seeded.settled()).toBe(false);
+    expectWithheld(seeded, 'seed-secret');
   });
 });
 
@@ -211,6 +231,25 @@ describe('takt-057 lastWriteEtag belongs to the person who wrote', () => {
     expect(store.lastWriteEtag()).toBe(etag);
     box.actor = { ...reader, unitId: 'u-fin' };
     expect(store.lastWriteEtag()).toBeUndefined();
+    await store.closeQuestion('q-1', {} as never);
+    expect(store.lastWriteEtag()).toBe(etag);
+  });
+
+  it('review finding 2: the new person\'s own write as the first call after a change brings the tag back', async () => {
+    const { store, box, etag } = setupEtag();
+    await store.closeQuestion('q-1', {} as never);
+    box.actor = { id: 'other-057', role: 'coordination' }; // no clear(), no read in between
+    await store.closeQuestion('q-1', {} as never);
+    expect(store.lastWriteEtag()).toBe(etag);
+  });
+
+  it('review nit 5: signed out, a write leaves lastWriteEtag as the adapter value (today\'s behaviour)', async () => {
+    const etag = '"v9"';
+    const closeQuestion = vi.fn(async () => ({ id: 'q-1' }));
+    const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => etag } as unknown as HvApi;
+    const store = createLiveStore(adapter, {
+      getActor: () => { throw new Error('signed out'); }, now: () => 0, monotonic: () => 0,
+    });
     await store.closeQuestion('q-1', {} as never);
     expect(store.lastWriteEtag()).toBe(etag);
   });
@@ -266,5 +305,8 @@ describe('takt-057 guarded() reads: failures and the signed-out path', () => {
     let write: Promise<unknown> | undefined;
     expect(() => { write = store.closeQuestion('q-1', {} as never); }).not.toThrow();
     await expect(write).rejects.toThrow('sync');
+    let seeded: Promise<unknown> | undefined;
+    expect(() => { seeded = store.seedDemo(); }).not.toThrow();
+    await expect(seeded).rejects.toThrow('sync');
   });
 });

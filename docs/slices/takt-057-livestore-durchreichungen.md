@@ -16,8 +16,15 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
 ## Ziel
 
 1. **Schreibantworten** (alle Methoden aus `WRITE_METHODS`) und **`seedDemo`**: eine vor einem Akteurwechsel oder `clear()`
-   begonnene Schreibung liefert ihren Inhalt (z. B. eine Frage mit `_actions` der vorigen Rechte) nicht an den Aufrufer, genau
-   wie eine Lesung (Promise bleibt unerfüllt, siehe Kopfkommentar des Live-Stores). Das Invalidierungssignal bleibt erhalten:
+   begonnene Schreibung liefert ihren Inhalt (z. B. eine Frage mit `_actions` der vorigen Rechte) nicht an den Aufrufer.
+   **Geändert nach Review-Befund 1 (Major):** anders als eine Lesung bleibt ihre Promise nicht unerfüllt, sondern lehnt mit
+   dem inhaltslosen Merker `WithheldAnswer` (exportiert aus `liveStore.ts`, `extends Error`) ab: keine Nutzlast, kein Text
+   des Dienstes, kein Status, nie das Problemobjekt der vorigen Person. Grund: die Ansichten werden bei einem Akteurwechsel
+   nicht neu eingehängt, und jedes `clear()` (auch Stromende `roles_changed`/`forbidden`/`session` bei derselben Person)
+   hebt die Epoche; ihre Schreibsperren (`speakers/Page.tsx` `inFlight`, `capture/Page.tsx` `writingRef`,
+   `answers/useWriteDoor.ts` `writing`/`lock`) fallen nur in `catch`/`finally` und blieben sonst für immer stehen.
+   `showProblem` (`components/toastStore.ts`) zeigt für den Merker keine Meldung. Lesungen (`read()`, die `guarded`-Lesungen
+   `getCockpit`/`listEvents`) bleiben unerfüllt wie bisher (Ladeschlüssel der Ansichten; Codex auf #168). Das Invalidierungssignal bleibt erhalten:
    `settleWrite` läuft bei `observeWrites` weiter auf Erfolg und Fehler, unabhängig davon, ob die Antwort zugestellt wird.
    Ohne angemeldete Person (Akteur `undefined`) bleibt der Weg wie heute (Adapter antwortet direkt).
 2. **`lastWriteEtag`**: liefert `undefined`, wenn seit der letzten erfolgreichen Schreibung ein Akteurwechsel oder ein `clear()`
@@ -36,15 +43,23 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
 ## Abnahme
 
 - Tests in `apps/web/src/api/liveStore061.test.ts` (Datei der Schutzfälle), jeder zuerst rot, dann grün:
-  - eine Schreibung, deren Antwort nach `clear('actor')` ankommt, erreicht den Aufrufer nicht; `settleWrite`-Wirkung
-    (Invalidierung) tritt trotzdem ein (bei `observeWrites: true`);
-  - `seedDemo` ebenso zurückgehalten;
+  - eine Schreibung, deren Antwort oder Fehler nach `clear('actor')` ankommt, erreicht den Aufrufer nicht, sondern lehnt mit
+    `WithheldAnswer` ohne Inhalt des Adapters ab (Review-Befund 1); `settleWrite`-Wirkung (Invalidierung) tritt trotzdem ein
+    (bei `observeWrites: true`);
+  - `seedDemo` ebenso zurückgehalten (Ablehnung mit `WithheldAnswer`);
+  - die erste Schreibung einer neuen Person nach einem strukturellen Akteurwechsel ohne `clear()` macht `lastWriteEtag`
+    wieder zum Adapterwert (Review-Befund 2);
   - `lastWriteEtag` ist nach `clear()` bzw. Akteurwechsel `undefined`, vorher der Adapterwert;
   - `guarded()`-Lesung (`listEvents` oder `getCockpit`): Ablehnung wird für dieselbe Person zugestellt, nach Wechsel nicht;
   - Akteurwechsel **ohne** `clear()` (nur `getActor()` liefert eine andere Person) hält eine laufende Antwort zurück;
   - abgemeldet: synchron werfender Adapter ergibt eine abgelehnte Promise.
 - Historie: ein Unit-Test (bestehende Testdatei der Historie oder neue neben `Page.tsx`), dass ein Fenster bei gleicher id und
-  anderem strukturellem Akteur nicht als eigenes gilt.
+  anderem strukturellem Akteur nicht als eigenes gilt; dazu (Review-Befund 4) ein Test auf der Ebene, auf der `Page.tsx`
+  das gehaltene Fenster anzeigt und als Ausgangspunkt des Weiterlesens nimmt: gleiche id, andere Rolle → nicht angezeigt,
+  `listEvents` liest von vorn.
+- `showProblem(new WithheldAnswer())` zeigt keine Meldung (Review-Befund 1).
+- Ein Test auf Hook-Ebene (`answers/useWriteDoor.ts`): nach einer zurückgehaltenen Schreibung über den Live-Store nimmt die
+  Schreibtür die nächste Aktion an (Review-Befund 1).
 - `pnpm gates` grün.
 
 ## Files allowed
@@ -54,6 +69,9 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
 - `apps/web/src/features/history/Page.tsx`
 - `apps/web/src/features/history/*.test.{ts,tsx}` (bestehende oder eine neue Testdatei; beim Bau von `*.test.ts(x)` berichtigt, das Tor liest Klammern wörtlich)
 - `docs/slices/takt-057-livestore-durchreichungen.md`
+- nach Review-Befund 1: `apps/web/src/components/toastStore.ts`, `apps/web/src/components/toastStore.test.ts`,
+  `apps/web/src/features/answers/useWriteDoor.test.tsx` (nur Test; die drei Schreibtüren selbst brauchen keine Änderung,
+  siehe Bericht)
 
 ## Bericht
 
