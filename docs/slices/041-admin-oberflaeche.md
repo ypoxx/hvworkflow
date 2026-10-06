@@ -732,6 +732,33 @@ dist/assets/index-CTxymbJW.js                        814.52 kB │ gzip: 236.97 
 mark-test-run: wrote /home/user/wt/s041/.claude/state/last-test-run (clean tree) at commit b8ca5dc, tree 9af2f3059e55…
 ```
 
+**Nacharbeit nach Review (06.10.2026), Commit `644f32a`**
+
+- Blocker (Zeitgrenze `inProcess.test.ts`): Demobestand einmal in `beforeAll`, je Test ein eigener Store über dieselben
+  Ereignisse; je Test jetzt 0,2–0,5 s statt einer Neusaat, Zeitgrenze 30 s/60 s als Spielraum.
+- Major (verlorene Änderung über den Live-Puffer): `readMaster` liest die Version mit `getMeeting()` (hebt die
+  Versionsmarke, verwirft älter gepufferte Listen) und prüft die Kennung der verwalteten Hauptversammlung. Neuer Test
+  `features/admin/liveStorePairing.test.ts` über `createLiveStore` mit falschem Adapter, zuerst rot gegen den alten Stand:
+  `AssertionError: expected [ 'unit-fin' ] to deeply equal [ 'unit-fin', 'unit-other' ]` und `promise resolved "{ version:
+  1, … }" instead of rejecting` (2 failed | 1 passed), danach grün.
+- Major (Datenschutz): die sieben Texte der Datei 041 stehen in `apps/web/e2e/support/e2e-texts.ts` und in
+  `WRITTEN_TEXTS` (Nachtrag des Orchestrators in Files allowed); der Folgeliste-Eintrag dazu ist entfernt.
+- e2e-http kürzer: E5 (Rollenkarten) und der 090-Fall sind im Projekt `http` deklariert übersprungen (vor `beforeEach`);
+  dort bleiben drei Tests mit zwei Wechseln auf `admin` und einem auf `capture`.
+- Minor 4, 5 und Nits 7, 8, 9 stehen in der Folgeliste (Abschnitt „Verwaltung (aus 041)“).
+- E2e in-process (`E2E_PORT=4411`): `041-verwaltung` 5 bestanden, axe ohne Verstoß; Screenshots neu.
+
+Schluss von `pnpm gates` auf `644f32a` (erster Lauf grün, kein Wiederholungslauf nötig; web 921 Tests):
+
+```
+slice-scope: warning — "docs/slices/041-admin-oberflaeche.md"'s "Files allowed" section differs from its version at the commit that introduced it (112fd2a).
+slice-scope: 63 changed file(s), all within "docs/slices/041-admin-oberflaeche.md"'s "Files allowed" list (37 pattern(s)).
+# pass 352
+# fail 0
+✓ built in 1.93s
+mark-test-run: wrote /home/user/wt/s041/.claude/state/last-test-run (clean tree) at commit 644f32a, tree 358bd2a2bf50…
+```
+
 ## Review findings
 
 —
