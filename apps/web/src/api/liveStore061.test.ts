@@ -119,8 +119,8 @@ function expectWithheld(outcome: ReturnType<typeof tracked>, ...secrets: string[
   for (const secret of secrets) expect(text).not.toContain(secret);
 }
 
-describe('takt-057 writes are withheld after an actor change', () => {
-  it('a write answered after clear() rejects with WithheldAnswer, without its content, and its invalidation still runs (observeWrites)', async () => {
+describe('takt-057 writes are withheld after an actor change, and settle without content', () => {
+  it('a success answered after clear() rejects with WithheldAnswer, without its content, and its invalidation still runs (observeWrites)', async () => {
     let release: (value: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     let n = 0;
@@ -147,7 +147,7 @@ describe('takt-057 writes are withheld after an actor change', () => {
     expect(listQuestions).toHaveBeenCalledTimes(2);
   });
 
-  it('a failed write after clear() rejects with WithheldAnswer, not the earlier problem, and still empties the buffer (observeWrites)', async () => {
+  it('a failure answered after clear() rejects with WithheldAnswer, not the earlier problem, and still empties the buffer (observeWrites)', async () => {
     let fail: (error: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((_resolve, reject) => { fail = reject; }));
     const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
@@ -179,6 +179,53 @@ describe('takt-057 writes are withheld after an actor change', () => {
     await expect(store.closeQuestion('q-1', {} as never)).rejects.toThrow('409');
   });
 
+  it('review finding 1: clear() for the same person (a stream end) withholds the content but settles the write', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    const store = createLiveStore(adapter, { getActor: () => ({ ...reader }), now: () => 0, monotonic: () => 0 });
+    const write = tracked(store.closeQuestion('q-1', {} as never));
+    store.clear('roles_changed');
+    release({ id: 'q-1', _actions: ['close'] });
+    await flush();
+    expectWithheld(write, 'q-1', 'close');
+  });
+
+  it('e2e finding: a write made while the actor is swapped for one synchronous task is answered, and neither empties the buffer nor withholds the view\'s reads', async () => {
+    let releaseRead: (value: unknown) => void = () => undefined;
+    const listQuestions = vi
+      .fn()
+      .mockImplementationOnce(async () => ({ items: [], total: 1 }))
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseRead = resolve; }));
+    const getSpeaker = vi.fn(async () => ({ id: 's-1' }));
+    const registerSpeaker = vi.fn(async () => ({ id: 's-2' }));
+    const adapter = {
+      listQuestions, getSpeaker, registerSpeaker, subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    store.subscribe(() => undefined);
+    await store.getSpeaker('s-1'); // buffered for the view's person
+    await store.listQuestions();
+    const pending = tracked(store.listQuestions('again' as never));
+    const before = actor;
+    actor = { id: 'u-mod-2', role: 'moderation' };
+    let written: Promise<unknown>;
+    try {
+      written = store.registerSpeaker({ displayName: 'x' } as never);
+    } finally {
+      actor = before;
+    }
+    const outcome = tracked(written);
+    releaseRead({ items: [], total: 2 });
+    await flush();
+    expect(pending.value()).toEqual({ items: [], total: 2 });
+    // The harness reads the write's answer (036a): the person at the device after the task is the one observed before.
+    expect(outcome.value()).toEqual({ id: 's-2' });
+    await store.getSpeaker('s-1');
+    expect(getSpeaker).toHaveBeenCalledTimes(1);
+  });
+
   it('an actor change without clear() (only getActor() returns another person) withholds a running write with WithheldAnswer', async () => {
     let release: (value: unknown) => void = () => undefined;
     const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
@@ -204,6 +251,27 @@ describe('takt-057 writes are withheld after an actor change', () => {
     release({ questions: 3, marker: 'seed-secret' });
     await flush();
     expectWithheld(seeded, 'seed-secret');
+  });
+});
+
+describe('takt-057 the swap rule does not open a path to another person', () => {
+  it('a write of B started right after an unobserved switch from A, then a real switch back to A in a later task: withheld', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
+    const adapter = { closeQuestion, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    const a: Actor = reader;
+    const b: Actor = { id: 'other-057', role: 'coordination' };
+    let actor: Actor = a;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    await store.listQuestions(); // the store has observed A
+    actor = b;
+    const write = tracked(store.closeQuestion('q-1', {} as never));
+    await Promise.resolve(); // the task ends with B at the device
+    actor = a;
+    release({ id: 'q-1', _actions: ['close'] });
+    await flush();
+    expectWithheld(write, 'q-1', 'close');
   });
 });
 

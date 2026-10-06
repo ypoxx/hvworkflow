@@ -17,7 +17,7 @@
  * the views' load keys compare only `getActor().id` and would otherwise show fields or `_actions` of the previous
  * rights (Codex P1). The view reloads anyway, `useApiVersion` counts on the actor change or on the listener call after
  * `clear()`. takt-057: a withheld write or `seedDemo` instead rejects with the content-free `WithheldAnswer`, because
- * the views free their write locks only when the promise settles.
+ * the views free their write locks only when the promise settles (see `write()` for how a write's person is found).
  */
 import {
   EVENT_SUBJECTS,
@@ -98,6 +98,10 @@ const WRITE_METHODS = {
   deliverQuestion: true, closeQuestion: true, withdrawQuestion: true, mergeQuestion: true,
   proposeRefusal: true, approveRefusal: true, forwardQuestion: true,
 } as const satisfies Record<WriteMethodName, true>;
+
+/** Markers of `etagOwner`; never a valid `actorKey` (that is always a JSON array). */
+const OPEN = 'open';
+const STALE = 'stale';
 
 const MAX_ENTRIES = 200;
 const BATCH_MS = 100;
@@ -227,9 +231,11 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   let batchTimer: ReturnType<typeof setTimeout> | undefined;
   let claimTimer: ReturnType<typeof setTimeout> | undefined;
   let swallowBareCall = false;
-  // takt-057: set by an actor change or `clear()`, reset by the next own successful write; `lastWriteEtag` is then
-  // the previous person's tag and is not handed out.
-  let etagStale = false;
+  // takt-057: whose tag the adapter holds — `OPEN` until the first write through the store (the adapter's own hook may
+  // have set one, takt-030), the structural actor of the last own successful write, or `STALE` after an explicit
+  // `clear()` or a write that ended for another person. `lastWriteEtag` hands it out only to that very person.
+  let etagOwner: string = OPEN;
+  let clears = 0;
 
   const currentActor = (): string | undefined => {
     try { return actorKey(options.getActor()); } catch { return undefined; }
@@ -272,7 +278,6 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     invalidateAll();
     mark = undefined;
     lastActor = undefined;
-    etagStale = true;
   };
   /** A structurally other actor than the last one seen empties the buffer (also the demo role switcher). */
   const observeActor = (): string | undefined => {
@@ -354,14 +359,10 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
    * Each caller gets a promise of its own; a withheld answer leaves it unsettled, with no reference kept here. The actor
    * is checked again at the moment of delivery, a microtask after the arrival (review minor 3, defence in depth).
    */
-  const forCaller = (shared: Promise<Outcome>, startA: number, actor: string, settleWithheld = false): Promise<never> =>
+  const forCaller = (shared: Promise<Outcome>, startA: number, actor: string): Promise<never> =>
     new Promise((resolve, reject) => {
       void shared.then((outcome) => {
-        // takt-057: a withheld write rejects with the content-free sentinel; a withheld read stays unsettled.
-        if (startA !== actorEpoch || observeActor() !== actor || outcome.kind === 'withheld') {
-          if (settleWithheld) reject(new WithheldAnswer());
-          return;
-        }
+        if (startA !== actorEpoch || observeActor() !== actor) return;
         if (outcome.kind === 'ok') resolve(outcome.value as never);
         else if (outcome.kind === 'error') reject(outcome.error);
       });
@@ -431,7 +432,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
    * An unbuffered read under the same actor protection as `read()` (Codex P1 on #168): nothing is kept, but an answer
    * requested before an actor change or `clear()` never reaches the caller.
    */
-  const guarded = <T>(call: () => Promise<T>, settleWithheld = false): Promise<T> => {
+  const guarded = <T>(call: () => Promise<T>): Promise<T> => {
     const actor = observeActor();
     if (actor === undefined) {
       // takt-057, Ziel 4: signed out as well, a synchronous throw reaches the caller as a rejected promise.
@@ -447,7 +448,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     } catch (error) {
       shared = Promise.resolve({ kind: 'error', error });
     }
-    return forCaller(shared, startA, actor, settleWithheld);
+    return forCaller(shared, startA, actor);
   };
 
   /** Collects what one message invalidates; applied once when the batch closes. */
@@ -523,37 +524,70 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     store[method] = (...args: unknown[]) => read(method, args);
   }
   /**
-   * takt-057: a write runs under `guarded()` like an unbuffered read, so an answer (e.g. a question with the previous
-   * rights' `_actions`) that arrives after an actor change or `clear()` never reaches the caller; it rejects with
-   * `WithheldAnswer` instead (review finding 1). The invalidation hangs on the adapter's own promise, inside the guarded
-   * call, so it runs on success and failure whether or not the answer is delivered. The ETag marker is reset only by a
-   * success of the write's own person and epoch, both read after the actor change has been observed (review finding 2);
-   * signed out it is left alone (review nit 5).
+   * takt-057: a write delivers its outcome only to the person it belongs to (T-G1-I-09), like a read: an answer or a
+   * refusal that arrives after an actor change or `clear()` is withheld. Unlike a read it still settles — with the
+   * content-free `WithheldAnswer` (review finding 1) — because the views free their write locks only in
+   * `catch`/`finally`. The invalidation hangs on the adapter's own promise and runs on success and failure either way.
+   *
+   * e2e findings: a write neither calls `observeActor()` (it must not empty the buffer or raise `A` by itself) nor
+   * counts a swap of the actor inside one synchronous task as a change of person. The e2e harness writes "somebody
+   * else's" event that way — `setActor(other)`, the write, `setActor(before)` in the same task — and reads the write's
+   * answer (036a: writes are never withheld for that). The write belongs to the person the store last observed when that
+   * person holds the device again at the end of the task (checked in a microtask queued before the adapter is called);
+   * an actor change by the app always arrives in a task of its own (role switcher, `/auth/me`, stream end).
    */
-  const write = (method: WriteMethodName, args: unknown[]): Promise<unknown> => {
-    const actor = observeActor();
+  const write = (call: () => Promise<unknown>, observe: boolean): Promise<unknown> => {
+    const actor = currentActor();
+    const observed = lastActor;
     const startA = actorEpoch;
-    return guarded(() => {
-      const result = Reflect.apply(adapter[method] as (...values: unknown[]) => Promise<unknown>, adapter, args);
-      return result.then(
-        (value) => {
-          // A late success of an earlier person leaves the adapter holding that person's tag: never handed out.
-          if (actor !== undefined) etagStale = !(startA === actorEpoch && currentActor() === actor);
-          if (options.observeWrites === true) settleWrite('success');
-          return value;
-        },
-        (error: unknown) => {
-          if (options.observeWrites === true) settleWrite('server_error');
-          throw error;
-        },
+    const startClears = clears;
+    let owner = actor;
+    if (actor !== undefined && observed !== undefined && actor !== observed) {
+      queueMicrotask(() => {
+        if (currentActor() === observed) owner = observed;
+      });
+    }
+    let result: Promise<unknown>;
+    try {
+      result = call();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const settled = result.then(
+      (value) => {
+        // Signed out: today's behaviour, the marker stays as it is (review nit 5).
+        if (actor !== undefined) {
+          etagOwner = startClears === clears && owner === actor && currentActor() === actor ? actor : STALE;
+        }
+        if (observe) settleWrite('success');
+        return value;
+      },
+      (error: unknown) => {
+        if (observe) settleWrite('server_error');
+        throw error;
+      },
+    );
+    // Signed out: nothing of anyone to protect; the adapter answers.
+    if (actor === undefined) return settled;
+    const own = (): boolean => startA === actorEpoch && currentActor() === owner;
+    return new Promise((resolve, reject) => {
+      settled.then(
+        (value) => (own() ? resolve(value) : reject(new WithheldAnswer())),
+        (error: unknown) => reject(own() ? error : new WithheldAnswer()),
       );
-    }, true);
+    });
   };
   for (const method of Object.keys(WRITE_METHODS) as WriteMethodName[]) {
-    store[method] = (...args: unknown[]) => write(method, args);
+    store[method] = (...args: unknown[]) =>
+      write(
+        () => Reflect.apply(adapter[method] as (...values: unknown[]) => Promise<unknown>, adapter, args),
+        options.observeWrites === true,
+      );
   }
   const control: LiveStoreControl = {
     clear(reason) {
+      clears += 1;
+      etagOwner = STALE;
       clearAll();
       // useApiVersion counts an actor change itself (takt-033b); a second count would load every view twice.
       if (reason !== 'actor') notify();
@@ -574,10 +608,10 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     // takt-057: the tag of the last own write only while the same person is signed in (an actor change seen here
     // raises the epoch and marks it stale); withheld like an answer, without touching the adapter.
     lastWriteEtag: () => {
-      observeActor();
-      return etagStale ? undefined : adapter.lastWriteEtag();
+      const actor = currentActor();
+      return etagOwner === OPEN || (actor !== undefined && etagOwner === actor) ? adapter.lastWriteEtag() : undefined;
     },
-    seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => guarded(() => adapter.seedDemo(seedOptions), true),
+    seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => write(() => adapter.seedDemo(seedOptions), false),
     subscribe(listener: Listener) {
       listeners.add(listener);
       if (detach === undefined) {

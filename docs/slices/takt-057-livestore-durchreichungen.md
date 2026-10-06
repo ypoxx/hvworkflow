@@ -27,6 +27,14 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
    `getCockpit`/`listEvents`) bleiben unerfüllt wie bisher (Ladeschlüssel der Ansichten; Codex auf #168). Das Invalidierungssignal bleibt erhalten:
    `settleWrite` läuft bei `observeWrites` weiter auf Erfolg und Fehler, unabhängig davon, ob die Antwort zugestellt wird.
    Ohne angemeldete Person (Akteur `undefined`) bleibt der Weg wie heute (Adapter antwortet direkt).
+   **Geändert nach den e2e-Befunden (CI #179, 564ba4e):** die Schreibung prüft die Person ohne `observeActor()` (sie leert
+   weder den Puffer noch hebt sie die Epoche), und ein Tausch des Akteurs innerhalb einer synchronen Aufgabe gilt nicht als
+   Personenwechsel: die Schreibung gehört der zuletzt beobachteten Person, wenn diese am Ende der Aufgabe wieder am Gerät
+   ist (geprüft in einer Mikroaufgabe, die vor dem Adapteraufruf eingereiht wird). Grund: das e2e-Geschirr (010b/010c/010d,
+   `unrelatedEvent`, `elsewhere`) schreibt „von anderer Stelle“, indem es `setActor(andere)`, die Schreibung und
+   `setActor(vorher)` in einer Aufgabe ausführt, und liest die Antwort der Schreibung (036a: „Writes are never withheld by
+   the live store“). Ein Akteurwechsel der Anwendung (Rollenwahl, `/auth/me`, Stromende) kommt immer in einer eigenen
+   Aufgabe. Die bestehenden e2e-Erwartungen bleiben unverändert.
 2. **`lastWriteEtag`**: liefert `undefined`, wenn seit der letzten erfolgreichen Schreibung ein Akteurwechsel oder ein `clear()`
    stattfand; sonst den Wert des Adapters. Kein Adapter-Eingriff nötig (Merker im Store).
 3. **Historie** (`apps/web/src/features/history/Page.tsx`): das gehaltene Ereignisfenster gehört nur derselben Person im
@@ -58,6 +66,10 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
   das gehaltene Fenster anzeigt und als Ausgangspunkt des Weiterlesens nimmt: gleiche id, andere Rolle → nicht angezeigt,
   `listEvents` liest von vorn.
 - `showProblem(new WithheldAnswer())` zeigt keine Meldung (Review-Befund 1).
+- e2e-Befunde: eine Schreibung, während der Akteur nur für eine synchrone Aufgabe getauscht ist, wird beantwortet und
+  leert weder den Puffer noch hält sie laufende Lesungen der Person am Gerät zurück; eine Schreibung von B nach einem
+  unbeobachteten Wechsel A→B, dann ein echter Wechsel zurück zu A in einer späteren Aufgabe, bleibt zurückgehalten;
+  die in-process-e2e-Suite (`pnpm --filter @hv/web e2e`) ist vollständig grün.
 - Ein Test auf Hook-Ebene (`answers/useWriteDoor.ts`): nach einer zurückgehaltenen Schreibung über den Live-Store nimmt die
   Schreibtür die nächste Aktion an (Review-Befund 1).
 - `pnpm gates` grün.
