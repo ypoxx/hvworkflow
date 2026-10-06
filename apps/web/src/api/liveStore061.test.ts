@@ -84,3 +84,187 @@ describe('takt-056 listEvents is withheld after an actor change (Codex P1 on #17
     await expect(store.listEvents(0, 50)).resolves.toEqual(page(2));
   });
 });
+
+/**
+ * takt-057: the remaining pass-throughs of the live store under the actor protection (T-G1-I-09). A write, `seedDemo`
+ * and `lastWriteEtag` began for one person must not hand their content to the next; the invalidation signal of a write
+ * stays. Each case first failed against the store of takt-056.
+ */
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+};
+function tracked(promise: Promise<unknown>): { settled: () => boolean } {
+  let settled = false;
+  void promise.then(() => { settled = true; }, () => { settled = true; });
+  return { settled: () => settled };
+}
+
+describe('takt-057 writes are withheld after an actor change', () => {
+  it('a write answered after clear() never reaches the caller, and its invalidation still runs (observeWrites)', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    let n = 0;
+    const listQuestions = vi.fn(async () => ({ items: [], total: ++n }));
+    const adapter = {
+      closeQuestion, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0, observeWrites: true });
+    const heard = vi.fn();
+    store.subscribe(heard);
+    const write = tracked(store.closeQuestion('q-1', { reason: 'answered' } as never));
+    actor = { id: 'other-057', role: 'coordination' };
+    store.clear('actor');
+    await store.listQuestions(); // buffered for the new person
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(1);
+    release({ id: 'q-1', _actions: ['close'] });
+    await flush();
+    expect(write.settled()).toBe(false);
+    // settleWrite('success') ran anyway: the buffer is empty and the listeners heard it.
+    expect(heard).toHaveBeenCalledTimes(1);
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed write after clear() is not delivered either, and still empties the buffer (observeWrites)', async () => {
+    let fail: (error: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(() => new Promise((_resolve, reject) => { fail = reject; }));
+    const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
+    const adapter = {
+      closeQuestion, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0, observeWrites: true });
+    store.subscribe(() => undefined);
+    const write = tracked(store.closeQuestion('q-1', {} as never));
+    actor = { id: 'other-057', role: 'coordination' };
+    store.clear('actor');
+    await store.listQuestions();
+    fail(new Error('412'));
+    await flush();
+    expect(write.settled()).toBe(false);
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(2);
+  });
+
+  it('for the same person a write answer and a write failure are delivered unchanged', async () => {
+    const closeQuestion = vi
+      .fn()
+      .mockImplementationOnce(async () => ({ id: 'q-1' }))
+      .mockImplementationOnce(async () => { throw new Error('409'); });
+    const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    const store = createLiveStore(adapter, { getActor: () => reader, now: () => 0, monotonic: () => 0 });
+    await expect(store.closeQuestion('q-1', {} as never)).resolves.toEqual({ id: 'q-1' });
+    await expect(store.closeQuestion('q-1', {} as never)).rejects.toThrow('409');
+  });
+
+  it('an actor change without clear() (only getActor() returns another person) withholds a running write', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    const write = tracked(store.closeQuestion('q-1', {} as never));
+    actor = { ...reader, role: 'moderation' }; // same id, other rights
+    release({ id: 'q-1', _actions: ['close'] });
+    await flush();
+    expect(write.settled()).toBe(false);
+  });
+
+  it('seedDemo answered after clear() never reaches the caller', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const seedDemo = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const adapter = { seedDemo, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    const seeded = tracked(store.seedDemo());
+    actor = { id: 'other-057', role: 'admin' };
+    store.clear('actor');
+    release({ questions: 3 });
+    await flush();
+    expect(seeded.settled()).toBe(false);
+  });
+});
+
+describe('takt-057 lastWriteEtag belongs to the person who wrote', () => {
+  function setupEtag() {
+    const etag = '"v7"';
+    const closeQuestion = vi.fn(async () => ({ id: 'q-1' }));
+    const adapter = { closeQuestion, subscribe: () => () => undefined, lastWriteEtag: () => etag } as unknown as HvApi;
+    const box: { actor: Actor } = { actor: reader };
+    const store = createLiveStore(adapter, { getActor: () => box.actor, now: () => 0, monotonic: () => 0 });
+    return { store, box, etag };
+  }
+
+  it('returns the adapter value after an own write, and undefined after clear()', async () => {
+    const { store, etag } = setupEtag();
+    await store.closeQuestion('q-1', {} as never);
+    expect(store.lastWriteEtag()).toBe(etag);
+    store.clear('logout');
+    expect(store.lastWriteEtag()).toBeUndefined();
+  });
+
+  it('is undefined after an actor change without clear(), and the next own write brings it back', async () => {
+    const { store, box, etag } = setupEtag();
+    await store.closeQuestion('q-1', {} as never);
+    expect(store.lastWriteEtag()).toBe(etag);
+    box.actor = { ...reader, unitId: 'u-fin' };
+    expect(store.lastWriteEtag()).toBeUndefined();
+    await store.closeQuestion('q-1', {} as never);
+    expect(store.lastWriteEtag()).toBe(etag);
+  });
+});
+
+describe('takt-057 guarded() reads: failures and the signed-out path', () => {
+  it('a rejection is delivered to the same person and withheld after a change', async () => {
+    let fail: (error: unknown) => void = () => undefined;
+    const listEvents = vi
+      .fn()
+      .mockImplementationOnce(async () => { throw new Error('500'); })
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+    const adapter = { listEvents, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    await expect(store.listEvents(0, 50)).rejects.toThrow('500');
+    const late = tracked(store.listEvents(0, 50));
+    actor = { id: 'other-057', role: 'coordination' };
+    store.clear('actor');
+    fail(new Error('500'));
+    await flush();
+    expect(late.settled()).toBe(false);
+  });
+
+  it('an actor change without clear() withholds a running getCockpit answer', async () => {
+    let release: (value: Cockpit) => void = () => undefined;
+    const getCockpit = vi.fn(() => new Promise<Cockpit>((resolve) => { release = resolve; }));
+    const adapter = { getCockpit, subscribe: () => () => undefined, lastWriteEtag: () => undefined } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0 });
+    const late = tracked(store.getCockpit());
+    actor = { ...reader, displayName: 'Koordination 2' };
+    release(answer(1));
+    await flush();
+    expect(late.settled()).toBe(false);
+  });
+
+  it('signed out: an adapter that throws synchronously gives a rejected promise, for reads and writes', async () => {
+    const boom = (): never => { throw new Error('sync'); };
+    const adapter = {
+      getCockpit: boom, listEvents: boom, closeQuestion: boom, seedDemo: boom,
+      subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    const store = createLiveStore(adapter, {
+      getActor: () => { throw new Error('signed out'); }, now: () => 0, monotonic: () => 0,
+    });
+    let cockpit: Promise<unknown> | undefined;
+    expect(() => { cockpit = store.getCockpit(); }).not.toThrow();
+    await expect(cockpit).rejects.toThrow('sync');
+    let events: Promise<unknown> | undefined;
+    expect(() => { events = store.listEvents(0, 50); }).not.toThrow();
+    await expect(events).rejects.toThrow('sync');
+    let write: Promise<unknown> | undefined;
+    expect(() => { write = store.closeQuestion('q-1', {} as never); }).not.toThrow();
+    await expect(write).rejects.toThrow('sync');
+  });
+});

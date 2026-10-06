@@ -213,6 +213,9 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   let batchTimer: ReturnType<typeof setTimeout> | undefined;
   let claimTimer: ReturnType<typeof setTimeout> | undefined;
   let swallowBareCall = false;
+  // takt-057: set by an actor change or `clear()`, reset by the next own successful write; `lastWriteEtag` is then
+  // the previous person's tag and is not handed out.
+  let etagStale = false;
 
   const currentActor = (): string | undefined => {
     try { return actorKey(options.getActor()); } catch { return undefined; }
@@ -255,6 +258,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     invalidateAll();
     mark = undefined;
     lastActor = undefined;
+    etagStale = true;
   };
   /** A structurally other actor than the last one seen empties the buffer (also the demo role switcher). */
   const observeActor = (): string | undefined => {
@@ -411,7 +415,10 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
    */
   const guarded = <T>(call: () => Promise<T>): Promise<T> => {
     const actor = observeActor();
-    if (actor === undefined) return call();
+    if (actor === undefined) {
+      // takt-057, Ziel 4: signed out as well, a synchronous throw reaches the caller as a rejected promise.
+      try { return call(); } catch (error) { return Promise.reject(error); }
+    }
     const startA = actorEpoch;
     let shared: Promise<Outcome>;
     try {
@@ -497,15 +504,33 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   for (const method of Object.keys(READ_TOPICS) as BufferedRead[]) {
     store[method] = (...args: unknown[]) => read(method, args);
   }
-  for (const method of Object.keys(WRITE_METHODS) as WriteMethodName[]) {
-    store[method] = (...args: unknown[]) => {
+  /**
+   * takt-057: a write runs under `guarded()` like an unbuffered read, so an answer (e.g. a question with the previous
+   * rights' `_actions`) that arrives after an actor change or `clear()` never reaches the caller. The invalidation hangs
+   * on the adapter's own promise, inside the guarded call, so it runs on success and failure whether or not the answer
+   * is delivered. The ETag marker is reset only by a success of the write's own person and epoch.
+   */
+  const write = (method: WriteMethodName, args: unknown[]): Promise<unknown> => {
+    const startA = actorEpoch;
+    const actor = currentActor();
+    return guarded(() => {
       const result = Reflect.apply(adapter[method] as (...values: unknown[]) => Promise<unknown>, adapter, args);
-      if (options.observeWrites !== true) return result;
       return result.then(
-        (value) => { settleWrite('success'); return value; },
-        (error: unknown) => { settleWrite('server_error'); throw error; },
+        (value) => {
+          // A late success of an earlier person leaves the adapter holding that person's tag: never handed out.
+          etagStale = !(startA === actorEpoch && actor !== undefined && currentActor() === actor);
+          if (options.observeWrites === true) settleWrite('success');
+          return value;
+        },
+        (error: unknown) => {
+          if (options.observeWrites === true) settleWrite('server_error');
+          throw error;
+        },
       );
-    };
+    });
+  };
+  for (const method of Object.keys(WRITE_METHODS) as WriteMethodName[]) {
+    store[method] = (...args: unknown[]) => write(method, args);
   }
   const control: LiveStoreControl = {
     clear(reason) {
@@ -526,8 +551,13 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     // takt-056: unbuffered like getCockpit, but under the same actor protection (Codex P1 on #176).
     listEvents: (after?: number, limit?: number) => guarded(() => adapter.listEvents(after, limit)),
     getCockpit: () => guarded(() => adapter.getCockpit()),
-    lastWriteEtag: () => adapter.lastWriteEtag(),
-    seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => adapter.seedDemo(seedOptions),
+    // takt-057: the tag of the last own write only while the same person is signed in (an actor change seen here
+    // raises the epoch and marks it stale); withheld like an answer, without touching the adapter.
+    lastWriteEtag: () => {
+      observeActor();
+      return etagStale ? undefined : adapter.lastWriteEtag();
+    },
+    seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => guarded(() => adapter.seedDemo(seedOptions)),
     subscribe(listener: Listener) {
       listeners.add(listener);
       if (detach === undefined) {
