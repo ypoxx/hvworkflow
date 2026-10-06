@@ -58,10 +58,10 @@ describe('featureRegistry', () => {
       expect(visible).toEqual(FEATURES);
     });
 
-    it('returns all routes but steering and focus when granted is an empty set (no other route requires permissions)', () => {
+    it('returns all routes but steering, focus and admin when granted is an empty set (no other route requires permissions)', () => {
       const visible = visibleRoutes(FEATURES, new Set());
-      // Scheibe 053/054: only `steering` and `focus` carry a 'requires' field; every other route stays visible.
-      const gated = ['steering', 'focus'];
+      // Scheibe 053/054/041: only `steering`, `focus` and `admin` carry a 'requires' field; every other route stays visible.
+      const gated = ['steering', 'focus', 'admin'];
       expect(visible).toEqual(FEATURES.filter((f) => !gated.includes(f.id)));
       for (const feature of FEATURES) {
         if (!gated.includes(feature.id)) expect(feature.requires).toBeUndefined();
@@ -111,8 +111,16 @@ describe('featureRegistry', () => {
       expect(visibleWith).toEqual([firstFeature, testFeature]);
     });
 
+    it('Scheibe 041: admin is visible with admin.roles.manage, hidden without it, and visible without a set at all (navigation today)', () => {
+      const granted = new Set<Permission>(['admin.roles.manage']);
+      expect(visibleRoutes(FEATURES, granted).map((f) => f.id)).toContain('admin');
+      expect(visibleRoutes(FEATURES, new Set()).map((f) => f.id)).not.toContain('admin');
+      expect(visibleRoutes(FEATURES, new Set<Permission>(['admin.units.manage'])).map((f) => f.id)).not.toContain('admin');
+      expect(visibleRoutes(FEATURES)).toEqual(FEATURES);
+    });
+
     it('preserves route order', () => {
-      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify', 'answer.draft']) as unknown as ReadonlySet<Permission>;
+      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify', 'answer.draft', 'admin.roles.manage']) as unknown as ReadonlySet<Permission>;
       const visible = visibleRoutes(FEATURES, granted);
       expect(visible).toEqual(FEATURES);
     });
@@ -171,14 +179,30 @@ describe('featureRegistry', () => {
       expect(focus?.i18nModule).toBe('focus');
       expect(focus?.counter).toBeUndefined();
       expect(ids.indexOf('focus')).toBe(ids.indexOf('answers') + 1);
-      expect(ids[ids.length - 1]).toBe('history');
+      // Scheibe 041: the administration follows the history; it is no phase of the day.
+      expect(ids[ids.length - 1]).toBe('admin');
     });
 
-    it('features are in the order they should appear (speakers first, history last)', () => {
+    it('Scheibe 041: the admin row is the last entry, path /admin, requires admin.roles.manage, no shortcut, no counter', () => {
+      const ids = FEATURES.map((f) => f.id);
+      const admin = FEATURES.find((f) => f.id === 'admin');
+      expect(admin?.path).toBe('/admin');
+      expect(admin?.requires).toBe('admin.roles.manage');
+      expect(admin?.shortcutKey).toBeUndefined();
+      expect(admin?.counter).toBeUndefined();
+      expect(admin?.testId).toBe('nav-admin');
+      expect(admin?.labelKey).toBe('nav.admin');
+      expect(admin?.helpKey).toBe('page.admin.description');
+      expect(admin?.i18nModule).toBe('admin');
+      expect(ids.indexOf('admin')).toBe(ids.indexOf('history') + 1);
+      expect(ids.indexOf('admin')).toBe(FEATURES.length - 1);
+    });
+
+    it('features are in the order they should appear (speakers first, the administration last)', () => {
       expect(FEATURES.length).toBeGreaterThan(0);
       expect(FEATURES[0]?.id).toBe('speakers');
       const lastIndex = FEATURES.length - 1;
-      expect(FEATURES[lastIndex]?.id).toBe('history');
+      expect(FEATURES[lastIndex]?.id).toBe('admin');
     });
   });
 });

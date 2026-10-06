@@ -844,6 +844,39 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-048 Design-Kritik nit D3/D7 · `features/answers/QuestionDetail.tsx:435` (gesperrter Knopf) · `ink-400` auf `ink-50` ≈ 2,3:1 · Ton prüfen.
 
 
+## Verwaltung (aus 041)
+
+- 041 Bau (Eigentümerfrage 5) · `scripts/lib/demo-persons.mjs`, `scripts/stack*.mjs` · das lokale Paket hat keine Person mit
+  Verwaltungsrolle; die zehnte Person lebt nur im Harness von `e2e-http` · Person `admin` im geteilten Verzeichnis mit
+  Zustandsübernahme für bestehende lokale Stände und Zeile auf der Installationsseite (Lane infra, rund 0,3 AStd).
+- 041 Bau (Eigentümerfrage 6) · `apps/web/src/api/roleCards.ts` · die Rollenkarten lesen die Rechtetabelle des Web-Builds,
+  nicht die wirksame des Dienstes · Endpunkt oder Feld mit der wirksamen Tabelle (Vertragsschritt, zusammen mit 089b).
+- 041 Befund (Kern) · `packages/domain/src/api.ts` `assignRole` · ohne `expiresAt` setzt der Kern kein Ablaufdatum, der
+  Vertrag sagt „Standard: Ende der Hauptversammlung“; die Oberfläche zeigt nur „Ende der Hauptversammlung“ · Vertragstext
+  und Projektion angleichen (Lane core).
+- 041 Bau · `apps/web/src/features/admin/Page.test.tsx` · Test 7 der Spec verlangte Testing Library; das Web-Paket hat keine
+  DOM-Testumgebung, und eine neue Abhängigkeit liegt außerhalb der erlaubten Dateien · Komponenten statisch gerendert,
+  Klick- und Tastenverhalten als reine Funktionen getestet, der Bedienweg in `e2e/041-verwaltung.spec.ts`; eine
+  DOM-Testumgebung (jsdom oder happy-dom) als eigene Scheibe der Lane web-api erwägen.
+- 041 Bau · `apps/web/src/components/Dialog.tsx` · D3 verlangt Dialoge mit 480 px; das Bauteil kennt nur 384/512/672 px
+  (`sm`/`md`/`lg`), die Verwaltung nutzt `md` · Größe in einer Bauteil-Scheibe ergänzen oder die Vorgabe auf 512 px setzen.
+- 041 Review minor 4 · `apps/web/e2e/041-verwaltung.spec.ts` · das Aufräumen im Projekt `http` ist nicht ausfallsicher:
+  scheitert ein Schritt nach dem Anlegen, bleiben Fachbereich, TOP, Platz oder Zuordnung für die Folgedateien stehen ·
+  `afterAll` mit eigenem Kontext der Verwaltungsperson, der eigene Einträge (Präfix „E2E 041“, Kennung
+  `e2e-041-pruefung`) entfernt bzw. entzieht.
+- 041 Review minor 5 · `features/admin/problems.ts` · ein 409 ohne Regel-id zeigt auch in den Stammdaten-Dialogen den Text
+  der Rollenzuordnung („Diese Kennung hat die Rolle schon …“) · eigener Schlüssel je Dialogart oder neutraler Text.
+- 041 Review nit 7 · `features/admin/noRoleNames.test.ts` · der Quelltest findet einen Rollennamen als ungequoteten
+  Objektschlüssel nicht (`{ admin: … }`) · Muster `\b<rolle>\s*:` ergänzen.
+- 041 Review nit 8 · `features/admin/AdminLayout.tsx` · `aria-controls` der nicht gewählten Tabs zeigt auf nicht
+  gerenderte Panels; das Tabpanel hat kein `tabIndex` (bei Tabs ohne fokussierbaren Inhalt, z. B. Hauptversammlungen) ·
+  alle Panels gerendert und versteckt oder `aria-controls` nur am gewählten Tab; `tabIndex={0}` am Panel.
+- 041 Codex P2 (#166) · `features/admin/Page.tsx` · „jetzt“ für den Anzeigezustand der Zuordnungen wird nur mit jeder Antwort
+  gelesen; läuft eine Zuordnung bei offener Seite ohne neues Ereignis ab (Demo im Browser), bleibt sie als aktiv mit Entziehen
+  stehen · Aktualisierung zum nächsten Ablaufzeitpunkt planen.
+- 041 Review nit 9 · Spec-Bericht 041, „Vor dem Bau prüfen“ 4 · die Aussage zu Konstanten mit SECRET/TOKEN/KEY/PASSWORD
+  im Namen ist ungenau formuliert · auf die Konstanten dieser Scheibe beschränken und so benennen.
+
 ## Leitstand (aus 061)
 
 - 061 Spec, Hinweis an Folgescheiben · `apps/web/src/features/answers/lib.ts:147-152` (`urgencyLevel`, 15/45 min) und
