@@ -5,7 +5,7 @@
  *
  * Nothing here is used outside the demo; production data enters through the API only.
  */
-import type { NewEvent } from './events.js';
+import type { DomainEvent, NewEvent } from './events.js';
 import type { Actor, QuestionStatus, StageAssignment, Track } from './types.js';
 
 /* ---------- deterministic randomness ---------- */
@@ -378,6 +378,13 @@ export interface SeedOptions {
   actor: Actor;
 }
 
+/**
+ * takt-052: seed times from the first speech on are spread over the 90 minutes before "now". The control
+ * desk's inflow window is 60 minutes; the extra 30 keep its bars filled through the first half hour of a
+ * demonstration.
+ */
+const SEED_SPREAD_MS = 90 * 60_000;
+
 /** Produce the complete event log of a meeting in progress. */
 export function seedEvents(o: SeedOptions): NewEvent[] {
   const rnd = mulberry32(o.seed);
@@ -389,9 +396,10 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
   // The meeting clock: it opened this morning; we replay events up to "now".
   const start = new Date(o.now.getTime() - 6.5 * 3600_000);
   let clock = start.getTime();
+  // takt-052: tick returns the raw, uncapped time; the mapping after generation places it before "now".
   const tick = (minMs: number, maxMs: number): string => {
     clock += intBetween(rnd, minMs, maxMs);
-    return new Date(Math.min(clock, o.now.getTime())).toISOString();
+    return new Date(clock).toISOString();
   };
   const push = (e: Omit<NewEvent, 'id'>): void => {
     events.push({ ...e, meetingId, id: id('ev') } as NewEvent);
@@ -457,6 +465,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
     }
   });
 
+  const speechFrom = clock;
   /* ---- speeches and questions ---- */
   // Speakers who have spoken: all of rounds 1-2, first 60% of round 3; one is speaking now.
   const spoken = speakers.filter((s) => s.round <= 2 || (s.round === 3 && s.position <= Math.floor(roundSizes[2]! * 0.6)));
@@ -605,6 +614,7 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
 
       const answerText = fill(part.answer, rnd, year);
       let version = 1;
+      // createdAt is set to the mapped event time below (takt-052); the raw value here is a placeholder.
       push({
         type: 'AnswerDrafted',
         at: tick(120_000, 900_000),
@@ -649,8 +659,31 @@ export function seedEvents(o: SeedOptions): NewEvent[] {
     }
   });
 
-  // Events were generated per speaker with a monotonically increasing clock, but the clock is
-  // capped at "now"; sort by time so the log reads chronologically, keeping causal order stable.
+  // takt-052: the raw clock runs far past "now" (the per-question life cycles add up to many hours), so
+  // every time from the first speech on is compressed linearly into the SEED_SPREAD_MS before "now".
+  // The mapping is monotone, so log order stays generation order; the opening events keep their raw time
+  // (they lie well before the window). With no event after speechFrom (questions: 0) nothing is mapped.
+  const rawEnd = clock;
+  const nowMs = o.now.getTime();
+  const place = (at: string): string => {
+    const raw = Date.parse(at);
+    if (raw <= speechFrom || rawEnd === speechFrom) return new Date(Math.min(raw, nowMs)).toISOString();
+    return new Date(nowMs - SEED_SPREAD_MS + Math.floor(((raw - speechFrom) * SEED_SPREAD_MS) / (rawEnd - speechFrom))).toISOString();
+  };
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    const at = place(e.at);
+    // An answer version is written when its AnswerDrafted event is, so its createdAt is that event's time.
+    // NewEvent omits `seq` from the union, which loses the narrowing on `type`; hence the payload cast.
+    if (e.type === 'AnswerDrafted') {
+      const payload = e.payload as Extract<DomainEvent, { type: 'AnswerDrafted' }>['payload'];
+      events[i] = { ...e, at, payload: { ...payload, answer: { ...payload.answer, createdAt: at } } } as NewEvent;
+    } else {
+      events[i] = { ...e, at } as NewEvent;
+    }
+  }
+  // After the monotone mapping the log is already in time order (ties only where QuestionLegalCleared
+  // takes its predecessor's time); the stable sort is kept as a guard and changes nothing.
   events.sort((a, b) => a.at.localeCompare(b.at));
   return events;
 }

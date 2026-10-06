@@ -33,13 +33,13 @@ function fakePool() {
   return { pool, calls };
 }
 
-async function seeded(extra: Parameters<typeof createApp>[0] = {}) {
+async function seeded(extra: Parameters<typeof createApp>[0] = {}, corpus: { questions: number; seed: number } = { questions: 30, seed: 3 }) {
   const sink = createMemorySink();
   let now = fixed;
   const app = createApp({ demoEnabled: true, clock: () => now, metricsToken: TOKEN,
     accessLog: { sink, hashKey: Buffer.alloc(32, 9) }, ...extra });
   const admin = `${SYNTHETIC_ACTOR}:admin`;
-  expect((await req(app, 'POST', '/v1/demo/seed', { actor: admin, body: { questions: 30, seed: 3 } })).status).toBe(200);
+  expect((await req(app, 'POST', '/v1/demo/seed', { actor: admin, body: corpus })).status).toBe(200);
   return { app, sink, advance(ms: number) { now = new Date(now.getTime() + ms); } };
 }
 
@@ -219,11 +219,16 @@ describe('Scheibe 033b: T-G2-D-03 result cache with one computation', () => {
   });
 
   it('shows a new question only after the window (values are cached, the log is not the source)', async () => {
-    const { app, advance } = await seeded();
+    // takt-052: the seed spreads its captures over the 90 minutes before the seed time, so with seeded
+    // questions one may leave the 300 s window during the 10 s below, and an uncached read at +9 s could
+    // then equal the cached one by chance. Seeding speakers without questions keeps the window empty but
+    // for the new question, so the cached and the uncached value differ at +9 s.
+    const { app, advance } = await seeded({}, { questions: 0, seed: 3 });
     const writer = `${SYNTHETIC_ACTOR}:capture`;
     const value = async (): Promise<number> => Number(/^hv_questions_captured_last_5m\{[^}]*\} (\d+)$/m
       .exec(await (await req(app, 'GET', '/metrics', { headers: bearer(TOKEN) })).text())![1]);
     const before = await value();
+    expect(before).toBe(0);
     await addQuestion(app, writer, 'Synthetischer Text', 'Synthetisch');
     advance(9_000);
     expect(await value()).toBe(before);

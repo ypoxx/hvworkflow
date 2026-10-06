@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { CORPUS_DEMO, CORPUS_LOAD, seedEvents } from '../seed.js';
 import { project } from '../state.js';
 import { QUESTION_STATUSES } from '../types.js';
-import type { DomainEvent } from '../events.js';
+import type { DomainEvent, NewEvent } from '../events.js';
+import { createInProcessApi } from '../api.js';
+import { computeCockpit } from '../cockpit.js';
+import { isOpenStatus } from '../indicators.js';
+import { createInMemoryEventStore } from '../store.js';
 
 describe('synthetic corpus (CORPUS_LOAD)', () => {
   const events = seedEvents({ ...CORPUS_LOAD, now: new Date('2027-04-20T13:30:00.000Z'), actor: { id: 'sys', role: 'admin' } });
@@ -112,6 +116,73 @@ describe('synthetic corpus (CORPUS_DEMO)', () => {
     for (const q of state.questions.values()) {
       const c = state.contributions.get(q.contributionId)!;
       expect(c.text.slice(q.span!.start, q.span!.end)).toBe(q.text);
+    }
+  });
+});
+
+/* ---- takt-052: seed times compressed into the 90 minutes before now (docs/slices/takt-052-seed-zeiten.md) ---- */
+
+const T052_NOW = new Date('2027-04-20T13:30:00.000Z');
+const T052_ACTOR = { id: 'sys', role: 'admin' } as const;
+const MINUTE_MS = 60_000;
+const SPREAD_MS = 90 * MINUTE_MS;
+// Age classes of `urgencyLevel` (apps/web/src/features/answers/lib.ts:147), not imported: apps/web is not
+// a dependency of the domain. Under 15 min, 15 to under 45 min, from 45 min on.
+const URGENCY_MEDIUM_FROM_MIN = 15;
+const URGENCY_HIGH_FROM_MIN = 45;
+
+type Drafted = Extract<DomainEvent, { type: 'AnswerDrafted' }>;
+const drafted = (events: readonly NewEvent[]): Drafted[] => events.filter((e) => e.type === 'AnswerDrafted') as unknown as Drafted[];
+
+describe('takt-052 Zeiten', () => {
+  for (const [name, corpus] of [['CORPUS_DEMO', CORPUS_DEMO], ['CORPUS_LOAD', CORPUS_LOAD]] as const) {
+    const events = seedEvents({ ...corpus, now: T052_NOW, actor: T052_ACTOR });
+    const nowIso = T052_NOW.toISOString();
+
+    it(`T1 ${name}: no event and no answer version lies after now; createdAt equals the event time`, () => {
+      expect(events.filter((e) => e.at > nowIso)).toEqual([]);
+      const answers = drafted(events);
+      expect(answers.length).toBeGreaterThan(0);
+      expect(answers.filter((e) => e.payload.answer.createdAt > nowIso).map((e) => e.id)).toEqual([]);
+      expect(answers.filter((e) => e.payload.answer.createdAt !== e.at).map((e) => e.id)).toEqual([]);
+    });
+
+    it(`T2 ${name}: every capture lies in the 90 minutes before now, the first more than 80 minutes back`, () => {
+      const captured = events.filter((e) => e.type === 'QuestionCaptured').map((e) => Date.parse(e.at));
+      expect(captured).toHaveLength(corpus.questions);
+      const from = T052_NOW.getTime() - SPREAD_MS;
+      expect(captured.filter((t) => t < from || t > T052_NOW.getTime())).toEqual([]);
+      expect(T052_NOW.getTime() - Math.min(...captured)).toBeGreaterThan(80 * MINUTE_MS);
+    });
+  }
+
+  it('T3 CORPUS_DEMO: the inflow fills all twelve windows of the control desk', async () => {
+    const store = createInMemoryEventStore();
+    const api = createInProcessApi({ store, actor: () => T052_ACTOR, clock: () => T052_NOW, seeder: seedEvents });
+    await api.seedDemo({ questions: CORPUS_DEMO.questions, seed: CORPUS_DEMO.seed });
+    const log = store.all();
+    const cockpit = computeCockpit(log, T052_NOW, log[0]!.meetingId!, () => true)!;
+    expect(cockpit.inflow.bins.filter((n) => n === 0)).toEqual([]);
+    expect(cockpit.inflow.bins).toEqual([11, 11, 10, 9, 14, 16, 16, 14, 8, 18, 18, 24]);
+  });
+
+  it('T4 CORPUS_DEMO: open questions carry many different ages and fill every urgency class', () => {
+    const events = seedEvents({ ...CORPUS_DEMO, now: T052_NOW, actor: T052_ACTOR });
+    const state = project(events.map((e, i) => ({ ...e, seq: i + 1 }) as DomainEvent));
+    const ages = [...state.questions.values()].filter((q) => isOpenStatus(q.status))
+      .map((q) => Math.floor((T052_NOW.getTime() - Date.parse(q.createdAt)) / MINUTE_MS));
+    expect(new Set(ages).size).toBeGreaterThanOrEqual(30);
+    expect(ages.filter((m) => m < URGENCY_MEDIUM_FROM_MIN).length).toBeGreaterThan(0);
+    expect(ages.filter((m) => m >= URGENCY_MEDIUM_FROM_MIN && m < URGENCY_HIGH_FROM_MIN).length).toBeGreaterThan(0);
+    expect(ages.filter((m) => m >= URGENCY_HIGH_FROM_MIN).length).toBeGreaterThan(0);
+  });
+
+  it('T5 edge cases: no questions and a single question seed without error, all times not after now', () => {
+    for (const questions of [0, 1]) {
+      const events = seedEvents({ ...CORPUS_DEMO, questions, now: T052_NOW, actor: T052_ACTOR });
+      expect(events.length).toBeGreaterThan(0);
+      for (const e of events) expect(e.at <= T052_NOW.toISOString(), `${questions}: ${e.type} ${e.at}`).toBe(true);
+      for (const e of drafted(events)) expect(e.payload.answer.createdAt <= T052_NOW.toISOString()).toBe(true);
     }
   });
 });

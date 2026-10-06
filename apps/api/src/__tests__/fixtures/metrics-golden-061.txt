@@ -1,6 +1,6 @@
 # HELP hv_open_question_oldest_age_seconds Sekunden seit Erfassung der ältesten offenen Einzelfrage des laufenden Jahrgangs; 0 ohne offene Einzelfrage.
 # TYPE hv_open_question_oldest_age_seconds gauge
-hv_open_question_oldest_age_seconds{meeting_id="hv-2031"} 20589
+hv_open_question_oldest_age_seconds{meeting_id="hv-2031"} 5469
 # HELP hv_open_questions Offene Einzelfragen je zugewiesenem Fachbereich des laufenden Jahrgangs; ohne Zuweisung unit_id=unassigned.
 # TYPE hv_open_questions gauge
 hv_open_questions{meeting_id="hv-2031",unit_id="unassigned"} 14
@@ -15,10 +15,10 @@ hv_open_questions{meeting_id="hv-2031",unit_id="unit-ops"} 15
 hv_open_questions{meeting_id="hv-2031",unit_id="unit-strat"} 6
 # HELP hv_questions_captured_last_5m Einzelfragen des laufenden Jahrgangs, die in den letzten 300 Sekunden erfasst wurden.
 # TYPE hv_questions_captured_last_5m gauge
-hv_questions_captured_last_5m{meeting_id="hv-2031"} 215
+hv_questions_captured_last_5m{meeting_id="hv-2031"} 14
 # HELP hv_questions_in_legal_review_over_10m Einzelfragen im Status in_review ohne Rechtsfreigabe der aktuellen Fassung, deren Eintritt in in_review länger als 600 Sekunden zurückliegt.
 # TYPE hv_questions_in_legal_review_over_10m gauge
-hv_questions_in_legal_review_over_10m{meeting_id="hv-2031"} 0
+hv_questions_in_legal_review_over_10m{meeting_id="hv-2031"} 9
 # HELP hv_events_last_1m Ereignisse mit Serverzeit in den letzten 60 Sekunden über alle Jahrgänge.
 # TYPE hv_events_last_1m gauge
 hv_events_last_1m 0
@@ -27,7 +27,7 @@ hv_events_last_1m 0
 hv_auth_no_active_role_total 0
 # HELP hv_open_question_oldest_age_seconds Sekunden seit Erfassung der ältesten offenen Einzelfrage des laufenden Jahrgangs; 0 ohne offene Einzelfrage.
 # TYPE hv_open_question_oldest_age_seconds gauge
-hv_open_question_oldest_age_seconds{meeting_id="hv-2031"} 21369
+hv_open_question_oldest_age_seconds{meeting_id="hv-2031"} 6249
 # HELP hv_open_questions Offene Einzelfragen je zugewiesenem Fachbereich des laufenden Jahrgangs; ohne Zuweisung unit_id=unassigned.
 # TYPE hv_open_questions gauge
 hv_open_questions{meeting_id="hv-2031",unit_id="unassigned"} 14

@@ -899,6 +899,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   `claude/slice-061-kern` · nur festgehalten, keine Änderung.
 - 061 Review Nit 11 · `scripts/metrics-allowlist-check.mjs` Regel (g) · `derived:` und `meta:` nehmen jeden Text an; der eigentliche
   Riegel ist A7 (Blattpfade aus dem Vertrag) · eine Begründungspflicht mit Mindestlänge oder geschlossene `meta:`-Liste prüfen.
+- takt-052 Spec, Variante B · `packages/domain/src/seed.ts` (`seedEvents`) · der Faden einer Seed-Frage zeigt an jeder Station
+  dieselbe Uhrzeit (die Lebensläufe werden mit gestaucht) · Lebenslauf je Frage über Minuten nach der Erfassung verteilen; die
+  Log-Reihenfolge (`seq`) ändert sich, daher eigene Spec mit Wirkungsanalyse (`docs/slices/takt-052-seed-zeiten.md`, Bewertung).
+- takt-052 Spec, bewusstes Nicht-Ziel · Leitstand-Zulauf · nach einer Stunde Vorführung ist der Zulauf leer (kein neuer Zulauf
+  ohne Erfassung, kein Zeitgeber) · nur bei Bedarf eine eigene Scheibe (`docs/slices/takt-052-seed-zeiten.md`, Nicht-Ziele).
 
 ## Skripte
 

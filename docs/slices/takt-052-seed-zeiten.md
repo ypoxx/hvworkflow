@@ -244,4 +244,57 @@ Spec.
 
 ## Bericht
 
+Slice: takt-052-seed-zeiten (Variante A) · Bau 06.10.2026 · Branch `claude/takt-052-seed-zeiten`
+
+**Erledigt.** `seedEvents` staucht alle Rohzeiten ab der ersten Rede linear in die 90 min vor `now`
+(`SEED_SPREAD_MS`); `tick` kappt nicht mehr; `AnswerDrafted.payload.answer.createdAt` ist das abgebildete `at` (Befund 2
+behoben). Inhalt, Ids, Ziehungen und Log-Reihenfolge sind unverändert (Fingerabdruck). T1–T5 in `seed.test.ts`, Golden A5 neu
+(vier Wertzeilen), Test `metrics033b.test.ts:221` nach Nachtrag angepasst, zwei Folgeliste-Zeilen.
+
+**Vor dem Bau prüfen.**
+1. `Math.min(clock` nur `seed.ts:394`; `createdAt: new Date(clock)` genau `:613` und `:627`. OK.
+2. Fingerabdruck auf dem unveränderten Seed: Mit dem Platzhalter `<masked>` ergibt die erweiterte Maske `4497dc627aef8`; mit
+   dem Platzhalter **`<time>`** (`"at":"<time>"`, `"createdAt":"<time>"`) genau `f28ff6ae63fc7`. Die Spec nennt den Platzhalter
+   nicht; gebaut ist `<time>`.
+3. Nach dem Umbau ohne Postgres rot: A5 (erwartet) und **`metrics033b.test.ts:221`** (nicht erwartet, `expected 6 to be 7`).
+   Bau angehalten, berichtet; Entscheidung des Orchestrators und Nachtrag siehe „Vor dem Bau prüfen“, Commit `73e3b6e`.
+4. Keine neuen e2e-Specs seit `68c87d9`; keine liest Seed-Zeiten. OK.
+
+**Rot vor dem Umbau** (`npx vitest run src/__tests__/seed.test.ts`, alter Seed, neue Tests):
+```
+ FAIL  … takt-052 Zeiten > T1 CORPUS_DEMO … AssertionError: expected [ 'ev-00060', 'ev-00069', …(172) ] to deeply equal []
+ FAIL  … takt-052 Zeiten > T2 CORPUS_DEMO … AssertionError: expected [ 1808205250269, 1808205637676, …(11) ] to deeply equal []
+ FAIL  … takt-052 Zeiten > T1 CORPUS_LOAD … AssertionError: expected [ 'ev-000au', 'ev-000b3', …(667) ] to deeply equal []
+ FAIL  … takt-052 Zeiten > T2 CORPUS_LOAD … AssertionError: expected [ 1808207252367, 1808207582913, …(10) ] to deeply equal []
+ FAIL  … takt-052 Zeiten > T3 CORPUS_DEMO … AssertionError: expected [ +0, +0, +0, +0, +0, +0, +0, +0, +0 ] to deeply equal []
+ FAIL  … takt-052 Zeiten > T4 CORPUS_DEMO … AssertionError: expected 3 to be greater than or equal to 30
+      Tests  6 failed | 17 passed (23)
+```
+T1 rot an `createdAt` (174 Fassungen nach `now` im Demo-Korpus, 669 im Last-Korpus). **T5 war schon vor dem Umbau grün**: die
+alte Kappung hielt jedes `at` bei `now`, und nichts warf. Akzeptanzkriterium 1 („T1–T5 vorher rot“) gilt damit nur für T1–T4.
+
+**Grün nach dem Umbau:** `seed.test.ts` + `seed-fictitious-names.test.ts`: `Tests 27 passed (27)`;
+`pnpm --filter @hv/domain test`: `Test Files 23 passed (23)`, `Tests 526 passed (526)` (`cockpit061.test.ts` unverändert,
+`OVER10M_AFTER_600S = 15` grün).
+
+**Fingerabdruck** (Maske mit `<time>`): Lauf 1 auf dem alten Seed `f28ff6ae63fc7` (grün, vor jeder Änderung an `seed.ts`),
+Lauf 2 auf dem neuen Seed `f28ff6ae63fc7` (grün). Alter Wert `1bac7aa18a9d88` steht im Kommentar.
+
+**Golden-Diff** (`git diff 68c87d9 -- apps/api/src/__tests__/fixtures/metrics-golden-061.txt`), genau Ziel 4:
+```
+@@ -3 +3 @@   20589 -> 5469    (hv_open_question_oldest_age_seconds)
+@@ -18 +18 @@ 215   -> 14      (hv_questions_captured_last_5m)
+@@ -21 +21 @@ 0     -> 9       (hv_questions_in_legal_review_over_10m)
+@@ -30 +30 @@ 21369 -> 6249    (hv_open_question_oldest_age_seconds)
+```
+
+**metrics033b (Nachtrag).** Der Test sät für sich `{ questions: 0, seed: 3 }` (Wortmeldungen ja, Einzelfragen nein; der Test
+braucht nur einen Redner) und prüft `vorher = 0`, bei +9 s `vorher` (Cache), bei +10 s `vorher + 1`. Die zuerst versuchte
+Variante (Basiswert aus `computeIndicators` über das Seed-Log bei +10 s, Seed mit 30 Fragen) war grün, verlor aber ihren Biss:
+Mit Cache-Laufzeit 0 blieb der Test grün, weil eine Seed-Erfassung schon vor +9 s aus dem Fenster fiel und der ungecachte Wert
+zufällig dem gecachten glich. Mutationsprobe auf der gebauten Fassung (`app.ts` danach zurückgesetzt, nicht committet):
+- `createSingleFlightCache<Indicators>(0, clock)`: `× shows a new question only after the window … expected 1 to be +0`
+- Cache im Handler umgangen (`((f) => f())(…)` statt `cachedIndicators(…)`): derselbe Test rot, `expected 1 to be +0`.
+Die übrigen Tests von `seeded()` säen weiter `{ questions: 30, seed: 3 }` (Vorgabe des neuen zweiten Parameters).
+
 ## Review findings
