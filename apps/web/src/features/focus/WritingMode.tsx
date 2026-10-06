@@ -8,17 +8,31 @@
  * the two states of the interface, never a role or the status, AGENTS.md R4/R5).
  */
 import { useId } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { AnswerBodyInput, Question } from '@hv/domain';
 import { previewText } from '../../api/answerFormat';
 import { Button, Panel, StaleBanner, Toolbar, ToolbarSpacer, cx } from '../../components';
 import { useT } from '../../i18n';
 import { AnswerBodyEditor } from '../answers/AnswerBodyEditor';
+import { saveDecision } from '../answers/draft';
 import { latestIsRefusal } from '../answers/refusal';
 import { ReadingTime, ReturnedNote, focusActionLabel } from './FocusDetail';
 import { focusActions, isSaveChord, shouldLeaveWriting } from './focus';
 import type { FocusAction } from './focus';
+
+/**
+ * Scheibe 060 (decision 7.2): what Ctrl+Enter does — save, open the comparison while the notice of a newer version stands
+ * (`canSave` itself unchanged), nothing when saving is locked, or ignore a key that is not the chord.
+ */
+export function saveKeyStep(
+  chord: Parameters<typeof isSaveChord>[0],
+  ui: { canSave: boolean; rebase: boolean },
+): 'save' | 'compare' | 'none' | 'ignore' {
+  if (!isSaveChord(chord)) return 'ignore';
+  const decision = saveDecision({ rebase: ui.rebase }, ui.canSave);
+  return decision === 'send' ? 'save' : decision;
+}
 
 const TEST_IDS: Readonly<Record<FocusAction, string>> = {
   save: 'focus-save',
@@ -41,8 +55,11 @@ export function WritingMode({
   onSources,
   onAction,
   onClose,
-  onRebase,
+  onCompare,
   onStaleReload,
+  compare,
+  restoredNote,
+  keptNote,
 }: {
   question: Question;
   /** What the answer field holds (055b): the input form the walker read, `null` when empty. */
@@ -63,14 +80,25 @@ export function WritingMode({
   onSources: (value: string) => void;
   onAction: (action: FocusAction) => void;
   onClose: () => void;
-  /** Replace the text by the newer version. */
-  onRebase: () => void;
+  /** Scheibe 060: open "Fassungen vergleichen" (the notice's button, and saving while the notice stands). */
+  onCompare: () => void;
   onStaleReload: () => void;
+  /** Scheibe 060: the comparison, shown in place of the field and the sources while it is open. */
+  compare?: ReactNode;
+  /** Scheibe 060: the line "wiederhergestellt" above the field. */
+  restoredNote?: ReactNode;
+  /** Scheibe 060: the line "zwischengespeichert" (or "nicht möglich"). */
+  keptNote?: ReactNode;
 }) {
   const t = useT();
   const keysId = useId();
   const labelId = useId();
-  const { primary, secondary } = focusActions(question._actions, { dirty, writing: true });
+  const offered = focusActions(question._actions, { dirty, writing: true });
+  // Design critique D-a (D2): while the comparison stands in place of the field, its decision is the one primary action;
+  // the footer does not offer saving at the same time.
+  const comparing = compare !== undefined;
+  const primary = comparing && offered.primary === 'save' ? undefined : offered.primary;
+  const secondary = comparing ? offered.secondary.filter((action) => action !== 'save') : offered.secondary;
   const mayDraft = question._actions.includes('answer.draft');
   // The plain text of the previewed document (055b decision 7): the reading time and "nothing to save" read it.
   const text = previewText(body);
@@ -85,9 +113,11 @@ export function WritingMode({
       shiftKey: event.shiftKey,
       isComposing: event.nativeEvent.isComposing,
     };
-    if (!isSaveChord(chord)) return;
+    const step = saveKeyStep(chord, { canSave, rebase });
+    if (step === 'ignore') return;
     event.preventDefault();
-    if (canSave) onAction('save');
+    if (step === 'save') onAction('save');
+    else if (step === 'compare') onCompare();
   };
 
   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -106,8 +136,13 @@ export function WritingMode({
         variant={isPrimary ? 'primary' : 'secondary'}
         data-testid={TEST_IDS[action]}
         aria-disabled={locked}
-        onClick={() => {
-          if (!locked) onAction(action);
+        onClick={(event) => {
+          // Scheibe 060 (decision 9): the second click of a double click never acts — the first one did, or it was a
+          // decision in the comparison, which closed it, and the second lands on the button now standing there.
+          if (locked || event.detail > 1) return;
+          // Scheibe 060 (decision 7.2): saving while the notice of a newer version stands opens the comparison.
+          if (action === 'save' && rebase) onCompare();
+          else onAction(action);
         }}
       >
         {focusActionLabel(t, action, dirty)}
@@ -123,7 +158,9 @@ export function WritingMode({
       className="flex h-full min-h-0 flex-col gap-2 outline-none"
     >
       {stale && <StaleBanner testId="stale-banner" message={t('answers.stale.banner')} onReload={onStaleReload} />}
-      {rebase && <StaleBanner testId="focus-rebase" message={t('focus.write.rebase')} onReload={onRebase} />}
+      {rebase && compare === undefined && (
+        <StaleBanner testId="focus-rebase" message={t('focus.write.rebase')} actionLabel={t('answers.editor.compare')} onReload={onCompare} />
+      )}
       <Panel
         className="min-h-0 flex-1"
         padded={false}
@@ -165,41 +202,46 @@ export function WritingMode({
             </p>
           )}
 
-          {/* Opening puts the caret at the end of the text (054 decision 5): `autoFocusEnd`. */}
-          <div className="flex min-h-[14rem] flex-1 flex-col">
-            <span id={labelId} className="hv-label">
-              {t('answers.editor.label')}
-            </span>
-            <AnswerBodyEditor
-              testId="focus-editor"
-              initial={body}
-              generation={generation}
-              labelId={labelId}
-              describedBy={keysId}
-              size="large"
-              autoFocusEnd
-              onChange={onBody}
-              onKeyDown={onFieldKeyDown}
-              className="mt-1 flex-1"
-            />
-          </div>
+          {compare !== undefined ? compare : (
+            <>
+              {restoredNote}
+              {/* Opening puts the caret at the end of the text (054 decision 5): `autoFocusEnd`. */}
+              <div className="flex min-h-[14rem] flex-1 flex-col">
+                <span id={labelId} className="hv-label">
+                  {t('answers.editor.label')}
+                </span>
+                <AnswerBodyEditor
+                  testId="focus-editor"
+                  initial={body}
+                  generation={generation}
+                  labelId={labelId}
+                  describedBy={keysId}
+                  size="large"
+                  autoFocusEnd
+                  onChange={onBody}
+                  onKeyDown={onFieldKeyDown}
+                  className="mt-1 flex-1"
+                />
+              </div>
 
-          <label className="block">
-            <span className="hv-label">{t('answers.editor.sources.label')}</span>
-            <input
-              data-testid="focus-sources"
-              value={sources}
-              placeholder={t('answers.editor.sources.placeholder')}
-              onChange={(event) => onSources(event.target.value)}
-              onKeyDown={onFieldKeyDown}
-              className={cx(
-                'mt-1 h-8 w-full rounded-md border border-line bg-surface px-2.5',
-                'text-[13px] text-ink-900 transition-colors duration-100',
-                'placeholder:text-ink-400 hover:border-ink-300',
-              )}
-            />
-            <span className="mt-1 block text-2xs text-ink-600">{t('answers.editor.sources.hint')}</span>
-          </label>
+              <label className="block">
+                <span className="hv-label">{t('answers.editor.sources.label')}</span>
+                <input
+                  data-testid="focus-sources"
+                  value={sources}
+                  placeholder={t('answers.editor.sources.placeholder')}
+                  onChange={(event) => onSources(event.target.value)}
+                  onKeyDown={onFieldKeyDown}
+                  className={cx(
+                    'mt-1 h-8 w-full rounded-md border border-line bg-surface px-2.5',
+                    'text-[13px] text-ink-900 transition-colors duration-100',
+                    'placeholder:text-ink-400 hover:border-ink-300',
+                  )}
+                />
+                <span className="mt-1 block text-2xs text-ink-600">{t('answers.editor.sources.hint')}</span>
+              </label>
+            </>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <ReadingTime text={text} />
@@ -209,9 +251,13 @@ export function WritingMode({
                 {t('answers.editor.hint')}
               </span>
             )}
-            <span id={keysId} data-testid="focus-write-keys" className="ml-auto text-2xs text-ink-600">
-              {t('focus.write.keys')}
-            </span>
+            {keptNote}
+            {/* Design critique D-c: the keys of the field do not apply while the comparison is open. */}
+            {!comparing && (
+              <span id={keysId} data-testid="focus-write-keys" className="ml-auto text-2xs text-ink-600">
+                {t('focus.write.keys')}
+              </span>
+            )}
           </div>
         </div>
       </Panel>

@@ -123,6 +123,11 @@ export const shellEn: typeof shellDe = {
   'common.retry': 'Try again',
   'common.dismiss': 'Dismiss',
   'common.none': 'not set',
+  // Scheibe 060: the lines of the draft buffer.
+  'common.draft.kept': 'Saved in this browser for now · {time}',
+  'common.draft.keptHelp': 'Survives a reload. In a private window the copy ends when the window closes.',
+  'common.draft.restored': 'Unsaved draft from {time} restored',
+  'common.draft.unavailable': 'Cannot keep a copy on this device',
   'toast.problem': 'Action not possible',
   'toast.rule': 'Rule',
   'toast.close': 'Close the message',

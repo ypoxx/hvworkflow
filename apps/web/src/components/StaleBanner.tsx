@@ -9,9 +9,11 @@ export interface StaleBannerProps {
   message: string;
   onReload: () => void;
   testId?: string;
+  /** Scheibe 060: another label for the button ("Vergleichen" over a newer version); default "Neu laden". */
+  actionLabel?: string;
 }
 
-export function StaleBanner({ message, onReload, testId }: StaleBannerProps) {
+export function StaleBanner({ message, onReload, testId, actionLabel }: StaleBannerProps) {
   const t = useT();
   return (
     <div
@@ -26,7 +28,7 @@ export function StaleBanner({ message, onReload, testId }: StaleBannerProps) {
     >
       <span>{message}</span>
       <Button variant="ghost" size="sm" onClick={onReload}>
-        {t('stale.reload')}
+        {actionLabel ?? t('stale.reload')}
       </Button>
     </div>
   );
