@@ -55,3 +55,31 @@ test('red: rule (c) holds although the fixture spec lists the name (no switch)',
   assert.equal(r.status, 1);
   assert.match(r.stderr, /no metric per person, with or without a spec entry/);
 });
+
+// ---- Scheibe 061: rule (g), reports of the catalog (G2, G3) ----
+// The report fixtures run against the real specs: the real spec 061 names `leitstand` in its
+// "## Kennzahlen-Allowlist", so each red fixture fails on the rule part under test.
+const reportFixture = (name) => run(['--catalog', join(FIXTURES, name)]);
+
+test('G2 green: the real catalog with its report "leitstand" passes, and a catalog without reports too', () => {
+  const real = run([]);
+  assert.equal(real.status, 0, real.stdout + real.stderr);
+  assert.match(real.stdout, /1 report\(s\), all within the allowlist/);
+  const withoutReports = fixture('green.json');
+  assert.equal(withoutReports.status, 0, withoutReports.stdout + withoutReports.stderr);
+  assert.match(withoutReports.stdout, /0 report\(s\)/);
+});
+
+const RED_REPORTS = [
+  ['report-person-field.json', /report leitstand: \(g\) field "oldestOpen\.items\[\]\.actorId" points at a person \("actor"\)/, 'a field path with actor'],
+  ['report-no-spec-section.json', /report nicht-in-der-allowlist: \(g\) spec "061"/, 'an id the spec section does not name'],
+  ['report-bad-source.json', /report leitstand: \(g\) field "totals\.open" has source "hv_not_a_catalog_family"/, 'a source outside family, Meeting.counts, derived and meta'],
+  ['report-bad-id.json', /report Leit_Stand: \(g\) id must match/, 'an id outside ^[a-z0-9-]+$'],
+];
+for (const [file, pattern, why] of RED_REPORTS) {
+  test(`G3 red: ${file} (${why})`, () => {
+    const r = reportFixture(file);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, pattern);
+  });
+}

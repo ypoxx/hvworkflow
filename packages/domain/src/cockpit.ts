@@ -223,6 +223,7 @@ export const COCKPIT_REPORT = {
   spec: '061',
   operationId: 'getMeetingCockpit',
   permission: 'cockpit.read',
+  purpose: 'Lagebild der Einzelfragen am HV-Tag: was am längsten wartet, wo es sich staut, wie sich die Lage entwickelt (Bestände, Wartezeiten, Zulauf; kein Erledigungsdurchsatz).',
   aggregation: ['meeting', 'status', 'unit'],
   questionReferences: true,
   minimumGroupSize: null,

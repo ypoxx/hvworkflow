@@ -69,5 +69,54 @@
       "personalReference": "mittelbar: bei einer einzigen rollenlosen Sitzung bzw. einem einzigen aktiven Nutzer zeigt der Zeitverlauf dessen Aktivität; Zuordnung nur über das Zugriffslog im Verfahren zu zweit (E13)",
       "spec": "033b"
     }
+  ],
+  "reports": [
+    {
+      "id": "leitstand",
+      "spec": "061",
+      "operationId": "getMeetingCockpit",
+      "permission": "cockpit.read",
+      "purpose": "Lagebild der Einzelfragen am HV-Tag: was am längsten wartet, wo es sich staut, wie sich die Lage entwickelt (Bestände, Wartezeiten, Zulauf; kein Erledigungsdurchsatz).",
+      "aggregation": ["meeting", "status", "unit"],
+      "questionReferences": true,
+      "minimumGroupSize": null,
+      "fields": [
+        {"path": "meetingId", "source": "meta: Jahrgang", "personalReference": "keiner"},
+        {"path": "asOf", "source": "meta: Rechenzeitpunkt aus der Uhr des Dienstes", "personalReference": "keiner"},
+        {"path": "meetingStatus", "source": "meta: Status des Jahrgangs", "personalReference": "keiner"},
+        {"path": "debateClosedAt", "source": "meta: Debattenschluss wie Meeting.debateClosedAt", "personalReference": "keiner"},
+        {"path": "totals.captured", "source": "Meeting.counts.questions", "personalReference": "keiner"},
+        {"path": "totals.open", "source": "Meeting.counts.open", "personalReference": "keiner"},
+        {"path": "totals.staged", "source": "Meeting.counts.staged", "personalReference": "keiner"},
+        {"path": "totals.answered", "source": "Meeting.counts.delivered", "personalReference": "keiner"},
+        {"path": "openByStatus.captured", "source": "Meeting.counts.byStatus.captured", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.classified", "source": "Meeting.counts.byStatus.classified", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.assigned", "source": "Meeting.counts.byStatus.assigned", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.answer_drafted", "source": "Meeting.counts.byStatus.answer_drafted", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.in_review", "source": "Meeting.counts.byStatus.in_review", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.approved", "source": "Meeting.counts.byStatus.approved", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByStatus.staged", "source": "Meeting.counts.byStatus.staged", "personalReference": "E13: Rollengruppen Erfassung, Legal Clearing, Freigabe"},
+        {"path": "openByUnit.*", "source": "hv_open_questions", "personalReference": "E13: Fachbereich mit einer Person"},
+        {"path": "openUnassigned", "source": "hv_open_questions", "personalReference": "E13: Fachbereich mit einer Person"},
+        {"path": "oldestOpen.ageSeconds", "source": "hv_open_question_oldest_age_seconds", "personalReference": "keiner"},
+        {"path": "oldestOpen.items[].id", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "oldestOpen.items[].number", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "oldestOpen.items[].status", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "oldestOpen.items[].unitId", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "oldestOpen.items[].ageSeconds", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "oldestOpen.items[].statusAgeSeconds", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "inflow.binSeconds", "source": "meta: Fensterbreite 300 s (Konstante)", "personalReference": "keiner"},
+        {"path": "inflow.bins[]", "source": "derived: zwölf Fenster je 300 s derselben Definition wie hv_questions_captured_last_5m; bins[11] = last5m", "personalReference": "E13: Gruppe Erfassung, begrenzt durch Redetempo"},
+        {"path": "inflow.last5m", "source": "hv_questions_captured_last_5m", "personalReference": "E13: Gruppe Erfassung, begrenzt durch Redetempo"},
+        {"path": "legalReview.over10m", "source": "hv_questions_in_legal_review_over_10m", "personalReference": "E13: Rollengruppe Legal Clearing"},
+        {"path": "legalReview.items[].id", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].number", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].status", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].unitId", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].ageSeconds", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].statusAgeSeconds", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"},
+        {"path": "legalReview.items[].reviewAgeSeconds", "source": "derived: Referenz je Einzelfrage aus der Projektion, gefiltert nach can(); keine Kennzahl", "personalReference": "keiner (kein Redner, kein Akteur)"}
+      ]
+    }
   ]
 }

@@ -127,7 +127,7 @@ describe('K3 equality with the 033b indicators', () => {
     return cockpit;
   };
 
-  it('on the seeded corpus at two instants', () => {
+  it('on the seeded corpus at three instants', () => {
     for (const offset of [120, 900, 3600]) {
       const events = store.all().filter((e) => e.meetingId !== undefined);
       const meetingId = events[0]!.meetingId!;
