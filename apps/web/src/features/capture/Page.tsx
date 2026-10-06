@@ -26,6 +26,7 @@ import {
   type HeldReference,
 } from './followUp';
 import {
+  deskLoading,
   etagForContribution,
   isSpeakerLocked,
   isVersionConflict,
@@ -412,9 +413,13 @@ export function CapturePage() {
               contributions={shownContributions}
               contribution={contribution}
               onSelectContribution={setChosenContribution}
-              // Until the first pair has landed the desk is still loading: showing the empty input form for a
-              // moment, only to swap it for the Redebeitrag, would invite typing into the wrong state.
-              loading={contributions.status === 'loading' || landed === null}
+              // Skeleton, not the empty input form, while the Redebeitrag is still on its way (takt-054).
+              loading={deskLoading({
+                contributionsSettled: contributions.settled,
+                landed,
+                freshest: latestContribution,
+                shown: contribution,
+              })}
               failed={contributions.status === 'error'}
               onRetry={contributions.reload}
               stale={staleFor !== null && (staleFor === contribution?.id || staleFor === speakerId)}

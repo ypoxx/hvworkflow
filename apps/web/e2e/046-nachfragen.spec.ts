@@ -228,3 +228,66 @@ test('E3 keyboard and axe: Alt+B focuses the search, Escape returns to the butto
   await expect(page.getByTestId('capture-follow-up-search')).toHaveCount(0);
   await expect(page.getByTestId('capture-suggest-reference-hint')).toBeVisible();
 });
+
+/**
+ * takt-054 (CI e2e-http run 37471605355, E1): a Wortmeldung that already has a Redebeitrag never shows the empty input
+ * form while that Redebeitrag's questions are on their way — the desk shows the skeleton until the Redebeitrag lands.
+ *
+ * `http`: the questions of a Redebeitrag answer 1.5 s late (the window of one slow HTTP round, made deterministic); E1
+ * left a Redebeitrag on the speaker at the microphone, so the preselected Wortmeldung has one. Reads only, no state left.
+ * `in-process`: there is no network to delay; the window is a few microtasks. The case still runs there, a Redebeitrag is
+ * captured first and the page is mounted afresh. In both projects a MutationObserver installed before the page loads
+ * records any appearance of the form, however short, so the check does not depend on polling into the window.
+ */
+test('takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load', async ({ page }) => {
+  await page.addInitScript(() => {
+    const flag = window as unknown as { __captureFormSeen: boolean };
+    flag.__captureFormSeen = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="capture-text"]') !== null) flag.__captureFormSeen = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  let delayed = 0;
+  let firstDelay: () => void = () => {};
+  const delayStarted = new Promise<void>((resolve) => { firstDelay = resolve; });
+  await page.route(
+    (url) => url.pathname.endsWith('/v1/questions') && url.searchParams.has('contributionId'),
+    async (route) => {
+      delayed += 1;
+      firstDelay();
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await route.continue();
+    },
+  );
+  await page.goto('/speakers');
+  await waitForCorpus(page);
+  await asRole(page, 'capture');
+  const fresh = page.getByTestId('capture-text');
+  const another = page.getByTestId('capture-contribution-new');
+  if (!isHttp()) {
+    // A fresh demo state per test: give the preselected Wortmeldung a Redebeitrag first, then leave the desk.
+    await page.getByTestId('nav-capture').click();
+    await expect(fresh.or(another)).toBeVisible({ timeout: 30_000 });
+    if (await fresh.isVisible()) {
+      await fresh.fill(FOLLOW_UP_046_SPEECH);
+      await page.getByTestId('capture-submit').click();
+    }
+    await expect(another).toBeVisible();
+    await page.getByTestId('nav-speakers').click();
+    await expect(page).toHaveURL(/\/speakers$/);
+    await expect(fresh).toHaveCount(0);
+    await page.evaluate(() => { (window as unknown as { __captureFormSeen: boolean }).__captureFormSeen = false; });
+  }
+
+  await page.getByTestId('nav-capture').click();
+  await expect(page).toHaveURL(/\/capture$/);
+  if (isHttp()) {
+    // Inside the window: the questions of the Redebeitrag are held back right now.
+    await delayStarted;
+    await expect(fresh).toHaveCount(0);
+  }
+  await expect(another).toBeVisible({ timeout: 30_000 });
+  await expect(fresh).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __captureFormSeen: boolean }).__captureFormSeen)).toBe(false);
+  if (isHttp()) expect(delayed).toBeGreaterThan(0);
+});
