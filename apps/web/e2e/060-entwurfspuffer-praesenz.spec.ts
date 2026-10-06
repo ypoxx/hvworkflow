@@ -342,6 +342,9 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
       await expect(page.locator('#main')).not.toContainText(DRAFT_060_TYPED);
       return;
     }
+    // The sign-out request is answered by a double: the real session of the expert's state file stays valid for the
+    // later steps and files (a real sign-out would end it on the service). The buffer is cleared before the request leaves.
+    await page.route('**/auth/logout', (route) => route.fulfill({ status: 204 }), { times: 1 });
     await page.getByRole('button', { name: /^(Abmelden|Sign out)$/ }).click();
     await expect(page.getByRole('heading', { name: /^(Anmelden|Sign in)$/ })).toBeVisible();
     expect(await readBuffer(page)).toEqual([]);
