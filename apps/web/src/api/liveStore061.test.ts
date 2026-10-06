@@ -168,6 +168,47 @@ describe('takt-057 writes are withheld after an actor change, and settle without
     expect(listQuestions).toHaveBeenCalledTimes(2);
   });
 
+  it('Codex P2 on #179: a write that throws synchronously takes the rejection path (withheld after clear(), buffer emptied)', async () => {
+    const closeQuestion = vi.fn((): never => {
+      throw Object.assign(new Error('secret sync detail'), { status: 412, ruleId: 'R-SYNC' });
+    });
+    const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
+    const adapter = {
+      closeQuestion, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    let actor: Actor = reader;
+    const store = createLiveStore(adapter, { getActor: () => actor, now: () => 0, monotonic: () => 0, observeWrites: true });
+    store.subscribe(() => undefined);
+    await store.listQuestions();
+    let write: ReturnType<typeof tracked> | undefined;
+    expect(() => { write = tracked(store.closeQuestion('q-1', {} as never)); }).not.toThrow();
+    actor = { id: 'other-057', role: 'coordination' };
+    store.clear('actor');
+    await flush();
+    expectWithheld(write!, 'secret', 'R-SYNC', '412');
+    // settleWrite('server_error') ran: the next read goes to the adapter again.
+    actor = reader;
+    store.clear('actor');
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(2);
+  });
+
+  it('Codex P2 on #179: for the same person a synchronous throw is delivered as a rejection and empties the buffer', async () => {
+    const closeQuestion = vi.fn((): never => { throw new Error('sync 409'); });
+    const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
+    const adapter = {
+      closeQuestion, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => undefined,
+    } as unknown as HvApi;
+    const store = createLiveStore(adapter, { getActor: () => reader, now: () => 0, monotonic: () => 0, observeWrites: true });
+    store.subscribe(() => undefined);
+    await store.listQuestions();
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(1);
+    await expect(store.closeQuestion('q-1', {} as never)).rejects.toThrow('sync 409');
+    await store.listQuestions();
+    expect(listQuestions).toHaveBeenCalledTimes(2);
+  });
+
   it('for the same person a write answer and a write failure are delivered unchanged', async () => {
     const closeQuestion = vi
       .fn()

@@ -551,7 +551,8 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     try {
       result = call();
     } catch (error) {
-      return Promise.reject(error);
+      // Codex P2 on #179: a synchronous throw takes the same path as a rejection (invalidation, delivery check).
+      result = Promise.reject(error);
     }
     const settled = result.then(
       (value) => {
