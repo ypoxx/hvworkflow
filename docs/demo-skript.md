@@ -25,9 +25,26 @@ je Vorgang mitgibt — deshalb ändert der Rollenschalter oben rechts sofort, wa
 | 10–11 | Historie | Beobachtung | Vorgangshistorie der eben bearbeiteten Frage: jeder Schritt mit Zeit und Person; Suche über 230 Fragen | „Jeder Schritt ist ein unveränderliches Ereignis. Das ist die Nachweisführung für § 131." |
 | 11–12 | Rechte | Beobachtung | Rolle „Beobachtung": alles sichtbar, nichts bedienbar; Rolle „Podium": nur die Bühne bedienbar | „Rechte sind Daten, nicht Code. Ein neues Jahr ist eine neue Tabelle, kein neuer Release." |
 
+### Zusatzszenen (Stand 06.10.2026)
+
+Je nach Zeit nach der Historie (Minute 10–11) einschieben; jede Szene dauert etwa eine Minute. Die Rollen wechselt der
+Rollenschalter oben rechts.
+
+| Szene | Rolle | Was zu sehen ist | Satz dazu |
+|---|---|---|---|
+| Nachfrage erfassen | Erfassung | In der Erfassung Alt+B drücken (oder „Nachfrage zu …“): Dialog „Bezug setzen“, Nummer wie F-0012 oder ein Stichwort eingeben, Art „Nachfrage“ oder „Klarstellung“ wählen; die nächste Einzelfrage trägt den Chip „Nachfrage zu F-n“ | „Eine Nachfrage hängt fest an der Frage, auf die sie sich bezieht. Der Bezug lässt sich danach nicht mehr ändern.“ |
+| Thread in der Historie | Beobachtung | Die eben erfasste Einzelfrage in der Historie öffnen: Block „Bezug“ mit der Bezugsfrage (war sie schon vorgelesen, auch mit der gehörten Antwortversion); bei der Bezugsfrage „Nachfragen und Klarstellungen (n)“; in der Zeitleiste „Als Nachfrage erfasst“ | „Das ist der Beleg zum Nachfragerecht: welche Antwort gehört wurde und was darauf nachgefragt wurde.“ |
+| Entwurf übersteht Neuladen | Fachbereich | In der Beantwortung (oder Fokusansicht) Text an eine Antwort anhängen, ohne zu speichern; Seite neu laden: der Text ist wieder da mit „Ungespeicherter Entwurf von HH:MM wiederhergestellt“; danach „Entwurf speichern“ | „Ein Neuladen oder ein abgestürzter Browser kostet keinen Text. Der Entwurf liegt nur auf diesem Gerät, bis er gespeichert ist.“ |
+| Fassungen vergleichen | Fachbereich und Recht | Nur mit dem lokalen Dienstpaket und zwei Fenstern (in der Browser-Demo hat jedes Fenster seinen eigenen Stand): während der Fachbereich tippt, speichert Recht eine Version; beim Fachbereich erscheint „Vergleichen“, Speichern öffnet „Fassungen vergleichen“ mit „Ihre Fassung · nicht gespeichert“ neben der neuen Version, „Unterschiede Wort für Wort“, Wahl „Mit meiner Fassung weiter“ oder „Version n übernehmen“ | „Niemand überschreibt still die Arbeit eines anderen. Wer zuletzt speichert, sieht, was inzwischen gespeichert wurde, und entscheidet.“ |
+| Leitstand | Koordination (oder Versammlungsbüro) | `/cockpit`: älteste offene Einzelfrage als Hauptwert mit „seit … in diesem Status“, Ohne Endstatus, Legal Clearing über 10 min, Zulauf letzte 5 min, Stationen, Rückstand je Fachbereich; beim Hauptwert „Faden öffnen“: die Stationen dieser Einzelfrage mit Uhrzeit; Escape schließt | „Der Leitstand zeigt, wo es staut, nie, wer langsam ist. Es gibt keine Kennzahl je Person.“ |
+| Verwaltung | Administration | `/admin`: Kopf mit der verwalteten Hauptversammlung; Tabs Rollenzuordnungen (Rolle mit Fachbereich und Ablauf zuordnen, entziehen), Fachbereiche, Tagesordnung, Bühnenplätze, Rollenkarten, Hauptversammlungen; eine abgelehnte Änderung (etwa einen Fachbereich entfernen, an dem noch Einzelfragen hängen) erklärt, warum | „Stammdaten und Rollen pflegt die Administration selbst. Anlegen und Einfrieren einer Hauptversammlung kommen als Nächstes.“ |
+
+Hinweis zum Leitstand: Bis PR #173 (takt-052, Seed-Zeiten) gemergt ist, liegen fast alle Zeiten des Demo-Korpus auf dem
+Zeitpunkt des Zurücksetzens; der Zulauf steht dann als eine Säule, und die Uhrzeiten eines Fadens sind gleich.
+
 ## Was bewusst nicht gezeigt wird
 
-Vorabfragen, Verweigerungspfad, Nachfragen, Notar, Publikation, Nachbereitung, Anbindung der
+Vorabfragen, Verweigerungspfad, Notar, Publikation, Nachbereitung, Anbindung der
 Nachbarsysteme. Alles davon ist im Vertrag und im Kern vorbereitet (Ereignisprotokoll, Pfade A/B/C,
 Rechte-Tabelle), aber nicht in der Oberfläche. Wenn danach gefragt wird: „Ist geschnitten, nicht
 gebaut — siehe erste-version-und-offene-fragen.md."

@@ -1,6 +1,6 @@
 # takt-054 — Erfassung: kein leeres Eingabeformular, solange der Redebeitrag noch lädt
 
-**Status:** gebaut (Review offen) · **Risikoklasse:** niedrig bis mittel (Oberfläche der Erfassung; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug. Leitplanken §4) · ca. 1 AStd · **Lanes:** web
+**Status:** gebaut und gemergt (#174, `bf1b3bb`; Review ohne Blocker und Major, CI `e2e-http` grün auf `54e84ad`) · **Risikoklasse:** niedrig bis mittel (Oberfläche der Erfassung; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug. Leitplanken §4) · ca. 1 AStd · **Lanes:** web
 **Rolle:** implementierer-oberflaeche; Review in frischem Kontext
 **Regeln:** AGENTS.md R1, R2, R3, R10, R12. Keine Rule ids aus `transitions.ts`.
 **Depends on:** 046 (gemergt) · **Glossar: neue Begriffe:** nein
@@ -117,8 +117,17 @@ Nachweisbild (Codex P1 auf #174; Files allowed per Nachtrag b0d7a6c um docs/evid
         (11 Muster; Warnung, dass Files allowed vom Stand aff43d2 abweicht, wegen des Nachtrags erwartet);
         Skripttests # pass 358, # fail 0.
       046 in-process --repeat-each=3 auf 43837cc: 9 passed (40.2s); überschriebene Bilder per git checkout zurückgesetzt.
-Open: CI-Lauf e2e-http des PR (Lauf-ID) steht aus; Folgelistenpunkte (Gerüst bei Versionssprung ohne Redebeitrag;
-      Review minor 1 und nit 5).
+CI e2e-http (Nachtrag 06.10.2026): grün auf 54e84ad (letzter Commit des PR #174), Lauf 37480797979, Job 112328786290
+      „e2e-http“, conclusion success, abgeschlossen 2026-10-06T14:49:47Z; Artefakt evidence-031-http, ID 11421412362,
+      SHA-256 0f9b2a648e9528f309cc791fe966e0ef35d949e0966c25f2d281282e3c64f830. Echter Auszug aus dem Joblog:
+        ✓  44 [http] › e2e/046-nachfragen.spec.ts:150:1 › E1/E2 capture a clarification and see the thread in the history @screenshot (7.8s)
+        -  45 [http] › e2e/046-nachfragen.spec.ts:186:1 › E3 keyboard and axe: Alt+B focuses the search, Escape returns to the button
+        ✓  46 [http] › e2e/046-nachfragen.spec.ts:249:1 › takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load @screenshot (3.1s)
+        15 skipped
+        75 passed (7.1m)
+        031a duration: total 7:41 of limit 12:00, warning above 6:30
+      Gemergt als #174 (bf1b3bb).
+Open: Folgelistenpunkte (Gerüst bei Versionssprung ohne Redebeitrag; Review minor 1 und nit 5).
 Touched: apps/web/src/features/capture/Page.tsx, apps/web/src/features/capture/useCapture.ts,
       apps/web/src/features/capture/deskLoading.test.ts, apps/web/e2e/046-nachfragen.spec.ts,
       docs/slices/takt-054-erfassung-ladezustand.md, docs/folgeliste.md, docs/evidence/takt-054-erfassung-*.png (3)
