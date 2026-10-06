@@ -64,7 +64,7 @@ function Entry({ entry, next }: { entry: ThreadEntry; next: ThreadEntry | undefi
   );
 }
 
-export function Thread({ read, units, onClose }: { read: ThreadRead; units: readonly Unit[]; onClose: () => void }) {
+export function Thread({ read, units, onClose, onRetry }: { read: ThreadRead; units: readonly Unit[]; onClose: () => void; onRetry: () => void }) {
   const t = useT();
   const titleId = useId();
   const unit = read.status === 'ready' ? unitName(units, read.unitId) : undefined;
@@ -91,7 +91,18 @@ export function Thread({ read, units, onClose }: { read: ThreadRead; units: read
       </header>
       <div className="min-h-[7.5rem] px-4 pt-3 pb-4">
         {read.status === 'loading' && <p className="text-[13px] text-ink-600">{t('cockpit.thread.loading')}</p>}
-        {read.status === 'failed' && <p role="status" className="text-[13px] text-ink-600">{t('cockpit.thread.failed')}</p>}
+        {read.status === 'failed' && (
+          // An incomplete thread says so, with its rule, and is read again on request (Codex P2).
+          <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="text-[13px] text-ink-600">
+              {t('cockpit.thread.failed')}
+              {read.ruleId !== undefined && ` ${t('cockpit.error.rule', { rule: read.ruleId })}`}
+            </p>
+            <Button size="sm" data-testid="cockpit-thread-retry" onClick={onRetry}>
+              {t('cockpit.error.retry')}
+            </Button>
+          </div>
+        )}
         {read.status === 'ready' && (
           <>
             {read.text !== undefined && <p className="max-w-4xl text-sm leading-6 text-ink-800">{read.text}</p>}

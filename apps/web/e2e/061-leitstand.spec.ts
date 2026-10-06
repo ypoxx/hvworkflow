@@ -295,9 +295,18 @@ test.describe.serial('061 Leitstand', () => {
 
   test('S7 at 200 % zoom (640 CSS px) one column, no horizontal scrolling, list included', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.setViewportSize({ width: 640, height: 450 });
+    // Opened at the normal width: the role switch waits for the header counter, which the shell hides at 640 px (CI run
+    // 37469905992). Then the zoom: 1280 px at 200 % is a 640 CSS px viewport.
     await openCockpit(page, 'coordination');
     await expect(page.getByTestId('cockpit-oldest')).toBeVisible();
+    await page.setViewportSize({ width: 640, height: 450 });
+    await expect(page.getByTestId('cockpit-oldest')).toBeVisible();
+    // One column: the main reading and the first card stand on top of each other, left edges flush.
+    await expect.poll(async () => {
+      const oldest = await page.getByTestId('cockpit-oldest').boundingBox();
+      const card = await page.getByTestId('cockpit-card-open').boundingBox();
+      return oldest !== null && card !== null && Math.abs(oldest.x - card.x) <= 1 && card.y >= oldest.y + oldest.height;
+    }).toBe(true);
     const overflow = () => page.evaluate(() => {
       const main = document.querySelector('main');
       return {

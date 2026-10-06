@@ -39,6 +39,7 @@ function props(over: Partial<CockpitViewProps> = {}): CockpitViewProps {
     onCloseList: noop,
     onCloseThread: noop,
     onRetry: noop,
+    onRetryThread: noop,
     ...over,
   };
 }

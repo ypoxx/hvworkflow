@@ -4,7 +4,8 @@
  * the status labels; transitions live in the core, AGENTS.md R5), no role names (R4).
  */
 import type { Question, QuestionStatus, StageAssignment, Unit } from '@hv/domain';
-import { cockpitLevel, COCKPIT_THRESHOLDS } from '../../api/cockpit';
+import { cockpitLevel, COCKPIT_THRESHOLDS, statusTrail } from '../../api/cockpit';
+import { isReadForbidden } from '../answers/lib';
 import type { Cockpit, CockpitFigure, CockpitLevel, CockpitOldestRef, CockpitOpenStatus, CockpitReviewRef, StatusTrailEntry } from '../../api/cockpit';
 import { statusLabel } from '../../i18n';
 import type { Translate } from '../../i18n';
@@ -350,6 +351,43 @@ export function threadEntries(trail: readonly StatusTrailEntry[] | null, current
   return entries;
 }
 
+/** One settled read (the shape of `Promise.allSettled`). */
+export type Settled<T> = { status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown };
+
+export interface ThreadSettlement<Q> {
+  question: Q | null;
+  trail: StatusTrailEntry[] | null;
+  /** A read failed for another reason than a refusal: the thread is incomplete and says so (Codex P2). */
+  failed: boolean;
+  ruleId?: string;
+}
+
+const ruleOf = (reason: unknown): string | undefined => {
+  if (typeof reason !== 'object' || reason === null || !('ruleId' in reason)) return undefined;
+  const ruleId = (reason as { ruleId: unknown }).ruleId;
+  return typeof ruleId === 'string' ? ruleId : undefined;
+};
+
+/**
+ * The two reads of a thread, settled. A refusal is a legitimate state (no text without the read right, only the current
+ * station without `history.read`, spec decision 6); any other failure of either read — network, 5xx — makes the whole
+ * thread failed, so an incomplete trail never looks like the refused one.
+ */
+export function settleThread<Q>(
+  id: string,
+  question: Settled<Q>,
+  history: Settled<Parameters<typeof statusTrail>[0]>,
+): ThreadSettlement<Q> {
+  const broken = [question, history].find((read) => read.status === 'rejected' && !isReadForbidden(read.reason));
+  const ruleId = broken?.status === 'rejected' ? ruleOf(broken.reason) : undefined;
+  return {
+    question: question.status === 'fulfilled' ? question.value : null,
+    trail: history.status === 'fulfilled' ? statusTrail(history.value, id) : null,
+    failed: broken !== undefined,
+    ...(ruleId !== undefined ? { ruleId } : {}),
+  };
+}
+
 export function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -362,7 +400,7 @@ export const stationLabel = (t: Translate, status: QuestionStatus): string => st
 /** What the thread shows: number, text (only with read right), unit and seat, the entries. */
 export type ThreadRead =
   | { status: 'loading'; id: string; number: string }
-  | { status: 'failed'; id: string; number: string }
+  | { status: 'failed'; id: string; number: string; ruleId?: string }
   | {
       status: 'ready';
       id: string;

@@ -32,6 +32,8 @@ export interface CockpitViewProps {
   onCloseList: () => void;
   onCloseThread: () => void;
   onRetry: () => void;
+  /** Reads the open thread again after a failure. */
+  onRetryThread: () => void;
 }
 
 /** Fixed heights while loading, so nothing jumps when the figures arrive (D8). */
@@ -70,6 +72,7 @@ export function CockpitView({
   onCloseList,
   onCloseThread,
   onRetry,
+  onRetryThread,
 }: CockpitViewProps) {
   const t = useT();
   const cockpit = read.status === 'ready' ? read.cockpit : null;
@@ -143,7 +146,7 @@ export function CockpitView({
           {selection !== null && list !== null && (
             <DrillList selection={selection} read={list} units={units} onOpenThread={onOpenThread} onClose={onCloseList} />
           )}
-          {thread !== null && <Thread read={thread} units={units} onClose={onCloseThread} />}
+          {thread !== null && <Thread read={thread} units={units} onClose={onCloseThread} onRetry={onRetryThread} />}
         </>
       )}
       {live}

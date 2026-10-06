@@ -14,12 +14,10 @@ import { useSearchParams } from 'react-router';
 import type { Question, Unit } from '@hv/domain';
 import { api } from '../../api';
 import { useActor } from '../../api/actor';
-import { statusTrail } from '../../api/cockpit';
 import type { Cockpit } from '../../api/cockpit';
 import { useApiVersion } from '../../api/useApiVersion';
 import { getLang, translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
-import { isReadForbidden } from '../answers/lib';
 import { CockpitView } from './CockpitView';
 import { applyResult, INITIAL_READING, startCockpitFeed } from './feed';
 import type { CockpitFeed, CockpitResult, ReadingState } from './feed';
@@ -31,9 +29,10 @@ import {
   rowsFromQuestions,
   rowsFromRefs,
   selectionSearch,
+  settleThread,
   threadEntries,
 } from './lib';
-import type { ListRead, Selection, ThreadRead } from './lib';
+import type { ListRead, Selection, ThreadRead, ThreadSettlement } from './lib';
 
 const NO_UNITS: readonly Unit[] = [];
 
@@ -163,43 +162,41 @@ function useList(selection: Selection | null, cockpit: Cockpit | null, actorId: 
 }
 
 /** The thread of one question: its text (only with the read right) and its status trail (only with `history.read`). */
-function useThread(id: string | undefined, cockpit: Cockpit | null, list: ListRead | null, actorId: string, version: number): ThreadRead | null {
-  const [loaded, setLoaded] = useState<{
-    owner: string;
-    question: Question | null;
-    trail: ReturnType<typeof statusTrail> | null;
-    failed: boolean;
-  } | null>(null);
+function useThread(id: string | undefined, cockpit: Cockpit | null, list: ListRead | null, actorId: string, version: number) {
+  const [loaded, setLoaded] = useState<(ThreadSettlement<Question> & { owner: string }) | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const owner = `${actorId}|${id ?? ''}`;
 
   useEffect(() => {
     if (id === undefined) return undefined;
     let cancelled = false;
     void Promise.allSettled([api.getQuestion(id), api.getQuestionHistory(id)]).then(([question, history]) => {
-      if (cancelled) return;
-      // A refusal is no failure: without the read right the thread shows no text, without `history.read` only the
-      // current station (spec decision 6).
-      const failed = (question.status === 'rejected' && !isReadForbidden(question.reason))
-        || (history.status === 'rejected' && !isReadForbidden(history.reason));
-      setLoaded({
-        owner,
-        question: question.status === 'fulfilled' ? question.value : null,
-        trail: history.status === 'fulfilled' ? statusTrail(history.value, id) : null,
-        failed,
-      });
+      if (!cancelled) setLoaded({ ...settleThread(id, question, history), owner });
     });
     return () => { cancelled = true; };
-  }, [id, owner, version]);
+  }, [id, owner, version, attempt]);
 
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  return { read: threadRead(id, cockpit, list, loaded !== null && loaded.owner === owner ? loaded : null), retry };
+}
+
+/** What the thread shows, from the settled reads and the reference of the list or the reading. */
+function threadRead(
+  id: string | undefined,
+  cockpit: Cockpit | null,
+  list: ListRead | null,
+  current: ThreadSettlement<Question> | null,
+): ThreadRead | null {
   if (id === undefined || cockpit === null) return null;
   const row = list?.status === 'ready' ? list.rows.find((candidate) => candidate.id === id) : undefined;
   const ref = row ?? cockpit.oldestOpen.items.find((item) => item.id === id) ?? cockpit.legalReview.items.find((item) => item.id === id);
-  const current = loaded !== null && loaded.owner === owner ? loaded : null;
   const question = current?.question ?? null;
   const number = question?.number ?? ref?.number ?? '';
   if (current === null) return { status: 'loading', id, number };
   const status = question?.status ?? ref?.status;
-  if ((current.failed && question === null) || status === undefined) return { status: 'failed', id, number };
+  if (current.failed || status === undefined) {
+    return { status: 'failed', id, number, ...(current.ruleId !== undefined ? { ruleId: current.ruleId } : {}) };
+  }
   const unitId = question?.unitId ?? ref?.unitId;
   return {
     status: 'ready',
@@ -221,7 +218,7 @@ export function CockpitPage() {
   const { read, announcement, retry } = useCockpit(actorId, version, units);
   const cockpit = read.status === 'ready' ? read.cockpit : null;
   const list = useList(selection, cockpit, actorId, version);
-  const thread = useThread(selection?.q, cockpit, list, actorId, version);
+  const { read: thread, retry: retryThread } = useThread(selection?.q, cockpit, list, actorId, version);
 
   // Where the focus goes back to (spec decision 11): the trigger of the list and of the thread, by a stable key.
   const listTrigger = useRef<string | null>(null);
@@ -324,6 +321,7 @@ export function CockpitPage() {
       onCloseList={onCloseList}
       onCloseThread={onCloseThread}
       onRetry={retry}
+      onRetryThread={retryThread}
     />
   );
 }
