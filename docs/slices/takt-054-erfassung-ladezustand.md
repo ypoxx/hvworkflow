@@ -49,6 +49,8 @@ Testproblem (Befund der Ursachenanalyse vom 06.10.2026):
   `fresh`/`another`)
 - `docs/slices/takt-054-erfassung-ladezustand.md`
 - `docs/folgeliste.md`
+- `docs/evidence/takt-054-*.png` (Nachtrag, Codex P1 auf #174: AGENTS.md R2 verlangt für Oberflächenarbeit ein
+  Bildschirmfoto; der e2e-Fall legt es in-process in DE und EN ab)
 
 ## Bericht
 
