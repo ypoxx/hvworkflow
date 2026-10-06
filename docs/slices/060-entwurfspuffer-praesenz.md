@@ -912,3 +912,12 @@ rot (`expected +0 to be 1`), danach grün.
 ## Review findings
 
 (leer)
+
+### Nachweis CI `e2e-http` auf dem letzten Stand (Codex P1 auf #170)
+
+Grüner Lauf des Projekts `http` gegen Dienst, Postgres und Keycloak auf dem Kopf **10628cb** (Basis mit 041, 046, 061 A/B,
+takt-053; Nacharbeit 4 eingeschlossen): Lauf **37476419839**, Job **112312889888**, Artefakt `evidence-031-http`,
+Artefakt-ID **11418634821**, SHA-256 **ca049b5a459a84de57f516a78e2be53ddf3f3750f66d9af0d350c202ced14d2b**;
+74 bestanden, 15 übersprungen, Dauer 5:43 (Grenze 12:00).
+060 im Projekt `http`: E1, E2, E3, E5, **E5b**, **E7**, E8 bestanden; E4, E6, E9 sind dort per Spec übersprungen
+(in-process abgedeckt). Damit sind die zuvor offenen http-Hälften (E3, E5, E5b, E7) auf dem endgültigen Stand belegt.
