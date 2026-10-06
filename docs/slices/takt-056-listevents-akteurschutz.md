@@ -35,3 +35,24 @@ eine zurückgehaltene Seite lässt die alte Schleife stehen, die Ansicht lädt f
 - `apps/web/src/api/liveStore.ts` (nur die Zeile `listEvents` und deren Kommentar)
 - `apps/web/src/api/liveStore061.test.ts`
 - `docs/slices/takt-056-listevents-akteurschutz.md`
+
+## Bericht
+
+```
+Slice: takt-056-listevents-akteurschutz
+Done: listEvents läuft über guarded() (ungepuffert, unter dem Akteurschutz); eine vor Akteurwechsel/clear angeforderte
+      Ereignisseite erreicht den Aufrufer nicht. Test in liveStore061.test.ts zuerst rot (Review bestätigt: mit der alten
+      Zeile „expected true to be false“), dann grün.
+Evidence: pnpm gates auf bb78d41 (Merge mit der Basis inkl. takt-055; der takt-056-Diff ist unverändert):
+      packages/domain test:       Tests  555 passed (555)
+      apps/web test:       Tests  1134 passed (1134)
+      apps/api test:       Tests  710 passed (710)
+      slice-scope: 3 changed file(s), all within "docs/slices/takt-056-listevents-akteurschutz.md"'s "Files allowed" list (4 pattern(s)).
+      ✓ built in 1.85s
+      mark-test-run: wrote /home/user/wt/takt056/.claude/state/last-test-run (clean tree) at commit bb78d41, tree 1c9f4ba44f9f…
+Open: Review (frischer Kontext, Perspektive Sicherheit): kein Blocker, kein Major. Die verbleibenden Durchreichungen des
+      Live-Stores ohne Akteurprüfung (lastWriteEtag, Schreibantworten, seedDemo) und der id-Vergleich in history/Page.tsx
+      (keyBelongsTo) tragen keinen Inhalt in den Lesepfad einer anderen Person; sie werden als eigener Sicherheitstakt
+      takt-057 vor dem Rollout gebaut (Folgeliste, Abschnitt „Vor Rollout“), nicht als Kleinbefund aufgeschoben.
+Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts, docs/slices/takt-056-listevents-akteurschutz.md
+```
