@@ -101,9 +101,25 @@ Review (frischer Kontext): kein Blocker, kein Major. Nachgearbeitet auf 4be6dfc 
       Darin: domain 555, web 1052, api 710 Tests grün; slice-scope: 6 changed file(s) innerhalb "Files allowed";
         Skripttests # pass 358, # fail 0.
       046 in-process --repeat-each=3 auf 4be6dfc: 9 passed (34.2s); docs/evidence danach zurückgesetzt.
+Nachweisbild (Codex P1 auf #174; Files allowed per Nachtrag b0d7a6c um docs/evidence/takt-054-*.png ergänzt):
+      docs/evidence/takt-054-erfassung-geruest-de.png, docs/evidence/takt-054-erfassung-stabil-de.png,
+      docs/evidence/takt-054-erfassung-stabil-en.png (Commit 43837cc). In-process dauert das Gerüst von sich aus nur
+      Mikrotasks; für das Gerüstbild hält der Fall deshalb die Fragen eines Redebeitrags über das vom Test gepatchte
+      api.listQuestions (Muster 010b/028 mit loadAppModules, kein Produkt-Hook) und gibt sie danach frei; die Bilder
+      „stabil“ zeigen den korrigierten Endzustand (Redebeitrag, „Weiterer Redebeitrag“, kein leeres Formular). Das
+      Fenster mit echter Netzlatenz belegt der http-Fall. Mit dem Halten ist der Fall in-process ohne Fix (Page.tsx aus
+      aff43d2) rot schon an der Gerüstprüfung: "expect(locator).toHaveCount(expected) failed" (Zeile 326).
+      pnpm gates grün auf Commit 43837cc (sauberer Baum, DB hv_test_t054). Ende:
+        dist/assets/index-hX7BzNq-.js                        887.37 kB │ gzip: 256.15 kB │ map: 3,518.93 kB
+        ✓ built in 1.86s
+        mark-test-run: wrote /home/user/wt/takt054/.claude/state/last-test-run (clean tree) at commit 43837cc, tree f0ea039bfa8a…
+      Darin: domain 555, web 1052, api 710 Tests grün; slice-scope: 9 changed file(s) innerhalb "Files allowed"
+        (11 Muster; Warnung, dass Files allowed vom Stand aff43d2 abweicht, wegen des Nachtrags erwartet);
+        Skripttests # pass 358, # fail 0.
+      046 in-process --repeat-each=3 auf 43837cc: 9 passed (40.2s); überschriebene Bilder per git checkout zurückgesetzt.
 Open: CI-Lauf e2e-http des PR (Lauf-ID) steht aus; Folgelistenpunkte (Gerüst bei Versionssprung ohne Redebeitrag;
       Review minor 1 und nit 5).
 Touched: apps/web/src/features/capture/Page.tsx, apps/web/src/features/capture/useCapture.ts,
       apps/web/src/features/capture/deskLoading.test.ts, apps/web/e2e/046-nachfragen.spec.ts,
-      docs/slices/takt-054-erfassung-ladezustand.md, docs/folgeliste.md
+      docs/slices/takt-054-erfassung-ladezustand.md, docs/folgeliste.md, docs/evidence/takt-054-erfassung-*.png (3)
 ```
