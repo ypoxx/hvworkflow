@@ -886,6 +886,21 @@ den Timern keine Zeile. Mit der alten Bedingung (Löschen nur bei gespeichertem 
 `AssertionError: expected 1 to be +0`; zurückgesetzt: grün. Spec E3 trägt den Nachtrag des Orchestrators; drei neue Einträge in der
 Folgeliste (Merker `roles_changed`, gemerkte fehlgeschlagene ids, toter Zweig).
 
+### Nacharbeit 3: CI gates, in-process E1 (Läufe 37460605618, 37463402183)
+
+**Ursache: eine Lücke im Persistieren der Demo, vor 060 vorhanden; der Test hat sie getroffen.** `saveLog` in
+`apps/web/src/api/index.ts` schreibt das Ereignislog 150 ms nach dem letzten Ereignis in localStorage (entprellt; von 060 nicht
+geändert). E1 lädt direkt nach dem Speichern neu; auf dem schnelleren CI-Runner lag das Neuladen innerhalb der 150 ms, die neue
+Version war noch nicht im Log und nach dem Neuladen weg (Erwartet 2, erhalten 1). Nachgestellt (lokal, Dev-Server wie in CI): direkt
+nach `draftAnswer` enthält localStorage den Text nicht, 300 ms später schon; `draftAnswer` und sofort `location.reload()` → die Version
+fehlt nach dem Laden. Der Entwurfspuffer und `seedIfEmpty` sind nicht beteiligt (Säen nur bei leerem Log, der Puffer schreibt keine
+Ereignisse). CI fährt in-process ebenfalls den Dev-Server (gleiche `playwright.config.ts`), keinen Produktionsbau.
+
+**Behoben im Test:** E1 wartet in-process, bis das Log den gespeicherten Text enthält, und lädt erst dann neu. **Produktbefund (nur
+Demo):** eine gespeicherte Version geht verloren, wenn innerhalb von 150 ms neu geladen oder geschlossen wird; HTTP ist nicht
+betroffen. Nicht behoben, weil `index.ts` in 060 nur für die Pufferverdrahtung erlaubt ist; Folgeliste und Hinweis an den
+Orchestrator (Vorschlag: Log bei `pagehide` sofort schreiben).
+
 ## Review findings
 
 (leer)

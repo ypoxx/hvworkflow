@@ -900,4 +900,9 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   ebenso bleibenden Zustand `unavailable`.
 - 060 Re-Check · `apps/web/src/api/draftBuffer.ts` `startedIn === epoch ? await store.getAll() : []` · der zweite Zweig ist tot
   (die Epoche kann sich vor dem Aufruf nicht ändern) · entfernen.
+- 060 Bau (CI-Läufe 37460605618, 37463402183) · **Demo verliert eine gespeicherte Antwortversion bei Neuladen innerhalb von
+  150 ms** · `apps/web/src/api/index.ts` `saveLog` schreibt das Ereignislog entprellt (150 ms) in localStorage; ein Neuladen oder
+  Schließen in diesem Fenster verliert jedes Ereignis seitdem (nachgestellt: `draftAnswer`, sofort `location.reload()` → Version fehlt).
+  Vor 060 vorhanden, nur Demo (HTTP speichert im Dienst). E1 wartet seit 060 auf das Log · Log bei `pagehide` sofort schreiben (oder
+  Schreiben nicht entprellen); Entscheidung an den Orchestrator, `index.ts` liegt dafür außerhalb der Dateien von 060.
 

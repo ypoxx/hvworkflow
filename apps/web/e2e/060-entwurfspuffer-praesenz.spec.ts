@@ -29,6 +29,8 @@ import { asRole, newContextAs } from './support/roles';
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const API_MODULE = '/src/api/index.ts';
+/** The localStorage name of the demo's event log (`STORAGE_KEY` in apps/web/src/api/index.ts). */
+const DEMO_LOG_STORAGE = 'hv-demo-events-v1';
 const EXPERT_UNIT_ID = 'unit-fin';
 const isHttp = (): boolean => test.info().project.name === 'http';
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -220,6 +222,13 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
     await save(page).click();
     await expect(versions(page)).toHaveCount(before + 1);
     await expect(kept(page)).toHaveCount(0);
+    // The demo writes its event log to localStorage 150 ms after the last event (`saveLog` in api/index.ts, debounced since
+    // before 060). A reload inside that window loses the new version (CI runs 37460605618, 37463402183): wait until the log
+    // holds it. Finding for the demo in docs/folgeliste.md; the HTTP mode stores on the service.
+    if (!isHttp()) {
+      await expect.poll(() => page.evaluate(([name, text]) => (localStorage.getItem(name!) ?? '').includes(text!), [DEMO_LOG_STORAGE, DRAFT_060_TYPED]))
+        .toBe(true);
+    }
     await page.reload();
     await waitForCorpus(page);
     await openInAnswers(page, number);
