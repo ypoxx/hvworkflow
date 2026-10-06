@@ -916,17 +916,104 @@ und aus Klasse hoch für alle vier Teile. Gemessene Bauzeiten der letzten Scheib
 
 ```
 Slice: 046-nachfragen-threads
-Done: <drei Zeilen>
-Evidence: <Schluss von `pnpm gates` mit Commit-Hash>, docs/evidence/046-erfassung-de.png, docs/evidence/046-erfassung-en.png,
-          docs/evidence/046-historie-de.png, docs/evidence/046-historie-en.png; PR-CI gates und e2e-http: Lauf-ID
-Rot vor Grün: <Testausgabe vor der Änderung>
-Mutationsproben: <sieben Ergebnisse>
-Vertrag: <Version, check.mjs (a)–(d)>
-Laufzeit e2e-http: <Dauer vorher/nachher>
-Vor-dem-Bau-Punkte: <Ergebnis je Punkt 1–9, Punkt 8 mit den Folgen für 053, 054, 055b, 080, abnahme>
+Done: Vertrag 0.4.5 (QuestionRelation, Bezugspaar in QuestionCapture, drei Felder an Question mit einseitigem
+      dependentRequired, Filter parentQuestionId an beiden Listen, Event.type QuestionLinked, geschlossenes
+      QuestionLinkedPayload); Kern mit R-LINK-01 (gleichlautende 422 ohne id), R-LINK-02 im Reduzierer (a–f, Regel e
+      über das Merkfeld State.lastReduced), parentAnswerVersion aus dem internen deliveredAnswerVersion, Maskierung in
+      Ansicht, Bühne, maskEvent und Strom; Dienst reicht den Filter durch; Erfassung mit Schaltfläche „Nachfrage zu …“,
+      Alt+B, Dialog „Bezug setzen“, Chip nur für den nächsten Einzelaufruf, Badge an der Karte; Historie mit Block
+      „Bezug“ und Zeitleistenzeile; e2e in-process und Einreihung in http zwischen 045 und 053.
+Evidence: pnpm gates mit TEST_DATABASE_URL/TEST_RUNTIME_DATABASE_URL (eigene Datenbank hv_test_s046) auf dem sauberen
+          Baucommit 3a91c68, exit 0; Tests domain 526, web 846, api 701 (P1–P2 liefen, nichts übersprungen); Schluss:
+            ✓ built in 2.05s
+            mark-test-run: wrote /home/user/wt/s046/.claude/state/last-test-run (clean tree) at commit 3a91c68, tree fe9a46ef03cd…
+          docs/evidence/046-erfassung-de.png, docs/evidence/046-erfassung-en.png, docs/evidence/046-historie-de.png,
+          docs/evidence/046-historie-en.png; PR-CI gates und e2e-http: offen (nicht gepusht, Auftrag)
+Rot vor Grün:
+  Kern link046.test.ts vor der Kernänderung: „Tests 31 failed | 4 passed (35)“ (erster Lauf vor dem WIP-Commit; nach dem
+    Abbruch erneut belegt durch vorübergehendes Zurücksetzen der Kerndateien auf 14d8995 mit den endgültigen Tests:
+    wieder 31 failed | 4 passed). Grün: 35 passed; ganzes Paket 526 passed.
+  Dienst link046.test.ts: gegen den Kernstand 14d8995 und app.ts ohne Filter 5 failed | 2 passed (H2 und H6 grün, weil
+    der Validator aus dem Vertragsschritt sie schon trägt: Vertrag zuerst); nur app.ts zurückgesetzt: H4 rot. Grün 7/7,
+    mit dem Test-16-Dateiteil 8/8.
+  Postgres postgres-link046.test.ts gegen Kern 14d8995: 2 failed (P1, P2). Grün 2/2.
+  Oberfläche (9 Dateien) vor der Umsetzung: 3 Dateien nicht ladbar (followUp, FollowUpDialog, ThreadBlock), 15 Tests rot
+    in http, parity, eventSummary, ContributionPane, QuestionCard, SuggestDialog. Grün 846/846. Die i18n-Schlüssel und
+    labels.ts entstanden vor den Tests; die Paritätszahl war trotzdem rot (falsch gezählt, korrigiert auf 648).
+  e2e 046-nachfragen.spec.ts in-process: erster Lauf rot (axe Farbkontrast text-ink-500 bei 11 px), nach Anhebung auf
+    text-ink-600 2/2 grün.
+Mutationsproben (je lokal rot, danach zurückgenommen):
+  1 R-LINK-01 ausgelassen: Kern Test 4 (128-Code-Punkte-Fall) und Test 5 rot; Dienst H3 rot.
+  2 Regel (e) auf version === 1: Test 3 (Paar mit anderer commandId), Test 6e3 und Merkfeld-Test rot.
+  3 touch auch für die Bezugsfrage: Test 1, Test 6e3, Test 14 rot.
+  4 Bezugsfrage in EVENT_SUBJECTS.QuestionLinked: Test 15 rot.
+  5 Maskierung in viewQuestion ausgelassen: Test 8 (Kind lesbar, Bezugsfrage nicht) und drei Fälle von Test 9 rot;
+    Entfernung in maskEvent ausgelassen: Test 10 rot.
+  6 Chip nach Erfolg nicht zurückgesetzt (heldAfterCapture gibt immer den Bezug zurück): W3 in followUp.test.ts rot.
+  7 parentAnswerVersion aus der neuesten statt der vorgelesenen Version: Test 1 und Test 2 rot.
+  Zusatz: Kopie des Merkfelds in snapshotBefore ausgelassen: der Kopietest rot.
+Minors der Nachprüfung (Orchestrator): (1) Test 2 prüft deliveredAnswerVersion auch in der Antwort einer Wiederholung
+  (deliverQuestion mit gleichem Idempotency-Key, replayValue/viewQuestion(…, historical)); (2) Kommentar „last delivered
+  with a version“ an QuestionRecord.deliveredAnswerVersion und im Fall QuestionDelivered; (3) Test 3 belegt das legitime
+  Paar Captured+Linked ohne commandId und mit gleicher commandId (wirkt) und mit anderer commandId (wirkt nicht);
+  (4) Regel (e) über State.lastReduced, gesetzt am Ende von reduce für jedes Ereignis dieses Jahrgangs (angewendet oder
+  nicht, nicht beim frühen Rücksprung für fremde Jahrgänge), kopiert in snapshotBefore; Tests „rule (e) memo“ und
+  „the memo is carried by snapshotBefore copies“.
+Vertrag: 0.4.5 (Integrationszweig noch 0.4.4); check.mjs (a)–(d) ok, (c) „0.4.4 -> 0.4.5“; contract:lint 12 Warnungen
+  wie auf der Basis; allowlist.json unverändert; zweiter Lauf von contract:types ohne Diff. Zahl der Operationen 70
+  laut check.mjs, auch auf der Basis (die Spec nennt 71: Zählfehler der Spec, keine Änderung).
+Laufzeit e2e-http: vorher (Schritt „End-to-end http project“, letzte drei grüne PR-Läufe mit ausgeführtem Job)
+  5:49 (37381243659), 5:06 (37369284554), 4:52 (37360163818); nachher: offen bis zur PR-CI. 046 läuft dort mit E1 und E2.
+Vor-dem-Bau-Punkte:
+  1 Vertrag 0.4.4 ohne QuestionLinked/QuestionRelation/ParentQuestionIdFilter, R-LINK frei: erfüllt.
+  2 059 nicht vor 046 gemergt: 0.4.5 bleibt.
+  3 Wiederholung: die Zuordnung filtert QuestionCaptured, QuestionLinked stört nicht; keine Änderung nötig. Test 11/H5.
+    Die Maskierung im Wiederholungspfad prüft die Bezugsfrage in `historical` (viewQuestion(…, source)).
+  4 Kein Test gleicht Event.type mit EVENT_TYPES oder labels.ts ab oder zählt QuestionCapture; ALL_EVENT_TYPES in
+    stream035 ergänzt (erlaubt). Neuer Befund: api.test.ts:500 und :513 weisen ReadEvent[] einem DomainEvent[] zu; eine
+    ReadEvent-Leseform { relation } wäre nicht zuweisbar (Scope-Befund, siehe Open).
+  5 eventSummary.ts ohne default-Zweig; Fall ergänzt, W5 belegt ihn.
+  6 Alt+N ist belegt (AppShell: Navigation ein- und ausklappen, Alt+N außerhalb von Eingabefeldern). Gewählt: Alt+B
+    („Bezug“), event.code KeyB, ohne Strg/Meta, nicht in input/textarea/select/contenteditable; in der App frei.
+    Glossarzeile nennt Alt+B.
+  7 siehe Laufzeit e2e-http.
+  8 Gemeinsame Datenbank http: 046 hinterlässt beim Redner am Mikrofon einen weiteren Redebeitrag mit zwei Fragen in
+    captured (eine Klarstellung einer Seed-Frage aus dem Suchwort, eine ohne Bezug), ohne Pfad und Fachbereich, Bühne
+    unverändert, kein Chip. 053: findSteerable nimmt die erste passende captured-Frage, auch eine aus 046, S2 bleibt
+    gültig; S3/S4 unberührt. 054 und 055b: Zähler wartet auf >= CORPUS_DEMO.questions (Mindestwert), keine Frage in
+    Finanzen. 080 prüft nur Layout der Wortmeldeliste; 046 ändert keinen Rednerstatus. Abnahme ruft einen eigenen Redner
+    auf. Lokal nicht im http-Projekt ausgeführt (kein Keycloak), Beleg folgt mit der PR-CI.
+  9 Zeilenangaben stimmten im Wesentlichen; Abweichung: 71 statt 70 Operationen (oben).
 Abweichung ADR 0012: R-LINK-01/02 im Regelregister statt in transitions.ts (für die Folgeliste, Eintrag durch den Orchestrator)
-Open: <was nicht erledigt ist, mit Grund>
-Touched: <Dateiliste>
+Open:
+  - ReadEvent-Leseform: Spec Entscheidung 5 verlangt für QuestionLinked die Nutzlast { relation } im Typ ReadEvent. Das
+    bricht packages/domain/src/__tests__/api.test.ts:500/:513 (DomainEvent[][] nimmt ReadEvent[] auf),
+    außerhalb Files allowed. Umgesetzt stattdessen: ReadEvent unverändert, eigener Typ QuestionLinkedReadPayload in
+    events.ts, eventSummary.ts liest nur relation über diesen Typ. Laufzeit und Vertrag sind geschlossen (maskEvent,
+    QuestionLinkedPayload). Für die Folgeliste: api.test.ts auf ReadEvent[][] umstellen, dann ReadEvent einengen.
+  - Test 16, Dateiteil: das Paket domain darf node:fs nicht importieren (arch-Tor); die Literalprüfung in api.ts/state.ts
+    und die zwei Zeilen in legal-trace.md stehen deshalb in apps/api/src/__tests__/link046.test.ts.
+  - stream.ts: über die Spec-Liste hinaus kopiert snapshotBefore das Merkfeld lastReduced (Auftrag des Orchestrators,
+    Nachprüfung Minor 4), mit eigenem Test.
+  - W2/W3 ohne DOM: das Web-Paket hat keine DOM-Testumgebung; Dialog, Chip, Alt+B und Suche sind als reine Funktionen
+    (followUp.ts) und statische Darstellungen getestet, die Interaktion (Fokus beim Öffnen, Escape zur Schaltfläche,
+    Alt+B nicht im Eingabefeld, Pfeile/Enter) in e2e E1/E3.
+  - Dialogbreite: die Dialog-Komponente kennt nur feste Größen; md = max-w-lg (512 px) statt 480 px.
+  - 003-answers-stage.spec.ts war im vollen in-process-Lauf (182 grün, 1 übersprungen, 1 rot) und in einem Wiederholungslauf
+    rot (Klick auf history-tab-stream läuft in den Zeitablauf), danach 6/6 grün; auf der Basis 4/4 grün. Wahrscheinlich
+    Last (parallele Builds), aber nicht ausgeschlossen, dass der neue Block die Historie belastet; für den Review.
+  - Lint-Warnung (keine Fehler): unicorn(no-useless-spread) in link046.test.ts Test 8.
+  - PR-CI (gates, e2e-http) mit Lauf-ID und Dauer des Schritts e2e-http: offen, nicht gepusht.
+  - Design-Kritik D1–D10: nicht Teil dieses Laufs.
+Touched: packages/contract/{openapi.yaml,src/types.ts,CHANGELOG.md,package.json}; packages/domain/src/{types,events,
+  envelope,state,stream,api,rules}.ts, __tests__/link046.test.ts, __tests__/stream035.test.ts; docs/legal-trace.md;
+  apps/api/src/app.ts, __tests__/{link046,postgres-link046,contract,takt-019-contract}.test.ts; apps/web/src/api/http(.test).ts;
+  apps/web/src/features/capture/{followUp,followUp.test,FollowUpDialog,FollowUpDialog.test,Page,SuggestDialog,
+  SuggestDialog.test,ContributionPane,ContributionPane.test,QuestionCard,QuestionCard.test}; apps/web/src/features/history/
+  {ThreadBlock,ThreadBlock.test,Page,eventSummary,eventSummary.test}; apps/web/src/i18n/{labels,capture.de,capture.en,
+  history.de,history.en,shell.de,shell.en,parity.test}.ts; apps/web/e2e/046-nachfragen.spec.ts, support/e2e-texts.ts,
+  playwright.config.ts; scripts/e2e-http-031.test.mjs; docs/evidence/046-*.png (4); docs/glossar.md;
+  docs/datenschutz/dsfa-vorentwurf.md; docs/sicherheit/bedrohungsmodell.md
 ```
 
 ## Review findings
