@@ -212,6 +212,12 @@ test('S2 --recreate keeps the stored ports, also an override from the first star
   assert(!normal.up.includes('--force-recreate'));
 });
 
+test('takt-055 the stack plan switches off the bake filesystem entitlement check (Compose v5 always uses bake)', () => {
+  const plan = upPlan(parseArgs(['up']), createState({ webPort: 18480, idpPort: 18555 }), '/state/dir');
+  assert.equal(plan.env.BUILDX_BAKE_ENTITLEMENTS_FS, '0');
+  assert.equal(plan.env.COMPOSE_BAKE, undefined);
+});
+
 // ---- S3 secrets -----------------------------------------------------------------------------------------------------
 
 test('S3 no secret in a versioned file; every env_file points into the state directory', () => {
