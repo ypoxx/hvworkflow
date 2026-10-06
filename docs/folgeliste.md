@@ -887,6 +887,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Die harte Grenze trägt deshalb wie `timing053` einen Aufschlag (100 ms), das Ziel 50 ms steht je Messreihe im Log · im CI-Log
   nachsehen; liegt es dort über 50 ms, den Zwischenspeicher aus Vor-dem-Bau-Punkt 5 der Spec 061 bauen
   (`createSingleFlightCache`, Filter nach `can()` danach).
+- 061 Teil B CI (Lauf 37468958219) · W10 · `getCockpit` beste Reihe 57,7 ms auf dem CI-Läufer (Paket-Suiten parallel), also über dem Ziel 50 ms; der Stolperdraht schreibt seither einen Warnhinweis · **vor Rollout** den Zwischenspeicher aus Vor-dem-Bau-Punkt 5 der Spec 061 bauen (T-G2-D-03), danach Warnhinweis wieder als Fehler.
 - 061 Teil B Bau · `packages/domain/src/seed.ts` (Uhr des Seeds, `Math.min(clock, o.now)`) · der Demo-Seed staucht fast alle
   Ereignisse auf den Seed-Zeitpunkt: im Leitstand steht der Zulauf als eine Säule, alle Uhrzeiten eines Fadens sind gleich, die
   „Danach die ältesten“ springen von 74 auf 22 min · Seed über den Nachmittag verteilen (eigener Takt; Golden von 061 und 033b

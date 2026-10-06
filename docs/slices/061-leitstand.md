@@ -1201,7 +1201,7 @@ failed | 36 passed (46)`), dann `04145d0` (grün), Bilder `bf4d92b`.
 | R3 | Ansage wiederholt sich nicht nach ruhiger Phase | `applyResult` leert die Region ohne neuen Wechsel; Test W11 auf Seitenebene (`feed.test.ts`) |
 | R4 | Verweigerter Leser liest alle 15 s | nach `forbidden` kein Intervall, keine Änderungs- oder Neuleselesung bis zum nächsten Feed (Personenwechsel); Test |
 | R5 | gefilterte älteste neben fremder Nummer | Hauptreferenz nur, wenn `items[0].ageSeconds === oldestOpen.ageSeconds`, sonst alle unter „Danach die ältesten“; Test W4 |
-| R6 | W10 | Annahme bei W10 vermerkt; Stolperdraht unter `CI` (beste Reihe < 50 ms) |
+| R6 | W10 | Annahme bei W10 vermerkt; Stolperdraht unter `CI` als Warnhinweis (beste Reihe ≥ 50 ms → `::warning`), nicht als Fehler: der erste CI-Lauf (37468958219) maß 57,7 ms bei gleichzeitig laufenden Paket-Suiten; Entscheidung des Orchestrators, Abhilfe Zwischenspeicher vor Rollout |
 | R7 | `lastFocused` | bei Fokuswechsel aus der Liste gelöscht; `focus({ preventScroll: true })` |
 | R10 | globales Escape | ignoriert Kopfzeile der Shell, Eingabefelder, `[role="menu"]` |
 | R8, R9, R12, R13, D14, D17 | — | Folgeliste |
