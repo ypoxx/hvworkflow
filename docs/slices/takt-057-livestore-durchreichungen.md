@@ -144,3 +144,39 @@ Open: Re-Check des Majors (schmal). oxlint-Warnungen only-export-components für
 Touched: zusätzlich apps/web/src/components/toastStore.ts, apps/web/src/components/toastStore.test.ts,
       apps/web/src/features/answers/useWriteDoor.test.tsx
 ```
+
+### Nachtrag nach den e2e-Befunden (CI `gates` auf #179, 564ba4e, Schritt „End-to-end acceptance scenario“)
+
+```
+Slice: takt-057-livestore-durchreichungen (e2e-Befunde)
+Done: Ursache (Hypothese b, nicht a): die e2e-Hilfen `unrelatedEvent` (010c), die Runde-4-Schreibung (010b) und
+      `elsewhere` (010d) schreiben „von anderer Stelle“ mit setActor(andere) → Schreibung → setActor(vorher) in einer
+      synchronen Aufgabe und warten auf 'ok' bzw. lesen die `version` der Antwort (036a: Schreibungen werden nie
+      zurückgehalten). Seit takt-057 gehörte die Schreibung der getauschten Person → WithheldAnswer („failed:
+      WithheldAnswer…“, „received value must be a number … undefined“). Zweitens rief write() über guarded()
+      observeActor() auf: der kurze Tausch leerte den Puffer und hob die Epoche, so dass auch die gehaltene Schreibung
+      derselben Person (010d Ziel 3, echter 412 auf A) zurückgehalten wurde. Toasts (Hypothese a) waren nicht die Ursache.
+      Änderung (nur liveStore.ts): write() ohne observeActor(); die Schreibung gehört der zuletzt beobachteten Person, wenn
+      sie am Ende der synchronen Aufgabe wieder am Gerät ist (Mikroaufgabe vor dem Adapteraufruf); sonst wie bisher
+      zurückgehalten mit WithheldAnswer. Keine Ansicht und keine e2e-Datei geändert. Neue Store-Tests (zuerst rot gegen
+      63d746a): Tausch innerhalb einer Aufgabe wird beantwortet und hält keine Lesung zurück; Wechsel A→B (B schreibt),
+      dann echter Wechsel zurück zu A in späterer Aufgabe bleibt zurückgehalten; clear() derselben Person bleibt
+      zurückgehalten (Befund 1).
+Evidence: Basis c63d981, die drei Dateien 010b/010c/010d: 79 passed; 564ba4e-Stand: 14 failed / 65 passed; nach dem
+      Fix: 79 passed. Volle in-process-Suite auf dem Stand von 64ff9a8 (`pnpm --filter @hv/web e2e`, Projekt in-process):
+        3 skipped
+        208 passed (10.5m)
+      (Basis c63d981 ebenso: 3 skipped, 208 passed.)
+      pnpm gates auf 64ff9a8, Ausgabe-Ende:
+      packages/domain test:       Tests  562 passed (562)
+      apps/web test:       Tests  1157 passed (1157)
+      apps/api test:       Tests  710 passed (710)
+      slice-scope: 8 changed file(s), all within "docs/slices/takt-057-livestore-durchreichungen.md"'s "Files allowed" list (9 pattern(s)).
+      ✓ built in 2.05s
+      mark-test-run: wrote /home/user/wt/takt057/.claude/state/last-test-run (clean tree) at commit 64ff9a8, tree e5a5ccc67d39…
+Open: Re-Check (Sicherheit) der Tauschregel: ein Akteurtausch innerhalb einer synchronen Aufgabe gilt nicht als
+      Personenwechsel; die Anwendung wechselt den Akteur nur in eigenen Aufgaben (Rollenwahl, /auth/me, Stromende). Die
+      e2e-Läufe schreiben docs/evidence/*.png neu; diese Änderungen sind nicht übernommen.
+Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts,
+      apps/web/src/features/answers/useWriteDoor.test.tsx, docs/slices/takt-057-livestore-durchreichungen.md
+```
