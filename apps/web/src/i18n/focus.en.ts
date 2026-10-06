@@ -18,6 +18,7 @@ export const focusEn: typeof focusDe = {
   'focus.write.close': 'Leave writing mode',
   'focus.write.keys': 'Ctrl+Enter saves the draft. Escape leaves writing mode; the text is kept.',
   'focus.write.gone': '{number} is no longer with you. The unsaved text was discarded.',
+  'focus.write.goneKept': '{number} is no longer with you. Your unsaved text stays in this browser until {time}.',
   'focus.write.rebase': 'A newer answer version has arrived meanwhile. Your text is not saved.',
   'focus.draft.unsaved': 'Unsaved text. Save first; then the question can be forwarded.',
   'focus.reading.time': 'Reading time approx. {time} min',

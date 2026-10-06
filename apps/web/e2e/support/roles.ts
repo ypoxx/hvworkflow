@@ -9,7 +9,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { expect, test } from './http-guard';
-import type { Locator, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Locator, Page } from '@playwright/test';
 
 type Lang = 'de' | 'en';
 
@@ -89,4 +89,23 @@ export async function asRole(page: Page, role: string): Promise<void> {
 export async function expectNotBusy(region: Locator): Promise<void> {
   await expect(region).not.toHaveAttribute('data-busy', 'true');
   await expect(region).not.toHaveAttribute('aria-busy', 'true');
+}
+
+/**
+ * Scheibe 060 (E7): a second browser context signed in as `role`, from the state `http-setup` wrote — a second person on
+ * another device. `http` only; the caller closes it.
+ */
+export async function newContextAs(browser: Browser, role: string): Promise<BrowserContext> {
+  if (!isHttp()) throw new Error('A second signed-in context exists only in the http project.');
+  const stateDir = process.env['E2E_HTTP_STATE_DIR'];
+  if (!stateDir) throw new Error('E2E_HTTP_STATE_DIR is required.');
+  labelsOf(role);
+  const { baseURL } = test.info().project.use;
+  return browser.newContext({
+    ...(baseURL !== undefined ? { baseURL } : {}),
+    locale: 'de-DE',
+    timezoneId: 'Europe/Berlin',
+    viewport: { width: 1440, height: 900 },
+    storageState: `${stateDir}/state-${role}.json`,
+  });
 }

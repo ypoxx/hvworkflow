@@ -8,11 +8,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactNode } from 'react';
 import type { AnswerBodyInput, AnswerVersion, Permission, Question } from '@hv/domain';
 import { translate } from '../../i18n';
 import type { TKey } from '../../i18n';
 import { isDirty, newDraft } from './focus';
-import { WritingMode } from './WritingMode';
+import { WritingMode, saveKeyStep } from './WritingMode';
 
 const de = (key: TKey) => translate('de', key);
 const EXPERT: Permission[] = ['answer.draft', 'question.submit_review', 'question.forward', 'question.read'];
@@ -31,7 +32,7 @@ function version(n: number, over: Partial<AnswerVersion> = {}): AnswerVersion {
 
 const plain = (text: string): AnswerBodyInput => ({ blocks: [{ type: 'paragraph', content: [{ text }] }] });
 
-function render(q: Question, opts: { text?: string; body?: AnswerBodyInput | null; rebase?: boolean } = {}): string {
+function render(q: Question, opts: { text?: string; body?: AnswerBodyInput | null; rebase?: boolean; compare?: ReactNode } = {}): string {
   const draft = newDraft('u-1', q);
   const body = opts.body !== undefined ? opts.body : opts.text !== undefined ? plain(opts.text) : draft.body;
   return renderToStaticMarkup(
@@ -49,7 +50,8 @@ function render(q: Question, opts: { text?: string; body?: AnswerBodyInput | nul
       onSources={() => undefined}
       onAction={() => undefined}
       onClose={() => undefined}
-      onRebase={() => undefined}
+      onCompare={() => undefined}
+      {...(opts.compare !== undefined ? { compare: opts.compare } : {})}
       onStaleReload={() => undefined}
     />,
   );
@@ -140,5 +142,45 @@ describe('WritingMode (Test 7)', () => {
     expect(render(question())).not.toContain('focus-approval-hint');
     const approved = question({ approval: { answerVersion: 1, approvedAt: '2026-06-15T10:10:00.000Z', approvedBy: { id: 'u-2', role: 'approver' } } });
     expect(render(approved)).toContain(de('answers.editor.hint'));
+  });
+});
+
+/**
+ * Scheibe 060, U7: with a newer foreign version standing (`rebase`), Ctrl+Enter opens the comparison instead of saving;
+ * `canSave` is unchanged; the notice offers "Vergleichen"; the comparison takes the place of the field.
+ */
+describe('WritingMode with the comparison (Scheibe 060, U7)', () => {
+  const chord = { key: 'Enter', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false };
+  it('Ctrl+Enter with rebase opens the comparison; without it saves; locked stays locked', () => {
+    expect(saveKeyStep(chord, { canSave: true, rebase: true })).toBe('compare');
+    expect(saveKeyStep(chord, { canSave: true, rebase: false })).toBe('save');
+    expect(saveKeyStep(chord, { canSave: false, rebase: true })).toBe('none');
+    expect(saveKeyStep({ ...chord, key: 'a' }, { canSave: true, rebase: true })).toBe('ignore');
+  });
+
+  it('canSave unchanged: with rebase and a change the save button stays open (it opens the comparison)', () => {
+    const html = render(question(), { text: 'mein Text', rebase: true });
+    expect(buttonTag(html, 'focus-save')).toContain('aria-disabled="false"');
+  });
+
+  it('the notice carries "Vergleichen" instead of "Neu laden"', () => {
+    const html = render(question(), { text: 'mein Text', rebase: true });
+    const compareLabel = translate('de', 'answers.editor.compare');
+    expect(html).toMatch(new RegExp(`data-testid="focus-rebase"[\\s\\S]*?<button[^>]*>${compareLabel}</button>`));
+    expect(html).not.toContain(translate('de', 'stale.reload'));
+  });
+
+  it('the comparison takes the place of the field and the sources', () => {
+    const html = render(question(), { text: 'mein Text', rebase: true, compare: <div data-testid="compare-slot" /> });
+    expect(html).toContain('data-testid="compare-slot"');
+    expect(html).not.toContain('data-testid="focus-editor"');
+    expect(html).not.toContain('data-testid="focus-sources"');
+  });
+
+  it('design critique D-a/D-c: while comparing, no save button in the footer (one primary only) and no keyboard hint', () => {
+    const html = render(question(), { text: 'mein Text', rebase: true, compare: <div data-testid="compare-slot" /> });
+    expect(html).not.toContain('data-testid="focus-save"');
+    expect(html).not.toContain('data-primary="true"');
+    expect(html).not.toContain('data-testid="focus-write-keys"');
   });
 });

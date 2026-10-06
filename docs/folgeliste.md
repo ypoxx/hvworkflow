@@ -762,14 +762,14 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-043 Review nit 3 · `Page.tsx` · `armHandOver` vor `run`; kehrt `run` früh zurück (Schreiben läuft), bleibt der Fokus
   scharf bis zur nächsten Bewegung · heute durch busy/aria-disabled verhindert; bei Änderung an `useWriteDoor` erst nach Annahme
   scharf machen.
-- 054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
-  mit Toast `focus.write.gone` · Entwurfspuffer mit 060.
+- ~~054 Bau · Entwurfstext beim Verlassen von „Meine Fragen“ durch einen fremden Schreibvorgang · der ungespeicherte Text fällt
+  mit Toast `focus.write.gone` · Entwurfspuffer mit 060.~~ Erledigt in 060 (`focus.write.goneKept`, e2e E9).
 - 054 Bau · `apps/web/src/app/ShortcutsDialog.tsx` · die Kürzelliste kennt Strg+Enter und Escape des Schreibmodus nicht ·
   Zeilen ergänzen (Lane web-shell).
 - 054 Bau · `apps/web/src/features/focus/Page.tsx` Fokus nach der Übergabe · wird nach der letzten Einzelfrage der Liste (leere
   Liste) verworfen; der Fokus fällt dann auf `body` · Fokusziel im Hinweis `focus-empty` vorsehen.
-- 054 Review 5 · ungespeicherter Text beim Verlassen von `/my` (Navigation weg von der Seite) geht still verloren · mit dem
-  Entwurfspuffer 060.
+- ~~054 Review 5 · ungespeicherter Text beim Verlassen von `/my` (Navigation weg von der Seite) geht still verloren · mit dem
+  Entwurfspuffer 060.~~ Erledigt in 060 (Wiederherstellen beim nächsten Öffnen des Schreibmodus, e2e E2).
 - 054 Review 6 · Escape während einer IME-Komposition verlässt den Schreibmodus · `isComposing` auch in `shouldLeaveWriting`.
 - 054 Review 7 · Verweigerungsbadge in Liste (`danger`) und Detail/Steuerung (`warning`) uneinheitlich · einen Ton festlegen.
 - 054 Review 8 · `DEMO_BINDINGS` ohne Grund (`reason`) und bei jedem Start erneut versucht (409 übergangen) · Grund mitgeben,
@@ -964,3 +964,49 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-047 Nachprüfung minor · `scripts/release-age.mjs:53` · Zeilen im Ausnahmeblock, die nur aus NBSP oder VT bestehen, werden
   übersprungen (verbirgt keinen Eintrag) · als unbekannte Zeile melden.
 - takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
+
+
+## Entwurfspuffer und Fassungsvergleich (aus 060 Bau)
+
+- 060 Bau · `apps/web/src/components/Button.tsx` · ein gesperrter Knopf (`aria-disabled`) trägt `pointer-events: none`; der zweite
+  Klick eines echten Doppelklicks trifft deshalb den Rahmen darunter, und der Fokus verlässt den Speichern-Knopf (E8 prüft den
+  Fokus darum nicht) · Sperre ohne `pointer-events: none` (Klick im Handler schlucken, wie heute schon) und E8 um den Fokus ergänzen.
+- 060 Bau · Spec Entscheidung 2 / U1 nennt „Blocktyp `script`“ als Beispiel einer Ablehnung durch `checkAnswerBodyInput`; der Kern
+  nimmt jeden Blocktyp bis 32 Zeichen an und bildet ihn auf einen Absatz ab (N1). Abgelehnt wird der manipulierte Eintrag erst
+  durch den Schlüssel `html` im Block; ein Block `script` ohne fremde Schlüssel erscheint als Absatz mit Klartext (keine Senke) ·
+  Spec-Wortlaut bei Gelegenheit berichtigen; keine engere eigene Regel (der Dienst würde den Entwurf annehmen).
+- 060 Bau · Entscheidung 9 · der zweite Klick eines Doppelklicks auf „Mit meiner Fassung weiter“ landet dort, wo nun „Entwurf
+  speichern“ steht; Speichern übergeht deshalb jeden Klick mit `detail > 1` (der erste Klick hat gehandelt) · Layout so ändern,
+  dass unter den Entscheidungsknöpfen das Feld liegt.
+- 060 Bau · Speichern, während schon weitergetippt wurde: der Eintrag behält bis zur nächsten Eingabe die alte Basisversion; ein
+  Neuladen genau dazwischen zeigt das Band „Vergleichen“ gegen die eigene neue Version · nach dem Speichern mit verändertem Rest
+  den Eintrag mit der neuen Basis neu schreiben.
+- 060 Bau · Persona-Wechsel in der Demo erreicht den Puffer über den Lesepfad (`getActor` des Live-Speichers ruft `notice()`);
+  `actor.ts` bietet kein Abonnement · bei der nächsten Scheibe an `actor.ts` ein `subscribe` anbieten und dort verdrahten.
+- 060 Review nit 11 · die Doppelklick-Sperre (`detail > 1`) schluckt auch einen bewussten zweiten Klick auf eine andere Aktion
+  an derselben Stelle · nach der Layoutänderung (Feld unter den Entscheidungen) entfernen.
+- 060 Review nit 12 · E5 (http) belegt nicht, dass der Speicher **vor** der Abmeldeanfrage leer ist (nur danach); die Reihenfolge
+  belegt U1 · im Double der Abmeldeanfrage den Objektspeicher lesen.
+- 060 Design-Kritik minor 7 · die Spalten des Vergleichs sind in der geteilten Ansicht eng (Umbruch nach Fensterbreite, nicht
+  nach Breite des Detailbereichs) · Container-Breakpoint erwägen.
+- 060 Design-Kritik D5 · die Uhrzeit im Hinweis `focus.write.goneKept` steht nicht in Mono und ohne Datum (bei Ablauf am Folgetag
+  missverständlich) · Datum ergänzen, Zeit in Mono (Toast mit Teilen).
+- 060 Review nit · „wiederhergestellt“ zeigt HH:MM, „zwischengespeichert“ HH:MM:SS · eine Form festlegen.
+- 060 Review nit · Uhrzeitformatierung an drei Stellen (`DraftNote`, `focus/Page.tsx`, `clockTime`) mit der Zeitzone des Geräts,
+  während der Kopf „Ortszeit Berlin“ zeigt · eine gemeinsame Formatierung mit der Zeitzone der Versammlung.
+- 060 Bau (CI-Lauf 37458349373) · Speichern offline im HTTP-Betrieb: die Schreibtür liest nach der Ablehnung neu, offline scheitert
+  auch das, und `useBacklog` zeigt danach keine Frage mehr (das Feld verschwindet; der Text bleibt im Puffer und kommt beim
+  nächsten Öffnen wieder) · bei einem gescheiterten Neuladen die zuletzt gezeigte Frage stehen lassen (Lane web-answers, 010d).
+- 060 Re-Check · `rolesChanged()` bleibt für die ganze Sitzung gesetzt; spätere Abgänge aus dem Schreibmodus löschen Entwürfe auch für
+  Fragen, die aus anderen Gründen gegangen sind · Merker nach der Prüfung zurücksetzen oder aus dem Datensatz der gehenden Frage
+  entscheiden.
+- 060 Re-Check · die gemerkten fehlgeschlagenen Akteur-ids erholen sich in der Sitzung nie · bekanntes Verhalten, passend zum
+  ebenso bleibenden Zustand `unavailable`.
+- ~~060 Re-Check · `apps/web/src/api/draftBuffer.ts` `startedIn === epoch ? await store.getAll() : []` · der zweite Zweig ist tot
+  (die Epoche kann sich vor dem Aufruf nicht ändern) · entfernen.~~ Erledigt mit der Behebung von Codex P2 (#170).
+- 060 Bau (CI-Läufe 37460605618, 37463402183) · **Demo verliert eine gespeicherte Antwortversion bei Neuladen innerhalb von
+  150 ms** · `apps/web/src/api/index.ts` `saveLog` schreibt das Ereignislog entprellt (150 ms) in localStorage; ein Neuladen oder
+  Schließen in diesem Fenster verliert jedes Ereignis seitdem (nachgestellt: `draftAnswer`, sofort `location.reload()` → Version fehlt).
+  Vor 060 vorhanden, nur Demo (HTTP speichert im Dienst). E1 wartet seit 060 auf das Log · Log bei `pagehide` sofort schreiben (oder
+  Schreiben nicht entprellen); Entscheidung an den Orchestrator, `index.ts` liegt dafür außerhalb der Dateien von 060.
+
