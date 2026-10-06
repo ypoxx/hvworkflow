@@ -29,7 +29,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { KEYCLOAK_IMAGE, KEYCLOAK_IMAGE_FORM, buildRealm, removeKeycloak, startKeycloak, waitForHttp } from './lib/keycloak-ci.mjs';
-import { PERSONS } from './lib/demo-persons.mjs';
+import { PERSONS as DEMO_PERSONS } from './lib/demo-persons.mjs';
 import { bootstrap } from './lib/demo-bootstrap.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,8 +63,12 @@ function assertPortFree(port) {
   });
 }
 
-/** The synthetic persons of the realm (slice 037a moved the list to `scripts/lib/demo-persons.mjs`). */
-export { PERSONS };
+/**
+ * The synthetic persons of the realm: the nine of `scripts/lib/demo-persons.mjs` (slice 037a, shared with the local
+ * stack) plus, for this harness only, one person with the administration role (Scheibe 041, decision 11). The shared
+ * list stays as it is, so the local stack's saved state (one password per person) does not break.
+ */
+export const PERSONS = [...DEMO_PERSONS, { key: 'admin', role: 'admin' }];
 
 // ---- pure parts (unit-tested, no Docker, no database) --------------------------------------------------------------
 
@@ -227,14 +231,14 @@ async function check() {
   stage = 'check: realm';
   const { realm, users, identity, redirectUri } = buildFixture({ httpPort });
   assert.equal(realm.users.length, PERSONS.length);
-  assert.equal(PERSONS.length, 9);
+  assert.equal(PERSONS.length, 10);
   assert.equal(realm.clients.length, 1);
   assert.deepEqual(realm.clients[0].redirectUris, [`http://localhost:${httpPort}/auth/callback`]);
   assert.equal(redirectUri, realm.clients[0].redirectUris[0]);
   assert(realm.users.every((user) => /@example\.test$/.test(user.email)));
   assert.equal(new Set(realm.users.map((user) => user.credentials[0].value)).size, PERSONS.length);
   assert.notEqual(identity.clientSecret, users.capture.password);
-  say('031a realm structure, nine persons and one redirect URI: PASS');
+  say('031a realm structure, ten persons and one redirect URI: PASS');
 
   stage = 'check: service environment';
   const texts = await loadTexts();

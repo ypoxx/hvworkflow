@@ -167,7 +167,7 @@ unter „Nachweis“; der Keycloak-Teil (H4 bis H8) läuft nur im CI-Job `e2e-ht
 
 - **029b-Nachtrag (Keycloak-Nachweis in CI):** der Schritt `scripts/keycloak-ci-029b.mjs` bleibt im Job `gates`; er nutzt seit 031a das Modul
   `scripts/lib/keycloak-ci.mjs` und das Keycloak-Image mit Digest. Zusätzlich fährt der Job `e2e-http` Anmeldung, Abmelden, Subject-Sperre und
-  Schreibkonflikt im Browser gegen den echten Dienst (Realm `hv-e2e-031`, neun synthetische Personen, Geheimnisse je Lauf).
+  Schreibkonflikt im Browser gegen den echten Dienst (Realm `hv-e2e-031`, zehn synthetische Personen (eine mit Verwaltungsrolle, Scheibe 041), Geheimnisse je Lauf).
 - **H7 weicht von der Spec ab:** eine Person ohne aktive Rolle bekommt keine Sitzung, `/auth/callback` antwortet 403 (`R-PERM-01`) vor jedem Cookie;
   die Seite „Keine aktive Rolle“ entsteht nur, wenn eine Rolle mitten in der Sitzung entfällt. H7 belegt deshalb „kein Cookie, `/auth/me` 401“.
 - Zuordnung Bedrohung → Test: T-G1-S-02 → H4, H5, H6; T-G1-S-03 → H1, H4, `030-anmeldung.spec.ts`; T-G1-T-05 → H3, H5, H8;
@@ -489,6 +489,24 @@ Vier-Augen-Verfahren mit `AuditAccessGranted` (047).
   Verweigerungsvorschlag ohne Begründung) ist gewollt; eine Attributregel für vertrauliche Fragen folgt mit 047.
 - *Nachweis:* `packages/domain/src/__tests__/forward048.test.ts` Tests 2, 3, 6, 7, 8a–8c, 11, 13; über HTTP
   `apps/api/src/__tests__/forward048.test.ts` H3, H4, H8, H9; auf Postgres `postgres-forward048.test.ts` P2.
+
+**MF-17 Leistungsauswertung über den Leitstand** (061; verwandt MF-09)
+- *Ablauf:* eine Person mit `cockpit.read` beobachtet über den Tag „im Legal Clearing“, „Legal Clearing über 10 min“, den Zulauf
+  (Arbeitsmenge der Erfassung) oder den Rückstand eines Fachbereichs mit einer Person und schließt auf die Arbeitsgeschwindigkeit
+  einzelner Beschäftigter; Screenshots oder Mitschriften der Wand ersetzen eine Auswertung.
+- *Verhindert durch:* die Antwort liefert nur Bestände, Wartezeiten und Zulauf, keinen Erledigungsdurchsatz (erledigt je Zeit je
+  Station) als Feld, keinen Akteur, keine Zahl je Person (geschlossenes Schema `Cockpit`, Allowlist aus dem Vertrag, Bericht `leitstand`
+  mit Tor-Regel (g)); Inhaberkreis auf drei Rollen. **Ehrlich benannt:** ein Durchsatz lässt sich aus aufeinanderfolgenden Lesungen
+  ableiten (die Seite liest alle 15 s neu; Einzelfragen, die aus `legalReview.items` verschwinden, und sinkende Bestände je Station
+  zeigen, wie viel eine kleine Gruppe erledigt hat). Dagegen gibt es keinen technischen Riegel; die Abwehr ist organisatorisch
+  (Betriebsvereinbarung, Mindestzahl über E13 vorbereitet als `minimumGroupSize`, heute `null`) plus das Zugriffslog als Erkennungsweg.
+- *Erkennung:* jede Lesung steht im Zugriffslog mit `operationId` `getMeetingCockpit` und `subjectHash` (033a); auffällige
+  Lesemuster außerhalb des HV-Fensters prüft der Datenschutz im Verfahren zu zweit (ADR 0013). *Signal und Empfänger:* DSB und
+  Betriebsrat über die Betriebsakte. *Ausnahme:* kein automatischer Alarm; Eigentümer Datenschutz, Ablauf mit E13, spätestens
+  29.01.2027.
+- *Nachweis:* `packages/domain/src/__tests__/cockpit061.test.ts` K7 (Negativtest mit Rot-Probe `claimedBy`); `apps/api/src/__tests__/cockpit061.test.ts`
+  A6 (Bericht gleich `COCKPIT_REPORT`), A7 (Blattpfade aus dem Vertrag); `scripts/metrics-allowlist-check.test.mjs` G3; auf Postgres
+  `postgres-cockpit061.test.ts` A4 (Zugriffslog ohne Antwortinhalt).
 
 **MF-08 Demo-Schalter in Staging** (029, 034, 042)
 - *Ablauf:* bei einem Deploy bleibt `HV_DEMO=1` gesetzt; Seed-Endpunkt und Header-Identität sind offen.

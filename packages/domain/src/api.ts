@@ -1631,7 +1631,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
       const reader = actor();
       // One fold over this meeting's events per read (T-G2-D-03, measured at 800 questions in slice 061).
       const cockpit = computeCockpit(store.all().filter((e) => e.meetingId === meetingId), clock(), meetingId,
-        (q) => can(reader, 'question.read', q).allow);
+        // The check reads the canonical record of the projection (review 061 A, minor 2); the figures stay at `now`.
+        (q) => can(reader, 'question.read', state.questions.get(q.id) ?? q).allow);
       if (cockpit === undefined) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
       return cockpit;
     },

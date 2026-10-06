@@ -12,6 +12,7 @@ import { historyEn } from './history.en';
 import { steeringEn } from './steering.en';
 import { focusEn } from './focus.en';
 import { cockpitEn } from './cockpit.en';
+import { adminEn } from './admin.en';
 
 export const en: Dictionary = {
   ...shellEn,
@@ -23,4 +24,5 @@ export const en: Dictionary = {
   ...steeringEn,
   ...focusEn,
   ...cockpitEn,
+  ...adminEn,
 };

@@ -9,7 +9,7 @@ import { expect, test as setup } from '../support/http-guard';
 
 /** One state per person; `revoke` belongs to H6 alone. `norole` has no state on purpose (H7 signs in itself). */
 const SETUP_PERSONS = [
-  'moderation', 'capture', 'coordination', 'expert', 'legal', 'approver', 'podium', 'revoke',
+  'moderation', 'capture', 'coordination', 'expert', 'legal', 'approver', 'podium', 'revoke', 'admin',
 ] as const;
 
 const stateDir = process.env['E2E_HTTP_STATE_DIR'];

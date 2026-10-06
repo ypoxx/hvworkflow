@@ -22,6 +22,7 @@ const ROLE_LABELS: Readonly<Record<string, Readonly<Record<Lang, string>>>> = {
   legal: { de: 'Recht', en: 'Legal' },
   approver: { de: 'Freigabe', en: 'Approver' },
   podium: { de: 'Podium', en: 'Podium' },
+  admin: { de: 'Administration', en: 'Administration' },
 };
 
 const isHttp = (): boolean => test.info().project.name === 'http';

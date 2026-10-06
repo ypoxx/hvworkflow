@@ -51,6 +51,7 @@ export const shellEn: typeof shellDe = {
   'nav.stage': 'Podium',
   'nav.history': 'History & search',
   'nav.cockpit': 'Cockpit',
+  'nav.admin': 'Administration',
   // --- 005 design system ---
   'process.segment.captured': 'Captured',
   'process.segment.drafting': 'Drafting',
@@ -161,6 +162,8 @@ export const shellEn: typeof shellDe = {
   'page.history.description': 'History of each question and full-text search across the corpus.',
   'page.cockpit.title': 'Cockpit',
   'page.cockpit.description': 'The questions at a glance: what waits longest, where it backs up, how things develop.',
+  'page.admin.title': 'Administration',
+  'page.admin.description': 'Set up the General Meeting: assign roles, maintain answering units, agenda and podium seats, check the role cards.',
   'page.notFound.title': 'Part not found',
   'page.notFound.description': 'This address does not belong to any part of the tool.',
   'page.notFound.back': 'Back to the requests to speak',
