@@ -71,9 +71,9 @@ Gesammelt; alle Scheiben sind auf Standard gebaut, keine Frage hält einen Merge
 
 ## Vor Rollout (Sicherheit und Leistung)
 
-- **`listEvents` ohne Akteurschutz** (`apps/web/src/api/liveStore.ts:526`): eine vor einem Personenwechsel angeforderte
-  Ereignisseite kann die neue Person erreichen, gleiches Muster wie Codex P1 auf #168. Eigener Takt: über `guarded()` leiten,
-  die Schleife in `history/lib.ts` beachten.
+- **`listEvents` ohne Akteurschutz** (`apps/web/src/api/liveStore.ts`): eine vor einem Personenwechsel angeforderte
+  Ereignisseite konnte die neue Person erreichen, gleiches Muster wie Codex P1 auf #168. Als Sicherheitsbefund nicht
+  aufgeschoben (Codex P1 auf #176): takt-056 (#177) leitet `listEvents` über `guarded()`; Merge nach grünem CI.
 - **Zwischenspeicher des Leitstands:** W10 auf dem CI-Läufer 57,7 ms gegen das Ziel 50 ms (Lauf 37468958219); der
   Stolperdraht warnt nur. Zwischenspeicher nach Vor-dem-Bau-Punkt 5 der Spec 061 bauen, danach die Warnung wieder als Fehler.
 - **`source-map-js` 1.2.2:** nach 2026-10-07T14:08Z anheben und die Ausnahme 1241209 entfernen, bevor sie am 2026-10-14 abläuft.
@@ -92,7 +92,7 @@ Gesammelt; alle Scheiben sind auf Standard gebaut, keine Frage hält einen Merge
 ## Nächste Schritte (Reihenfolge)
 
 1. PR #173 (takt-052) mergen, sobald CI grün ist.
-2. Takt `listEvents` mit Akteurschutz (Sicherheit, vor Rollout).
+2. takt-056 (#177, `listEvents` mit Akteurschutz) und takt-055 (#175, Stack-Build unter Compose v5) mergen.
 3. Ab 2026-10-07T14:08Z: `source-map-js` 1.2.2, Ausnahme entfernen.
 4. Takt `e2e-http` teilen (Entscheidung aus takt-046).
 5. Takt Zwischenspeicher des Leitstands (W10).

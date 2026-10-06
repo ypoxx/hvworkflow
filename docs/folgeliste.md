@@ -12,10 +12,10 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 Diese Punkte stehen hier nur, damit sie nicht verloren gehen. Sie sind **keine** Folgelisten-Nits und werden vor jedem Rollout
 in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
 
-- **Takt-Kandidat (Sicherheit, vor Rollout): `listEvents` ohne Akteurschutz** · `apps/web/src/api/liveStore.ts:526` · `listEvents`
-  geht wie `getCockpit` vor dessen Fix direkt an den Adapter; eine vor Akteurwechsel oder `clear` angeforderte Ereignisseite kann
-  die neue Person erreichen (gleiches Muster wie Codex P1 auf #168) · über `guarded()` leiten; die Schleife in `history/lib.ts`
-  beachten (eine zurückgehaltene Seite darf die Schleife nicht hängen lassen). Eigener Takt.
+- **`listEvents` ohne Akteurschutz: in Arbeit als takt-056 (#177), nicht aufgeschoben** · `apps/web/src/api/liveStore.ts` ·
+  eine vor Akteurwechsel oder `clear` angeforderte Ereignisseite konnte die neue Person erreichen (gleiches Muster wie Codex P1
+  auf #168). Nach Codex P1 auf #176 als Sicherheitsbefund sofort gebaut: `listEvents` über `guarded()`, Test zuerst rot. Diese
+  Zeile entfällt mit dem Merge von #177.
 - **Zwischenspeicher des Leitstands (vor Rollout)** · W10 auf dem CI-Läufer 57,7 ms gegen das Ziel 50 ms · Eintrag im Abschnitt
   „Leitstand (aus 061)“ (Lauf 37468958219).
 - **`source-map-js` 1.2.2 (vor Ablauf der Ausnahme)** · nach 2026-10-07T14:08Z anheben, Ausnahme 1241209 entfernen, bevor sie am
