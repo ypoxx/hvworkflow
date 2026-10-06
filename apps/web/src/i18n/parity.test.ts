@@ -18,6 +18,8 @@ import { focusDe } from './focus.de';
 import { focusEn } from './focus.en';
 import { adminDe } from './admin.de';
 import { adminEn } from './admin.en';
+import { cockpitDe } from './cockpit.de';
+import { cockpitEn } from './cockpit.en';
 import { de } from './de';
 import { en } from './en';
 
@@ -65,6 +67,7 @@ const modules: Array<{
   { name: 'steering', de: steeringDe as Record<string, string>, en: steeringEn as Record<string, string>, prefixes: ['steering'] },
   { name: 'focus', de: focusDe as Record<string, string>, en: focusEn as Record<string, string>, prefixes: ['focus'] },
   { name: 'admin', de: adminDe as Record<string, string>, en: adminEn as Record<string, string>, prefixes: ['admin'] },
+  { name: 'cockpit', de: cockpitDe as Record<string, string>, en: cockpitEn as Record<string, string>, prefixes: ['cockpit'] },
 ];
 
 describe('i18n parity checks', () => {
@@ -181,13 +184,15 @@ describe('i18n parity checks', () => {
   // Scheibe 041: +125 keys for the administration view (shell 3: nav, page title, description; admin 122).
   // Scheibe 061 (part A): +1 `action.cockpit.read`, required by ACTION_KEYS for the new right.
   // Scheibe 046: +28 keys for follow-up references (capture 17, history 10, shell 1 event name).
-  it('(f) Total key count is 775 across all modules and matches de and en', () => {
+  // Scheibe 061 (part B): +84 keys for the control desk (shell 3: nav, page title, description; cockpit 81).
+  // Scheibe 061 (part B, fix round): +1 `cockpit.thread.seat` ("Bühne: …" in the thread, design critique 12).
+  it('(f) Total key count is 860 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(775);
-    expect(deKeys).toBe(775);
-    expect(enKeys).toBe(775);
+    expect(totalKeys).toBe(860);
+    expect(deKeys).toBe(860);
+    expect(enKeys).toBe(860);
   });
 });

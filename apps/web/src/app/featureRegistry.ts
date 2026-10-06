@@ -9,7 +9,7 @@
  */
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Focus, History, ListOrdered, PencilLine, Presentation, ScrollText, SlidersHorizontal, Waypoints } from 'lucide-react';
+import { Focus, Gauge, History, ListOrdered, PencilLine, Presentation, ScrollText, SlidersHorizontal, Waypoints } from 'lucide-react';
 import type { Permission } from '@hv/domain';
 import type { Meeting } from '@hv/domain';
 import type { TKey } from '../i18n';
@@ -21,6 +21,7 @@ import { FocusPage } from '../features/focus/Page';
 import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
 import { AdminPage } from '../features/admin/Page';
+import { CockpitPage } from '../features/cockpit/Page';
 
 /** The header and navigation show only the scalar counters; `byStatus` feeds the process strip. */
 export type NumericCounter = Exclude<keyof Meeting['counts'], 'byStatus' | 'byUnit' | 'bySeat'>;
@@ -152,6 +153,20 @@ export const FEATURES: readonly Feature[] = [
     i18nModule: 'admin',
     requires: 'admin.roles.manage',
     Component: AdminPage,
+  },
+  {
+    // Scheibe 061: the control desk (Leitstand), last entry, no shortcut and no counter. `requires` is data, not a role
+    // name; until the interface knows the person's rights (089b), the navigation shows it to everyone and the page shows
+    // its read state on a refusal.
+    id: 'cockpit',
+    path: '/cockpit',
+    labelKey: 'nav.cockpit',
+    icon: Gauge,
+    testId: 'nav-cockpit',
+    helpKey: 'page.cockpit.description',
+    i18nModule: 'cockpit',
+    requires: 'cockpit.read',
+    Component: CockpitPage,
   },
 ];
 
