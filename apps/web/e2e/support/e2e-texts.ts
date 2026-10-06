@@ -66,6 +66,16 @@ export const FOCUS_054_RETURN_REASON = 'e2e 054';
  */
 export const FORMAT_055B_HTTP_ANSWER = 'Synthetische Antwort 055b: Die Dividende steigt deutlich.';
 
+/**
+ * Scheibe 060: what the draft buffer tests type. TYPED and OFFLINE are buffered and partly saved (E1, E3), SAVED is saved
+ * by a double click (E8), COMPARE_MINE is one's own text in the comparison and OTHER the foreign version (E6, E7).
+ */
+export const DRAFT_060_TYPED = 'Synthetischer Zusatz 060 im Puffer.';
+export const DRAFT_060_OFFLINE = 'Offline weitergeschrieben 060.';
+export const DRAFT_060_SAVED = 'Synthetischer Doppelklick 060.';
+export const DRAFT_060_COMPARE_MINE = 'Meine Fassung 060.';
+export const DRAFT_060_OTHER = 'Fremde Fassung 060.';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -90,4 +100,9 @@ export const WRITTEN_TEXTS: readonly string[] = [
   FOCUS_054_UNSAVED,
   FOCUS_054_RETURN_REASON,
   FORMAT_055B_HTTP_ANSWER,
+  DRAFT_060_TYPED,
+  DRAFT_060_OFFLINE,
+  DRAFT_060_SAVED,
+  DRAFT_060_COMPARE_MINE,
+  DRAFT_060_OTHER,
 ];

@@ -436,15 +436,14 @@ describe('wireDraftBuffer and sign-out', () => {
 
   it('sign-out: the clear is complete before the sign-out request of the double is called', async () => {
     const d = deferredStore();
-    const buffer = bufferOver(d.store);
-    await buffer.load();
     const order: string[] = [];
+    const buffer = bufferOver({ ...d.store, clear: () => d.store.clear().then(() => { order.push('cleared'); }) });
+    await buffer.load();
     const signOut = vi.fn(async () => { order.push('request'); });
     const done = clearBeforeSignOut(buffer, signOut);
     await settle();
     expect(signOut).not.toHaveBeenCalled();
     await d.complete();
-    order.push('cleared');
     await done;
     expect(order).toEqual(['cleared', 'request']);
   });
