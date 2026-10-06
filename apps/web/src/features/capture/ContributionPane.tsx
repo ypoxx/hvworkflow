@@ -4,11 +4,13 @@
  * text is read-only, tinted where it is already covered, and the atomisation tools sit under it.
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert } from 'lucide-react';
+import { CornerDownRight, ListChecks, MessageSquareQuote, PencilLine, Plus, TriangleAlert, X } from 'lucide-react';
 import type { Contribution, Question, QuestionCapture, Speaker } from '@hv/domain';
 import { Badge, Button, EmptyState, Kbd, Panel, SourceIcon, StaleBanner, cx } from '../../components';
 import { useActor } from '../../api/actor';
 import { actionLabel, useLang, useT } from '../../i18n';
+import { relationLabel } from '../../i18n/labels';
+import type { FollowUpReference } from './followUp';
 import { ContributionText } from './ContributionText';
 import { CoverageBar } from './CoverageBar';
 import { Field, FIELD_CONTROL, FIELD_TEXTAREA } from './fields';
@@ -68,6 +70,10 @@ export interface ContributionPaneProps {
   questions: readonly Question[];
   hoveredQuestionId: string | null;
   onHoverQuestion: (id: string | null) => void;
+  /** Scheibe 046: the reference for the next single capture (chip), set through the dialog the page opens. */
+  reference?: FollowUpReference | null;
+  onOpenFollowUp?: () => void;
+  onClearReference?: () => void;
 }
 
 export function ContributionPane({
@@ -92,6 +98,9 @@ export function ContributionPane({
   questions,
   hoveredQuestionId,
   onHoverQuestion,
+  reference = null,
+  onOpenFollowUp,
+  onClearReference,
 }: ContributionPaneProps) {
   const t = useT();
   const lang = useLang();
@@ -195,15 +204,34 @@ export function ContributionPane({
       {...(speaker !== undefined ? { description: speaker.displayName } : {})}
       actions={
         canCapture && contribution !== undefined && !showForm ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="capture-contribution-new"
-            onClick={() => setComposing(true)}
-            icon={<Plus size={14} strokeWidth={2} aria-hidden="true" />}
-          >
-            {t('capture.contribution.new')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onOpenFollowUp !== undefined && (
+              // Scheibe 046: "Nachfrage zu …" with its key; only where capturing is allowed (design principle 9).
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="capture-follow-up-open"
+                aria-keyshortcuts="Alt+B"
+                onClick={onOpenFollowUp}
+                icon={<CornerDownRight size={14} strokeWidth={1.75} aria-hidden="true" />}
+              >
+                {t('capture.followUp.open')}
+                <span className="ml-1.5 inline-flex gap-0.5" aria-hidden="true">
+                  <Kbd>{t('capture.key.alt')}</Kbd>
+                  <Kbd>{t('capture.key.b')}</Kbd>
+                </span>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="capture-contribution-new"
+              onClick={() => setComposing(true)}
+              icon={<Plus size={14} strokeWidth={2} aria-hidden="true" />}
+            >
+              {t('capture.contribution.new')}
+            </Button>
+          </div>
         ) : undefined
       }
       footer={
@@ -403,6 +431,26 @@ export function ContributionPane({
             description={t('capture.text.empty.body')}
           />
         ) : (
+          <>
+          {canCapture && reference !== null && (
+            // Scheibe 046: the chip over the text; it goes with the next single capture only.
+            <div className="mb-3 flex">
+              <span data-testid="capture-follow-up-chip" className="hv-badge tone-accent inline-flex items-center gap-1.5">
+                <CornerDownRight size={12} strokeWidth={1.75} aria-hidden="true" />
+                {relationLabel(t, reference.relation, reference.number)}
+                <button
+                  type="button"
+                  data-testid="capture-follow-up-remove"
+                  aria-label={t('capture.followUp.remove')}
+                  title={t('capture.followUp.remove')}
+                  className="-mr-1 rounded-sm p-0.5 hover:bg-ink-100"
+                  onClick={onClearReference}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden="true" />
+                </button>
+              </span>
+            </div>
+          )}
           <ContributionText
             contribution={contribution}
             canCapture={canCapture}
@@ -412,6 +460,7 @@ export function ContributionPane({
             hoveredQuestionId={hoveredQuestionId}
             onHoverQuestion={onHoverQuestion}
           />
+          </>
         )}
       </div>
     </Panel>

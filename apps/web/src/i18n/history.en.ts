@@ -74,4 +74,15 @@ export const historyEn: typeof historyDe = {
   'history.forward.reason.expertise_elsewhere': 'Expertise lies with another answering unit',
   'history.forward.reason.capacity': 'Workload',
   'history.forward.reason.other': 'Other',
+  // Scheibe 046: the thread block and the timeline line of a QuestionLinked.
+  'history.thread.title': 'Reference',
+  'history.thread.parent': 'Referenced question',
+  'history.thread.hidden.follow_up': 'Follow-up question to a question not visible to you',
+  'history.thread.hidden.clarification': 'Clarification of a question not visible to you',
+  'history.thread.answerVersion': 'refers to read-out answer version',
+  'history.thread.children': 'Follow-up questions and clarifications ({count})',
+  'history.thread.loading': 'Loading reference',
+  'history.thread.error': 'The reference could not be loaded.',
+  'history.payload.linked.follow_up': 'Captured as a follow-up question',
+  'history.payload.linked.clarification': 'Captured as a clarification',
 };

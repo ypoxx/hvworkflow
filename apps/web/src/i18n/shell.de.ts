@@ -239,6 +239,7 @@ export const shellDe = {
   'event.ContributionClaimed': 'Redebeitrag übernommen',
   'event.ContributionReleased': 'Redebeitrag freigegeben',
   'event.QuestionCaptured': 'Einzelfrage erfasst',
+  'event.QuestionLinked': 'Bezug gesetzt',
   'event.QuestionClassified': 'Klassifiziert',
   'event.QuestionAssigned': 'Zugewiesen',
   'event.QuestionForwarded': 'An anderen Fachbereich weitergeleitet',

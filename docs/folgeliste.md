@@ -844,6 +844,28 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-048 Design-Kritik nit D3/D7 · `features/answers/QuestionDetail.tsx:435` (gesperrter Knopf) · `ink-400` auf `ink-50` ≈ 2,3:1 · Ton prüfen.
 
 
+## Nachfragen-Threads (aus 046)
+
+- 046 Bau, Vor-dem-Bau-Punkt 4 · `packages/domain/src/events.ts` (`ReadEvent`), `packages/domain/src/__tests__/api.test.ts:500/513` ·
+  die Leseform `{ relation }` für `QuestionLinked` im Typ `ReadEvent` ist zurückgestellt, weil `api.test.ts` (außerhalb der
+  erlaubten Dateien) `ReadEvent[]` einem `DomainEvent[]` zuweist; heute eigener Typ `QuestionLinkedReadPayload` · `api.test.ts`
+  auf `ReadEvent[][]` umstellen, dann `ReadEvent` einengen.
+- 046 Bau · `packages/domain/src/stream.ts` (`snapshotBefore`) · kopiert das Merkfeld `lastReduced` (Regel e von R-LINK-02),
+  über die Spec-Liste „nur EVENT_TOPICS, EVENT_SUBJECTS, maskEvent“ hinaus; angenommene Scope-Abweichung (Auftrag des
+  Orchestrators, Nachprüfung Minor 4) · keine Arbeit, nur Vermerk.
+- 046 Review · `apps/web/src/features/capture/FollowUpDialog.tsx` (`RELATIONS`) · dupliziert `QUESTION_RELATIONS` der Domäne
+  (Laufzeitimport aus `@hv/domain` verletzt die Regel „features nur Typen“) · gemeinsame Liste in `i18n/labels.ts` oder Typ-Ableitung.
+- 046 Design-Kritik · `FollowUpDialog.tsx`, `ThreadBlock.tsx` · Fehlertexte „Die Suche ist gerade nicht möglich“ und „Der Bezug
+  konnte nicht geladen werden“ nennen keinen Grund (Prinzip 5) · Grund aus dem Problem (Status, Netz) anzeigen.
+- 046 Design-Kritik · `ThreadBlock.tsx` · Blockbeschriftungen in 11 px (`text-2xs`); die Zahl in „Nachfragen und Klarstellungen (n)“
+  steht nicht in Mono · Sammelgang Typografie.
+- 046 Design-Kritik · `ContributionPane.tsx` (Chip, Ton accent) gegen `QuestionCard.tsx` (Badge, Ton neutral) · zwei Töne für
+  denselben Bezug · einheitlichen Ton festlegen.
+- 046 Design-Kritik · `features/history/Page.tsx` · nach dem Öffnen einer Frage aus dem Block „Bezug“ bleibt die linke Trefferliste
+  auf der alten Suche; Auswahl und Liste laufen auseinander · Liste mitführen oder Treffer markieren.
+- 046 Design-Kritik · `components/Dialog.tsx` · nur feste Größen; „Bezug setzen“ ist 512 px statt der spezifizierten 480 px ·
+  bei der nächsten Dialog-Überarbeitung eine Größe ergänzen oder die Spec angleichen.
+
 ## Verwaltung (aus 041)
 
 - 041 Bau (Eigentümerfrage 5) · `scripts/lib/demo-persons.mjs`, `scripts/stack*.mjs` · das lokale Paket hat keine Person mit

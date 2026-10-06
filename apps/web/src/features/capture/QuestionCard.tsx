@@ -4,10 +4,52 @@
  * card lives behind the explicit "Klassifizieren" action in `ClassifyDialog` now, rendered only when
  * `question._actions` allows it (AGENTS.md rule 4) — until slice 053 moves it to the Steuerungsansicht.
  */
-import { Tag } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CornerDownRight, Tag } from 'lucide-react';
 import type { Question } from '@hv/domain';
-import { Button, StatusBadge, cx } from '../../components';
+import { api } from '../../api';
+import { Badge, Button, StatusBadge, cx } from '../../components';
 import { actionLabel, useT } from '../../i18n';
+import type { Translate } from '../../i18n';
+import { relationLabel } from '../../i18n/labels';
+
+/**
+ * Scheibe 046: the id whose number the card resolves — only one the view delivered. A masked reference (the reader
+ * may not read the referenced question) has no id, so nothing is fetched for it.
+ */
+export function parentToResolve(question: Pick<Question, 'relation' | 'parentQuestionId'>): string | undefined {
+  return question.relation !== undefined ? question.parentQuestionId : undefined;
+}
+/** "Nachfrage zu F-0012" with a resolved number; only the relation without one (masked, not yet loaded, 404). */
+export function referenceBadgeText(t: Translate, relation: string, number: string | null | undefined): string {
+  return relationLabel(t, relation, number ?? undefined);
+}
+
+/**
+ * Design minor 5: while the number loads, the badge already reads "Nachfrage zu F-····" with figure spaces in the
+ * number's place, so it does not grow when the number arrives.
+ */
+export const PENDING_NUMBER = 'F-\u2007\u2007\u2007\u2007';
+
+/**
+ * Resolves the number once per load of the card: `undefined` while it loads, `null` after a 404 (outside the read
+ * scope) or a failed read, otherwise the number.
+ */
+function useParentNumber(parentId: string | undefined): string | null | undefined {
+  const [resolved, setResolved] = useState<{ id: string; number: string | null } | null>(null);
+  useEffect(() => {
+    if (parentId === undefined) return undefined;
+    let live = true;
+    api.getQuestion(parentId).then(
+      (parent) => { if (live) setResolved({ id: parentId, number: parent.number }); },
+      // 404 (outside the read scope) or a failed read: the badge keeps the relation alone.
+      () => { if (live) setResolved({ id: parentId, number: null }); },
+    );
+    return () => { live = false; };
+  }, [parentId]);
+  if (parentId === undefined) return null;
+  return resolved !== null && resolved.id === parentId ? resolved.number : undefined;
+}
 
 export function QuestionCard({
   question,
@@ -22,6 +64,7 @@ export function QuestionCard({
 }) {
   const t = useT();
   const mayClassify = question._actions.includes('question.classify');
+  const parentNumber = useParentNumber(parentToResolve(question));
 
   return (
     <article
@@ -39,6 +82,19 @@ export function QuestionCard({
       <header className="flex items-center gap-2">
         <span className="font-mono text-2xs tabular-nums text-ink-500">{question.number}</span>
         <StatusBadge status={question.status} />
+        {question.relation !== undefined && (
+          // Scheibe 046: neutral, no status colour for a reference (design principle 4).
+          <Badge tone="neutral">
+            <span
+              data-testid="capture-question-reference"
+              className="inline-flex items-center gap-1 whitespace-pre"
+              {...(parentNumber === undefined ? { 'aria-busy': true } : {})}
+            >
+              <CornerDownRight size={12} strokeWidth={1.75} aria-hidden="true" />
+              {referenceBadgeText(t, question.relation, parentNumber === undefined ? PENDING_NUMBER : parentNumber)}
+            </span>
+          </Badge>
+        )}
         {mayClassify && (
           // m4 (review round 1): "secondary" with a Tag icon reads as an action, not a label —
           // "ghost" with plain text next to a status badge looked like one more piece of metadata.
