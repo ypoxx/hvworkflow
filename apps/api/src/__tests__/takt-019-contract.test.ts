@@ -5,10 +5,10 @@ describe('takt-019: additive meeting lifecycle contract', () => {
   const schemas = openapiDoc.components.schemas;
 
   it('declares the new patch without changing the operation surface', () => {
-    expect(openapiDoc.info.version).toBe('0.4.5');
+    expect(openapiDoc.info.version).toBe('0.4.6');
     // 66 operations up to 0.3.12; contract 0.4.0 (slice 043a) pre-declares three refusal operations;
-    // contract 0.4.3 (slice 048) adds forwardQuestion.
-    expect(Object.keys(operations)).toHaveLength(70);
+    // contract 0.4.3 (slice 048) adds forwardQuestion; contract 0.4.5 (slice 061) adds getMeetingCockpit; contract 0.4.6 (slice 046) adds no operation.
+    expect(Object.keys(operations)).toHaveLength(71);
     expect(schemas.MeetingStatus.enum).toEqual(['preparation', 'running', 'closed']);
     expect(schemas.MeetingStatus.description).toMatch(/MeetingCreated[\s\S]*MeetingStarted[\s\S]*MeetingClosed/);
     expect(schemas.MeetingStatus.description).toMatch(/DebateClosed[\s\S]*does not close/i);

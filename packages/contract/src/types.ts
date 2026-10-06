@@ -195,7 +195,7 @@ export interface paths {
         put?: never;
         /**
          * Atomise a speech into individual questions (Einzelfragen erfassen)
-         * @description Since 0.4.5 (slice 046): each item may name a referenced question (Bezugsfrage) of the same meeting with `parentQuestionId` and `relation` (both or neither). The referenced question must exist in the meeting of the capture and be readable for the caller (R-LINK-01); otherwise `422` with `ruleId` `R-LINK-01` and one message for an unknown id, a question of another meeting and an unreadable question alike, without the id. All or nothing: if one item fails, no event is written for any item. One commit appends, per item, `QuestionCaptured` and, for an item with a reference, directly after it `QuestionLinked` (same command). A reference arises only with the capture and never changes (R-LINK-02). `parentAnswerVersion` is derived by the service, never sent. Built on the defaults ("auf Standard gebaut (Spec 046)").
+         * @description Since 0.4.6 (slice 046): each item may name a referenced question (Bezugsfrage) of the same meeting with `parentQuestionId` and `relation` (both or neither). The referenced question must exist in the meeting of the capture and be readable for the caller (R-LINK-01); otherwise `422` with `ruleId` `R-LINK-01` and one message for an unknown id, a question of another meeting and an unreadable question alike, without the id. All or nothing: if one item fails, no event is written for any item. One commit appends, per item, `QuestionCaptured` and, for an item with a reference, directly after it `QuestionLinked` (same command). A reference arises only with the capture and never changes (R-LINK-02). `parentAnswerVersion` is derived by the service, never sent. Built on the defaults ("auf Standard gebaut (Spec 046)").
          */
         post: operations["captureQuestions"];
         delete?: never;
@@ -684,7 +684,7 @@ export interface paths {
         /**
          * Podium view (Bühne) of the current meeting — current question, queue, counters (alias)
          * @deprecated
-         * @description Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5. `StageView` never carries a refusal justification (since 0.4.0, see `getMeetingStage`). Since 0.4.5 (slice 046): questions of the stage view carry neither `parentQuestionId` nor `parentAnswerVersion`.
+         * @description Alias for `GET /meetings/{meetingId}/stage` of the current meeting. Veraltet seit 0.3.0, entfällt mit Vertrag 0.5. `StageView` never carries a refusal justification (since 0.4.0, see `getMeetingStage`). Since 0.4.6 (slice 046): questions of the stage view carry neither `parentQuestionId` nor `parentAnswerVersion`.
          */
         get: operations["getStage"];
         put?: never;
@@ -1201,9 +1201,32 @@ export interface paths {
         };
         /**
          * Podium view (Bühne) of a meeting — current question, queue, counters
-         * @description Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a client parameter (slices 040, 047); a `seat` query parameter arrives as the contract line of slices 056/057, not with a contract-only release. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent from `StageView`, for every reader (the podium holds no `question.refuse.*` permission). Since 0.4.5 (slice 046): questions of the stage view carry neither `parentQuestionId` nor `parentAnswerVersion`, for every reader.
+         * @description Since 0.3.0 (slice 025); canonical form of `GET /stage`. Permission `stage.read`. The per-seat filter (ADR 0006) is resolved in the service from the actor's seat, never from a client parameter (slices 040, 047); a `seat` query parameter arrives as the contract line of slices 056/057, not with a contract-only release. Since 0.4.0 (slice 043a, enforced from slice 044): `answers[].refusalJustification` is always absent from `StageView`, for every reader (the podium holds no `question.refuse.*` permission). Since 0.4.6 (slice 046): questions of the stage view carry neither `parentQuestionId` nor `parentAnswerVersion`, for every reader.
          */
         get: operations["getMeetingStage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{meetingId}/cockpit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Control desk (Leitstand) figures of a meeting — oldest open question, stations, backlog per unit, inflow, legal clearing
+         * @description Since 0.4.5 (slice 061). Permission `cockpit.read` (denial R-PERM-02). Aggregates per meeting (Jahrgang), status and answering unit (Fachbereich) by the definitions of the evaluation catalogue (slice 033b, report `leitstand` in `catalog.json`); no figure per person, per role, per session or per device. References (`oldestOpen.items`, `legalReview.items`) name only questions the reader may read (`can(actor, 'question.read', question)`); the aggregates are unfiltered, which is why every holder of `cockpit.read` holds unscoped `question.read`. No question text, no actor, no speaker, no claim. Ages are whole seconds, rounded down, never negative, computed against the service clock (`asOf`); a question captured after `asOf`, and a question's own events after `asOf`, count nowhere. Meetings in every status are computed; equality with `/metrics` holds for running meetings.
+         */
+        get: operations["getMeetingCockpit"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1442,10 +1465,10 @@ export interface components {
             personId?: string;
         };
         /**
-         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`. Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin. It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich".
+         * @description Permission identifiers (Rechtebezeichner), identical to the domain permission list. A permission is granted exclusively in `ROLE_PERMISSIONS` (`packages/domain/src/permissions.ts`, AGENTS.md rule 4) — never by comparing a role name in interface or server code. Since 0.2.0: the read permissions `speaker.read`, `contribution.read`, `stage.read`, `history.read` and `event.read` (next to `question.read`; the read operations check them from slice 010, denial = R-PERM-02) and `question.legal.clear` (legal clearing — Rechtsfreigabe — recorded as its own event `QuestionLegalCleared`; a recommendation bound to an answer version, not the approval, which stays `question.approve`; register E25; slice 021). Since 0.2.1: `question.read.delivered` — a scoped alternative to `question.read` for the observer role (Beobachter): it only unlocks a question in status `delivered` or `closed` (R-PERM-03, `READ_SCOPES` in `packages/domain/src/permissions.ts`), for `listQuestions` and `getQuestion`, and applies to every holder including admin (slice 010). Since 0.3.0 (identifiers only; granted in `ROLE_PERMISSIONS` by the implementing slice, deny by default until then): `contribution.claim` and `question.claim` (take over and release, slice 028); `agenda.manage` (agenda and its progress events, slice 025); `admin.meetings.manage` (create/clone a meeting), `admin.units.manage`, `admin.seats.manage`, `admin.config.freeze` (slice 040); `admin.roles.manage` (role assignments, slice 026). Added after Codex on 50cc738, for slices without a contract lane that 0.4.0 (slice 043) does not list either: `question.identity.reveal` (clear names on read, slice 026 grants and checks it; 043 lists it but comes after 026), `admin.override` (change after the configuration freeze with a reason, slice 040), `question.read.protected` and `event.read.personal` (confidentiality level and personal history under four eyes, slice 047). Since 0.4.0 (identifiers only; granted in `ROLE_PERMISSIONS` by slice 044, deny by default until then; never granted to admin): `question.refuse.propose` (propose a refusal, `proposeRefusal`) and `question.refuse.approve` (approve a refusal, `approveRefusal`; slice 043a, ADR 0012). Holding one of them is also what lets a reader see `refusalJustification` on `Question.answers`. Since 0.4.3 (slice 048): `question.forward` (forward a question to another answering unit with a reason code, `forwardQuestion`); granted in `ROLE_PERMISSIONS` by slice 048, never to admin. It narrows the general "Weiterleiten" of the rights concept §2.4 to "an anderen Fachbereich". Since 0.4.5 (slice 061): `cockpit.read` (read the control desk figures, `getMeetingCockpit`); granted in `ROLE_PERMISSIONS` by slice 061 to moderation, coordination and admin; holders hold unscoped `question.read`.
          * @enum {string}
          */
-        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.forward" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
+        Action: "speaker.register" | "speaker.reorder" | "speaker.update" | "speaker.read" | "contribution.capture" | "contribution.read" | "contribution.claim" | "question.capture" | "question.classify" | "question.assign" | "question.forward" | "question.claim" | "answer.draft" | "question.submit_review" | "question.legal.clear" | "question.approve" | "question.return" | "question.stage" | "question.deliver" | "question.close" | "question.withdraw" | "question.merge" | "question.read" | "question.read.delivered" | "stage.read" | "history.read" | "event.read" | "cockpit.read" | "agenda.manage" | "admin.meetings.manage" | "admin.units.manage" | "admin.seats.manage" | "admin.roles.manage" | "admin.config.freeze" | "question.identity.reveal" | "admin.override" | "question.read.protected" | "event.read.personal" | "question.refuse.propose" | "question.refuse.approve" | "demo.seed";
         /**
          * @description Lifecycle of a meeting (Jahrgang): MeetingCreated projects preparation from slice 025, MeetingStarted projects running, MeetingClosed projects closed. DebateClosed does not close the meeting; it records only the end of the general debate. R-MTG in slice 025 checks the transitions. Public actions arrive in later slices.
          * @enum {string}
@@ -1989,10 +2012,10 @@ export interface components {
             /** Format: date-time */
             deliveredAt?: string;
             mergedIntoId?: string;
-            /** @description Since 0.4.5 (slice 046): the referenced question (Bezugsfrage) of a follow-up question or clarification, same meeting. Present only when the reader may read the referenced question; never in the stage view; never its number or text */
+            /** @description Since 0.4.6 (slice 046): the referenced question (Bezugsfrage) of a follow-up question or clarification, same meeting. Present only when the reader may read the referenced question; never in the stage view; never its number or text */
             parentQuestionId?: string;
             relation?: components["schemas"]["QuestionRelation"];
-            /** @description Since 0.4.5 (slice 046): the answer version of the parent that had last been read out (`QuestionDelivered.answerVersion`) when this question was captured; absent if the parent had not been read out with a version by then; never changes afterwards. Masked like `parentQuestionId` */
+            /** @description Since 0.4.6 (slice 046): the answer version of the parent that had last been read out (`QuestionDelivered.answerVersion`) when this question was captured; absent if the parent had not been read out with a version by then; never changes afterwards. Masked like `parentQuestionId` */
             parentAnswerVersion?: number;
             /** @description Optimistic-locking counter, also the ETag */
             version: number;
@@ -2006,12 +2029,12 @@ export interface components {
         QuestionCapture: {
             text: string;
             span?: components["schemas"]["TextSpan"];
-            /** @description Since 0.4.5 (slice 046): the referenced question (Bezugsfrage) of the same meeting; must be readable for the caller (R-LINK-01). Immutable once captured (R-LINK-02). The service derives `parentAnswerVersion`; the client never sends it. */
+            /** @description Since 0.4.6 (slice 046): the referenced question (Bezugsfrage) of the same meeting; must be readable for the caller (R-LINK-01). Immutable once captured (R-LINK-02). The service derives `parentAnswerVersion`; the client never sends it. */
             parentQuestionId?: string;
             relation?: components["schemas"]["QuestionRelation"];
         };
         /**
-         * @description Since 0.4.5 (slice 046): how a question relates to its referenced question, as a closed code without free text. `follow_up` (Nachfrage): the speaker asks further about a given or announced answer (right to ask follow-up questions). `clarification` (Klarstellung): the speaker asks for an answer or question to be clarified.
+         * @description Since 0.4.6 (slice 046): how a question relates to its referenced question, as a closed code without free text. `follow_up` (Nachfrage): the speaker asks further about a given or announced answer (right to ask follow-up questions). `clarification` (Klarstellung): the speaker asks for an answer or question to be clarified.
          * @enum {string}
          */
         QuestionRelation: "follow_up" | "clarification";
@@ -2087,6 +2110,88 @@ export interface components {
             deliveredCount: number;
             openCount: number;
         };
+        /** @description Since 0.4.5 (slice 061): the control desk figures of one meeting (`getMeetingCockpit`). Every leaf path is listed with its source in the report `leitstand` of the evaluation catalogue (`apps/api/src/metrics/catalog.json`). "Open" is the catalogue definition of slice 033b: status not in delivered, closed, withdrawn, merged. */
+        Cockpit: {
+            meetingId: string;
+            /**
+             * Format: date-time
+             * @description Computation time from the service clock
+             */
+            asOf: string;
+            meetingStatus: components["schemas"]["MeetingStatus"];
+            /** Format: date-time */
+            debateClosedAt?: string;
+            totals: {
+                /** @description All questions of the meeting */
+                captured: number;
+                /** @description Questions without a final status (033b "open") */
+                open: number;
+                /** @description Questions on the podium queue */
+                staged: number;
+                /** @description Questions read out: delivered and closed */
+                answered: number;
+            };
+            /** @description Open questions per station (the seven open statuses) */
+            openByStatus: {
+                captured: number;
+                classified: number;
+                assigned: number;
+                answer_drafted: number;
+                in_review: number;
+                approved: number;
+                staged: number;
+            };
+            /** @description Open questions per answering unit id of the meeting; every unit is a key, also with 0 */
+            openByUnit: {
+                [key: string]: number;
+            };
+            /** @description Open questions without an answering unit */
+            openUnassigned: number;
+            oldestOpen: {
+                /** @description Age of the oldest open question since capture; 0 without one; independent of the reference filter */
+                ageSeconds: number;
+                /** @description Oldest first, ties by `number`; only questions the reader may read */
+                items: components["schemas"]["CockpitOldestRef"][];
+            };
+            inflow: {
+                /** @enum {integer} */
+                binSeconds: 300;
+                /** @description Captures per 300 s window over the last hour; `bins[11]` = `last5m` (age 0 to 300 s inclusive), `bins[i]` for i < 11 counts ages in (300·(11−i), 300·(12−i)] */
+                bins: number[];
+                /** @description As `hv_questions_captured_last_5m` */
+                last5m: number;
+            };
+            legalReview: {
+                /** @description As `hv_questions_in_legal_review_over_10m` */
+                over10m: number;
+                /** @description Longest waiting first; only questions the reader may read */
+                items: components["schemas"]["CockpitReviewRef"][];
+            };
+        };
+        /** @description Since 0.4.5 (slice 061): a reference to an open question in `Cockpit.oldestOpen`; no text, no speaker, no actor */
+        CockpitOldestRef: {
+            id: string;
+            number: string;
+            status: components["schemas"]["QuestionStatus"];
+            unitId?: string;
+            /** @description Seconds since capture */
+            ageSeconds: number;
+            /** @description Seconds since the last status change */
+            statusAgeSeconds: number;
+        };
+        /** @description Since 0.4.5 (slice 061): a reference to a question in legal clearing over 10 minutes; no text, no speaker, no actor */
+        CockpitReviewRef: {
+            id: string;
+            number: string;
+            status: components["schemas"]["QuestionStatus"];
+            unitId?: string;
+            /** @description Seconds since capture */
+            ageSeconds: number;
+            /** @description Seconds since the last status change */
+            statusAgeSeconds: number;
+            /** @description Waiting time in legal clearing by the 033b definition; a new refusal proposal restarts it */
+            reviewAgeSeconds: number;
+        };
         /** @description Payload of `QuestionLegalCleared` (since 0.2.0): legal (Recht) has cleared the current answer version (Rechtsfreigabe), or a podium question without an answer. The clearing is a recommendation, not the approval itself, which stays with `question.approve` (register E25). Emitted by `clearQuestionLegally` from slice 021c. */
         QuestionLegalClearedPayload: {
             /** @description Same value as the event's `subjectId`, repeated so the payload is self-contained for neighbouring systems */
@@ -2107,7 +2212,7 @@ export interface components {
             unitId: string;
             reasonCode: components["schemas"]["ForwardReasonCode"];
         };
-        /** @description Since 0.4.5 (slice 046): read payload of `QuestionLinked` in `EventRead`. Closed: the relation only. The stored original also carries `parentQuestionId` and, when the parent had been read out with a version, `parentAnswerVersion`; every event read path removes both, for every reader. */
+        /** @description Since 0.4.6 (slice 046): read payload of `QuestionLinked` in `EventRead`. Closed: the relation only. The stored original also carries `parentQuestionId` and, when the parent had been read out with a version, `parentAnswerVersion`; every event read path removes both, for every reader. */
         QuestionLinkedPayload: {
             relation: components["schemas"]["QuestionRelation"];
         };
@@ -2216,7 +2321,7 @@ export interface components {
             /** @enum {string} */
             reason: "session" | "forbidden" | "roles_changed" | "rotate" | "unavailable";
         };
-        /** @description Standard read projection of a stored Event (slice 026, ADR 0009/0013/0015), returned by question history, the global event feed and each SSE `event` message of `/stream` (readers with `event.read`; since 0.3.11 other readers receive `StreamChange` instead). The original Event is unchanged in the append-only log. This projection omits personId, payload.pii, historical clear-name fields, hash and prevHash. sourceHash identifies the stored original; it is not a digest of this redacted JSON and cannot be recomputed from it. Only the complete stored original can be checked against the hash chain. seq remains the global cursor. Since 0.4.2 (slice 044a, SG2): `payload.pii` stays absent as before, and with it the justification of a refusal (`pii.refusalJustification`); and `payload.note` of a `QuestionLegalCleared` (the remark of the clearing lawyer) is absent from every event read path (`getQuestionHistory`, `listEvents`, `event` messages of `streamEvents`), for every reader and for every legal clearance, not only for refusals, because the remark can carry the legal assessment behind a refusal. The removal is bound to that event type, not to the key: a `note` in another payload is not affected, so the schema carries no `note: false`. The stored original keeps the remark under the hash chain (rule 7). Built on the default ("auf Standard gebaut"). Since 0.4.5 (slice 046): `payload.parentQuestionId` and `payload.parentAnswerVersion` of a `QuestionLinked` are absent from every event read path, for every reader; the read payload is `QuestionLinkedPayload` (`relation` only). A reader who may read the referenced question reads the reference on the `Question` view. */
+        /** @description Standard read projection of a stored Event (slice 026, ADR 0009/0013/0015), returned by question history, the global event feed and each SSE `event` message of `/stream` (readers with `event.read`; since 0.3.11 other readers receive `StreamChange` instead). The original Event is unchanged in the append-only log. This projection omits personId, payload.pii, historical clear-name fields, hash and prevHash. sourceHash identifies the stored original; it is not a digest of this redacted JSON and cannot be recomputed from it. Only the complete stored original can be checked against the hash chain. seq remains the global cursor. Since 0.4.2 (slice 044a, SG2): `payload.pii` stays absent as before, and with it the justification of a refusal (`pii.refusalJustification`); and `payload.note` of a `QuestionLegalCleared` (the remark of the clearing lawyer) is absent from every event read path (`getQuestionHistory`, `listEvents`, `event` messages of `streamEvents`), for every reader and for every legal clearance, not only for refusals, because the remark can carry the legal assessment behind a refusal. The removal is bound to that event type, not to the key: a `note` in another payload is not affected, so the schema carries no `note: false`. The stored original keeps the remark under the hash chain (rule 7). Built on the default ("auf Standard gebaut"). Since 0.4.6 (slice 046): `payload.parentQuestionId` and `payload.parentAnswerVersion` of a `QuestionLinked` are absent from every event read path, for every reader; the read payload is `QuestionLinkedPayload` (`relation` only). A reader who may read the referenced question reads the reference on the `Question` view. */
         EventRead: {
             seq: number;
             id: string;
@@ -2264,7 +2369,7 @@ export interface components {
                 [key: string]: unknown;
             };
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the justification in `answer`): the justification of a refusal is never written into `answer`; it stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId` (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The same payload carries `toStatus`, the target status taken from the transition table (a value of `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before, and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass` `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now. Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). Since 0.4.4 (slice 055) `AnswerDrafted.answer.body` is the stored form `AnswerBody` (a `draftAnswer` with `body`). A bound payload schema for `AnswerDrafted` follows with slice 043c. Since 0.4.5 (slice 046) `QuestionLinked` (subject: the new question) stores `{ parentQuestionId, relation, parentAnswerVersion? }`, written directly after the `QuestionCaptured` of the same question in the same command; like `QuestionLegalCleared.note`, `parentQuestionId` and `parentAnswerVersion` stand only in the stored original (`EventRead` carries `QuestionLinkedPayload`). Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
+        /** @description One immutable stored fact, distinct from the redacted EventRead response. The sequence number is global and gap-free. Payload schemas are bound per event type additively: `QuestionLegalCleared` carries `QuestionLegalClearedPayload`, `AgendaItemOpened`/`VotingOpened`/`VotingClosed` carry `AgendaItemEventPayload`, `RoleAssigned` carries `RoleAssignedPayload`, `RoleRevoked` `RoleRevokedPayload`, and since 0.4.1 (slice 040b) `AgendaItemsReplaced`, `UnitsReplaced` and `StageSeatsReplaced` carry `AgendaItemsReplacedPayload`, `UnitsReplacedPayload` and `StageSeatsReplacedPayload` (bound with nested `if`/`then`/`else`, invisible to the generated types); the three master-data events name the meeting in `subjectId`, carry the whole list and raise `Meeting.version`. Since 0.4.1 (slice 040b) `MeetingCreated` may carry an optional `stageSeats` list in the same form as `StageSeatsReplaced` (seed; cloning from slice 040c); without it the meeting has no seats. In `EventRead` no seat carries `personId` (`StageSeatRead`). `MeetingStarted` and `MeetingClosed` name the meeting in `subjectId` and have empty payloads. `DebateClosed` also names the meeting in `subjectId` but projects only its recorded time to `Meeting.debateClosedAt`; all other payloads remain open objects. A late `ContributionCaptured` carries `lateEntry: true` and the `lateEntryReason` in its payload (R-MTG-03, slice 025). Since 0.4.0 (slice 043a, written from slice 044): the `AnswerDrafted` payload of a refusal (`proposeRefusal`) carries in `answer` the fields `answerKind`, `refusalGroundId`, `refusalGroundHash` and a snapshot `refusalGround` (`title`, `stageText`, `legalRef` of the catalogue entry at the proposal, from which the hash can be recomputed). Since 0.4.2 (slice 044a; correction of the 0.4.0 wording, which placed the justification in `answer`): the justification of a refusal is never written into `answer`; it stands only in `payload.pii` (`PiiEnvelope`) as `pii.refusalJustification`, next to `pii.keyId` (the meeting), so it is personal data under ADR 0009 and never reaches an `EventRead`. The same payload carries `toStatus`, the target status taken from the transition table (a value of `QuestionStatus`, `in_review` for a proposal); only `proposeRefusal` writes it, an `AnswerDrafted` without `toStatus` (every `draftAnswer`) leads to `answer_drafted` as before, and the projection treats a value outside `QuestionStatus` the same way. The `AnswerDrafted` of `proposeRefusal` and the `QuestionApproved` of `approveRefusal` carry `retentionClass` `record` (Niederschrift-relevant, DSFA V7); every other answer event keeps `working` for now. Built on the defaults ("auf Standard gebaut", ADR 0012 proposed, not read by legal). Since 0.4.4 (slice 055) `AnswerDrafted.answer.body` is the stored form `AnswerBody` (a `draftAnswer` with `body`). A bound payload schema for `AnswerDrafted` follows with slice 043c. Since 0.4.6 (slice 046) `QuestionLinked` (subject: the new question) stores `{ parentQuestionId, relation, parentAnswerVersion? }`, written directly after the `QuestionCaptured` of the same question in the same command; like `QuestionLegalCleared.note`, `parentQuestionId` and `parentAnswerVersion` stand only in the stored original (`EventRead` carries `QuestionLinkedPayload`). Envelope v2 (Umschlag, since 0.3.0, ADR 0011, filled by slice 024): `schemaVersion`, `meetingId`, `idempotencyKey`, `causationId`, `prevHash`/`hash` (SHA-256 over canonical JSON of the envelope without `hash`), `recordedAt` (authoritative, server clock), `occurredAt` with `occurredAtSource`, `retentionClass`, `legalHold`, `personId`, `payload.pii` with `keyId`. All of them optional in 0.3.0; the ones marked "Pflicht ab 0.3.6" become required with slice 028. Invariants the schema enforces (`dependentRequired`, `dependentSchemas`): `occurredAt` and `occurredAtSource` come together; `hash` and `prevHash` come together; a `schemaVersion` requires the v2 envelope of slice 024 (`prevHash`, `hash`, `recordedAt`, `occurredAt`, `occurredAtSource`, `retentionClass`, `legalHold`; `meetingId` joins with 0.3.6, because the core carries it only from 025) and forbids `actor.displayName` and binds the genesis (`prevHash` empty exactly at `seq` 1, a SHA-256 from `seq` 2 on); conversely none of those seven fields appears without `schemaVersion`, so a half envelope never validates; the agenda and role events require `subjectId`. A stored v1 event is upcast on load before EventRead is served; HTTP responses never carry schemaVersion 1. Prose only, because JSON Schema cannot compare two values: `at` equals `recordedAt`; for source `server`, `occurredAt` equals `recordedAt`; `legalHold` is `false` in the beta. A broken chain is a load error naming the `seq` (slice 024). New payload fields outside `pii` are free of personal data from slice 026. Historical `SpeakerRegistered` payloads can retain `displayName` and `organisation` in the stored original; EventRead removes them without changing that original or its hash. */
         Event: {
             /** @description Global, gap-free, starting at 1 (the first event of the log). Gap-freeness across events is prose (a single-item schema cannot see its neighbours); the service checks it on load (slice 024). */
             seq: number;
@@ -2607,7 +2712,7 @@ export interface components {
         AgendaItemIdFilter: string;
         /** @description Full-text search over question and answer text */
         FullTextFilter: string;
-        /** @description Since 0.4.5 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
+        /** @description Since 0.4.6 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
         ParentQuestionIdFilter: string;
         QuestionLimit: number;
         QuestionOffset: number;
@@ -3156,7 +3261,7 @@ export interface operations {
                 agendaItemId?: components["parameters"]["AgendaItemIdFilter"];
                 /** @description Full-text search over question and answer text */
                 q?: components["parameters"]["FullTextFilter"];
-                /** @description Since 0.4.5 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
+                /** @description Since 0.4.6 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
                 parentQuestionId?: components["parameters"]["ParentQuestionIdFilter"];
                 limit?: components["parameters"]["QuestionLimit"];
                 offset?: components["parameters"]["QuestionOffset"];
@@ -4857,7 +4962,7 @@ export interface operations {
                 agendaItemId?: components["parameters"]["AgendaItemIdFilter"];
                 /** @description Full-text search over question and answer text */
                 q?: components["parameters"]["FullTextFilter"];
-                /** @description Since 0.4.5 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
+                /** @description Since 0.4.6 (slice 046): the direct follow-up questions and clarifications of this referenced question (Bezugsfrage). Each child is filtered with the read scope of the list, independent of whether the referenced question itself is readable; the returned views are masked as `Question`. */
                 parentQuestionId?: components["parameters"]["ParentQuestionIdFilter"];
                 limit?: components["parameters"]["QuestionLimit"];
                 offset?: components["parameters"]["QuestionOffset"];
@@ -4902,6 +5007,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StageView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            408: components["responses"]["RequestTimeout"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PersistenceBusy"];
+        };
+    };
+    getMeetingCockpit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id of the meeting (Jahrgang), `Meeting.id` */
+                meetingId: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "X-Server-Time": components["headers"]["X-Server-Time"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cockpit"];
                 };
             };
             401: components["responses"]["Unauthorized"];

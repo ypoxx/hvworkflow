@@ -10,9 +10,9 @@ contract change without a version bump and a section here, and refuses an expire
 
 Each entry names the slice that implements it in core, seed, web or e2e.
 
-## [0.4.5] - 2026-10-05
+## [0.4.6] - 2026-10-06
 
-Additive patch step of the 0.4 cycle, after 0.4.4 of slice 055. The contract step of Scheibe 046 (Nachfragen-Threads),
+Additive patch step of the 0.4 cycle, after 0.4.5 of slice 061 (moved from 0.4.5 when 061 part A merged first). The contract step of Scheibe 046 (Nachfragen-Threads),
 written as the first commit of that slice, before its core code (AGENTS.md rule 6). One new request pair, three new
 optional response fields, one new query parameter, one new `Event.type` and one closed read payload; no new operation,
 no new `Action`, no new required field. Built on the defaults: "auf Standard gebaut (Spec 046)".
@@ -44,6 +44,27 @@ no new `Action`, no new required field. Built on the defaults: "auf Standard geb
   or `parentAnswerVersion`.
 - **`Event`**, **`EventRead`** descriptions (Scheibe 046): the stored and the read form of `QuestionLinked`; every
   event read path removes `parentQuestionId` and `parentAnswerVersion`, for every reader.
+
+## [0.4.5] - 2026-10-06
+
+Additive patch step of the 0.4 cycle, after 0.4.4 of slice 055. The contract step of Scheibe 061 (Leitstand, part A:
+contract, core, service), written as the first contract commit of that slice, before its core code (AGENTS.md rule 6).
+One new read operation, one new `Action`, three new schemas; no new `Event.type`, no change to a request body, no
+change to `/metrics`. Built on the defaults: "auf Standard gebaut".
+
+### Added
+
+- **`getMeetingCockpit`** (`GET /meetings/{meetingId}/cockpit`, Scheibe 061): the control desk figures (Leitstand) of
+  a meeting. Permission `cockpit.read`, denial R-PERM-02; `503` `PersistenceBusy` like other reads over Postgres.
+  Aggregates per meeting, status and answering unit by the definitions of the evaluation catalogue (033b); the report
+  `leitstand` in `catalog.json` lists every leaf path with its source. References only to questions the reader may
+  read; no question text, no actor, no speaker, no claim.
+- **`cockpit.read`** in the enum `Action` (Scheibe 061): granted in `ROLE_PERMISSIONS` to moderation, coordination and
+  admin; every holder holds unscoped `question.read`.
+- **`Cockpit`**, **`CockpitOldestRef`**, **`CockpitReviewRef`** (Scheibe 061): closed schemas
+  (`additionalProperties: false` except the map `openByUnit`, `maxProperties: 200`), integers with `minimum: 0`,
+  `oldestOpen.items` at most 4, `legalReview.items` at most 50, `inflow.bins` exactly 12 with `binSeconds` 300.
+  Separate reference schemas so that `reviewAgeSeconds` cannot appear in `oldestOpen`.
 
 ## [0.4.4] - 2026-10-04
 

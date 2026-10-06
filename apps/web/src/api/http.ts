@@ -656,6 +656,8 @@ export function createHttpApi(options: HttpApiOptions): HttpApi {
     proposeRefusal: (questionId, input, writeOptions) => write('post', '/questions/{questionId}/refusals', { params: questionPath(questionId), body: input, write: writeOptions }),
     approveRefusal: (questionId, answerVersion, writeOptions) => write('post', '/questions/{questionId}/refusal-approvals', { params: questionPath(questionId), body: { answerVersion }, write: writeOptions }),
     getStage: () => read('get', '/stage'),
+    // Scheibe 061 (contract 0.4.5): the control desk figures of the current meeting; never buffered (liveStore.ts).
+    getCockpit: async () => read('get', '/meetings/{meetingId}/cockpit', { params: await meetingRoute() }),
     listEvents: (after, limit) => read('get', '/events', { query: { after, limit } }),
     seedDemo: () => Promise.reject(new ApiProblem(403, translate(language(), 'http.errorTitle'), translate(language(), 'http.demoOnly'))),
     subscribe(listener) {

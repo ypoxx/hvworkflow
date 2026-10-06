@@ -13,7 +13,7 @@ import { relationLabel } from '../../i18n/labels';
 import { FIELD_CONTROL } from './fields';
 import { createFollowUpSearch, moveActive, type FollowUpReference, type SearchState } from './followUp';
 
-/** The relations of contract 0.4.5 in their display order (`QUESTION_RELATIONS` of the domain; type-only import here). */
+/** The relations of contract 0.4.6 in their display order (`QUESTION_RELATIONS` of the domain; type-only import here). */
 const RELATIONS: readonly QuestionRelation[] = ['follow_up', 'clarification'];
 
 const excerpt = (text: string, max = 140): string => (text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`);

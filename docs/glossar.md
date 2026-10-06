@@ -63,4 +63,8 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Steuerungsansicht | Steering view | `apps/web/src/features/steering/**` | — |
 | Verteilung | Distribution | `Meeting.counts.byUnit` (offen je Fachbereich), `Meeting.counts.bySeat` (auf der Bühne je Bühnenplatz); Summen aus dem Dienst, nie je Person (Scheibe 053) | „Matrix“ (es sind zwei Randsummen), „Dashboard“ |
 | Leitstand | Cockpit | `apps/web/src/features/cockpit/**` | — |
+| Verwaltung (Ansicht) | Administration (view) | `apps/web/src/features/admin/**`, Route `/admin` (Scheibe 041) | „Admin“, „Admin-Panel“ in deutschen Texten |
+| Rollenzuordnung | Role assignment | `RoleAssignment`, `assignRole`, `revokeRole` (Scheibe 026; Oberfläche 041) | „Berechtigungsticket“ |
+| Rollenkarte | Role card | `roleCards()` aus `ROLE_PERMISSIONS` (Scheibe 041; druckbar mit 062) | — |
+| Kennung | Subject id | `subjectId` (pseudonym, ADR 0004) | „Benutzername“, „E-Mail“ |
 | Rechtsfreigabe | Legal clearing | `question.legal.clear` | — |

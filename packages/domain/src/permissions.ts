@@ -34,6 +34,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'stage.read', // holds question.stage, must see what is on the podium
     'history.read', // may read a question, may trace how it came to be (Plan 3)
     'question.identity.reveal',
+    'cockpit.read', // Scheibe 061: steers the debate and its close (087); control desk figures
   ],
   capture: [
     'contribution.capture',
@@ -58,6 +59,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'question.identity.reveal',
     'question.refuse.propose', // Scheibe 044a (E25, ADR 0012; built on the default)
     'question.forward', // Scheibe 048 (E5 open, built on the default): to another answering unit
+    'cockpit.read', // Scheibe 061: nearest role to "Leitstand / Projektleitung" (Rechtekonzept §5)
   ],
   // Scheibe 048: `question.forward` inside the unit-bound bundle, so a bound expert forwards only
   // questions of her own unit (R-PERM-03 in `can()`); no rule of its own.
@@ -96,6 +98,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, RoleBundle>> = {
     'admin.units.manage', // Scheibe 040b: Fachbereiche of a meeting
     'admin.seats.manage', // Scheibe 040b: Bühnenplätze with person and device
     'demo.seed', // demo only; 042 limits it
+    'cockpit.read', // Scheibe 061: aggregates only (§4 "Rechte, keine Inhalte")
   ],
   observer: ['question.read.delivered'],
 };

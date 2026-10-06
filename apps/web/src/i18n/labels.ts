@@ -88,6 +88,7 @@ const ACTION_KEYS: Readonly<Record<Permission, TKey>> = {
   'stage.read': 'action.stage.read',
   'history.read': 'action.history.read',
   'event.read': 'action.event.read',
+  'cockpit.read': 'action.cockpit.read', // Scheibe 061
   'demo.seed': 'action.demo.seed',
 };
 

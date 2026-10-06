@@ -76,6 +76,18 @@ export const FOLLOW_UP_046_FREE_QUESTION = 'Synthetische Frage 046 ohne Bezug zu
 export const FOLLOW_UP_046_SPEECH = 'Synthetischer Redebeitrag 046 zur Nachfrage. ' + FOLLOW_UP_046_QUESTION + ' Ich danke Ihnen.';
 export const FOLLOW_UP_046_SEARCH = 'Dividende';
 
+/**
+ * Scheibe 041: the administration view. A synthetic subject id that gets a role and loses it again (with a reason), and
+ * one unit (renamed once), one agenda item, one podium seat with a device, each added and removed again.
+ */
+export const ADMIN_041_SUBJECT = 'e2e-041-pruefung';
+export const ADMIN_041_REVOKE_REASON = 'Synthetischer Grund der Prüfung 041';
+export const ADMIN_041_UNIT_NAME = 'E2E 041 Prüfbereich';
+export const ADMIN_041_UNIT_RENAMED = 'E2E 041 Prüfbereich neu';
+export const ADMIN_041_AGENDA_TITLE = 'E2E 041 Prüfpunkt';
+export const ADMIN_041_SEAT_LABEL = 'E2E 041 Prüfplatz';
+export const ADMIN_041_SEAT_DEVICE = 'geraet-041';
+
 /** Every text the suite writes; none of them may appear in the access log. */
 export const WRITTEN_TEXTS: readonly string[] = [
   SPEECH_OPENING,
@@ -103,4 +115,11 @@ export const WRITTEN_TEXTS: readonly string[] = [
   FOLLOW_UP_046_QUESTION,
   FOLLOW_UP_046_FREE_QUESTION,
   FOLLOW_UP_046_SPEECH,
+  ADMIN_041_SUBJECT,
+  ADMIN_041_REVOKE_REASON,
+  ADMIN_041_UNIT_NAME,
+  ADMIN_041_UNIT_RENAMED,
+  ADMIN_041_AGENDA_TITLE,
+  ADMIN_041_SEAT_LABEL,
+  ADMIN_041_SEAT_DEVICE,
 ];

@@ -16,6 +16,8 @@ import { steeringDe } from './steering.de';
 import { steeringEn } from './steering.en';
 import { focusDe } from './focus.de';
 import { focusEn } from './focus.en';
+import { adminDe } from './admin.de';
+import { adminEn } from './admin.en';
 import { de } from './de';
 import { en } from './en';
 
@@ -62,6 +64,7 @@ const modules: Array<{
   { name: 'history', de: historyDe as Record<string, string>, en: historyEn as Record<string, string>, prefixes: ['history'] },
   { name: 'steering', de: steeringDe as Record<string, string>, en: steeringEn as Record<string, string>, prefixes: ['steering'] },
   { name: 'focus', de: focusDe as Record<string, string>, en: focusEn as Record<string, string>, prefixes: ['focus'] },
+  { name: 'admin', de: adminDe as Record<string, string>, en: adminEn as Record<string, string>, prefixes: ['admin'] },
 ];
 
 describe('i18n parity checks', () => {
@@ -175,14 +178,16 @@ describe('i18n parity checks', () => {
   // Scheibe 055b: +9 keys for the answer format (answers 8: toolbar, four marks, hint, keys, format-only; history 1).
   // takt-048: +1 `answers.editor.rebase`, a newer answer version arrived over a changed draft in the Beantwortung;
   // +1 `answers.editor.startsFrom`, the version the prefilled field starts from (design critique D1).
+  // Scheibe 041: +125 keys for the administration view (shell 3: nav, page title, description; admin 122).
+  // Scheibe 061 (part A): +1 `action.cockpit.read`, required by ACTION_KEYS for the new right.
   // Scheibe 046: +28 keys for follow-up references (capture 17, history 10, shell 1 event name).
-  it('(f) Total key count is 649 across all modules and matches de and en', () => {
+  it('(f) Total key count is 775 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(649);
-    expect(deKeys).toBe(649);
-    expect(enKeys).toBe(649);
+    expect(totalKeys).toBe(775);
+    expect(deKeys).toBe(775);
+    expect(enKeys).toBe(775);
   });
 });

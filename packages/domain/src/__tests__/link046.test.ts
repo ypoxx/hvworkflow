@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, can, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { verifyEventChain } from '../envelope.js';
 import type { DomainEvent, NewEvent } from '../events.js';
+import { computeCockpit } from '../cockpit.js';
 import { ruleRegister } from '../rules.js';
 import { seedEvents } from '../seed.js';
 import { emptyState, project, reduce, type State } from '../state.js';
@@ -773,5 +774,19 @@ describe('Test 17: envelope', () => {
     expect(() => createInMemoryEventStore({ load: () => log, save: () => undefined })).not.toThrow();
     const typo = log.map((e) => (e.type === 'QuestionLinked' ? { ...e, type: 'QuestionLinkd' } : e)) as unknown as DomainEvent[];
     expect(() => createInMemoryEventStore({ load: () => typo, save: () => undefined })).toThrow(/type/);
+  });
+});
+
+/* ---------- with 061 ---------- */
+
+describe('Leitstand (061) with QuestionLinked', () => {
+  it('a capture with reference counts once in the inflow, and the fold over the log does not throw', async () => {
+    const parent = await captured();
+    const at0 = new Date(time);
+    const before = computeCockpit(store.all(), at0, meetingId, () => true)!;
+    await followUp(parent.id);
+    const after = computeCockpit(store.all(), new Date(time), meetingId, () => true)!;
+    const sum = (c: typeof before) => c.inflow.bins.reduce((total, bin) => total + bin, 0);
+    expect(sum(after)).toBe(sum(before) + 1);
   });
 });

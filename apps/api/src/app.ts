@@ -1066,6 +1066,10 @@ export function createApp(options: CreateAppOptions = {}): App {
   });
   app.get('/v1/meetings/:meetingId/stage', guarded('getMeetingStage'), async (c) =>
     c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).getStage()));
+  // Slice 061: the control desk figures (Leitstand), computed from this request's meeting snapshot at the
+  // service clock; `cockpit.read` and the reference filter are decided in the core (`getCockpit`).
+  app.get('/v1/meetings/:meetingId/cockpit', guarded('getMeetingCockpit'), async (c) =>
+    c.json(await (await meetingDomain(requireParam(c, 'meetingId'))).getCockpit()));
 
   app.get('/v1/meeting', guarded(undefined), async (c) => c.json(await domain.getMeeting()));
   app.get('/v1/agenda-items', guarded(undefined), async (c) => c.json(await domain.listAgendaItems()));
