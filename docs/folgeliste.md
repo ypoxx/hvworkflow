@@ -23,6 +23,11 @@ in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
 
 ## Oberfläche: Lade- und Schreibränder (Kandidat 010e)
 
+- takt-058 Review minor · `apps/web/e2e/058-dialog-fokus.spec.ts` (`writeElsewhere`) · der Helfer tauscht den Akteur synchron um
+  den Start von `registerSpeaker` (Muster aus 010c `unrelatedEvent`); löst die API den Akteur einmal verzögert auf, scheitert F2
+  mit 403 statt am Fokus · bei einer Überarbeitung der 010c-Helfer mitziehen.
+- takt-058 Review nit · `058-dialog-fokus.spec.ts` · Escape mit dem aktuellen `onClose` ist nur indirekt geprüft (am Ende von
+  `expectFocusKept`) · eigener Testtitel.
 - takt-057 Nachprüfung minor · `features/capture/Page.tsx`, `features/speakers/Page.tsx` · nach `clear()` derselben Person
   (Stromende) sieht eine vom Dienst angenommene, aber zurückgehaltene Schreibung wie ein stiller Fehlschlag aus; der Entwurf
   bleibt stehen, ein zweiter Klick kann einen doppelten Redebeitrag erzeugen · `WithheldAnswer` als „Ausgang unbekannt“
