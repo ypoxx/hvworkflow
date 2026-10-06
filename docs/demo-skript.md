@@ -50,7 +50,7 @@ Nach der Historie einschieben oder ans Ende stellen; je Szene etwa eine Minute, 
 | Entwicklung | Historie, Ereignisstrom (Rolle Administration, „Historie & Suche", Tab „Ereignisstrom"), Rechte als Daten, Rollenkarten, Verweigerung (Vier-Augen im Kern), Repository (nächster Abschnitt) |
 | Produkt | Erfassung, Beantwortung, Bühne, Verweigerung, Nachfrage |
 | Betrieb | Leitstand, Verwaltung, lokales Dienstpaket (`docs/betrieb/installation.md`, Anleitung `docs/admin/anleitung.md`) |
-| Finanzen | Kurz halten: der Ablauf bis zur Bühne genügt; Kosten und Aufwand stehen im Dossier, nicht in der Demo (Belege je Scheibe: `docs/messung.md`) |
+| Finanzen | Kurz halten: der Ablauf bis zur Bühne genügt; Kosten und Aufwand stehen nicht in der Demo, sondern im separaten Dossier (Übersichtsseite des Eigentümers) und im Produktplan §8 (`docs/produktplan-beta.md`) |
 
 ## Was bewusst nicht gezeigt wird
 
