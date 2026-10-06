@@ -68,8 +68,10 @@ const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
  * Takt-059: `E2E_DEMO_BUILD=1` is a third way to run the suite, on its own: the demo mode as `vite build` output behind
  * `vite preview`, never the dev server (which injects inline scripts and would hide what a CSP blocks), with the single
  * project `demo-build`. Its file attaches the CSP from `netlify.toml` to every document response; `vite preview` sends none.
- * Without the variable nothing changes. The build goes below `node_modules` per run, like the HTTP build; its path reaches
- * the test workers through the environment, because they load this file again under another process id.
+ * Without the variable nothing changes. `E2E_DEMO_BUILD_DIR` names a directory (by default per run below `node_modules`);
+ * the build always goes into its fixed leaf `web-build`, as the HTTP build does, so `--emptyOutDir` never empties the named
+ * directory itself (review of takt-059, finding 6). The directory reaches the test workers through the environment, because
+ * they load this file again under another process id.
  */
 const demoBuildEnabled = process.env['E2E_DEMO_BUILD'] === '1';
 if (demoBuildEnabled && httpEnabled) throw new Error('E2E_DEMO_BUILD and E2E_HTTP exclude each other.');
@@ -78,9 +80,9 @@ const DEMO_BUILD_SPEC = 'takt-059-demo-csp.spec.ts';
 if (demoBuildEnabled) {
   // A blank value counts as absent, as for E2E_HTTP_STATE_DIR.
   process.env['E2E_DEMO_BUILD_DIR'] = process.env['E2E_DEMO_BUILD_DIR']?.trim() ||
-    join(import.meta.dirname, `node_modules/.e2e-demo-build-${process.pid}/web-build`);
+    join(import.meta.dirname, `node_modules/.e2e-demo-build-${process.pid}`);
 }
-const demoBuildDir = process.env['E2E_DEMO_BUILD_DIR'] ?? '';
+const demoBuildDir = `${process.env['E2E_DEMO_BUILD_DIR'] ?? ''}/web-build`;
 // The guards of the HTTP build: the path goes into a shell command inside single quotes, and `--emptyOutDir` wipes it.
 if (demoBuildEnabled && (!isAbsolute(demoBuildDir) || dirname(resolve(demoBuildDir)) === '/' || demoBuildDir.includes("'"))) {
   throw new Error('E2E_DEMO_BUILD_DIR must be an absolute path below the root directory, without a single quote.');

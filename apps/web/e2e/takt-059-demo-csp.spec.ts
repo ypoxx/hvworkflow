@@ -8,15 +8,18 @@
  * Netlify sends for `/*`, read from `netlify.toml` (one source, nothing copied into this file).
  *
  * D1 walks the core views with the role switcher (Rollenwechsel), the language switch (Sprachwechsel), the keyboard
- *    shortcuts dialog (Tastaturkürzel) and one submitted form (a Wortmeldung), and requires zero `securitypolicyviolation`
+ *    shortcuts dialog (Tastaturkürzel), one submitted form (a Wortmeldung) and the highlight of the answer field (toolbar in
+ *    Beantwortung, Ctrl+Shift+H in the Schreibmodus), which must be painted; it requires zero `securitypolicyviolation`
  *    events and zero console errors.
- * D2 proves that the policy is in force: an inline script inserted through `page.evaluate` does not run and causes exactly
- *    one violation, and string evaluation (`eval`) is refused with exactly one more.
+ * D2 proves that the policy is in force: an inline script and a `<style>` element inserted through `page.evaluate` take no
+ *    effect and cause exactly one violation each, and string evaluation (`eval`) is refused with exactly one more. It also
+ *    reads the policy text: the four `'none'` directives are there, and nothing but `'self'`/`'none'` except the one
+ *    relaxation `style-src-attr 'unsafe-inline'`.
  * D3 proves that the build holds no `.map` file and no `sourceMappingURL` comment.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { CORPUS_DEMO } from '@hv/domain';
-import type { Page } from '@playwright/test';
+import type { ConsoleMessage, Locator, Page } from '@playwright/test';
 import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
 import { asRole } from './support/roles';
@@ -29,8 +32,10 @@ declare module 'node:fs' {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-/** A synthetic name for the one write of D1 (AGENTS.md R11). */
+/** Synthetic texts for the writes of D1 (AGENTS.md R11); each highlighted word occurs once in its field. */
 const SPEAKER_NAME = 'Probe Neunundfünfzig';
+const HIGHLIGHT_ANSWERS = 'Gelbprobe';
+const HIGHLIGHT_WRITING = 'Schreibprobe';
 
 /**
  * The header values of the `[[headers]]` table whose `for` is `"/*"`. A deliberately small reader for the shape of
@@ -71,10 +76,27 @@ function netlifyCsp(): string {
   return csp;
 }
 
+/**
+ * The one relaxation against `'self'`/`'none'` (review of takt-059, orchestrator's decision): the highlight of the answer
+ * field is the browser's `execCommand('hiliteColor')`, which writes a `style` attribute. Style attributes run no script,
+ * `url()` in them still meets `img-src`/`font-src 'self'`, `<style>` elements stay blocked (D2).
+ */
+const RELAXATIONS: Readonly<Record<string, readonly string[]>> = { 'style-src-attr': ["'unsafe-inline'"] };
+
 interface Violation { directive: string; blocked: string }
+interface Findings { violations: Violation[]; errors: string[] }
+
+/**
+ * `vite preview` answers the browser's own `/favicon.ico` request with 404 (no SPA fallback for a path with an extension);
+ * Netlify answers it with 200 through the `/*` rule, and the interface never asks for it. Exactly that message is no finding.
+ */
+function isFavicon404(message: ConsoleMessage): boolean {
+  return message.location().url.endsWith('/favicon.ico') &&
+    message.text().startsWith('Failed to load resource: the server responded with a status of 404');
+}
 
 /** Collects CSP violations (through a binding, so nothing is lost on a reload) and console errors of the page. */
-async function watch(page: Page): Promise<{ violations: Violation[]; errors: string[] }> {
+async function watch(page: Page): Promise<Findings> {
   const violations: Violation[] = [];
   const errors: string[] = [];
   await page.exposeBinding('__takt059Violation', (_source, violation: Violation) => { violations.push(violation); });
@@ -84,7 +106,7 @@ async function watch(page: Page): Promise<{ violations: Violation[]; errors: str
       report({ directive: event.effectiveDirective, blocked: event.blockedURI });
     });
   });
-  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('console', (message) => { if (message.type() === 'error' && !isFavicon404(message)) errors.push(message.text()); });
   page.on('pageerror', (error) => { errors.push(`pageerror: ${error.message}`); });
   return { violations, errors };
 }
@@ -98,6 +120,27 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ response, headers: { ...response.headers(), ...Object.fromEntries(headers) } });
   });
 });
+
+/**
+ * Lets late reports arrive before a check: two animation frames and a task turn in the page (a violation event is a queued
+ * task, its binding call reaches the test before the answer to this evaluation), then up to 300 ms that any report ends.
+ */
+async function settle(page: Page, findings: Findings): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }));
+  const until = Date.now() + 300;
+  await expect.poll(() => findings.violations.length + findings.errors.length > 0 || Date.now() >= until, { intervals: [50] })
+    .toBe(true);
+}
+
+/** The highlighted word carries the highlight's `style` attribute and the browser really paints it (not transparent). */
+async function expectHighlightPainted(field: Locator, word: string): Promise<void> {
+  const span = field.locator('span[style*="background-color"]').filter({ hasText: word });
+  await expect(span).toHaveText(word);
+  await expect.poll(() => span.evaluate((el) => getComputedStyle(el).backgroundColor), { message: `painted background of ${word}` })
+    .not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
+}
 
 const heading = (page: Page, title: string) => page.getByRole('heading', { level: 1, name: title, exact: true });
 
@@ -117,11 +160,12 @@ async function openView(page: Page, navTestId: string, path: string, title: stri
 }
 
 test.describe('takt-059 CSP of the demo build', () => {
-  test('D1 core views, role switch, language switch, shortcuts dialog and one form: zero violations, zero console errors @screenshot', async ({ page }) => {
-    const { violations, errors } = await watch(page);
-    const clean = (where: string): void => {
-      expect(violations, `CSP violations up to ${where}`).toEqual([]);
-      expect(errors, `console errors up to ${where}`).toEqual([]);
+  test('D1 core views, role switch, language switch, shortcuts dialog, one form and the highlight: zero violations, zero console errors @screenshot', async ({ page }) => {
+    const findings = await watch(page);
+    const clean = async (where: string): Promise<void> => {
+      await settle(page, findings);
+      expect(findings.violations, `CSP violations up to ${where}`).toEqual([]);
+      expect(findings.errors, `console errors up to ${where}`).toEqual([]);
     };
 
     const response = await page.goto('/');
@@ -131,27 +175,52 @@ test.describe('takt-059 CSP of the demo build', () => {
     await waitForCorpus(page);
     await expect(page.getByTestId('speaker-row').first()).toBeVisible();
     await expect(heading(page, 'Wortmeldungen')).toBeVisible();
-    clean('speakers');
+    await clean('speakers');
     await openView(page, 'nav-capture', '/capture', 'Erfassung', 'capture-forbidden');
     await openView(page, 'nav-history', '/history', 'Historie & Suche', 'history-forbidden');
-    clean('capture, history');
+    await clean('capture, history');
 
     await asRole(page, 'coordination');
     await openView(page, 'nav-steering', '/steering', 'Steuerung', 'steering-forbidden');
     await openView(page, 'nav-cockpit', '/cockpit', 'Leitstand');
     await expect(page.getByTestId('cockpit-page')).toBeVisible();
-    clean('steering, cockpit');
+    await clean('steering, cockpit');
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: evidence('takt-059-demo-csp.png') });
     await openView(page, 'nav-answers', '/answers', 'Beantwortung');
 
-    // Beantwortung with an open question, so the editor renders; then Meine Fragen.
+    // Beantwortung with an open question, so the editor renders; a word highlighted through the toolbar is painted.
     await asRole(page, 'expert');
     await page.getByTestId('answers-filter-status-assigned').click();
     await page.getByTestId('answers-row').first().click();
     await expect(page.getByTestId('answers-detail')).toBeVisible();
+    const drafted = (await page.getByTestId('answers-detail-number').innerText()).trim();
+    const answerField = page.getByTestId('answer-editor');
+    await answerField.focus();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type(` ${HIGHLIGHT_ANSWERS}`);
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    await page.getByTestId('format-highlight').click();
+    await expectHighlightPainted(answerField, HIGHLIGHT_ANSWERS);
+    await clean('answers, highlight from the toolbar');
+
+    // Meine Fragen: the Schreibmodus (writing mode) of another own assigned question (the draft above would carry its
+    // highlight to the end of the field), Ctrl+Shift+H, then Escape (the text stays an unsaved draft, nothing is written).
     await openView(page, 'nav-focus', '/my', 'Meine Fragen', 'focus-forbidden');
-    clean('answers, my questions');
+    const own = page.locator(`[data-testid="focus-row"][data-status="assigned"]:not([data-returned]):not([data-number="${drafted}"])`)
+      .filter({ hasNot: page.getByTestId('focus-row-refusal') }).first();
+    await own.dblclick();
+    await expect(page.getByTestId('focus-writing')).toBeVisible();
+    const writingField = page.getByTestId('focus-editor');
+    await expect(writingField).toBeFocused();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type(` ${HIGHLIGHT_WRITING}`);
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    await page.keyboard.press('Control+Shift+H');
+    await expectHighlightPainted(writingField, HIGHLIGHT_WRITING);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('focus-writing')).toHaveCount(0);
+    await clean('my questions, Ctrl+Shift+H in the writing mode');
 
     // The expert does not read the stage; the podium does, and the view turns from its refused state into the stage.
     await page.getByTestId('nav-stage').click();
@@ -159,11 +228,11 @@ test.describe('takt-059 CSP of the demo build', () => {
     await asRole(page, 'podium');
     await expect(heading(page, 'Bühne')).toBeVisible();
     await expect(page.getByTestId('stage-forbidden')).toHaveCount(0);
-    clean('stage');
+    await clean('stage');
 
     await asRole(page, 'admin');
     await openView(page, 'nav-admin', '/admin', 'Verwaltung');
-    clean('admin');
+    await clean('admin');
 
     await page.getByTestId('lang-option-en').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -171,14 +240,14 @@ test.describe('takt-059 CSP of the demo build', () => {
     await openView(page, 'nav-cockpit', '/cockpit', 'Cockpit');
     await page.getByTestId('lang-option-de').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
-    clean('language switch');
+    await clean('language switch');
 
     await page.getByRole('button', { name: 'Tastaturkürzel' }).click();
     const dialog = page.getByRole('dialog', { name: 'Tastaturkürzel' });
     await expect(dialog).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
-    clean('shortcuts dialog');
+    await clean('shortcuts dialog');
 
     // One form sent under `form-action 'none'`: the interface handles every submit itself, nothing navigates.
     await asRole(page, 'moderation');
@@ -188,14 +257,26 @@ test.describe('takt-059 CSP of the demo build', () => {
     await page.getByTestId('speaker-register-submit').click();
     await expect(page.getByText(SPEAKER_NAME)).toBeVisible();
     await expect(page).toHaveURL(/\/speakers$/);
-    clean('speaker registration');
+    await clean('speaker registration');
   });
 
-  test('D2 the policy is in force: an inline script and eval are refused, one violation each', async ({ page }) => {
-    const csp = netlifyCsp();
-    // Guard on the text itself: no unsafe source and no foreign host may slip into the policy unnoticed.
-    const sources = csp.split(';').flatMap((directive) => directive.trim().split(/\s+/).slice(1));
-    expect(sources.filter((source) => source !== "'self'" && source !== "'none'"), 'sources other than self and none').toEqual([]);
+  test('D2 the policy is in force: inline script, style element and eval are refused, one violation each; the text holds', async ({ page }) => {
+    // The text itself: no unsafe source and no foreign host may slip into the policy unnoticed, the one relaxation is exactly
+    // `RELAXATIONS`, and the four directives without a fallback to `default-src` (or with `'none'` by intent) are present.
+    const parts = netlifyCsp().split(';').map((part) => part.trim()).filter((part) => part !== '');
+    const directives = new Map(parts.map((part) => {
+      const [name = '', ...sources] = part.split(/\s+/);
+      return [name, sources] as const;
+    }));
+    expect(directives.size, 'no directive twice').toBe(parts.length);
+    for (const [name, sources] of directives) {
+      const relaxed = RELAXATIONS[name];
+      if (relaxed !== undefined) expect(sources, name).toEqual(relaxed);
+      else expect(sources.filter((source) => source !== "'self'" && source !== "'none'"), name).toEqual([]);
+    }
+    for (const name of ['frame-ancestors', 'base-uri', 'form-action', 'object-src']) expect(directives.get(name), name).toEqual(["'none'"]);
+    expect(directives.get('script-src'), 'script-src').toEqual(["'self'"]);
+    expect(directives.get('style-src'), 'style-src').toEqual(["'self'"]);
 
     const { violations, errors } = await watch(page);
     await page.goto('/speakers');
@@ -215,6 +296,17 @@ test.describe('takt-059 CSP of the demo build', () => {
     // The browser reports the refusal on the console as well: the console check of D1 would see it too.
     await expect.poll(() => errors.filter((error) => error.includes('Content Security Policy')).length).toBe(1);
 
+    // A `<style>` element stays blocked (`style-src 'self'`); only style attributes are relaxed.
+    const styleApplied = await page.evaluate(() => {
+      const style = document.createElement('style');
+      style.textContent = ':root { --takt059-probe: applied; }';
+      document.head.append(style);
+      return getComputedStyle(document.documentElement).getPropertyValue('--takt059-probe').trim() !== '';
+    });
+    expect(styleApplied, 'the style element took effect').toBe(false);
+    await expect.poll(() => violations.length).toBe(2);
+    expect(violations[1]).toEqual({ directive: 'style-src-elem', blocked: 'inline' });
+
     // DevTools lets string evaluation through while its own evaluation runs (`allowUnsafeEvalBlockedByCSP`), so the eval
     // runs in a timer task of the page, after `page.evaluate` has returned.
     const evalResult = await page.evaluate(() => new Promise<string>((resolve) => {
@@ -228,13 +320,15 @@ test.describe('takt-059 CSP of the demo build', () => {
       }, 0);
     }));
     expect(evalResult).toBe('refused');
-    await expect.poll(() => violations.length).toBe(2);
-    expect(violations[1]).toEqual({ directive: 'script-src', blocked: 'eval' });
+    await expect.poll(() => violations.length).toBe(3);
+    expect(violations[2]).toEqual({ directive: 'script-src', blocked: 'eval' });
   });
 
   test('D3 the demo build holds no source map and no sourceMappingURL comment', async () => {
-    const dir = process.env['E2E_DEMO_BUILD_DIR'];
-    if (!dir) throw new Error('E2E_DEMO_BUILD_DIR is not set: run with E2E_DEMO_BUILD=1 (playwright.config.ts).');
+    const root = process.env['E2E_DEMO_BUILD_DIR'];
+    if (!root) throw new Error('E2E_DEMO_BUILD_DIR is not set: run with E2E_DEMO_BUILD=1 (playwright.config.ts).');
+    // The build always lies in the fixed leaf `web-build` below the directory (playwright.config.ts).
+    const dir = `${root}/web-build`;
     const files = readdirSync(dir, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => `${entry.parentPath}/${entry.name}`);

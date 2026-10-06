@@ -22,13 +22,22 @@ statische Demo auf Netlify.
    worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
    Jede Lockerung (etwa `'unsafe-inline'` für Stile) nur mit nachgewiesenem Verstoß und Begründung im Bericht; `'unsafe-eval'`
    und fremde Hosts sind ausgeschlossen. Die vorhandenen Header bleiben.
+   **Nachtrag nach dem Sicherheitsreview (Blocker, Entscheidung des Orchestrators, 06.10.2026):** zugelassen ist genau eine
+   Lockerung, `style-src-attr 'unsafe-inline'`. Die Hervorhebung im Antwortfeld ist `execCommand('hiliteColor')`; Chrome
+   schreibt dafür ein `style`-Attribut, das `style-src 'self'` sperrt (gespeichert, aber nicht gemalt). Begründung: ein
+   Stilattribut führt kein Skript aus; `url()`-Abfluss bleibt durch `img-src`/`font-src 'self'` gesperrt; die Oberfläche hat
+   keine HTML-Senke; eine Änderung am Editor am Vortag der Demo trägt mehr Risiko. `style-src 'self'` bleibt für Elemente und
+   Dateien (keine `<style>`-Elemente, keine fremden Hosts). Die Lockerung entfällt, sobald die Hervorhebung über CSSOM oder
+   eine Klasse gesetzt wird (Kandidat für die Folgeliste).
 2. **Keine Quellkarten im Demo-Build**: `build.sourcemap` ist im Modus `demo` aus. Der HTTP-Modus bleibt, wie er ist (nginx
    blockiert `.map` dort bereits).
 3. **Prüfung gegen den gebauten Stand, nicht den Dev-Server** (der injiziert Inline-Skripte): ein Playwright-Projekt
    `demo-build`, das den Demo-Modus mit `vite build` baut und mit `vite preview` ausliefert, die CSP **aus `netlify.toml`
    gelesen** (eine Quelle, kein Abschreiben) an jede Dokumentantwort hängt und über die Kernansichten geht: Wortmeldungen,
    Erfassung, Steuerung, Beantwortung, Meine Fragen, Bühne, Historie, Leitstand, Verwaltung, Sprachwechsel, Rollenwechsel,
-   Tastaturkürzel-Dialog. Ein Test sammelt `securitypolicyviolation`-Ereignisse und Konsolenfehler und verlangt **null**.
+   Tastaturkürzel-Dialog, dazu (Nachtrag) die Hervorhebung im Antwortfeld über die Werkzeugleiste in Beantwortung und mit
+   Strg+Umschalt+H im Schreibmodus, die tatsächlich gemalt sein muss. Ein Test sammelt `securitypolicyviolation`-Ereignisse
+   und Konsolenfehler und verlangt **null**.
    Ein zweiter Test belegt, dass die CSP tatsächlich greift (z. B. ein per `page.evaluate` eingefügtes Inline-Skript wird
    blockiert und erzeugt genau einen Verstoß). Ein dritter belegt, dass im gebauten `dist` keine `.map`-Datei liegt und kein
    `sourceMappingURL`-Kommentar.
