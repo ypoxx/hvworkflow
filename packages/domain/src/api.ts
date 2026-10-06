@@ -19,6 +19,7 @@ import { checkAgendaItems, checkStageSeats, checkUnits } from './masterData.js';
 import { AnswerFormatError, answerPlainText, codePointLength, normalizeAnswerBodyForWrite, sanitizeAnswerText, ANSWER_TEXT_MAX_LENGTH } from './answerFormat.js';
 import { maskEvent, resolveMeetingActor, snapshotBefore, visibleMessages, type StreamMessage, type StreamStates } from './stream.js';
 import { CORPUS_DEMO } from './seed.js';
+import { computeCockpit } from './cockpit.js';
 import type { EventStore } from './store.js';
 import type {
   Actor,
@@ -26,6 +27,7 @@ import type {
   AgendaItemInput,
   AnswerDraft,
   Classification,
+  Cockpit,
   Contribution,
   ContributionCapture,
   MeetingContributionCapture,
@@ -153,6 +155,12 @@ export interface HvApi {
   approveRefusal(id: string, answerVersion: number, opts?: WriteOptions): Promise<Question>;
 
   getStage(): Promise<StageView>;
+  /**
+   * Scheibe 061: the control desk figures (Leitstand) of the current meeting, computed fresh at the
+   * injected clock (`computeCockpit`, cockpit.ts). Permission `cockpit.read` (R-PERM-02); references only
+   * to questions the actor may read (`can(actor, 'question.read', q)`).
+   */
+  getCockpit(): Promise<Cockpit>;
   listEvents(after?: number, limit?: number): Promise<{ items: ReadEvent[]; lastSeq: number }>;
   /** Defaults to CORPUS_DEMO. `roundSizes` is a domain-only option; the contract names `questions` and `seed`. */
   seedDemo(options?: { questions?: number; seed?: number; roundSizes?: readonly number[] }): Promise<Meeting>;
@@ -1615,6 +1623,18 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
         deliveredCount: counts?.delivered ?? 0,
         openCount: counts?.open ?? 0,
       };
+    },
+    async getCockpit() {
+      requireReadPermission('getCockpit');
+      const meetingId = state.meeting?.id;
+      if (meetingId === undefined) throw new ApiProblem(404, 'Not found', 'No meeting exists yet.');
+      const reader = actor();
+      // One fold over this meeting's events per read (T-G2-D-03, measured at 800 questions in slice 061).
+      const cockpit = computeCockpit(store.all().filter((e) => e.meetingId === meetingId), clock(), meetingId,
+        // The check reads the canonical record of the projection (review 061 A, minor 2); the figures stay at `now`.
+        (q) => can(reader, 'question.read', state.questions.get(q.id) ?? q).allow);
+      if (cockpit === undefined) throw new ApiProblem(404, 'Not found', `Meeting ${meetingId} does not exist.`);
+      return cockpit;
     },
     async listEvents(after = 0, limit = 1000) {
       requireReadPermission('listEvents');

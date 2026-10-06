@@ -9,6 +9,7 @@
  */
 import type { DomainEvent } from './events.js';
 import { project } from './state.js';
+import type { QuestionRecord, QuestionStatus } from './types.js';
 
 export interface MeetingIndicators {
   meetingId: string;
@@ -30,14 +31,43 @@ export interface Indicators {
 }
 
 export const UNASSIGNED_UNIT = 'unassigned';
-const CAPTURED_WINDOW_MS = 300_000;
-const LEGAL_REVIEW_LIMIT_MS = 600_000;
+/*
+ * The definitions below are shared with the control desk (Leitstand, slice 061, `cockpit.ts`), so both
+ * read the same window, the same "open" and the same entry into legal review; `/metrics` stays byte for
+ * byte the same (golden `apps/api/src/__tests__/fixtures/metrics-golden-061.txt`).
+ */
+export const CAPTURED_WINDOW_MS = 300_000;
+export const LEGAL_REVIEW_LIMIT_MS = 600_000;
 const EVENTS_WINDOW_MS = 60_000;
 
-const eventTime = (event: DomainEvent): number => Date.parse(event.recordedAt ?? event.at);
+/** Server time of an event (ADR 0011): `recordedAt`, else `at`; never the device's `occurredAt`. */
+export const eventTime = (event: Pick<DomainEvent, 'at' | 'recordedAt'>): number => Date.parse(event.recordedAt ?? event.at);
 
 /** An age inside a rolling window: never negative, so an event after `now` (clock set back) counts nowhere. */
-const withinWindow = (ageMs: number, windowMs: number): boolean => ageMs >= 0 && ageMs <= windowMs;
+export const withinWindow = (ageMs: number, windowMs: number): boolean => ageMs >= 0 && ageMs <= windowMs;
+
+/** "Open" in the evaluation catalogue (033b): every status except the four that end the question's way. */
+const NOT_OPEN_STATUSES: readonly QuestionStatus[] = ['delivered', 'closed', 'withdrawn', 'merged'];
+export const isOpenStatus = (status: QuestionStatus): boolean => !NOT_OPEN_STATUSES.includes(status);
+
+/**
+ * An event that (re)starts the legal-review clock (033b): submitted for review, a return into
+ * `in_review` (a legacy form R-TRANS-06 no longer writes), or an answer version written straight into
+ * `in_review` (Scheibe 044a: a refusal proposal; every new proposal restarts the clock).
+ */
+export const entersLegalReview = (event: DomainEvent): boolean =>
+  event.type === 'QuestionSubmittedForReview' ||
+  (event.type === 'QuestionReturned' && event.payload.toStatus === 'in_review') ||
+  (event.type === 'AnswerDrafted' && event.payload.toStatus === 'in_review');
+
+/** In `in_review` without a legal clearance of the latest answer version (033b). */
+export function awaitsLegalClearance(q: QuestionRecord): boolean {
+  if (q.status !== 'in_review') return false;
+  const latest = q.answers.at(-1)?.version;
+  const cleared = q.legalClearance !== undefined &&
+    (q.legalClearance.answerVersion === undefined || q.legalClearance.answerVersion === latest);
+  return !cleared;
+}
 
 export function computeIndicators(events: readonly DomainEvent[], now: Date): Indicators {
   const nowMs = now.getTime();
@@ -61,12 +91,7 @@ export function computeIndicators(events: readonly DomainEvent[], now: Date): In
     const inReviewSince = new Map<string, number>();
     for (const event of group) {
       if (event.type === 'QuestionCaptured') capturedAt.set(event.subjectId, eventTime(event));
-      else if (event.type === 'QuestionSubmittedForReview' ||
-        (event.type === 'QuestionReturned' && event.payload.toStatus === 'in_review') ||
-        // Scheibe 044a: a refusal proposal enters legal review directly; every new proposal restarts the clock.
-        (event.type === 'AnswerDrafted' && event.payload.toStatus === 'in_review')) {
-        inReviewSince.set(event.subjectId, eventTime(event));
-      }
+      else if (entersLegalReview(event)) inReviewSince.set(event.subjectId, eventTime(event));
     }
 
     const openByUnit: Record<string, number> = { [UNASSIGNED_UNIT]: 0 };
@@ -77,17 +102,14 @@ export function computeIndicators(events: readonly DomainEvent[], now: Date): In
     for (const q of state.questions.values()) {
       const at = capturedAt.get(q.id);
       if (at !== undefined && withinWindow(nowMs - at, CAPTURED_WINDOW_MS)) captured += 1;
-      if (!['delivered', 'closed', 'withdrawn', 'merged'].includes(q.status)) {
+      if (isOpenStatus(q.status)) {
         const unit = q.unitId ?? UNASSIGNED_UNIT;
         openByUnit[unit] = (openByUnit[unit] ?? 0) + 1;
         if (at !== undefined && (oldest === undefined || at < oldest)) oldest = at;
       }
-      if (q.status === 'in_review') {
-        const latest = q.answers.at(-1)?.version;
-        const cleared = q.legalClearance !== undefined &&
-          (q.legalClearance.answerVersion === undefined || q.legalClearance.answerVersion === latest);
+      if (awaitsLegalClearance(q)) {
         const since = inReviewSince.get(q.id);
-        if (!cleared && since !== undefined && nowMs - since > LEGAL_REVIEW_LIMIT_MS) legalOver += 1;
+        if (since !== undefined && nowMs - since > LEGAL_REVIEW_LIMIT_MS) legalOver += 1;
       }
     }
     meetings.push({

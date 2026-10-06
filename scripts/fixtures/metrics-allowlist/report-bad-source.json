@@ -1,0 +1,2 @@
+{ "metrics": [], "reports": [ { "id": "leitstand", "spec": "061", "aggregation": ["meeting"], "questionReferences": false, "minimumGroupSize": null,
+  "fields": [ { "path": "totals.open", "source": "hv_not_a_catalog_family", "personalReference": "keiner" } ] } ] }

@@ -34,8 +34,11 @@ import type { WriteOutcome } from './http';
 
 /** Every read method of `HvApi` (the contract names them get… and list…); a new one fails to compile below. */
 export type ReadMethodName = Extract<keyof HvApi, `get${string}` | `list${string}`>;
-/** `listEvents` is a cursor read and never buffered. */
-type BufferedRead = Exclude<ReadMethodName, 'listEvents'>;
+/**
+ * `listEvents` is a cursor read and never buffered. Scheibe 061: neither is `getCockpit`, a time-dependent read
+ * whose ages move with the service clock without any event, so a buffered answer would go stale silently.
+ */
+type BufferedRead = Exclude<ReadMethodName, 'listEvents' | 'getCockpit'>;
 
 /** Topics → reads, as data (m7). Complete by type: a missing or unknown read fails `satisfies`. */
 export const READ_TOPICS = {
@@ -402,6 +405,26 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     return forCaller(shared, startA, actor);
   };
 
+  /**
+   * An unbuffered read under the same actor protection as `read()` (Codex P1 on #168): nothing is kept, but an answer
+   * requested before an actor change or `clear()` never reaches the caller.
+   */
+  const guarded = <T>(call: () => Promise<T>): Promise<T> => {
+    const actor = observeActor();
+    if (actor === undefined) return call();
+    const startA = actorEpoch;
+    let shared: Promise<Outcome>;
+    try {
+      shared = call().then(
+        (value): Outcome => ({ kind: 'ok', value }),
+        (error: unknown): Outcome => ({ kind: 'error', error }),
+      );
+    } catch (error) {
+      shared = Promise.resolve({ kind: 'error', error });
+    }
+    return forCaller(shared, startA, actor);
+  };
+
   /** Collects what one message invalidates; applied once when the batch closes. */
   const collect = (events: readonly ReadEvent[], change: StreamChange | undefined): { full: boolean; matches: Match[] } => {
     if (events.length === 0 && change === undefined) return { full: true, matches: [] };
@@ -501,6 +524,7 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
   };
   return Object.assign(store, control, {
     listEvents: (after?: number, limit?: number) => adapter.listEvents(after, limit),
+    getCockpit: () => guarded(() => adapter.getCockpit()),
     lastWriteEtag: () => adapter.lastWriteEtag(),
     seedDemo: (seedOptions?: Parameters<HvApi['seedDemo']>[0]) => adapter.seedDemo(seedOptions),
     subscribe(listener: Listener) {

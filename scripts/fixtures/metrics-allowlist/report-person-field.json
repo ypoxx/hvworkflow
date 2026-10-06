@@ -1,0 +1,3 @@
+{ "metrics": [], "reports": [ { "id": "leitstand", "spec": "061", "aggregation": ["meeting", "unit"], "questionReferences": false, "minimumGroupSize": null,
+  "fields": [ { "path": "openByUnit.*", "source": "Meeting.counts.byUnit", "personalReference": "keiner" },
+    { "path": "oldestOpen.items[].actorId", "source": "derived: wer zuletzt gehandelt hat", "personalReference": "Person" } ] } ] }

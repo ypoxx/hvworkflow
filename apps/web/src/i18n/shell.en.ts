@@ -222,6 +222,7 @@ export const shellEn: typeof shellDe = {
   'action.stage.read': 'View',
   'action.history.read': 'View',
   'action.event.read': 'View',
+  'action.cockpit.read': 'View the cockpit',
   'action.demo.seed': 'Create the demo corpus',
   'event.MeetingCreated': 'General meeting created',
   'event.MeetingStarted': 'General meeting started',

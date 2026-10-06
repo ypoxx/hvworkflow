@@ -54,3 +54,19 @@ test('states "Es gibt keine Kennzahl je Person." and the section "Nicht im Katal
   for (const term of ['Rate-Limit-Zähler', 'Zugriffslog', 'Vorgangshistorie']) assert.ok(md.includes(term), term);
   assert.equal(JSON.parse(json).notInCatalog.length, 3);
 });
+
+// Scheibe 061, G1: the reports of the catalog (a view that shows figures) get their own section.
+test('G1 writes the section "Berichte (Oberfläche)" with the report leitstand and "reports" into the JSON', () => {
+  const { md, json } = generate();
+  const parsed = JSON.parse(json);
+  assert.match(md, /^## Berichte \(Oberfläche\)$/m);
+  assert.deepEqual(parsed.reports.map((r) => r.id), catalog.reports.map((r) => r.id));
+  const report = catalog.reports.find((r) => r.id === 'leitstand');
+  assert.ok(report, 'leitstand in catalog.json');
+  assert.match(md, /^### Bericht `leitstand`$/m);
+  for (const text of [report.purpose, report.permission, report.operationId, 'Scheibe 061', 'Mindestzahl: nicht festgelegt']) {
+    assert.ok(md.includes(text), text);
+  }
+  for (const field of report.fields) assert.ok(md.includes(`| \`${field.path}\` | ${field.source} | ${field.personalReference} |`), field.path);
+  assert.deepEqual(parsed.reports.find((r) => r.id === 'leitstand').fields, report.fields);
+});
