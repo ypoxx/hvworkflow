@@ -1010,3 +1010,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Vor 060 vorhanden, nur Demo (HTTP speichert im Dienst). E1 wartet seit 060 auf das Log · Log bei `pagehide` sofort schreiben (oder
   Schreiben nicht entprellen); Entscheidung an den Orchestrator, `index.ts` liegt dafür außerhalb der Dateien von 060.
 
+- takt-054 Bau (06.10.2026, zu prüfen) · `features/capture/ContributionPane.tsx:390` · bei einer Wortmeldung ohne Redebeitrag
+  ersetzt das Gerüst das offene Eingabeformular bei jedem Neuladen von listContributions (Versionssprung, z. B. durch SSE),
+  der Fokus im Textfeld geht dabei verloren (Verhalten vor takt-054 genauso, über status === 'loading') · Gerüst nur zeigen,
+  solange noch nie für diese Wortmeldung geantwortet wurde.
+- takt-054 Review minor 1 · `features/capture/Page.tsx` (`deskLoading`) · hängt das Lesen der Fragen eines Redebeitrags,
+  zeigt die Erfassung das Gerüst ohne erneuten Versuch bis zum nächsten Neuladen · bei Fehler oder Zeitüberschreitung,
+  solange `freshest` gesetzt und `shown` undefined ist, die Karte mit „Erneut versuchen“ zeigen.
+- takt-054 Review nit 5 · `features/capture/deskLoading.test.ts` · zwei Tabellenzeilen fehlen: `landed = null, freshest = c1`
+  und `settled = false, shown = c1` · ergänzen.
