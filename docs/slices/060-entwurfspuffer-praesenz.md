@@ -1,6 +1,6 @@
 # Scheibe 060 — Entwurfspuffer der Antwortansichten und Fassungsvergleich
 
-**Status:** spec, Fassung 2 (05.10.2026; gelesen auf `c5990c8`: 028, 036a, 036b, 054, 055b, 090 und takt-048 gemergt, Vertrag
+**Status:** gebaut (Bericht unten; Design-Kritik und Review offen), Spec Fassung 2 (05.10.2026; gelesen auf `c5990c8`: 028, 036a, 036b, 054, 055b, 090 und takt-048 gemergt, Vertrag
 0.4.4). Fassung 1 (`a3a2dae`) hatte im Lesebefund 2 blocker, 10 major, 13 minor, 4 nit; diese Fassung arbeitet ihn ein
 (Abschnitt „Lesebefund zu Fassung 1“) und setzt die Teilung des Orchestrators um. Achte Scheibe der Oberflächenkette der
 Freigabe-Demo 045 → 048 → 053 → 054 → 055 → 055b → 059 → 046 → **060** → 061 → 041 (Register E57). **Geteilt:** 060 baut den
@@ -741,16 +741,81 @@ Datensatz und E5b; Fassung 1: 3,8 mit Präsenz und Erfassung; Plan: 2 AStd ohne 
 
 ```
 Slice: 060-entwurfspuffer-praesenz
-Done: <Puffer der Antwortansichten je Akteur und Versammlung (IndexedDB, 14 h, Löschstellen), Wiederherstellen nach Neuladen,
-      Verbindungsabbruch und erneuter Anmeldung; Fassungsvergleich bei 412 und Live-Version; Doppelklick belegt>
-Evidence: pnpm gates auf <commit> (Exit 0), Schluss unten; docs/evidence/060-{wiederhergestellt,vergleich}-{de,en}.png;
-      e2e in-process <n bestanden>; CI e2e-http Run <id>, Artefakt <name>/<id>, Digest <sha256>
-Open: <Laufzeit e2e-http vorher/nachher; Befunde>
-Touched: <Dateiliste>
+Done: Puffer der Antwortansichten je Akteur und Versammlung (IndexedDB, 14 h, Löschstellen über wireDraftBuffer und
+      clearBeforeSignOut), Wiederherstellen nach Neuladen, neuem Tab, Verbindungsabbruch und erneuter Anmeldung (Basis immer
+      aus dem Datensatz); Fassungsvergleich bei 412 und Live-Version; Doppelklick belegt.
+Evidence: pnpm gates auf d0dc06f (Exit 0, sauberer Baum), Schluss unten; docs/evidence/060-{wiederhergestellt,vergleich}-{de,en}.png;
+      e2e in-process 060: 8 bestanden, 2 übersprungen (E5b, E7 nur http); CI e2e-http: steht aus (Branch nicht gepusht)
+Open: Lauf e2e-http (E3 http-Teil, E5 http-Teil, E5b, E7) lokal nicht ausführbar (kein Keycloak); Laufzeit e2e-http
+      vorher/nachher offen; Design-Kritik und Review in frischem Kontext stehen aus; Befunde in docs/folgeliste.md
+Touched: siehe unten
 ```
 
-Zusätzlich: rot vorher (Commit, Fehlerzeilen), Design-Kritik-Tabelle D1–D10, angepasste Zeilen in den gelisteten e2e-Dateien
-falls nötig, Folgeliste-Einträge.
+**Rot vorher.** Einheit auf `18dc8d7` (Tests vor dem Code): `Test Files 7 failed (7)`, `Tests 24 failed | 68 passed (92)`;
+Fehlerzeilen u. a. `Cannot find module './draftBuffer'` (U1, U6), `Cannot find module './DraftNote'` (U8), `Cannot find module
+'/src/features/answers/CompareVersions'` (U5), `TypeError: restoreDraft is not a function` (U2–U4), `expected 621 to be 636` (U9),
+U7 drei Fälle rot. e2e auf `67f5f47` (Puffermodul da, Ansichten unverändert): E1 `060-entwurfspuffer-praesenz.spec.ts:203`
+`expect(getByTestId('draft-kept')).toBeVisible()` element(s) not found; E3 `:258` dasselbe; E6 `:413`
+`expect(getByTestId('compare-title')).toBeFocused()` element(s) not found.
+
+**Grün.** Einheit `apps/web` 870 bestanden (in `pnpm gates`). e2e in-process (Port 4511): 060 E1–E6, E8, E9 grün, axe a/b auf
+„wiederhergestellt“ und „Vergleich“ in de und en je 0 Verstöße. Die gelisteten bestehenden Dateien (003, 010d, 013, 021c, 040a,
+045, 054, 055b, 090, abnahme, takt-048) liefen zusammen mit 060: 91 bestanden, 2 rot — `003-answers-stage.spec.ts:44` (Zeitüberschreitung
+90 s in axe) ist auf dem Spec-Stand `b514a78` ohne diese Scheibe ebenso rot (Last durch parallele Bauten), E6 rot wegen eines
+inzwischen ersetzten Zeitfensters (unten). Keine bestehende e2e-Datei wurde angepasst. Die beiden letzten Änderungen (Doppelklick
+über `detail > 1`, Testmuster) liefen danach nur mit der 060-Datei und den Einheitstests erneut.
+
+**Re-Check-minors eingearbeitet.** (1) `clearBeforeSignOut(buffer, signOut)` in `draftBuffer.ts`, genutzt in `index.ts`; U1 prüft
+Reihenfolge und 1-s-Grenze (hängend und werfend). (2) `onStreamEnd` ist ein Registrierungshaken an `wireDraftBuffer`, verdrahtet an der
+Option `onStreamEnd` von `createHttpApi`; `sessionAuth === undefined` (Demo) ist ein No-op (U1). (3) Kommentar in `onActorChange`:
+das Laden wärmt nur, Korrektheit kommt aus dem Vergleich mit `getActor()` bei jedem Zugriff. (4) Restrisiko „hängender Speicher beim
+Abmelden“ steht in der Zelle Gegenmaßnahme von T-G1-I-08.
+
+**Abweichungen und Entscheidungen im Bau (für Review und Design-Kritik).**
+- *Scharfschalten:* der Puffer antwortet erst nach dem ersten ausdrücklichen `load()` (Ende von `seedIfEmpty` bzw. `onActorChange`);
+  vorher lädt und löscht ein Zugriff nichts (Absicherung gegen Blocker 1).
+- *Persona-Wechsel ohne Zugriff:* in der Demo erreicht der Wechsel den Puffer über den Lesepfad: `index.ts` reicht dem Live-Speicher
+  ein `getActor`, das `draftBuffer.notice()` ruft (nie scharfschaltend). Ohne das blieb der Eintrag bei einem Wechsel ohne Antwortansicht
+  liegen (E5 war rot). Zusätzlich lädt die Fokusansicht bei jeder neuen Akteur-id.
+- *Eigentümer des geplanten Schreibens:* `schedule` merkt sich die `ownerId` der Eingabe; ein Schreiben nach einem Wechsel innerhalb der
+  400 ms wird verworfen (`put` weist eine fremde `ownerId` ab, U1).
+- *Blocktyp `script`:* `checkAnswerBodyInput` nimmt jeden Blocktyp an (N1 macht einen Absatz daraus); abgelehnt wird der manipulierte
+  Eintrag durch den Schlüssel `html`. Keine engere eigene Regel (Spec: was der Dienst annimmt, wird nie abgelehnt); Folgeliste.
+- *Doppelklick:* der zweite Klick eines Doppelklicks auf „Mit meiner Fassung weiter“ traf „Entwurf speichern“ und schrieb (E8 rot);
+  Speichern übergeht jetzt Klicks mit `detail > 1`. Der Fokus nach dem Doppelklick auf „Entwurf speichern“ wird nicht geprüft: der
+  gesperrte Knopf trägt `pointer-events: none` (Button.tsx, nicht erlaubt), der zweite Klick fällt durch; Folgeliste.
+- *E9:* die Rückgabe durch Recht läuft im Test über einen synchronen Personatausch um einen API-Aufruf, weil ein gerenderter
+  Personawechsel den Eintrag der Fachkraft nach Entscheidung 4 löscht (purgeOthers) und „zurück bei A ist nichts mehr da“ gilt.
+- *E5 http:* die Abmeldeanfrage beantwortet ein Double (204), damit die echte Sitzung der Fachkraft für die folgenden Schritte und
+  Dateien gültig bleibt; geprüft wird, dass der Speicher nach dem Klick auf „Abmelden“ leer ist.
+- *E2:* „Tab schließen“ ohne Aufräumen; jeder Playwright-Kontext beginnt mit leerem IndexedDB, im http-Projekt bleibt nichts für die
+  Folgedateien.
+
+**Design-Kritik D1–D10:** steht aus (frischer Kontext, nicht diese Sitzung).
+
+**Gates-Schluss (d0dc06f):**
+
+```
+✓ built in 1.88s
+mark-test-run: wrote /home/user/wt/s060/.claude/state/last-test-run (clean tree) at commit d0dc06f, tree 50be50a36bf6…
+```
+
+Vorher zwei Läufe auf `59ac61c` rot nur durch Zeittests in `apps/api` unter Last (`postgres027.test.ts:319` 408 statt 200,
+`limits034a.test.ts`; einzeln grün, `apps/api` unberührt), ein Lauf rot durch `i18n-literals` in den neuen Testmustern (behoben in `8629d33`, dort grün); `d0dc06f` ergänzt die geteilte
+Liste des http-Projekts und das Abmelde-Double in E5 (http).
+
+**Touched:** `apps/web/src/api/draftBuffer.ts`, `apps/web/src/api/draftBuffer.test.ts`, `apps/web/src/api/index.ts`,
+`apps/web/src/components/DraftNote.tsx`, `apps/web/src/components/DraftNote.test.tsx`, `apps/web/src/components/StaleBanner.tsx`,
+`apps/web/src/components/index.ts`, `apps/web/src/features/answers/CompareVersions.tsx`,
+`apps/web/src/features/answers/CompareVersions.test.tsx`, `apps/web/src/features/answers/draft.ts`,
+`apps/web/src/features/answers/draft.test.ts`, `apps/web/src/features/answers/QuestionDetail.tsx`,
+`apps/web/src/features/answers/QuestionDetail.test.tsx`, `apps/web/src/features/answers/AnswerEditor.tsx`,
+`apps/web/src/features/answers/Page.tsx`, `apps/web/src/features/focus/Page.tsx`, `apps/web/src/features/focus/WritingMode.tsx`,
+`apps/web/src/features/focus/WritingMode.test.tsx`, `apps/web/src/i18n/{shell,answers,focus}.{de,en}.ts`,
+`apps/web/src/i18n/parity.test.ts`, `apps/web/e2e/060-entwurfspuffer-praesenz.spec.ts`, `apps/web/e2e/support/e2e-texts.ts`,
+`apps/web/e2e/support/roles.ts`, `docs/evidence/060-*.png`, `docs/glossar.md`, `docs/datenschutz/dsfa-vorentwurf.md`,
+`docs/sicherheit/bedrohungsmodell.md`, `docs/agentische-entwicklung-plan.md`, `docs/folgeliste.md`, diese Datei.
+`apps/web/playwright.config.ts` und `scripts/e2e-http-031.test.mjs` (die neue Datei nach 055b in beiden Listen).
 
 ## Review findings
 
