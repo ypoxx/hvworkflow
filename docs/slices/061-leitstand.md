@@ -1227,6 +1227,19 @@ mark-test-run: wrote /home/user/wt/s061b/.claude/state/last-test-run (clean tree
 
 **Offen:** CI `e2e-http` (Lauf, Job, Dauer); Seed-Streuung (eigener Takt des Orchestrators).
 
+### Nacharbeit Teil B nach CI e2e-http und Codex (06.10.2026)
+
+- **S7 im Projekt `http`** (Lauf 37469905992 auf `ad871f7`): `asRole` wartet auf den Kopfzähler, den die Shell bei 640 px ausblendet.
+  S7 öffnet den Leitstand jetzt in normaler Breite und zoomt danach auf 640 × 450; geprüft werden eine Spalte (Hauptlesung und
+  erste Karte übereinander, linke Kanten bündig) und kein waagrechtes Scrollen. `roles.ts` unverändert.
+- **Codex P2** (`Page.tsx`): eine nicht verweigerte, gescheiterte Lesung der Historie (Netz, 5xx) ließ den Faden wie den Zustand
+  „ohne `history.read`“ aussehen. `settleThread` (lib.ts) wertet beide Lesungen aus: Verweigerung bleibt ein Zustand, jedes andere
+  Scheitern macht den Faden gescheitert, mit Regel-id und „Erneut laden“ (`cockpit-thread-retry`). Tests zuerst (`67ce6b4`, rot:
+  `Tests 4 failed | 42 passed (46)`), danach grün (`ab0a44d`).
+- Nachweise: `061-leitstand.spec.ts` in-process `--repeat-each=3` `21 passed (1.8m)`, axe 0 serious/critical; Bilder unverändert
+  (keine sichtbare Änderung). `pnpm gates` auf `ab0a44d` grün: domain `555 passed`, web `1040 passed`, api `710 passed`,
+  `slice-scope: 38 changed file(s), all within …`, Skripte `# pass 358 # fail 0`, `mark-test-run: … (clean tree) at commit ab0a44d`.
+
 ## Review findings
 
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
