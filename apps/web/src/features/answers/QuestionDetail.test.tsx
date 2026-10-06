@@ -4,10 +4,14 @@
  * the justification (Begründung) is rendered only where the record carries it — the interface asks no
  * right and no role for it (044a §6).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
-import type { AnswerVersion, Permission, Question, RefusalGround } from '@hv/domain';
+import type { AnswerBodyInput, AnswerVersion, Permission, Question, RefusalGround } from '@hv/domain';
+import { getActor } from '../../api/actor';
+import { createDraftBuffer, createMemoryStore } from '../../api/draftBuffer';
+import type { DraftBuffer } from '../../api/draftBuffer';
+import { saveDecision } from './draft';
 import { translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
 import { AnswerText } from '../../components';
@@ -316,5 +320,83 @@ describe('the start hint of the Beantwortung (takt-048, design critique D1)', ()
     const changed = editor(true, 3);
     expect(hintTag(changed)).toBe('');
     expect(buttonTag(changed, 'answer-submit-draft')).not.toContain('aria-describedby');
+  });
+});
+
+/**
+ * Scheibe 060, U6: the Beantwortung with the draft buffer. A buffered draft is restored and says so (`draft-restored`);
+ * over a newer foreign version the notice carries "Vergleichen" instead of "Neu laden" (the old reload discarded the text
+ * without a word); rendering — a programmatic build — writes nothing to the buffer; saving with a standing notice opens
+ * the comparison instead of sending (`saveDecision`, U2).
+ */
+describe('QuestionDetail with the draft buffer (Scheibe 060, U6)', () => {
+  const ME = getActor().id;
+  const plainInput = (text: string): AnswerBodyInput => ({ blocks: [{ type: 'paragraph', content: [{ text }] }] });
+  const v = (n: number, text: string): AnswerVersion => ({ version: n, text, createdAt: at, createdBy: { id: 'u-legal-1', role: 'legal' } });
+  const record = (answers: AnswerVersion[]): Question => ({
+    ...q(['answer.draft', 'question.submit_review', 'question.read'], answers), meetingId: 'm-1', status: 'answer_drafted',
+  });
+
+  async function bufferWith(entryBody: AnswerBodyInput, baseVersion: number) {
+    const store = createMemoryStore();
+    const put = vi.spyOn(store, 'put');
+    const del = vi.spyOn(store, 'delete');
+    const buffer = createDraftBuffer({ store, now: () => Date.parse(at) + 60_000, getActor });
+    await buffer.load();
+    await buffer.put({ ownerId: ME, meetingId: 'm-1', questionId: 'q1', body: entryBody, sources: '', baseVersion });
+    put.mockClear();
+    del.mockClear();
+    return { buffer, put, del };
+  }
+
+  function renderWith(question: Question, buffer: DraftBuffer): string {
+    return renderToStaticMarkup(
+      <MemoryRouter>
+        <QuestionDetail
+          question={question}
+          history={[]}
+          historyForbidden={false}
+          units={[]}
+          busy={false}
+          draftResetToken={0}
+          versionFocus={{ token: 0, version: 0 }}
+          catalogue={{ status: 'ready', grounds: [G1] }}
+          onAction={() => undefined}
+          buffer={buffer}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  it('a buffered draft is restored and says so; saving is open', async () => {
+    const { buffer, put, del } = await bufferWith(plainInput('Antwort eins. Gepuffert060.'), 1);
+    const html = renderWith(record([v(1, 'Antwort eins.')]), buffer);
+    expect(html).toContain('data-testid="draft-restored"');
+    expect(buttonTag(html, 'answer-submit-draft')).toContain('aria-disabled="false"');
+    expect(put).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it('over a newer foreign version the notice carries "Vergleichen", not "Neu laden"', async () => {
+    const { buffer } = await bufferWith(plainInput('Antwort eins. Gepuffert060.'), 1);
+    const html = renderWith(record([v(1, 'Antwort eins.'), v(2, 'Antwort zwei.')]), buffer);
+    expect(html).toContain('data-testid="answer-editor-rebase"');
+    expect(html).toMatch(/data-testid="answer-editor-rebase"[\s\S]*?<button[^>]*>Vergleichen<\/button>/);
+    expect(html).not.toContain(translate('de', 'stale.reload'));
+  });
+
+  it('without an entry: no restored line, nothing written', async () => {
+    const store = createMemoryStore();
+    const put = vi.spyOn(store, 'put');
+    const buffer = createDraftBuffer({ store, now: () => Date.parse(at), getActor });
+    await buffer.load();
+    const html = renderWith(record([v(1, 'Antwort eins.')]), buffer);
+    expect(html).not.toContain('draft-restored');
+    expect(html).not.toContain('draft-kept');
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('saving with the notice standing opens the comparison instead of sending', () => {
+    expect(saveDecision({ rebase: true }, true)).toBe('compare');
   });
 });

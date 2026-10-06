@@ -175,13 +175,14 @@ describe('i18n parity checks', () => {
   // Scheibe 055b: +9 keys for the answer format (answers 8: toolbar, four marks, hint, keys, format-only; history 1).
   // takt-048: +1 `answers.editor.rebase`, a newer answer version arrived over a changed draft in the Beantwortung;
   // +1 `answers.editor.startsFrom`, the version the prefilled field starts from (design critique D1).
-  it('(f) Total key count is 621 across all modules and matches de and en', () => {
+  // Scheibe 060: +15 keys for the draft buffer and the comparison (shell 4 `common.draft.*`, answers 10, focus 1).
+  it('(f) Total key count is 636 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(621);
-    expect(deKeys).toBe(621);
-    expect(enKeys).toBe(621);
+    expect(totalKeys).toBe(636);
+    expect(deKeys).toBe(636);
+    expect(enKeys).toBe(636);
   });
 });
