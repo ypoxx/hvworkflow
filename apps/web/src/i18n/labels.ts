@@ -11,6 +11,7 @@ import type {
   EventType,
   ForwardReasonCode,
   Permission,
+  QuestionRelation,
   QuestionStatus,
   Role,
   StageAssignment,
@@ -120,6 +121,7 @@ const EVENT_KEYS: Readonly<Record<EventType, TKey>> = {
   ContributionClaimed: 'event.ContributionClaimed',
   ContributionReleased: 'event.ContributionReleased',
   QuestionCaptured: 'event.QuestionCaptured',
+  QuestionLinked: 'event.QuestionLinked',
   QuestionClassified: 'event.QuestionClassified',
   QuestionAssigned: 'event.QuestionAssigned',
   QuestionForwarded: 'event.QuestionForwarded',
@@ -206,4 +208,19 @@ export function eventLabel(
     return t('event.QuestionApproved.refusal');
   }
   return eventTypeLabel(t, event.type);
+}
+
+/**
+ * Scheibe 046: the relation of a follow-up reference (Nachfrage, Klarstellung). With a number it reads
+ * "Nachfrage zu F-0012"; without one (the referenced question is masked or unknown) only the relation.
+ * A code this build does not know (a later contract stage) stays the code.
+ */
+const RELATION_KEYS: Readonly<Record<QuestionRelation, { alone: TKey; to: TKey }>> = {
+  follow_up: { alone: 'capture.relation.follow_up', to: 'capture.relation.follow_up.to' },
+  clarification: { alone: 'capture.relation.clarification', to: 'capture.relation.clarification.to' },
+};
+export function relationLabel(t: Translate, code: string, number?: string): string {
+  if (!Object.hasOwn(RELATION_KEYS, code)) return code;
+  const keys = RELATION_KEYS[code as QuestionRelation];
+  return number !== undefined ? t(keys.to, { number }) : t(keys.alone);
 }

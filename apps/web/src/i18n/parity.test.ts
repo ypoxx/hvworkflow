@@ -180,14 +180,15 @@ describe('i18n parity checks', () => {
   // +1 `answers.editor.startsFrom`, the version the prefilled field starts from (design critique D1).
   // Scheibe 041: +125 keys for the administration view (shell 3: nav, page title, description; admin 122).
   // Scheibe 061 (part A): +1 `action.cockpit.read`, required by ACTION_KEYS for the new right.
+  // Scheibe 046: +28 keys for follow-up references (capture 17, history 10, shell 1 event name).
   // Scheibe 060: +15 keys for the draft buffer and the comparison (shell 4 `common.draft.*`, answers 10, focus 1).
-  it('(f) Total key count is 762 across all modules and matches de and en', () => {
+  it('(f) Total key count is 790 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(762);
-    expect(deKeys).toBe(762);
-    expect(enKeys).toBe(762);
+    expect(totalKeys).toBe(790);
+    expect(deKeys).toBe(790);
+    expect(enKeys).toBe(790);
   });
 });

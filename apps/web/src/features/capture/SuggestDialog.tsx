@@ -46,10 +46,22 @@ export function setChecked(
 export const setAllChecked = (keys: readonly string[], checked: boolean): Selection =>
   new Set(checked ? [] : keys);
 
+/** Scheibe 046 (Lesebefund M7): with a set chip, taken-over suggestions go without the reference, and say so. */
+export function ReferenceHint({ show }: { show: boolean }) {
+  const t = useT();
+  if (!show) return null;
+  return (
+    <p data-testid="capture-suggest-reference-hint" className="mb-3 rounded-md border border-line bg-sunken px-3 py-2 text-[13px] text-ink-700">
+      {t('capture.followUp.suggestHint')}
+    </p>
+  );
+}
+
 export function SuggestDialog({
   open,
   contribution,
   locked = false,
+  referenceSet = false,
   onClose,
   onSubmit,
 }: {
@@ -57,6 +69,8 @@ export function SuggestDialog({
   contribution: Contribution;
   /** takt-032: a write on this Redebeitrag is in flight; taking over waits for its answer. */
   locked?: boolean;
+  /** Scheibe 046: a follow-up reference is set; the taken-over suggestions are sent without it. */
+  referenceSet?: boolean;
   onClose: () => void;
   onSubmit: (questions: QuestionCapture[]) => Promise<boolean>;
 }) {
@@ -118,6 +132,7 @@ export function SuggestDialog({
         </>
       }
     >
+      <ReferenceHint show={referenceSet} />
       {candidates.length === 0 ? (
         <p className="py-6 text-center text-[13px] text-ink-500">{t('capture.suggest.empty')}</p>
       ) : (

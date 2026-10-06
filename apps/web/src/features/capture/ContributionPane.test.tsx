@@ -2,9 +2,10 @@
  * takt-032 (Ziel 2): while a write on the chosen Redebeitrag runs, the pane says so and locks every
  * way to capture with `aria-disabled` (takt-008: focus stays). Rendered statically.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Contribution } from '@hv/domain';
+import { setLang, translate, type Lang } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import type { ContributionPaneProps } from './ContributionPane';
 
@@ -71,3 +72,34 @@ describe('ContributionPane busy', () => {
     expect(tag(open, 'capture-suggest')).not.toContain('aria-disabled="true"');
   });
 });
+
+/* Scheibe 046, W3: the button "Nachfrage zu …" with its key, and the chip of a set reference. */
+describe.each(['de', 'en'] as Lang[])('ContributionPane follow-up reference (%s)', (lang) => {
+  afterEach(() => setLang('de'));
+  const ref = { parentQuestionId: 'q-12', number: 'F-0012', relation: 'clarification' as const };
+
+  it('with canCapture: the button with Alt+B; no chip without a reference', () => {
+    setLang(lang);
+    const html = renderToStaticMarkup(<ContributionPane {...props({ reference: null, onOpenFollowUp: () => undefined, onClearReference: () => undefined })} />);
+    expect(tag(html, 'capture-follow-up-open')).toContain('aria-keyshortcuts="Alt+B"');
+    expect(html).toContain(translate(lang, 'capture.followUp.open'));
+    expect(html).toContain(translate(lang, 'capture.key.b'));
+    expect(html).not.toContain('data-testid="capture-follow-up-chip"');
+  });
+
+  it('a set reference shows the chip with kind and number and "Bezug entfernen"', () => {
+    setLang(lang);
+    const html = renderToStaticMarkup(<ContributionPane {...props({ reference: ref, onOpenFollowUp: () => undefined, onClearReference: () => undefined })} />);
+    expect(tag(html, 'capture-follow-up-chip')).toBeDefined();
+    expect(html).toContain(translate(lang, 'capture.relation.clarification.to', { number: 'F-0012' }));
+    expect(tag(html, 'capture-follow-up-remove')).toContain(`aria-label="${translate(lang, 'capture.followUp.remove')}"`); // i18n-ok: expected markup in a test, not a rendered text
+  });
+
+  it('without canCapture neither button nor chip', () => {
+    setLang(lang);
+    const html = renderToStaticMarkup(<ContributionPane {...props({ canCapture: false, reference: ref, onOpenFollowUp: () => undefined, onClearReference: () => undefined })} />);
+    expect(html).not.toContain('data-testid="capture-follow-up-open"');
+    expect(html).not.toContain('data-testid="capture-follow-up-chip"');
+  });
+});
+

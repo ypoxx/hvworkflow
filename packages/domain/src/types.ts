@@ -345,6 +345,22 @@ export interface QuestionRecord {
   stagePosition?: number;
   deliveredAt?: string;
   mergedIntoId?: string;
+  /**
+   * Scheibe 046: the referenced question (Bezugsfrage) of a follow-up question or clarification, set
+   * once by `QuestionLinked` (R-LINK-02). The view masks `parentQuestionId` and `parentAnswerVersion`
+   * for readers who may not read the referenced question and on the stage (`viewQuestion`).
+   */
+  parentQuestionId?: string;
+  relation?: QuestionRelation;
+  /** Scheibe 046: the parent's last delivered answer version when this question was captured. */
+  parentAnswerVersion?: number;
+  /**
+   * Scheibe 046: the answer version last delivered with a version (`QuestionDelivered.answerVersion`).
+   * A later delivery without a version (podium path) keeps the old value; a return, a withdrawal or a
+   * new version never clears it. Internal to the projection, source of `parentAnswerVersion`; never
+   * part of a view (`viewQuestion` strips it).
+   */
+  deliveredAnswerVersion?: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -389,9 +405,20 @@ export interface MeetingContributionCapture {
   occurredAtSource?: 'device' | 'paper' | 'transcript';
   lateEntryReason?: string;
 }
+/**
+ * Scheibe 046: how a question relates to its referenced question (Bezugsfrage). `follow_up` is a
+ * follow-up question (Nachfrage), `clarification` a clarification (Klarstellung). A closed code, never
+ * free text.
+ */
+export const QUESTION_RELATIONS = ['follow_up', 'clarification'] as const;
+export type QuestionRelation = (typeof QUESTION_RELATIONS)[number];
+
 export interface QuestionCapture {
   text: string;
   span?: TextSpan;
+  /** Scheibe 046: both or neither; the referenced question of the same meeting (R-LINK-01). */
+  parentQuestionId?: string;
+  relation?: QuestionRelation;
 }
 export interface Classification {
   track: Track;
@@ -458,6 +485,8 @@ export interface QuestionFilter {
   contributionId?: string;
   agendaItemId?: string;
   q?: string;
+  /** Scheibe 046: the direct children of this referenced question; `''` filters too (empty list). */
+  parentQuestionId?: string;
   limit?: number;
   offset?: number;
 }

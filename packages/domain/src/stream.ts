@@ -51,6 +51,8 @@ export const EVENT_TOPICS: Readonly<Record<EventType, readonly StreamTopic[]>> =
   SpeakerUpdated: ['meeting', 'speakers'],
   ContributionCaptured: ['meeting', 'speakers', 'contributions'],
   QuestionCaptured: ['meeting', 'speakers', 'contributions', 'questions', 'stage'],
+  // Scheibe 046: only the child changes; counters do not.
+  QuestionLinked: ['questions'],
   QuestionClassified: ['meeting', 'questions', 'stage'],
   QuestionAssigned: ['meeting', 'questions', 'stage'],
   QuestionForwarded: ['meeting', 'questions', 'stage'], // Scheibe 048: counts.byUnit changes
@@ -103,6 +105,9 @@ export const EVENT_SUBJECTS: { readonly [T in EventType]: (e: Extract<DomainEven
   ContributionCaptured: (e) => [{ kind: 'contribution', id: e.subjectId }, { kind: 'speaker', id: e.payload.speakerId }, ...meetingRef(e)],
   QuestionCaptured: (e) => [question(e.subjectId), { kind: 'contribution', id: e.payload.contributionId },
     { kind: 'speaker', id: e.payload.speakerId }, ...meetingRef(e)],
+  // Scheibe 046 (T-G1-I-09): the child only. A signal to readers of the parent would tell them that a
+  // follow-up exists that they may not read; their thread list reloads on the topic `questions`.
+  QuestionLinked: questionOnly,
   QuestionClassified: questionStatus,
   QuestionAssigned: questionStatus,
   QuestionForwarded: questionStatus,
@@ -203,6 +208,13 @@ export function maskEvent(event: DomainEvent): ReadEvent {
   // this event type only (not a key in MASKED_KEYS, which acts recursively in every payload); the
   // stored original keeps it (rule 7).
   if (event.type === 'QuestionLegalCleared') delete payload['note'];
+  // Scheibe 046: the id of the referenced question and its read-out answer version are removed for
+  // every reader, bound to this event type; this masking does not know the reader, and the id of an
+  // unreadable question must not leak (SC-03). Readers of the parent read the reference on the view.
+  if (event.type === 'QuestionLinked') {
+    delete payload['parentQuestionId'];
+    delete payload['parentAnswerVersion'];
+  }
   return { ...visible, actor: eventActor, payload, redacted: true, sourceHash } as ReadEvent;
 }
 
@@ -451,6 +463,7 @@ export function snapshotBefore(states: StreamStates, batch: readonly DomainEvent
       snap.units = clone(source.units);
       snap.stageCounter = source.stageCounter;
       snap.lastSeq = source.lastSeq;
+      snap.lastReduced = source.lastReduced === null ? null : { ...source.lastReduced };
       out.set(e.meetingId, snap);
     }
     for (const ref of subjectsOf(e)) {

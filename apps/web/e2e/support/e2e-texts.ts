@@ -67,6 +67,16 @@ export const FOCUS_054_RETURN_REASON = 'e2e 054';
 export const FORMAT_055B_HTTP_ANSWER = 'Synthetische Antwort 055b: Die Dividende steigt deutlich.';
 
 /**
+ * Scheibe 046: the follow-up threads. A speech with two question sentences: the first is captured as a clarification
+ * (Klarstellung) of a question found in the dialog, the second through the free entry without a reference. The search
+ * word finds questions of the seed corpus; the number of the referenced question is read from the hit, never fixed.
+ */
+export const FOLLOW_UP_046_QUESTION = 'Wie genau ist die genannte Quote im Bericht abgegrenzt?';
+export const FOLLOW_UP_046_FREE_QUESTION = 'Synthetische Frage 046 ohne Bezug zum Geschäftsbericht?';
+export const FOLLOW_UP_046_SPEECH = 'Synthetischer Redebeitrag 046 zur Nachfrage. ' + FOLLOW_UP_046_QUESTION + ' Ich danke Ihnen.';
+export const FOLLOW_UP_046_SEARCH = 'Dividende';
+
+/**
  * Scheibe 060: what the draft buffer tests type. TYPED and OFFLINE are buffered and partly saved (E1, E3), SAVED is saved
  * by a double click (E8), COMPARE_MINE is one's own text in the comparison and OTHER the foreign version (E6, E7).
  */
@@ -117,6 +127,9 @@ export const WRITTEN_TEXTS: readonly string[] = [
   DRAFT_060_SAVED,
   DRAFT_060_COMPARE_MINE,
   DRAFT_060_OTHER,
+  FOLLOW_UP_046_QUESTION,
+  FOLLOW_UP_046_FREE_QUESTION,
+  FOLLOW_UP_046_SPEECH,
   ADMIN_041_SUBJECT,
   ADMIN_041_REVOKE_REASON,
   ADMIN_041_UNIT_NAME,
