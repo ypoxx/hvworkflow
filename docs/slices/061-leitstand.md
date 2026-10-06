@@ -355,6 +355,11 @@ Fachbereichszeile: „Liste öffnen: {Beschriftung}, {Zahl}[, {Stufe} · {Schwel
   „−60 min“ links und „jetzt“ rechts (benannte Ausnahme zu D3: 11 px wie Badges); `role="img"` mit Namen „Zulauf je 5 Minuten in der
   letzten Stunde: 2, 3, …; zuletzt 3“; daneben „letzte Stunde: {Summe}“. Eine Farbe, Position trägt die Bedeutung. `Sparkline`
   bleibt unberührt. **Keine Diagrammbibliothek** (takt-047).
+  *Nachtrag nach Design-Kritik (Entscheidung des Orchestrators, 06.10.2026):* Säulen **Grau 500** (3,9:1 auf der Karte) statt Grau 300
+  (1,68:1); leere Fenster als 1-px-Strich ebenfalls in Grau 500 (mindestens 3:1, WCAG 1.4.11). Beschriftung der Karte „Zulauf letzte
+  5 min“ / „Inflow last 5 min“, damit eine 0 nicht wie ein Fehler liest; Zahl, Säulen und „letzte Stunde“ auf einer Zeile, Achse
+  darunter (wie die Skizze). Die Karte „Im Legal Clearing über 10 min“ trägt sichtbar „Legal Clearing über 10 min“; Beschriftung und
+  zugänglicher Name teilen eine Zeichenkette (WCAG 2.5.3).
 - **Stationen** (volle Breite, ersetzt hier die dichte `ProcessStrip`): sechs beschriftete Spalten **erfasst, klassifiziert,
   zugewiesen, Antwortentwurf, im Legal Clearing, freigegeben** mit `openByStatus` (20 px Mono) und der Statustönung nur als 3-px-
   Oberkante; „auf der Bühne“ steht in der vierten Karte, nicht doppelt. „Engpass“-Badge nach Entscheidung 4. Jede Spalte eine
@@ -688,6 +693,9 @@ R-TRANS-06 nie nach `in_review` führt, von 033b aber gezählt —, neuer Verwei
 - **W9** Live in-process über den echten Live-Store: Zurückziehen durch moderation ⇒ `totals.open` sinkt ohne Neuladen; das
   15-s-Intervall liest `getCockpit` am Puffer vorbei (zwei Aufrufe ⇒ zwei Rechnungen).
 - **W10** Zeit: `getCockpit` bei 800 p90 < 50 ms; Liste „Ohne Endstatus“ bei 800 p90 < 100 ms (D9).
+  *Angenommen vom Orchestrator (06.10.2026, Review R6):* harte Grenze für `getCockpit` 100 ms wie `timing053`, bis zu drei
+  Messreihen, die beste zählt, jede steht im Log mit „within/above“ gegen 50 ms; Stolperdraht: mit gesetztem `CI` muss die beste
+  Messreihe unter 50 ms liegen (sonst Zwischenspeicher nach Vor-dem-Bau-Punkt 5).
 - **W11** Ansage: Wechsel einer Kennzahl nach „kritisch“ erzeugt genau eine Ansage; gleichbleibend kritisch keine weitere; Wechsel
   nach erhöht keine.
 

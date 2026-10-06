@@ -69,7 +69,7 @@ export function DrillList({
     if (gone === null || rows.some((row) => row.id === gone)) return;
     lastFocused.current = null;
     if (document.activeElement === null || document.activeElement === document.body) {
-      root.current?.querySelector<HTMLElement>('[data-testid="cockpit-list-title"]')?.focus();
+      root.current?.querySelector<HTMLElement>('[data-testid="cockpit-list-title"]')?.focus({ preventScroll: true });
     }
   }, [rows]);
 
@@ -111,6 +111,11 @@ export function DrillList({
             lastFocused.current = row.id;
             setActive(row.id);
           }}
+          onBlur={(event) => {
+            // The focus went elsewhere on purpose: a later removal of this row must not pull it back (review R7).
+            const next = event.relatedTarget;
+            if (next instanceof Node && root.current?.contains(next) !== true) lastFocused.current = null;
+          }}
           onKeyDown={onKeyDown}
           onClick={() => onOpenThread(row.id, `row:${row.id}`)}
           className={cx(
@@ -118,7 +123,8 @@ export function DrillList({
             'relative h-9 w-full border-b border-line px-4 text-left text-[13px] transition-colors duration-100',
             // The list scrolls inside its panel: the focus ring sits inside the row, so the scroller cannot clip it.
             'focus-visible:-outline-offset-2',
-            selected ? 'bg-accent-50 text-accent-700' : 'text-ink-800 hover:bg-ink-50',
+            // Selected: the list pattern of the house — accent 50 and a left bar; the text keeps its colour.
+            selected ? 'bg-accent-50 text-ink-800' : 'text-ink-800 hover:bg-ink-50',
           )}
         >
           {selected && <span aria-hidden="true" className="absolute top-1 bottom-1 left-0 w-0.5 rounded-full bg-accent-600" />}
@@ -166,7 +172,10 @@ export function DrillList({
         </h2>
         {read.status === 'ready' && (
           <span data-testid="cockpit-list-count" data-count={rows.length} className="inline-flex">
-            <Badge mono>{t('cockpit.list.count', { n: rows.length })}</Badge>
+            <Badge>
+              <span aria-hidden="true" className="font-mono">{rows.length}</span>
+              <span className="sr-only">{t('cockpit.list.count', { n: rows.length })}</span>
+            </Badge>
           </span>
         )}
         {capped && <span className="text-2xs text-ink-600">{t('cockpit.list.legalCapped', { shown: rows.length, total: read.total ?? 0 })}</span>}

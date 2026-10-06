@@ -891,10 +891,22 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   Ereignisse auf den Seed-Zeitpunkt: im Leitstand steht der Zulauf als eine Säule, alle Uhrzeiten eines Fadens sind gleich, die
   „Danach die ältesten“ springen von 74 auf 22 min · Seed über den Nachmittag verteilen (eigener Takt; Golden von 061 und 033b
   neu, weil `/metrics` den Seed liest).
-- 061 Teil B Bau · `apps/web/src/i18n/cockpit.de.ts` (`cockpit.label.legal`) · sichtbar „Legal Clearing > 10 min“ (Skizze der Spec),
-  zugänglicher Name nach dem Muster „Liste öffnen: Im Legal Clearing über 10 min, …“; die sichtbare Beschriftung steht nicht
-  wörtlich im Namen (WCAG 2.5.3, für Spracheingabe) · im Review UX/Barrierefreiheit entscheiden, ob die Karte „über“ statt „>“
-  zeigt (dann umbricht die Beschriftung an der Wand in zwei Zeilen).
+- 061 Teil B Review R8 · `features/cockpit/Page.tsx` (`useCockpit`, `useApiVersion`) · ein Wechsel der Person startet den Feed neu
+  (eine Lesung) und zählt zugleich `useApiVersion` hoch (zweite Lesung) · die Versionszählung beim Personenwechsel im Leitstand
+  übergehen oder den Feed die erste Lesung selbst auslösen lassen.
+- 061 Teil B Review R9 · `features/cockpit/feed.ts` (`tick`) · bei verborgenem Tab läuft das Intervall weiter und tut nichts · das
+  Intervall bei `hidden` anhalten und beim Zeigen neu starten (spart Weckrufe, keine fachliche Wirkung).
+- 061 Teil B Review R12 · `features/cockpit/lib.ts` (`unitRows`, `Selection.unit`) · `none` ist ein Platzhalter im selben Raum wie
+  Fachbereichs-ids; ein Fachbereich mit der id `none` wäre nicht unterscheidbar · eigener Schalter (`list=unassigned`) oder eine
+  Prüfung der ids in der Verwaltung (041).
+- 061 Teil B Review R13 · `apps/web/e2e/061-leitstand.spec.ts` (S3) · im Projekt `http` liegt meist keine Einzelfrage länger als 10 min
+  im Legal Clearing; der Faden-Teil von S3 läuft dann nicht (nur Zeilenzahl 0 und Escape) · mit dem Seed-Takt eine wartende
+  Einzelfrage im Harness anlegen oder den Faden in `http` über die älteste offene prüfen.
+- 061 Teil B Design-Kritik D14 · `apps/web/src/app/Header.tsx` · bei 1280 px schneidet die Kopfzeile den Titel der HV ab („Ordentliche
+  Hauptversammlung …“) · Shell, außerhalb dieser Scheibe; mit 089b oder einem Shell-Takt.
+- 061 Teil B Design-Kritik D17 · `apps/web/src/components/Panel.tsx` (Haarlinienschatten) · D4 sagt „keine Schatten außer bei
+  Dialogen“, das Bauteil (und mit ihm der Leitstand) trägt einen 1-px-Schatten · Konvention des Bauteilsatzes, im Design-Takt
+  entscheiden (Schatten streichen oder D4 um die Haarlinie ergänzen).
 - 061 Teil A Bau · `packages/domain/src/cockpit.ts` (`computeCockpit`) · eine Einzelfrage, die nach `now` erfasst wurde, und
   ihre eigenen Ereignisse nach `now` (Uhr zurückgestellt) zählen im Leitstand nirgends, in `computeIndicators` aber weiter im
   Bestand („offen“, Rückstand je Fachbereich, älteste offene mit Alter 0); die Gleichheit K3 gilt nur ohne solche Ereignisse · in

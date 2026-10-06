@@ -97,11 +97,10 @@ export function levelText(
   return { level, text: t('cockpit.level.badge', { level: t(`cockpit.level.${level}`), threshold: thresholdText(t, figure, level) }) };
 }
 
-/** The one pattern of accessible names: "Liste öffnen: {label}, {count}[, {level}]". */
-export function listName(t: Translate, label: string, count: number, level?: LevelText): string {
-  return level === undefined
-    ? t('cockpit.name.open', { label, count })
-    : t('cockpit.name.openLevel', { label, count, level: level.text });
+/** The one pattern of accessible names: "Liste öffnen: {label}, {count}[, {level}]"; the level as badge text or a mark. */
+export function listName(t: Translate, label: string, count: number, level?: LevelText | string): string {
+  if (level === undefined) return t('cockpit.name.open', { label, count });
+  return t('cockpit.name.openLevel', { label, count, level: typeof level === 'string' ? level : level.text });
 }
 
 /* ---------- units and the backlog ---------- */

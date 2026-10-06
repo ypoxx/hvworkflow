@@ -73,6 +73,14 @@ async function headerNumber(page: Page, testId: string): Promise<number> {
   return Number(((await page.getByTestId(testId).textContent()) ?? '').replace(/\D/g, ''));
 }
 
+/** The list's head at the top of the main region (only `main` scrolls; the shell stays where it is). */
+async function listToTop(page: Page): Promise<void> {
+  await page.getByTestId('cockpit-list').evaluate((el) => {
+    const main = el.closest('main');
+    if (main !== null) main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - 24;
+  });
+}
+
 /** Text of the page's main region (where the views render), for the privacy checks. */
 const mainText = (page: Page): Promise<string> => page.locator('main').innerText();
 
@@ -192,11 +200,11 @@ test.describe.serial('061 Leitstand', () => {
 
       if (!isHttp()) {
         // The image shows the list with its thread: the list's head at the top of the view.
-        await page.getByTestId('cockpit-list').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        await listToTop(page);
         await shoot(page, '061-liste-faden-de.png', '061 list and thread DE');
         await setLang(page, 'en');
         await expect(page.getByTestId('cockpit-thread-title')).toHaveText(`Thread ${number}`);
-        await page.getByTestId('cockpit-list').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        await listToTop(page);
         await shoot(page, '061-liste-faden-en.png', '061 list and thread EN');
         await setLang(page, 'de');
         await row.focus();
@@ -213,6 +221,27 @@ test.describe.serial('061 Leitstand', () => {
     await expect(page.getByTestId('cockpit-list')).toHaveCount(0);
     await expect(page).toHaveURL(/\/cockpit$/);
     await expect(card).toBeFocused();
+
+    await test.step('"Faden öffnen" moves the focus to the thread; Escape and Back return it to the button', async () => {
+      const open = page.getByTestId('cockpit-oldest-open');
+      if ((await open.count()) === 0) return; // no readable oldest question (http, 8a)
+      await open.click();
+      await expect(page.getByTestId('cockpit-thread-title')).toBeFocused();
+      await expect(page.getByTestId('cockpit-thread')).toBeInViewport();
+      // Only the main region scrolled: the shell's root stays at the top, the header in view.
+      expect(await page.evaluate(() => document.scrollingElement?.scrollTop ?? 0)).toBe(0);
+      expect(await page.locator('#main').evaluate((el) => el.parentElement?.parentElement?.scrollTop ?? 0)).toBe(0);
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('cockpit-thread')).toHaveCount(0);
+      await expect(open).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('cockpit-list')).toHaveCount(0);
+      await open.click();
+      await expect(page.getByTestId('cockpit-thread-title')).toBeFocused();
+      await page.goBack();
+      await expect(page.getByTestId('cockpit-list')).toHaveCount(0);
+      await expect(open).toBeFocused();
+    });
 
     await test.step('the URL carries the list: opened directly, closed by Back', async () => {
       await page.goto('/cockpit?list=legal');

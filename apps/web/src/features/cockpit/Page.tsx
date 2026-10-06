@@ -21,10 +21,9 @@ import { getLang, translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
 import { isReadForbidden } from '../answers/lib';
 import { CockpitView } from './CockpitView';
-import { startCockpitFeed } from './feed';
-import type { CockpitFeed, CockpitResult } from './feed';
+import { applyResult, INITIAL_READING, startCockpitFeed } from './feed';
+import type { CockpitFeed, CockpitResult, ReadingState } from './feed';
 import {
-  announcementFor,
   escapeTarget,
   LEGAL_LIST_MAX,
   OPEN_STATUSES,
@@ -34,9 +33,20 @@ import {
   selectionSearch,
   threadEntries,
 } from './lib';
-import type { CockpitRead, ListRead, Selection, ThreadRead } from './lib';
+import type { ListRead, Selection, ThreadRead } from './lib';
 
 const NO_UNITS: readonly Unit[] = [];
+
+/**
+ * Brings a panel to the top of the main region (block "start"). Only the scroller of the views moves: `scrollIntoView`
+ * would also scroll the shell's root, which hides its overflow but is still scrollable, and push the header away.
+ */
+function scrollToTop(element: HTMLElement | null): void {
+  const main = element?.closest('main');
+  if (element === null || element === undefined || main === null || main === undefined) return;
+  const gap = Number.parseFloat(getComputedStyle(main).paddingTop) || 0;
+  main.scrollTop += element.getBoundingClientRect().top - main.getBoundingClientRect().top - gap;
+}
 const LIST_LIMIT = 2000;
 
 /** The fields a list row needs; the question text and the speaker are dropped right after the read (spec decision 8). */
@@ -63,41 +73,25 @@ function useUnits(version: number): readonly Unit[] {
   return units;
 }
 
-/** The reading of the control desk and its one polite announcement. */
+/** The reading of the control desk and its one polite announcement (`applyResult`, feed.ts). */
 function useCockpit(actorId: string, version: number, units: readonly Unit[]) {
-  const [state, setState] = useState<{ actor: string; read: CockpitRead; announcement: string }>({
-    actor: actorId, read: { status: 'loading' }, announcement: '',
-  });
+  const [state, setState] = useState<ReadingState & { actor: string }>({ ...INITIAL_READING, actor: actorId });
   // A reading belongs to its actor: another person at the device starts from "loading", never from foreign figures.
-  if (state.actor !== actorId) setState({ actor: actorId, read: { status: 'loading' }, announcement: '' });
+  if (state.actor !== actorId) setState({ ...INITIAL_READING, actor: actorId });
 
   // The names for the announcement, read when a result arrives (outside a render).
   const unitsRef = useRef(units);
   useEffect(() => { unitsRef.current = units; }, [units]);
-  const previous = useRef<Cockpit | null>(null);
   const feed = useRef<CockpitFeed | null>(null);
 
   useEffect(() => {
-    previous.current = null;
     const onResult = (result: CockpitResult): void => {
-      if (result.status === 'ready') {
-        const text = announcementFor(tNow, previous.current, result.cockpit, unitsRef.current);
-        previous.current = result.cockpit;
-        setState((current) => ({
-          actor: actorId,
-          read: { status: 'ready', cockpit: result.cockpit },
-          announcement: text ?? (current.actor === actorId ? current.announcement : ''),
-        }));
-        return;
-      }
-      if (result.status === 'forbidden') previous.current = null;
       setState((current) => {
-        // A passing failure keeps the last figures on screen; "Stand" says how old they are. A refusal never does.
-        if (result.status === 'error' && current.actor === actorId && current.read.status === 'ready') return current;
-        return { actor: actorId, read: result, announcement: '' };
+        const base = current.actor === actorId ? current : { ...INITIAL_READING, actor: actorId };
+        return { ...applyResult(base, result, tNow, unitsRef.current), actor: actorId };
       });
     };
-    const handle = startCockpitFeed({
+  const handle = startCockpitFeed({
       read: () => api.getCockpit(),
       onResult,
       timers: {
@@ -128,7 +122,7 @@ function useCockpit(actorId: string, version: number, units: readonly Unit[]) {
   }, [version]);
 
   const retry = useCallback(() => feed.current?.refresh(), []);
-  const read = state.actor === actorId ? state.read : ({ status: 'loading' } as const);
+  const read = state.actor === actorId ? state.read : INITIAL_READING.read;
   return { read, announcement: state.actor === actorId ? state.announcement : '', retry };
 }
 
@@ -250,7 +244,7 @@ export function CockpitPage() {
     const base = trigger.startsWith('row:') && selection !== null ? selection : { list: 'oldest' as const };
     if (!trigger.startsWith('row:')) listTrigger.current = trigger;
     threadTrigger.current = trigger;
-    pendingFocus.current = 'thread';
+    pendingFocus.current = trigger.startsWith('row:') ? 'thread' : 'thread-title';
     go({ ...base, q: id }, base === selection && selection?.q !== undefined);
   }, [go, selection]);
 
@@ -261,11 +255,16 @@ export function CockpitPage() {
   const onCloseThread = useCallback(() => close(escapeTarget(selection), threadTrigger.current), [close, selection]);
   const onCloseList = useCallback(() => close(null, listTrigger.current), [close]);
 
-  // Escape: the thread first, then the list — unless a dialog of the shell has the key.
+  // Escape: the thread first, then the list — unless a dialog of the shell, the header (role switcher, language),
+  // a menu or a text field has the key (review R10).
   useEffect(() => {
     if (selection === null) return undefined;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('[role="dialog"]') !== null) return;
+      const origin = event.target instanceof Element ? event.target : null;
+      if (origin?.closest('input, textarea, select, [contenteditable="true"], [role="menu"]')) return;
+      const header = origin?.closest('header');
+      if (header && header.closest('[data-testid="cockpit-page"]') === null) return;
       event.preventDefault();
       if (selection.q !== undefined) onCloseThread();
       else onCloseList();
@@ -274,22 +273,43 @@ export function CockpitPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selection, onCloseThread, onCloseList]);
 
-  // The focus moves only after an action of the person — never on a live update (D8, W8).
+  // The focus moves only after an action of the person — never on a live update (D8, W8). A close by the browser's
+  // Back has no action of its own: the focus then returns to the stored trigger as well (review nit 11).
+  const previous = useRef<Selection | null>(selection);
+  const pendingThreadScroll = useRef(false);
   useEffect(() => {
     const target = pendingFocus.current;
-    if (target === null) return;
+    const before = previous.current;
+    previous.current = selection;
     pendingFocus.current = null;
-    if (target === 'list-title') {
-      const title = document.querySelector<HTMLElement>('[data-testid="cockpit-list-title"]');
-      title?.focus({ preventScroll: true });
-      title?.scrollIntoView({ block: 'nearest' });
-    } else if (target === 'thread') {
-      document.querySelector<HTMLElement>('[data-testid="cockpit-thread"]')?.scrollIntoView({ block: 'nearest' });
-    } else {
-      const key = target.slice('trigger:'.length);
+    const focusTrigger = (key: string | null): void => {
+      if (key === null) return;
       document.querySelector<HTMLElement>(`[data-cockpit-trigger="${CSS.escape(key)}"]`)?.focus();
+    };
+    if (target === null) {
+      if (before?.q !== undefined && selection?.q === undefined && selection !== null) focusTrigger(threadTrigger.current);
+      else if (before !== null && selection === null) focusTrigger(listTrigger.current);
+      return;
+    }
+    if (target === 'list-title') {
+      document.querySelector<HTMLElement>('[data-testid="cockpit-list-title"]')?.focus({ preventScroll: true });
+      scrollToTop(document.querySelector<HTMLElement>('[data-testid="cockpit-list"]'));
+    } else if (target === 'thread' || target === 'thread-title') {
+      // From the main reading the focus goes to the thread's heading; from a row it stays on the row (arrows browse).
+      if (target === 'thread-title') document.querySelector<HTMLElement>('[data-testid="cockpit-thread-title"]')?.focus({ preventScroll: true });
+      pendingThreadScroll.current = true;
+    } else {
+      focusTrigger(target.slice('trigger:'.length));
     }
   }, [selection]);
+
+  // Scrolled once the thread has its content, so it is in view at its full height (design major 8).
+  const threadStatus = thread?.status;
+  useEffect(() => {
+    if (!pendingThreadScroll.current || threadStatus === undefined || threadStatus === 'loading') return;
+    pendingThreadScroll.current = false;
+    scrollToTop(document.querySelector<HTMLElement>('[data-testid="cockpit-thread"]'));
+  }, [threadStatus, selection?.q]);
 
   return (
     <CockpitView

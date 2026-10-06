@@ -280,7 +280,7 @@ describe('W5 privacy in the DOM, list and thread open', () => {
     // The count badge shows the number in mono; the words stay for assistive technology.
     const badge = element(html, 'cockpit-list-count');
     expect(badge).toMatch(/<span aria-hidden="true" class="font-mono">6<\/span>/);
-    expect(badge).toContain('<span class="sr-only">6 Einzelfragen</span>');
+    expect(badge).toContain(`<span class="sr-only">${de('cockpit.list.count', { n: 6 })}</span>`);
     expect(html).toContain('Ausschüttungsquote');
     expect(html).not.toMatch(/\bu-[a-z]+(-[a-z0-9]+)?\b/); // no actor id (u-legal-1, u-exp-fin, …)
     expect(html).not.toMatch(/Birgit|Mertens|Wortmeldung|speaker/i);

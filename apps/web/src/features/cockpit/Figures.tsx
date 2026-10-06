@@ -55,7 +55,7 @@ export function LevelBadge({ level, testId = 'cockpit-level' }: { level: LevelTe
 function BigDuration({ seconds }: { seconds: number }) {
   const t = useT();
   return (
-    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+    <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
       {durationParts(seconds).map((part) => (
         <span key={part.unit} className="inline-flex items-baseline gap-1">
           <span className="font-mono text-[44px] leading-[48px] font-medium tracking-[-0.02em] text-ink-900 tabular-nums">
@@ -99,11 +99,15 @@ export function OldestPanel({
   const titleId = useId();
   const { ageSeconds, items } = cockpit.oldestOpen;
   const open = cockpit.totals.open > 0;
-  const [first, ...rest] = items;
+  // 8a (review R5): the first readable reference is the main reference only if it is the oldest itself; otherwise the
+  // age stands alone and every readable reference goes to "Danach die ältesten".
+  const head = items[0];
+  const first = head !== undefined && head.ageSeconds === ageSeconds ? head : undefined;
+  const rest = first === undefined ? items : items.slice(1);
   const level = open ? levelText(t, 'oldestOpen', ageSeconds) : undefined;
 
   return (
-    <section aria-labelledby={titleId} data-testid="cockpit-oldest" className={cx(CARD, 'flex min-h-[21rem] flex-col p-5', className)}>
+    <section aria-labelledby={titleId} data-testid="cockpit-oldest" className={cx(CARD, 'flex min-h-[21rem] flex-col p-4', className)}>
       <h2 id={titleId} className={LABEL}>
         {t('cockpit.label.oldest')}
       </h2>
@@ -119,7 +123,7 @@ export function OldestPanel({
           <p data-testid="cockpit-oldest-ref" className="mt-3 text-[13px] text-ink-800">
             <RefLine number={first.number} status={first.status} {...(first.unitId !== undefined ? { unitId: first.unitId } : {})} units={units} />
           </p>
-          <p className="mt-0.5 text-[13px] text-ink-600">
+          <p className="mt-1 text-[13px] text-ink-600">
             {t('cockpit.oldest.inStatus', { duration: formatDuration(t, first.statusAgeSeconds) })}
           </p>
           <div className="mt-4">
@@ -137,7 +141,7 @@ export function OldestPanel({
         </>
       )}
       {rest.length > 0 && (
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-4">
           <div className="border-t border-line pt-4">
             <h3 className={LABEL}>{t('cockpit.label.next')}</h3>
             <ul className="mt-2 -mx-2">
@@ -180,7 +184,6 @@ export function OldestPanel({
 function FigureCard({
   testId,
   label,
-  nameLabel = label,
   count,
   level,
   sub,
@@ -188,21 +191,22 @@ function FigureCard({
 }: {
   testId: string;
   label: string;
-  /** The label in the accessible name when it says more than the caps label (it contains the visible one, WCAG 2.5.3). */
-  nameLabel?: string;
   count: number;
   level?: LevelText;
   sub: ReactNode;
   onClick: () => void;
 }) {
   const t = useT();
+  const subId = useId();
   return (
     <button
       type="button"
       data-testid={testId}
       data-count={count}
       data-cockpit-trigger={testId}
-      aria-label={listName(t, nameLabel, count, level)}
+      // One string for the visible label and the name (WCAG 2.5.3); the sub-line describes the figure.
+      aria-label={listName(t, label, count, level)}
+      aria-describedby={subId}
       onClick={onClick}
       className={cx(CARD_BUTTON, '@container flex min-h-[8.5rem] flex-col items-start p-4')}
     >
@@ -212,7 +216,7 @@ function FigureCard({
         <span className="font-mono text-[28px] leading-9 font-medium text-ink-900 tabular-nums">{count}</span>
         <LevelBadge level={level} />
       </span>
-      <span className="mt-auto pt-2 text-[13px] text-ink-600">{sub}</span>
+      <span id={subId} className="mt-1 text-[13px] text-ink-600">{sub}</span>
     </button>
   );
 }
@@ -233,7 +237,6 @@ export function Cards({ cockpit, onOpenList }: { cockpit: Cockpit; onOpenList: O
       <FigureCard
         testId="cockpit-card-legal"
         label={t('cockpit.label.legal')}
-        nameLabel={t('cockpit.list.legal')}
         count={cockpit.legalReview.over10m}
         {...optionalLevel(levelText(t, 'legalReviewOver10m', cockpit.legalReview.over10m))}
         sub={t('cockpit.legal.of', { n: cockpit.openByStatus.in_review })}
@@ -280,7 +283,8 @@ export function InflowChart({ bins }: { bins: readonly number[] }) {
             width={bar.width}
             height={bar.height}
             rx={bar.empty ? 0 : 1.5}
-            className={bar.latest && !bar.empty ? 'fill-accent-500' : 'fill-ink-300'}
+            // Grey 500 holds 3.9:1 on the card, also as the 1 px stroke of an empty window (orchestrator decision, spec 5).
+            className={bar.latest && !bar.empty ? 'fill-accent-500' : 'fill-ink-500'}
           />
         ))}
       </svg>
@@ -294,6 +298,7 @@ export function InflowChart({ bins }: { bins: readonly number[] }) {
 
 export function InflowCard({ cockpit, onOpenList }: { cockpit: Cockpit; onOpenList: OpenList }) {
   const t = useT();
+  const subId = useId();
   const label = t('cockpit.label.inflow');
   const count = cockpit.inflow.last5m;
   return (
@@ -303,15 +308,19 @@ export function InflowCard({ cockpit, onOpenList }: { cockpit: Cockpit; onOpenLi
       data-count={count}
       data-cockpit-trigger="cockpit-card-inflow"
       aria-label={listName(t, label, count)}
+      aria-describedby={subId}
       onClick={() => onOpenList({ list: 'inflow' }, 'cockpit-card-inflow')}
-      className={cx(CARD_BUTTON, 'flex min-h-[8.5rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 p-4')}
+      className={cx(CARD_BUTTON, 'flex min-h-[8.5rem] flex-col items-start p-4')}
     >
-      <span className="flex flex-col items-start self-stretch">
-        <span className={LABEL}>{label}</span>
-        <span className="mt-2 font-mono text-[28px] leading-9 font-medium text-ink-900 tabular-nums">{count}</span>
-        <span className="mt-auto pt-2 text-[13px] text-ink-600">{t('cockpit.inflow.hour', { n: sum(cockpit.inflow.bins) })}</span>
+      <span className={LABEL}>{label}</span>
+      {/* As in the sketch: number, chart and the hour's sum on one line, the axis under the chart. */}
+      <span className="mt-2 flex flex-wrap items-start gap-x-6 gap-y-2">
+        <span className="font-mono text-[28px] leading-[48px] font-medium text-ink-900 tabular-nums">{count}</span>
+        <InflowChart bins={cockpit.inflow.bins} />
+        <span id={subId} className="text-[13px] leading-[48px] text-ink-600">
+          {t('cockpit.inflow.hour', { n: sum(cockpit.inflow.bins) })}
+        </span>
       </span>
-      <InflowChart bins={cockpit.inflow.bins} />
     </button>
   );
 }
@@ -350,16 +359,17 @@ export function Stations({ cockpit, onOpenList }: { cockpit: Cockpit; onOpenList
                 data-status={status}
                 data-count={count}
                 data-cockpit-trigger={`station:${status}`}
-                aria-label={listName(t, label, count, bottleneck)}
+                // The station names its bottleneck, not the threshold of the card it comes from (review minor 2).
+                aria-label={listName(t, label, count, bottleneck === undefined ? undefined : t('cockpit.bottleneck'))}
                 onClick={() => onOpenList({ list: 'open', station: status }, `station:${status}`)}
                 className={cx(
-                  'flex min-h-[5.25rem] w-full flex-col items-start gap-1.5 border-t-[3px] px-4 pt-2.5 pb-3 text-left',
+                  'flex min-h-[5.25rem] w-full flex-col items-start gap-2 border-t-[3px] px-4 pt-3 pb-3 text-left',
                   'transition-colors duration-100 hover:bg-ink-25 focus-visible:-outline-offset-2',
                   STATION_EDGE[status],
                 )}
               >
                 <span className={LABEL}>{label}</span>
-                <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className={cx('font-mono text-xl leading-7 font-medium tabular-nums', count === 0 ? 'text-ink-600' : 'text-ink-900')}>
                     {count}
                   </span>
@@ -445,7 +455,7 @@ export function Backlog({
                   <span className="truncate text-[13px] text-ink-800">{label}</span>
                   {row.unassigned && <span className="truncate text-[11px] leading-4 text-ink-600">{t('cockpit.backlog.noUnitHint')}</span>}
                 </span>
-                <span className="relative h-2.5 rounded-sm bg-ink-100">
+                <span className="relative h-2 rounded-sm bg-ink-100">
                   <span
                     data-testid="cockpit-unit-bar"
                     className={cx('absolute inset-y-0 left-0 rounded-sm', FILL[row.level])}

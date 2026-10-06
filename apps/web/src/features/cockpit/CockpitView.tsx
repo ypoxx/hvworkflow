@@ -53,6 +53,7 @@ function LoadingFrame() {
         </div>
       </div>
       <div className={cx(CARD, 'min-h-[7.75rem]')} />
+      <div data-testid="cockpit-loading-backlog" className={cx(CARD, 'min-h-[18rem]')} />
     </div>
   );
 }

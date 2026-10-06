@@ -63,7 +63,7 @@ verbindliche Zuordnung; Abweichungen sind Befunde.
 | Faden | Thread | `statusTrail` in `packages/domain/src/cockpit.ts`: die Stationen einer Einzelfrage in Zeitreihenfolge mit Uhrzeit, die aktuelle mit Verweildauer, ohne Akteure (Scheibe 061) | „Timeline“ |
 | Endstatus | Final status | Oberfläche: vorgelesen, abgeschlossen, zurückgezogen, zusammengeführt — das Gegenteil von „offen“ im Katalog 033b („Ohne Endstatus“ = offen); **nicht** dasselbe wie `TERMINAL_STATUSES` im Code, das „vorgelesen“ nicht enthält, weil danach noch „abgeschlossen“ folgen kann (Scheibe 061) | „terminal“ in Texten |
 | Kanarienfrage | Canary question | Platzhalter `CanaryLine` im Kopf des Leitstands („nicht eingerichtet“); Inhalt folgt mit 086 (Scheibe 061) | — |
-| Engpass | Bottleneck | Kennzeichen an der Station „im Legal Clearing“ des Leitstands ab der Stufe „erhöht“ von „Legal Clearing > 10 min“ (`COCKPIT_THRESHOLDS`, Scheibe 061) | — |
+| Engpass | Bottleneck | Kennzeichen an der Station „im Legal Clearing“ des Leitstands ab der Stufe „erhöht“ von „Legal Clearing über 10 min“ (`COCKPIT_THRESHOLDS`, Scheibe 061) | — |
 | Verwaltung (Ansicht) | Administration (view) | `apps/web/src/features/admin/**`, Route `/admin` (Scheibe 041) | „Admin“, „Admin-Panel“ in deutschen Texten |
 | Rollenzuordnung | Role assignment | `RoleAssignment`, `assignRole`, `revokeRole` (Scheibe 026; Oberfläche 041) | „Berechtigungsticket“ |
 | Rollenkarte | Role card | `roleCards()` aus `ROLE_PERMISSIONS` (Scheibe 041; druckbar mit 062) | — |

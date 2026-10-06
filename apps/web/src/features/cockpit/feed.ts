@@ -6,8 +6,12 @@
  *
  * Pure apart from the injected timers and visibility, so W9 drives it over the real live store without a browser.
  */
+import type { Unit } from '@hv/domain';
 import type { Cockpit } from '../../api/cockpit';
+import type { Translate } from '../../i18n';
 import { isReadForbidden } from '../answers/lib';
+import { announcementFor } from './lib';
+import type { CockpitRead } from './lib';
 
 export const COCKPIT_INTERVAL_MS = 15_000;
 
@@ -50,13 +54,42 @@ export function resultOf(error: unknown): CockpitResult {
   return ruleId === undefined ? { status: 'error' } : { status: 'error', ruleId };
 }
 
+/** What the page shows for one actor: the reading, the text of the live region, and the reading before (for the change). */
+export interface ReadingState {
+  read: CockpitRead;
+  announcement: string;
+  previous: Cockpit | null;
+}
+
+export const INITIAL_READING: ReadingState = { read: { status: 'loading' }, announcement: '', previous: null };
+
+/**
+ * One result of the feed applied to what the page shows. The live region carries text only for the reading in which a
+ * figure turned critical and is empty otherwise, so the same text after a calm phase is announced again (review R3). A
+ * passing failure keeps the last figures ("Stand" says how old they are); a refusal always replaces them.
+ */
+export function applyResult(state: ReadingState, result: CockpitResult, t: Translate, units: readonly Unit[]): ReadingState {
+  if (result.status === 'ready') {
+    return {
+      read: { status: 'ready', cockpit: result.cockpit },
+      announcement: announcementFor(t, state.previous, result.cockpit, units) ?? '',
+      previous: result.cockpit,
+    };
+  }
+  if (result.status === 'error' && state.read.status === 'ready') return state;
+  return { read: result, announcement: '', previous: null };
+}
+
 export function startCockpitFeed(options: CockpitFeedOptions): CockpitFeed {
   let stopped = false;
+  let refused = false;
   let running = false;
   let again = false;
+  let handle: number | undefined;
 
   const run = (): void => {
-    if (stopped) return;
+    // After a refusal nothing reads again until the next feed (another actor): no polling of a refused person (R4).
+    if (stopped || refused) return;
     if (running) {
       again = true;
       return;
@@ -66,7 +99,17 @@ export function startCockpitFeed(options: CockpitFeedOptions): CockpitFeed {
       .read()
       .then(
         (cockpit) => { if (!stopped) options.onResult({ status: 'ready', cockpit }); },
-        (error: unknown) => { if (!stopped) options.onResult(resultOf(error)); },
+        (error: unknown) => {
+          if (stopped) return;
+          const result = resultOf(error);
+          if (result.status === 'forbidden') {
+            refused = true;
+            again = false;
+            if (handle !== undefined) options.timers.clearInterval(handle);
+            handle = undefined;
+          }
+          options.onResult(result);
+        },
       )
       .finally(() => {
         running = false;
@@ -80,7 +123,7 @@ export function startCockpitFeed(options: CockpitFeedOptions): CockpitFeed {
   const tick = (): void => {
     if (!options.visibility.hidden()) run();
   };
-  const handle = options.timers.setInterval(tick, options.intervalMs ?? COCKPIT_INTERVAL_MS);
+  handle = options.timers.setInterval(tick, options.intervalMs ?? COCKPIT_INTERVAL_MS);
   const unsubscribeChanges = options.subscribe?.(run);
   const unsubscribeVisibility = options.visibility.subscribe(tick);
   run();
@@ -89,7 +132,7 @@ export function startCockpitFeed(options: CockpitFeedOptions): CockpitFeed {
     refresh: run,
     stop: () => {
       stopped = true;
-      options.timers.clearInterval(handle);
+      if (handle !== undefined) options.timers.clearInterval(handle);
       unsubscribeChanges?.();
       unsubscribeVisibility();
     },

@@ -7,16 +7,16 @@
 import { useId } from 'react';
 import { X } from 'lucide-react';
 import type { Unit } from '@hv/domain';
-import { Badge, Button, StageAssignmentBadge, cx } from '../../components';
-import { useT } from '../../i18n';
+import { Badge, Button, cx } from '../../components';
+import { stageAssignmentLabel, useT } from '../../i18n';
 import { CARD } from './Figures';
 import { chunks, formatDuration, hallTime, stationLabel, THREAD_ROW, unitName } from './lib';
 import type { ThreadEntry, ThreadRead } from './lib';
 
 const MARK: Readonly<Record<ThreadEntry['state'], { shape: string; className: string }>> = {
-  past: { shape: 'filled', className: 'h-2.5 w-2.5 bg-ink-600' },
-  current: { shape: 'ring', className: 'h-3.5 w-3.5 border-2 border-accent-500 bg-accent-50' },
-  future: { shape: 'hollow', className: 'h-2.5 w-2.5 border border-ink-300 bg-surface' },
+  past: { shape: 'filled', className: 'h-2 w-2 bg-ink-600' },
+  current: { shape: 'ring', className: 'h-4 w-4 border-2 border-accent-500 bg-accent-50' },
+  future: { shape: 'hollow', className: 'h-2 w-2 border border-ink-300 bg-surface' },
 };
 
 function Entry({ entry, next }: { entry: ThreadEntry; next: ThreadEntry | undefined }) {
@@ -45,18 +45,18 @@ function Entry({ entry, next }: { entry: ThreadEntry; next: ThreadEntry | undefi
       <span aria-hidden="true" className="flex h-4 items-center">
         <span data-testid="cockpit-thread-mark" data-shape={mark.shape} className={cx('shrink-0 rounded-full', mark.className)} />
         {next !== undefined && (
-          <span className={cx('mx-1.5 h-px flex-1', next.state === 'future' ? 'bg-ink-200' : 'bg-ink-600')} />
+          <span className={cx('mx-2 h-px flex-1', next.state === 'future' ? 'bg-ink-200' : 'bg-ink-600')} />
         )}
       </span>
       <span aria-hidden="true" className="mt-2 block pr-3">
         <span className={cx('block truncate text-[13px]', entry.state === 'current' ? 'font-medium text-ink-900' : entry.state === 'past' ? 'text-ink-800' : 'text-ink-600')}>
           {station}
         </span>
-        {(time !== undefined || since !== undefined) && (
-          <span className="block truncate font-mono text-[11px] leading-4 text-ink-600 tabular-nums">
-            {time}
-            {time !== undefined && since !== undefined && ' · '}
-            {since !== undefined && <span className="text-accent-700">{since}</span>}
+        {time !== undefined && <span className="block truncate font-mono text-[11px] leading-4 text-ink-600 tabular-nums">{time}</span>}
+        {/* Its own line, wrapping if it must: "seit 5 h 5 min" is never cut off (design critique 3, 15). */}
+        {since !== undefined && (
+          <span data-testid="cockpit-thread-since" className="block font-mono text-[11px] leading-4 text-ink-600 tabular-nums">
+            {since}
           </span>
         )}
       </span>
@@ -75,7 +75,9 @@ export function Thread({ read, units, onClose }: { read: ThreadRead; units: read
           {t('cockpit.thread.title', { number: read.number })}
         </h2>
         {unit !== undefined && <Badge tone="outline">{unit}</Badge>}
-        {read.status === 'ready' && read.stageAssignment !== undefined && <StageAssignmentBadge assignment={read.stageAssignment} />}
+        {read.status === 'ready' && read.stageAssignment !== undefined && (
+          <Badge tone="outline">{t('cockpit.thread.seat', { seat: stageAssignmentLabel(t, read.stageAssignment) })}</Badge>
+        )}
         <Button
           variant="ghost"
           size="sm"
