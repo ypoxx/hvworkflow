@@ -938,3 +938,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - takt-047 Nachprüfung minor · `scripts/release-age.mjs:53` · Zeilen im Ausnahmeblock, die nur aus NBSP oder VT bestehen, werden
   übersprungen (verbirgt keinen Eintrag) · als unbekannte Zeile melden.
 - takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
+- takt-054 Bau (06.10.2026, zu prüfen) · `features/capture/ContributionPane.tsx:390` · bei einer Wortmeldung ohne Redebeitrag
+  ersetzt das Gerüst das offene Eingabeformular bei jedem Neuladen von listContributions (Versionssprung, z. B. durch SSE),
+  der Fokus im Textfeld geht dabei verloren (Verhalten vor takt-054 genauso, über status === 'loading') · Gerüst nur zeigen,
+  solange noch nie für diese Wortmeldung geantwortet wurde.

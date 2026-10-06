@@ -1,6 +1,6 @@
 # takt-054 — Erfassung: kein leeres Eingabeformular, solange der Redebeitrag noch lädt
 
-**Status:** spec · **Risikoklasse:** niedrig bis mittel (Oberfläche der Erfassung; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug. Leitplanken §4) · ca. 1 AStd · **Lanes:** web
+**Status:** gebaut (Review offen) · **Risikoklasse:** niedrig bis mittel (Oberfläche der Erfassung; kein Vertrag, kein Dienst, keine Rechte, kein Personenbezug. Leitplanken §4) · ca. 1 AStd · **Lanes:** web
 **Rolle:** implementierer-oberflaeche; Review in frischem Kontext
 **Regeln:** AGENTS.md R1, R2, R3, R10, R12. Keine Rule ids aus `transitions.ts`.
 **Depends on:** 046 (gemergt) · **Glossar: neue Begriffe:** nein
@@ -49,3 +49,45 @@ Testproblem (Befund der Ursachenanalyse vom 06.10.2026):
   `fresh`/`another`)
 - `docs/slices/takt-054-erfassung-ladezustand.md`
 - `docs/folgeliste.md`
+
+## Bericht
+
+```
+Slice: takt-054-erfassung-ladezustand
+Done: Reine Funktion deskLoading (useCapture.ts) mit Tabellentest deskLoading.test.ts; Page.tsx setzt loading nur noch
+      über sie. Ladend, solange latestContribution bekannt, das gezeigte Paar ihn aber nicht enthält (Ziel 1), und
+      zusätzlich solange contributions.settled falsch ist (statt status === 'loading', siehe Abweichung). Neuer e2e-Fall
+      „takt-054 …“ in 046 (http: page.route verzögert GET /v1/questions mit contributionId um 1,5 s; beide Projekte:
+      MutationObserver ab Seitenstart meldet jedes noch so kurze Auftauchen von capture-text).
+Evidence: Ursachenanalyse am Code bestätigt (landPair hält das leere Paar, contribution undefined, loading false).
+      Tabellentest zuerst rot, mit der alten Logik in deskLoading (nicht nur „Funktion fehlt“):
+        × landed = empty pair, freshest = c1, shown = undefined
+        AssertionError: expected false to be true // Object.is equality
+        Tests  1 failed | 5 passed (6)
+      danach grün (capture: Tests 106 passed (106)).
+      e2e-Fall in-process ohne Fix rot (Page.tsx aus HEAD~1, --repeat-each=3): 3 failed, "Received: true" an der
+        Observer-Prüfung; nur mit der latestContribution-Klausel, aber status === 'loading': ebenfalls 3 failed; nur mit
+        settled, ohne latestContribution-Klausel: 3 failed. Mit beiden: 3 passed.
+      pnpm gates grün auf Commit efb2643 (sauberer Baum, DB hv_test_t054). Ende:
+        dist/assets/index-mASKBvQC.js                        839.73 kB │ gzip: 243.90 kB │ map: 3,422.03 kB
+        ✓ built in 3.09s
+        mark-test-run: wrote /home/user/wt/takt054/.claude/state/last-test-run (clean tree) at commit efb2643, tree 63d33b8c0aa2…
+      Darin: domain 555, web 990, api 710 Tests grün; slice-scope: 5 changed file(s), all within … "Files allowed";
+        Skripttests # pass 358, # fail 0.
+      046 und 002 in-process --repeat-each=3 auf efb2643: 12 passed (1.4m); docs/evidence danach per git checkout
+        zurückgesetzt (die Scheibe verlangt keine Bildschirmfotos, kein neuer Text, das Gerüst gibt es schon).
+      http: lokal nicht lauffähig (kein Docker-Daemon, also kein Keycloak; 046 läuft in http nur mit IdP). Lauf-ID des
+        CI-Jobs e2e-http folgt mit dem PR.
+Abweichung: Die Analyse nannte nur die latestContribution-Klausel. Der neue Observer zeigte in-process einen zweiten,
+      kürzeren Blitz: im Render, in dem die Wortmeldung aufgelöst wird, hat sich der Schlüssel von listContributions eben
+      geändert, status meldet aber bis zum Effekt noch das „ready“ des leeren Vorschlüssels, und das bereits gelandete
+      leere Paar macht loading falsch – das Formular steht einen Commit lang da. deskLoading nimmt deshalb
+      contributionsSettled (AsyncState.settled, vorhanden; useAsync unverändert). Beides liegt in der loading-Eigenschaft.
+      In-process: Fall läuft mit (kein Netz zum Verzögern, das Fenster sind Mikrotasks; der Observer fängt es trotzdem,
+      siehe Rot-Lauf). Die Wartepunkte fresh.or(another) in E1/E3 blieben unverändert: mit dem Fix erscheint bei einer
+      Wortmeldung mit Redebeitrag das Formular gar nicht mehr, die erste Sichtbarkeit ist also schon die stabile.
+Open: CI-Lauf e2e-http des PR (Lauf-ID) steht aus; ein Folgelistenpunkt (Gerüst bei Versionssprung ohne Redebeitrag).
+Touched: apps/web/src/features/capture/Page.tsx, apps/web/src/features/capture/useCapture.ts,
+      apps/web/src/features/capture/deskLoading.test.ts, apps/web/e2e/046-nachfragen.spec.ts,
+      docs/slices/takt-054-erfassung-ladezustand.md, docs/folgeliste.md
+```
