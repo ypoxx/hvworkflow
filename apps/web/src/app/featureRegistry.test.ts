@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { Gauge } from 'lucide-react';
 import type { Permission } from '@hv/domain';
 import { FEATURES, visibleRoutes, checkFeatureRegistry, getNavigationShortcutRange } from './featureRegistry';
 
@@ -58,10 +59,10 @@ describe('featureRegistry', () => {
       expect(visible).toEqual(FEATURES);
     });
 
-    it('returns all routes but steering and focus when granted is an empty set (no other route requires permissions)', () => {
+    it('returns all routes but steering, focus and cockpit when granted is an empty set (no other route requires permissions)', () => {
       const visible = visibleRoutes(FEATURES, new Set());
-      // Scheibe 053/054: only `steering` and `focus` carry a 'requires' field; every other route stays visible.
-      const gated = ['steering', 'focus'];
+      // Scheibe 053/054/061: only `steering`, `focus` and `cockpit` carry a 'requires' field; every other route stays visible.
+      const gated = ['steering', 'focus', 'cockpit'];
       expect(visible).toEqual(FEATURES.filter((f) => !gated.includes(f.id)));
       for (const feature of FEATURES) {
         if (!gated.includes(feature.id)) expect(feature.requires).toBeUndefined();
@@ -111,8 +112,15 @@ describe('featureRegistry', () => {
       expect(visibleWith).toEqual([firstFeature, testFeature]);
     });
 
+    it('Scheibe 061: cockpit is visible with cockpit.read, hidden without it, and visible without a set at all (navigation today)', () => {
+      const granted = new Set<Permission>(['cockpit.read']);
+      expect(visibleRoutes(FEATURES, granted).map((f) => f.id)).toContain('cockpit');
+      expect(visibleRoutes(FEATURES, new Set()).map((f) => f.id)).not.toContain('cockpit');
+      expect(visibleRoutes(FEATURES)).toEqual(FEATURES);
+    });
+
     it('preserves route order', () => {
-      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify', 'answer.draft']) as unknown as ReadonlySet<Permission>;
+      const granted = new Set(['speaker.read', 'contribution.read', 'question.read', 'question.classify', 'answer.draft', 'cockpit.read']) as unknown as ReadonlySet<Permission>;
       const visible = visibleRoutes(FEATURES, granted);
       expect(visible).toEqual(FEATURES);
     });
@@ -171,14 +179,29 @@ describe('featureRegistry', () => {
       expect(focus?.i18nModule).toBe('focus');
       expect(focus?.counter).toBeUndefined();
       expect(ids.indexOf('focus')).toBe(ids.indexOf('answers') + 1);
-      expect(ids[ids.length - 1]).toBe('history');
+      // Scheibe 061: the cockpit row comes after history, as the last entry.
+      expect(ids[ids.length - 2]).toBe('history');
     });
 
-    it('features are in the order they should appear (speakers first, history last)', () => {
+    it('Scheibe 061: the cockpit row is the last entry, path /cockpit, requires cockpit.read, no shortcut, no counter', () => {
+      const cockpit = FEATURES.find((f) => f.id === 'cockpit');
+      expect(cockpit?.path).toBe('/cockpit');
+      expect(cockpit?.requires).toBe('cockpit.read');
+      expect(cockpit?.shortcutKey).toBeUndefined();
+      expect(cockpit?.counter).toBeUndefined();
+      expect(cockpit?.testId).toBe('nav-cockpit');
+      expect(cockpit?.labelKey).toBe('nav.cockpit');
+      expect(cockpit?.helpKey).toBe('page.cockpit.description');
+      expect(cockpit?.i18nModule).toBe('cockpit');
+      expect(cockpit?.icon).toBe(Gauge);
+      expect(FEATURES[FEATURES.length - 1]?.id).toBe('cockpit');
+    });
+
+    it('features are in the order they should appear (speakers first, cockpit last)', () => {
       expect(FEATURES.length).toBeGreaterThan(0);
       expect(FEATURES[0]?.id).toBe('speakers');
       const lastIndex = FEATURES.length - 1;
-      expect(FEATURES[lastIndex]?.id).toBe('history');
+      expect(FEATURES[lastIndex]?.id).toBe('cockpit');
     });
   });
 });
