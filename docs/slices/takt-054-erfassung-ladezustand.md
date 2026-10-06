@@ -86,7 +86,21 @@ Abweichung: Die Analyse nannte nur die latestContribution-Klausel. Der neue Obse
       In-process: Fall läuft mit (kein Netz zum Verzögern, das Fenster sind Mikrotasks; der Observer fängt es trotzdem,
       siehe Rot-Lauf). Die Wartepunkte fresh.or(another) in E1/E3 blieben unverändert: mit dem Fix erscheint bei einer
       Wortmeldung mit Redebeitrag das Formular gar nicht mehr, die erste Sichtbarkeit ist also schon die stabile.
-Open: CI-Lauf e2e-http des PR (Lauf-ID) steht aus; ein Folgelistenpunkt (Gerüst bei Versionssprung ohne Redebeitrag).
+Review (frischer Kontext): kein Blocker, kein Major. Nachgearbeitet auf 4be6dfc (nach Einmischen der Basis f686390):
+      minor 3 begrenztes Warten (expect.poll auf die verzögerte Anfrage, 15 s, Meldung nennt die fehlende Vorbedingung
+      Redebeitrag), nit 4 page.unrouteAll am Ende, minor 2 Observer prüft zusätzlich records[].addedNodes (Knoten selbst
+      oder Nachfahre). Erneut geprüft: in-process ohne Fix (Page.tsx aus aff43d2) weiterhin rot, 3 failed,
+      "Received: true" an der Observer-Prüfung; der Fall ist dort also mehr als eine Rauchprobe. minor 1 und nit 5 in
+      docs/folgeliste.md.
+      pnpm gates grün auf Commit 4be6dfc (sauberer Baum, DB hv_test_t054). Ende:
+        dist/assets/index-hX7BzNq-.js                        887.37 kB │ gzip: 256.15 kB │ map: 3,518.93 kB
+        ✓ built in 2.04s
+        mark-test-run: wrote /home/user/wt/takt054/.claude/state/last-test-run (clean tree) at commit 4be6dfc, tree 7843d824b09c…
+      Darin: domain 555, web 1052, api 710 Tests grün; slice-scope: 6 changed file(s) innerhalb "Files allowed";
+        Skripttests # pass 358, # fail 0.
+      046 in-process --repeat-each=3 auf 4be6dfc: 9 passed (34.2s); docs/evidence danach zurückgesetzt.
+Open: CI-Lauf e2e-http des PR (Lauf-ID) steht aus; Folgelistenpunkte (Gerüst bei Versionssprung ohne Redebeitrag;
+      Review minor 1 und nit 5).
 Touched: apps/web/src/features/capture/Page.tsx, apps/web/src/features/capture/useCapture.ts,
       apps/web/src/features/capture/deskLoading.test.ts, apps/web/e2e/046-nachfragen.spec.ts,
       docs/slices/takt-054-erfassung-ladezustand.md, docs/folgeliste.md
