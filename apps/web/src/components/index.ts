@@ -5,6 +5,8 @@ export { Button } from './Button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button';
 export { cx } from './cx';
 export { Dialog } from './Dialog';
+export { DraftNote } from './DraftNote';
+export type { DraftNoteProps } from './DraftNote';
 export type { DialogProps } from './Dialog';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';

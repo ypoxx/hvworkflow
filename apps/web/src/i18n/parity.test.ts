@@ -186,13 +186,14 @@ describe('i18n parity checks', () => {
   // Scheibe 046: +28 keys for follow-up references (capture 17, history 10, shell 1 event name).
   // Scheibe 061 (part B): +84 keys for the control desk (shell 3: nav, page title, description; cockpit 81).
   // Scheibe 061 (part B, fix round): +1 `cockpit.thread.seat` ("Bühne: …" in the thread, design critique 12).
-  it('(f) Total key count is 860 across all modules and matches de and en', () => {
+  // Scheibe 060: +15 keys for the draft buffer and the comparison (shell 4 `common.draft.*`, answers 10, focus 1).
+  it('(f) Total key count is 875 across all modules and matches de and en', () => {
     const totalKeys = modules.reduce((sum, m) => sum + Object.keys(m.de).length, 0);
     const deKeys = Object.keys(de as Record<string, string>).length;
     const enKeys = Object.keys(en as Record<string, string>).length;
 
-    expect(totalKeys).toBe(860);
-    expect(deKeys).toBe(860);
-    expect(enKeys).toBe(860);
+    expect(totalKeys).toBe(875);
+    expect(deKeys).toBe(875);
+    expect(enKeys).toBe(875);
   });
 });

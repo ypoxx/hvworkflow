@@ -347,3 +347,30 @@ export function landPair<Q, C>(
   }
   return { questions: next.questions, contributions: next.contributions };
 }
+
+/**
+ * takt-054: whether the Erfassung (capture desk) is still loading — skeleton instead of the empty
+ * input form. Until the first pair has landed the desk is loading: showing the empty form for a
+ * moment, only to swap it for the Redebeitrag, would invite typing into the wrong state. The same
+ * holds while the freshest read already knows a Redebeitrag (`freshest`) that the shown pair does
+ * not contain yet (`shown`): an earlier empty pair stays on screen until that Redebeitrag's
+ * questions have answered (`landPair`), one HTTP round (CI e2e-http run 37471605355, 046 E1).
+ * A Wortmeldung without any Redebeitrag still gets the form at once.
+ *
+ * "Answered" is `settled`, not `status !== 'loading'`: in the render where the Wortmeldung is
+ * resolved the key has just changed and `status` still reports the previous key's empty answer
+ * until the loading effect runs, which showed the form for one commit as well.
+ */
+export function deskLoading(input: {
+  /** The Redebeiträge of the Wortmeldung have answered for the key of this render (`AsyncState.settled`). */
+  contributionsSettled: boolean;
+  landed: object | null;
+  freshest: { id: string } | undefined;
+  shown: { id: string } | undefined;
+}): boolean {
+  return (
+    !input.contributionsSettled ||
+    input.landed === null ||
+    (input.freshest !== undefined && input.shown === undefined)
+  );
+}

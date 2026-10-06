@@ -46,6 +46,8 @@ export function AnswersPage() {
   // Scheibe 045: bumped after a refusal was written; the detail then focuses the new version card.
   const [versionFocus, setVersionFocus] = useState({ token: 0, version: 0 });
   const catalogue = useRefusalGrounds(loadRefusalGrounds);
+  // Scheibe 060: the detail shows "Fassungen vergleichen"; "Stand veraltet" gives way meanwhile (one notice, not two).
+  const [detailComparing, setDetailComparing] = useState(false);
 
   const backlog = useBacklog(filters, selectedId);
   const { reload, selected: question } = backlog;
@@ -91,6 +93,8 @@ export function AnswersPage() {
               ),
             // Only the draft of the question it was written for (slice 010d, Ziel 3).
             () => setDraftResetToken((value) => value + 1),
+            // Scheibe 060 (decision 7.3): the detail sorts a 412 for the comparison; the default behaviour stays.
+            action.onProblem,
           );
           break;
         }
@@ -187,7 +191,7 @@ export function AnswersPage() {
             </Panel>
           ) : (
             <div data-testid="answers-detail" className="flex h-full min-h-0 flex-col gap-2">
-              {staleFor === question.id && (
+              {staleFor === question.id && !detailComparing && (
                 <StaleBanner
                   testId="stale-banner"
                   message={t('answers.stale.banner')}
@@ -209,6 +213,7 @@ export function AnswersPage() {
                   versionFocus={versionFocus}
                   catalogue={catalogue}
                   onAction={onAction}
+                  onCompareChange={setDetailComparing}
                 />
               </div>
             </div>

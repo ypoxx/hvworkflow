@@ -121,6 +121,11 @@ export const shellDe = {
   'common.retry': 'Erneut versuchen',
   'common.dismiss': 'Ausblenden',
   'common.none': 'keine Angabe',
+  // Scheibe 060: the lines of the draft buffer (Entwurfspuffer).
+  'common.draft.kept': 'In diesem Browser zwischengespeichert · {time}',
+  'common.draft.keptHelp': 'Bleibt beim Neuladen erhalten. In einem privaten Fenster endet die Kopie mit dem Fenster.',
+  'common.draft.restored': 'Ungespeicherter Entwurf von {time} wiederhergestellt',
+  'common.draft.unavailable': 'Keine Sicherung auf diesem Gerät möglich',
   'toast.problem': 'Aktion nicht möglich',
   'toast.rule': 'Regel',
   'toast.close': 'Meldung schließen',

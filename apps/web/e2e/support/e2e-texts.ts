@@ -77,6 +77,16 @@ export const FOLLOW_UP_046_SPEECH = 'Synthetischer Redebeitrag 046 zur Nachfrage
 export const FOLLOW_UP_046_SEARCH = 'Dividende';
 
 /**
+ * Scheibe 060: what the draft buffer tests type. TYPED and OFFLINE are buffered and partly saved (E1, E3), SAVED is saved
+ * by a double click (E8), COMPARE_MINE is one's own text in the comparison and OTHER the foreign version (E6, E7).
+ */
+export const DRAFT_060_TYPED = 'Synthetischer Zusatz 060 im Puffer.';
+export const DRAFT_060_OFFLINE = 'Offline weitergeschrieben 060.';
+export const DRAFT_060_SAVED = 'Synthetischer Doppelklick 060.';
+export const DRAFT_060_COMPARE_MINE = 'Meine Fassung 060.';
+export const DRAFT_060_OTHER = 'Fremde Fassung 060.';
+
+/**
  * Scheibe 041: the administration view. A synthetic subject id that gets a role and loses it again (with a reason), and
  * one unit (renamed once), one agenda item, one podium seat with a device, each added and removed again.
  */
@@ -112,6 +122,11 @@ export const WRITTEN_TEXTS: readonly string[] = [
   FOCUS_054_UNSAVED,
   FOCUS_054_RETURN_REASON,
   FORMAT_055B_HTTP_ANSWER,
+  DRAFT_060_TYPED,
+  DRAFT_060_OFFLINE,
+  DRAFT_060_SAVED,
+  DRAFT_060_COMPARE_MINE,
+  DRAFT_060_OTHER,
   FOLLOW_UP_046_QUESTION,
   FOLLOW_UP_046_FREE_QUESTION,
   FOLLOW_UP_046_SPEECH,

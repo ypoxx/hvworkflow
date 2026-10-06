@@ -18,6 +18,7 @@ import {
 import { getActor, setActor, setSessionActor, DEMO_ACTORS, DEMO_BINDINGS } from './actor';
 import { createSessionAuth } from './auth';
 import { connection } from './connection';
+import { clearBeforeSignOut, clearWithin, createDraftBuffer, createIndexedDbStore, wireDraftBuffer } from './draftBuffer';
 import { createHttpApi, followSessionActor, getHttpSession, logoutHttpSession, type HttpApi } from './http';
 import { actorKey, createLiveStore, type LiveStore } from './liveStore';
 import { DEMO_MODE } from './mode';
@@ -87,6 +88,14 @@ let liveStore: LiveStore | undefined;
 /** The HTTP adapter with its stream (slice 036b); absent in the demo, which has no stream (ADR 0002). */
 let httpAdapter: HttpApi | undefined;
 
+/**
+ * Scheibe 060: the draft buffer of the answer views (IndexedDB, per actor and meeting). Its owner is compared with
+ * `getActor()` on every access; this module only wires where it is loaded and cleared (decision 4).
+ */
+export const draftBuffer = createDraftBuffer({ store: createIndexedDbStore(), now: () => new Date().getTime(), getActor });
+/** Hooks on the stream end of the HTTP adapter (registered through `wireDraftBuffer`); never called in the demo. */
+const streamEndHooks: ((reason: string) => void)[] = [];
+
 /** Slice 036b: opens, closes and (on a structurally other actor) restarts the stream; set once the adapter exists. */
 let followActor: ((actor: Actor | undefined) => void) | undefined;
 /** The session actor as seen last, for the structural comparison on a session refresh (takt-033b). */
@@ -95,7 +104,8 @@ export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
   readSession: getHttpSession,
   // Slice 036b: only an explicit sign-out (or a 401) lets the reconnect limit of the tab start afresh.
   signOut: async (csrfToken) => {
-    await logoutHttpSession(csrfToken);
+    // Scheibe 060: the buffer is empty before the sign-out request leaves (at most 1 s; a hung store never blocks it).
+    await clearBeforeSignOut(draftBuffer, () => logoutHttpSession(csrfToken));
     httpAdapter?.resetStreamLimits();
   },
   onActorChange: (actor) => {
@@ -108,6 +118,10 @@ export const sessionAuth = DEMO_MODE ? undefined : createSessionAuth({
     // Slice 036b (N5): every confirmed `/auth/me` asks for the stream, before the shell mounts the views; an open stream
     // or a pending retry stays as it is, a structurally other actor restarts it. Without an actor the stream closes.
     followActor?.(actor);
+    // Scheibe 060: loading here only warms the buffer for the confirmed actor (and deletes every other actor's entries,
+    // also after a reload, when the previous id is unknown). Correctness comes from the comparison with `getActor()` on
+    // every access, not from this call.
+    if (actor !== undefined) void draftBuffer.load();
   },
 });
 
@@ -126,11 +140,14 @@ httpAdapter = DEMO_MODE ? undefined : createHttpApi({
   // and only its confirmation (`onActorChange(actor)` above) opens a new stream. A 401 goes on to `onUnauthorized`.
   onStreamEnd: (reason) => {
     liveStore?.clear(reason);
+    // Scheibe 060: `forbidden` clears the draft buffer, `roles_changed` marks it for a re-check (`wireDraftBuffer`).
+    for (const hook of streamEndHooks) hook(reason);
     if (reason !== 'unauthorized') sessionAuth?.refresh().catch(() => undefined);
   },
   connection,
   locale: getLang,
 });
+wireDraftBuffer({ buffer: draftBuffer, sessionAuth, onStreamEnd: (hook) => { streamEndHooks.push(hook); } });
 followActor = httpAdapter === undefined ? undefined : followSessionActor(httpAdapter);
 const adapter: HvApi = httpAdapter
   ?? createInProcessApi({ store: store!, actor: getActor, clock: () => new Date(), seeder: seedEvents });
@@ -141,7 +158,13 @@ const adapter: HvApi = httpAdapter
  * `performance.now()` measures the maximum age of entries (monotonic, unaffected by a clock set back).
  */
 liveStore = createLiveStore(adapter, {
-  getActor,
+  // Scheibe 060: every read asks for the actor; a persona switch thus reaches the draft buffer before any view needs it
+  // (it deletes the previous persona's drafts). Not armed before the end of `seedIfEmpty`, so the start deletes nothing.
+  getActor: () => {
+    const actor = getActor();
+    draftBuffer.notice();
+    return actor;
+  },
   now: () => new Date().getTime(),
   monotonic: () => performance.now(),
   observeWrites: DEMO_MODE,
@@ -172,6 +195,8 @@ export async function seedIfEmpty(): Promise<void> {
   } finally {
     setActor(before);
   }
+  // Scheibe 060: the first load of the draft buffer, after the persona is back (blocker 1: never in `setActor`).
+  void draftBuffer.load();
 }
 
 /**
@@ -190,8 +215,8 @@ async function bindDemoActors(): Promise<void> {
   }
 }
 
-/** Wipe this device's demo data and reload with a fresh corpus. */
-export function resetDemo(): void {
+/** Wipe this device's demo data (the event log and the draft buffer) and reload with a fresh corpus. */
+export async function resetDemo(): Promise<void> {
   if (!DEMO_MODE) return;
   // Neither a pending write nor one queued before the reload unloads the page may bring the old log back (takt-053).
   logSaver.stop();
@@ -200,6 +225,8 @@ export function resetDemo(): void {
   } catch {
     /* ignore */
   }
+  // Scheibe 060: reload only once the buffer's clear completed (at most 1 s, a hung store does not block the reset).
+  await clearWithin(draftBuffer);
   window.location.reload();
 }
 
