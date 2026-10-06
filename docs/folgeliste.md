@@ -1012,6 +1012,10 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   für den Stack ab, weil Compose v5 die Freigabe `--allow=fs.read` nicht durchreicht · dauerhafte Lösung prüfen (Secret-Quelle
   ohne Lesefreigabe außerhalb des Kontexts, oder Compose-Schalter, sobald es einen gibt).
 
+- Doku-Pass 06.10. Codex P2 (#176) · `docs/produktplan-beta.md` (041b) · 041b hängt im Plan nur an den Sammelknoten 040 und 041,
+  nicht an 040c/040d (Specs noch im Status „spec“); plan-graph sieht die Abhängigkeit als erfüllt · eigene Planknoten für
+  040c/040d anlegen oder 041b ausdrücklich bis zu deren Merge sperren.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit

@@ -118,9 +118,15 @@ Nachweisbild (Codex P1 auf #174; Files allowed per Nachtrag b0d7a6c um docs/evid
         Skripttests # pass 358, # fail 0.
       046 in-process --repeat-each=3 auf 43837cc: 9 passed (40.2s); überschriebene Bilder per git checkout zurückgesetzt.
 CI e2e-http (Nachtrag 06.10.2026): grün auf 54e84ad (letzter Commit des PR #174), Lauf 37480797979, Job 112328786290
-      „e2e-http“, conclusion success, abgeschlossen 2026-10-06T14:49:47Z; der neue Fall „takt-054 …“ in
-      046-nachfragen.spec.ts lief im Projekt http (Angabe des Orchestrators; das Joblog ist über die API dieser Sitzung
-      nicht lesbar, Lauf und Ergebnis per API geprüft). Gemergt als #174 (bf1b3bb).
+      „e2e-http“, conclusion success, abgeschlossen 2026-10-06T14:49:47Z; Artefakt evidence-031-http, ID 11421412362,
+      SHA-256 0f9b2a648e9528f309cc791fe966e0ef35d949e0966c25f2d281282e3c64f830. Echter Auszug aus dem Joblog:
+        ✓  44 [http] › e2e/046-nachfragen.spec.ts:150:1 › E1/E2 capture a clarification and see the thread in the history @screenshot (7.8s)
+        -  45 [http] › e2e/046-nachfragen.spec.ts:186:1 › E3 keyboard and axe: Alt+B focuses the search, Escape returns to the button
+        ✓  46 [http] › e2e/046-nachfragen.spec.ts:249:1 › takt-054 a Wortmeldung with a Redebeitrag shows no empty form while its questions load @screenshot (3.1s)
+        15 skipped
+        75 passed (7.1m)
+        031a duration: total 7:41 of limit 12:00, warning above 6:30
+      Gemergt als #174 (bf1b3bb).
 Open: Folgelistenpunkte (Gerüst bei Versionssprung ohne Redebeitrag; Review minor 1 und nit 5).
 Touched: apps/web/src/features/capture/Page.tsx, apps/web/src/features/capture/useCapture.ts,
       apps/web/src/features/capture/deskLoading.test.ts, apps/web/e2e/046-nachfragen.spec.ts,
