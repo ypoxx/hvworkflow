@@ -48,8 +48,17 @@ aus, darf es den alten Stand nicht zurückschreiben; mit einem Sofort-Schreiben 
 - Gebaut vom Orchestrator; Spec 674c284, Umsetzung ffb6cbf, Review-Nacharbeit im Folge-Commit.
 - Rot zuerst: `demoLogSaver.test.ts` scheiterte ohne Modul (`Cannot find module './demoLogSaver'`), der `stop`-Fall
   scheiterte vor der Nacharbeit (1 failed | 5 passed); danach grün.
-- `pnpm gates` grün auf ffb6cbf (domain 519, web 929, api 700; slice-scope 4 Dateien). Lauf auf dem Nacharbeits-Commit
-  steht in der PR-Beschreibung.
+- `pnpm gates` grün auf ffb6cbf (domain 519, web 929, api 700) und auf dem Nacharbeits-Commit **6616f59** (letzter
+  Code-Stand; danach nur dieser Bericht). Echter Schluss des Laufs auf 6616f59:
+
+```
+packages/domain test:       Tests  519 passed (519)
+apps/web test:       Tests  931 passed (931)
+apps/api test:       Tests  700 passed (700)
+slice-scope: 4 changed file(s), all within "docs/slices/takt-053-demo-log-sofort.md"'s "Files allowed" list (7 pattern(s)).
+✓ built in 2.87s
+mark-test-run: wrote /home/user/wt/takt053/.claude/state/last-test-run (clean tree) at commit 6616f59, tree c76c6242d39c…
+```
 - Review (frischer Kontext, Sonnet, niedriges Risiko): kein Blocker, kein Major. Minor 1 (Reset durch spätes Schreiben
   rückgängig) behoben mit `stop`; Test-Nits (`afterEach` für echte Uhr, `save` nach `cancel`) übernommen.
 
