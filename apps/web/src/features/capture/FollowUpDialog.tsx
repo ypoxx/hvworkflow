@@ -8,7 +8,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import type { Question, QuestionRelation } from '@hv/domain';
 import { Button, Dialog, StatusBadge, cx } from '../../components';
-import { useT } from '../../i18n';
+import { useLang, useT } from '../../i18n';
 import { relationLabel } from '../../i18n/labels';
 import { FIELD_CONTROL } from './fields';
 import { createFollowUpSearch, moveActive, type FollowUpReference, type SearchState } from './followUp';
@@ -16,7 +16,24 @@ import { createFollowUpSearch, moveActive, type FollowUpReference, type SearchSt
 /** The relations of contract 0.4.5 in their display order (`QUESTION_RELATIONS` of the domain; type-only import here). */
 const RELATIONS: readonly QuestionRelation[] = ['follow_up', 'clarification'];
 
-const excerpt = (text: string, max = 90): string => (text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`);
+const excerpt = (text: string, max = 140): string => (text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`);
+
+/** The capture time of a hit as the desk shows times (Berlin), so twins with the same wording can be told apart. */
+function timeOf(lang: string, iso: string): string {
+  return new Intl.DateTimeFormat(lang, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date(iso));
+}
+
+/** Number · speaker · time: the second line of a hit and the confirmation line (design D1). */
+function HitMeta({ question, lang, testId }: { question: Question; lang: string; testId?: string }) {
+  return (
+    <span {...(testId !== undefined ? { 'data-testid': testId } : {})} className="flex items-center gap-1.5 text-[12px] text-ink-600">
+      <span className="font-mono tabular-nums">{question.number}</span>
+      {question.speakerDisplayName !== undefined && (<><span aria-hidden="true">·</span><span>{question.speakerDisplayName}</span></>)}
+      <span aria-hidden="true">·</span>
+      <span className="font-mono tabular-nums">{timeOf(lang, question.createdAt)}</span>
+    </span>
+  );
+}
 
 export interface FollowUpPanelProps {
   relation: QuestionRelation;
@@ -35,8 +52,10 @@ export interface FollowUpPanelProps {
 /** The body of the dialog, without the modal frame: rendered statically in the unit tests. */
 export function FollowUpPanel({ relation, onRelation, query, onQuery, state, active, chosenId, onChoose, onKeyDown, onRetry, inputRef }: FollowUpPanelProps) {
   const t = useT();
+  const lang = useLang();
   const ids = useId();
   const items = state.kind === 'results' ? state.items : [];
+  const chosen = chosenId === null ? undefined : items.find((question) => question.id === chosenId);
   return (
     <div className="grid gap-4">
       <fieldset className="grid gap-1.5">
@@ -77,13 +96,14 @@ export function FollowUpPanel({ relation, onRelation, query, onQuery, state, act
         />
       </div>
       {/* Fixed height for every state, so nothing jumps while the hits arrive (design principle 8). */}
-      <div className="h-72 overflow-y-auto rounded-md border border-line">
+      {/* Focusable, so the hits can also be scrolled with the keyboard (axe scrollable-region-focusable). */}
+      <div tabIndex={0} aria-label={t('capture.followUp.search')} className="h-72 overflow-y-auto rounded-md border border-line">
         {state.kind === 'empty' ? (
           <p className="px-3 py-6 text-center text-[13px] text-ink-600">{t('capture.followUp.hint')}</p>
         ) : state.kind === 'loading' ? (
           <div role="status" aria-busy="true" className="grid gap-2 p-3">
             <span className="sr-only">{t('capture.followUp.loading')}</span>
-            {[0, 1, 2, 3].map((row) => <div key={row} aria-hidden="true" className="h-9 animate-pulse rounded-sm bg-ink-50" />)}
+            {[0, 1, 2, 3].map((row) => <div key={row} aria-hidden="true" className="h-12 animate-pulse rounded-sm bg-ink-200" />)}
           </div>
         ) : state.kind === 'none' ? (
           <p className="px-3 py-6 text-center text-[13px] text-ink-600">{t('capture.followUp.none')}</p>
@@ -102,23 +122,34 @@ export function FollowUpPanel({ relation, onRelation, query, onQuery, state, act
                 aria-selected={index === active}
                 data-testid="capture-follow-up-hit"
                 data-number={question.number}
+                data-status={question.status}
                 data-chosen={question.id === chosenId ? 'true' : 'false'}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onChoose(question)}
                 className={cx(
-                  'flex cursor-pointer items-center gap-3 border-b border-line px-3 py-2 last:border-b-0',
-                  index === active && 'bg-ink-25',
+                  // The house selection (Table, WorkList): accent background and a left bar for the active row.
+                  'flex cursor-pointer items-start gap-3 border-b border-l-2 border-line px-3 py-2 transition-colors duration-100 last:border-b-0',
+                  index === active ? 'border-l-accent-600 bg-accent-50' : 'border-l-transparent hover:bg-ink-50',
                   question.id === chosenId && 'outline outline-2 -outline-offset-2 outline-accent-500',
                 )}
               >
-                <span className="font-mono text-2xs tabular-nums text-ink-600">{question.number}</span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink-800">{excerpt(question.text)}</span>
+                <span className="grid min-w-0 flex-1 gap-0.5">
+                  <span className="text-[13px] leading-5 text-ink-800">{excerpt(question.text)}</span>
+                  <HitMeta question={question} lang={lang} testId="capture-follow-up-hit-meta" />
+                </span>
                 <StatusBadge status={question.status} />
               </li>
             ))}
           </ul>
         )}
       </div>
+      {chosen !== undefined && (
+        // Design D1: the reference cannot be changed afterwards (R-LINK-02), so the choice is named before it is set.
+        <p data-testid="capture-follow-up-chosen" className="flex items-center gap-2 text-[13px] text-ink-800">
+          <span className="font-medium">{t('capture.followUp.chosen')}</span>
+          <HitMeta question={chosen} lang={lang} />
+        </p>
+      )}
     </div>
   );
 }
@@ -165,6 +196,11 @@ export function FollowUpDialog({
   }, [open]);
 
   const items = state.kind === 'results' ? state.items : [];
+  // The active hit stays in view while the arrows move through a list longer than the box.
+  useEffect(() => {
+    if (active < 0) return;
+    document.querySelector('[data-testid="capture-follow-up-hit"][aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [active]);
   const submit = (): void => {
     if (chosen === null) return;
     onSubmit({ parentQuestionId: chosen.id, number: chosen.number, relation });
@@ -175,8 +211,9 @@ export function FollowUpDialog({
       setActive((index) => moveActive(index, event.key === 'ArrowDown' ? 1 : -1, items.length));
     } else if (event.key === 'Enter') {
       event.preventDefault();
+      // Enter chooses the active hit; once it is chosen, the next Enter sets the reference (review 10).
       const hit = items[active];
-      if (hit !== undefined) setChosen(hit);
+      if (hit !== undefined && hit.id !== chosen?.id) setChosen(hit);
       else if (chosen !== null) submit();
     }
   };

@@ -45,15 +45,19 @@ describe('W3 the chip goes with the next single capture only', () => {
     const route = captureItems([{ text: 'Warum?' }], REF, 'single');
     expect(route.items[0]).toMatchObject({ parentQuestionId: 'q-12', relation: 'clarification' });
     expect(route.applied).toBe(true);
-    expect(heldAfterCapture(held(), route.applied, true)).toBeNull();
-    expect(heldAfterCapture(held(), route.applied, false)).toEqual(held());
+    expect(heldAfterCapture(held(), REF, route.applied, true)).toBeNull();
+    expect(heldAfterCapture(held(), REF, route.applied, false)).toEqual(held());
+    // Review 8: a reference set anew while the call ran is not the one that was sent; it stays.
+    const newer = held({ reference: { ...REF, parentQuestionId: 'q-13', number: 'F-0013' } });
+    expect(heldAfterCapture(newer, REF, route.applied, true)).toEqual(newer);
+    expect(heldAfterCapture(null, REF, route.applied, true)).toBeNull();
   });
   it('taken-over suggestions are sent without the reference, also a single one; the chip stays', () => {
     for (const items of [[{ text: 'A?' }], [{ text: 'A?' }, { text: 'B?' }]] as QuestionCapture[][]) {
       const route = captureItems(items, REF, 'suggest');
       expect(route.items).toEqual(items);
       expect(route.applied).toBe(false);
-      expect(heldAfterCapture(held(), route.applied, true)).toEqual(held());
+      expect(heldAfterCapture(held(), REF, route.applied, true)).toEqual(held());
     }
   });
   it('a change of the speech or of the person removes it', () => {
@@ -74,6 +78,13 @@ describe('W3 Alt+B (Alt+N is the navigation toggle of the shell)', () => {
     expect(isFollowUpShortcut(key({ altKey: false }))).toBe(false);
     expect(isFollowUpShortcut(key({ ctrlKey: true }))).toBe(false);
     expect(isFollowUpShortcut(key({ metaKey: true }))).toBe(false);
+  });
+  it('review 7: not while a dialog is open, and not from inside a dialog', () => {
+    expect(isFollowUpShortcut(key(), true)).toBe(false);
+    const inDialog = { tagName: 'BUTTON', isContentEditable: false, closest: (selector: string) => (selector === '[role="dialog"]' ? {} : null) };
+    expect(isFollowUpShortcut(key({ target: inDialog }))).toBe(false);
+    const outside = { tagName: 'BUTTON', isContentEditable: false, closest: () => null };
+    expect(isFollowUpShortcut(key({ target: outside }))).toBe(true);
   });
   it('not while the focus is in an editable field', () => {
     for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) expect(isFollowUpShortcut(key({ target: { tagName, isContentEditable: false } })), tagName).toBe(false);

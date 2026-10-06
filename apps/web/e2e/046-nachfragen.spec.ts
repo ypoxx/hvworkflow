@@ -63,20 +63,27 @@ async function leaveField(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
-/** Opens "Bezug setzen" with Alt+B, finds a question by the search word, chooses the first hit; returns its number. */
+/**
+ * Opens "Bezug setzen" with Alt+B, finds questions by the search word and chooses, with the arrows and Enter, the first
+ * hit that was read out (so the answer version is recorded), otherwise the first hit; returns its number.
+ */
 async function setReference(page: Page, relation: 'follow_up' | 'clarification'): Promise<string> {
   await leaveField(page);
   await page.keyboard.press('Alt+b');
   const search = page.getByTestId('capture-follow-up-search');
   await expect(search).toBeFocused();
   await search.fill(FOLLOW_UP_046_SEARCH);
-  const first = page.getByTestId('capture-follow-up-hit').first();
-  await expect(first).toBeVisible({ timeout: 15_000 });
-  const number = (await first.getAttribute('data-number')) ?? '';
+  const hits = page.getByTestId('capture-follow-up-hit');
+  await expect(hits.first()).toBeVisible({ timeout: 15_000 });
+  const statuses = await hits.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-status')));
+  const index = Math.max(0, statuses.indexOf('delivered'));
+  const hit = hits.nth(index);
+  const number = (await hit.getAttribute('data-number')) ?? '';
   expect(number).toMatch(/^F-\d+$/);
-  await page.keyboard.press('ArrowDown');
+  for (let step = 0; step <= index; step++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(first).toHaveAttribute('data-chosen', 'true');
+  await expect(hit).toHaveAttribute('data-chosen', 'true');
+  await expect(page.getByTestId('capture-follow-up-chosen')).toContainText(number);
   await page.getByTestId(`capture-follow-up-relation-${relation}`).check();
   await page.getByTestId('capture-follow-up-submit').click();
   await expect(page.getByTestId('capture-follow-up-chip')).toBeVisible();
@@ -101,6 +108,15 @@ async function captureWithReference(page: Page): Promise<{ parent: string; child
 
   const parent = await setReference(page, 'clarification');
   await expect(page.getByTestId('capture-follow-up-chip')).toContainText(parent);
+  if (!isHttp()) {
+    // E4: the chip alone, before the capture it goes with (it is gone afterwards, as the next steps prove).
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: evidence('046-erfassung-de.png') });
+    await setLang(page, 'en');
+    await expect(page.getByTestId('capture-follow-up-chip')).toContainText(`Clarification of ${parent}`);
+    await page.screenshot({ path: evidence('046-erfassung-en.png') });
+    await setLang(page, 'de');
+  }
 
   await markPassage(page, FOLLOW_UP_046_QUESTION);
   await page.keyboard.press('Alt+q');
@@ -134,27 +150,22 @@ test('E1/E2 capture a clarification and see the thread in the history @screensho
   await waitForCorpus(page);
   const { parent, child } = await test.step('E1 capture', () => captureWithReference(page));
 
-  if (!isHttp()) {
-    await test.step('E4 capture screenshots DE/EN: chip and card with badge', async () => {
-      // A second chip for the screenshot only; it is removed again, so no further reference is written.
-      await setReference(page, 'follow_up');
-      await page.evaluate(() => document.fonts.ready);
-      await page.screenshot({ path: evidence('046-erfassung-de.png') });
-      await setLang(page, 'en');
-      await expect(page.getByTestId('capture-follow-up-chip')).toContainText('Follow-up question to');
-      await page.screenshot({ path: evidence('046-erfassung-en.png') });
-      await setLang(page, 'de');
-      await page.getByTestId('capture-follow-up-remove').click();
-      await expect(page.getByTestId('capture-follow-up-chip')).toHaveCount(0);
-    });
-  }
-
   await test.step('E2 history: block on the child, the parent lists the child, the timeline line', async () => {
     await openInHistory(page, child);
     const block = page.getByTestId('history-thread');
     await expect(block).toBeVisible();
     await expect(page.getByTestId('history-thread-parent')).toContainText(parent);
     await expect(page.locator('[data-testid="history-event"][data-type="QuestionLinked"]')).toContainText('Als Klarstellung erfasst');
+    if (!isHttp()) {
+      // The child side: the referenced question and the answer version that had been read out (E4, design round).
+      await expect(page.getByTestId('history-thread-answer-version')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: evidence('046-historie-bezug-de.png') });
+      await setLang(page, 'en');
+      await expect(page.getByTestId('history-thread-answer-version')).toContainText('refers to read-out answer version');
+      await page.screenshot({ path: evidence('046-historie-bezug-en.png') });
+      await setLang(page, 'de');
+    }
     await page.getByTestId('history-thread-parent').click();
     await expect(page.getByTestId('history-timeline')).toBeVisible();
     await expect(page.locator(`[data-testid="history-thread-child"][data-number="${child}"]`)).toBeVisible();
@@ -193,8 +204,27 @@ test('E3 keyboard and axe: Alt+B focuses the search, Escape returns to the butto
   await expect(page.getByTestId('capture-follow-up-search')).toBeFocused();
   await page.getByTestId('capture-follow-up-search').fill(FOLLOW_UP_046_SEARCH);
   await expect(page.getByTestId('capture-follow-up-hit').first()).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-follow-up-chosen')).toBeVisible();
   await checkAxe(page, 'capture (Bezug setzen, dialog open)');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('capture-follow-up-search')).toHaveCount(0);
   await expect(page.getByTestId('capture-follow-up-open')).toBeFocused();
+  // Review 10: Enter chooses, the next Enter sets the reference.
+  await leaveField(page);
+  await page.keyboard.press('Alt+b');
+  await page.getByTestId('capture-follow-up-search').fill(FOLLOW_UP_046_SEARCH);
+  await expect(page.getByTestId('capture-follow-up-hit').first()).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('capture-follow-up-search')).toHaveCount(0);
+  await expect(page.getByTestId('capture-follow-up-chip')).toBeVisible();
+  // Review 7: Alt+B does nothing over another dialog.
+  await page.getByTestId('capture-suggest').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Alt+b');
+  await expect(page.getByTestId('capture-follow-up-search')).toHaveCount(0);
+  await expect(page.getByTestId('capture-suggest-reference-hint')).toBeVisible();
 });

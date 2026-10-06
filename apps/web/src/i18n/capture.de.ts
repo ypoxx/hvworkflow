@@ -60,6 +60,7 @@ export const captureDe = {
   'capture.followUp.none': 'Keine Einzelfrage gefunden',
   'capture.followUp.error': 'Die Suche ist gerade nicht möglich.',
   'capture.followUp.remove': 'Bezug entfernen',
+  'capture.followUp.chosen': 'Gewählt:',
   'capture.followUp.suggestHint': 'Der Bezug gilt nicht für übernommene Vorschläge',
   'capture.key.b': 'B',
 };

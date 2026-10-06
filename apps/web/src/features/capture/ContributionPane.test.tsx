@@ -81,7 +81,7 @@ describe.each(['de', 'en'] as Lang[])('ContributionPane follow-up reference (%s)
   it('with canCapture: the button with Alt+B; no chip without a reference', () => {
     setLang(lang);
     const html = renderToStaticMarkup(<ContributionPane {...props({ reference: null, onOpenFollowUp: () => undefined, onClearReference: () => undefined })} />);
-    expect(tag(html, 'capture-follow-up-open')).toBeDefined();
+    expect(tag(html, 'capture-follow-up-open')).toContain('aria-keyshortcuts="Alt+B"');
     expect(html).toContain(translate(lang, 'capture.followUp.open'));
     expect(html).toContain(translate(lang, 'capture.key.b'));
     expect(html).not.toContain('data-testid="capture-follow-up-chip"');

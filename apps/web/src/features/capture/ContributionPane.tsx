@@ -211,6 +211,7 @@ export function ContributionPane({
                 variant="ghost"
                 size="sm"
                 data-testid="capture-follow-up-open"
+                aria-keyshortcuts="Alt+B"
                 onClick={onOpenFollowUp}
                 icon={<CornerDownRight size={14} strokeWidth={1.75} aria-hidden="true" />}
               >

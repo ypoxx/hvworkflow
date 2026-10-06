@@ -74,9 +74,21 @@ describe.each(['de', 'en'] as Lang[])('W5 ThreadBlock (%s)', (lang) => {
     expect(threadReads(CHILD)).toEqual({ parentId: 'p', childrenOf: 'k' });
   });
 
-  it('no relation and no children: no block', () => {
+  it('no relation and no children: no block, but only once the children are known', () => {
     setLang(lang);
     expect(renderToStaticMarkup(<ThreadBlockView {...props({ question: PARENT, parent: { kind: 'none' } })} />)).toBe('');
+  });
+
+  it('design D6: on the parent side, loading shows a skeleton and an error shows reason and retry (never "no follow-ups")', () => {
+    setLang(lang);
+    const loading = renderToStaticMarkup(<ThreadBlockView {...props({ question: PARENT, parent: { kind: 'none' }, children: { kind: 'loading' } })} />);
+    expect(loading).toContain('data-testid="history-thread-loading"');
+    expect(loading).toContain(t('history.thread.loading'));
+    expect(loading).not.toContain('bg-ink-50 ');
+    expect(loading).toMatch(/bg-ink-(1\d\d|2\d\d)/);
+    const error = renderToStaticMarkup(<ThreadBlockView {...props({ question: PARENT, parent: { kind: 'none' }, children: { kind: 'error' } })} />);
+    expect(error).toContain(t('history.thread.error'));
+    expect(error).toContain('data-testid="history-thread-retry"');
   });
 
   it('loading: a skeleton of fixed height with a status text; error: reason and retry', () => {

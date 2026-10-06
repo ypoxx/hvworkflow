@@ -323,7 +323,7 @@ export function CapturePage() {
         writingRef.current = false;
         setWritingQuestions(false);
         // Gone after a successful call that carried it; kept after 412, 422 or a network failure.
-        if (sent.applied) setHeld((current) => heldAfterCapture(current, sent.applied, ok));
+        if (sent.applied) setHeld((current) => heldAfterCapture(current, reference, sent.applied, ok));
       }
     },
     [contribution, contributionMark, actorId, reference],
@@ -335,7 +335,7 @@ export function CapturePage() {
   useEffect(() => {
     if (!followUpAvailable) return undefined;
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (!isFollowUpShortcut(event)) return;
+      if (!isFollowUpShortcut(event, document.querySelector('[role="dialog"]') !== null)) return;
       event.preventDefault();
       setFollowUpOpen(true);
     };

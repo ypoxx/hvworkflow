@@ -36,9 +36,12 @@ export function captureItems(items: readonly QuestionCapture[], reference: Follo
   return { items: withReference(items, reference), applied };
 }
 
-/** After a capture: a reference that went out with a successful call is used up; otherwise it stays. */
-export function heldAfterCapture(held: HeldReference | null, applied: boolean, ok: boolean): HeldReference | null {
-  return ok && applied ? null : held;
+/**
+ * After a capture: the reference that went out with a successful call is used up; otherwise it stays. Only the very
+ * reference that was sent is cleared — one set anew while the call ran stays (review 8).
+ */
+export function heldAfterCapture(held: HeldReference | null, sent: FollowUpReference | null, applied: boolean, ok: boolean): HeldReference | null {
+  return ok && applied && held !== null && held.reference === sent ? null : held;
 }
 
 /** The reference only while the same person works on the same speech (compared by id, never by role). */
@@ -46,7 +49,7 @@ export function heldFor(held: HeldReference | null, actorId: string, contributio
   return held !== null && held.actorId === actorId && held.contributionId === contributionId ? held : null;
 }
 
-interface KeyTarget { readonly tagName?: string; readonly isContentEditable?: boolean }
+interface KeyTarget { readonly tagName?: string; readonly isContentEditable?: boolean; readonly closest?: (selector: string) => unknown }
 /** An element where a typed character belongs to the text (inputs, text areas, selects, editable content). */
 export function isEditableTarget(target: unknown): boolean {
   if (target === null || typeof target !== 'object') return false;
@@ -58,8 +61,15 @@ export function isEditableTarget(target: unknown): boolean {
  * pre-build check 6), so the free key B ("Bezug") is taken. By the physical key (`code`, layout-proof like Alt+Q),
  * without Ctrl or Meta, and never while typing, so a special character on Alt+B (macOS) reaches the text.
  */
-export function isFollowUpShortcut(event: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; code: string; target: unknown }): boolean {
-  return event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyB' && !isEditableTarget(event.target);
+export function isFollowUpShortcut(
+  event: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; code: string; target: unknown },
+  dialogOpen = false,
+): boolean {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.code !== 'KeyB' || isEditableTarget(event.target)) return false;
+  // Review 7: never over another dialog (suggestions, classification) and never from inside one.
+  if (dialogOpen) return false;
+  const target = event.target as KeyTarget | null;
+  return !(target !== null && typeof target === 'object' && typeof target.closest === 'function' && target.closest('[role="dialog"]') != null);
 }
 
 export const FOLLOW_UP_SEARCH_DELAY_MS = 250;

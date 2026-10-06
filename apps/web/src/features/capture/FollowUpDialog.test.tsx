@@ -12,7 +12,7 @@ import { setLang, translate, type Lang } from '../../i18n';
 import { FollowUpPanel, type FollowUpPanelProps } from './FollowUpDialog';
 
 const hit = (n: number, text: string): Question => ({
-  id: `q${n}`, number: `F-00${n}`, text, status: 'delivered', meetingId: 'm', contributionId: 'c', speakerId: 's',
+  id: `q${n}`, number: `F-00${n}`, text, status: 'delivered', meetingId: 'm', contributionId: 'c', speakerId: 's', speakerDisplayName: `Redner ${n}`,
   answers: [], version: 1, createdAt: '2027-04-20T10:00:00.000Z', updatedAt: '2027-04-20T10:00:00.000Z', _actions: [],
 });
 
@@ -72,3 +72,49 @@ describe.each(['de', 'en'] as Lang[])('W2 FollowUpPanel (%s)', (lang) => {
     expect(error).toContain('data-testid="capture-follow-up-retry"');
   });
 });
+
+/* Design round (D8, D1, review 10): the active hit is visible, hits can be told apart, the choice is confirmed. */
+describe.each(['de', 'en'] as Lang[])('W2 FollowUpPanel design round (%s)', (lang) => {
+  const twins = [hit(12, 'Plant die Gesellschaft, die Dividendenpolitik umzustellen?'), hit(13, 'Plant die Gesellschaft, die Dividendenpolitik umzustellen?')];
+  const row = (html: string, number: string): string => html.match(new RegExp(`<li[^>]*data-number="${number}"[^>]*>`))![0];
+
+  it('the keyboard-active hit uses the house selection (accent background and left bar); others hover', () => {
+    setLang(lang);
+    const html = renderToStaticMarkup(<FollowUpPanel {...props({ query: 'x', active: 1, state: { kind: 'results', query: 'x', items: twins } })} />);
+    expect(row(html, 'F-0013')).toContain('bg-accent-50');
+    expect(row(html, 'F-0013')).toContain('border-l-accent-600');
+    expect(row(html, 'F-0012')).not.toContain('bg-accent-50');
+    expect(row(html, 'F-0012')).toContain('hover:bg-');
+    expect(html).not.toContain('bg-ink-25"');
+  });
+
+  it('two lines per hit: wording, then number, speaker and time (number and time in mono)', () => {
+    setLang(lang);
+    const html = renderToStaticMarkup(<FollowUpPanel {...props({ query: 'x', state: { kind: 'results', query: 'x', items: twins } })} />);
+    expect(html.match(/data-testid="capture-follow-up-hit-meta"/g)).toHaveLength(2);
+    expect(html).toContain('Redner 12');
+    expect(html).toContain('Redner 13');
+    expect(html).toMatch(/data-testid="capture-follow-up-hit-meta"[^>]*text-\[12px\]/);
+    expect(html).toMatch(/font-mono[^>]*>F-0013</); // i18n-ok: expected markup in a test, not a rendered text
+    expect(html).toMatch(/font-mono[^>]*>\d\d:\d\d</); // i18n-ok: expected markup in a test, not a rendered text
+  });
+
+  it('a confirmation line names the chosen question; none without a choice; the skeleton is visible', () => {
+    setLang(lang);
+    const chosen = renderToStaticMarkup(<FollowUpPanel {...props({ query: 'x', chosenId: 'q13', state: { kind: 'results', query: 'x', items: twins } })} />);
+    expect(chosen).toContain('data-testid="capture-follow-up-chosen"');
+    expect(chosen).toContain(translate(lang, 'capture.followUp.chosen'));
+    expect(chosen.match(/data-testid="capture-follow-up-chosen"[\s\S]*?<\/p>/)![0]).toContain('F-0013');
+    const none = renderToStaticMarkup(<FollowUpPanel {...props({ query: 'x', state: { kind: 'results', query: 'x', items: twins } })} />);
+    expect(none).not.toContain('data-testid="capture-follow-up-chosen"');
+    const loading = renderToStaticMarkup(<FollowUpPanel {...props({ query: 'x', state: { kind: 'loading', query: 'x' } })} />);
+    expect(loading).not.toContain('bg-ink-50');
+  });
+
+  it('design D7: the button names the same term as chip and card', () => {
+    const open = translate(lang, 'capture.followUp.open');
+    const chip = translate(lang, 'capture.relation.follow_up.to', { number: 'F-0012' });
+    expect(chip.startsWith(open.replace(/\s*…$/, ''))).toBe(true);
+  });
+});
+

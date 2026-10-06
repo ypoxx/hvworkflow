@@ -25,8 +25,17 @@ export function referenceBadgeText(t: Translate, relation: string, number: strin
   return relationLabel(t, relation, number ?? undefined);
 }
 
-/** Resolves the number once per load of the card; a 404 (outside the read scope) leaves it unresolved. */
-function useParentNumber(parentId: string | undefined): string | null {
+/**
+ * Design minor 5: while the number loads, the badge already reads "Nachfrage zu F-····" with figure spaces in the
+ * number's place, so it does not grow when the number arrives.
+ */
+export const PENDING_NUMBER = 'F-\u2007\u2007\u2007\u2007';
+
+/**
+ * Resolves the number once per load of the card: `undefined` while it loads, `null` after a 404 (outside the read
+ * scope) or a failed read, otherwise the number.
+ */
+function useParentNumber(parentId: string | undefined): string | null | undefined {
   const [resolved, setResolved] = useState<{ id: string; number: string | null } | null>(null);
   useEffect(() => {
     if (parentId === undefined) return undefined;
@@ -38,7 +47,8 @@ function useParentNumber(parentId: string | undefined): string | null {
     );
     return () => { live = false; };
   }, [parentId]);
-  return resolved !== null && resolved.id === parentId ? resolved.number : null;
+  if (parentId === undefined) return null;
+  return resolved !== null && resolved.id === parentId ? resolved.number : undefined;
 }
 
 export function QuestionCard({
@@ -75,9 +85,13 @@ export function QuestionCard({
         {question.relation !== undefined && (
           // Scheibe 046: neutral, no status colour for a reference (design principle 4).
           <Badge tone="neutral">
-            <span data-testid="capture-question-reference" className="inline-flex items-center gap-1">
+            <span
+              data-testid="capture-question-reference"
+              className="inline-flex items-center gap-1 whitespace-pre"
+              {...(parentNumber === undefined ? { 'aria-busy': true } : {})}
+            >
               <CornerDownRight size={12} strokeWidth={1.75} aria-hidden="true" />
-              {referenceBadgeText(t, question.relation, parentNumber)}
+              {referenceBadgeText(t, question.relation, parentNumber === undefined ? PENDING_NUMBER : parentNumber)}
             </span>
           </Badge>
         )}

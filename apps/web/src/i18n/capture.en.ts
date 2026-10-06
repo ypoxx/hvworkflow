@@ -52,7 +52,7 @@ export const captureEn: typeof captureDe = {
   'capture.relation.clarification': 'Clarification',
   'capture.relation.follow_up.to': 'Follow-up question to {number}',
   'capture.relation.clarification.to': 'Clarification of {number}',
-  'capture.followUp.open': 'Follow-up to …',
+  'capture.followUp.open': 'Follow-up question to …',
   'capture.followUp.title': 'Set reference',
   'capture.followUp.description': 'The next question refers to a question already captured at this general meeting. The reference cannot be changed afterwards.',
   'capture.followUp.kind': 'Kind of reference',
@@ -62,6 +62,7 @@ export const captureEn: typeof captureDe = {
   'capture.followUp.none': 'No question found',
   'capture.followUp.error': 'The search is not available right now.',
   'capture.followUp.remove': 'Remove reference',
+  'capture.followUp.chosen': 'Selected:',
   'capture.followUp.suggestHint': 'The reference does not apply to accepted suggestions',
   'capture.key.b': 'B',
 };

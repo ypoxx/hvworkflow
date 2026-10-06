@@ -40,8 +40,9 @@ export function ThreadBlockView({ question, parent, children, onOpen, onRetry }:
   const loading = parent.kind === 'loading' || children.kind === 'loading';
   const failed = parent.kind === 'error' || children.kind === 'error';
   const kids = children.kind === 'ready' ? children.value : [];
-  // Without a relation the block appears only once children are known to exist; with one it holds its place.
-  if (relation === undefined && (loading || failed || kids.length === 0)) return null;
+  // Design D6 (Fehlerbild 8): the block is left out only when the children are known and there are none. While they
+  // load it holds its place, and a failed read says so with a retry — never as if there were no follow-ups.
+  if (relation === undefined && !loading && !failed && kids.length === 0) return null;
 
   return (
     <section data-testid="history-thread" aria-labelledby={titleId} className="mb-4 rounded-md border border-line px-3 py-3">
@@ -50,8 +51,8 @@ export function ThreadBlockView({ question, parent, children, onOpen, onRetry }:
         // A fixed height, so the timeline below does not jump when the block has loaded (design principle 8).
         <div data-testid="history-thread-loading" role="status" aria-busy="true" className="grid h-20 gap-2">
           <span className="sr-only">{t('history.thread.loading')}</span>
-          <div aria-hidden="true" className="h-8 animate-pulse rounded-sm bg-ink-50" />
-          <div aria-hidden="true" className="h-8 animate-pulse rounded-sm bg-ink-50" />
+          <div aria-hidden="true" className="h-8 animate-pulse rounded-sm bg-ink-200" />
+          <div aria-hidden="true" className="h-8 animate-pulse rounded-sm bg-ink-200" />
         </div>
       ) : failed ? (
         <div className="flex items-center gap-3">
@@ -59,25 +60,25 @@ export function ThreadBlockView({ question, parent, children, onOpen, onRetry }:
           <Button size="sm" variant="secondary" data-testid="history-thread-retry" onClick={onRetry}>{t('common.retry')}</Button>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
           {relation !== undefined && (
             parent.kind === 'ready' ? (
-              <div className="grid gap-1">
+              <div className="grid min-w-0 gap-1">
                 <span className="text-2xs text-ink-600">{t('history.thread.parent')}</span>
                 <button
                   type="button"
                   data-testid="history-thread-parent"
                   onClick={() => onOpen(parent.value.id)}
-                  className="flex items-center gap-2 rounded-sm text-left hover:bg-ink-25"
+                  className="flex w-full min-w-0 items-center gap-2 rounded-sm text-left hover:bg-ink-25"
                 >
-                  <Badge tone="neutral">
+                  <Badge tone="neutral" className="shrink-0">
                     <span className="inline-flex items-center gap-1">
                       <CornerDownRight size={12} strokeWidth={1.75} aria-hidden="true" />
                       {relationLabel(t, relation, parent.value.number)}
                     </span>
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-[13px] text-ink-800">{excerpt(parent.value.text)}</span>
-                  <StatusBadge status={parent.value.status} />
+                  <span className="shrink-0"><StatusBadge status={parent.value.status} /></span>
                 </button>
                 {question.parentAnswerVersion !== undefined && (
                   <span data-testid="history-thread-answer-version" className="text-2xs text-ink-600">
@@ -93,7 +94,7 @@ export function ThreadBlockView({ question, parent, children, onOpen, onRetry }:
             )
           )}
           {kids.length > 0 && (
-            <div className="grid gap-1">
+            <div className="grid min-w-0 gap-1">
               <span className="text-2xs text-ink-600">{t('history.thread.children', { count: kids.length })}</span>
               <ul className="grid gap-1">
                 {kids.map((kid) => (
@@ -108,7 +109,7 @@ export function ThreadBlockView({ question, parent, children, onOpen, onRetry }:
                       <span className="font-mono text-2xs tabular-nums text-ink-600">{kid.number}</span>
                       {kid.relation !== undefined && <Badge tone="neutral">{relationLabel(t, kid.relation)}</Badge>}
                       <span className="min-w-0 flex-1 truncate text-[13px] text-ink-800">{excerpt(kid.text)}</span>
-                      <StatusBadge status={kid.status} />
+                      <span className="shrink-0"><StatusBadge status={kid.status} /></span>
                     </button>
                   </li>
                 ))}
