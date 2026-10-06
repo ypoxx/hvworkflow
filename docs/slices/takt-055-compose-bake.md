@@ -1,4 +1,4 @@
-# takt-055 — Stack-Build ohne Bake-Berechtigungsabfrage (COMPOSE_BAKE=false)
+# takt-055 — Stack-Build ohne Bake-Berechtigungsabfrage (BUILDX_BAKE_ENTITLEMENTS_FS=0)
 
 **Status:** gebaut · **Risikoklasse:** niedrig (nur das lokale/CI-Stack-Skript; kein Produktcode, kein Vertrag, keine Rechte, keine Daten. Leitplanken §4) · ca. 0,3 AStd · **Lanes:** infra
 **Rolle:** Orchestrator baut (kleiner Takt); Review in frischem Kontext
@@ -15,17 +15,23 @@ früher (PR #174) war grün.
 
 ## Ziel
 
-`scripts/stack.mjs` setzt in der Umgebung aller Compose-Aufrufe des Stacks `COMPOSE_BAKE=false`: Compose baut wie bisher mit
-dem klassischen Builder, das Secret bleibt ein Build-Secret (kein Wechsel zu Build-Args, keine neue Berechtigung).
+`scripts/stack.mjs` setzt in der Umgebung aller Compose-Aufrufe des Stacks `BUILDX_BAKE_ENTITLEMENTS_FS=0`: Bake prüft die
+Dateisystem-Berechtigung für das Build-Secret außerhalb des Build-Kontexts nicht mehr ab. Das Secret bleibt ein Build-Secret
+(kein Wechsel zu Build-Args). Die Bake-Definition erzeugt Compose aus der versionierten `compose.yaml`, nicht aus fremder Quelle.
+
+**Nachtrag (Codex P1 auf #175):** Der erste Ansatz `COMPOSE_BAKE=false` wirkt unter Compose v5 nicht (v5 hat den eigenen
+Builder entfernt und baut immer über Bake; der Läufer und `docs/evidence/037a-installation-befolgt.txt` nennen Compose 5.1.1).
+Compose kennt keinen Schalter, die Freigabe `--allow=fs.read=…` an Bake durchzureichen; die Abschaltung der Prüfung über die
+Umgebung ist der kleinste Eingriff, der das Build-Secret im Zustandsverzeichnis lässt.
 
 ## Nicht-Ziele
 
 - Keine Änderung an `deploy/compose/compose.yaml`, an den Dockerfiles oder am Secret-Verfahren.
-- Kein `--allow`-Schalter (er hängt an der Bake-Version und würde den Pfad des Zustandsverzeichnisses in die Befehlszeile tragen).
+- Kein Umzug des Secrets in den Build-Kontext (es bleibt außerhalb des Repos, wie 037a es verlangt).
 
 ## Abnahme
 
-- `scripts/stack.test.mjs`: `upPlan(...).env.COMPOSE_BAKE === 'false'` (zuerst rot).
+- `scripts/stack.test.mjs`: `upPlan(...).env.BUILDX_BAKE_ENTITLEMENTS_FS === '0'` (zuerst rot).
 - `pnpm gates` grün; CI `stack-037a` grün im PR-Lauf.
 
 ## Files allowed
