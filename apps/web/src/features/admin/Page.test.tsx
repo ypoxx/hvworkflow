@@ -25,7 +25,7 @@ vi.mock('../../components', async (original) => ({
   ),
 }));
 
-const { readAccess } = await import('./access');
+const { readAccess, accessFor } = await import('./access');
 const { AdminLayout } = await import('./AdminLayout');
 const { ADMIN_TABS, rovingTarget } = await import('./tabs');
 const { AssignDialog } = await import('./AssignDialog');
@@ -316,5 +316,13 @@ describe('(h) role cards', () => {
       expect(has(html, t('admin.roleCards.unitBound'))).toBe(card.unitBound);
       if (card.acts.length === 0 || card.reads.length === 0) expect(has(html, t('admin.roleCards.none'))).toBe(true);
     }
+  });
+});
+
+describe('access answer belongs to one actor (Codex P1 on #166)', () => {
+  it('an answer read for another actor is shown as loading, never as the previous actor\'s rows', () => {
+    const answer = { actorId: 'u-admin', value: { status: 'ready', assignments: [] } as const };
+    expect(accessFor(answer, 'u-admin')).toEqual({ status: 'ready', assignments: [] });
+    expect(accessFor(answer, 'u-coord')).toEqual({ status: 'loading' });
   });
 });

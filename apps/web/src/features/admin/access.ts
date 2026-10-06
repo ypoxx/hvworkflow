@@ -21,3 +21,12 @@ export async function readAccess(api: Pick<HvApi, 'listRoleAssignments'>): Promi
     return isForbidden(error) ? { status: 'forbidden' } : { status: 'failed', error };
   }
 }
+
+/**
+ * The access answer as it applies to the actor on screen. An answer read for another actor (persona switch, new
+ * session) counts as loading until the recheck for this actor returns, so the previous actor's assignment rows and
+ * controls never show to the new one, not even for the length of one request.
+ */
+export function accessFor(answer: { actorId: string; value: Access }, actorId: string): Access {
+  return answer.actorId === actorId ? answer.value : { status: 'loading' };
+}

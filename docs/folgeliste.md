@@ -871,6 +871,9 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 041 Review nit 8 · `features/admin/AdminLayout.tsx` · `aria-controls` der nicht gewählten Tabs zeigt auf nicht
   gerenderte Panels; das Tabpanel hat kein `tabIndex` (bei Tabs ohne fokussierbaren Inhalt, z. B. Hauptversammlungen) ·
   alle Panels gerendert und versteckt oder `aria-controls` nur am gewählten Tab; `tabIndex={0}` am Panel.
+- 041 Codex P2 (#166) · `features/admin/Page.tsx` · „jetzt“ für den Anzeigezustand der Zuordnungen wird nur mit jeder Antwort
+  gelesen; läuft eine Zuordnung bei offener Seite ohne neues Ereignis ab (Demo im Browser), bleibt sie als aktiv mit Entziehen
+  stehen · Aktualisierung zum nächsten Ablaufzeitpunkt planen.
 - 041 Review nit 9 · Spec-Bericht 041, „Vor dem Bau prüfen“ 4 · die Aussage zu Konstanten mit SECRET/TOKEN/KEY/PASSWORD
   im Namen ist ungenau formuliert · auf die Konstanten dieser Scheibe beschränken und so benennen.
 

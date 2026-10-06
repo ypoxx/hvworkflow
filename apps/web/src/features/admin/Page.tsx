@@ -15,7 +15,7 @@ import { useActor } from '../../api/actor';
 import { useApiVersion } from '../../api/useApiVersion';
 import { useMeeting } from '../../app/useMeeting';
 import { useLang } from '../../i18n';
-import { readAccess } from './access';
+import { accessFor, readAccess } from './access';
 import type { Access } from './access';
 import { AdminLayout } from './AdminLayout';
 import { MasterDataTab } from './MasterDataTab';
@@ -31,7 +31,11 @@ export function AdminPage() {
   const actorId = useActor().id;
   const version = useApiVersion();
   const [tab, setTab] = useState<AdminTabId>('roles');
-  const [access, setAccess] = useState<{ value: Access; now: Date }>({ value: { status: 'loading' }, now: new Date() });
+  const [answer, setAnswer] = useState<{ actorId: string; value: Access; now: Date }>({
+    actorId,
+    value: { status: 'loading' },
+    now: new Date(),
+  });
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((value) => value + 1), []);
 
@@ -39,12 +43,14 @@ export function AdminPage() {
     let cancelled = false;
     void readAccess(api).then((value) => {
       // The one place "now" is read: with the answer it belongs to (assignment states are display only).
-      if (!cancelled) setAccess({ value, now: new Date() });
+      if (!cancelled) setAnswer({ actorId, value, now: new Date() });
     });
     return () => {
       cancelled = true;
     };
-  }, [version, tick]);
+  }, [version, tick, actorId]);
+  // Keyed by actor: after a switch the previous answer is not shown while the recheck runs.
+  const access = { value: accessFor(answer, actorId), now: answer.now };
 
   const meetingId = meeting?.id;
   const panel = (() => {
