@@ -48,26 +48,32 @@ Slice: takt-058-dialog-fokus
 Done: Dialog.tsx hält onClose in einer Referenz (useLayoutEffect bei jedem Rendern); Escape ruft onCloseRef.current(),
       der Fokus-Effekt hängt nur noch an [open]. Fokusfalle, Fokus-Rückgabe und Scroll-Sperre unverändert.
       Neuer in-process-Fall e2e/058-dialog-fokus.spec.ts (F1 Sprachwechsel über den Store, F2 Wortmeldung einer
-      anderen Person) zuerst rot, dann grün.
-Evidence: pnpm gates auf e1d26ec (Code und Spec; dieser Bericht kam danach als reine Doku-Änderung hinzu):
+      anderen Person) zuerst rot, dann grün; F1 schreibt den Beleg docs/evidence/058-dialog-fokus.png.
+Evidence: pnpm gates auf ad96e88 (Code, Spec, Screenshot; dieser Bericht kam danach als reine Doku-Änderung hinzu):
       packages/domain test:       Tests  562 passed (562)
       apps/web test:       Tests  1134 passed (1134)
       apps/api test:       Tests  710 passed (710)
-      slice-scope: 3 changed file(s), all within "docs/slices/takt-058-dialog-fokus.md"'s "Files allowed" list (3 pattern(s)).
-      ✓ built in 2.20s
-      mark-test-run: wrote /home/user/wt/takt058/.claude/state/last-test-run (clean tree) at commit e1d26ec, tree 2dd0593420e6…
-      e2e rot vor dem Fix (Basis c63d981 + neuer Spec), beide Fälle an expectFocusKept, 058-dialog-fokus.spec.ts:132:
+      slice-scope: warning — "docs/slices/takt-058-dialog-fokus.md"'s "Files allowed" section differs from its version at the commit that introduced it (803b0e3).
+      slice-scope: 4 changed file(s), all within "docs/slices/takt-058-dialog-fokus.md"'s "Files allowed" list (4 pattern(s)).
+      # pass 359
+      # fail 0
+      ✓ built in 2.17s
+      mark-test-run: wrote /home/user/wt/takt058/.claude/state/last-test-run (clean tree) at commit ad96e88, tree 70a783a6ed24…
+      (Die Warnung ist die gewollte Ergänzung des Screenshots in Files allowed nach Codex-P1 auf #180.)
+      e2e rot vor dem Fix (Basis c63d981 + neuer Spec), beide Fälle an expectFocusKept (toBeFocused):
         Error: expect(locator).toBeFocused() failed
         Locator:  getByTestId('answer-refuse-kind-refusal_no_claim')
         Expected: focused
         Received: inactive
         2 failed
-      e2e grün nach dem Fix (playwright test e2e/058-dialog-fokus.spec.ts e2e/045-verweigerung.spec.ts --project=in-process):
-        ✓  1 … 058 Dialog behält den Fokus › F1 Sprachwechsel über den Store bei offenem Dialog (4.1s)
-        ✓  3 … 058 Dialog behält den Fokus › F2 Schreibung anderswo (Wortmeldung einer anderen Person) bei offenem Dialog (3.3s)
-        ✓  7 … 045 … › E7 Tastatur (D8): der Dialog ganz mit der Tastatur, Absenden fokussiert und aktiv, nicht ausgelöst (3.4s)
-        8 passed (1.2m)
-      Kein Screenshot: die Abnahme verlangt keinen; neu erzeugte docs/evidence/*.png wurden verworfen.
+      e2e grün auf dem Stand von ad96e88 (playwright test e2e/058-dialog-fokus.spec.ts e2e/045-verweigerung.spec.ts
+      --project=in-process):
+        ✓  1 … 058 Dialog behält den Fokus › F1 Sprachwechsel über den Store bei offenem Dialog @screenshot (5.5s)
+        ✓  3 … 058 Dialog behält den Fokus › F2 Schreibung anderswo (Wortmeldung einer anderen Person) bei offenem Dialog (3.2s)
+        ✓  7 … 045 … › E7 Tastatur (D8): der Dialog ganz mit der Tastatur, Absenden fokussiert und aktiv, nicht ausgelöst (3.2s)
+        8 passed (1.3m)
+      docs/evidence/058-dialog-fokus.png: Dialog nach dem Wechsel auf Englisch, Fokusring weiter auf „no right to information“.
 Open: Review in frischem Kontext steht aus. Escape mit aktuellem onClose decken 045 E6/E7 und F1/F2 (Escape schließt).
-Touched: apps/web/src/components/Dialog.tsx, apps/web/e2e/058-dialog-fokus.spec.ts, docs/slices/takt-058-dialog-fokus.md
+Touched: apps/web/src/components/Dialog.tsx, apps/web/e2e/058-dialog-fokus.spec.ts, docs/evidence/058-dialog-fokus.png,
+      docs/slices/takt-058-dialog-fokus.md
 ```
