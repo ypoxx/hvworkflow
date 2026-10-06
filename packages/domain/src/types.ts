@@ -73,6 +73,8 @@ export const PERMISSIONS = [
   'stage.read',
   'history.read',
   'event.read',
+  // Scheibe 061: read the control desk figures (Leitstand, `getCockpit`); next to the other read rights.
+  'cockpit.read',
   'demo.seed',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
@@ -100,6 +102,8 @@ export const READ_PERMISSIONS = {
   // Scheibe 044a (043a): the catalogue of refusal grounds is global code data; every reader of a
   // question or of the stage may read it.
   listRefusalGrounds: ['question.read', 'question.read.delivered', 'stage.read'],
+  // Scheibe 061: the control desk figures of the current meeting (Leitstand).
+  getCockpit: ['cockpit.read'],
 } as const satisfies Record<string, readonly Permission[]>;
 export type ReadMethod = keyof typeof READ_PERMISSIONS;
 
@@ -462,6 +466,44 @@ export interface QuestionFilter {
 export interface WriteOptions {
   ifMatch?: string;
   idempotencyKey?: string;
+}
+
+/* ---------- control desk (Leitstand, slice 061, contract 0.4.5) ---------- */
+
+/** The seven open statuses (033b "open"), the stations of the control desk. */
+export type CockpitOpenStatus = Exclude<QuestionStatus, 'delivered' | 'closed' | 'withdrawn' | 'merged'>;
+
+/** A reference to an open question in `Cockpit.oldestOpen` (contract `CockpitOldestRef`): no text, no speaker, no actor. */
+export interface CockpitOldestRef {
+  id: string;
+  number: string;
+  status: QuestionStatus;
+  unitId?: string;
+  /** Seconds since capture. */
+  ageSeconds: number;
+  /** Seconds since the last status change (`statusTrail`). */
+  statusAgeSeconds: number;
+}
+
+/** A reference to a question in legal clearing over 10 minutes (contract `CockpitReviewRef`). */
+export interface CockpitReviewRef extends CockpitOldestRef {
+  /** Waiting time in legal clearing by the 033b definition; a new refusal proposal restarts it. */
+  reviewAgeSeconds: number;
+}
+
+/** The control desk figures of one meeting (contract `Cockpit`): aggregates per meeting, status and unit. */
+export interface Cockpit {
+  meetingId: string;
+  asOf: string;
+  meetingStatus: Meeting['status'];
+  debateClosedAt?: string;
+  totals: { captured: number; open: number; staged: number; answered: number };
+  openByStatus: Record<CockpitOpenStatus, number>;
+  openByUnit: Record<string, number>;
+  openUnassigned: number;
+  oldestOpen: { ageSeconds: number; items: CockpitOldestRef[] };
+  inflow: { binSeconds: 300; bins: number[]; last5m: number };
+  legalReview: { over10m: number; items: CockpitReviewRef[] };
 }
 
 /* ---------- stream (slice 035a, contract 0.3.11) ---------- */

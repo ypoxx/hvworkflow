@@ -243,8 +243,10 @@ describe('K6 legal clearing over 10 minutes', () => {
 describe('K7 privacy (negative test): nothing per person reaches the answer', () => {
   it('no actor id, personId, assignment subject, speakerId, speaker name or question text', async () => {
     current = { id: 'actor-admin-061', role: 'admin' };
-    await api.assignRole({ subjectId: 'subject-fin-4711', personId: 'person-fin-4711', role: 'expert', unitId: 'unit-fin' });
-    await api.assignRole({ subjectId: 'subject-hr-4712', personId: 'person-hr-4712', role: 'expert', unitId: 'unit-hr' });
+    // Two persons with clear names from the synthetic corpus, bound to units through role assignments.
+    const [first, second] = [...project(store.all()).persons.keys()];
+    await api.assignRole({ subjectId: 'subject-fin-4711', personId: first!, role: 'expert', unitId: 'unit-fin' });
+    await api.assignRole({ subjectId: 'subject-hr-4712', personId: second!, role: 'expert', unitId: 'unit-hr' });
     // A claim by a bound expert, so a claim holder exists in the projection.
     current = { id: 'subject-fin-4711', role: 'expert', assignmentScoped: true };
     const own = (await api.listQuestions({ status: ['assigned'] })).items[0]!;
