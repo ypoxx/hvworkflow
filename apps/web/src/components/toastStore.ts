@@ -4,6 +4,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { ApiProblem } from '@hv/domain';
+import { WithheldAnswer } from '../api/liveStore';
 
 export type ToastTone = 'neutral' | 'success' | 'danger';
 
@@ -44,8 +45,13 @@ function isProblem(error: unknown): error is ApiProblem {
   return typeof error === 'object' && error !== null && 'detail' in error && 'status' in error;
 }
 
-/** Show a failed API call the way the contract describes it: title, detail and the rule that said no. */
+/**
+ * Show a failed API call the way the contract describes it: title, detail and the rule that said no.
+ * takt-057 (review finding 1): a write the live store withheld after an actor change or `clear()` is no refusal of
+ * the person on screen; it shows nothing and returns `-1` (no toast id). The view's own `catch` still frees its lock.
+ */
 export function showProblem(error: unknown, fallbackTitle: string): number {
+  if (error instanceof WithheldAnswer) return -1;
   if (isProblem(error)) {
     return showToast({
       tone: 'danger',

@@ -180,6 +180,8 @@ export function isSeeded(): boolean {
  * Seed the synthetic corpus once. Seeding needs `demo.seed`, which only the administration persona
  * holds; the current persona is restored afterwards so the demo starts in the chosen role.
  */
+// takt-057: the swap below spans `await`s, so the store sees the administration at start and at delivery. Never turn it
+// into a synchronous swap-and-restore around a store call: the live store would attribute the write to the restored person.
 export async function seedIfEmpty(): Promise<void> {
   if (!DEMO_MODE) return;
   if (startupError) throw startupError;

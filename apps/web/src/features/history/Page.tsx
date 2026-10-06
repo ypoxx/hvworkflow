@@ -8,9 +8,10 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { History, Lock, Search } from 'lucide-react';
-import type { AgendaItem, DomainEvent, Question, ReadEvent, Unit } from '@hv/domain';
+import type { Actor, AgendaItem, DomainEvent, Question, ReadEvent, Unit } from '@hv/domain';
 import { api } from '../../api';
 import { getActor, useActor } from '../../api/actor';
+import { actorKey } from '../../api/liveStore';
 import { useApiVersion } from '../../api/useApiVersion';
 import {
   Button,
@@ -44,7 +45,7 @@ import {
   readVerdict,
   tableRows,
 } from './lib';
-import type { KeyedRead, PagedResults, ReadVerdict } from './lib';
+import type { KeyedRead, PagedResults, ReadVerdict, StreamWindowState } from './lib';
 
 type Tab = 'question' | 'stream';
 
@@ -104,6 +105,43 @@ function TabButton({
   );
 }
 
+/**
+ * takt-057, Ziel 3 (T-G1-I-09): the held window of the Ereignisstrom is keyed by the structural actor (`actorKey`,
+ * every field of the `Actor`), not only its id — a role change under the same id must not extend or show the window
+ * the previous rights read. The other records of this view keep their id keys (`keyBelongsTo` is unchanged).
+ */
+export function streamWindowKey(actor: Actor, version: number): string {
+  return loadKey(actorKey(actor), version);
+}
+
+/** Whether the window read under `key` may be offered to `actor` (structurally the same person, any version). */
+export function streamWindowOwned(key: string | null, actor: Actor): boolean {
+  return keyBelongsTo(key, actorKey(actor));
+}
+
+/** The held stream window as the page keeps it (`streamState`). */
+interface HeldStream {
+  key: string | null;
+  cursor: number;
+  window: readonly ReadEvent[];
+  curve: readonly number[];
+}
+
+/** What the Ereignisstrom tab shows of the held window: nothing of a structurally other person (takt-057). */
+export function shownStream(
+  held: HeldStream,
+  actor: Actor,
+): { window: readonly ReadEvent[]; curve: readonly number[] } {
+  return streamWindowOwned(held.key, actor)
+    ? { window: held.window, curve: held.curve }
+    : { window: NO_READ_EVENTS, curve: NO_CURVE };
+}
+
+/** The start the stream effect hands to `advanceStream`: the own window, or `null` (read afresh) for anyone else. */
+export function heldStreamBase(held: HeldStream, actor: Actor): StreamWindowState | null {
+  return streamWindowOwned(held.key, actor) ? { cursor: held.cursor, events: held.window } : null;
+}
+
 export function HistoryPage() {
   const t = useT();
   const version = useApiVersion();
@@ -156,12 +194,7 @@ export function HistoryPage() {
   // load that read it.
   // takt-038, Ziel 2: `cursor` is the `seq` the window has been read up to; later counts read only
   // from there to the head (`advanceStream`, lib.ts).
-  const [streamState, setStreamState] = useState<{
-    key: string | null;
-    cursor: number;
-    window: readonly ReadEvent[];
-    curve: readonly number[];
-  }>({ key: null, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
+  const [streamState, setStreamState] = useState<HeldStream>({ key: null, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
   // Ziel 1 (slice 010b): `listQuestions` is the Hauptabfrage of the Historie — set from the 403's
   // ruleId alone (AGENTS.md rule 4), e.g. podium, who holds neither `question.read` nor
   // `question.read.delivered` at all. observer never sets this: it holds the scoped
@@ -173,7 +206,8 @@ export function HistoryPage() {
   // cleared — after a switch from a refused role, a 500 on the new role's first read left the
   // refusal standing (Ziel 2). A refusal belongs to the actor: a plain failure of the same actor's
   // next load keeps it (review round 1, finding 4).
-  const actorId = useActor().id;
+  const actor = useActor();
+  const actorId = actor.id;
   /**
    * Slice 090: the search is text the person typed, and it belongs to them. On an actor change it
    * is emptied in the same render (compared by `id`, never by role, AGENTS.md rule 4), so the next
@@ -244,9 +278,8 @@ export function HistoryPage() {
     keyBelongsTo(historyState.key, actorId)
       ? historyState.events
       : null;
-  const streamOwned = keyBelongsTo(streamState.key, actorId);
-  const streamWindow = streamOwned ? streamState.window : NO_READ_EVENTS;
-  const curve = streamOwned ? streamState.curve : NO_CURVE;
+  const streamOwned = streamWindowOwned(streamState.key, actor);
+  const { window: streamWindow, curve } = shownStream(streamState, actor);
   /**
    * Slice 010d, review round 1, finding 3: the stream effect reads its own record through this ref
    * instead of depending on it. As a dependency (`streamOwned`, and before it `streamLastSeq`) every
@@ -500,17 +533,18 @@ export function HistoryPage() {
     // an unchanged head then costs one empty read and leaves the window as it is.
     // Slice 010d: only this actor's own window is extended; a window another actor read is not shown
     // (`streamOwned`) and is read afresh, once.
+    // takt-057: the window itself is keyed structurally (`streamWindowKey`); `requested` stays the id key the verdict
+    // compares with `mainKey`.
+    const windowKey = streamWindowKey(getActor(), version);
     const held = streamRef.current;
-    const base = keyBelongsTo(held.key, getActor().id)
-      ? { cursor: held.cursor, events: held.window }
-      : null;
+    const base = heldStreamBase(held, getActor());
     advanceStream(api, base)
       .then((next) => {
         if (!isCurrentLoad(requested, current())) return;
         setStreamRead({ key: requested, status: 'ready' });
         if (next === base) return;
         setStreamState({
-          key: requested,
+          key: windowKey,
           cursor: next.cursor,
           window: next.events,
           curve: loadCurve(next.events, Date.now()),
@@ -523,16 +557,16 @@ export function HistoryPage() {
           // an error toast. Minor 3 (review round 2): clears the tail read too, and rewinds the
           // cursor to 0 — a role that regains `event.read` later reads its window afresh.
           setStreamRead({ key: requested, status: 'forbidden' });
-          setStreamState({ key: requested, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
+          setStreamState({ key: windowKey, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE });
           return;
         }
         // Slice 010c, Ziel 2: the failure is this load's answer; it replaces a refusal given to
         // another actor (`readVerdict`).
         setStreamRead({ key: requested, status: 'error' });
         setStreamState((previous) =>
-          keyBelongsTo(previous.key, getActor().id)
+          streamWindowOwned(previous.key, getActor())
             ? previous
-            : { key: requested, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE },
+            : { key: windowKey, cursor: 0, window: NO_READ_EVENTS, curve: NO_CURVE },
         );
         problem(error);
       });
