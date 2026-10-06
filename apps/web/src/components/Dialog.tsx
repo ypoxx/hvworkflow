@@ -2,7 +2,7 @@
  * A modal that behaves: role=dialog, aria-modal, focus moved in and returned, Tab trapped inside,
  * Esc closes. Nothing in this tool may steal the keyboard from the person at the podium.
  */
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
@@ -42,6 +42,13 @@ export function Dialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  // Takt-058: callers pass `onClose` inline, so it is a new function on every render. The focus effect below must not
+  // depend on it, or any re-render of the page beneath an open dialog (a stream event, a language switch, a write
+  // elsewhere) would re-run it and throw the focus back to the first element. Escape reads the current one from here.
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,7 +60,7 @@ export function Dialog({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || panel === null) return;
@@ -78,7 +85,7 @@ export function Dialog({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
