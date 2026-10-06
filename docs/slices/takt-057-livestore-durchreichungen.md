@@ -84,6 +84,7 @@ die Folgeliste geschoben), sie vor dem Merge des Doku-PRs zu bauen statt sie als
 - nach Review-Befund 1: `apps/web/src/components/toastStore.ts`, `apps/web/src/components/toastStore.test.ts`,
   `apps/web/src/features/answers/useWriteDoor.test.tsx` (nur Test; die drei Schreibtüren selbst brauchen keine Änderung,
   siehe Bericht)
+- nach Nachprüfung 2: `apps/web/src/api/actor.ts`, `apps/web/src/api/index.ts` (nur Kommentar, Nachprüfung 2)
 
 ## Bericht
 
@@ -179,4 +180,31 @@ Open: Re-Check (Sicherheit) der Tauschregel: ein Akteurtausch innerhalb einer sy
       e2e-Läufe schreiben docs/evidence/*.png neu; diese Änderungen sind nicht übernommen.
 Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts,
       apps/web/src/features/answers/useWriteDoor.test.tsx, docs/slices/takt-057-livestore-durchreichungen.md
+```
+
+### Nachtrag nach der zweiten Nachprüfung (Sicherheit, d3fe2cb: kein Blocker, kein Major, 2 Minor, 2 Nit)
+
+```
+Slice: takt-057-livestore-durchreichungen (zweite Nachprüfung)
+Done: Minor 1: drei Fälle im lastWriteEtag-Block mit beobachtetem A: (a) B schreibt nach unbeobachtetem Wechsel →
+      Adapterwert; (b) Tauschschreibung (andere Person für eine Aufgabe, A zurück) → Antwort zugestellt, lastWriteEtag für
+      A undefined; dazu der Nit-4-Fall. Mutationsprüfung: `owner === actor` → `owner === currentActor()` bleibt grün, weil
+      die Klausel aus `currentActor() === actor` folgt (ein beförderter Eigentümer ist nie `actor`); im Code vermerkt.
+      Die Mutation, die die Klausel schützt (Marke auf den beförderten Eigentümer: `currentActor() === owner ? owner`),
+      macht (b) rot. (a) und (b) waren gegen d3fe2cb schon grün (Abdeckung, kein Fehler).
+      Minor 2: Warum-Kommentare an `setActor` (api/actor.ts) und `seedIfEmpty` (api/index.ts): nie synchron um einen
+      Store-Aufruf tauschen und zurücksetzen. Nur Kommentar; Files allowed ergänzt.
+      Nit 3: Kommentar an lastWriteEtag berichtigt (Ausgabe nur, solange currentActor() dem Eigentümer der letzten eigenen
+      erfolgreichen Schreibung gleicht). Nit 4: `startA === actorEpoch` in der Marken-Bedingung; Test (ein beobachteter
+      Wechsel A→B→A während des Flugs) ist ohne die Klausel rot (Mutation geprüft).
+Evidence: pnpm gates auf dem Arbeitsstand dieses Commits (Code identisch, vor dem Bericht; Basis d3fe2cb), Ausgabe-Ende:
+      packages/domain test:       Tests  562 passed (562)
+      apps/web test:       Tests  1160 passed (1160)
+      apps/api test:       Tests  710 passed (710)
+      slice-scope: 8 changed file(s), all within "docs/slices/takt-057-livestore-durchreichungen.md"'s "Files allowed" list (11 pattern(s)).
+      ✓ built in 1.97s
+      In-process-e2e 010b/010c/010d auf demselben Stand: 79 passed (3.0m). docs/evidence/*.png nicht übernommen.
+Open: –
+Touched: apps/web/src/api/liveStore.ts, apps/web/src/api/liveStore061.test.ts, apps/web/src/api/actor.ts,
+      apps/web/src/api/index.ts, docs/slices/takt-057-livestore-durchreichungen.md
 ```

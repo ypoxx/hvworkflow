@@ -311,6 +311,62 @@ describe('takt-057 lastWriteEtag belongs to the person who wrote', () => {
     expect(store.lastWriteEtag()).toBe(etag);
   });
 
+  /** Second re-check: a store that has observed A through a read, so the swap rule (promotion to the observed person) is active. */
+  function setupObserved() {
+    let etag = '"v1"';
+    let release: (value: unknown) => void = () => undefined;
+    const closeQuestion = vi.fn(async (id: string) => {
+      etag = `"${id}"`;
+      return { id };
+    });
+    const heldWrite = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const listQuestions = vi.fn(async () => ({ items: [], total: 0 }));
+    const adapter = {
+      closeQuestion, deliverQuestion: heldWrite, listQuestions, subscribe: () => () => undefined, lastWriteEtag: () => etag,
+    } as unknown as HvApi;
+    const a: Actor = reader;
+    const box: { actor: Actor } = { actor: a };
+    const store = createLiveStore(adapter, { getActor: () => box.actor, now: () => 0, monotonic: () => 0 });
+    return { store, box, a, release: (value: unknown) => release(value) };
+  }
+
+  it('second re-check (a): B writes after a switch the store has not observed; lastWriteEtag for B is the adapter value', async () => {
+    const { store, box } = setupObserved();
+    await store.listQuestions(); // observed A
+    box.actor = { id: 'other-057', role: 'coordination' };
+    await store.closeQuestion('b-1', {} as never);
+    expect(store.lastWriteEtag()).toBe('"b-1"');
+  });
+
+  it('second re-check (b): a swap write (another actor for one task, A restored) leaves lastWriteEtag for A undefined', async () => {
+    const { store, box, a } = setupObserved();
+    await store.listQuestions(); // observed A
+    await store.closeQuestion('a-1', {} as never);
+    expect(store.lastWriteEtag()).toBe('"a-1"');
+    box.actor = { id: 'u-mod-2', role: 'moderation' };
+    let written: Promise<unknown>;
+    try {
+      written = store.closeQuestion('x-1', {} as never);
+    } finally {
+      box.actor = a;
+    }
+    await expect(written).resolves.toEqual({ id: 'x-1' }); // the harness reads the answer (036a)
+    expect(store.lastWriteEtag()).toBeUndefined(); // the adapter holds the other person's tag
+  });
+
+  it('second re-check nit 4: an actor change the store observes during the flight ends the claim on the tag, even back to A', async () => {
+    const { store, box, a, release } = setupObserved();
+    await store.listQuestions(); // observed A
+    const write = store.deliverQuestion('a-2', {} as never);
+    box.actor = { id: 'other-057', role: 'coordination' };
+    await store.listQuestions(); // observed B: epoch raised
+    box.actor = a;
+    await store.listQuestions(); // observed A again
+    release({ id: 'a-2' });
+    await expect(write).rejects.toBeInstanceOf(WithheldAnswer);
+    expect(store.lastWriteEtag()).toBeUndefined();
+  });
+
   it('review nit 5: signed out, a write leaves lastWriteEtag as the adapter value (today\'s behaviour)', async () => {
     const etag = '"v9"';
     const closeQuestion = vi.fn(async () => ({ id: 'q-1' }));

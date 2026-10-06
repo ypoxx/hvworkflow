@@ -557,7 +557,11 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
       (value) => {
         // Signed out: today's behaviour, the marker stays as it is (review nit 5).
         if (actor !== undefined) {
-          etagOwner = startClears === clears && owner === actor && currentActor() === actor ? actor : STALE;
+          // `startA` as in `own()` below: an actor change the store observed during the flight also ends the claim.
+          // `owner === actor` is implied by `currentActor() === actor` (a promoted owner differs from `actor`); kept so the
+          // tag can never name a promoted owner (second re-check, test (b)).
+          etagOwner =
+            startA === actorEpoch && startClears === clears && owner === actor && currentActor() === actor ? actor : STALE;
         }
         if (observe) settleWrite('success');
         return value;
@@ -605,8 +609,8 @@ export function createLiveStore(adapter: HvApi, options: LiveStoreOptions): Live
     // takt-056: unbuffered like getCockpit, but under the same actor protection (Codex P1 on #176).
     listEvents: (after?: number, limit?: number) => guarded(() => adapter.listEvents(after, limit)),
     getCockpit: () => guarded(() => adapter.getCockpit()),
-    // takt-057: the tag of the last own write only while the same person is signed in (an actor change seen here
-    // raises the epoch and marks it stale); withheld like an answer, without touching the adapter.
+    // takt-057: the tag is handed out only while `currentActor()` equals the owner of the last own successful write
+    // (`etagOwner`), or before any write went through the store; withheld like an answer, without touching the adapter.
     lastWriteEtag: () => {
       const actor = currentActor();
       return etagOwner === OPEN || (actor !== undefined && etagOwner === actor) ? adapter.lastWriteEtag() : undefined;

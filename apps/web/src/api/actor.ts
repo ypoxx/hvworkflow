@@ -54,6 +54,11 @@ export function getActor(): Actor {
   if (!current) throw new Error('No confirmed session actor.');
   return current;
 }
+/**
+ * takt-057: never swap the actor and restore it synchronously around a live store call (`setActor(x)`, call,
+ * `setActor(before)` in one task). The live store treats such a swap as no change of person and attributes the write
+ * and its answer to the restored person; only the e2e harness may rely on that.
+ */
 export function setActor(actor: Actor): void {
   if (!DEMO_MODE) throw new Error('Demo persona switching is unavailable in HTTP mode.');
   current = actor;
