@@ -167,7 +167,7 @@ unter „Nachweis“; der Keycloak-Teil (H4 bis H8) läuft nur im CI-Job `e2e-ht
 
 - **029b-Nachtrag (Keycloak-Nachweis in CI):** der Schritt `scripts/keycloak-ci-029b.mjs` bleibt im Job `gates`; er nutzt seit 031a das Modul
   `scripts/lib/keycloak-ci.mjs` und das Keycloak-Image mit Digest. Zusätzlich fährt der Job `e2e-http` Anmeldung, Abmelden, Subject-Sperre und
-  Schreibkonflikt im Browser gegen den echten Dienst (Realm `hv-e2e-031`, neun synthetische Personen, Geheimnisse je Lauf).
+  Schreibkonflikt im Browser gegen den echten Dienst (Realm `hv-e2e-031`, zehn synthetische Personen (eine mit Verwaltungsrolle, Scheibe 041), Geheimnisse je Lauf).
 - **H7 weicht von der Spec ab:** eine Person ohne aktive Rolle bekommt keine Sitzung, `/auth/callback` antwortet 403 (`R-PERM-01`) vor jedem Cookie;
   die Seite „Keine aktive Rolle“ entsteht nur, wenn eine Rolle mitten in der Sitzung entfällt. H7 belegt deshalb „kein Cookie, `/auth/me` 401“.
 - Zuordnung Bedrohung → Test: T-G1-S-02 → H4, H5, H6; T-G1-S-03 → H1, H4, `030-anmeldung.spec.ts`; T-G1-T-05 → H3, H5, H8;

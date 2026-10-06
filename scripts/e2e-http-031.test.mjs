@@ -24,10 +24,10 @@ const WEB = join(ROOT, 'apps/web');
 
 // Slice 031b (decision 4): with an IdP the five shared files run in the http project, in the order of their paths.
 const SHARED_FILES = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
-  '045-verweigerung.spec.ts', '053-steuerung.spec.ts', '054-fokusansicht.spec.ts', '055b-antwortformat.spec.ts',
+  '041-verwaltung.spec.ts', '045-verweigerung.spec.ts', '053-steuerung.spec.ts', '054-fokusansicht.spec.ts', '055b-antwortformat.spec.ts',
   '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
 const HTTP_ORDER = ['002-speakers-capture.spec.ts', '021b-koordination.spec.ts', '021c-rechtsfreigabe.spec.ts',
-  '030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts', '045-verweigerung.spec.ts', '053-steuerung.spec.ts',
+  '030-anmeldung.spec.ts', '031-http-betriebsart.spec.ts', '041-verwaltung.spec.ts', '045-verweigerung.spec.ts', '053-steuerung.spec.ts',
   '054-fokusansicht.spec.ts', '055b-antwortformat.spec.ts', '080-sprecher-zustand.spec.ts', 'abnahme.spec.ts'];
 
 const LOADER = join(ROOT, 'apps/api/node_modules/tsx/dist/loader.mjs');
@@ -37,13 +37,13 @@ const scratch = () => mkdtempSync(join(tmpdir(), 'e2e-http-031-test-'));
 
 // ---- realm ---------------------------------------------------------------------------------------------------------
 
-test('realm: nine synthetic persons, one client with one redirect URI from E2E_HTTP_PORT', () => {
+test('realm: ten synthetic persons (Scheibe 041: one with the administration role), one client with one redirect URI from E2E_HTTP_PORT', () => {
   for (const port of [4174, 4999]) {
     const { realm, users, identity } = buildFixture({ httpPort: port });
     assert.deepEqual(Object.keys(users).sort(),
-      ['approver', 'capture', 'coordination', 'expert', 'legal', 'moderation', 'norole', 'podium', 'revoke']);
-    assert.equal(PERSONS.length, 9);
-    assert.equal(realm.users.length, 9);
+      ['admin', 'approver', 'capture', 'coordination', 'expert', 'legal', 'moderation', 'norole', 'podium', 'revoke']);
+    assert.equal(PERSONS.length, 10);
+    assert.equal(realm.users.length, 10);
     assert.equal(realm.clients.length, 1);
     assert.deepEqual(realm.clients[0].redirectUris, [`http://localhost:${port}/auth/callback`]);
     assert.equal(realm.clients[0].publicClient, false);
@@ -54,8 +54,8 @@ test('realm: nine synthetic persons, one client with one redirect URI from E2E_H
       assert.match(user.username, /^synthetic-[0-9a-f-]{36}$/);
       assert(user.firstName && user.lastName && user.emailVerified === true);
     }
-    assert.equal(new Set(realm.users.map((user) => user.credentials[0].value)).size, 9, 'one password per person');
-    assert.equal(new Set(realm.users.map((user) => user.id)).size, 9);
+    assert.equal(new Set(realm.users.map((user) => user.credentials[0].value)).size, 10, 'one password per person');
+    assert.equal(new Set(realm.users.map((user) => user.id)).size, 10);
   }
 });
 

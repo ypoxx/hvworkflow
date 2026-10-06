@@ -9,7 +9,7 @@
  */
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Focus, History, ListOrdered, PencilLine, Presentation, ScrollText, Waypoints } from 'lucide-react';
+import { Focus, History, ListOrdered, PencilLine, Presentation, ScrollText, SlidersHorizontal, Waypoints } from 'lucide-react';
 import type { Permission } from '@hv/domain';
 import type { Meeting } from '@hv/domain';
 import type { TKey } from '../i18n';
@@ -20,6 +20,7 @@ import { AnswersPage } from '../features/answers/Page';
 import { FocusPage } from '../features/focus/Page';
 import { StagePage } from '../features/stage/Page';
 import { HistoryPage } from '../features/history/Page';
+import { AdminPage } from '../features/admin/Page';
 
 /** The header and navigation show only the scalar counters; `byStatus` feeds the process strip. */
 export type NumericCounter = Exclude<keyof Meeting['counts'], 'byStatus' | 'byUnit' | 'bySeat'>;
@@ -137,6 +138,20 @@ export const FEATURES: readonly Feature[] = [
     i18nModule: 'history',
     shortcutKey: 5,
     Component: HistoryPage,
+  },
+  {
+    // Scheibe 041: the administration (Verwaltung), after the history — it is no phase of the day. `requires` is data,
+    // not a role name; until the interface knows the person's rights (089b), the navigation shows it to everyone and
+    // the page shows its locked state. No shortcut, no counter.
+    id: 'admin',
+    path: '/admin',
+    labelKey: 'nav.admin',
+    icon: SlidersHorizontal,
+    testId: 'nav-admin',
+    helpKey: 'page.admin.description',
+    i18nModule: 'admin',
+    requires: 'admin.roles.manage',
+    Component: AdminPage,
   },
 ];
 

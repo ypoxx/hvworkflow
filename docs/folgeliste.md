@@ -779,6 +779,27 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 
+## Verwaltung (aus 041)
+
+- 041 Bau (Eigentümerfrage 5) · `scripts/lib/demo-persons.mjs`, `scripts/stack*.mjs` · das lokale Paket hat keine Person mit
+  Verwaltungsrolle; die zehnte Person lebt nur im Harness von `e2e-http` · Person `admin` im geteilten Verzeichnis mit
+  Zustandsübernahme für bestehende lokale Stände und Zeile auf der Installationsseite (Lane infra, rund 0,3 AStd).
+- 041 Bau (Eigentümerfrage 6) · `apps/web/src/api/roleCards.ts` · die Rollenkarten lesen die Rechtetabelle des Web-Builds,
+  nicht die wirksame des Dienstes · Endpunkt oder Feld mit der wirksamen Tabelle (Vertragsschritt, zusammen mit 089b).
+- 041 Befund (Kern) · `packages/domain/src/api.ts` `assignRole` · ohne `expiresAt` setzt der Kern kein Ablaufdatum, der
+  Vertrag sagt „Standard: Ende der Hauptversammlung“; die Oberfläche zeigt nur „Ende der Hauptversammlung“ · Vertragstext
+  und Projektion angleichen (Lane core).
+- 041 Bau · `apps/web/e2e/support/e2e-texts.ts` · die Texte, die `041-verwaltung.spec.ts` im Projekt `http` schreibt
+  (Kennung `e2e-041-pruefung`, Grund, Fachbereich, TOP, Bühnenplatz, Gerät), stehen nur als Konstanten in der Datei,
+  nicht in `WRITTEN_TEXTS`; die Prüfung des Zugriffslogs sucht sie deshalb nicht · in einer Scheibe mit `e2e-texts.ts`
+  nachtragen.
+- 041 Bau · `apps/web/src/features/admin/Page.test.tsx` · Test 7 der Spec verlangte Testing Library; das Web-Paket hat keine
+  DOM-Testumgebung, und eine neue Abhängigkeit liegt außerhalb der erlaubten Dateien · Komponenten statisch gerendert,
+  Klick- und Tastenverhalten als reine Funktionen getestet, der Bedienweg in `e2e/041-verwaltung.spec.ts`; eine
+  DOM-Testumgebung (jsdom oder happy-dom) als eigene Scheibe der Lane web-api erwägen.
+- 041 Bau · `apps/web/src/components/Dialog.tsx` · D3 verlangt Dialoge mit 480 px; das Bauteil kennt nur 384/512/672 px
+  (`sm`/`md`/`lg`), die Verwaltung nutzt `md` · Größe in einer Bauteil-Scheibe ergänzen oder die Vorgabe auf 512 px setzen.
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
