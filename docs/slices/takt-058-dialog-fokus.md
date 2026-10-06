@@ -39,6 +39,7 @@ Seitenscrollens bleiben unverändert.
 - `apps/web/src/components/Dialog.tsx`
 - `apps/web/e2e/058-dialog-fokus.spec.ts`
 - `docs/slices/takt-058-dialog-fokus.md`
+- `docs/evidence/058-dialog-fokus.png`
 
 ## Bericht
 

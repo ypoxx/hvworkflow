@@ -13,6 +13,7 @@
  */
 import { CORPUS_DEMO } from '@hv/domain';
 import type { Page } from '@playwright/test';
+import { evidence } from './support/evidence';
 import { expect, test } from './support/http-guard';
 import { asRole } from './support/roles';
 
@@ -125,11 +126,15 @@ async function writeElsewhere(page: Page, displayName: string): Promise<void> {
   await waitDone(page);
 }
 
-/** After the re-render: the focus is still on "ohne Anspruch", and the arrow key selects the next choice. */
-async function expectFocusKept(page: Page): Promise<void> {
+/**
+ * After the re-render: the focus is still on "ohne Anspruch", and the arrow key selects the next choice. With `shot`,
+ * the moment the focus is shown kept is written as evidence (R2), before the arrow key moves it.
+ */
+async function expectFocusKept(page: Page, shot?: string): Promise<void> {
   const noClaim = page.getByTestId('answer-refuse-kind-refusal_no_claim');
   const withGround = page.getByTestId('answer-refuse-kind-refusal_with_ground');
   await expect(noClaim).toBeFocused();
+  if (shot !== undefined) await page.screenshot({ path: evidence(shot) });
   await page.keyboard.press('ArrowDown');
   await expect(withGround).toBeChecked();
   await expect(withGround).toBeFocused();
@@ -143,11 +148,11 @@ test.describe('058 Dialog behält den Fokus', () => {
     await waitForCorpus(page);
   });
 
-  test('F1 Sprachwechsel über den Store bei offenem Dialog', async ({ page }) => {
+  test('F1 Sprachwechsel über den Store bei offenem Dialog @screenshot', async ({ page }) => {
     await focusNoClaim(page);
     await switchLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expectFocusKept(page);
+    await expectFocusKept(page, '058-dialog-fokus.png');
   });
 
   test('F2 Schreibung anderswo (Wortmeldung einer anderen Person) bei offenem Dialog', async ({ page }) => {
