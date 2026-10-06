@@ -21,7 +21,7 @@ export const focusDe = {
   'focus.write.close': 'Schreibmodus verlassen',
   'focus.write.keys': 'Strg+Enter speichert den Entwurf. Escape verlässt den Schreibmodus, der Text bleibt erhalten.',
   'focus.write.gone': '{number} liegt nicht mehr bei Ihnen. Der ungespeicherte Text ist verworfen.',
-  'focus.write.goneKept': '{number} liegt nicht mehr bei Ihnen. Ihr ungespeicherter Text bleibt auf diesem Gerät bis {time} erhalten.',
+  'focus.write.goneKept': '{number} liegt nicht mehr bei Ihnen. Ihr ungespeicherter Text bleibt in diesem Browser bis {time} erhalten.',
   'focus.write.rebase': 'Inzwischen liegt eine neuere Antwortversion vor. Ihr Text ist nicht gespeichert.',
   'focus.draft.unsaved': 'Ungespeicherter Text. Erst speichern; danach lässt sich die Einzelfrage weiterleiten.',
   'focus.reading.time': 'Vorlesezeit ca. {time} min',

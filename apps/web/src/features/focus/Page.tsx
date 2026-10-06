@@ -171,6 +171,14 @@ export function FocusPage() {
     // say until when it stays on this device. Without the buffer the notice of 054 stands: the text is gone.
     for (const { number, key, questionId } of discarded) {
       const meetingId = meetingOf.current[key];
+      // Decision 4 (review 060, minor 4): after `roles_changed`, a question that no longer offers drafting takes its entry
+      // along; the notice of 054 says the text is gone.
+      const stillDrafts = selected !== null && selected.id === questionId && selected._actions.includes('answer.draft');
+      if (meetingId !== undefined && draftBuffer.rolesChanged() && !stillDrafts) {
+        void draftBuffer.delete(meetingId, questionId);
+        showToast({ tone: 'neutral', title: t('focus.write.gone', { number }) });
+        continue;
+      }
       const written = meetingId === undefined ? Promise.resolve(undefined) : draftBuffer.flush(meetingId, questionId);
       void written.then((at) => showToast({
         tone: 'neutral',
@@ -179,7 +187,7 @@ export function FocusPage() {
           : t('focus.write.goneKept', { number, time: clockOf(at + BUFFER_LIFETIME_MS) }),
       }));
     }
-  }, [listSettled, drafts, recordOf, actorId, writingId, t]);
+  }, [listSettled, drafts, recordOf, actorId, writingId, selected, t]);
 
   // Opening the writing mode waits for the record of the chosen question; it opens only when that record offers
   // drafting and the question is one of "Meine Fragen" (the list can be older than the detail).
@@ -340,6 +348,14 @@ export function FocusPage() {
       if (late.changedAt !== undefined) setRestoredAt((previous) => ({ ...previous, [key]: late.changedAt! }));
     }
   }, [snapshotSeen, snapshotNow, writingId, selected, actorId, drafts]);
+
+  // A refused save and an open comparison belong to the question they were made on (010d Ziel 3, review 060 minor 7).
+  const [shownSeen, setShownSeen] = useState({ selectedId, writingId });
+  if (shownSeen.selectedId !== selectedId || shownSeen.writingId !== writingId) {
+    setShownSeen({ selectedId, writingId });
+    setRefused(null);
+    setCompareFor(null);
+  }
 
   // Decision 7.3: a refused save is sorted against the next record of its question that is newer than the click's.
   useEffect(() => {

@@ -257,8 +257,10 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
     if (isHttp()) {
       await save(page).click();
       await expect(page.locator('[aria-live] [role="status"]').first()).toBeVisible();
-      await expect(field(page)).toContainText(DRAFT_060_OFFLINE);
-      await expect(save(page)).toHaveAttribute('aria-disabled', 'false');
+      // The refused write re-reads the question (write door); offline that read fails too, and the Beantwortung drops the
+      // detail (useBacklog: a failed `getQuestion` shows no question, 010d). The text is not lost: it stays in the buffer
+      // and comes back below, once the question is open again.
+      expect(JSON.stringify(await readBuffer(page))).toContain(DRAFT_060_OFFLINE);
       await context.setOffline(false);
       // A new sign-in of the same person: the session cookie is gone, then the harness's state signs in again.
       await context.clearCookies();
@@ -536,7 +538,7 @@ test.describe.serial('060 Entwurfspuffer und Fassungsvergleich', () => {
       const q = page.items.find((item) => item.number === id)!;
       await module.api.submitForReview(q.id, { ifMatch: `"v${q.version}"` });
     }), [API_MODULE, number]);
-    await expect(page.getByText(new RegExp(`${escape(number)} liegt nicht mehr bei Ihnen\\. Ihr ungespeicherter Text bleibt auf diesem Gerät bis \\d\\d:\\d\\d erhalten\\.`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`${escape(number)} liegt nicht mehr bei Ihnen\\. Ihr ungespeicherter Text bleibt in diesem Browser bis \\d\\d:\\d\\d erhalten\\.`))).toBeVisible();
     await expect(page.getByTestId('focus-writing')).toHaveCount(0);
     expect((await readBuffer(page)).length).toBe(1);
     // Legal returns it (a permitted role). The demo persona is swapped only around the one synchronous call, so no view

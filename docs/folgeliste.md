@@ -879,4 +879,18 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   den Eintrag mit der neuen Basis neu schreiben.
 - 060 Bau · Persona-Wechsel in der Demo erreicht den Puffer über den Lesepfad (`getActor` des Live-Speichers ruft `notice()`);
   `actor.ts` bietet kein Abonnement · bei der nächsten Scheibe an `actor.ts` ein `subscribe` anbieten und dort verdrahten.
+- 060 Review nit 11 · die Doppelklick-Sperre (`detail > 1`) schluckt auch einen bewussten zweiten Klick auf eine andere Aktion
+  an derselben Stelle · nach der Layoutänderung (Feld unter den Entscheidungen) entfernen.
+- 060 Review nit 12 · E5 (http) belegt nicht, dass der Speicher **vor** der Abmeldeanfrage leer ist (nur danach); die Reihenfolge
+  belegt U1 · im Double der Abmeldeanfrage den Objektspeicher lesen.
+- 060 Design-Kritik minor 7 · die Spalten des Vergleichs sind in der geteilten Ansicht eng (Umbruch nach Fensterbreite, nicht
+  nach Breite des Detailbereichs) · Container-Breakpoint erwägen.
+- 060 Design-Kritik D5 · die Uhrzeit im Hinweis `focus.write.goneKept` steht nicht in Mono und ohne Datum (bei Ablauf am Folgetag
+  missverständlich) · Datum ergänzen, Zeit in Mono (Toast mit Teilen).
+- 060 Review nit · „wiederhergestellt“ zeigt HH:MM, „zwischengespeichert“ HH:MM:SS · eine Form festlegen.
+- 060 Review nit · Uhrzeitformatierung an drei Stellen (`DraftNote`, `focus/Page.tsx`, `clockTime`) mit der Zeitzone des Geräts,
+  während der Kopf „Ortszeit Berlin“ zeigt · eine gemeinsame Formatierung mit der Zeitzone der Versammlung.
+- 060 Bau (CI-Lauf 37458349373) · Speichern offline im HTTP-Betrieb: die Schreibtür liest nach der Ablehnung neu, offline scheitert
+  auch das, und `useBacklog` zeigt danach keine Frage mehr (das Feld verschwindet; der Text bleibt im Puffer und kommt beim
+  nächsten Öffnen wieder) · bei einem gescheiterten Neuladen die zuletzt gezeigte Frage stehen lassen (Lane web-answers, 010d).
 

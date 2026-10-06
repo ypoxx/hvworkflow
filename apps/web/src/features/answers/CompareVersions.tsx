@@ -114,12 +114,12 @@ export function CompareVersions({ mine, theirs, autoFocus, onKeepMine, onTakeThe
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <div data-testid="compare-mine" className="min-w-0 rounded-md border border-line bg-surface px-3 py-2.5">
-          <span className="hv-label">{t('answers.compare.mine')}</span>
+          <span data-testid="compare-mine-head" className="text-2xs font-medium text-ink-600">{t('answers.compare.mine')}</span>
           <AnswerText answer={{ text: mineText, ...(mineBody !== null ? { body: mineBody } : {}) }} className="mt-1 text-[13px] leading-relaxed text-ink-800 select-text" />
           <Sources sources={splitSources(mine.sources)} />
         </div>
         <div data-testid="compare-theirs" className="min-w-0 rounded-md border border-line bg-surface px-3 py-2.5">
-          <span data-testid="compare-theirs-head" aria-live="polite" className="hv-label">
+          <span data-testid="compare-theirs-head" aria-live="polite" className="text-2xs font-medium text-ink-600">
             {fill(t('answers.compare.theirs'), {
               version: mono(theirs.version),
               author,
@@ -149,23 +149,22 @@ export function CompareVersions({ mine, theirs, autoFocus, onKeepMine, onTakeThe
         {diffOpen && <WordDiff from={theirsText} to={mineText} />}
       </details>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      {/* Design critique D-b (D3): the three buttons share one row and one top edge; the hint has its own line below. */}
+      <div data-testid="compare-actions" className="mt-3 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="ghost" data-testid="compare-back" onClick={onBack}>
           {t('answers.compare.back')}
         </Button>
         <span className="flex-1" />
-        <span className="flex flex-col items-end gap-1">
-          <Button size="sm" variant="secondary" data-testid="compare-take-theirs" aria-describedby={hintId} onClick={() => onTakeTheirs(theirs.version)}>
-            {t('answers.compare.takeTheirs', { version: theirs.version })}
-          </Button>
-          <span id={hintId} className="text-2xs text-ink-600">
-            {t('answers.compare.takeTheirsHint')}
-          </span>
-        </span>
+        <Button size="sm" variant="secondary" data-testid="compare-take-theirs" aria-describedby={hintId} onClick={() => onTakeTheirs(theirs.version)}>
+          {t('answers.compare.takeTheirs', { version: theirs.version })}
+        </Button>
         <Button size="sm" variant="primary" data-testid="compare-keep-mine" onClick={() => onKeepMine(theirs.version)}>
           {t('answers.compare.keepMine')}
         </Button>
       </div>
+      <p id={hintId} className="mt-1 text-right text-2xs text-ink-600">
+        {t('answers.compare.takeTheirsHint')}
+      </p>
     </section>
   );
 }

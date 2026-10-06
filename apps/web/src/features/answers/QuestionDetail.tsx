@@ -432,8 +432,14 @@ export function QuestionDetail({
     const step = bufferStep(draft, true);
     const target = { ownerId: actorId, meetingId, questionId: question.id };
     if (step.kind === 'put') buffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
-    else if (step.kind === 'delete' && entry !== undefined) buffer.scheduleDelete(target);
+    // Always, also without a stored entry: a put still pending from an input undone within 400 ms must not land (review 060).
+    else if (step.kind === 'delete') buffer.scheduleDelete(target);
   });
+
+  // A one-shot request: the field took the focus when it was built after the comparison (its layout effect ran first).
+  useEffect(() => {
+    if (focusField && !comparing) setFocusField(false);
+  }, [focusField, comparing]);
 
   useEffect(() => {
     onCompareChange?.(comparing);
@@ -479,6 +485,8 @@ export function QuestionDetail({
 
   const may = question._actions;
   const mayDraft = may.includes('answer.draft');
+  // Without `answer.draft` there is no field to return to: the comparison closes with it (review 060, minor 8).
+  if (comparing && !mayDraft) setComparing(false);
   const maySubmit = may.includes('question.submit_review');
   const mayApprove = may.includes('question.approve');
   const mayLegalClear = may.includes('question.legal.clear');

@@ -93,7 +93,12 @@ export function WritingMode({
   const t = useT();
   const keysId = useId();
   const labelId = useId();
-  const { primary, secondary } = focusActions(question._actions, { dirty, writing: true });
+  const offered = focusActions(question._actions, { dirty, writing: true });
+  // Design critique D-a (D2): while the comparison stands in place of the field, its decision is the one primary action;
+  // the footer does not offer saving at the same time.
+  const comparing = compare !== undefined;
+  const primary = comparing && offered.primary === 'save' ? undefined : offered.primary;
+  const secondary = comparing ? offered.secondary.filter((action) => action !== 'save') : offered.secondary;
   const mayDraft = question._actions.includes('answer.draft');
   // The plain text of the previewed document (055b decision 7): the reading time and "nothing to save" read it.
   const text = previewText(body);
@@ -247,9 +252,12 @@ export function WritingMode({
               </span>
             )}
             {keptNote}
-            <span id={keysId} data-testid="focus-write-keys" className="ml-auto text-2xs text-ink-600">
-              {t('focus.write.keys')}
-            </span>
+            {/* Design critique D-c: the keys of the field do not apply while the comparison is open. */}
+            {!comparing && (
+              <span id={keysId} data-testid="focus-write-keys" className="ml-auto text-2xs text-ink-600">
+                {t('focus.write.keys')}
+              </span>
+            )}
           </div>
         </div>
       </Panel>

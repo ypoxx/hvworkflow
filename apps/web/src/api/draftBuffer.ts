@@ -16,7 +16,7 @@
  * the comparison only through `AnswerText` (decision 2).
  */
 import { useSyncExternalStore } from 'react';
-import { checkAnswerBodyInput, codePointLength } from '@hv/domain';
+import { ANSWER_TEXT_MAX_LENGTH, checkAnswerBodyInput, codePointLength } from '@hv/domain';
 import type { AnswerBodyInput } from '@hv/domain';
 import { previewAnswer, previewText } from './answerFormat';
 
@@ -39,7 +39,6 @@ const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 const SOURCES_MAX_PARTS = 50;
 const SOURCE_MAX_CHARS = 2000;
 const SOURCES_MAX_CHARS = 102_000;
-const ANSWER_TEXT_MAX_CHARS = 20_000;
 
 /** One buffered draft: exactly the fields of decision 2. The base itself always comes from the record. */
 export interface BufferEntry {
@@ -122,9 +121,11 @@ export function sanitizeEntry(raw: unknown, now: number): BufferEntry | undefine
     if (checkAnswerBodyInput(body) !== undefined) return undefined;
     checked = body as AnswerBodyInput;
     if (previewAnswer(checked) === null && hasText(checked)) return undefined;
-    if (codePointLength(previewText(checked)) > ANSWER_TEXT_MAX_CHARS) return undefined;
+    if (codePointLength(previewText(checked)) > ANSWER_TEXT_MAX_LENGTH) return undefined;
   }
-  return { id, schema: BUFFER_SCHEMA, ownerId, meetingId, questionId, body: checked, sources, baseVersion, changedAt };
+  const clean: BufferEntry = { id, schema: BUFFER_SCHEMA, ownerId, meetingId, questionId, body: checked, sources, baseVersion, changedAt };
+  // The serialised cap holds on read as on write (review 060, minor 6): a planted entry cannot be larger than one written.
+  return JSON.stringify(clean).length > ENTRY_MAX_CHARS ? undefined : clean;
 }
 
 /** A store in memory with the same interface, for tests (and nothing else). */
@@ -233,6 +234,10 @@ export function createDraftBuffer(options: {
   let loadedFor: string | undefined;
   let loading: { id: string; done: Promise<void> } | undefined;
   let loads = 0;
+  /** Actor ids whose load failed: never asked again on this page (review 060, blocker 1: no load loop on a dead store). */
+  const failed = new Set<string>();
+  /** Bumped by every clear: a load that started before it must not bring cleared entries back (review 060, minor 5). */
+  let epoch = 0;
   let rev = 0;
   let roles = false;
   // Not armed until the first explicit load: the demo start switches to the administration and back before it (blocker 1).
@@ -262,10 +267,11 @@ export function createDraftBuffer(options: {
 
   async function loadFor(id: string): Promise<void> {
     if (loading?.id === id) return loading.done;
+    const startedIn = epoch;
     const done = (async () => {
       status = status === 'unavailable' ? status : 'loading';
       try {
-        const rows = await store.getAll();
+        const rows = startedIn === epoch ? await store.getAll() : [];
         const at = now();
         const next = new Map<string, BufferEntry>();
         const drop: string[] = [];
@@ -281,6 +287,7 @@ export function createDraftBuffer(options: {
         // purgeOthers: every entry of another actor, every rejected and every expired one goes (idempotent).
         for (const rawId of drop) await store.delete(rawId);
         if (actorId() !== id) return;
+        if (startedIn !== epoch) next.clear();
         if (loadedFor !== id) roles = false;
         for (const [key, held] of pending) if (held.ownerId !== id) cancelPending(key);
         snapshot = next;
@@ -291,6 +298,7 @@ export function createDraftBuffer(options: {
         if (status !== 'unavailable') status = 'ready';
       } catch {
         status = 'unavailable';
+        failed.add(id);
       } finally {
         if (loading?.id === id) loading = undefined;
         notify();
@@ -305,7 +313,7 @@ export function createDraftBuffer(options: {
     const id = actorId();
     if (id === undefined || !armed) return undefined;
     if (id !== loadedFor) {
-      void loadFor(id);
+      if (!failed.has(id)) void loadFor(id);
       return undefined;
     }
     return id;
@@ -330,7 +338,7 @@ export function createDraftBuffer(options: {
     const changedAt = now();
     const candidate = { ...fields, id: entryId(fields.meetingId, fields.ownerId, fields.questionId), schema: BUFFER_SCHEMA, changedAt };
     const entry = sanitizeEntry(candidate, changedAt);
-    if (entry === undefined || JSON.stringify(entry).length > ENTRY_MAX_CHARS) {
+    if (entry === undefined) {
       switchOff();
       return undefined;
     }
@@ -398,7 +406,7 @@ export function createDraftBuffer(options: {
     async load() {
       armed = true;
       const id = actorId();
-      if (id === undefined || id === loadedFor) return;
+      if (id === undefined || id === loadedFor || failed.has(id)) return;
       await loadFor(id);
     },
     notice() {
@@ -439,6 +447,7 @@ export function createDraftBuffer(options: {
       return id === loadedFor && snapshot.has(key) ? kept.get(key) : undefined;
     },
     async clear() {
+      epoch += 1;
       for (const key of [...pending.keys()]) cancelPending(key);
       snapshot = new Map();
       kept.clear();
