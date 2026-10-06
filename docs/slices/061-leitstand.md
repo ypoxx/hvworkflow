@@ -914,6 +914,112 @@ i18n-Schlüssel; Ergebnisse der Vor-dem-Bau-Punkte 3 (Faltbarkeit), 5 (Rechenzei
 Tabelle mit Vergleich zu `docs/evidence/089-lagebild.png` und Urteil zu den benannten Ausnahmen; Abweichungen vom Prototyp
 (Rednernamen, Wortmeldung, Widerspruchskanal, Rednerwand, Flussbild, Prognosen) mit Grund.
 
+### Bericht Teil A (Kern), 06.10.2026
+
+```
+Slice: 061-leitstand (Teil A)
+Done: Vertrag 0.4.5 (getMeetingCockpit, cockpit.read, Cockpit/CockpitOldestRef/CockpitReviewRef); Kern cockpit.ts
+      (computeCockpit, statusTrail, COCKPIT_THRESHOLDS, cockpitLevel, COCKPIT_REPORT), Recht in drei Bündeln, getCockpit
+      mit can()-Filter; Route, Bericht leitstand im Katalog, Tor-Regel (g), Generator; MF-17, DSFA V15; Web-Adapter.
+Evidence: pnpm gates grün auf 6185101 (Schluss unten); Teil A: Artefakt auswertungskatalog erst im PR-Lauf (offen)
+Open: siehe „Offen“ unten
+Touched: siehe „Dateien“ unten
+```
+
+**Commits** (auf `225cc4e`, Branch `claude/slice-061-leitstand`, nicht gepusht): `e8c3fbb` Golden zuerst · `c332c43`
+Vertragsschritt · `4b8a310` Kerntests rot · `b6346c0` Kern · `c2c89dd` Katalog, Tor (g), Generator · `393f3c1` Dienst ·
+`2be6a29` Web-Adapter · `6185101` MF-17, DSFA V15, Folgeliste.
+
+**Rot, dann grün (echte Ausgaben, gekürzt):**
+- Kern K1–K12 vor `cockpit.ts` (`4b8a310`): `FAIL src/__tests__/cockpit061.test.ts … Error: Cannot find module
+  '../cockpit.js'`; danach `Tests 22 passed (22)`.
+- Dienst A1–A7 ohne Route: `Tests 4 failed | 2 passed (6)` (A1, A2, A3, A7 rot; A5 und A6 prüfen vorher Gebautes, siehe
+  Rot-Proben); Postgres A4 ohne Route: `Tests 3 failed (3)`; danach zusammen `Tests 9 passed (9)`.
+- Katalog G1–G3 mit dem Tor und Generator vor (g): `# pass 21 # fail 6` (G1, G2, vier G3); danach `# pass 27 # fail 0`.
+- Web L1 und Routenzeile vor dem Adapter: `Tests 2 failed | 168 passed (170)` (`expected 'undefined' to be 'function'`,
+  `invoke is not a function`); danach mit Parität `Tests 204 passed (204)`. Test (p) ist auf `b6346c0` rot (der Kern hat
+  `getCockpit`, der Live-Store noch nicht) und ab `2be6a29` grün.
+- **Rot-Probe K7** (nicht committet): ein Feld `claimedBy` an jeder Referenz ⇒ `AssertionError: u-legal-1: expected
+  '{"meetingId":"hv-2031",…' not to contain 'u-legal-1'`.
+- **Rot-Probe A5** (nicht committet): Sortierung von `openQuestionsByUnit` in `indicators.ts` umgedreht ⇒ `× renderMetrics
+  for the seed at a fixed clock equals metrics-golden-061.txt`. Das Golden wurde vor jeder Änderung an `indicators.ts`
+  erzeugt (`e8c3fbb`); nach dem Umbau auf die gemeinsamen Hilfen byte-gleich (`cmp` ohne Unterschied, A5 grün).
+
+**Schlüsselweg der Antwort:** `meetingId, asOf, meetingStatus, debateClosedAt?, totals.{captured,open,staged,answered},
+openByStatus.{captured,classified,assigned,answer_drafted,in_review,approved,staged}, openByUnit.*, openUnassigned,
+oldestOpen.{ageSeconds, items[].{id,number,status,unitId?,ageSeconds,statusAgeSeconds}}, inflow.{binSeconds,bins[],last5m},
+legalReview.{over10m, items[].{…, reviewAgeSeconds}}` — 35 Blattpfade, gleich `COCKPIT_REPORT.fields` und
+`catalog.json reports[leitstand].fields` (A6, A7).
+
+**Rechte-Diff (Wahrheitstabelle, Rechteentscheidung):** nur „Role × Leserecht“ ändert sich, neue letzte Spalte
+`cockpit.read`: moderation ✓, capture ·, coordination ✓, expert ·, legal ·, approver ·, podium ·, admin ✓, observer ·.
+Alle übrigen Tabellen Zeile für Zeile gleich. Stromthemen unverändert.
+
+**Vor-dem-Bau-Punkte:** (1) Nachprüfung lag vor; Vertragsversion: Integrationszweig bei 0.4.4, 046 noch nicht gemergt ⇒
+**0.4.5** (siehe Offen). (2) Golden als eigener Commit vor `indicators.ts`. (3) Faltbarkeit: `reduce` über die Ereignisse
+aus `getQuestionHistory` ergibt für alle 230 Einzelfragen des Seeds den Status von `listQuestions` (K9 grün); kein Rückfall
+nötig. (5) Rechenzeit: die erste Fassung (eine Faltung über das ganze Log) lag bei 800 Einzelfragen (6329 Ereignisse)
+bei p50 244 ms / p90 312 ms, weil `reduce` nach jedem Ereignis den Jahrgang neu zählt. Umbau ohne Zwischenspeicher:
+dieselbe Faltung je Einzelfrage über ihre eigenen Ereignisse auf leerem Zustand, der Rest des Logs einmal, danach einmal
+`refreshCounts` (Gleichheit mit `project` durch K3 und K11 gepinnt) ⇒ **p50 18,7 ms, p90 25,9 ms** (200 Läufe, warm,
+in-process). (4) und (6) gehören zu Teil B.
+
+**Abweichungen und Präzisierungen (Bau):**
+- `computeCockpit` gibt `undefined` zurück, wenn die Ereignisse den Jahrgang nicht enthalten; `getCockpit` antwortet dann
+  404. Ereignisse mit Serverzeit nach `now` zählen im Leitstand nirgends (K8); `computeIndicators` zählt sie im Bestand
+  weiter, K3 gilt ohne solche Ereignisse (Folgeliste).
+- Eine Fachbereichs-id aus dem Log, die nicht mehr in der Konfiguration steht, behält wie bei `hv_open_questions` einen
+  eigenen Schlüssel in `openByUnit` (K3).
+- `COCKPIT_REPORT` und der Katalogeintrag tragen zusätzlich `purpose` (Zweck für den Generator-Abschnitt); Blattpfade
+  von Abbildung und Liste als `openByUnit.*` bzw. `inflow.bins[]`.
+- `cockpitLevel(figure, value, { debateClosed })` mit den Kennzahlen `oldestOpen`, `legalReviewOver10m`, `unitBacklog`,
+  `unassignedBacklog`, `openTotal`, `inflow`, `staged`; `COCKPIT_THRESHOLDS.oldestOpenSeconds` in Sekunden (900/2700).
+- Tag der Operation: das bestehende `meeting`. Englischer Text `action.cockpit.read`: „View the cockpit“ (Glossar
+  Leitstand = Cockpit); deutsch „Leitstand ansehen“. Parität 621 → **622**.
+
+**Gates** (`pnpm gates` auf sauberem Baum, Commit `6185101`, eigene Datenbank `hv_test_s061`, Postgres-Tests aktiv):
+
+```
+packages/domain test:       Tests  513 passed (513)
+apps/web test:       Tests  801 passed (801)
+apps/api test:       Tests  700 passed (700)
+apps/api test: operation-coverage: 71 operations in the contract, 69 exercised by tests, 2 pre-declared in allowlist.json
+slice-scope: 43 changed file(s), all within "docs/slices/061-leitstand.md"'s "Files allowed" list (101 pattern(s)).
+metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
+# tests 358
+# pass 358
+# fail 0
+✓ built in 2.92s
+mark-test-run: wrote /home/user/wt/s061/.claude/state/last-test-run (clean tree) at commit 6185101, tree 2a37042ca5bd…
+```
+
+Zwei frühere Läufe auf demselben Commit waren rot in `postgres027.test.ts` („rebuilds a 10,000-event Postgres snapshot“,
+408 nach 16,7 s bzw. 28,6 s) und einmal in `postgres-stream035.test.ts` Test 29 (Streuung 5,6 s > 2 s), bei Lastmittel 20–30
+auf vier Kernen durch parallele Agenten. Derselbe Test war in derselben Lage auch auf dem Basis-Commit `225cc4e` rot (11,6 s)
+und ist einzeln auf beiden Commits grün; der grüne Lauf oben lief bei Lastmittel um 9. Kein Bezug zu 061 (der Test liest
+`/v1/meetings`, nicht den Leitstand).
+
+**Offen:**
+- Vertragsversion **0.4.5** statt der erwarteten 0.4.6, weil 046 bei Baubeginn nicht gemergt war. Versionsabhängige Stellen
+  bei einem Rebase auf 0.4.6: `packages/contract/openapi.yaml` (`info.version`, „Since 0.4.5“ im `Action`-Absatz, in der
+  Operation und in drei Schemabeschreibungen), `packages/contract/package.json`, `packages/contract/CHANGELOG.md`
+  (Abschnittskopf und Text), `packages/contract/src/types.ts` (neu erzeugen), `takt-019-contract.test.ts` (Version, Zahl
+  der Operationen 71 bzw. 72 mit 046, Kommentar), `contract.test.ts` (Version), `apps/web/src/api/http.ts` (Kommentar),
+  `apps/web/src/api/http.test.ts` (Kommentar), `docs/sicherheit/bedrohungsmodell.md` (Zeile 061). MF-Nummer bleibt 17.
+- Artefakt `auswertungskatalog` mit „Berichte (Oberfläche)“: erst im CI-Lauf des PR (Lauf-ID, Artefakt-ID nachtragen).
+- Branch heißt `claude/slice-061-leitstand` (die Spec nennt `claude/slice-061-kern`); `slice-scope` erkennt beide.
+- Folgeliste: Schwellen doppelt (`urgencyLevel`), Zeitgrenze für Ereignisse nach `now` in `/metrics`.
+
+**Dateien:** `packages/contract/{openapi.yaml,package.json,CHANGELOG.md,src/types.ts}`;
+`packages/domain/src/{cockpit.ts,indicators.ts,types.ts,permissions.ts,api.ts,index.ts}`;
+`packages/domain/src/__tests__/{cockpit061,admin040a,api,forward048}.test.ts`; `packages/domain/policy-truth-table.md`;
+`apps/api/src/app.ts`; `apps/api/src/metrics/catalog.json`; `apps/api/src/__tests__/{cockpit061,postgres-cockpit061,
+takt-019-contract,contract}.test.ts`; `apps/api/src/__tests__/fixtures/metrics-golden-061.txt`;
+`scripts/{auswertungskatalog,metrics-allowlist-check}{.mjs,.test.mjs}`; `scripts/fixtures/metrics-allowlist/report-{person-field,
+no-spec-section,bad-source,bad-id}.json`; `apps/web/src/api/{http.ts,http.test.ts,liveStore.ts,liveStore.test.ts,
+liveStore061.test.ts}`; `apps/web/src/i18n/{labels.ts,shell.de.ts,shell.en.ts,parity.test.ts}`;
+`docs/sicherheit/bedrohungsmodell.md`; `docs/datenschutz/dsfa-vorentwurf.md`; `docs/folgeliste.md`; diese Spec.
+
 ## Review findings
 
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
