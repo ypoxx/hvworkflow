@@ -69,6 +69,8 @@ statische Demo auf Netlify.
 
 ## Bericht
 
+Der erste Block beschreibt den Stand 1d56b8d (vor dem Sicherheitsreview); gültig ist der Nachtrag darunter (2287433).
+
 ```
 Slice: takt-059-demo-csp
 Done: netlify.toml sendet für /* zusätzlich Content-Security-Policy (nur 'self'/'none'); die drei vorhandenen Header
@@ -129,4 +131,77 @@ Open: Review in frischem Kontext (Perspektive Sicherheit) steht aus. CSP für HT
       Kandidat für docs/folgeliste.md).
 Touched: netlify.toml, apps/web/vite.config.ts, apps/web/playwright.config.ts, apps/web/e2e/takt-059-demo-csp.spec.ts,
       .github/workflows/gates.yml, docs/evidence/takt-059-demo-csp.png, docs/slices/takt-059-demo-csp.md
+```
+
+### Nachtrag nach dem Sicherheitsreview (Review von b75695c)
+
+```
+Slice: takt-059-demo-csp (Nachtrag: Blocker und Minors des Sicherheitsreviews)
+Done: Blocker behoben: netlify.toml lockert genau style-src-attr 'unsafe-inline'. Die Hervorhebung im Antwortfeld ist
+      execCommand('hiliteColor') (editorCommands.ts:85); Chrome schreibt ein style-Attribut, das style-src 'self' sperrte
+      (gespeichert, nicht gemalt). D1 hebt in Beantwortung über die Werkzeugleiste (format-highlight) und im Schreibmodus von
+      Meine Fragen mit Strg+Umschalt+H hervor und verlangt einen gemalten Hintergrund (computed background-color nicht
+      transparent), weiter null Verstöße und null Konsolenfehler. Vor jeder Prüfung von D1 zwei Animation-Frames, eine
+      Task-Runde und ein Fenster bis 300 ms (Minor 7); der 404 von vite preview auf /favicon.ico zählt nicht (Nit 9, nur
+      genau diese Meldung). D2 zusätzlich: <style>-Element bleibt wirkungslos, genau ein Verstoß style-src-elem; die vier
+      Direktiven frame-ancestors, base-uri, form-action, object-src sind je 'none' (Minor 3); der Textwächter lässt genau
+      die eine Lockerung zu, script-src und style-src bleiben 'self'. playwright.config.ts: E2E_DEMO_BUILD_DIR nennt ein
+      Verzeichnis, gebaut wird immer in dessen festes Blatt web-build, --emptyOutDir leert nur dieses (Minor 6). Spec Ziel 1
+      und 3 ergänzt. Kein Oberflächencode geändert.
+CSP (final, netlify.toml):
+      default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; font-src 'self';
+      connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';
+      frame-ancestors 'none'
+      Einzige Lockerung: style-src-attr 'unsafe-inline' (Entscheidung des Orchestrators). Nachgewiesener Verstoß: D1 gegen
+      die Policy von b75695c rot (unten). Begründung: ein Stilattribut führt kein Skript aus; url()-Abfluss bleibt durch
+      img-src/font-src 'self' gesperrt; die Oberfläche hat keine HTML-Senke; eine Änderung am Editor am Vortag der Demo trägt
+      mehr Risiko. style-src 'self' gilt weiter für Elemente und Dateien (D2: <style> blockiert). Die Lockerung entfällt,
+      sobald die Hervorhebung über CSSOM (wie bodyToDom: span.style.backgroundColor) oder eine Klasse gesetzt wird.
+      Unverändert: img-src ohne data: (Verschärfung), kein 'unsafe-eval', kein fremder Host.
+Evidence: pnpm gates auf 2287433 (Code, Spec, Screenshot; dieser Nachtrag kam danach als reine Doku-Änderung hinzu):
+      packages/domain test:       Tests  562 passed (562)
+      apps/web test:       Tests  1162 passed (1162)
+      apps/api test:       Tests  710 passed (710)
+      i18n-literal check: 0 literals found under apps/web/src/features, apps/web/src/app.
+      slice-scope: 7 changed file(s), all within "docs/slices/takt-059-demo-csp.md"'s "Files allowed" list (7 pattern(s)).
+      # pass 359
+      # fail 0
+      dist/assets/index-CSiifmGG.js                        908.74 kB │ gzip: 262.96 kB
+      ✓ built in 1.13s
+      mark-test-run: wrote /home/user/wt/takt059/.claude/state/last-test-run (clean tree) at commit 2287433, tree acf4c50e9059…
+      D1 rot gegen die Policy von b75695c (netlify.toml aus b75695c, Test aus 2287433, danach zurückgesetzt):
+        ✘  1 [demo-build] › … D1 core views, role switch, language switch, shortcuts dialog, one form and the highlight: … (8.0s)
+        Error: painted background of Gelbprobe
+        Expected pattern: not /^(transparent|rgba\(0, 0, 0, 0\))$/
+        Received string:      "rgba(0, 0, 0, 0)"
+        1 failed
+      Ebenso rot der Schreibmodus allein (Prüfung der Werkzeugleiste vorübergehend herausgenommen):
+        Error: painted background of Schreibprobe
+        Received string:      "rgba(0, 0, 0, 0)"
+        1 failed
+      demo-build grün auf 2287433 (E2E_DEMO_BUILD=1 pnpm exec playwright test --project=demo-build):
+        ✓  1 [demo-build] › … D1 core views, role switch, language switch, shortcuts dialog, one form and the highlight: zero violations, zero console errors @screenshot (7.7s)
+        ✓  2 [demo-build] › … D2 the policy is in force: inline script, style element and eval are refused, one violation each; the text holds (630ms)
+        ✓  3 [demo-build] › … D3 the demo build holds no source map and no sourceMappingURL comment (106ms)
+        3 passed (12.5s)
+      --repeat-each=3 grün (9 passed). in-process-e2e der Editor-Specs auf 2287433 (055b, 054, 060, 058; die Policy wirkt
+      dort nicht, die regenerierten PNGs zurückgesetzt):
+        3 skipped
+        24 passed (1.8m)
+      Minor 6: E2E_DEMO_BUILD_DIR=/, ein relativer Pfad und ein Pfad mit ' werden abgewiesen; mit dem Repo-Pfad baut der
+      Befehl nach <repo>/web-build, nicht in das Repo selbst.
+      docs/evidence/takt-059-demo-csp.png neu, unter der finalen CSP.
+Open: Nachprüfung des Blockers in frischem Kontext steht aus. Kandidaten für docs/folgeliste.md (nicht behoben; die Datei
+      ist nicht in Files allowed):
+      - Hervorhebung über CSSOM oder eine Klasse statt execCommand('hiliteColor'); danach style-src-attr 'unsafe-inline'
+        streichen.
+      - Befund 2: Einfügen oder Ablegen von HTML mit Stilen aus fremder Zwischenablage erzeugt style-src-elem-Rauschen.
+      - Befund 4: strenger default-src 'none', worker-src 'none', manifest-src 'none'.
+      - Befund 8: liegengebliebene Verzeichnisse .e2e-demo-build-<pid> unter apps/web/node_modules.
+      - Befund 10: Trusted Types.
+      - Befund 11: Zeilen BF-06 und BF-25 im Bedrohungsmodell nachziehen.
+      - Befund 12: ungenutzte apps/web/public/favicon.svg und icons.svg.
+      - Aus dem ersten Bericht: die Form des Modus E2E_DEMO_BUILD in scripts/e2e-http-031.test.mjs festhalten.
+Touched (2287433): netlify.toml, apps/web/playwright.config.ts, apps/web/e2e/takt-059-demo-csp.spec.ts,
+      docs/evidence/takt-059-demo-csp.png, docs/slices/takt-059-demo-csp.md
 ```
