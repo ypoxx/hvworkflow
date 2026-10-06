@@ -33,8 +33,9 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 ## Tests
 
 - 021c Hotfix Review minor · `apps/api/src/__tests__/legal-clearance.test.ts` · der HTTP-Regressionstest prüft nach 422 derzeit nur die Frageversion; `legalClearance` und Ereigniszahl zusätzlich je Request prüfen (der Domänentest deckt beides bereits ab).
-- 010c CI-Korrektur minor · `apps/web/e2e/010c-lesezustand.spec.ts:118` · ein `import()` mit `await` bleibt in
-  `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.
+- ~~010c CI-Korrektur minor · `apps/web/e2e/010c-lesezustand.spec.ts:118` · ein `import()` mit `await` bleibt in
+  `installHarness` (in 010d auf Abfrage umgestellt, prüfen ob erledigt) · ggf. streichen.~~ → erledigt in **010d**
+  (Ziel 5: `installHarness` startet die Importe und fragt den Zustand ab; geprüft in takt-050).
 - 090 R2 nit · `apps/web/e2e/090-eingaben-je-akteur.spec.ts` (`expectCleared`) · Prüfung von `#main` per
   `not.toContainText` sieht keine Feldwerte und fügt nichts hinzu · streichen oder auf Feldwerte umstellen.
 - takt-049 · `apps/web/playwright.config.ts` · kein `actionTimeout`: Jede wartende Locator-Aktion in einem
@@ -43,6 +44,41 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 - takt-049 · `apps/web/e2e/045-verweigerung.spec.ts:160` · `count()` und danach `getAttribute('aria-pressed')`
   (gleiche Form, außerhalb eines Polls, der Umschalter bleibt stehen) · bei Gelegenheit auf eine atomare Lesung
   umstellen.
+- takt-050 · `apps/web/e2e/028-konflikte.spec.ts:20, 55, 77, 98` · `await import(...)` im Evaluate (gleiche Klasse wie
+  010b R4B) · auf `support/app-modules.ts` umstellen, Evaluates synchron.
+- takt-050 · `apps/web/e2e/053-steuerung.spec.ts:317` · `await import(...)` und danach `await` auf `listQuestions` und
+  `assignQuestion` im Evaluate · Hilfe nutzen, Ausgang an `window`, abfragen.
+- takt-050 · `apps/web/e2e/055b-antwortformat.spec.ts:307, 462` · `await import('…/domToBody')` im Evaluate · Hilfe mit
+  eigener URL nutzen.
+- takt-050 · `apps/web/e2e/takt-037-vorschlagsauswahl.spec.ts:56` · `await import(...)` und `await` auf App-Aufrufe im
+  Evaluate · wie 053.
+- takt-050 · `apps/web/e2e/010c-lesezustand.spec.ts:118–160` · eigenes `installHarness` mit gleichem Zweck, das Promise
+  hängt nicht an `window` · auf die gemeinsame Hilfe umstellen.
+- takt-050 · `apps/web/playwright.config.ts:27–28` und `.github/workflows/gates.yml:152` · lokal Chromium 141 (fest
+  abgelegt), in CI Headless Shell 151 (Revision 1234): Browserabhängige Wackler lassen sich lokal nicht nachstellen ·
+  Revision 1234 lokal bereitstellen oder CI auf denselben Browser festlegen (Eigentümer, Netzrichtlinie).
+
+- takt-049 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/focus-list.ts:28` · `readFocusList` ruft `checkVisibility()` ohne
+  Optionen: `visibility:hidden` und Nullgröße zählen als sichtbar (Playwright wertet beides als versteckt) ·
+  `{ visibilityProperty: true }` und eine Prüfung der Box.
+- takt-049 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/focus-list.ts` (T1) · der Test belegt das Verhalten von Playwright,
+  nicht `waitForMine` selbst; kein eingecheckter Test bricht, wenn `waitForMine` zurückgedreht wird · einen Test, der an der
+  Lesefunktion scheitert.
+- takt-049 Review (Sonnet, 05.10.2026) nit · `apps/web/e2e/support/focus-list.ts` · Zeilen werden nur innerhalb von `focus-list` gelesen
+  (gleichwertig, nur vermerkt); die 2-s-Grenze misst mit `performance.now`.
+- ~~054 F6 · `apps/web/e2e/054-fokusansicht.spec.ts` (in-process F6 „coordination: the notice, no rows“) · `waitForMine` lief nach 15 s
+  in den Timeout (#159, Job 111855623850, Commit `7928053`, Artefakt des Laufs 37337216828)~~ → erledigt in **takt-049** (atomare Lesung; Ursache war die zeilenweise Lesung der Liste).
+- 010b Runde 4 (Lauf 37347756649, Job 111890560965, Commit `d17bcbf`, 05.10.2026) · `apps/web/e2e/010b-lesepfade.spec.ts:802` (Runde 4 B,
+  Bühne, Rollenwechsel bei „Nur Bühne“) · `page.evaluate: Resulting promise was garbage collected`, bisher einmalig · **in Arbeit als
+  takt-050** (nicht offen); `evaluate` nicht über Navigation oder Rollenwechsel hinweg offen halten.
+- takt-050 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/app-modules.ts:74-81` (mit #165) · die Pollmeldung nennt immer
+  „state 'loading' means the dynamic import never settled“, auch bei Zustand `failed: …` · neutral formulieren oder bei `failed` früh
+  mit dem Fehlertext abbrechen.
+- takt-050 Review minor · `apps/web/e2e/support/app-modules.ts:52-56` · nach `failed` startet ein zweiter Aufruf von `loadAppModules`
+  einen neuen Import (impliziter Neuversuch über Aufrufe) · einen Satz Kommentar oder `failed` festhalten.
+- takt-050 Review nit · `apps/web/e2e/010b-lesepfade.spec.ts:809` (R4A) · der Poll auf `expect.any(Number)` zeigt ein `failed: …` nur als
+  Zeitüberschreitung (der empfangene Wert steht in der Meldung).
+
 
 ## Dienst: Anmeldung (vor oder mit 029)
 
@@ -456,6 +492,18 @@ behoben oder als harte Vorbedingung in 034 geführt; hier nur minor/nit.
 - 037a Review · `docs/evidence/037a-stack-protokoll.txt` · das Protokoll entstand auf „938ffbe + Arbeitsstand“, nicht auf
   einem benannten Commit · bei der nächsten Wiederholung (mit erreichbarem quay.io) auf einem benannten Commit neu aufnehmen.
 
+- takt-045 Review (Opus, 05.10.2026) minor 1 · `scripts/stack.mjs:718,793` · ein misslungener Start (`startCode` ≠ 0) lässt Postgres
+  gestoppt, die Installationsseite nennt nur Strg+C · Hinweis `pnpm stack:up` oder feste Zeile bei `startCode` ≠ 0. **Offen.**
+- takt-045 Review minor 2 · `scripts/stack.mjs:780-791` · wirft `observePostgresRestart`, fehlen die Zeile S16.1 und der
+  Zustand des Dienstes · `try/finally` um den Aufruf. **Offen.**
+- takt-045 Review minor 3 · `scripts/stack.test.mjs` · Tests fehlen für: Wächter endet früh, `startPostgres` wirft, langer Stopp
+  (> 45 s) startet sofort. **Offen.**
+- takt-045 Review minor 4 · `scripts/stack.mjs:716-720` · ein Fehler von `startPostgres` im `finally` verdrängt den Fehler des
+  Stopps · beide melden oder den ersten Fehler behalten. **Offen.**
+- takt-045 Review nit · `scripts/stack.mjs` (Label der ersten `check`-Zeile) · geändert, obwohl die Spec „bleibt“ sagt;
+  `scripts/stack.test.mjs:928-929` (Test 4) kodiert `1_004_000` hart; der 45-s-Timer nach DOWN wird nicht gelöscht.
+
+
 ## Sicherheit und Datenschutz aus der Nachprüfung — nicht Folgeliste, eingeplant
 
 Nach dem Kopf dieser Datei gehören Befunde zu Sicherheit, Recht und Datenschutz nicht auf die Folgeliste (Codex P1 auf
@@ -779,12 +827,40 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 055b Bau · `apps/web/src/api/http.test.ts` · der typisierte Fall „`draftAnswer` reicht `body` durch“ (Folgepunkt aus 055)
   liegt außerhalb der erlaubten Dateien von 055b · in einer Scheibe mit `api/**` nachziehen.
 
+- takt-048 Review (Opus, 05.10.2026) minor · `features/answers/QuestionDetail.tsx:328-348,796` · der eigene neue Stand kommt vor
+  `draftResetToken`: der Rebase-Hinweis „neuere Antwortversion“ blitzt kurz beim eigenen Speichern auf (`afterSave` läuft vor
+  `onRecord`, wenn `latest` = gesendet) · Reihenfolge ändern oder den eigenen Stand erkennen.
+- takt-048 Review nit · `features/answers/QuestionDetail.tsx:822` · `version = answers.length + 1` statt `latest.version + 1`.
+- takt-048 Review nit · `features/answers/draft.ts:76` · `discard` und `onRecord` erhöhen `generation` um 2.
+- takt-048 Design-Kritik (05.10.2026) D2 · `QuestionDetail.tsx:435` · ohne anderen Schritt ist der einzige primäre Knopf ein
+  gesperrter „Entwurf speichern“ über vorbelegtem Text; kein Screenshot · Zustand prüfen, Screenshot ergänzen.
+- takt-048 Design-Kritik D6/D7 · `i18n/answers.de.ts:65`, `i18n/focus.de.ts:24` (`answers.editor.rebase`, `focus.write.rebase`) · „Ihr Text ist nicht
+  gespeichert.“ sagt nicht, dass „Neu laden“ den Text verwirft · beide Stellen im selben Wortlaut ändern.
+- takt-048 Design-Kritik D6 Nachweis · `docs/evidence/` · keine Screenshots von Rebase-Hinweis, geändertem Zustand und
+  Verweigerung leer · bei Gelegenheit ergänzen.
+- takt-048 Design-Kritik D4/D5 Nachweis · `docs/evidence/` · Nullzähler nur in der Fachbereichszelle im Normalzustand belegt; nicht
+  „Ohne Fachbereich“, Bühnenplatz, Hover und aktiv · ergänzen (zusammen mit `SpeakerRow.tsx:176`, siehe „Kontrast der Nullzähler“).
+- takt-048 Design-Kritik nit D10 · `features/answers/QuestionDetail.tsx` (Versionskarte) · der vorbelegte Text steht doppelt unter der Karte.
+- takt-048 Design-Kritik nit D3/D7 · `features/answers/QuestionDetail.tsx:435` (gesperrter Knopf) · `ink-400` auf `ink-50` ≈ 2,3:1 · Ton prüfen.
+
+
 ## Skripte
 
 - 043a/044a Doku · `scripts/downgrade-check.mjs:73` (`/^(\d{3})-.*\.md$/`) und `:28` (`BULLET_RE` mit `\d{3}`) · Specs mit
   Buchstaben (043a, 044a, 064a …) fallen aus der Prüfung; eine zu niedrig eingestufte Teil-Spec fällt nicht auf · Muster
   um `[a-z]?` erweitern und Teil-Specs gegen den Plan-Eintrag der Stammscheibe prüfen (ergänzt den Eintrag takt-021 Codex P1).
 - Vorschlag (04.10.2026, #148 geschlossen wegen eines Gitleaks-Fehlalarms in einem Commit) · Ablauf vor dem Push · lokaler Gitleaks-Lauf über die Commits des Zweigs; das Programm fehlt im Container · Bereitstellung klären (Binärdatei im Bauabbild oder Pre-push-Skript), bis dahin gilt die Regel: Speichernamen als Modulkonstanten, nie als JSX-Literal.
+- takt-046 Review (Sonnet, 05.10.2026) nit · `scripts/e2e-http-031.mjs:182` (`clock`) · rundet ab: bei 390_001 ms steht „6:30 … warning
+  above 6:30“ · Kommentar oder aufrunden.
+- takt-046 Review nit · `scripts/e2e-http-031.mjs:188-190` (`formatDuration`) · leere `stages` ergeben „stages: “ (praktisch
+  unerreichbar) · festen Text „none“.
+- takt-046 Review nit · `scripts/e2e-http-031.test.mjs:555-558` · die Regex prüft nicht die Reihenfolge von Aufräumen und Zeile im `finally`.
+- takt-047 Nachprüfung (05.10.2026) minor · `scripts/release-age.mjs:7` (`PATTERN_ENTRY`) · breite Stämme wie `hono*` und `@a/*` sind
+  erlaubt (Spec: mindestens 3 Zeichen oder ein voller Scope) · engere Regel.
+- takt-047 Nachprüfung minor · `scripts/release-age.mjs:53` · Zeilen im Ausnahmeblock, die nur aus NBSP oder VT bestehen, werden
+  übersprungen (verbirgt keinen Eintrag) · als unbekannte Zeile melden.
+- takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
+
 
 ## Entwurfspuffer und Fassungsvergleich (aus 060 Bau)
 

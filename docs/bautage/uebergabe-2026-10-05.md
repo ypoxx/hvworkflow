@@ -32,3 +32,32 @@ takt-046 (`e2e-http`-Laufzeit: Grenze anheben oder Job teilen), takt-045 (Sonde 
 - Frage an den DSB zur Aufbewahrungsklasse (`working` oder `record`) für `QuestionForwarded` und `QuestionAssigned`; offen bis zur Antwort.
 - CSP der Webseite (037b) vor jedem Rollout von 055/055b.
 - E21 unverändert (Nach-Beta).
+
+## Abend 05.10.2026
+
+Stand: Integrationsbranch bei `c5990c8`. Gemergt an diesem Tag, in dieser Reihenfolge:
+
+- #158 `4e38512` Eigentümerentscheidungen in den Docs.
+- #159 `11bbdf7` takt-046: Grenzen von `e2e-http` auf 12, 14 und 20 Minuten, Laufzeitzeile je Lauf.
+- #161 `3136bf0` takt-047: pnpm `minimumReleaseAge` 10080 mit Ausnahmeweg für Sicherheitspatches.
+- #160 `d17bcbf` takt-045: Sonde `postgres-restart` mit stop, DOWN gesehen, start.
+- #163 `8215bc0` takt-049: 054 F6, `waitForMine` liest atomar.
+- #162 `c5990c8` takt-048: Nullzähler Grau 600, Beantwortung mit der letzten Version vorbelegt; Risikoklasse mittel, 1,0 AStd, weil die Vorbelegung den Pfad berührt, der Antwortversionen anlegt.
+
+Review-Befunde und Folgepunkte stehen in `docs/folgeliste.md` (Abschnitte Tests, Betriebspaket, Antwortformat in der Oberfläche, Skripte).
+
+### Offen
+
+- **takt-050** (010b Runde 4, `page.evaluate` beim Rollenwechsel; `010b-lesepfade.spec.ts:802`): in Arbeit.
+- **055c** (nummerierte Listen): Spec zuerst, Klasse hoch, Entscheidung zur Form der Liste nötig.
+- Rechtsblick zur Formatänderung, die die Freigabe aufhebt: empfohlen, nicht erfolgt.
+- Frage an den DSB zur Aufbewahrungsklasse für `QuestionForwarded` und `QuestionAssigned`: offen.
+- CSP der Webseite (037b) vor jeder geteilten Umgebung.
+- Rollout nur mit ausdrücklichem Go des Eigentümers.
+- Danach die Kette 059, 046, 060, 061, 041; 089b nach 041.
+
+### Lehren
+
+- Parallele `pnpm gates`-Läufe brauchen getrennte Datenbanken (`hv_test_<takt>`); die Postgres-Tests teilen sonst einen datenbankweiten Advisory-Lock und werden rot.
+- `slice-scope` liest Pfade in Backticks unter „Dateien“ als erlaubt, auch in Verneinungen („nicht …“); gesperrte Pfade dort ohne Backticks nennen.
+- e2e-Abfragen müssen das DOM atomar lesen (ein `evaluate`), nicht Zeile für Zeile mit wartenden Locator-Aktionen innerhalb von `expect.poll` (takt-049).
