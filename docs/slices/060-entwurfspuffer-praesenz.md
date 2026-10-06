@@ -901,6 +901,14 @@ Demo):** eine gespeicherte Version geht verloren, wenn innerhalb von 150 ms neu 
 betroffen. Nicht behoben, weil `index.ts` in 060 nur für die Pufferverdrahtung erlaubt ist; Folgeliste und Hinweis an den
 Orchestrator (Vorschlag: Log bei `pagehide` sofort schreiben).
 
+### Nacharbeit 4: Codex P2 auf #170 (überholtes Laden löscht)
+
+`loadFor` löschte die Zeilen nach einer veralteten Lesung, bevor es den aktuellen Akteur prüfte: bei A → B → A mit langsamem
+IndexedDB entfernte das Laden für B die Zeile von A, während die Momentaufnahme weiter für A galt. Jetzt prüft das Laden Akteur und
+`clear`-Epoche vor dem Löschen und vor jeder einzelnen Löschung; ein überholtes Laden löscht nichts und übernimmt nichts (der tote
+Zweig `startedIn === epoch ? … : []` entfällt). Test zuerst: `draftBuffer.test.ts` „A → B → A while the B load waits for storage“
+rot (`expected +0 to be 1`), danach grün.
+
 ## Review findings
 
 (leer)

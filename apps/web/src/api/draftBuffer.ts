@@ -271,7 +271,7 @@ export function createDraftBuffer(options: {
     const done = (async () => {
       status = status === 'unavailable' ? status : 'loading';
       try {
-        const rows = startedIn === epoch ? await store.getAll() : [];
+        const rows = await store.getAll();
         const at = now();
         const next = new Map<string, BufferEntry>();
         const drop: string[] = [];
@@ -284,10 +284,16 @@ export function createDraftBuffer(options: {
           }
           next.set(clean.id, clean);
         }
+        // A superseded load deletes nothing (Codex P2 on #170): the persona may have changed again while storage answered
+        // (A → B → A), and a purge by the stale load would remove the current actor's rows behind a snapshot loaded for it.
+        const current = (): boolean => actorId() === id && startedIn === epoch;
+        if (!current()) return;
         // purgeOthers: every entry of another actor, every rejected and every expired one goes (idempotent).
-        for (const rawId of drop) await store.delete(rawId);
-        if (actorId() !== id) return;
-        if (startedIn !== epoch) next.clear();
+        for (const rawId of drop) {
+          if (!current()) return;
+          await store.delete(rawId);
+        }
+        if (!current()) return;
         if (loadedFor !== id) roles = false;
         for (const [key, held] of pending) if (held.ownerId !== id) cancelPending(key);
         snapshot = next;

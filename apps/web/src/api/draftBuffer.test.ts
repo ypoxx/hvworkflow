@@ -576,3 +576,37 @@ describe('fix round (review 060)', () => {
     expect(store.rows.size).toBe(0);
   });
 });
+
+describe('Codex P2 on #170: a superseded load deletes nothing', () => {
+  it('A → B → A while the B load waits for storage: A’s row survives in the store and in the snapshot', async () => {
+    const inner = createMemoryStore();
+    await inner.put(entry({ ownerId: 'u-a' }));
+    let holdNext = false;
+    let release: (() => void) | undefined;
+    const store: BufferStore = {
+      ...inner,
+      getAll: async () => {
+        const rows = await inner.getAll();
+        if (holdNext) {
+          holdNext = false;
+          await new Promise<void>((resolve) => { release = resolve; });
+        }
+        return rows;
+      },
+    };
+    const buffer = bufferOver(store);
+    await buffer.load();
+    expect(buffer.entryFor('m-1', 'q-1')).toBeDefined();
+    holdNext = true;
+    actor = { id: 'u-b' };
+    buffer.notice();
+    await settle();
+    actor = { id: 'u-a' };
+    expect(buffer.entryFor('m-1', 'q-1')).toBeDefined();
+    release!();
+    await settle();
+    await settle();
+    expect(inner.rows.size).toBe(1);
+    expect(buffer.entryFor('m-1', 'q-1')).toBeDefined();
+  });
+});
