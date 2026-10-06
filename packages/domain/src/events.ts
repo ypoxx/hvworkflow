@@ -8,6 +8,7 @@ import type {
   AnswerVersion,
   Classification,
   ForwardReasonCode,
+  QuestionRelation,
   QuestionStatus,
   SpeakerReopenReason,
   SpeakerStatus,
@@ -92,6 +93,18 @@ export type QuestionCaptured = Base<
   'QuestionCaptured',
   { number: string; contributionId: string; speakerId: string; text: string; span?: TextSpan }
 >;
+/**
+ * Scheibe 046: the reference of a new question (subject) to its referenced question of the same
+ * meeting, written in the capture command right after its `QuestionCaptured` (R-LINK-02). No personal
+ * data, no number, no text. Every event read path removes `parentQuestionId` and `parentAnswerVersion`
+ * (`maskEvent`); the stored original keeps them.
+ */
+export type QuestionLinked = Base<'QuestionLinked', {
+  parentQuestionId: string;
+  relation: QuestionRelation;
+  /** Last delivered answer version of the parent at capture (QuestionDelivered.answerVersion); absent if none. */
+  parentAnswerVersion?: number;
+}>;
 export type QuestionClassified = Base<'QuestionClassified', Classification>;
 /** Scheibe 040b: master data as whole lists; `subjectId` is the meeting, every one raises `Meeting.version`. */
 export type AgendaItemsReplaced = Base<'AgendaItemsReplaced', { agendaItems: { id: string; number: number; title: string }[] }>;
@@ -159,6 +172,7 @@ export type DomainEvent =
   | SpeakerUpdated
   | ContributionCaptured
   | QuestionCaptured
+  | QuestionLinked
   | QuestionClassified
   | QuestionAssigned
   | QuestionForwarded
@@ -187,8 +201,12 @@ export type EventType = DomainEvent['type'];
  * Standard read projection. `maskEvent` (api.ts) strips `displayName`, `organisation`, `pii` and
  * `personId` recursively from every payload; a new payload field that holds clear-text person data
  * must be added to that block list. sourceHash identifies the immutable original, not this redacted JSON. */
+type ReadForm<E extends DomainEvent> = Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string };
 export type ReadEvent = DomainEvent extends infer E
-  ? E extends DomainEvent ? Omit<E, 'hash' | 'prevHash' | 'personId' | 'commandId' | 'commandOperation' | 'commandResource'> & { redacted: true; sourceHash: string } : never
+  ? E extends DomainEvent
+    // Scheibe 046: the read payload of a link is the relation only, so no read path can type-read the id.
+    ? E extends QuestionLinked ? Omit<ReadForm<E>, 'payload'> & { payload: { relation: QuestionRelation } } : ReadForm<E>
+    : never
   : never;
 
 /** An event before it is appended: the store assigns `seq`. */

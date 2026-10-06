@@ -56,7 +56,7 @@ import type {
   UnitInput,
   WriteOptions,
 } from './types.js';
-import { FORWARD_REASON_CODES, PERMISSIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
+import { FORWARD_REASON_CODES, PERMISSIONS, QUESTION_RELATIONS, READ_PERMISSIONS, STAGE_ASSIGNMENTS, TRACKS } from './types.js';
 
 /** RFC 9457-shaped error. The HTTP adapter maps it 1:1 to a problem+json response. */
 export class ApiProblem extends Error {
@@ -350,6 +350,26 @@ function checkRefusalProposal(input: RefusalProposal): string | null {
   return null;
 }
 
+/**
+ * Scheibe 046: the form of the reference pair of one captured question, as the validator checks it
+ * (`QuestionCapture`, contract 0.4.5): both or neither, a known relation, an id of 1 to 128 code points.
+ * A 422 without rule id; the message never repeats the id.
+ */
+function checkReferencePair(input: QuestionCapture): string | null {
+  const body = input as unknown as Record<string, unknown>;
+  const id = body['parentQuestionId'];
+  const relation = body['relation'];
+  if (id === undefined && relation === undefined) return null;
+  if (id === undefined || relation === undefined) return 'parentQuestionId and relation come together.';
+  if (typeof relation !== 'string' || !(QUESTION_RELATIONS as readonly string[]).includes(relation)) {
+    return 'relation must be follow_up or clarification.';
+  }
+  if (typeof id !== 'string' || id.length === 0 || codePointLength(id) > 128) return 'parentQuestionId must contain 1 to 128 characters.';
+  return null;
+}
+/** Scheibe 046: rule id of the capture check; one message for unknown, other meeting and unreadable. */
+const R_LINK_01 = 'R-LINK-01';
+
 export function createInProcessApi(options: InProcessApiOptions): HvApi {
   const { store } = options;
   const clock = options.clock ?? systemClock;
@@ -471,10 +491,16 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
    * possible. `stage: true` (getStage) never shows it, whoever reads.
    */
   const viewQuestion = (q: QuestionRecord, source: State = state, view: { stage?: true } = {}): Question => {
-    const { claim, legalClearerIds: _clearers, ...record } = q;
+    const { claim, legalClearerIds: _clearers, deliveredAnswerVersion: _delivered, parentQuestionId, parentAnswerVersion, ...record } = q;
     const readsJustification = view.stage !== true && REFUSAL_JUSTIFICATION_READ.some((p) => can(actor(), p).allow);
+    // Scheibe 046 (SC-03): the id of the referenced question and its read-out answer version only for a
+    // reader of that question, looked up in the same projection as the child (`source`, the historical
+    // one on replay); never on the stage. `relation` stays: it tells nothing about the other question.
+    const parent = parentQuestionId !== undefined ? source.questions.get(parentQuestionId) : undefined;
+    const showsParent = view.stage !== true && parent !== undefined && can(actor(), 'question.read', parent).allow;
     return {
     ...record,
+    ...(showsParent ? { parentQuestionId, ...(parentAnswerVersion !== undefined ? { parentAnswerVersion } : {}) } : {}),
     ...viewClaim(claim),
     ...(source.speakers.has(q.speakerId) ? { speakerDisplayName: viewSpeaker(source.speakers.get(q.speakerId)!, source).displayName } : {}),
     answers: q.answers.map(({ refusalJustification, ...a }) => ({ ...a, createdBy: viewActor(a.createdBy),
@@ -817,6 +843,8 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
     if (f.speakerId && q.speakerId !== f.speakerId) return false;
     if (f.contributionId && q.contributionId !== f.contributionId) return false;
     if (f.agendaItemId && q.agendaItemId !== f.agendaItemId) return false;
+    // Scheibe 046: direct children only; `''` is a filter too (no question has an empty parent id).
+    if (f.parentQuestionId !== undefined && q.parentQuestionId !== f.parentQuestionId) return false;
     if (f.q) {
       const needle = f.q.toLowerCase();
       const speaker = state.speakers.get(q.speakerId);
@@ -1194,15 +1222,34 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
           if (q.span && (q.span.start < 0 || q.span.end > c.text.length || q.span.end < q.span.start)) {
             throw new ApiProblem(422, 'Unprocessable', 'Span is outside the contribution text.');
           }
+          const pairProblem = checkReferencePair(q);
+          if (pairProblem !== null) throw new ApiProblem(422, 'Unprocessable', pairProblem);
         }
+        // Scheibe 046, 'R-LINK-01': the referenced question lies in this meeting's projection and is
+        // readable for the caller. Unknown, other meeting and unreadable answer alike and without the id,
+        // so the answer is no existence oracle (MF-15). "Unreadable" cannot occur with today's roles
+        // (every holder of question.capture reads every question); the check guards a later role with
+        // capture right and a narrow read scope. No status criterion (no status logic outside the table).
+        const parents = questions.map((q) => {
+          if (q.parentQuestionId === undefined) return undefined;
+          const parent = state.questions.get(q.parentQuestionId);
+          if (!parent || !can(actor(), 'question.read', parent).allow) {
+            throw new ApiProblem(422, 'Unprocessable', 'The referenced question is not available for a follow-up reference.', R_LINK_01);
+          }
+          return parent;
+        });
         checkIfMatch(c.version, opts, true);
         const ids: string[] = [];
         const base = state.questions.size;
+        // One append (all or nothing): per question its QuestionCaptured and, with a reference, right
+        // after it its QuestionLinked (R-LINK-02), so no state "question without its reference" is readable.
         append(
-          questions.map((q, i) => {
+          questions.flatMap((q, i) => {
             const id = newId();
             ids.push(id);
-            return {
+            const parent = parents[i];
+            const deliveredVersion = parent?.deliveredAnswerVersion;
+            return [{
               type: 'QuestionCaptured' as const,
               subjectId: id,
               payload: {
@@ -1212,7 +1259,15 @@ export function createInProcessApi(options: InProcessApiOptions): HvApi {
                 text: q.text.trim(),
                 ...(q.span !== undefined ? { span: q.span } : {}),
               },
-            };
+            }, ...(parent !== undefined && q.relation !== undefined ? [{
+              type: 'QuestionLinked' as const,
+              subjectId: id,
+              payload: {
+                parentQuestionId: parent.id,
+                relation: q.relation,
+                ...(deliveredVersion !== undefined ? { parentAnswerVersion: deliveredVersion } : {}),
+              },
+            }] : [])];
           }),
         );
         return ids.map((id) => viewQuestion(requireQuestion(id)));
