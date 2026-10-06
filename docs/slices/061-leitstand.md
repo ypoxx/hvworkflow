@@ -1180,6 +1180,53 @@ mark-test-run: wrote /home/user/wt/s061b/.claude/state/last-test-run (clean tree
 `docs/evidence/061-{leitstand-de,leitstand-en,liste-faden-de,liste-faden-en,wand-1280x720-de,wand-1280x720-en}.png`;
 `docs/glossar.md`; `docs/feedback/2026-09-zielbild-oberflaeche.md`; `docs/folgeliste.md`; diese Spec.
 
+### Nacharbeit Teil B nach Design-Kritik und Review (06.10.2026)
+
+Basis eingemischt (`dca472e`: Teil A gemergt als `68c87d9`, dazu 041; Teil-A-Dateien auf Stand der Basis, Registerreihenfolge
+… history, admin, cockpit; Parität 747 + 84 = 831, mit `cockpit.thread.seat` **832**). Tests zuerst (`40caceb`, rot: `Tests 10
+failed | 36 passed (46)`), dann `04145d0` (grün), Bilder `bf4d92b`.
+
+| Nr. | Befund | Änderung |
+|---|---|---|
+| D1 (Blocker) D3 | Hauptlesung `p-5`, übrige Panels `p-4` | ein Token `p-4` für alle Panels; Quelltest gegen `p-5` |
+| D2 D8 | „Faden öffnen“ verschob den Fokus nicht | Fokus auf die Fadenüberschrift (`preventScroll`), danach Bildlauf; Escape und Zurück geben den Fokus an den Auslöser (S3) |
+| D3 D5/D1 | „seit …“ abgeschnitten | eigene Zeile, darf umbrechen, Grau 600 Mono |
+| D4 WCAG 2.5.3 | Beschriftung ≠ Name | sichtbar „Legal Clearing über 10 min“ / „Legal clearing over 10 min“, `nameLabel` entfernt |
+| D5 Kontrast | Säulen Grau 300 (1,68:1), leere Fenster unsichtbar | Säulen und Striche Grau 500 (3,9:1); Nachtrag in Entscheidung 5 |
+| D6/7 Zulauf, Karten | 400-px-Lücke, „0“ liest wie Fehler, Unterzeile unten | Zahl, Säulen, „letzte Stunde“ auf einer Zeile, Achse darunter; „Zulauf letzte 5 min“; Unterzeile direkt unter der Zahl |
+| D8 Bildlauf, Zurück | Liste/Faden nicht oben; Zurück ohne Fokus | Bildlauf nur im Hauptbereich (block „start“; `scrollIntoView` verschob den Shell-Rahmen, gefunden am Bild), Faden nach dem Laden; Zurück fokussiert den gespeicherten Auslöser |
+| D9 Namen | Unterzeile fehlte, Station mit fremder Schwelle | `aria-describedby` auf die Unterzeile; Station „…, 14, Engpass“ (auch Review minor 2) |
+| D10 Raster | `pt-2.5`, `gap-1.5`, `gap-x-2.5`, `mt-0.5`, `mx-1.5`, `h-2.5` | auf 4/8 px; Quelltest |
+| D11–D16 | Zählbadge, Bühnenbadge, Ladeplatzhalter, Farbe | nur die Zahl in Mono (Wörter `sr-only`); „Bühne: Finanzvorstand“; Platzhalter Rückstand; aktuelle Zeit Grau Mono; gewählte Zeile Akzent 50 + Balken, Text ungefärbt |
+| R3 | Ansage wiederholt sich nicht nach ruhiger Phase | `applyResult` leert die Region ohne neuen Wechsel; Test W11 auf Seitenebene (`feed.test.ts`) |
+| R4 | Verweigerter Leser liest alle 15 s | nach `forbidden` kein Intervall, keine Änderungs- oder Neuleselesung bis zum nächsten Feed (Personenwechsel); Test |
+| R5 | gefilterte älteste neben fremder Nummer | Hauptreferenz nur, wenn `items[0].ageSeconds === oldestOpen.ageSeconds`, sonst alle unter „Danach die ältesten“; Test W4 |
+| R6 | W10 | Annahme bei W10 vermerkt; Stolperdraht unter `CI` (beste Reihe < 50 ms) |
+| R7 | `lastFocused` | bei Fokuswechsel aus der Liste gelöscht; `focus({ preventScroll: true })` |
+| R10 | globales Escape | ignoriert Kopfzeile der Shell, Eingabefelder, `[role="menu"]` |
+| R8, R9, R12, R13, D14, D17 | — | Folgeliste |
+
+**Nachweise:** Web `Tests 977 passed (977)`; `061-leitstand.spec.ts` `--repeat-each=3` `21 passed (1.6m)`, axe 0 serious/critical; sechs
+Bilder neu (`bf4d92b`). Die volle `in-process`-Suite lief nicht erneut (Teil-B-Änderungen nur unter `features/cockpit/**` und der
+eigenen e2e-Datei; letzte volle Suite vor der Nacharbeit 192 passed).
+
+**Gates** (`pnpm gates` auf sauberem Baum, Commit `bf4d92b`, Datenbank `hv_test_s061b`, erster Lauf):
+
+```
+packages/domain test:       Tests  519 passed (519)
+apps/web test:       Tests  977 passed (977)
+apps/api test:       Tests  700 passed (700)
+slice-scope: 38 changed file(s), all within "docs/slices/061-leitstand.md"'s "Files allowed" list (101 pattern(s)).
+metrics-allowlist: 6 metrics, 1 report(s), all within the allowlist.
+# tests 358
+# pass 358
+# fail 0
+✓ built in 2.57s
+mark-test-run: wrote /home/user/wt/s061b/.claude/state/last-test-run (clean tree) at commit bf4d92b, tree c01159ddb58e…
+```
+
+**Offen:** CI `e2e-http` (Lauf, Job, Dauer); Seed-Streuung (eigener Takt des Orchestrators).
+
 ## Review findings
 
 - **Lesebefund 05.10.2026** (frischer Kontext, auf `1ebe51e`): 3 Blocker, 6 major, 11 minor, 5 nits, Vorschläge zur Wirkung in der
