@@ -20,7 +20,7 @@ import { BUFFER_LIFETIME_MS, useBufferRevision } from '../../api/draftBuffer';
 import { DraftNote, EmptyState, PageHeader, Panel, SplitPane, StaleBanner, showToast } from '../../components';
 import { useT } from '../../i18n';
 import { CompareVersions } from '../answers/CompareVersions';
-import { bufferStep, conflictAfterRefusal, keepMine, lateRestore, restoreDraft, takeTheirs } from '../answers/draft';
+import { bufferInput, conflictAfterRefusal, keepMine, lateRestore, restoreDraft, takeTheirs } from '../answers/draft';
 import { ForwardDialog } from '../answers/ForwardDialog';
 import { forwardProblemHandler } from '../answers/forward';
 import { problemStatus, splitSources } from '../answers/lib';
@@ -313,9 +313,7 @@ export function FocusPage() {
       const meetingId = meetingOf.current[key];
       if (draft === undefined || meetingId === undefined) continue;
       const target = { ownerId: actorId, meetingId, questionId: draft.questionId };
-      const step = bufferStep(draft, true);
-      if (step.kind === 'put') draftBuffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
-      else if (step.kind === 'delete') draftBuffer.scheduleDelete(target);
+      bufferInput(draftBuffer, target, draft);
     }
     typedKeys.current.clear();
     for (const key of savedKeys.current) {

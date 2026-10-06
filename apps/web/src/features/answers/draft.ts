@@ -13,7 +13,7 @@
  */
 import type { AnswerBody, AnswerBodyInput, Question } from '@hv/domain';
 import { answerBodyOf, previewAnswer, previewText } from '../../api/answerFormat';
-import type { BufferedDraft } from '../../api/draftBuffer';
+import type { BufferedDraft, DraftBuffer, DraftTarget } from '../../api/draftBuffer';
 import { draftBase, draftKey, isDirty, joinSources, newDraft, writingOutcome } from '../focus/focus';
 import type { FocusDraft } from '../focus/focus';
 import { refusalKindOf } from './refusal';
@@ -222,4 +222,19 @@ export function bufferStep(draft: FocusDraft, byInput: boolean): BufferStep {
   if (!byInput) return { kind: 'none' };
   if (!isDirty(draft)) return { kind: 'delete' };
   return { kind: 'put', body: draft.body, sources: draft.sources, baseVersion: draft.baseVersion };
+}
+
+/**
+ * Decision 4: the buffer call after an input, for both answer views. A changed draft is scheduled; an unchanged one is
+ * deleted always — also when nothing is stored yet, because a put from an input undone within 400 ms may still be pending
+ * and must not land (review 060, major 2).
+ */
+export function bufferInput(
+  buffer: Pick<DraftBuffer, 'schedule' | 'scheduleDelete'>,
+  target: DraftTarget,
+  draft: FocusDraft,
+): void {
+  const step = bufferStep(draft, true);
+  if (step.kind === 'put') buffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
+  else if (step.kind === 'delete') buffer.scheduleDelete(target);
 }

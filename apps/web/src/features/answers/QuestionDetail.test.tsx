@@ -11,7 +11,7 @@ import type { AnswerBodyInput, AnswerVersion, Permission, Question, RefusalGroun
 import { getActor } from '../../api/actor';
 import { createDraftBuffer, createMemoryStore } from '../../api/draftBuffer';
 import type { DraftBuffer } from '../../api/draftBuffer';
-import { saveDecision } from './draft';
+import { bufferInput, saveDecision, startDraft } from './draft';
 import { translate } from '../../i18n';
 import type { TKey, TParams } from '../../i18n';
 import { AnswerText } from '../../components';
@@ -399,5 +399,33 @@ describe('QuestionDetail with the draft buffer (Scheibe 060, U6)', () => {
 
   it('saving with the notice standing opens the comparison instead of sending', () => {
     expect(saveDecision({ rebase: true }, true)).toBe('compare');
+  });
+});
+
+/**
+ * Re-check of review 060, major 2: the buffer step the Beantwortung (and the writing mode) runs after an input. Typing
+ * schedules a put; undoing back to the base text within 400 ms — while nothing is stored yet — must cancel it, so that
+ * the removed text never lands in the store. With the old condition (delete only when an entry is stored) the put landed.
+ */
+describe('the buffer step after an input (re-check, major 2)', () => {
+  it('type, then undo to the base within 400 ms with no entry stored: after the timers, no row', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = createMemoryStore();
+      const buffer = createDraftBuffer({ store, now: () => Date.parse(at), getActor });
+      await buffer.load();
+      const record: Question = { ...q(['answer.draft', 'question.read'], [{ version: 1, text: 'Basis.', createdAt: at, createdBy: { id: 'u-2', role: 'expert' } }]), meetingId: 'm-1' };
+      const start = startDraft(getActor().id, record);
+      const target = { ownerId: getActor().id, meetingId: 'm-1', questionId: record.id };
+      bufferInput(buffer, target, { ...start, body: { blocks: [{ type: 'paragraph', content: [{ text: 'Basis. Weg damit.' }] }] } });
+      vi.advanceTimersByTime(200);
+      expect(buffer.entryFor('m-1', record.id)).toBeUndefined();
+      bufferInput(buffer, target, start);
+      vi.advanceTimersByTime(1000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(store.rows.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

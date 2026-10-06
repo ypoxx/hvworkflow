@@ -535,6 +535,10 @@ neue Ausnahme; Fragen nach `_actions` gewählt; „beide“ = in-process und htt
   wiederhergestellt (Sitzungsverlust löscht nicht). `context.setOffline(false)`, `page.reload()` → vollständiger Text inklusive
   des offline Getippten; speichern → genau eine neue Version (in-process über einen Zähler um `draftAnswer`, http über die Zahl der
   Versionen im gelesenen Datensatz).
+  *Nachtrag (Orchestrator, 06.10.2026):* im HTTP-Pfad baut die Beantwortung das Detail nach dem gescheiterten Neuladen offline ab
+  (`useBacklog`, 010d, außerhalb dieser Scheibe); „Text bleibt“ gilt dort über den Puffer: der Text steht im Objektspeicher und kommt
+  nach der erneuten Anmeldung wieder. Die Zusicherung „Sperre löst sich“ entfällt für diesen Pfad. Siehe `docs/folgeliste.md`, 060-Eintrag
+  „Speichern offline im HTTP-Betrieb“.
 - **E4 Inhalt des Eintrags (in-process):** über `page.evaluate` den Objektspeicher lesen (Konstanten aus dem Modul importiert):
   genau die Felder aus Entscheidung 2; weder Fragetext noch Fragenummer noch ein Anzeigename im serialisierten Eintrag. Danach
   einen manipulierten Eintrag (Blocktyp `script`, Schlüssel `html` im Block) hineinschreiben, neu laden → kein
@@ -862,6 +866,25 @@ nicht (nit 12), enge Spalten in der geteilten Ansicht, Toastzeit ohne Mono und D
 Detail verschwindet nach gescheitertem Neuladen offline.
 
 Offen: neuer CI-Lauf `e2e-http` nach dem Push (E3, E5, E5b, E7); Nachweis mit Artefaktangaben folgt aus dem PR.
+
+### Nacharbeit 2: CI e2e-http E5b (Lauf 37460612152)
+
+**Der Test war falsch, nicht der Code.** E5b (c) füllte die Suche mit `` `${number} ` ``. `useBacklog` trimmt und entprellt den
+Suchbegriff (150 ms) und liest die Liste nur bei einem geänderten Begriff; der getrimmte Begriff war derselbe, den `openInAnswers` kurz
+davor gesetzt hatte. Es ging also keine Anfrage an `/v1/questions`, das 401-Double (`times: 1`) antwortete nie, und die
+Anmeldeseite erschien nicht. Der Produktpfad stimmt: jede 401-Antwort einer Lesung ruft `onUnauthorized` (`http.ts`), der
+Live-Speicher leert sich, der Zustand wird `signedOut`, die Shell zeigt die Anmeldeseite mit der Überschrift „Anmelden“ (wie 031 H6
+nach dem Neuladen). Behoben: ein ungelesener Begriff (`` `${number} 060` ``), der Test wartet auf die Anfrage und erst dann auf die
+Überschrift. E7 (nie gelaufen) wartet im zweiten Browser jetzt auf die geschriebene Version statt auf das Fehlen von `draft-kept`
+(das bei einem schnellen Klick nie erschienen wäre). E6, E8 (ab dem Doppelklick) und E9 laufen im http-Projekt nicht (übersprungen bzw.
+früher Rücksprung). In-process 060 danach: 8 bestanden, 2 übersprungen. Offen: der nächste CI-Lauf `e2e-http`.
+
+Aus dem engen Re-Check: major 2 hat jetzt einen Test auf der Ansichtsseite. Der Pufferschritt nach einer Eingabe ist die reine Funktion
+`bufferInput` (`draft.ts`), die Beantwortung und Schreibmodus aufrufen; `QuestionDetail.test.tsx` „the buffer step after an input“
+tippt (Put geplant), stellt innerhalb von 400 ms den Basistext wieder her, ohne dass ein Eintrag gespeichert ist, und erwartet nach
+den Timern keine Zeile. Mit der alten Bedingung (Löschen nur bei gespeichertem Eintrag) testweise eingesetzt: rot,
+`AssertionError: expected 1 to be +0`; zurückgesetzt: grün. Spec E3 trägt den Nachtrag des Orchestrators; drei neue Einträge in der
+Folgeliste (Merker `roles_changed`, gemerkte fehlgeschlagene ids, toter Zweig).
 
 ## Review findings
 

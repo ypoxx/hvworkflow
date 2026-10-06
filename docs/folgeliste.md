@@ -893,4 +893,11 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 060 Bau (CI-Lauf 37458349373) · Speichern offline im HTTP-Betrieb: die Schreibtür liest nach der Ablehnung neu, offline scheitert
   auch das, und `useBacklog` zeigt danach keine Frage mehr (das Feld verschwindet; der Text bleibt im Puffer und kommt beim
   nächsten Öffnen wieder) · bei einem gescheiterten Neuladen die zuletzt gezeigte Frage stehen lassen (Lane web-answers, 010d).
+- 060 Re-Check · `rolesChanged()` bleibt für die ganze Sitzung gesetzt; spätere Abgänge aus dem Schreibmodus löschen Entwürfe auch für
+  Fragen, die aus anderen Gründen gegangen sind · Merker nach der Prüfung zurücksetzen oder aus dem Datensatz der gehenden Frage
+  entscheiden.
+- 060 Re-Check · die gemerkten fehlgeschlagenen Akteur-ids erholen sich in der Sitzung nie · bekanntes Verhalten, passend zum
+  ebenso bleibenden Zustand `unavailable`.
+- 060 Re-Check · `apps/web/src/api/draftBuffer.ts` `startedIn === epoch ? await store.getAll() : []` · der zweite Zweig ist tot
+  (die Epoche kann sich vor dem Aufruf nicht ändern) · entfernen.
 

@@ -39,7 +39,7 @@ import type { FocusDraft } from '../focus/focus';
 import { AnswerEditor } from './AnswerEditor';
 import { CompareVersions } from './CompareVersions';
 import {
-  afterSave, bufferStep, canSave as mayBeSaved, conflictAfterRefusal, discard, keepMine, lateRestore, onRecord, restoreDraft,
+  afterSave, bufferInput, canSave as mayBeSaved, conflictAfterRefusal, discard, keepMine, lateRestore, onRecord, restoreDraft,
   saveDecision, takeTheirs,
 } from './draft';
 import { clockTime, lapsedApproval, latestVersion, problemStatus, sealedApproval, wordDiff } from './lib';
@@ -429,11 +429,7 @@ export function QuestionDetail({
     if (!byInput.current) return;
     byInput.current = false;
     if (meetingId === undefined || !question._actions.includes('answer.draft')) return;
-    const step = bufferStep(draft, true);
-    const target = { ownerId: actorId, meetingId, questionId: question.id };
-    if (step.kind === 'put') buffer.schedule({ ...target, body: step.body, sources: step.sources, baseVersion: step.baseVersion });
-    // Always, also without a stored entry: a put still pending from an input undone within 400 ms must not land (review 060).
-    else if (step.kind === 'delete') buffer.scheduleDelete(target);
+    bufferInput(buffer, { ownerId: actorId, meetingId, questionId: question.id }, draft);
   });
 
   // A one-shot request: the field took the focus when it was built after the comparison (its layout effect ran first).
