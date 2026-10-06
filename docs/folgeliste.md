@@ -13,13 +13,9 @@ Diese Punkte stehen hier nur, damit sie nicht verloren gehen. Sie sind **keine**
 in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
 
 - ~~**`listEvents` ohne Akteurschutz**~~ · erledigt mit takt-056 (#177): `listEvents` läuft über `guarded()`, Test zuerst rot.
-- **takt-057-Kandidat: übrige Durchreichungen im Live-Speicher (Sicherheit, aus Review takt-056)** · eigener Takt vor Rollout:
-  - minor · `apps/web/src/api/liveStore.ts` `lastWriteEtag` ohne Akteurprüfung, überlebt `clear()` · `clear()` setzt den
-    Schreib-ETag zurück, nach Akteurwechsel `undefined`.
-  - minor · `liveStore.ts` Schreibantworten und `seedDemo` ohne `forCaller` · Inhalt nach Akteurwechsel zurückhalten,
-    Erfolgs- und Fehlersignal nicht.
-  - minor · `features/history/Page.tsx` `keyBelongsTo` vergleicht nur die id · strukturellen Akteurschlüssel nutzen.
-  - nit · `guarded()` ohne try/catch im abgemeldeten Pfad; nit · Test ohne Ablehnungsfall und ohne Wechsel ohne `clear()`.
+- ~~**übrige Durchreichungen im Live-Speicher**~~ · erledigt mit takt-057 (#179), nicht aufgeschoben (Codex P1 auf #178):
+  Schreibantworten und `seedDemo` unter dem Akteurschutz (zurückgehalten lehnen sie inhaltslos mit `WithheldAnswer` ab),
+  `lastWriteEtag` nach Akteurwechsel/`clear()` leer, Historienfenster am strukturellen Akteur.
 - **Zwischenspeicher des Leitstands (vor Rollout)** · W10 auf dem CI-Läufer 57,7 ms gegen das Ziel 50 ms · Eintrag im Abschnitt
   „Leitstand (aus 061)“ (Lauf 37468958219).
 - **`source-map-js` 1.2.2 (vor Ablauf der Ausnahme)** · nach 2026-10-07T14:08Z anheben, Ausnahme 1241209 entfernen, bevor sie am
@@ -27,6 +23,14 @@ in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
 
 ## Oberfläche: Lade- und Schreibränder (Kandidat 010e)
 
+- takt-057 Nachprüfung minor · `features/capture/Page.tsx`, `features/speakers/Page.tsx` · nach `clear()` derselben Person
+  (Stromende) sieht eine vom Dienst angenommene, aber zurückgehaltene Schreibung wie ein stiller Fehlschlag aus; der Entwurf
+  bleibt stehen, ein zweiter Klick kann einen doppelten Redebeitrag erzeugen · `WithheldAnswer` als „Ausgang unbekannt“
+  behandeln: neu laden, Entwurf erst nach Abgleich leeren, neutraler Hinweis.
+- takt-057 Nachprüfung nit · `app/BootScreen.tsx` · ein zurückgehaltenes `seedDemo` zeigte die englische Meldung von
+  `WithheldAnswer` wörtlich (praktisch unerreichbar) · auf einen `boot.failed.*`-Schlüssel abbilden.
+- takt-057 Nachprüfung nit · `api/liveStore.ts` `WithheldAnswer` · Meldung nennt nur den Akteurwechsel, gilt auch nach
+  `clear()` · Wortlaut ergänzen.
 - 010d R1 Befund 5 · `features/history/Page.tsx` · Historie zeigt nach erstem Ladefehler „Kein Treffer“ / „Noch keine
   Ereignisse“ und nutzt `answers.list.loading` · gestalteter Ladefehler mit eigenen `history.*`-Schlüsseln.
 - 010d R2 N3 · `features/answers/WorkList.tsx` · kein Beschäftigt-Signal beim erneuten Versuch; Zähler „0 von 0“ im
