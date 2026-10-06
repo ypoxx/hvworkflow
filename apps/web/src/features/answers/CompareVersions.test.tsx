@@ -114,4 +114,23 @@ describe('CompareVersions (U5)', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(other.defaultPrevented).toBe(false);
   });
+
+  it('design critique D-b: the three buttons share one row; the hint stands on its own line below it', () => {
+    const html = render();
+    const row = html.match(/<div data-testid="compare-actions"[\s\S]*?<\/div>/)?.[0] ?? '';
+    expect(row).toContain('data-testid="compare-back"');
+    expect(row).toContain('data-testid="compare-take-theirs"');
+    expect(row).toContain('data-testid="compare-keep-mine"');
+    expect(row).not.toContain(translate('de', 'answers.compare.takeTheirsHint'));
+    expect(html.indexOf(translate('de', 'answers.compare.takeTheirsHint'))).toBeGreaterThan(html.indexOf('data-testid="compare-actions"'));
+  });
+
+  it('design critique D-e: column heads in ink 600, not the upper-case label; the author as in the version list', () => {
+    const html = render();
+    expect(tag(html, 'compare-mine-head')).toContain('text-ink-600');
+    expect(tag(html, 'compare-mine-head')).not.toContain('hv-label');
+    expect(tag(html, 'compare-theirs-head')).toContain('text-ink-600');
+    expect(tag(html, 'compare-theirs-head')).not.toContain('hv-label');
+  });
 });
+

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnswerBody, AnswerBodyInput, AnswerMark, AnswerVersion, Permission, Question } from '@hv/domain';
 import { previewAnswer } from '../../api/answerFormat';
+import { translate } from '../../i18n';
 import { isDirty, newDraft } from '../focus/focus';
 import type { FocusDraft } from '../focus/focus';
 import type { BufferedDraft } from '../../api/draftBuffer';
@@ -400,5 +401,12 @@ describe('Scheibe 060', () => {
       expect(bufferStep(typed, true)).toEqual({ kind: 'put', body: plain('Neu.'), sources: 'GB S. 4', baseVersion: 1 });
       expect(bufferStep(fresh, true)).toEqual({ kind: 'delete' });
     });
+  });
+});
+
+describe('orchestrator D-d: the notice on leaving says "in this browser", as decision 6', () => {
+  it('goneKept names the browser, not the device, in both languages', () => {
+    expect(translate('de', 'focus.write.goneKept', { number: 'F-1', time: '10:00' })).toContain('in diesem Browser');
+    expect(translate('en', 'focus.write.goneKept', { number: 'F-1', time: '10:00' })).toContain('in this browser');
   });
 });

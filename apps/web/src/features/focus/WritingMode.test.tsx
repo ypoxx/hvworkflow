@@ -176,4 +176,11 @@ describe('WritingMode with the comparison (Scheibe 060, U7)', () => {
     expect(html).not.toContain('data-testid="focus-editor"');
     expect(html).not.toContain('data-testid="focus-sources"');
   });
+
+  it('design critique D-a/D-c: while comparing, no save button in the footer (one primary only) and no keyboard hint', () => {
+    const html = render(question(), { text: 'mein Text', rebase: true, compare: <div data-testid="compare-slot" /> });
+    expect(html).not.toContain('data-testid="focus-save"');
+    expect(html).not.toContain('data-primary="true"');
+    expect(html).not.toContain('data-testid="focus-write-keys"');
+  });
 });

@@ -507,3 +507,72 @@ describe('notice (a persona switch seen on a read)', () => {
     expect(store.rows.size).toBe(0);
   });
 });
+
+describe('fix round (review 060)', () => {
+  it('blocker 1: a store that always rejects is asked exactly once per actor id, however often views ask', async () => {
+    const getAll = vi.fn(() => Promise.reject(new Error('blocked')));
+    const store: BufferStore = { ...createMemoryStore(), getAll };
+    const buffer = bufferOver(store);
+    await buffer.load();
+    expect(buffer.status()).toBe('unavailable');
+    for (let i = 0; i < 50; i++) {
+      buffer.entryFor('m-1', 'q-1');
+      buffer.keptAt('m-1', 'q-1');
+      buffer.notice();
+    }
+    await buffer.load();
+    await settle();
+    expect(getAll).toHaveBeenCalledTimes(1);
+    actor = { id: 'u-b' };
+    for (let i = 0; i < 50; i++) buffer.entryFor('m-1', 'q-1');
+    await settle();
+    expect(getAll).toHaveBeenCalledTimes(2);
+  });
+
+  it('major 2: a put scheduled and then undone within 400 ms leaves no row', async () => {
+    vi.useFakeTimers();
+    const store = createMemoryStore();
+    const buffer = bufferOver(store);
+    await buffer.load();
+    buffer.schedule(fields({ body: plain('weggenommen') }));
+    vi.advanceTimersByTime(200);
+    buffer.scheduleDelete({ ownerId: 'u-a', meetingId: 'm-1', questionId: 'q-1' });
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(store.rows.size).toBe(0);
+    expect(buffer.entryFor('m-1', 'q-1')).toBeUndefined();
+  });
+
+  it('minor 5: a clear during an in-flight load is not undone when the load lands', async () => {
+    const inner = createMemoryStore();
+    await inner.put(entry());
+    let release: (() => void) | undefined;
+    const store: BufferStore = {
+      ...inner,
+      getAll: async () => {
+        const rows = await inner.getAll();
+        await new Promise<void>((resolve) => { release = resolve; });
+        return rows;
+      },
+    };
+    const buffer = bufferOver(store);
+    const loading = buffer.load();
+    await settle();
+    await buffer.clear();
+    release!();
+    await loading;
+    expect(buffer.entryFor('m-1', 'q-1')).toBeUndefined();
+    expect(inner.rows.size).toBe(0);
+  });
+
+  it('minor 6: an entry over 256 KiB serialised is rejected on read as well', async () => {
+    const marks = Array.from({ length: 16 }, (_, i) => `m${String(i).padStart(30, '0')}`);
+    const heavy: AnswerBodyInput = { blocks: [{ type: 'paragraph', content: Array.from({ length: 2000 }, () => ({ text: '', marks })) }] };
+    expect(sanitizeEntry(entry({ body: heavy }), NOW)).toBeUndefined();
+    const store = createMemoryStore();
+    await store.put(entry({ body: heavy }) as BufferEntry);
+    const buffer = bufferOver(store);
+    await buffer.load();
+    expect(store.rows.size).toBe(0);
+  });
+});
