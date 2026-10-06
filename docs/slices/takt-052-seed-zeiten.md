@@ -181,9 +181,11 @@ new question only after the window“) sät `{ questions: 30, seed: 3 }`, liest 
 Frage, rückt die Uhr um 10 s vor und erwartet `vorher + 1`. Das galt nur, weil fast alle Seed-Erfassungen auf `now` lagen;
 mit den gestauchten Zeiten verlässt eine Seed-Erfassung in diesen 10 s das 300-s-Fenster (rot: `expected 6 to be 7`).
 Entscheidung des Orchestrators: Die Absicht des Tests bleibt (neue Frage erst nach dem Fenster sichtbar, Werte aus dem
-Cache, nicht aus dem Log); der erwartete Wert wird aus derselben Quelle wie die Metrik zur späteren Uhrzeit ohne die neue
-Frage berechnet, statt anzunehmen, dass jede Seed-Erfassung auf `now` liegt. Die Datei kommt unter Files allowed, nur für
-diesen Test und seine Fixture-Nutzung.
+Cache, nicht aus dem Log); er darf nicht mehr annehmen, dass jede Seed-Erfassung auf `now` liegt. Umgesetzt ist das so:
+Dieser eine Test sät `{ questions: 0, seed: 3 }` (zweiter, optionaler Parameter von `seeded()`, Vorgabe unverändert), prüft
+`vorher = 0`, bei +9 s weiter 0 (Cache) und bei +10 s 1. Der zuerst erwogene Weg, den Erwartungswert über
+`computeIndicators` zur späteren Uhrzeit zu berechnen, verlor in der Mutationsprobe seine Schärfe (bei TTL 0 grün) und wurde
+verworfen (Review-Befund minor 1). Die Datei kommt unter Files allowed, nur für diesen Test und seine Fixture-Nutzung.
 
 ## Files allowed
 
