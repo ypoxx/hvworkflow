@@ -11,6 +11,7 @@
  * request, an in-memory access-log sink. Every call goes through `req()`, which checks the response against the
  * contract (the bound `QuestionLinkedPayload` in `EventRead` included).
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createApp, type App } from '../app.ts';
 import { createMemorySink } from '../observability/accessLog.ts';
@@ -224,3 +225,14 @@ describe('Scheibe 046: follow-up references over HTTP', () => {
     }
   });
 });
+
+/* Test 16 of the core, the part that reads files (the domain package may not import node:fs, arch gate). */
+describe('Scheibe 046, Test 16: rule ids in the production code and legal-trace', () => {
+  const file = (path: string): string => readFileSync(new URL(`../../../../${path}`, import.meta.url), 'utf8');
+  it('the literals R-LINK-01 (api.ts) and R-LINK-02 (state.ts); docs/legal-trace.md has exactly two R-LINK lines', () => {
+    expect(file('packages/domain/src/api.ts')).toContain("'R-LINK-01'");
+    expect(file('packages/domain/src/state.ts')).toContain("'R-LINK-02'");
+    expect(file('docs/legal-trace.md').split('\n').filter((line) => line.startsWith('| R-LINK-'))).toHaveLength(2);
+  });
+});
+

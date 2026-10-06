@@ -16,6 +16,15 @@ import { getLang, translate, useT } from '../../i18n';
 import { ContributionPane } from './ContributionPane';
 import { QuestionsPane } from './QuestionsPane';
 import { SuggestDialog } from './SuggestDialog';
+import { FollowUpDialog } from './FollowUpDialog';
+import {
+  FOLLOW_UP_SEARCH_LIMIT,
+  captureItems,
+  heldAfterCapture,
+  heldFor,
+  isFollowUpShortcut,
+  type HeldReference,
+} from './followUp';
 import {
   etagForContribution,
   isSpeakerLocked,
@@ -233,10 +242,20 @@ export function CapturePage() {
    * dialog needs no such rule: it closes with its question, which `useAsync` hands to nobody else.
    */
   const [dialogActorId, setDialogActorId] = useState(actorId);
+  /**
+   * Scheibe 046: the follow-up reference (chip) for the next single capture, owned by the person and the speech it
+   * was set for; a change of either removes it in the same render (compared by id, never by role).
+   */
+  const [held, setHeld] = useState<HeldReference | null>(null);
+  const [followUpOpen, setFollowUpOpen] = useState(false);
   if (dialogActorId !== actorId) {
     setDialogActorId(actorId);
     setSuggestOpen(false);
+    setFollowUpOpen(false);
   }
+  const ownHeld = heldFor(held, actorId, contribution?.id);
+  if (held !== null && ownHeld === null) setHeld(null);
+  const reference = ownHeld?.reference ?? null;
 
   const writeContribution = useCallback(
     async (text: string): Promise<boolean> => {
@@ -270,11 +289,15 @@ export function CapturePage() {
   );
 
   const captureQuestions = useCallback(
-    async (items: QuestionCapture[]): Promise<boolean> => {
-      if (contribution === undefined || items.length === 0 || writingRef.current) return false;
+    async (input: QuestionCapture[], route: 'single' | 'suggest' = 'single'): Promise<boolean> => {
+      if (contribution === undefined || input.length === 0 || writingRef.current) return false;
       writingRef.current = true;
       setWritingQuestions(true);
       const startedActor = actorId;
+      // Scheibe 046: the one place the reference joins a capture (single question only, never suggestions).
+      const sent = captureItems(input, reference, route);
+      const items = sent.items;
+      let ok = false;
       try {
         // No toast: the new cards and the rising Restabdeckung are the answer (design principle 8).
         await api.captureQuestions(contribution.id, items, {
@@ -290,6 +313,7 @@ export function CapturePage() {
           setContributionMark(mark === null ? null : { actorId: startedActor, ...mark });
         }
         setStaleFor(null);
+        ok = true;
         return true;
       } catch (error: unknown) {
         if (isVersionConflict(error)) setStaleFor(contribution.id);
@@ -298,10 +322,31 @@ export function CapturePage() {
       } finally {
         writingRef.current = false;
         setWritingQuestions(false);
+        // Gone after a successful call that carried it; kept after 412, 422 or a network failure.
+        if (sent.applied) setHeld((current) => heldAfterCapture(current, sent.applied, ok));
       }
     },
-    [contribution, contributionMark, actorId],
+    [contribution, contributionMark, actorId, reference],
   );
+  const captureSuggestions = useCallback((items: QuestionCapture[]) => captureQuestions(items, 'suggest'), [captureQuestions]);
+
+  /** Scheibe 046: Alt+B opens "Bezug setzen" where capturing is allowed (Alt+N is the shell's navigation key). */
+  const followUpAvailable = !forbidden && canCapture && contribution !== undefined;
+  useEffect(() => {
+    if (!followUpAvailable) return undefined;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!isFollowUpShortcut(event)) return;
+      event.preventDefault();
+      setFollowUpOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [followUpAvailable]);
+  const closeFollowUp = useCallback(() => {
+    setFollowUpOpen(false);
+    // After the modal has handed the focus back, it goes to the button "Nachfrage zu …".
+    setTimeout(() => document.querySelector<HTMLElement>('[data-testid="capture-follow-up-open"]')?.focus(), 0);
+  }, []);
 
   const refetch = useCallback(() => {
     fetchedQuestions.reload();
@@ -384,6 +429,9 @@ export function CapturePage() {
               questions={questions.data.items}
               hoveredQuestionId={hoveredQuestionId}
               onHoverQuestion={onHoverQuestion}
+              reference={reference}
+              onOpenFollowUp={() => setFollowUpOpen(true)}
+              onClearReference={() => setHeld(null)}
             />
           }
           right={
@@ -404,8 +452,20 @@ export function CapturePage() {
           open={suggestOpen}
           contribution={contribution}
           onClose={() => setSuggestOpen(false)}
-          onSubmit={captureQuestions}
+          onSubmit={captureSuggestions}
           locked={busy}
+          referenceSet={reference !== null}
+        />
+      )}
+      {contribution !== undefined && canCapture && (
+        <FollowUpDialog
+          open={followUpOpen}
+          onClose={closeFollowUp}
+          search={async (q) => (await api.listQuestions({ q, limit: FOLLOW_UP_SEARCH_LIMIT })).items}
+          onSubmit={(next) => {
+            setHeld({ actorId, contributionId: contribution.id, reference: next });
+            closeFollowUp();
+          }}
         />
       )}
     </div>

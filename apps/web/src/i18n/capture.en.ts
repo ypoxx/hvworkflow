@@ -47,4 +47,21 @@ export const captureEn: typeof captureDe = {
   // (docs/slices/010b-lesepfade-oberflaeche.md, goal 1).
   'capture.forbidden.title': 'This role has no read permission for this view',
   'capture.forbidden.body': 'This role may not read Capture.',
+  // Scheibe 046: follow-up references, only for the next single capture.
+  'capture.relation.follow_up': 'Follow-up question',
+  'capture.relation.clarification': 'Clarification',
+  'capture.relation.follow_up.to': 'Follow-up question to {number}',
+  'capture.relation.clarification.to': 'Clarification of {number}',
+  'capture.followUp.open': 'Follow-up to …',
+  'capture.followUp.title': 'Set reference',
+  'capture.followUp.description': 'The next question refers to a question already captured at this general meeting. The reference cannot be changed afterwards.',
+  'capture.followUp.kind': 'Kind of reference',
+  'capture.followUp.search': 'Number or keyword',
+  'capture.followUp.hint': 'Enter a number like F-0012 or a keyword',
+  'capture.followUp.loading': 'Loading matches',
+  'capture.followUp.none': 'No question found',
+  'capture.followUp.error': 'The search is not available right now.',
+  'capture.followUp.remove': 'Remove reference',
+  'capture.followUp.suggestHint': 'The reference does not apply to accepted suggestions',
+  'capture.key.b': 'B',
 };

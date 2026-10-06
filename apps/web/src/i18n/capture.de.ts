@@ -45,4 +45,21 @@ export const captureDe = {
   // (docs/slices/010b-lesepfade-oberflaeche.md, Ziel 1).
   'capture.forbidden.title': 'In dieser Rolle keine Leseberechtigung für diese Ansicht',
   'capture.forbidden.body': 'Diese Rolle darf die Erfassung nicht lesen.',
+  // Scheibe 046: follow-up references (Bezug zur Bezugsfrage), only for the next single capture.
+  'capture.relation.follow_up': 'Nachfrage',
+  'capture.relation.clarification': 'Klarstellung',
+  'capture.relation.follow_up.to': 'Nachfrage zu {number}',
+  'capture.relation.clarification.to': 'Klarstellung zu {number}',
+  'capture.followUp.open': 'Nachfrage zu …',
+  'capture.followUp.title': 'Bezug setzen',
+  'capture.followUp.description': 'Die nächste Einzelfrage bezieht sich auf eine schon erfasste Einzelfrage dieser Hauptversammlung. Der Bezug lässt sich danach nicht mehr ändern.',
+  'capture.followUp.kind': 'Art des Bezugs',
+  'capture.followUp.search': 'Nummer oder Stichwort',
+  'capture.followUp.hint': 'Nummer wie F-0012 oder ein Stichwort eingeben',
+  'capture.followUp.loading': 'Treffer werden geladen',
+  'capture.followUp.none': 'Keine Einzelfrage gefunden',
+  'capture.followUp.error': 'Die Suche ist gerade nicht möglich.',
+  'capture.followUp.remove': 'Bezug entfernen',
+  'capture.followUp.suggestHint': 'Der Bezug gilt nicht für übernommene Vorschläge',
+  'capture.key.b': 'B',
 };

@@ -162,6 +162,10 @@ describe('HTTP HvApi adapter', () => {
     ['captureContribution', [{ speakerId: 's', text: 'Text' }], 'POST', '/v1/contributions', { speakerId: 's', text: 'Text' }],
     ['captureMeetingContribution', [{ speakerId: 's', text: 'Text', source: 'paper' }], 'POST', '/v1/meetings/current/contributions', { speakerId: 's', text: 'Text', source: 'paper' }],
     ['captureQuestions', ['c /1', [{ text: 'Question' }]], 'POST', '/v1/contributions/c%20%2F1/questions', { questions: [{ text: 'Question' }] }],
+    // Scheibe 046, W6: both reference fields pass through in the body.
+    ['captureQuestions', ['c /1', [{ text: 'Q', parentQuestionId: 'q /12', relation: 'clarification' }]], 'POST', '/v1/contributions/c%20%2F1/questions',
+      { questions: [{ text: 'Q', parentQuestionId: 'q /12', relation: 'clarification' }] }],
+    ['listQuestions', [{ parentQuestionId: 'q /12', limit: 8 }], 'GET', '/v1/questions?parentQuestionId=q+%2F12&limit=8'],
     ['claimContribution', ['c /1'], 'POST', '/v1/contributions/c%20%2F1/claim'],
     ['releaseContribution', ['c /1'], 'POST', '/v1/contributions/c%20%2F1/release'],
     ['claimQuestion', ['q /1'], 'POST', '/v1/questions/q%20%2F1/claim'],

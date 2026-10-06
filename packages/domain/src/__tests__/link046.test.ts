@@ -8,7 +8,6 @@
  * Built on the defaults ("auf Standard gebaut (Spec 046)"). Every call goes through
  * `createInProcessApi` with an injected clock; after every rejected call the store's head is unchanged.
  */
-import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiProblem, can, createInProcessApi, etagOf, type HvApi } from '../api.js';
 import { verifyEventChain } from '../envelope.js';
@@ -751,17 +750,14 @@ describe('Test 15: stream', () => {
 /* ---------- 16 ---------- */
 
 describe('Test 16: register and tables', () => {
-  it('R-LINK-01 and R-LINK-02 as guards with verified false; the literals stand in the production code; legal-trace has two lines', () => {
+  it('R-LINK-01 and R-LINK-02 as guards with verified false and their sources', () => {
     const entries = ruleRegister().filter((r) => r.ruleId.startsWith('R-LINK-'));
     expect(entries.map((r) => [r.ruleId, r.kind, r.legalRef.verified])).toEqual([
       ['R-LINK-01', 'Guard', false], ['R-LINK-02', 'Guard', false]]);
     expect(entries[0]!.legalRef.source).toBe('Recherche');
     expect(entries[1]!.legalRef.source).toBe('Leitplanken');
-    const src = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-    expect(src('api.ts')).toContain("'R-LINK-01'");
-    expect(src('state.ts')).toContain("'R-LINK-02'");
-    const trace = readFileSync(new URL('../../../../docs/legal-trace.md', import.meta.url), 'utf8');
-    expect(trace.split('\n').filter((line) => line.startsWith('| R-LINK-'))).toHaveLength(2);
+    // The literals in api.ts/state.ts and the two lines of docs/legal-trace.md are read from disk in
+    // apps/api/src/__tests__/link046.test.ts ("Test 16"): the domain package may not import node:fs (arch gate).
     expect(QUESTION_RELATIONS).toEqual(['follow_up', 'clarification']);
   });
 });
