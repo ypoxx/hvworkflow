@@ -7,6 +7,20 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 
 **Format:** eine Zeile je Punkt: Herkunft (Scheibe, Runde) · Datei:Zeile · Befund in einem Satz · Vorschlag.
 
+## Vor Rollout: Sicherheit und Leistung (eigene Takte, keine Kleinbefunde)
+
+Diese Punkte stehen hier nur, damit sie nicht verloren gehen. Sie sind **keine** Folgelisten-Nits und werden vor jedem Rollout
+in eine geteilte Umgebung als eigene Takte gebaut (Übergabe 06.10.2026).
+
+- **Takt-Kandidat (Sicherheit, vor Rollout): `listEvents` ohne Akteurschutz** · `apps/web/src/api/liveStore.ts:526` · `listEvents`
+  geht wie `getCockpit` vor dessen Fix direkt an den Adapter; eine vor Akteurwechsel oder `clear` angeforderte Ereignisseite kann
+  die neue Person erreichen (gleiches Muster wie Codex P1 auf #168) · über `guarded()` leiten; die Schleife in `history/lib.ts`
+  beachten (eine zurückgehaltene Seite darf die Schleife nicht hängen lassen). Eigener Takt.
+- **Zwischenspeicher des Leitstands (vor Rollout)** · W10 auf dem CI-Läufer 57,7 ms gegen das Ziel 50 ms · Eintrag im Abschnitt
+  „Leitstand (aus 061)“ (Lauf 37468958219).
+- **`source-map-js` 1.2.2 (vor Ablauf der Ausnahme)** · nach 2026-10-07T14:08Z anheben, Ausnahme 1241209 entfernen, bevor sie am
+  2026-10-14 abläuft · Eintrag „takt-051 Folge“ im Abschnitt „Skripte“.
+
 ## Oberfläche: Lade- und Schreibränder (Kandidat 010e)
 
 - 010d R1 Befund 5 · `features/history/Page.tsx` · Historie zeigt nach erstem Ladefehler „Kein Treffer“ / „Noch keine
@@ -69,8 +83,8 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
 - ~~054 F6 · `apps/web/e2e/054-fokusansicht.spec.ts` (in-process F6 „coordination: the notice, no rows“) · `waitForMine` lief nach 15 s
   in den Timeout (#159, Job 111855623850, Commit `7928053`, Artefakt des Laufs 37337216828)~~ → erledigt in **takt-049** (atomare Lesung; Ursache war die zeilenweise Lesung der Liste).
 - 010b Runde 4 (Lauf 37347756649, Job 111890560965, Commit `d17bcbf`, 05.10.2026) · `apps/web/e2e/010b-lesepfade.spec.ts:802` (Runde 4 B,
-  Bühne, Rollenwechsel bei „Nur Bühne“) · `page.evaluate: Resulting promise was garbage collected`, bisher einmalig · **in Arbeit als
-  takt-050** (nicht offen); `evaluate` nicht über Navigation oder Rollenwechsel hinweg offen halten.
+  Bühne, Rollenwechsel bei „Nur Bühne“) · `page.evaluate: Resulting promise was garbage collected`, bisher einmalig · → erledigt in
+  **takt-050** (#165 `924266a`); `evaluate` nicht über Navigation oder Rollenwechsel hinweg offen halten.
 - takt-050 Review (Sonnet, 05.10.2026) minor · `apps/web/e2e/support/app-modules.ts:74-81` (mit #165) · die Pollmeldung nennt immer
   „state 'loading' means the dynamic import never settled“, auch bei Zustand `failed: …` · neutral formulieren oder bei `failed` früh
   mit dem Fehlertext abbrechen.
@@ -78,6 +92,9 @@ Sicherheit, Recht oder Datenschutz gehören **nicht** hierher, sie werden in der
   einen neuen Import (impliziter Neuversuch über Aufrufe) · einen Satz Kommentar oder `failed` festhalten.
 - takt-050 Review nit · `apps/web/e2e/010b-lesepfade.spec.ts:809` (R4A) · der Poll auf `expect.any(Number)` zeigt ein `failed: …` nur als
   Zeitüberschreitung (der empfangene Wert steht in der Meldung).
+- Doku 06.10.2026 · Job `e2e-http` (`scripts/e2e-http-031.mjs`, `.github/workflows/`) · mit 060 und 061 liegt die Laufzeit bei
+  7:24–7:35, also über der Warnschwelle 6:30 und unter der Grenze 12:00 · die Entscheidung „Job teilen“ aus takt-046 ist fällig;
+  eigener Takt vor der nächsten Scheibe mit neuer `e2e-http`-Datei.
 
 
 ## Dienst: Anmeldung (vor oder mit 029)
@@ -865,6 +882,13 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   auf der alten Suche; Auswahl und Liste laufen auseinander · Liste mitführen oder Treffer markieren.
 - 046 Design-Kritik · `components/Dialog.tsx` · nur feste Größen; „Bezug setzen“ ist 512 px statt der spezifizierten 480 px ·
   bei der nächsten Dialog-Überarbeitung eine Größe ergänzen oder die Spec angleichen.
+- 046 Design-Nachprüfung (06.10.2026) minor P8 · `features/capture/FollowUpDialog.tsx:146` · die Bestätigungszeile erscheint erst
+  nach der Wahl, die Fußzeile springt um rund 35 px · Höhe reservieren.
+- 046 Design-Nachprüfung minor P8 · `features/history/ThreadBlock.tsx:45,50-56` · das Gerüst blinkt rund 130 px hoch bei Fragen
+  ohne Bezug und ohne Nachfragen (HTTP: eine Runde) · Gerüst erst nach 200 ms zeigen oder einzeilig.
+- 046 Spec, Hinweis an den Orchestrator · Aufbewahrungsklasse von `QuestionCaptured`/`QuestionLinked`: `working` im Code,
+  `record` in DSFA-Zeile V3 · **Frage an die DSB über den Eigentümer** (Übergabe 06.10.2026), kein Code-Befund; nach der Antwort
+  Code oder DSFA angleichen.
 
 ## Verwaltung (aus 041)
 
@@ -898,6 +922,34 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   stehen · Aktualisierung zum nächsten Ablaufzeitpunkt planen.
 - 041 Review nit 9 · Spec-Bericht 041, „Vor dem Bau prüfen“ 4 · die Aussage zu Konstanten mit SECRET/TOKEN/KEY/PASSWORD
   im Namen ist ungenau formuliert · auf die Konstanten dieser Scheibe beschränken und so benennen.
+- 041 Nachprüfung minor · `apps/web/src/api/liveStorePairing.test.ts` (Test 2) · bedingte Zusicherung (`if version === 1 … else`) ·
+  deterministisches Szenario.
+- 041 Nachprüfung minor · `apps/web/e2e/041-verwaltung.spec.ts` · der Skip bei `E2E_HTTP=1` hat keinen Skripttest · Test ergänzen.
+- 041 Design-Kritik (06.10.2026) D1/D7 · `i18n/admin.de.ts:139-140`, `admin.en.ts:138` · Ablehnungstexte zu R-ADM-07/08 ohne nächsten
+  Schritt, „Rechteverwaltung“ ist Jargon, EN unidiomatisch · nächsten Schritt nennen, Wortlaut glätten.
+- 041 Design-Kritik D1 · `admin.de.ts:111,137` · der Text zu R-ADM-02 ist für alle Listen gleich und nennt den TOP auch beim
+  Fachbereich; Dialogtitel „Eintrag entfernen“ generisch · Text und Titel je Liste.
+- 041 Design-Kritik D7/D1 · `AssignDialog.tsx:305`, `shell.de.ts:182`, `shell.en.ts:184` · drei Bezeichnungen für „Zuordnen“; DE- und
+  EN-Dialogtitel unterscheiden sich · eine Bezeichnung.
+- 041 Design-Kritik D7 · `admin.de.ts:20,49-50,112,115-116` · „der Dienst“ als Fachwort in Texten; der gesperrte Zustand nennt keine
+  Handlung · Alltagssprache, Handlung nennen.
+- 041 Design-Kritik D6 · `MasterDataTab.tsx:101` · fehlender Kurzname „keine Angabe“ sieht aus wie ein echter Wert · als Leerwert
+  kennzeichnen.
+- 041 Design-Kritik D6 · `AssignDialog.tsx:402`, `parts.tsx:183` · eine ungültige Uhrzeit tauscht nur den Hinweistext · Fehlerzustand
+  am Feld.
+- 041 Design-Kritik D2 · `RemoveDialog.tsx:35-44`, `RevokeDialog.tsx:95` · der rote Primärknopf bleibt nach einer Ablehnung aktiv ·
+  nach Ablehnung sperren oder auf „Schließen“ umstellen.
+- 041 Design-Kritik D4 · `AdminLayout.tsx:38`, `MeetingsTab.tsx:222`, `MasterDataTab.tsx:52-53` · Akzentblau als Statusfarbe ·
+  Statustöne des Bauteilsatzes.
+- 041 Design-Kritik D3/Kontrast · `parts.tsx:177,183,205`, `RolesTab.tsx:169` · 11 px unter der Skala; `.hv-label` in ink-500 hat
+  etwa 3,9:1 für Formularlabels · Skala und Ton anheben.
+- 041 Design-Kritik D5 · `RolesTab.tsx:178-184`, `MeetingsTab.tsx:220` · Zeiten in Mono, aber linksbündig · rechtsbündig.
+- 041 Design-Kritik D8 · `RoleCardsTab.tsx:64` · `aria-live` auf der ganzen Rollenkarte · nur auf die Änderungsmeldung.
+- 041 Design-Kritik nits · `cx` mischt Klassen nicht (`MasterDataTab.tsx:103`, `parts.tsx:296`); rohe Rechte-ids in den Rollenkarten
+  (`RoleCardsTab.tsx:48`); EN-Titel des gesperrten Zustands (`admin.en.ts:17`); gestrichelte Leerbox als gesperrter Zustand;
+  Screenshots fehlen für mehrere Zustände · im Sammelgang.
+- takt-041 Review nit · `docs/slices/takt-041-hono-sicherheitspatch.md` · die Spec sagt „Patch-/Minor“, gemeint und gebaut ist nur
+  Patch · Wortlaut berichtigen.
 
 ## Leitstand (aus 061)
 
@@ -913,7 +965,7 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
 - 061 Teil B Bau · `packages/domain/src/seed.ts` (Uhr des Seeds, `Math.min(clock, o.now)`) · der Demo-Seed staucht fast alle
   Ereignisse auf den Seed-Zeitpunkt: im Leitstand steht der Zulauf als eine Säule, alle Uhrzeiten eines Fadens sind gleich, die
   „Danach die ältesten“ springen von 74 auf 22 min · Seed über den Nachmittag verteilen (eigener Takt; Golden von 061 und 033b
-  neu, weil `/metrics` den Seed liest).
+  neu, weil `/metrics` den Seed liest). → als **takt-052** in PR #173 (Seed-Zeiten über 90 min verteilt), noch offen.
 - 061 Teil B Review R8 · `features/cockpit/Page.tsx` (`useCockpit`, `useApiVersion`) · ein Wechsel der Person startet den Feed neu
   (eine Lesung) und zählt zugleich `useApiVersion` hoch (zweite Lesung) · die Versionszählung beim Personenwechsel im Leitstand
   übergehen oder den Feed die erste Lesung selbst auslösen lassen.
@@ -934,6 +986,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   ihre eigenen Ereignisse nach `now` (Uhr zurückgestellt) zählen im Leitstand nirgends, in `computeIndicators` aber weiter im
   Bestand („offen“, Rückstand je Fachbereich, älteste offene mit Alter 0); die Gleichheit K3 gilt nur ohne solche Ereignisse · in
   071 oder 086 entscheiden, ob `/metrics` dieselbe Zeitgrenze bekommt (Golden neu, eigener Commit).
+- 061 Teil A Nachprüfung (06.10.2026) minor · `docs/slices/061-leitstand.md:641-642` (K8) · der Wortlaut „Ereignis nach asOf zählt
+  nirgends“ ist weiter als der Vertrag (nur eigene Frage-Ereignisse und Erfassungen nach `asOf`) · an den Vertrag angleichen.
+- 061 Teil A Nachprüfung minor · `packages/domain/src/cockpit.ts:83` · Ereignisse der Versammlungsebene nach `asOf` zählen
+  (`meetingStatus`, `debateClosedAt`, Fachbereichsliste bei zurückgestellter Uhr) · zusammen mit `/metrics` in 071 oder 086 entscheiden.
+- 061 Teil B Design-Nachprüfung nit · `features/cockpit/Page.tsx` (`useCockpit`) · die Einrückung von `startCockpitFeed` ist
+  verrutscht · kosmetisch, beim nächsten Anfassen.
 - 061 Review Nit 7 · `indicators.ts` (`NOT_OPEN_STATUSES`), `state.ts` (`refreshCounts`, Liste inline), `types.ts`
   (`CockpitOpenStatus`) · drei Definitionen von „offen“ · später eine Konsistenzprüfung (Test, der alle drei gegeneinander hält)
   oder eine gemeinsame Quelle.
@@ -965,6 +1023,19 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   übersprungen (verbirgt keinen Eintrag) · als unbekannte Zeile melden.
 - takt-051 Folge · `pnpm-lock.yaml`, `scripts/audit-exceptions.json` · nach 2026-10-07T14:08Z `source-map-js` auf 1.2.2 anheben (ohne `minimumReleaseAgeExclude`) und Ausnahme 1241209 entfernen; Ausnahme läuft 2026-10-14 ab.
 
+
+## Seed-Zeiten (aus takt-052, PR #173 offen)
+
+Gelten erst nach dem Merge von PR #173; bis dahin stehen die Zeilen nicht im Integrationszweig.
+
+- takt-052 Review (06.10.2026) minor · `packages/domain/src/seed.ts:671` (`place`) · Ereignisse vor der ersten Rede werden nicht auf
+  `now − SEED_SPREAD_MS` gekappt; mit großen `roundSizes` (etwa `[400,400,300,100]`) ändert der stabile Sort die Reihenfolge ·
+  `min(raw, now − SEED_SPREAD_MS)` oder Assert; heute nicht erreichbar (der Vertrag nimmt keine `roundSizes`).
+- takt-052 Review minor · `packages/domain/src/__tests__/seed.test.ts:70` · der Test „ordered“ kann nicht scheitern (der Seed sortiert am
+  Ende); die Reihenfolge schützt nur der Fingerabdruck · Test: F-Nummern steigen mit der Logposition, je Subjekt Erzeugungsreihenfolge.
+- takt-052 Review minor · `seed-fictitious-names.test.ts:57` · die Maske verdeckt alle `at`, auch die unveränderten Vor-Rede-Zeiten ·
+  Test für `now − 6,5 h + raw` oder nur Ereignisse nach der ersten Rede maskieren.
+- takt-052 Review nits · `seed.ts:623/637` Platzhalter-`createdAt`; T5 ohne `roundSizes: []` · im Sammelgang.
 
 ## Entwurfspuffer und Fassungsvergleich (aus 060 Bau)
 
@@ -1004,11 +1075,12 @@ und Timeouts). Der Datenschutzbefund `claim.personId` (028) ist in **takt-027** 
   ebenso bleibenden Zustand `unavailable`.
 - ~~060 Re-Check · `apps/web/src/api/draftBuffer.ts` `startedIn === epoch ? await store.getAll() : []` · der zweite Zweig ist tot
   (die Epoche kann sich vor dem Aufruf nicht ändern) · entfernen.~~ Erledigt mit der Behebung von Codex P2 (#170).
-- 060 Bau (CI-Läufe 37460605618, 37463402183) · **Demo verliert eine gespeicherte Antwortversion bei Neuladen innerhalb von
+- ~~060 Bau (CI-Läufe 37460605618, 37463402183) · **Demo verliert eine gespeicherte Antwortversion bei Neuladen innerhalb von
   150 ms** · `apps/web/src/api/index.ts` `saveLog` schreibt das Ereignislog entprellt (150 ms) in localStorage; ein Neuladen oder
   Schließen in diesem Fenster verliert jedes Ereignis seitdem (nachgestellt: `draftAnswer`, sofort `location.reload()` → Version fehlt).
   Vor 060 vorhanden, nur Demo (HTTP speichert im Dienst). E1 wartet seit 060 auf das Log · Log bei `pagehide` sofort schreiben (oder
-  Schreiben nicht entprellen); Entscheidung an den Orchestrator, `index.ts` liegt dafür außerhalb der Dateien von 060.
+  Schreiben nicht entprellen); Entscheidung an den Orchestrator, `index.ts` liegt dafür außerhalb der Dateien von 060.~~
+  → erledigt in **takt-053** (#171 `84fbfe3`: das Demo-Protokoll wird beim Verlassen sofort geschrieben).
 
 - takt-054 Bau (06.10.2026, zu prüfen) · `features/capture/ContributionPane.tsx:390` · bei einer Wortmeldung ohne Redebeitrag
   ersetzt das Gerüst das offene Eingabeformular bei jedem Neuladen von listContributions (Versionssprung, z. B. durch SSE),
