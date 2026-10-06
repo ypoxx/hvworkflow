@@ -55,10 +55,10 @@ die Takt-Spur (Plan 5.9); jeder bekommt beim Bau seine Mini-Spec `docs/slices/ta
 
 | Nr. | Vorschlag | Begründung | Status | Ort | Aufwand |
 |---|---|---|---|---|---|
-| Z10 | Eine große Zahl: älteste unbeantwortete Frage mit Station und Einheit, darunter die drei nächstältesten | Recherche Z.247 | plan | 061 | — |
-| Z11 | Prognosen aus dem Tempo: „im Legal Clearing abgebaut ca. 16:05 bei 9 Freigaben je 15 min", „nächste Antwortrunde voll ca. 16:02" | Recherche Z.27 | neu | 061 | 0,25 |
-| Z12 | Flussbild: ein Punkt je Einzelfrage in ihrer Station, Alter als Farbe und Form, Tempo je Station („+14 in 15 min"), Kennzeichen „Engpass", Tabelle mit denselben Zahlen. Die Stationen kommen im Produkt aus Status und Projektion (README, „Nicht übernehmen") | #11, #25 | neu | 061 | 1 |
-| Z13 | Faden je Frage: Stationen mit Uhrzeit, aktuelle Station mit Verweildauer, Absprung in die Fokusansicht | Recherche Z.21 (Nachweisführung) | neu | 061 (Drill-down) | 0,5 |
+| Z10 | Eine große Zahl: älteste unbeantwortete Frage mit Station und Einheit, darunter die drei nächstältesten | Recherche Z.247 | ist (061) | 061 | — |
+| Z11 | Prognosen aus dem Tempo: „im Legal Clearing abgebaut ca. 16:05 bei 9 Freigaben je 15 min", „nächste Antwortrunde voll ca. 16:02" | Recherche Z.27 | neu | 061b | 0,25 |
+| Z12 | Flussbild: ein Punkt je Einzelfrage in ihrer Station, Alter als Farbe und Form, Tempo je Station („+14 in 15 min"), Kennzeichen „Engpass", Tabelle mit denselben Zahlen. Die Stationen kommen im Produkt aus Status und Projektion (README, „Nicht übernehmen") | #11, #25 | neu | 061b | 1 |
+| Z13 | Faden je Frage: Stationen mit Uhrzeit, aktuelle Station mit Verweildauer, Absprung in die Fokusansicht | Recherche Z.21 (Nachweisführung) | ist teilweise (061) | 061 (Drill-down) | 0,5 |
 | Z14 | Rednerwand mit Abschluss-Check: Wortmeldungen mit offenen Fragen zuerst, vollständige in einer Zeile eingeklappt, aufgeklappt jede Antwort mit Uhrzeit und Vorstandsmitglied | Recherche Z.78 | plan (Ansicht neu) | 087 | 0,5 |
 | Z15 | Widerspruch zur Niederschrift als eigener Kanal über dem Lagebild, „An Notar übergeben" mit Empfangsvermerk | Recherche Z.74 | plan | 050, 085 | — |
 
