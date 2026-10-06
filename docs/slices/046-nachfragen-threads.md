@@ -1055,3 +1055,29 @@ Entscheidungen des Orchestrators eingearbeitet im Folgecommit; je Befund:
 | N2 | minor | Regel (e) mit `version === 1` zu schwach | Regel (e): unmittelbar zuvor reduziertes Ereignis ist das `QuestionCaptured` derselben Frage; Test 6e3; Mutationsprobe 2 |
 | N3 | minor | Rücknahme: geschlossenes Leseschema und Bindung fehlen | Vertragsschritt, Absatz „Rücknahme nach dem Merge“ mit ADR-0015-Behandlung |
 | N4 | minor | Lesbarkeit der Bezugsfrage im Wiederholungspfad | Entscheidung 5: Prüfung in `source` = `historical` |
+
+### Design-Kritik und Review (frischer Kontext, 06.10.2026, zu PR #169 `153b056`): Design 2 blocker, 2 major, 2 minor; Review ohne blocker/major
+
+Umgesetzt in `8aa7e41` (Tests zuerst: 14 neue bzw. verschärfte Einheitstests rot, danach grün). `pnpm gates` mit
+Postgres-Variablen (Datenbank hv_test_s046) auf dem sauberen Commit `8aa7e41`, exit 0; domain 526, web 858, api 701;
+Schluss: `✓ built in 1.65s` · `mark-test-run: wrote … (clean tree) at commit 8aa7e41, tree 268f79420abd…`.
+e2e `046-nachfragen.spec.ts` in-process mit `--repeat-each=3`: 6 passed.
+
+| Nr. | Klasse | Befund (kurz) | Umsetzung |
+|---|---|---|---|
+| D8 | blocker | aktiver Treffer unsichtbar (`bg-ink-25`) | Hausmuster: `bg-accent-50` und linke Akzentleiste `border-l-accent-600`, übrige Zeilen mit Hover; aktiver Treffer scrollt in Sicht; Trefferliste per Tastatur scrollbar (axe `scrollable-region-focusable`) |
+| D6 | blocker | Block auf Elternseite bei Laden/Fehler leer (Fehlerbild 8) | Block entfällt nur bei geladenen null Kindern; Laden: Skeleton fester Höhe, Fehler: Grund und „Erneut versuchen“; Skeleton `bg-ink-200` (auch im Dialog) |
+| D1 | major | Treffer nicht unterscheidbar, Wahl unumkehrbar | zweizeilige Treffer (Wortlaut; Nummer · Redner · Uhrzeit in 12 px, Nummer und Zeit Mono); Bestätigungszeile „Gewählt: F-… · …“ über dem Fuß |
+| D7 | major | Begriff Schaltfläche vs. Chip/Karte (en) | en „Follow-up question to …“ wie Chip und Karte und Glossar |
+| D-m5 | minor | Badge wächst beim Laden der Nummer | Platzhalter `F-` plus vier Ziffernleerzeichen, `aria-busy` |
+| D-m6 | minor | Nachweis Kindseite fehlt; Chip-Screenshot irreführend | `046-historie-bezug-{de,en}.png` (Bezugsfrage mit „bezieht sich auf die vorgelesene Antwortversion 1“); `046-erfassung-*` zeigt den Chip allein vor der Erfassung; die e2e wählt per Pfeil den ersten vorgelesenen Treffer; Zeilenlayout des Blocks (abgeschnittenes Badge) behoben |
+| R7 | review | Alt+B über anderen Dialogen | ignoriert, wenn ein Dialog offen ist oder das Ziel in `[role=dialog]` liegt (Einheitstest, e2e E3 mit Vorschlagsdialog) |
+| R8 | review | Bezug nach Erfolg auch gelöscht, wenn inzwischen neu gesetzt | gelöscht nur, wenn noch derselbe gesendete Bezug (Einheitstest) |
+| R9 | review | Tastenkürzel nicht ausgezeichnet | `aria-keyshortcuts="Alt+B"` |
+| R10 | review | zweites Enter unerreichbar | Enter wählt, das nächste Enter setzt den Bezug (e2e E3) |
+
+Nicht umgesetzt, in `docs/folgeliste.md` Abschnitt „Nachfragen-Threads (aus 046)“: Einengung von `ReadEvent`; Kopie des
+Merkfelds in `snapshotBefore` als angenommene Scope-Abweichung; `RELATIONS` doppelt zu `QUESTION_RELATIONS`; Fehlertexte
+ohne Grund; 11-px-Beschriftungen und Zahl „(n)“ nicht Mono; Chip accent gegen Badge neutral; linke Liste nach Öffnen aus dem
+Block nicht nachgeführt; Dialogbreite 512 statt 480 px. Vertragsversion bleibt 0.4.5 (Umstellung auf 0.4.6 nach dem Merge
+von 061 Teil A, auf Ansage des Orchestrators).
