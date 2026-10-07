@@ -64,6 +64,35 @@ if (!isAbsolute(httpBuildDir) || dirname(resolve(httpBuildDir)) === '/') {
 if (httpBuildDir.includes("'")) throw new Error('E2E_HTTP_STATE_DIR must not contain a single quote.');
 const httpOutput = stateDir ? { outputDir: `${stateDir}/test-results` } : {};
 
+/**
+ * Takt-059: `E2E_DEMO_BUILD=1` is a third way to run the suite, on its own: the demo mode as `vite build` output behind
+ * `vite preview`, never the dev server (which injects inline scripts and would hide what a CSP blocks), with the single
+ * project `demo-build`. Its file attaches the CSP from `netlify.toml` to every document response; `vite preview` sends none.
+ * Without the variable nothing changes. `E2E_DEMO_BUILD_DIR` names a directory (by default per run below `node_modules`);
+ * the build always goes into its fixed leaf `web-build`, as the HTTP build does, so `--emptyOutDir` never empties the named
+ * directory itself (review of takt-059, finding 6). The directory reaches the test workers through the environment, because
+ * they load this file again under another process id.
+ */
+const demoBuildEnabled = process.env['E2E_DEMO_BUILD'] === '1';
+if (demoBuildEnabled && httpEnabled) throw new Error('E2E_DEMO_BUILD and E2E_HTTP exclude each other.');
+const demoBuildPort = Number(process.env['E2E_DEMO_BUILD_PORT'] ?? 4175);
+const DEMO_BUILD_SPEC = 'takt-059-demo-csp.spec.ts';
+if (demoBuildEnabled) {
+  // A blank value counts as absent, as for E2E_HTTP_STATE_DIR.
+  process.env['E2E_DEMO_BUILD_DIR'] = process.env['E2E_DEMO_BUILD_DIR']?.trim() ||
+    join(import.meta.dirname, `node_modules/.e2e-demo-build-${process.pid}`);
+}
+const demoBuildDir = `${process.env['E2E_DEMO_BUILD_DIR'] ?? ''}/web-build`;
+// The guards of the HTTP build: the path goes into a shell command inside single quotes, and `--emptyOutDir` wipes it.
+if (demoBuildEnabled && (!isAbsolute(demoBuildDir) || dirname(resolve(demoBuildDir)) === '/' || demoBuildDir.includes("'"))) {
+  throw new Error('E2E_DEMO_BUILD_DIR must be an absolute path below the root directory, without a single quote.');
+}
+const demoBuildProjects: NonNullable<PlaywrightTestConfig['projects']> = [{
+  name: 'demo-build',
+  testMatch: DEMO_BUILD_SPEC,
+  use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${demoBuildPort}` },
+}];
+
 const httpUse = {
   ...devices['Desktop Chrome'],
   baseURL: `http://localhost:${httpPort}`,
@@ -92,7 +121,8 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   // The HTML report shows `fill` values, i.e. the passwords typed in the HTTP project: only the list reporter then.
-  reporter: httpEnabled ? [['list']] : [['list'], ['html', { open: 'never' }]],
+  // Takt-059: the demo build too, so that its CI step after the in-process run does not replace that run's HTML report.
+  reporter: httpEnabled || demoBuildEnabled ? [['list']] : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://localhost:${port}`,
     trace: 'retain-on-failure',
@@ -102,7 +132,17 @@ export default defineConfig({
     ...launch,
   },
   // The demo server exists only without the HTTP run: `in-process` does not run with `E2E_HTTP=1` (slice 031a review).
-  webServer: httpEnabled
+  webServer: demoBuildEnabled
+    ? [{
+        // `HV_WEB_MODE` set explicitly: an outer `http` must not leak into the demo build.
+        command: `pnpm exec vite build --outDir '${demoBuildDir}' --emptyOutDir && ` +
+          `pnpm exec vite preview --outDir '${demoBuildDir}' --port ${demoBuildPort} --strictPort`,
+        url: `http://localhost:${demoBuildPort}`,
+        reuseExistingServer: false,
+        timeout: 120_000,
+        env: { HV_WEB_MODE: 'demo' },
+      }]
+    : httpEnabled
     ? [{
         // Single quotes keep a path with spaces in one piece; a quote in the path is not expected (private temp directory).
         command: `pnpm exec vite build --outDir '${httpBuildDir}' --emptyOutDir && ` +
@@ -118,10 +158,10 @@ export default defineConfig({
         reuseExistingServer: true,
         timeout: 120_000,
       }],
-  projects: [
+  projects: demoBuildEnabled ? demoBuildProjects : [
     {
       name: 'in-process',
-      testIgnore: [...HTTP_SPECS.map((name) => `**/${name}`), `**/${HTTP_SETUP}`],
+      testIgnore: [...HTTP_SPECS.map((name) => `**/${name}`), `**/${HTTP_SETUP}`, `**/${DEMO_BUILD_SPEC}`],
       use: { ...devices['Desktop Chrome'] },
     },
     ...httpProjects,

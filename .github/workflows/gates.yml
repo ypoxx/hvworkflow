@@ -157,6 +157,13 @@ jobs:
       - name: End-to-end acceptance scenario
         if: steps.docsfilter.outputs.code == 'true'
         run: pnpm --filter @hv/web e2e
+      # Takt-059: the demo as built for Netlify, behind `vite preview`, under the CSP read from netlify.toml (BF-06, BF-25).
+      - name: End-to-end demo build under the Netlify CSP
+        if: steps.docsfilter.outputs.code == 'true'
+        timeout-minutes: 5
+        env:
+          E2E_DEMO_BUILD: '1'
+        run: pnpm --filter @hv/web exec playwright test --project=demo-build
       # Slice 031a: pinned to the full hash like the catalogue upload above (was `@v4`).
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

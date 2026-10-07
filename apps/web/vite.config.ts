@@ -22,5 +22,7 @@ export default defineConfig({
     } : {}),
   },
   preview: { port: 4173, strictPort: true },
-  build: { sourcemap: true },
+  // Takt-059 (BF-25): the demo is public and static, so its build ships no source maps; the HTTP mode keeps them as before
+  // (nginx refuses `.map` there).
+  build: { sourcemap: webMode === 'http' },
 });
