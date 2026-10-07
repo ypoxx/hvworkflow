@@ -277,6 +277,9 @@ test.describe('takt-059 CSP of the demo build', () => {
     for (const name of ['frame-ancestors', 'base-uri', 'form-action', 'object-src']) expect(directives.get(name), name).toEqual(["'none'"]);
     expect(directives.get('script-src'), 'script-src').toEqual(["'self'"]);
     expect(directives.get('style-src'), 'style-src').toEqual(["'self'"]);
+    // Re-check minor 1: the reasoning for the one relaxation rests on these (`url()` in a style attribute stays blocked by
+    // `img-src`/`font-src`, every other fetch by `default-src`), so deleting or widening one of them must fail here too.
+    for (const name of ['default-src', 'img-src', 'font-src', 'connect-src']) expect(directives.get(name), name).toEqual(["'self'"]);
 
     const { violations, errors } = await watch(page);
     await page.goto('/speakers');
