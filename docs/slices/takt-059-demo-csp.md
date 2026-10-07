@@ -205,3 +205,24 @@ Open: Nachprüfung des Blockers in frischem Kontext steht aus. Kandidaten für d
 Touched (2287433): netlify.toml, apps/web/playwright.config.ts, apps/web/e2e/takt-059-demo-csp.spec.ts,
       docs/evidence/takt-059-demo-csp.png, docs/slices/takt-059-demo-csp.md
 ```
+
+### Nachtrag: Nachprüfung (frischer Kontext) zu 85594d5
+
+Blocker bestätigt behoben; Lockerung `style-src-attr 'unsafe-inline'` eng (zehn `url()`-Vektoren in Stil-Attributen gegen einen
+fremden Ursprung: alle von `img-src` verweigert, null Anfragen; `<style>` und `<link href=data:>` bleiben gesperrt; keine
+HTML-Senke). Minor 1 sofort behoben statt Folgeliste (Sicherheitsabsicherung): D2 pinnt zusätzlich `default-src`, `img-src`,
+`font-src`, `connect-src` auf `'self'`, weil die Begründung der Lockerung auf ihnen ruht. Rot belegt: ohne `default-src` in
+`netlify.toml` scheitert D2 mit `Error: default-src`; mit ihm grün. Nit: Browser ohne `style-src-attr` (etwa Safari < 15.4,
+Firefox < 108) fallen auf `style-src 'self'` zurück und malen die Hervorhebung nicht; schließt sicher, keine Sicherheitsfolge.
+Nit: ein vorab gelegter Symlink unter `<dir>/web-build` würde geleert (wie beim HTTP-Build); Standardpfad ist je Lauf frisch.
+
+```
+pnpm gates auf bd7c2e3 (Exit 0):
+packages/domain test:       Tests  562 passed (562)
+apps/web test:       Tests  1162 passed (1162)
+apps/api test:       Tests  710 passed (710)
+slice-scope: 7 changed file(s), all within "docs/slices/takt-059-demo-csp.md"'s "Files allowed" list (7 pattern(s)).
+✓ built in 1.24s
+mark-test-run: wrote /home/user/wt/takt059/.claude/state/last-test-run (clean tree) at commit bd7c2e3, tree 8253f7ef2f0d…
+demo-build auf bd7c2e3: 3 passed (12.8s)
+```
